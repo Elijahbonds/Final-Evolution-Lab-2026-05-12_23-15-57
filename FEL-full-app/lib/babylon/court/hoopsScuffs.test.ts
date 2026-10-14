@@ -49,16 +49,21 @@ describe('a landing', () => {
 describe('spacing and teleports', () => {
   it('one mark per cooldown per body', () => {
     const legs: [number, number, number][] = [];
-    for (let i = 0; i < 8; i++) { legs.push([0.3, 0, 6], [0.15, 0, 0]); }   // eight stop-and-gos in 3.6 s
+    for (let i = 0; i < 12; i++) { legs.push([0.2, 0, 6], [0.2, 0, 0]); }   // twelve stop-and-gos in 4.8 s, each faster than the cooldown
     const r = drive(new ScuffTracker(), legs);
-    for (let i = 1; i < r.length; i++) expect(r[i].at - r[i - 1].at).toBeGreaterThanOrEqual(SCUFF_COOLDOWN_S - 0.02);
+    expect(SCUFF_COOLDOWN_S).toBeGreaterThanOrEqual(0.4);   // and below, a literal 0.4: the test must not move with the constant it checks
+    expect(r.length).toBeGreaterThanOrEqual(3);   // not vacuous: he is planting, the cooldown is what thins it
+    expect(r.length).toBeLessThanOrEqual(Math.ceil(4.8 / 0.4));
+    for (let i = 1; i < r.length; i++) expect(r[i].at - r[i - 1].at).toBeGreaterThanOrEqual(0.4 - 0.02);
   });
   it('a possession reset (a teleport) is not a stop', () => {
+    const JUMP = 12;   // a literal, not TELEPORT_M: the test must not move with the constant it checks
+    expect(TELEPORT_M).toBeLessThan(JUMP);
     const t = new ScuffTracker();
     let x = 0; t.step(DT, 0, 0, 0);
     for (let i = 0; i < 40; i++) { x += 6 * DT; t.step(DT, x, 0, 0); }
-    expect(t.step(DT, x + TELEPORT_M + 3, 0, 8)).toEqual([]);
-    for (let i = 0; i < 40; i++) expect(t.step(DT, x + TELEPORT_M + 3, 0, 8)).toEqual([]);
+    expect(t.step(DT, x + JUMP, 0, 8)).toEqual([]);
+    for (let i = 0; i < 60; i++) expect(t.step(DT, x + JUMP, 0, 8)).toEqual([]);
   });
   it('a zero step lays nothing and breaks nothing', () => { const t = new ScuffTracker(); expect(t.step(0, 1, 0, 1)).toEqual([]); expect(t.step(DT, 1, 0, 1)).toEqual([]); });
 });

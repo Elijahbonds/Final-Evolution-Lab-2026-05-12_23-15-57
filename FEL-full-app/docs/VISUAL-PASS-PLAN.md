@@ -769,7 +769,7 @@ per mode. The glossy floor does not mount on onevone / threevthree / carnival: t
   game runs down (the better of the score and, in 3v3, the clock), eased over 4 s, and the lamps' lights and the glow come up 2.2× / 1.3×.
   Not moved: the sun's DIRECTION (the shadow cache drew the static scenery's shadows once from it), the exposure and the grade (one
   owner), the photographic backdrop. Still under reduced motion.
-- **3v3 — the Streetball Arena** (`court/streetballDressing`). A chain-link cage down both sidelines and behind the basket (the near end
+- **3v3 — the Streetball Arena** (`court/streetballDressing`). A chain-link cage (real bars) down both sidelines and behind the basket (the near end
   is open: the 'team' camera stands 18 m back and as far as 29 m), four lamp poles at its corners whose heads are `lhead_stb_*`
   (glow halo + a clustered light each on desktop), two graffiti walls outside the cage (never behind the rim: what stands behind the thing
   you aim at is kept quiet), two benches with a boombox and a duffel, and a flat team ring under every body but the hero's (cyan under
@@ -783,9 +783,10 @@ per mode. The glossy floor does not mount on onevone / threevthree / carnival: t
   with the hub and hidden while an event runs (an event paints its own floor; the dojo is a room).
 - **Findings worth the next lane's time.** (1) A BLENDED panel is an opaque wall to the SSAO's geometry buffer (it renders depth and
   normals with its own shader, which knows alpha tests and not blends): the cage's back panel, alpha 0.4 over a lit lawn, darkened
-  everything seen through it to near black. Alpha-TEST a lattice (a `RawTexture` with one RGB grey everywhere and the wire in the alpha:
-  a painted canvas stores premultiplied RGBA, so a transparent texel's RGB is black and every mip of a canvas lattice goes dark), and
-  dissolve it by raising `alphaCutOff`. (2) `DynamicTexture.clone()` makes a BLANK canvas: the copy is never painted and never ready.
+  everything seen through it to near black, and a lattice made an ALPHA-TESTED panel (`transparencyMode` ALPHATEST on a `RawTexture`,
+  every check in the page right: tested, cut-off set, texture ready) still drew as a solid wall on the rig. The chain-link is REAL BARS
+  now (`latticeSegments`: one thin-instanced draw a panel, 160 bars each), which has neither problem. A painted canvas lattice is its
+  own trap: a canvas stores premultiplied RGBA, so a transparent texel's RGB is lost (black) and every mip of the lattice goes dark. (2) `DynamicTexture.clone()` makes a BLANK canvas: the copy is never painted and never ready.
   (3) Babylon multiplies the lit colour, emissive included, by the diffuse texture's RGB, so a texture's transparent texels (black) darken
   an emissive material: keep the colour in the material and the shape in the alpha. (4) The harness's 20 s load watchdog, on a machine at
   load 20, retries into a DOUBLED scene (two heroes, two foes, 22 skinned bodies): a capture with `Load timed out` in its log is not a

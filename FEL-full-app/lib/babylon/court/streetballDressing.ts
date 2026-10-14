@@ -163,6 +163,9 @@ export function mountStreetball(scene: Scene, o: StreetballOpts): StreetballHand
   // ── the wire: real bars, one thin-instanced draw a panel, hidden when the camera is a hand from it ──────────────────
   const wireM = new StandardMaterial('court_cage_link_m', scene);
   wireM.diffuseColor = new Color3(0.78, 0.82, 0.88); wireM.specularColor = new Color3(0.25, 0.25, 0.25); wireM.emissiveColor = new Color3(0.2, 0.22, 0.25); mats.push(wireM);
+  // behind the rim the wire is kept quiet (what stands behind the thing you aim at must not compete with the rim): the same lattice, a third as bright
+  const wireQuiet = new StandardMaterial('court_cage_link_quiet_m', scene);
+  wireQuiet.diffuseColor = new Color3(0.36, 0.38, 0.42); wireQuiet.specularColor = Color3.Black(); wireQuiet.emissiveColor = new Color3(0.06, 0.065, 0.075); mats.push(wireQuiet);
   const panels: { mesh: Mesh; shown: boolean; x: number; z: number; alongX: boolean; lo: number; hi: number }[] = [];
   const q = new Quaternion(), sc = new Vector3(), tr = new Vector3(), m4 = new Matrix();
   for (const pn of o.tier === 'mobile' ? [] : plan.panels) {   // a phone draws the frame alone: a 30 cm lattice is under a pixel at 390 px wide
@@ -180,7 +183,7 @@ export function mountStreetball(scene: Scene, o: StreetballOpts): StreetballHand
     mesh.thinInstanceRefreshBoundingInfo(true);
     mesh.position.set((pn.x0 + pn.x1) / 2, 0.02, (pn.z0 + pn.z1) / 2);
     if (!alongX) mesh.rotation.y = Math.PI / 2;
-    mesh.material = wireM; dress(mesh);
+    mesh.material = pn.id === 'B' ? wireQuiet : wireM; dress(mesh);
     panels.push({ mesh, shown: true, x: mesh.position.x, z: mesh.position.z, alongX, lo: alongX ? pn.x0 : pn.z0, hi: alongX ? pn.x1 : pn.z1 });
   }
   obs.push(scene.onBeforeRenderObservable.add(() => {
@@ -282,7 +285,7 @@ export function mountStreetball(scene: Scene, o: StreetballOpts): StreetballHand
       mesh.thinInstanceBufferUpdated('matrix');
     };
     a.mesh.thinInstanceSetBuffer('matrix', buf.a, 16, false); b.mesh.thinInstanceSetBuffer('matrix', buf.b, 16, false);
-    ringsOf = () => { if (!(scene.metadata as { felCinematic?: number } | null)?.felCinematic) { fill(buf.a, a.mesh, teams.mine()); fill(buf.b, b.mesh, teams.theirs()); } };
+    ringsOf = () => { fill(buf.a, a.mesh, teams.mine()); fill(buf.b, b.mesh, teams.theirs()); };   // through a replay too: the bodies are the recording's then, and the rings follow them
     obs.push(scene.onBeforeRenderObservable.add(ringsOf));
   }
 

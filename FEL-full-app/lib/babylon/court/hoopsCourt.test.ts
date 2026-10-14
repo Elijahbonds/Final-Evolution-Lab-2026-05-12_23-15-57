@@ -78,6 +78,18 @@ describe('the replay at the dead ball', () => {
     expect(again).toBe(false);
     expect(f.calls.highlights.length).toBe(1);
   });
+  it('the mode\'s own reset is not a dead ball of its own: the pacing counts the possession once (replay at A, none at B or C, next at D)', async () => {
+    const { scene } = rig(); const f = fakeCtx(scene);
+    const b = mountHoopsBroadcast(f.ctx, { rim: RIM, final: () => false });
+    const possession = async (): Promise<number> => {
+      const before = f.calls.highlights.length;
+      f.ctx.momentum.report({ kind: 'posterize' });
+      // the mode's reset comes back through its own hook, as resetPositions() does
+      if (b.deadBall(() => { b.deadBall(() => undefined); })) await f.finishReplay();
+      return f.calls.highlights.length - before;
+    };
+    expect([await possession(), await possession(), await possession(), await possession()]).toEqual([1, 0, 0, 1]);
+  });
   it('NEVER for the final moment', () => {
     const { scene } = rig(); const f = fakeCtx(scene); let final = true;
     const b = mountHoopsBroadcast(f.ctx, { rim: RIM, final: () => final });
@@ -115,6 +127,13 @@ describe('the replay at the dead ball', () => {
     let resets = 0; b.deadBall(() => { resets++; });
     b.dispose(); await f.finishReplay();
     expect(resets).toBe(0);
+  });
+  it('the momentum bus listener can be removed, and only that one', () => {
+    const bus = new MomentumBus(); const seen: string[] = [];
+    const offA = bus.onReport((e) => seen.push(`a:${e.kind}`)); bus.onReport((e) => seen.push(`b:${e.kind}`));
+    bus.report({ kind: 'block' }); expect(offA()).toBe(true);
+    bus.report({ kind: 'steal' });
+    expect(seen).toEqual(['a:block', 'b:block', 'b:steal']);
   });
   it('stops listening to the bus on dispose', () => {
     const { scene } = rig(); const f = fakeCtx(scene);
@@ -167,8 +186,9 @@ describe('the scuffs reach the decal pool', () => {
 // ── the dusk ─────────────────────────────────────────────────────────────────────────────────────────
 describe('the dusk targets', () => {
   it('is exactly the rig\'s look until the game is a fifth gone, and complete at the end', () => {
-    const t0 = duskTarget(0), tS = duskTarget(DUSK_START), t1 = duskTarget(1);
+    const t0 = duskTarget(0), tS = duskTarget(0.2), t1 = duskTarget(1);   // literals: the test must not move with the constants it checks
     for (const t of [t0, tS]) expect([t.sunK, t.hemiK, t.sunMix, t.hemiMix, t.lampK, t.glowK, t.k]).toEqual([1, 1, 0, 0, 1, 1, 0]);
+    expect(DUSK_START).toBeCloseTo(0.2, 6); expect(duskTarget(0.15).k).toBe(0); expect(duskTarget(0.3).k).toBeGreaterThan(0);
     expect(t1.k).toBe(1); expect(t1.lampK).toBeCloseTo(LAMP_GAIN, 6); expect(t1.glowK).toBeCloseTo(GLOW_GAIN, 6);
     expect(t1.sunK).toBeLessThan(1); expect(t1.sunK).toBeGreaterThan(0.6);   // a notch deeper, not a night
     expect(t1.sunMix).toBeGreaterThan(0); expect(t1.sunMix).toBeLessThan(1);

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { CARVE_TINT, DECAL_KINDS, DECAL_SIZE, decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
+import { HELD_PROBE_MODE, holdProbeMode } from '../../../tests/helpers/heldMode';
 
 function rig(modeId = 'karate') {
   const engine = new NullEngine();
@@ -76,6 +77,9 @@ describe('the pool', () => {
     expect(a.scene.metadata.felDecals).toBeTruthy();
     h.dispose();
     expect(a.scene.metadata.felDecals).toBeUndefined();
-    expect(mountSceneDecals(rig('dunk').scene, 'desktop')).toBeNull();
+    const release = holdProbeMode();
+    try { expect(mountSceneDecals(rig(HELD_PROBE_MODE).scene, 'desktop')).toBeNull(); } finally { release(); }
+    const c = mountSceneDecals(rig('onevone').scene, 'desktop');   // vis-hoops-court lifted its hold: the court keeps its scuffs
+    expect(c).not.toBeNull(); c?.dispose();
   });
 });

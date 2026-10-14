@@ -424,7 +424,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     else if (w === 0 || S.players > 1) S.mic?.say({ moment: 'carnival.eventwin', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } });
     else S.mic?.say({ moment: 'carnival.eventloss', priority: 2, crowd: { moment: 'crowd.groan', n: 1 } });
     const [n1, n2] = names(S);
-    S.fx?.eventResult(w); S.fx?.board({ title: 'STANDINGS', rows: nightBoard(S.tally, names(S)), footer: w === -1 ? 'TIE' : `${names(S)[w]} TAKES ${S.current.title}` });   // vis-hoops-court: a volley (and, in the dark, fireworks) when the player takes it; the sign shows the board
+    S.fx?.eventResult(w); S.fx?.board({ title: 'STANDINGS', rows: nightBoard(S.tally, names(S)), footer: w === -1 ? 'TIE' : `${names(S)[w]} ${names(S)[w] === 'YOU' ? 'TAKE' : 'TAKES'} ${S.current.title}` });   // vis-hoops-court: a volley (and, in the dark, fireworks) when the player takes it; the sign shows the board
     hud(ctx, S, {
       banner: `${S.current.title}: ${n1} ${a} · ${n2} ${b}`,
       blurb: w === -1 ? 'TIE — nobody takes it' : `${names(S)[w]} TAKES IT`,

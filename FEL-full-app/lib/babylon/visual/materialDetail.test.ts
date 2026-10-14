@@ -6,6 +6,7 @@ import { MeshBuilder, NullEngine, PBRMaterial, Scene, TransformNode } from '@bab
 import { DETAIL_LEVELS, DETAIL_RELIEF, detailLevelsFor, encodeDetail } from './groundTextures';
 import { PUDDLE_ROUGHNESS, puddleShare, wetSurface } from './WetSurface';
 import { SKIN_DRY, SKIN_SWEAT, SWEAT_FALL_S, setSkinSweat, sweatStep } from '../core/skinShading';
+import { HELD_PROBE_MODE, holdProbeMode } from '../../../tests/helpers/heldMode';
 
 /** A size×size RGBA grain with a bright vertical ridge at x = size/2. */
 function ridge(size: number): Uint8ClampedArray {
@@ -30,10 +31,12 @@ describe('the floor grain has relief (detail map: R albedo, G normal y, B roughn
     encodeDetail(flat, 4, DETAIL_RELIEF.grass);
     for (let i = 0; i < 16; i++) { expect(flat[i * 4]).toBe(128); expect(flat[i * 4 + 1]).toBe(128); expect(flat[i * 4 + 2]).toBe(128); expect(flat[i * 4 + 3]).toBe(128); }
   });
-  it('the floors take the relief on the wave-2 modes; the held hoops floors keep the flat grain', () => {
+  it('the floors take the relief on the wave-2 modes; a held mode keeps the flat grain', () => {
     expect(detailLevelsFor('asphalt', 'football')).toEqual(DETAIL_LEVELS.asphalt);
     expect(detailLevelsFor('grass', null)).toEqual(DETAIL_LEVELS.grass);
-    expect(detailLevelsFor('concrete', 'onevone')).toEqual({ bump: 0, rough: 0 });
+    const release = holdProbeMode();
+    try { expect(detailLevelsFor('concrete', HELD_PROBE_MODE)).toEqual({ bump: 0, rough: 0 }); } finally { release(); }
+    expect(detailLevelsFor('concrete', 'onevone')).toEqual(DETAIL_LEVELS.concrete);   // vis-hoops-court lifted the hold: the street court takes the relief
     for (const k of Object.keys(DETAIL_LEVELS) as (keyof typeof DETAIL_LEVELS)[]) { expect(DETAIL_LEVELS[k].bump).toBeLessThanOrEqual(0.6); expect(DETAIL_LEVELS[k].bump).toBeGreaterThan(0); }
     const src = fs.readFileSync(path.resolve(__dirname, 'groundTextures.ts'), 'utf8');
     expect(src).toContain('mat.detailMap.bumpLevel = lv.bump;');

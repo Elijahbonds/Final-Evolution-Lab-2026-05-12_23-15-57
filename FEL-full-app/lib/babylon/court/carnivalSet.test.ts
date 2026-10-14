@@ -152,8 +152,7 @@ describe('the marquee', () => {
     const m = mountMarquee(scene, { at: { x: 0, y: 6.4, z: 21 }, yaw: 0, tier: 'desktop', calm: () => true });
     const a = scene.getMeshByName('bb_wheel_marquee_a')!;
     const lum = (): number => { const e = (a.material as unknown as { emissiveColor: { r: number; g: number; b: number } }).emissiveColor; return e.r + e.g + e.b; };
-    const l0 = lum(); for (let i = 0; i < 20; i++) m.update(0.2);
-    expect(lum()).toBe(l0);
+    const l0 = lum(); for (let i = 0; i < 21; i++) { m.update(0.2); expect(lum()).toBe(l0); }   // every step, not just the end (an even count of swaps lands back on the start)
     m.dispose();
   });
   it('mounts a face, a frame and two chaser sets whose brightness swaps', () => {
@@ -193,6 +192,17 @@ describe('the carnival\'s celebrations', () => {
     const { scene } = rig(); const f = fakeCtx(scene); const fx = mountCarnivalFx(f.ctx);
     fx.eventResult(1); fx.eventResult(-1); expect(bursts.length).toBe(0);
     fx.eventResult(0); expect(bursts.length).toBe(4);
+    fx.dispose();
+  });
+  it('showSet(false) takes the whole fair and the sign away (an event is up and owns the sky); showSet(true) brings them back', () => {
+    const { scene } = rig(); const f = fakeCtx(scene); const fx = mountCarnivalFx(f.ctx);
+    const fair = scene.meshes.filter((m) => m.name.startsWith('carn_court_'));
+    expect(fair.length).toBeGreaterThan(3);
+    const face = scene.getMeshByName('carn_marquee_face')!;
+    fx.showSet(false);
+    for (const m of [...fair, face]) expect(m.isEnabled()).toBe(false);
+    fx.showSet(true);
+    for (const m of [...fair, face]) expect(m.isEnabled()).toBe(true);
     fx.dispose();
   });
   it('fireworks between events only when the sky is dark', () => {
