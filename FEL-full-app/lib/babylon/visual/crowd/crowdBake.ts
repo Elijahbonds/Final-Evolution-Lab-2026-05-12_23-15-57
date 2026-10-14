@@ -22,6 +22,7 @@ import { BakedVertexAnimationManager, Constants, LoadAssetContainerAsync, Matrix
 import type { AbstractMesh, AnimationGroup, AssetContainer, Mesh, PBRMaterial, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { gateContainerRig } from '../../anim/rigNormalize';
+import { boneNode } from '../../anim/boneLookup';
 import { buildCrowdClip } from './crowdClips';
 import { CLOCK_T0, CROWD_CLIPS, CROWD_FPS, layoutClips, type ClipRange, type CrowdClipName } from './crowdVat';
 
@@ -182,7 +183,7 @@ function markDirty(sk: Skeleton, mesh: AbstractMesh): AbstractMesh {
 
 /** After the bake: the live bones collapse to a point, so a pass that skins with them (the SSAO's G-buffer) draws nothing. */
 function foldSkeleton(sk: Skeleton): void {
-  const hips = sk.bones.find((b) => b.name === 'Hips')?.getTransformNode();
+  const hips = boneNode(sk, 'Hips');   // the prefix-tolerant lookup (GATE 0: no exact-match bone finds)
   if (hips) hips.scaling = new Vector3(0, 0, 0);
   (sk as unknown as { _markAsDirty(): void })._markAsDirty();
 }

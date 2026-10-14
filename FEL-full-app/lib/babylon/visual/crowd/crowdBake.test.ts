@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { LoadAssetContainerAsync, NullEngine, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { gateContainerRig } from '../../anim/rigNormalize';
+import { findBone } from '../../anim/boneLookup';
 import { bakeBody } from './crowdBake';
 import { SEAT_DROP } from './crowdClips';
 import { layoutClips } from './crowdVat';
@@ -27,7 +28,7 @@ describe('baking a crowd body', () => {
     const stride = (sk.bones.length + 1) * 16;
     expect(vat.length).toBe(stride * rows);
     expect(vat.every(Number.isFinite)).toBe(true);
-    const hips = sk.bones.findIndex((b) => b.name === 'Hips');
+    const hips = sk.bones.indexOf(findBone(sk, 'Hips')!);
     const hipsY = (row: number): number => vat[row * stride + hips * 16 + 13];   // the hips' displacement from bind (translation y)
     const row = (name: keyof typeof ranges, i = 0): number => ranges[name].start + 1 + i;
     // seated vs standing: the hips are a chair's height lower — thighs level over a ~0.45 m seat (measured, not SEAT_DROP's
