@@ -75,15 +75,35 @@ describe('one tone per pulse', () => {
   const proto = AssessRunner.prototype as unknown as { pulse: (k: FlashKind) => void };
   const real = proto.pulse;
   proto.pulse = function (this: unknown, k: FlashKind) { pulses.push(k); return real.call(this, k); };
+  // …and each part's final count of valid reps, as the runner finishes it (`finishPart` is private too)
+  const finals: { part: string; valid: number }[] = [];
+  const fp = AssessRunner.prototype as unknown as { finishPart: (now: number) => void };
+  const realFinish = fp.finishPart;
+  fp.finishPart = function (this: { part: { def: { id: string }; valid: number } }, now: number) {
+    finals.push({ part: this.part.def.id, valid: this.part.valid });
+    return realFinish.call(this, now);
+  };
   const { v, views } = driveHandsFree();
   proto.pulse = real;
+  fp.finishPart = realFinish;
   const tones = tonesOf(views);
 
-  it('a counted rep plays exactly one tone: one captured tone per captured pulse, no second mark-driven tone', () => {
+  it('a counted rep plays exactly one tone: the captured tones equal the final counted reps, not the pulses', () => {
     expect(v.step).toBe('done');
-    const counted = pulses.filter((k) => k === 'captured').length;   // the runner pulses 'captured' once per counted rep (onRep, the T5 loop)
+    // the reps that counted: each part's final valid count, read as the part finishes (its last rep ends the part on the
+    // same tick, so no view ever shows the final count), and all seven parts finished
+    expect(finals.map((f) => f.part)).toEqual(['T1-front', 'T1-side', 'T2-left', 'T2-right', 'T3-left', 'T3-right', 'T5']);
+    const counted = finals.reduce((a, f) => a + f.valid, 0);
     expect(counted).toBeGreaterThan(0);
+    // QA (2026-10-14): compared with the PULSES, a second pulse('captured') per rep played two tones and stayed green
     expect(tones.filter((k) => k === 'captured')).toHaveLength(counted);
+  });
+
+  it('each pulse id is due once: no id repeats in the pulse log', () => {
+    for (const w of views) {
+      const ids = (w.flashCues ?? []).map((c) => c.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
   });
 
   it('each countdown beat beeps once: a full 3-2-1 is exactly three beeps, one per number, one tone per pulse', () => {
