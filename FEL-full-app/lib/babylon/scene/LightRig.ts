@@ -23,6 +23,7 @@ import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecal
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
 import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
+import { phoneSkipsCaster } from './phoneCasters';   // phone-perf (2026-10-14)
 
 export interface LightRigHandle {
   hemi: HemisphericLight; sun: DirectionalLight;
@@ -197,6 +198,7 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
     if (!mesh.name || mesh.name.startsWith('__')) return;
     if (RECEIVER_HINTS.test(mesh.name)) { mesh.receiveShadows = true; return; }
     if (NEVER_CAST.test(mesh.name)) return;
+    if (phoneSkipsCaster(mesh.name, tier)) return;   // phone-perf: a phone's map skips parts hidden in a bigger part's shadow, and HUD pieces (phoneCasters.ts)
     if (FOLIAGE_NO_CAST.test(mesh.name)) { mesh.receiveShadows = true; return; }   // still RECEIVES
     try {
       const r = mesh.getBoundingInfo().boundingSphere.radiusWorld;
