@@ -11,7 +11,7 @@ import { cuesDue, type FlashKind } from './realtime-cues';
 
 const STAND = { front: standFront(0.5), left: standSide('left', 0.5), right: standSide('right', 0.5) };
 
-function driveHandsFree(maxLoops = 4000) {
+function driveHandsFree(maxLoops = 4000, override: Partial<Record<string, Capture>> = {}) {
   // SCREEN A: as the page does — the take-off foot is tapped before the camera (here: "Not sure", a tap that answers null)
   const r = new AssessRunner({ aspect: 4 / 3, painAsked: true, handsFree: true, takeoffLeg: null, cameraFps: () => 30 });
   let t = 0;
@@ -37,10 +37,10 @@ function driveHandsFree(maxLoops = 4000) {
       const part = v.part!;
       if (!fed.has(part)) {
         fed.add(part);
-        const cap = part === 'T1-front' ? ohsFront({}) : part === 'T1-side' ? ohsSide({})
+        const cap = override[part] ?? (part === 'T1-front' ? ohsFront({}) : part === 'T1-side' ? ohsSide({})
           : part === 'T2-left' ? kneeWall('left') : part === 'T2-right' ? kneeWall('right')
           : part === 'T3-left' ? singleLegSquat('left') : part === 'T3-right' ? singleLegSquat('right')
-          : cmj([{ heightM: 0.4 }, { heightM: 0.45 }, { heightM: 0.42 }]);
+          : cmj([{ heightM: 0.4 }, { heightM: 0.45 }, { heightM: 0.42 }]));
         feed(cap, { part });
       } else feed(standFor(v));
     } else feed(standFor(v));
@@ -124,5 +124,33 @@ describe('one tone per pulse', () => {
     expect(src).toContain('cuesDue(');
     expect(src).not.toMatch(/cueRep\(/);
     expect(src.match(/cueFlash\(/g)).toHaveLength(1);
+  });
+
+  // QA re-check (2026-10-14): a recording WITH a rejected rep. The first knee-to-wall rock lifts the heel (an invalid rep,
+  // runner.ts markRep → 'notRead'), so that rep plays its single retry tone (unchanged) and must play NO captured tone:
+  // the captured tones still equal the counted reps, so a captured tone on a rep that does not count turns this red.
+  it('a rep that does not count plays no captured tone (a recording with a rejected rep)', () => {
+    const ps: FlashKind[] = [];
+    const fin: { part: string; valid: number; attempts: number }[] = [];
+    const realP = proto.pulse;
+    const realF = (AssessRunner.prototype as unknown as { finishPart: (now: number) => void }).finishPart;
+    proto.pulse = function (this: unknown, k: FlashKind) { ps.push(k); return realP.call(this, k); };
+    (AssessRunner.prototype as unknown as { finishPart: (now: number) => void }).finishPart = function (this: { part: { def: { id: string }; valid: number; attempts: number } }, now: number) {
+      fin.push({ part: this.part.def.id, valid: this.part.valid, attempts: this.part.attempts });
+      return realF.call(this, now);
+    };
+    let run: ReturnType<typeof driveHandsFree>;
+    try {
+      run = driveHandsFree(4000, { 'T2-left': kneeWall('left', {}, { reps: 4, perRep: (i) => (i === 0 ? { heelLiftM: 0.08 } : {}) }) });
+    } finally {
+      proto.pulse = realP;
+      (AssessRunner.prototype as unknown as { finishPart: (now: number) => void }).finishPart = realF;
+    }
+    expect(run.v.step).toBe('done');
+    const t2 = fin.find((f) => f.part === 'T2-left')!;
+    expect(t2.attempts).toBeGreaterThan(t2.valid);                    // the recording really holds a rep that did not count
+    expect(ps.filter((k) => k === 'retry').length).toBeGreaterThan(0); // …and it played the retry tone (left as is)
+    const counted = fin.reduce((a, f) => a + f.valid, 0);
+    expect(tonesOf(run.views).filter((k) => k === 'captured')).toHaveLength(counted);
   });
 });
