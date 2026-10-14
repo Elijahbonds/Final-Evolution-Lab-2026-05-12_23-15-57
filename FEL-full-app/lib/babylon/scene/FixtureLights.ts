@@ -147,9 +147,9 @@ export interface StripSource {
 }
 export const STRIP_POOL = 8;
 /** A strip light hangs this high over its point, and reaches this far (its pool covers the nearest ~STRIP_POOL points). */
-export const STRIP_HEIGHT = 1.5, STRIP_RANGE = 17;
+export const STRIP_HEIGHT = 2.2, STRIP_RANGE = 20;
 /** Candela-ish: what one strip light puts on the road under it at full mood gain (a street lamp is a few). */
-export const STRIP_INTENSITY = 4.2;
+export const STRIP_INTENSITY = 12;
 
 export function stripRegistry(scene: Scene): StripSource[] {
   const md = (scene.metadata ??= {}) as { felFixtureStrips?: StripSource[] };

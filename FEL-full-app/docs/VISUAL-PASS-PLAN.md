@@ -852,3 +852,53 @@ per mode. The glossy floor does not mount on onevone / threevthree / carnival: t
   grades for carnival (the mood is read once at mount; the grade has one owner), a camera swoop between hub and event and a slow drift
   crane in 3v3's dead balls (both touch the play camera), VLS sun shafts. A scorebug, a "GAME POINT" lower third and 3v3's clock bug are
   HUD: routed to lane/hud-hoops. [ART]: bespoke streetball props, detailed carnival rides, more crowd body variety.
+
+## Wave 3 status — atmosphere and surfaces (w3-atmos, 2026-10-14)
+
+The deferred atmosphere and surface items from waves 1 and 2. Everything below is presentation only: no tuned number moved. `scene/**` and
+`visual/**` edits are this lane's this round (flagged `shared file:` in each commit). `?lookoff=heat|sunshafts|fixtures` are the one-build A/Bs;
+`?lookon=sunshafts` shows a pass a mode has not earned.
+
+- **flashBeat vs the harness repaint.** While a mode reported a speed vignette (or an impact pulse ran), `ModeHarness` repainted the rest
+  exposure every frame over `LightRig.flashBeat()`'s own write, so a momentum sting, a made three or a storm's lightning never reached the
+  screen on a racing mode. The rig now keeps the flash LEVEL (`flash01`, 1.35x exposure, 0.85 of the remainder a frame: unchanged); the harness
+  paints it in the one grade write with the impact and the speed vignette (`ImpactFrame.stepFrameGrade`, pure). The decay is stepped by dt now
+  (the same wall-clock length at 144 Hz as at 60). `core/flashCompose.test.ts` drives the real rig the way the harness does: the bug measured
+  on the old path, then the fix; flash alone, flash with an impact, reduced motion.
+- **Dome mismatches.** The `neon` bake (`public/backdrops/baked/neon.jpg`) is mis-named: it is the Venice skatepark at golden hour (its manifest
+  source is `skateboarding.jpg`). A venue loaded it over its painted sky, so `?place=neon-block`, the Neon Cage, the football Dome, dance's
+  Neon Club and Brain Brawl's Arcade Night stood under a sunset with palms at night. `paintedSky` on a place look / arena look opts out of the
+  photograph and the venue's painted night horizon is the sky (a starred sky, the neon pylons, SkyDome's clouds on top). Daytime and home looks
+  are untouched (a test holds that). A real photographic night dome stays [ART].
+- **Chi rims.** A lit edge on a charged fighter's contour (`visual/ChiRim.ts`), and on a Hundred agent as it materialises. It is the ink hull
+  (the outline renderer, skinned like the body) recoloured in an HDR chi colour and a little wider, so it costs no draw, no shader and no
+  compile and follows every bone; the bloom makes the halo. Not a GlowLayer include (that draws the body filled, not its edge) and not a
+  fresnel plugin (the fighters share their materials: a clone and a compile mid-match). The aura's call drives it for all five combat modes.
+- **Heat haze.** `scene/HeatHaze.ts`: one full-screen distortion pass, mounted once after load, that early-outs outside a heat source's column;
+  a ripple of 4 px at 1080p. The Foundry's two fire pits and Ember Caldera's lava register sources. Desktop/high, not under reduced motion.
+  It distorts whatever is in the column on the screen, near or far (there is no depth in the pass): a pillar in front of a pit wobbles a
+  little too. Measured A/B on one frame (`?lookoff=heat`).
+- **Sun shafts: measured, not mounted.** `scene/SunShafts.ts` is the VLS mount and its gate; the gate is a measurement. Rig, 1080p, 40 samples
+  across the first ~8 s of each goldenHour mode, the rig's sun projected through the live view-projection: the sun was in the frame in none
+  (dunk, dunkduel, onevone, threevthree, threepoint, carnival, skateboard, surf, volleyball, tennis, aeroaces on two circuits, velocitykart).
+  The moods put the sun 50-60 degrees up and a play camera frames a 46 degree field at a horizon. The pass is a second render of the
+  occluders plus a blur on every frame and may never be toggled, so it mounts for no mode today (`SUN_SHAFT_MODES` is empty; a mode earns it
+  at 25 % in frame); `?lookon=sunshafts&tier=high` shows it for one load.
+- **Kart.** `racing/roadSurface.ts`: the asphalt grain (relief and roughness) over the road's paint (desktop/high: a phone's texture row is
+  frozen over the ceiling); rumble ribs on the kerbs (a normal map);
+  the road named into the weather's wet pass with a wet reflection level (environment and specular lift to 1.0 as it soaks, and come back).
+  The kart has no weather chip, so it honours `?weather=rain|storm|fog` from the URL only (never the saved pick of the other modes) for its
+  looks, and reads none of the weather's gameplay modifiers. The night courses' edge strip is a fixture now (`FixtureLights` strips): a pool
+  of 8 clustered lights that follows the kart along the strip, each pinned to one of the nearest lamps.
+- **Aero.** `racing/aeroAtmos.ts`: cloud banks to fly through (soft upright sprites at the line's height that fade out as the camera enters
+  while the fog thickens to 4x and takes the cloud's colour); skim spray off the plane's track over water (sparks over lava); the caldera's
+  lava glow (the world's underlight 0.8 to ~1.7, a glow on the lava, the haze) and a ring of light round the plane at every checkpoint.
+  A phone keeps only the ring and the lava glow (`mobileBudget.json` holds aeroaces at 0 live particles: no sprites, no spray).
+- **Findings worth the next lane's time.** (1) An upright or camera-facing sprite that dips into a depth plane (the sea, the ground) is cut
+  flat across the whole cloud: keep its body above the plane. (2) Babylon's `BILLBOARDMODE_ALL` tilts a big quad to a high camera, which is
+  what put the island's clouds into the sea. (3) `camera._postProcesses` carries `null` holes after the pipeline rebuilds, and a pass attached
+  before a rebuild ends up in FRONT of the pipeline: attach after load and keep it last (`HeatHaze.keepLast`). (4) `Observable.remove` inside a notification
+  unregisters on the next tick, not at once (a test that counts observers needs a tick).
+- **Deferred.** A "Rain" chip for the kart's start screen (HUD: w3-present or an owner call; the URL works today). Sun shafts for any mode that
+  looks at the sun (a replay that cranes to it, a finish flown into it) - add its measured share to `SUN_SHAFT_MEASURED`. A photographic night
+  dome ([ART]). Heat haze with depth (a refraction of what is BEHIND the pit only) needs the depth pass. Tyre spray behind a kart on the wet road.

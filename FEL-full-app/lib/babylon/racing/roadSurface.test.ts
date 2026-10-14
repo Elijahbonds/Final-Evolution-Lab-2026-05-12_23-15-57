@@ -51,6 +51,15 @@ describe('asphaltRoad / markWetGloss / ribKerb', () => {
     applied.calls.length = 0; asphaltRoad(scene, road, 1);
     expect((applied.calls[0] as unknown[])[3]).toEqual([4, 4]);   // a floor of 4 m a tile: never a vanishing one
   });
+  it('a phone keeps the paint alone: one more 512 px texture would raise the kart\'s frozen texture row', () => {
+    const scene = new Scene(new NullEngine());
+    (scene.metadata ??= {}).felTier = 'mobile';
+    applied.calls.length = 0;
+    expect(asphaltRoad(scene, { name: 'kart_road' } as never, 9)).toBe(false);
+    expect(applied.calls.length).toBe(0);
+    scene.metadata.felTier = 'high';
+    expect(asphaltRoad(scene, { name: 'kart_road' } as never, 9)).toBe(true);
+  });
   it('markWetGloss flags the material with the levels it lerps to and the ones it was dry', () => {
     const scene = new Scene(new NullEngine());
     const mat = new PBRMaterial('t', scene); mat.environmentIntensity = 0.35; mat.specularIntensity = 0.22;
@@ -81,7 +90,7 @@ describe('wired in, and presentation only', () => {
   it('the kart reads the weather for its LOOKS only: rain, storm, fog from the URL, and none of the gameplay modifiers', () => {
     const k = read('../modes/VelocityKartMode.ts');
     expect(k).toMatch(/readWeatherUrl\(\)/);
-    expect(k).toMatch(/mountWeatherFx\(ctx\.scene, ctx\.lights, weather, \{ tier: ctx\.lights\.tier, keepSky: true \}\)/);
+    expect(k).toMatch(/mountWeatherFx\(ctx\.scene, ctx\.lights, weather, \{ tier: ctx\.lights\.tier, keepSky: true, fogHex: hazeColor\(course\.mood\) \}\)/);   // the air is the course's haze, not its dark clear colour
     for (const m of ['gripMult', 'boardDragMult', 'ballWindAccel', 'flightWind', 'gustWind', 'airDensityMult', 'wet01']) expect(k, m).not.toContain(`weather.${m}`);
     expect(k).toMatch(/weatherFx\?\.dispose\(\); weatherFx = null; weather = null;/);
   });

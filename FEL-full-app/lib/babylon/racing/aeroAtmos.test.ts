@@ -64,9 +64,9 @@ describe('puffFade / insideCloud / fogPulse', () => {
   });
   it('the air thickens with depth: a white-out at the heart, nothing at the edge', () => {
     expect(fogPulse(0)).toEqual({ densityMul: 1, tint: 0 });
-    expect(fogPulse(1).densityMul).toBeGreaterThan(5);
-    expect(fogPulse(1).densityMul).toBeLessThan(6);   // ~45 m of sight at the heart of a bank: a white-out for a beat, not a blindfold
-    expect(fogPulse(1).tint).toBeGreaterThan(0.6);
+    expect(fogPulse(1).densityMul).toBeGreaterThan(3.5);
+    expect(fogPulse(1).densityMul).toBeLessThan(4.5);   // ~60 m of sight at the heart of a bank: a veil for a beat, not a blindfold (measured on the caldera at 5.5x: a brown wall)
+    expect(fogPulse(1).tint).toBeGreaterThan(0.5); expect(fogPulse(1).tint).toBeLessThan(0.7);
     expect(fogPulse(0.5).densityMul).toBeLessThan(fogPulse(1).densityMul);
     expect(fogPulse(9).densityMul).toBe(fogPulse(1).densityMul);
   });
@@ -81,7 +81,8 @@ describe('skimRate', () => {
   it('grows as the plane comes down and as it goes faster', () => {
     expect(skimRate(2, 1, 'desktop', false)).toBeGreaterThan(skimRate(8, 1, 'desktop', false));
     expect(skimRate(3, 1, 'desktop', false)).toBeGreaterThan(skimRate(3, 0.4, 'desktop', false));
-    expect(skimRate(0, 1, 'desktop', false)).toBeGreaterThan(100);
+    expect(skimRate(0, 1, 'desktop', false)).toBeGreaterThan(300);
+    expect(skimRate(SKIM_AGL / 2, 1, 'desktop', false)).toBeGreaterThan(60);   // the island's own racing line (6 m) throws a visible plume
   });
   it('a phone gets 40 %, reduced motion a third of that', () => {
     const d = skimRate(2, 1, 'desktop', false);
@@ -173,6 +174,27 @@ describe('the mount (NullEngine)', () => {
     expect(at.stats.lava).toBe(0);
     expect(heatRegistry(scene).sources[0].strength).toBe(0);
     expect(seen.length).toBe(2);
+  });
+  it('a phone gets no sprites and no spray (mobileBudget.json holds aeroaces at 0 live particles), and keeps the ring and the lava', () => {
+    device(false);
+    const scene = new Scene(new NullEngine());
+    const before = scene.particleSystems.length;
+    const hot = mountAeroAtmos(scene, by('volcano'), { tier: 'mobile' });
+    expect(scene.particleSystems.length).toBe(before);   // not one particle system
+    expect(hot.stats.puffs).toBe(0);
+    expect(heatRegistry(scene).sources.length).toBe(1);  // the lava's haze source still registers (the pass itself is not mounted on a phone)
+    const v = by('volcano'); let lake = { x: 0, z: 0 }, best = 0;
+    for (let d = 0; d < v.line.length; d += 10) { const p = pointAlong(v.line, d).pos; const k = lavaNear('volcano', v.floorAt, p.x, p.z); if (k > best) { best = k; lake = { x: p.x, z: p.z }; } }
+    hot.update(1 / 60, { x: lake.x, y: 3, z: lake.z, heading: 0, speed01: 1 }, null);
+    expect(hot.stats.lava).toBeGreaterThan(0.4);          // the glow still comes up
+    expect(hot.stats.spraying).toBe(false);               // and nothing sprays
+    hot.ringPass({ x: 0, y: 6, z: 0, heading: 0, speed01: 1 }); hot.update(1 / 60, flight, null);
+    expect(hot.stats.ringsLive).toBe(1);                  // the ring stays
+    hot.dispose();
+    const dt = mountAeroAtmos(scene, by('canyon'), { tier: 'desktop' });
+    expect(scene.particleSystems.length).toBe(before + 2); // desktop: the clouds and the spray
+    dt.dispose();
+    expect(scene.particleSystems.length).toBe(before);
   });
   it('reduced motion: the ring does not flare', () => {
     device(true);

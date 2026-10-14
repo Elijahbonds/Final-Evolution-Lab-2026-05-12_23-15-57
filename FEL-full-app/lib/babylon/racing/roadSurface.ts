@@ -2,7 +2,7 @@
 // wet track gloss in rain". The road was a painted tarmac texture on a PBR slab with roughness 0.92 (and an environment
 // intensity of 0.35, so nothing it did could ever shine). Three changes, all of them the surface and none of them the course:
 //
-//   ASPHALT    the shared floor-grain detail map (visual/groundTextures: aggregate relief in the normal, a rougher dark speck and a
+//   ASPHALT    (desktop / high: a phone's texture row is frozen over the ceiling) the shared floor-grain detail map (visual/groundTextures: aggregate relief in the normal, a rougher dark speck and a
 //              smoother pale one) over the road's own paint. The road's UV is one road-width a tile across and along, so the
 //              grain is tiled by the road's width, not the slab's chord.
 //   KERBS      the apex blocks get rumble ribs: a normal map of a few raised ribs across each block, so the red and white catch the
@@ -38,6 +38,8 @@ export function markWetGloss(mat: PBRMaterial, wet: WetGloss = ROAD_WET): void {
  * swing come from groundTextures' own levels, so the road is graded the way every other floor is, held modes excepted.
  */
 export function asphaltRoad(scene: Scene, road: Mesh, halfWidth: number): boolean {
+  // not on a phone: the grain is one more 512 px texture and mobileBudget.json holds the kart's texture row frozen over the ceiling (284 MB)
+  if ((scene.metadata as { felTier?: string } | null)?.felTier === 'mobile') return false;
   const w = Math.max(4, halfWidth * 2);
   return applyFloorDetailToMesh(scene, road, { kind: 'asphalt', blend: 0.5 }, [w, w]);
 }

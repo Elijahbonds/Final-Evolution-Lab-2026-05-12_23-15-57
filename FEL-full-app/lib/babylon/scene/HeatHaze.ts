@@ -30,7 +30,7 @@ export interface HeatRegistry { sources: HeatSource[] }
 
 /** At most this many columns are drawn (the shader's loop bound; the nearest to the middle of the frame win). */
 export const HEAT_MAX = 3;
-/** The shimmer's reach at full strength, as a fraction of the frame's height (~4 px at 1080p). */
+/** The shimmer's reach at full strength, as a fraction of the frame's height (4.1 px at 1080p, whatever the width). */
 export const HEAT_AMP = 0.0038;
 
 export function heatRegistry(scene: Scene): HeatRegistry {
@@ -78,8 +78,9 @@ export function projectColumn(src: HeatSource, viewProj: Matrix, eye: { x: numbe
   if (rx < 0.004 || ry < 0.004) return null;   // too small to see
   if (cx + rx < 0 || cx - rx > 1 || cy + ry < 0 || cy - ry > 1) return null;   // wholly off the frame
   const edge = Math.min(1, Math.min(cx, 1 - cx, cy, 1 - cy) / 0.12 + 0.35);   // easing out toward the frame's edge
-  const near = 1 - Math.max(0, (dist - far * 0.6) / (far * 0.4));
-  return { cx, cy, rx: Math.min(rx, 0.6), ry: Math.min(ry, 0.8), k: Math.max(0, Math.min(1, edge * near)) * Math.max(0, Math.min(1, src.strength)) };
+  const far01 = 1 - Math.max(0, (dist - far * 0.6) / (far * 0.4));
+  const close01 = Math.max(0, Math.min(1, (dist - 1.5) / 3.5));   // a camera in the hot air has no haze to look through
+  return { cx, cy, rx: Math.min(rx, 0.6), ry: Math.min(ry, 0.8), k: Math.max(0, Math.min(1, edge * far01 * close01)) * Math.max(0, Math.min(1, src.strength)) };
 }
 
 /** Pure: the nearest-to-frame-centre `HEAT_MAX` live columns of a registry, as the shader's uniform arrays (4 floats a column: the ellipse; the amplitude apart). */
@@ -99,6 +100,7 @@ uniform sampler2D textureSampler;
 uniform vec4 hEllipse[${HEAT_MAX}];
 uniform vec4 hAmp[${HEAT_MAX}];
 uniform float hTime;
+uniform float hAspect;   // height / width: the amplitude is a share of the frame's HEIGHT, so a sideways push is that many PIXELS on any screen
 void main(void) {
   vec2 off = vec2(0.0);
   for (int i = 0; i < ${HEAT_MAX}; i++) {
@@ -109,7 +111,7 @@ void main(void) {
       float f = 1.0 - d; f *= f;
       float w1 = sin(q.y * 9.0 - hTime * 5.0 + sin(q.x * 3.0 + hTime) * 2.0);
       float w2 = sin(q.y * 17.0 - hTime * 7.3 + 1.3);
-      off += vec2(w1 * 0.7 + w2 * 0.3, w2 * 0.12) * hAmp[i].x * f;
+      off += vec2((w1 * 0.7 + w2 * 0.3) * hAspect, w2 * 0.12) * hAmp[i].x * f;
     }
   }
   gl_FragColor = texture2D(textureSampler, vUV + off);
@@ -157,7 +159,7 @@ export function mountHeatHaze(scene: Scene, tier: QualityTier, camera?: Camera |
   ShaderStore.ShadersStore['felHeatHazeFragmentShader'] = FRAGMENT;
   let post: PostProcess;
   try {
-    post = new PostProcess('fel_heat_haze', 'felHeatHaze', ['hEllipse', 'hAmp', 'hTime'], null, 1.0, cam, Texture.BILINEAR_SAMPLINGMODE, engine, false, undefined, Constants.TEXTURETYPE_UNSIGNED_BYTE);
+    post = new PostProcess('fel_heat_haze', 'felHeatHaze', ['hEllipse', 'hAmp', 'hTime', 'hAspect'], null, 1.0, cam, Texture.BILINEAR_SAMPLINGMODE, engine, false, undefined, Constants.TEXTURETYPE_UNSIGNED_BYTE);
   } catch (e) {
     console.warn('[FEL-HEAT] the haze pass is unavailable, continuing without it:', e);
     return null;
@@ -179,6 +181,7 @@ export function mountHeatHaze(scene: Scene, tier: QualityTier, camera?: Camera |
     effect.setArray4('hEllipse', packed.ellipse);
     effect.setArray4('hAmp', packed.amp);
     effect.setFloat('hTime', t);
+    effect.setFloat('hAspect', engine.getRenderHeight() / Math.max(1, engine.getRenderWidth()));
   };
   console.info('[FEL-HEAT] heat haze mounted (' + reg.sources.length + ' source' + (reg.sources.length === 1 ? '' : 's') + ')');
   return {

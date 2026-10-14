@@ -5,7 +5,7 @@
 //
 //   CLOUD BANKS    soft billboard puffs in banks along the line at the line's own height (not the deck 150 m up: CloudDeck). A puff fades
 //                  out as the camera comes into it - no quad is ever clipped by the near plane - while the air whitens (the fog's
-//                  density rises to 5.5x and takes the cloud's colour, ~45 m of sight at the heart of a bank), so a flight THROUGH a
+//                  density rises to 4x and takes the cloud's colour, ~60 m of sight at the heart of a bank), so a flight THROUGH a
 //                  bank is a short white-out, not a sprite sliced in half.
 //   SKIM SPRAY     a low pass over water throws spray off the plane's track (over lava: sparks and embers). Rate follows closeness
 //                  to the surface and speed; none above SKIM_AGL.
@@ -13,9 +13,10 @@
 //                  lava under the plane, and the air over the lake shimmers (scene/HeatHaze: a source following the plane).
 //   RING PASS      a ring of light leaves the plane at a checkpoint and widens round it, in the course's tint (a vertical ShockRing).
 //
-// Budgets: the puffs are static particles (count by tier, 52 / 22), the spray is one pooled system (<= 120 live), the ring pool is
-// three tori. Nothing is created after load. Reduced motion: no ring, no fog pulse; the puffs stay (they are scenery) and the spray
-// thins to a third.
+// Budgets: the puffs are static particles (54), the spray is one pooled system (<= 360 live), the ring pool is three tori. Nothing is
+// created after load. A PHONE gets neither sprites nor spray: mobileBudget.json holds aeroaces at 0 live particles (a row only goes up
+// with a re-measurement), so the phone keeps the ring (two tori), the lava glow (one ground disc) and the world's underlight.
+// Reduced motion: no ring, no fog pulse; the puffs stay (they are scenery) and the spray thins to a third.
 
 import { Color3, Color4, DynamicTexture, Engine, MeshBuilder, ParticleSystem, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Camera, Mesh, Scene } from '@babylonjs/core';
@@ -88,7 +89,7 @@ export function insideCloud(dist: number, size: number): number {
 /** Pure: the fog's density multiple and the share of the cloud tint in its colour, for a cloud depth 0..1 (a white-out at 1). */
 export function fogPulse(inside01: number): { densityMul: number; tint: number } {
   const k = Math.max(0, Math.min(1, inside01));
-  return { densityMul: 1 + 4.5 * k, tint: 0.85 * k };
+  return { densityMul: 1 + 3 * k, tint: 0.6 * k };
 }
 
 // ── pure: the skim ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -97,7 +98,7 @@ export function fogPulse(inside01: number): { densityMul: number; tint: number }
 export function skimRate(agl: number, speed01: number, tier: AtmosTier, calm: boolean): number {
   if (!(agl < SKIM_AGL) || !(speed01 > 0.25)) return 0;
   const close = 1 - Math.max(0, agl) / SKIM_AGL;
-  const full = 200 * close * close * Math.min(1, speed01);
+  const full = 420 * Math.pow(close, 1.4) * Math.min(1, speed01);
   return Math.round(full * (tier === 'mobile' ? 0.4 : 1) * (calm ? 0.33 : 1));
 }
 
@@ -188,57 +189,63 @@ export function mountAeroAtmos(scene: Scene, circuit: AeroCircuit, opts: AeroAtm
   const liquid = theme === 'island' || theme === 'city' || theme === 'volcano';
   const calm = (): boolean => !motionPolicy().flash;
 
-  // ── cloud banks ──
-  const banks = tier === 'mobile' ? 3 : 6, per = tier === 'mobile' ? 7 : 9;
-  const puffs = cloudBanksFor(circuit.line, circuit.floorAt, circuit.corridor, banks, per);
+  const phone = tier === 'mobile';
+
+  // ── cloud banks (not on a phone: its aeroaces row holds 0 live particles) ──
+  const puffs = phone ? [] : cloudBanksFor(circuit.line, circuit.floorAt, circuit.corridor, 6, 9);
   const cloudTint = theme === 'volcano' ? new Color4(0.62, 0.55, 0.52, 1) : theme === 'city' ? new Color4(0.3, 0.27, 0.4, 1) : theme === 'canyon' ? new Color4(1, 0.9, 0.78, 1) : new Color4(1, 1, 1, 1);
-  const clouds = new ParticleSystem('aero_fx_clouds', puffs.length, scene);
-  clouds.particleTexture = puffTexture(scene);
-  clouds.blendMode = ParticleSystem.BLENDMODE_STANDARD;
-  clouds.billboardMode = ParticleSystem.BILLBOARDMODE_Y;   // upright: a sprite tilted to a high camera would dip into the sea and be cut by it
-  clouds.emitter = new Vector3(0, 0, 0);
-  clouds.minLifeTime = clouds.maxLifeTime = 1e9;   // static scenery: they never die
-  clouds.minEmitPower = clouds.maxEmitPower = 0;
-  clouds.emitRate = 0; clouds.manualEmitCount = puffs.length;
-  clouds.disposeOnStop = false;
-  clouds.color1 = cloudTint; clouds.color2 = cloudTint; clouds.colorDead = cloudTint;
-  clouds.minInitialRotation = 0; clouds.maxInitialRotation = Math.PI * 2;
-  let at = 0;
-  clouds.startPositionFunction = (_wm, pos, particle) => {
-    const i = at++ % puffs.length; const p = puffs[i];
-    pos.set(p.x, p.y, p.z);
-    (particle as unknown as { size: number }).size = p.size;
-    (particle as unknown as { fel?: number }).fel = i;
-  };
   const camPos = new Vector3();
   let inside = 0, fogBase: { d: number; c: Color3 } | null = null;
-  clouds.updateFunction = (list) => {
-    for (const q of list) {
-      const i = (q as unknown as { fel?: number }).fel ?? 0; const p = puffs[i]; if (!p) continue;
-      const d = Math.hypot(q.position.x - camPos.x, q.position.y - camPos.y, q.position.z - camPos.z);
-      q.color.set(cloudTint.r, cloudTint.g, cloudTint.b, p.alpha * puffFade(d, p.size));
-      q.size = p.size;
-    }
-  };
-  clouds.start();
-  owned.push(clouds);
+  const clouds = puffs.length ? new ParticleSystem('aero_fx_clouds', puffs.length, scene) : null;
+  if (clouds) {
+    clouds.particleTexture = puffTexture(scene);
+    clouds.blendMode = ParticleSystem.BLENDMODE_STANDARD;
+    clouds.billboardMode = ParticleSystem.BILLBOARDMODE_Y;   // upright: a sprite tilted to a high camera would dip into the sea and be cut by it
+    clouds.emitter = new Vector3(0, 0, 0);
+    clouds.minLifeTime = clouds.maxLifeTime = 1e9;   // static scenery: they never die
+    clouds.minEmitPower = clouds.maxEmitPower = 0;
+    clouds.emitRate = 0; clouds.manualEmitCount = puffs.length;
+    clouds.disposeOnStop = false;
+    clouds.color1 = cloudTint; clouds.color2 = cloudTint; clouds.colorDead = cloudTint;
+    clouds.minInitialRotation = 0; clouds.maxInitialRotation = Math.PI * 2;
+    let at = 0;
+    clouds.startPositionFunction = (_wm, pos, particle) => {
+      const i = at++ % puffs.length; const p = puffs[i];
+      pos.set(p.x, p.y, p.z);
+      (particle as unknown as { size: number }).size = p.size;
+      (particle as unknown as { fel?: number }).fel = i;
+    };
+    clouds.updateFunction = (list) => {
+      for (const q of list) {
+        const i = (q as unknown as { fel?: number }).fel ?? 0; const p = puffs[i]; if (!p) continue;
+        const d = Math.hypot(q.position.x - camPos.x, q.position.y - camPos.y, q.position.z - camPos.z);
+        q.color.set(cloudTint.r, cloudTint.g, cloudTint.b, p.alpha * puffFade(d, p.size));
+        q.size = p.size;
+      }
+    };
+    clouds.start();
+    owned.push(clouds);
+  }
 
   // ── skim spray / sparks: one pooled system, the plane's own ground track ──
-  const spray = new ParticleSystem('aero_fx_spray', tier === 'mobile' ? 60 : 120, scene);
-  spray.particleTexture = dotTexture(scene);
-  spray.blendMode = hot ? ParticleSystem.BLENDMODE_ADD : ParticleSystem.BLENDMODE_STANDARD;
-  const sprayAt = new Vector3(); spray.emitter = sprayAt;
-  spray.minEmitBox = new Vector3(-2.2, 0, -1.2); spray.maxEmitBox = new Vector3(2.2, 0.2, 1.2);
-  spray.direction1 = new Vector3(-0.7, 1.3, -0.5); spray.direction2 = new Vector3(0.7, 2.2, 0.5);
-  spray.minEmitPower = 2.5; spray.maxEmitPower = hot ? 9 : 6.5;
-  spray.minLifeTime = hot ? 0.45 : 0.55; spray.maxLifeTime = hot ? 1.0 : 1.2;
-  spray.gravity = new Vector3(0, hot ? -3 : -9, 0);
-  spray.minSize = hot ? 0.18 : 0.9; spray.maxSize = hot ? 0.5 : 2.4;
-  spray.addSizeGradient(0, 0.4); spray.addSizeGradient(1, hot ? 0.2 : 1);
-  if (hot) { spray.color1 = new Color4(1, 0.66, 0.2, 1); spray.color2 = new Color4(1, 0.36, 0.1, 1); spray.colorDead = new Color4(0.6, 0.1, 0.02, 0); }
-  else { spray.color1 = new Color4(0.93, 0.97, 1, 0.55); spray.color2 = new Color4(0.8, 0.9, 1, 0.4); spray.colorDead = new Color4(0.85, 0.93, 1, 0); }
-  spray.emitRate = 0; spray.disposeOnStop = false; spray.start();
-  owned.push(spray);
+  const sprayAt = new Vector3();
+  const spray = phone ? null : new ParticleSystem('aero_fx_spray', 360, scene);
+  if (spray) {
+    spray.particleTexture = dotTexture(scene);
+    spray.blendMode = hot ? ParticleSystem.BLENDMODE_ADD : ParticleSystem.BLENDMODE_STANDARD;
+    spray.emitter = sprayAt;
+    spray.minEmitBox = new Vector3(-2.6, 0, -1.6); spray.maxEmitBox = new Vector3(2.6, 0.2, 1.6);
+    spray.direction1 = new Vector3(-0.7, 1.3, -0.5); spray.direction2 = new Vector3(0.7, 2.2, 0.5);
+    spray.minEmitPower = 2.5; spray.maxEmitPower = hot ? 9 : 6.5;
+    spray.minLifeTime = hot ? 0.45 : 0.7; spray.maxLifeTime = hot ? 1.0 : 1.4;
+    spray.gravity = new Vector3(0, hot ? -3 : -9, 0);
+    // (Babylon's size gradient is ABSOLUTE, metres: the gradient is the size, minSize / maxSize are ignored once it is set)
+    if (hot) { spray.addSizeGradient(0, 0.3); spray.addSizeGradient(1, 0.12); } else { spray.addSizeGradient(0, 0.5); spray.addSizeGradient(0.5, 1.4); spray.addSizeGradient(1, 2.4); }
+    if (hot) { spray.color1 = new Color4(1, 0.66, 0.2, 1); spray.color2 = new Color4(1, 0.36, 0.1, 1); spray.colorDead = new Color4(0.6, 0.1, 0.02, 0); }
+    else { spray.color1 = new Color4(0.95, 0.98, 1, 0.6); spray.color2 = new Color4(0.85, 0.93, 1, 0.42); spray.colorDead = new Color4(0.9, 0.95, 1, 0); }
+    spray.emitRate = 0; spray.disposeOnStop = false; spray.start();
+    owned.push(spray);
+  }
 
   // ── lava: a glow lying on the lake under the plane, and the air over the lake ──
   let glow: Mesh | null = null, glowMat: StandardMaterial | null = null;
@@ -255,7 +262,7 @@ export function mountAeroAtmos(scene: Scene, circuit: AeroCircuit, opts: AeroAtm
 
   // ── the ring: a vertical ShockRing pool ──
   const rings: { mesh: Mesh; mat: StandardMaterial; age: number; reach: number }[] = [];
-  const ringN = tier === 'mobile' ? 2 : 3;
+  const ringN = phone ? 2 : 3;
   for (let i = 0; i < ringN; i++) {
     const mesh = MeshBuilder.CreateTorus(`aero_fx_ring_${i}`, { diameter: 2, thickness: 0.09, tessellation: 44 }, scene);
     const mat = new StandardMaterial(`aero_fx_ring_m_${i}`, scene);
@@ -295,12 +302,14 @@ export function mountAeroAtmos(scene: Scene, circuit: AeroCircuit, opts: AeroAtm
       const wet = liquid && overLiquid(theme, circuit.floorAt, f.x, f.z);
       const agl = f.y - SURFACE_Y;
       const rate = wet ? skimRate(agl, f.speed01, tier, calm()) : 0;
-      stats.spraying = rate > 0;
-      if (rate > 0) {
-        const fx = Math.sin(f.heading), fz = Math.cos(f.heading);
-        sprayAt.set(f.x - fx * 3.5, SURFACE_Y + 0.15, f.z - fz * 3.5);
-        spray.emitRate = rate;
-      } else spray.emitRate = 0;
+      stats.spraying = !!spray && rate > 0;
+      if (spray) {
+        if (rate > 0) {
+          const fx = Math.sin(f.heading), fz = Math.cos(f.heading);
+          sprayAt.set(f.x - fx * 3.5, SURFACE_Y + 0.15, f.z - fz * 3.5);
+          spray.emitRate = rate;
+        } else spray.emitRate = 0;
+      }
       // the lava
       if (hot && glow && glowMat && heat) {
         const near = lavaNear(theme, circuit.floorAt, f.x, f.z);

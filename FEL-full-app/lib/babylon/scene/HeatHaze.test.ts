@@ -44,6 +44,11 @@ describe('projectColumn', () => {
     expect(projectColumn({ ...PIT, x: 60 }, vp, c.globalPosition)).toBeNull();       // far off to the side
     expect(projectColumn({ ...PIT, z: 400 }, vp, c.globalPosition)).toBeNull();      // beyond the reach
   });
+  it('a camera inside the hot air gets none of it', () => {
+    const { c, vp } = cam([0, 2, -1.0], [0, 1.5, 0]);
+    const col = projectColumn(PIT, vp, c.globalPosition);
+    expect(col === null || col.k === 0).toBe(true);
+  });
   it('strength scales the weight, and none is none', () => {
     const { c, vp } = cam([0, 2, -10], [0, 1.5, 0]);
     const full = projectColumn(PIT, vp, c.globalPosition)!.k, half = projectColumn({ ...PIT, strength: 0.5 }, vp, c.globalPosition)!.k;

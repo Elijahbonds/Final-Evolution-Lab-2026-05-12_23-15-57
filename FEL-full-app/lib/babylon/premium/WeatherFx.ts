@@ -31,7 +31,7 @@ function streakTexture(scene: Scene, snow: boolean): DynamicTexture {
   tex.update(); tex.hasAlpha = true; return tex;
 }
 
-export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit: WeatherKit, opts: { tier?: QualityTier; /** a PLACE LOOK brought its own sky: the time of day retunes the lights but leaves the painted sky and the clear colour alone (the Dome's neon rafters went dusk-orange under a 'natural' pick, measured) */ keepSky?: boolean } = {}): WeatherFxHandle {
+export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit: WeatherKit, opts: { tier?: QualityTier; /** a PLACE LOOK brought its own sky: the time of day retunes the lights but leaves the painted sky and the clear colour alone (the Dome's neon rafters went dusk-orange under a 'natural' pick, measured) */ keepSky?: boolean; /** w3-atmos: the fog's colour (a hex), where the clear colour is not the air's: the kart's courses, whose clear colour is a dark purple under a pink sky */ fogHex?: string } = {}): WeatherFxHandle {
   const tier = opts.tier ?? 'desktop';
   const disposers: (() => void)[] = [];
   const s = kit.state;
@@ -76,7 +76,7 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
   if (fogD > 0) {
     const prevMode = scene.fogMode, prevD = scene.fogDensity, prevC = scene.fogColor.clone();
     scene.fogMode = Scene.FOGMODE_EXP2; scene.fogDensity = fogD;
-    const c = scene.clearColor; scene.fogColor = new Color3(c.r * 0.7 + 0.2, c.g * 0.7 + 0.2, c.b * 0.7 + 0.22);
+    const c = scene.clearColor; scene.fogColor = opts.fogHex ? Color3.FromHexString(opts.fogHex) : new Color3(c.r * 0.7 + 0.2, c.g * 0.7 + 0.2, c.b * 0.7 + 0.22);
     disposers.push(() => { scene.fogMode = prevMode; scene.fogDensity = prevD; scene.fogColor = prevC; });
   }
 

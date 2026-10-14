@@ -94,6 +94,7 @@ import { asphaltRoad, markWetGloss } from '../racing/roadSurface';
 import { WeatherKit } from '../core/WeatherKit';
 import { readWeatherUrl } from '../nexus/weather';
 import { addStripSource } from '../scene/FixtureLights';
+import { hazeColor } from '../scene/Atmosphere';
 import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 
 /** A kart is small; a full-size body swamps it. */
@@ -1253,7 +1254,7 @@ return {
     if (crowd) console.info(`[RACE-VENUE] ${crowd.count} trackside spectators`);
     road = buildRoad(ctx);
     // w3-atmos: rain, storm or fog from the URL (a kart has no weather chip); the weather's wet pass finds the road by name (premium/WeatherFx GROUND_RE)
-    { const wx = readWeatherUrl(); weatherFx?.dispose(); weather = wx ? WeatherKit.fromPick(wx, 'links', 7) : null; weatherFx = weather ? mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: true }) : null; }
+    { const wx = readWeatherUrl(); weatherFx?.dispose(); weather = wx ? WeatherKit.fromPick(wx, 'links', 7) : null; weatherFx = weather ? mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: true, fogHex: hazeColor(course.mood) }) : null; }
     marks = buildMarks(ctx);
     noCast(ctx, marks);   // phone pass: a 12 cm slab across the road throws no shadow worth a draw per cascade
     kart = buildKart(ctx);
