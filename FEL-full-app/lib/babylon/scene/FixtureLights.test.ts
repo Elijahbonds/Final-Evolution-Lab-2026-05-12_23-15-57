@@ -9,6 +9,7 @@ import {
   type FixtureIn,
 } from './FixtureLights';
 import { WAVE2_HELD_MODES, wave2Look } from './lookPolicy';
+import { HELD_PROBE_MODE, holdProbeMode } from '../../../tests/helpers/heldMode';
 
 const W = { r: 1, g: 0.9, b: 0.7 };
 const f = (role: FixtureIn['role'], x: number, y: number, z: number, color = W): FixtureIn => ({ role, pos: { x, y, z }, color });
@@ -97,8 +98,9 @@ describe('mountFixtureLights on a scene', () => {
     const s = new Scene(new NullEngine());
     lamp(s);
     expect(mountFixtureLights(s, 'mobile', 'nightGame', null)).toBeNull();
-    (s.metadata ??= {}).felModeId = 'onevone';   // a held hoops mode (vis-hoops-court's) — dunk is lifted
-    expect(mountFixtureLights(s, 'high', 'nightGame', null)).toBeNull();
+    (s.metadata ??= {}).felModeId = HELD_PROBE_MODE;
+    const release = holdProbeMode();
+    try { expect(mountFixtureLights(s, 'high', 'nightGame', null)).toBeNull(); } finally { release(); }
     s.metadata.felModeId = 'volleyball';
     const before = s.lights.length;
     expect(mountFixtureLights(s, 'desktop', 'nightGame', null)).toBeNull();   // NullEngine has no texelFetch: unsupported
@@ -108,13 +110,16 @@ describe('mountFixtureLights on a scene', () => {
     expect(fixtureLightsWanted('desktop', 'volleyball')).toBe(true);
     expect(fixtureLightsWanted('high', null)).toBe(true);
     expect(fixtureLightsWanted('mobile', 'volleyball')).toBe(false);
-    expect(fixtureLightsWanted('high', 'onevone')).toBe(false);   // a mode still held (vis-hoops-court's)
+    const release = holdProbeMode();
+    try { expect(fixtureLightsWanted('high', HELD_PROBE_MODE)).toBe(false); } finally { release(); }
     expect(fixtureLightsWanted('high', 'dunk')).toBe(true);       // vis-hoops-dunk lifted its hold
     expect(fixtureLightsWanted('high', 'volleyball', true)).toBe(false);
   });
-  it('the court hoops modes stay held until their lane lifts them; dunk, dunkduel and threepoint (vis-hoops-dunk) and everything else take the look', () => {
-    for (const m of ['onevone', 'threevthree', 'carnival']) expect(wave2Look(m), m).toBe(false);
-    for (const m of ['dunk', 'dunkduel', 'threepoint', 'football', 'volleyball', 'karate', 'dance', 'golf', null]) expect(wave2Look(m), String(m)).toBe(true);
-    expect(WAVE2_HELD_MODES.size).toBeGreaterThanOrEqual(3);
+  it('a held id is not given the look; everything else is — all six hoops modes and their aliases included (both hoops lanes lifted)', () => {
+    const release = holdProbeMode();
+    try { expect(wave2Look(HELD_PROBE_MODE)).toBe(false); expect(WAVE2_HELD_MODES.has(HELD_PROBE_MODE)).toBe(true); } finally { release(); }
+    expect(WAVE2_HELD_MODES.has(HELD_PROBE_MODE)).toBe(false);
+    for (const m of ['dunk', 'dunkduel', 'threepoint', 'onevone', 'threevthree', 'carnival', 'basketball', 'hoops1v1', 'hoops3v3', 'basketball_h2h', 'basketball_dunk']) expect(wave2Look(m), m).toBe(true);
+    for (const m of ['football', 'volleyball', 'karate', 'dance', 'golf', null]) expect(wave2Look(m), String(m)).toBe(true);
   });
 });

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { MeshBuilder, NullEngine, PBRMaterial, Scene, Vector3 } from '@babylonjs/core';
 import { GLOSSY_FLOOR_MESH, GLOSSY_FLOOR_MODES, MIRROR_RADIUS, VARNISH_ROUGHNESS, glossyFloorWanted, mirrorRatio, mirrors, mountGlossyFloor } from './GlossyFloor';
+import { HELD_PROBE_MODE, holdProbeMode } from '../../../tests/helpers/heldMode';
 
 const mesh = (name: string, extra: Partial<{ skeleton: unknown; isVisible: boolean; enabled: boolean }> = {}) =>
   ({ name, skeleton: extra.skeleton, isVisible: extra.isVisible ?? true, isEnabled: () => extra.enabled ?? true });
@@ -13,7 +14,9 @@ describe('which floors', () => {
     expect(glossyFloorWanted('desktop', 'volleyball', 'court')).toBe(true);    // the Gym
     expect(glossyFloorWanted('desktop', 'volleyball', 'sand')).toBe(false);    // the beach
     expect(glossyFloorWanted('mobile', 'dance', undefined)).toBe(false);
-    expect(glossyFloorWanted('high', 'onevone', 'court')).toBe(false);         // still held (vis-hoops-court's)
+    const release = holdProbeMode();
+    try { expect(glossyFloorWanted('high', HELD_PROBE_MODE, 'court')).toBe(false); } finally { release(); }   // a held mode gets no mirror
+    expect(glossyFloorWanted('high', 'onevone', 'court')).toBe(true);          // vis-hoops-court lifted the hold: a wooden-court place mirrors
     for (const m of ['dunk', 'dunkduel', 'threepoint']) expect(glossyFloorWanted('desktop', m, undefined), m).toBe(true);   // vis-hoops-dunk: the Venice court's painted plane
     expect(glossyFloorWanted('mobile', 'dunk', undefined)).toBe(false);
     expect(glossyFloorWanted('desktop', 'dunk', undefined, true)).toBe(false);   // ?lookoff=mirror

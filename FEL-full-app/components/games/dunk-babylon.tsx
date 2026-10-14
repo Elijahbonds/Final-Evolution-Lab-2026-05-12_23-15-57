@@ -25,9 +25,21 @@ import { DunkBeatStrip } from './dunk-beat-strip';
 import { DunkFieldBoard } from './dunk-field-board';
 import { decodeTakeoff, ZONE_HEX } from '@/lib/babylon/core/DunkTakeoffRead';
 import { MicCaption, MicToggle } from './mic-caption';
+import { HUD_PLATE, HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, LINE_CLAMP_STYLE, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
+import { JudgeCards } from './judge-cards';
 import type { HudPoster } from '@/lib/babylon/core/ModeHarness';
 
 type Hud = Record<string, HudValue>;
+
+/** Venice DualShock pad: on phones (< 640 px) the hint and the beat strip sit above the pad column (the diamond stacks over the LOOK
+ *  stick, about 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */
+const PAD_LIFT = 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)';
+
+/** A tappable chip (SKIP / RUN IT BACK / CHALLENGE): the plate, the label step and a tone, on a real button. */
+const chipButtonStyle = (tone: HudTone) => ({
+  ...hudType('label'), color: hudColor(tone), background: HUD_PLATE.background, border: HUD_PLATE.border,
+  borderRadius: HUD_PLATE.radius, boxShadow: HUD_PLATE.shadow, letterSpacing: '0.12em', fontWeight: 800,
+});
 
 /** TRY-ONBOARD (G1/G3/G7): a continuous host wants the NIGHT CARD, not a session end.
  *  `continuous` puts the mode on its GO AGAIN loop; `onCard` receives each night's
@@ -198,6 +210,11 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   }, [emit]);
 
   const judging = Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0;
+  // the banner's text (none while the judges hold the screen), and whether it rides high (the dunker is in the air)
+  const bannerText = !judging && typeof hud.banner === 'string' ? hud.banner : '';
+  const bannerUp = bannerText !== '' && hud.bannerHigh === true;
+  // the timing verdict: how the dunk was actually landed, under the judges' cards' slot
+  const timing = !judging && typeof hud.slamTiming === 'string' && hud.slamTiming !== '' && phase === 'playing';
 
   // ── Controller Link (CONTROLLER-UNIVERSAL-MULTI) ──────────────────────────
   // A phone joins by QR as this contest's pad while the host is on the TV. ONE adapter per bus: toInputBus keeps the
@@ -214,54 +231,107 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           from DunkMode's `slamBeat` so a harness can press ON the beat instead of on a stopwatch (CLOTHING-SOFT-RESIDUAL R2). */}
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/hud-hoops): the contest's readouts on the shared system — same keys, same gates, same handlers.
+          The two corner columns flow (the scoreboard, then what hangs under it) instead of sitting at top-[9%] / top-[15%]:
+          those offsets were a phone's proportions, and at the TV's zoom the scoreboard row is taller than 9 % of the screen,
+          so the walk-out line, the SKIP / RUN IT BACK / CHALLENGE chip and the cut bug landed on top of it (measured). */}
+      <HudFrame>
       {/* HUD bezel — judged contest scoreboard (M47) */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 py-3 font-mono text-xs">
-        <div className="flex items-center gap-2">
-          <span className="fel-panel fel-stat px-3 py-1 text-lg">
-            {hnode(hud.score, 0)} <span className="text-white/50">vs</span> {hnode(hud.rivalScore, 0)}
-          </span>
-          {hud.round != null && (
-            <span className="fel-panel px-2 py-1 text-[var(--fel-cyan)]">{/^\d/.test(String(hud.round)) ? 'RD ' : ''}{hnode(hud.round)}</span>
+      <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 px-4 py-3">
+        <div className="flex min-w-0 flex-col items-start gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Scorebug>
+              <ScoreValue value={hnode(hud.score, 0)} size="stat" />
+              <HudText size="label" alpha={HUD_TEXT_ALPHA.faint}>vs</HudText>
+              <ScoreValue value={hnode(hud.rivalScore, 0)} size="stat" />
+            </Scorebug>
+            {hud.round != null && (
+              <HudChip tone="you" size="body">{/^\d/.test(String(hud.round)) ? 'RD ' : ''}{hnode(hud.round)}</HudChip>
+            )}
+            {/* dunk-next phase 3: the dunk-off's own two cards — never added to the night's totals beside them */}
+            {typeof hud.dunkOff === 'string' && hud.dunkOff && (
+              <HudChip tone="score" size="body" style={{ fontWeight: 800 }}>{hud.dunkOff}</HudChip>
+            )}
+            {hud.dunkNum != null && (
+              <HudChip alpha={0.7} size="body">DUNK {hnode(hud.dunkNum)}</HudChip>
+            )}
+          </div>
+          {/* WHOSE TRACK IS PLAYING. The walk-out is audio first -- it plays whether or not this draws -- but a
+              player should be able to see that the thing they authored in the Music Room is the thing coming
+              out of the speakers. Phrased by walkOutLine so the wording lives in one place. */}
+          {typeof hud.walkOutNow === 'string' && hud.walkOutNow && phase === 'playing' && (
+            <HudChip tone="you" alpha={0.85} size="caption" className="uppercase">{hud.walkOutNow}</HudChip>
           )}
-          {/* dunk-next phase 3: the dunk-off's own two cards — never added to the night's totals beside them */}
-          {typeof hud.dunkOff === 'string' && hud.dunkOff && (
-            <span className="fel-panel px-2 py-1 font-bold text-[var(--fel-gold)]">{hud.dunkOff}</span>
+          {/* DUNK MOTION phase 12 — THE SHOW: the broadcast bug while the triple cut plays (a tap skips it), the announcer's lower third,
+              and the poster of a big make, kept until the next attempt. */}
+          {typeof hud.cut === 'string' && hud.cut && (
+            <HudPlate as="span" className="inline-flex items-center gap-2 px-2.5 py-1">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full motion-reduce:animate-none" style={{ background: hudColor('danger') }} />
+              <HudText size="caption" className="uppercase tracking-[0.16em]">{hud.cut}</HudText>
+              <HudText size="caption" alpha={0.4}>· tap to skip</HudText>
+            </HudPlate>
           )}
-          {hud.dunkNum != null && (
-            <span className="fel-panel px-2 py-1 text-white/70">DUNK {hnode(hud.dunkNum)}</span>
+          {/* dunk-next phase 5: THE FIELD — four dunkers, the cut line, the final (core/DunkField); the night card shows the full board */}
+          {typeof hud.field === 'string' && hud.field && phase === 'playing' && !card && !judging && (
+            <div>
+              <DunkFieldBoard value={hud.field} compact />
+            </div>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {hud.prop != null && (
-            <span className="fel-panel px-2 py-1 text-[var(--fel-purple)]">{hnode(hud.prop)}</span>
+        <div className="flex max-w-[55%] flex-none flex-col items-end gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {hud.prop != null && (
+              <HudChip tone="power" size="body">{hnode(hud.prop)}</HudChip>
+            )}
+            {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing */}
+            {hud.specials === 'LOCKED' && (
+              <HudChip tone="score" alpha={0.8} size="caption" style={{ fontWeight: 700 }}>SPECIALS · SEASON PASS</HudChip>
+            )}
+            {hud.style != null && (
+              <HudChip tone="score" size="body">{hnode(hud.style)}</HudChip>
+            )}
+          </div>
+
+          {/* dunk-next phase 4: SKIP the rival's dunk straight to his card (B on a pad, K on a keyboard, this chip on a phone) */}
+          {hud.rivalSkip === true && phase === 'playing' && !card && (
+            <button type="button" onClick={tapSkip} data-fel-dunk-skip
+              className="pointer-events-auto inline-flex items-center gap-2 px-3 py-1.5 uppercase" style={chipButtonStyle('text')}>
+              SKIP TO HIS CARD <span style={{ opacity: 0.45 }}>B ▸▸</span>
+            </button>
           )}
-          {/* SEASON SPECIALS: the kangaroo, the sky tap, the board-top flip and the backboard run are the PRO lane's — named and locked, never missing */}
-          {hud.specials === 'LOCKED' && (
-            <span className="fel-panel px-2 py-1 font-mono text-[9px] tracking-wider text-amber-300/80">SPECIALS · SEASON PASS</span>
+
+          {/* dunk-next phase 8: RUN IT BACK on a retryable miss (A or RUN on a pad / keyboard, this chip on a phone) — the attempt is already spent */}
+          {hud.runBack === true && phase === 'playing' && !card && (
+            <button type="button" onClick={tapRunBack} data-fel-dunk-runback
+              className="pointer-events-auto inline-flex items-center gap-2 px-3 py-1.5 uppercase" style={chipButtonStyle('you')}>
+              RUN IT BACK <span style={{ opacity: 0.45 }}>A ▸</span>
+            </button>
           )}
-          {hud.style != null && (
-            <span className="fel-panel px-2 py-1 text-[var(--fel-gold)]">{hnode(hud.style)}</span>
+
+          {/* dunk-next phase 6: the practice runway's CHALLENGE — the set piece, its target and your best (L1 on a pad, Q on a keyboard, a tap here) */}
+          {typeof hud.challenge === 'string' && hud.challenge && phase === 'playing' && !card && (
+            <button type="button" onClick={tapChallenge} data-fel-dunk-challenge
+              className="pointer-events-auto inline-flex items-center gap-2 px-3 py-1.5 uppercase" style={chipButtonStyle('score')}>
+              {hud.challenge} <span style={{ opacity: 0.45 }}>L1 ▸</span>
+            </button>
           )}
+
+          {/* HYPE meter */}
+          {phase === 'playing' && (
+            <HudMeter className="items-end" label="HYPE" labelTone="danger" height="thin" width="6rem" value={Math.max(0, Math.min(100, hnum(hud.hype)))} max={100} tone="danger" />
+          )}
+          {/* THE MIC's switch hangs under the HYPE meter: at its own top-[18%] corner it sat on top of it at the TV's zoom (measured) */}
+          {phase === 'playing' && <MicToggle flow />}
         </div>
       </div>
-
-      {/* HYPE meter */}
-      {phase === 'playing' && (
-        <div className="pointer-events-none absolute right-4 top-14 flex flex-col items-end gap-1">
-          <span className="font-mono text-[10px] text-[var(--fel-red)]">HYPE</span>
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full bg-[var(--fel-red)] transition-[width] duration-300" style={{ width: `${Math.max(0, Math.min(100, hnum(hud.hype)))}%` }} />
-          </div>
-        </div>
-      )}
 
       {/* Venice DualShock pad (2026-09-05): the charge METER is gone — the Benchmark feel bar calls a meter a hard
           fail ("meter slideshow"), and HOLD = RUN carries its own cue: the hold ring fills on the pad's RUN button. */}
 
       {/* SLAM! cue */}
       {hud.slamPulse === true && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 text-center">
-          <span className="fel-heading text-4xl font-black text-[var(--fel-gold)] drop-shadow">SLAM!</span>
+        <div className="absolute inset-x-0 top-1/2 text-center">
+          <HudText size="hero" tone="score">SLAM!</HudText>
         </div>
       )}
 
@@ -277,95 +347,29 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           the verdict frame with "105 ms EARLY - EXECUTION 75%" showing through the gaps BETWEEN the judge chips,
           stray letters and all. Percent offsets cannot express "under" — a column can, so they share one now and the
           order is the order they are read in. */}
-      {(judging || (typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && !judging)) ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[20%] flex flex-col items-center gap-2">
-          {judging && (
-            <>
-              <div className="flex items-end justify-center gap-1.5">
-                {(hud.judgeReveal as HudScoreCard[]).map((j) => (
-                  <div key={j.name} className="fel-panel flex flex-col items-center px-2.5 py-1">
-                    <span className="font-mono text-[9px] uppercase tracking-wider text-[var(--fel-cyan)]">{j.name}</span>
-                    <span className="text-2xl font-black leading-none text-[var(--fel-gold)]">{j.score}</span>
-                  </div>
-                ))}
-                <div className="fel-panel ml-1 flex flex-col items-center border-[var(--fel-gold)]/40 px-3 py-1">
-                  <span className="font-mono text-[9px] uppercase tracking-wider text-white/50">total</span>
-                  <span className="text-2xl font-black leading-none text-white">
-                    {(hud.judgeReveal as HudScoreCard[]).reduce((s, j) => s + Number(j.score), 0)}
-                  </span>
-                </div>
-              </div>
-              {/* the card that just flipped gets to speak */}
-              <span className="fel-panel max-w-[85%] truncate px-3 py-1 font-mono text-[11px] text-white/70">
-                {(hud.judgeReveal as HudScoreCard[])[(hud.judgeReveal as HudScoreCard[]).length - 1].line}
-              </span>
-            </>
-          )}
-          {!judging && typeof hud.slamTiming === 'string' && hud.slamTiming && phase === 'playing' && (
+      {(judging || timing || bannerUp) ? (
+        <div className={`absolute inset-x-0 ${bannerUp ? 'top-[13%]' : 'top-[20%]'} flex flex-col items-center gap-2`}>
+          {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
+              sat exactly where both flight cameras put the rim, so "OVER THE CAR!" / "WINDMILL!" covered the ball going through the
+              ring on every flush the eye filmed. It comes back down for the replay and the judges. It heads this column while it is
+              up, so the timing verdict under it can never sit on top of it. */}
+          {bannerUp && <HudBanner flow text={bannerText} tone="you" size="score" />}
+          {judging && <JudgeCards cards={hud.judgeReveal as HudScoreCard[]} />}
+          {timing && (
             <div className="flex flex-col items-center gap-1">
-              <span className="fel-panel px-3 py-1 font-mono text-[12px] tracking-wide text-[var(--fel-cyan)]">
-                {hud.slamTiming}
-              </span>
+              <HudChip tone="you" size="body">{String(hud.slamTiming)}</HudChip>
               {typeof hud.breakdown === 'string' && hud.breakdown ? (
-                <span className="fel-panel px-2.5 py-0.5 font-mono text-[10px] text-white/60">{hud.breakdown}</span>
+                <HudChip size="caption" alpha={0.6}>{hud.breakdown}</HudChip>
               ) : null}
             </div>
           )}
         </div>
-      ) : null}  {/* banner — DUNK-CAR-CLIP R2: while the dunker is in the air (hud.bannerHigh) it rides at the top of the frame. At 38% it
-          sat exactly where both flight cameras put the rim, so "OVER THE CAR!" / "WINDMILL!" covered the ball going through the
-          ring on every flush the eye filmed. It comes back down for the replay and the judges. */}
-      {!judging && typeof hud.banner === 'string' && hud.banner && (
-        <div className={`pointer-events-none absolute inset-x-0 ${hud.bannerHigh === true ? 'top-[13%]' : 'top-[38%]'} text-center`}>
-          <span className="fel-heading fel-panel px-4 py-2 text-2xl font-bold text-[var(--fel-cyan)]">{hud.banner}</span>
-        </div>
-      )}
+      ) : null}
+      {!judging && !bannerUp && <HudBanner text={bannerText} tone="you" size="score" className="top-[38%]" />}
 
-      {/* dunk-next phase 5: THE FIELD — four dunkers, the cut line, the final (core/DunkField); the night card shows the full board */}
-      {typeof hud.field === 'string' && hud.field && phase === 'playing' && !card && !judging && (
-        <div className="pointer-events-none absolute left-3 top-[15%]">
-          <DunkFieldBoard value={hud.field} compact />
-        </div>
-      )}
-
-      {/* dunk-next phase 4: SKIP the rival's dunk straight to his card (B on a pad, K on a keyboard, this chip on a phone) */}
-      {hud.rivalSkip === true && phase === 'playing' && !card && (
-        <button type="button" onClick={tapSkip} data-fel-dunk-skip
-          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-white">
-          SKIP TO HIS CARD <span className="text-white/45">B ▸▸</span>
-        </button>
-      )}
-
-      {/* dunk-next phase 8: RUN IT BACK on a retryable miss (A or RUN on a pad / keyboard, this chip on a phone) — the attempt is already spent */}
-      {hud.runBack === true && phase === 'playing' && !card && (
-        <button type="button" onClick={tapRunBack} data-fel-dunk-runback
-          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--fel-cyan)]">
-          RUN IT BACK <span className="text-white/45">A ▸</span>
-        </button>
-      )}
-
-      {/* dunk-next phase 6: the practice runway's CHALLENGE — the set piece, its target and your best (L1 on a pad, Q on a keyboard, a tap here) */}
-      {typeof hud.challenge === 'string' && hud.challenge && phase === 'playing' && !card && (
-        <button type="button" onClick={tapChallenge} data-fel-dunk-challenge
-          className="fel-panel pointer-events-auto absolute right-3 top-[9%] inline-flex items-center gap-2 px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--fel-gold)]">
-          {hud.challenge} <span className="text-white/45">L1 ▸</span>
-        </button>
-      )}
-
-      {/* DUNK MOTION phase 12 — THE SHOW: the broadcast bug while the triple cut plays (a tap skips it), the announcer's lower third,
-          and the poster of a big make, kept until the next attempt. */}
-      {typeof hud.cut === 'string' && hud.cut && (
-        <div className="pointer-events-none absolute left-3 top-[9%]">
-          <span className="fel-panel inline-flex items-center gap-2 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-white">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />{hud.cut}<span className="text-white/40">· tap to skip</span>
-          </span>
-        </div>
-      )}
-      {phase === 'playing' && !judging && <MicCaption text={hud.mic} who={hud.micWho} />}
-      {phase === 'playing' && <MicToggle />}
       {!judging && typeof hud.call === 'string' && hud.call && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-[58%] px-4 text-center">
-          <span className="fel-heading inline-block rounded-md bg-black/55 px-3 py-1 text-base font-black uppercase italic tracking-wide text-[#ffd75e]">{hud.call}</span>
+        <div className="absolute inset-x-0 top-[58%] px-4 text-center">
+          <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{hud.call}</HudText></HudPlate>
         </div>
       )}
       {hud.poster && typeof hud.poster === 'object' && !Array.isArray(hud.poster) && phase === 'playing' && (
@@ -374,16 +378,6 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
 
       {/* Venice DualShock pad: on phones (< 640 px) the hint plate sits above the pad column (the diamond stacks over the
           LOOK stick, ≈ 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */}
-      {/* WHOSE TRACK IS PLAYING. The walk-out is audio first -- it plays whether or not this draws -- but a
-          player should be able to see that the thing they authored in the Music Room is the thing coming
-          out of the speakers. Phrased by walkOutLine so the wording lives in one place. */}
-      {typeof hud.walkOutNow === 'string' && hud.walkOutNow && phase === 'playing' && (
-        <div className="pointer-events-none absolute left-3 top-3">
-          <span className="fel-panel px-2.5 py-1 font-mono text-[10px] uppercase tracking-wide text-[var(--fel-cyan)]/80">
-            {hud.walkOutNow}
-          </span>
-        </div>
-      )}
 
       {/* dunk-next phase 7 — THE TAKE-OFF READ: on the run, the foot and where he would leave the floor going up NOW, in the judges' own
           words and the floor mark's colour (the stripe gold, the elbow cyan, the paint white). The beat strip takes this spot in the air. */}
@@ -391,10 +385,12 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         const t = decodeTakeoff(hud.takeoff);
         if (!t || phase !== 'playing' || judging || (typeof hud.beats === 'string' && hud.beats)) return null;
         return (
-          <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ bottom: 'calc(clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem) + 2.6rem)' }}>
-            <span className="fel-panel inline-flex items-center gap-2 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: ZONE_HEX[t.zone] }} data-fel-takeoff={t.zone}>
-              <span className="text-white/45">TAKE-OFF</span>{t.chip}
-            </span>
+          <div className="absolute inset-x-0 flex justify-center px-3" style={{ bottom: `calc(${PAD_LIFT} + 2.6rem)` }}>
+            <HudPlate as="span" className="inline-flex items-center px-3 py-1">
+              <HudText size="label" className="inline-flex items-baseline gap-2 uppercase" style={{ fontWeight: 800 }}>
+                <span style={{ opacity: 0.45 }}>TAKE-OFF</span><span style={{ color: ZONE_HEX[t.zone] }} data-fel-takeoff={t.zone}>{t.chip}</span>
+              </HudText>
+            </HudPlate>
           </div>
         );
       })()}
@@ -402,14 +398,16 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {/* dunk-next phase 1 — THE BEAT STRIP: RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT. Above the hint, out of
           the way of the rim; it stands aside for the triple cut and the judges. */}
       {typeof hud.beats === 'string' && hud.beats && phase === 'playing' && !judging && !(typeof hud.cut === 'string' && hud.cut) && (
-        <div className="pointer-events-none absolute inset-x-0 flex justify-center px-3" style={{ bottom: 'calc(clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem) + 2.6rem)' }}>
+        <div className="absolute inset-x-0 flex justify-center px-3" style={{ bottom: `calc(${PAD_LIFT} + 2.6rem)` }}>
           <DunkBeatStrip value={hud.beats} />
         </div>
       )}
 
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 px-3 text-center" style={{ bottom: 'clamp(2.5rem, calc((640px - 100vw) * 999), 17.5rem)' }}>
-          <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
+        <div className="absolute inset-x-0 px-3 text-center" style={{ bottom: PAD_LIFT }}>
+          <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5">
+            <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hud.hint}</HudText>
+          </HudPlate>
         </div>
       )}
 
@@ -418,60 +416,72 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           camera is still on the dunker, and one button puts him back on the runway. It covers
           nothing at the bottom of the screen, where the touch pad lives. */}
       {card && (
-        <div className="pointer-events-none absolute inset-x-0 top-[18%] flex flex-col items-center px-4 text-center">
-          <div className="fel-panel pointer-events-auto w-full max-w-sm rounded-2xl px-6 py-5">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/45">
+        <div className="absolute inset-x-0 top-[18%] flex flex-col items-center px-4 text-center landscape:top-[15%]">
+          {/* upright it is one column, as it was; on a sideways screen (a TV, a phone on its side) the same card is two columns, because
+              the one-column card ran off the bottom of the screen and took GO AGAIN with it (measured at 1920x1080 and 844x390) */}
+          <HudPlate className="pointer-events-auto w-full max-w-sm px-6 py-5 landscape:max-w-[34rem] landscape:py-4" style={{ borderRadius: 16 }}>
+          <div className="landscape:grid landscape:grid-cols-2 landscape:items-center landscape:gap-x-6">
+          <div>
+            <HudText as="div" size="caption" alpha={0.45} className="uppercase tracking-[0.2em]">
               Night {hnum(hud.nightNum) || 1} · Flight Night
-            </p>
-            <h2 className={`fel-heading mt-1 text-3xl font-black ${card === 'WON' ? 'text-[var(--fel-gold)]' : 'text-white'}`}>
+            </HudText>
+            <HudText as="div" size="banner" tone={card === 'WON' ? 'score' : 'text'} className="mt-1 uppercase" style={{ fontWeight: 800 }}>
               {card === 'WON' ? 'YOU TOOK THE CARD' : typeof hud.nightField === 'string' && hud.nightField.startsWith('CUT') ? 'CUT AT THE LINE' : 'RIVAL TOOK THE CARD'}
-            </h2>
+            </HudText>
             {/* dunk-next phase 5: how the field went — the champion, the final, or where the cut fell */}
             {typeof hud.nightField === 'string' && hud.nightField ? (
-              <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightField}</p>
+              <HudText as="div" size="label" tone="score" className="mt-1 uppercase">{hud.nightField}</HudText>
             ) : null}
-            <p className="mt-2 font-mono text-sm text-white/70">
-              YOU {hnode(hud.score, 0)} <span className="text-white/35">·</span> RIVAL {hnode(hud.rivalScore, 0)}
-            </p>
+            <HudText as="div" size="value" alpha={0.7} className="mt-2">
+              YOU {hnode(hud.score, 0)} <span style={{ opacity: 0.5 }}>·</span> RIVAL {hnode(hud.rivalScore, 0)}
+            </HudText>
             {typeof hud.nightDunkOff === 'string' && hud.nightDunkOff ? (
-              <p className="mt-1 font-mono text-[11px] font-bold uppercase text-[var(--fel-gold)]">{hud.nightDunkOff}</p>
+              <HudText as="div" size="label" tone="score" className="mt-1 uppercase">{hud.nightDunkOff}</HudText>
             ) : null}
             {typeof hud.field === 'string' && hud.field ? <div className="mt-2 text-left"><DunkFieldBoard value={hud.field} /></div> : null}
+          </div>
+          <div>
             {/* dunk-next phase 6: what a won night just opened on this device, or the next thing to chase */}
             {typeof hud.nightUnlock === 'string' && hud.nightUnlock ? (
-              <p className={`mt-2 font-mono text-[10px] font-bold uppercase tracking-wide ${hud.nightUnlock.startsWith('UNLOCKED') ? 'text-[var(--fel-gold)]' : 'text-white/45'}`}>{hud.nightUnlock}</p>
+              <HudText as="div" size="caption" tone={hud.nightUnlock.startsWith('UNLOCKED') ? 'score' : 'text'} alpha={hud.nightUnlock.startsWith('UNLOCKED') ? 1 : 0.55} className="mt-2 uppercase" style={{ fontWeight: 800 }}>{hud.nightUnlock}</HudText>
             ) : null}
-            <p className="mt-1 font-mono text-[11px] text-white/45">
+            <HudText as="div" size="label" alpha={0.55} className="mt-1">
               {hnum(hud.nightMakes)} dunked · {hnum(hud.nightMisses)} missed
               {hnum(hud.nightBest) > 1 ? ` · best run ${hnum(hud.nightBest)}` : ''}
-            </p>
+            </HudText>
             {/* WHO YOU WERE UP AGAINST. A roster means coming back is a different night; the card is where
                 that becomes visible, because it is the screen a player actually reads. */}
             {typeof hud.rivalName === 'string' && hud.rivalName ? (
-              <p className="mt-1 font-mono text-[10px] uppercase tracking-wide text-white/45">
+              <HudText as="div" size="caption" alpha={0.55} className="mt-1 uppercase">
                 vs {hud.rivalName}
-              </p>
+              </HudText>
             ) : null}
             {/* THE PASSION PIPELINE CREDENTIAL. Engagement, stated as engagement -- the label is phrased by
                 musicCredential so no surface here can turn a play count into a rating or a gate. Absent
                 when the athlete has no walk-out, rather than shown as a zero. */}
             {typeof hud.walkOut === 'string' && hud.walkOut ? (
-              <p className="mt-2 font-mono text-[10px] uppercase tracking-wide text-[var(--fel-cyan)]/70">
+              <HudText as="div" size="caption" tone="you" alpha={0.7} className="mt-2 uppercase">
                 {hud.walkOut}
-              </p>
+              </HudText>
             ) : null}
             <button
               onClick={tapGoAgain}
               disabled={!cardArmed}
-              className={`mt-4 w-full rounded-xl bg-[var(--fel-cyan)] px-6 py-3 fel-heading text-lg font-bold text-black transition-all ${cardArmed ? 'opacity-100 hover:scale-[1.02]' : 'opacity-40'}`}
+              className={`mt-4 w-full px-6 py-3 transition-all ${cardArmed ? 'opacity-100 hover:scale-[1.02]' : 'opacity-40'}`}
+              style={{ ...hudType('stat'), background: hudColor('you'), color: hudColor('ink'), borderRadius: 12, fontWeight: 800 }}
             >
               GO AGAIN
             </button>
-            <p className="mt-2 font-mono text-[10px] text-white/35">or press any button</p>
+            <HudText as="div" size="caption" alpha={0.5} className="mt-2">or press any button</HudText>
             {cardSlot}
           </div>
+          </div>
+          </HudPlate>
         </div>
       )}
+      </HudFrame>
+
+      {phase === 'playing' && !judging && <MicCaption text={hud.mic} who={hud.micWho} />}
 
       {/* BootSplash: cartridge boot / venue art / progress / READY / 3-2-1 / error+retry / PAUSED */}
       <BootSplash

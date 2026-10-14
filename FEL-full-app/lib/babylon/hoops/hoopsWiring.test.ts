@@ -36,10 +36,10 @@ describe('the hoops visual modules import nothing that scores, judges, times or 
   });
 });
 
-describe('the look hold: this lane lifted dunk, dunkduel and threepoint, and only those', () => {
-  it('they take the shared look; the court modes (another lane\'s) are still held', () => {
+describe('the look hold: this lane lifted dunk, dunkduel and threepoint (and vis-hoops-court its own)', () => {
+  it('they take the shared look; so do the court modes, lifted by their lane', () => {
     for (const m of ['dunk', 'dunkduel', 'threepoint']) expect(wave2Look(m), m).toBe(true);
-    for (const m of ['onevone', 'threevthree', 'carnival']) expect(wave2Look(m), m).toBe(false);
+    for (const m of ['onevone', 'threevthree', 'carnival']) expect(wave2Look(m), m).toBe(true);   // vis-hoops-court lifted its own (merged): all six hoops modes take the look
     for (const m of ['dunk', 'dunkduel', 'threepoint', 'basketball_dunk']) expect(WAVE2_HELD_MODES.has(m), m).toBe(false);
   });
 });

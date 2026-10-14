@@ -4,6 +4,7 @@ import { Color3, MeshBuilder, NullEngine, Scene, StandardMaterial, Texture } fro
 import { BAKE_HORIZON_Y, SKY_LOOKS, SUN_GLOW, bakeKeyOf, mountSkyDome, skyDomeWanted, towardSun } from './SkyDome';
 import { HAZE, HAZE_DENSITY, atmosphereWanted, hazeAt, mountAtmosphere } from './Atmosphere';
 import { MOODS, type VenueMood } from './moods';
+import { HELD_PROBE_MODE, holdProbeMode } from '../../../tests/helpers/heldMode';
 
 describe('the sky looks', () => {
   it('reads which photograph a dome shows, through the washed and recomposed copies', () => {
@@ -43,8 +44,10 @@ describe('mountSkyDome', () => {
     expect(skyDomeWanted('desktop', 'sprint')).toBe(true);
     expect(skyDomeWanted('high', null)).toBe(true);
     expect(skyDomeWanted('mobile', 'sprint')).toBe(false);
-    expect(skyDomeWanted('high', 'onevone')).toBe(false);   // a mode still held (vis-hoops-court's)
-    expect(skyDomeWanted('high', 'dunk')).toBe(true);       // vis-hoops-dunk lifted its hold (dunk, dunkduel, threepoint)
+    const release = holdProbeMode();
+    try { expect(skyDomeWanted('high', HELD_PROBE_MODE)).toBe(false); } finally { release(); }
+    expect(skyDomeWanted('high', 'onevone')).toBe(true);   // vis-hoops-court lifted its hold
+    expect(skyDomeWanted('high', 'dunk')).toBe(true);      // vis-hoops-dunk lifted its hold (dunk, dunkduel, threepoint)
     expect(skyDomeWanted('high', 'sprint', true)).toBe(false);
   });
   it('plugs into the domes\' own materials (both skies) and comes off again', () => {
@@ -87,7 +90,8 @@ describe('the haze (aerial perspective)', () => {
     expect(atmosphereWanted(base)).toBe(true);
     expect(atmosphereWanted({ ...base, fogMode: Scene.FOGMODE_EXP2 })).toBe(false);   // a weather's fog, a spec venue's
     expect(atmosphereWanted({ ...base, hasVenueSky: true })).toBe(false);
-    expect(atmosphereWanted({ ...base, modeId: 'onevone' })).toBe(false);   // a mode still held (vis-hoops-court's)
+    const release = holdProbeMode();
+    try { expect(atmosphereWanted({ ...base, modeId: HELD_PROBE_MODE })).toBe(false); } finally { release(); }
     expect(atmosphereWanted({ ...base, modeId: 'threepoint' })).toBe(true);   // vis-hoops-dunk lifted its hold
     expect(atmosphereWanted({ ...base, mood: 'indoorArena' })).toBe(false);
     expect(atmosphereWanted({ ...base, off: true })).toBe(false);

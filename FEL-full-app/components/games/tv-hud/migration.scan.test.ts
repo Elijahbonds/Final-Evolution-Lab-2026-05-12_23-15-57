@@ -92,10 +92,37 @@ export const MIGRATED: Record<string, {
     modeId: '"velocitykart"',
     keys: 'banner chasing cup delta draft drift gap hint item itemKind lap mini pos shield speed threat threatHop threatSide time trackCue'.split(' '),
   },
+  // lane/hud-hoops: the hoops hosts (keys frozen from the base aeb65c98, the hold-lift round's head; modeId as each host binds its splash and touch deck)
+  'dunk-babylon.tsx': {
+    modeId: '"dunk"',
+    // (HostLobby and PadChips are the host's, outside the frame; the QR lobby's anchor is pinned by consoleView.scan)
+    keys: 'banner bannerHigh beats breakdown call challenge cut dunkNum dunkOff field hint hype judgeReveal mic micWho nightBest nightCard nightDunkOff nightField nightMakes nightMisses nightNum nightUnlock poster prop rivalName rivalScore rivalSkip round runBack score slamBeat slamPulse slamTiming specials style takeoff walkOut walkOutNow'.split(' '),
+  },
+  'carnival-babylon.tsx': {
+    modeId: '"carnival"',
+    keys: 'banner blurb board boardTitle charge chargeHi chargeLo eventNum hint mic micWho p1name p2name rivalLive rivalScore score time turnLabel'.split(' '),
+  },
+  'dunkduel-babylon.tsx': {
+    modeId: '"dunkduel"',
+    keys: 'activePlayer banner charge dunkNum hint judgeReveal mic micWho p1Score p2Score prop slamPulse style'.split(' '),
+  },
+  'basketball-babylon.tsx': {
+    modeId: '"onevone"',
+    keys: 'banner foeScore hint mic micWho score shotMeterGreen shotMeterT shotPips winBy2'.split(' '),
+  },
+  'three-v-three-babylon.tsx': {
+    modeId: '"threevthree"',
+    allowHex: ['#fbbf24'],   // the touch deck's BALL! slot colour: TouchOverlay takes a hex string and tints with it (call-for-ball-tests pins the override)
+    keys: 'ast banner court foeScore hint mic micWho onBall overdrive passPreview score shotMeterGreen shotMeterT synergy time'.split(' '),
+  },
+  'three-point-babylon.tsx': {
+    modeId: '"threepoint"',
+    keys: 'ball ballIdx banner board clock cut heat left meter meterGreen meterHalf money moneyRack need rack rackIdx relPips round score streak'.split(' '),
+  },
 };
 
-/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter.) */
-const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx'];
+/** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row; hoops-shot-meter: the 1v1 and 3v3 release bar; dunk-beat-strip and dunk-field-board: the dunk host's own readouts; mic-caption: the MC's line and its switch, drawn by all six hoops hosts.) */
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx', 'hoops-shot-meter.tsx', 'dunk-beat-strip.tsx', 'dunk-field-board.tsx', 'mic-caption.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 
