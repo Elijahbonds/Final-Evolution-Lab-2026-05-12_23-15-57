@@ -299,6 +299,7 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
 // a control that does nothing. Unlisted = 'LOOK'.
 const R_STICK: Record<string, string | null> = {
   skateboard: 'FLICK',                                   // the trick input — never stolen for the camera
+  onevone: 'DRIBBLE', threevthree: 'DRIBBLE',            // H1: the R stick is the Pro Stick while you hold the ball
   tennis: null, tiebreak: null,                          // the rally camera is a cut behind the baseline
   volleyball: 'AIM',                                     // IMPROVE (2026-10-06): the R stick aims the spike and the serve, apart from the feet
   golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give

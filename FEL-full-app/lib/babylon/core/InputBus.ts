@@ -100,6 +100,14 @@ const KEYMAP: Record<string, FelInput> = {
   r: { t: 'button', btn: 'RS', pressed: true },
   escape: { t: 'button', btn: 'START', pressed: true },
 };
+// H1 H-19: the keyboard R stick (opt-in via InputBus.keyRStick). 8 is up, the ring around it the diagonals and sides;
+// N and / sweep: N draws down→left→up, clockwise on screen (+y is down), the reader's sign +1, a spin RIGHT;
+// / draws down→right→up, counter-clockwise, sign −1, a spin LEFT (F3). Up is −y like every stick.
+const D = Math.SQRT1_2;
+export const KEY_RSTICK: Readonly<Record<string, readonly [number, number]>> = {
+  '8': [0, -1], u: [-D, -D], o: [D, -D], h: [-1, 0], ';': [1, 0], m: [-D, D], ',': [0, 1], '.': [D, D],
+};
+export const KEY_SWEEP: Readonly<Record<string, 1 | -1>> = { n: -1, '/': 1 };
 // Dunk keyboard hotfix (2026-09-07): the ARROWS are the L stick too. They were d-pad only, so on a mode whose d-pad
 // is a picker (the dunk's PROP) ArrowUp cycled the prop instead of running at the rim while W ran — players use the
 // arrows exactly like WASD. Held arrows and WASD sum into ONE L-stick vector (up = −y on every source); the arrows
@@ -174,6 +182,8 @@ export class InputBus {
   private slotListeners = new Set<SlotListener>();
   private padListeners = new Set<PadsListener>();
   private held = new Set<string>();
+  /** H1 H-19: the keyboard R stick, opt-in (the hoops modes switch it on). A compass ring of keys clear of I/J/K/L. */
+  keyRStick = false;
   private raf = 0;
   /** Space doubles as R-trigger analog (hold-depth) for charge mechanics. */
   private spaceDownAt = 0;
@@ -235,6 +245,7 @@ export class InputBus {
     if (!held.length) return;
     if (held.some((k) => WASD.has(k))) this.emit({ t: 'stick', side: 'L', x: 0, y: 0 });
     if (held.includes(' ')) this.emit({ t: 'trigger', side: 'R', value: 0 });   // zero the charge; never fire it
+    if (held.some((k) => KEY_RSTICK[k])) this.emit({ t: 'stick', side: 'R', x: 0, y: 0 });   // H-19
     for (const key of held) {
       if (key.startsWith('pad_dpad_')) { this.emit({ t: 'dpad', dir: key.slice(9) as 'up' | 'down' | 'left' | 'right', pressed: false }); continue; }
       if (key.startsWith('pad_')) { this.emit({ t: 'button', btn: key.slice(4) as FelButton, pressed: false }); continue; }
@@ -248,6 +259,18 @@ export class InputBus {
 
   // A blur releases the keys and the pad a hidden window can no longer see let go of — never the body: the camera still
   // sees it (P3 Z7), and the arbiter composes what releaseAll sends with whatever the body is still doing.
+  /** H-19: a sweep key draws a quick half circle (the reader needs a rotation, not a point) and lets go. */
+  private sweepR(sign: 1 | -1): void {
+    const N = 6;
+    for (let i = 0; i <= N + 1; i++) {
+      setTimeout(() => {
+        if (i > N) { this.emit({ t: 'stick', side: 'R', x: 0, y: 0 }); return; }
+        const a = Math.PI / 2 - sign * (i / N) * Math.PI;   // from below the ball, round the ring
+        this.emit({ t: 'stick', side: 'R', x: Math.cos(a) * 0.95, y: Math.sin(a) * 0.95 });
+      }, i * 18);
+    }
+  }
+
   private onBlur = (): void => { this.releaseAll(); };
 
   on(fn: Listener): () => void {
@@ -401,6 +424,16 @@ export class InputBus {
     if (down && this.held.has(key)) return;        // no key-repeat spam
     down ? this.held.add(key) : this.held.delete(key);
 
+    if (this.keyRStick && (KEY_RSTICK[key] || KEY_SWEEP[key])) {
+      const sw = KEY_SWEEP[key];
+      if (sw) { if (down) this.sweepR(sw); return; }
+      let x = 0, y = 0;
+      for (const k of this.held) { const v = KEY_RSTICK[k]; if (v) { x += v[0]; y += v[1]; } }
+      const m = Math.hypot(x, y);
+      if (m > 1) { x /= m; y /= m; }
+      this.emit({ t: 'stick', side: 'R', x, y });
+      return;
+    }
     const arrow = ARROWS[key];
     if (WASD.has(key) || arrow) {
       if (arrow) ev.preventDefault();   // a held arrow must not scroll the /try page under the canvas

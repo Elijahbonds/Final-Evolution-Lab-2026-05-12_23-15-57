@@ -28,10 +28,11 @@ for (const [name, path] of [['1v1', '../lib/babylon/modes/OneVOneMode.ts'], ['3v
   ok(/const last = \[\.\.\.stickGestures\]\.reverse\(\)\.find\(\(g\) => g\.kind === 'flick' \|\| g\.kind === 'sweep'\);/.test(src), `${name} captures the newest real move gesture (not a bare hold/release) when busy`);
   ok(/if \(last\) \{ bufferedGesture = last; bufferedGestureAt = performance\.now\(\); \}/.test(src), `${name} timestamps the buffered gesture with the same wall clock the shot buffer uses`);
   // the replay must happen BEFORE the main gate, gated on the SAME busy flags, and feed the same resolution loop
-  ok(/if \(bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && performance\.now\(\) - bufferedGestureAt <= STICK_MOVE_BUFFER_MS\) \{/.test(src), `${name} only replays once ALL the same busy flags the live gate checks have cleared`);
+  ok(/if \(bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && bufferLive\(bufferedGestureAt, stickLockClearAt, performance\.now\(\)\)\) \{/.test(src), `${name} only replays once ALL the same busy flags the live gate checks have cleared`);
   ok(/stickGestures\.unshift\(bufferedGesture\); bufferedGesture = null;/.test(src), `${name} unshifts the buffered gesture into the SAME array the live resolution loop reads (no second, parallel resolution path)`);
   // a stale buffer past the window must not leak into a frame where the lock clears late
-  ok(/\} else bufferedGesture = null;/.test(src), `${name} drops an expired buffer rather than holding it forever`);
+  ok(/\} else if \(bufferedGesture && !bufferLive\(bufferedGestureAt, stickLockClearAt, performance\.now\(\)\)\) bufferedGesture = null;/.test(src), `${name} drops an expired buffer rather than holding it forever (H-04: aged by bufferLive — 700 ms from capture, 220 ms after the lock clears)`);
+  ok(/if \(shooting \|\| dunking \|\| finish \|\| gather \|\| spin\) stickLockClearAt = null; else if \(stickLockClearAt === null\) stickLockClearAt = performance\.now\(\);/.test(src), `${name} stamps the lock-clear time the buffer ages from`);
   // a possession reset must not let a buffered move from the last possession fire on the next one
   ok((src.match(/stickGestures = \[\]; bufferedGesture = null;/g) ?? []).length >= 1, `${name} clears the buffer on every possession reset that also clears stickGestures (no stale cross-possession replay)`);
 }
