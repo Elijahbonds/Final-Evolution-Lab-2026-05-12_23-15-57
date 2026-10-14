@@ -11,11 +11,15 @@ import type { QualityTier } from '../scene/QualityTier';
 import { SoundKit } from '../audio/SoundKit';
 import type { WeatherKit } from '../core/WeatherKit';
 import { wetSurface, type WetSurfaceHandle } from '../visual/WetSurface';   // vis-foundation-2 A9.14: puddles
+import { wetGloss } from '../racing/roadSurface';   // w3-atmos: a road that reflects when it is soaked
 import { sceneModeId, wave2Look } from '../scene/lookPolicy';
 
 export interface WeatherFxHandle { update(dt: number): void; dispose(): void }
+/** w3-atmos: a ground material's wet-gloss levels (racing/roadSurface.markWetGloss): what its reflections lerp to when soaked, and what they were dry. */
+interface WetGlossMeta { env: number; spec: number; dryEnv: number; drySpec: number }
 
-const GROUND_RE = /venue_ground|venue_rough|^field$|^green$|court|fairway|turf/i;
+// w3-atmos: + the kart's road (a merged slab named kart_road; the weather's wet pass darkens it and, flagged felWetGloss, lifts its reflections)
+const GROUND_RE = /venue_ground|venue_rough|^field$|^green$|court|fairway|turf|^kart_road$/i;
 
 function streakTexture(scene: Scene, snow: boolean): DynamicTexture {
   // a flake fills a SQUARE sprite (the first cut drew a 16 px dot in the middle of a 16 x 64 streak canvas: a 5 cm
@@ -104,19 +108,19 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
   // grounds' materials, so a ground whose material lands after the mesh (a hole's green, a late load) still gets the sheen.
   // The name is read again on that pass, as the scan read it: a 'venue_ground' renamed to 'venue_apron' before the pass
   // stays dry, exactly as before (every rename in the venues starts from 'venue_ground', which is tracked on add).
-  const wetMats: { m: PBRMaterial; rough: number; albedo: Color3; cur: Color3; puddles: WetSurfaceHandle | null }[] = [];
+  const wetMats: { m: PBRMaterial; rough: number; albedo: Color3; cur: Color3; puddles: WetSurfaceHandle | null; gloss: WetGlossMeta | null }[] = [];
   const puddles = wave2Look(sceneModeId(scene));   // A9.14: standing water in the low spots (not on the held hoops modes)
   const grounds: AbstractMesh[] = [];
   let groundsAdded = false;
   const track = (mesh: AbstractMesh) => { if (GROUND_RE.test(mesh.name) && !grounds.includes(mesh)) { grounds.push(mesh); groundsAdded = true; } };
   const collect = () => {
     for (let i = grounds.length - 1; i >= 0; i--) if (grounds[i].isDisposed()) grounds.splice(i, 1);
-    for (const mesh of grounds) { const mat = mesh.material; if (!(mat instanceof PBRMaterial) || !GROUND_RE.test(mesh.name)) continue; if (wetMats.some((w) => w.m === mat)) continue; wetMats.push({ m: mat, rough: mat.roughness ?? 0.85, albedo: mat.albedoColor.clone(), cur: mat.albedoColor.clone(), puddles: puddles && kit.precipitating ? wetSurface(mat) : null }); }
+    for (const mesh of grounds) { const mat = mesh.material; if (!(mat instanceof PBRMaterial) || !GROUND_RE.test(mesh.name)) continue; if (wetMats.some((w) => w.m === mat)) continue; wetMats.push({ m: mat, rough: mat.roughness ?? 0.85, albedo: mat.albedoColor.clone(), cur: mat.albedoColor.clone(), puddles: puddles && kit.precipitating ? wetSurface(mat) : null, gloss: (mat.metadata as { felWetGloss?: WetGlossMeta } | null)?.felWetGloss ?? null }); }
   };
   for (const mesh of scene.meshes) track(mesh);
   collect(); groundsAdded = false;
   const meshAdded = scene.onNewMeshAddedObservable.add(track);
-  disposers.push(() => { scene.onNewMeshAddedObservable.remove(meshAdded); for (const w of wetMats) { try { w.m.roughness = w.rough; w.m.albedoColor = w.albedo; w.puddles?.dispose(); } catch { /* disposed with its mesh */ } } });
+  disposers.push(() => { scene.onNewMeshAddedObservable.remove(meshAdded); for (const w of wetMats) { try { w.m.roughness = w.rough; w.m.albedoColor = w.albedo; if (w.gloss) { w.m.environmentIntensity = w.gloss.dryEnv; w.m.specularIntensity = w.gloss.drySpec; } w.puddles?.dispose(); } catch { /* disposed with its mesh */ } } });
 
   // ── storm: lightning + thunder ────────────────────────────────────────────────────────────────────────────────
   let nextBolt = s.condition === 'storm' ? 4 + Math.random() * 6 : Infinity; let thunderIn = Infinity;
@@ -131,7 +135,7 @@ export function mountWeatherFx(scene: Scene, lights: LightRigHandle | null, kit:
       const wet = kit.wet01();
       // a soaked fairway is visibly darker and glossy. `cur` is handed to the material once and then written in place: the
       // property setter ignores an equal colour, so after the first frame this marks nothing dirty (a new Color3 did, every frame)
-      if (wetMats.length) for (const w of wetMats) { w.m.roughness = w.rough + (0.18 - w.rough) * wet; w.albedo.scaleToRef(1 - 0.3 * wet, w.cur); w.m.albedoColor = w.cur; w.puddles?.set(wet); }
+      if (wetMats.length) for (const w of wetMats) { w.m.roughness = w.rough + (0.18 - w.rough) * wet; w.albedo.scaleToRef(1 - 0.3 * wet, w.cur); w.m.albedoColor = w.cur; w.puddles?.set(wet); if (w.gloss) { w.m.environmentIntensity = wetGloss(w.gloss.dryEnv, w.gloss.env, wet); w.m.specularIntensity = wetGloss(w.gloss.drySpec, w.gloss.spec, wet); } }
       if (t >= nextBolt) {
         nextBolt = t + 5 + Math.random() * 9; lights?.flashBeat(); thunderIn = 0.5 + Math.random() * 1.2;
       }
