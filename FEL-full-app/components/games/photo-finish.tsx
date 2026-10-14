@@ -36,12 +36,12 @@ export function PhotoFinishPrint({ src, line, you, pacer }: { src: unknown; line
   const x = (sec: number): string => `${(r.lineX + (sec / r.spanS) * (0.94 - r.lineX)) * 100}%`;
   const tone = m.winner === 'pacer' ? 'danger' : 'good';
   return (
-    <div data-photo-finish className="pointer-events-none absolute bottom-[5%] left-0 right-0 flex justify-center px-4">
+    <div data-photo-finish className="pointer-events-none absolute bottom-[5%] left-0 right-0 flex justify-center px-4 [@media(max-width:639px)]:bottom-[14rem]">
       <motion.figure
         initial={reduced ? { opacity: 0 } : { opacity: 0, y: 36, rotate: -3 }}
         animate={reduced ? { opacity: 1 } : { opacity: 1, y: 0, rotate: -1.2 }}
         transition={reduced ? { duration: 0.2 } : { type: 'spring', damping: 17, stiffness: 190, mass: 0.9 }}
-        className="m-0 w-[min(40%,460px)] min-w-[260px]"
+        className="m-0 w-[min(34%,420px)] min-w-[240px]"
         style={PRINT}
       >
         <div className="relative w-full overflow-hidden" style={{ aspectRatio: '16 / 9', background: hudColor('ink') }}>

@@ -122,7 +122,7 @@ export const MIGRATED: Record<string, {
 };
 
 /** Shared HUD pieces a migrated host draws through, held to the same rules. (boost-hud: the racing hosts' and the boards' boost meter; judge-cards: the dunk and dunk-duel judges' row; hoops-shot-meter: the 1v1 and 3v3 release bar; dunk-beat-strip and dunk-field-board: the dunk host's own readouts; mic-caption: the MC's line and its switch, drawn by all six hoops hosts.) */
-const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx', 'hoops-shot-meter.tsx', 'dunk-beat-strip.tsx', 'dunk-field-board.tsx', 'mic-caption.tsx', 'fight-presentation.tsx', 'photo-finish.tsx'];
+const PIECES = ['timing-prompt.tsx', 'combat-hud-band.tsx', 'boost-hud.tsx', 'judge-cards.tsx', 'hoops-shot-meter.tsx', 'dunk-beat-strip.tsx', 'dunk-field-board.tsx', 'mic-caption.tsx', 'fight-presentation.tsx', 'photo-finish.tsx', 'race-course-map.tsx', 'dunk-poster.tsx', 'three-point-options.tsx'];
 
 const keyRead = (src: string, k: string) => new RegExp(`hud\\.${k}\\b|hud\\[['"]${k}['"]\\]`).test(src);
 

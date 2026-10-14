@@ -9,12 +9,12 @@ import { VoiceKit } from '@/lib/babylon/audio/mic/VoiceKit';
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 import { HUD_FONT_CLASS, HUD_PLATE, HudText, hudColor, hudType } from './tv-hud';
 
-export function MicCaption({ text, who, className = 'bottom-[14%]' }: { text: unknown; who: unknown; className?: string }) {
+export function MicCaption({ text, who, className = 'bottom-[14%]', flow = false }: { text: unknown; who: unknown; className?: string; /** In the flow of a parent column (the dunk host's bottom stack) instead of a layer of its own at `className`. */ flow?: boolean }) {
   const line = typeof text === 'string' ? text : '';
   if (!line) return null;
   const name = typeof who === 'string' ? who : '';
   return (
-    <div className={`pointer-events-none absolute inset-x-0 ${className} z-10 flex justify-center px-4 ${HUD_FONT_CLASS}`} aria-hidden>
+    <div data-mic-caption className={`pointer-events-none ${flow ? 'relative flex w-full' : `absolute inset-x-0 ${className}`} z-10 flex justify-center px-4 ${HUD_FONT_CLASS}`} aria-hidden>
       {/* data-mic-line: on a sideways screen the line may run wider (app/game-surface.css, console view) — at 560 px it
           wrapped to two lines and, zoomed for a TV, the box sat across the dunker's legs */}
       <div data-mic-line className="max-w-[min(92vw,560px)] px-3 py-1.5 text-center"

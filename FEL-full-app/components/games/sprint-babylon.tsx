@@ -191,10 +191,11 @@ export function makeSprintHost(modeKey: string, title: string) {
               )}
             </div>
           )}
-          <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" />
+          {/* WAVE 3: with the photo finish up the result line rides above the print (it was at a third of the stage, where the print stands) */}
+          <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" className={hud.photoSrc ? 'top-[24%]' : undefined} />
 
           {/* IMPROVE (2026-10-06): the hint the mode always sent — the controls, explained on screen */}
-          {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && (
+          {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && !hud.photoSrc && (
             <HudPlate className="absolute right-4 top-4 z-20 max-w-[45%] px-2 py-1 text-right">
               <HudText size="caption" alpha={0.8}>{hud.hint}</HudText>
             </HudPlate>
