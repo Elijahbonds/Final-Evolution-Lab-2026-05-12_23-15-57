@@ -67,7 +67,8 @@ import { boneNode } from '../anim/boneLookup';   // POLISH: the rack pick aims a
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
-import { collectFadeLeaves, updateFade, type FadeLeaf, type Pt } from './threePointOcclusion';   // CAM-FIXES: the trees the corner camera stands in
+import { collectFadeLeaves, updateFade, type FadeLeaf, type Pt } from './threePointOcclusion';
+import { THREE_POINT_INTRO, holdForIntro } from './threePointIntro';   // the broadcast intro: the clock waits for it   // CAM-FIXES: the trees the corner camera stands in
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { ShotArc, followThroughFor, ShotMeter, SHOT_QUALITY_PCT, distanceContest01, type ShotQuality } from '../core/BasketballCore';
 import { BallSim } from '../core/BallPhysics';
@@ -1361,12 +1362,14 @@ export const ThreePointMode: ModeDefinition = {
   mood: 'goldenHour',
   camPreset: 'hoops',
   replay: true,       // vis-hoops-dunk: the money ball on a hot streak, replayed (ctx.highlight in contactMake, through the board lane's ReplayGate)
+  intro: THREE_POINT_INTRO,   // the broadcast crane over the venue before the first rack (skippable; none under reduced motion)
   replayDof: false,   // …without the depth of field (the board lane measured it flattening a frame on desktop; the replay is otherwise the same)
   replayCast: () => ({ bodies: player ? [player.root] : [], loose: [ball, ...flights.map((f) => f.mesh)].filter((m): m is Mesh => !!m) }),   // the shooter, and every ball
   // HOOPS BODY (2026-10-07): the body drives the shot (claims: the jump and the release; the card's lines). The floor presses
   // nothing here (the row binds nothing), so a dip or a stray jump never fires a ball on its own.
   body: THREE_BODY,
   onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
+    if (ctx.camDirector.inIntro) return false;   // no shot is taken under the broadcast intro
     if (S.phase !== 'shoot' || S.fired) return false;
     const act = bodyShot.see(ev);
     if (act.start) bodyStart(ctx);
@@ -1585,6 +1588,7 @@ export const ThreePointMode: ModeDefinition = {
   },
 
   onInput(ctx: ModeContext, e: FelInput): void {
+    if (ctx.camDirector.inIntro) return;   // the intro's input: the press that skips it (the harness's skipIntro) is never a shot
     if (e.t === 'stick' && e.side === 'R') { S.lookX = e.x; S.lookY = e.y; return; }   // MODE-STICK-FACE: R stick → the director's look orbit
     if (S.phase === 'done') return;
     // IMPROVE (2026-10-06) #2: SKIP THE STANDINGS. The board ignored every press for 0.75 s a card plus a 4 s hold; a press
@@ -1624,6 +1628,7 @@ export const ThreePointMode: ModeDefinition = {
     micTick(ctx);   // THE MIC: its clock runs on every frame (the board's calls, the caption's expiry)
     if (S.phase === 'done' || !player || !ball || !flights.length) return;
     if (!S.optsRead) readRunOptions(ctx);   // IMPROVE (2026-10-06) #5 #6: the READY screen's picks, on the run's first frame
+    if (holdForIntro(ctx.camDirector, player.root.position, RIM)) { updateFadeLeaves(ctx, dt); pushHud(ctx); return; }   // the intro on screen: the clock and the run wait
     stepFlights(ctx, dt);   // IMPROVE (2026-10-06) #1: every ball in the air lands on its own, in every phase
     if (pick) {   // POLISH: the pick off the rack — eased from the rack to the hand, then attached
       pick.t = Math.min(1, pick.t + dt / PICK_SEC); const k = pick.t * pick.t * (3 - 2 * pick.t);
