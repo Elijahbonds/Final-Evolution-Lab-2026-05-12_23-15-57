@@ -27,12 +27,20 @@ import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
+import { sendFinish, flushFinishes, type FinishDeps } from '@/lib/sessions/finishOutbox';   // QA-H2: a finish survives a reload
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
 } from '@/lib/carnival-run';
+
+/** QA-H2: this device's finish outbox (lib/sessions/finishOutbox), and the browser's fetch and timer for its retries. */
+const finishStore = (): Storage | null => { try { return window.localStorage; } catch { return null; } };
+const FINISH_DEPS: FinishDeps = {
+  fetch: (url, init) => fetch(url, init),
+  sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+};
 
 export interface GameResult {
   score: number;
@@ -239,6 +247,8 @@ function GameShellInner({
     return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
   }, [scheme, gameKey, babylonOwnsInput]);
 
+  // QA-H2: a finish a reload cut off is re-sent once the page is up (the server finishes a runId once: never paid twice)
+  useEffect(() => { void flushFinishes(finishStore(), FINISH_DEPS, Date.now()); }, []);
   useEffect(() => { runLive.current = result === null; }, [result]);
   useEffect(() => {
     inputCount.current = 0;
@@ -285,10 +295,7 @@ function GameShellInner({
       // this run's server run, read now (a REPLAY swaps in the next one). Not cleared: a game that ends the same run twice
       // finishes the same runId twice, and the server answers the second with the first's stored result (replayed)
       const started = serverRun.current ?? Promise.resolve(null);
-      started.then((runId) => fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      started.then((runId) => sendFinish(finishStore(), runId, { ...FINISH_DEPS, fetch: (_url, init) => fetch('/api/sessions', init) }, Date.now(), JSON.stringify({
           mode,
           // ECONOMY-SESSIONS-HARDEN: the run the server started; the server checks the score as sent (a whole number >= 0,
           // within the mode's rules) and times the run itself — `duration` is only the room's own figure now
@@ -318,8 +325,7 @@ function GameShellInner({
           // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
           ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
             const form = formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st); return form ? { form } : {}; })(),
-        }),
-      }))
+        })))
         // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
         .then((r) => (r ? r.json().catch(() => null) : null))
         .then(async (j) => {
@@ -489,10 +495,11 @@ function GameShellInner({
               }).catch(() => {}); // best-effort, never block the recap
             }
           } else if (mine()) {
-            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, ...(j?.reason ? { unpaid: unpaidReason(j.reason, j.detail) } : {}) });
+            // QA-H2: no answer after the retries — say so (the outbox re-sends it on the next game page), never a silent card
+            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, ...(j?.reason ? { unpaid: unpaidReason(j.reason, j.detail) } : !j ? { unpaid: 'NOT_SAVED' } : {}) });
           }
         })
-        .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
+        .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, unpaid: 'NOT_SAVED' }); });
     },
     [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode, challengeCode]
   );
