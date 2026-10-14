@@ -799,9 +799,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     board = null; endChase(); ballSim.stop();
   }
   function resetPossession(toMe = true): void {
-    for (const f of foes) f.reach = null;   // T-A: a showing reach ends with the possession
     if (hoopsFx?.deadBall(() => resetPossession(toMe))) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
+    for (const f of foes) f.reach = null;   // T-A: a showing reach ends with the possession
     dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration (nor a run: the movers stand, the pins let go)
@@ -3676,10 +3676,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** Their possession. IMPROVE (2026-10-06) #1: `cont` = the same possession carried on by a SWING — the receiver of their kick-out is
    *  the new ball-handler (no check, no chatter); he shoots it off the catch when he is open out there, else he attacks. */
   async function opponentPossession(ctx: ModeContext, cont?: SwingCatch): Promise<void> {
-    for (const f of foes) f.reach = null;   // T-A: a showing reach ends with the possession
     if (ended) return;
     if (!cont && hoopsFx?.deadBall(() => opponentPossession(ctx))) return;   // vis-hoops-court: their ball is the other dead ball (a swing's catch, `cont`, is not one)
     possessionToken++;
+    for (const f of foes) f.reach = null;   // T-A: a showing reach ends with the possession
     dropBoard();   // HOTFIX (2026-09-24): their ball ends any board still live (see dropBoard)
     goaltendCalled = false; foeShotScored = false;   // …and again for theirs: the latch is per SHOT, not per game
     carrierId = 'foeTeam';
