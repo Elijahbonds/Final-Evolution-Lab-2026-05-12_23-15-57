@@ -2,7 +2,7 @@
 //
 // WHY. The phone sweep (scratchpad phoneperf, 390×844 DPR 3, mobile tier) read the GPU texture list of every mode. The
 // models' own 2048² maps were the biggest single items on the phone tier: the guest player's kit body
-// (`candidates/fel-kit-male.glb`, its skin map 2048² = 21.3 MB with mips) in nearly every mode, and the karate dojo
+// (the kit body, heroBody KIT_BODY_URL: its skin map 2048² = 21.3 MB with mips) in nearly every mode, and the karate dojo
 // (`props/meshy/dojo.glb`, three 2048² maps = 64 MB). A 2048² map is four times the memory of a 1024² one and on a
 // 390-px-wide screen it is never seen at more than ~1024 texels across. The scanned hero already ships a phone file for
 // exactly this reason (CharacterLibrary MOBILE_HERO_URL: "skin at 1024²"); this does the same for every glTF model at
@@ -19,20 +19,26 @@
 // Babylon-internal: `_prepareWebGLTexture` is private API. phoneTextureCap.test.ts reads the shipped Babylon source and
 // fails if the method stops existing or stops reading the cap, so an upgrade breaks a test, not a phone.
 
+import { KIT_BODY_URL } from '../core/heroBody';
+
 /** The largest edge a glTF model's texture is uploaded at on the phone tier. */
 export const PHONE_MODEL_TEXTURE_MAX = 1024;
 /** The guest player's kit body on a phone: its skin (the file's one 2048² map) at 1024², every other map at 512². */
 export const PHONE_KIT_SKIN_MAX = 1024, PHONE_KIT_OTHER_MAX = 512;
 
 /**
- * THE KIT BODY (phone-perf, 2026-10-14). The guest player plays `candidates/fel-kit-male.glb` (or -female): one body with
+ * THE KIT BODY (phone-perf, 2026-10-14). The guest player plays the kit body (heroBody's KIT_BODY_URL, male or female): one body with
  * EVERY wardrobe option in it — six hair styles, two tops, two pairs of shoes, shorts, eyes — fifteen maps, uploaded
  * whether worn or not. Measured on the phone tier: 95.8 MB, a third of the 256 MB phone ceiling, in every mode a guest
  * plays (who_scene_it's whole texture list was 225 MB). The phone split the owner already ships for bodies is the rule
  * here: the scanned hero's phone file (CharacterLibrary MOBILE_HERO_URL) and every rival (roster-from-kit) carry the skin
  * at 1024² and everything else at 512². The kit file's skin is its only 2048² map, so the split reads off the size.
  */
-const PLAYER_KIT_IMAGE = /\/models\/candidates\/fel-kit-(male|female)\.glb#image\d+$/;
+const KIT_FILES = Object.values(KIT_BODY_URL);   // the files are spelled in heroBody.ts only (heroBody.test holds that)
+function isPlayerKitImage(url: string): boolean {
+  const file = url.replace(/#image\d+$/, '');
+  return KIT_FILES.some((u) => file.endsWith(u));
+}
 
 /** A glTF-embedded image, as Babylon's glTF loader names it (`<file>.glb#image7`, also behind a `data:` prefix). */
 const MODEL_IMAGE = /\.(glb|gltf)#image\d+$/i;
@@ -44,7 +50,7 @@ export function isModelImageUrl(url: string | null | undefined): boolean {
 /** Pure: the edge cap a phone uploads this image under, or Infinity for none (not a model image). */
 export function phoneCapFor(url: string | null | undefined, w: number, h: number): number {
   if (!isModelImageUrl(url)) return Infinity;
-  if (PLAYER_KIT_IMAGE.test(url as string)) return Math.max(w, h) >= 2048 ? PHONE_KIT_SKIN_MAX : PHONE_KIT_OTHER_MAX;
+  if (isPlayerKitImage(url as string)) return Math.max(w, h) >= 2048 ? PHONE_KIT_SKIN_MAX : PHONE_KIT_OTHER_MAX;
   return PHONE_MODEL_TEXTURE_MAX;
 }
 
