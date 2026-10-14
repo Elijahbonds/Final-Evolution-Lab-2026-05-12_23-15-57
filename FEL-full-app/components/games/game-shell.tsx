@@ -27,7 +27,7 @@ import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
-import { sendFinish, flushFinishes, type FinishDeps } from '@/lib/sessions/finishOutbox';   // QA-H2: a finish survives a reload
+import { sendFinish, flushFinishes, settled, type FinishDeps } from '@/lib/sessions/finishOutbox';   // QA-H2: a finish survives a reload
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
@@ -168,6 +168,7 @@ function GameShellInner({
   /** The wallet coins this run's earn reports were granted (BRAINBRAWL-POLISH-2 N10), and whether a cap cut the coin earn —
    *  null until a grant lands, and left null for a refused earn or a zero grant nothing capped (no "+0" tile). */
   const [recapCoins, setRecapCoins] = useState<{ coins: number; capped: boolean } | null>(null);
+  const finishUser = useRef<string | null>(null);   // QA-H2: the signed-in user a finish is saved under (/api/profile)
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
@@ -247,8 +248,6 @@ function GameShellInner({
     return () => { active = false; cancelAnimationFrame(raf); poller.setScheme(null); };
   }, [scheme, gameKey, babylonOwnsInput]);
 
-  // QA-H2: a finish a reload cut off is re-sent once the page is up (the server finishes a runId once: never paid twice)
-  useEffect(() => { void flushFinishes(finishStore(), FINISH_DEPS, Date.now()); }, []);
   useEffect(() => { runLive.current = result === null; }, [result]);
   useEffect(() => {
     inputCount.current = 0;
@@ -274,6 +273,10 @@ function GameShellInner({
         if (!live) return;
         if (j?.grade) {
           setProfile({ prq: j?.prq ?? 50, grade: j.grade, display: readPrqDisplay(j) });
+          // QA-H2: who is signed in; a finish a reload cut off is re-sent once that is known, and only that user's
+          // (the server finishes a runId once: never paid twice)
+          finishUser.current = typeof j?.profile?.userId === 'string' ? j.profile.userId : null;
+          void flushFinishes(finishStore(), FINISH_DEPS, Date.now(), finishUser.current);
         } else {
           router.replace('/login');
         }
@@ -325,9 +328,10 @@ function GameShellInner({
           // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
           ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
             const form = formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st); return form ? { form } : {}; })(),
-        })))
-        // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
-        .then((r) => (r ? r.json().catch(() => null) : null))
+        }), finishUser.current))
+        // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card. An answer
+        // that is not about the run (401/403/404/408/429: still in the outbox) reads as NOT_SAVED
+        .then((r) => (r && settled(r) ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
             // ECONOMY-CAPS (c): a replayed finish returns the stored body verbatim — no second reward card.
