@@ -56,6 +56,7 @@ const DECAY_PER_SEC = 2.2;
 export class MomentumBus {
   private score = 0;
   private subs = new Set<(tier: MomentumTier, prev: MomentumTier, score: number) => void>();
+  private reportSubs = new Set<(e: MomentumEvent) => void>();
 
   get tier(): MomentumTier {
     return TIERS.find(([, min]) => this.score >= min)![0];
@@ -70,6 +71,7 @@ export class MomentumBus {
 
   /** Report a game-breaking event. Returns the tier if it changed. */
   report(e: MomentumEvent): MomentumTier | null {
+    this.reportSubs.forEach((fn) => fn(e));   // vis-hoops-court: the highlight pacer hears every play as it is reported (read only)
     const prev = this.tier;
     this.score = Math.max(0, Math.min(100, this.score + (e.weight ?? WEIGHT[e.kind])));
     const next = this.tier;
@@ -88,6 +90,13 @@ export class MomentumBus {
   onTierChange(fn: (tier: MomentumTier, prev: MomentumTier, score: number) => void): () => void {
     this.subs.add(fn);
     return () => this.subs.delete(fn);
+  }
+
+  /** Hear every report as it is sent, before it moves the score (a broadcast that wants to know a block happened, not what it
+   *  was worth). Read only: the listener cannot change the event or the score. Returns the way to stop listening. */
+  onReport(fn: (e: MomentumEvent) => void): () => void {
+    this.reportSubs.add(fn);
+    return () => this.reportSubs.delete(fn);
   }
 
   reset(): void { this.score = 0; }

@@ -645,7 +645,7 @@ Notes for the per-mode passes, from the shadow cache's per-frame lists:
 ## Foundation status after wave 1 (vis-foundation-2, 2026-10-13)
 
 Every system below mounts from the rig (`LightRig.captureVenue`, after `load()`) or the harness, so a mode gets it without
-a mode file; `scene/lookPolicy.ts` HOLDS the hoops modes out of all of them this wave (owner: hoops off-limits). `?lookoff=`
+a mode file; `scene/lookPolicy.ts` HOLDS the hoops modes out of all of them this wave (owner: hoops off-limits; lifted 2026-10-14, "Go on hoops", mode lane by mode lane: onevone, threevthree and carnival are no longer held — see "Wave 2 status — the hoops courts" below). `?lookoff=`
 (fixtures, sky, air, mirror) switches one off for a one-build A/B.
 
 - **A9.12 broadcast kit.** `CameraDirector.establish('walkIn' | 'establish')`: a crane over the venue, a cut to a low shot
@@ -733,3 +733,67 @@ freerun's world), `event` (big air's gate, towers and booth), `palette` (freerun
   breaks (`venuePropSets` is shared, and the tower is [ART]); a wet sheen after a duck-dive (`mountSweat` owns the skin level);
   puddle reflections and a concrete detail map at the Warehouse (`GlossyFloor` is a named-floor list); a night session with
   floodlights for big air; landmark buildings and bespoke course modules are [ART].
+
+
+## Wave 2 status — the hoops courts (vis-hoops-court, 2026-10-14)
+
+Part B for onevone, threevthree and carnival, after the owner's "Go on hoops". The three modes left `scene/lookPolicy.ts`'s hold
+(the dunk lane lifts its own), so fixture lights, the sky and air, the glossy floor, decals, the wet surface and the sweat reach them.
+Checked on the rig (1080p desktop, same seed): the sky is de-blocked (cloud wisps where the photograph's paint blotches were), the court
+grain carries its detail map, the lamps light (goldenHour's fixture gain is 0.35, so quietly); nothing looked wrong, so no system is held
+per mode. The glossy floor does not mount on onevone / threevthree / carnival: their ground is a painted street court, not a wooden one
+(`GlossyFloor` takes a named stage mode or a `court` place ground), which is right for an outdoor concrete court.
+
+- **Where the work lives.** OneVOneMode and ThreeVThreeMode carry only one-line hooks (the owner's right-stick PR #240 edits both):
+  `intro` / `replay` / `replayCast` on the definition, one `mountHoopsCourt` in `load()`, `hoopsFx?.holdIntro(...)` after `micTick`, the
+  dead-ball hook at the head of each possession reset (1v1: `resetPositions`, `startDefense`; 3v3: `resetPossession`,
+  `opponentPossession` unless it is a swing's catch), one dispose. Everything else is `court/hoops*`, `court/mount/*`,
+  `court/streetballDressing`, `court/carnival*`.
+- **The intro.** `walkIn` on onevone and threevthree, `establish` on carnival. A court game plays underneath the intro (the harness
+  keeps the mode running), and a defender who checks the ball while the player watches a crane is a steal they could not see coming, so
+  `holdIntro` steps the camera director (it drives the intro) and returns from the mode's update until the first press hands the frame
+  over. Carnival's hub never stepped the director (its shot is a `snapTo`), so `carnivalFx.stepIntro` does, on the pick screen and the
+  first card only; `endIntro()` runs BEFORE an event builds (an intro ended after would restore the hub's pose over the event's).
+- **Replays: noted, then played at the dead ball.** `MomentumBus.onReport` (new, read-only) lets the broadcast hear every posterize,
+  ankle-break, block and dunk as it is reported (3v3 reports its drift ankle-break as a `clean_hit` of weight 14). They are NOTED, not
+  played: a replay in a live possession stops the game under the player's thumbs. At the next dead ball the best moment of the
+  possession plays once, from 1.2 s before it to now (`ctx.highlight({ lastSeconds, endAt, objective: rim })`), and the mode's own reset
+  runs AFTER it (a replay puts the bodies back where the frame left them, so a reset made during it would be undone). Never the final
+  moment (`final: ended` / `ended || buzzer`), never in reduced motion, one every two possessions, four a run
+  (`court/hoopsMoments`). Carnival has no replay: each event spawns its own bodies and the recorder's cast is read once.
+  `replayDof` stays on: measured on onevone, 1080p, the same frame with the depth of field switched off at runtime, the court's
+  luma mean is 113.8 vs 113.7 and its std 32.1 vs 32.4 (the snow piste's 221.9 vs 6.4 did not repeat).
+- **Scuffs.** `court/hoopsScuffs` reads the bodies' ground paths (a run that stops, a heading turned 66 degrees inside 0.22 s at speed,
+  a landing after 0.22 s in the air) and stamps `felDecals` 'scuff' on the court (y 0.02). It does not ask the modes when they planted.
+- **Dusk.** `court/mount/hoopsDusk`: the sun's strength and colour and the hemisphere move 65 % of the way toward the dusk mood as the
+  game runs down (the better of the score and, in 3v3, the clock), eased over 4 s, and the lamps' lights and the glow come up 2.2× / 1.3×.
+  Not moved: the sun's DIRECTION (the shadow cache drew the static scenery's shadows once from it), the exposure and the grade (one
+  owner), the photographic backdrop. Still under reduced motion.
+- **3v3 — the Streetball Arena** (`court/streetballDressing`). A chain-link cage (real bars) down both sidelines and behind the basket (the near end
+  is open: the 'team' camera stands 18 m back and as far as 29 m), four lamp poles at its corners whose heads are `lhead_stb_*`
+  (glow halo + a clustered light each on desktop), two graffiti walls outside the cage (never behind the rim: what stands behind the thing
+  you aim at is kept quiet), two benches with a boombox and a duffel, and a flat team ring under every body but the hero's (cyan under
+  his two mates, magenta under the three they face). A phone gets the frame, the poles, the benches, the props and the rings: eight meshes.
+- **Carnival — the fair** (`court/carnivalSet`, `carnivalMarquee`, `mount/carnivalFx`). String lights on poles round the plaza (a bulb
+  mesh a strand, `bb_bulb_carn_*`: a halo each and one clustered light per strand), four game booths with striped awnings and signs, two
+  big tops, a carousel and a ferris wheel turning on the horizon (`bb_wheel_marquee_carn`), balloons (one thin-instanced draw), and a
+  marquee over the back of the plaza with chaser bulbs that says GAME NIGHT, the event on its card and the standings between events (the
+  mode hands it the night's own board rows; it paints, it never adds). A confetti volley from both sides when a card turns and when
+  the player takes an event; fireworks over the horizon when the sky is dark, and always at the champion's finale. The fair is shown
+  with the hub and hidden while an event runs (an event paints its own floor; the dojo is a room).
+- **Findings worth the next lane's time.** (1) A BLENDED panel is an opaque wall to the SSAO's geometry buffer (it renders depth and
+  normals with its own shader, which knows alpha tests and not blends): the cage's back panel, alpha 0.4 over a lit lawn, darkened
+  everything seen through it to near black, and a lattice made an ALPHA-TESTED panel (`transparencyMode` ALPHATEST on a `RawTexture`,
+  every check in the page right: tested, cut-off set, texture ready) still drew as a solid wall on the rig. The chain-link is REAL BARS
+  now (`latticeSegments`: one thin-instanced draw a panel, 160 bars each), which has neither problem. A painted canvas lattice is its
+  own trap: a canvas stores premultiplied RGBA, so a transparent texel's RGB is lost (black) and every mip of the lattice goes dark. (2) `DynamicTexture.clone()` makes a BLANK canvas: the copy is never painted and never ready.
+  (3) Babylon multiplies the lit colour, emissive included, by the diffuse texture's RGB, so a texture's transparent texels (black) darken
+  an emissive material: keep the colour in the material and the shape in the alpha. (4) The harness's 20 s load watchdog, on a machine at
+  load 20, retries into a DOUBLED scene (two heroes, two foes, 22 skinned bodies): a capture with `Load timed out` in its log is not a
+  measurement. (5) `FOLLOW_PRESETS.team` puts the camera 18 m behind a player at z 6 and up to 29 m behind one at z 15: nothing
+  may stand at the near end of the 3v3 half court.
+- **Deferred.** Instanced crowds ringing the cage and the plaza (A9.9's baked-vertex crowd is not built), a cloth net with sway (HoopJuice
+  is shared with the dunk lane, whose Part B names it), the heat shimmer (a refraction post), moths round the poles, per-event colour
+  grades for carnival (the mood is read once at mount; the grade has one owner), a camera swoop between hub and event and a slow drift
+  crane in 3v3's dead balls (both touch the play camera), VLS sun shafts. A scorebug, a "GAME POINT" lower third and 3v3's clock bug are
+  HUD: routed to lane/hud-hoops. [ART]: bespoke streetball props, detailed carnival rides, more crowd body variety.

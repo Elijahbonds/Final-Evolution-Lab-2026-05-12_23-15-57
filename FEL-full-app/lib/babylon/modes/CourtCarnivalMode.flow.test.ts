@@ -45,6 +45,23 @@ vi.mock('../audio/SoundKit', () => ({ SoundKit: { play: () => undefined, unlock:
 vi.mock('../visual/EffectsKit', () => ({ EffectsKit: { burst: () => undefined } }));
 vi.mock('../core/NexusVenue', () => ({ mountVenue: () => ({ built: { root: { setEnabled: () => undefined } }, hidePlaceholders: () => undefined }) }));
 vi.mock('../nexus/placeLooks', () => ({ readPlaceLook: () => null }));
+/** vis-hoops-court: the fair, its marquee and the celebrations need a real scene, lights and camera director (the venue, the bodies and the mic are
+ *  stubbed here for the same reason): they are stubbed too, and what the mode TOLD them is recorded. */
+const fxCalls: string[] = [];
+let fxStepIntro: (hubPhase: boolean) => void = () => undefined;
+vi.mock('../court/mount/carnivalFx', () => ({
+  mountCarnivalFx: () => ({
+    night: false,
+    showSet: (on: boolean) => { fxCalls.push(`set:${on}`); },
+    board: (s: { title: string; footer?: string }) => { fxCalls.push(`board:${s.title}|${s.footer ?? ''}`); },
+    endIntro: () => { fxCalls.push('endIntro'); },
+    stepIntro: (_s: unknown, _o: unknown, hub: boolean) => { fxStepIntro(hub); return false; },
+    reveal: () => { fxCalls.push('reveal'); },
+    eventResult: (w: number) => { fxCalls.push(`result:${w}`); },
+    finale: (won: boolean) => { fxCalls.push(`finale:${won}`); },
+    update: () => undefined, dispose: () => undefined,
+  }),
+}));
 vi.mock('../audio/mic/ModeMic', () => ({
   ModeMic: class {
     ready = false;
@@ -103,7 +120,7 @@ async function night(events: Fake[]) {
   return { ctx, hud, end, run, press, dpad, banners };
 }
 
-beforeEach(() => { anim.parks = anim.loops = anim.resets = 0; posture.live = 0; refusals.length = 0; vi.spyOn(console, 'info').mockImplementation(() => undefined); vi.spyOn(console, 'warn').mockImplementation(() => undefined); });
+beforeEach(() => { anim.parks = anim.loops = anim.resets = 0; posture.live = 0; refusals.length = 0; fxCalls.length = 0; fxStepIntro = () => undefined; vi.spyOn(console, 'info').mockImplementation(() => undefined); vi.spyOn(console, 'warn').mockImplementation(() => undefined); });
 afterEach(() => { CourtCarnivalMode.dispose?.(); engine.dispose(); vi.restoreAllMocks(); });
 
 describe('the pick screen (#8, #13)', () => {
@@ -267,5 +284,55 @@ describe('the hub sleeps through an event (#15), and the HUD hears play once a v
     expect(pushes.length).toBeLessThanOrEqual(3);                   // a clock tick and the rival's 0 → 1 (the band is [1, 1] × 10)
     const shown = pushes.map((h) => `${h.time}|${h.rivalLive}`);
     expect(new Set(shown).size).toBe(shown.length);                 // never the same values twice
+  });
+});
+
+describe('the fair and its marquee (vis-hoops-court)', () => {
+  it('is raised with the hub, says GAME NIGHT and the night\'s length, and a card turning says the event, the standings and fires a volley', async () => {
+    const evs = [fake(), fake(), fake(), fake()];
+    const n = await night(evs);
+    expect(fxCalls.slice(0, 2)).toEqual(['board:GAME NIGHT|4 EVENTS', 'set:true']);
+    await n.press('A');
+    expect(fxCalls).toContain('reveal');
+    const title = String(n.banners().at(-1)).replace('NEXT UP: ', '');   // the night's draw is seeded: whichever event came up first
+    expect(evs.some((e) => e.title === title)).toBe(true);
+    expect(fxCalls.some((c) => c === `board:${title}|EVENT 1 OF 4`)).toBe(true);
+  });
+  it('the crane is handed back BEFORE an event builds and the fair comes down (an intro ended after would restore the hub\'s camera over the event\'s)', async () => {
+    const evs = [fake(), fake(), fake(), fake()];
+    const n = await night(evs);
+    await n.press('A'); await n.run(0.7); await n.press('A');
+    const end = fxCalls.indexOf('endIntro'), down = fxCalls.indexOf('set:false');
+    expect(end).toBeGreaterThan(-1); expect(down).toBeGreaterThan(end);
+    expect(evs.reduce((n2, e) => n2 + e.builds, 0)).toBe(1);   // (the night's draw is seeded: whichever event came up)
+  });
+  it('the director is stepped on the pick screen and the card, and not once an event is playing', async () => {
+    const seen: boolean[] = []; fxStepIntro = (hub) => { seen.push(hub); };
+    const evs = [fake({ durationSec: 5 }), fake(), fake(), fake()];
+    const n = await night(evs);
+    await n.run(0.2);
+    expect(seen.length).toBeGreaterThan(5); expect(seen.every((h) => h)).toBe(true);   // the pick screen
+    await n.press('A'); await n.run(0.7); await n.press('A'); seen.length = 0;
+    await n.run(1);
+    expect(seen.length).toBeGreaterThan(30); expect(seen.every((h) => !h)).toBe(true);   // the event
+  });
+  it('an event the player took is a win at the fair (0); the rival\'s is 1; a tie is -1; the finale says whether the PLAYER took the night', async () => {
+    const win = [fake(), fake(), fake(), fake()]; win.forEach((e) => { e.score = 5; });   // 50 against the rival\'s 10
+    const n = await night(win);
+    await n.press('A');                                             // the pick screen: begin the night
+    for (let i = 0; i < 4; i++) { await n.run(0.7); await n.press('A'); await n.run(2.1); await n.run(0.7); await n.press('A'); }
+    expect(fxCalls.filter((c) => c === 'result:0').length).toBe(4);
+    expect(fxCalls).toContain('finale:true');
+    expect(fxCalls.find((c) => c.startsWith('board:CHAMPION'))).toBeTruthy();
+    expect(fxCalls.filter((c) => c.startsWith('board:STANDINGS|YOU TAKE ')).length).toBe(4);   // 'YOU TAKE', not 'YOU TAKES'
+  });
+  it('a lost night is a FINAL board and finale:false', async () => {
+    const lose = [fake(), fake(), fake(), fake()];   // 0 against the rival\'s 10
+    const n = await night(lose);
+    await n.press('A');
+    for (let i = 0; i < 4; i++) { await n.run(0.7); await n.press('A'); await n.run(2.1); await n.run(0.7); await n.press('A'); }
+    expect(fxCalls.filter((c) => c === 'result:1').length).toBe(4);
+    expect(fxCalls).toContain('finale:false');
+    expect(fxCalls.find((c) => c.startsWith('board:FINAL'))).toBeTruthy();
   });
 });
