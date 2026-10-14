@@ -65,9 +65,18 @@ export class CharacterAnimator {
   register(g: AnimationGroup): void {
     g.stop();
     this.groups.set(g.name, g);
+    this.names = null;
   }
 
-  get clipNames(): Set<string> { return new Set(this.groups.keys()); }
+  /**
+   * The clips this body owns. PHONE-PERF (2026-10-14): built once per change, not per read. It was a fresh Set of every
+   * group name on EVERY read, and play / setPlaybackScale / durationOf (and the opponent and style wrappers around them)
+   * read it several times per body per frame: 13 % of everything the dunk allocated in play (~330 KB a frame, measured
+   * with the heap sampler on the phone profile) — garbage a phone's collector pays for in hitches. Callers only read it
+   * (has / iterate / resolve); do not mutate it.
+   */
+  get clipNames(): Set<string> { return (this.names ??= new Set(this.groups.keys())); }
+  private names: Set<string> | null = null;
 
   /** M68: SkinningGuard uses this to tell "stalled" from "nothing is playing". */
   get isPlaying(): boolean { return this.current?.isPlaying ?? false; }

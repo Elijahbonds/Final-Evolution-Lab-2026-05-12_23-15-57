@@ -24,6 +24,7 @@ import type { VenueMood } from '../scene/moods';
 import { mountBackdrop, MOOD_TO_FAMILY, type BackdropFamily } from '../visual/Backdrops';
 import { autoInk, inkStyleFor } from '../visual/AnimeInk';
 import { mountLetterbox } from '../visual/Letterbox';
+import { installPhoneTextureCap } from '../scene/phoneTextureCap';   // phone-perf: model textures ≤ 1024² on a phone
 
 export interface LookStackOpts {
   canvas: HTMLCanvasElement | null;
@@ -68,6 +69,9 @@ export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
   const tier: QualityTier = o.tier ?? (o.canvas && fit ? detectRenderTier(o.canvas, fit, engine) : 'desktop');
   const scene = new Scene(engine);
   (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
+  // PHONE-PERF (2026-10-14): a phone uploads a glTF model's texture at 1024² at most (phoneTextureCap.ts); desktop untouched.
+  // In the shared look stack so the Studio's phone preview counts the same texture memory a mode does.
+  installPhoneTextureCap(engine, tier);
   scene.metadata.felModeId = o.modeId;      // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
   o.onScene?.(scene, { engine, fit, tier });
   const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
