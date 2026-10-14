@@ -191,7 +191,40 @@ code) the firewall still holds.
   that `decalAlpha` reads as 1), so a placed mark needs no refresh.
 - `lib/babylon/core/ModeHarness.ts` (movement-play): extract `mountLookStack` (§4.1).
 
-## 9. Status
+## 9. Status (2026-10-14, lane/nexus-studio)
 
-Phase 0 (this doc), phase 1 (shell, flag, viewport) and phase 2 (track 1) are on `lane/nexus-studio`; the status of
-each piece is in the lane's closing report and the commits.
+**Built and proven on the capture rig** (esbuild bundle + Playwright/SwiftShader, no `next dev`; shots in the session
+scratchpad `nexus-studio/`):
+
+- The shell: four tracks (Venues · AI builder · Characters · Scripts), project name, undo / redo with the step's label,
+  save state ("Saved on this device"), save, export, import, Play-test. Scene tree (venues, grouped objects, hide, lock),
+  asset browser (search; click to place at the view's centre, drag into the view to place there), inspector (every
+  object kind; the venue's light, sky, haze, ground, dressing, weather and broadcast camera), toolbar, shortcuts.
+- The viewport on the mode's own look stack: a 32-object demo venue (night mood, own sky, city horizon, floor and line
+  colours, 4 floods + 6 lamps lit by FixtureLights' 10 clustered lights, two seated bleachers built by the real crowd,
+  6 palms + bushes + a banner tower through VenueProps, the hoop bus and a sedan through meshyProps, a banner and flags
+  through the PlaceLook, decals) imports, draws and edits; delete → undo restores it in the live UI (32 → 31 → 32).
+- Previews: a replay angle (`low`) and the walk-in intro (crane, letterbox) through the real director.
+- The meter: the demo venue measures desktop 331 / 1600 draws, 69 / 900 meshes, 59 / 512 MB; on the Phone switch (the stage
+  re-mounted on the mobile tier: crowd cards, no fixture lights, one shadow map) 65 / 600 draws, 58 / 400 meshes,
+  53 / 256 MB. Tiebreak's reference row is tennis's (115 draws, 141 MB measured on a phone).
+- Play-test: the button writes the export and opens `/dev/mode/tiebreak?venue=<id>&place=home`; Tiebreak loads the same
+  export through `?venue=` and draws the same venue (night, floods, lamps, palms,
+  bleachers with fans, banner), opens on the walk-in intro and hands back its own fixed camera when the intro ends.
+
+**Not done / known gaps** (each is a next step, not a hidden failure):
+- Glossy floor and persistent decals wait on the routed one-liners (§8); the decal layer's refresh is the stopgap.
+- Replay angles are exported but only a mode that replays reads them; Tiebreak has no replays.
+- The editor shows the drag on a proxy box and re-draws the real prop on release (a kit prop is a thin instance).
+- No server save (no route stores a project; §2.1). No multi-select, copy/paste between venues, or prefab groups yet.
+- Play-test runs in a development build only, by design (the load path is dev-only).
+
+**Next, by track:**
+- Track 1 polish: multi-select + group move, prefab stamps (a "lamp row", a "bleacher pair"), a second play-test mode
+  (Football Rush: it already replays and runs the intro, so replay angles become live), the routed one-liners.
+- Track 2 (AI builder): CELL emits Studio commands (`lib/nexus-studio/edits.ts`) instead of files — "put a night
+  crowd on the east side" becomes a reviewed command list on the same undo stack; the ABACUS kill switch still gates it.
+- Track 3 (characters): a project character is a Closet share code; casting places it (the rival, the crowd's variety)
+  through `playerIdentity`; the Closet Studio stays the editor.
+- Track 4 (scripts): event → condition → action graphs over `ctx.momentum`, crowd `react()`, juice, HUD banners, the
+  director; venue triggers first, interpreted inside `mountStudioExtras`.
