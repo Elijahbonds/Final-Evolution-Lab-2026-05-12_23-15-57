@@ -1,8 +1,5 @@
 // Stripe payment methods — what can actually be offered, and what cannot (2026-09-12).
 //
-// KLARNA-OFF (2026-10-13): Klarna and Afterpay/Clearpay are no longer in either pinned list. They must also be
-// switched off in the Stripe Dashboard, because the default (no pin) shows whatever the Dashboard enables.
-//
 // Asked for: Stripe, PayPal, Cash App, Afterpay, Shop Pay. Two of those have hard limits that are
 // better written down than rediscovered in a failing checkout:
 //
@@ -32,11 +29,8 @@ export type StripeMode = 'subscription' | 'payment';
 /** Recurring: the weekly plan. Narrow on purpose — see the note on Afterpay and PayPal above. */
 const RECURRING: readonly string[] = ['card', 'link', 'cashapp'];
 
-/** One-time: the store. No buy-now-pay-later (KLARNA-OFF): no Klarna, no Afterpay/Clearpay. */
-const ONE_TIME: readonly string[] = ['card', 'link', 'cashapp', 'paypal'];
-
-/** Methods taken off every pinned list (KLARNA-OFF). */
-export const REMOVED_METHODS: readonly string[] = ['klarna', 'afterpay_clearpay'];
+/** One-time: the store. BNPL and wallets are all fair game at these amounts. */
+const ONE_TIME: readonly string[] = ['card', 'link', 'cashapp', 'afterpay_clearpay', 'klarna', 'paypal'];
 
 /**
  * The payment_method_types for a Checkout Session, or undefined to defer to the Dashboard.
@@ -57,5 +51,7 @@ export const UNAVAILABLE_METHODS: Readonly<Record<string, string>> = {
 
 /** Methods deliberately excluded from the weekly plan, with the reason. */
 export const NOT_ON_SUBSCRIPTION: Readonly<Record<string, string>> = {
+  afterpay_clearpay: 'Afterpay is buy-now-pay-later for one-time amounts; Stripe does not support it for subscriptions.',
+  klarna: 'Klarna is one-time only in this configuration.',
   paypal: 'PayPal via Stripe is region-gated for subscriptions; offered on one-time purchases.',
 };
