@@ -44,16 +44,16 @@ function placePackStand(id: string, at: [number, number], yaw: number, o: Partia
  * DERBY (Pro Diamond). The camera stands behind the plate (z −3.4) looking out; the outfield wall (z 24.6–38.3) is 6.5–9 m
  * tall, so the three spec grandstands behind it (venueSpecs derby: z 44 and the two at ±30, 30) are the HOMER's crowd —
  * seen from the flight camera and the replay, as the ball clears into them. Down both baselines, outside the six
- * Onlookers that flank the infield view (x ±6.5…11), a bleacher each side faces the infield: the crowd the batter swings
- * in front of. The Onlookers stay (they are the near crowd, full bodies).
+ * Onlookers that flank the infield view (x ±6.5…11), a bleacher each side faces the infield — in FOUL ground (|x| > z all
+ * along it, so nobody sits where a fair ball lands): the crowd the batter swings in front of. The Onlookers stay (they are the near crowd, full bodies).
  */
 const DERBY: CrowdVenue = {
   stands: [
     placePackStand('db_center', [0, 44], PI),
     placePackStand('db_left', [-30, 30], PI * 0.75),
     placePackStand('db_right', [30, 30], -PI * 0.75),
-    { id: 'db_first', front: [14.5, 0, 11], yaw: -PI / 2 - 0.35, width: 16, rows: 4, step: [0.7, 0.42], posture: 'seated', benches: true },
-    { id: 'db_third', front: [-14.5, 0, 11], yaw: PI / 2 + 0.35, width: 16, rows: 4, step: [0.7, 0.42], posture: 'seated', benches: true },
+    { id: 'db_first', front: [16, 0, 8], yaw: -PI / 2 - 0.35, width: 12, rows: 4, step: [0.7, 0.42], posture: 'seated', benches: true },
+    { id: 'db_third', front: [-16, 0, 8], yaw: PI / 2 + 0.35, width: 12, rows: 4, step: [0.7, 0.42], posture: 'seated', benches: true },
   ],
   focus: [0, 1, 12],
   eye: [-1.8, 1.9, -3.4],

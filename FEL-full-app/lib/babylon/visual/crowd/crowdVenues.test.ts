@@ -57,3 +57,12 @@ describe('velocity kart: the circuit\'s own grandstands', () => {
     }
   });
 });
+
+describe('derby: the baseline bleachers sit in foul ground', () => {
+  it('every baseline seat has |x| > z (the foul lines run from the plate at 45°)', () => {
+    for (const s of layoutSeats(crowdVenue('derby')!)) {
+      if (!/^db_(first|third)$/.test(s.stand)) continue;
+      expect(Math.abs(s.pos[0]), `${s.stand} row ${s.row}`).toBeGreaterThan(s.pos[2]);
+    }
+  });
+});
