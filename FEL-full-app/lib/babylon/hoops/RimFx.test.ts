@@ -5,6 +5,7 @@ import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { installOffscreenShim } from '../../../tests/helpers/canvasShim';
 import { mountRimFx, FLAME_CAP } from './RimFx';
 import { flameRate } from './hoopsLook';
+import { writeMotionPref } from '../../a11y/reducedMotion';
 
 beforeAll(() => installOffscreenShim());
 const RIM = new Vector3(0, 3.05, -0.6);
@@ -84,5 +85,20 @@ describe('RimFx', () => {
     expect(s.materials.some((m) => m.name === 'hoops_netglow_m')).toBe(false);
     expect(s.textures.some((t) => t.name === 'hoops_flame')).toBe(false);
     h.make('big'); h.update(0.1); h.streak(3, 3);   // a late call into a disposed handle is a no-op, not a throw
+  });
+  it('reduced motion: no ring of light and no flare of the net on a make; the fire still burns, steady', () => {
+    writeMotionPref('reduce');
+    try {
+      const s = rig(); const h = mountRimFx(s, RIM, 'desktop');
+      h.make('money'); h.update(1 / 60);
+      expect(s.meshes.filter((m) => m.name.startsWith('fr_shock_') && m.isEnabled()).length).toBe(0);
+      expect(sock(s).isEnabled()).toBe(false);
+      h.streak(3, 3);
+      const alphas: number[] = [];
+      for (let i = 0; i < 120; i++) { h.update(1 / 60); if (i > 60) alphas.push((s.getMaterialByName('hoops_netglow_m') as unknown as { alpha: number }).alpha); }
+      expect(sock(s).isEnabled()).toBe(true);
+      expect(Math.max(...alphas) - Math.min(...alphas)).toBeLessThan(0.01);   // a steady glow, not a pulse
+      h.dispose();
+    } finally { writeMotionPref('system'); }
   });
 });

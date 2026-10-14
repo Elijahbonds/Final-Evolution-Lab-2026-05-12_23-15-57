@@ -92,3 +92,24 @@ describe('what throws a shadow', () => {
     for (const frag of ['hoops_netglow', 'hoops_flame', 'hoops_halo', 'tp_aprons', '_led', '_pool', 'jt_card_', '_frame', '_post', 'jt_top']) expect(built, frag).toContain(frag);
   });
 });
+
+describe('3-Point\'s replay is gated', () => {
+  const src = read('lib/babylon/modes/ThreePointMode.ts');
+  it('opts in, with its cast, and reaches highlight() once, only through the board lane\'s ReplayGate', () => {
+    expect(src).toMatch(/replay: true,/);
+    expect(src).toMatch(/replayCast: \(\) =>/);
+    const calls = src.match(/ctx\.highlight\?\.\(/g) ?? [];
+    expect(calls.length).toBe(1);
+    const at = src.indexOf('ctx.highlight?.(');
+    const around = src.slice(Math.max(0, at - 700), at);
+    expect(around).toContain('replayGate.consider(');
+    expect(around).toContain('plan');
+  });
+  it('never for the run\'s last ball, the buzzer\'s ball, the practice rack — and the gate is reset with every run', () => {
+    const at = src.indexOf('replayGate.consider(');
+    const gate = src.slice(Math.max(0, at - 260), at);
+    expect(gate).toContain('f.money'); expect(gate).toContain('!f.endsRun'); expect(gate).toContain('!f.quiet'); expect(gate).toContain("S.round !== 'practice'");
+    expect(src.match(/replayGate\.reset\(\)/g)?.length).toBe(2);   // resetState and resetRun
+    expect(src).toContain('S.clock);');   // the clock left rides into the gate (its tail guard)
+  });
+});
