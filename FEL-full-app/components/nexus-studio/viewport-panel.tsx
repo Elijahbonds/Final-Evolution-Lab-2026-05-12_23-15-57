@@ -9,6 +9,7 @@ import type { StudioReplayAngle, StudioTransform, StudioVenue, V3 } from '@/lib/
 import type { BudgetSample } from '@/lib/nexus-studio/budget';
 import type { SnapSettings } from '@/lib/nexus-studio/snap';
 import type { CameraMode, StudioViewport, Tool } from '@/lib/nexus-studio/viewport';
+import type { ExportCast } from '@/lib/nexus-studio/cast';
 import { DRAG_MIME } from './asset-browser';
 import { C } from './ui';
 
@@ -34,6 +35,8 @@ export interface ViewportPanelProps {
   onDropItem(itemId: string, at: V3): void;
   onStats(s: BudgetSample): void;
   onPreviewEnd(): void;
+  /** Track 3: the venue's cast, decoded — the viewport stands it on the hero's spot on the real rig. */
+  cast?: ExportCast | null;
 }
 
 export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(function ViewportPanel(p, ref) {
@@ -83,6 +86,7 @@ export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(func
 
   useEffect(() => { if (status === 'ready') void vpRef.current?.update(p.venue); }, [p.venue, status]);
   useEffect(() => { vpRef.current?.select(p.selected); }, [p.selected, status]);
+  useEffect(() => { if (status === 'ready') vpRef.current?.setCast(p.cast ?? null); }, [p.cast, status]);
   useEffect(() => { vpRef.current?.setTool(p.tool); }, [p.tool, status]);
   useEffect(() => { vpRef.current?.setCamera(p.camera); }, [p.camera, status]);
   useEffect(() => { vpRef.current?.setSnap(p.snap); }, [p.snap, status]);

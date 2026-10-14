@@ -64,6 +64,15 @@ describe('the inspector', () => {
     for (const s of ['aria-label="Mood"', 'aria-label="Sky top"', 'aria-label="Court dressing"', 'aria-label="Weather"', 'aria-label="Intro"', 'aria-label="Preview the low angle"', 'aria-label="Glossy floor"']) expect(html).toContain(s);
     expect(html).toContain('value="nightGame" selected=""');
   });
+  it('track 3: with the project, the venue has a character slot — the player\'s own look, the project\'s characters, Closet and paste', () => {
+    const project = { ...starterProject(), characters: [{ id: 'c1', name: 'Nova', lookCode: 'FEL2.abc.0000000' }] };
+    const html = renderToStaticMarkup(createElement(Inspector, { ...props, venue: { ...v, cast: { player: 'c1' } }, project, object: null }));
+    expect(html).toContain('data-testid="cast-slot"');
+    expect(html).toContain('<option value="c1" selected="">Nova</option>');
+    expect(html).toContain('From my Closet');
+    expect(html).toContain('Paste a share code');
+    expect(renderToStaticMarkup(createElement(Inspector, { ...props, object: null }))).not.toContain('cast-slot');
+  });
   it('a fixture shows its role, light and height; a locked object cannot be deleted', () => {
     const fixture = v.objects.find((o) => o.type === 'fixture')!;
     const html = renderToStaticMarkup(createElement(Inspector, { ...props, object: fixture }));

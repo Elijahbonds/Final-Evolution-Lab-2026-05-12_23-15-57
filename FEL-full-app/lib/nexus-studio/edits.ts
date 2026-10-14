@@ -3,8 +3,14 @@
 
 import type { Command, ObjectPatch } from './commands';
 import {
-  duplicateObject, newVenue, type StudioObject, type StudioProject, type StudioTransform, type StudioVenue, type VenueSettings,
+  LIMITS, duplicateObject, newId, newVenue,
+  type StudioCharacter, type StudioObject, type StudioProject, type StudioScript, type StudioTransform, type StudioVenue, type VenueSettings,
 } from './doc';
+import {
+  NODE_SPECS, edgeAllowed, newEdge, newNode, pointWonGraph, sanitizeParams, wouldCycle,
+  type NodeKind, type ParamValue, type ScriptGraph,
+} from './scripts';
+import type { CastSlot } from './cast';
 import { instantiate, type CatalogItem } from './catalog';
 import type { PlaytestTarget } from './targets';
 
@@ -56,3 +62,88 @@ export function switchVenue(id: string): Command { return { label: 'Switch venue
 export function importProject(project: StudioProject): Command { return { label: `Import ${project.name}`, ops: [{ op: 'replaceProject', project }] }; }
 
 export function renameProject(name: string): Command { return { label: 'Rename project', group: 'project:name', ops: [{ op: 'setName', name }] }; }
+
+// ── track 3: characters (Closet share codes) and the venue's cast ───────────────────────────────────────────────────
+
+/** Add a character; with `cast`, also cast it in venue `v` — one undo step either way. */
+export function addCharacter(p: StudioProject, c: { name: string; lookCode: string }, cast?: { venue: StudioVenue; slot: CastSlot }): { cmd: Command; id: string } {
+  const character: StudioCharacter = { id: newId('char'), name: c.name.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, LIMITS.name) || `Character ${p.characters.length + 1}`, lookCode: c.lookCode };
+  const ops: Command['ops'] = [{ op: 'addCharacter', character }];
+  if (cast) ops.push({ op: 'patchVenue', venueId: cast.venue.id, patch: { cast: { ...cast.venue.cast, [cast.slot]: character.id } } });
+  return { id: character.id, cmd: { label: cast ? `Cast ${character.name}` : `Add ${character.name}`, ops } };
+}
+
+/** Remove a character, and take it out of every venue that casts it (in the same step, so Undo puts both back). */
+export function removeCharacter(p: StudioProject, id: string): Command | null {
+  const c = p.characters.find((x) => x.id === id);
+  if (!c) return null;
+  const ops: Command['ops'] = [];
+  for (const v of p.venues) {
+    if (v.cast?.player !== id) continue;
+    const { player: _gone, ...rest } = v.cast; void _gone;
+    ops.push({ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(rest).length ? rest : undefined } });
+  }
+  ops.push({ op: 'removeCharacter', id });
+  return { label: `Delete ${c.name}`, ops };
+}
+
+export function renameCharacter(id: string, name: string): Command {
+  return { label: 'Rename character', group: `char:${id}:name`, ops: [{ op: 'patchCharacter', id, patch: { name: name.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, LIMITS.name) || 'Character' } }] };
+}
+
+/** Fill (or empty, with null) a venue's cast slot. */
+export function castCharacter(v: StudioVenue, slot: CastSlot, id: string | null): Command {
+  const cast = { ...v.cast };
+  if (id) cast[slot] = id; else delete cast[slot];
+  return { label: id ? 'Cast character' : 'Uncast character', ops: [{ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(cast).length ? cast : undefined } }] };
+}
+
+// ── track 4: scripts (event → condition → action graphs) ────────────────────────────────────────────────────────────
+
+/** A new script: blank, or the brief's example (on a point won → crowd cheer + banner). */
+export function addScript(p: StudioProject, template: 'blank' | 'pointWon' = 'pointWon'): { cmd: Command; id: string } {
+  const graph: ScriptGraph = template === 'pointWon' ? pointWonGraph() : { enabled: true, nodes: [], edges: [] };
+  const script: StudioScript = { id: newId('script'), name: template === 'pointWon' ? 'Point won → cheer + banner' : `Script ${p.scripts.length + 1}`, ...graph };
+  return { id: script.id, cmd: { label: 'New script', ops: [{ op: 'addScript', script }] } };
+}
+
+export function removeScript(p: StudioProject, id: string): Command | null {
+  const s = p.scripts.find((x) => x.id === id);
+  return s ? { label: `Delete ${s.name}`, ops: [{ op: 'removeScript', id }] } : null;
+}
+
+export function editScript(id: string, patch: Partial<Omit<StudioScript, 'id'>>, label: string, group?: string): Command {
+  const clean = patch.name !== undefined ? { ...patch, name: patch.name.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, LIMITS.name) || 'Script' } : patch;
+  return { label, ...(group ? { group } : {}), ops: [{ op: 'patchScript', id, patch: clean }] };
+}
+
+/** Add a node to a script. */
+export function addScriptNode(s: StudioScript, kind: NodeKind, x: number, y: number): { cmd: Command; id: string } {
+  const node = newNode(kind, x, y);
+  return { id: node.id, cmd: editScript(s.id, { nodes: [...s.nodes, node] }, `Add ${NODE_SPECS[kind].label}`) };
+}
+
+/** Connect two nodes, if the edge is allowed and closes no loop (else null). */
+export function connectNodes(s: StudioScript, from: string, to: string): Command | null {
+  const a = s.nodes.find((n) => n.id === from), b = s.nodes.find((n) => n.id === to);
+  if (!a || !b || !edgeAllowed(a.kind, b.kind) || s.edges.some((e) => e.from === from && e.to === to) || wouldCycle(s.edges, from, to)) return null;
+  return editScript(s.id, { edges: [...s.edges, newEdge(from, to)] }, 'Connect');
+}
+
+/** Delete nodes and edges (a deleted node takes its edges with it). */
+export function deleteFromScript(s: StudioScript, ids: readonly string[]): Command | null {
+  const nodes = s.nodes.filter((n) => !ids.includes(n.id));
+  const edges = s.edges.filter((e) => !ids.includes(e.id) && nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to));
+  if (nodes.length === s.nodes.length && edges.length === s.edges.length) return null;
+  return editScript(s.id, { nodes, edges }, nodes.length === s.nodes.length ? 'Disconnect' : 'Delete node');
+}
+
+/** Move a node (one undo step per drag: the caller seals on release). */
+export function moveScriptNode(s: StudioScript, id: string, x: number, y: number): Command {
+  return editScript(s.id, { nodes: s.nodes.map((n) => (n.id === id ? { ...n, x: Math.round(x), y: Math.round(y) } : n)) }, 'Move node', `script:${s.id}:move:${id}`);
+}
+
+/** A node's parameter, through its spec's sanitiser (typing coalesces per field). */
+export function setNodeParam(s: StudioScript, id: string, key: string, value: ParamValue): Command {
+  return editScript(s.id, { nodes: s.nodes.map((n) => (n.id === id ? { ...n, params: sanitizeParams(n.kind, { ...n.params, [key]: value }) } : n)) }, `Edit ${key}`, `script:${s.id}:param:${id}:${key}`);
+}

@@ -5,7 +5,7 @@
 //   kit       → a registered visual/venuePropSets set, mounted by mountVenue through VenueProps (thin instances)
 //   meshy     → visual/meshyProps spawnMeshyProp
 //   fixtures  → lit heads named for scene/FixtureLights' roles, found by the rig's captureVenue (desktop/high)
-//   decals    → visual/GroundDecals' pool, refreshed before a placed mark would fade
+//   decals    → visual/GroundDecals' pool, stamped once with `persist` (a placed mark never fades)
 //   crowd     → visual/crowd mountModeCrowd with the export's stands (it hears the mode's momentum when there is one)
 //   weather   → premium/WeatherFx over core/WeatherKit.fromPick
 //   intro     → the mode's `intro` getter + a director stepper (a mode with a fixed camera never steps the director)
@@ -19,7 +19,7 @@ import type { PlaceLook } from '../babylon/nexus/placeLooks';
 import { VENUE_PROP_SETS, type PropPlacement } from '../babylon/visual/venuePropSets';
 import { propSetFor } from '../babylon/visual/VenueProps';
 import { spawnMeshyProp, type MeshyPropKey } from '../babylon/visual/meshyProps';
-import { mountGroundDecals, decalCap, decalLife } from '../babylon/visual/GroundDecals';
+import { mountGroundDecals, decalCap } from '../babylon/visual/GroundDecals';
 import { mountModeCrowd } from '../babylon/visual/crowd/modeCrowd';
 import type { CrowdVenue } from '../babylon/visual/crowd/crowdLayout';
 import { WeatherKit } from '../babylon/core/WeatherKit';
@@ -28,9 +28,13 @@ import type { LightRigHandle } from '../babylon/scene/LightRig';
 import type { QualityTier } from '../babylon/scene/QualityTier';
 import type { VenueMood } from '../babylon/scene/moods';
 import type { IntroKind } from '../babylon/scene/broadcastShots';
+import type { HudValue } from '../babylon/core/ModeHarness';
 import type { ExportCrowd, ExportDecal, ExportFixture, ExportMeshyProp, StudioVenueExport } from './exportVenue';
 import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
 import { targetOf } from './targets';
+import { castIdentity } from './cast';
+import { mountScriptHost, type ScriptHost, type ScriptHostCtx } from './scriptHost';
+import { invalidateIdentity, primeIdentity } from '../babylon/core/playerIdentity';
 
 // ── the mode's side: is there a Studio venue for this mode? ─────────────────────────────────────────────────────────
 
@@ -164,45 +168,36 @@ export function mountFixtureLayer(scene: Scene, parent: TransformNode | null, it
 }
 
 /**
- * Placed marks. GroundDecals is a transient pool (a mark fades over decalLife); a placed mark must stay, so the layer keeps
- * its OWN pool and re-stamps every mark at half its life — exactly `cap` stamps per kind (unused slots get a zero-size
- * stamp), so each mark always lands in the same slot and is never drawn twice. (Routed: a `persist` stamp option on
- * GroundDecals would make the refresh unnecessary — docs/NEXUS-STUDIO.md §8.)
+ * Placed marks: GroundDecals' pool with `persist` stamps (docs/NEXUS-STUDIO.md §8), so a mark is stamped once, never fades and
+ * a mode's transient marks never take its slot. At most `cap` kept marks per kind (the pool's size): the rest are not drawn.
  */
 export function mountDecalLayer(scene: Scene, tier: QualityTier, items: readonly ExportDecal[]): Layer & { stamped: number; live(): number } {
   if (!items.length) return { stamped: 0, live: () => 0, dispose() {} };
   const pool = mountGroundDecals(scene, tier);
-  const cap = decalCap(tier), life = decalLife(tier);
-  const byKind = new Map<ExportDecal['kind'], ExportDecal[]>();
-  for (const d of items) { const l = byKind.get(d.kind) ?? []; if (l.length < cap) l.push(d); byKind.set(d.kind, l); }
-  const stampAll = (): void => {
-    for (const [kind, list] of byKind) {
-      for (const d of list) pool.stamp(kind, d.at[0], d.at[2], d.yaw, { y: d.at[1], scale: d.scale });
-      for (let i = list.length; i < cap; i++) pool.stamp(kind, 0, 0, 0, { scale: 0 });
-    }
-  };
-  stampAll();
-  let acc = 0;
-  const obs = scene.onBeforeRenderObservable.add(() => {
-    acc += Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);   // the pool's own clock step
-    if (acc >= life * 0.5) { acc = 0; stampAll(); }
-  });
-  let stamped = 0; for (const l of byKind.values()) stamped += l.length;
-  /** Marks on the ground now (each kind's slots, the zero-size fillers included): `cap` per kind while the refresh runs. */
-  const live = (): number => { let n = 0; for (const k of byKind.keys()) n += pool.live(k); return n; };
-  return { stamped, live, dispose() { scene.onBeforeRenderObservable.remove(obs); pool.dispose(); } };
+  const cap = decalCap(tier);
+  const kinds = new Map<ExportDecal['kind'], number>();
+  let stamped = 0;
+  for (const d of items) {
+    const n = kinds.get(d.kind) ?? 0;
+    if (n >= cap) continue;
+    pool.stamp(d.kind, d.at[0], d.at[2], d.yaw, { y: d.at[1], scale: d.scale, persist: true });
+    kinds.set(d.kind, n + 1); stamped++;
+  }
+  /** Marks on the ground now. */
+  const live = (): number => { let n = 0; for (const k of kinds.keys()) n += pool.live(k); return n; };
+  return { stamped, live, dispose() { pool.dispose(); } };
 }
 
 /** The export's stands as a crowd (visual/crowd). `ctx` may carry the mode's momentum and phase: the crowd then reacts. */
-export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?: () => string }, crowd: ExportCrowd | null): Layer & { seats: number } {
-  if (!crowd?.stands.length) return { seats: 0, dispose() {} };
+export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?: () => string }, crowd: ExportCrowd | null): Layer & { seats: number; crowd: { react(kind: string, strength?: number): void } | null } {
+  if (!crowd?.stands.length) return { seats: 0, crowd: null, dispose() {} };
   const venue: CrowdVenue = {
     stands: crowd.stands.map((s) => ({ id: `studio_${s.id}`, front: [...s.front] as [number, number, number], yaw: s.yaw, width: s.width, rows: s.rows, step: [...s.step] as [number, number], posture: s.posture, benches: s.benches, gaps: s.gaps })),
     focus: [...crowd.focus] as [number, number, number], eye: [...crowd.eye] as [number, number, number],
     camera: { at: [...crowd.camera.at] as [number, number, number], into: [...crowd.camera.into] as [number, number], margin: crowd.camera.margin },
   };
   const h = mountModeCrowd(ctx as Parameters<typeof mountModeCrowd>[0], 'tennis', { venue });
-  return { seats: h?.seats ?? 0, dispose() { h?.dispose(); } };
+  return { seats: h?.seats ?? 0, crowd: h ? { react: (kind, strength) => h.react(kind as Parameters<typeof h.react>[0], strength) } : null, dispose() { h?.dispose(); } };
 }
 
 /** The weather's look (never its gameplay: nothing here reads the kit's modifiers). 'natural' mounts nothing. */
@@ -225,9 +220,13 @@ export interface StudioModeCtx {
   /** The mode's play camera (put back as the mode left it when the intro ends). */
   camera?: { position: Vector3; fov: number; getTarget(): Vector3; setTarget(t: Vector3): void };
   objectiveRef?: { current: Vector3 | null };
+  /** track 4: the HUD bridge (the script host taps it to hear the score, and writes its banner through it) */
+  setHud?: (u: Record<string, HudValue>) => void;
+  /** track 4: the mode's replay (a script's replay shot), where the mode replays */
+  highlight?: () => Promise<void>;
 }
 
-export interface StudioExtras extends Layer { readonly layers: Record<'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather', Layer> }
+export interface StudioExtras extends Layer { readonly layers: Record<'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather', Layer>; readonly scripts?: ScriptHost }
 
 /** Mount everything the export adds over the venue (call right after mountVenue with `studioLook(exp)`). */
 export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, opts: { stepIntro?: boolean } = {}): StudioExtras {
@@ -249,7 +248,13 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
   // ends puts the mode's own camera back exactly as the mode left it: the play camera is the mode's, not the follow's.
   const zero = Vector3.Zero();
   let held: { subject: Vector3; objective: Vector3 | null; pos: Vector3; target: Vector3; fov: number } | null = null;
-  const stepper = opts.stepIntro && ctx.camDirector && exp.intro !== 'none'
+  // track 4: a project's scripts, run by the host on the mode's own events (presentation only — scriptHost.ts)
+  const target = targetOf(exp.target);
+  const scripts = mountScriptHost(ctx as ScriptHostCtx, exp.scripts ?? [], {
+    crowd: layers.crowd.crowd, fixtureHeads: layers.fixtures.heads, subject: exp.subject ?? target?.subject, ...(target?.scoreKeys ? { scoreKeys: target.scoreKeys } : {}),
+  });
+  const scriptedShots = (exp.scripts ?? []).some((s) => s.nodes.some((n) => n.kind === 'camera' && n.params.shot !== 'replay'));
+  const stepper = opts.stepIntro && ctx.camDirector && (exp.intro !== 'none' || scriptedShots)
     ? scene.onBeforeRenderObservable.add(() => {
       const d = ctx.camDirector!;
       const cam = ctx.camera;
@@ -269,8 +274,9 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
     })
     : null;
   return {
-    layers,
+    layers, scripts,
     dispose() {
+      scripts.dispose();
       if (stepper) scene.onBeforeRenderObservable.remove(stepper);
       for (const l of Object.values(layers)) l.dispose();
       delete meta.felStudioGround;
@@ -278,10 +284,21 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
   };
 }
 
-/** A mode's one-line hook: the extras for the Studio venue this page carries for `modeKey`, or null. */
+/**
+ * A mode's one-line hook: the extras for the Studio venue this page carries for `modeKey`, or null. A venue that casts a
+ * player (track 3) seats that look as the session's identity HERE — before the mode's load() spawns its hero — so the
+ * mode's own spawn (CharacterLibrary.spawn → resolveIdentity → the body file → applyIdentity) dresses the hero in it.
+ * Dispose forgets it, so the next mount resolves the player's own look again.
+ */
 export function mountStudioFor(modeKey: string, ctx: StudioModeCtx): StudioExtras | null {
   const exp = studioVenueFor(modeKey);
   if (!exp) return null;
-  console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals`);
-  return mountStudioExtras(ctx, exp, { stepIntro: true });
+  console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals${exp.cast?.player ? `, cast: ${exp.cast.player.name}` : ''}`);
+  const cast = exp.cast?.player ?? null;
+  if (cast) primeIdentity(castIdentity(cast));
+  const extras = mountStudioExtras(ctx, exp, { stepIntro: true });
+  return {
+    layers: extras.layers, scripts: extras.scripts,
+    dispose() { extras.dispose(); if (cast) invalidateIdentity(); },
+  };
 }

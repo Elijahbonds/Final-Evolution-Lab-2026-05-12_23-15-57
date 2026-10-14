@@ -15,6 +15,8 @@ export interface PlaytestTarget {
   spec: string;
   /** Where the mode's hero stands (the intro and replay previews frame it) and who it plays toward. */
   subject: V3;
+  /** The hero's facing on that spot (radians; the cast preview stands it so). */
+  subjectYaw: number;
   objective: V3;
   /** CameraDirector preset the mode plays on. */
   camPreset: 'court';
@@ -22,6 +24,8 @@ export interface PlaytestTarget {
   weatherFamily: 'court';
   /** crowdLayout.CrowdVenue's look line for this mode's play camera (a stand may not sit in front of it or behind it). */
   crowdView: { focus: V3; eye: V3; camera: { at: V3; into: [number, number]; margin: number } };
+  /** track 4: the HUD keys the mode posts its score under (the script host hears "Point scored" there). */
+  scoreKeys?: { me: string; them: string };
   /** config/mobileBudget.json row measured on this venue (the mode's own, or the closest one). */
   budgetKey: string;
   /** Opens the mode with a Studio venue: dev only (the load path is dev only). */
@@ -34,12 +38,14 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     label: 'Tiebreak',
     spec: 'tennis',
     subject: [0, 0, 10],     // core/TiebreakFlight NEAR_Z
+    subjectYaw: Math.PI,     // TiebreakMode PLAYER_YAW
     objective: [0.4, 0, -10], // FAR_Z, the rival's spot
     camPreset: 'court',
     weatherFamily: 'court',
     // visual/crowd/crowdVenues.ts TENNIS: the play camera stands behind the near baseline looking −z
     crowdView: { focus: [0, 1, -2], eye: [0, 4.4, 15.8], camera: { at: [0, 4.4, 15.8], into: [0, -1], margin: 5 } },
     budgetKey: 'tennis',
+    scoreKeys: { me: 'myPts', them: 'aiPts' },   // TiebreakMode hud()
     route: (v) => `/dev/mode/tiebreak?venue=${encodeURIComponent(v)}`,
   },
 };

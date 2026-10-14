@@ -11,6 +11,7 @@ import {
   Color3, GizmoManager, LinesMesh, Mesh, MeshBuilder, PointerEventTypes, StandardMaterial, TransformNode, Vector3,
   type AbstractEngine, type AbstractMesh, type Observer, type PointerInfo, type Scene,
 } from '@babylonjs/core';
+import type { ExportCast } from './cast';
 import { exportVenue, type StudioVenueExport } from './exportVenue';
 import { mountStage, type Stage, type StageLayer } from './stage';
 import { proxyBox } from './catalog';
@@ -42,6 +43,7 @@ export function changedLayers(prev: StudioVenueExport | null, next: StudioVenueE
   if (!same(prev.fixtures, next.fixtures)) out.add('fixtures');
   if (!same(prev.decals, next.decals)) out.add('decals');
   if (!same(prev.crowd, next.crowd)) out.add('crowd');
+  if (!same(prev.cast, next.cast)) out.add('cast');
   if (!same([prev.weather, !!prev.look.sky], [next.weather, !!next.look.sky])) out.add('weather');
   // the subject mark moves the previews' frame and the capture's centre: a cheap venue-free re-run of captureVenue
   if (!same(prev.subject, next.subject) || prev.glossyFloor !== next.glossyFloor) out.add('fixtures');
@@ -85,6 +87,18 @@ export class StudioViewport {
     this.venueDebounceMs = opts.venueDebounceMs ?? (engineOverride ? 0 : 90);
   }
 
+  private cast: ExportCast | null = null;
+
+  /** Track 3: the venue's cast, decoded (cast.ts resolveCast — share codes decode asynchronously). Re-mounts the cast layer. */
+  setCast(cast: ExportCast | null): void {
+    if (JSON.stringify(cast) === JSON.stringify(this.cast)) return;
+    this.cast = cast;
+    if (!this.stage || !this.exp || !this.venue) return;
+    const exp = exportVenue(this.venue, cast);
+    this.exp = exp;
+    this.stage.realise(exp, ['cast']);
+  }
+
   get scene(): Scene | null { return this.stage?.scene ?? null; }
   get currentStage(): Stage | null { return this.stage; }
   get selection(): string | null { return this.selected; }
@@ -93,7 +107,7 @@ export class StudioViewport {
   async load(venue: StudioVenue, tier?: QualityTier): Promise<void> {
     this.tier = tier;
     const run = async () => {
-      const exp = exportVenue(venue);
+      const exp = exportVenue(venue, this.cast);
       // the engine outlives a re-mount (a mood change, the meter's tier switch): a canvas whose engine was disposed has
       // lost its WebGL context, and a second engine on it never draws
       const engine = this.stage?.engine ?? this.engine ?? this.engineOverride;
@@ -119,7 +133,7 @@ export class StudioViewport {
   /** A new document state: re-realise what changed (the whole stage for a mood, spec or target change). */
   async update(venue: StudioVenue): Promise<void> {
     if (!this.stage) return this.load(venue, this.tier);
-    const exp = exportVenue(venue);
+    const exp = exportVenue(venue, this.cast);
     const layers = changedLayers(this.exp, exp);
     if (layers === null) return this.load(venue, this.tier);
     this.venue = venue;

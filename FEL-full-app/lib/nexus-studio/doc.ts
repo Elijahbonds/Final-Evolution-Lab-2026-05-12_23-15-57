@@ -6,6 +6,8 @@
 // UNTRUSTED: `sanitizeProject` drops unknown kinds, clamps every number, caps every string and list, and re-mints a
 // colliding id. `migrateProject` is the one place a later version reads this one.
 
+import { sanitizeGraph, type ScriptGraph } from './scripts';
+
 export const STUDIO_DOC_KIND = 'nexus-studio-project' as const;
 export const STUDIO_DOC_VERSION = 1 as const;
 
@@ -103,14 +105,17 @@ export interface VenueSettings {
   replayAngles: StudioReplayAngle[];
   /** Ask for the planar-mirror floor (scene/GlossyFloor.ts) — desktop/high, a wooden court. */
   glossyFloor: boolean;
+  /** Track 3: who the venue casts — a project character's id per slot (cast.ts). Absent = the player's own look. */
+  cast?: { player?: string };
 }
 
 export interface StudioVenue extends VenueSettings { id: string; objects: StudioObject[] }
 
-/** Track 3: a character is a Closet look (its share code, lib/creator/look/shareCode). */
+/** Track 3: a character is a Closet look (its share code, lib/creator/look/shareCode). A code that is not code-shaped, or
+ *  longer than the Closet's own ceiling, is dropped whole (a truncated code is a corrupt one). */
 export interface StudioCharacter { id: string; name: string; lookCode?: string }
-/** Track 4: a script graph. Empty until phase 4. */
-export interface StudioScript { id: string; name: string; nodes: unknown[]; edges: unknown[] }
+/** Track 4: an event → condition → action graph (scripts.ts), run by interpreter.ts in every venue the project plays. */
+export interface StudioScript extends ScriptGraph { id: string; name: string }
 
 export interface StudioProject {
   kind: typeof STUDIO_DOC_KIND;
@@ -144,8 +149,11 @@ export const LIMITS = {
   standWidth: [2, 80] as const,
   standRows: [1, 12] as const,
   fixtureHeight: [0.3, 40] as const,
-  code: 4096,
+  /** lib/creator/look/shareCode MAX_SHARE_CODE_CHARS: the longest code the Closet itself reads. */
+  code: 50_000,
 };
+/** The share-code shape (cast.ts holds the decode): FEL<version>.<base64url>.<checksum>. */
+const CODE = /^FEL\d{1,3}\.[A-Za-z0-9_-]+\.[0-9a-z]{7}$/;
 
 // ── constructors ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -354,6 +362,7 @@ export function sanitizeVenue(x: unknown, seen: Set<string>): StudioVenue | null
     intro: oneOf(x.intro, INTROS) ?? 'none',
     replayAngles: angles,
     glossyFloor: x.glossyFloor === true,
+    ...(isObj(x.cast) && typeof x.cast.player === 'string' && ID.test(x.cast.player) ? { cast: { player: x.cast.player } } : {}),
     objects,
   };
 }
@@ -390,15 +399,17 @@ export function sanitizeProject(raw: unknown, now = new Date()): ParseResult {
   const characters: StudioCharacter[] = [];
   for (const c of Array.isArray(x.characters) ? x.characters : []) {
     if (!isObj(c) || characters.length >= LIMITS.characters) continue;
-    const code = typeof c.lookCode === 'string' ? c.lookCode.slice(0, LIMITS.code) : undefined;
+    const code = typeof c.lookCode === 'string' && c.lookCode.length <= LIMITS.code && CODE.test(c.lookCode) ? c.lookCode : undefined;
     characters.push({ id: idOr(c.id, 'char', seen), name: str(c.name, LIMITS.name, 'Character'), ...(code ? { lookCode: code } : {}) });
   }
   const scripts: StudioScript[] = [];
   for (const s of Array.isArray(x.scripts) ? x.scripts : []) {
     if (!isObj(s) || scripts.length >= LIMITS.scripts) continue;
-    // phase 4 defines nodes and edges; until then a script is a name and an empty graph (nothing executable is imported)
-    scripts.push({ id: idOr(s.id, 'script', seen), name: str(s.name, LIMITS.name, 'Script'), nodes: [], edges: [] });
+    // the graph through its own sanitiser: known node kinds, params per spec, allowed and acyclic edges — data, never code
+    scripts.push({ id: idOr(s.id, 'script', seen), name: str(s.name, LIMITS.name, 'Script'), ...sanitizeGraph(s) });
   }
+  // a cast that names a character the project does not have is dropped (the venue plays the player's own look)
+  for (const v of venues) if (v.cast?.player && !characters.some((c) => c.id === v.cast!.player)) delete v.cast;
   const at = now.toISOString();
   const activeVenueId = typeof x.activeVenueId === 'string' && venues.some((v) => v.id === x.activeVenueId) ? x.activeVenueId : venues[0].id;
   const iso = (s: unknown) => (typeof s === 'string' && !Number.isNaN(Date.parse(s)) ? new Date(s).toISOString() : at);

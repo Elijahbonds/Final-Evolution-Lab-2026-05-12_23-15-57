@@ -1,34 +1,32 @@
-// THE EDITOR'S STAGE (docs/NEXUS-STUDIO.md §4.1): the harness's look stack, in the harness's order, with the same calls —
-// so what the viewport draws is what the mode draws. stage.order.test.ts reads ModeHarness.ts and fails when the
-// harness's order or calls change, so the two cannot drift silently.
+// THE EDITOR'S STAGE (docs/NEXUS-STUDIO.md §4.1): the harness's look stack through the harness's own function
+// (lib/babylon/core/lookStack.ts mountLookStack, which ModeHarness.mountMode calls) — so what the viewport draws is what the
+// mode draws, by construction. stage.order.test.ts holds both callers to it.
 //
-//   createEngine → applyCanvasFit → detectRenderTier → Scene (+ felTier, felModeId) → the camera → mountLightRig →
-//   mountSsao (when the tier asks) → mountBackdrop → autoInk → CameraDirector → mountLetterbox →
+//   mountLookStack (createEngine → applyCanvasFit → detectRenderTier → Scene (+ felTier, felModeId) → the camera →
+//   mountLightRig → mountSsao (when the tier asks) → mountBackdrop → autoInk → CameraDirector → mountLetterbox) →
 //   load(): mountVenue(spec, { keepGameplayCamera, look }) + the Studio layers (runtime.ts, the mode's own call) →
 //   liftBlackMaterials → lights.adoptRest → lights.captureVenue
 //
 // Not mounted, on purpose: the game session (READY gate, body seam, session store, results), the perf guard (adaptive
 // quality would move the budget meter under the creator's feet) and the dev PerfMonitor overlay (the meter replaces it).
 
-import { ArcRotateCamera, Scene, TargetCamera, TransformNode, UniversalCamera, Vector3 } from '@babylonjs/core';
-import type { AbstractEngine } from '@babylonjs/core';
-import { createEngine } from '../babylon/core/createEngine';
-import { applyCanvasFit, type FitResult } from '../babylon/core/canvasFit';
-import { detectRenderTier, mountSsao, tierRigSettings, type QualityTier, type SsaoHandle } from '../babylon/scene/QualityTier';
-import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../babylon/scene/LightRig';
-import { mountBackdrop, MOOD_TO_FAMILY } from '../babylon/visual/Backdrops';
-import { autoInk, inkStyleFor } from '../babylon/visual/AnimeInk';
-import { CameraDirector } from '../babylon/core/CameraDirector';
-import { mountLetterbox } from '../babylon/visual/Letterbox';
+import { ArcRotateCamera, TransformNode, UniversalCamera, Vector3 } from '@babylonjs/core';
+import type { AbstractEngine, Scene, TargetCamera } from '@babylonjs/core';
+import { mountLookStack } from '../babylon/core/lookStack';
+import type { FitResult } from '../babylon/core/canvasFit';
+import type { QualityTier } from '../babylon/scene/QualityTier';
+import { liftBlackMaterials, type LightRigHandle } from '../babylon/scene/LightRig';
+import type { CameraDirector } from '../babylon/core/CameraDirector';
 import { mountVenue, type VenueHandle } from '../babylon/core/NexusVenue';
 import type { StudioVenueExport } from './exportVenue';
 import { targetOf } from './targets';
 import {
   studioLook, mountMeshyLayer, mountFixtureLayer, mountDecalLayer, mountCrowdLayer, mountWeatherLayer, type Layer,
 } from './runtime';
+import { mountCastLayer, type CastLayer } from './castLayer';
 
-export type StageLayer = 'venue' | 'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather';
-export const STAGE_LAYERS: readonly StageLayer[] = ['venue', 'meshy', 'fixtures', 'decals', 'crowd', 'weather'];
+export type StageLayer = 'venue' | 'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather' | 'cast';
+export const STAGE_LAYERS: readonly StageLayer[] = ['venue', 'meshy', 'fixtures', 'decals', 'crowd', 'weather', 'cast'];
 
 export interface StageOpts {
   canvas: HTMLCanvasElement | null;
@@ -63,37 +61,35 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
   const { canvas } = opts;
   let exp = opts.exp;
   const target = targetOf(exp.target);
-  // 1–3: engine, canvas fit, tier (as ModeHarness.mountMode)
-  const engine = opts.engine ?? await createEngine(canvas!);
-  const fit = opts.engine || !canvas ? null : applyCanvasFit(engine, canvas);
-  const tier: QualityTier = opts.tier ?? (canvas && fit ? detectRenderTier(canvas, fit, engine) : 'desktop');
-  const scene = new Scene(engine);
-  (scene.metadata ??= {}).felTier = tier;
-  scene.metadata.felModeId = exp.target;   // lookPolicy, the fixture / sky / decal gates and the kit defaults see the target mode
-  // the harness makes its camera before the rig, so the post pipeline attaches to it; the editor's cameras come first too
-  const shot = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
-  const orbit = new ArcRotateCamera('studio_orbit', Math.PI / 2, 1.0, 38, new Vector3(0, 1, -2), scene);   // from the play camera's side (+z, looking −z)
-  orbit.lowerRadiusLimit = 2; orbit.upperRadiusLimit = 260; orbit.upperBetaLimit = Math.PI / 2 - 0.02; orbit.minZ = 0.1; orbit.maxZ = 2000;
-  orbit.wheelDeltaPercentage = 0.02; orbit.panningSensibility = 60;
-  const fly = new UniversalCamera('studio_fly', new Vector3(0, 6, 28), scene);
-  fly.minZ = 0.1; fly.maxZ = 2000; fly.speed = 0.6; fly.setTarget(new Vector3(0, 1, 0));
-  fly.keysUp = [87]; fly.keysDown = [83]; fly.keysLeft = [65]; fly.keysRight = [68]; fly.keysUpward = [69]; fly.keysDownward = [81];
-  scene.activeCamera = orbit;
-  const mood = exp.mood;
-  // 4: the rig (LightRig: hemi + sun + shadows + the post pipeline + IBL), then SSAO where the tier asks
-  const lights = mountLightRig(scene, mood, tier);
-  const ssao: SsaoHandle | null = tierRigSettings(tier, mood).ssao ? mountSsao(scene, orbit) : null;
-  // 5: the painted backdrop and the ink, as the mode would get them (Tiebreak names no backdrop: the mood's family)
-  const backdrop = mountBackdrop(scene, MOOD_TO_FAMILY[mood] ?? 'park', mood);
-  const unink = autoInk(scene, inkStyleFor(exp.target));
-  // 6: the director (the intro preview) on the mode's own preset, and its letterbox
-  const camDirector = new CameraDirector(scene, shot, target?.camPreset ?? 'court');
-  const letterbox = mountLetterbox(scene, canvas, () => camDirector.cinematic01);
+  // 1–6: the look stack — the SAME function ModeHarness.mountMode calls (lib/babylon/core/lookStack.ts): engine, canvas fit,
+  // tier, the scene marked with the target mode (lookPolicy, the fixture / sky / decal gates and the kit defaults see it),
+  // the play camera, the rig, SSAO by tier, the backdrop, the ink, the director on the mode's preset and its letterbox.
+  // The editor's own cameras are made in the camera hook, before the rig, so the post pipeline and SSAO attach to the orbit.
+  let orbit!: ArcRotateCamera;
+  let fly!: UniversalCamera;
+  const look = await mountLookStack({
+    canvas, engine: opts.engine, tier: opts.tier,
+    modeId: exp.target,
+    camPreset: target?.camPreset ?? 'court',
+    mood: () => exp.mood,
+    onCamera: (scene) => {
+      orbit = new ArcRotateCamera('studio_orbit', Math.PI / 2, 1.0, 38, new Vector3(0, 1, -2), scene);   // from the play camera's side (+z, looking −z)
+      orbit.lowerRadiusLimit = 2; orbit.upperRadiusLimit = 260; orbit.upperBetaLimit = Math.PI / 2 - 0.02; orbit.minZ = 0.1; orbit.maxZ = 2000;
+      orbit.wheelDeltaPercentage = 0.02; orbit.panningSensibility = 60;
+      fly = new UniversalCamera('studio_fly', new Vector3(0, 6, 28), scene);
+      fly.minZ = 0.1; fly.maxZ = 2000; fly.speed = 0.6; fly.setTarget(new Vector3(0, 1, 0));
+      fly.keysUp = [87]; fly.keysDown = [83]; fly.keysLeft = [65]; fly.keysRight = [68]; fly.keysUpward = [69]; fly.keysDownward = [81];
+      scene.activeCamera = orbit;
+      return orbit;
+    },
+  });
+  const { engine, fit, tier, scene, lights, ssao, backdrop, unink, camDirector, letterbox } = look;
+  const shot = look.camera;
 
   // 7: load() — the venue the mode mounts, with the Studio look, then the Studio's layers (runtime.ts: the mode's calls)
   const ctx = { scene, canvas: canvas ?? undefined, camDirector };
   let venue: VenueHandle | null = null;
-  const layers: Partial<Record<Exclude<StageLayer, 'venue'>, Layer>> = {};
+  const layers: Partial<Record<Exclude<StageLayer, 'venue' | 'cast'>, Layer>> & { cast?: CastLayer } = {};
   const subject = (): Vector3 => Vector3.FromArray(exp.subject ?? target?.subject ?? [0, 0, 0]);
   const objective = (): Vector3 => Vector3.FromArray(target?.objective ?? [0, 0, -10]);
   const mountLayer = (name: StageLayer): void => {
@@ -110,6 +106,8 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
       case 'fixtures': layers.fixtures?.dispose(); layers.fixtures = mountFixtureLayer(scene, null, exp.fixtures); return;
       case 'decals': layers.decals?.dispose(); layers.decals = mountDecalLayer(scene, tier, exp.decals); return;
       case 'crowd': layers.crowd?.dispose(); layers.crowd = mountCrowdLayer({ scene }, exp.crowd); return;
+      // track 3: the cast character on the mode's own hero spot, on the real rig (castLayer.ts) — RIG-ADJACENT
+      case 'cast': layers.cast?.dispose(); layers.cast = mountCastLayer(scene, exp.cast?.player, target?.subject ?? [0, 0, 0], target?.subjectYaw ?? 0); return;
       case 'weather': layers.weather?.dispose(); layers.weather = mountWeatherLayer(scene, lights, exp.weather, target?.weatherFamily ?? 'court', { tier, keepSky: !!exp.look.sky }); return;
     }
   };

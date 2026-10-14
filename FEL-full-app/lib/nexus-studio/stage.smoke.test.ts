@@ -91,16 +91,15 @@ describe('changedLayers', () => {
 });
 
 describe('placed marks stay', () => {
-  it('a decal outlives the pool\'s own life because the layer refreshes it (cap stamps per kind, one slot each)', () => {
+  it('a placed decal outlives the pool\'s own life: stamped once with persist, no refresh, and a mode\'s transient marks never take its slot', () => {
     const scene = new Scene(engine()); made.push(scene);
     new FreeCamera('c', new Vector3(0, 5, -5), scene);
     const layer = mountDecalLayer(scene, 'mobile', [{ kind: 'scuff', at: [0, 0, 0], yaw: 0, scale: 1 }, { kind: 'foot', at: [1, 0, 1], yaw: 0, scale: 1 }]);
     expect(layer.stamped).toBe(2);
-    const live0 = layer.live();
-    expect(live0).toBeGreaterThan(0);
+    expect(layer.live()).toBe(2);   // exactly the placed marks: no zero-size fillers, no refresh stamps
     const frames = Math.ceil((decalLife('mobile') * 3) / 0.1);   // three lives at 100 ms a frame
     for (let i = 0; i < frames; i++) scene.render();
-    expect(layer.live()).toBe(live0);
+    expect(layer.live()).toBe(2);
     layer.dispose();
   });
 
