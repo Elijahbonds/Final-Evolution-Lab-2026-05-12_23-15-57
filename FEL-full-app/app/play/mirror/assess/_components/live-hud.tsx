@@ -53,7 +53,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
     <div className="absolute inset-0">
       {/* full-screen colour flash */}
       {flashColour ? (
-        <div key={v.flash} className="pointer-events-none absolute inset-0 z-[5] animate-pulse" style={{ backgroundColor: flashColour, opacity: 0.55, animationDuration: `${FLASH_MS}ms` }} aria-hidden />
+        <div key={v.flash} className="pointer-events-none absolute inset-0 z-[5] motion-safe:animate-pulse" style={{ backgroundColor: flashColour, opacity: 0.55, animationDuration: `${FLASH_MS}ms` }} aria-hidden />
       ) : null}
 
       {/* move header: readable from ~3 m — never while a rep is up (SCREEN A) */}
