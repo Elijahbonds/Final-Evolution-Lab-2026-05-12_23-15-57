@@ -2862,8 +2862,8 @@ export const DunkMode: ModeDefinition = (() => {
     // flight's own read is about to appear. The runway teaches; the air reads.
     teachHint = ''; ctx.setHud({ hint: '' });
     mic?.hold(4);   // THE MIC: nothing from the booth through the flight — the rhythm ticks are the player's (released on the iron)
-    setPhase('cinematic'); setWin('takeoff');
     stampCourt(ctx.scene, plantMarks(player.root.position, player.root.rotation.y, launchSpeed01));   // vis-hoops-dunk: the plant foot's scuff (visual only)
+    setPhase('cinematic'); setWin('takeoff');
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     guestFactor = turn === 'player' ? guestSlamFactor(playerJumps++) : 1;   // IMPROVE (2026-10-06): a guest's first jumps (see slamWindowBase)
     if (guestFactor !== 1) console.info(`[DUNK] first jumps: slam window x${guestFactor.toFixed(2)}`);

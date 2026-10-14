@@ -76,6 +76,8 @@ describe('the pool', () => {
     expect(a.scene.metadata.felDecals).toBeTruthy();
     h.dispose();
     expect(a.scene.metadata.felDecals).toBeUndefined();
-    expect(mountSceneDecals(rig('dunk').scene, 'desktop')).toBeNull();
+    expect(mountSceneDecals(rig('onevone').scene, 'desktop')).toBeNull();   // a hoops mode still held (vis-hoops-court's)
+    const d = mountSceneDecals(rig('dunk').scene, 'desktop');   // vis-hoops-dunk lifted its hold: dunk, dunkduel and threepoint stamp now
+    expect(d).not.toBeNull(); d?.dispose();
   });
 });
