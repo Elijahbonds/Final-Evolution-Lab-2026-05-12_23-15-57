@@ -32,9 +32,6 @@ const NOT_IMPORTED: Record<string, string> = {
   // dead), but this one exists to be imported by them: six rule tests strip comments with it before scanning
   // source. Counting tests generally would blind the check; excusing this one file by name does not.
   'lib/testing/sourceScan.ts': 'test support — imported by the rule tests that scan source, and tests are not counted as consumers',
-  // HOOPS-BLOCK-SET BLK-1 (2026-10-14): the block selector core lands alone, by the PR's scope (no mode wiring); its only
-  // caller today is HoopsBlocks.test.ts. BLK-2 wires it into the 1v1 / 3v3 block press, and wiring it up means deleting this line.
-  'lib/babylon/core/HoopsBlocks.ts': 'BLK-1 selector core, landed before its mode wiring (BLK-2); only its test calls it so far',
   // R5 / HOOPS-10 round 5 (2026-10-01): training had no headless sim while dance, dunkduel and irl/acting all
   // carry one. The sim is the mode's scoring rules extracted so the integrity ceiling and the win-rate read run
   // headless; its only caller today is its test (same class as sourceScan above — tests are not consumers).
