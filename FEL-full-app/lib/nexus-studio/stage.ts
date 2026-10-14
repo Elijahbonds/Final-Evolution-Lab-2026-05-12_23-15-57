@@ -19,7 +19,7 @@ import { liftBlackMaterials, type LightRigHandle } from '../babylon/scene/LightR
 import type { CameraDirector } from '../babylon/core/CameraDirector';
 import { mountVenue, type VenueHandle } from '../babylon/core/NexusVenue';
 import type { StudioVenueExport } from './exportVenue';
-import { targetOf } from './targets';
+import { castFrameFor, targetOf } from './targets';
 import {
   studioLook, mountMeshyLayer, mountFixtureLayer, mountDecalLayer, mountCrowdLayer, mountWeatherLayer, type Layer,
 } from './runtime';
@@ -107,7 +107,7 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
       case 'decals': layers.decals?.dispose(); layers.decals = mountDecalLayer(scene, tier, exp.decals); return;
       case 'crowd': layers.crowd?.dispose(); layers.crowd = mountCrowdLayer({ scene }, exp.crowd); return;
       // track 3: the cast character on the mode's own hero spot, on the real rig (castLayer.ts) — RIG-ADJACENT
-      case 'cast': layers.cast?.dispose(); layers.cast = mountCastLayer(scene, exp.cast?.player, target?.subject ?? [0, 0, 0], target?.subjectYaw ?? 0); return;
+      case 'cast': layers.cast?.dispose(); layers.cast = mountCastLayer(scene, exp.cast?.player, target?.subject ?? [0, 0, 0], target?.subjectYaw ?? 0, castFrameFor(exp.target)); return;
       case 'weather': layers.weather?.dispose(); layers.weather = mountWeatherLayer(scene, lights, exp.weather, target?.weatherFamily ?? 'court', { tier, keepSky: !!exp.look.sky }); return;
     }
   };

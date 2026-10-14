@@ -270,8 +270,9 @@ the device copy, as every mode reads them) or a **pasted code** (decoded before 
   own sanitisers. `mountStudioFor` seats `castIdentity` with `primeIdentity` before the mode's `load()` spawns its hero, so the
   mode's own spawn (`CharacterLibrary.spawn` → `resolveIdentity` → `urlForHeroBody` → `applyIdentity`) dresses it; dispose
   forgets it. TiebreakMode is unchanged.
-- **The standard frame:** a cast never changes the body's height or build (`proportions: null`), even though a code carries
-  a frame — the play scale feeds modes' outcome points (REACH-FREEZE). Presentation only.
+- **Height and build (owner 2026-10-14, "Own height and build"; was the standard frame):** a cast wears the frame its code
+  carries (clamped to `COSMETIC_CLAMP`), visual only, in a mode whose fairness review allows it (`targets.ts castFrame`;
+  Tiebreak today) — §10.5. Everywhere else it plays on the standard frame (`proportions: null`).
 - **The viewport** stands the cast on the mode's hero spot on the real rig (`castLayer.ts`: the same spawn, identity and idle).
   RIG-ADJACENT; GATE 0 (`scripts/gate0-animation-verification.ts`) passed before it: 39 / 0.
 
@@ -302,5 +303,58 @@ drag nodes, drag from a port to connect (illegal or looping wires refused), Dele
   opened from a character ("Edit in the Closet").
 - Track 4: more events as modes expose them as data (a rally length, a replay ending), per-venue scope for a script, a
   minimap of the graph; a second play-test mode (Football Rush replays: the replay shot becomes live).
-- Owner calls: the AI builder is open to teens 13–17 (answered 2026-10-14, §10.1); whether a cast may carry its height/build (no, today).
+- Owner calls, answered 2026-10-14: the AI builder is open to teens 13–17 (§10.1); a cast keeps its own height and build,
+  visual only (§10.5).
+
+### 10.5 Cast fairness (owner 2026-10-14: "Own height and build" — needs a scoring-fairness review first)
+
+**Question.** A cast now draws at its character's own height and build. Can that change a score, a judgement or an outcome?
+Reviewed on `lane/nexus-studio-3` by measuring, not by reading imports. RIG-ADJACENT; GATE 0 passed first (39 / 0).
+
+**Which modes a cast can play.** `primeIdentity(castIdentity(…))` is called in one place, `runtime.ts mountStudioFor`, and one
+mode calls that: **Tiebreak**, and only with a dev-only `?venue=` (`studioLoadAllowed` is false in a production build). The
+editor's `castLayer` stands the cast in the viewport (no rules run there). `racing/raceLook`'s `primeIdentity` is the race's own
+player look, not a cast. Tiebreak's rival is a tinted spawn — an opponent (`CharacterLibrary.decideRole`) — and never wears the
+session identity. So the review is Tiebreak's.
+
+**Where the scale lives.** `applyIdentity` → `applyProportions`: height on the root, build on the root's girth (x, z), clamped to
+`COSMETIC_CLAMP` (height 0.96–1.04, build 0.94–1.08); reach frozen at 1; the scale recorded on the root (`playFramePoint`).
+`playScales` spawns every body at exactly 1.0 in a ranked session or a `STANDARD_FRAME_MODES` mode (dunk, dunkduel, threepoint,
+onevone, threevthree) whatever the identity says. On the real kit body (`fel-kit-female.glb` through the real spawn and identity
+pipe, NullEngine): head 1.506 m at 1.04 / 1.08, 1.389 m at 0.96 / 0.94, 1.446 m standard; shoulders 0.404 / 0.320 / 0.352 m; the
+forearm-to-hand bone 0.251 / 0.227 / 0.237 m in the world (the arm's joints are frozen, but the root's scale still carries it) —
+which is why the review is about what the mode READS. The same cast forced to `'own'` in onevone spawns at 1.0000 / 1.0000.
+
+**Tiebreak, channel by channel** (`TiebreakMode.ts`, `core/TiebreakBlitz.ts`, `core/TiebreakFlight.ts`):
+
+| Channel | What Tiebreak does | Reads the scaled body? |
+|---|---|---|
+| Hit / reach radius | None exists. A swing is judged by `TiebreakBlitz.swingTiming` (the ball's clock against the window) and the side pressed against `state.incoming`; `commitSwing` takes the state, the side, the RNG, `reactBase`, the feel and `aiNets` — no position, no hand, no racket. `TiebreakBlitz.ts` imports nothing. | no |
+| The return's flight | `hitFrom` is the ball's position on `TiebreakFlight`'s fixed path (`NEAR_Z`, `FAR_Z`, `BOUNCE_AT`), never the hand | no |
+| The AI's net roll | `aiNets(rally, rng)` | no |
+| Jump height | Tiebreak has no jump | n/a |
+| Collision capsules | None: no physics, no collider. The roots slide to x = ±1.7 m at a fixed z (a position, not a scale) | no |
+| Camera framing that feeds aim | `snapTo(player root, rival root)` once at load; the `court` preset's fixed `targetHeight` 1.35 m; the harness never steps it. The input is left / right timing — there is no aim | no |
+| Score and the end | `postedScore(myPts, bestRally)` and `ctx.end` — counts only | no |
+| Which arm swings | `sideOfRigHand` reads which side the right shoulder is on in the root's frame — a positive scale cannot flip a sign (shoulders ~0.35 m apart, the threshold 0.02 m). Picks the drawn clip | drawing only |
+| Ground lock, player ring, frame guard, sweat, light capture, QA probe | Floors the root and hips; draws the indicator; re-centres a lost camera; effects; diagnostics | drawing only |
+
+**Measured** (`lib/nexus-studio/castFairness.test.ts`, helper `tests/helpers/tiebreakRally.ts`): the real Tiebreak mode on a
+NullEngine, loaded through the real Studio path (`?venue=b64:` → `mountStudioFor` → `primeIdentity`), its hero dressed by the real
+`resolveIdentity` → `applyIdentity` (CharacterLibrary's own two calls) on a stand-in body with a real skeleton (a GLB cannot load in
+vitest), the real `CameraDirector` and `GroundLock`, a fixed seed, and a scripted player that reads what a person sees (the ring and
+the ball's side). One whole match — 9–11, best rally 4, 36 presses, 3,933 frames, every judgement (returned, too early, wrong side,
+ace, warm-up) — is **bit-identical** for a 1.04 / 1.08 cast, a 0.96 / 0.94 cast and no cast: every score, HUD line, clip, sound,
+ball position, ring state, camera position and target, and the end. The drawn body is not: root 1.1232 / 1.04 against 0.9024 / 0.96,
+the head 13 cm apart. Mutations the test catches: the reaction window scaled by height; the return leaving from a hand height; the
+camera framing the head; the slide spot scaled by build; `castFrameFor` always standard or always own; the export dropping the frame;
+`castIdentity` ignoring or defaulting the frame.
+
+**Decision.** Tiebreak: `castFrame: 'own'` — the frame is drawn, never scored. Any other mode: `'standard'` (`castFrameFor` answers
+'standard' for a mode with no target row) until its own review says otherwise; a ranked or standard-frame mode spawns at 1.0
+regardless. No gameplay value, no tuned number and no TiebreakMode line changed: Tiebreak's rules already read none of the body.
+
+**Not covered here.** A real device look at the play-test (the drawn height difference on screen) — the owner's eye. The real GLB
+was measured for the scale, not driven through a match (vitest cannot load it). The Closet's Studio/photo `presentation` size is not
+carried (it is the Closet stage's own); reach stays frozen.
 
