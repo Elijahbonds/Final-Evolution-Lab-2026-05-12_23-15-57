@@ -20,6 +20,7 @@ import { mountGlossyFloor, type GlossyFloorHandle } from './GlossyFloor';
 import { mountSceneDecals, type GroundDecalsHandle } from '../visual/GroundDecals';
 import { mountEnvironmentIBL } from './EnvironmentIBL';
 import { motionPolicy } from '../../a11y/reducedMotion';
+import { FLASH_GAIN, stepFlashLevel } from '../core/ImpactFrame';
 
 export interface LightRigHandle {
   hemi: HemisphericLight; sun: DirectionalLight;
@@ -36,6 +37,14 @@ export interface LightRigHandle {
   /** M44: brief exposure pulse for a highlight beat (dunk flush, TD, KO,
    *  goal) — reads as a camera-flash without a hard cut. Self-reverts. */
   flashBeat(): void;
+  /**
+   * w3-atmos: the flash beat's level, 0 (none) .. 1 (just fired), decaying on the rig's own clock. The harness composes it
+   * into the frame it paints (ImpactFrame.stepFrameGrade) after calling `composeFlashInHarness()`; until then the rig paints
+   * the flash itself (a scene with a rig and no harness).
+   */
+  readonly flash01: number;
+  /** The harness takes over painting the flash: the rig keeps the level and stops writing the exposure. */
+  composeFlashInHarness(): void;
   /**
    * ONE OWNER FOR THE GRADE (A9.3). The resting exposure and vignette every pulse returns to — the impact frame and the
    * speed vignette (ModeHarness composes over this object, by reference) and the flash beat. Starts at the mood's.
@@ -242,6 +251,9 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
   liftBlackMaterials(scene);
 
   let flashObs: ReturnType<Scene['onBeforeRenderObservable']['add']> | null = null;
+  let flashLevel = 0;
+  let harnessPaints = false;
+  const paintFlash = (): void => { pipeline.imageProcessing.exposure = rest.exposure * (1 + (FLASH_GAIN - 1) * flashLevel); };
   return {
     hemi, sun, shadows, pipeline, tier, mood, kicker, glow, rest, shadowCache,
     adoptRest() {
@@ -281,18 +293,20 @@ export function mountLightRig(scene: Scene, mood: VenueMood, tier: QualityTier =
       // HOTFIX (2026-09-24): reduced motion — no exposure flash (a made three, a momentum tier, the storm's lightning:
       // the thunder still rolls, the sky just does not strobe)
       if (!motionPolicy().flash) return;
-      const base = rest.exposure;   // A9.3: the owned rest, not the raw mood (a night's dimmed exposure stays dimmed)
-      pipeline.imageProcessing.exposure = base * 1.35;            //TUNE(elijah)
+      // w3-atmos: the rig keeps the LEVEL; the exposure is rest * (1 + 0.35 * level), painted by whoever owns the frame.
+      // (It used to write `exposure = rest * 1.35` here and ease it back from an observer - and the harness repainted the
+      // rest exposure over that every frame while a mode reported a speed vignette, so the flash never reached the screen.)
+      flashLevel = 1;                                            //TUNE(elijah) 1.35x, 0.85 a frame: as before
+      if (!harnessPaints) paintFlash();
       if (flashObs) return;
       flashObs = scene.onBeforeRenderObservable.add(() => {
-        const ip = pipeline.imageProcessing;
-        ip.exposure += (base - ip.exposure) * 0.15;                //TUNE(elijah)
-        if (Math.abs(ip.exposure - base) < 0.01) {
-          ip.exposure = base;
-          if (flashObs) { scene.onBeforeRenderObservable.remove(flashObs); flashObs = null; }
-        }
+        flashLevel = stepFlashLevel(flashLevel, scene.getEngine().getDeltaTime(), rest.exposure);
+        if (!harnessPaints) paintFlash();
+        if (flashLevel <= 0 && flashObs) { scene.onBeforeRenderObservable.remove(flashObs); flashObs = null; }
       });
     },
+    get flash01() { return flashLevel; },
+    composeFlashInHarness() { harnessPaints = true; },
     dispose() {
       if (autoObserver) scene.onNewMeshAddedObservable.remove(autoObserver);
       if (flashObs) scene.onBeforeRenderObservable.remove(flashObs);
