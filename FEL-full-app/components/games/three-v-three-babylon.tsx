@@ -15,6 +15,8 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
+import { HoopsShotMeter } from './hoops-shot-meter';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
 
 type Hud = Record<string, HudValue>;
@@ -110,70 +112,58 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/hud-hoops): the 3v3's readouts on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* HUD bezel */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
-        <span className="fel-panel fel-stat px-3 py-1 text-lg">
-          {hnode(hud.score, 0)} – {hnode(hud.foeScore, 0)}
-        </span>
-        <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-cyan)]">
-          AST {hnode(hud.ast, 0)}
-        </span>
+      <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-4 py-3">
+        <Scorebug>
+          <ScoreValue value={hnode(hud.score, 0)} size="stat" />
+          <HudText size="stat" alpha={HUD_TEXT_ALPHA.faint}>–</HudText>
+          <ScoreValue value={hnode(hud.foeScore, 0)} size="stat" />
+        </Scorebug>
+        <HudChip tone="you" size="body">AST {hnode(hud.ast, 0)}</HudChip>
         {/* CHOKEPOINT COURT (?choke=1): the rails are on */}
-        {typeof hud.court === 'string' && hud.court && <span className="fel-panel px-3 py-1 font-mono text-[10px] tracking-wider text-[#fbbf24]">{hud.court}</span>}
+        {typeof hud.court === 'string' && hud.court && <HudChip tone="score" size="caption">{hud.court}</HudChip>}
         {/* SYNERGY (owner brief 2026-09-18): the team's shared gauge — assists, steals, drifts, blocks, dunks and the slipstream fill it; full, it OVERDRIVES for 15 s */}
         {typeof hud.synergy === 'number' && (() => {
           const syn = Math.max(0, Math.min(100, Number(hud.synergy))); const od = Number(hud.overdrive ?? 0);
           return (
-            <span className="fel-panel flex items-center gap-2 px-3 py-1 font-mono text-xs">
-              <span className="text-[10px] tracking-wider text-white/60">SYN</span>
-              <span className="h-2 w-20 overflow-hidden rounded-full bg-black/50"><span className={`block h-full rounded-full transition-[width] duration-150 ${od > 0 ? 'bg-[#fbbf24]' : syn >= 70 ? 'bg-[#fde68a]/85' : 'bg-[var(--fel-cyan)]/80'}`} style={{ width: `${od > 0 ? 100 : syn}%` }} /></span>
-              {od > 0 ? <span className="text-[10px] font-bold text-[#fbbf24]">OVERDRIVE {od}s</span> : null}
-            </span>
+            <HudPlate as="span" className="flex items-center px-3 py-1">
+              <HudMeter
+                layout="inline" label="SYN" height="bar" width="5rem"
+                value={od > 0 ? 100 : syn} max={100}
+                tone={od > 0 || syn >= 70 ? 'score' : 'you'} fillAlpha={od > 0 ? 1 : syn >= 70 ? 0.85 : 0.8}
+                status={od > 0 ? `OVERDRIVE ${od}s` : undefined} statusTone="score"
+              />
+            </HudPlate>
           );
         })()}
-        <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-gold)]">
-          {typeof hud.time === 'number' ? `${hud.time}s` : 'TO 21'}
-        </span>
+        <HudChip tone="score" size="body">{typeof hud.time === 'number' ? `${hud.time}s` : 'TO 21'}</HudChip>
       </div>
 
       {/* shot meter */}
-      {meter !== null && phase === 'playing' && (() => {
-        // THE SHOT METER (owner, 2026-09-18): the bar carries the GREEN release window the mode publishes
-        // (`shotMeterGreen` = "center,half" in 0..1) and a marker on the fill — the 3D bar beside the shooter's head
-        // (visual/ShotMeter3D) shows the same numbers in the world
-        const g = typeof hud.shotMeterGreen === 'string' ? hud.shotMeterGreen.split(',').map(Number) : null;
-        const green = g && g.length === 2 && g.every((v) => Number.isFinite(v)) ? { left: (g[0] - g[1]) * 100, width: g[1] * 200 } : null;
-        return (
-          <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center">
-            <div className="relative h-3 w-64 overflow-hidden rounded-full bg-black/55 ring-1 ring-white/30">
-              {green && <div className="absolute inset-y-0 bg-[#39ff88]/70" style={{ left: `${green.left}%`, width: `${green.width}%` }} />}
-              <div className="h-full bg-[var(--fel-cyan)]/90" style={{ width: `${meter * 100}%` }} />
-              <div className="absolute inset-y-0 w-[3px] -translate-x-1/2 bg-white shadow-[0_0_6px_#fff]" style={{ left: `${meter * 100}%` }} />
-            </div>
-          </div>
-        );
-      })()}
-
-      {typeof hud.banner === 'string' && hud.banner && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-1/3 text-center">
-          <span className="fel-heading text-3xl font-bold text-[var(--fel-cyan)] drop-shadow">{hud.banner}</span>
+      {meter !== null && phase === 'playing' && (
+        <div className="absolute inset-x-0 bottom-24 flex justify-center">
+          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} />
         </div>
       )}
-      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
-      {phase === 'playing' && <MicToggle />}
+
+      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
 
       {/* IMPROVE (2026-10-06) #5: what the PASS button would throw right now — the ring under the mate is its colour */}
       {typeof hud.passPreview === 'string' && hud.passPreview && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[4.25rem] text-center">
-          <span className={`fel-panel px-2 py-0.5 font-mono text-[10px] tracking-wider ${hud.passPreview === 'NO LANE' ? 'text-white/50' : 'text-[var(--fel-cyan)]'}`}>J · {hud.passPreview}</span>
+        <div className="absolute inset-x-0 bottom-[4.25rem] flex justify-center">
+          <HudChip size="caption" tone={hud.passPreview === 'NO LANE' ? 'text' : 'you'} alpha={hud.passPreview === 'NO LANE' ? 0.5 : 1}>J · {hud.passPreview}</HudChip>
         </div>
       )}
       {/* IMPROVE (2026-10-06) #7: ONE line for the state you are in (it used to be every control at once) */}
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-10 px-3 text-center">
-          <span className="fel-panel px-3 py-1.5 font-mono text-[11px] text-white/80">{hud.hint}</span>
-        </div>
+        <HudLine text={hud.hint} size="caption" alpha={0.8} className="bottom-10" />
       )}
+      </HudFrame>
+
+      {phase === 'playing' && <MicCaption text={hud.mic} who={hud.micWho} />}
+      {phase === 'playing' && <MicToggle />}
 
       <BootSplash
         modeId="threevthree"

@@ -15,6 +15,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';   // CONTROLLER-UNIVERSAL-MULTI: pass-the-pad nights name each controller
 import { hnode } from './hud-format';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreCell, ScoreValue, Scorebug } from './tv-hud';
 import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): the MC's words and the voice switch
 /** The between-events scoreboard rows the mode publishes (HudScoreCard shape). */
@@ -103,81 +104,77 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/hud-hoops): the carnival's readouts on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* HUD bezel — Carnival Points vs rival + event counter + clock */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
-        <span className="fel-panel fel-stat px-3 py-1 text-lg">
-          <span className="mr-1 text-[10px] text-[#22d3ee]">{hnode(hud.p1name, 'YOU')}</span>{hnode(hud.score, 0)}
-          <span className="mx-2 text-white/40">vs</span>
-          <span className="mr-1 text-[10px] text-[#facc15]">{hnode(hud.p2name, 'RIVAL')}</span>{hnode(hud.rivalScore, 0)}
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 py-3">
+        <Scorebug>
+          <ScoreCell inline label={hnode(hud.p1name, 'YOU')} labelTone="you" value={hnode(hud.score, 0)} size="stat" />
+          <HudText size="label" alpha={HUD_TEXT_ALPHA.faint}>vs</HudText>
+          <ScoreCell inline label={hnode(hud.p2name, 'RIVAL')} labelTone="them" value={hnode(hud.rivalScore, 0)} size="stat" />
           {typeof hud.rivalLive === 'number' && hud.rivalLive > 0 && phase === 'playing' && (
-            <span className="ml-1 text-xs text-[#facc15]/80">+{hud.rivalLive}</span>
+            <HudText size="body" tone="them" alpha={0.8}>+{hud.rivalLive}</HudText>
           )}
-        </span>
+        </Scorebug>
         <div className="flex items-center gap-2">
           {hud.eventNum != null && (
-            <span className="fel-panel px-3 py-1 font-mono text-xs text-[var(--fel-purple)]">
-              EVENT {hnode(hud.eventNum, '')}
-            </span>
+            <HudChip tone="power" size="body">EVENT {hnode(hud.eventNum, '')}</HudChip>
           )}
           {typeof hud.turnLabel === 'string' && hud.turnLabel && phase === 'playing' && (
-            <span className="fel-panel px-3 py-1 font-mono text-xs font-bold text-white">{hud.turnLabel}</span>
+            <HudChip size="body">{hud.turnLabel}</HudChip>
           )}
           {typeof hud.time === 'number' && phase === 'playing' && (
-            <span className="fel-panel px-3 py-1 font-mono text-sm font-bold text-[var(--fel-gold)]">
-              {hnode(hud.time, 0)}s
-            </span>
+            <HudChip tone="score" size="value">{hnode(hud.time, 0)}s</HudChip>
           )}
         </div>
       </div>
 
       {/* per-event hint line */}
       {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 flex justify-center">
-          <span className="fel-panel px-3 py-1 text-center text-xs text-white/80">{hud.hint}</span>
-        </div>
+        <HudLine text={hud.hint} size="body" alpha={0.8} className="bottom-24" />
       )}
 
       {/* IMPROVE (2026-10-06): Slam Rush's CHARGE meter — the fill is the held charge, the gold band is where a release goes
           down (chargeLo..chargeHi). The make used to hang on a value nobody could see. */}
       {typeof hud.charge === 'number' && phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-36 flex justify-center">
-          <div className="fel-panel relative h-4 w-[220px] overflow-hidden rounded-full p-0">
-            {typeof hud.chargeLo === 'number' && typeof hud.chargeHi === 'number' && (
-              <div className="absolute inset-y-0 bg-[var(--fel-gold)]/45"
-                style={{ left: `${Math.max(0, hud.chargeLo) * 100}%`, width: `${Math.max(0, Math.min(1, hud.chargeHi) - hud.chargeLo) * 100}%` }} />
-            )}
-            <div className="absolute inset-y-0 left-0 bg-[var(--fel-cyan)]/80"
-              style={{ width: `${Math.max(0, Math.min(1, hud.charge)) * 100}%` }} />
-          </div>
+        <div className="absolute inset-x-0 bottom-36 flex justify-center">
+          <HudMeter
+            height="strip" width="220px" framed
+            value={Math.max(0, Math.min(1, hud.charge))} max={1} tone="you" fillAlpha={0.8} fillStyle={{ transition: 'none' }}
+            segments={typeof hud.chargeLo === 'number' && typeof hud.chargeHi === 'number'
+              ? [{ from: Math.max(0, hud.chargeLo), to: Math.max(0, Math.min(1, hud.chargeHi)), tone: 'score', alpha: 0.45 }]
+              : undefined}
+          />
         </div>
       )}
 
       {/* reveal / result / finale card — A+ mission #3: title, the verb line, and the scoreboard between events */}
       {typeof hud.banner === 'string' && hud.banner && (
-        <div className="pointer-events-none absolute inset-x-0 top-[22%] flex flex-col items-center gap-2 px-4 text-center">
-          <span className="fel-heading fel-panel px-6 py-2 text-3xl font-black text-[var(--fel-cyan)] drop-shadow md:text-4xl">{hud.banner}</span>
+        <div className="absolute inset-x-0 top-[22%] flex flex-col items-center gap-2 px-4 text-center">
+          <HudBanner flow text={hud.banner} tone="you" />
           {typeof hud.blurb === 'string' && hud.blurb && (
-            <span className="fel-panel px-4 py-1.5 font-mono text-sm font-bold text-white/90">{hud.blurb}</span>
+            <HudPlate className="px-4 py-1.5"><HudText size="value" alpha={0.9}>{hud.blurb}</HudText></HudPlate>
           )}
           {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && !(typeof hud.eventNum === 'string' && hud.eventNum) && (
-            <span className="fel-panel px-3 py-1 font-mono text-xs text-white/70">{hud.hint}</span>
+            <HudPlate className="px-3 py-1"><HudText size="body" alpha={0.7}>{hud.hint}</HudText></HudPlate>
           )}
           {isBoard(hud.board) && typeof hud.boardTitle === 'string' && hud.boardTitle && (
-            <div className="fel-panel mt-2 w-full max-w-[460px] px-4 py-3 text-left">
+            <HudPlate className="mt-2 w-full max-w-[460px] px-4 py-3 text-left">
               <div className="grid gap-1.5">
                 {hud.board.map((r, i) => (
-                  <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg bg-black/40 px-3 py-1.5">
-                    <span className="font-mono text-sm font-bold" style={{ color: i === 0 ? '#22d3ee' : '#facc15' }}>{r.name}</span>
-                    <span className="truncate font-mono text-[11px] text-white/60">{r.line}</span>
-                    <span className="fel-stat text-lg">{r.score}</span>
+                  <div key={r.name} className="flex items-center justify-between gap-3 rounded-lg px-3 py-1.5" style={{ background: 'rgba(0, 0, 0, 0.4)' }}>
+                    <HudText size="value" tone={i === 0 ? 'you' : 'them'}>{r.name}</HudText>
+                    <HudText size="label" alpha={HUD_TEXT_ALPHA.faint} className="truncate">{r.line}</HudText>
+                    <ScoreValue value={r.score} size="stat" pop={false} />
                   </div>
                 ))}
               </div>
-              <div className="mt-2 text-center font-mono text-[11px] text-[var(--fel-gold)]">{hud.boardTitle}</div>
-            </div>
+              <HudText as="div" size="label" tone="score" className="mt-2 text-center">{hud.boardTitle}</HudText>
+            </HudPlate>
           )}
         </div>
       )}
+      </HudFrame>
 
       {/* THE MIC: under the reveal / hand-off card, and at the bottom while the scoreboard is up (it would cover the scores) */}
       {phase === 'playing' && (

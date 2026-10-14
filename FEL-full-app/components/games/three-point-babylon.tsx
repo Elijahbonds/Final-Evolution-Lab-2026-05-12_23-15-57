@@ -26,6 +26,7 @@ import { HostLobby } from '@/components/controller-link/host-lobby';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnum } from './hud-format';
+import { HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24)
 import { ThreePointOptions } from './three-point-options';   // IMPROVE (2026-10-06) #8: the shot input on the pause screen
 
@@ -174,12 +175,109 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
+      {/* TV HUD (A9.13, lane/hud-hoops): the shootout's readouts on the shared system — same keys, same gates, same slots. */}
+      <HudFrame>
       {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
       {turnLine && (
-        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-lg bg-black/70 px-4 py-1.5">
-          <span className="fel-heading text-sm font-bold tracking-[0.2em] text-[#00E5FF]">{turnLine}</span>
+        <div className="absolute left-1/2 top-3 -translate-x-1/2">
+          <HudChip tone="you" size="value" className="tracking-[0.2em]">{turnLine}</HudChip>
         </div>
       )}
+
+      {/* A+ mission #4 — Wii Sports Resort readability on top of the 2K contest: the score and the clock at couch size,
+          the rack as pips (money ball gold, the loaded ball pulsing), points left, the heat, and a wide release meter
+          under the shooter drawn from the SAME bands the mode grades with. */}
+      {phase === 'playing' && (
+        // pt-9 while a turn banner is up: at its own top-3 slot the score covered it (measured), so the stack starts under it
+        <div className={`absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 ${turnLine ? 'pt-9' : ''}`}>
+          <div className="flex items-end gap-5">
+            <HudPlate className="px-5 py-1.5 leading-none"><ScoreValue value={hnum(hud.score)} size="hero" tone="score" /></HudPlate>
+            {/* IMPROVE (2026-10-06) #6: the practice rack has no clock (the mode sends clock: null) */}
+            {typeof hud.clock === 'number'
+              ? <HudPlate className="px-4 py-2 leading-none"><ScoreValue value={`${hnum(hud.clock)}s`} size="score" tone={hud.clock <= 10 ? 'danger' : 'text'} pop={false} /></HudPlate>
+              : <HudPlate className="px-4 py-2 leading-none"><HudText size="stat" alpha={0.7}>NO CLOCK</HudText></HudPlate>}
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <HudChip size="label" alpha={0.7}>{String(hud.round ?? 'QUALIFYING')}</HudChip>
+            {hud.money ? <HudChip size="label" tone="score" style={{ fontWeight: 800 }}>MONEY BALL · 2 PTS</HudChip> : null}
+            {hud.heat === 'fire' ? <HudChip size="label" tone="heat" style={{ fontWeight: 800 }}>ON FIRE ×{hnum(hud.streak)}</HudChip>
+              : Number(hud.streak) >= 2 ? <HudChip size="label" tone="heat" alpha={0.8}>streak ×{hnum(hud.streak)}</HudChip> : null}
+            {typeof hud.left === 'number' && <HudChip size="label" alpha={0.6}>{hud.left} LEFT</HudChip>}
+          </div>
+          {typeof hud.rackIdx === 'number' && typeof hud.ballIdx === 'number' && (
+            <div className="flex items-center gap-3">
+              {rackPips(hud.rackIdx, hud.ballIdx, undefined, undefined, typeof hud.moneyRack === 'number' ? hud.moneyRack : -1).map((row, r) => (
+                <HudPlate key={r} className="flex items-start gap-1 px-1.5 py-1">
+                  {row.map((p, b) => {
+                    // IMPROVE (2026-10-06) #4: what each release was, under its ball — the run's timing bias at a glance
+                    const grade = typeof hud.relPips === 'string' ? hud.relPips[r * 5 + b] : '.';
+                    const tick = PIP_TICK[grade ?? '.'];
+                    return (
+                      <span key={b} className="flex flex-col items-center gap-0.5">
+                        <span
+                          className={`inline-block rounded-full ${p.money ? 'h-3 w-3' : 'h-2.5 w-2.5'} ${p.state === 'next' ? 'animate-pulse motion-reduce:animate-none ring-2 ring-white' : ''}`}
+                          style={{ background: p.state === 'taken' ? 'rgba(255,255,255,0.18)' : p.money ? hudColor('score') : hudColor('heat'), opacity: p.state === 'ahead' ? 0.85 : 1 }}
+                        />
+                        <span className="inline-block h-[3px] w-2.5 rounded-full" title={tick?.label} style={{ background: tick ? hudColor(tick.tone) : 'transparent' }} />
+                      </span>
+                    );
+                  })}
+                </HudPlate>
+              ))}
+            </div>
+          )}
+          <div className="hidden">RACK {String(hud.rack ?? '—')} · BALL {String(hud.ball ?? '—')}</div>
+          {/* The contest layer publishes round/money/need/board — all four
+              used to be computed every frame and rendered NOWHERE (the classic
+              "HUD state is not a bezel" trap; only the dev route's JSON dump
+              ever showed them). This is the contest the player is in. */}
+          {typeof hud.need === 'number' && (
+            <HudChip tone="danger" size="value">NEED {hnum(hud.need)} TO WIN</HudChip>
+          )}
+          {/* IMPROVE (2026-10-06) #3: qualifying's number — projected from the field's form, the way the final shows NEED */}
+          {typeof hud.cut === 'number' && (
+            <HudChip tone="you" size="value">CUT ≈ {hnum(hud.cut)} · TOP 3 ADVANCE</HudChip>
+          )}
+          {/* IMPROVE (2026-10-06) #4: the key to the ticks under the pips (only once a ball has been shot) */}
+          {typeof hud.relPips === 'string' && /[EGPL]/.test(hud.relPips) && (
+            <HudPlate className="flex gap-2 px-2 py-0.5">
+              {(['E', 'P', 'G', 'L'] as const).map((k) => <HudText key={k} size="caption" tone={PIP_TICK[k]?.tone ?? 'text'}>{PIP_TICK[k]?.label}</HudText>)}
+            </HudPlate>
+          )}
+        </div>
+      )}
+
+      {/* the release meter + the call — bottom centre, under the shooter, couch-size */}
+      {phase === 'playing' && (
+        <div className="absolute inset-x-0 bottom-24 z-20 flex flex-col items-center gap-2">
+          {typeof hud.banner === 'string' && hud.banner && (
+            <HudBanner flow text={hud.banner} tone={hud.banner.startsWith('MISS') ? 'text' : 'you'} />
+          )}
+          {typeof hud.meter === 'number' && (
+            <ReleaseBar
+              t={hud.meter}
+              green={typeof hud.meterGreen === 'number' ? hud.meterGreen : SHOT_TARGET}
+              half={typeof hud.meterHalf === 'number' ? hud.meterHalf : GOOD_BAND}
+            />
+          )}
+        </div>
+      )}
+
+      {phase === 'playing' && Array.isArray(hud.board) && (
+        <HudPlate className="absolute right-4 top-4 z-20 px-3 py-2">
+          {(hud.board as { name: string; score: number | string; line: string; form?: string }[]).map((r) => (
+            <div key={r.name} className="flex items-baseline gap-3 py-0.5">
+              <HudText size="body" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-16 truncate">{r.name}</HudText>
+              {/* IMPROVE (2026-10-06) #7: the rival's form — the reveal runs coldest first, so the HOT cards land last */}
+              <HudText size="caption" tone={r.form === 'HOT' ? 'heat' : 'info'} className="w-8" style={{ fontWeight: 800 }}>{r.form ?? ''}</HudText>
+              <HudText size="value" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-8 text-right">{r.score}</HudText>
+              <HudText size="caption" tone={r.line === 'CHAMPION' ? 'score' : r.line === 'ADVANCES' ? 'you' : 'text'} alpha={r.line === 'CHAMPION' || r.line === 'ADVANCES' ? 1 : 0.4}>{r.line}</HudText>
+            </div>
+          ))}
+        </HudPlate>
+      )}
+      </HudFrame>
+
       {/* MOVEMENT PLAY P3 (2026-09-24, the step-4a review): BootSplash draws the pause now, so it sits where this host's
           own pause sat — after the turn banner, so the pause's dim covers the banner as it did (plan R11). Every other
           phase of the splash is z-40 or nothing, so the order changes only the pause. */}
@@ -207,84 +305,6 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       )}
       {busReady && busRef.current && <PadChips bus={busRef.current} className="left-4 top-4" />}
 
-      {/* A+ mission #4 — Wii Sports Resort readability on top of the 2K contest: the score and the clock at couch size,
-          the rack as pips (money ball gold, the loaded ball pulsing), points left, the heat, and a wide release meter
-          under the shooter drawn from the SAME bands the mode grades with. */}
-      {phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 font-mono text-white">
-          <div className="flex items-end gap-5">
-            <div className="fel-panel px-5 py-1.5 text-5xl font-black leading-none text-[#ffd75e]">{hnum(hud.score)}</div>
-            {/* IMPROVE (2026-10-06) #6: the practice rack has no clock (the mode sends clock: null) */}
-            {typeof hud.clock === 'number'
-              ? <div className={`fel-panel px-4 py-2 text-3xl font-bold leading-none ${hud.clock <= 10 ? 'text-[#ff2d78]' : 'text-white'}`}>{hnum(hud.clock)}s</div>
-              : <div className="fel-panel px-4 py-2 text-xl font-bold leading-none text-white/70">NO CLOCK</div>}
-          </div>
-          <div className="flex items-center gap-2 text-[11px] tracking-widest">
-            <span className="fel-panel px-2 py-0.5 text-white/70">{String(hud.round ?? 'QUALIFYING')}</span>
-            {hud.money ? <span className="fel-panel px-2 py-0.5 font-bold text-[#ffd75e]">MONEY BALL · 2 PTS</span> : null}
-            {hud.heat === 'fire' ? <span className="fel-panel px-2 py-0.5 font-bold text-[#ff6a00]">ON FIRE ×{hnum(hud.streak)}</span>
-              : Number(hud.streak) >= 2 ? <span className="fel-panel px-2 py-0.5 text-[#ffb347]">streak ×{hnum(hud.streak)}</span> : null}
-            {typeof hud.left === 'number' && <span className="fel-panel px-2 py-0.5 text-white/60">{hud.left} LEFT</span>}
-          </div>
-          {typeof hud.rackIdx === 'number' && typeof hud.ballIdx === 'number' && (
-            <div className="flex items-center gap-3">
-              {rackPips(hud.rackIdx, hud.ballIdx, undefined, undefined, typeof hud.moneyRack === 'number' ? hud.moneyRack : -1).map((row, r) => (
-                <div key={r} className="flex items-start gap-1 rounded bg-black/45 px-1.5 py-1">
-                  {row.map((p, b) => {
-                    // IMPROVE (2026-10-06) #4: what each release was, under its ball — the run's timing bias at a glance
-                    const grade = typeof hud.relPips === 'string' ? hud.relPips[r * 5 + b] : '.';
-                    const tick = PIP_TICK[grade ?? '.'];
-                    return (
-                      <span key={b} className="flex flex-col items-center gap-0.5">
-                        <span
-                          className={`inline-block rounded-full ${p.money ? 'h-3 w-3' : 'h-2.5 w-2.5'} ${p.state === 'next' ? 'animate-pulse ring-2 ring-white' : ''}`}
-                          style={{ background: p.state === 'taken' ? 'rgba(255,255,255,0.18)' : p.money ? '#ffd75e' : '#e8742c', opacity: p.state === 'ahead' ? 0.85 : 1 }}
-                        />
-                        <span className="inline-block h-[3px] w-2.5 rounded-full" title={tick?.label} style={{ background: tick?.color ?? 'transparent' }} />
-                      </span>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="hidden">RACK {String(hud.rack ?? '—')} · BALL {String(hud.ball ?? '—')}</div>
-          {/* The contest layer publishes round/money/need/board — all four
-              used to be computed every frame and rendered NOWHERE (the classic
-              "HUD state is not a bezel" trap; only the dev route's JSON dump
-              ever showed them). This is the contest the player is in. */}
-          {typeof hud.need === 'number' && (
-            <div className="fel-panel px-3 py-1 text-sm font-bold text-[#ff2d78]">NEED {hnum(hud.need)} TO WIN</div>
-          )}
-          {/* IMPROVE (2026-10-06) #3: qualifying's number — projected from the field's form, the way the final shows NEED */}
-          {typeof hud.cut === 'number' && (
-            <div className="fel-panel px-3 py-1 text-sm font-bold text-[#22d3ee]">CUT ≈ {hnum(hud.cut)} · TOP 3 ADVANCE</div>
-          )}
-          {/* IMPROVE (2026-10-06) #4: the key to the ticks under the pips (only once a ball has been shot) */}
-          {typeof hud.relPips === 'string' && /[EGPL]/.test(hud.relPips) && (
-            <div className="flex gap-2 text-[9px] tracking-widest text-white/50">
-              {(['E', 'P', 'G', 'L'] as const).map((k) => <span key={k} style={{ color: PIP_TICK[k]?.color }}>{PIP_TICK[k]?.label}</span>)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* the release meter + the call — bottom centre, under the shooter, couch-size */}
-      {phase === 'playing' && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-24 z-20 flex flex-col items-center gap-2 font-mono">
-          {typeof hud.banner === 'string' && hud.banner && (
-            <div className={`fel-heading fel-panel px-5 py-1.5 text-3xl font-black ${hud.banner.startsWith('MISS') ? 'text-white/70' : 'text-[#00E5FF]'}`}>{hud.banner}</div>
-          )}
-          {typeof hud.meter === 'number' && (
-            <ReleaseBar
-              t={hud.meter}
-              green={typeof hud.meterGreen === 'number' ? hud.meterGreen : SHOT_TARGET}
-              half={typeof hud.meterHalf === 'number' ? hud.meterHalf : GOOD_BAND}
-            />
-          )}
-        </div>
-      )}
-
       {/* THE MIC: the MC's words just above the call and the meter (the scoreboard owns the top, the board the right) */}
       {phase === 'playing' && <MicCaption text={micLine.text} who={micLine.who} className="bottom-[12rem]" />}
       {/* The switch never takes focus from a click: Space is the keyboard's SHOOT and fires on keyup, and a focused button
@@ -292,22 +312,6 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       {phase === 'playing' && (
         <div className="contents" onMouseDown={(e) => e.preventDefault()}>
           <MicToggle className="left-4 top-[24%]" />
-        </div>
-      )}
-
-      {phase === 'playing' && Array.isArray(hud.board) && (
-        <div className="pointer-events-none absolute right-4 top-4 z-20 rounded-lg border border-white/15 bg-black/60 px-3 py-2 font-mono text-xs text-white backdrop-blur-sm">
-          {(hud.board as { name: string; score: number | string; line: string; form?: string }[]).map((r) => (
-            <div key={r.name} className={`flex items-baseline gap-3 py-0.5 ${r.name === 'YOU' ? 'text-[#ffd75e]' : ''}`}>
-              <span className="w-16 truncate">{r.name}</span>
-              {/* IMPROVE (2026-10-06) #7: the rival's form — the reveal runs coldest first, so the HOT cards land last */}
-              <span className={`w-8 text-[9px] font-bold tracking-wider ${r.form === 'HOT' ? 'text-[#ff6a00]' : 'text-[#7cc6ff]'}`}>{r.form ?? ''}</span>
-              <span className="w-8 text-right text-base font-bold">{r.score}</span>
-              <span className={`text-[10px] tracking-wider ${
-                r.line === 'CHAMPION' ? 'text-[#ffd75e]' : r.line === 'ADVANCES' ? 'text-[#22d3ee]' : 'text-white/40'
-              }`}>{r.line}</span>
-            </div>
-          ))}
         </div>
       )}
 
@@ -327,8 +331,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
 }
 
 /** IMPROVE (2026-10-06) #4: the release-history ticks (threePointRules.pipFor): early short, late long, the green between. */
-const PIP_TICK: Record<string, { color: string; label: string } | undefined> = {
-  E: { color: '#5b8def', label: 'EARLY' }, G: { color: '#22d3ee', label: 'GOOD' }, P: { color: '#ffd75e', label: 'PERFECT' }, L: { color: '#ff5d5d', label: 'LATE' },
+const PIP_TICK: Record<string, { tone: HudTone; label: string } | undefined> = {
+  E: { tone: 'info', label: 'EARLY' }, G: { tone: 'you', label: 'GOOD' }, P: { tone: 'score', label: 'PERFECT' }, L: { tone: 'danger', label: 'LATE' },
 };
 
 /** The timing bar the whole mode hangs on — GOOD and PERFECT bands drawn from the shared ShotMeter's OWN window
@@ -336,13 +340,15 @@ const PIP_TICK: Record<string, { color: string; label: string } | undefined> = {
  *  the SAME window it is graded against, however distance or TV mode widened it). */
 function ReleaseBar({ t, green, half }: { t: number; green: number; half: number }) {
   const perfectHalf = half * 0.35;   // BasketballCore.ShotMeter.release(): perfect is the inner 0.35 of the good window
-  const good = { left: `${(green - half) * 100}%`, width: `${half * 200}%` };
-  const perfect = { left: `${(green - perfectHalf) * 100}%`, width: `${perfectHalf * 200}%` };
+  // The GOOD band is authored (a cyan class at /35) but never drew: Tailwind has no /35 in its opacity scale and emitted no rule
+  // (measured: 0 matches in the compiled CSS), so the bar the owner has felt shows the PERFECT band and the marker. That is what is
+  // drawn here — showing the wider window would change how the bar reads, and it is the owner's call. To show it, add
+  // { from: green - half, to: green + half, tone: 'you', alpha: 0.35 } ahead of the PERFECT segment.
   return (
-    <div className="relative h-5 w-[min(520px,70vw)] overflow-hidden rounded-md border border-white/20 bg-black/55">
-      <div className="absolute inset-y-0 bg-[#22d3ee]/35" style={good} />
-      <div className="absolute inset-y-0 bg-[#ffd75e]/80" style={perfect} />
-      <div className="absolute inset-y-0 w-[4px] -translate-x-1/2 bg-white shadow-[0_0_8px_#fff]" style={{ left: `${t * 100}%` }} />
-    </div>
+    <HudMeter
+      height="strip" width="min(520px, 70vw)" framed
+      segments={[{ from: green - perfectHalf, to: green + perfectHalf, tone: 'score', alpha: 0.8 }]}
+      markers={[{ at: t, tone: 'text', width: 4, glow: true }]}
+    />
   );
 }
