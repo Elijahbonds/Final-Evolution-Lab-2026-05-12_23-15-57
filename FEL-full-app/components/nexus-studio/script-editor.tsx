@@ -147,7 +147,7 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
             const accepts = drag?.kind === 'wire' && wireFrom && edgeAllowed(wireFrom.kind, n.kind) && !wouldCycle(script.edges, wireFrom.id, n.id);
             return (
               <g key={n.id} transform={`translate(${n.x} ${n.y})`} data-testid="script-node" data-kind={n.kind}
-                onPointerDown={(e) => { e.stopPropagation(); setSelected(n.id); const w = toWorld(e); setDrag({ kind: 'node', id: n.id, dx: w.x - n.x, dy: w.y - n.y }); (e.target as Element).setPointerCapture?.(e.pointerId); }}
+                onPointerDown={(e) => { e.stopPropagation(); setSelected(n.id); const w = toWorld(e); setDrag({ kind: 'node', id: n.id, dx: w.x - n.x, dy: w.y - n.y }); try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* a synthetic event has no live pointer */ } }}
                 style={{ cursor: 'grab' }}>
                 <rect width={NODE_W} height={NODE_H} rx={10} fill="#0f141c" stroke={on ? '#ffffff' : accepts ? col : '#263142'} strokeWidth={on || accepts ? 2 : 1} />
                 <rect width={NODE_W} height={20} rx={10} fill={col} fillOpacity={0.16} />

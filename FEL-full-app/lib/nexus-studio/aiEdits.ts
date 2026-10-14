@@ -199,7 +199,14 @@ export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt:
 
 /** One line per edit, for the review list the creator reads before Apply. */
 export function describeEdit(e: AiEdit): string {
-  if (e.op === 'venue') return `Venue: ${Object.entries(e.set).map(([k, val]) => `${k} ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`).join(' · ')}`;
+  if (e.op === 'venue') {
+    const say = (k: string, val: unknown): string => {
+      if (k === 'sky' && val && typeof val === 'object') { const sky = val as { top?: string; bottom?: string }; return `own sky ${sky.top} → ${sky.bottom}`; }
+      if (k === 'ground' && val && typeof val === 'object') { const g = val as { kind?: string; color?: string }; return `ground ${[g.kind, g.color].filter(Boolean).join(' ')}`; }
+      return `${k} ${typeof val === 'object' ? JSON.stringify(val) : String(val)}`;
+    };
+    return `Venue: ${Object.entries(e.set).map(([k, val]) => say(k, val)).join(' · ')}`;
+  }
   if (e.op === 'clear') return e.type === 'all' ? 'Clear every unlocked object' : `Clear every unlocked ${e.type}`;
   const item = catalogItem(e.item);
   return `Place ${e.name ?? item?.label ?? e.item} at (${e.at[0].toFixed(1)}, ${e.at[2].toFixed(1)})`;

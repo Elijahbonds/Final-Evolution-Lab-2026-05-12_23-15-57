@@ -63,8 +63,9 @@ StudioObject  { id, name, locked?, hidden?, t: { p: [x,y,z], ry, s } } & one of
   { type: 'decal',     kind: DecalKind, tint? }         // GroundDecals marks, kept alive
   { type: 'cameraMark', role: 'subject' }               // where the intro / replay previews frame the play
 
-StudioCharacter { id, name, lookCode?: string }   // track 3: a Closet share code (lib/creator/look/shareCode)
-StudioScript    { id, name, nodes: [], edges: [] } // track 4: the graph, empty until phase 4
+StudioCharacter { id, name, lookCode?: string }   // track 3: a Closet share code (lib/creator/look/shareCode), §10.2
+StudioVenue.cast?: { player?: characterId }        // track 3: who the venue's hero is
+StudioScript    { id, name, enabled, nodes: ScriptNode[], edges: ScriptEdge[] }   // track 4: an event → condition → action graph, §10.3
 ```
 
 **Why a PlaceLook over a spec.** Every spec-mounted mode already accepts a `PlaceLook` (`mountVenue(ctx, spec, { look })`):
@@ -118,9 +119,11 @@ behave as in that mode) → `mountLightRig(scene, mood, tier)` → `mountSsao` w
 Why not `runMode` itself: `runMode` is a game session — READY gate, body seam, session store, result sink, a 20 s load
 watchdog, `assertSpawned` (a hero is required), the perf guard that pauses rendering outside play. None of that belongs in
 an editor, and faking a hero to satisfy it would be a lie in the scene. The look stack is what "what you edit is what a
-mode renders" needs, and `stage.order.test.ts` reads `ModeHarness.ts` and fails if the harness's order or calls change, so
-the two cannot drift silently. **Proposal (routed to movement-play, who holds ModeHarness):** extract
-`mountLookStack(def, canvas)` from `mountMode` so both call one function.
+mode renders" needs. **Done (lane/nexus-studio-2):** the stack is ONE function, `lib/babylon/core/lookStack.ts`
+`mountLookStack`, which `ModeHarness.mountMode` and `stage.ts` both call (the harness's perf guard and agent bridge run in
+its `onScene` hook, the mood is read once in its `mood` thunk, the editor's cameras are made in `onCamera`), so the two
+cannot drift by construction; `stage.order.test.ts` holds the order inside it and that neither caller makes a look-stack
+call itself.
 
 ### 4.2 Editing
 
@@ -185,11 +188,13 @@ code) the firewall still holds.
 
 ## 8. Routed (files other lanes hold or changed in the last 24 h)
 
-- `lib/babylon/scene/GlossyFloor.ts` (vis-hoops-dunk, 14 h): in `mountGlossyFloor`, read
-  `(scene.metadata as { felStudioGround?: string } | null)?.felStudioGround` before `readPlaceLook(modeId)?.ground?.kind`.
-- `lib/babylon/visual/GroundDecals.ts` (vis-race/vis-board, 16 h): a `persist?: boolean` stamp option (born = a sentinel
-  that `decalAlpha` reads as 1), so a placed mark needs no refresh.
-- `lib/babylon/core/ModeHarness.ts` (movement-play): extract `mountLookStack` (§4.1).
+All three landed on `lane/nexus-studio-2` (2026-10-14), each flagged `shared file:`:
+- `lib/babylon/scene/GlossyFloor.ts`: `mountGlossyFloor` reads `scene.metadata.felStudioGround` before the place look's
+  ground kind — a Studio venue's glossy floor reaches the viewport and the mode.
+- `lib/babylon/visual/GroundDecals.ts`: `stamp(…, { persist: true })` — a kept mark never fades and the ring steps over it;
+  the Studio decal layer stamps once (the refresh is gone).
+- `lib/babylon/core/ModeHarness.ts`: `mountLookStack` extracted (§4.1). A/B on the real harness (seeded, stepped): same
+  meshes, materials, lights, cameras and clear colour; frame differences inside the old build's own run-to-run noise.
 
 ## 9. Status (2026-10-14, lane/nexus-studio)
 
@@ -228,3 +233,67 @@ scratchpad `nexus-studio/`):
   through `playerIdentity`; the Closet Studio stays the editor.
 - Track 4 (scripts): event → condition → action graphs over `ctx.momentum`, crowd `react()`, juice, HUD banners, the
   director; venue triggers first, interpreted inside `mountStudioExtras`.
+
+## 10. Tracks 2–4 (2026-10-14, lane/nexus-studio-2)
+
+### 10.1 Track 2: the AI builder — CELL answers with Studio commands
+
+The AI builder track has two halves: **Build the venue with CELL** (new) beside CELL's game-file `StudioShell` (unchanged).
+A creator types "a night beach court with floodlights and a packed far stand"; `POST /api/cell/venue` asks CELL (its
+existing `builder` role, JSON mode) for **edits in a closed vocabulary** — `venue` (settings), `place` (a catalog item),
+`row` (a line of them), `clear` — and the panel shows them as a reviewed list; **Apply** runs them as **one command**
+("AI: …") on the same undo stack a hand edit uses.
+
+- **Untrusted, twice.** The route sanitises the answer and the browser sanitises it again (`lib/nexus-studio/aiEdits.ts`):
+  only catalog items (no gameplay prop exists there), every number clamped, rows and answers capped, prototype keys never
+  read, and every placed object through `doc.ts sanitizeObject` / every setting through `sanitizeVenue` — the import
+  path's own sanitisers. Ids are minted by the Studio. Nothing is evaluated; the model's text is never returned.
+- **The route** (`app/api/cell/venue/route.ts`): the ABACUS kill switch first (503 coming soon before the session, the body
+  or the database), signed in, a rate limit per account, **adults only** (DB `dobYear`, strict rule), a capped body. The
+  prompt carries the venue's settings and placements — never the account, a character or a look. No new env or secret.
+- **The panel** asks `useAiStatus('studio')` and sends nothing unless the server says the AI is available.
+
+### 10.2 Track 3: characters — a Closet share code, worn through playerIdentity
+
+A project character is a Closet share code. The venue inspector's **Cast · Player** slot picks the player's own look, a
+project character, a look **from my Closet** (each saved look encoded as the Closet's Share does; a minor's looks come from
+the device copy, as every mode reads them) or a **pasted code** (decoded before it is added). The Characters track lists them.
+
+- **The export carries the decoded look** (`cast.ts`): the mode's side is synchronous and re-sanitises it with the Closet's
+  own sanitisers. `mountStudioFor` seats `castIdentity` with `primeIdentity` before the mode's `load()` spawns its hero, so the
+  mode's own spawn (`CharacterLibrary.spawn` → `resolveIdentity` → `urlForHeroBody` → `applyIdentity`) dresses it; dispose
+  forgets it. TiebreakMode is unchanged.
+- **The standard frame:** a cast never changes the body's height or build (`proportions: null`), even though a code carries
+  a frame — the play scale feeds modes' outcome points (REACH-FREEZE). Presentation only.
+- **The viewport** stands the cast on the mode's hero spot on the real rig (`castLayer.ts`: the same spawn, identity and idle).
+  RIG-ADJACENT; GATE 0 (`scripts/gate0-animation-verification.ts`) passed before it: 39 / 0.
+
+### 10.3 Track 4: visual scripting — event → condition → action, presentation only
+
+Graphs are data in the project (`scripts.ts`), edited in a React + SVG node editor (`script-editor.tsx`, no dependency):
+drag nodes, drag from a port to connect (illegal or looping wires refused), Delete, pan, zoom, a node inspector per spec.
+
+| Events (listen) | Conditions | Actions (presentation) |
+|---|---|---|
+| Point scored (me/them/any: the HUD the mode posts), Momentum report (`onReport`), Momentum tier (`onTierChange`, up/down), Play starts / ends (the phase), Timer (every/once, play clock), Zone enter (the hero's spot) | Compare (myScore, theirScore, lead, momentum, elapsed, fires), Cooldown, Chance | Crowd reaction (`crowd.react`), Effects burst (`EffectsKit.burst`), HUD banner (tv-hud `HudBanner`, the `studioBanner` key), Camera shot (`camDirector.establish`, or the mode's `ctx.highlight` replay), Light pulse (the venue's Studio fixture heads), Sound cue (`SoundKit` SFX bus) |
+
+- **The interpreter** (`interpreter.ts`) walks a graph when the host says an event happened and hands actions to a sink as
+  data: acyclic, depth-capped, 8 actions a second at most. It imports only `scripts.ts` and `doc.ts`.
+- **The host** (`scriptHost.ts`, mounted by `mountStudioExtras`, so only with a dev-only `?venue=`) listens and does
+  presentation; bursts, light pulses and camera shots respect reduced motion. Its HUD tap hands every mode update to the
+  harness unchanged first and writes only `studio*` keys; dispose restores the harness's own `setHud`.
+- **`interpreter.wiring.test.ts`** proves it: the interpreter's whole value-import graph is `{interpreter, scripts, doc}`;
+  the host imports nothing that scores, judges, times, pays or tunes, and never reports, ends, cards, resets or reads the
+  multiplier, in any spelling.
+- **Proven in the Tiebreak play-test:** the export carries the enabled scripts; "Point won → cheer" (onScore me → cooldown →
+  crowd cheer + banner + confetti) fires on a point the bot wins, drawn by the dev runner's HudBanner.
+
+### 10.4 Next
+
+- Track 2: CELL proposing scripts and casts too (the same review-then-apply step); a CELL "explain this venue" pass.
+- Track 3: a rival / crowd casting slot (the rival is a roster body: casting it needs the roster's say); the Closet Studio
+  opened from a character ("Edit in the Closet").
+- Track 4: more events as modes expose them as data (a rally length, a replay ending), per-venue scope for a script, a
+  minimap of the graph; a second play-test mode (Football Rush replays: the replay shot becomes live).
+- Owner calls: minors and the AI builder (adults only today); whether a cast may carry its height/build (no, today).
+
