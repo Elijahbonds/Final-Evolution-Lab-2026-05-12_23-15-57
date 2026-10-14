@@ -76,11 +76,11 @@ describe('one tone per pulse', () => {
   const real = proto.pulse;
   proto.pulse = function (this: unknown, k: FlashKind) { pulses.push(k); return real.call(this, k); };
   // …and each part's final count of valid reps, as the runner finishes it (`finishPart` is private too)
-  const finals: { part: string; valid: number }[] = [];
+  const finals: { part: string; valid: number; attempts: number }[] = [];
   const fp = AssessRunner.prototype as unknown as { finishPart: (now: number) => void };
   const realFinish = fp.finishPart;
-  fp.finishPart = function (this: { part: { def: { id: string }; valid: number } }, now: number) {
-    finals.push({ part: this.part.def.id, valid: this.part.valid });
+  fp.finishPart = function (this: { part: { def: { id: string }; valid: number; attempts: number } }, now: number) {
+    finals.push({ part: this.part.def.id, valid: this.part.valid, attempts: this.part.attempts });
     return realFinish.call(this, now);
   };
   const { v, views } = driveHandsFree();
@@ -94,6 +94,7 @@ describe('one tone per pulse', () => {
     // same tick, so no view ever shows the final count), and all seven parts finished
     expect(finals.map((f) => f.part)).toEqual(['T1-front', 'T1-side', 'T2-left', 'T2-right', 'T3-left', 'T3-right', 'T5']);
     const counted = finals.reduce((a, f) => a + f.valid, 0);
+    expect(tones.filter((k) => k === 'retry')).toHaveLength(finals.reduce((a, f) => a + (f.attempts - f.valid), 0));
     expect(counted).toBeGreaterThan(0);
     // QA (2026-10-14): compared with the PULSES, a second pulse('captured') per rep played two tones and stayed green
     expect(tones.filter((k) => k === 'captured')).toHaveLength(counted);
@@ -151,6 +152,12 @@ describe('one tone per pulse', () => {
     expect(t2.attempts).toBeGreaterThan(t2.valid);                    // the recording really holds a rep that did not count
     expect(ps.filter((k) => k === 'retry').length).toBeGreaterThan(0); // …and it played the retry tone (left as is)
     const counted = fin.reduce((a, f) => a + f.valid, 0);
-    expect(tonesOf(run.views).filter((k) => k === 'captured')).toHaveLength(counted);
+    const notCounted = fin.reduce((a, f) => a + (f.attempts - f.valid), 0);
+    expect(notCounted).toBeGreaterThan(0);
+    // QA final re-check: on what is HEARD (cuesDue's output, as the HUD plays it), not on the pulses — a cuesDue that dropped
+    // the retry tone passed while the pulses still held it. One retry tone per rep that did not count, one captured per counted.
+    const heard = tonesOf(run.views);
+    expect(heard.filter((k) => k === 'retry')).toHaveLength(notCounted);
+    expect(heard.filter((k) => k === 'captured')).toHaveLength(counted);
   });
 });
