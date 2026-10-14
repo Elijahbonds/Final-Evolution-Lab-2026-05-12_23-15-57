@@ -16,7 +16,7 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/scoring.ts': [[['3', '100'], 'the 0–3 and 0–100 scales'], [['1000', '10'], 'ms → Hz, and one decimal of rounding']],
   'lib/assess/reps.ts': [],
   'lib/assess/calibration.ts': [[LANDMARKS, 'MediaPipe landmark indices and the 33-landmark count']],
-  'lib/assess/protocol.ts': [[['5', '3'], 'rep counts of T4, T6 and T7, listed as "Full screen: coming later" and never run']],
+  'lib/assess/protocol.ts': [[['5', '3'], 'rep counts of T4, T6 and T7, defined, hidden (notBuilt) and never run']],
   'lib/assess/why.ts': [[['10', '100', '1000'], 'rounding, percent, ms → s'], [['2.54'], 'cm per inch'], [['3', '4', '5'], 'the §7.3 ranking order of finding categories and PR #20\'s top-three findings count (not shown by SCREEN-SHIP\'s results)']],
   'lib/assess/runner.ts': [[['1000', '10000', '10', '100'], 'ms → s, Hz rounding, percent'], [['33'], 'the 33-landmark count'], [['3'], 'the 0–3 scale in PR #20\'s mini line'], [['2.54'], 'cm per inch'], [['900', '420'], 'still-hold and flash duration (SCREEN-REALTIME UI pacing)']],
   'lib/assess/geometry.ts': [

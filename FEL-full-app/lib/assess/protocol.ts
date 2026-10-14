@@ -2,8 +2,8 @@
 //
 // OWNER DEFAULT Q2 (lane brief, 2026-09-28): the seven-test lineup IS the protocol. All seven are defined here so a
 // stored result, the docs and a later Full screen all name the same tests the same way. The Quick Screen runs T1, T2,
-// T3 and T5 and grades them in this lane; T4, T6 and T7 are listed but `notBuilt` — the UI shows "Full screen: coming
-// later" rather than a grader that does not exist.
+// T3 and T5 and grades them in this lane; T4, T6 and T7 are defined but `notBuilt` — HIDDEN everywhere on screen
+// (MIRROR-NO-PLACEHOLDER, 2026-10-13) until their graders are real. No row, no promise.
 //
 // Pure data.
 import { PROTOCOL_VERSION, th } from './thresholds';
@@ -97,8 +97,6 @@ export function runnableTests(mode: AssessMode): ProtocolTest[] {
   return testsFor(mode).filter((t) => !t.notBuilt);
 }
 
-/** What a listed-but-unbuilt test says on screen. */
-export const NOT_BUILT_LINE = 'Full screen: coming later';
 
 export const SIDES: readonly Side[] = ['left', 'right'];
 export const sideLabel = (s: Side): string => (s === 'left' ? 'Left' : 'Right');
