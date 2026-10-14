@@ -902,3 +902,9 @@ The deferred atmosphere and surface items from waves 1 and 2. Everything below i
 - **Deferred.** A "Rain" chip for the kart's start screen (HUD: w3-present or an owner call; the URL works today). Sun shafts for any mode that
   looks at the sun (a replay that cranes to it, a finish flown into it) - add its measured share to `SUN_SHAFT_MEASURED`. A photographic night
   dome ([ART]). Heat haze with depth (a refraction of what is BEHIND the pit only) needs the depth pass. Tyre spray behind a kart on the wet road.
+- **Budgets, measured** (rig: 240x135 desktop-tier and 48x105 phone-tier probes, same camera and moment, base = `origin/lane/finish-release` vs this lane; draws from the engine's per-frame count, `?tier=` forced). Desktop ceilings 1600 draws / 900 active / 512 MB, phone 600 / 400 / 256 MB; every row is far inside both.
+  Foundry (combat, heat haze + chi rims): desktop 342 -> 343 draws, 54 active, particles 95 -> 95, 165 MB both; phone 76 -> 77 draws, 159 MB both.
+  Coconut Cove (aero, clouds + spray + ring): desktop 204 -> 206 draws, 65 active, particles 52 -> 232 (spray, cap 360), 183 MB both; phone 74 -> 75 draws, particles 54 -> 54 (no sprites, no spray), 183 MB both.
+  Knight arena (combat, chi rims): desktop 585 -> 586 draws, 100 active, texture 267 -> 271 MB (the rim glow's soft texture), phone 124 -> 124, 267 MB both.
+  Neon block (kart night, strip lights; `mobileBudget.json` row untouched): desktop 351 -> 351 draws, 55 active, texture 132 -> 129 MB, phone 64 -> 65 draws, 132 -> 129 MB.
+  Sun shafts: not mounted by any mode (measured share 0), so no row moves; with `?lookon=sunshafts` the pass adds one full occluder pass at half resolution.
