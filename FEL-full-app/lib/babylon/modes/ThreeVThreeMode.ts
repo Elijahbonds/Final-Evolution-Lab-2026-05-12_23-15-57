@@ -201,6 +201,10 @@ const FORMAT: ScoringFormat = 'alternating';
 // and that difference IS the shot selection: a corner three is the bargain and
 // the top of the key is the hard one. isThree() now answers it per angle.
 const POSSESSION_SEC = 90;
+/** NB-3 (hoops grade 0d16f5dd): a game level at the buzzer goes to OVERTIME — sudden death, the next bucket wins — on this clock;
+ *  level again when it runs out, another overtime. (It ended 10–10 as a loss-shaped DRAW with no tiebreak.) */
+const OVERTIME_SEC = 30;
+const OVERTIME_BANNER = 'OVERTIME — NEXT BUCKET WINS';
 /** BIOMECH-HOOPS-WAVE1: the facing slew (rad/s); a defender inside this range keeps his chest on the carrier. */
 const FACE_RATE = 10, FACE_RIM_RATE = 6, DEFEND_FACE_RANGE = 6;
 
@@ -290,7 +294,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     standingOf(foeScore, myScore, TARGET_SCORE, Math.min(1, Math.max(myScore, foeScore) / TARGET_SCORE));
   let carrierId: 'me' | 'mate0' | 'mate1' | 'foeTeam' = 'me';
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
-  let buzzer = false;   // HOOPS-TO-75 WA-1: the horn fired — wait for live shots before posting the final score
+  let buzzer = false;
+  let overtime = false;   // NB-3: sudden death after a level buzzer   // HOOPS-TO-75 WA-1: the horn fired — wait for live shots before posting the final score
   /** HOOPS MOTION phase 3b: a MATE's shot is up (the one-shot-at-a-time guard). teammateShoots used to raise the hero's own `shooting`,
    *  which nothing cleared when their ball followed his make (opponentPossession leaves it): the hero looped `bball_shoot_jumper` while
    *  sliding on defence and was slewed toward the rim until the next possession of ours (V:3v3 C6). */
@@ -989,7 +994,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[3V3-HANDLE] handle ${handle} (override)`); }
       }
 
-      myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false; buzzer = false;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
+      myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false; buzzer = false; overtime = false;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
       shotContest = 0; foeCloseMem = foes.map(() => 0);
       ctx.heroRef.current = me.char.root;
       ctx.objectiveRef.current = RIM;
@@ -1103,6 +1108,20 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (timeLeft > 0) timeLeft -= dt;
       else if (!buzzer) { buzzer = true; SoundKit.play('whistle'); }
       const liveAtBuzzer = arc.active || mateArc.active || !!foeDunkFlight || dunking || shooting || mateShooting;
+      // NB-3: in overtime the first bucket ends it, once nothing is still in the air
+      if (overtime && !ended && myScore !== foeScore && !liveAtBuzzer) {
+        ended = true; SoundKit.play('whistle');
+        const ot = myScore > foeScore ? 'WIN' : 'LOSS';
+        putHud(ctx, { score: myScore, foeScore, time: Math.ceil(Math.max(0, timeLeft)) });
+        micEnd(ot);
+        return ctx.end(ot, myScore, endStats());
+      }
+      if (buzzer && !ended && !liveAtBuzzer && myScore === foeScore) {
+        // NB-3: level at the horn — overtime, not a result
+        overtime = true; buzzer = false; timeLeft = OVERTIME_SEC;
+        bannerFlash(ctx, OVERTIME_BANNER, 1600);
+        console.info(`[3V3-RULES] overtime at ${myScore}–${foeScore}: next bucket wins (${OVERTIME_SEC}s)`);
+      }
       if (buzzer && !ended) {
         if (!liveAtBuzzer) {
           ended = true;

@@ -131,7 +131,7 @@ describe('the rules reach the game (#1 #2 #5 #6 #7 #9)', () => {
   });
   it('#9 every ending posts the box score', () => {
     expect(CODE).not.toMatch(/ctx\.end\([^)]*\{ foeScore, assists \}\)/);
-    expect(CODE.match(/ctx\.end\([^;]*endStats\(\)\)/g)?.length).toBe(9);
+    expect(CODE.match(/ctx\.end\([^;]*endStats\(\)\)/g)?.length).toBe(10);   // NB-3: + the overtime ending
     expect(fn('resolveMyShot')).toMatch(/box\.fga\+\+;/);
   });
 });
