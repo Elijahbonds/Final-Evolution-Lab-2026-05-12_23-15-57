@@ -77,6 +77,8 @@ export class StudioViewport {
   private lastDraws = 0;
 
   private venueTimer: ReturnType<typeof setTimeout> | null = null;
+  private engine: AbstractEngine | null = null;
+  private detectedTier: QualityTier | undefined;
   private venueDebounceMs: number;
 
   constructor(private canvas: HTMLCanvasElement | null, private cb: ViewportCallbacks, private engineOverride?: AbstractEngine, opts: { venueDebounceMs?: number } = {}) {
@@ -92,10 +94,14 @@ export class StudioViewport {
     this.tier = tier;
     const run = async () => {
       const exp = exportVenue(venue);
-      const engine = this.stage?.engine ?? this.engineOverride;
+      // the engine outlives a re-mount (a mood change, the meter's tier switch): a canvas whose engine was disposed has
+      // lost its WebGL context, and a second engine on it never draws
+      const engine = this.stage?.engine ?? this.engine ?? this.engineOverride;
       this.teardownScene();
-      const stage = await mountStage({ canvas: this.canvas, engine, exp, tier });
+      const stage = await mountStage({ canvas: this.canvas, engine, exp, tier: tier ?? this.detectedTier });
       if (this.disposed) { stage.dispose(); return; }
+      this.engine = stage.engine;
+      if (!tier) this.detectedTier = stage.tier;   // the device's own tier, kept for the re-mounts that reuse the engine
       this.stage = stage; this.exp = exp; this.venue = venue;
       this.setupEditor(stage);
       this.syncProxies(venue);
@@ -435,7 +441,7 @@ export class StudioViewport {
 
   dispose(): void {
     this.disposed = true;
-    const engine = this.stage?.engine;
+    const engine = this.stage?.engine ?? this.engine;
     this.teardownScene();
     if (engine && !this.engineOverride) { engine.stopRenderLoop(); engine.dispose(); }
   }

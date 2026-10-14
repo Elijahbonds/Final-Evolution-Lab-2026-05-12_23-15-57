@@ -171,6 +171,16 @@ describe('the viewport', () => {
     expect(vp.scene!.getTransformNodeByName(`__studio_obj_${rest[0].id}`)).toBeNull();
   });
 
+  it('the meter\'s tier switch re-mounts on the SAME engine (a second engine on the canvas would never draw)', async () => {
+    const v = { ...everyKindVenue(), mood: 'indoorArena' as const };   // desktop's outdoor rig is a CSM, which NullEngine refuses
+    const vp = await viewport(v);
+    const e0 = vp.currentStage!.engine;
+    await vp.load(v, 'desktop');
+    expect(vp.currentStage!.engine).toBe(e0);
+    expect(vp.currentStage!.tier).toBe('desktop');
+    expect(vp.scene!.metadata.felTier).toBe('desktop');
+  });
+
   it('the budget sample leaves the editor\'s own overlays out of the count', async () => {
     const vp = await viewport(everyKindVenue());
     vp.scene!.render();

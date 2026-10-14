@@ -59,7 +59,7 @@ export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(func
         onError: (m) => { setError(m); setStatus('error'); },
       });
       vpRef.current = vp;
-      await vp.load(venueRef.current, p.phone ? 'mobile' : undefined);
+      await vp.load(venueRef.current, phoneRef.current ? 'mobile' : undefined);
       if (!alive) { vp.dispose(); return; }
       vp.setTool(cbs.current.tool); vp.setCamera(cbs.current.camera); vp.setSnap(cbs.current.snap); vp.setGrid(cbs.current.grid);
       vp.select(cbs.current.selected);
@@ -69,8 +69,16 @@ export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(func
     const onResize = () => vpRef.current?.currentStage?.engine.resize();
     window.addEventListener('resize', onResize);
     return () => { alive = false; window.removeEventListener('resize', onResize); vpRef.current?.dispose(); vpRef.current = null; };
-    // the tier is the only thing that rebuilds the engine; everything else is pushed below
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // the meter's tier switch re-mounts the stage on the SAME engine (a second engine on this canvas would never draw)
+  const phoneRef = useRef(p.phone);
+  useEffect(() => {
+    if (phoneRef.current === p.phone) return;
+    phoneRef.current = p.phone;
+    const vp = vpRef.current; if (!vp) return;
+    setStatus('loading');
+    void vp.load(venueRef.current, p.phone ? 'mobile' : undefined).then(() => setStatus((s) => (s === 'error' ? s : 'ready')));
   }, [p.phone]);
 
   useEffect(() => { if (status === 'ready') void vpRef.current?.update(p.venue); }, [p.venue, status]);
