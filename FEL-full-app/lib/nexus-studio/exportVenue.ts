@@ -11,10 +11,15 @@ import {
   REPLAY_ANGLES, SPEC_PROP_KINDS, WEATHER_PICKS, clampNum, wrapAngle,
   type StudioBackdrop, type StudioDecalKind, type StudioFixtureRole, type StudioGroundKind, type StudioIntro,
   type StudioMeshyKey, type StudioMood, type StudioPosture, type StudioReplayAngle, type StudioSky, type StudioSpecPropKind,
-  type StudioVenue, type StudioWeather, type V3,
+  type StudioScript, type StudioVenue, type StudioWeather, type V3,
 } from './doc';
 import { targetOf } from './targets';
 import { sanitizeCast, type ExportCast } from './cast';
+import { sanitizeGraph, type ScriptGraph } from './scripts';
+
+/** A script the mode runs (track 4): its id and the graph. Disabled scripts are not exported. */
+export interface ExportScript extends ScriptGraph { id: string }
+export const EXPORT_SCRIPTS_MAX = 16;
 
 export const EXPORT_KIND = 'nexus-studio-venue' as const;
 export const EXPORT_VERSION = 1 as const;
@@ -52,6 +57,8 @@ export interface StudioVenueExport {
   subject: V3 | null;
   /** Track 3: the decoded looks the venue casts (cast.ts). Absent = the player's own look. */
   cast?: ExportCast;
+  /** Track 4: the project's enabled scripts (scripts.ts), run by the mode's script host. Absent = none. */
+  scripts?: ExportScript[];
 }
 
 const r3 = (n: number): number => Math.round(n * 1000) / 1000;
@@ -59,7 +66,9 @@ const v3 = (p: V3): V3 => [r3(p[0]), r3(p[1]), r3(p[2])];
 
 /** A Studio venue → what a mode loads. Hidden objects are left out; locked ones are in (locked is an editor state). `cast` is
  *  the venue's cast already decoded (cast.ts resolveCast: share codes decode asynchronously). */
-export function exportVenue(v: StudioVenue, cast?: ExportCast | null): StudioVenueExport {
+export function exportVenue(v: StudioVenue, cast?: ExportCast | null, scripts?: readonly StudioScript[]): StudioVenueExport {
+  const runs: ExportScript[] = (scripts ?? []).filter((x) => x.enabled && x.nodes.length).slice(0, EXPORT_SCRIPTS_MAX)
+    .map((x) => ({ id: x.id, enabled: true, nodes: x.nodes.map((n) => ({ ...n, params: { ...n.params } })), edges: x.edges.map((e) => ({ ...e })) }));
   const live = v.objects.filter((o) => !o.hidden);
   const props: ExportSpecProp[] = [], kit: ExportKitProp[] = [], meshy: ExportMeshyProp[] = [];
   const fixtures: ExportFixture[] = [], stands: ExportStand[] = [], decals: ExportDecal[] = [];
@@ -95,6 +104,7 @@ export function exportVenue(v: StudioVenue, cast?: ExportCast | null): StudioVen
     baseDressing: v.baseDressing, kit, meshy, fixtures, crowd, decals,
     weather: v.weather, glossyFloor: v.glossyFloor, subject,
     ...(cast ? { cast } : {}),
+    ...(runs.length ? { scripts: runs } : {}),
   };
 }
 
@@ -149,6 +159,12 @@ export function sanitizeVenueExport(raw: unknown): StudioVenueExport | null {
     };
   }) : [];
   const cast = sanitizeCast(raw.cast);
+  const scripts: ExportScript[] = [];
+  for (const sc of Array.isArray(raw.scripts) ? raw.scripts : []) {
+    if (scripts.length >= EXPORT_SCRIPTS_MAX || !isObj(sc)) continue;
+    const g = sanitizeGraph(sc);
+    if (g.enabled && g.nodes.length) scripts.push({ id: typeof sc.id === 'string' && KEY.test(sc.id) ? sc.id : `script_${scripts.length}`, ...g });
+  }
   const angles: StudioReplayAngle[] = [];
   for (const a of Array.isArray(raw.replayAngles) ? raw.replayAngles : []) { const v = oneOf(a, REPLAY_ANGLES); if (v && !angles.includes(v) && angles.length < LIMITS.replayAngles) angles.push(v); }
   return {
@@ -189,6 +205,7 @@ export function sanitizeVenueExport(raw: unknown): StudioVenueExport | null {
     glossyFloor: raw.glossyFloor === true,
     subject: Array.isArray(raw.subject) ? pos(raw.subject) : null,
     ...(cast ? { cast } : {}),
+    ...(scripts.length ? { scripts } : {}),
   };
 }
 

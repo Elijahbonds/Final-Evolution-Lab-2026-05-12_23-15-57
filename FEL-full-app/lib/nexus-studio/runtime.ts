@@ -28,10 +28,12 @@ import type { LightRigHandle } from '../babylon/scene/LightRig';
 import type { QualityTier } from '../babylon/scene/QualityTier';
 import type { VenueMood } from '../babylon/scene/moods';
 import type { IntroKind } from '../babylon/scene/broadcastShots';
+import type { HudValue } from '../babylon/core/ModeHarness';
 import type { ExportCrowd, ExportDecal, ExportFixture, ExportMeshyProp, StudioVenueExport } from './exportVenue';
 import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
 import { targetOf } from './targets';
 import { castIdentity } from './cast';
+import { mountScriptHost, type ScriptHost, type ScriptHostCtx } from './scriptHost';
 import { invalidateIdentity, primeIdentity } from '../babylon/core/playerIdentity';
 
 // ── the mode's side: is there a Studio venue for this mode? ─────────────────────────────────────────────────────────
@@ -187,15 +189,15 @@ export function mountDecalLayer(scene: Scene, tier: QualityTier, items: readonly
 }
 
 /** The export's stands as a crowd (visual/crowd). `ctx` may carry the mode's momentum and phase: the crowd then reacts. */
-export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?: () => string }, crowd: ExportCrowd | null): Layer & { seats: number } {
-  if (!crowd?.stands.length) return { seats: 0, dispose() {} };
+export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?: () => string }, crowd: ExportCrowd | null): Layer & { seats: number; crowd: { react(kind: string, strength?: number): void } | null } {
+  if (!crowd?.stands.length) return { seats: 0, crowd: null, dispose() {} };
   const venue: CrowdVenue = {
     stands: crowd.stands.map((s) => ({ id: `studio_${s.id}`, front: [...s.front] as [number, number, number], yaw: s.yaw, width: s.width, rows: s.rows, step: [...s.step] as [number, number], posture: s.posture, benches: s.benches, gaps: s.gaps })),
     focus: [...crowd.focus] as [number, number, number], eye: [...crowd.eye] as [number, number, number],
     camera: { at: [...crowd.camera.at] as [number, number, number], into: [...crowd.camera.into] as [number, number], margin: crowd.camera.margin },
   };
   const h = mountModeCrowd(ctx as Parameters<typeof mountModeCrowd>[0], 'tennis', { venue });
-  return { seats: h?.seats ?? 0, dispose() { h?.dispose(); } };
+  return { seats: h?.seats ?? 0, crowd: h ? { react: (kind, strength) => h.react(kind as Parameters<typeof h.react>[0], strength) } : null, dispose() { h?.dispose(); } };
 }
 
 /** The weather's look (never its gameplay: nothing here reads the kit's modifiers). 'natural' mounts nothing. */
@@ -218,9 +220,13 @@ export interface StudioModeCtx {
   /** The mode's play camera (put back as the mode left it when the intro ends). */
   camera?: { position: Vector3; fov: number; getTarget(): Vector3; setTarget(t: Vector3): void };
   objectiveRef?: { current: Vector3 | null };
+  /** track 4: the HUD bridge (the script host taps it to hear the score, and writes its banner through it) */
+  setHud?: (u: Record<string, HudValue>) => void;
+  /** track 4: the mode's replay (a script's replay shot), where the mode replays */
+  highlight?: () => Promise<void>;
 }
 
-export interface StudioExtras extends Layer { readonly layers: Record<'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather', Layer> }
+export interface StudioExtras extends Layer { readonly layers: Record<'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather', Layer>; readonly scripts?: ScriptHost }
 
 /** Mount everything the export adds over the venue (call right after mountVenue with `studioLook(exp)`). */
 export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, opts: { stepIntro?: boolean } = {}): StudioExtras {
@@ -242,7 +248,13 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
   // ends puts the mode's own camera back exactly as the mode left it: the play camera is the mode's, not the follow's.
   const zero = Vector3.Zero();
   let held: { subject: Vector3; objective: Vector3 | null; pos: Vector3; target: Vector3; fov: number } | null = null;
-  const stepper = opts.stepIntro && ctx.camDirector && exp.intro !== 'none'
+  // track 4: a project's scripts, run by the host on the mode's own events (presentation only — scriptHost.ts)
+  const target = targetOf(exp.target);
+  const scripts = mountScriptHost(ctx as ScriptHostCtx, exp.scripts ?? [], {
+    crowd: layers.crowd.crowd, fixtureHeads: layers.fixtures.heads, subject: exp.subject ?? target?.subject, ...(target?.scoreKeys ? { scoreKeys: target.scoreKeys } : {}),
+  });
+  const scriptedShots = (exp.scripts ?? []).some((s) => s.nodes.some((n) => n.kind === 'camera' && n.params.shot !== 'replay'));
+  const stepper = opts.stepIntro && ctx.camDirector && (exp.intro !== 'none' || scriptedShots)
     ? scene.onBeforeRenderObservable.add(() => {
       const d = ctx.camDirector!;
       const cam = ctx.camera;
@@ -262,8 +274,9 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
     })
     : null;
   return {
-    layers,
+    layers, scripts,
     dispose() {
+      scripts.dispose();
       if (stepper) scene.onBeforeRenderObservable.remove(stepper);
       for (const l of Object.values(layers)) l.dispose();
       delete meta.felStudioGround;
@@ -285,7 +298,7 @@ export function mountStudioFor(modeKey: string, ctx: StudioModeCtx): StudioExtra
   if (cast) primeIdentity(castIdentity(cast));
   const extras = mountStudioExtras(ctx, exp, { stepIntro: true });
   return {
-    layers: extras.layers,
+    layers: extras.layers, scripts: extras.scripts,
     dispose() { extras.dispose(); if (cast) invalidateIdentity(); },
   };
 }

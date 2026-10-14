@@ -1,8 +1,9 @@
 'use client';
 
 // NEXUS STUDIO (docs/NEXUS-STUDIO.md): the editor inside FEL. Four tracks, phased — the venue / level editor (built),
-// the AI game builder (CELL: venue edits as Studio commands, beside the existing StudioShell, unchanged), the character / look editor and visual scripting
-// (planned; their panels say what they will reuse). /studio is flag-gated and unlinked (lib/nav/reachability.test.ts).
+// the AI game builder (CELL: venue edits as Studio commands, beside the existing StudioShell, unchanged), characters (Closet
+// share codes cast through playerIdentity) and visual scripting (event → condition → action graphs, presentation only).
+// /studio is flag-gated and unlinked (lib/nav/reachability.test.ts).
 
 import { useRef, useState } from 'react';
 import { Undo2, Redo2, Save, Download, Upload, Play, Box, Sparkles, UserRound, Workflow, Check, CloudOff, AlertTriangle } from 'lucide-react';
@@ -16,6 +17,7 @@ import { studioLoadAllowed } from '@/lib/nexus-studio/runtime';
 import { useResolvedCast, useStudio, type SaveState } from './use-studio';
 import { VenueEditor } from './venue-editor';
 import { CharactersTrack } from './characters';
+import { ScriptsTrack } from './script-editor';
 import { AiVenuePanel } from './ai-venue-panel';
 import { C, ToolButton } from './ui';
 
@@ -56,7 +58,7 @@ export function NexusStudioApp() {
     const t = targetOf(venue.base.target);
     if (!t) { setMessage('This venue has no mode to play it in yet.'); return; }
     if (!studioLoadAllowed()) { setMessage('Play-test runs in a development build only (the mode’s ?venue= load path is dev-only).'); return; }
-    const exp = exportVenue(venue, cast);   // track 3: the cast rides the export, decoded (synchronously here: a popup must open in the click)
+    const exp = exportVenue(venue, cast, doc.scripts);   // tracks 3 + 4: the cast (decoded, synchronously: a popup must open in the click) and the scripts ride the export
     const w = writePlaytest(browserKV(), exp);
     const param = w.ok ? exp.venueId : encodeInline(exp);
     if (!param) { setMessage(`Could not hand the venue over: ${w.ok ? '' : w.error}`); return; }
@@ -95,7 +97,7 @@ export function NexusStudioApp() {
           <ToolButton title="Export the project (.nexus.json)" onClick={doExport}><Download className="h-4 w-4" /></ToolButton>
           <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /></ToolButton>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void doImport(f); e.target.value = ''; }} />
-          {track === 'venue' && (
+          {track !== 'ai' && (
             <button type="button" onClick={playtest} className="ml-1 flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-semibold" style={{ background: C.cyan, color: '#050505' }} title="Open the mode with this venue (development build)">
               <Play className="h-3.5 w-3.5" aria-hidden /> Play-test in {targetOf(venue?.base.target ?? '')?.label ?? 'mode'}
             </button>
@@ -119,22 +121,7 @@ export function NexusStudioApp() {
         </div>
       )}
       {track === 'characters' && <CharactersTrack studio={studio} onPreview={() => setTrack('venue')} />}
-      {track === 'scripts' && <PlannedTrack title="Scripts (track 4)" lines={[
-        'Event → condition → action graphs over the seams a mode already exposes as data: the momentum meter, the crowd’s react(), the juice and the HUD banner, the broadcast camera, the replay.',
-        'Venue triggers first (a zone fires a cheer, a fixture flash, a banner), gameplay rules last. A project already carries an empty scripts list, so nothing migrates when it lands.',
-      ]} />}
-    </div>
-  );
-}
-
-function PlannedTrack({ title, lines }: { title: string; lines: string[] }) {
-  return (
-    <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-8">
-      <div className="max-w-xl rounded-xl border p-6" style={{ borderColor: C.line, background: C.surface }}>
-        <h2 className="font-display text-[15px] font-semibold uppercase tracking-[0.14em]" style={{ color: C.cyan }}>{title}</h2>
-        <p className="mt-1 text-[12px]" style={{ color: C.gold }}>Planned — docs/NEXUS-STUDIO.md §3</p>
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-[13px]" style={{ color: C.text }}>{lines.map((l) => <li key={l}>{l}</li>)}</ul>
-      </div>
+      {track === 'scripts' && <ScriptsTrack studio={studio} />}
     </div>
   );
 }

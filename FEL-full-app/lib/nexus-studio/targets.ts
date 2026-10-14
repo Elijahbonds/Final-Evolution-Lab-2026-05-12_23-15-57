@@ -24,6 +24,8 @@ export interface PlaytestTarget {
   weatherFamily: 'court';
   /** crowdLayout.CrowdVenue's look line for this mode's play camera (a stand may not sit in front of it or behind it). */
   crowdView: { focus: V3; eye: V3; camera: { at: V3; into: [number, number]; margin: number } };
+  /** track 4: the HUD keys the mode posts its score under (the script host hears "Point scored" there). */
+  scoreKeys?: { me: string; them: string };
   /** config/mobileBudget.json row measured on this venue (the mode's own, or the closest one). */
   budgetKey: string;
   /** Opens the mode with a Studio venue: dev only (the load path is dev only). */
@@ -43,6 +45,7 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     // visual/crowd/crowdVenues.ts TENNIS: the play camera stands behind the near baseline looking −z
     crowdView: { focus: [0, 1, -2], eye: [0, 4.4, 15.8], camera: { at: [0, 4.4, 15.8], into: [0, -1], margin: 5 } },
     budgetKey: 'tennis',
+    scoreKeys: { me: 'myPts', them: 'aiPts' },   // TiebreakMode hud()
     route: (v) => `/dev/mode/tiebreak?venue=${encodeURIComponent(v)}`,
   },
 };

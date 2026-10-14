@@ -6,6 +6,8 @@
 // UNTRUSTED: `sanitizeProject` drops unknown kinds, clamps every number, caps every string and list, and re-mints a
 // colliding id. `migrateProject` is the one place a later version reads this one.
 
+import { sanitizeGraph, type ScriptGraph } from './scripts';
+
 export const STUDIO_DOC_KIND = 'nexus-studio-project' as const;
 export const STUDIO_DOC_VERSION = 1 as const;
 
@@ -112,8 +114,8 @@ export interface StudioVenue extends VenueSettings { id: string; objects: Studio
 /** Track 3: a character is a Closet look (its share code, lib/creator/look/shareCode). A code that is not code-shaped, or
  *  longer than the Closet's own ceiling, is dropped whole (a truncated code is a corrupt one). */
 export interface StudioCharacter { id: string; name: string; lookCode?: string }
-/** Track 4: a script graph. Empty until phase 4. */
-export interface StudioScript { id: string; name: string; nodes: unknown[]; edges: unknown[] }
+/** Track 4: an event → condition → action graph (scripts.ts), run by interpreter.ts in every venue the project plays. */
+export interface StudioScript extends ScriptGraph { id: string; name: string }
 
 export interface StudioProject {
   kind: typeof STUDIO_DOC_KIND;
@@ -403,8 +405,8 @@ export function sanitizeProject(raw: unknown, now = new Date()): ParseResult {
   const scripts: StudioScript[] = [];
   for (const s of Array.isArray(x.scripts) ? x.scripts : []) {
     if (!isObj(s) || scripts.length >= LIMITS.scripts) continue;
-    // phase 4 defines nodes and edges; until then a script is a name and an empty graph (nothing executable is imported)
-    scripts.push({ id: idOr(s.id, 'script', seen), name: str(s.name, LIMITS.name, 'Script'), nodes: [], edges: [] });
+    // the graph through its own sanitiser: known node kinds, params per spec, allowed and acyclic edges — data, never code
+    scripts.push({ id: idOr(s.id, 'script', seen), name: str(s.name, LIMITS.name, 'Script'), ...sanitizeGraph(s) });
   }
   // a cast that names a character the project does not have is dropped (the venue plays the player's own look)
   for (const v of venues) if (v.cast?.player && !characters.some((c) => c.id === v.cast!.player)) delete v.cast;

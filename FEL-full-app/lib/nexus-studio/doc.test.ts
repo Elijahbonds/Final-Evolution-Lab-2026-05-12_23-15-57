@@ -86,11 +86,13 @@ describe('an untrusted file', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('imports no script nodes until phase 4 defines them (nothing executable rides a file)', () => {
+  it('imports script graphs as data only: an unknown node (a `run`, code) is dropped; a known node keeps only its spec\'s params', () => {
     const raw = JSON.parse(JSON.stringify(everyKindProject()));
-    raw.scripts = [{ id: 's1', name: 'x', nodes: [{ run: 'alert(1)' }], edges: [1] }];
+    raw.scripts = [{ id: 's1', name: 'x', nodes: [{ run: 'alert(1)' }, { id: 'n1', kind: 'banner', x: 1, y: 2, params: { text: 'GO', onclick: 'alert(1)' } }], edges: [1] }];
     const r = sanitizeProject(raw);
-    expect(r.ok && r.project.scripts).toEqual([{ id: 's1', name: 'x', nodes: [], edges: [] }]);
+    // test changed (phase 4): scripts now carry nodes, so the expectation names the one valid node instead of an empty graph;
+    // the hostile node and edge are still dropped, and the banner's foreign `onclick` param is not kept
+    expect(r.ok && r.project.scripts).toEqual([{ id: 's1', name: 'x', enabled: true, nodes: [{ id: 'n1', kind: 'banner', x: 1, y: 2, params: { text: 'GO', tone: 'score', seconds: 1.8 } }], edges: [] }]);
   });
 
   it('caps the object count', () => {
