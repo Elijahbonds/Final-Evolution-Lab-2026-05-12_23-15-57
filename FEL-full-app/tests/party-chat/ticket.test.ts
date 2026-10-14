@@ -68,11 +68,19 @@ describe('GET /api/party/ticket', () => {
     const keys = (o: unknown): string[] => (o && typeof o === 'object' ? Object.entries(o).flatMap(([k, v]) => [k, ...keys(v)]) : []);
     expect(values(rest)).not.toContain('u9');
     expect(values(rest).map(String)).not.toContain('1980');
+    // …and the original SUBSTRING bar, kept: a birth year or user id embedded in a longer string ('born 1980', 'hi u9') is a
+    // leak too. Only the random fields are taken out first (the signed ticket, checked above and below, and the TURN
+    // username / credential pair, an expiry + HMAC base64), so the check cannot flake on them and still sees everything else.
+    const redacted = { ...rest, iceServers: (rest.iceServers as Array<Record<string, unknown>>).map(({ username: _u, credential: _c, ...ice }) => ice) };
+    expect(JSON.stringify(redacted)).not.toContain('1980');
+    expect(JSON.stringify(redacted)).not.toContain('u9');
     expect(keys(rest)).not.toEqual(expect.arrayContaining(['uid']));
     expect(keys(rest).filter((k) => /dob|birth|user_?id/i.test(k))).toEqual([]);
     const claims = JSON.parse(Buffer.from(ticket.split('.')[0], 'base64url').toString('utf8')) as Record<string, unknown>;
     expect(claims.uid).toBe('u9');
     expect(values(claims).map(String)).not.toContain('1980');
+    const { pub: _pub, exp: _exp, ...fixedClaims } = claims;   // pub is a hash and exp is the clock: the random parts
+    expect(JSON.stringify(fixedClaims)).not.toContain('1980');
     expect(Object.keys(claims).filter((k) => /dob|birth|year/i.test(k))).toEqual([]);
     expect(verifyTicket(ticket, 'route-secret', Date.now())).toMatchObject({ uid: 'u9', adult: true });
   });
