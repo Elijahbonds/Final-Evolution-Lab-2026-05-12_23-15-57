@@ -11,6 +11,7 @@ import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
+import { lazyRunFor } from '@/lib/sessions/lazyRun';   // NB-4: a hoops run waits for TAP TO START only when Babylon loads
 import { canFullscreen, isFullscreen, toggleFullscreen } from '@/lib/ui/fullscreen';
 import { consoleLayout, consoleStageVars, type ConsoleLayout } from '@/lib/ui/consoleView';
 import { VirtualController } from './virtual-controller';
@@ -249,10 +250,25 @@ function GameShellInner({
   }, [scheme, gameKey, babylonOwnsInput]);
 
   useEffect(() => { runLive.current = result === null; }, [result]);
+  const lazyRun = useRef(lazyRunFor(mode));
+  lazyRun.current = lazyRunFor(mode);
   useEffect(() => {
     inputCount.current = 0;
     runMark.current = markRun(sessionStore.record());
-    serverRun.current = startServerRun();
+    // NB-4 (hoops grade 0d16f5dd): a harness game asks for its server run when play STARTS (TAP TO START: the harness's
+    // ready → playing, sessionStore.beginRun), not when the page mounts — an idle or bounced visit opens no run. Every
+    // other game still asks at mount, as before.
+    let stopWaiting: (() => void) | null = null;
+    if (lazyRun.current) {
+      serverRun.current = null;
+      let seen = sessionStore.record()?.runId ?? 0;
+      stopWaiting = sessionStore.subscribe(() => {
+        const id = sessionStore.record()?.runId ?? 0;
+        if (id > seen) { seen = id; serverRun.current = startServerRun(); }
+      });
+    } else {
+      serverRun.current = startServerRun();
+    }
     const mark = () => { if (runLive.current) inputCount.current += 1; };
     window.addEventListener('keydown', mark);
     window.addEventListener('pointerdown', mark);
@@ -261,6 +277,7 @@ function GameShellInner({
       window.removeEventListener('keydown', mark);
       window.removeEventListener('pointerdown', mark);
       window.removeEventListener('touchstart', mark);
+      stopWaiting?.();
     };
   }, [gameKey, startServerRun]);
 
@@ -514,7 +531,13 @@ function GameShellInner({
   const inPlace = useRef<(() => boolean) | null>(null);
   const registerReplay = useCallback((fn: (() => boolean) | null) => { inPlace.current = fn; }, []);
 
+  // QA-H1: a double-tap / mash on PLAY AGAIN is one replay (two went out in the same ms → two server runs, one orphaned).
+  // Re-armed once the next run's result clears the card.
+  const replaying = useRef(false);
+  useEffect(() => { if (result !== null) replaying.current = false; }, [result]);
   const replay = () => {
+    if (replaying.current) return;
+    replaying.current = true;
     setResult(null);
     setRecap(null);
     setRecapCoins(null);
