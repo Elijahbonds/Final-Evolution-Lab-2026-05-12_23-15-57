@@ -67,6 +67,16 @@ describe('SCREEN-HARDEN middleware headers', () => {
     expect(res.headers.get('Content-Security-Policy')).toBeNull();
   });
 
+  it('CSP-Report-Only carries no directive a report-only policy ignores (each one is a console error on every load)', () => {
+    // upgrade-insecure-requests is ignored when delivered report-only, and Chrome
+    // logs "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a report-only
+    // policy" as an error. Found on the live /screen and /play/mirror/assess by the 2026-10-14 bug sweep.
+    for (const p of ['/screen', '/screen/privacy', '/screen/program/dunking', '/play/mirror/assess', '/play/mirror/assess/results']) {
+      const csp = call(p).headers.get('Content-Security-Policy-Report-Only') ?? '';
+      expect(csp, p).not.toMatch(/upgrade-insecure-requests/);
+    }
+  });
+
   it('nonces differ between two requests', () => {
     const na = call('/screen').headers.get('Content-Security-Policy-Report-Only')!.match(/'nonce-([^']+)'/)![1];
     const nb = call('/screen').headers.get('Content-Security-Policy-Report-Only')!.match(/'nonce-([^']+)'/)![1];

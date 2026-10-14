@@ -958,6 +958,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
+      ctx0 = ctx;   // bug sweep 2026-10-14: stickDirToFoe reads ctx0.camDirector, and update() is what used to set it — a stick push and an attack in the first playing frame, before any update(), threw
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       // P7: who is driving — a real press or push is the pad's

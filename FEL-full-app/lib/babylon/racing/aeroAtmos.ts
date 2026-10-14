@@ -5,8 +5,9 @@
 //
 //   CLOUD BANKS    soft billboard puffs in banks along the line at the line's own height (not the deck 150 m up: CloudDeck). A puff fades
 //                  out as the camera comes into it - no quad is ever clipped by the near plane - while the air whitens (the fog's
-//                  density rises to 4x and takes the cloud's colour, ~60 m of sight at the heart of a bank), so a flight THROUGH a
-//                  bank is a short white-out, not a sprite sliced in half.
+//                  density rises to 2.5x and takes 0.3 of the cloud's colour, ~100 m of sight at the heart of a bank), so a flight
+//                  THROUGH a bank is a short veil, not a sprite sliced in half - and the next ring never goes (it was 4x / 0.6, ~60 m:
+//                  the ring 110 m ahead sank to 4-8 % on two courses; owner 2026-10-14 "Soften it", halved).
 //   SKIM SPRAY     a low pass over water throws spray off the plane's track (over lava: sparks and embers). Rate follows closeness
 //                  to the surface and speed; none above SKIM_AGL.
 //   LAVA GLOW      over the caldera's lake the plane's belly lights orange (the world's underlight, scaled), a glow lies on the
@@ -86,10 +87,17 @@ export function insideCloud(dist: number, size: number): number {
   return 1 - smooth(size * 0.5 * 0.35, size * 0.5 * 1.0, dist);
 }
 
-/** Pure: the fog's density multiple and the share of the cloud tint in its colour, for a cloud depth 0..1 (a white-out at 1). */
+/**
+ * TUNED (owner 2026-10-14 "Soften it", w3-followups): the fog pulse at the heart of a cloud. Was +3 density (4x) and a 0.6 tint,
+ * ~60 m of half-sight, and the ring 110-125 m ahead sank to 4-8 % on the caldera / canyon / city. Halved: +1.5 (2.5x) and 0.3.
+ */
+export const CLOUD_FOG_GAIN = 1.5;
+export const CLOUD_FOG_TINT = 0.3;
+
+/** Pure: the fog's density multiple and the share of the cloud tint in its colour, for a cloud depth 0..1 (a veil at 1, the next ring still there). */
 export function fogPulse(inside01: number): { densityMul: number; tint: number } {
   const k = Math.max(0, Math.min(1, inside01));
-  return { densityMul: 1 + 3 * k, tint: 0.6 * k };
+  return { densityMul: 1 + CLOUD_FOG_GAIN * k, tint: CLOUD_FOG_TINT * k };
 }
 
 // ── pure: the skim ─────────────────────────────────────────────────────────────────────────────────────────────

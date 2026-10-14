@@ -111,12 +111,16 @@ describe('phoneTextureCap', () => {
     expect(src).toMatch(/\(\.\.\.args\) => this\._prepareWebGLTexture\(\.\.\.args, format\)/);
   });
 
-  it('the harness installs it once the tier is known, before anything loads', () => {
-    const h = readFileSync(join(__dirname, '../core/ModeHarness.ts'), 'utf8');
-    const tierAt = h.indexOf('const tier = detectRenderTier(');
+  // test changed (coordinator merge with #278): the look stack moved out of ModeHarness into core/lookStack.ts (mountLookStack,
+  // shared with the Nexus Studio viewport), so the install moved with it. Same intent: once the tier is known, before anything
+  // loads, and the harness reaches it through mountLookStack.
+  it('the look stack installs it once the tier is known, before anything loads (and the harness mounts the look stack)', () => {
+    const h = readFileSync(join(__dirname, '../core/lookStack.ts'), 'utf8');
+    const tierAt = h.indexOf('const tier: QualityTier =');
     const capAt = h.indexOf('installPhoneTextureCap(engine, tier);');
     expect(tierAt).toBeGreaterThan(0);
     expect(capAt).toBeGreaterThan(tierAt);
     expect(capAt).toBeLessThan(h.indexOf('mountLightRig('));
+    expect(readFileSync(join(__dirname, '../core/ModeHarness.ts'), 'utf8')).toContain('mountLookStack(');
   });
 });

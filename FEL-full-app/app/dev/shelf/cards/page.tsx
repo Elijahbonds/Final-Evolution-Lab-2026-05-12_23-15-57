@@ -1,3 +1,4 @@
+import { notFound } from 'next/navigation';
 import { TabPage } from '@/components/shell/tab-page';
 import { BoostShelf } from '@/components/cards/boost-shelf';
 import { gameVitals } from '@/lib/cards/boosts';
@@ -9,8 +10,12 @@ export const dynamic = 'force-dynamic';
  * A session-less view of the Profile tab's new half — the creator-card shelf and the PRQ header (the measured
  * number; CARD-SAFE-2: cards are cosmetic, so there is no separate in-game number). Same components the real page mounts. Buying from here will 401,
  * which is correct: this is for looking at, and the wallet does not care that you are a developer.
+ *
+ * Hard 404 outside `next dev`, like every other app/dev page. It was being served on the live site (bug sweep
+ * 2026-10-14) with a made-up "Elijah Bonds" profile and a PRQ of 64 that nobody earned.
  */
 export default function DevCardsPage() {
+  if (process.env.NODE_ENV !== 'development') notFound();
   const vitals = gameVitals(64, ['coach-v-elite', 'neural-max']);
   const grade = prqGrade(vitals.base);
   return (

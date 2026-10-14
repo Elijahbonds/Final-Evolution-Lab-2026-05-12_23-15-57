@@ -1,7 +1,7 @@
 // vis-foundation-2 A9.14 (routed from vis-combat) — the shared ground-decal pool.
 import { describe, expect, it } from 'vitest';
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { CARVE_TINT, DECAL_KINDS, DECAL_SIZE, decalAlpha, decalCap, decalLife, mountGroundDecals, mountSceneDecals, nextSlot } from './GroundDecals';
+import { CARVE_TINT, DECAL_KINDS, DECAL_SIZE, KEPT_MARK, decalAlpha, decalCap, decalLife, markAlpha, mountGroundDecals, mountSceneDecals, nextSlot, slotFor } from './GroundDecals';
 import { HELD_PROBE_MODE, holdProbeMode } from '../../../tests/helpers/heldMode';
 
 function rig(modeId = 'karate') {
@@ -25,6 +25,34 @@ describe('decal life', () => {
     expect(nextSlot(-1, 4)).toBe(0); expect(nextSlot(3, 4)).toBe(0);
     expect(decalCap('mobile')).toBeLessThan(decalCap('desktop'));
     expect(decalLife('mobile')).toBeLessThan(decalLife('high'));
+  });
+});
+
+describe('kept marks (NEXUS STUDIO: persist)', () => {
+  it('a kept mark is always full strength; any other mark ages exactly as before', () => {
+    expect(markAlpha(KEPT_MARK, 1e6, 8)).toBe(1);
+    expect(markAlpha(2, 10, 10)).toBe(decalAlpha(8, 10));
+    expect(markAlpha(-1e9, 0, 10)).toBe(0);   // an empty slot
+  });
+  it('the ring steps over kept slots; with none kept it is the old ring', () => {
+    const born = [0, KEPT_MARK, 0, 0];
+    expect(slotFor(0, 4, born, false)).toBe(2);   // slot 1 is kept
+    expect(slotFor(-1, 4, [0, 0, 0, 0], false)).toBe(nextSlot(-1, 4));
+    expect(slotFor(3, 4, [0, 0, 0, 0], true)).toBe(0);
+    const full = [KEPT_MARK, KEPT_MARK, KEPT_MARK];
+    expect(slotFor(1, 3, full, false)).toBe(-1);   // a transient mark has nowhere to go
+    expect(slotFor(1, 3, full, true)).toBe(2);     // a kept one takes the ring's next slot
+  });
+  it('in the pool: kept marks outlive many lives and survive a flood of transient marks', () => {
+    const { scene, frame } = rig();
+    const d = mountGroundDecals(scene, 'mobile');
+    d.stamp('scuff', 0, 0, 0, { persist: true });
+    d.stamp('scuff', 1, 0, 0, { persist: true });
+    for (let i = 0; i < decalCap('mobile') * 2; i++) d.stamp('scuff', 5, i * 0.1, 0);   // a mode's slides
+    expect(d.live('scuff')).toBe(decalCap('mobile'));
+    frame(Math.ceil(decalLife('mobile') * 60) * 3);
+    expect(d.live('scuff')).toBe(2);   // the transient ones faded; the two kept ones stay
+    d.dispose();
   });
 });
 

@@ -54,7 +54,7 @@ export interface GlossyFloorHandle { readonly mirror: MirrorTexture; readonly fl
 export function mountGlossyFloor(scene: Scene, tier: QualityTier, at: Vector3 | null, off = false): GlossyFloorHandle | null {
   const modeId = sceneModeId(scene);
   let kind: string | undefined;
-  try { kind = modeId ? readPlaceLook(modeId)?.ground?.kind : undefined; } catch { kind = undefined; }
+  try { kind = (scene.metadata as { felStudioGround?: string } | null)?.felStudioGround ?? (modeId ? readPlaceLook(modeId)?.ground?.kind : undefined); } catch { kind = undefined; }   // NEXUS STUDIO: a Studio venue names its floor (docs/NEXUS-STUDIO.md §8)
   if (!glossyFloorWanted(tier, modeId, kind, off)) return null;
   const floor = scene.getMeshByName((modeId && GLOSSY_FLOOR_MESH[modeId]) || 'venue_ground');
   const mat = floor?.material as PBRMaterial | null | undefined;
