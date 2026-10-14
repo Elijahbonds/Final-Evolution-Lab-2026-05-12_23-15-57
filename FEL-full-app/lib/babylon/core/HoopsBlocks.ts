@@ -94,12 +94,14 @@ export function selectBlock(i: BlockInput, gates: BlockGates): BlockType {
 /** §4 foul rates [TUNE]. */
 export const FOUL_BAD_ANGLE_DEG = 60, FOUL_BAD_ANGLE_PCT = 0.25;
 export const FOUL_HARD_GAP_PCT = 0.5, FOUL_STANDOFF_PCT = 0.15;
-export const FOUL_LATE_MS = 100, FOUL_LATE_PCT = 0.35;
-
-/** The window a contact is judged on for the late-press test. A contact the selector names no big block (it fell to
- *  'contest': too late or too early for every type) is judged on the swat's — the front block every contact can be. */
-function windowFor(type: BlockType): BlockWindow {
-  return type === 'contest' || type === 'goaltend' ? BLOCK_WINDOWS.swat : BLOCK_WINDOWS[type];
+/** LATE PRESS (PM reading, 2026-10-14): a press after the swat window closes but still during the shooter's release — inside
+ *  this margin past the swat window's end — that makes contact is a foul [TUNE]. */
+export const FOUL_LATE_MARGIN_MS = 100;
+export const FOUL_LATE_PCT = 0.35;
+/** The late-press foul: after the swat window closes (strictly), within FOUL_LATE_MARGIN_MS of it (edge inside). */
+export function latePress(tPressMs: number): boolean {
+  const end = BLOCK_WINDOWS.swat.t + BLOCK_WINDOWS.swat.half;
+  return tPressMs > end && tPressMs <= end + FOUL_LATE_MARGIN_MS;
 }
 
 /** The chance a CONTACT (the hand met the ball or the body; called on the contact frame only — a no-touch contest is
@@ -108,8 +110,7 @@ export function blockFoulChance(i: BlockInput, type: BlockType, gapM: number): n
   if (type === 'goaltend') return 0;   // the basket counts (§4)
   const angle = !i.behind && i.angleDeg > FOUL_BAD_ANGLE_DEG ? FOUL_BAD_ANGLE_PCT : 0;
   const body = gapM < BODY_HARD_GAP ? FOUL_HARD_GAP_PCT : gapM < BODY_STANDOFF ? FOUL_STANDOFF_PCT : 0;
-  const w = windowFor(type);
-  const late = i.tPressMs > w.t + w.half + FOUL_LATE_MS ? FOUL_LATE_PCT : 0;
+  const late = latePress(i.tPressMs) ? FOUL_LATE_PCT : 0;
   return Math.max(angle, body, late);
 }
 

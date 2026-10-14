@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { BODY_HARD_GAP, BODY_STANDOFF } from './BasketballCore';
 import {
-  BLOCK_WINDOWS, CATCH_METER_FULL_MS, FOUL_BAD_ANGLE_PCT, FOUL_HARD_GAP_PCT, FOUL_LATE_PCT, FOUL_STANDOFF_PCT, FRAME_MS, HOLD_MS,
+  BLOCK_WINDOWS, CATCH_METER_FULL_MS, FOUL_BAD_ANGLE_PCT, FOUL_HARD_GAP_PCT, FOUL_LATE_MARGIN_MS, FOUL_LATE_PCT, latePress, FOUL_STANDOFF_PCT, FRAME_MS, HOLD_MS,
   STARTER_GATES, blockFoul, blockFoulChance, catchMeter, inWindow, selectBlock, windowFrames, windowWidth, type BlockGates, type BlockInput,
 } from './HoopsBlocks';
 
@@ -115,11 +115,21 @@ describe('K-BLK5: fouls', () => {
     expect(Math.abs(rate(front(), BODY_HARD_GAP - 0.01) - FOUL_HARD_GAP_PCT)).toBeLessThanOrEqual(0.03);
     expect(Math.abs(rate(front(), BODY_STANDOFF - 0.01) - FOUL_STANDOFF_PCT)).toBeLessThanOrEqual(0.03);
   });
-  it('a late press (past the window end + 100 ms) still making contact: 35 % ± 3', () => {
-    expect(Math.abs(rate(front({ tPressMs: 101 }), 1.2) - FOUL_LATE_PCT)).toBeLessThanOrEqual(0.03);
+  it('LATE PRESS (PM reading): after the swat window closes but during the release, making contact: 35 % ± 3', () => {
+    expect(Math.abs(rate(front({ tPressMs: 50 }), 1.2) - FOUL_LATE_PCT)).toBeLessThanOrEqual(0.03);
+  });
+  it('the late margin is one [TUNE] constant: strictly after the swat window, edge FOUL_LATE_MARGIN_MS inside, past it no late foul', () => {
+    const end = BLOCK_WINDOWS.swat.t + BLOCK_WINDOWS.swat.half;
+    expect(FOUL_LATE_MARGIN_MS).toBe(100);
+    expect(latePress(end)).toBe(false);
+    expect(latePress(end + 1)).toBe(true);
+    expect(latePress(end + FOUL_LATE_MARGIN_MS)).toBe(true);
+    expect(latePress(end + FOUL_LATE_MARGIN_MS + 1)).toBe(false);
+    expect(rate(front({ tPressMs: end + FOUL_LATE_MARGIN_MS + 1 }), 1.2)).toBe(0);
+    expect(rate(front({ tPressMs: end }), 1.2)).toBe(0);
   });
   it('the highest cause is used, not the sum', () => {
-    expect(blockFoulChance(front({ angleDeg: 61, tPressMs: 101 }), 'contest', 0.8)).toBe(FOUL_HARD_GAP_PCT);
+    expect(blockFoulChance(front({ angleDeg: 61, tPressMs: 50 }), 'contest', 0.8)).toBe(FOUL_HARD_GAP_PCT);
   });
   it('a clean front press at 1.10 m: never a foul; a goaltend is never a foul', () => {
     expect(rate(front(), BODY_STANDOFF)).toBe(0);
