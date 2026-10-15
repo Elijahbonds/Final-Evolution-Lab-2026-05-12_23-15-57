@@ -625,6 +625,9 @@ export class DefenderBrain implements AIBehavior {
    *  brain through it, the same way the depth pass takes its rng. Measured before: LUCK=0.99 and the poke still stripped
    *  the lab's handler 4.5 s into every possession, because this class rolled Math.random on its own. */
   constructor(private aggression = 0.6, private markIndex: number | null = null, private rng: () => number = Math.random) {}
+  /** NB-1: the OPPONENT pick read again at TAP TO START (the brain is built at load, before the pick). */
+  setAggression(a: number): void { this.aggression = a; }
+  get aggressionNow(): number { return this.aggression; }
   /** Re-mark this defender (the scram switch, lib/babylon/core/Matchups.ts). */
   setMark(index: number | null): void { this.markIndex = index; }
   get mark(): number | null { return this.markIndex; }

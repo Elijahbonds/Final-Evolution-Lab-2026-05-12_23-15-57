@@ -9,7 +9,9 @@
 //   slam(at)              a ground shockwave ring, a crack decal that fades, debris chunks, dust
 //   puff(at)              a soft smoke puff (a blink-in, a landing, a ring-out)
 //   blink(from, to)       an afterimage trail: ghosts along the path and a puff at each end (Naruto-Storm's body flicker)
-//   aura(key, root, 0..1) a column of energy round a fighter, a light pool at the feet, rising motes — the chi / chakra meter
+//   aura(key, root, 0..1) a column of energy round a fighter, a light pool at the feet, rising motes — the chi / chakra meter,
+//                         and (w3-atmos) a lit edge on the fighter's own contour (visual/ChiRim: the ink hull, recoloured HDR)
+//   edge(root, colour?)   a one-shot lit edge that blazes and settles on a body (an agent materialising)
 //
 // What it is NOT: it does not time anything, hit-stop anything or change a number. It consumes the shared particle budget
 // (visual/ParticleBudget) and the tier the harness recorded on the scene; the sprites are procedural (fxPaint.ts).
@@ -18,6 +20,7 @@
 import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, ShadowGenerator } from '@babylonjs/core';
 import { fitBurst, liveParticles, particleBudget, particleBudgetScale } from '../visual/ParticleBudget';
+import { mountChiRim } from '../visual/ChiRim';   // w3-atmos: the glow edge on the fighter's own contour
 import { paintAuraColumn, paintCrack, paintDot, paintLightPool, paintRing, paintSmoke, paintStar, type Ctx } from './fxPaint';
 
 export type HitKind = 'light' | 'medium' | 'heavy' | 'special' | 'parry' | 'guard' | 'break';
@@ -112,6 +115,8 @@ export interface CombatFx {
   blink(from: Vector3, to: Vector3, tint?: string): void;
   /** The aura round a fighter. `level` 0..1 (0 = off); call every frame or on change, it only does work when it changes. */
   aura(key: string, root: TransformNode, level: number, color?: string): void;
+  /** w3-atmos: a one-shot lit edge on `root`'s skinned body that blazes and settles over `life` s (default 0.8): an agent arriving. */
+  edge(root: TransformNode, color?: string, life?: number): void;
   /** Turn every aura off (a round's end, a KO). */
   clearAuras(): void;
   tick(dt: number): void;
@@ -204,6 +209,8 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
   const owned: { dispose(): void }[] = [];
   const own = <T extends { dispose(): void }>(x: T): T => { owned.push(x); return x; };
 
+  const rim = mountChiRim(scene, { tier });   // w3-atmos: the aura's edge on the fighter's own contour (no draws: the ink hull recoloured)
+  owned.push(rim);
   const star = starTex(scene), ring = ringTex(scene), dot = dotTex(scene), smoke = smokeTex(scene);
 
   // ── pooled particle systems: built and warmed now ──
@@ -418,6 +425,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     },
 
     aura(key, root, level, color) {
+      rim.set(key, root, level, color);
       let a = auras.get(key);
       if (!a) { if (level < 0.04) return; a = mkAura(key, root); auras.set(key, a); }   // (a key the modes do not use is built on demand)
       if (a.root !== root) { a.root = root; a.col.parent = root; a.pool.parent = root; }
@@ -425,9 +433,12 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       if (color && color !== a.hex) applyAuraColour(a, color);
     },
 
-    clearAuras() { for (const a of auras.values()) a.target = 0; },
+    edge(root, color, life) { rim.flash(root, color, life); },
+
+    clearAuras() { rim.clear(); for (const a of auras.values()) a.target = 0; },
 
     tick(dt) {
+      rim.tick(dt);
       for (const g of groundRings) {
         if (!g.mesh.isEnabled()) continue;
         g.t += dt; const u = Math.min(1, g.t / g.life), e = 1 - (1 - u) * (1 - u);

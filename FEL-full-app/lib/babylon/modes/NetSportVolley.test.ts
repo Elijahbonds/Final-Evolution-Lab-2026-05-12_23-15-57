@@ -10,11 +10,14 @@ describe('NetSportMode wiring (source scan, comments stripped)', () => {
   const net = stripComments(fs.readFileSync(path.resolve(__dirname, 'NetSportMode.ts'), 'utf8'));
   const update = net.slice(net.indexOf('update(ctx: ModeContext, dt: number)'));
 
-  it('#8: the crowd steps BEFORE the rest pause returns, so the cheer\'s hop plays', () => {
-    const crowdStep = update.indexOf('crowd?.update(dt)');
-    const restReturn = update.indexOf('if (restSec > 0)');
-    expect(crowdStep).toBeGreaterThan(-1);
-    expect(crowdStep).toBeLessThan(restReturn);
+  // test changed (w3-crowds, 2026-10-14): #8 pinned `crowd?.update(dt)` ahead of the rest pause's return, because the
+  // Onlookers only moved when the mode stepped them and the rest skipped the step, so the cheer's hop never played. The
+  // Onlookers are replaced by the stands (visual/crowd), which run on their own clock off the scene's render: a cheer plays
+  // through any rest by construction. What #8 protected — the cheer is seen after the point — is asserted on that design.
+  it('#8: the stands are mounted and never stepped by the mode — the cheer plays through the rest pause', () => {
+    expect(net).toMatch(/crowd = mountModeCrowd\(ctx, VOLLEY \? 'volleyball' : 'tennis'\)/);
+    expect(update).not.toMatch(/crowd\?\.update\(/);
+    expect(net).not.toMatch(/new Onlookers\(/);
   });
 
   it('#12: the rally cap replays the point instead of awarding it', () => {

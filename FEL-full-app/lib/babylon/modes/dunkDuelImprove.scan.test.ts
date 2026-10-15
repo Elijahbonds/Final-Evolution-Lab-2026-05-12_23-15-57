@@ -46,7 +46,7 @@ describe('the make, replayed and judged on stage (#6 #12)', () => {
     const m = fn('makeShow');
     expect(m.indexOf('cutting = true')).toBeLessThan(m.indexOf('rec.playCuts('));
     expect(m).toMatch(/paused,\n/);
-    expect(m).toMatch(/pausableDelay\(tripleCutSec\(\) \* 1000 \+ 1200, paused\)/);
+    expect(m).toMatch(/pausableDelay\(cutsSec\(cuts\) \* 1000 \+ 1200, paused\)/);
     const skip = DUEL.indexOf("if (cutting && e.t === 'button' && e.pressed && (e.btn === 'A' || e.btn === 'B')) { replay?.stop();");
     expect(skip).toBeGreaterThan(0);
     expect(skip).toBeLessThan(DUEL.indexOf("if (phase === 'handoff' && e.t === 'button' && e.pressed) {"));

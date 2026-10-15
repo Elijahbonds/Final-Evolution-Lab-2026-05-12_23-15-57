@@ -1,0 +1,60 @@
+{
+ "_about": "DANCE CLIPS (MUSIC-SUITE P9, 2026-09-29, owner decision #17: \"breaking + popping — breaking from captures on disk; popping/locking/moonwalk searched in CMU/UAL first; Mixamo files listed for the owner if missing\"). CMU subjects 85 (jumps; flips; breakdance) and 90 (cartwheels; acrobatics; dances) were already on disk (approved 2026-09-15); 120_21 (Robot, subject 120 'Various Style Walks') was extracted from cmuconvert-daz-113-128.zip, already on disk. UAL2 [Standard] has no dance take at all (43 animations: sword, farm, zombie, ninja — listed with scripts/mocap/sources.mts listGlbAnimations). Windows chosen off take-events.mts, take-timeline.mts and stream-sheet.mts contact sheets. TRUE FPS: 85 and 90 measure 120 (fps-check.mts: 33:1 and 44:12 flight votes); 120 has no flight, so its rate was read off a walk's cadence instead (120_19 'walk slow' steps at 53/min read at 120 against 90_22's 83/min on the same counter; at 60 it would be 26/min, which no walk is) — 120. Every clip is REAL TIME (no duration: the retarget keeps the window's own length) and carries a ROOT TRACK. danceClips.ts decides how each one fills a beat-timed step (CAPTURE_PLAN): a groove (a closed cycle looped on the beat) or a floor move (dropped into from standing and back up). `dance` = the dance step id the capture dances.",
+ "clips": [
+  {
+   "name": "dnc_toprock",
+   "dance": "dance_toprock_kick",
+   "source": "cmu",
+   "file": "cmu/85/85_14.bvh",
+   "from": 1.1,
+   "to": 2.2,
+   "rootTrack": true,
+   "note": "BreakSequencewithFlips, the upright opening before the drop: stepping on bent knees with the arms up and working (hips 0.77–0.83 m, feet lifting 0.3–0.6 m, hands 1.1–1.4 m). Closed cycle 0.76 s (err 1.02 — the shipped six-step's is 1.04). On the rig: knees driving up in turn, the arms folded across the chest",
+   "label": "KICK STEP"
+  },
+  {
+   "name": "dnc_freeze_side",
+   "dance": "dance_freeze_side",
+   "source": "cmu",
+   "file": "cmu/85/85_10.bvh",
+   "from": 1.95,
+   "to": 3.35,
+   "rootTrack": true,
+   "note": "EndofBreakDance, the held freeze after the opening inverted spin: the body rolled 82° onto its side and tipped 111–114° off upright, hips 0.47–0.48 m, both feet up at 0.9 m, held 1.4 s",
+   "label": "SIDE FREEZE"
+  },
+  {
+   "name": "dnc_headstand",
+   "dance": "dance_power_headstand",
+   "source": "cmu",
+   "file": "cmu/85/85_10.bvh",
+   "from": 0.35,
+   "to": 1.5,
+   "rootTrack": true,
+   "note": "EndofBreakDance, the opening: inverted (165–176° off upright), hips 1.08–1.38 m up, both hands past the head, turning 421° in 1.6 s. On the hero's rig it lands as a HEADSTAND spin (head on the floor, hands beside it — _music-p9-moves.mts frames), so it is named for what the player sees",
+   "label": "HEADSTAND SPIN"
+  },
+  {
+   "name": "dnc_moonwalk",
+   "dance": "dance_pop_moonwalk",
+   "source": "cmu",
+   "file": "cmu/90/90_32.bvh",
+   "from": 4.9,
+   "to": 6.0,
+   "rootTrack": true,
+   "note": "moonwalk: the feet slide back in turn (0.19–0.30 m) while the hips hold at 0.85 m; closed cycle 0.90 s (err 0.27, the closest seam of any dance capture)",
+   "label": "MOONWALK"
+  },
+  {
+   "name": "dnc_robot",
+   "dance": "dance_pop_robot",
+   "source": "cmu",
+   "file": "cmu/120/120_21.bvh",
+   "from": 9.2,
+   "to": 11.2,
+   "rootTrack": true,
+   "note": "Robot: elbows locked at right angles, forearms level (hands 1.1–1.25 m), stiff stepping and set turns; closed cycle 1.55 s (err 0.53)",
+   "label": "ROBOT"
+  }
+ ]
+}
