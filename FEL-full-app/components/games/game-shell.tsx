@@ -206,7 +206,11 @@ function GameShellInner({
   const serverRun = useRef<Promise<string | null> | null>(null);
   const startServerRun = useCallback((): Promise<string | null> => {
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      mode, ...(playtestRun ? { playtest: true } : {}),
+      // TIER-SERVER: the head-to-head this run is for, so the server records its tier (PRO) at the start
+      ...(arenaMatchId ? { arenaMatchId } : {}), ...(mpCode ? { mp: mpCode } : {}), ...(challengeCode ? { c: challengeCode } : {}),
+    }) })
       .then((r) => (r?.ok ? r.json() : null))
       .then((j) => {
         if (j && typeof j.runId === 'string') {
@@ -222,7 +226,7 @@ function GameShellInner({
         import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
         return null;
       });
-  }, [mode, agentRun, playtestRun]);
+  }, [mode, agentRun, playtestRun, arenaMatchId, mpCode, challengeCode]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);

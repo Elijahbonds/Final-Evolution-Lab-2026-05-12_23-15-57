@@ -75,7 +75,7 @@ const submit = (matchId: string) => POST(new Request('http://fel.local/api/arena
 
 beforeEach(() => {
   h.matches = [duel('m1'), duel('m2')]; h.events = []; h.locks = new Map(); h.lockOn = true; h.payouts = [];
-  h.runs = { r1: { id: 'r1', userId: 'u1', mode: 'hoops1v1', status: 'paid', score: 11, startedAt: new Date('2026-09-02') } };
+  h.runs = { r1: { id: 'r1', userId: 'u1', mode: 'hoops1v1', result: { tier: 'pro', staked: true }, status: 'paid', score: 11, startedAt: new Date('2026-09-02') } };
 });
 
 describe('one run, two duels, the same instant', () => {

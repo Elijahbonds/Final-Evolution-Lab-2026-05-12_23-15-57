@@ -7,6 +7,7 @@ import { isCatalogueMode } from '@/lib/session-payout';
 import { decideRunEligibility, isAgentRunRequest } from '@/lib/sessions/runEligibility';
 import { ruleFor } from '@/lib/sessions/modeScoreRules';
 import { startRun } from '@/lib/sessions/sessionRuns';
+import { serverTierFor } from '@/lib/sessions/runTier';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,11 +44,13 @@ export async function POST(req: Request) {
     if (eligibility.payoutEligible && !ruleFor(mode)) {
       eligibility = { payoutEligible: false, reason: 'NO_RULES' as const };
     }
-    const run = await startRun(prisma, { userId, mode, eligibility, agentRun });
+    // TIER-SERVER: the tier is the server's — PRO on any head-to-head start, the client's pick never read there
+    const tier = serverTierFor(body);
+    const run = await startRun(prisma, { userId, mode, eligibility, agentRun, tier });
     if (!run.payoutEligible) {
       await recordServerEvent({ name: 'session_run_unpaid', userId, props: { mode: run.modeSlug, reason: run.reason ?? '' } });
     }
-    return NextResponse.json({ ok: true, ...run });
+    return NextResponse.json({ ok: true, ...run, tier: tier.tier });
   } catch (e) {
     console.error('session start error', e);
     return NextResponse.json({ error: 'Failed to start run' }, { status: 500 });

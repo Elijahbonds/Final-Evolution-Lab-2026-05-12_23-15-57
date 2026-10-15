@@ -212,7 +212,7 @@ let seq = 0;
 /** ARENA-SETTLE-SERVER: a run the server finished for `userId` in the duel's mode, a minute after the duel opened; its runId. */
 function ran(d: Row, userId: string, score: number): string {
   const id = `run-${d.id}-${userId}`;
-  h.store.runs[id] = { id, userId, mode: d.mode, status: 'paid', score, startedAt: new Date(new Date(d.createdAt).getTime() + 60_000) };
+  h.store.runs[id] = { id, userId, mode: d.mode, result: { tier: 'pro', staked: true }, status: 'paid', score, startedAt: new Date(new Date(d.createdAt).getTime() + 60_000) };
   return id;
 }
 

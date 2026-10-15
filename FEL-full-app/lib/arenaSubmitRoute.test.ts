@@ -71,7 +71,7 @@ const arenaMatch = (over: Record<string, unknown> = {}) => ({
 
 /** ARENA-SETTLE-SERVER: a finished server run of the caller's, in the duel's mode, started after the duel opened. */
 const finishedRun = (over: Record<string, unknown> = {}) => ({
-  id: 'r1', userId: 'u1', mode: String(h.match?.mode ?? 'hoops1v1'), status: 'paid', score: 0,
+  id: 'r1', userId: 'u1', mode: String(h.match?.mode ?? 'hoops1v1'), result: { tier: 'pro', staked: true }, status: 'paid', score: 0,
   startedAt: new Date(new Date(String(h.match?.createdAt ?? '2026-09-01')).getTime() + 60_000), ...over,
 });
 
