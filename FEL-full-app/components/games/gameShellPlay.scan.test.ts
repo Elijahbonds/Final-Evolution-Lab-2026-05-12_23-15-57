@@ -85,8 +85,9 @@ describe('the music session request: the fields the server reads (session-payout
     const route = read('app/api/sessions/route.ts');
     const tx = route.slice(route.indexOf('prisma.$transaction'));
     expect(tx).toMatch(/if \(won\) \{\s*const w = await sessionWalletGrant\(tx, \{ playerId: userId, reasonCode: REASON\.MODE_SESSION_WON/);
-    // the server's verdict (sessionWon); a floor-only mode (Prove It, owner decision 2026-09-28) never wins
-    expect(route).toContain('const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score });');
+    // the server's verdict (sessionWon); a floor-only mode (Prove It, owner decision 2026-09-28) never wins; WIN-SERVER: the
+    // opponent's score goes with it, so a head-to-head hoops game is judged on the board
+    expect(route).toContain('const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score, opponentScore });');
     // the route answers with its own verdict under that name
     expect(tx).toMatch(/const payload: Record<string, unknown> = \{\s*ok: true,\s*paid: true,\s*replayed: false,\s*runId: run\.id,\s*sessionId:[^\n]*\n\s*won,/);
   });

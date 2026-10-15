@@ -69,8 +69,9 @@
  * the route (route.ts:135-146, moved to streakStep() below unchanged for every play session).
  */
 
+import { gameWinner, winRule } from '@/lib/babylon/modes/onevoneRules';
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
-import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax } from '@/lib/arena-score-integrity';
+import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax, MIRRORED } from '@/lib/arena-score-integrity';
 import { performSetMax } from '@/lib/babylon/music/performSet';
 
 /**
@@ -341,9 +342,13 @@ export function readDanceAccuracy(stats: RoomStats | null): number | null {
  */
 export function sessionWon(
   mode: string, claimedWon: boolean, stats: RoomStats | null, durationSec: number,
-  opts: { score?: number; statsForwarded?: boolean } = {},
+  opts: { score?: number; statsForwarded?: boolean; opponentScore?: number } = {},
 ): boolean {
   if (!isCatalogueMode(mode)) return false;                  // P2 FIX PASS (D): no rules to win by
+  // WIN-SERVER (QA top-5 #2, 2026-10-15): a head-to-head hoops game is won on the board, not on the client's word. The
+  // route sends the score and the opponent's score it stores; the claim must agree with the rules (the less-paying answer).
+  const judged = judgeHeadToHead(canonicalModeKey(mode), opts.score, opts.opponentScore);
+  if (judged !== null) return claimedWon && judged;
   if (canonicalModeKey(mode) === 'music') {
     // P2 FIX PASS (A): a client that predates the contract sent no stats at all — its room applied the rule itself, and
     // a won set always scored (a hit is at least 50 points)
@@ -351,6 +356,24 @@ export function sessionWon(
     return claimedWon && musicSetWon(readMusicSet(stats, durationSec));
   }
   return claimedWon;
+}
+
+/**
+ * WIN-SERVER: the server's own result of a head-to-head hoops game, or null for a mode it does not judge here.
+ *  · hoops1v1: first to 11 (lib/babylon/modes/onevoneRules.ts gameWinner), or the win-by-2 option (cap 15); a won game is
+ *    one either rule ends in this player's favour. 3–11 is not a win under any of them.
+ *  · hoops3v3: the game ends at 21 or on the buzzer, so the winner is whoever has more; a tie is not a win.
+ * A score missing from the call (a caller that is not the finish route) leaves the old answer to the caller.
+ */
+export const SERVER_JUDGED_WIN_MODES: readonly string[] = ['hoops1v1', 'hoops3v3'];
+export function judgeHeadToHead(modeKey: string, score: number | undefined, opponentScore: number | undefined): boolean | null {
+  if (!SERVER_JUDGED_WIN_MODES.includes(modeKey)) return null;
+  if (!Number.isFinite(score) || !Number.isFinite(opponentScore)) return null;
+  const me = Number(score), foe = Number(opponentScore);
+  if (modeKey === 'hoops1v1') {
+    return gameWinner(me, foe, winRule(MIRRORED.onevoneTarget, false)) === 'me' || gameWinner(me, foe, winRule(MIRRORED.onevoneTarget, true)) === 'me';
+  }
+  return me > foe;
 }
 
 /** The accuracy (0..1) PRQ scales dance and music by (lib/prq.ts), or null when the room sent no counts to read it from. */
