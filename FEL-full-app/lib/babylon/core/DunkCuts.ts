@@ -8,7 +8,7 @@
 // The pure half: which cameras, how long, what the announcer says, which celebration the dunker throws. The mode plays it
 // (DunkReplayCam.playCuts replays the RECORDED POSE, not a re-fly of the clips — the flush as it actually happened, three times).
 
-export type CutId = 'baseline' | 'profile' | 'phone';
+export type CutId = 'baseline' | 'profile' | 'phone' | 'orbit';
 export interface CutSpec {
   id: CutId;
   /** Seconds of the recording before the iron contact, and after it. */
@@ -25,6 +25,17 @@ export const TRIPLE_CUT: readonly CutSpec[] = [
   { id: 'profile', lead: 0.45, tail: 0.1, speed: 0.8, label: 'ON THE IRON' },
   { id: 'phone', lead: 0.4, tail: 0.15, speed: 0.75, label: 'FROM THE STANDS' },
 ];
+/**
+ * THE FOURTH ANGLE (lane/w3-present, wave 3): an ORBIT round the rim — the same flush once more, the camera sweeping from the side of the
+ * approach round beyond the rim, so the last look is the dunker coming through the iron at the lens. It is camera TRAVEL, so it is the one
+ * cut reduced motion drops (`showCuts(false)`). Slower than the rest (0.65) and short (1.0 s): the contest's triple cut is tuned, this is added after it.
+ */
+export const ORBIT_CUT: CutSpec = { id: 'orbit', lead: 0.4, tail: 0.25, speed: 0.65, label: 'AROUND THE RIM' };
+/** The cuts the made dunk plays: the tuned triple, then the orbit (travel allowed) — or the triple alone (reduced motion). */
+export const showCuts = (travel = true): readonly CutSpec[] => (travel ? [...TRIPLE_CUT, ORBIT_CUT] : TRIPLE_CUT);
+export const cutsSec = (cuts: readonly CutSpec[]): number => cuts.reduce((s, c) => s + cutSec(c), 0);
+/** How far the orbit sweeps, radians, and its radius (m) round the rim. */
+export const ORBIT = { sweepRad: 2.55, radius: 3.4 } as const;
 /** The poster freeze on the contact frame at the end of a big one. */
 export const POSTER_SEC = 0.9;
 export const cutSec = (c: CutSpec): number => (c.lead + c.tail) / c.speed;
@@ -36,7 +47,7 @@ export interface CutCam { pos: P3; target: P3; fov: number; shake: number }
  * Where each camera sits, from the rim and the way the dunker came at it (`approach`: his horizontal direction of travel, toward
  * the rim). `side` is the approach turned a quarter to the right.
  */
-export function cutCamera(id: CutId | 'poster', rim: P3, body: P3, approach: { x: number; z: number }): CutCam {
+export function cutCamera(id: CutId | 'poster', rim: P3, body: P3, approach: { x: number; z: number }, progress = 0): CutCam {
   const n = Math.hypot(approach.x, approach.z) || 1, ax = approach.x / n, az = approach.z / n;
   const sx = -az, sz = ax;   // the approach's right
   const at = (s: number, up: number, along: number): P3 => ({ x: rim.x + sx * s + ax * along, y: rim.y + up, z: rim.z + sz * s + az * along });
@@ -46,6 +57,12 @@ export function cutCamera(id: CutId | 'poster', rim: P3, body: P3, approach: { x
     case 'baseline': return { pos: at(1.6, -2.35, 0.9), target: mid(chest, rim, 0.45), fov: 0.95, shake: 0 };        // under the rim, looking up at him
     case 'profile': return { pos: at(3.6, -0.1, -0.3), target: mid(chest, rim, 0.6), fov: 0.72, shake: 0 };           // level with the iron, side on
     case 'phone': return { pos: at(-2.6, -1.1, -4.2), target: mid(chest, rim, 0.5), fov: 0.62, shake: 0.012 };        // a phone up in the stands behind him
+    case 'orbit': {
+      // round the rim: from the approach's right side (the profile's side), sweeping ahead of the rim and on round, rising a little
+      const k = Math.max(0, Math.min(1, progress)), th = ORBIT.sweepRad * (k * k * (3 - 2 * k));
+      const c = Math.cos(th), sn = Math.sin(th);
+      return { pos: { x: rim.x + (sx * c + ax * sn) * ORBIT.radius, y: rim.y - 0.3 + 0.9 * k, z: rim.z + (sz * c + az * sn) * ORBIT.radius }, target: mid(chest, rim, 0.5), fov: 0.7, shake: 0 };
+    }
     case 'poster': return { pos: at(1.3, -2.6, 0.6), target: chest, fov: 1.0, shake: 0 };                              // the poster: low and wide, under him
   }
 }

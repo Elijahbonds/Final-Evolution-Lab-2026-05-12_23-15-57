@@ -44,4 +44,36 @@ export function readWeather(modeId?: string): WeatherPick {
     return v && VALID.has(v) ? (v as WeatherPick) : 'natural';
   } catch { return 'natural'; }
 }
+/**
+ * w3-atmos: the precipitation / fog a mode with NO weather chip honours, from the URL alone (`?weather=rain|storm|fog`): never the
+ * saved pick (that is the golf / tennis / football / penalty chip's, and a Rain chosen there must not rain on a kart race the
+ * player did not pick it for), and never a time of day. Null = the mode's own sky.
+ */
+export function readWeatherUrl(): 'rain' | 'storm' | 'fog' | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const q = new URLSearchParams(window.location.search).get('weather');
+    return q === 'rain' || q === 'storm' || q === 'fog' ? q : null;
+  } catch { return null; }
+}
+
+// ── the kart's RAIN chip (w3-followups, owner 2026-10-14 "Add a Rain chip") ──────────────────────────────────────────────────────
+export const KART_RAIN_KEY = 'fel-kart-rain';
+/** The Velocity Kart start screen's saved Rain on/off, per device. Its own key, never `fel-weather` (a Rain chosen on the golf chip must not rain on a kart race). */
+export function readKartRainSaved(): boolean {
+  try { return typeof window !== 'undefined' && window.localStorage.getItem(KART_RAIN_KEY) === '1'; } catch { return false; }
+}
+export function writeKartRain(on: boolean): void { try { window.localStorage.setItem(KART_RAIN_KEY, on ? '1' : '0'); } catch { /* convenience only */ } }
+/**
+ * What the kart dresses its sky in: `?weather=rain|storm|fog` on the URL wins (any other `?weather=` value is the sky as authored: a
+ * link is explicit), then the saved Rain chip, else null (the course's own sky). Looks only: nothing here reaches handling, grip,
+ * speed or the field (racing/kartRain.test holds the physics' imports and the mode's uses of it).
+ */
+export function readKartWeather(): 'rain' | 'storm' | 'fog' | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    if (new URLSearchParams(window.location.search).has('weather')) return readWeatherUrl();
+    return readKartRainSaved() ? 'rain' : null;
+  } catch { return null; }
+}
 export function writeWeather(pick: WeatherPick): void { try { window.localStorage.setItem(WEATHER_KEY, pick); } catch { /* convenience only */ } }

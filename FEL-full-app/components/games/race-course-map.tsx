@@ -5,6 +5,7 @@
 // hosts draw them. The mode sends the strings (aeroAcesRules.mapPath / mapDots / toMap); this only draws them.
 
 import type { HudValue } from '@/lib/babylon';
+import { HudPlate, HudText, hudColor } from './tv-hud';   // WAVE 3 (lane/w3-present): on the TV HUD system — the plate, the display face, the one palette
 
 type Hud = Record<string, HudValue>;
 
@@ -29,19 +30,19 @@ export function RaceCourseMap({ hud, className = 'left-3 top-[5.5rem]' }: { hud:
   const me = typeof hud.mapMe === 'string' ? hud.mapMe.split(',').map(Number) : null;
   const ring = mapDotsOf(hud.mapRing)[0];
   return (
-    <div className={`pointer-events-none absolute ${className} fel-panel rounded-lg p-1`} aria-hidden>
-      <svg viewBox="0 0 100 100" className="h-20 w-20 sm:h-28 sm:w-28">
-        <path d={hud.mapPath} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={3.2} strokeLinejoin="round" />
+    <HudPlate className={`pointer-events-none absolute ${className} p-1`} data-hud="course-map">
+      <svg viewBox="0 0 100 100" className="h-20 w-20 sm:h-28 sm:w-28" aria-hidden>
+        <path d={hud.mapPath} fill="none" stroke={hudColor('text', 0.35)} strokeWidth={3.2} strokeLinejoin="round" />
         {typeof hud.mapCut === 'string' && hud.mapCut
-          ? <path d={hud.mapCut} fill="none" stroke="#fcd34d" strokeOpacity={0.75} strokeWidth={1.6} strokeDasharray="2.4 2" strokeLinecap="round" />
+          ? <path d={hud.mapCut} fill="none" stroke={hudColor('score')} strokeOpacity={0.75} strokeWidth={1.6} strokeDasharray="2.4 2" strokeLinecap="round" />
           : null}
-        {mapDotsOf(hud.mapField).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.2} fill="#94a3b8" />)}
-        {ring ? <circle cx={ring[0]} cy={ring[1]} r={3.2} fill="none" stroke="#7dd3fc" strokeWidth={1.4} /> : null}
+        {mapDotsOf(hud.mapField).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.2} fill={hudColor('info', 0.8)} />)}
+        {ring ? <circle cx={ring[0]} cy={ring[1]} r={3.2} fill="none" stroke={hudColor('you')} strokeWidth={1.4} /> : null}
         {me && me.length === 3 && me.every(Number.isFinite)
-          ? <path d="M0,-5 L3.6,4 L0,2.2 L-3.6,4 Z" fill="#ffd166" stroke="#1f2937" strokeWidth={0.8} transform={`translate(${me[0]} ${me[1]}) rotate(${me[2]})`} />
+          ? <path d="M0,-5 L3.6,4 L0,2.2 L-3.6,4 Z" fill={hudColor('score')} stroke={hudColor('ink')} strokeWidth={0.8} transform={`translate(${me[0]} ${me[1]}) rotate(${me[2]})`} />
           : null}
       </svg>
-    </div>
+    </HudPlate>
   );
 }
 
@@ -51,9 +52,9 @@ export function ThreatWarning({ words, side, now, action }: { words: HudValue | 
   if (typeof words !== 'string' || !words) return null;
   return (
     <div className={`pointer-events-none absolute flex ${THREAT_POS[String(side)] ?? THREAT_POS.BEHIND}`}>
-      <span className={`fel-panel px-3 py-1 font-mono text-sm font-bold ${now ? 'animate-pulse text-[#86efac]' : 'text-[#ff4b4b]'}`}>
-        {THREAT_ARROW[String(side)] ?? '▼'} {words}{now ? ` — ${action}` : ''}
-      </span>
+      <HudPlate as="span" className={`px-3 py-1 ${now ? 'animate-pulse motion-reduce:animate-none' : ''}`}>
+        <HudText size="value" tone={now ? 'good' : 'danger'} style={{ fontWeight: 800 }}>{THREAT_ARROW[String(side)] ?? '▼'} {words}{now ? ` — ${action}` : ''}</HudText>
+      </HudPlate>
     </div>
   );
 }

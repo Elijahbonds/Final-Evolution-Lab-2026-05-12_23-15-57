@@ -121,6 +121,9 @@ export interface LedWallOptions {
 
 export interface LedWallHandle {
   mesh: Mesh;
+  /** lane/dance-extras (2026-10-14): a word the wall holds in place of the name card / song title while it is set — the FREESTYLE
+   *  section's cue (DanceMode). null puts the card back. Visual only: it changes what is painted, nothing the room reads. */
+  setOverride(text: string | null): void;
   /** Repaint if the frame's key moved. Returns whether it repainted (tests, cost accounting). */
   update(s: LedState): boolean;
   setTrack(track: string): void;
@@ -146,6 +149,7 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
   mat.roughness = 1; mat.metallic = 0;
   mesh.material = mat;
   let track = o.track;
+  let override: string | null = null;
   let lastKey = '';
   const font = (px: number): string => `900 ${px}px "Arial Black", Impact, system-ui, sans-serif`;
 
@@ -165,8 +169,8 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
         g.fillRect(c * cell + 1, r * cell + 1, cell - 2, cell - 2);
       }
     }
-    if (kind === 'name' || flare > 0.35) {
-      const text = kind === 'name' ? ledCardText(s.barIndex, track, o.player ?? '') : track;
+    if (kind === 'name' || flare > 0.35 || override !== null) {
+      const text = override ?? (kind === 'name' ? ledCardText(s.barIndex, track, o.player ?? '') : track);
       g.textAlign = 'center'; g.textBaseline = 'middle';
       let px = Math.round(H * 0.62);
       g.font = font(px);
@@ -182,13 +186,14 @@ export function mountLedWall(scene: Scene, o: LedWallOptions): LedWallHandle {
   return {
     mesh,
     update(s) {
-      const key = ledFrameKey(s);
+      const key = override === null ? ledFrameKey(s) : `${ledFrameKey(s)}|${override}`;
       if (key === lastKey) return false;
       lastKey = key;
       paint(s);
       return true;
     },
     setTrack(t) { if (t !== track) { track = t; lastKey = ''; } },
+    setOverride(text) { if (text !== override) { override = text; lastKey = ''; } },
     dispose() { mesh.dispose(false, true); tex.dispose(); },
   };
 }

@@ -282,8 +282,8 @@ export class DunkReplayRecorder {
         (lastBall ??= new Vector3()).copyFrom(bp);
         this.ball.setAbsolutePosition(bp);
         if (!frozen) {
-          const c = segs[s].c, cam = cutCamera(c.id, rim, { x: contact.cp.x, y: contact.cp.y, z: contact.cp.z }, approach);
-          const push = 1 - 0.06 * (left / segs[s].dur);   // a slow push-in through the cut
+          const c = segs[s].c, cam = cutCamera(c.id, rim, { x: contact.cp.x, y: contact.cp.y, z: contact.cp.z }, approach, left / segs[s].dur);
+          const push = c.id === 'orbit' ? 1 : 1 - 0.06 * (left / segs[s].dur);   // a slow push-in through the cut (the orbit travels instead)
           const w = cam.shake && handheld ? cam.shake * Math.sin(rt * 37) : 0, w2 = cam.shake && handheld ? cam.shake * Math.cos(rt * 29) : 0;
           this.camera.position.set(cam.target.x + (cam.pos.x - cam.target.x) * push + w, cam.target.y + (cam.pos.y - cam.target.y) * push + w2, cam.target.z + (cam.pos.z - cam.target.z) * push);
           this.camera.setTarget(Vector3.Lerp(new Vector3(cam.target.x, cam.target.y, cam.target.z), Vector3.Lerp(a.bp, b.bp, k), 0.25));

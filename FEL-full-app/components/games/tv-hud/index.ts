@@ -5,4 +5,5 @@ export { HudFrame, END_CARD_HANDOFF_CLASS, CONSOLE_FLUSH_CLASS } from './hud-fra
 export { HudPlate, HudText, HudChip, ScoreValue, ScoreCell, ScoreDivider, Scorebug } from './scorebug';
 export { HudBanner, HudLine, LINE_CLAMP_STYLE, PHONE_THUMB_GAP_CLASS } from './banner';
 export { HudMeter, HudPips, METER_HEIGHT, type MeterSegment, type MeterTick, type MeterMarker, type MeterHeight } from './meter';
+export { HudLowerThird, LOWER_THIRD_MS, lowerThirdFires } from './lower-third';
 export { useHudReducedMotion } from './use-hud-motion';

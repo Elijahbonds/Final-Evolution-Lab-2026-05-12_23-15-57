@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { approvedProfiles, coachStoreBookHref } from '@/lib/creator/creatorCatalog';
+import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
 import { CreatorFrame, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 
@@ -20,7 +21,7 @@ export default async function TeamPage() {
         <SectionTitle>Profiles</SectionTitle>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {profiles.map((profile) => {
-            const bookHref = coachStoreBookHref(profile);
+            const bookHref = bookHrefWhenStoreOpen(coachStoreBookHref(profile));
             return (
               <div
                 key={profile.slug}

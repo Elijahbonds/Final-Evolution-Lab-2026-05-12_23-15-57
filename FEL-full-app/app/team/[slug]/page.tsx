@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { approvedServices, coachStoreBookHref, getApprovedProfile } from '@/lib/creator/creatorCatalog';
+import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
 
@@ -19,7 +20,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
   const viewer = await currentViewer();
   const services = approvedServices(profile);
   // "Book" goes to the existing coach store page (adults-only: sign-in, 18+ and the store terms are checked there).
-  const bookHref = coachStoreBookHref(profile);
+  const bookHref = bookHrefWhenStoreOpen(coachStoreBookHref(profile));
 
   return (
     <CreatorFrame signedIn={viewer.signedIn} title={profile.name} lede={profile.specialty}>

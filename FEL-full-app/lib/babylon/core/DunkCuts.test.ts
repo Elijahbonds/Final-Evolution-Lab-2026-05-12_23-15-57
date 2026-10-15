@@ -76,3 +76,43 @@ describe('the celebrations', () => {
     expect(pickCelebration({ total: 33, bands, rivalId: 'stack' })).toBeNull();
   });
 });
+
+// ── THE FOURTH ANGLE (lane/w3-present, wave 3): the orbit round the rim ──────────────────────────────────────────────
+import { ORBIT, ORBIT_CUT, cutsSec, showCuts } from './DunkCuts';
+describe('the orbit angle', () => {
+  const rim = { x: 0, y: 3.05, z: 5 }, body = { x: 0, y: 3, z: 4.4 }, approach = { x: 0, z: 1 };
+  const flat = (p: { x: number; z: number }) => Math.hypot(p.x - rim.x, p.z - rim.z);
+  it('is the fourth cut after the tuned triple, which is unchanged', () => {
+    expect(TRIPLE_CUT.map((c) => c.id)).toEqual(['baseline', 'profile', 'phone']);
+    expect(showCuts(true).map((c) => c.id)).toEqual(['baseline', 'profile', 'phone', 'orbit']);
+    expect(showCuts(true)[3]).toBe(ORBIT_CUT);
+  });
+  it('reduced motion (no camera travel) keeps the triple and nothing else', () => {
+    expect(showCuts(false)).toBe(TRIPLE_CUT);
+    expect(cutsSec(showCuts(false))).toBeCloseTo(tripleCutSec(), 9);
+  });
+  it('adds about a second to the show (tripleCutSec is untouched)', () => {
+    expect(cutsSec(showCuts(true)) - tripleCutSec()).toBeCloseTo(cutSec(ORBIT_CUT), 9);
+    expect(cutSec(ORBIT_CUT)).toBeGreaterThan(0.8); expect(cutSec(ORBIT_CUT)).toBeLessThan(1.3);
+  });
+  it('travels: starts on the approach\'s right (the profile\'s side), sweeps ORBIT.sweepRad round the rim at its radius, and rises', () => {
+    const a = cutCamera('orbit', rim, body, approach, 0), b = cutCamera('orbit', rim, body, approach, 1), m = cutCamera('orbit', rim, body, approach, 0.5);
+    expect(flat(a.pos)).toBeCloseTo(ORBIT.radius, 6); expect(flat(b.pos)).toBeCloseTo(ORBIT.radius, 6); expect(flat(m.pos)).toBeCloseTo(ORBIT.radius, 6);
+    const p = cutCamera('profile', rim, body, approach).pos;
+    expect(Math.sign(a.pos.x - rim.x)).toBe(Math.sign(p.x - rim.x));       // the same side as the profile angle
+    const ang = (q: { x: number; z: number }) => Math.atan2(q.z - rim.z, q.x - rim.x);
+    const sweep = Math.abs(Math.atan2(Math.sin(ang(b.pos) - ang(a.pos)), Math.cos(ang(b.pos) - ang(a.pos))));
+    expect(sweep).toBeCloseTo(ORBIT.sweepRad, 3);
+    expect(b.pos.y).toBeGreaterThan(a.pos.y);
+    expect(cutCamera('orbit', rim, body, approach, -3).pos.x).toBeCloseTo(a.pos.x, 9);   // progress is clamped
+    expect(cutCamera('orbit', rim, body, approach, 9).pos.z).toBeCloseTo(b.pos.z, 9);
+  });
+  it('ends beyond the rim, looking back at the dunker: the last look is him coming through the iron at the lens', () => {
+    const b = cutCamera('orbit', rim, body, approach, 1);
+    expect(b.pos.z).toBeGreaterThan(rim.z - 1.5);                              // round the far side or past it
+    expect(b.target.z).toBeLessThan(rim.z);                                      // the look is back toward the dunker
+  });
+  it('the other angles ignore progress (they do not travel)', () => {
+    for (const id of ['baseline', 'profile', 'phone', 'poster'] as const) expect(cutCamera(id, rim, body, approach, 0.9)).toEqual(cutCamera(id, rim, body, approach, 0));
+  });
+});

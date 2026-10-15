@@ -328,9 +328,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {/* Venice DualShock pad (2026-09-05): the charge METER is gone — the Benchmark feel bar calls a meter a hard
           fail ("meter slideshow"), and HOLD = RUN carries its own cue: the hold ring fills on the pad's RUN button. */}
 
-      {/* SLAM! cue */}
+      {/* SLAM! cue (WAVE 3: 43 % of the stage, up from 50 %: the bottom column's top now stands where the MC caption and the call did) */}
       {hud.slamPulse === true && phase === 'playing' && (
-        <div className="absolute inset-x-0 top-1/2 text-center">
+        <div className="absolute inset-x-0 top-[43%] text-center">
           <HudText size="hero" tone="score">SLAM!</HudText>
         </div>
       )}
@@ -367,11 +367,6 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       ) : null}
       {!judging && !bannerUp && <HudBanner text={bannerText} tone="you" size="score" className="top-[38%]" />}
 
-      {!judging && typeof hud.call === 'string' && hud.call && phase === 'playing' && (
-        <div className="absolute inset-x-0 top-[58%] px-4 text-center">
-          <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{hud.call}</HudText></HudPlate>
-        </div>
-      )}
       {hud.poster && typeof hud.poster === 'object' && !Array.isArray(hud.poster) && phase === 'playing' && (
         <DunkPoster poster={hud.poster as HudPoster} onClose={() => setHud((h) => ({ ...h, poster: null }))} />
       )}
@@ -379,37 +374,54 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {/* Venice DualShock pad: on phones (< 640 px) the hint plate sits above the pad column (the diamond stacks over the
           LOOK stick, ≈ 264 px); the clamp is a media switch in pure CSS — this project's Tailwind emits no max-* variants. */}
 
-      {/* dunk-next phase 7 — THE TAKE-OFF READ: on the run, the foot and where he would leave the floor going up NOW, in the judges' own
-          words and the floor mark's colour (the stripe gold, the elbow cyan, the paint white). The beat strip takes this spot in the air. */}
+      {/* WAVE 3 (lane/w3-present): THE BOTTOM STACK. The hint, the take-off read, the beat strip and the MC's lower third were four absolutely
+          placed layers (the hint at PAD_LIFT, the take-off chip and the strip 2.6 rem above it, the caption at 14 % of the stage), and at the
+          TV's zoom the caption sat across the chip, the strip and the hint (measured at 1080p: 12-18 kpx of overlap each). They are ONE
+          column now, in the order they are read, so no size or zoom can make one cross another: it grows UP from the hint's slot, and the
+          caption is its top.
+            hint        (lowest: the controls line)
+            take-off    on the run: the foot and where he would leave the floor going up NOW, in the judges' own words and the floor mark's
+                        colour (the stripe gold, the elbow cyan, the paint white); the beat strip takes this spot in the air
+            beat strip  RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT; stands aside for the triple cut and the judges
+            MC          what the court's MC just said
+            call        the judges' call on the dunk ("FROM THE STRIPE!"), the top of the column */}
       {(() => {
         const t = decodeTakeoff(hud.takeoff);
-        if (!t || phase !== 'playing' || judging || (typeof hud.beats === 'string' && hud.beats)) return null;
+        const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
+        const cutting = typeof hud.cut === 'string' && hud.cut;
+        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? hud.hint : '';
+        const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
+        const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
+        const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
+        const call = !judging && hud.slamPulse !== true && typeof hud.call === 'string' && hud.call && phase === 'playing' ? hud.call : '';   // (the call yields to the SLAM! cue: the QTE window is the one thing on screen then)
+        if (!hint && !takeoff && !strip && !mic && !call) return null;
         return (
-          <div className="absolute inset-x-0 flex justify-center px-3" style={{ bottom: `calc(${PAD_LIFT} + 2.6rem)` }}>
-            <HudPlate as="span" className="inline-flex items-center px-3 py-1">
-              <HudText size="label" className="inline-flex items-baseline gap-2 uppercase" style={{ fontWeight: 800 }}>
-                <span style={{ opacity: 0.45 }}>TAKE-OFF</span><span style={{ color: ZONE_HEX[t.zone] }} data-fel-takeoff={t.zone}>{t.chip}</span>
-              </HudText>
-            </HudPlate>
+          <div data-dunk-bottom className="pointer-events-none absolute inset-x-0 flex flex-col-reverse items-center gap-[0.35rem] px-3" style={{ bottom: PAD_LIFT }}>
+            {hint && (
+              <div className="w-full text-center">
+                <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5">
+                  <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hint}</HudText>
+                </HudPlate>
+              </div>
+            )}
+            {takeoff && (
+              <HudPlate as="span" className="inline-flex items-center px-3 py-1">
+                <HudText size="label" className="inline-flex items-baseline gap-2 uppercase" style={{ fontWeight: 800 }}>
+                  <span style={{ opacity: 0.45 }}>TAKE-OFF</span><span style={{ color: ZONE_HEX[takeoff.zone] }} data-fel-takeoff={takeoff.zone}>{takeoff.chip}</span>
+                </HudText>
+              </HudPlate>
+            )}
+            {strip && <DunkBeatStrip value={strip} />}
+            {mic && <MicCaption flow text={hud.mic} who={hud.micWho} />}
+            {/* the call ("FROM THE STRIPE!") was a layer of its own at 58 % of the stage, and the caption now stands where it was */}
+            {call && (
+              <div className="w-full px-4 text-center">
+                <HudPlate as="span" className="inline-block px-3 py-1"><HudText size="value" tone="score" className="uppercase italic">{call}</HudText></HudPlate>
+              </div>
+            )}
           </div>
         );
       })()}
-
-      {/* dunk-next phase 1 — THE BEAT STRIP: RISE · HANG · PRE · SLAM, the tricks under their beats, PERFECT FLIGHT. Above the hint, out of
-          the way of the rim; it stands aside for the triple cut and the judges. */}
-      {typeof hud.beats === 'string' && hud.beats && phase === 'playing' && !judging && !(typeof hud.cut === 'string' && hud.cut) && (
-        <div className="absolute inset-x-0 flex justify-center px-3" style={{ bottom: `calc(${PAD_LIFT} + 2.6rem)` }}>
-          <DunkBeatStrip value={hud.beats} />
-        </div>
-      )}
-
-      {typeof hud.hint === 'string' && hud.hint && phase === 'playing' && (
-        <div className="absolute inset-x-0 px-3 text-center" style={{ bottom: PAD_LIFT }}>
-          <HudPlate as="span" className="inline-block max-w-[min(92%,980px)] px-3 py-1.5">
-            <HudText as="div" size="body" alpha={0.8} style={LINE_CLAMP_STYLE}>{hud.hint}</HudText>
-          </HudPlate>
-        </div>
-      )}
 
       {/* NIGHT CARD (TRY-ONBOARD G1) — the end of a contest, held on the live court. This is
           deliberately NOT a modal over a dead canvas: the game is still running behind it, the
@@ -480,8 +492,6 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         </div>
       )}
       </HudFrame>
-
-      {phase === 'playing' && !judging && <MicCaption text={hud.mic} who={hud.micWho} />}
 
       {/* BootSplash: cartridge boot / venue art / progress / READY / 3-2-1 / error+retry / PAUSED */}
       <BootSplash

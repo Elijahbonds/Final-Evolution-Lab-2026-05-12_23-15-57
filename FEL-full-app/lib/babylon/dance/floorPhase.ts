@@ -21,6 +21,12 @@ export const FLOOR_PHASE: Readonly<Record<string, FloorPhase>> = {
   dance_freeze_baby: { down: 0.5, rise: 1.5 },
   dance_power_windmill: { down: 0.75, rise: 7 },
   dance_footwork_six: { down: 0.75, rise: 7 },
+  // lane/dance-extras (2026-10-14): the three captured FLOOR moves (dance/moves.ts), from danceClips.ts MOVE_CAPTURES — the drop is
+  // `inBeats`, the rise begins `outBeats` before the end of their 4-beat step: the side freeze (½ in, ¾ out), the headstand spin and
+  // the helicopter (¾ in, 1 out). The standing captures (kick step, moonwalk, robot) never leave their feet: no row.
+  dance_freeze_side: { down: 0.5, rise: 3.25 },
+  dance_power_headstand: { down: 0.75, rise: 3 },
+  dance_power_helicopter: { down: 0.75, rise: 3 },
 };
 
 /** The floor phase of a clip id (a mirrored `<id>.M` reads its base id's), or null for a standing move. */

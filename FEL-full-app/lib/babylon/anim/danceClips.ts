@@ -26,10 +26,20 @@
 // what the rhythm game needs to be playable. They are not what ships in a
 // finished product — replace them with an authored pack and delete this file.
 // The alias fallback below means that swap needs no code change.
+//
+// MUSIC-SUITE P9 (2026-09-29), moves (owner decision #17): six CAPTURED moves joined the pack — the kick step, the side
+// freeze, the helicopter and the headstand spin (breaking), the moonwalk and the robot (popping), every one a real CMU
+// capture (anim/authored/mocapDance.ts, generated from scripts/mocap/dance-clips.json; the helicopter is mocapStyles.ts's
+// brk_helicopter, captured in 2026-09-15 and never danced). They have no procedural keys at all (a captured move or none —
+// never a placeholder): MOVE_CAPTURES below fits each to its beat-timed step, and one that cannot build on a rig dances its
+// procedural sibling (CAPTURE_SIBLING). The vocabulary and what CMU/UAL lacked are in lib/babylon/dance/moves.ts; the Mixamo
+// list for the rest is the owner's (outbox musicsuite/p9/MOCAP-WANTED.md). The eight DANCE_LIBRARY steps are unchanged.
 
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
 import { buildPoseClip, type Deg3, type PoseKey } from './poseClip';
 import { MOCAP_STYLE_CLIPS } from './authored/mocapStyles';
+import { MOCAP_DANCE_CLIPS } from './authored/mocapDance';
+import { CAPTURED_MOVES } from '../dance/moves';
 import { sampleRootTrack, type RootTrack } from './MoveRootLayer';
 import type { RootKey } from './mocapRetarget';
 type V3 = [number, number, number];
@@ -47,6 +57,27 @@ export const DANCE_ALIASES: Record<string, string> = {
   dance_trans_spin: 'strafe_left',
   dance_bounce_shoulder: 'idle_stand',
   dance_stumble: 'karate_hit_react',   // the net if the pose clip cannot build on a rig: what the mode played before
+  // MUSIC-SUITE P9 (2026-09-29): the captured moves' LAST net, the same kind as the rows above (a sport clip every rig
+  // registers — scripts/creative-anim-tests.ts holds every row resolvable). Before it, resolveDanceClip tries the move's
+  // procedural sibling in the same family (CAPTURE_SIBLING): a failed moonwalk dances the arm wave, not a walk.
+  dance_toprock_kick: 'walk',
+  dance_freeze_side: 'guard',
+  dance_power_helicopter: 'roundhouse',
+  dance_power_headstand: 'roundhouse',
+  dance_pop_moonwalk: 'walk',
+  dance_pop_robot: 'guard',
+};
+
+/** MUSIC-SUITE P9: a captured move's procedural sibling (same family, a DANCE_LIBRARY id) — what it dances when its
+ *  capture cannot build on a rig. There is no procedural stand-in for a captured-only move, on purpose: the owner's rule
+ *  is a captured move or none, so a failed capture borrows a real sibling's motion rather than a made-up clip. */
+export const CAPTURE_SIBLING: Readonly<Record<string, string>> = {
+  dance_toprock_kick: 'dance_toprock_basic',
+  dance_freeze_side: 'dance_freeze_baby',
+  dance_power_helicopter: 'dance_power_windmill',
+  dance_power_headstand: 'dance_power_windmill',
+  dance_pop_moonwalk: 'dance_wave_arm',
+  dance_pop_robot: 'dance_wave_arm',
 };
 
 /** beats → seconds at a reference 120 BPM. Clips are authored at this tempo
@@ -249,6 +280,56 @@ export const DANCE_CAPTURES: Readonly<Record<string, string>> = {
 };
 
 /**
+ * THE CAPTURED MOVES (MUSIC-SUITE P9, 2026-09-29, owner decision #17 — lib/babylon/dance/moves.ts has the search and the
+ * vocabulary). How each capture fills its beat-timed step, on the same STANDING → capture → STANDING contract as the two
+ * RECOGNISABLE steps above (a step that overruns its slot wraps on the standing groove; the file header's rule):
+ *   'cycle' — the capture's closed cycle (closedCycle, at least `minCycleSec`) repeated at its REAL speed to fill the step
+ *             between the drop and the rise, exactly as composeCapturedStep always did for the windmill and the six-step;
+ *   'once'  — the capture's whole window played ONCE, evenly re-timed to fill the step between the drop and the rise. For
+ *             a held freeze and the two spins: a capture that plays once needs no forced seam, and forcing one on the
+ *             headstand spin (its best cycle closes at err 3.3; the six-step's at 1.0) would pop the body mid-spin.
+ * `inBeats` / `outBeats` are the drop and the rise. The RECOGNISABLE pair keep theirs (¾ in, 1 out: they are floor moves);
+ * the standing captures (the kick step, the moonwalk, the robot) come up out of and back into the groove in a quarter beat,
+ * because their bent knees are the move — a ¾-beat drop would spend a fifth of a 4-beat step getting into it. The floor
+ * captures keep the floor moves' ramps, the freeze a shorter drop so the hold is most of the step. NEW TUNED NUMBERS.
+ * DANCE_CAPTURES above is UNCHANGED (its two steps still compose byte for byte — danceClips.captures.test.ts pins the hash):
+ * its readers (coreClips.test.ts) hold every entry to a floor move that turns the body over, which a moonwalk is not.
+ */
+export interface MoveCapturePlan {
+  clip: string;
+  kind: 'cycle' | 'once';
+  inBeats: number;
+  outBeats: number;
+  /** 'cycle' only: the shortest closed cycle (s). */
+  minCycleSec?: number;
+}
+export const MOVE_CAPTURES: Readonly<Record<string, MoveCapturePlan>> = {
+  dance_toprock_kick: { clip: 'dnc_toprock', kind: 'cycle', inBeats: 0.25, outBeats: 0.25, minCycleSec: 0.7 },
+  dance_pop_moonwalk: { clip: 'dnc_moonwalk', kind: 'cycle', inBeats: 0.25, outBeats: 0.25, minCycleSec: 0.8 },
+  dance_pop_robot: { clip: 'dnc_robot', kind: 'cycle', inBeats: 0.25, outBeats: 0.25, minCycleSec: 0.8 },
+  dance_freeze_side: { clip: 'dnc_freeze_side', kind: 'once', inBeats: 0.5, outBeats: 0.75 },
+  dance_power_headstand: { clip: 'dnc_headstand', kind: 'once', inBeats: 0.75, outBeats: 1 },
+  dance_power_helicopter: { clip: 'brk_helicopter', kind: 'once', inBeats: 0.75, outBeats: 1 },
+};
+
+/** The plan a step's capture composes by: the RECOGNISABLE pair's (as ever), a captured move's, or none. */
+function capturePlanFor(id: string): MoveCapturePlan | null {
+  const rec = DANCE_CAPTURES[id];
+  if (rec) return { clip: rec, kind: 'cycle', inBeats: 0.75, outBeats: 1 };
+  return MOVE_CAPTURES[id] ?? null;
+}
+
+/** A capture by clip name — the style captures (the RECOGNISABLE pair, the helicopter) or the dance captures. */
+function captureNamed(name: string): { duration: number; source: string; keys: PoseKey[]; root?: RootKey[] } | null {
+  return MOCAP_STYLE_CLIPS.find((x) => x.name === name) ?? MOCAP_DANCE_CLIPS.find((x) => x.name === name) ?? null;
+}
+
+/** A step's length in beats: a procedural step's own, else a captured move's (moves.ts), else null. */
+function stepBeats(id: string): number | null {
+  return BUILDERS[id]?.beats ?? CAPTURED_MOVES.find((m) => m.id === id)?.beats ?? null;
+}
+
+/**
  * The closed CYCLE inside a capture: the sub-window [i, j] (at least `minSec` long) whose end pose best matches its start —
  * hands, feet, pelvis orientation and height — so the step can repeat with no snap at the seam. Pure.
  */
@@ -278,11 +359,15 @@ export function closedCycle(keys: readonly PoseKey[], root: readonly RootKey[], 
  * root track come out on one timeline. Pure.
  */
 export function composeCapturedStep(id: string): { keys: PoseKey[]; root: RootKey[]; duration: number } | null {
-  const def = BUILDERS[id];
-  const cap = MOCAP_STYLE_CLIPS.find((x) => x.name === DANCE_CAPTURES[id]);
-  if (!def || !cap?.root?.length) return null;
-  const T = beats(def.beats), tIn = beats(0.75), tOut = T - beats(1);
-  const cyc = closedCycle(cap.keys, cap.root);
+  // MUSIC-SUITE P9: any captured step — the RECOGNISABLE pair (the same numbers as ever: ¾-beat drop, 1-beat rise, the
+  // default 0.5 s cycle) or a captured move (MOVE_CAPTURES). A step with no plan, no length or no root track is null.
+  const plan = capturePlanFor(id);
+  const n = stepBeats(id);
+  const cap = plan ? captureNamed(plan.clip) : null;
+  if (!plan || !n || !cap?.root?.length) return null;
+  const T = beats(n), tIn = beats(plan.inBeats), tOut = T - beats(plan.outBeats);
+  if (plan.kind === 'once') return composeOnce(cap, T, tIn, tOut, id);
+  const cyc = closedCycle(cap.keys, cap.root, plan.minCycleSec ?? 0.5);
   const src = cap.keys.slice(cyc.from, cyc.to + 1);
   const t0 = src[0].t, len = src[src.length - 1].t - t0;
   // the generated captures are time-compressed against their source (`source: 'cmu:90_34.bvh 2.35–4.45s'` in 1.1 s): repeat
@@ -310,6 +395,27 @@ export function composeCapturedStep(id: string): { keys: PoseKey[]; root: RootKe
   return { keys, root, duration: T };
 }
 
+/** MUSIC-SUITE P9: a capture played ONCE between the drop and the rise (MoveCapturePlan 'once'): STANDING at 0, the whole
+ *  window evenly re-timed onto [tIn, tOut], STANDING at T. No seam is forced — the rise starts from the window's own last
+ *  pose. Body keys and the root track on one timeline. Pure. */
+function composeOnce(cap: { keys: PoseKey[]; root?: RootKey[] }, T: number, tIn: number, tOut: number, id: string): { keys: PoseKey[]; root: RootKey[]; duration: number } {
+  const src = cap.keys;
+  const t0 = src[0].t, len = Math.max(1e-6, src[src.length - 1].t - t0);
+  const scale = (tOut - tIn) / len;
+  const track: RootTrack = { name: id, duration: len, keys: cap.root ?? [] };
+  const keys: PoseKey[] = [key(0, STAND)];
+  const root: RootKey[] = [[0, 0, 0, 0, 1, 0]];
+  for (const k of src) {
+    const t = tIn + (k.t - t0) * scale;
+    keys.push({ ...k, t });
+    const q = sampleRootTrack(track, k.t);
+    root.push([t, q.q.x, q.q.y, q.q.z, q.q.w, q.h]);
+  }
+  keys.push(key(T, STAND));
+  root.push([T, 0, 0, 0, 1, 0]);
+  return { keys, root, duration: T };
+}
+
 /** The root tracks for the captured steps registered on a rig, the mirrored `.M` step included (a sagittal reflection
  *  of the pelvis orientation: x, −y, −z, w — the same reflection registerMirroredClips applies to the bones). */
 export function danceRootTracks(registeredIds: Iterable<string>): RootTrack[] {
@@ -323,22 +429,26 @@ export function danceRootTracks(registeredIds: Iterable<string>): RootTrack[] {
   return out;
 }
 
-/** The ids this file builds (the mode registers exactly these). */
-export const DANCE_CLIP_IDS = Object.keys(BUILDERS);
+/** The ids this file builds (the mode registers exactly these). MUSIC-SUITE P9: the procedural pack's nine, then the
+ *  captured moves (lib/babylon/dance/moves.ts CAPTURED_MOVES). */
+export const DANCE_CLIP_IDS = [...Object.keys(BUILDERS), ...CAPTURED_MOVES.map((m) => m.id)];
 
 /** Build one dance clip on a live skeleton (the rig tests use this). */
 export function buildDanceClip(scene: Scene, skeleton: Skeleton, id: string): AnimationGroup | null {
   const def = BUILDERS[id];
-  if (!def) return null;
-  if (DANCE_CAPTURES[id]) {
+  if (!def && !MOVE_CAPTURES[id]) return null;
+  if (DANCE_CAPTURES[id] || MOVE_CAPTURES[id]) {
     try {
       const c = composeCapturedStep(id);
       const g = c ? buildPoseClip(scene, skeleton, id, c.duration, c.keys) : null;
       if (g) return g;
     } catch (e) {
-      console.warn(`[FEL-ANIM] danceClips: capture for "${id}" failed (${String(e).slice(0, 120)}) — procedural keys instead`);
+      console.warn(`[FEL-ANIM] danceClips: capture for "${id}" failed (${String(e).slice(0, 120)}) — ${def ? 'procedural keys instead' : `its sibling ${CAPTURE_SIBLING[id]} dances it`}`);
     }
   }
+  // a captured-only move has no procedural keys (never a placeholder): it is left unregistered and resolveDanceClip
+  // hands its steps to its sibling
+  if (!def) return null;
   return buildPoseClip(scene, skeleton, id, beats(def.beats), def.keys());
 }
 
@@ -377,8 +487,11 @@ export function registerDanceClips(
   return { built, aliased };
 }
 
-/** Resolve an id for playback, honouring the alias fallback. */
+/** Resolve an id for playback, honouring the alias fallback. MUSIC-SUITE P9: a captured move that did not register
+ *  dances its procedural sibling first (CAPTURE_SIBLING), and only then its sport-clip alias. */
 export function resolveDanceClip(id: string, isRegistered: (x: string) => boolean): string {
   if (isRegistered(id)) return id;
+  const sibling = CAPTURE_SIBLING[id];
+  if (sibling && isRegistered(sibling)) return sibling;
   return DANCE_ALIASES[id] ?? 'idle_stand';
 }
