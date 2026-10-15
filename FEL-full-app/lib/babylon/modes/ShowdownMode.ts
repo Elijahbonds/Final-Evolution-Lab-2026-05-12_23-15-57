@@ -23,6 +23,7 @@
 //     opener lands clean.
 // All naming/visuals original.
 
+import { timeOutVerdict, roundsExhausted } from './roundVerdict';
 import { mountPostureLayer } from '../anim/PostureLayer';
 type PostureHandle = ReturnType<typeof mountPostureLayer>;
 import { combatPose, combatApproach, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
@@ -134,7 +135,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     return wishV.set(f.x * -stickY + r.x * stickX, 0, f.z * -stickY + r.z * stickX);
   };
   let ultTimer = 0, assistTimer = 0, assistActive = 0;
-  let myRounds = 0, foeRounds = 0;
+  let myRounds = 0, foeRounds = 0, drawnRounds = 0;   // DUEL-IDLE-FIX: a level round on the clock is nobody's
   // IMPROVE (2026-10-06): the one-beat guard flashes, per fighter, SET when the defence lands (they were only ever counted
   // down, so the tree never played the parry or the guard impact)
   let parryFlash = 0, giFlash = 0, foeParryFlash = 0, foeGiFlash = 0;
@@ -604,8 +605,26 @@ export const ShowdownMode: ModeDefinition = (() => {
     if (support) { support.animator.park(); support.root.setEnabled(false); }   // parked: no clip advancing on a hidden rig
   }
 
-  function endRound(ctx: ModeContext, playerWon: boolean, reason = 'K.O.'): void {   // phase 9: the round says why
+  function endRound(ctx: ModeContext, verdict: boolean | null, reason = 'K.O.'): void {   // phase 9: the round says why
     if (phase === 'matchOver' || phase === 'roundOver') return;   // IMPROVE (2026-10-06): one verdict per round
+    // DUEL-IDLE-FIX (LB-1/LB-2): a round the clock ends level (null) goes to neither side and is replayed; when every round
+    // of the best-of has been played with nobody at roundsToWin, the match ends and is not a win
+    if (verdict === null) {
+      drawnRounds++;
+      charging = false; meMove.vel.setAll(0); foeMove.vel.setAll(0);
+      ctx.setHud({ wins: myRounds, foeWins: foeRounds });
+      if (roundsExhausted(myRounds + foeRounds + drawnRounds, SHOWDOWN.roundsToWin)) {
+        setPhase('matchOver');
+        SoundKit.play('whistle');
+        ctx.end('SHOWDOWN_LOST', Math.max(0, myRounds * 100 - foeRounds * 40), { foeRounds, drawnRounds });
+        return;
+      }
+      setPhase('roundOver');
+      koCue.arm({ kind: 'time', decidesMatch: false, victim: 0 }, motionPolicy().reduced);
+      banner(ctx, `TIME — DRAWN ROUND — NO POINT`, SHOWDOWN.roundOverSec * 1000);
+      return;
+    }
+    const playerWon = verdict;
     if (playerWon) myRounds++; else foeRounds++;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
     if (playerWon) roundWinBeat(ctx);
@@ -638,7 +657,7 @@ export const ShowdownMode: ModeDefinition = (() => {
     meMove.vel.setAll(0); foeMove.vel.setAll(0);
     squareUp(); roundStartRival();
     setPhase('ready');
-    const round = myRounds + foeRounds + 1;
+    const round = myRounds + foeRounds + drawnRounds + 1;
     ctx.setHud({ round: `${round}`, hp: meState.hp, foeHp: foeState.hp });
     banner(ctx, roundCall(round), Infinity);
     SoundKit.play('whoosh', { pitch: 0.7, volume: 0.35 });
@@ -809,7 +828,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (dev) dev.combatPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };
       }
       chakra = new ResourceMeter(CHAKRA); foeChakra = new ResourceMeter(CHAKRA);
-      koCue.reset(); myRounds = 0; foeRounds = 0; assistTimer = 0; mbus.reset(); matchLatch = false; heavyAt = 0;
+      koCue.reset(); myRounds = 0; foeRounds = 0; drawnRounds = 0; assistTimer = 0; mbus.reset(); matchLatch = false; heavyAt = 0;
       clock = 0; timers.clear(); bannerSlot.clear(); foeUlt.clear(); foeFullCalled = false; charging = false; knock.clear();
       for (const k of Object.keys(hudSent)) delete hudSent[k];
 
@@ -929,7 +948,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = 0; }   // phase 5
       if (!padGuard.held && xBtn.guardHeld(now() / 1000) && meState.controllable) { padGuard.press(now()); if (!guardUp) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); } }   // phase 3: the hold is the guard (P7: the pad's, apart from a body guard already up)
       if (phaseSec > BUDGET_SEC[phase]) {
-        if (phase === 'fighting') { console.info('[SD] time — round decided on HP'); endRound(ctx, meState.hp >= foeState.hp, 'TIME'); return; }   // the long round's bell, not a fault
+        if (phase === 'fighting') { console.info('[SD] time — round decided on HP'); endRound(ctx, timeOutVerdict(meState.hp, foeState.hp), 'TIME'); return; }   // the long round's bell, not a fault
         console.warn(`[FEL-WATCHDOG] showdown stuck in "${phase}"`);
         if (phase === 'ultimate') { ctx.camDirector.setPreset('fight'); setPhase('fighting'); }
         else if (phase === 'ready') fight(ctx);

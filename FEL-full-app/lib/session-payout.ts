@@ -69,6 +69,9 @@
  * the route (route.ts:135-146, moved to streakStep() below unchanged for every play session).
  */
 
+import { roundMatchWon } from '@/lib/babylon/modes/roundVerdict';
+import { SHOWDOWN } from '@/lib/babylon/modes/showdownRules';
+import { DUEL, DUEL_SCORE } from '@/lib/babylon/modes/duelRules';
 import { gameWinner, winRule } from '@/lib/babylon/modes/onevoneRules';
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
 import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax, MIRRORED } from '@/lib/arena-score-integrity';
@@ -363,9 +366,19 @@ export function sessionWon(
  *  · hoops1v1: first to 11 (lib/babylon/modes/onevoneRules.ts gameWinner), or the win-by-2 option (cap 15); a won game is
  *    one either rule ends in this player's favour. 3–11 is not a win under any of them.
  *  · hoops3v3: the game ends at 21 or on the buzzer, so the winner is whoever has more; a tie is not a win.
+ *  · showdown, duel (DUEL-IDLE-FIX): the rounds to win, read back off the score and the foe's rounds (roundVerdict.ts).
  * A score missing from the call (a caller that is not the finish route) leaves the old answer to the caller.
  */
-export const SERVER_JUDGED_WIN_MODES: readonly string[] = ['hoops1v1', 'hoops3v3'];
+export const SERVER_JUDGED_WIN_MODES: readonly string[] = ['hoops1v1', 'hoops3v3', 'showdown', 'duel'];
+/** DUEL-IDLE-FIX: the round modes' scoring, as each posts it (ShowdownMode endRound: rounds × 100 − foe rounds × 40;
+ *  duelRules duelScore: the same plus ring-outs and guard impacts). opponentScore is the foe's rounds in both shells. */
+export const ROUND_MODE_RULES: Readonly<Record<string, { roundsToWin: number; winPts: number; lossPts: number; extraMax: number }>> = {
+  showdown: { roundsToWin: SHOWDOWN.roundsToWin, winPts: 100, lossPts: 40, extraMax: 0 },
+  duel: {
+    roundsToWin: DUEL.roundsToWin, winPts: DUEL_SCORE.winPts, lossPts: DUEL_SCORE.lossPts,
+    extraMax: DUEL.roundsToWin * DUEL_SCORE.ringOutPts + DUEL_SCORE.impactCap * DUEL_SCORE.impactPts,
+  },
+};
 export function judgeHeadToHead(modeKey: string, score: number | undefined, opponentScore: number | undefined): boolean | null {
   if (!SERVER_JUDGED_WIN_MODES.includes(modeKey)) return null;
   if (!Number.isFinite(score) || !Number.isFinite(opponentScore)) return null;
@@ -373,6 +386,7 @@ export function judgeHeadToHead(modeKey: string, score: number | undefined, oppo
   if (modeKey === 'hoops1v1') {
     return gameWinner(me, foe, winRule(MIRRORED.onevoneTarget, false)) === 'me' || gameWinner(me, foe, winRule(MIRRORED.onevoneTarget, true)) === 'me';
   }
+  if (ROUND_MODE_RULES[modeKey]) return roundMatchWon(me, foe, ROUND_MODE_RULES[modeKey]);
   return me > foe;
 }
 
