@@ -26,7 +26,8 @@ import {
 } from '@/lib/screen/copy';
 import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR, UNREAD_WORD } from './screen-ui';
 import { KidResults } from './kid-results';
-import { DrillDemo } from './drill-demo';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
+import { DrillDemo } from './drill-demo';
+import { aboutInches } from '@/lib/screen/jump';   // EDU-LINKS (2026-10-07): the demo slot, filled with the 3D ExerciseDemo
 
 type TestId = keyof typeof SCREEN_TEST_NAMES;
 /** The checks the start card lists, in check order (A3-3). */
@@ -119,7 +120,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
 
       {s.jumpBestIn !== null ? (
         <section data-personal-best className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{s.jumpBestIn} in</b></p>
+          <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{aboutInches(s.jumpBestIn)}</b></p>
           <p className="text-[16px] text-white/55">A personal best to beat next time.</p>
         </section>
       ) : null}

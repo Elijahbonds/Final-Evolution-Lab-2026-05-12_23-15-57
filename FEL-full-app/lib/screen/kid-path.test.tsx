@@ -220,7 +220,7 @@ describe('the kid view: their number, the change, the save line, "Run it again";
 
   it('a first screen: "Your jump: N in", the save-your-number line and "Run it again"; no change line yet', () => {
     const h = kid(15.7, null);
-    expect(text(h)).toContain(`${KID_JUMP}: 15.7 in`);
+    expect(text(h)).toContain(`${KID_JUMP}: about 16 in`);
     expect(h).toContain('data-kid-save-line');
     expect(text(h)).toContain(KID_SAVE_LINE);
     expect(h).not.toContain('data-kid-change');
