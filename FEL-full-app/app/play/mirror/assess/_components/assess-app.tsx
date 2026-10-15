@@ -48,6 +48,7 @@ import type { Side } from '@/lib/assess/protocol';
 import { maybeSaveAdultScreen } from '@/lib/privacy/screenHistoryClient';
 import { landingDevice, maybeSaveLandingCheck } from '@/lib/privacy/landingCheckSave';
 import { summarize } from '@/lib/screen/checks';
+import { clearReplay, holdReplay } from '@/lib/screen/rep-memory';
 import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
 } from '@/lib/screen/copy';
@@ -205,6 +206,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       width: cam?.width ?? 0, height: cam?.height ?? 0,
     });
     cleanup();                                                   // the camera stops the moment the screen ends
+    clearReplay();                                               // MIRROR step 2: a new screen never shows the last one's rep
     const summary = v.result ? summarize(v.result) : null;
     if (!summary || v.result?.pain) { setPhase('stopped'); return; }
     if (modeRef.current === 'jump') {
@@ -234,6 +236,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     // Adult branch only. The helper asks the server; kids never get here, and a self-reported 18+ who is not
     // verified (or who has not opted in) is not saved.
     void maybeSaveAdultScreen(summary);
+    // MIRROR step 2: the worst-rep frames, for the results page, in page memory only (never the summary, never saved)
+    holdReplay(v.result!.tests);
     // …and the landing check from a full screen's T5 (the rest of a screen begun as the jump carries a T5 already sent)
     if (modeRef.current !== 'rest') void maybeSaveLandingCheck({ kid: false, tests: v.result!.tests, takeoffLeg: v.result!.takeoffLeg, pain: v.result!.pain }, device);
     setPhase('toResults');                                        // 18 or older: kept in this tab (keepResult)

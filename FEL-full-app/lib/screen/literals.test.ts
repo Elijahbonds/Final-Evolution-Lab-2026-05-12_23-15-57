@@ -45,6 +45,9 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'app/play/mirror/assess/_components/live-hud.tsx': [[['100', '1000'], 'percent, ms → s'], [['0.55', '3'], 'flash opacity and distance read in a comment (not a grade)'], [['160', '40', '320', '25'], 'SCREEN A: the big rep counter\'s clamp (px/vh, at least 30% of the stage) and the pain tap\'s minimum share of the screen height — sizes, not grades']],
   'app/play/mirror/assess/_components/skeleton.ts': [[LANDMARKS, 'the bones and joints drawn'], [['0.35', '160', '0.9', '2.5', '110', '6', '1.5', '240', '200', '2.4', '0.2', '0.08', '1e-6'], 'drawing: visibility for the frozen view, line widths, alpha, radii, guide lengths, padding']],
   'app/play/mirror/assess/_components/use-voice.ts': [[['1.02'], 'speech rate']],
+  // MIRROR step 2 (fault replay)
+  'app/play/mirror/assess/_components/fault-replay.tsx': [[['240', '320'], 'the replay canvas drawing size and max width in px (a size, not a grade)']],
+  'lib/screen/rep-memory.ts': [],
 };
 const NONE = [
   'app/play/mirror/assess/_components/camera-help.tsx', 'app/play/mirror/assess/_components/not-saved.tsx', 'app/play/mirror/assess/_components/results-page.tsx',
