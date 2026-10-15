@@ -69,17 +69,43 @@ export function speedVignetteLevel(speed01: number): number {
   return (s - SPEED_VIGNETTE_ON) / (1 - SPEED_VIGNETTE_ON);
 }
 
+// FLASH BEAT (w3-atmos): the rig's exposure pulse for a highlight (a made three, a momentum tier, a lightning bolt). It used
+// to write the pipeline's exposure itself, and the harness repainted the rest exposure over it every frame while a mode
+// reported a speed vignette (or an impact pulse was running) - so a flash on a racing mode never reached the screen. The rig
+// now only keeps the LEVEL (0..1); whoever paints the frame composes it: exposure * (1 + (FLASH_GAIN - 1) * level).
+/** Exposure multiple at full flash. (Was the literal 1.35 in LightRig.flashBeat: unchanged.) */
+export const FLASH_GAIN = 1.35;
+/** Fraction of the remaining flash left after one 60 fps frame. (Was `+= (base - exposure) * 0.15` per frame: unchanged at 60 fps.) */
+export const FLASH_KEEP_PER_FRAME = 0.85;
+/** The flash is over when it adds less than this much exposure. (Was the literal 0.01: unchanged.) */
+export const FLASH_END_EXPOSURE = 0.01;
+
 /**
- * Compose the impact pulse and the speed vignette over the venue's resting grade. Impact wins the frame
- * (it is the moment); speed only ever adds what impact is not already using. Exposure is impact's alone —
- * speed narrows the edges, it does not dip the brightness mid-race.
+ * Step the flash level by `dtMs` of real time. The old decay was a per-frame multiply (identical at 60 fps, five times too
+ * fast at 144 Hz - ImpactFrame's decision 3), so it is now `0.85 ** (dt / 16.67 ms)`: the same curve at 60 fps, and the same
+ * wall-clock length on every screen. Returns 0 once the flash adds less than FLASH_END_EXPOSURE to `restExposure`.
  */
-export function composeFrameGrade(base: Grade, impactLevel: number, speedLevel: number): Grade {
+export function stepFlashLevel(level: number, dtMs: number, restExposure: number): number {
+  if (!(level > 0)) return 0;
+  const dt = Number.isFinite(dtMs) && dtMs > 0 ? Math.min(100, dtMs) : 1000 / 60;   // a rendered frame is a frame (a NullEngine reads 0); a stalled tab must not skip the pulse
+  const next = level * Math.pow(FLASH_KEEP_PER_FRAME, dt / (1000 / 60));
+  return next * (FLASH_GAIN - 1) * Math.max(0, restExposure) < FLASH_END_EXPOSURE ? 0 : next;
+}
+
+/**
+ * Compose the impact pulse, the speed vignette and the flash beat over the venue's resting grade. Impact wins the frame
+ * (it is the moment); speed only ever adds what impact is not already using. Exposure is impact's and the flash's alone -
+ * speed narrows the edges, it does not dip the brightness mid-race. The flash multiplies whatever exposure the impact left
+ * (a hit that lands inside a flash dips the flashed frame, it does not cancel it).
+ */
+export function composeFrameGrade(base: Grade, impactLevel: number, speedLevel: number, flashLevel = 0): Grade {
   const g = impactGrade(impactLevel, base);
   const sv = Math.max(0, Math.min(1, speedLevel));
-  if (sv <= 0) return g;
+  const fl = Math.max(0, Math.min(1, Number.isFinite(flashLevel) ? flashLevel : 0));
+  const exposure = fl > 0 ? g.exposure * (1 + (FLASH_GAIN - 1) * fl) : g.exposure;
+  if (sv <= 0) return { vignette: g.vignette, exposure };
   const speedVignette = base.vignette * (1 + (SPEED_VIGNETTE_GAIN - 1) * sv);
-  return { vignette: Math.max(g.vignette, speedVignette), exposure: g.exposure };
+  return { vignette: Math.max(g.vignette, speedVignette), exposure };
 }
 
 export interface ImpactFrameState {
@@ -126,4 +152,27 @@ export function impactGrade(level: number, base: Grade): Grade {
     vignette: base.vignette * (1 + (IMPACT_VIGNETTE_GAIN - 1) * k),
     exposure: base.exposure * (1 - IMPACT_EXPOSURE_DIP * k),
   };
+}
+
+/** What the harness remembers between frames about the grade it paints. */
+export interface FrameGradeState {
+  frame: ImpactFrameState;
+  /** The last frame painted something other than the rest, so the return to rest is written once. */
+  painted: boolean;
+}
+export const FRAME_GRADE_IDLE: FrameGradeState = { frame: IMPACT_FRAME_IDLE, painted: false };
+
+/**
+ * One tick of the harness's grade writer: decay the impact pulse and compose it with the speed vignette and the rig's flash
+ * level. `write` is the grade to paint this frame, or null when everything is at rest and was already painted there.
+ * Pure, so the composition (a flash on a mode that reports a speed vignette) is tested without a GPU.
+ */
+export function stepFrameGrade(
+  s: FrameGradeState, rest: Grade, dt: number, speedLevel: number, flashLevel: number,
+): { state: FrameGradeState; write: Grade | null } {
+  const flashing = flashLevel > 0;
+  if (!(s.frame.level > 0 || s.painted || speedLevel > 0 || flashing)) return { state: s, write: null };
+  const frame = decayImpactFrame(s.frame, dt);
+  const write = composeFrameGrade(rest, frame.level, speedLevel, flashLevel);
+  return { state: { frame, painted: frame.level > 0 || flashing }, write };
 }

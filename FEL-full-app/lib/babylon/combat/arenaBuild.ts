@@ -17,6 +17,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, LinesMesh, ShadowGenerator } from '@babylonjs/core';
 import type { CombatArena } from './arenas';
+import { addHeatSource } from '../scene/HeatHaze';   // w3-atmos: a fire pit's column of hot air (the light rig mounts the pass once load() is done)
 import { paintDot, paintFlame, paintGate, paintLightPool, type Ctx } from './fxPaint';
 import {
   FLOOR_HAS_EMISSIVE, WALL_HAS_EMISSIVE, WALL_TILE_M, floorStyleOf, paintFloor, paintWall, wallStyleOf, type FloorStyle, type WallStyle,
@@ -281,6 +282,7 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
 
   // ── hazards: a glowing grate, real flames and embers (fire) or arcing bolts (shock) ──
   const systems: ParticleSystem[] = [];
+  const heatOff: Array<() => void> = [];
   if (arena.hazards.length) {
     const flameTex = paintedTexture(scene, `arena_${arena.id}_flame_t`, 64, 128, (c) => paintFlame(c, 64, 128)); owned.push(flameTex);
     const emberTex = paintedTexture(scene, `arena_${arena.id}_ember_t`, 32, 32, (c) => paintDot(c, 32)); owned.push(emberTex);
@@ -307,6 +309,8 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
         f.addSizeGradient(0, 0.55); f.addSizeGradient(0.35, 0.85); f.addSizeGradient(1, 0.3);
         f.minAngularSpeed = -0.6; f.maxAngularSpeed = 0.6;
         f.start(); systems.push(f);
+        // w3-atmos: the hot air over the pit - a column twice the pit's width, 3 m tall (the shimmer is the HeatHaze post)
+        heatOff.push(addHeatSource(scene, { x: h.x, y: lift + 0.2, z: h.z, halfWidth: h.r * 1.5, height: 3.4, strength: 1 }));
         // embers: tiny hot motes that climb, drift and die
         const e = new ParticleSystem(`arena_${arena.id}_embers_${i}`, mobile ? 14 : 30, scene);
         e.particleTexture = emberTex; e.blendMode = ParticleSystem.BLENDMODE_ADD;
@@ -395,6 +399,7 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
     },
     dispose() {
       for (const p of systems) { try { p.dispose(); } catch { /* gone */ } }
+      for (const off of heatOff) off();
       for (const m of root.getChildMeshes()) { m.material?.dispose(); m.dispose(); }
       for (const o of owned) { try { o.dispose(); } catch { /* the scene took it */ } }
       root.dispose();

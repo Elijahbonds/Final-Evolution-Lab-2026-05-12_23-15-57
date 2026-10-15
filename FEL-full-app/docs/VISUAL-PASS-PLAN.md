@@ -852,3 +852,174 @@ per mode. The glossy floor does not mount on onevone / threevthree / carnival: t
   grades for carnival (the mood is read once at mount; the grade has one owner), a camera swoop between hub and event and a slow drift
   crane in 3v3's dead balls (both touch the play camera), VLS sun shafts. A scorebug, a "GAME POINT" lower third and 3v3's clock bug are
   HUD: routed to lane/hud-hoops. [ART]: bespoke streetball props, detailed carnival rides, more crowd body variety.
+
+## Wave 3 status — presentation: combat cinematics, replays, sprint photo finish, HUD leftovers, the dunk's fourth angle (w3-present, 2026-10-14)
+
+Everything here is presentation only: no play-camera call, speed, timing window, difficulty, score, judging or pay changed (`combat/wave3.wiring.test.ts`
+holds the director-call counts and that the new modules import nothing that scores). The new cameras are OVERLAYS, not director states.
+
+- **The cinema rig** (`combat/cinemaRig.ts`). A cinematic is drawn over the frame the play camera already made: on `scene.onBeforeRender` (insertFirst, so
+  the harness's shake rides on it) the rig reads the play camera's pose and writes the cinematic one; on `onAfterRender` it puts the play camera's own pose
+  back. The mode reads the camera next frame and finds exactly what its director wrote, so the stick mapping (read off the camera's own forward), the
+  Hundred camera's damping and FrameGuard are untouched, and a cut ends with nothing to hand back. Bars: `scene.metadata.felCinematic` (the foundation's
+  letterbox). Reduced motion (`motionPolicy().travel`) skips every cut.
+- **Karate VS.** A fighting-game intro before ROUND 1 of a match (`combat/fightShots.fightIntroAt`): the rival walks in on a low front three-quarter with his name
+  plate, then the player, then a wide two-shot that eases into the play camera round the ring; any press skips. Plates carry the opponent pick and the fighting
+  style, never a profile name. Slam text (ROUND n / FINAL ROUND / FIGHT! / K.O. / TIME!) as HUD keys `slam` / `slamSeq` drawn by `components/games/fight-presentation.tsx`.
+  The DRAGON cut (`combat/dragonCutter`): a low wind-up angle, a profile at the blow (told when it lands, so a hit-stop or Focus cannot desync it), an ease out;
+  the RIVAL's DRAGON cuts in at the blow only (its wind-up is the telegraph the player reads on the play camera).
+- **Karate Endless.** The 100th KO (once a run) fires the existing `finisher` slow-mo beat, a gold grade swing, a "THE HUNDREDTH" call and a 3.2 s orbit round the
+  fighter and the fallen body (`fightShots.finisherAt`) over the Hundred camera, which is untouched.
+- **KO and ring-out replays** (`combat/koReplay`): Karate VS, Showdown, Duel and Mixed. A real KO or ring-out replays once, 0.9 s (1.2 s for a ring-out) after the
+  fall, from the victim's side, from the two fighters only; never the match-deciding round, never the bell or a fire pit, at most 2 a match, never under reduced
+  motion. The harness holds `update()` while it plays and the host steps its stat band aside and tags the shot REPLAY.
+- **Sprint.** The photo finish: the frame drawn at the tape (read off the canvas the dunk poster's way) with the finish line over the real line and a timing ruler
+  (`racing/photoFinish`: winner on the line, loser to the right by the margin, "YOU BY 0.56 s") on the raw crossing times; the host holds the result 2.6 s for it, any
+  press or tap skips. The d-pad now skips a replay (shared: `core/ModeHarness.ts`, one line). A mid-race overtake replay is NOT enabled: measured on the real core
+  (cadences 200-400 ms) every winnable run passes the pacer at 2-5 s, the pacer's window is 10 s .. 88 % (8.8-12.5 s) less a 0.7 s settle, and the only pass after 10 s
+  (cadence ~258 ms, 11.48 s) settles at 12.18 s, past an 88 % mark at 11.80 s.
+- **HUD leftovers** (`components/games/**`). The dunk host's hint, take-off chip, beat strip, MC lower third and call are one bottom column (flex-col-reverse), so none
+  can cross another (measured overlap at 1080p was 12-18 kpx per pair, now none at 1080p, 720p, 390x844 and 844x390); the three-point standings join the score stack on a
+  phone (390 px: 5 overlaps, now none) and sit below the rack plates from 1024 px (1080p: LEFT chip and 5th rack, now none); `tv-hud/lower-third.tsx` (`HudLowerThird`) is the
+  broadcast lower third, used for the dunk duel's "PLAYER n · DUNK 4/6" name card and the shootout's "PENALTY 3 OF 5"; `race-course-map`, `dunk-poster` and
+  `three-point-options` are on the TV HUD tokens (they are in the migration scan's PIECES).
+- **Dunk.** A fourth orbit angle on the made dunk's replay (`core/DunkCuts.ORBIT_CUT`, `cutCamera(..., progress)`): the camera sweeps 146 degrees round the rim at
+  3.4 m, 1.0 s, after the tuned triple (unchanged) and before the poster; reduced motion keeps the triple.
+- **Deferred / [ART].** Landscape phones (844x390): the three-point corner standings still touch the 5th rack and the LEFT chip (about 2.5 kpx), and the MC caption
+  sits under the NEED / CUT chips (3 kpx). A sprint overtake replay needs a pacing rule that is not "10 s .. 88 %" (a 100 m race is 10-13 s long). A true slit-scan
+  (a side-on finish camera) needs a second camera drawn each frame for the last metres: not built; the print is the frame the race camera drew.
+
+## Wave 3 status — atmosphere and surfaces (w3-atmos, 2026-10-14)
+
+The deferred atmosphere and surface items from waves 1 and 2. Everything below is presentation only: no tuned number moved. `scene/**` and
+`visual/**` edits are this lane's this round (flagged `shared file:` in each commit). `?lookoff=heat|sunshafts|fixtures` are the one-build A/Bs;
+`?lookon=sunshafts` shows a pass a mode has not earned.
+
+- **flashBeat vs the harness repaint.** While a mode reported a speed vignette (or an impact pulse ran), `ModeHarness` repainted the rest
+  exposure every frame over `LightRig.flashBeat()`'s own write, so a momentum sting, a made three or a storm's lightning never reached the
+  screen on a racing mode. The rig now keeps the flash LEVEL (`flash01`, 1.35x exposure, 0.85 of the remainder a frame: unchanged); the harness
+  paints it in the one grade write with the impact and the speed vignette (`ImpactFrame.stepFrameGrade`, pure). The decay is stepped by dt now
+  (the same wall-clock length at 144 Hz as at 60). `core/flashCompose.test.ts` drives the real rig the way the harness does: the bug measured
+  on the old path, then the fix; flash alone, flash with an impact, reduced motion.
+- **Dome mismatches.** The `neon` bake (`public/backdrops/baked/neon.jpg`) is mis-named: it is the Venice skatepark at golden hour (its manifest
+  source is `skateboarding.jpg`). A venue loaded it over its painted sky, so `?place=neon-block`, the Neon Cage, the football Dome, dance's
+  Neon Club and Brain Brawl's Arcade Night stood under a sunset with palms at night. `paintedSky` on a place look / arena look opts out of the
+  photograph and the venue's painted night horizon is the sky (a starred sky, the neon pylons, SkyDome's clouds on top). Daytime and home looks
+  are untouched (a test holds that). A real photographic night dome stays [ART].
+- **Chi rims.** A lit edge on a charged fighter's contour (`visual/ChiRim.ts`), and on a Hundred agent as it materialises. It is the ink hull
+  (the outline renderer, skinned like the body) recoloured in an HDR chi colour and a little wider, so it costs no draw, no shader and no
+  compile and follows every bone; the bloom makes the halo. Not a GlowLayer include (that draws the body filled, not its edge) and not a
+  fresnel plugin (the fighters share their materials: a clone and a compile mid-match). The aura's call drives it for all five combat modes.
+- **Heat haze.** `scene/HeatHaze.ts`: one full-screen distortion pass, mounted once after load, that early-outs outside a heat source's column;
+  a ripple of 4 px at 1080p. The Foundry's two fire pits and Ember Caldera's lava register sources. Desktop/high, not under reduced motion.
+  It distorts whatever is in the column on the screen, near or far (there is no depth in the pass): a pillar in front of a pit wobbles a
+  little too. Measured A/B on one frame (`?lookoff=heat`).
+- **Sun shafts: measured, not mounted.** `scene/SunShafts.ts` is the VLS mount and its gate; the gate is a measurement. Rig, 1080p, 40 samples
+  across the first ~8 s of each goldenHour mode, the rig's sun projected through the live view-projection: the sun was in the frame in none
+  (dunk, dunkduel, onevone, threevthree, threepoint, carnival, skateboard, surf, volleyball, tennis, aeroaces on two circuits, velocitykart).
+  The moods put the sun 50-60 degrees up and a play camera frames a 46 degree field at a horizon. The pass is a second render of the
+  occluders plus a blur on every frame and may never be toggled, so it mounts for no mode today (`SUN_SHAFT_MODES` is empty; a mode earns it
+  at 25 % in frame); `?lookon=sunshafts&tier=high` shows it for one load.
+- **Kart.** `racing/roadSurface.ts`: the asphalt grain (relief and roughness) over the road's paint (desktop/high: a phone's texture row is
+  frozen over the ceiling); rumble ribs on the kerbs (a normal map);
+  the road named into the weather's wet pass with a wet reflection level (environment and specular lift to 1.0 as it soaks, and come back).
+  The kart honours `?weather=rain|storm|fog` from the URL, and (w3-followups, owner 2026-10-14) a RAIN on/off chip on its start screen, saved per device as `fel-kart-rain` (never the saved pick of the other modes) for its
+  looks, and reads none of the weather's gameplay modifiers. The night courses' edge strip is a fixture now (`FixtureLights` strips): a pool
+  of 8 clustered lights that follows the kart along the strip, each pinned to one of the nearest lamps.
+- **Aero.** `racing/aeroAtmos.ts`: cloud banks to fly through (soft upright sprites at the line's height that fade out as the camera enters
+  while the fog thickens to 2.5x (was 4x; owner 2026-10-14 "Soften it") and takes 0.3 of the cloud's colour); skim spray off the plane's track over water (sparks over lava); the caldera's
+  lava glow (the world's underlight 0.8 to ~1.7, a glow on the lava, the haze) and a ring of light round the plane at every checkpoint.
+  A phone keeps only the ring and the lava glow (`mobileBudget.json` holds aeroaces at 0 live particles: no sprites, no spray).
+- **Findings worth the next lane's time.** (1) An upright or camera-facing sprite that dips into a depth plane (the sea, the ground) is cut
+  flat across the whole cloud: keep its body above the plane. (2) Babylon's `BILLBOARDMODE_ALL` tilts a big quad to a high camera, which is
+  what put the island's clouds into the sea. (3) `camera._postProcesses` carries `null` holes after the pipeline rebuilds, and a pass attached
+  before a rebuild ends up in FRONT of the pipeline: attach after load and keep it last (`HeatHaze.keepLast`). (4) `Observable.remove` inside a notification
+  unregisters on the next tick, not at once (a test that counts observers needs a tick).
+- **Deferred.** A "Rain" chip for the kart's start screen (HUD: w3-present or an owner call; the URL works today). Sun shafts for any mode that
+  looks at the sun (a replay that cranes to it, a finish flown into it) - add its measured share to `SUN_SHAFT_MEASURED`. A photographic night
+  dome ([ART]). Heat haze with depth (a refraction of what is BEHIND the pit only) needs the depth pass. Tyre spray behind a kart on the wet road.
+- **Budgets, measured** (rig: 240x135 desktop-tier and 48x105 phone-tier probes, same camera and moment, base = `origin/lane/finish-release` vs this lane; draws from the engine's per-frame count, `?tier=` forced). Desktop ceilings 1600 draws / 900 active / 512 MB, phone 600 / 400 / 256 MB; every row is far inside both.
+  Foundry (combat, heat haze + chi rims): desktop 342 -> 343 draws, 54 active, particles 95 -> 95, 165 MB both; phone 76 -> 77 draws, 159 MB both.
+  Coconut Cove (aero, clouds + spray + ring): desktop 204 -> 206 draws, 65 active, particles 52 -> 232 (spray, cap 360), 183 MB both; phone 74 -> 75 draws, particles 54 -> 54 (no sprites, no spray), 183 MB both.
+  Knight arena (combat, chi rims): desktop 585 -> 586 draws, 100 active, texture 267 -> 271 MB (the rim glow's soft texture), phone 124 -> 124, 267 MB both.
+  Neon block (kart night, strip lights; `mobileBudget.json` row untouched): desktop 351 -> 351 draws, 55 active, texture 132 -> 129 MB, phone 64 -> 65 draws, 132 -> 129 MB.
+  Sun shafts: not mounted by any mode (measured share 0), so no row moves; with `?lookon=sunshafts` the pass adds one full occluder pass at half resolution.
+
+## Wave 3 status — crowds and reactions (w3-crowds, 2026-10-14)
+
+A9.9 built: a shared baked-animation crowd (`lib/babylon/visual/crowd/`) with reactions, rolled out to football, derby, tennis,
+volleyball, 3-Point, dunk, dunkduel, velocitykart and penalty. Presentation only: no speed, timing, camera, difficulty, score or pay
+value changed; `crowdWiring.test.ts` holds the module to importing nothing that scores, judges or tunes, and to only LISTENING to the
+Game-Breaker meter (a type import, `onReport` / `onTierChange`, never `report`).
+
+- **The bodies.** The five unused `public/models/crowd/*.glb` spectators share ONE texture set (byte-identical images) and only its
+  base colour carries anything (the emissive map is black, the normal map flat): the first body keeps its base colour, the other
+  four load with no materials — one 1024² texture for the whole crowd. FINDING / [ART]: the bodies' arms are skinned to the TORSO
+  (forearms and hands carry 0–40 of ~5,000 vertices; skin-transferred with the arms down), so no fan can raise an arm or clap. The
+  vocabulary is legs, hips, spine and head: up off the seat and rocked back (cheer), folded forward head down (groan), a rhythmic
+  rock or knee-bounce (applause), rise / sit down, a jumping stand. Arm cheers need a re-skin.
+- **The bake** (`crowdBake`, `crowdVat`). Ten authored clips (`crowdClips`, pose clips on the 22-joint rig) sampled at 30 fps into a
+  float vertex-animation texture per body (484 rows, ~0.7 MB each) by evaluating the animations directly — Babylon's
+  `VertexAnimationBaker` renders the whole scene once per frame. The shader's frame arithmetic is replicated and tested (each range
+  sits behind a pad row; the offset that starts a one-shot "now"). After the bake the live skeleton is folded to a point: the SSAO's
+  geometry buffer does not know baked animation and would otherwise draw the crowd in its T-pose bind.
+- **Fans and cards** (`crowdStands`, `crowdCards`, `crowdLayout`). A fan is a thin instance: one draw per stand × body, each block with
+  its OWN geometry (a thin instance's extra buffers live on the geometry — two blocks sharing one drew nothing: "no buffer bound to
+  enabled attribute"). Tiers: high 400 fans + 260 cards, desktop 300 + 220, phone cards only (140, no crowd GLB, no float texture).
+  Far rows are CARDS: on desktop a one-time 640×256 snapshot of the baked bodies in four poses (seated, seated cheer, standing,
+  standing cheer), unlit; on a phone a painted 256×128 atlas, lit. Seats are laid from each venue's stands deterministically with gaps,
+  turned toward the play; a venue's CAMERA LINE refuses any seat between the play camera and the play or behind it (tested per venue).
+  Bleachers (`benches: true`) are laid where a venue has no seating (the beach, the 3-Point sand, the tennis and football sidelines).
+- **Out of the passes it has no business in.** Every crowd mesh is named `__crowd_*`, the rig's "not scenery" mark: never a shadow
+  caster, never inked, not a glow occluder, not in a mirror. The governor's 'still' level stops the crowd's clock. (A rig note: the
+  first frame drawn after the capture rig re-enables shadows is the phone shadow cache's re-bake — 3-Point measures 191 there without
+  the crowd and 195 with it; the steady frame is 127 vs 131. Measure a frame later.)
+- **Reactions** (`crowdReact`, `modeCrowd`). `mountModeCrowd(ctx, key)` hears every play a mode reports to `ctx.momentum` (weight ≥ 6:
+  a cheer sized by it; ≤ −6: a groan), stands the crowd for a few seconds when the meter rises to ON FIRE, and rises and applauds when
+  the match ends (`react('finish', 1)` from a mode's own win jumps instead). Football, derby and penalty report nothing to the meter
+  (starting to would change its stings, shake and commentary), so they call `react()` at the touchdown / truck / tackle, the homer /
+  robbed homer, the goal / save. A share of the crowd takes part by strength, staggered in a ripple along each stand; a groan never
+  cuts a cheer off. Reduced motion: a third of the crowd, claps for cheers, nobody stands. The crowd builds 20 frames after the mode's
+  load returns (it would otherwise share load()'s 20 s watchdog), one body a frame.
+- **Per mode.** football: the end-zone stand + both sidelines, in place of the 16 sideline Onlookers. derby: the three spec grandstands
+  behind the wall (the homer's crowd, seen in the flight and the replay) + a bleacher down each baseline in foul ground; the six
+  infield Onlookers stay. tennis: the far grandstand + both sidelines behind the glass, in place of the 8 Onlookers (the near grandstand
+  is behind the play camera and stays painted). volleyball: two bleachers flanking the far end (nobody straight behind the far court:
+  the ball is read against it) + both sidelines, in place of the 8 Onlookers. 3-Point: a bleacher on the far sand behind the lamp post,
+  never behind the rim. dunk / dunkduel: a standing boardwalk crowd either side of the rim's line (|x| ≥ 4); the court's sides stay
+  clear (the hoopbus and the tent are dunk surfaces). velocitykart: people in the circuit's own straight grandstands
+  (`kartCrowdVenue` reads `kartSceneryFor`); the trackside Onlookers stay. penalty: two stands flanking the goal behind its line
+  (QA P1-05's rule, tested on their seats), in place of the 4 Onlookers.
+- **Budgets** (capture rig, same seed and frame 540, before → after; draws / active meshes / texture MB; desktop 1080p, phone 390×844
+  DPR 2 at the steady frame). Desktop: football 489/55/193 → 455/66/198, derby 559/96/189 → 613/121/200, tennis 311/67/142 →
+  257/73/136, volleyball 620/113/203 → 566/119/191, 3-Point 819/139/264 → 820/151/271, dunk 567/143/309 → 589/159/317, dunkduel
+  570/152/251 → 594/169/259, kart 546/72/237 → 556/77/244, penalty 231/49/149 → 195/46/151 (all far under 1600 / 900 / 512; a stand
+  block is one draw, the crowd's textures are ~10 MB). Phone (cards only): football 125 → 116 draws (skinned bodies 19 → 11), derby
+  105 → 110, tennis 79 → 68 (13 → 7), volleyball 110 → 89 (17 → 9), 3-Point 127 → 131, dunk 99 → 104 (texture 255 → 255), dunkduel
+  154 → 106, kart 108 → 112 (texture 236 → 236), penalty 65 → 61 (11 → 7). No `mobileBudget.json` row is raised; replacing Onlookers
+  with cards lowers the phones' skinned-body counts.
+- **Deferred / [ART].** Arm-raising cheers, claps, scarves and flags (the bodies' arm skinning: [ART]); more body variety ([ART]);
+  tennis's near grandstand stays painted (behind the main play camera; the end-change view sees it); the dunk crowd-card strip and the
+  painted stand faces are not animated (cards of our own stand in front of them); derby's glove-reach crowd at the wall on a robbed
+  homer; a phone-flash sync with `PhoneFlashes`; the kart's round grandstands (curved seating) keep their painted look.
+
+## Phone perf pass (phone-perf, 2026-10-14)
+
+Owner: "Phone perf pass" — measure every mode on the phone tier, trim the worst five. Rig: `scripts/probes/_perf-sweep.mts` (390×844,
+DPR 3, mobile tier, `?perf=off`, 4× CPU throttle, virtual time) through a production esbuild bundle of the harness (`PAGE=`, `RASTER=4`,
+`SEED=7`), base (`566beb28`) and the lane side by side. The probe was checked against known answers first (+50 meshes → +50 draws per
+pass, a 1024² texture → +5 MB, a fixed burn ×4–5 under the throttle, a known ballast → +17 MB heap). GPU time is not measured
+(SwiftShader); counts are exact; CPU ms are noisy on the shared box.
+
+- **Nothing is near 600 draws / 400 meshes** (worst: 3-Point 260 / 82). The phone limits that bind are texture memory and CPU time.
+- **Texture.** The guest kit body carries every wardrobe option: 15 maps, 95.8 MB on a phone in every mode a guest plays. A phone now
+  uploads glTF model maps at ≤ 1024² and the kit body at the bodies' phone split (skin 1024², the rest 512²) (`scene/phoneTextureCap`).
+  All 31 modes: 5552 → 2991 MB in total, median 188 → 89 MB; dunk 255 → 183, karate 201 → 81, who_scene_it 224 → 153.
+- **Shadow pass.** A phone's map skips accessories, eyes, soles, HUD and hoop-juice overlays (`scene/phoneCasters`): shadow draws per
+  frame median 16 → 6. 3-Point's cache no longer stands down (a third visibility change makes a mover; demotions are not rationed):
+  shadow draws 95 → 11, frame draws 191 → 112.
+- **Allocation.** `CharacterAnimator.clipNames` cached (13 % of the dunk's per-frame garbage).
+- `mobileBudget.json`: dunk / karate / threepoint / threevthree texture rows (and draws where they fell) lowered to lock the wins.
+- **Findings for the owner.** dunk and karate already exceed their activeMeshes and particles budgets on finish-release; the animation
+  layers (PostureLayer, TwoBoneIK, FootPlanting) are the next CPU/GC lever and are rig code (sign-off); production does not pre-warm
+  materials (`warmAll` is dev-only), so phones compile shaders mid-play.

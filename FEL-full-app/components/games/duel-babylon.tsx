@@ -16,6 +16,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { HudBanner, HudFrame, HudText } from './tv-hud';
 import { CombatClock, CombatEdgeCall, CombatRound, CombatStat } from './combat-hud-band';
+import { ReplayBug } from './fight-presentation';   // WAVE 3 (lane/w3-present)
 
 type Hud = Record<string, HudValue>;
 
@@ -98,7 +99,9 @@ export default function DuelBabylon({ onEnd }: GameProps) {
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
 
-  const showHud = phase === 'playing';
+  // WAVE 3: a KO replay (hud.replay) is the shot — the stat band steps aside and the REPLAY tag says how to skip it
+  const replaying = Number(hud.replay) === 1;
+  const showHud = phase === 'playing' && !replaying;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -135,7 +138,8 @@ export default function DuelBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" size="hero" plate={false} />}
+      {showHud && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" size="hero" plate={false} />}
+      <ReplayBug on={replaying} />
       </HudFrame>
 
       <BootSplash
