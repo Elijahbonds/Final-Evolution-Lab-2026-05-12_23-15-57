@@ -40,7 +40,13 @@ describe('week-1 dunk cards: word for word from programs/DUNK-PROGRAM.md', () =>
   });
 
   it('each day card is its weekly-layout item, day and title, word for word', () => {
-    WEEK1_DUNK_DAYS.forEach((d, i) => expect([`${d.day} ${d.title}`, `${d.day} ${d.title[0].toLowerCase()}${d.title.slice(1)}`], d.day).toContain(WEEKLY[i]));
+    // Saturday's item names the base weeks' day and then the later weeks': the card is the base-week part, the words
+    // before " (base weeks)" of THIS line's Sat item, exactly (PM 2026-10-14). Every other day is its whole item.
+    const SAT = 'Sat Movement Snack (base weeks); weeks 3+ may add the optional dunk session';
+    expect(WEEKLY[5]).toBe(SAT);
+    const item = (i: number) => (i === 5 ? SAT.slice(0, SAT.indexOf(' (base weeks)')) : WEEKLY[i]);
+    expect(item(5)).toBe('Sat Movement Snack');
+    WEEK1_DUNK_DAYS.forEach((d, i) => expect([`${d.day} ${d.title}`, `${d.day} ${d.title[0].toLowerCase()}${d.title.slice(1)}`], d.day).toContain(item(i)));
     expect(WEEK1_DUNK_DAYS).toHaveLength(WEEKLY.length);
   });
 
