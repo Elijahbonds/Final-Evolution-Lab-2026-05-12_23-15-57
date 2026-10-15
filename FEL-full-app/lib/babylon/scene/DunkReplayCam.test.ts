@@ -126,3 +126,26 @@ describe('pausableDelay', () => {
     } finally { vi.useRealTimers(); }
   });
 });
+
+// WAVE 3 (lane/w3-present): the fourth angle travels. The orbit cut's camera moves THROUGH the segment (the other cuts hold a pose and push in).
+import { ORBIT, ORBIT_CUT } from '../core/DunkCuts';
+describe('the orbit cut plays as a travelling camera', () => {
+  it('the camera stays on the orbit radius round the rim and sweeps through the cut; the other cuts do not sweep', async () => {
+    const r = rig();
+    for (let i = 0; i < 60; i++) r.step((k) => { r.root.position.y = Math.min(1.2, k * 0.03); r.root.position.z = k * 0.02; }, i);
+    const contact = r.nowSec() - 0.2;
+    const rim = new Vector3(0, 3.05, 5);
+    const cam = r.scene.activeCamera as FreeCamera;
+    const bearings: number[] = [], radii: number[] = [];
+    const done = r.rec.playCuts(rim, contact, [ORBIT_CUT]);
+    for (let i = 0; i < 28; i++) {
+      r.step();
+      if (r.rec.cutNow === 0) { radii.push(Math.hypot(cam.position.x - rim.x, cam.position.z - rim.z)); bearings.push(Math.atan2(cam.position.z - rim.z, cam.position.x - rim.x)); }
+    }
+    r.rec.stop(); await done;
+    expect(radii.length).toBeGreaterThan(15);
+    for (const d of radii) expect(Math.abs(d - ORBIT.radius)).toBeLessThan(0.02);   // (no push-in on the orbit)
+    const swept = Math.abs(bearings[bearings.length - 1] - bearings[0]);
+    expect(swept).toBeGreaterThan(1.0);                                                // it travelled well over a radian by the end of the frames played
+  });
+});

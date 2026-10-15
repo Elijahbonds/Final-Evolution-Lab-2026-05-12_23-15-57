@@ -4,7 +4,7 @@
   "bpm": 126,
   "bars": 56,
   "author": "FEL (MUSIC-SUITE P9, 2026-09-29)",
-  "about": "Difficulty 6. The electro lead and the clap set the accents (1, 1.5, 3); the verse doubles end on the 7 / 7.25 kick pickup, the hooks on sixteenth doubles off the lead (1.5 / 1.75, 5.5 / 5.75); builds climb in quarters; four freezes across the two breaks; free-tap bars every beat. Captured-move names, played as their family's library clip until those clips land: the ROBOT in every B verse, the KICK STEP and the HELICOPTER in the second hook, the SIDE FREEZE on the last break, the MOONWALK to close. Accents, doubles and free taps are STYLE taps; only the moves are scored steps.",
+  "about": "Difficulty 6. The electro lead and the clap set the accents (1, 1.5, 3); the verse doubles end on the 7 / 7.25 kick pickup, the hooks on sixteenth doubles off the lead (1.5 / 1.75, 5.5 / 5.75); builds climb in quarters; four freezes across the two breaks; free-tap bars every beat. Captured-move short names (robot, sidefreeze, moonwalk, and the same two in the final hook) still play their family's library clip, as they always did; the second hook opts in to the CAPTURES by naming their ids (ehBc: dance_toprock_kick, dance_power_helicopter — the same families, beats and accents as ehB, so the steps, the cap and the pay are the same). The last hook ends in a FREESTYLE section (efreeH: the same free taps, marked): the buttons pick the move, MATCH is not asked, and it pays STYLE only. Accents, doubles and free taps are STYLE taps; only the moves are scored steps.",
   "phrases": {
     "ein": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 2, "m": "spin" }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" }, { "b": 7 } ] },
     "ein2": { "bars": 2, "notes": [ { "b": 0, "m": "wave" }, { "b": 1 }, { "b": 2, "m": "spin" }, { "b": 4, "m": "wave", "mir": 1 }, { "b": 6, "m": "spin" }, { "b": 7 } ] },
@@ -14,7 +14,8 @@
     "ehA": { "bars": 2, "notes": [ { "b": 0, "m": "windmill" }, { "b": 1 }, { "b": 1.5, "x2": 0.25 }, { "b": 3 }, { "b": 4, "m": "wave" }, { "b": 6.5 } ] },
     "ehB": { "bars": 2, "notes": [ { "b": 0, "m": "kickstep" }, { "b": 1 }, { "b": 1.5, "x2": 0.25 }, { "b": 2.5 }, { "b": 4, "m": "helicopter" }, { "b": 5 }, { "b": 5.5, "x2": 0.25 }, { "b": 7 } ] },
     "efree": { "bars": 2, "free": { "every": 1 } },
-    "efreeH": { "bars": 2, "free": { "every": 1 } },
+    "ehBc": { "bars": 2, "notes": [ { "b": 0, "m": "dance_toprock_kick" }, { "b": 1 }, { "b": 1.5, "x2": 0.25 }, { "b": 2.5 }, { "b": 4, "m": "dance_power_helicopter" }, { "b": 5 }, { "b": 5.5, "x2": 0.25 }, { "b": 7 } ] },
+    "efreeH": { "bars": 2, "free": { "every": 1, "freestyle": true } },
     "ebrk1": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze" }, { "b": 3, "m": "wave" }, { "b": 4, "m": "spin" }, { "b": 4.5 }, { "b": 6 } ] },
     "ebrk2": { "bars": 2, "notes": [ { "b": 0, "m": "babyfreeze", "mir": 1 }, { "b": 3, "m": "wave", "mir": 1 }, { "b": 4, "m": "spin" }, { "b": 6 } ] },
     "ebrk3": { "bars": 2, "notes": [ { "b": 0, "m": "sidefreeze" }, { "b": 4, "m": "babyfreeze", "mir": 1 }, { "b": 7, "m": "spin" } ] },
@@ -28,7 +29,7 @@
     { "name": "break", "bar": 25, "bars": 4, "play": ["ebrk1", "ebrk2"] },
     { "name": "verse", "bar": 29, "bars": 8, "play": ["evA", "efree", "evB", "evA"] },
     { "name": "build", "bar": 37, "bars": 4, "play": ["evB", "ebA"] },
-    { "name": "hook", "bar": 41, "bars": 8, "play": ["ehB", "efree", "ehA", "efree"] },
+    { "name": "hook", "bar": 41, "bars": 8, "play": ["ehBc", "efree", "ehA", "efree"] },
     { "name": "break", "bar": 49, "bars": 2, "play": ["ebrk3"] },
     { "name": "hook", "bar": 51, "bars": 4, "play": ["ehB", "efreeH"] },
     { "name": "outro", "bar": 55, "bars": 2, "play": ["eout"] }

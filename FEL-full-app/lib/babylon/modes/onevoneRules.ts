@@ -63,6 +63,11 @@ export const WIN_BY_2_KEY = 'fel-1v1-winby2';
  *  same game there, and the stake is held to the first-to-11 ceiling (13). */
 export const HEAD_TO_HEAD_PARAMS: readonly string[] = ['arena', 'mp', 'c'];
 /** Is the win-by-2 pick offered on this run? Never on a staked or head-to-head run. */
+/** A staked or head-to-head run (?arena= / ?mp= / ?c=): it plays PRO and the start screen offers no OPPONENT pick (QA #259). */
+export function headToHeadRun(search: string): boolean {
+  const q = new URLSearchParams(search);
+  return HEAD_TO_HEAD_PARAMS.some((k) => q.get(k));
+}
 export function winBy2Offered(search: string): boolean {
   const q = new URLSearchParams(search);
   return !HEAD_TO_HEAD_PARAMS.some((k) => q.get(k));

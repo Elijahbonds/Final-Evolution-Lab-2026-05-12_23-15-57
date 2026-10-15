@@ -136,7 +136,7 @@ import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 // HOOPS KINETIC (owner brief 2026-09-18): the parry-vault, the momentum drift and its ankle-breaker, the footstool board, the drive-by steal.
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, FOOTSTOOL, footstoolRead, DRIVE_BY, driveByRead } from '../core/HoopsKinetic';
-import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
+import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
@@ -206,6 +206,7 @@ import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2: the shared OPPONENT pick
+import { tierForRun } from './threevthreeRules';   // QA #259: a staked / head-to-head run plays PRO, whatever the pick
 import type { AmbientHandle } from '../visual/EffectsKit';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
   ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
@@ -402,7 +403,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** The rival is on the floor (posterized) — held there by the tree until the stun ends. */
   let foeFloored = false;
   let lookX = 0, lookY = 0;   // R stick → camera look (MODE-STICK-FACE family, 2026-09-07)
-  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false;
+  const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false; let pausedAt = 0; let stickLockClearAt: number | null = null; let keyBus: { keyRStick: boolean } | null = null;   // H1 H-03/H-04/H-19
   let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
   // HOOPS-10PHASE-2 phase 5: the size-up chain's OWN eaten-press fault — the shot button had exactly this bug
   // (see SHOT_BUFFER_MS above) and the fix is the same tool. A flick thrown mid-gather/mid-finish/mid-spin used
@@ -904,6 +905,14 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   /** A possession-changing timer: only fires if the possession it was scheduled in is still the live one. IMPROVE (2026-10-06) #6
    *  #13: on the mode's clock (after) — it waits out a pause, and dispose ends it (ended, the token bumped, the queue emptied). */
+  /** #2 #3 / NB-1: the OPPONENT pick and the win rule as they stand now — read at load AND again at TAP TO START (onPlay). */
+  function readRules(): { knobs: typeof knobs; winCond: WinRule } {
+    return {
+      knobs: ONEVONE_TIER[tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())] ?? ONEVONE_TIER.pro,
+      winCond: winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' })),
+    };
+  }
+
   function later(ms: number, fn: () => void): void {
     const tok = possessionToken;
     after(ms / 1000, () => { if (!ended && possessionToken === tok) fn(); });
@@ -915,6 +924,17 @@ export const OneVOneMode: ModeDefinition = (() => {
     // HOOPS BODY (2026-10-07): the body plays 1v1 through the hero's ControlSource; its claimed events land here
     body: COURT_BODY,
     onBody: (_ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean => bodyCtl?.see(ev, view) ?? false,
+    // NB-1 (HONEST-START): load() ran at page load, before the start screen's OPPONENT / WIN BY 2 picks — this run plays the pick
+    onPlay(ctx: ModeContext) {
+      if (myScore !== 0 || foeScore !== 0) return;   // only before the first bucket
+      const r = readRules();
+      if (r.knobs === knobs && r.winCond.winBy2 === winCond.winBy2) return;
+      knobs = r.knobs; winCond = r.winCond;
+      foeBrain?.setAggression(knobs.defenderAggression);
+      nerveTheAttacker();
+      putHud(ctx, { winBy2: winCond.winBy2 });
+      console.info(`[1V1-RULES] at start: opponent ${tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+    },
 
     async load(ctx: ModeContext) {
       // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
@@ -962,9 +982,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       // the pips (#10), the box (#4); the OPPONENT pick (#2) and the win rule (#3) are read for this run
       modeClock = 0; bannerUntil = 0; timers.length = 0; lastUpdateMs = -1; meFlightTick = null; foeFlightTick = null;
       hudMemo.clear(); hintShown = ''; hintAt = 0; hintPossession = null; pips = ''; box = emptyBox();
-      knobs = ONEVONE_TIER[readTier()] ?? ONEVONE_TIER.pro;
+      knobs = ONEVONE_TIER[tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())] ?? ONEVONE_TIER.pro;
       winCond = winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' }));
-      console.info(`[1V1-RULES] opponent ${readTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] opponent ${tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
@@ -1080,7 +1100,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (!stickShot && e.y < -0.5 && Math.abs(e.x) > 0.3) { stickShot = { side: e.x > 0 ? 'right' : 'left', shimmy: !!meSlot.intent.sprint, started: false, shimmied: false }; shimmyLeft = stickShot.shimmy ? 0.22 : 0; }
           rStick.reset(); lookX = 0; lookY = 0;
         } else {
-        const onFloor = carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin;
+        const onFloor = carrying && possession === 'mine' && !shooting && !dunking;   // H1 H-04: handling, not just "free" — a busy-frame gesture is BUFFERED, not reset
         if (onFloor) { stickGestures.push(...rStick.feed(e.x, e.y, performance.now() / 1000)); lookX = 0; lookY = 0; }
         else { rStick.reset(); lookX = e.x; lookY = e.y; }
         }
@@ -1139,6 +1159,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      if (!ctx.input.keyRStick) { ctx.input.keyRStick = true; keyBus = ctx.input; }   // H1 H-19: the keyboard R stick is on in hoops
       meter3d?.update(dt); if (!shooting && !dunking && meter3d?.visible()) meter3d.end(null);   // a shot that ended without a release (a block, a strip) drops the bar
       if (ended) return;
       // IMPROVE (2026-10-06) #6: the mode's clock — the beats that fell due (a reset, a check, a banner's clear) before anything reads
@@ -1536,26 +1557,34 @@ export const OneVOneMode: ModeDefinition = (() => {
         // a half-circle sweep the STEEZO ROLL (the wrap rolled into the spin). In the air the same stick is the trick stick.
         // HOOPS-10PHASE-2 phase 5: a buffered gesture gets first crack at THIS frame's window, same as any live one —
         // it is replayed through the exact same loop below, so every gate (handle locks, chains, escape timing) still runs.
-        if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && performance.now() - bufferedGestureAt <= STICK_MOVE_BUFFER_MS) {
+        if (shooting || dunking || finish || gather || spin) stickLockClearAt = null; else if (stickLockClearAt === null) stickLockClearAt = performance.now();   // H1 H-04
+        if (carrying && possession === 'mine') stickGestures.push(...rStick.tick(performance.now() / 1000));   // H1 H-03: a still thumb still reaches the hold clock
+        if (pausedDribble && (!(carrying && possession === 'mine') || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); console.info("[1V1-STICK] PAUSIN' let go quietly"); }
+        if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) {
           stickGestures.unshift(bufferedGesture); bufferedGesture = null;
-        } else bufferedGesture = null;
+        } else if (bufferedGesture && !bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) bufferedGesture = null;   // H-04: the buffer survives the lock, then 220 ms
         if (stickGestures.length && carrying && !shooting && !dunking && !finish && !gather && !spin) {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
             if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
+            if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
+              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold('bball_hesi', { fadeSec: moveFadeSec(false), speedRatio: 0.25 }); console.info("[1V1-STICK] PAUSIN'"); }
+              continue;
+            }
             const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
             // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
             // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
             // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
-            const locked = !!pick0 && pick0.move === 'snatchback' && !hasMove('snatch_back', handle);
-            if (locked) refuse(ctx, `SNATCHBACK NEEDS HANDLE ${MOVE_HANDLE.snatch_back} — YOURS ${handle}`);
-            const pick = locked ? { move: 'stepback' as const, side: pick0!.side } : pick0;
+            const own0 = pick0 ? ownedStickMove(pick0.move, handle) : null;   // H1 H-02: every gated move falls back, never a dead stick
+            const locked = !!own0 && own0.locked;
+            if (locked) refuse(ctx, `${pick0!.move.replace(/_/g, ' ').toUpperCase()} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);
+            const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
             if (!pick) continue;
             if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;   // a size-up is rhythm, not the move the aggressive BTB chains off
             console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(meCarry?.hand ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
             // THE 2K PRO STICK (2026-09-18): the size-up (a package animation in place, no travel), the L2 step-back dribble
             // (a hop off the rim that arms the step-back jumper), the L2 spin — none of them a chain move
-            if (pick.move === 'size_up') { const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', handle); console.info(`[1V1-HANDLE] size-up ${suClip} (handle ${handle})`); meAnimTree.beat(suClip, { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
+            if (pick.move === 'size_up') { const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', handle); console.info(`[1V1-HANDLE] size-up ${suClip} (handle ${handle})`); meAnimTree.beat(suClip, { fadeSec: moveFadeSec(sprintOk) }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
             if (pick.move === 'stepback') {
               // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
               // into a cross reads as a combo and the tier is real. It is rated 0 — the gate is what you chain into it.
@@ -1563,7 +1592,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               console.info(`[1V1-HANDLE] link stepback (chain ${chain.length}, handle ${handle})`);
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
-              meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
+              meAnimTree.beat('bball_stepback_gather', { fadeSec: moveFadeSec(sprintOk) }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
               continue;
             }
             if (pick.move === 'snatchback') {
@@ -1578,7 +1607,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
               meCarry?.switchHand();
-              meAnimTree.beat('bball_stepback_gather', { fadeSec: 0.08 }); SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
+              meAnimTree.beat('bball_stepback_gather', { fadeSec: moveFadeSec(sprintOk) }); SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
               continue;
             }
             if (pick.move === 'spin') {
@@ -1605,8 +1634,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               }
               meDribble.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (carrying && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, sideS); } }); }
             if (g.kind === 'flick') { chainBeforeFlick = chain; flickAt = performance.now() / 1000; flickMove = pick.move; }
-            doMove(ctx, pick.move, pick.side ?? undefined);
-            SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1);
+            if (doMove(ctx, pick.move, pick.side ?? undefined)) {SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1); }   // H1: no whoosh for a refused move
           }
           stickGestures = [];
         } else if (stickGestures.length) {
@@ -2222,6 +2250,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      if (keyBus) keyBus.keyRStick = false;
       // IMPROVE (2026-10-06) #13: the mode is over for everything it deferred — no queued beat, no flight, no banner clear runs into
       // the bodies disposed below (later() checks `ended` and the token; the queue is emptied besides)
       ended = true; possessionToken++; timers.length = 0; bannerUntil = 0; meFlightTick = null; foeFlightTick = null;
@@ -3205,7 +3234,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   /** `flick`: a left-stick crossover's move (HOOPS MOTION phase 3d, S2 — this is its one beat source): a move with no clip of its own
    *  plays the crossover (flickClip), so the flick always moves the hands. */
-  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', flick = false): void {   // STICK HANDLE: the stick's side wins over the defender read
+  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', flick = false): boolean {   // H1: false when the handle refused it   // STICK HANDLE: the stick's side wins over the defender read
     // THE DECISION IS SHARED (HandleSystem.resolveHandleMove); what stays here is the RENDERING — this
     // mode's clips, banners and defender. 3v3 renders the same outcome its own way, so a tuning change to
     // the chain or the odds lands in both games instead of one.
@@ -3215,7 +3244,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       set: foeVelLast.length() < 0.6,
       within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE,
     }, roll);
-    if (!outcome.owned) return;                      // not in my hands yet — the gate IS the upgrade
+    if (!outcome.owned) return false;                      // not in my hands yet — the gate IS the upgrade
     chain = outcome.chain;
 
     // THE MOVE ITSELF. Everything below renders what the move DID — the banner, the defender, the chain — and
@@ -3263,12 +3292,12 @@ export const OneVOneMode: ModeDefinition = (() => {
         micStolen(false);   // THE MIC: I lost it; he did not take it
         console.info(`[1V1-HANDLE] off the head — MISSED (odds ${odds.toFixed(2)})`);
       }
-      return;
+      return true;
     }
 
     if (outcome.restarted) {
       if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] ${move} out of window — new chain`);
-      return;
+      return true;
     }
     // THE BODY GOES WHERE THE MOVE SAYS. One shot, never a per-frame scale (that compounds into a
     // teleport — same reason the jab burst is written the way it is). The lateral sign is AWAY from him,
@@ -3293,6 +3322,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       ctx.feel?.impact?.(0.08 * chain.length);
     }
     reactToBreak(ctx, outcome, moveDir);
+    return true;
   }
 
   /** The two bodies as the loose ball sees them: a jumper reaches higher, a floored body cannot reach at all. */

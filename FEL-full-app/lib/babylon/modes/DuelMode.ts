@@ -61,6 +61,8 @@ import { readCombatArena, arenasFor, arenaClamp, offEdge, insideBy, describeAren
 import { buildArena, type ArenaHandle } from '../combat/arenaBuild';
 import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chi aura, the ring-out plume
 import { mountPresentation, type Presentation } from '../combat/presentation';   // the critical edge's grade swing, speed lines, the impact frame
+import { KoReplayCue, playKoReplay } from '../combat/koReplay';   // WAVE 3 (lane/w3-present): KO / ring-out replays — never the match-deciding one
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { mountWeaponTrail, type WeaponTrail } from '../combat/weaponTrail';   // the streak a blade / staff leaves, in each fighter's colour
 import { readBlend, blendTraits } from '../combat/schools';
 import { styleMoveset } from '../combat/loadout';
@@ -226,6 +228,7 @@ export const DuelMode: ModeDefinition = (() => {
   let arena: CombatArena = arenasFor('duel')[0];
   let arenaHandle: ArenaHandle | null = null;
   let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
+  const koCue = new KoReplayCue();   // WAVE 3: a round's KO or ring-out plays back once, a beat after the fall
   let myTrail: WeaponTrail | null = null, foeTrail: WeaponTrail | null = null;
   /** IMPROVE (2026-10-06): metres inside the picked arena's edge at (x, z), through one scratch point (the brain probes it
    *  every frame; a `{ x, z }` per call was garbage). */
@@ -573,6 +576,7 @@ export const DuelMode: ModeDefinition = (() => {
     }
     meOut = !playerWon; foeOut = playerWon;
     meMove.vel.setAll(0); foeMove.vel.setAll(0); foeUlt.clear();
+    koCue.arm({ kind: how, decidesMatch: myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN, victim: playerWon ? 1 : 0 }, motionPolicy().reduced);   // WAVE 3: never the match's last round (afterRound ends it)
     banner(ctx, `${label} — ROUND ${round}`, DUEL.roundOverSec * 1000);
   }
 
@@ -619,7 +623,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startMatch(ctx: ModeContext): void {
-    round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
+    koCue.reset(); round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
     ringOutWins = 0; guardImpacts = 0; lastFoeWeapon = null; rivalWonLast = false;
     startRound(ctx);
   }
@@ -627,6 +631,7 @@ export const DuelMode: ModeDefinition = (() => {
   /** A round's start — everything reset, the fighters on their marks, the rival's weapon for this round, then the beat:
    *  "ROUND n" for READY, then FIGHT! (update()). */
   function startRound(ctx: ModeContext): void {
+    koCue.cancel();
     meState.resetRound(); foeState.resetRound(); xBtn.reset(); padGuard.reset(); guardUp = false; book.reset(); stringLabels = []; deferred.clear(); ledger.reset(); bodyShift = null; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
     // IMPROVE (2026-10-06): nothing of the last round carries in — the beats, the verdict, the rival's armed edge, its guard
     meDef.releaseBlock(); foeDef.releaseBlock(); foeLaunchedSec = 0; foeUlt.clear(); foeSubstituted = 0; foeFullCalled = false;
@@ -802,6 +807,8 @@ export const DuelMode: ModeDefinition = (() => {
 
   return {
     modeId: 'duel', mood: 'dojoWarm', camPreset: 'duel',  // Phase 9: side-on disc framing
+    replay: true,   // WAVE 3: KO and ring-out replays, from [player, rival]
+    replayCast: () => ({ bodies: [player.root, rival.root] }),
     // MOVEMENT PLAY P7: the body plays the duel only behind its flag (read at mount — the dev probe's ?bodyfight=duel)
     get body() { return bodyFightOn('duel') ? { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES } : undefined; },
     get onBody() { return bodyFightOn('duel') ? onBodyEvent : undefined; },
@@ -954,6 +961,7 @@ export const DuelMode: ModeDefinition = (() => {
       if (phase === 'intro') { beginPlay(ctx); return; }
       if (phase === 'ready' && phaseSec >= DUEL.readySec) fight(ctx);
       else if (phase === 'roundOver' && phaseSec >= DUEL.roundOverSec) { afterRound(ctx); return; }
+      if (phase === 'roundOver') { const plan = koCue.step(dt); if (plan) playKoReplay(ctx, plan); }   // WAVE 3: the replay, a beat after the fall
       // phase 8 — MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock (his animator, brain, swings,
       // movement), me on mine. `sdtRoom` / `sdtHero` below are the two clocks; nothing else in this update reads `dt` for a body.
       const wasFocus = focus.active;
@@ -1033,7 +1041,7 @@ export const DuelMode: ModeDefinition = (() => {
       knock.clear(); bannerSlot.clear(); foeUlt.clear();
       modeVenue?.dispose?.(); modeVenue = null;
       arenaHandle?.dispose(); arenaHandle = null;
-      fx?.dispose(); fx = null; pres?.dispose(); pres = null; myTrail?.dispose(); myTrail = null; foeTrail?.dispose(); foeTrail = null;
+      fx?.dispose(); fx = null; pres?.dispose(); pres = null; koCue.reset(); myTrail?.dispose(); myTrail = null; foeTrail?.dispose(); foeTrail = null;
       // the props are parented to a hand bone, so disposing the character takes them — but they are also
       // rebuilt on every weapon change, and a stale one left behind would ride the next round's rig
       myProp?.dispose(); myProp = null;

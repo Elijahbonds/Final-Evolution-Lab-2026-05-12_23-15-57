@@ -21,6 +21,7 @@ import { sideOfRigHand, sideOfVector, type AthleteSide } from '../anim/athleteSi
 import { SoundKit } from '../audio/SoundKit';
 import { HAPTIC, padRumble } from '../premium/Haptics';
 import { readPlaceLook } from '../nexus/placeLooks';
+import { mountStudioFor, studioIntro, studioLookFor, studioMood, type StudioExtras } from '@/lib/nexus-studio/runtime';   // NEXUS STUDIO: a dev-only ?venue= (null without one, and in production)
 import {
   commitSwing, freshBlitz, goingOut, matchCall, mulberry32, postedScore, ringClose01, skipGap, swingTiming, tickBlitz,
   RETURN_OUT_SEC, TARGET, type BlitzFeel, type BlitzState, type Side, NORMAL_FEEL, aiNetsIt, gradeReactBase,
@@ -87,6 +88,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   const state: BlitzState = freshBlitz(opts.warmup ?? (readWarmed() ? WARMUP_AGAIN : WARMUP_FIRST));
   const warmTotal = state.warmup;
   let venue: VenueHandle | null = null;
+  let studio: StudioExtras | null = null;   // NEXUS STUDIO: a Studio venue's props, fixtures, crowd and weather (dev-only ?venue=)
   let player: SpawnedCharacter | null = null;
   let rival: SpawnedCharacter | null = null;
   let playerBody: BeatOwner | null = null;
@@ -356,12 +358,14 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
 
   return {
     modeId: 'tiebreak',
-    mood: 'goldenHour',
+    get mood() { return studioMood('tiebreak', 'goldenHour'); },   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one
+    get intro() { return studioIntro('tiebreak'); },                // NEXUS STUDIO: none unless a dev-only ?venue= asks for one
     camPreset: 'court',
 
     async load(ctx: ModeContext): Promise<void> {
-      venue = mountVenue(ctx, 'tennis', { keepGameplayCamera: true, look: readPlaceLook('tiebreak') });
+      venue = mountVenue(ctx, 'tennis', { keepGameplayCamera: true, look: studioLookFor('tiebreak') ?? readPlaceLook('tiebreak') });
       venue?.hidePlaceholders();
+      studio = mountStudioFor('tiebreak', ctx);   // NEXUS STUDIO: null without a dev-only ?venue=
       player = await CharacterLibrary.spawn(ctx.scene, DEFAULT_HERO_URL, {
         position: new Vector3(0, 0, NEAR_Z), yawRad: PLAYER_YAW, startClip: SPORT_CLIP.idle,
       });
@@ -485,6 +489,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       player?.dispose();
       rival?.dispose();
       venue?.dispose();
+      studio?.dispose(); studio = null;   // NEXUS STUDIO
       ball = null; ring = null; shadow = null; player = null; rival = null; venue = null;
       playerBody = null; rivalBody = null;
     },
@@ -499,7 +504,8 @@ let registryLiveTiebreak: ModeDefinition | null = null;
 
 export const TiebreakMode: ModeDefinition = {
   modeId: 'tiebreak',
-  mood: 'goldenHour',
+  get mood() { return studioMood('tiebreak', 'goldenHour'); },   // NEXUS STUDIO (dev-only ?venue=)
+  get intro() { return studioIntro('tiebreak'); },
   camPreset: 'court',
   load(ctx) {
     registryLiveTiebreak = makeTiebreakMode({ reactBase: gradeReactBase('READY'), aiNets: aiNetsIt });

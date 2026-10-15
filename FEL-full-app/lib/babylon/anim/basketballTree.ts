@@ -19,6 +19,7 @@ import { plantLeg, claimLeg, releaseLeg } from './FootPlanting';
 import type { CharacterAnimator } from './CharacterAnimator';
 import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
+import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -91,8 +92,8 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   speed_dribble:   { clip: 'bball_dribble_jog', loop: true, fadeSec: 0.14 },    // DRIBBLE GEARS: the jog (78_10), paced by the jog reference
   walk_dribble:    { clip: 'bball_dribble_walk', loop: true, fadeSec: 0.16 },   // the walking dribble (06_01) — a slowed run used to play here
   sprint_dribble:  { clip: 'bball_dribble_run', loop: true, fadeSec: 0.12 },    // the sprint (78_06), its own pace
-  crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.08 },
-  crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.08 },
+  crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.12 },   // H1 H-05
+  crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.12 },
   protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
   // ANIM CLEAN-UP (owner, 2026-09-18: "fix the off arm while running"). The DRIVE — a sprint at the rim with the ball —
   // played the plain run: both arms pumping while the ball-carry IK dragged the ball arm back to the bounce beside the
@@ -257,7 +258,7 @@ export class BasketballAnimTree {
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null) this.strideFilter.set(r0);
         this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
-      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? c.fadeSec * 0.6 : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
+      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every

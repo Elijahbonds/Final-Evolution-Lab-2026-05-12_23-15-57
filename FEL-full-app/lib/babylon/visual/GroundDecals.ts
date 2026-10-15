@@ -39,6 +39,20 @@ export function decalAlpha(age: number, life: number): number {
 /** Pure: the ring buffer — the slot the next stamp takes. */
 export function nextSlot(cursor: number, cap: number): number { return (cursor + 1) % cap; }
 
+/** NEXUS STUDIO (docs/NEXUS-STUDIO.md §8): a `persist` stamp's birth time. A kept mark never fades and never ages out. */
+export const KEPT_MARK = Number.POSITIVE_INFINITY;
+/** Pure: a slot's opacity — a kept mark is always 1, any other mark follows decalAlpha. */
+export function markAlpha(born: number, clock: number, life: number): number {
+  return born === KEPT_MARK ? 1 : decalAlpha(clock - born, life);
+}
+/** Pure: the slot a stamp takes. The ring as before, stepping over kept marks, so a mode's transient marks never wipe a placed
+ *  one. A full pool of kept marks: a kept stamp takes the ring's next slot (the oldest goes) and a transient one is dropped (-1). */
+export function slotFor(cursor: number, cap: number, born: ArrayLike<number>, persist: boolean): number {
+  let c = cursor;
+  for (let i = 0; i < cap; i++) { c = nextSlot(c, cap); if (born[c] !== KEPT_MARK) return c; }
+  return persist ? nextSlot(cursor, cap) : -1;
+}
+
 function paint(scene: Scene, kind: DecalKind): DynamicTexture {
   const S = 128;
   const tex = new DynamicTexture(`fel_decal_${kind}`, { width: S, height: S }, scene, true);
@@ -95,8 +109,10 @@ function paint(scene: Scene, kind: DecalKind): DynamicTexture {
 
 export interface GroundDecalsHandle {
   /** Leave a mark at (x, z) on the floor at height `y`, turned `yaw` radians, scaled ×`scale`. `pitch` tips it onto a slope (a
-   *  piste's rise, radians about the mark's own x axis); `tint` colours a `carve` mark (CARVE_TINT). */
-  stamp(kind: DecalKind, x: number, z: number, yaw?: number, opts?: { y?: number; scale?: number; pitch?: number; tint?: readonly [number, number, number] }): void;
+   *  piste's rise, radians about the mark's own x axis); `tint` colours a `carve` mark (CARVE_TINT). `persist` keeps the mark at
+   *  full strength for the life of the pool (a placed mark: Nexus Studio's ground marks) — it never fades, and a transient
+   *  stamp never takes its slot; `cap` kept marks per kind at most. */
+  stamp(kind: DecalKind, x: number, z: number, yaw?: number, opts?: { y?: number; scale?: number; pitch?: number; tint?: readonly [number, number, number]; persist?: boolean }): void;
   /** Live marks of a kind (for probes and tests). */
   live(kind: DecalKind): number;
   /** The newest mark of a kind, for probes and tests: its instance colour and how far its face tips from level (1 = flat). */
@@ -137,7 +153,7 @@ export function mountGroundDecals(scene: Scene, tier: QualityTier): GroundDecals
       if (!p.count) continue;
       let alive = 0;
       for (let i = 0; i < cap; i++) {
-        const a = decalAlpha(clock - p.born[i], life);
+        const a = markAlpha(p.born[i], clock, life);
         if (a > 0) alive++;
         if (p.cols[i * 4 + 3] !== a) p.cols[i * 4 + 3] = a;
       }
@@ -148,7 +164,9 @@ export function mountGroundDecals(scene: Scene, tier: QualityTier): GroundDecals
   return {
     stamp(kind, x, z, yaw = 0, opts = {}) {
       const p = pool(kind);
-      p.cursor = nextSlot(p.cursor, cap);
+      const slot = slotFor(p.cursor, cap, p.born, opts.persist === true);
+      if (slot < 0) return;   // every slot holds a kept mark: a transient mark has nowhere to go
+      p.cursor = slot;
       const [w, l] = DECAL_SIZE[kind]; const k = opts.scale ?? 1;
       s.set(w * k, 1, l * k); t.set(x, (opts.y ?? 0) + 0.012, z);
       Quaternion.RotationYawPitchRollToRef(yaw, opts.pitch ?? 0, 0, q);
@@ -156,7 +174,7 @@ export function mountGroundDecals(scene: Scene, tier: QualityTier): GroundDecals
       tmp.copyToArray(p.mats, p.cursor * 16);
       const tn = opts.tint;
       p.cols.set([tn?.[0] ?? 1, tn?.[1] ?? 1, tn?.[2] ?? 1, 1], p.cursor * 4);
-      p.born[p.cursor] = clock;
+      p.born[p.cursor] = opts.persist ? KEPT_MARK : clock;
       p.count = Math.min(cap, p.count + 1);
       p.mesh.thinInstanceBufferUpdated('matrix'); p.mesh.thinInstanceBufferUpdated('color');
     },
@@ -166,7 +184,7 @@ export function mountGroundDecals(scene: Scene, tier: QualityTier): GroundDecals
       const c = p.cursor;
       return { rgb: [p.cols[c * 4], p.cols[c * 4 + 1], p.cols[c * 4 + 2]], normalY: p.mats[c * 16 + 5] };   // the matrix's local-y column, y term: the face's tilt
     },
-    live(kind) { const p = pools.get(kind); if (!p) return 0; let n = 0; for (let i = 0; i < cap; i++) if (decalAlpha(clock - p.born[i], life) > 0) n++; return n; },
+    live(kind) { const p = pools.get(kind); if (!p) return 0; let n = 0; for (let i = 0; i < cap; i++) if (markAlpha(p.born[i], clock, life) > 0) n++; return n; },
     dispose() {
       scene.onBeforeRenderObservable.remove(obs);
       for (const p of pools.values()) { p.mesh.material?.dispose(true, true); p.mesh.dispose(); }
