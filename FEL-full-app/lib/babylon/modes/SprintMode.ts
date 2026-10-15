@@ -9,7 +9,7 @@
 // The core is fixed-step: tick(dtMs) advances the clock, step(side) feeds a
 // stride. Nothing here re-implements any of it.
 
-import { Color3, Mesh, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, Matrix, Mesh, MeshBuilder, StandardMaterial, Tools, Vector3 } from '@babylonjs/core';
 import type { PBRMaterial } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -38,6 +38,7 @@ import { stepFinishGrace } from '../racing/RaceField';   // MECHANICS PASS: the 
 import { buildSprintDressing, type SprintDressingHandle } from '../racing/sprintDressing';
 import { stepPlants, type PlantState } from '../racing/raceMoments';
 import { stampDecal } from '../racing/raceStamp';
+import { lineRow01 } from '../racing/photoFinish';   // WAVE 3 (lane/w3-present): the photo-finish still's finish-line row
 import { EffectsKit } from '../visual/EffectsKit';
 // MOVEMENT PLAY P8 (2026-09-26): running in place IS the race — each told step graded on the camera's capture clock against a
 // body's cadence (a thumb's 5 taps a second is not a jog's 3), the reaction timed on the same clock, a step captured before
@@ -232,6 +233,7 @@ function finish(ctx: ModeContext, timeS: number, rawS: number): void {
   S.won = won;
   dressing?.setClock(timeS, true);   // VIS-RACE: the gantry shows the official time (dip and false-start penalties in)
   finishBeat(ctx, won);
+  capturePhoto(ctx, rawS);   // WAVE 3: the still the host prints as the photo finish
   // PB SPLITS: the tape is the last mark (the core's clock at the line), then the run is kept if it is the best
   if (core) trackMarks(ctx, core.state.distanceM, rawS * 1000);
   const saved = saveSprintPbIfFaster(RACE_DIST, { totalMs: Math.round(timeS * 1000), atM: S.atM });
@@ -252,6 +254,25 @@ function finish(ctx: ModeContext, timeS: number, rawS: number): void {
   S.runV = core?.state.speed ?? 0; S.runOver = 0;
   S.pendingEnd = () => ctx.end(outcome, score, stats);
   S.runout = RUNOUT_SEC;
+}
+
+/**
+ * WAVE 3 (lane/w3-present): THE PHOTO. The frame the camera drew as the runner reaches the tape — read off the canvas the way the dunk's poster is
+ * (Tools.CreateScreenshot reads the drawn frame; a separate render target flashed the canvas black and tripped the display watchdog there) — and where
+ * the finish line is in it (its world point, projected through the frame's own matrices). The host prints both with the two RAW crossing times
+ * (racing/photoFinish does the ruler's arithmetic). The pacer's crossing is its own curve's: RIVAL_TIME_S. Nothing here touches the race.
+ */
+function capturePhoto(ctx: ModeContext, rawS: number): void {
+  try {
+    const engine = ctx.scene.getEngine(), cam = ctx.camera;
+    const w = engine.getRenderWidth(), h = engine.getRenderHeight();
+    const p = Vector3.Project(new Vector3(0, 0.02, -RACE_DIST), Matrix.Identity(), ctx.scene.getTransformMatrix(), cam.viewport.toGlobal(w, h));
+    const row = lineRow01(p.y, h, p.z);
+    Tools.CreateScreenshot(engine, cam, { precision: 0.5 }, (data) => {
+      ctx.setHud({ photoSrc: data, photoLine: row, photoYou: Number(rawS.toFixed(3)), photoPacer: RIVAL_TIME_S });
+      console.info(`[SPRINT-PHOTO] captured (${Math.round(data.length / 1024)} kB) line ${row === null ? 'off-frame' : row}`);
+    }, 'image/jpeg', false, 0.8);
+  } catch (e) { console.warn('[SPRINT-PHOTO] capture failed', e); }
 }
 
 /** IMPROVE (2026-10-06): PB SPLITS — record the clock at every 10 m crossed since the last frame; call 30 m and 60 m out
@@ -374,6 +395,7 @@ return {
     say('ON YOUR MARKS', 1.2);
     // MOVEMENT PLAY P8: the probe's read-only seam
     (ctx.scene.metadata ??= {}).sprint = { state: () => ({ ...core!.state, reactS: S.reactS, dipped: S.dipped, stumbles: S.stumbles, rivalDist: +S.rivalDist.toFixed(1), body: { ...S.body }, cadence: core!.cadenceStats }) };
+    ctx.setHud({ photoSrc: null, photoLine: null });   // WAVE 3: a new race starts without last race's photo
     pushHud(ctx, 0, true);
   },
 

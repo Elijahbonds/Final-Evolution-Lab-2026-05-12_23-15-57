@@ -1,7 +1,7 @@
 {
-  "measuredAt": "2026-10-06",
+  "measuredAt": "2026-10-14",
   "probe": "scripts/probes/_perf-sweep.mts",
-  "profile": "390x844 portrait, DPR 3, isMobile/hasTouch (mobile tier, 780x1688 backing), SwiftShader, 4x CPU throttle, virtual time, a fake pad playing; ?perf=off (the content, not the governor). Worst frame of the run per metric.",
+  "profile": "390x844 portrait, DPR 3, isMobile/hasTouch (mobile tier, 780x1688 backing), SwiftShader, 4x CPU throttle, virtual time, a fake pad playing; ?perf=off (the content, not the governor). Worst frame of the run per metric. 2026-10-14 (lane/phone-perf): the drawCalls and textureMb of dunk, karate, threepoint and threevthree re-measured after the phone pass (the same profile through the esbuild static bundle, PAGE=, RASTER=4, SEED=7; only lowered); every other number is the 2026-10-06 sweep's.",
   "headroom": 1.2,
   "ceilingSource": "drawCalls / activeMeshes / textureMb: PerfMonitor MOBILE_BUDGET. skinnedBodies 16 and particles 1500: perf-guard (TUNED).",
   "ceiling": {
@@ -78,17 +78,17 @@
     },
     "dunk": {
       "measured": {
-        "drawCalls": 154,
+        "drawCalls": 144,
         "activeMeshes": 67,
         "skinnedBodies": 12,
-        "textureMb": 253,
+        "textureMb": 183,
         "particles": 10
       },
       "budget": {
-        "drawCalls": 185,
+        "drawCalls": 173,
         "activeMeshes": 81,
         "skinnedBodies": 15,
-        "textureMb": 256,
+        "textureMb": 220,
         "particles": 12
       }
     },
@@ -126,17 +126,17 @@
     },
     "karate": {
       "measured": {
-        "drawCalls": 205,
+        "drawCalls": 154,
         "activeMeshes": 64,
         "skinnedBodies": 22,
-        "textureMb": 193,
+        "textureMb": 81,
         "particles": 20
       },
       "budget": {
-        "drawCalls": 246,
+        "drawCalls": 185,
         "activeMeshes": 77,
         "skinnedBodies": 22,
-        "textureMb": 232,
+        "textureMb": 98,
         "particles": 24
       }
     },
@@ -241,30 +241,30 @@
         "drawCalls": 220,
         "activeMeshes": 77,
         "skinnedBodies": 16,
-        "textureMb": 214,
+        "textureMb": 144,
         "particles": 0
       },
       "budget": {
         "drawCalls": 264,
         "activeMeshes": 93,
         "skinnedBodies": 16,
-        "textureMb": 256,
+        "textureMb": 173,
         "particles": 0
       }
     },
     "threevthree": {
       "measured": {
-        "drawCalls": 196,
+        "drawCalls": 173,
         "activeMeshes": 81,
         "skinnedBodies": 16,
-        "textureMb": 216,
+        "textureMb": 145,
         "particles": 10
       },
       "budget": {
-        "drawCalls": 236,
+        "drawCalls": 208,
         "activeMeshes": 98,
         "skinnedBodies": 16,
-        "textureMb": 256,
+        "textureMb": 174,
         "particles": 12
       }
     },

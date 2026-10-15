@@ -225,7 +225,7 @@ describe('wiring that needs a whole mode to exercise', () => {
   const src = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
 
   it('feel.impact only pulses the frame when flashes are allowed', () => {
-    expect(src('lib/babylon/core/ModeHarness.ts')).toMatch(/impact: \(s: number\) => \{[^}]*if \(motionPolicy\(\)\.flash\) frame = kickImpactFrame\(frame, s\)/);
+    expect(src('lib/babylon/core/ModeHarness.ts')).toMatch(/impact: \(s: number\) => \{[^}]*if \(motionPolicy\(\)\.flash\) gradeState = \{ \.\.\.gradeState, frame: kickImpactFrame\(gradeState\.frame, s\) \}/);
   });
 
   it('the QA trace does not count a suppressed flash or shake as the answer to a press', () => {

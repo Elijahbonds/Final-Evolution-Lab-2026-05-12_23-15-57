@@ -31,6 +31,15 @@ export function isRealMoneyCompetitionEnabled(): boolean {
   return envOn('REAL_MONEY_COMPETITION');
 }
 
+/**
+ * NEXUS STUDIO (owner, 2026-10-14) — the Nexus editor inside FEL at /studio (docs/NEXUS-STUDIO.md). Default OFF: /studio
+ * is a 404 for everyone while unset. Separate from STUDIO_CREATOR_ENABLED, which opens the PAID Studio surface (credits,
+ * cartridges, partner keys) — turning the editor on must not open those.
+ */
+export function isNexusStudioEnabled(): boolean {
+  return envOn('NEXUS_STUDIO_ENABLED');
+}
+
 /** Standard 403 body for a disabled feature. */
 export const FEATURE_DISABLED = { error: 'feature_disabled', message: 'This feature is not currently enabled.' } as const;
 

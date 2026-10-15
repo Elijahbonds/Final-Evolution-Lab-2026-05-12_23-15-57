@@ -56,6 +56,7 @@ import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';
 // VIS-COURT (wave 2, 2026-10-13): the golf, derby and penalty visuals — a shot tracer with its readout, the flag as cloth, a putting
 // grid, the tee's sign, the replays and their pacing. Every one is fed positions and numbers this file already has; none is read back.
 import { ShotTracer } from '../court/ShotTracer';
@@ -1013,6 +1014,8 @@ export const DerbyMode: ModeDefinition = (() => {
   let incoming = false, swung = false, ended = false;
   /** L4 — the crowd down the baselines. A derby is watched. */
   let gallery: Onlookers | null = null;
+  /** w3-crowds (A9.9): the stands — the homer's grandstands behind the wall and a bleacher down each baseline. */
+  let stands: ModeCrowd | null = null;
   let batPosture: { dispose(): void } | null = null, pitchPosture: { dispose(): void } | null = null;
   /** A pitch is on the way from the timer but has not been thrown yet. This is
    *  the re-entry guard; using `incoming` for it meant the whiff test — which
@@ -1222,10 +1225,11 @@ export const DerbyMode: ModeDefinition = (() => {
     } else {
       gained = homer ? distPts * mult : 0; pts += gained;
       roundOver = bankSwing(tally, homer, distFt);
-      if (verdict === 'robbed') { park.robbed++; SoundKit.play('crowdGroan', { volume: 0.5 }); }
+      if (verdict === 'robbed') { park.robbed++; SoundKit.play('crowdGroan', { volume: 0.5 }); stands?.react('groan', 0.8); }
     }
     if (homer) SoundKit.play('score', { pitch: q > 0.85 ? 1.2 : 1 }); else if (!tg) SoundKit.play('impact', { pitch: 1.35, volume: 0.4 });
     gallery?.cheer(homer || tg ? q : 0.2);
+    if (homer || tg) stands?.react(homer && q > 0.85 ? 'stand' : 'cheer', homer ? Math.max(0.5, q) : 0.6);   // w3-crowds: a dinger stands them up
     const x = mult > 1 ? ` (x${mult})` : '';
     const banner = tg ? `${tg.kind === 'glass' ? 'GLASS SHATTERED' : 'BULLSEYE'}! +${gained}${x}`
       : homer ? (clutch ? `CLUTCH DINGER! +${gained}` : q > 0.85 ? `DINGER! +${gained}` : `HOMER +${gained}`) + x
@@ -1348,6 +1352,7 @@ export const DerbyMode: ModeDefinition = (() => {
         // IMPROVE (2026-10-06, Derby #19): six bodies (twelve spots, every other one), parked while off-screen — the follow
         // cam on a hit and the outfield leave them all out of frame (Tennis's opt-in, Onlookers.pauseOffscreen).
       ], undefined, undefined, { pauseOffscreen: true });
+      stands = mountModeCrowd(ctx, 'derby');   // w3-crowds
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.7, 0, 0), Math.PI / 2, SPORT_CLIP.derbyStance);
       meAnim = new BeatOwner(me.animator); meAnim.loop(SPORT_CLIP.derbyStance);
       // The bat (Phase 6, 2026-09-03): the stance and swing are real now; the
@@ -1676,7 +1681,7 @@ export const DerbyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
     // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
-    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 
@@ -1803,8 +1808,8 @@ export const PenaltyMode: ModeDefinition = (() => {
   /** A+ mission #8 (FIFA read): every kick as a pip, both sides. */
   let myKicks: KickResult[] = [], theirKicks: KickResult[] = [];
   const kicksHud = () => ({ kicksYou: kickPips(myKicks, REGULATION_KICKS), kicksThem: kickPips(theirKicks, REGULATION_KICKS), goals, themGoals });
-  /** L4 — the bank behind the goal. A shootout is watched. */
-  let gallery: Onlookers | null = null;
+  /** L4 — the crowd behind the goal (w3-crowds, A9.9: two stands flanking it, in place of the four Onlookers). */
+  let crowd: ModeCrowd | null = null;
   let strikerPosture: { dispose(): void } | null = null, keeperPosture: { dispose(): void } | null = null;
   // ── the shootout (D1/D2 built in the depth pass) ──
   /** The rival's goals — a shootout is against SOMEONE. Their kicks are
@@ -1960,8 +1965,7 @@ export const PenaltyMode: ModeDefinition = (() => {
     }
     const c = Math.ceil(brk.clock), f = Math.round(brk.flow), kin = gameT - brk.kineticAt <= FLOW.kineticSec ? 'KINETIC' : '';
     if (c !== brk.hudClock || f !== brk.hudFlow || kin !== brk.hudKin) { brk.hudClock = c; brk.hudFlow = f; brk.hudKin = kin; ctx.setHud({ clock: c, flow: f, kinetic: kin }); }
-    // IMPROVE (2026-10-06, Penalty #16): the gallery is updated once a frame, in update() — this second call swayed it at
-    // double speed through every breakaway
+    // IMPROVE (2026-10-06, Penalty #16): the crowd is never stepped here (w3-crowds: the stands run on their own clock)
     ctx.camDirector.update(p, vel, ball.position);
   }
   /** The curved glass down each side of the breakaway. */
@@ -2000,13 +2004,13 @@ export const PenaltyMode: ModeDefinition = (() => {
       }
       SoundKit.play('score');
       SoundKit.play('crowdCheer');
-      gallery?.cheer(1);
+      crowd?.react('cheer', 1);
     } else {
       SoundKit.play(saved ? 'crowdGroan' : 'miss');
       if (!saved) SoundKit.play('crowdGroan', { volume: 0.3 });   // A+ P0: the miss groans too, quieter
       ctx.feel?.impact?.(0.45);           // A+ P0: heavier feel on a save / miss — never the goal punch
       console.info(`[PEN-JUICE] ${saved ? 'saved' : 'miss'} (heavy feel + groan)`);
-      gallery?.cheer(0.25);               // a save is THEIR moment
+      crowd?.react('groan', saved ? 0.6 : 0.8);   // a save is THEIR moment: the stands groan
     }
     bannerCh?.cancel();   // IMPROVE (2026-10-06, Penalty #11): the strike label's pending clear must not wipe the result
     ctx.setHud({
@@ -2096,7 +2100,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       ended = true;
       SoundKit.play('whistle');
       const won = winner === 'you';
-      if (won) SoundKit.play('crowdCheer');
+      if (won) { SoundKit.play('crowdCheer'); crowd?.react('finish', 1); }
       ctx.setHud({ banner: won ? `LEVEL AFTER ${SD_CAP} — YOURS ON ${decidedBy === 'style' ? 'STYLE' : decidedBy === 'later-save' ? 'THE LATER SAVE' : 'NERVE'}` : `LEVEL AFTER ${SD_CAP} — THEIRS ON THE LATER SAVE` });
       // stats are numbers: decidedBy 1 = style, 2 = the later save, 3 = nerve
       console.info(`[PEN-END] ${won ? 'WIN' : 'LOSS'} ${goals}-${themGoals} style ${stylePts} sd ${sdRounds}`);
@@ -2107,7 +2111,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       ended = true;
       SoundKit.play('whistle');
       const won = s.winner === 'you';
-      if (won) SoundKit.play('crowdCheer');
+      if (won) { SoundKit.play('crowdCheer'); crowd?.react('finish', 1); }
       console.info(`[PEN-END] ${won ? 'WIN' : 'LOSS'} ${goals}-${themGoals} style ${stylePts}`);
       ctx.end(won ? 'SHOOTOUT_WIN' : 'SHOOTOUT_LOSS', goals * 20 + stylePts,
         { goals, stylePts, themGoals, sdRounds: Math.max(0, round - REGULATION_KICKS), ...endStats() });
@@ -2165,7 +2169,7 @@ export const PenaltyMode: ModeDefinition = (() => {
       // in the goal mouth behind the keeper, and they read as more keepers. 2 m behind the keeper camera (fixed at z 13.4
       // on THEIR kick): at 13.2 the camera stood inside a spectator (measured 2026-09-06). IMPROVE (2026-10-06, Penalty
       // #18): parked while the camera is off them (Onlookers.pauseOffscreen: the breakaway's follow cam turns away).
-      gallery = new Onlookers(ctx.scene, penaltyGallerySpots(GALLERY_PER_SIDE), undefined, undefined, { pauseOffscreen: true });
+      crowd = mountModeCrowd(ctx, 'penalty');   // w3-crowds: the stands flank the goal where these spots did (crowdVenues PENALTY)
       me = await spawnAthlete(ctx, CFG.heroUrl, new Vector3(-0.4, 0, -1.6), 0, SPORT_CLIP.penaltyIdle);
       keeper = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0, 10.4), Math.PI, SPORT_CLIP.keeperIdle);
       // the left dive is the authored right dive reflected across the sagittal plane, registered as 'keeper_dive.M'
@@ -2353,7 +2357,6 @@ export const PenaltyMode: ModeDefinition = (() => {
           }
         }
       }
-      gallery?.update(dt);
       if (phase === 'break') { tickBreak(ctx, dt); return; }   // BREAKAWAY
       if (phase === 'flight') {
         // BREAKAWAY: the follow camera rides the shot; IMPROVE (2026-10-06, Penalty #3): the classic pen's fixed camera
@@ -2454,6 +2457,7 @@ export const PenaltyMode: ModeDefinition = (() => {
             theirKicks.push(theyScore ? 'goal' : 'miss');
             if (r.saved) { lastSaveBy = 'you'; ctx.juice.scorePop(ball.position, 'SAVED!', '#7CFFB2'); ctx.feel?.impact?.(0.5); }
             SoundKit.play(theyScore ? 'crowdGroan' : 'crowdCheer', { volume: 0.4 });
+            crowd?.react(theyScore ? 'groan' : 'cheer', theyScore ? 0.5 : 0.8);   // w3-crowds
             bannerCh?.cancel();
             ctx.setHud({
               score: goals * 20 + stylePts, ...kicksHud(),   // phase 3: the number the result reports (goals x20 + style); the board is kicksYou / goals / themGoals
@@ -2485,6 +2489,6 @@ export const PenaltyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Penalty #10 / #13): ended, and every pending timer cleared — startKeeperRound / afterTheirKick /
     // the rise checked only `!ended`, which dispose never set; and the weather's particles and light restorers go with it.
-    dispose() { ended = true; timers.clear(); resultBeat.cancel(); bannerCh = null; goalNet?.dispose(); goalNet = null; flares?.dispose(); flares = null; penRings?.dispose(); penRings = null; penProxy?.dispose(); penProxy = null; weatherFx?.dispose(); weatherFx = null; strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; gallery?.dispose(); gallery = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; timers.clear(); resultBeat.cancel(); bannerCh = null; goalNet?.dispose(); goalNet = null; flares?.dispose(); flares = null; penRings?.dispose(); penRings = null; penProxy?.dispose(); penProxy = null; weatherFx?.dispose(); weatherFx = null; strikerPosture?.dispose(); strikerPosture = null; keeperPosture?.dispose(); keeperPosture = null; penaltyVenue?.dispose?.(); penaltyVenue = null; crowd?.dispose(); crowd = null; me?.dispose(); keeper?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); reticle?.dispose(); SoundKit.stopAmbient(); },
   };
 })();

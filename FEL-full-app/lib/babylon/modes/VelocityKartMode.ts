@@ -19,6 +19,8 @@ import { BoostKit } from '../core/BoostKit';          // FINISH-RELEASE: the sha
 import { BoostFx } from '../premium/BoostFx';
 import { BoostPads } from '../visual/BoostPads';
 import { Onlookers } from '../visual/Onlookers';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';   // w3-crowds (A9.9)
+import { kartCrowdVenue } from '../visual/crowd/crowdVenues';
 import { Color3, DynamicTexture, Mesh,
   MeshBuilder, PBRMaterial, Texture, TransformNode, Vector3, Vector4 } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -55,7 +57,7 @@ import { collectBalloon, balloonsHit, stepBalloons, useItem, stepMissiles, stepM
 import { AeroPickups } from '../racing/aeroPickups';
 import {
   buildKerbs, buildObstacles, obstacleContact, placeObstacles, stillTouching,
-  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, kartSettingFor, buildForest, buildEdgeLights, buildShortcuts, SHORTCUT_CLEAR } from '../racing/kartDressing';
+  type PlacedObstacle, buildChevrons, buildGantry, kartSceneryFor, kartSettingFor, buildForest, buildEdgeLights, edgeLightsFor, buildShortcuts, SHORTCUT_CLEAR } from '../racing/kartDressing';
 import { buildCloudDeck, type CloudDeckHandle } from '../visual/CloudDeck';
 import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS } from '../visual/venuePropSets';
@@ -89,6 +91,13 @@ import { OVERTAKE, OvertakeWatch, TyreTrail, rearAxle } from '../racing/raceMome
 import { stampDecal } from '../racing/raceStamp';
 import { buildStartLights, GREEN_HOLD_SEC, type StartLightsHandle } from '../racing/startLights';
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
+// w3-atmos: the road's asphalt grain and its wet gloss; rain / storm / fog on ?weather= (visual only: the kart reads none of the weather's gameplay modifiers)
+import { asphaltRoad, markWetGloss } from '../racing/roadSurface';
+import { WeatherKit } from '../core/WeatherKit';
+import { readKartWeather } from '../nexus/weather';
+import { addStripSource } from '../scene/FixtureLights';
+import { hazeColor } from '../scene/Atmosphere';
+import { mountWeatherFx, type WeatherFxHandle } from '../premium/WeatherFx';
 
 /** A kart is small; a full-size body swamps it. */
 const DRIVER_SCALE = 0.92;
@@ -121,6 +130,7 @@ let venueRoot: TransformNode | null = null;
 let worldGround: Mesh | null = null;
 let trackside: TracksideHandle | null = null;
 let crowd: Onlookers | null = null;
+let stands: ModeCrowd | null = null;   // w3-crowds (A9.9): the grandstands' crowd
 let roadTex: DynamicTexture | null = null;
 // THE FIELD (2026-09-13). This mode shipped as a time trial: a clock does not overtake you on the last
 // corner, and Phase 0 recorded it as the one racing mode with no opponent of any kind. The rivals are
@@ -228,6 +238,8 @@ let ramps: Mesh[] = [];
 let kerbRoot: TransformNode | null = null;
 let detailRoot: TransformNode | null = null; let scenery: VenuePropsHandle | null = null; let sceneryGone = false;   // DETAIL PASS
 let clouds: CloudDeckHandle | null = null;   // 10-phase pass, phase 6: the sky over the course
+let stripOff: (() => void) | null = null;   // w3-atmos: the night course's edge lights as a fixture strip
+let weather: WeatherKit | null = null; let weatherFx: WeatherFxHandle | null = null;   // w3-atmos: ?weather= rain / storm / fog, looks only
 let vehicleLight: VehicleLightHandle | null = null;   // 10-phase pass, phase 7: the vehicles' own light
 let speedLines: SpeedLines | null = null;   // 10-phase pass, phase 8: streaks past ~80% of top speed
 let dustFx: DustEmitter | null = null;      // 10-phase pass, phase 8: the rear wheels' continuous dust
@@ -734,6 +746,8 @@ function buildRoad(ctx: ModeContext): Mesh[] {
   merged.material = tarmac;
   merged.receiveShadows = true;
   merged.isPickable = false;
+  asphaltRoad(ctx.scene, merged, half);   // w3-atmos: the aggregate's relief and roughness over the paint
+  markWetGloss(tarmac);                    // w3-atmos: a soaked road reflects (WeatherFx lifts these with the wetness)
   return [merged];
 }
 
@@ -1219,12 +1233,19 @@ return {
       // THE SETTING (owner, 2026-09-18): the mountain courses stand in a real forest on the relief; the night courses
       // read their road by edge lights (the orbit station was a black frame to the render watchdog without them)
       if (course.venue === 'slope') buildForest(ctx.scene, circuit, worldHeightFn(course), course.mood === 'alpine' ? '#2f5a3e' : '#3b6a4a').parent = detailRoot;
-      if (course.mood === 'nightGame') buildEdgeLights(ctx.scene, circuit).parent = detailRoot;
+      if (course.mood === 'nightGame') {
+        buildEdgeLights(ctx.scene, circuit).parent = detailRoot;
+        // w3-atmos: the edge strip is a fixture: a pool of clustered lights that follows the kart along it (scene/FixtureLights strips; desktop/high)
+        stripOff?.(); const tint = Color3.FromHexString(circuit.course.tint);
+        stripOff = addStripSource(ctx.scene, { points: edgeLightsFor(circuit).map(([x, y, z]) => [x, y, z] as const), color: { r: tint.r, g: tint.g, b: tint.b }, follow: () => (state ? state.pos : null) });
+      }
       // phase 6: the event (racing kit) PLUS the place it stands in (the venue family's own nature/city band)
       shortcutRoot?.dispose(); shortcutRoot = buildShortcuts(ctx.scene, circuit);   // IMPROVE #8: the sand path(s)
       const key = `kart-${circuit.course.id}${vKey ? `-${vKey}` : ''}`; VENUE_PROP_SETS[key] = [...kartSceneryFor(circuit), ...kartSettingFor(circuit)];
       sceneryGone = false; scenery?.dispose(); scenery = null;
       void mountVenueProps(ctx.scene, key, detailRoot, { snapToGround: true }).then((h) => { if (sceneryGone) h?.dispose(); else scenery = h; });
+      // w3-crowds (A9.9): people in the circuit's own grandstands; they hear the overtakes (ctx.momentum) and the finish
+      stands?.dispose(); stands = mountModeCrowd(ctx, 'velocitykart', { venue: kartCrowdVenue(kartSceneryFor(circuit), worldHeightFn(course), [course.start.at.x, 3, course.start.at.z]) });
     }
     console.info(`[RACE-VENUE] ${course.id}: ${trackside.count} trackside instances`);
     // RACING WAS THE LAST FAMILY WITH NOBODY WATCHING. The board modes have had Onlookers since it landed;
@@ -1237,6 +1258,8 @@ return {
       : null;
     if (crowd) console.info(`[RACE-VENUE] ${crowd.count} trackside spectators`);
     road = buildRoad(ctx);
+    // w3-atmos: rain, storm or fog from the URL, else the start screen's Rain chip (w3-followups); the weather's wet pass finds the road by name (premium/WeatherFx GROUND_RE)
+    { const wx = readKartWeather(); weatherFx?.dispose(); weather = wx ? WeatherKit.fromPick(wx, 'links', 7) : null; weatherFx = weather ? mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: true, fogHex: hazeColor(course.mood) }) : null; }
     marks = buildMarks(ctx);
     noCast(ctx, marks);   // phone pass: a 12 cm slab across the road throws no shadow worth a draw per cascade
     kart = buildKart(ctx);
@@ -1489,6 +1512,7 @@ return {
   update(ctx: ModeContext, dt: number): void {
     crowd?.update(dt);   // they idle and bob whether or not the race is running
     clouds?.update(dt, ctx.scene.activeCamera);
+    weather?.update(dt); weatherFx?.update(dt);   // w3-atmos
     if (!state || !kart || S.done) return;
     // GC-13 / phase 10: the HUD's words and the ring's gamepad puck follow whoever is riding — a body gets
     // a body's words and no puck (the exact call rideHud.test.ts pins); the puck is re-asserted once a
@@ -1880,8 +1904,10 @@ return {
 
   dispose(): void {
     boostFx?.dispose(); boostFx = null; boostPads?.dispose(); boostPads = null;
+    weatherFx?.dispose(); weatherFx = null; weather = null; stripOff?.(); stripOff = null;   // w3-atmos
     startLights?.dispose(); startLights = null; replayDue = false; goAge = null;   // VIS-RACE
     crowd?.dispose?.(); crowd = null;
+    stands?.dispose(); stands = null;   // w3-crowds
     kart?.dispose(); kart = null;
     for (const m of marks) m.dispose();
     for (const r of road) r.dispose();

@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { runMode, InputBus, type ModePhase, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
+import { HudBanner, type HudTone } from '@/components/games/tv-hud';   // NEXUS STUDIO: a play-tested script's banner (studioBanner)
 // MOVEMENT PLAY P3 (2026-09-24): no Body button here, so the body source is loaded for its probe hook alone —
 // window.__FEL_BODY__ (dev / agent only), which a probe switches on before it feeds frames (scripts/probes/_body-seam-live.mts)
 import '@/lib/input/poseSource';
@@ -75,6 +76,9 @@ export function DevModeRunner({ modeKey }: { modeKey: string }) {
         </p>
         <pre className="mt-1 whitespace-pre-wrap text-[10px] text-white/45">{JSON.stringify(hud, null, 1)}</pre>
       </div>
+
+      {/* NEXUS STUDIO (track 4): a Studio script's HUD banner, drawn by the TV HUD's own HudBanner (empty text draws nothing) */}
+      <HudBanner text={hud.studioBanner} tone={(typeof hud.studioBannerTone === 'string' ? hud.studioBannerTone : 'score') as HudTone} className="top-1/4 z-20" />
 
       <button
         // Blur: space activates a focused button, and space is the shoot key,

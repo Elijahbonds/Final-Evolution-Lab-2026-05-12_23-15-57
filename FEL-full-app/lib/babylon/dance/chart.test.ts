@@ -9,6 +9,7 @@ import { MAX_SONG_BARS } from '../music/Song';
 import { FEL_SONGS, songFor, type FelSong } from './felSongs';
 import { chartForLevel, grooveBeats, GROOVE_WINDOW_SEC, buttonForStep, FAMILY_BUTTON, categoryOf } from './chartPlay';
 import { isStakingPaused } from '@/lib/stakingPause';
+import { danceMove, isCapturedMove } from './moves';
 import {
   CHART_FORMAT, CHART_MOVES, CHART_SONG_IDS, DENSITY_BAND, DIFFICULTY_RULES, SCORED_STEP_CAP, chartFor, chartStats, chartStepsFor,
   chartStyleBeatsFor, clipStem, expandChart, moveClip, planChart, selectScored, stepsFromPresses, styleBeatsFromPresses, swingBeat,
@@ -77,14 +78,19 @@ describe('DENSITY PAYS AS STYLE: a chart\'s steps are its moves, every other pre
       const style = chartStyleBeatsFor(s)!;
       expect(style.length).toBeGreaterThan(0);
       expect(style.length).toBeLessThanOrEqual(st.styleTaps);
-      // sorted, no step shares a beat with a style tap, and every step is a plain DANCE_LIBRARY press step
+      // sorted, no step shares a beat with a style tap, and every step is a plain press step of the room's vocabulary: a DANCE_LIBRARY
+      // row, or — only where the chart opts in by naming its id (dance/moves.ts; lane/dance-extras, 2026-10-14) — a captured move.
+      // test changed (lane/dance-extras): this said "DANCE_LIBRARY row" and read the clip's beats off DANCE_LIBRARY; the two opt-in
+      // phrases (evolution ehBc, canals kvDc) make a step's clip a captured move, which is a 4-beat press step of its own family.
       expect([...style].sort((a, b) => a - b)).toEqual(style);
       const stepBeats = new Set(steps.map((x) => x.beat));
       for (const b of style) expect(stepBeats.has(b), `style beat ${b} is also a step`).toBe(false);
       for (const x of steps) {
-        expect(DANCE_LIBRARY.some((c) => c.id === x.clipId)).toBe(true);
+        expect(danceMove(x.clipId), x.clipId).not.toBeNull();
+        if (isCapturedMove(x.clipId)) expect(JSON.stringify(chart), `${s.id} names ${x.clipId}`).toContain(`"${x.clipId}"`);   // a chart opts in; no alias reaches one
+        else expect(DANCE_LIBRARY.some((c) => c.id === x.clipId)).toBe(true);
         expect(Object.keys(x).sort()).toEqual(['beat', 'clipId', 'holdBeats', 'mirrored']);   // exactly stepsForSong's shape
-        expect(x.holdBeats).toBe(DANCE_LIBRARY.find((c) => c.id === x.clipId)!.beats);
+        expect(x.holdBeats).toBe(danceMove(x.clipId)!.beats);
       }
     });
   }
@@ -269,7 +275,7 @@ describe('a freeze keeps the current hold: a step held through its clip, release
     for (const s of FEL_SONGS) {
       const steps = chartStepsFor(s)!;
       steps.forEach((x, i) => {
-        if (DANCE_LIBRARY.find((c) => c.id === x.clipId)!.category !== 'freeze') return;
+        if (danceMove(x.clipId)!.category !== 'freeze') return;   // test changed (lane/dance-extras): the vocabulary lookup (a captured freeze is a freeze too)
         freezes++;
         expect(x.holdBeats).toBe(2);
         const next = steps[i + 1];
