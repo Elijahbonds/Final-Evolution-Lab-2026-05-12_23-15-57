@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ResultsView } from '@/app/play/mirror/assess/_components/results-view';
+import { ResultsView, checkCards } from '@/app/play/mirror/assess/_components/results-view';
 import { FaultReplay } from '@/app/play/mirror/assess/_components/fault-replay';
 import { gradeSession } from '@/lib/assess/runner';
 import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, syntheticCalibration } from '@/lib/assess/replay';
@@ -104,6 +104,24 @@ describe('MIRROR step 2: the worst-rep skeleton', () => {
     for (const c of drawn) expect(c).toContain('data-top-priority');
     expect(drawn.length).toBeLessThanOrEqual(cards.filter((x) => x.includes('data-top-priority')).length);
     expect(cards.filter((x) => !x.includes('data-top-priority') && x.includes('data-fault-replay'))).toEqual([]);
+  });
+
+  // PM (2026-10-14): two cards can say Top priority; only the TOP-RANKED one (the first in sort order; on a tie, the first
+  // in that order) draws the replay — exactly one, on the first card.
+  it('two Top priority cards that could each draw a rep: exactly one replay, on the first card', () => {
+    const MANY = graded2();
+    const SM = summarize(MANY)!;
+    holdReplay(MANY.tests);
+    const held = heldReplay();
+    const tops = checkCards(SM).filter((c) => c.top);
+    expect(tops.length).toBe(2);                                                    // not vacuous: two Top priority cards…
+    for (const c of tops) expect(pickReplay(held, c.row), c.test).not.toBeNull();   // …and each has a rep it could draw
+    const h = renderToStaticMarkup(createElement(ResultsView, { summary: SM, age: '18+', onClear: () => {}, onRunAgain: () => {}, replay: held }));
+    const cards = h.split('<li').slice(1);
+    expect(cards.filter((x) => x.includes('data-top-priority'))).toHaveLength(2);
+    expect(h.match(/data-fault-replay=/g)?.length ?? 0).toBe(1);
+    expect(cards[0]).toContain(`data-check-card="${tops[0].test}"`);
+    expect(cards[0]).toContain('data-fault-replay');
   });
 
   it('no frames, no replay; and never for a kid or an age not given', () => {

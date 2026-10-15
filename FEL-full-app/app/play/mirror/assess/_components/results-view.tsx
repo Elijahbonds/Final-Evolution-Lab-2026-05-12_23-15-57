@@ -88,7 +88,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
       <section>
         <h2 className="px-1 text-[16px] font-bold uppercase tracking-[0.14em] text-white/60">Your checks</h2>
         <ul data-check-cards className="mt-2 space-y-2">
-          {checkCards(s).map(({ test, band, row, top }) => {
+          {checkCards(s).map(({ test, band, row, top }, idx) => {
             const word = band ?? 'unread';
             const pad = top ? 'p-3.5' : 'px-3.5 py-2.5';
             const cueText = top ? 'text-[16px] text-white/85' : 'text-[16px] text-white/75';
@@ -111,7 +111,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                     <p data-cue className={`mt-1 leading-snug ${cueText}`}>Try this: {cueOf(row.id)}<EarlyTag /></p>
                   </>
                 ) : null}
-                {top ? (() => {
+                {top && idx === 0 ? (() => {   // the replay: the TOP-RANKED card only (first in sort order; a tie goes to the first)
                   const rep = pickReplay(replay, row);
                   return rep ? <FaultReplay rep={rep} /> : null;
                 })() : null}
