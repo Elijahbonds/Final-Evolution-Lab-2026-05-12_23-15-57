@@ -904,7 +904,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     setPhase('walkIn');
     banner(ctx, '', 0);
     ctx.setHud({
-      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[readTier()]?.name ?? 'PRO').toUpperCase(),
+      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[runTier()]?.name ?? 'PRO').toUpperCase(),
       meName: 'YOU', meSub: blendName(readBlend()).toUpperCase(),
     });
     SoundKit.play('whoosh', { pitch: 0.55, volume: 0.3 });
