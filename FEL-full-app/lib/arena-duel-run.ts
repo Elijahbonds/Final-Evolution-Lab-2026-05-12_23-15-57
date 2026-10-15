@@ -8,7 +8,7 @@
 //   · was finished (paid or recorded) with a score,
 //   · started after the duel was created (a run played before the duel existed is not a run FOR it),
 //   · has not already been submitted to another duel (its runId rides in the SCORE_SUBMITTED event),
-// and the posted score must equal that run's score. Nothing here writes; a refusal is thrown before the route writes.
+// and the posted score must equal that run's score. Nothing here writes (it only locks the run row); a refusal is thrown before the route writes.
 // No schema change: the run is read from SessionRun as it is, and the binding is the MatchEvent payload that already exists.
 import { arenaModeKey } from '@/lib/arena';
 import { RUN_STATUS } from '@/lib/sessions/sessionRuns';
@@ -25,6 +25,10 @@ export async function readDuelRun(
 ): Promise<DuelRunVerdict> {
   const runId = typeof a.runId === 'string' && a.runId.length > 0 && a.runId.length <= 64 ? a.runId : null;
   if (!runId) return { ok: false, code: 'NO_RUN', detail: 'A duel score has to come from a run you played: play the duel from its link and it submits itself.', status: 409 };
+  // The run row is locked for the rest of the settle transaction (SELECT … FOR UPDATE): a second submit of the same run,
+  // to another duel at the same instant, waits here until this one commits, and then its "already used" read below sees
+  // this one's SCORE_SUBMITTED. Without the lock both reads ran before either write and one run paid two duels.
+  await tx.$queryRaw`SELECT id FROM "SessionRun" WHERE id = ${runId} FOR UPDATE`;
   const run = await tx.sessionRun.findUnique({ where: { id: runId } });
   if (!run) return { ok: false, code: 'NO_RUN', detail: 'That run was not found.', status: 409 };
   if (run.userId !== a.userId) return { ok: false, code: 'RUN_NOT_YOURS', detail: 'That run is not yours.', status: 403 };

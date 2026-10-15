@@ -142,6 +142,7 @@ const h = vi.hoisted(() => {
     user: { findMany: async () => [{ id: 'u1', name: 'You' }, { id: 'u2', name: 'Rival' }, { id: 'house', name: 'House' }] },
     gameSession: { findMany: async () => [] },
     sessionRun: { findUnique: async ({ where }: Row) => (store.runs[where.id] ? { ...store.runs[where.id] } : null) },
+    $queryRaw: async () => [],   // the run row's FOR UPDATE lock (raced in arenaDuelRunRace.test.ts)
   });
 
   const prisma = {

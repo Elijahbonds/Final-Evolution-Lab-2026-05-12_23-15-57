@@ -67,6 +67,7 @@ const tx = {
   // MUSIC-SUITE P6: the player's attempt events on a duel (lib/arena-music.ts readMusicAttempt)
   // ARENA-SETTLE-SERVER (lib/arena-duel-run.ts): the run a duel score names, and whether it already counted elsewhere
   sessionRun: { findUnique: async ({ where }: Row) => db.runs[where.id] ?? null },
+  $queryRaw: async () => [],   // the run row's FOR UPDATE lock (raced in arenaDuelRunRace.test.ts)
   matchEvent: {
     findFirst: async ({ where }: Row) => db.events.find((e) => e.userId === where.userId && e.type === where.eventType
       && e.matchId !== where.matchId?.not && JSON.stringify(e.payload).includes(where.payload.contains)) ?? null,

@@ -44,6 +44,7 @@ function fakeTx(match: Record<string, unknown>, stored: StoredEvent[] = []): Wri
   h.match = match;
   h.tx = {
     sessionRun: { findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null) },
+    $queryRaw: async () => [],   // the run row's FOR UPDATE lock (raced in arenaDuelRunRace.test.ts)
     competitionMatch: {
       findUnique: async () => ({ ...match }),
       update: async ({ data }: { data: Record<string, unknown> }) => { writes.updates.push(data); Object.assign(match, data); return { ...match }; },
