@@ -16,7 +16,7 @@ const strings = () => [WEEK1_TITLE, WEEK1_END_SET, WEEK1_EXIT, ...WEEK1_DUNK_DAY
 describe('MIRROR step 3: week 1 of the base weeks', () => {
   it('seven days in the program\'s weekly layout: A, snack, B, off, C, snack, off', () => {
     expect(WEEK1_DUNK_DAYS.map((d) => `${d.day}:${d.kind}`)).toEqual(['Mon:session', 'Tue:snack', 'Wed:session', 'Thu:rest', 'Fri:session', 'Sat:snack', 'Sun:rest']);
-    expect(WEEK1_DUNK_DAYS.filter((d) => d.kind === 'session').map((d) => d.title)).toEqual(['Session A', 'Session B', 'Session C']);
+    expect(WEEK1_DUNK_DAYS.filter((d) => d.kind === 'session').map((d) => d.title)).toEqual(['Session A', 'Session B', 'Session C (re-test first)']);   // the doc's weekly layout, word for word
   });
 
   it('every session opens with the check-in, closes with the Neural Flush, and has Spring and Strong blocks', () => {

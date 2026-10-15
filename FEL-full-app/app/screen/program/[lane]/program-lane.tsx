@@ -127,8 +127,8 @@ export function Week1Cards() {
             <p className="text-[16px] font-black leading-snug">{d.day} · {d.title}</p>
             {d.blocks.length ? (
               <ul className="mt-1 space-y-1">
-                {d.blocks.map((b) => (
-                  <li key={b.name} className="text-[16px] leading-snug text-white/85"><b>{b.name}:</b> {b.what}</li>
+                {d.blocks.map((b, i) => (
+                  <li key={`${i}-${b.name}`} className="text-[16px] leading-snug text-white/85"><b>{b.name}:</b> {b.what}</li>
                 ))}
               </ul>
             ) : null}
