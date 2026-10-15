@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { timeOutVerdict, roundsExhausted, roundMatchWon } from './roundVerdict';
 import { duelScore, DUEL, DUEL_SCORE } from './duelRules';
 import { ROUND_MODE_RULES, sessionWon } from '../../session-payout';
+import { versusScore } from '../core/VersusScore';
 
 const src = (f: string) => readFileSync(join(__dirname, f), 'utf8');
 
@@ -25,7 +26,7 @@ describe('a round the clock ends', () => {
 });
 
 describe('the modes use it (the old `meState.hp >= foeState.hp` gave the tie to the player)', () => {
-  for (const f of ['ShowdownMode.ts', 'DuelMode.ts']) {
+  for (const f of ['ShowdownMode.ts', 'DuelMode.ts', 'KarateVSMode.ts']) {
     it(`${f}: the TIME bell asks timeOutVerdict, and no round is decided on hp >= hp`, () => {
       const s = src(f);
       expect(s).toContain("timeOutVerdict(meState.hp, foeState.hp), 'TIME'");
@@ -58,5 +59,30 @@ describe('WIN-SERVER for the round modes: the idle "win" is not paid', () => {
     expect(ROUND_MODE_RULES.duel.extraMax).toBeLessThan(DUEL_SCORE.winPts);
     expect(ROUND_MODE_RULES.duel.roundsToWin).toBe(DUEL.roundsToWin);
     expect(roundMatchWon(999, 0, { roundsToWin: 2, winPts: 100, lossPts: 40, extraMax: 100 })).toBe(false);
+  });
+});
+
+// WIN-SERVER, mode by mode (PM 2026-10-15): Karate VS (Storm Duel) next. Its TIME bell had the same hp >= hp tie.
+describe('WIN-SERVER: Karate VS', () => {
+  const kvs = (myWins: number, foeWins: number, hp: number[], perfectDodges = 0, routes = 0) =>
+    versusScore({ myWins, foeWins, hpLeftOnWins: hp, perfectDodges, routes });
+  it('the server reads the mode\'s own ROUNDS_TO_WIN', () => {
+    expect(src('KarateVSMode.ts')).toMatch(/const ROUNDS_TO_WIN = 2;/);
+    expect(ROUND_MODE_RULES.karateVersus.roundsToWin).toBe(2);
+  });
+  it('the idle repro (drawn rounds, nothing won) is not a win', () => {
+    expect(sessionWon('karateVersus', true, null, 300, { score: 0, opponentScore: 0 })).toBe(false);
+  });
+  it('2–0 and 2–1 wins are wins at any HP; a 1–2 loss with every bonus maxed is not', () => {
+    expect(sessionWon('karateVersus', true, null, 60, { score: kvs(2, 0, [0.01, 0.01]), opponentScore: 0 })).toBe(true);
+    expect(sessionWon('karateVersus', true, null, 60, { score: kvs(2, 1, [0, 0]), opponentScore: 1 })).toBe(true);
+    expect(sessionWon('karateVersus', true, null, 60, { score: Math.max(0, kvs(1, 2, [1], 99, 99)), opponentScore: 2 })).toBe(false);
+  });
+  it('1–1 with a drawn round and every bonus maxed is not a match won', () => {
+    expect(sessionWon('karateVersus', true, null, 300, { score: kvs(1, 1, [1], 99, 99), opponentScore: 1 })).toBe(false);
+  });
+  it('the bonuses short of a win stay under one round, so the line holds', () => {
+    const r = ROUND_MODE_RULES.karateVersus;
+    expect((r.roundsToWin - 1) * (r.perWinExtra ?? 0) + r.extraMax).toBeLessThan(r.winPts);
   });
 });

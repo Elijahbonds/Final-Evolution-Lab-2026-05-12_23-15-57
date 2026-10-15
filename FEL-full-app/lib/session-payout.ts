@@ -69,6 +69,9 @@
  * the route (route.ts:135-146, moved to streakStep() below unchanged for every play session).
  */
 
+import { VERSUS_SCORE } from '@/lib/babylon/core/VersusScore';
+/** KarateVSMode ROUNDS_TO_WIN (a Babylon file; held to it by roundVerdict.test.ts). */
+const KVS_ROUNDS_TO_WIN = 2;
 import { roundMatchWon } from '@/lib/babylon/modes/roundVerdict';
 import { SHOWDOWN } from '@/lib/babylon/modes/showdownRules';
 import { DUEL, DUEL_SCORE } from '@/lib/babylon/modes/duelRules';
@@ -369,11 +372,17 @@ export function sessionWon(
  *  · showdown, duel (DUEL-IDLE-FIX): the rounds to win, read back off the score and the foe's rounds (roundVerdict.ts).
  * A score missing from the call (a caller that is not the finish route) leaves the old answer to the caller.
  */
-export const SERVER_JUDGED_WIN_MODES: readonly string[] = ['hoops1v1', 'hoops3v3', 'showdown', 'duel'];
+export const SERVER_JUDGED_WIN_MODES: readonly string[] = ['hoops1v1', 'hoops3v3', 'showdown', 'duel', 'karateVersus'];
 /** DUEL-IDLE-FIX: the round modes' scoring, as each posts it (ShowdownMode endRound: rounds × 100 − foe rounds × 40;
  *  duelRules duelScore: the same plus ring-outs and guard impacts). opponentScore is the foe's rounds in both shells. */
-export const ROUND_MODE_RULES: Readonly<Record<string, { roundsToWin: number; winPts: number; lossPts: number; extraMax: number }>> = {
+export const ROUND_MODE_RULES: Readonly<Record<string, { roundsToWin: number; winPts: number; lossPts: number; extraMax: number; perWinExtra?: number }>> = {
   showdown: { roundsToWin: SHOWDOWN.roundsToWin, winPts: 100, lossPts: 40, extraMax: 0 },
+  // WIN-SERVER, Karate VS (Storm Duel): core/VersusScore — rounds, the HP kept on each round WON (≤ 25 a round), the
+  // perfect dodges and routes (capped, flat); opponentScore is the foe's rounds (karate-vs-babylon.tsx)
+  karateVersus: {
+    roundsToWin: KVS_ROUNDS_TO_WIN, winPts: VERSUS_SCORE.winPts, lossPts: VERSUS_SCORE.lossPts, perWinExtra: VERSUS_SCORE.hpPtsPerRoundWon,
+    extraMax: VERSUS_SCORE.dodgeCap * VERSUS_SCORE.dodgePts + VERSUS_SCORE.routeCap * VERSUS_SCORE.routePts,
+  },
   duel: {
     roundsToWin: DUEL.roundsToWin, winPts: DUEL_SCORE.winPts, lossPts: DUEL_SCORE.lossPts,
     extraMax: DUEL.roundsToWin * DUEL_SCORE.ringOutPts + DUEL_SCORE.impactCap * DUEL_SCORE.impactPts,

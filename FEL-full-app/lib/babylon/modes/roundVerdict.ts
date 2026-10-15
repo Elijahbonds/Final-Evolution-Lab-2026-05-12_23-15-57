@@ -20,8 +20,10 @@ export function roundsExhausted(roundsPlayed: number, roundsToWin: number): bool
  * rounds. A match is won with `roundsToWin` rounds and fewer foe rounds; with fewer wins the score cannot reach
  * roundsToWin × winPts − foe × lossPts unless the extras bridge a whole round, which `extraMax` < winPts rules out.
  */
-export function roundMatchWon(score: number, foeRounds: number, r: { roundsToWin: number; winPts: number; lossPts: number; extraMax: number }): boolean {
+export function roundMatchWon(score: number, foeRounds: number, r: { roundsToWin: number; winPts: number; lossPts: number; extraMax: number; perWinExtra?: number }): boolean {
   if (!Number.isFinite(score) || !Number.isInteger(foeRounds) || foeRounds < 0 || foeRounds >= r.roundsToWin) return false;
-  if (r.extraMax >= r.winPts) return false;   // the line would not separate a win from a loss: never judged a win
+  // the line must separate a win from a non-win: the most a match short of roundsToWin can add on top (`perWinExtra` per
+  // round won, e.g. Karate VS's HP bonus, plus the flat `extraMax`) has to stay under one round's points, else never a win
+  if ((r.roundsToWin - 1) * (r.perWinExtra ?? 0) + r.extraMax >= r.winPts) return false;
   return score + foeRounds * r.lossPts >= r.roundsToWin * r.winPts;
 }
