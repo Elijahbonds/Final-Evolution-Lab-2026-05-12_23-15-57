@@ -24,7 +24,7 @@
 // between (buildInstrumentChips, songCategories) are ordinary pure functions a test can call directly.
 
 import type { DanceStep } from '../../core/DanceCore';
-import { DANCE_LIBRARY } from '../../core/DanceCore';
+import { danceMove } from '../moves';   // lane/dance-extras: the whole vocabulary (DANCE_LIBRARY's rows are the same objects), so a chart that opts in to a captured move still calls for its family's instrument
 
 export type InstrumentChipState = 'earned' | 'ducked' | 'fel';
 
@@ -53,7 +53,7 @@ export const EARNED_LEVEL = 0;
 export function songCategories(steps: readonly Pick<DanceStep, 'clipId'>[]): Set<string> {
   const cats = new Set<string>();
   for (const s of steps) {
-    const cat = DANCE_LIBRARY.find((c) => c.id === s.clipId)?.category;
+    const cat = danceMove(s.clipId)?.category;
     if (cat) cats.add(cat);
   }
   return cats;

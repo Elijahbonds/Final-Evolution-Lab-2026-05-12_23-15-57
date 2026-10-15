@@ -21,11 +21,14 @@ import { mountVenueProps, type VenuePropsHandle } from '../visual/VenueProps';
 import { VENUE_PROP_SETS, type PropPlacement } from '../visual/venuePropSets';
 import { buildCloudDeck, type CloudDeckHandle } from '../visual/CloudDeck';
 import { locate, pointAlong, type AeroCircuit } from './aeroCircuits';
+import { underlightFor } from './aeroAtmos';
 
 export interface AeroWorld {
   root: TransformNode;
   ocean: OceanHandle | null;
   update(dt: number, camera: Camera): void;
+  /** w3-atmos: the caldera's underlight follows how much lava the plane is over (0 = the resting 0.8). A no-op off the volcano. */
+  setLavaGlow(k: number): void;
   dispose(): void;
 }
 
@@ -461,6 +464,7 @@ export async function buildAeroWorld(scene: Scene, c: AeroCircuit): Promise<Aero
 
   return {
     root, ocean,
+    setLavaGlow(k) { if (underlight) underlight.intensity = underlightFor(k); },
     update(dt, camera) {
       ocean?.update(dt, camera);
       clouds.update(dt, camera);

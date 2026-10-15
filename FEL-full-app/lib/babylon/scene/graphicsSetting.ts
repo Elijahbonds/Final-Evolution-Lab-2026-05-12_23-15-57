@@ -62,6 +62,15 @@ export function lookFeatureOff(name: string): boolean {
   return !!v && v.split(',').map((x) => x.trim()).includes(name);
 }
 
+/**
+ * `?lookon=sunshafts,…` for one load: switch a measured-off look feature ON where the mode has not earned it (w3-atmos): the
+ * owner's way to see what a feature is before deciding. Never stored.
+ */
+export function lookFeatureOn(name: string): boolean {
+  const v = query('lookon');
+  return !!v && v.split(',').map((x) => x.trim()).includes(name);
+}
+
 /** `?look=legacy`: the shared look as it shipped before the visual-foundation pass (screenshots, the owner's A/B). */
 export function isLegacyLook(): boolean { return query('look') === 'legacy'; }
 

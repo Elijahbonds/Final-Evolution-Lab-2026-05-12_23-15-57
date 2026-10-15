@@ -194,3 +194,14 @@ describe('the mode wiring (source pins)', () => {
     expect(CODE).toContain("ctx.scene.metadata?.felTier === 'mobile' ? spots.filter((_, i) => i % 4 === 0).slice(0, KVS_PHONE_ONLOOKERS) : spots");
   });
 });
+
+describe('bug sweep 2026-10-14: an attack pressed before the first update() does not throw', () => {
+  it('onInput records the context itself, because stickDirToFoe reads ctx0.camDirector and update() was the only writer', () => {
+    const at = CODE.indexOf('onInput(ctx: ModeContext, e: FelInput) {');
+    expect(at).toBeGreaterThan(-1);
+    const first = CODE.slice(at, at + 200);
+    expect(first, 'ctx0 is assigned in the first statements of onInput').toMatch(/ctx0 = ctx;/);
+    // the stick read lives in swing(), above, and is reached from onInput: the assignment has to be at the top of onInput
+    expect(CODE.indexOf('stickDirToFoe()')).toBeGreaterThan(-1);
+  });
+});

@@ -59,7 +59,9 @@ describe('load (#7 #8 #12 #20)', () => {
 
 describe('the rules reach the game (#1 #2 #3 #4 #10)', () => {
   it('#2 the OPPONENT pick sets the rival: his poke and his patience; the splash offers the pick on 1v1', () => {
-    expect(SRC).toMatch(/knobs = ONEVONE_TIER\[readTier\(\)\] \?\? ONEVONE_TIER\.pro;/);
+    // QA #259: through tierForRun — a staked / head-to-head run plays PRO, whatever the pick
+    expect(SRC).toMatch(/knobs = ONEVONE_TIER\[tierForRun\(typeof window !== 'undefined' \? window\.location\.search : '', readTier\(\)\)\] \?\? ONEVONE_TIER\.pro;/);
+    expect(SRC).not.toMatch(/ONEVONE_TIER\[readTier\(\)\]/);
     expect(SRC).toMatch(/new DefenderBrain\(knobs\.defenderAggression, null, roll\)/);
     expect(SRC).toMatch(/attacker\.patience = attackerPatience\(nerve\(rivalStanding\(\)\)\.aggression, knobs\)/);
     expect(SPLASH).toMatch(/const TIER_MODES = new Set\(\[[^\]]*'onevone'/);

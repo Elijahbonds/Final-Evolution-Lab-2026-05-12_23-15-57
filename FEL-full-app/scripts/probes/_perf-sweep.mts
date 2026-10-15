@@ -14,6 +14,22 @@
 //
 //   PORT=3230 CHROMIUM_EXE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome \
 //   MODES=dunk,onevone PROFILES=portrait,landscape SECONDS=6 OUT=<dir> npx tsx scripts/probes/_perf-sweep.mts
+//
+// PHONE-PERF (2026-10-14) — what the phone pass learned running this, folded back in:
+//   * ONE 1/60 s STEP PER DISPLAY FRAME. The clock stepped once per rAF CALLBACK, so with two rAF users registered (the
+//     harness and anything else) game time ran 2x fast: a 6 s run played 3 s of frames. Every callback in a frame shares
+//     the real timestamp; the step keys on it.
+//   * INTERVALS ON GAME TIME. RenderWatchdog samples the frame every 1 s (a canvas readback + PNG encode). On the wall clock
+//     of a software-GL box (~1 game frame per real second) that was nearly every frame — 30 % of a 3v3 profile — where a
+//     phone pays it once per 30–150 frames. setInterval now fires on the virtual clock (VINTERVAL=0: the wall clock).
+//   * SEED=<n>: Math.random is mulberry32(n) and Date.now a constant, so a before and an after draw the same venues,
+//     questions and casts (who_scene_it's texture list moved 224 → 342 MB between unseeded runs on the draw alone).
+//   * Per frame also: shadow-map draws (the draw counter around every shadow map's render) and other render-target draws;
+//     the JS heap (peak in play, retained after a forced GC, and the allocation churn per game second); a fixed workload
+//     timed outside the frame every 10th frame (calibMs: the box's speed now — a shared box's load moves frame times 3x).
+//   * PAGE=<url>: a static page (the esbuild bundle of lib/babylon + registry) instead of /dev/mode/<id>; it must publish
+//     window.__phase and window.__bus. RASTER=<k>: cut the backing k× after load (same viewport, tier, camera and culling,
+//     so the same draws, meshes and CPU work); SwiftShader rasterises on this box's CPU and a 780×1688 frame takes seconds.
 import { chromium, type Browser } from 'playwright-core';
 import fs from 'node:fs';
 import { chromiumExe } from './_chromium.mts';
@@ -25,6 +41,8 @@ const THROTTLE = Number(process.env.THROTTLE ?? 4);
 const PROFILES = (process.env.PROFILES ?? 'portrait').split(',').filter(Boolean);
 const MODES = (process.env.MODES ?? 'dunk').split(',').filter(Boolean);
 const TAG = process.env.TAG ?? 'before';
+const PAGE = process.env.PAGE ?? '';
+const RASTER = Number(process.env.RASTER ?? 1);
 /** `?perf=off` measures the harness as it was before the guard (the guard installs nothing); '' measures it on. */
 const QUERY = process.env.QUERY ?? (TAG === 'before' ? '?perf=off' : '');
 fs.mkdirSync(OUT, { recursive: true });
@@ -37,13 +55,24 @@ const VIEW: Record<string, { width: number; height: number }> = {
 // REALTIME=1 keeps the page's own clock: the governor then sees this box's real frame times and steps (the "after"
 // behaviour run); the default virtual clock makes every mode play the same game seconds (the content measurement).
 const REALTIME = !!process.env.REALTIME;
+const SEED = process.env.SEED;
 const INIT = `(() => {
   const realNow = performance.now.bind(performance);
   window.__realNow = realNow;
   if (!${REALTIME}) {
     let vt = realNow(); const raf = window.requestAnimationFrame.bind(window);
     performance.now = () => vt;
-    window.requestAnimationFrame = (cb) => raf(() => { vt += 1000 / 60; cb(vt); });
+    let lastTs = -1;   // one step per display frame: every callback in a frame shares the real timestamp
+    window.requestAnimationFrame = (cb) => raf((ts) => { if (ts !== lastTs) { lastTs = ts; vt += 1000 / 60; } cb(vt); });
+    if (${process.env.VINTERVAL !== '0'}) {
+      const si = window.setInterval.bind(window);
+      window.setInterval = (fn, ms, ...a) => { let last = performance.now(); const want = Math.max(1, Number(ms) || 0); return si(() => { const n = performance.now(); if (n - last >= want) { last = n; fn(...a); } }, Math.min(want, 50)); };
+    }
+  }
+  if (${SEED !== undefined}) {
+    let t = ${Number(SEED ?? 0)} >>> 0;
+    Math.random = () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t); r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; };
+    const D = 1.7e12; Date.now = () => D;
   }
   window.__name = window.__name || function (f) { return f; };
   // the harness's 20 s load watchdog (LOAD_WATCHDOG_MS) is a phone-on-a-network guard; a dev build on software GL on a
@@ -60,11 +89,24 @@ const INSTRUMENT = `(() => {
   window.__PAD = pad; navigator.getGamepads = () => [pad];
   const ev = new Event('gamepadconnected'); Object.defineProperty(ev, 'gamepad', { value: pad }); window.dispatchEvent(ev);
   const si = dev.instrument();
-  const R = window.__REC = { frames: [], t0: performance.now(), gov: [] };
+  const R = window.__REC = { frames: [], t0: performance.now(), gov: [], calib: [] };
+  // every render target's draws, split: the shadow maps vs the rest (a mirror, a crowd snapshot, a depth pass)
+  const hooked = new WeakSet(); let sd = 0, od = 0;
+  const hook = (rt, isShadow) => {
+    if (!rt || hooked.has(rt)) return; hooked.add(rt); let d0 = 0;
+    rt.onBeforeRenderObservable.add(() => { d0 = engine._drawCalls.current; });
+    rt.onAfterRenderObservable.add(() => { const d = engine._drawCalls.current - d0; if (isShadow) sd += d; else od += d; });
+  };
+  const scan = () => {
+    for (const l of scene.lights) { const sg = l.getShadowGenerator && l.getShadowGenerator(); if (sg && sg.getShadowMap) hook(sg.getShadowMap(), true); }
+    for (const rt of scene.customRenderTargets) hook(rt, false);
+  };
+  const heap = () => (performance.memory ? performance.memory.usedJSHeapSize : 0);
+  let h0 = heap(); R.churn = 0; R.peak = h0;
   // the guard's own readout (window.__FEL_PERF__, published in dev): its level, cap and scale every 2 s
   setInterval(() => { const g = window.__FEL_PERF__; if (g) { const s = g.state(); R.gov.push({ t: Math.round((performance.now() - R.t0) / 100) / 10, cap: s.cap, level: s.level, scale: s.renderScale, fps: Math.round(s.fps), js: Math.round(s.workP50 * 10) / 10, thermal: s.thermal, reason: s.reason }); } }, 2000);
   let tb = 0, ta = 0, taa = 0;
-  engine.onBeginFrameObservable.add(() => { tb = now(); });
+  engine.onBeginFrameObservable.add(() => { tb = now(); sd = 0; od = 0; scan(); });
   scene.onBeforeAnimationsObservable.add(() => { ta = now(); });
   scene.onAfterAnimationsObservable.add(() => { taa = now(); });
   engine.onEndFrameObservable.add(() => {
@@ -73,6 +115,8 @@ const INSTRUMENT = `(() => {
     const g = (performance.now() - R.t0) / 1000;
     pad.axes[0] = Math.sin(g * 0.7) * 0.8; pad.axes[1] = -0.6 + Math.cos(g * 0.5) * 0.3;
     const a = (g % 1.5) < 0.12; pad.buttons[0].pressed = a; pad.buttons[0].value = a ? 1 : 0; pad.timestamp = performance.now();
+    const h = heap(); if (h > h0) R.churn += h - h0; h0 = h; if (h > R.peak) R.peak = h;
+    if (R.frames.length % 10 === 5) { const c0 = now(); let x = 0; for (let i = 0; i < 200000; i++) x += Math.sqrt(i) * 1.0001; R.calib.push(now() - c0 + (x < 0 ? 1 : 0)); }
     if (!ta) return;
     let parts = 0;
     for (const ps of scene.particleSystems) parts += ps.getActiveCount ? ps.getActiveCount() : 0;
@@ -80,7 +124,7 @@ const INSTRUMENT = `(() => {
     let verts = 0; for (let i = 0; i < act.length; i++) verts += act.data[i].getTotalVertices();
     R.frames.push({
       work: te - tb, update: ta - tb, anim: taa - ta, render: te - taa,
-      draws: si.drawCallsCounter.current, meshes: act.length, verts, parts, psys: scene.particleSystems.length,
+      draws: si.drawCallsCounter.current, shadowDraws: sd, rtDraws: od, meshes: act.length, verts, parts, psys: scene.particleSystems.length,
     });
     ta = 0;
   });
@@ -144,16 +188,18 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
   ]);
   const t0 = Date.now();
   try {
-    await p.goto(`http://127.0.0.1:${PORT}/dev/mode/${mode}${QUERY}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+    const url = PAGE ? `${PAGE}?mode=${mode}${QUERY ? '&' + QUERY.replace(/^\?/, '') : ''}` : `http://127.0.0.1:${PORT}/dev/mode/${mode}${QUERY}`;
+    await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 240000 });
     let state = '';
     for (let i = 0; i < 180; i++) {
-      state = await ev(() => (/DEV · \S+ · (\w+)/.exec(document.body.innerText) ?? [])[1] ?? '');
+      state = await ev(() => (window as any).__phase ?? (/DEV · \S+ · (\w+)/.exec(document.body.innerText) ?? [])[1] ?? '');
       if (process.env.VERBOSE && i % 10 === 0) console.log(`  [${mode}/${profile}] t+${((Date.now() - t0) / 1000).toFixed(0)}s phase "${state}"`);
       if (state === 'playing') break;
       if (state === 'error') break;
-      if (state === 'ready') {
+      if (state === 'ready' || (PAGE && state && state !== 'loading' && i % 4 === 3)) {
+        const bus = await ev(() => { const b = (window as any).__bus; if (!b) return false; b.emit({ t: 'button', btn: 'START', pressed: true }); b.emit({ t: 'button', btn: 'START', pressed: false }); return true; });
         const s = p.locator('text=/^START$/').first();
-        if (await s.count()) await s.click({ timeout: 5000 }).catch(() => {});
+        if (!bus && await s.count()) await s.click({ timeout: 5000 }).catch(() => {});
       }
       await p.waitForTimeout(1000);
     }
@@ -162,6 +208,7 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       return { mode, profile, ok: false, note: `never played (${state || 'no phase'}) ${why} ${errs[0] ?? ''} ${cons.slice(0, 2).join(' | ')}` };
     }
     const loadS = (Date.now() - t0) / 1000;
+    if (RASTER !== 1) await ev(`(() => { const e = window.__FEL_DEV__.scene.getEngine(); e.setHardwareScalingLevel(e.getHardwareScalingLevel() * ${RASTER}); })()`);
     await ev(INSTRUMENT);
     const cdp = await Promise.race([ctx.newCDPSession(p), crash]);
     const send = (rate: number) => Promise.race([cdp.send('Emulation.setCPUThrottlingRate', { rate }), crash,
@@ -179,6 +226,9 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
     await send(1);
     const fr = (await ev(() => (window as any).__REC.frames)) as Array<Record<string, number>>;
     const govLog = (await ev(() => (window as any).__REC.gov)) as unknown[];
+    const heapRec = (await ev(() => { const R = (window as any).__REC; return { churn: R.churn, peak: R.peak, calib: R.calib, t0: R.t0, now: performance.now() }; })) as { churn: number; peak: number; calib: number[]; t0: number; now: number };
+    await cdp.send('HeapProfiler.collectGarbage');
+    const heapUse = await cdp.send('Runtime.getHeapUsage') as { usedSize: number };
     const f = fr.slice(Math.min(30, Math.floor(fr.length / 4)));   // the first frames carry the throttle switch
     const col = (k: string) => f.map((x) => x[k]);
     const shadows = (snap.shadows as Array<{ size: number; cascades: number; casters: number; blur: boolean }>) ?? [];
@@ -193,6 +243,9 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
       meshes: pct(col('meshes'), 0.5), meshesMax: Math.max(...col('meshes')),
       vertsK: pct(col('verts'), 0.5) / 1000, vertsMaxK: Math.max(...col('verts')) / 1000,
       parts: pct(col('parts'), 0.5), partsMax: Math.max(...col('parts')), psysMax: Math.max(...col('psys')),
+      shadowDraws: pct(col('shadowDraws'), 0.5), shadowDrawsMax: Math.max(...col('shadowDraws')), rtDraws: pct(col('rtDraws'), 0.5),
+      heapPeakMb: heapRec.peak / 1048576, heapAfterGcMb: heapUse.usedSize / 1048576,
+      churnMbPerS: heapRec.churn / 1048576 / Math.max(0.1, (heapRec.now - heapRec.t0) / 1000), calibMs: pct(heapRec.calib, 0.5),
       fillMpx: (Number(snap.backingPx) * (1 + postPasses) + shadowPx) / 1e6,
       ...snap, govLog, errors: errs.length, err0: errs[0],
     };
@@ -205,7 +258,7 @@ async function run(b: Browser, mode: string, profile: string): Promise<Row> {
 
 const b = await chromium.launch({
   executablePath: chromiumExe(),
-  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info'],
 });
 const rows: Row[] = [];
 const jsonl = `${OUT}/sweep-${TAG}.jsonl`;
@@ -220,7 +273,7 @@ for (const mode of MODES) {
     fs.appendFileSync(jsonl, JSON.stringify(r) + '\n');
     const n = (k: string, d = 1) => (typeof r[k] === 'number' ? (r[k] as number).toFixed(d) : '-');
     console.log(r.ok
-      ? `${mode.padEnd(17)} ${profile.padEnd(9)} work p50 ${n('workP50')} p95 ${n('workP95')} ms · draws ${n('draws', 0)} · meshes ${n('meshes', 0)} · verts ${n('vertsK', 0)}k · bodies ${r.bodies} · parts ${n('partsMax', 0)} · tex ${n('texMb', 0)} MB · ${r.backing}`
+      ? `${mode.padEnd(17)} ${profile.padEnd(9)} work p50 ${n('workP50')} p95 ${n('workP95')} ms · draws ${n('draws', 0)} (shadow ${n('shadowDraws', 0)}) · meshes ${n('meshes', 0)} · verts ${n('vertsK', 0)}k · bodies ${r.bodies} · parts ${n('partsMax', 0)} · tex ${n('texMb', 0)} MB · heap ${n('heapAfterGcMb', 0)} MB · calib ${n('calibMs')} ms · ${r.backing}`
       : `${mode.padEnd(17)} ${profile.padEnd(9)} FAILED ${r.note}`);
   }
 }

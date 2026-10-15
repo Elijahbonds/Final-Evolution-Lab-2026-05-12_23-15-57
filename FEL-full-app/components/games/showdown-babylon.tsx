@@ -17,6 +17,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { HudFrame, HudText } from './tv-hud';
 import { CombatHudBand, CombatRound, CombatStat } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
+import { ReplayBug } from './fight-presentation';   // WAVE 3 (lane/w3-present)
 
 type Hud = Record<string, HudValue>;
 
@@ -91,6 +92,8 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
 
+  // WAVE 3: a KO replay (hud.replay) is the shot — the stat band steps aside and the REPLAY tag says how to skip it
+  const replaying = Number(hud.replay) === 1;
   const showHud = phase === 'playing';
 
   return (
@@ -100,6 +103,7 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
       {/* TV HUD (A9.13, lane/tv-hud): the fight readouts on the shared system — same keys, same band, same corners. */}
       {showHud && (
         <HudFrame>
+        {!replaying && (
         <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''}>
         <div className="flex justify-between px-4 py-3">
           <div className="flex flex-col items-start gap-1">
@@ -119,6 +123,8 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
           </div>
         </div>
         </CombatHudBand>
+        )}
+        <ReplayBug on={replaying} />
         </HudFrame>
       )}
 

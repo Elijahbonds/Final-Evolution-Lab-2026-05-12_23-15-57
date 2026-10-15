@@ -15,7 +15,8 @@ describe('speed-vignette rollout', () => {
   it('the harness owns the pipeline: it composes impact + speed and a mode only reports a fraction', () => {
     const h = src('lib/babylon/core/ModeHarness.ts');
     expect(h).toContain('speedVignette01(fraction: number): void');   // the opt-in hook on ModeFeel
-    expect(h).toContain('composeFrameGrade(restGrade, frame.level, speedLevel)');
+    // w3-atmos: the grade is stepped by ImpactFrame.stepFrameGrade (impact pulse + speed + the flashBeat decay, one compose)
+    expect(h).toContain('stepFrameGrade(gradeState, restGrade, dt, speedLevel, lights.flash01)');
     expect(h).toContain('speedVignetteLevel(speedVignetteRaw)');
   });
 

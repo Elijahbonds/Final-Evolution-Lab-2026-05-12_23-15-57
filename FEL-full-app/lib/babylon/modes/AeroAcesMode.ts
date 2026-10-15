@@ -73,6 +73,7 @@ import {
   mapFrame, mapPath, toMap, flyoverPose, aeroGhostKey, raceProgress, hudDue, type BannerPrio, type Threat, type MapFrame,
 } from './aeroAcesRules';   // IMPROVE (2026-10-06): the owner-picked improvements' pure rules
 import { buildAeroWorld, type AeroWorld } from '../racing/aeroWorlds';
+import { mountAeroAtmos, type AeroAtmosHandle } from '../racing/aeroAtmos';   // w3-atmos: cloud banks, skim spray, lava glow, the ring-pass shockwave
 import { buildToyPlane, blurProp, Scarf, brighter, type ToyPlane } from '../racing/toyPlane';
 import { aeroHudWords, RideHudSwitch, setRingGlyph } from './rideHud';   // GC-13 / 10-phase pass, phase 10: the HUD says the rider's words
 import { resolveRaceIdentity } from '../racing/raceLook';   // PR #138: a minor's look is the device's, and never uploaded
@@ -123,6 +124,7 @@ export function makeAeroAcesMode(): ModeDefinition {
   let circuit: AeroCircuit = aeroCircuits()[0];
   let tune: ArcadeTune = ARCADE_TRAINER;   // the garage pick is read in load(), never at factory time (pickerReach)
   let world: AeroWorld | null = null;
+  let atmos: AeroAtmosHandle | null = null;     // w3-atmos: presentation only (racing/aeroAtmos.ts)
   let player: ToyPlane | null = null;
   let pilot: SpawnedCharacter | null = null;
   let seated: AnimationGroup | null = null;
@@ -582,6 +584,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       scarf = new Scarf(ctx.scene, player.scarfAnchor, '#ffffff');
 
       buildRivals(ctx.scene);
+      atmos?.dispose(); atmos = mountAeroAtmos(ctx.scene, circuit, { tier: ctx.lights.tier, setLavaGlow: (k) => world?.setLavaGlow(k) });   // w3-atmos
 
       // phase 7: one vehicle light over every plane on the grid (receiveShadows on all, fill where the mood is flat)
       vehicleLight?.dispose();
@@ -1056,6 +1059,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       const res = stepRace(race, circuit.course, prevPos, flight.pos, dt);
       // RACING PASS phase 8: a GATE between laps answered nothing — no sound, no pop (the plane measured 3.6 juice beats a
       // minute against the kart's 58–75). A ring flown through chimes and pops, as the kart's checkpoints do.
+      if (res.gate) atmos?.ringPass({ x: flight.pos.x, y: flight.pos.y, z: flight.pos.z, heading: flight.heading, speed01: flight.speed / Math.max(1, tune.top) });   // w3-atmos: the ring of light round the plane at a checkpoint (and the lap line)
       if (res.gate && !res.lap) {
         SoundKit.play('score', { pitch: 1, volume: 0.35 });
         ctx.juice.scorePop(flight.pos.add(new Vector3(0, 3, 0)), `RING ${race.next === 0 ? circuit.course.gates.length : race.next}/${circuit.course.gates.length}`, '#7dd3fc');
@@ -1092,6 +1096,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       banner.tick(dt);
 
       world?.update(dt, ctx.camera);
+      atmos?.update(dt, { x: flight.pos.x, y: flight.pos.y, z: flight.pos.z, heading: flight.heading, speed01: flight.speed / Math.max(1, tune.top) }, ctx.camera);   // w3-atmos
       ctx.camDirector.look(S.lookX, S.lookY, dt);
       ctx.camDirector.update(flight.pos, fwd.scale(flight.speed), null);
       baseFov ??= ctx.camera.fov;
@@ -1119,6 +1124,7 @@ export function makeAeroAcesMode(): ModeDefinition {
       for (const rp of rivalPlanes) rp.dispose();
       rivalPlanes = []; rivals = []; rivalKits = []; rivalDrive = []; driveLine = null; line = null;
       pickups?.dispose(); pickups = null;
+      atmos?.dispose(); atmos = null;
       world?.dispose(); world = null;
       balloons = []; bananas = []; missiles = []; mines = [];
       ghostMesh?.material?.dispose(); ghostMesh?.dispose(); ghostMesh = null; ghostBest = null;

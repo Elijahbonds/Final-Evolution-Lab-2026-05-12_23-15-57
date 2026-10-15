@@ -18,20 +18,22 @@ import { HudBanner, HudChip, HudText, ScoreValue, useHudReducedMotion, type HudT
 /** Above JuiceKit's overlay (z-index 30), below the READY / PAUSED splash (z-40). */
 export const COMBAT_HUD_Z = 35;
 
-export function CombatHudBand({ children, banner, alert }: {
+export function CombatHudBand({ children, banner, alert, slam }: {
   /** The HUD row: laid out in flow (no absolute positioning of its own). */
   children: ReactNode;
   /** The mode's banner line (hud.banner); nothing when empty. */
   banner?: string;
   /** A warning line above the banner (Ring's Edge's edge danger). */
   alert?: ReactNode;
+  /** WAVE 3 (lane/w3-present): the call the host's slam text is saying now (hud.slam: FIGHT!, ROUND 2). The band does not repeat it in small type under the big one. */
+  slam?: unknown;
 }) {
   return (
     <div data-hud-band className="pointer-events-none absolute inset-x-0 top-0 flex flex-col" style={{ zIndex: COMBAT_HUD_Z }}>
       {children}
       <div data-banner-band className="flex flex-col items-center gap-1 px-4 text-center">
         {alert}
-        {banner ? <HudBanner flow text={banner} tone="you" plate={false} /> : null}
+        {banner && banner !== slam ? <HudBanner flow text={banner} tone="you" plate={false} /> : null}
       </div>
     </div>
   );

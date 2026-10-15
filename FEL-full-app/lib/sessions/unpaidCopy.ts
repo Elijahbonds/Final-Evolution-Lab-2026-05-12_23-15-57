@@ -16,6 +16,7 @@ const TITLES: Readonly<Record<string, string>> = {
   RUN_EXPIRED: 'RUN TIMED OUT — NOT PAID',
   RUN_CLOSED: 'ALREADY RECORDED',
   RUN_IN_FLIGHT: 'STILL RECORDING',
+  NOT_SAVED: 'NOT SAVED YET',
 };
 
 const LINES: Readonly<Record<string, string>> = {
@@ -30,6 +31,7 @@ const LINES: Readonly<Record<string, string>> = {
   RUN_EXPIRED: 'The run was open too long to be paid. Play again to earn.',
   RUN_CLOSED: 'This run was already recorded.',
   RUN_IN_FLIGHT: 'This run is being recorded in another tab.',
+  NOT_SAVED: "Your result didn't reach the server. It will be sent again the next time you open a game.",
 };
 
 /** The key the card is written from: a SCORE_INVALID for a mode with no measured rules yet is its own case, not a bad result. */
