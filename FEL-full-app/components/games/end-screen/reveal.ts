@@ -141,6 +141,19 @@ export function pressIntent(s: RevealState, total: number, sinceMountMs: number)
   return revealDone(s, total) ? 'activate' : 'skip';
 }
 
+/** QA-H6 (hoops grade 0d16f5dd): keys mashed on the 1v1 card during the celebration took the player off to the hub before
+ *  PLAY AGAIN could be pressed. B / Escape / Backspace now leaves only once the card has finished revealing AND has sat
+ *  still for this long; before that a back press skips the reveal (like A), never leaves. */
+export const BACK_SETTLE_MS = 800;
+
+/** What B does right now: before ARM_MS nothing; while beats are still to come, it skips; within BACK_SETTLE_MS of the
+ *  reveal finishing (`sinceDoneMs` null = not finished) nothing; after that it leaves. */
+export function backIntent(s: RevealState, total: number, sinceMountMs: number, sinceDoneMs: number | null): 'ignore' | 'skip' | 'leave' {
+  if (sinceMountMs < ARM_MS) return 'ignore';
+  if (!revealDone(s, total)) return 'skip';
+  return sinceDoneMs !== null && sinceDoneMs >= BACK_SETTLE_MS ? 'leave' : 'ignore';
+}
+
 /** The sound and buzz each beat plays — presentation only. */
 export type Cue = 'tick' | 'win' | 'levelUp' | 'record' | 'soft';
 export function cueFor(step: StepId, ctx: { won: boolean; newBest: boolean; tierUps: number; levelUps?: number; goalsDone?: number }): Cue {

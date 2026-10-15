@@ -59,8 +59,12 @@ describe('phase 1 — the flight is a four-beat bar', () => {
   });
   it('the host draws the strip above the hint, and stands it aside for the cut and the judges', () => {
     expect(HOST).toMatch(/import \{ DunkBeatStrip \} from '\.\/dunk-beat-strip';/);
-    expect(HOST).toMatch(/hud\.beats && phase === 'playing' && !judging && !\(typeof hud\.cut === 'string' && hud\.cut\)/);
-    expect(HOST).toMatch(/<DunkBeatStrip value=\{hud\.beats\} \/>/);
+    // test changed (w3-present): the strip, the take-off chip, the hint and the MC caption are ONE bottom column now (components/games/dunk-babylon.tsx,
+    // `data-dunk-bottom`, flex-col-reverse: the hint lowest, then the chip or the strip, then the caption); the strip's gates are the same three
+    // (playing, not judging, no cut up) and it is still above the hint. The old pin read the strip as its own absolutely placed layer.
+    expect(HOST).toMatch(/const strip = beats && phase === 'playing' && !judging && !cutting \? beats : '';/);
+    expect(HOST).toMatch(/\{strip && <DunkBeatStrip value=\{strip\} \/>\}/);
+    expect(HOST.indexOf('{hint && (')).toBeLessThan(HOST.indexOf('{strip && <DunkBeatStrip'));   // flex-col-reverse: first = lowest, so the strip stands above the hint
   });
 });
 
@@ -326,9 +330,10 @@ describe('phase 7 — the live take-off read', () => {
     expect(DUNK).toMatch(/takeoffMark\?\.dispose\(\); takeoffMark = null; takeoffMat\?\.dispose\(\);/);
   });
   it('the host draws the chip in the zone\'s colour, and gives the spot to the beat strip in the air', () => {
+    // test changed (w3-present): the chip is a child of the dunk host's bottom column; same read, same gate (it gives the spot to the strip), same zone colour
     expect(HOST).toMatch(/const t = decodeTakeoff\(hud\.takeoff\);/);
-    expect(HOST).toMatch(/\(typeof hud\.beats === 'string' && hud\.beats\)\) return null;/);
-    expect(HOST).toMatch(/style=\{\{ color: ZONE_HEX\[t\.zone\] \}\} data-fel-takeoff=\{t\.zone\}/);
+    expect(HOST).toMatch(/const takeoff = t && phase === 'playing' && !judging && !beats \? t : null;/);
+    expect(HOST).toMatch(/style=\{\{ color: ZONE_HEX\[takeoff\.zone\] \}\} data-fel-takeoff=\{takeoff\.zone\}/);
   });
 });
 

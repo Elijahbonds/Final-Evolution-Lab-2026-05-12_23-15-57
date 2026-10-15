@@ -45,6 +45,24 @@ const canvasOwner = new WeakMap<HTMLCanvasElement, object>();
 
 type Hud = Record<string, HudValue>;
 
+type StandingRow = { name: string; score: number | string; line: string; form?: string };
+/** The shootout's standings rows (the board key): YOU, then the field, each with form, score and where they stand. */
+function Standings({ rows }: { rows: StandingRow[] }) {
+  return (
+    <>
+      {rows.map((r) => (
+        <div key={r.name} className="flex items-baseline gap-3 py-0.5">
+          <HudText size="body" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-16 truncate">{r.name}</HudText>
+          {/* IMPROVE (2026-10-06) #7: the rival's form — the reveal runs coldest first, so the HOT cards land last */}
+          <HudText size="caption" tone={r.form === 'HOT' ? 'heat' : 'info'} className="w-8" style={{ fontWeight: 800 }}>{r.form ?? ''}</HudText>
+          <HudText size="value" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-8 text-right">{r.score}</HudText>
+          <HudText size="caption" tone={r.line === 'CHAMPION' ? 'score' : r.line === 'ADVANCES' ? 'you' : 'text'} alpha={r.line === 'CHAMPION' || r.line === 'ADVANCES' ? 1 : 0.4}>{r.line}</HudText>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function ThreePointBabylon({ onEnd }: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
@@ -207,7 +225,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           {typeof hud.rackIdx === 'number' && typeof hud.ballIdx === 'number' && (
             <div className="flex items-center gap-3">
               {rackPips(hud.rackIdx, hud.ballIdx, undefined, undefined, typeof hud.moneyRack === 'number' ? hud.moneyRack : -1).map((row, r) => (
-                <HudPlate key={r} className="flex items-start gap-1 px-1.5 py-1">
+                <HudPlate key={r} data-hud="rack" className="flex items-start gap-1 px-1.5 py-1">
                   {row.map((p, b) => {
                     // IMPROVE (2026-10-06) #4: what each release was, under its ball — the run's timing bias at a glance
                     const grade = typeof hud.relPips === 'string' ? hud.relPips[r * 5 + b] : '.';
@@ -244,6 +262,12 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
               {(['E', 'P', 'G', 'L'] as const).map((k) => <HudText key={k} size="caption" tone={PIP_TICK[k]?.tone ?? 'text'}>{PIP_TICK[k]?.label}</HudText>)}
             </HudPlate>
           )}
+          {/* WAVE 3: the standings, on a phone (see the corner plate below) */}
+          {Array.isArray(hud.board) && (
+            <HudPlate className="px-3 py-1.5 sm:hidden" data-hud="standings-stack">
+              <Standings rows={hud.board as StandingRow[]} />
+            </HudPlate>
+          )}
         </div>
       )}
 
@@ -263,17 +287,14 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
+      {/* WAVE 3 (lane/w3-present): THE STANDINGS stand where the screen has room. In the right-hand corner (as it always was) from 640 px up; on a
+          phone it joins the score stack, in the flow under the chips, because at 390 px the corner plate (about 250 px wide) ran across the
+          score and the clock (the stack is centred and as wide as its widest chip). From 1024 px up (a TV, a desktop window) the stack's
+          five rack plates and its LEFT chip reach past the plate's corner slot, so it drops below them (33 % of the stage: measured at 1080p
+          and 720p). Same rows, same keys, same tones. */}
       {phase === 'playing' && Array.isArray(hud.board) && (
-        <HudPlate className="absolute right-4 top-4 z-20 px-3 py-2">
-          {(hud.board as { name: string; score: number | string; line: string; form?: string }[]).map((r) => (
-            <div key={r.name} className="flex items-baseline gap-3 py-0.5">
-              <HudText size="body" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-16 truncate">{r.name}</HudText>
-              {/* IMPROVE (2026-10-06) #7: the rival's form — the reveal runs coldest first, so the HOT cards land last */}
-              <HudText size="caption" tone={r.form === 'HOT' ? 'heat' : 'info'} className="w-8" style={{ fontWeight: 800 }}>{r.form ?? ''}</HudText>
-              <HudText size="value" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-8 text-right">{r.score}</HudText>
-              <HudText size="caption" tone={r.line === 'CHAMPION' ? 'score' : r.line === 'ADVANCES' ? 'you' : 'text'} alpha={r.line === 'CHAMPION' || r.line === 'ADVANCES' ? 1 : 0.4}>{r.line}</HudText>
-            </div>
-          ))}
+        <HudPlate className="absolute right-4 top-4 z-20 hidden px-3 py-2 sm:block lg:top-[33%]" data-hud="standings-corner">
+          <Standings rows={hud.board as StandingRow[]} />
         </HudPlate>
       )}
       </HudFrame>

@@ -33,6 +33,7 @@
 // idle stance, chest and eyes on the dunker.
 
 import { Color3, Color4, MeshBuilder, Vector3 } from '@babylonjs/core';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';   // w3-crowds (A9.9)
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, Scene, TransformNode } from '@babylonjs/core';
 import { tintGarmentSlot, SLOT_KEYS } from '../core/playerIdentity';   // IMPROVE (2026-10-06) #1: P2 wears P2's colour
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // IMPROVE (2026-10-06) #2: a ring per duellist
@@ -40,7 +41,8 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { dressBall } from '../visual/meshyProps';   // IMPROVE (2026-10-06) #10: the duel ball is a basketball
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // IMPROVE (2026-10-06) #7: the contest's slam meter
 import { DunkReplayRecorder, pausableDelay } from '../scene/DunkReplayCam';   // IMPROVE (2026-10-06) #12: the make, replayed
-import { TRIPLE_CUT, tripleCutSec } from '../core/DunkCuts';
+import { motionPolicy } from '@/lib/a11y/reducedMotion';   // WAVE 3: the orbit angle is camera travel
+import { showCuts, cutsSec } from '../core/DunkCuts';
 import { DunkFlight, DUNK_TRICKS, cueOf, cueVerdict, cueFireAt, CUE_BEAT_LABEL, type DunkTrick } from '../core/DunkSystem';   // IMPROVE (2026-10-06) #8: air tricks
 import { trickInput } from '../core/DunkAssist';
 import type { AmbientHandle } from '../visual/EffectsKit';
@@ -154,6 +156,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   let settleArmed = false, settleArmAt = 0;   // A+ P4 (P10 mirror): the settle waits for feet-down, not the flush frame
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
+  let stands: ModeCrowd | null = null;       // w3-crowds (A9.9): the boardwalk crowd
   let dressing: DuelDressingHandle | null = null;   // vis-hoops-dunk: the 3D score tower and the judges' table
   let phones: PhoneFlashes | null = null;           // vis-hoops-dunk: the stands' phones, by the make and the gap between the duellists
   let phase: Phase = 'handoff';
@@ -722,11 +725,12 @@ export const DunkDuelMode: ModeDefinition = (() => {
     const paused = (): boolean => typeof ctx.phase === 'function' && ctx.phase() === 'paused';
     if (rec) {
       cutting = true; ctx.camDirector.suspended = true; setCinematic(ctx.scene, 1);   // vis-hoops-dunk: the broadcast's bars over the cut
-      const cutDone = rec.playCuts(rim, contactAt, TRIPLE_CUT, {
-        onCut: (i, c) => { ctx.setHud({ hint: `REPLAY ${i + 1}/${TRIPLE_CUT.length} · ${c.label} — A skips` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
+      const cuts = showCuts(motionPolicy().travel);   // the tuned triple, then (wave 3) the orbit round the rim; reduced motion keeps the triple
+      const cutDone = rec.playCuts(rim, contactAt, cuts, {
+        onCut: (i, c) => { ctx.setHud({ hint: `REPLAY ${i + 1}/${cuts.length} · ${c.label} — A skips` }); if (i > 0) SoundKit.play('whoosh', { pitch: 1.6 + i * 0.2, volume: 0.25 }); },
         paused,
       });
-      await Promise.race([cutDone, pausableDelay(tripleCutSec() * 1000 + 1200, paused)]);   // the net does not run through a pause
+      await Promise.race([cutDone, pausableDelay(cutsSec(cuts) * 1000 + 1200, paused)]);   // the net does not run through a pause
       if (gen !== modeGen) return;   // left mid-replay: nothing below may touch the disposed scene (#13)
       rec.stop(); cutting = false; ctx.camDirector.suspended = false; setCinematic(ctx.scene, 0);
       ctx.setHud({ hint: '' });
@@ -912,6 +916,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
       rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
       dressing?.dispose(); dressing = mountDuelDressing(ctx.scene, towerState(), JUDGE_COUNT);   // vis-hoops-dunk (display only)
+      stands?.dispose(); stands = mountModeCrowd(ctx, 'dunkduel');   // w3-crowds: the boardwalk crowd; it hears the duel's makes
       phones?.dispose(); phones = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));
       (ctx.scene.metadata ??= {}).felHoops = { rimFx, dressing, probe: () => ({ phase, clipTime, turn: activeIdx }) };   // for the rig's probes (read only)
       mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location }); micOpened = false; micFiller = false;   // THE MIC
@@ -1205,6 +1210,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
       if (p1) postureOf.delete(p1); if (p2) postureOf.delete(p2);
       hoopJuice?.dispose(); hoopJuice = null;
       rimFx?.dispose(); rimFx = null; dressing?.dispose(); dressing = null; phones?.dispose(); phones = null;   // vis-hoops-dunk
+      stands?.dispose(); stands = null;   // w3-crowds
       mic?.dispose(); mic = null;   // THE MIC stops with the mode
       modeVenue?.dispose?.(); modeVenue = null;
       if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);   // A+ P8 H1

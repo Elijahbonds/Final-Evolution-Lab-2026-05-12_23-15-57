@@ -131,6 +131,54 @@ export function patchClusteredSheen(store: Record<string, string> = ShaderStore.
   return true;
 }
 
+// STRIPS (w3-atmos): a lit STRIP is a fixture too - a kart course's edge lights, hundreds of thin instances of one mesh - but it is
+// far too long for the cap, and a kart passes the whole lap by. So a strip does not get a light each: it gets a small POOL of
+// lights that follow whoever is passing (a mode registers it with the points along the strip and a `follow`), each pinned to
+// one of the nearest points and moved to the next as it falls behind; a light's range ends where the next one begins, so a
+// light that changes points does it at zero intensity. They sit in the same clustered container as the rest.
+export interface StripSource {
+  /** world points along the strip (a lamp every few metres) */
+  points: ReadonlyArray<readonly [number, number, number]>;
+  color: { r: number; g: number; b: number };
+  /** where the light is wanted (the kart); null = nobody, the pool rests */
+  follow: () => { x: number; y: number; z: number } | null;
+  /** how many lights in the pool (default STRIP_POOL) */
+  pool?: number;
+}
+export const STRIP_POOL = 8;
+/** A strip light hangs this high over its point, and reaches this far (its pool covers the nearest ~STRIP_POOL points). */
+export const STRIP_HEIGHT = 2.2, STRIP_RANGE = 20;
+/** Candela-ish: what one strip light puts on the road under it at full mood gain (a street lamp is a few). */
+export const STRIP_INTENSITY = 12;
+
+export function stripRegistry(scene: Scene): StripSource[] {
+  const md = (scene.metadata ??= {}) as { felFixtureStrips?: StripSource[] };
+  return (md.felFixtureStrips ??= []);
+}
+/** Register a strip; returns its remover. Must happen before the rig's captureVenue (i.e. in load()). */
+export function addStripSource(scene: Scene, src: StripSource): () => void {
+  const reg = stripRegistry(scene);
+  reg.push(src);
+  return () => { const i = reg.indexOf(src); if (i >= 0) reg.splice(i, 1); };
+}
+
+/**
+ * Pure: which points the pool's lights sit on. The `k` points nearest `at` (on the ground plane) get a light; a light whose point
+ * is still among them STAYS on it (so nothing flickers as the follower moves), the free lights take the newly near points,
+ * nearest first. `prev` is the last assignment (point index per light, -1 = none).
+ */
+export function stripSlots(points: ReadonlyArray<readonly [number, number, number]>, at: { x: number; z: number }, k: number, prev: readonly number[]): number[] {
+  const n = Math.min(k, points.length);
+  const order = points.map((p, i) => ({ i, d: (p[0] - at.x) ** 2 + (p[2] - at.z) ** 2 })).sort((a, b) => a.d - b.d).slice(0, n).map((o) => o.i);
+  const want = new Set(order);
+  const out: number[] = new Array(k).fill(-1);
+  const taken = new Set<number>();
+  for (let s = 0; s < k; s++) { const p = prev[s]; if (p !== undefined && p >= 0 && want.has(p) && !taken.has(p)) { out[s] = p; taken.add(p); } }
+  const fresh = order.filter((i) => !taken.has(i));
+  for (let s = 0; s < k && fresh.length; s++) if (out[s] < 0) out[s] = fresh.shift()!;
+  return out;
+}
+
 export interface FixtureLightsHandle {
   container: ClusteredLightContainer;
   readonly lights: readonly Light[];
@@ -160,14 +208,15 @@ export function fixtureLightsWanted(tier: QualityTier, modeId: string | null, of
 
 /**
  * Light the scene's fixtures (call after load(); the rig's captureVenue does, desktop/high only). Null when there are no
- * fixtures or the engine cannot cluster. `at` = the play area.
+ * fixtures (nor strips) or the engine cannot cluster. `at` = the play area.
  */
 export function mountFixtureLights(scene: Scene, tier: QualityTier, mood: VenueMood, at: Vector3 | null): FixtureLightsHandle | null {
   if (!fixtureLightsWanted(tier, sceneModeId(scene))) return null;
   const fixtures = findFixtures(scene);
-  if (!fixtures.length) return null;
+  const strips = stripRegistry(scene).filter((s) => s.points.length > 0);
+  if (!fixtures.length && !strips.length) return null;
   const plan = planFixtureLights(fixtures, at ? { x: at.x, y: at.y, z: at.z } : null, { cap: FIXTURE_CAP[tier === 'high' ? 'high' : 'desktop'], mood });
-  if (!plan.length) return null;
+  if (!plan.length && !strips.length) return null;
   const lights: Light[] = [];
   for (const [i, p] of plan.entries()) {
     const pos = new Vector3(p.pos.x, p.pos.y, p.pos.z);
@@ -195,14 +244,45 @@ export function mountFixtureLights(scene: Scene, tier: QualityTier, mood: VenueM
     container.dispose(); for (const l of lights) l.dispose();
     return null;
   }
-  container.maxRange = Math.max(...plan.map((p) => p.range));
+  // w3-atmos: the strips' pools (they join the container once it exists; the cap does not count them: a pool is a few lights by design)
+  const gain = FIXTURE_MOOD_GAIN[mood] ?? 0.5;
+  const pools = strips.map((src, si) => {
+    const k = src.pool ?? STRIP_POOL;
+    const ls: PointLight[] = [];
+    for (let i = 0; i < k; i++) {
+      const l = new PointLight(`fel_fixture_strip_${si}_${i}`, new Vector3(0, -100, 0), scene);
+      l.intensity = 0; l.range = STRIP_RANGE; l.diffuse = new Color3(src.color.r, src.color.g, src.color.b); l.specular = l.diffuse.scale(0.5); l.shadowEnabled = false;
+      ls.push(l);
+    }
+    return { src, ls, slots: new Array<number>(k).fill(-1) };
+  });
+  container.maxRange = Math.max(STRIP_RANGE, ...plan.map((p) => p.range));
   for (const l of lights) container.addLight(l);
+  for (const p of pools) for (const l of p.ls) container.addLight(l);
+  const stripObs = pools.length ? scene.onBeforeRenderObservable.add(() => {
+    for (const p of pools) {
+      const at = p.src.follow();
+      if (!at) { for (const l of p.ls) l.intensity = 0; continue; }
+      p.slots = stripSlots(p.src.points, at, p.ls.length, p.slots);
+      p.ls.forEach((l, s) => {
+        const i = p.slots[s];
+        if (i < 0) { l.intensity = 0; return; }
+        const pt = p.src.points[i];
+        l.position.set(pt[0], pt[1] + STRIP_HEIGHT, pt[2]);
+        // fade each light with its distance from the follower, so a light that is handed the next point does it at nothing
+        const d = Math.hypot(pt[0] - at.x, pt[2] - at.z);
+        l.intensity = STRIP_INTENSITY * gain * Math.max(0, 1 - (d / STRIP_RANGE) ** 2);
+      });
+    }
+  }) : null;
   const roles = plan.reduce<Record<string, number>>((a, p) => { a[p.role] = (a[p.role] ?? 0) + 1; return a; }, {});
-  console.info(`[FEL-FIXTURE] ${lights.length} fixture lights (${Object.entries(roles).map(([k, n]) => `${n} ${k}`).join(', ')}) from ${fixtures.length} fixtures, clustered`);
+  console.info(`[FEL-FIXTURE] ${lights.length} fixture lights (${Object.entries(roles).map(([k, n]) => `${n} ${k}`).join(', ')}) from ${fixtures.length} fixtures, clustered${pools.length ? `, + ${pools.reduce((n, p) => n + p.ls.length, 0)} strip lights following ${pools.length} strip${pools.length === 1 ? '' : 's'}` : ''}`);
   return {
     container,
-    get lights() { return lights; },
+    get lights() { return [...lights, ...pools.flatMap((p) => p.ls)]; },
     dispose() {
+      if (stripObs) scene.onBeforeRenderObservable.remove(stripObs);
+      for (const p of pools) for (const l of p.ls) { try { container.removeLight(l); } catch { /* gone */ } l.dispose(); }
       for (const l of lights) { try { container.removeLight(l); } catch { /* gone */ } l.dispose(); }
       container.dispose();
     },

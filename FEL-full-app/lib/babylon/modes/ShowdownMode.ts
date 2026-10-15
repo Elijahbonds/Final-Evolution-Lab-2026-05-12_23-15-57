@@ -42,6 +42,8 @@ import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeAren
 import { buildArena, gateMaterial, type ArenaHandle } from '../combat/arenaBuild';
 import { mountCombatFx, hitKindOf, auraLevel, type CombatFx } from '../combat/combatFx';   // VISUAL PASS (2026-10-13): the hit language, the chakra aura, the partner's blink-in, the slam's cracks
 import { mountPresentation, type Presentation } from '../combat/presentation';   // the ultimate's grade swing, speed lines, the impact frame
+import { KoReplayCue, playKoReplay } from '../combat/koReplay';   // WAVE 3 (lane/w3-present): KO / ring-out replays — never the match-deciding one
+import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { readPlaceLook } from '../nexus/placeLooks';
 import { FighterState, KARATE_ATTACKS, CHI_MAX, PARRY_WINDOW_MS, guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, RIVAL_POWER_BASE, type RivalPower } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
@@ -214,6 +216,7 @@ export const ShowdownMode: ModeDefinition = (() => {
   let foePower: RivalPower = rivalPower(1, null);
   let arena: CombatArena = arenasFor('showdown')[0]; let arenaHandle: ArenaHandle | null = null;   // phase 7
   let fx: CombatFx | null = null, pres: Presentation | null = null;   // VISUAL PASS: pooled hit sparks / rings / auras; the whole-screen beats
+  const koCue = new KoReplayCue();   // WAVE 3: a round's KO plays back once, a beat after the fall
   // MOVEMENT PLAY P7: the body's fight read (see KarateVSMode: the same seam) — the strikes through the book and the
   // StrikeController's elapsed start, the rival's hits on a body player resolved at impact against the ledger
   // the READY screen's spin / jump kick opt-in, read when a kick is told: the toggle is offered after load (READY, or the
@@ -619,12 +622,14 @@ export const ShowdownMode: ModeDefinition = (() => {
     // IMPROVE (2026-10-06): the KO pause is a phase on the game clock (update() starts the next round after it); the fight
     // used to run on under this banner for 1.8 s of wall clock
     setPhase('roundOver');
+    koCue.arm({ kind: reason === 'K.O.' ? 'ko' : reason === 'TIME' ? 'time' : 'hazard', decidesMatch: false, victim: playerWon ? 1 : 0 }, motionPolicy().reduced);   // WAVE 3 (the match-deciding round returned above: it goes to the end card)
     banner(ctx, `${reason} — ROUND ${myRounds + foeRounds} — ${playerWon ? 'YOU' : 'RIVAL'}`, SHOWDOWN.roundOverSec * 1000);   // phase 9: the same grammar the duel reads (K.O. — ROUND n — YOU)
   }
 
   /** IMPROVE (2026-10-06): a round's start — everything reset, the fighters on their marks, then the beat: "ROUND n" for
    *  READY, then FIGHT! (update()). */
   function startRound(ctx: ModeContext): void {
+    koCue.cancel();
     meState.resetRound(); foeState.resetRound(); xBtn.reset(); padGuard.reset(); guardUp = false; book.reset(); stringLabels = []; deferred.clear(); ledger.reset(); bodyShift = null; foeLaunchedSec = 0; rival.root.position.y = 0; focus.stop(); focusHeld = false; rival.animator.setTimeScale(1); player.animator.setTimeScale(1); ctx.juice.tint(null);
     timers.clear(); foeUlt.clear(); hideAssist(); charging = false; meSubstituted = 0; foeSubstituted = 0;
     meHitT = 0; foeHitT = 0; meHitBy = null; foeHitBy = null; parryFlash = 0; giFlash = 0; foeParryFlash = 0; foeGiFlash = 0;
@@ -724,6 +729,8 @@ export const ShowdownMode: ModeDefinition = (() => {
 
   return {
     modeId: 'showdown', mood: 'dojoWarm', camPreset: 'fight',
+    replay: true,   // WAVE 3: KO replays, from [player, rival] (not the partner or the gate)
+    replayCast: () => ({ bodies: [player.root, rival.root] }),
     // MOVEMENT PLAY P7: the body's own strikes, guard, slips and steps (bodyFightFlags)
     ...(BODY_FIGHT.showdown ? { body: { claims: FIGHT_CLAIMS, lines: FIGHT_CARD_LINES }, onBody: onBodyEvent } : {}),
 
@@ -802,7 +809,7 @@ export const ShowdownMode: ModeDefinition = (() => {
         if (dev) dev.combatPosture = { me: () => mePosture?.layer.get() ?? null, foe: () => foePosture?.layer.get() ?? null, bio: () => ({ me: { ...meBio }, foe: { ...foeBio } }) };
       }
       chakra = new ResourceMeter(CHAKRA); foeChakra = new ResourceMeter(CHAKRA);
-      myRounds = 0; foeRounds = 0; assistTimer = 0; mbus.reset(); matchLatch = false; heavyAt = 0;
+      koCue.reset(); myRounds = 0; foeRounds = 0; assistTimer = 0; mbus.reset(); matchLatch = false; heavyAt = 0;
       clock = 0; timers.clear(); bannerSlot.clear(); foeUlt.clear(); foeFullCalled = false; charging = false; knock.clear();
       for (const k of Object.keys(hudSent)) delete hudSent[k];
 
@@ -899,6 +906,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       if (phase === 'intro') { startRound(ctx); return; }
       if (phase === 'ready' && phaseSec >= SHOWDOWN.readySec) fight(ctx);
       else if (phase === 'roundOver' && phaseSec >= SHOWDOWN.roundOverSec) { startRound(ctx); return; }
+      if (phase === 'roundOver') { const plan = koCue.step(dt); if (plan) playKoReplay(ctx, plan); }   // WAVE 3: the KO replay, a beat after the fall (the harness holds update() while it plays)
       // phase 8 — MATRIX FOCUS: the trigger holds bullet time — the rival on the room's clock (his animator, brain, swings,
       // movement), me on mine. `sdtRoom` / `sdtHero` below are the two clocks; nothing else in this update reads `dt` for a body.
       const wasFocus = focus.active;
@@ -1085,7 +1093,7 @@ export const ShowdownMode: ModeDefinition = (() => {
       // IMPROVE (2026-10-06): nothing waits on a disposed rig — the timers, the slides and the banner go with the mode
       timers.clear(); knock.clear(); bannerSlot.clear(); foeUlt.clear(); charging = false;
       modeVenue?.dispose?.(); modeVenue = null; arenaHandle?.dispose(); arenaHandle = null;
-      fx?.dispose(); fx = null; pres?.dispose(); pres = null;
+      fx?.dispose(); fx = null; pres?.dispose(); pres = null; koCue.reset();
       support?.dispose(); support = null;
       wallMesh?.dispose(false, true); wallMesh = null;   // IMPROVE (2026-10-06): the gate's material with it
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;

@@ -52,7 +52,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
-import { Onlookers } from '../visual/Onlookers';
+import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';
 import { mountFootballFx, type FootballFxHandle } from '../court/FootballFx';   // VIS-COURT (wave 2): towers, down lines, pylons, pyro, turf — visual only, reads the line of scrimmage and the events below
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
@@ -236,8 +236,8 @@ export const FootballRushMode: ModeDefinition = (() => {
   let weather: WeatherKit = new WeatherKit(); let weatherFx: WeatherFxHandle | null = null;
   /** The nearest defender's closing speed for the pursuit read (the steering presets top out near this). */
   const DEF_SPEED = 6.4;
-  /** L4 — sideline banks. A drive is watched; 2 draws, instanced. */
-  let gallery: Onlookers | null = null;
+  /** w3-crowds (A9.9): the stands — the end-zone and sideline crowd that replaced the 16 sideline Onlookers. */
+  let crowd: ModeCrowd | null = null;
   // PRE-SNAP — every play begins SET: the defense holds its alignment and
   // the ball snaps on the PLAYER's call (first forward push), auto-snapping
   // at 3s so an idle phone never stalls. The benchmark's lock justification
@@ -589,6 +589,7 @@ export const FootballRushMode: ModeDefinition = (() => {
   /** The tackle: the down, the distance, the reset (was inline in the contact loop). True when update must return. */
   function tackledBy(ctx: ModeContext, mob: Mob, how: string): boolean {
     tackleWeight(ctx);
+    crowd?.react('groan', 0.6);   // w3-crowds
     EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');
     courtFx?.tackle({ x: runner.root.position.x, z: runner.root.position.z });   // VIS-COURT: turf chunks, a scuff and a ring of dust
     downed = true; move = null; cutSec = 0; vault = null; lane = 'turf'; runner.root.position.y = 0; launchSec = 0; hopSec = 0;
@@ -829,12 +830,8 @@ export const FootballRushMode: ModeDefinition = (() => {
       assertSpawned(ctx.scene, { hero: runner.root, minWorldMeshes: 6, modeId: 'football' });
       SoundKit.startAmbient('stadium');
       EffectsKit.ambient(ctx.scene, 'gridiron');
-      // L4 — a drive is watched. Two sideline banks outside the playing
-      // width (FIELD_HALF_X 20), in the runner-cam's frame edges.
-      gallery = new Onlookers(ctx.scene, [
-        ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(-21.5, 0, 4 + i * 4)),
-        ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => new Vector3(21.5, 0, 6 + i * 4)),
-      ]);
+      // L4 — a drive is watched (w3-crowds: the end-zone and sideline stands, in place of the 16 sideline Onlookers)
+      crowd = mountModeCrowd(ctx, 'football');
       courtFx?.dispose(); courtFx = mountFootballFx(ctx.scene, { phone: ctx.lights.tier === 'mobile', fieldHalfW: 21, goalZ: FIELD_LENGTH, endZ: FIELD_LENGTH + 5 });   // VIS-COURT
       if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).felCourt = courtFx;   // the capture driver stages a cut, a tackle, a truck and a touchdown through it
       newDrive(ctx, 'TAKE THE FIELD');
@@ -1125,7 +1122,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           courtFx?.truck({ x: mob.char.root.position.x, z: mob.char.root.position.z });   // VIS-COURT
           EffectsKit.burst(ctx.scene, mob.char.root.position.add(new Vector3(0, TURF_Y, 0)), 'dust');   // turf at his feet (ANIM-SURGICAL)
           flash(ctx, 'TRUCKED!', 600);
-          gallery?.cheer(0.6);
+          crowd?.react('cheer', 0.6);
           styleCredit(ctx, 'truck');
           if (driveEvades >= BREAKAWAY_THRESHOLD && breakawaySec <= 0) {
             breakawaySec = BREAKAWAY_SEC;
@@ -1168,7 +1165,7 @@ export const FootballRushMode: ModeDefinition = (() => {
         SoundKit.play('crowdCheer');
         EffectsKit.burst(ctx.scene, runner.root.position.add(new Vector3(0, 1.8, 0)), 'confetti');
         holdBanner(ctx, 'TOUCHDOWN!');   // holds through the spike; the next drive's banner replaces it
-        gallery?.cheer(1);
+        crowd?.react(drive >= DRIVES ? 'finish' : 'stand', 1);   // w3-crowds: a touchdown stands them up; the last one ends the night on their feet
         logDrive('TOUCHDOWN');
         if (drive >= DRIVES) {
           ended = true;
@@ -1182,7 +1179,6 @@ export const FootballRushMode: ModeDefinition = (() => {
       }
 
       drive3D(Math.min(1, vel.length() / 8), trucking);
-      gallery?.update(dt);
       ctx.camDirector.look(lookX, lookY, dt);
       ctx.camDirector.update(runner.root.position, vel, null);
     },
@@ -1191,7 +1187,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       posture?.dispose(); posture = null; animTree = null;
       courtFx?.dispose(); courtFx = null;   // VIS-COURT
       rushVenue?.dispose?.(); rushVenue = null;
-      gallery?.dispose(); gallery = null;
+      crowd?.dispose(); crowd = null;
       lineArrow?.dispose(); lineArrow = null; pursuit?.dispose(); pursuit = null; weatherFx?.dispose(); weatherFx = null;
       runner?.dispose();
       for (const b of blockers) b.char.dispose(); blockers = [];

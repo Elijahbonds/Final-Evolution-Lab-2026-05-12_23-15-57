@@ -207,6 +207,11 @@ export interface RunnerView {
   progress: { done: number; total: number };
   /** Full-screen colour flash (SCREEN-REALTIME). */
   flash: FlashKind | null;
+  /**
+   * The recent pulses, each with its own id (two countdown beats in a row are two ids; two reps in one frame are two
+   * pulses). The page plays exactly one tone per id — a counted rep is one pulse, so one tone. Oldest first.
+   */
+  flashCues?: readonly { id: number; kind: FlashKind }[];
   /** Plain rejection line for the last rep that did not count. */
   rejection: Rejection | null;
   /** Move N of 4, readable from across the room. */
@@ -297,6 +302,11 @@ export class AssessRunner {
   private readonly handsFree: boolean;
   private flash: FlashKind | null = null;
   private flashAt = 0;
+  private flashId = 0;
+  private readonly pulseLog: { id: number; kind: FlashKind }[] = [];
+  private readonly pulseAt: number[] = [];
+  /** The countdown number last beeped: one pulse per number (3, 2, 1), not one per frame. */
+  private countN: number | null = null;
   private rejection: Rejection | null = null;
   private dimWarning = false;
   private retryMessage: string | null = null;
@@ -476,12 +486,13 @@ export class AssessRunner {
           if (this.stillGate.step(framing.ok && !trackingLost(frame), frame.t) < 1) break;
           this.countdownReady = true;
           this.stepAt = now;
+          this.countN = Math.ceil(th('ui.timing').countdownMs / 1000);
           this.pulse('countdown');
         }
         const left = th('ui.timing').countdownMs - (now - this.stepAt);
         const n = Math.ceil(left / 1000);
         if (left <= 0) { this.go('active', now); this.pulse('start'); this.say('Go.', true); }
-        else { this.pulse('countdown'); this.say(String(n), true); }
+        else { if (n !== this.countN) { this.countN = n; this.pulse('countdown'); } this.say(String(n), true); }
         break;
       }
       case 'active':
@@ -554,6 +565,10 @@ export class AssessRunner {
   private pulse(kind: FlashKind): void {
     this.flash = kind;
     this.flashAt = this.now;
+    this.flashId++;
+    this.pulseLog.push({ id: this.flashId, kind });
+    this.pulseAt.push(this.now);
+    while (this.pulseAt.length && this.now - this.pulseAt[0] > th('ui.timing').markMs) { this.pulseAt.shift(); this.pulseLog.shift(); }
   }
 
   private go(step: RunnerStep, now: number): void {
@@ -826,6 +841,7 @@ export class AssessRunner {
       result: this.result,
       progress: { done: this.partIdx, total: this.parts.length },
       flash,
+      flashCues: [...this.pulseLog],
       rejection: this.rejection,
       move: moveOf(def?.id ?? this.donePart?.part ?? null, this.parts),
       setupReady: (this.step === 'framing' || this.step === 'position') && !!this.lastFraming?.ok && !this.lastFraming?.issues.some((i) => i !== 'dim'),
