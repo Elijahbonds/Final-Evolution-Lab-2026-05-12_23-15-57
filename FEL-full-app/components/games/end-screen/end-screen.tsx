@@ -32,7 +32,7 @@ import { StoryRefusedPanel } from '../end-card-refusal';
 import { FormBlock } from '../form-block';   // HOOPS BODY (2026-10-07): the FORM block
 import type { EndScreenAction, EndScreenProps } from './types';
 import {
-  buildSteps, stepDurations, initialReveal, revealReducer, isShown, revealDone, pressIntent, cueFor, ARM_MS, type StepId,
+  buildSteps, stepDurations, initialReveal, revealReducer, isShown, revealDone, pressIntent, backIntent, cueFor, ARM_MS, type StepId,
 } from './reveal';
 import { applyRun, browserStore, localDay, playedOn, browserAccountBest, mergeAccountBest, ACCOUNT_BEST_WAIT_MS, type AccountBest } from './records';
 import { levelFill } from './level-bar';
@@ -252,6 +252,12 @@ export function EndScreen(props: EndScreenProps) {
   const [focusId, setFocusId] = useState('primary');
   const focusRef = useRef(focusId); focusRef.current = focusId;
   const rvRef = useRef(rv); rvRef.current = rv;
+  // QA-H6: when the reveal finished (B leaves only a settle after it)
+  const doneAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (!revealDone(rv, steps.length)) doneAt.current = null;
+    else if (doneAt.current === null) doneAt.current = now();
+  }, [rv, steps.length, now]);
   const stepsLen = useRef(steps.length); stepsLen.current = steps.length;
   const exitHref = exitHrefFor(storyNodeId);
   const navRef = useRef(onNavigate); navRef.current = onNavigate;
@@ -282,7 +288,12 @@ export function EndScreen(props: EndScreenProps) {
       else if (p === 'activate') focusables().find((el) => el.dataset.endFocus === focusRef.current)?.click();
       return;
     }
-    if (it === 'back') { if (since >= ARM_MS) navRef.current(exitHref); return; }
+    if (it === 'back') {
+      const b = backIntent(rvRef.current, stepsLen.current, since, doneAt.current === null ? null : now() - doneAt.current);
+      if (b === 'skip') dispatch({ type: 'skip' });
+      else if (b === 'leave') navRef.current(exitHref);
+      return;
+    }
     const els = focusables();
     if (!els.length) return;
     const from = Math.max(0, els.findIndex((el) => el.dataset.endFocus === focusRef.current));

@@ -26,6 +26,8 @@ export interface ArenaHazard { x: number; z: number; r: number; kind: 'fire' | '
 export interface ArenaLook {
   skyTop: string; skyBottom: string; fog: string; sun: string; ambient: number;
   backdrop: 'beach' | 'ocean' | 'city' | 'stadium' | 'mountains' | 'dojo' | 'neon' | 'links';
+  /** w3-atmos: the painted horizon is the sky, not the baked photograph (NexusWebScene Environment.paintedSky): a night arena. */
+  paintedSky?: boolean;
   /** The floor: the venue's ground kind + colours (NexusWebScene GroundSpec). */
   ground: { kind: 'mat' | 'street' | 'stage' | 'court' | 'sand'; color: string; line: string; markings: 'ring' | 'none' };
   /** The CC0 prop dressing set (visual/venuePropSets); null = none — a neon cage has no shrine behind it. */
@@ -294,7 +296,7 @@ const CAGE: CombatArena = {
   shape: { kind: 'disc', radius: 6.4 }, edge: 'ropes',
   walls: perimeterWalls({ kind: 'disc', radius: 6.4 }, 3, 'cage', 8, Math.PI / 8, Math.PI * 2 + Math.PI / 8),
   pillars: [], hazards: [],
-  look: { ...nightSky, backdrop: 'neon', ground: { kind: 'street', color: '#1a1d2b', line: '#22d3ee', markings: 'none' }, floorHalf: 12,   // CAM CLEARANCE: was 11 — the 'fight' camera swings 3 m off-axis as well as 4.2 m back, which is 11.6 m out from the 6.4 m rim
+  look: { ...nightSky, backdrop: 'neon', paintedSky: true, ground: { kind: 'street', color: '#1a1d2b', line: '#22d3ee', markings: 'none' }, floorHalf: 12,   // CAM CLEARANCE: was 11 — the 'fight' camera swings 3 m off-axis as well as 4.2 m back, which is 11.6 m out from the 6.4 m rim
     wallColor: '#22d3ee', accent: '#22d3ee', mood: 'nightGame', propSet: null,
     props: [lamp(8, 8, '#22d3ee'), lamp(-8, 8, '#f472b6'), lamp(8, -8, '#f472b6'), lamp(-8, -8, '#22d3ee'), { kind: 'banner', position: [0, 0, -10.5], color: '#22d3ee' }] },
 };

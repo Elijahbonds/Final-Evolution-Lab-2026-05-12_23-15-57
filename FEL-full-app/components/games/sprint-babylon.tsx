@@ -13,6 +13,8 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } 
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { HudBanner, HudChip, HudFrame, HudPlate, HudText, ScoreValue, hudColor, type HudTone } from './tv-hud';
+import { PhotoFinishPrint } from './photo-finish';   // WAVE 3 (lane/w3-present): the photo-finish end image
+import { PHOTO_HOLD_MS } from '@/lib/babylon/racing/photoFinish';
 
 // Which harness currently owns a given canvas. React mounts effects twice in
 // dev: effect A starts an async runMode(), its cleanup fires before A has even
@@ -77,6 +79,11 @@ export function makeSprintHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+    // WAVE 3: the photo finish holds the result for a couple of seconds (the print on screen); any press or tap hands it over at once
+    const hudRef = useRef<Hud>({});
+    hudRef.current = hud;
+    const holdRef = useRef<{ go: () => void; timer: ReturnType<typeof setTimeout> } | null>(null);
+    const [holding, setHolding] = useState(false);
     useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
@@ -88,6 +95,7 @@ export function makeSprintHost(modeKey: string, title: string) {
       busRef.current = bus;
       let stop: (() => void) | null = null;
       let disposed = false;
+      const offSkip = bus.on((e) => { if (holdRef.current && 'pressed' in e && e.pressed) holdRef.current.go(); });   // WAVE 3: a press (a button, the d-pad) hands the result over
 
       // DEFERRED like every other host (racing pass phase 5, 2026-09-23). Booted straight from the effect, React's
       // development double-mount left the FIRST harness running: its cleanup ran before runMode resolved (no stop to
@@ -108,7 +116,7 @@ export function makeSprintHost(modeKey: string, title: string) {
         resultSink: async (r: SessionResult) => {
           if (endedRef.current) return;
           endedRef.current = true;
-          onEndRef.current({
+          const result = ({
             score: r.score,
             stats: r.stats, outcome: r.outcome,   // pass 5 phase 3: the proof line reads these
             opponentScore: 0,
@@ -120,6 +128,14 @@ export function makeSprintHost(modeKey: string, title: string) {
               return r.outcome === 'win' ? `SUB-13 · ${t}s` : r.outcome === 'dnf' ? 'DID NOT FINISH'
                 : Number(r.stats?.beatPacer) ? `BEAT THE PACER · ${t}s — NOW SUB-13` : `THE PACER TAKES IT · ${t}s`; })(),
           } satisfies GameResult);
+          // WAVE 3: the photo finish — when the mode sent a still of the tape, the print holds the result for PHOTO_HOLD_MS (skippable)
+          const still = hudRef.current.photoSrc;
+          if (disposed || typeof still !== 'string' || !still) { onEndRef.current(result); return; }
+          let done = false;
+          const go = (): void => { if (done) return; done = true; clearTimeout(timer); holdRef.current = null; setHolding(false); onEndRef.current(result); };
+          const timer = setTimeout(go, PHOTO_HOLD_MS);
+          holdRef.current = { go, timer };
+          setHolding(true);
         },
       }).then((s) => {
         // If a newer mount already claimed this canvas, do NOT run our teardown —
@@ -133,6 +149,8 @@ export function makeSprintHost(modeKey: string, title: string) {
       return () => {
         disposed = true;
         clearTimeout(startTimer);
+        offSkip();
+        if (holdRef.current) { clearTimeout(holdRef.current.timer); holdRef.current = null; }   // a result held for the print is not sent from a host that has gone
         if (canvasOwner.get(canvas) === token) stop?.();
       };
     }, []);   // mount once — see onEndRef above
@@ -173,19 +191,24 @@ export function makeSprintHost(modeKey: string, title: string) {
               )}
             </div>
           )}
-          <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" />
+          {/* WAVE 3: with the photo finish up the result line rides above the print (it was at a third of the stage, where the print stands) */}
+          <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" className={hud.photoSrc ? 'top-[24%]' : undefined} />
 
           {/* IMPROVE (2026-10-06): the hint the mode always sent — the controls, explained on screen */}
-          {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && (
+          {phase === 'playing' && typeof hud.hint === 'string' && hud.hint && !hud.photoSrc && (
             <HudPlate className="absolute right-4 top-4 z-20 max-w-[45%] px-2 py-1 text-right">
               <HudText size="caption" alpha={0.8}>{hud.hint}</HudText>
             </HudPlate>
           )}
-          {phase === 'playing' && Number(hud.beat) > 0 && (
+          {/* WAVE 3: the photo finish — the still the mode took at the tape, with the line and the ruler */}
+          <PhotoFinishPrint src={hud.photoSrc} line={hud.photoLine} you={hud.photoYou} pacer={hud.photoPacer} />
+          {phase === 'playing' && Number(hud.beat) > 0 && !hud.photoSrc && (
             <SprintMetronome seq={Number(hud.beat)} ms={Number(hud.beatMs) || 200} foot={String(hud.beatFoot ?? '')}
               grade={String(hud.beatGrade ?? '')} call={String(hud.beatCall ?? '')} />
           )}
         </HudFrame>
+
+        {holding && <div data-photo-skip className="absolute inset-0 z-30 cursor-pointer" onPointerDown={() => holdRef.current?.go()} aria-hidden="true" />}
 
         <BootSplash
           modeId={modeKey}

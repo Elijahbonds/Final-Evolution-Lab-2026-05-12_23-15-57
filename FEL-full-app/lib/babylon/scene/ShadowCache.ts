@@ -129,7 +129,19 @@ const freshPose = (m: CasterLike): { updateFlag: number; m: ArrayLike<number> } 
  */
 export const MAX_PLACEMENTS = 1;
 
-interface Entry { m: CasterLike; pose: Pose; on: boolean; still: number; stillSince: number; mover: boolean; placed: number; shifted: boolean }
+/**
+ * A STATIC THAT KEEPS BLINKING IS A MOVER (phone-perf, 2026-10-14). Every show or hide of a baked caster is a re-bake,
+ * and the re-bakes are rationed (RebakeLimiter: more than 8 in 4 s and the cache stands down for the session). Measured
+ * on 3-Point's phone tier: the hand ball and the flight balls swap visibility on every shot, the rim's juice ring flashes
+ * on every make, and each swap re-baked the whole venue (~140 draws in that frame); nine re-bakes in the first shots and
+ * the cache was OFF for the rest of the run — every one of the 187 casters drawn every frame (96 shadow draws, 197 in
+ * all, against 33 when cached). A static whose visibility changes more than MAX_TOGGLES times is demoted to a mover
+ * like one that moved: it costs its own draw when shown, and nothing when hidden, for good. Two changes stay re-bakes —
+ * a rack ball taken once (hidden) and a set piece shown once and hidden once (an intro prop) are still scenery.
+ */
+export const MAX_TOGGLES = 2;
+
+interface Entry { m: CasterLike; pose: Pose; on: boolean; still: number; stillSince: number; mover: boolean; placed: number; shifted: boolean; toggles: number }
 
 /**
  * How long a late-added caster must hold still before it joins the baked statics: SETTLE_MS of wall time AND at least
@@ -165,7 +177,7 @@ export class CasterLedger {
 
   private put(m: CasterLike, where: 'static' | 'moving', mover: boolean): void {
     this.version++;
-    const e: Entry = { m, pose: new Pose(m.getWorldMatrix(), m), on: shown(m), still: 0, stillSince: this.now, mover, placed: 0, shifted: false };
+    const e: Entry = { m, pose: new Pose(m.getWorldMatrix(), m), on: shown(m), still: 0, stillSince: this.now, mover, placed: 0, shifted: false, toggles: 0 };
     if (where === 'static') { this.st.set(m, e); this.statics.push(m); } else { this.mv.set(m, e); this.moving.push(m); }
   }
 
@@ -207,6 +219,7 @@ export class CasterLedger {
           e.shifted = false;
           if (++e.placed > MAX_PLACEMENTS) { this.demote(i, e, now); why = 'moved'; continue; }
         }
+        if (++e.toggles > MAX_TOGGLES) { this.demote(i, e, now); why = 'moved'; continue; }   // a blinker: drawn when shown, from now on
         why ||= 'toggled';
         continue;
       }
@@ -573,7 +586,12 @@ export function mountShadowCache(scene: Scene, gen: ShadowGenerator, light: Dire
     if (!dirty) { syncLive(); return; }
     if (dirty === 'retry') {
       if (frameNo % 10 !== 0) return;   // still compiling: try every 10th frame, live in between
-    } else if (!limiter.record(clock())) { off(`re-baked too often (last: ${dirty})`); return; }
+    } else if (dirty !== 'moved' && !limiter.record(clock())) { off(`re-baked too often (last: ${dirty})`); return; }
+    // ^ a DEMOTION ('moved': a static became a mover, by moving, by a second placement or by blinking) is not rationed: each
+    // caster is demoted at most once, so they cannot thrash, and every one makes the next frames cheaper. The ration is for
+    // what has no end — a light that keeps moving, a world streaming in. Measured on 3-Point's phone tier (phone-perf,
+    // 2026-10-14): the first three shots demote the hand ball and both flight balls (each a toggle plus a demotion, a mesh
+    // and its child a frame apart), nine re-bakes inside four seconds, and the cache stood down for the whole session.
     const reason = dirty; dirty = '';
     if (bake(reason)) failedBakes = 0;
     else { dirty = 'retry'; if (++failedBakes > 60) off('the bake never completed'); }

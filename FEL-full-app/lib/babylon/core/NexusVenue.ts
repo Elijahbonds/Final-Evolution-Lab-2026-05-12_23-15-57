@@ -129,11 +129,11 @@ export interface MountVenueOptions {
  */
 
 /** A combat arena's look over a venue spec: its sky and fog, its floor, its lamps and banners; no scanned map. */
-export function applyArena<T extends { environment: { skyTop: string; skyBottom: string; fogColor: string; fogDensity: number; ambient: number; sunColor: string; backdrop?: string }; ground: { kind: string; size: [number, number]; color: string; lineColor?: string; markings?: string }; props: unknown[]; mapKey?: string }>(spec: T, arena: CombatArena): T {
+export function applyArena<T extends { environment: { skyTop: string; skyBottom: string; fogColor: string; fogDensity: number; ambient: number; sunColor: string; backdrop?: string; paintedSky?: boolean }; ground: { kind: string; size: [number, number]; color: string; lineColor?: string; markings?: string }; props: unknown[]; mapKey?: string }>(spec: T, arena: CombatArena): T {
   const L = arena.look;
   return {
     ...spec,
-    environment: { ...spec.environment, skyTop: L.skyTop, skyBottom: L.skyBottom, fogColor: L.fog, sunColor: L.sun, ambient: L.ambient, backdrop: L.backdrop },
+    environment: { ...spec.environment, skyTop: L.skyTop, skyBottom: L.skyBottom, fogColor: L.fog, sunColor: L.sun, ambient: L.ambient, backdrop: L.backdrop, paintedSky: L.paintedSky },
     ground: { ...spec.ground, kind: L.ground.kind, size: [L.floorHalf * 2, L.floorHalf * 2] as [number, number], color: L.ground.color, lineColor: L.ground.line, markings: L.ground.markings, offset: undefined },
     props: [...L.props],
     mapKey: undefined,
@@ -142,11 +142,12 @@ export function applyArena<T extends { environment: { skyTop: string; skyBottom:
 
 /** A place look over a venue spec: the sky, the floor's colours, the horizon and added dressing. The surface's size and
  *  markings stay — they are the game. A scanned map is dropped so the look shows (the map carries its own colours). */
-export function applyLook<T extends { environment: { skyTop: string; skyBottom: string; fogColor: string; fogDensity: number; ambient: number; sunColor: string; backdrop?: string }; ground: { kind: string; color: string; lineColor?: string }; props: unknown[]; mapKey?: string }>(spec: T, look: PlaceLook): T {
+export function applyLook<T extends { environment: { skyTop: string; skyBottom: string; fogColor: string; fogDensity: number; ambient: number; sunColor: string; backdrop?: string; paintedSky?: boolean }; ground: { kind: string; color: string; lineColor?: string }; props: unknown[]; mapKey?: string }>(spec: T, look: PlaceLook): T {
   const env = look.sky
     ? { ...spec.environment, skyTop: look.sky.top, skyBottom: look.sky.bottom, fogColor: look.sky.fog, sunColor: look.sky.sun, ambient: look.sky.ambient ?? spec.environment.ambient, fogDensity: look.sky.fogDensity ?? spec.environment.fogDensity }
     : { ...spec.environment };
   if (look.backdrop) env.backdrop = look.backdrop;
+  if (look.paintedSky) env.paintedSky = true;
   const ground = { ...spec.ground, ...(look.ground?.color ? { color: look.ground.color } : {}), ...(look.ground?.line ? { lineColor: look.ground.line } : {}), ...(look.ground?.kind ? { kind: look.ground.kind } : {}) };
   const changed = !!(look.sky || look.backdrop || look.ground || look.props?.length || look.propSet !== undefined);
   return { ...spec, environment: env, ground, props: [...spec.props, ...(look.props ?? [])], mapKey: changed && look.ground ? undefined : spec.mapKey };

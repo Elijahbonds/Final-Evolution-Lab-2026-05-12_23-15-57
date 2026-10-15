@@ -13,7 +13,7 @@ import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, t
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
-import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText } from './tv-hud';
+import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, HudLowerThird } from './tv-hud';
 import { JudgeCards } from './judge-cards';
 import { MicCaption, MicToggle } from './mic-caption';
 
@@ -151,6 +151,25 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
       )}
 
       {phase === 'playing' && <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="you" plate={false} className="top-1/3" />}
+
+      {/* WAVE 3 (lane/w3-present): the player-turn name card — a lower third that slides in when the floor changes hands (the active
+          player and the dunk's number are the key), from the keys the duel already sends. It sits above the hint and clear of the MC's caption. */}
+      {(() => {
+        const who = typeof hud.activePlayer === 'string' ? hud.activePlayer : '';
+        const count = typeof hud.dunkNum === 'string' ? hud.dunkNum : '';
+        const [num, ...rest] = count.split(' · ');
+        return (
+          <HudLowerThird
+            enabled={showHud}
+            cardKey={who ? `${who}|${count}` : ''}
+            tone={who === 'P2' ? 'them' : 'you'}
+            kicker="NOW UP"
+            title={who ? `PLAYER ${who.replace(/\D/g, '') || '1'}` : ''}
+            sub={`DUNK ${num || '1/2'}${rest.length ? ` · ${rest.join(' · ')}` : ''} · ${hnode(hud.style, 'POWER')} · ${hnode(hud.prop, 'NO PROP')}`}
+            aside={<span>{hnum(hud.p1Score, 0)}–{hnum(hud.p2Score, 0)}</span>}
+          />
+        );
+      })()}
       </HudFrame>
 
       {/* THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice */}

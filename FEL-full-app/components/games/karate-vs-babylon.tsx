@@ -16,6 +16,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { HudFrame } from './tv-hud';
 import { CombatClock, CombatHudBand, CombatRound, CombatStat } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
+import { FightIntroPlates, FightSlam, ReplayBug } from './fight-presentation';   // WAVE 3 (lane/w3-present): the intro's name plates, ROUND / FIGHT / K.O. slam text, the replay tag
 
 type Hud = Record<string, HudValue>;
 
@@ -103,6 +104,9 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
   }, [emit]);
 
   const showHud = phase === 'playing';
+  // WAVE 3: during the intro walk-in (hud.intro) and a KO replay (hud.replay) the stat band steps aside — the shot is the picture
+  const intro = typeof hud.intro === 'string' ? hud.intro : '';
+  const replaying = Number(hud.replay) === 1;
 
   return (
     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
@@ -111,7 +115,8 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
       {/* TV HUD (A9.13, lane/tv-hud): the fight readouts on the shared system — same keys, same band, same corners. */}
       {showHud && (
         <HudFrame>
-        <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''}>
+        {!intro && !replaying && (
+        <CombatHudBand banner={typeof hud.banner === 'string' ? hud.banner : ''} slam={hud.slam}>
         <div className="flex justify-between px-4 py-3">
           <div className="flex flex-col items-start gap-1">
             <CombatStat label="HP" value={hnum(hud.hp, 100)} tone="you" />
@@ -130,6 +135,10 @@ export default function KarateVSBabylon({ onEnd }: GameProps) {
           </div>
         </div>
         </CombatHudBand>
+        )}
+        <FightIntroPlates beat={hud.intro} foeName={hud.foeName} foeSub={hud.foeSub} meName={hud.meName} meSub={hud.meSub} />
+        <FightSlam text={hud.slam} seq={hud.slamSeq} />
+        <ReplayBug on={replaying} />
         </HudFrame>
       )}
 

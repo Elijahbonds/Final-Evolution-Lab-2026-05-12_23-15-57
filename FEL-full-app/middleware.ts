@@ -38,7 +38,10 @@ function cspReportOnly(nonce: string): string {
     "base-uri 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    'upgrade-insecure-requests',
+    // No `upgrade-insecure-requests` here: a report-only policy ignores it, and every page that carries this header
+    // logged "The Content Security Policy directive 'upgrade-insecure-requests' is ignored when delivered in a
+    // report-only policy" as a console ERROR on each load (/screen*, /play/mirror/assess*; bug sweep 2026-10-14). Add it
+    // back when this policy is switched to enforcing.
   ].join('; ');
 }
 

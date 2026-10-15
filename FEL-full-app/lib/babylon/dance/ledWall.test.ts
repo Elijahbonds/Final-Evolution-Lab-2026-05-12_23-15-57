@@ -126,6 +126,29 @@ describe('the LED wall: the mesh', () => {
     expect(m.albedoColor.r + m.albedoColor.g + m.albedoColor.b).toBe(0);
     w.dispose();
   });
+  it('lane/dance-extras: a FREESTYLE section holds its word on the wall over any pattern until it is cleared, then the card comes back', () => {
+    const w = mountLedWall(scene, { at: [0, 4, 14], width: 15, height: 3.3, small: false, track: 'WINDWARD CIRCLE', player: 'ELI' });
+    w.update(st(5, 0.1));                                               // a moving pattern: no text at all (no cheer)
+    painted.length = 0;
+    w.update(st(5, 0.15));
+    expect(painted).toEqual([]);
+    w.setOverride('FREESTYLE');
+    painted.length = 0;
+    expect(w.update(st(5, 0.15))).toBe(true);                           // the word changes the picture: it repaints on the same beat
+    expect(painted).toContain('FREESTYLE');
+    painted.length = 0;
+    expect(w.update(st(5, 0.16))).toBe(false);                          // …and then holds like any frame
+    w.update(st(9, 0.2));                                               // a new bar's pattern keeps the word
+    expect(painted).toContain('FREESTYLE');
+    w.update(st(0, 0, -1, false));                                      // even the name card gives way to it
+    expect(painted.filter((t) => t === 'THE CYPHER')).toEqual([]);
+    w.setOverride(null);
+    painted.length = 0;
+    w.update(st(0, 0, -1, false));
+    expect(painted).toContain('THE CYPHER');
+    expect(painted).not.toContain('FREESTYLE');
+    w.dispose();
+  });
   it('a small (phone) wall is half the texture size', () => {
     const big = mountLedWall(scene, { at: [0, 4, 14], width: 15, height: 3.3, small: false, track: 'A' });
     const small = mountLedWall(scene, { at: [0, 4, 14], width: 15, height: 3.3, small: true, track: 'A' });
