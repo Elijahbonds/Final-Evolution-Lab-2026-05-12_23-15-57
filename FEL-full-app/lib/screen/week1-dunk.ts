@@ -51,7 +51,7 @@ export const WEEK1_DUNK_DAYS: readonly Week1Day[] = [
     { name: 'Strong', what: 'Same as A' },
     FLUSH,
   ] },
-  { day: 'Sat', title: 'Movement Snack, or a dunk day in Track 3', kind: 'snack', blocks: [SNACK] },
+  { day: 'Sat', title: 'Movement Snack', kind: 'snack', blocks: [SNACK] },
   { day: 'Sun', title: 'Off', kind: 'rest', blocks: [] },
 ];
 

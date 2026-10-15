@@ -63,4 +63,34 @@ describe('week-1 dunk cards: word for word from programs/DUNK-PROGRAM.md', () =>
       expect(d.blocks.find((b) => b.name === 'Down, Up, Check')!.what, d.day).toBe(duc === 'Same' ? rows.get('Down, Up, Check')![0] : duc);
     });
   });
+
+  // QA (2026-10-14): another whole sentence of the doc passed in these lines' place. Each is tied to ITS passage now.
+  it('the exit, the end-the-set rule, the Neural Flush, the check-in, breath and stack and the Movement Snack are each their own passage, exactly', () => {
+    const lines = DOC.split('\n');
+    const firstSentence = (t: string) => t.split(/(?<=[.!?])\s+/)[0].trim();
+    // §9.3 Weeks 1–2 · Base: the sentence under the table that says when to leave the base
+    const base = DOC.slice(DOC.indexOf('### 9.3'), DOC.indexOf('**Weeks 3 and 5', DOC.indexOf('### 9.3')));
+    const leave = base.split('\n').filter((l) => l.startsWith('Leave the base'));
+    expect(leave).toHaveLength(1);
+    expect(WEEK1_EXIT).toBe(leave[0].trim());
+    // the bold "End the set the moment:" rule, its first sentence
+    const endSet = lines.filter((l) => l.startsWith('**End the set the moment:**'));
+    expect(endSet).toHaveLength(1);
+    expect(WEEK1_END_SET).toBe(firstSentence(unbold(endSet[0])));
+    // §6.1 session table: row 0 Check-in, row 4 Breath and stack, row 7 Reset (Neural Flush) — the "What you do" cell
+    const row = (n: number, name: string) => {
+      const r = lines.filter((l) => l.startsWith(`| ${n} | ${name} |`));
+      expect(r, name).toHaveLength(1);
+      return unbold(r[0].split('|')[3]);
+    };
+    const sessionBlock = (name: string) => [...new Set(WEEK1_DUNK_DAYS.filter((d) => d.kind === 'session').map((d) => d.blocks.find((b) => b.name === name)!.what))];
+    expect(sessionBlock('Reset (Neural Flush)')).toEqual([row(7, 'Reset (Neural Flush)')]);
+    expect(sessionBlock('Check-in')).toEqual([row(0, 'Check-in')]);
+    const breath = WEEK1_DUNK_DAYS.find((d) => d.day === 'Mon')!.blocks.filter((b) => b.name === 'Breath and stack').map((b) => b.what);
+    expect(breath[0]).toBe(row(4, 'Breath and stack'));
+    // the bold "Movement Snack:" passage, on both snack days
+    const snack = lines.filter((l) => l.startsWith('**Movement Snack:**'));
+    expect(snack).toHaveLength(1);
+    for (const d of WEEK1_DUNK_DAYS.filter((x) => x.kind === 'snack')) expect(d.blocks.map((b) => b.what), d.day).toEqual([unbold(snack[0].replace('**Movement Snack:**', ''))]);
+  });
 });

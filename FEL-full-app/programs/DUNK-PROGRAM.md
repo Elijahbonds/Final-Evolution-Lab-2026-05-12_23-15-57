@@ -142,7 +142,7 @@ Small, quick bounces teach your legs to be springy. You move up by **quality, no
 
 Base weeks (1–2) can be repeated up to twice if your exit gates aren't met.
 
-**Weekly layout (every track):** Mon session A · Tue Movement Snack (5 min) · Wed session B · Thu off or a walk · Fri session C (re-test first) · Sat Movement Snack, or a dunk day in Track 3 · Sun off.
+**Weekly layout (every track):** Mon session A · Tue Movement Snack (5 min) · Wed session B · Thu off or a walk · Fri session C (re-test first) · Sat Movement Snack · Sun off.
 
 **Movement Snack:** 3 rounds of 3 slow breaths, 20 s of tiny ankle bounces while breathing, then a 3-breath Neural Flush.
 
