@@ -33,6 +33,8 @@ const h = vi.hoisted(() => {
     /** MUSIC-SUITE P6 FIX PASS: Postgres row locks — an UPDATE holds its row until the transaction ends (off: no locks). */
     noLocks: false,
     rowLocks: new Map<string, { owner: symbol; released: Promise<void> }>(),
+    /** ARENA-SETTLE-SERVER: the server runs (SessionRun) a duel score names */
+    runs: {} as Record<string, Row>,
   };
 
   const fieldMatch = (v: unknown, c: any): boolean => {
@@ -40,6 +42,7 @@ const h = vi.hoisted(() => {
     if (c instanceof Date) return v instanceof Date && v.getTime() === c.getTime();
     if (c && typeof c === 'object') {
       if ('in' in c) return c.in.includes(v);
+      if ('contains' in c) return typeof v === 'string' && v.includes(c.contains);
       if ('not' in c) return c.not === null ? v !== null && v !== undefined : v !== c.not;
       const t = v === null || v === undefined ? NaN : new Date(v as string).getTime();
       if ('lte' in c) return t <= c.lte.getTime();
@@ -138,6 +141,7 @@ const h = vi.hoisted(() => {
     },
     user: { findMany: async () => [{ id: 'u1', name: 'You' }, { id: 'u2', name: 'Rival' }, { id: 'house', name: 'House' }] },
     gameSession: { findMany: async () => [] },
+    sessionRun: { findUnique: async ({ where }: Row) => (store.runs[where.id] ? { ...store.runs[where.id] } : null) },
   });
 
   const prisma = {
@@ -204,6 +208,13 @@ const FEE = 50;
 const RAKE = 10;
 
 let seq = 0;
+/** ARENA-SETTLE-SERVER: a run the server finished for `userId` in the duel's mode, a minute after the duel opened; its runId. */
+function ran(d: Row, userId: string, score: number): string {
+  const id = `run-${d.id}-${userId}`;
+  h.store.runs[id] = { id, userId, mode: d.mode, status: 'paid', score, startedAt: new Date(new Date(d.createdAt).getTime() + 60_000) };
+  return id;
+}
+
 function duel(over: Row = {}): Row {
   seq += 1;
   const m = {
@@ -221,7 +232,7 @@ const snapshot = () => JSON.stringify({ m: h.store.matches, e: h.store.events, l
 beforeEach(() => {
   seq = 0;
   Object.assign(h.store, {
-    matches: [], events: [], ledger: new Map(), balances: {}, user: 'u1',
+    matches: [], events: [], ledger: new Map(), balances: {}, user: 'u1', runs: {},
     failLedgerFor: null, beforeClaim: null, beforeUpdate: null, brokenClaim: false, failCandidates: false, hangCandidates: false,
     noLocks: false, rowLocks: new Map(),
   });
@@ -595,7 +606,7 @@ describe('the expiry rule on the routes that take a stake or a score', () => {
     h.store.beforeUpdate = (where) => {
       if (where.id === d.id && 'player1Score' in where) Object.assign(d, { status: 'SETTLED', winnerId: 'u2' });   // the sweep's forfeit landed first
     };
-    const r = await post(submitPOST, { matchId: d.id, score: 7 });              // a tie — would have refunded BOTH on top of the forfeit
+    const r = await post(submitPOST, { matchId: d.id, score: 7, runId: ran(d, 'u1', 7) });              // a tie — would have refunded BOTH on top of the forfeit
     expect(r).toMatchObject({ status: 409, json: { error: 'NOT_SUBMITTABLE' } });
     expect(d.player1Score).toBeNull();
     expect(h.store.ledger.size).toBe(0);
@@ -604,7 +615,7 @@ describe('the expiry rule on the routes that take a stake or a score', () => {
 
   it('submit-score before expiry is unchanged: the second score settles the duel as it always did', async () => {
     const d = duel({ expiresAt: new Date(Date.now() + HOUR), player2Score: 5 });
-    const r = await post(submitPOST, { matchId: d.id, score: 8 });
+    const r = await post(submitPOST, { matchId: d.id, score: 8, runId: ran(d, 'u1', 8) });
     expect(r).toMatchObject({ status: 200, json: { settled: true, winnerId: 'u1', payout: 90 } });
     expect(d).toMatchObject({ status: 'SETTLED', player1Score: 8 });
     // and a sweep afterwards finds nothing to do
@@ -755,8 +766,8 @@ describe('P6 fix pass: races the review found, run with the fake\'s row locks', 
   it('two submits at once: the later one reads the other score back from its own write, and the duel SETTLES', async () => {
     const d = duel({ expiresAt: realFuture(10) });
     const [a, b] = await Promise.all([
-      (async () => { h.store.user = 'u1'; return post(submitPOST, { matchId: d.id, score: 5 }); })(),
-      (async () => { await new Promise((r) => setImmediate(r)); h.store.user = 'u2'; return post(submitPOST, { matchId: d.id, score: 9 }); })(),
+      (async () => { h.store.user = 'u1'; return post(submitPOST, { matchId: d.id, score: 5, runId: ran(d, 'u1', 5) }); })(),
+      (async () => { await new Promise((r) => setImmediate(r)); h.store.user = 'u2'; return post(submitPOST, { matchId: d.id, score: 9, runId: ran(d, 'u2', 9) }); })(),
     ]);
     expect([a.status, b.status]).toEqual([200, 200]);
     expect([a.json.settled, b.json.settled].filter(Boolean)).toHaveLength(1);
@@ -776,7 +787,7 @@ describe('P6 fix pass: the deadline starts again at the JOIN (the creator gets a
     h.store.user = 'u1';
     expect((await post(joinPOST, { matchId: d.id })).status).toBe(200);
     expect(new Date(d.expiresAt).getTime()).toBe(NOW.getTime() + ARENA_EXPIRY_HOURS * HOUR);
-    expect((await post(submitPOST, { matchId: d.id, score: 7 })).status).toBe(200);        // the joiner plays at once
+    expect((await post(submitPOST, { matchId: d.id, score: 7, runId: ran(d, 'u1', 7) })).status).toBe(200);        // the joiner plays at once
     const oldDeadline = new Date(NOW.getTime() + 11 * 60_000);
     expect((await reclaimExpiredArenaDuels(h.prisma as never, { now: oldDeadline })).scanned).toBe(0);
     expect(d).toMatchObject({ status: 'ACTIVE', winnerId: null });                           // the creator can still play

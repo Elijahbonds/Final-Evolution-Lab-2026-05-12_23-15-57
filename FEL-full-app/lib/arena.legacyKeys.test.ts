@@ -26,6 +26,8 @@ const db = {
   sessionQueries: [] as Row[],
   duelQueries: [] as Row[],
   events: [] as Array<{ matchId?: string; userId?: string | null; type: string; payload: Row; createdAt?: Date }>,
+  // ARENA-SETTLE-SERVER: the server runs (SessionRun) a duel score names
+  runs: {} as Record<string, Row>,
 };
 
 const matchesWhere = (where: Row): Row[] => db.matches.filter((m) => {
@@ -63,7 +65,11 @@ const tx = {
     },
   },
   // MUSIC-SUITE P6: the player's attempt events on a duel (lib/arena-music.ts readMusicAttempt)
+  // ARENA-SETTLE-SERVER (lib/arena-duel-run.ts): the run a duel score names, and whether it already counted elsewhere
+  sessionRun: { findUnique: async ({ where }: Row) => db.runs[where.id] ?? null },
   matchEvent: {
+    findFirst: async ({ where }: Row) => db.events.find((e) => e.userId === where.userId && e.type === where.eventType
+      && e.matchId !== where.matchId?.not && JSON.stringify(e.payload).includes(where.payload.contains)) ?? null,
     findMany: async ({ where }: Row) => db.events
       .filter((e) => e.matchId === where.matchId && e.userId === where.userId && where.eventType.in.includes(e.type))
       .map((e) => ({ eventType: e.type, payload: JSON.stringify(e.payload), createdAt: e.createdAt ?? new Date(0) })),
@@ -152,7 +158,7 @@ function played(matchId: string, userId: string, every = 2): number {
 const finished = (matchId: string, userId: string) => db.events.push({ matchId, userId, type: MUSIC_ATTEMPT_FINISH, payload: { taps: [] } });
 
 beforeEach(() => {
-  db.matches = []; db.sessions = []; db.created = []; db.sessionQueries = []; db.duelQueries = []; db.events = [];
+  db.matches = []; db.sessions = []; db.created = []; db.sessionQueries = []; db.duelQueries = []; db.events = []; db.runs = {};
   vi.mocked(recordServerEvent).mockClear();
 });
 
@@ -293,7 +299,9 @@ describe('a staked music rival and endless free play', () => {
   it('another mode still bands its rival on the player\'s sessions', async () => {
     db.matches = [legacyMatch({ mode: 'threePoint', matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE })];
     db.sessions = [{ userId: USER, mode: 'threePoint', score: 14, createdAt: new Date('2026-09-19T00:00:00Z') }];
-    await submitPOST(post({ matchId: 'legacy-1', score: 12 }));
+    // ARENA-SETTLE-SERVER: the 12 is a threePoint run the server finished for the player after the duel opened
+    db.runs['run-3p'] = { id: 'run-3p', userId: USER, mode: 'threePoint', status: 'paid', score: 12, startedAt: new Date('2026-09-20T00:01:00Z') };
+    await submitPOST(post({ matchId: 'legacy-1', score: 12, runId: 'run-3p' }));
     expect(db.duelQueries).toEqual([]);
     expect(db.sessionQueries.map((w) => w.mode)).toEqual(['threePoint', 'threePoint']);
     expect(db.events.find((e) => e.type === 'GHOST_SCORED')!.payload).toMatchObject({ bandSource: 'player-history', bandCenter: 14 });
