@@ -202,3 +202,6 @@ export const PRIVACY_POINTS = [
 ] as const;
 export const PRIVACY_CLEARED = 'Cleared. No results from the screen are left in this tab.';
 export const PRIVACY_CONTACT = `Questions? Final Evolution LLC, ${SCREEN_CONTACT_EMAIL}`;
+
+/** Framing helper: the "you're in the shot" badge, so the state is never shown by colour alone (UX advice §2). */
+export const FRAMING_IN_FRAME = 'In frame';
