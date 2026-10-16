@@ -173,7 +173,8 @@ describe('the mode wiring (source pins)', () => {
     expect(CODE).toContain("foeResource.max = hasFightMove('dragon', foeRatings) ? CHI_MAX : Infinity;");
   });
   it('#10 / #13 a visible round clock, TIME at the bell, and a FIGHT! beat at every round start', () => {
-    expect(CODE).toContain("endRound(ctx, meState.hp >= foeState.hp, 'TIME')");
+    // WIN-SERVER (2026-10-15): the bell decides on HP, and level HP is a drawn round, not the player's (roundVerdict.ts)
+    expect(CODE).toContain("endRound(ctx, timeOutVerdict(meState.hp, foeState.hp), 'TIME')");
     expect(CODE).toContain('ctx.setHud({ timeLeft: left })');
     expect(CODE).toContain("setPhase('ready')");
     expect(CODE).toContain("if (phase === 'ready' && phaseSec >= READY_SEC) fight(ctx);");
