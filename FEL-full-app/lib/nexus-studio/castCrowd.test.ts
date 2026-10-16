@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../babylon/scene/EnvironmentIBL', () => ({ mountEnvironmentIBL: () => () => {} }));
 
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { CAST_SPACING_M, CROWD_CAST_MAX, CROWD_SEED, crowdCastSeats, crowdVenueOf, resolveCast, sanitizeCast, type CastMember } from './cast';
+import { CAST_SPACING_M, CROWD_CAST_MAX, CROWD_SEED, crowdCastSeats, crowdVenueOf, inPlayView, resolveCast, sanitizeCast, type CastMember } from './cast';
 import { CAST_FAN_HANDS, castFanKeys, mountCrowdCastLayer } from './castLayer';
 import { crowdClipKeys } from '../babylon/visual/crowd/crowdClips';
 import { REF_ARM_LEN } from '../babylon/anim/poseClip';
@@ -57,6 +57,16 @@ describe('the seats: the crowd\'s own empty ones', () => {
     expect(crowdCastSeats(crowd, CROWD_CAST_MAX)).toEqual(seats);
     const near = (s: (typeof seats)[number]) => fans.reduce((a, b) => (dist3(a.pos, s.pos) < dist3(b.pos, s.pos) ? a : b));
     for (const s of seats) expect(Math.abs(Math.atan2(Math.sin(s.yaw - near(s).yaw), Math.cos(s.yaw - near(s).yaw)))).toBeLessThan(0.35);
+  });
+  it('the play camera sees them: seats inside its view come first (the stands\' near ends never make the frame)', () => {
+    const crowd = crowdOf();
+    const v = crowdVenueOf(crowd);
+    const seats = crowdCastSeats(crowd, CROWD_CAST_MAX);
+    for (const s of seats) expect(inPlayView(s.pos, v.camera)).toBe(true);
+    // the cone: straight down the court yes, square to the side no, behind the camera no
+    expect(inPlayView([0, 0, 0], v.camera)).toBe(true);
+    expect(inPlayView([12, 0, v.camera.at[2] - 1], v.camera)).toBe(false);
+    expect(inPlayView([0, 0, v.camera.at[2] + 5], v.camera)).toBe(false);
   });
   it('a packed stand has no gap: the cast takes the aisle (a row\'s end), still past the camera line', () => {
     const crowd = crowdOf();

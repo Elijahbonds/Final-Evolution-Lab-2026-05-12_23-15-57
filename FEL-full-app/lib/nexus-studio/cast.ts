@@ -137,11 +137,23 @@ export interface CastSeat { pos: V3; yaw: number; posture: StandSpec['posture'];
 export const CROWD_SEED = 11;
 /** Two cast fans sit at least this far apart (m): spread through the stand, not a clump. */
 export const CAST_SPACING_M = 1.5;
+/** A seat the play camera sees: within this half-angle (radians) of the camera line's direction into the play. The nearest seats
+ *  to the eye are the stands' near ends, which a camera looking down the court never frames (seen in the Tiebreak play-test). */
+export const CAST_VIEW_HALF_ANGLE = (35 * Math.PI) / 180;
+
+/** Pure: is a point inside the play camera's view cone (horizontal), from the venue's camera line? */
+export function inPlayView(p: readonly number[], camera: { at: readonly number[]; into: readonly [number, number] }, half = CAST_VIEW_HALF_ANGLE): boolean {
+  const dx = p[0] - camera.at[0], dz = p[2] - camera.at[2];
+  const l = Math.hypot(dx, dz), li = Math.hypot(camera.into[0], camera.into[1]) || 1;
+  if (!l) return false;
+  return (dx * camera.into[0] + dz * camera.into[1]) / (l * li) >= Math.cos(half);
+}
 
 /**
  * Where `n` cast characters sit among the fans. Pure and deterministic. The empty seats are the crowd's OWN gaps: the same layout
- * with no gaps, less the seats the crowd fills (same seed, same seat order). Nearest the eye first, inside the card distance, at
- * least CAST_SPACING_M apart; a packed stand offers its rows' ends (the aisle) instead, past the camera line like every seat.
+ * with no gaps, less the seats the crowd fills (same seed, same seat order). Seats the play camera frames first (inPlayView), then
+ * the rest; nearest the eye first within each; inside the card distance, at least CAST_SPACING_M apart; a packed stand offers its
+ * rows' ends (the aisle) instead, past the camera line like every seat.
  */
 export function crowdCastSeats(crowd: ExportCrowd | null | undefined, n: number, seed = CROWD_SEED): CastSeat[] {
   if (!crowd?.stands.length || n <= 0) return [];
@@ -166,7 +178,9 @@ export function crowdCastSeats(crowd: ExportCrowd | null | undefined, n: number,
   }
   const out: CastSeat[] = [];
   const far = (p: V3) => out.every((o) => Math.hypot(o.pos[0] - p[0], o.pos[1] - p[1], o.pos[2] - p[2]) >= CAST_SPACING_M);
-  for (const pool of [gaps, aisles.sort((a, b) => a.dist - b.dist)]) {
+  const seen = (s: { pos: V3 }) => inPlayView(s.pos, venue.camera);
+  const sorted = aisles.sort((a, b) => a.dist - b.dist);
+  for (const pool of [gaps.filter(seen), gaps.filter((s) => !seen(s)), sorted.filter(seen), sorted.filter((s) => !seen(s))]) {
     for (const s of pool) {
       if (out.length >= n) break;
       if (!far(s.pos)) continue;
