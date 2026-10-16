@@ -22,6 +22,7 @@
 // not picked twice; the round clock and the edge call have their own HUD fields; the score pays ring-outs and guard
 // impacts; and the per-frame and per-press garbage is gone. Pure rules: ./duelRules.ts.
 
+import { timeOutVerdict, roundsExhausted } from './roundVerdict';
 import { mountPostureLayer } from '../anim/PostureLayer';
 type PostureHandle = ReturnType<typeof mountPostureLayer>;
 import { combatPose, combatApproach, COMBAT_INPUT_IDLE, type CombatPostureInput } from '../core/CombatPosture';
@@ -186,7 +187,7 @@ export const DuelMode: ModeDefinition = (() => {
     const f = ctx.camDirector.forwardFlat(), r = ctx.camDirector.rightFlat();
     return wishV.set(f.x * -stickY + r.x * stickX, 0, f.z * -stickY + r.z * stickX);
   };
-  let round = 1, myWins = 0, foeWins = 0;
+  let round = 1, myWins = 0, foeWins = 0, drawnRounds = 0;   // DUEL-IDLE-FIX: level rounds on the clock
   // IMPROVE (2026-10-06): what the result pays beyond the rounds (duelRules.duelScore), and what the rival's weapon pick reads
   let ringOutWins = 0, guardImpacts = 0;
   let lastFoeWeapon: DuelWeapon | null = null, rivalWonLast = false;
@@ -562,9 +563,19 @@ export const DuelMode: ModeDefinition = (() => {
   /** The round's verdict. IMPROVE (2026-10-06): the KO pause is a phase on the GAME clock (update() moves on after it — it
    *  was a 2000 ms setTimeout that a pause did not hold and a dispose did not cancel), and the bodies show it through
    *  their trees: the loser `out` (ko → the floor hold), the winner `celebrating`. */
-  function endRound(ctx: ModeContext, playerWon: boolean, label: string, how: 'ko' | 'ringout' | 'time'): void {
+  function endRound(ctx: ModeContext, verdict: boolean | null, label: string, how: 'ko' | 'ringout' | 'time'): void {
     if (phase !== 'fighting') return;
     setPhase('roundOver');
+    // DUEL-IDLE-FIX (LB-14): a round the clock ends level (null) goes to neither side; afterRound replays it, or ends a
+    // match whose rounds have all been played with nobody at ROUNDS_TO_WIN as not won
+    if (verdict === null) {
+      drawnRounds++;
+      meMove.vel.setAll(0); foeMove.vel.setAll(0); foeUlt.clear();
+      koCue.arm({ kind: how, decidesMatch: false, victim: 0 }, motionPolicy().reduced);
+      banner(ctx, `TIME — DRAWN ROUND ${round} — NO POINT`, DUEL.roundOverSec * 1000);
+      return;
+    }
+    const playerWon = verdict;
     if (playerWon) { myWins++; if (how === 'ringout') ringOutWins++; } else foeWins++;
     rivalWonLast = !playerWon;
     SoundKit.play(playerWon ? 'crowdCheer' : 'crowdGroan');
@@ -582,14 +593,14 @@ export const DuelMode: ModeDefinition = (() => {
 
   /** After the KO pause: the match's end, or the next round. */
   function afterRound(ctx: ModeContext): void {
-    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
+    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN || roundsExhausted(myWins + foeWins + drawnRounds, ROUNDS_TO_WIN)) {
       setPhase('matchOver');
       SoundKit.play('whistle');
       const won = myWins >= ROUNDS_TO_WIN;
       if (won) matchPunch(ctx);
       // IMPROVE (2026-10-06): the result pays a ring-out round and each guard impact on top of the rounds (duelRules)
       const score = duelScore({ myWins, foeWins, ringOutWins, guardImpacts });
-      ctx.end(won ? 'DUEL_WON' : 'DUEL_LOST', score, { foeWins, wins: myWins, ringOuts: ringOutWins, guardImpacts, weapon: myWeapon as string } as never);
+      ctx.end(won ? 'DUEL_WON' : 'DUEL_LOST', score, { foeWins, wins: myWins, drawnRounds, ringOuts: ringOutWins, guardImpacts, weapon: myWeapon as string } as never);
       return;
     }
     round++;
@@ -623,7 +634,7 @@ export const DuelMode: ModeDefinition = (() => {
   }
 
   function startMatch(ctx: ModeContext): void {
-    koCue.reset(); round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
+    koCue.reset(); round = 1; myWins = 0; foeWins = 0; drawnRounds = 0; matchLatch = false; heavyAt = 0;
     ringOutWins = 0; guardImpacts = 0; lastFoeWeapon = null; rivalWonLast = false;
     startRound(ctx);
   }
@@ -978,7 +989,7 @@ export const DuelMode: ModeDefinition = (() => {
       if (foeLaunchedSec > 0) { foeLaunchedSec = Math.max(0, foeLaunchedSec - dt); rival.root.position.y = DISC_LIFT + launchHeight(1 - foeLaunchedSec / LAUNCH_AIR_SEC); if (foeLaunchedSec === 0) rival.root.position.y = DISC_LIFT; }
       if (!padGuard.held && xBtn.guardHeld(now() / 1000) && meState.controllable) { padGuard.press(now()); if (!guardUp) { guardUp = true; meDef.pressBlock(now(), false); meState.pressBlock(now()); SoundKit.play('impact', { pitch: 1.3, volume: 0.18 }); } }   // phase 3: the hold is the guard (P7: the pad's, apart from a body guard already up)
       if (phaseSec > BUDGET_SEC[phase]) {
-        if (phase === 'fighting') endRound(ctx, meState.hp >= foeState.hp, 'TIME', 'time');   // the round clock's bell (the HUD shows it now)
+        if (phase === 'fighting') endRound(ctx, timeOutVerdict(meState.hp, foeState.hp), 'TIME', 'time');   // the round clock's bell (the HUD shows it now)
         else if (phase === 'weaponSelect') startMatch(ctx);   // nothing pressed: the weapon in hand
         else if (phase === 'ready') fight(ctx);
         else if (phase === 'roundOver') afterRound(ctx);
