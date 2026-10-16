@@ -19,10 +19,10 @@ const MODES: SimMode[] = ['kvs', 'showdown', 'duel', 'mixed'];
 // mirror honest: each mode puts its own power on the rival at a round start, and the three without the line grammar turn
 // the brain's sidestep off.
 const MODE_FILE: Record<SimMode, { file: string; power: string; stepping: boolean }> = {
-  kvs: { file: 'KarateVSMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.karateVs, readTier())', stepping: false },
-  showdown: { file: 'ShowdownMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.showdown, readTier())', stepping: false },
-  duel: { file: 'DuelMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.duel * DUEL.rivalPowerByWeapon[myWeapon], readTier())', stepping: false },
-  mixed: { file: 'MixedCombatMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.mixedcombat * RIVAL_POWER_BY_LOADOUT[myLoadout], readTier())', stepping: true },
+  kvs: { file: 'KarateVSMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.karateVs, runTier())', stepping: false },
+  showdown: { file: 'ShowdownMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.showdown, runTier())', stepping: false },
+  duel: { file: 'DuelMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.duel * DUEL.rivalPowerByWeapon[myWeapon], runTier())', stepping: false },
+  mixed: { file: 'MixedCombatMode.ts', power: 'rivalPower(RIVAL_POWER_BASE.mixedcombat * RIVAL_POWER_BY_LOADOUT[myLoadout], runTier())', stepping: true },
 };
 const modeSrc = (f: string): string => readFileSync(join(__dirname, '..', 'modes', f), 'utf8');
 
@@ -183,7 +183,7 @@ describe('the combo breaker (core/ComboBreaker)', () => {
     it(`${file}: tracks my string, breaks on a landed blow, pays and plays it (BREAK!, the flash, the whiff beat, the counter)`, () => {
       const s = modeSrc(file);
       expect(s).toContain('breaker.track(dt, meStrike.current);');
-      expect(s).toMatch(/breaker\.hit\(now\(\) \/ 1000, readTier\(\), /);
+      expect(s).toMatch(/breaker\.hit\(now\(\) \/ 1000, runTier\(\), /);
       expect(s).toContain("banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 900);");
       expect(s).toContain("ctx.juice.flash('#ff3344', 110);");
       expect(s).toContain('rivalBrain.openCounter(COMBO_BREAK.counterSec);');
@@ -203,7 +203,7 @@ describe('the combo breaker (core/ComboBreaker)', () => {
     const s = modeSrc('KarateVSMode.ts');
     expect(s).toContain("import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';");
     expect(s).toContain('breaker.track(dt, animOf(true).strike);');   // each swing is its own strike object: a new one is a link
-    expect(s).toMatch(/breaker\.hit\(now\(\) \/ 1000, readTier\(\), defState\.chi >= SUBSTITUTION_CHI_COST\)/);   // the substitution's 25 chi
+    expect(s).toMatch(/breaker\.hit\(now\(\) \/ 1000, runTier\(\), defState\.chi >= SUBSTITUTION_CHI_COST\)/);   // the substitution's 25 chi
     expect(s).toContain("banner(ctx, 'BREAK! — THE RIVAL ESCAPED YOUR STRING', 0.9);");
     expect(s).toContain("ctx.juice.flash('#ff3344', 110);");
     expect(s).toContain('brain.openCounter(COMBO_BREAK.counterSec);');
