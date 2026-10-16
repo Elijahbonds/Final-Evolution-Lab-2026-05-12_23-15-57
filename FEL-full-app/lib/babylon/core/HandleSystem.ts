@@ -166,6 +166,15 @@ export function handleFrom(prq: { agility?: number; flexibility?: number; mental
 export const BASELINE_HANDLE = 50;
 
 /**
+ * H2 (owner, 2026-10-16: "unlock all moves until H9"): the handle the two hoops modes GATE moves on. Every move in MOVE_HANDLE is owned
+ * at it, so nothing is refused and nothing falls back — while the player's own handle (BASELINE_HANDLE until H9 wires the rating) still
+ * sets everything else a handle sets: the chain window, the ankle-break odds, the hard break and the dribble's tightness. H9 deletes it
+ * and the modes gate on the rating again. resolveHandleMove / canChain take it as their `gate` argument (default: the handle itself, so
+ * every caller that passes none gates exactly as before).
+ */
+export const MOVES_UNLOCKED_GATE = 100;
+
+/**
  * How long after one move the next can still chain off it.
  *
  * This is the Street dial. A low handle gets a window so short that moves are effectively separate
@@ -232,8 +241,8 @@ export const MAX_CHAIN = 4;
 /** The moves only the RIGHT STICK produces (StickHandle.stickMoveFor) — moveFromContext never names them. */
 export const STICK_ONLY: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross', 'momentum_btb', 'steezo_roll', 'stepback']);
 export const MOMENTUM_REPEATABLE: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross']);
-export function canChain(next: HandleMove, state: ChainState, handle: number): boolean {
-  if (!hasMove(next, handle)) return false;
+export function canChain(next: HandleMove, state: ChainState, handle: number, gate: number = handle): boolean {
+  if (!hasMove(next, gate)) return false;   // H2: `gate` owns the move (MOVES_UNLOCKED_GATE); `handle` still sets the window
   if (state.last === null) return true;                 // opening a chain is always allowed
   if (state.last === next && !MOMENTUM_REPEATABLE.has(next)) return false;   // no double-tapping one move into a "combo" — except the MOMENTUM SPAM (2K17): the cross chains into itself
   return state.since <= chainWindowSec(handle);
@@ -460,11 +469,12 @@ export function resolveHandleMove(
   handle: number,
   def: DefenderRead,
   roll: () => number = Math.random,
+  gate: number = handle,   // H2: the handle the move is OWNED at (MOVES_UNLOCKED_GATE); `handle` still prices it
 ): MoveOutcome {
-  if (!hasMove(move, handle)) {
+  if (!hasMove(move, gate)) {
     return { owned: false, chain, tier: chainTier(chain.length), restarted: false, broke: 'none', odds: 0 };
   }
-  if (!canChain(move, chain, handle)) {
+  if (!canChain(move, chain, handle, gate)) {
     // out of the window, or a repeat: this is a new chain rather than a refusal, so the input is never eaten
     const fresh = pushChain(move, { ...CHAIN_IDLE }, handle);
     return { owned: true, chain: fresh, tier: chainTier(fresh.length), restarted: true, broke: 'none', odds: 0 };
@@ -594,9 +604,14 @@ export function movesTheBody(move: HandleMove): boolean {
 }
 
 /** MOVE PACE (owner, 2026-09-17: "make the crossover and hesi look faster with the turbo"). The clip's playback rate for a
- *  handle move: on the turbo the cross / hesi / in-and-out snap (1.35×, a shorter fade); off it they play at the capture's
- *  own pace. Pure — the modes hand it to the tree's beat and to the tree's crossover state. */
-export const MOVE_RATE_TURBO = 1.35, MOVE_RATE_BASE = 1.0;
+ *  handle move: on the turbo the cross / hesi / in-and-out snap (a shorter fade); off it they play at the capture's own pace.
+ *  Pure — the modes hand it to the tree's beat and to the tree's crossover state.
+ *  H2 (owner pick 2026-09-26 Q3, re-confirmed 2026-10-14 decision 10): the turbo plays a move at 1.25× REAL speed — 1.35 → 1.25.
+ *  Every clip a handle move beats through the renderer is real-time at rate 1 (the v2 crossing clips are built on their paths at pace 1;
+ *  the hesi's capture is 0.55 s of motion in 0.55 s), so 1.25 here IS MOVE_TURBO_REAL below — and the clip now runs at its ball path's
+ *  pace (handleMotion runs the path at MOVE_TURBO_REAL; at 1.35 the hands left the ball 8 % early on every turbo move). A literal, not
+ *  the constant, because MOVE_TURBO_REAL is declared further down. */
+export const MOVE_RATE_TURBO = 1.25, MOVE_RATE_BASE = 1.0;
 export function moveRate(turbo: boolean): number { return turbo ? MOVE_RATE_TURBO : MOVE_RATE_BASE; }
 export function moveFadeSec(turbo: boolean): number { return turbo ? 0.08 : 0.12; }   // H1 H-05: 0.07/0.045 popped the hand swap on the 30 fps rigs
 

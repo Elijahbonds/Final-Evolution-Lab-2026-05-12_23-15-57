@@ -26,9 +26,22 @@ describe('the 2K map, relative to the ball hand', () => {
   bothHands('between the legs is a flick AWAY from the ball hand', flick(-1, 0), 'between_legs');
   bothHands('crossover is up-away', flick(-0.75, -0.75), 'crossover');
   bothHands('in and out is up', flick(0, -1), 'in_and_out');
-  bothHands('behind the back is down-away', flick(-0.75, 0.75), 'behind_back');
+  // H2 rewrote this row (owner 2026-10-16: the down-away flick thrown SET is the BTB slide): it read the default walking, unpressured
+  // read, which is now the slide's — the plain behind-the-back is asserted at pace and under pressure below, where it still lives.
+  bothHands('behind the back is down-away (at pace)', flick(-0.75, 0.75), 'behind_back', { speed01: 0.6 });
   bothHands('step-back is a plain down flick — no modifier', flick(0, 1), 'stepback');
   bothHands('a size-up is up-toward', flick(0.75, -0.75), 'size_up');
+});
+
+describe('H2: the BTB SLIDE — the behind-the-back thrown set (owner 2026-10-16)', () => {
+  bothHands('set (slow, space): down-away is the slide', flick(-0.75, 0.75), 'btb_slide', { speed01: 0.2, pressured: false });
+  bothHands('pressured: it stays the behind-the-back', flick(-0.75, 0.75), 'behind_back', { speed01: 0.2, pressured: true });
+  bothHands('at pace: it stays the behind-the-back', flick(-0.75, 0.75), 'behind_back', { speed01: 0.35, pressured: false });
+  bothHands('with R2 it is still the momentum wrap, set or not', flick(-0.75, 0.75), 'momentum_btb', { speed01: 0.1, escape: true });
+  it('the slide goes the way the ball goes: away from the ball hand', () => {
+    expect(stickMoveFor(flick(-0.75, 0.75), read({ speed01: 0.1 }))).toEqual({ move: 'btb_slide', side: 'left' });
+    expect(stickMoveFor(flick(0.75, 0.75), read({ speed01: 0.1, hand: 'Left' }))).toEqual({ move: 'btb_slide', side: 'right' });
+  });
 });
 
 describe('R2 held is the ESCAPE', () => {

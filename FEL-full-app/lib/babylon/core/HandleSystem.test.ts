@@ -789,9 +789,14 @@ describe('moveRateFor — a move plays at REAL speed, 1.25× real on the turbo (
       const r = moveRateFor(real, played, true);
       expect((real / (played / r)), `${real} in ${played}`).toBeCloseTo(1.25, 12);   // real seconds per played second
     }
-    // today's flat rate on the feint capture (0.70 s in 0.55 s) is 1.72× real on the turbo — moveRateFor holds it to 1.25
-    expect((0.7 / 0.55) * MOVE_RATE_TURBO).toBeGreaterThan(1.7);
+    // the OLD flat rate (1.35, until H2) on the feint capture (0.70 s in 0.55 s) was 1.72× real on the turbo — moveRateFor holds it to 1.25.
+    // H2 rewrote this line: it read MOVE_RATE_TURBO, which is now 1.25 itself (the owner's pick); the 1.35 it described is pinned as a literal.
+    expect((0.7 / 0.55) * 1.35).toBeGreaterThan(1.7);
     expect(MOVE_TURBO_REAL).toBeGreaterThan(1.2);   // the intent of the MOVE_RATE_TURBO > 1.2 pin above: the turbo still reads faster
+  });
+  it('H2: the renderer\'s turbo rate IS the real-speed turbo (owner Q3 / decision 10: 1.35 → 1.25) — the clip and its ball path share a pace', () => {
+    expect(MOVE_RATE_TURBO).toBe(MOVE_TURBO_REAL);
+    expect(moveRateFor(0.55, 0.55, true)).toBe(MOVE_RATE_TURBO);   // the hesi's capture: 0.55 s of motion in 0.55 s
   });
   it('degenerate inputs play at rate 1 (and the turbo on top): no division by zero reaches the tree', () => {
     expect(moveRateFor(0, 0.5, false)).toBe(1); expect(moveRateFor(0.5, 0, false)).toBe(1); expect(moveRateFor(0, 0, true)).toBe(1.25);
@@ -811,3 +816,27 @@ describe('impulseFor (U18)', () => {
   });
 });
 
+
+// ── H2 (owner, 2026-10-16): every move UNLOCKED until H9 — the gate handle owns them, the player's handle still prices them ──────────
+import { MOVES_UNLOCKED_GATE, BASELINE_HANDLE as BASE_H2, MOVE_HANDLE as MH_H2, resolveHandleMove as rhm, canChain as cc, ankleBreakOdds as abo } from './HandleSystem';
+describe('MOVES_UNLOCKED_GATE (H2: unlock all moves until H9)', () => {
+  const live = { present: true, closing: true, set: false, within: true };
+  it('owns every move in the vocabulary', () => {
+    for (const m of Object.keys(MH_H2) as (keyof typeof MH_H2)[]) expect(MH_H2[m], m).toBeLessThanOrEqual(MOVES_UNLOCKED_GATE);
+  });
+  it('a baseline handle with the gate throws the shammgod — the move is owned, nothing refused', () => {
+    expect(rhm('shammgod', { last: null, since: Infinity, length: 0 }, BASE_H2, live, () => 0.99).owned).toBe(false);   // no gate: refused, as before
+    const o = rhm('shammgod', { last: null, since: Infinity, length: 0 }, BASE_H2, live, () => 0.99, MOVES_UNLOCKED_GATE);
+    expect(o.owned).toBe(true); expect(o.chain.length).toBe(1);
+  });
+  it('the odds are still the PLAYER\'s handle, not the gate\'s: an unlocked move at 50 rolls the 50 odds', () => {
+    const o = rhm('behind_back', { last: null, since: Infinity, length: 0 }, BASE_H2, live, () => 0.0, MOVES_UNLOCKED_GATE);
+    expect(o.odds).toBeCloseTo(abo({ chainLength: 1, handle: BASE_H2, defenderClosing: true, defenderSet: false, move: 'behind_back' }), 12);
+  });
+  it('an unlocked move CHAINS (canChain reads the gate for ownership, the handle for the window)', () => {
+    const st = { last: 'crossover' as const, since: 0.2, length: 1 };
+    expect(cc('double_cross', st, BASE_H2)).toBe(false);                       // 72 > 50: not owned, as before
+    expect(cc('double_cross', st, BASE_H2, MOVES_UNLOCKED_GATE)).toBe(true);   // owned at the gate, inside 50's window (0.44 s)
+    expect(cc('double_cross', { ...st, since: 0.6 }, BASE_H2, MOVES_UNLOCKED_GATE)).toBe(false);   // past 50's window: the gate does not widen it
+  });
+});

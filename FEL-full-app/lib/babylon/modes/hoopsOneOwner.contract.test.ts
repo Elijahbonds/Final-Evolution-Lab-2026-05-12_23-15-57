@@ -77,9 +77,10 @@ describe('1v1 (S2): a left-stick crossover plays ONE beat, from the move picker'
     // its doMove as a flick (and passes the cut's side: the reversal's end side), doMove hands `flick` to requestMove, and the renderer
     // plays flickClip for a flick and beats it on this body's tree (meHost)
     const block = mode.slice(mode.indexOf('if (drib.crossover && !finish && !posting) {'));
-    expect(block.slice(0, 2400)).toMatch(/inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,\s*\}, handle\), undefined, true, cutSide\);/);
+    // H2 rewrote this pin (same intent — the flick is marked a flick): the read picks at the unlock gate now, not the handle
+    expect(block.slice(0, 2400)).toMatch(/inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,\s*\}, MOVES_UNLOCKED_GATE\), undefined, true, cutSide\);/);
     const fn = mode.slice(mode.indexOf('function doMove('), mode.indexOf('function doMove(') + 2400);
-    expect(fn).toMatch(/function doMove\(ctx: ModeContext, move: HandleMove, dirHint\?: 'left' \| 'right', flick = false, cutSide\?: 'left' \| 'right'\)/);
+    expect(fn).toMatch(/function doMove\(ctx: ModeContext, move: HandleMove, dirHint\?: 'left' \| 'right', flick = false, cutSide\?: 'left' \| 'right'(, variant\?: 'slide')?\)/);   // (H2: + the BTB slide's variant)
     expect(fn).toMatch(/requestMove\(meHost\(\), \{\s*move, hint: dirHint, cutSide, flick,/);
     expect(mode).toMatch(/beat: \(clip, o\) => meAnimTree\.beat\(clip, o\)/);
     const hm = readFileSync('lib/babylon/anim/handleMotion.ts', 'utf8');

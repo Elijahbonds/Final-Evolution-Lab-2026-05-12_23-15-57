@@ -170,6 +170,19 @@ export class DribbleController {
     this.cutTo(-tx / n, -tz / n, DribbleController.STEPBACK_HOP_SPEED + (sprint ? 0.4 : 0), false);
     this.movement.launchFor(0.35); this.movement.noteBurst(0.35);
   }
+  /** THE BTB SLIDE (H2, owner 2026-10-16: "add a curry slide like behind the back"): the ball wraps behind the back and the body hops
+   *  SIDEWAYS the way it went — `side` is the athlete's (the ball's end hand) — with a little give away from the rim (`tx, tz` = toward
+   *  it), the chest kept on the man like the step-back's (no turn to run). A space move: the launch is armed, no shot window.
+   *  New numbers (assumption, not felt yet — the reel shows them): 3.0 m/s, the step-back's hop (3.6) less a little, since the slide
+   *  goes across rather than away; 0.25 of it away from the rim; 0.35 s of launch, the step-back's. ≈ 0.8 m of slide by the catch. */
+  static readonly SLIDE_HOP_SPEED = 3.0;
+  static readonly SLIDE_BACK = 0.25;
+  slide(side: 'left' | 'right', tx: number, tz: number, sprint: boolean): void {
+    const { rx, rz } = this.frame(); const sgn = side === 'right' ? 1 : -1;
+    const n = Math.hypot(tx, tz) || 1, b = DribbleController.SLIDE_BACK;
+    this.cutTo(rx * sgn * (1 - b) - (tx / n) * b, rz * sgn * (1 - b) - (tz / n) * b, DribbleController.SLIDE_HOP_SPEED + (sprint ? 0.3 : 0), false);
+    this.movement.launchFor(0.35); this.movement.noteBurst(0.3);
+  }
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
     this.movement.pause(on);

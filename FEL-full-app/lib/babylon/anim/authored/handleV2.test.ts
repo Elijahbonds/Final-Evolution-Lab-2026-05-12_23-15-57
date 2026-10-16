@@ -15,10 +15,11 @@ import { BALL_ELBOW_POLE } from '../ballCarry';
 import { pathAt } from '../handlePaths';
 import { buildPoseClip } from '../poseClip';
 import {
-  buildCrossover, buildMomentumCross, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildShammgod,
+  buildCrossover, buildMomentumCross, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildShammgod, buildBtbSlide, SLIDE_V2_KEYS,
   carryStanceAtBind, handleV2Keys, mirrorKey, buildHesi, BASKETBALL_CLIPS, V2_KEYS as KEYS_OF, V2_BALL_POLE,
 } from './basketball';
 import { pathFor, strokeStretch, type PathMove } from '../handlePaths';
+import type { V2Key as V2KeyT } from './basketball';
 import { HOOPS_DRIBBLE } from '../Dribble';
 
 const BODIES = { hero: 'public/models/fel-hero.glb', 'kit-female': 'public/models/candidates/fel-kit-female.glb' } as const;
@@ -58,7 +59,7 @@ function bodyFrame(r: Rig): { o: Vector3; right: Vector3; up: Vector3; front: Ve
 }
 const local = (fr: ReturnType<typeof bodyFrame>, w: Vector3): [number, number, number] => { const d = w.subtract(fr.o); return [Vector3.Dot(d, fr.right), Vector3.Dot(d, fr.up), Vector3.Dot(d, fr.front)]; };
 
-const CLIPS: { name: string; move: PathMove; build: (s: Scene, k: Skeleton) => AnimationGroup | null; mirrored: boolean }[] = [
+const CLIPS: { name: string; move: PathMove; build: (s: Scene, k: Skeleton) => AnimationGroup | null; mirrored: boolean; keys?: readonly V2KeyT[] }[] = [
   { name: 'bball_crossover_left', move: 'crossover', build: (s, k) => buildCrossover(s, k, 'left'), mirrored: false },
   { name: 'bball_crossover_right', move: 'crossover', build: (s, k) => buildCrossover(s, k, 'right'), mirrored: true },
   { name: 'bball_momentum_cross_left', move: 'momentum_cross', build: (s, k) => buildMomentumCross(s, k, 'left'), mirrored: false },
@@ -69,6 +70,9 @@ const CLIPS: { name: string; move: PathMove; build: (s: Scene, k: Skeleton) => A
   { name: 'bball_behind_back_right', move: 'behind_back', build: (s, k) => buildBehindBackDribble(s, k, 'right'), mirrored: true },
   { name: 'bball_double_cross_right', move: 'double_cross', build: (s, k) => buildDoubleCross(s, k, 'right'), mirrored: false },
   { name: 'bball_shammgod_left', move: 'shammgod', build: (s, k) => buildShammgod(s, k, 'left'), mirrored: false },
+  // H2 (owner 2026-10-16): the BTB slide — the behind-the-back's path, its own keys; held to every line the crossing clips are
+  { name: 'bball_btb_slide_left', move: 'behind_back', build: (s, k) => buildBtbSlide(s, k, 'left'), mirrored: false, keys: SLIDE_V2_KEYS },
+  { name: 'bball_btb_slide_right', move: 'behind_back', build: (s, k) => buildBtbSlide(s, k, 'right'), mirrored: true, keys: SLIDE_V2_KEYS },
 ];
 
 for (const body of Object.keys(BODIES)) {
@@ -90,7 +94,7 @@ for (const body of Object.keys(BODIES)) {
       let checked = 0; const misses: string[] = [];
       for (const c of CLIPS) {
         rest(r); const g = c.build(r.scene, r.sk)!;
-        const { keys } = handleV2Keys(c.move, KEYS_OF[c.move]!, st);
+        const { keys } = handleV2Keys(c.move, c.keys ?? KEYS_OF[c.move]!, st);
         for (const k of keys) {
           for (const side of ['Right', 'Left'] as const) {
             const tgt = k.handsBody?.[side]; if (!tgt) continue;
@@ -155,7 +159,7 @@ for (const body of Object.keys(BODIES)) {
         const T = (g.to - g.from) / 30;
         for (let i = 0; i <= Math.round(T * 60); i++) { const { twist } = twistAt(g, i / 60); if (!(twist <= 3)) bad.push(`${c.name} @${(i / 60).toFixed(2)}: ${twist.toFixed(1)}°`); }
         // the same keys without kneesFront: the ankles at every key agree within 1 cm (only the knee's swivel changed)
-        const keys = handleV2Keys(c.move, KEYS_OF[c.move]!, st).keys.map((k) => (c.mirrored ? mirrorKey(k) : k));
+        const keys = handleV2Keys(c.move, c.keys ?? KEYS_OF[c.move]!, st).keys.map((k) => (c.mirrored ? mirrorKey(k) : k));
         rest(r); const raw = buildPoseClip(r.scene, r.sk, `${c.name}_raw`, T, keys.map((k) => ({ ...k, kneesFront: false })), { smooth: true, prefilter: 0, periodic: false })!;
         for (const k of keys) {
           const a = twistAt(raw, k.t).ankles, b = twistAt(g, k.t).ankles;
@@ -223,5 +227,8 @@ for (const body of Object.keys(BODIES)) {
 describe('the names', () => {
   it('the momentum cross has its own clip, registered', () => {
     expect(BASKETBALL_CLIPS).toContain('bball_momentum_cross_left'); expect(BASKETBALL_CLIPS).toContain('bball_momentum_cross_right');
+  });
+  it('H2: the BTB slide has its own clip, registered (a generic name: no real names on the floor)', () => {
+    expect(BASKETBALL_CLIPS).toContain('bball_btb_slide_left'); expect(BASKETBALL_CLIPS).toContain('bball_btb_slide_right');
   });
 });

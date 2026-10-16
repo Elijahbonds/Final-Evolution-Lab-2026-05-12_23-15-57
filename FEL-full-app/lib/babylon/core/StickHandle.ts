@@ -39,8 +39,10 @@ export const RESOLVE_SEC = 0.35;
 /** H-01: an excursion that has not flicked becomes a hold only after this (> RESOLVE_SEC, so a resolving push is never
  *  stolen by the hold). After a fast flick the "pause after the cross" keeps STICK.holdSec. */
 export const HOLD_UNFLICKED_SEC = 0.38;
-/** H-03: PAUSIN' releases quietly (no explode) when the stick stays parked this long — a resting thumb can't freeze you. */
-export const PAUSE_MAX_SEC = 1.5;
+/** H-03: PAUSIN' releases quietly (no explode) when the stick stays parked this long — a resting thumb can't freeze you.
+ *  H2 (owner pick 2026-09-26 Q1, re-confirmed 2026-10-14 decision 10): at most 0.9 s — 1.5 → 0.9. The ball path's hold
+ *  (handlePaths PAUSIN_MAX_SEC) was already 0.9; the stick's own clock now agrees with it. */
+export const PAUSE_MAX_SEC = 0.9;
 /** H-04: a gesture buffered during a spin / gather / finish lives at most this long from capture… */
 export const BUSY_BUFFER_MAX_MS = 700;
 /** …and for this long after the lock clears (the phase 5 window, same number the modes declare). */
@@ -148,7 +150,7 @@ export function dir8Of(x: number, y: number): StickDir8 {
  *    L2 + down              the STEP-BACK dribble (a squeeze inside its window is the step-back jumper)
  *    sweep                  the steezo roll · hold: PAUSIN' (the mode) · release: the explode */
 export type StickMove = 'momentum_cross' | 'momentum_btb' | 'crossover' | 'hesi' | 'in_and_out' | 'between_legs' | 'behind_back' | 'steezo_roll'
-  | 'size_up' | 'stepback' | 'snatchback' | 'spin';
+  | 'size_up' | 'stepback' | 'snatchback' | 'spin' | 'btb_slide';
 export interface StickRead {
   speed01: number; pressured: boolean; sprint: boolean;
   /** Which hand the ball is in. 2K's map is RELATIVE TO IT: "toward" and "away" mean the ball hand's side. Default Right. */
@@ -161,6 +163,14 @@ export interface StickRead {
   sinceMoveSec?: number;
 }
 export const MOMENTUM_MIN_SPEED01 = 0.4;
+/**
+ * THE BTB SLIDE (owner, 2026-10-16: "add a curry slide like behind the back"; on screen it has a generic name, no real names). The
+ * behind-the-back flick (down-away) thrown SET — slower than this share of top speed, with no body inside the pressure ring — is the
+ * slide: the ball wraps behind the back while the body hops sideways the way the ball went, to make space. At pace or pressured it stays
+ * the plain behind-the-back; with R2 it is still the momentum wrap. A space move only: it chains like the behind-the-back it is (the
+ * decision is behind_back's), no shot window (owner, same round). 0.35 is the read moveFromContext already uses for "space and no hurry".
+ */
+export const SLIDE_MAX_SPEED01 = 0.35;
 /** A behind-the-back thrown inside this much of another move is the AGGRESSIVE one (the momentum wrap). */
 export const AGGRESSIVE_BTB_SEC = 0.7;
 
@@ -174,7 +184,7 @@ export const AGGRESSIVE_BTB_SEC = 0.7;
  *
  *   toward      hesi              up-toward   size-up
  *   away        between the legs  up          in and out
- *   up-away     crossover         down-away   behind the back
+ *   up-away     crossover         down-away   behind the back (SET: the BTB slide — H2)
  *   down        step-back         rotation    spin
  *
  * R2 held is the escape of any of them: crossover → momentum cross, behind the back → momentum wrap, step-back → the
@@ -196,7 +206,7 @@ export function stickMoveFor(g: StickGesture, r: StickRead): { move: StickMove; 
       if (d8 === 'left') return { move: 'between_legs', side: away };
       if (d8 === 'upleft') return { move: escape ? 'momentum_cross' : 'crossover', side: away };
       if (d8 === 'up') return { move: 'in_and_out', side: toward };
-      if (d8 === 'downleft') return { move: escape ? 'momentum_btb' : 'behind_back', side: away };
+      if (d8 === 'downleft') return { move: escape ? 'momentum_btb' : r.speed01 < SLIDE_MAX_SPEED01 && !r.pressured ? 'btb_slide' : 'behind_back', side: away };   // H2: set = the slide
       if (d8 === 'down') return { move: escape ? 'snatchback' : 'stepback', side: away };
       if (d8 === 'upright') return { move: 'size_up', side: toward };
       // down-toward (F2, H-02 "never a dead stick"): the step-back to the ball side — R2 makes it the snatchback
@@ -240,8 +250,10 @@ export function pausinWanted(r: { sprint: boolean; dist: number; speed: number; 
 const STICK_TO_HANDLE: Partial<Record<StickMove, HandleMove>> = {
   momentum_cross: 'momentum_cross', momentum_btb: 'momentum_btb', crossover: 'crossover', hesi: 'hesi', in_and_out: 'in_and_out',
   between_legs: 'between_legs', behind_back: 'behind_back', steezo_roll: 'steezo_roll', stepback: 'stepback', snatchback: 'snatch_back', spin: 'spin',
+  btb_slide: 'behind_back',   // H2: the slide IS a behind-the-back to the gate and the chain (its body is the mode's)
 };
-const HANDLE_TO_STICK: Partial<Record<HandleMove, StickMove>> = Object.fromEntries(Object.entries(STICK_TO_HANDLE).map(([k, v]) => [v, k])) as Partial<Record<HandleMove, StickMove>>;
+// (the slide is not a fallback target: a refused move falls back to the plain behind-the-back, never to the slide)
+const HANDLE_TO_STICK: Partial<Record<HandleMove, StickMove>> = Object.fromEntries(Object.entries(STICK_TO_HANDLE).filter(([k]) => k !== 'btb_slide').map(([k, v]) => [v, k])) as Partial<Record<HandleMove, StickMove>>;
 /** H-02: the stick move the handle actually owns — the gesture's own move, or its fallback (never a dead stick). The stick
  *  spin is ungated (H-21). `need` is the rating of the move asked for, for the refuse chip. */
 export function ownedStickMove(move: StickMove, handle: number): { move: StickMove; locked: boolean; need: number } {

@@ -62,7 +62,7 @@ describe('the left-stick crossover goes to the hand on the side the cut goes to 
     const three = readFileSync(path.join(__dirname, '../modes/ThreeVThreeMode.ts'), 'utf8');
     const s3 = three.indexOf('const cutSide = sideOfVector(me.char.root.rotation.y, wish);');
     expect(s3).toBeGreaterThan(0);
-    expect(three.indexOf('}, handle), undefined, cutSide);', s3)).toBeGreaterThan(s3);
+    expect(three.indexOf('}, MOVES_UNLOCKED_GATE), undefined, cutSide);', s3)).toBeGreaterThan(s3);   // (H2: the read picks at the unlock gate; was `}, handle)`)
     // 3v3's facing write for the hero comes after the crossover's read in the same update
     const w3 = three.indexOf('me.char.root.rotation.y =', s3);
     expect(w3).toBeGreaterThan(s3);

@@ -51,6 +51,9 @@ export interface HandleRequest {
   turbo?: boolean;
   /** The clip to beat instead of MOVE_CLIP's (a size-up's, the step-back's, the jab's); null: no clip. */
   clip?: string | null;
+  /** H2: a sided clip of the call site's own, named for the ball's END side like MOVE_CLIP's (the BTB slide: the behind-the-back's
+   *  decision and path, its own body). Ignored for a same-hand twin, like `clip`. */
+  clipFor?: (dir: Side) => string;
   /** The ball's path: the move whose path runs (default the rendered move's own), or false (none: the carry bounces through it). */
   path?: PathMove | false;
   fadeSec?: number; speedRatio?: number;
@@ -136,7 +139,7 @@ export function requestMove(host: HandleHost, req: HandleRequest): HandleResult 
   const sides = resolveSides(req.move, startHand, { hint: req.hint, cutSide: req.cutSide, path: req.path });
   const { rendered, twin, endHand, clipDir } = sides;
   const turbo = !!req.turbo;
-  const clip = crossClip(req.clip !== undefined && !twin ? req.clip : rendered === 'jab' ? null : req.flick ? flickClip(rendered, clipDir) : moveClip(rendered, clipDir));
+  const clip = crossClip(req.clip !== undefined && !twin ? req.clip : req.clipFor && !twin ? req.clipFor(clipDir) : rendered === 'jab' ? null : req.flick ? flickClip(rendered, clipDir) : moveClip(rendered, clipDir));
   const beat = (): void => { if (clip) host.beat(clip, { fadeSec: req.fadeSec ?? moveFadeSec(turbo), speedRatio: req.speedRatio ?? moveRate(turbo) }); };
   // the ball: now, or at the running move's catch (a double request: the double cross); a move with no path of its own bounces through
   let ball: HandleResult['ball'] = 'none', clipAt: HandleResult['clipAt'] = clip ? 'now' : 'none';

@@ -122,7 +122,7 @@ import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM D
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
+  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
   ANKLE_STUMBLE_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / moveImpulse are the renderer's — anim/handleMotion)
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, type ChainState, type HandleMove,
   moveRate, moveFadeSec,   // MOVE PACE
@@ -1527,7 +1527,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
           // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
           // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
-          const own0 = pick0 ? ownedStickMove(pick0.move, handle) : null;   // H1 H-02: every gated move falls back, never a dead stick
+          const own0 = pick0 ? ownedStickMove(pick0.move, MOVES_UNLOCKED_GATE) : null;   // H2: every move unlocked until H9   // H1 H-02: every gated move falls back, never a dead stick
           const locked = !!own0 && own0.locked;
           if (locked) refuse(ctx, `${pick0!.move.replace(/_/g, ' ').toUpperCase()} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);
           const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
@@ -1537,7 +1537,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // THE 2K PRO STICK (remapped 2026-09-22, relative to the ball hand — docs/SPEC-STICK-2K-DECODE.md): the size-up, the step-back on DOWN, the spin on a ROTATION, the snatchback with R2
           if (pick.move === 'size_up') {
             // HOOPS MOTION phase 4b: its move's clip AND ball in place — no decision, no impulse, no link (1v1's)
-            const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', handle);
+            const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', MOVES_UNLOCKED_GATE);   // H2: the whole cycle, unlocked
             const su = requestMove(meHost(), { move: sizeUpMoveOf(suClip), hint: pick.side ?? undefined, decide: { kind: 'none' }, fadeSec: moveFadeSec(sprintOk), speedRatio: 1 });
             console.info(`[3V3-HANDLE] size-up ${su.clip ?? suClip} (handle ${handle})`); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue;
           }
@@ -1545,7 +1545,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
             // into a cross reads as a combo and the tier is real. It is rated 0 — the gate is what you chain into it.
             // HOOPS MOTION phase 4b: through the renderer (1v1's) — a link with no read, its own clip, no path, no impulse
-            requestMove(meHost(), { move: 'stepback', decide: { kind: 'chainOnly', run: () => { chain = resolveHandleMove('stepback', chain, handle, { present: false, closing: false, set: true, within: false }, roll).chain; } }, clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1, path: false });
+            requestMove(meHost(), { move: 'stepback', decide: { kind: 'chainOnly', run: () => { chain = resolveHandleMove('stepback', chain, handle, { present: false, closing: false, set: true, within: false }, roll, MOVES_UNLOCKED_GATE).chain; } }, clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1, path: false });
             console.info(`[3V3-HANDLE] link stepback (chain ${chain.length}, handle ${handle})`);
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
@@ -1560,7 +1560,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             requestMove(meHost(), {
               move: 'snatch_back', clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,
               decide: { kind: 'custom', run: () => {
-                const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll);
+                const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll, MOVES_UNLOCKED_GATE);
                 chain = sno.chain;
                 console.info(`[3V3-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
                 reactToBreak(ctx, sno, nfS, 'snatch_back', pick.side ?? 'right');
@@ -1596,6 +1596,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               }
               me.drib.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (iAmCarrier && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, (nearestLiveFoe()?.char.root.position ?? null), sideS); } }); }
           if (g.kind === 'flick') { chainBeforeFlick = chain; flickAt = performance.now() / 1000; flickMove = pick.move; }
+          if (pick.move === 'btb_slide') {   // H2 THE BTB SLIDE (owner 2026-10-16): the behind-the-back's decision and chain, its own clip and hop
+            if (doMove(ctx, 'behind_back', pick.side ?? undefined, undefined, 'slide')) { SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.feel?.impact?.(0.1); }
+            continue;
+          }
           if (doMove(ctx, pick.move, pick.side ?? undefined)) {SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1); }   // H1: no whoosh for a refused move
         }
         stickGestures = [];
@@ -1623,7 +1627,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           last: chain.last,
           chainLength: chain.length,
           inHisChest: nfDist < OFF_THE_HEAD_RANGE,
-        }, handle), undefined, cutSide);
+        }, MOVES_UNLOCKED_GATE), undefined, cutSide);   // H2: the read picks from every move (unlocked until H9)
       }
       const nearestFoeDist = foes.reduce((best, f) => f.stunSec > 0 ? best : Math.min(best, Vector3.Distance(f.char.root.position, me.char.root.position)), Infinity);
       if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter
@@ -3201,14 +3205,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     gatherBallToHand(ball, me.char.skeleton, hoopsHand(me.char));
   }
   /** `cutSide`: the left-stick reversal's (plan §3.4). */
-  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', cutSide?: 'left' | 'right'): boolean {   // H1: false when the handle refused it   // STICK HANDLE
+  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', cutSide?: 'left' | 'right', variant?: 'slide'): boolean {   // H1: false when the handle refused it   // H2: `variant` 'slide' = the BTB slide   // STICK HANDLE
     const foe = nearestLiveFoe();
     // HOOPS MOTION phase 4b: the render is 1v1's (anim/handleMotion): this mode's own decision first (its read, and no roll: Math.random, as
     // today), then the clip — WITH OR WITHOUT a live foe (U17: the clip played only `if (foe)`) — the ball's path, and the impulse signed by
     // the move (U18). The side is the ball's end side (the other hand for a crossing move), not "away from the man".
     const turboMove = !!me.slot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS
     const r = requestMove(meHost(), {
-      move, hint: dirHint, cutSide, turbo: turboMove, impulse: true,
+      move, hint: dirHint, cutSide, turbo: turboMove, impulse: variant !== 'slide',   // H2: the slide's body is its hop (below), not the impulse
       path: move === 'steezo_roll' ? 'momentum_btb' : undefined,   // the roll's wrap here; startSpin's pull is its way back
       decide: { kind: 'resolve', run: () => resolveHandleMove(move, chain, handle, {
         present: !!foe,
@@ -3216,10 +3220,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           && facingCos(foe.char.root.rotation.y, foe.char.root.position, me.char.root.position) > 0,
         set: !!foe && foe.speed01 < 0.1,
         within: !!foe && distXZ(me.char.root.position, foe.char.root.position) < SHAKE_RANGE,
-      }) },
+      }, Math.random, MOVES_UNLOCKED_GATE) },   // H2: owned at the unlock gate, priced at the player's handle
+      clipFor: variant === 'slide' ? (d) => `bball_btb_slide_${d}` : undefined,
     });
     if (!r.owned || !r.outcome) return false;        // not in my hands yet — the gate IS the upgrade
     const outcome = r.outcome;
+    if (variant === 'slide') {   // H2 THE BTB SLIDE: the body hops sideways the way the ball went, the chest kept on him (a space move)
+      const toRimL = RIM_FLOOR.subtract(me.char.root.position); toRimL.y = 0;
+      me.drib.slide(r.endHand, toRimL.x, toRimL.z, turboMove);
+      console.info(`[3V3-HANDLE] btb slide ${r.endHand} at ${me.drib.vel.length().toFixed(1)} m/s`);
+    }
     chain = outcome.chain;
 
     // THE MOVE ITSELF — see the note in 1v1's doMove. Twelve moves shared the tree's one crossover state, so

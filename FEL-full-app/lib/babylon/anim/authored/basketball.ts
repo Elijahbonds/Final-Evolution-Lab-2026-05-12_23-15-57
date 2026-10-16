@@ -37,6 +37,7 @@ export const BASKETBALL_CLIPS = [
   'bball_behind_back_left', 'bball_behind_back_right', 'bball_double_cross_left', 'bball_double_cross_right',
   'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',
   'bball_momentum_cross_left', 'bball_momentum_cross_right',   // HOOPS MOTION phase 4c (plan §4.2): the momentum cross on its own (wider) path
+  'bball_btb_slide_left', 'bball_btb_slide_right',   // H2 (owner 2026-10-16): the BTB slide — the behind-the-back's wrap with the body skipping sideways
   'bball_ankle_stumble', 'bball_ankle_slip',
   'bball_stepback_gather',
   'bball_hop_step', 'bball_euro_step',
@@ -215,6 +216,11 @@ export function buildBetweenLegsDribble(scene: Scene, sk: Skeleton, dir: 'left' 
 /** BEHIND THE BACK (phase 4c v2, plan §4.4): one right-hand key set (`_left`), `_right` = its mirror (mirrorKey). */
 export function buildBehindBackDribble(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
   return buildHandleV2(scene, sk, `bball_behind_back_${dir}`, 'behind_back', BEHIND_V2, dir === 'right');
+}
+/** THE BTB SLIDE (H2, owner 2026-10-16): the behind-the-back's wrap and path with the body skipping sideways the ball's way (SLIDE_V2).
+ *  `dir` is the side the ball ENDS on, as the behind-the-back's: `_left` is the right hand's, `_right` its mirror. */
+export function buildBtbSlide(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildHandleV2(scene, sk, `bball_btb_slide_${dir}`, 'behind_back', SLIDE_V2, dir === 'right');
 }
 /** DOUBLE CROSS (phase 4c v2, plan §4.5): two crossings, the second lower — it ends in the START hand (owner Q5), so `_right` is the right
  *  hand's (the side the ball ends on) and `_left` its mirror. */
@@ -1009,6 +1015,24 @@ const BEHIND_V2: readonly V2Key[] = [
   { t: 0.46, bones: { ...torso(0, 14), ...LEGS.stance }, hipsY: -0.05, R: OFF_R, L: 'on' },
 ];
 /**
+ * THE BTB SLIDE (H2, owner 2026-10-16: "add a curry slide like behind the back"; a generic name on screen, no real names): the
+ * behind-the-back's wrap and path (0.46 s), the body SKIPPING sideways the way the ball goes. DribbleController.slide moves the root
+ * (3 m/s, its launch 0.35 s), so the clip keeps the feet light while the root travels: the right foot drives and the lead (left) foot
+ * reaches out (0.06–0.14), both feet off the floor through the skip (0.14–0.26), the lead lands wide (0.30), the trail closes under the
+ * catch (0.38). The shoulder turns away for the wrap like the behind-the-back's (hips −20°) and the chest stays on the man; the body loads
+ * low before the push and lands low on the catch. Keyed as ankles (V2Key.feet), right hand first. assumption: the skip's timing against
+ * the root's travel is mine, not measured yet — the reel's foot-slide column is its check.
+ */
+const SLIDE_V2: readonly V2Key[] = [
+  { t: 0, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.06, bones: { ...torso(-10, 18, 5) }, hipsY: -0.12, R: 'on', L: [-0.28, 0.94, 0.10], feet: STANCE_FEET },   // the load
+  { t: 0.14, bones: { ...torso(-20, 19, 11) }, hipsY: -0.09, R: 'on', L: { near: 0.34, off: [-0.02, 0.18, -0.06] }, feet: { Left: [-0.30, ANKLE_Y + 0.05, 0.08], Right: STANCE_FEET.Right } },   // the drive: the lead foot off, the right pushes
+  { t: 0.22, bones: { ...torso(-20, 19, 11) }, hipsY: -0.06, R: { near: 0.14, off: [0.06, 0.08, 0.04] }, L: { near: 0.34, off: [-0.01, 0.10, -0.04] }, feet: { Left: [-0.33, ANKLE_Y + 0.06, 0.07], Right: [0.12, ANKLE_Y + 0.07, 0.07] } },   // the skip: both feet light
+  { t: 0.30, bones: { ...torso(-12, 21, 6) }, hipsY: -0.12, R: [0.22, 0.92, 0.04], L: { near: 0.34, off: [-0.01, 0.04, -0.02] }, feet: { Left: [-0.30, ANKLE_Y, 0.07], Right: [0.08, ANKLE_Y + 0.05, 0.07] } },   // the lead lands wide
+  { t: 0.38, bones: { ...torso(-5, 22, 3) }, hipsY: -0.15, R: [0.23, 0.93, 0.08], L: 'on', feet: { Left: [-0.24, ANKLE_Y, 0.08], Right: [0.14, ANKLE_Y, 0.08] } },   // the trail closes under the catch
+  { t: 0.46, bones: { ...torso(0, 14) }, hipsY: -0.05, R: OFF_R, L: 'on', feet: STANCE_FEET },
+];
+/**
  * DOUBLE CROSS (plan §4.5): 0.60 s — R → L (the push 0–0.08, the floor at 0.17, the left hand's low catch 0.25–0.29), the left hand pushes
  * it straight back (0.29–0.35), the floor at 0.43, the right hand's catch 0.51–0.60. The hips go one way, come back THROUGH the middle
  * (the half-beat he has to read), and go further the second time — lower, harder. Both feet stay planted where the stance put them
@@ -1057,6 +1081,8 @@ const IN_AND_OUT_V2: readonly V2Key[] = [
   { t: 0.24, bones: { ...torso(6, 26, -3) }, hipsY: -0.17, R: 'on', L: [-0.27, 1.0, 0.12], feet: { Left: [-0.24, ANKLE_Y + 0.04, 0.15], Right: STANCE_FEET.Right } },
   { t: 0.34, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
 ];
+/** The BTB slide's keys (H2): on the behind-the-back's path, so not in V2_KEYS (one table per path); the tests read it here. */
+export const SLIDE_V2_KEYS: readonly V2Key[] = SLIDE_V2;
 /** The v2 key tables by path (the tests resolve them the way the builders do). */
 export const V2_KEYS: Readonly<Partial<Record<PathMove, readonly V2Key[]>>> = {
   crossover: CROSSOVER_V2, momentum_cross: MOMENTUM_CROSS_V2, between_legs: BETWEEN_V2, behind_back: BEHIND_V2, double_cross: DOUBLE_CROSS_V2,

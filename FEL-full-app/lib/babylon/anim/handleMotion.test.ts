@@ -246,7 +246,9 @@ describe('HOOPS MOTION phase 4c: the crossover\'s A/B (plan §4.1 — ?hm4cross=
 describe('the modes\' call sites (contract: the source)', () => {
   const one = readFileSync('lib/babylon/modes/OneVOneMode.ts', 'utf8'), three = readFileSync('lib/babylon/modes/ThreeVThreeMode.ts', 'utf8');
   it('each call site keeps its decision kind: doMove resolves (1v1 with its roll, 3v3 with none), the step-back links (chainOnly), the snatchback and the jab decide themselves (custom), the size-up and the spin decide nothing', () => {
-    for (const [name, src, roll] of [['1v1', one, /\}, roll\) \},\s*\}\);/], ['3v3', three, /within: !!foe && distXZ\(me\.char\.root\.position, foe\.char\.root\.position\) < SHAKE_RANGE,\s*\}\) \},/]] as const) {
+    // H2 rewrote the two RNG pins (same intent): resolveHandleMove takes the unlock gate after the RNG now, so 3v3 names its Math.random
+    // (the default it used by passing none) and both pass MOVES_UNLOCKED_GATE — 1v1 still rolls its seeded `roll`, 3v3 still Math.random.
+    for (const [name, src, roll] of [['1v1', one, /\}, roll, MOVES_UNLOCKED_GATE\) \},/], ['3v3', three, /within: !!foe && distXZ\(me\.char\.root\.position, foe\.char\.root\.position\) < SHAKE_RANGE,\s*\}, Math\.random, MOVES_UNLOCKED_GATE\) \},/]] as const) {
       const fn = src.slice(src.indexOf('function doMove('), src.indexOf('function doMove(') + 3000);
       expect(fn, name).toMatch(/decide: \{ kind: 'resolve', run: \(\) => resolveHandleMove\(move, chain, handle, \{/);
       expect(fn, name).toMatch(roll);
