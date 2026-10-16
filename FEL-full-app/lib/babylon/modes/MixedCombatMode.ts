@@ -52,7 +52,7 @@ import {
   guardPressMs, rivalDifficulty, rivalPower, applyRivalPower, poweredAttack, RIVAL_POWER_BASE, type RivalPower,
 } from '../core/FightCore';
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
-import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick — PRO on a staked / head-to-head run (QA #259)
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats, the round-over beat and banners on the game clock
 import { dragonLicensed, fallStep, neutralRollDir, onlookerSpots, RIVAL_POWER_BY_LOADOUT } from './mixedRules';   // IMPROVE (2026-10-06)
 import { mixedScore } from '../core/MixedScore';   // IMPROVE (2026-10-06): the result, with its ring-out bonus
@@ -406,7 +406,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     brain.setRound(round);
     const shift = brain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
     if (shift.label) console.info(`[MIX-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
-    brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, readTier()));
+    brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, runTier()));
     brain.setCanSpecial(dragonLicensed(foeRatings));   // IMPROVE (2026-10-06): the pit licenses the DRAGON at full chi (#5/#6)
     brain.setEdge((x, z) => insideBy({ x, z }, arena.shape));
     knock.clear();
@@ -856,7 +856,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   function startRound(ctx: ModeContext): void {
     // COMBAT DIFFICULTY (2026-10-06): the rival's POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before
     // resetRound fills the HP. Mixed keeps the brain's sidestep: this is the one mode whose line grammar it answers.
-    foePower = rivalPower(RIVAL_POWER_BASE.mixedcombat * RIVAL_POWER_BY_LOADOUT[myLoadout], readTier());   // the pick's matchup (mixedRules)
+    foePower = rivalPower(RIVAL_POWER_BASE.mixedcombat * RIVAL_POWER_BY_LOADOUT[myLoadout], runTier());   // the pick's matchup (mixedRules)
     applyRivalPower(foeState, foePower);
     meState.resetRound(); foeState.resetRound(); book.reset(); xBtn.reset(); padBlock.reset(); queuedKey = null; meDash = null; meDashIframeSec = 0; meDashUntil = 0; foeLaunchedSec = 0; rival.root.position.y = 0;   // STORM
     deferred.clear(); ledger.reset(); bodyShift = null;   // P7

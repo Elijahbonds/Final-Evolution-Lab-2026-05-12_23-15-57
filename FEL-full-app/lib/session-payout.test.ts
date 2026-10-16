@@ -16,6 +16,7 @@ import {
   STREAK_DAY_MS, STREAK_LC_PER_DAY, STREAK_CAP_DAYS, type StreakProfile,
   // MUSIC-SUITE P3 FIX PASS
   creationNextDueAt,
+  judgeHeadToHead,
 } from './session-payout';
 import { SCORE_CEILINGS } from './arena-score-integrity';
 import { gradeFor } from './babylon/core/danceTracks';
@@ -619,5 +620,34 @@ describe('skateboarding and surfing are paid at most what 4 × their best run se
       const file = b.source.split(' ')[0].replace('~/Claude/outbox/', '').replace(/:\d+$/, '');
       expect(readFileSync(join(outbox, file), 'utf8'), b.source).toContain(String(b.bestScore));
     }
+  });
+});
+
+// WIN-SERVER (QA top-5 #2, qa-top5-risk-2026-10-15.md): QA's repro, POST /api/sessions { mode: 'hoops1v1', score: 3,
+// opponentScore: 11, won: true }, was paid as a win (sessionWon returned the claim). A hoops game is won on the board.
+describe('WIN-SERVER: a head-to-head hoops win is the server\'s', () => {
+  it('QA repro: a 3–11 1v1 sent as won is not a win', () => {
+    expect(sessionWon('hoops1v1', true, null, 300, { score: 3, opponentScore: 11 })).toBe(false);
+  });
+  it('a 1v1 won first to 11, or by 2 (12–10), or at the cap (15–14), is a win when claimed', () => {
+    expect(sessionWon('hoops1v1', true, null, 300, { score: 11, opponentScore: 4 })).toBe(true);
+    expect(sessionWon('hoops1v1', true, null, 300, { score: 13, opponentScore: 10 })).toBe(true);
+    expect(sessionWon('hoops1v1', true, null, 300, { score: 12, opponentScore: 10 })).toBe(true);
+    expect(sessionWon('hoops1v1', true, null, 300, { score: 15, opponentScore: 14 })).toBe(true);
+  });
+  it('a game nobody has won yet (10–9) or a tie is not a win, whatever the claim', () => {
+    expect(sessionWon('hoops1v1', true, null, 300, { score: 10, opponentScore: 9 })).toBe(false);
+    expect(sessionWon('hoops3v3', true, null, 300, { score: 15, opponentScore: 15 })).toBe(false);
+  });
+  it('3v3: more points at the end wins; fewer does not', () => {
+    expect(sessionWon('hoops3v3', true, null, 300, { score: 18, opponentScore: 12 })).toBe(true);
+    expect(sessionWon('hoops3v3', true, null, 300, { score: 4, opponentScore: 21 })).toBe(false);
+  });
+  it('the less-paying answer: a board win the client calls a loss is still not paid as a win', () => {
+    expect(sessionWon('hoops1v1', false, null, 300, { score: 11, opponentScore: 2 })).toBe(false);
+  });
+  it('judgeHeadToHead judges the hoops games and leaves every other mode to its own rule', () => {
+    expect(judgeHeadToHead('hoops1v1', 3, 11)).toBe(false);
+    expect(judgeHeadToHead('golf', 3, 11)).toBeNull();
   });
 });

@@ -206,7 +206,11 @@ function GameShellInner({
   const serverRun = useRef<Promise<string | null> | null>(null);
   const startServerRun = useCallback((): Promise<string | null> => {
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      mode, ...(playtestRun ? { playtest: true } : {}),
+      // TIER-SERVER: the head-to-head this run is for, so the server records its tier (PRO) at the start
+      ...(arenaMatchId ? { arenaMatchId } : {}), ...(mpCode ? { mp: mpCode } : {}), ...(challengeCode ? { c: challengeCode } : {}),
+    }) })
       .then((r) => (r?.ok ? r.json() : null))
       .then((j) => {
         if (j && typeof j.runId === 'string') {
@@ -222,7 +226,7 @@ function GameShellInner({
         import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
         return null;
       });
-  }, [mode, agentRun, playtestRun]);
+  }, [mode, agentRun, playtestRun, arenaMatchId, mpCode, challengeCode]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -423,13 +427,15 @@ function GameShellInner({
                 // integers); some modes accrue fractional points internally
                 // (e.g. the carnival gauntlet at 0.4/unit).
                 const arenaScore = Math.max(0, Math.round(res?.score ?? 0));
+                // ARENA-SETTLE-SERVER: the duel settles on the score of the server run this finish closed, named by its runId
+                const duelRunId = await started;
                 const ar = await fetch('/api/arena/submit-score', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   // the dunk card rides along when the mode produced one, so the other player can see what
                   // was actually thrown rather than only the number it added up to
                   body: JSON.stringify({
-                    matchId: arenaMatchId, score: arenaScore,
+                    matchId: arenaMatchId, score: arenaScore, ...(duelRunId ? { runId: duelRunId } : {}),
                     ...((res as { detail?: { card?: unknown } })?.detail?.card ? { card: (res as { detail?: { card?: unknown } }).detail!.card } : {}),
                   }),
                 }).then(async (r2) => {

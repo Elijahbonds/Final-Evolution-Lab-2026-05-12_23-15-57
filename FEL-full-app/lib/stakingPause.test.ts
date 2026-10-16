@@ -40,6 +40,8 @@ const h = vi.hoisted(() => ({
   mpMatches: [] as Row[],
   bestScores: {} as Record<string, number>,
   grants: [] as Row[],
+  // ARENA-SETTLE-SERVER: the server runs (SessionRun) a duel score can come from
+  runs: {} as Record<string, Row>,
 }));
 
 const matchesWhere = (where: Row): Row[] => h.matches.filter((m) => {
@@ -61,7 +63,12 @@ const tx = {
   },
   gameSession: { findMany: async () => [] },   // no past sessions: a dance ghost draws off the baseline
   // MUSIC-SUITE P6: a music duel's attempt events (lib/arena-music.ts readMusicAttempt)
+  // ARENA-SETTLE-SERVER (lib/arena-duel-run.ts): the run a duel score names, and whether it already counted elsewhere
+  sessionRun: { findUnique: async ({ where }: Row) => h.runs[where.id] ?? null },
+  $queryRaw: async () => [],   // the run row's FOR UPDATE lock (raced in arenaDuelRunRace.test.ts)
   matchEvent: {
+    findFirst: async ({ where }: Row) => h.events.find((e) => e.userId === where.userId && e.type === where.eventType
+      && e.matchId !== where.matchId?.not && JSON.stringify(e.payload).includes(where.payload.contains)) ?? null,
     findMany: async ({ where }: Row) => h.events
       .filter((e) => e.matchId === where.matchId && e.userId === where.userId && where.eventType.in.includes(e.type))
       .map((e) => ({ eventType: e.type, payload: JSON.stringify(e.payload), createdAt: new Date(0) })),
@@ -170,7 +177,7 @@ function played(matchId: string, userId: string): number {
 
 beforeEach(() => {
   h.matches = []; h.created = []; h.events = []; h.locks = []; h.refunds = []; h.payouts = []; h.houseCalls = 0;
-  h.userLookups = 0; h.escrowLocks = []; h.mpCreated = []; h.mpMatches = []; h.bestScores = {}; h.grants = [];
+  h.userLookups = 0; h.escrowLocks = []; h.mpCreated = []; h.mpMatches = []; h.bestScores = {}; h.grants = []; h.runs = {};
 });
 
 describe('the one list (lib/stakingPause.ts)', () => {
@@ -305,7 +312,9 @@ describe('every other mode stakes exactly as before — music again too (P6)', (
 describe('a duel that already exists on a paused mode still finishes', () => {
   it('a dance QUICK MATCH opened before the pause takes the score, draws the house and settles', async () => {
     h.matches = [duel()];
-    const res = await submitPOST(post({ matchId: 'd-1', score: 4000 }));
+    // ARENA-SETTLE-SERVER: the 4000 is the score of a dance run the server finished for this player after the duel opened
+    h.runs['run-d1'] = { id: 'run-d1', userId: USER, mode: 'dance', result: { tier: 'pro', staked: true }, status: 'paid', score: 4000, startedAt: new Date(Date.now() + 1000) };
+    const res = await submitPOST(post({ matchId: 'd-1', score: 4000, runId: 'run-d1' }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.settled).toBe(true);

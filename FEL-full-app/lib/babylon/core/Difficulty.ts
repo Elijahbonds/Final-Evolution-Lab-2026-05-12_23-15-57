@@ -156,6 +156,22 @@ export function writeTier(tier: Tier): void {
   try { window.localStorage.setItem(TIER_KEY, tier); } catch { /* convenience only */ }
 }
 
+/** A staked or head-to-head run: both sides must face the same opponent and the stake is settled on the score, so
+ *  ?arena= / ?mp= / ?c= always play PRO, whatever was picked or remembered (QA #259, PM 2026-10-14). The same list as
+ *  onevoneRules.HEAD_TO_HEAD_PARAMS (pinned by staked-pro tests). */
+export const STAKED_RUN_PARAMS: readonly string[] = ['arena', 'mp', 'c'];
+
+/** The tier a run with this query string plays: the pick, except PRO on a staked / head-to-head run. */
+export function tierForSearch(search: string, picked: Tier): Tier {
+  const q = new URLSearchParams(search);
+  return STAKED_RUN_PARAMS.some((k) => q.get(k)) ? 'pro' : picked;
+}
+
+/** The tier THIS run plays — every mode's opponent reads this, never readTier() bare. */
+export function runTier(): Tier {
+  return tierForSearch(typeof window !== 'undefined' ? window.location.search : '', readTier());
+}
+
 export function readProfile(): TierProfile {
-  return profileFor(readTier());
+  return profileFor(runTier());
 }
