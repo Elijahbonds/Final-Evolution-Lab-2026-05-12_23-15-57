@@ -106,7 +106,9 @@ export type StudioApi = ReturnType<typeof useStudio>;
 /** Track 3: the active venue's cast, decoded (share codes decode asynchronously; a code that will not decode casts nothing). */
 export function useResolvedCast(doc: StudioProject, venue: StudioVenue | null): ExportCast | null {
   const [cast, setCast] = useState<ExportCast | null>(null);
-  const key = venue?.cast?.player ? `${venue.cast.player}|${doc.characters.find((c) => c.id === venue.cast!.player)?.lookCode ?? ''}|${doc.characters.find((c) => c.id === venue.cast!.player)?.name ?? ''}` : '';
+  // studio-4b: the crowd's characters too (their codes and names), so seating one or editing its look re-resolves the cast
+  const ids = venue?.cast ? [venue.cast.player ?? '', ...(venue.cast.crowd ?? [])] : [];
+  const key = ids.some(Boolean) ? ids.map((id) => { const c = doc.characters.find((x) => x.id === id); return `${id}|${c?.lookCode ?? ''}|${c?.name ?? ''}`; }).join('§') : '';
   useEffect(() => {
     let live = true;
     if (!key || !venue) { setCast(null); return; }
