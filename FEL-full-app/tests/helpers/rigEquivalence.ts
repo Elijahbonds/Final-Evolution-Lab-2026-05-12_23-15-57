@@ -15,7 +15,7 @@
 // Use: runRigScenario(implA, scenario) and runRigScenario(implB, scenario), then firstDifference(a, b). An implementation is the
 // set of layer entry points (a module namespace satisfies it); tests/helpers/rigLegacy holds the frozen pre-change layers.
 import { readFileSync } from 'node:fs';
-import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, Vector3 } from '@babylonjs/core';
+import { FreeCamera, NullEngine, Quaternion, Scene, SceneLoader, TransformNode as TNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { CharacterAnimator } from '@/lib/babylon/anim/CharacterAnimator';
@@ -24,6 +24,8 @@ import { installOpponentMotion } from '@/lib/babylon/anim/opponentMotion';
 import { neverBindPose, sanitizeImportedGroups } from '@/lib/babylon/anim/importSanitizer';
 import { buildDanceClip } from '@/lib/babylon/anim/danceClips';
 import { boneNode } from '@/lib/babylon/anim/boneLookup';
+import { bindFrame } from '@/lib/babylon/anim/bindFrame';
+import { bindFrontInFrame } from '@/lib/babylon/anim/groupMirror';
 import type { PosturePose } from '@/lib/babylon/core/DunkPosture';
 import type { LegPose } from '@/lib/babylon/core/DunkLegs';
 
@@ -37,7 +39,12 @@ export interface RigImpl {
   claimLeg: (skeleton: Skeleton, side: 'Left' | 'Right', pinWorld: Vector3) => void;
   releaseLeg: (skeleton: Skeleton, side: 'Left' | 'Right') => void;
   solveChainInFrame: (rootN: TransformNode, midN: TransformNode, endN: TransformNode, targetWorld: Vector3, poleWorldDir: Vector3, weight?: number) => { miss: number };
+  /** The hinged arm (HandIK): built once per arm, applied after every writer of the arm, every frame. */
+  makeHingeArm: (arm: { shoulder: TransformNode; elbow: TransformNode; hand: TransformNode }, bindUpper: Quaternion, bindF: Quaternion, frontInFrame: Vector3) => HingeLike | null;
+  hingeArmApply: (H: HingeLike, dt: number, stamp: number, twistRateDeg: number) => void;
 }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type HingeLike = { tau: number } & Record<string, any>;
 interface PostureFeedLike { pose: PosturePose; legs?: LegPose; aim: Vector3 | null; eyes?: Vector3 | null; spinYaw?: number; window?: string }
 interface PostureReadouts { aimRad: number; headYaw: number; headPitch: number; chestYaw: number; clipHipYaw: number; pose: PosturePose; legs: LegPose; ok: boolean }
 interface ContactLike { planted: boolean; pin: { x: number; y: number; z: number } }
@@ -56,6 +63,8 @@ export interface RigScenario {
   turn: number;
   jump?: [number, number];
   spin?: boolean;
+  /** A jump that starts while the clip holds a foot on the floor (the airborne release of a PLANTED pin). */
+  hop?: [number, number];
   /** FootPlanting intensity (1 desktop, 0.6 phone). */
   plantIntensity: number;
   seed: number;
@@ -124,13 +133,32 @@ export async function runRigScenario(impl: RigImpl, sc: RigScenario, perturb?: R
     };
     const posture = impl.mountPostureLayer(scene, sk, root, feed, `EQ-${impl.name}`);
     const arms = (['Left', 'Right'] as const).map((s) => ({ shoulder: boneNode(sk, `${s}Arm`)!, elbow: boneNode(sk, `${s}ForeArm`)!, hand: boneNode(sk, `${s}Hand`)! }));
+    // what the posture layer's world-matrix walk must refresh besides bones: props parented to bones (the carried ball, a cap)
+    const ball = new TNode('rig-eq-ball', scene); ball.parent = boneNode(sk, 'RightHand'); ball.position.set(0.02, -0.09, 0.05);
+    const cap = new TNode('rig-eq-cap', scene); cap.parent = boneNode(sk, 'Head'); cap.position.set(0, 0.16, 0.03);
+    const props = [ball, cap];
+    // the hinged arms, built as motionLayers builds them (construction-time only; the per-frame hingeArmApply is what is compared)
+    const bf = bindFrame(sk), front = bindFrontInFrame(sk);
+    const hinges: HingeLike[] = [];
+    for (const a of arms) {
+      const bu = bf.bind.get(a.shoulder), bfo = bf.bind.get(a.elbow);
+      if (!bu || !bfo || !front) continue;
+      const H = impl.makeHingeArm(a, (bf.parentRot.get(a.shoulder) ?? Quaternion.Identity()).multiply(bu.q), bfo.q, front); if (H) hinges.push(H);
+    }
     const reachT = new Vector3(), reachPole = new Vector3();
     const misses = [0, 0];
     let reachSlerp = 0;
+    let mid: Float64Array = new Float64Array(0);
     const armObs = scene.onAfterAnimationsObservable.add(() => {
+      // MID-FRAME: the world matrices the next writer reads (no compute forced here) — the posture walk's whole job
+      let c = 0;
+      for (const n of midNodes) { const m = n.getWorldMatrix().m; for (let i = 0; i < 16; i++) mid[c++] = m[i]; }
       const win = Math.floor(frame / 20) % 5;   // 0: no reach; 1: full; 2: 0.6; 3: 0.3; 4: full with a pole straight back
       misses[0] = misses[1] = 0;
-      if (win === 0) return;
+      if (win !== 0) reach(win);
+      for (const H of hinges) impl.hingeArmApply(H, DT, frame, 800);   // motionLayers' ARM_TWIST_RATE_DEG
+    });
+    const reach = (win: number): void => {
       const w = win === 2 ? 0.6 : win === 3 ? 0.3 : 1;
       if (w < 1) reachSlerp++;
       for (let i = 0; i < 2; i++) {
@@ -139,19 +167,22 @@ export async function runRigScenario(impl: RigImpl, sc: RigScenario, perturb?: R
         if (win === 4) reachPole.set(0, -0.1, -1); else reachPole.set(side * 0.9, -0.2, -0.3 + 0.2 * Math.sin(t));
         misses[i] = impl.solveChainInFrame(arms[i].shoulder, arms[i].elbow, arms[i].hand, reachT, reachPole, w).miss;
       }
-    });
+    };
 
     const nodes: TransformNode[] = sk.bones.map((b) => b.getTransformNode()).filter((n): n is TransformNode => !!n);
+    const midNodes: TransformNode[] = [...nodes, ...props];
+    mid = new Float64Array(midNodes.length * 16);
     const columns: string[] = [];
-    for (const n of [root, ...nodes]) {
+    for (const n of [root, ...nodes, ...props]) {
       for (const k of ['px', 'py', 'pz', 'qx', 'qy', 'qz', 'qw']) columns.push(`${n.name}.${k}`);
       for (let i = 0; i < 16; i++) columns.push(`${n.name}.world${i}`);
     }
     columns.push('posture.aimRad', 'posture.headYaw', 'posture.headPitch', 'posture.chestYaw', 'posture.clipHipYaw', 'posture.weight', 'posture.legWeight',
       'plant.left.planted', 'plant.left.pin.x', 'plant.left.pin.y', 'plant.left.pin.z', 'plant.right.planted', 'plant.right.pin.x', 'plant.right.pin.y', 'plant.right.pin.z',
-      'reach.left.miss', 'reach.right.miss');
+      'reach.left.miss', 'reach.right.miss', 'hinge.left.tau', 'hinge.right.tau');
+    for (const n of midNodes) for (let i = 0; i < 16; i++) columns.push(`mid:${n.name}.world${i}`);
 
-    const coverage: Record<string, number> = { plantedFrames: 0, releases: 0, flyingFrames: 0, claimFrames: 0, teleports: 0, spinFrames: 0, reachSlerpFrames: 0, postureOffFrames: 0, clipsPlayed: 0, postureOk: 0, aimFrames: 0, eyesFrames: 0, hipStripFrames: 0 };
+    const coverage: Record<string, number> = { plantedFrames: 0, releases: 0, flyingFrames: 0, claimFrames: 0, teleports: 0, spinFrames: 0, reachSlerpFrames: 0, postureOffFrames: 0, clipsPlayed: 0, postureOk: 0, aimFrames: 0, eyesFrames: 0, hipStripFrames: 0, liftOffWhilePlanted: 0, hinges: hinges.length, propsUnderBones: props.length };
     const rows: Float64Array[] = [];
     let x = 0, z = 0, yaw = 0, prevY = 0, wasPlanted = [false, false];
     const yawAxis = Vector3.Up();
@@ -166,8 +197,8 @@ export async function runRigScenario(impl: RigImpl, sc: RigScenario, perturb?: R
       x += Math.sin(yaw) * sp * DT; z += Math.cos(yaw) * sp * DT;
       if (frame === Math.floor(sc.frames * 0.7)) { x += 3.5; coverage.teleports++; }   // a reset: > 2 m in a frame
       let y = 0;
-      if (sc.jump && frame >= sc.jump[0] && frame < sc.jump[1]) { const u = (frame - sc.jump[0]) / (sc.jump[1] - sc.jump[0]); y = 4 * 0.9 * u * (1 - u); }
-      if (Math.abs(y - prevY) / DT > 1.2) coverage.flyingFrames++;
+      for (const j of [sc.jump, sc.hop]) if (j && frame >= j[0] && frame < j[1]) { const u = (frame - j[0]) / (j[1] - j[0]); y = 4 * (j === sc.hop ? 0.35 : 0.9) * u * (1 - u); }
+      if (Math.abs(y - prevY) / DT > 1.2) { coverage.flyingFrames++; if (wasPlanted[0] || wasPlanted[1]) coverage.liftOffWhilePlanted++; }
       prevY = y;
       root.position.set(x, y, z);
       root.rotationQuaternion = Quaternion.RotationAxis(yawAxis, yaw).multiply(baseRot);
@@ -183,7 +214,7 @@ export async function runRigScenario(impl: RigImpl, sc: RigScenario, perturb?: R
       perturb?.(frame, sk);
 
       const row = new Float64Array(columns.length); let c = 0;
-      for (const n of [root, ...nodes]) {
+      for (const n of [root, ...nodes, ...props]) {
         const q = n.rotationQuaternion;
         row[c++] = n.position.x; row[c++] = n.position.y; row[c++] = n.position.z;
         row[c++] = q ? q.x : NaN; row[c++] = q ? q.y : NaN; row[c++] = q ? q.z : NaN; row[c++] = q ? q.w : NaN;
@@ -193,6 +224,8 @@ export async function runRigScenario(impl: RigImpl, sc: RigScenario, perturb?: R
       row[c++] = L.aimRad; row[c++] = L.headYaw; row[c++] = L.headPitch; row[c++] = L.chestYaw; row[c++] = L.clipHipYaw; row[c++] = L.pose.weight; row[c++] = L.legs.weight;
       for (const s of [d.left, d.right]) { row[c++] = s.planted ? 1 : 0; row[c++] = s.pin.x; row[c++] = s.pin.y; row[c++] = s.pin.z; }
       row[c++] = misses[0]; row[c++] = misses[1];
+      row[c++] = hinges[0]?.tau ?? NaN; row[c++] = hinges[1]?.tau ?? NaN;
+      row.set(mid, c); c += mid.length;
       rows.push(row);
       coverage.postureOk = L.ok ? 1 : 0;
       if (Math.abs(L.aimRad) > 1e-4) coverage.aimFrames++;

@@ -60,8 +60,12 @@ export function legPose(window: PostureWindow, trick: string | null): LegPose {
 }
 
 export function easeLegPose(cur: LegPose, to: LegPose, k: number): LegPose {
-  const l = (a: number, b: number) => a + (b - a) * k;
-  return { footPitch: l(cur.footPitch, to.footPitch), toeCurl: l(cur.toeCurl, to.toeCurl), weight: l(cur.weight, to.weight) };
+  return easeLegPoseInto({ footPitch: 0, toeCurl: 0, weight: 0 }, cur, to, k);
+}
+/** easeLegPose written into `out` (RIG-PERF 2026-10-16: no garbage per frame). `out` may be `cur`. */
+export function easeLegPoseInto(out: LegPose, cur: LegPose, to: LegPose, k: number): LegPose {
+  out.footPitch = cur.footPitch + (to.footPitch - cur.footPitch) * k; out.toeCurl = cur.toeCurl + (to.toeCurl - cur.toeCurl) * k; out.weight = cur.weight + (to.weight - cur.weight) * k;
+  return out;
 }
 export const cloneLegPose = (p: LegPose): LegPose => easeLegPose(p, p, 0);
 

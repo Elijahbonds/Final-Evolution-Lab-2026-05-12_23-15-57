@@ -160,8 +160,16 @@ export function hipYawStrip(clipHipYaw: number, keep: number): number { return -
 
 /** Scalar fields of a pose, eased toward a target (the mode slerps the quaternion fields itself). */
 export function easePose(cur: PosturePose, to: PosturePose, k: number): PosturePose {
-  const l = (a: number, b: number) => a + (b - a) * k;
-  const l3 = (a: Deg3, b: Deg3): Deg3 => [l(a[0], b[0]), l(a[1], b[1]), l(a[2], b[2])];
-  return { lean: l(cur.lean, to.lean), spine1: l3(cur.spine1, to.spine1), spine2: l3(cur.spine2, to.spine2), neck: l3(cur.neck, to.neck), head: l3(cur.head, to.head), shrug: l(cur.shrug, to.shrug), forward: l(cur.forward, to.forward), eyes: l(cur.eyes, to.eyes), chestAim: l(cur.chestAim, to.chestAim), hipYawKeep: l(cur.hipYawKeep, to.hipYawKeep), weight: l(cur.weight, to.weight) };
+  return easePoseInto({ lean: 0, spine1: [0, 0, 0], spine2: [0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0], shrug: 0, forward: 0, eyes: 0, chestAim: 0, hipYawKeep: 0, weight: 0 }, cur, to, k);
 }
+/** easePose written into `out` (RIG-PERF 2026-10-16: the Posture Poses layer eases its own pose in place every frame, no garbage).
+ *  `out` may be `cur` — every field is read before it is written. The one formula: a + (b − a)·k per scalar. */
+export function easePoseInto(out: PosturePose, cur: PosturePose, to: PosturePose, k: number): PosturePose {
+  out.lean = cur.lean + (to.lean - cur.lean) * k;
+  ease3(out.spine1, cur.spine1, to.spine1, k); ease3(out.spine2, cur.spine2, to.spine2, k); ease3(out.neck, cur.neck, to.neck, k); ease3(out.head, cur.head, to.head, k);
+  out.shrug = cur.shrug + (to.shrug - cur.shrug) * k; out.forward = cur.forward + (to.forward - cur.forward) * k; out.eyes = cur.eyes + (to.eyes - cur.eyes) * k;
+  out.chestAim = cur.chestAim + (to.chestAim - cur.chestAim) * k; out.hipYawKeep = cur.hipYawKeep + (to.hipYawKeep - cur.hipYawKeep) * k; out.weight = cur.weight + (to.weight - cur.weight) * k;
+  return out;
+}
+function ease3(out: Deg3, a: Deg3, b: Deg3, k: number): void { out[0] = a[0] + (b[0] - a[0]) * k; out[1] = a[1] + (b[1] - a[1]) * k; out[2] = a[2] + (b[2] - a[2]) * k; }
 export const clonePose = (p: PosturePose): PosturePose => easePose(p, p, 0);
