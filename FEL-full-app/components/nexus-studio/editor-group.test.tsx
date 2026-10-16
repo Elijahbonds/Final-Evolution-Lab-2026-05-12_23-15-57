@@ -51,6 +51,7 @@ describe('the venue’s target', () => {
     expect(html).not.toContain('aria-label="Weather"');
     expect(html).toContain('Football Rush opens on the intro you pick and replays its big moments through the ticked angles');
     expect(html).toContain('lays its own field');
+    expect(html).not.toContain('aria-label="Glossy floor"');
   });
 });
 

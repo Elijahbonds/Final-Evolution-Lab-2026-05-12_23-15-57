@@ -103,6 +103,20 @@ describe('a list selection', () => {
     expect(xs.length).toBeGreaterThan(0);
     expect(new Set(xs.map(Math.sign)).size).toBe(1);   // one side of the court only
   });
+
+  it('a box never takes what stands behind the camera (its projection would land on the screen mirrored)', async () => {
+    const v = everyKindVenue();
+    const vp = await viewport(v);
+    const st = vp.currentStage!;
+    st.scene.activeCamera = st.orbit;
+    st.orbit.setPosition(new Vector3(0, 2, 0)); st.orbit.setTarget(new Vector3(0, 2, -10));   // standing at the origin, looking −z
+    st.scene.render();
+    const got = new Set(vp.idsInRect({ x: -1e5, y: -1e5 }, { x: 1e5, y: 1e5 }));
+    const behind = v.objects.filter((o) => !o.hidden && o.t.p[2] > 3);
+    expect(behind.length).toBeGreaterThan(0);
+    for (const o of behind) expect(got.has(o.id)).toBe(false);
+    expect(v.objects.some((o) => got.has(o.id) && o.t.p[2] < -3)).toBe(true);   // the control: what is in front is taken
+  });
 });
 
 describe('Football Rush’s stage', () => {

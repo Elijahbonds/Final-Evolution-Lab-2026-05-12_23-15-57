@@ -103,7 +103,9 @@ export function exportVenue(v: StudioVenue, cast?: ExportCast | null, scripts?: 
     },
     baseDressing: v.baseDressing, kit, meshy, fixtures, crowd, decals,
     // §11: where the mode's weather is gameplay (targets.ts modeWeather) the venue does not set it
-    weather: target?.modeWeather ? 'natural' : v.weather, glossyFloor: v.glossyFloor, subject,
+    // …and where the mode lays its own field over the spec (targets.ts furniture: Football Rush's turf), there is no wooden
+    // court for GlossyFloor to varnish, so the ask is not exported either
+    weather: target?.modeWeather ? 'natural' : v.weather, glossyFloor: target?.furniture ? false : v.glossyFloor, subject,
     ...(cast ? { cast } : {}),
     ...(runs.length ? { scripts: runs } : {}),
   };

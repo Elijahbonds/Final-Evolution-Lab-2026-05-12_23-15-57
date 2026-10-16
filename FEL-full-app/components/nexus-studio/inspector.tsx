@@ -240,9 +240,11 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
         </span>
       </Row>
       <Row label="Court dressing" hint="The court's own CC0 set (VenueProps)"><Select label="Court dressing" value={v.baseDressing} options={[{ value: 'keep', label: 'Keep' }, { value: 'none', label: 'Bare' }]} onChange={(d) => set({ baseDressing: d }, 'dressing')} /></Row>
-      <Row label="Glossy floor" hint="GlossyFloor: a varnished mirror on a wooden court (desktop/TV), in the viewport and in the mode">
-        <Toggle label="Glossy floor" on={v.glossyFloor} onChange={(on) => set({ glossyFloor: on, ...(on && !v.ground?.kind ? { ground: { ...v.ground, kind: 'court' } } : {}) }, 'glossy floor')} />
-      </Row>
+      {!target?.furniture && (
+        <Row label="Glossy floor" hint="GlossyFloor: a varnished mirror on a wooden court (desktop/TV), in the viewport and in the mode">
+          <Toggle label="Glossy floor" on={v.glossyFloor} onChange={(on) => set({ glossyFloor: on, ...(on && !v.ground?.kind ? { ground: { ...v.ground, kind: 'court' } } : {}) }, 'glossy floor')} />
+        </Row>
+      )}
 
       <PanelTitle>Weather</PanelTitle>
       {target?.modeWeather

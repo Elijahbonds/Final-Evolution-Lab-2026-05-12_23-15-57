@@ -54,6 +54,10 @@ describe('the target row is the mode’s own data', () => {
     expect(exportVenue(footballVenue()).weather).toBe('natural');
     expect(exportVenue(everyKindVenue()).weather).toBe('rain');
   });
+  it('the glossy floor is not asked for over the mode’s own turf; Tiebreak keeps the ask', () => {
+    expect(exportVenue(footballVenue({ glossyFloor: true })).glossyFloor).toBe(false);
+    expect(exportVenue({ ...everyKindVenue(), glossyFloor: true }).glossyFloor).toBe(true);
+  });
 });
 
 describe('the mode without a Studio venue is exactly as it shipped', () => {
