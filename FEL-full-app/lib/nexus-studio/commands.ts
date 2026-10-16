@@ -13,7 +13,7 @@
 
 import {
   findObject, venueSettings,
-  type StudioCharacter, type StudioObject, type StudioProject, type StudioScript, type StudioVenue, type VenueSettings,
+  type StudioCharacter, type StudioObject, type StudioProject, type StudioScript, type StudioStamp, type StudioVenue, type VenueSettings,
 } from './doc';
 
 export type ObjectPatch = { [K in keyof StudioObject]?: StudioObject[K] } & Record<string, unknown>;
@@ -35,6 +35,10 @@ export type Op =
   | { op: 'addScript'; script: StudioScript; index?: number }
   | { op: 'removeScript'; id: string }
   | { op: 'patchScript'; id: string; patch: Partial<Omit<StudioScript, 'id'>> }
+  // track 1 (§11): the project's prefab stamps (an optional list: the last one removed takes the key with it)
+  | { op: 'addStamp'; stamp: StudioStamp; index?: number }
+  | { op: 'removeStamp'; id: string }
+  | { op: 'patchStamp'; id: string; patch: Partial<Omit<StudioStamp, 'id'>> }
   | { op: 'replaceProject'; project: StudioProject };
 
 export interface Command { label: string; ops: Op[]; group?: string }
@@ -184,6 +188,35 @@ export function applyOp(doc: StudioProject, op: Op): { doc: StudioProject; inver
       const next = list.slice(); next[i] = merged;
       const inverse = { op: op.op, id: op.id, patch: before } as Op;
       return { doc: { ...doc, [key]: next }, inverse };
+    }
+    case 'addStamp': {
+      const list = (doc.stamps ?? []).slice();
+      if (list.some((x) => x.id === op.stamp.id)) throw new CommandError(`${op.stamp.id} already exists`);
+      list.splice(op.index === undefined ? list.length : Math.max(0, Math.min(list.length, op.index)), 0, clone(op.stamp));
+      return { doc: { ...doc, stamps: list }, inverse: { op: 'removeStamp', id: op.stamp.id } };
+    }
+    case 'removeStamp': {
+      const list = doc.stamps ?? [];
+      const index = list.findIndex((x) => x.id === op.id);
+      if (index < 0) throw new CommandError(`no stamp ${op.id}`);
+      const rest = list.filter((x) => x.id !== op.id);
+      const next: StudioProject = { ...doc, stamps: rest };
+      if (!rest.length) delete next.stamps;   // a project with no stamps carries no key: undo of the first save is exact
+      return { doc: next, inverse: { op: 'addStamp', stamp: list[index], index } };
+    }
+    case 'patchStamp': {
+      const list = doc.stamps ?? [];
+      const i = list.findIndex((x) => x.id === op.id);
+      if (i < 0) throw new CommandError(`no stamp ${op.id}`);
+      const before: Record<string, unknown> = {};
+      const merged: Record<string, unknown> = { ...list[i] };
+      for (const [k, val] of Object.entries(op.patch)) {
+        if (k === 'id') throw new CommandError('an id cannot change');
+        before[k] = k in list[i] ? clone((list[i] as unknown as Record<string, unknown>)[k]) : undefined;
+        if (val === undefined) delete merged[k]; else merged[k] = clone(val);
+      }
+      const next = list.slice(); next[i] = merged as unknown as StudioStamp;
+      return { doc: { ...doc, stamps: next }, inverse: { op: 'patchStamp', id: op.id, patch: before as Partial<StudioStamp> } };
     }
     case 'replaceProject':
       return { doc: clone(op.project), inverse: { op: 'replaceProject', project: doc } };

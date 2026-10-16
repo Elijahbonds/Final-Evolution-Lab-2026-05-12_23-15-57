@@ -24,6 +24,26 @@ import {
   studioLook, mountMeshyLayer, mountFixtureLayer, mountDecalLayer, mountCrowdLayer, mountWeatherLayer, type Layer,
 } from './runtime';
 import { mountCastLayer, type CastLayer } from './castLayer';
+import { VenueKit } from '../babylon/visual/VenueKit';
+import { mountFootballFx } from '../babylon/court/FootballFx';
+
+/**
+ * §11: the target mode's own field furniture, built by the mode's own builders so the creator edits around the field the mode
+ * plays on (Football Rush lays VenueKit's gridiron over the spec's ground and stands FootballFx's flood towers round it).
+ * Editor-side only: it is never exported — the mode builds its own in load(). Returns its dispose (null: disposed with the scene).
+ */
+export function mountTargetFurniture(scene: Scene, kind: 'gridiron' | undefined, tier: QualityTier): { dispose(): void } | null {
+  if (kind !== 'gridiron') return null;
+  VenueKit.buildGridiron(scene);   // FootballRushMode.load()'s own call: the street-turf field, its lines and posts
+  // FootballRushMode.load()'s own FootballFx: the flood towers, down lines and pylons (fieldHalfW 21, goal 40, end 45)
+  return mountFootballFx(scene, { phone: tier === 'mobile', fieldHalfW: 21, goalZ: 40, endZ: 45 });
+}
+
+/** §11: under a target's own field the spec's ground hides, as the mode hides it (FootballRushMode: `venue_ground_under`). */
+function hideSpecGround(venue: VenueHandle | null): void {
+  if (!venue) return;
+  for (const m of venue.built.root.getChildMeshes()) if (m.name === 'venue_ground') { m.visibility = 0; m.name = 'venue_ground_under'; m.isPickable = false; }
+}
 
 export type StageLayer = 'venue' | 'meshy' | 'fixtures' | 'decals' | 'crowd' | 'weather' | 'cast';
 export const STAGE_LAYERS: readonly StageLayer[] = ['venue', 'meshy', 'fixtures', 'decals', 'crowd', 'weather', 'cast'];
@@ -99,6 +119,7 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
         const keep = scene.activeCamera;
         venue = mountVenue(ctx, exp.spec, { keepGameplayCamera: true, look: studioLook(exp) });
         venue?.hidePlaceholders();
+        if (target?.furniture) hideSpecGround(venue);
         if (keep) scene.activeCamera = keep;
         return;
       }
@@ -115,6 +136,7 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
   const glossy = (): void => { if (exp.glossyFloor) meta.felStudioGround = 'court'; else delete meta.felStudioGround; };
   glossy();
   for (const l of STAGE_LAYERS) mountLayer(l);
+  const furniture = mountTargetFurniture(scene, target?.furniture, tier);
   // 8: after load — the harness's three calls
   liftBlackMaterials(scene);
   lights.adoptRest();
@@ -139,6 +161,7 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
       anchor.position.copyFrom(subject());
     },
     dispose(o = {}) {
+      furniture?.dispose();
       for (const l of Object.values(layers)) l?.dispose();
       venue?.dispose(); venue = null;
       letterbox.dispose(); unink(); backdrop.dispose(); ssao?.dispose(); lights.dispose();

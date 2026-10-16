@@ -3,7 +3,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { catalog, catalogIdOf, catalogItem, instantiate, kitSize, prettyModel, proxyBox } from './catalog';
+import { catalog, catalogIdOf, catalogItem, instantiate, kitScale, kitSize, prettyModel, proxyBox } from './catalog';
 import { sanitizeObject, OBJECT_TYPES } from './doc';
 import { snapAngle, snapTransform, snapValue, yawOfQuaternion, DEFAULT_SNAP } from './snap';
 import { DESKTOP_CEILING, MOBILE_MONITOR, PHONE_CEILING, level, meterRows, modeRow, textureMb, worst } from './budget';
@@ -46,6 +46,18 @@ describe('the catalog', () => {
     expect(b.size[0]).toBe(16);
     const flood = instantiate(catalogItem('fixture:flood')!);
     expect(proxyBox(flood).size[1]).toBeGreaterThan(12);
+  });
+
+  it('§11: a kit item is placed at its kit\'s venue-set scale, inside a box its own size (a Kenney model is toy-sized at 1×)', () => {
+    expect(kitScale('nature')).toBeGreaterThan(4); expect(kitScale('nature')).toBeLessThan(5);   // the venue sets' median (4.6 on 2026-10-16)
+    expect(kitScale('no-such-kit')).toBe(1);
+    const palm = instantiate(catalogItem('kit:nature/tree_palmDetailedTall')!);
+    expect(palm.t.s).toBe(kitScale('nature'));
+    const b = proxyBox(palm);
+    expect(b.size[1] * palm.t.s).toBeCloseTo(kitSize('tree_palmDetailedTall')[1], 6);   // the life-size reach once placed
+    // the GLB is 1.25 m tall in its own units (POSITION bounds): the placed palm is ~5.8 m, inside a ~7 m reach — not 1.25 m in 7 m
+    expect(1.25 * palm.t.s).toBeGreaterThan(5);
+    expect(instantiate(catalogItem('fixture:lamp')!).t.s).toBe(1);   // the systems are life-size already
   });
 
   it('names read like words; sizes read off the model name', () => {

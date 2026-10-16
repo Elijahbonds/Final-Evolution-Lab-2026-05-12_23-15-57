@@ -24,7 +24,9 @@ describe('the broadcast opt-ins', () => {
     expect(golf).toMatch(/intro: 'establish'/); expect(golf).toMatch(/replay: true/); expect(golf).toMatch(/replayCast:/);
     expect(derby).toMatch(/intro: 'walkIn'/); expect(derby).toMatch(/replay: true/); expect(derby).toMatch(/replayCast:/);
     expect(pen).not.toMatch(/\n\s+intro: '/); expect(pen).toMatch(/replay: true/); expect(pen).toMatch(/replayCast:/);
-    expect(fb).toMatch(/intro: 'walkIn'/); expect(fb).toMatch(/replay: true/);   // football's own, from the foundation
+    // football's own, from the foundation. NEXUS STUDIO 4a: the intro is a getter that answers 'walkIn' unless a dev-only
+    // ?venue= picks one (lib/nexus-studio/football.test.ts holds that it is 'walkIn' without a venue and in production)
+    expect(fb).toMatch(/get intro\(\) \{ return studioIntroOr\('football', 'walkIn'\); \}/); expect(fb).toMatch(/replay: true/);
   });
   it('the harness reads the cast only for a mode that asked for replays, once, after load', () => {
     const i = idx(harness, 'def.replayCast?.(ctx)');

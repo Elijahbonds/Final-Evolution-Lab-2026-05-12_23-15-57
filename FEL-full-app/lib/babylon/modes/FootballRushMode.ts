@@ -52,6 +52,7 @@ import { EffectsKit } from '../visual/EffectsKit';
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
+import { mountStudioFor, studioIntroOr, studioLookFor, studioMood, studioReplayAngles, type StudioExtras } from '@/lib/nexus-studio/runtime';   // NEXUS STUDIO: a dev-only ?venue= (null without one, and in production)
 import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';
 import { mountFootballFx, type FootballFxHandle } from '../court/FootballFx';   // VIS-COURT (wave 2): towers, down lines, pylons, pyro, turf — visual only, reads the line of scrimmage and the events below
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -75,6 +76,7 @@ import {
 } from './footballRushRules';
 
 let rushVenue: VenueHandle | null = null;   // ship pass 4: the mounted venue spec, disposed with the mode
+let studio: StudioExtras | null = null;   // NEXUS STUDIO: a dev-only ?venue='s extras (null without one)
 let courtFx: FootballFxHandle | null = null;   // VIS-COURT: the gridiron's broadcast dressing
 
 // MAP-SIZE FIX: VenueKit.buildGridiron widened from 22m to 44m to match a
@@ -751,8 +753,8 @@ export const FootballRushMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'football', mood: 'nightGame', camPreset: 'gridiron',   // WA-24: runner sat inside defenders; gridiron pulls back
-    intro: 'walkIn',   // vis-foundation-2 A9.12: the broadcast intro (crane, then the runner) — the presentation kit's proving mode
+    modeId: 'football', get mood() { return studioMood('football', 'nightGame'); }, camPreset: 'gridiron',   // WA-24: runner sat inside defenders; gridiron pulls back. NEXUS STUDIO: 'nightGame' unless a dev-only ?venue= names one
+    get intro() { return studioIntroOr('football', 'walkIn'); },   // vis-foundation-2 A9.12: the broadcast intro (crane, then the runner) — the presentation kit's proving mode. NEXUS STUDIO: 'walkIn' unless a dev-only ?venue= picks one
     replay: true,      // vis-foundation-2 A9.12: record the bodies for the touchdown replay (ctx.highlight below)
 
     async load(ctx: ModeContext) {
@@ -764,10 +766,12 @@ export const FootballRushMode: ModeDefinition = (() => {
       clock = 0; timers.clear(); bannerUntil = Infinity; hudSent = {}; hudGateSec = 0; parSentFor = -1; evadesAtDrive = 0; hopT = 0; hopSec = 0;
       coins?.dispose(); coins = null; fumbleBall = null; ballMat = null; kickBall = null;
       bestScore = loadFootballBest();
-      rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true, look: readPlaceLook('football') });   // PLACE: the splash's pick
+      const look = studioLookFor('football') ?? readPlaceLook('football');   // NEXUS STUDIO: the place pick unless a dev-only ?venue= lays a Studio look
+      rushVenue = mountVenue(ctx, 'football_rush', { keepGameplayCamera: true, look });   // PLACE: the splash's pick
+      studio?.dispose(); studio = mountStudioFor('football', ctx);   // NEXUS STUDIO: null without a dev-only ?venue=
       // WEATHER: the start screen's pick — rain softens the cut (grip), snow slows the run (drag), fog / night dress it
       weather = WeatherKit.fromPick(readWeather('football'), 'gridiron', Math.floor(Date.now() / 1000) % 100000);
-      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook('football')?.sky });   // a place with its own sky keeps it
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!look?.sky });   // a place with its own sky keeps it
       // the kit gridiron stands at y 0.05: the reads sit just over it
       lineArrow?.dispose(); lineArrow = mountAimArrow(ctx.scene, '#22d3ee', 0.09); lineArrow.show(false);
       pursuit?.dispose(); pursuit = mountRing(ctx.scene, '#ff2d78', 1.5, 0.09); pursuit.show(false);
@@ -1172,7 +1176,7 @@ export const FootballRushMode: ModeDefinition = (() => {
           SoundKit.play('whistle');
           return ctx.end('DRIVES_DONE', score, endStats());
         }
-        void ctx.highlight?.({ lastSeconds: 2.6, objective: new Vector3(0, 0, FIELD_LENGTH + 4) });   // vis-foundation-2 A9.12: the run, replayed (skippable)
+        void ctx.highlight?.({ lastSeconds: 2.6, objective: new Vector3(0, 0, FIELD_LENGTH + 4), angles: studioReplayAngles('football') });   // vis-foundation-2 A9.12: the run, replayed (skippable). NEXUS STUDIO: a dev-only ?venue='s angles, else the director's own cut
         const next = drive + 1;
         // IMPROVE (2026-10-06) #5: the next drive waits out the spike on the mode clock (a pause holds the spike too)
         timers.later(clock, TD_HOLD_SEC, () => { if (ended) return; drive = next; newDrive(ctx, `TOUCHDOWN! · DRIVE ${next}/${DRIVES}`); }, 'drive');
@@ -1187,6 +1191,7 @@ export const FootballRushMode: ModeDefinition = (() => {
       posture?.dispose(); posture = null; animTree = null;
       courtFx?.dispose(); courtFx = null;   // VIS-COURT
       rushVenue?.dispose?.(); rushVenue = null;
+      studio?.dispose(); studio = null;   // NEXUS STUDIO
       crowd?.dispose(); crowd = null;
       lineArrow?.dispose(); lineArrow = null; pursuit?.dispose(); pursuit = null; weatherFx?.dispose(); weatherFx = null;
       runner?.dispose();

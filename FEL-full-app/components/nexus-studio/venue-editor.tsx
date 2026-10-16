@@ -5,12 +5,18 @@
 //
 // KEYBOARD (ignored while typing in a field): Ctrl/⌘+Z undo · Ctrl/⌘+Shift+Z or Ctrl+Y redo · Ctrl/⌘+S save ·
 // Q select · W move · E rotate · R scale · 1 orbit · 2 pan · 3 fly (WASD, Q/E down/up) · F frame · G grid · N snap ·
-// Del / Backspace delete · Ctrl/⌘+D duplicate · arrows nudge a grid step · Esc deselect / stop a preview.
+// Del / Backspace delete · Ctrl/⌘+D duplicate · Ctrl/⌘+C copy · Ctrl/⌘+V paste (at the view's centre, any venue) ·
+// Ctrl/⌘+A select all · H hide / show · L lock / unlock · arrows nudge a grid step · Esc deselect / stop a preview.
+// §11: every one of these takes the whole selection, as one undo step.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MousePointer2, Move3d, Rotate3d, Scale3d, Orbit, Hand, Plane, Grid3x3, Magnet, Focus } from 'lucide-react';
+import { MousePointer2, Move3d, Rotate3d, Scale3d, Orbit, Hand, Plane, Grid3x3, Magnet, Focus, ClipboardPaste } from 'lucide-react';
 import { catalogItem, type CatalogItem } from '@/lib/nexus-studio/catalog';
-import { deleteObjects, duplicate, moveObject, placeItem, toggleFlag, addVenue, switchVenue } from '@/lib/nexus-studio/edits';
+import { moveObject, placeItem, addVenue, switchVenue } from '@/lib/nexus-studio/edits';
+import { boxSelect, clickSelect, groupDeleteCommand, groupFlagCommand, groupTransformCommand, selectedObjects, treeSelect, type GroupDelta } from '@/lib/nexus-studio/group';
+import { copySelection, duplicateSelection, pasteClip } from '@/lib/nexus-studio/clipboard';
+import { allStamps, placeStamp, removeStampCommand, renameStampCommand, stampFromSelection } from '@/lib/nexus-studio/stamps';
+import type { StudioStamp } from '@/lib/nexus-studio/doc';
 import { DEFAULT_SNAP, SNAP_MOVES, snapTransform, type SnapSettings } from '@/lib/nexus-studio/snap';
 import { targetOf, PLAYTEST_TARGETS, DEFAULT_TARGET } from '@/lib/nexus-studio/targets';
 import type { BudgetSample } from '@/lib/nexus-studio/budget';
@@ -18,7 +24,8 @@ import type { CameraMode, Tool } from '@/lib/nexus-studio/viewport';
 import type { StudioTransform, V3 } from '@/lib/nexus-studio/doc';
 import { useResolvedCast, type StudioApi } from './use-studio';
 import { AssetBrowser } from './asset-browser';
-import { SceneTree } from './scene-tree';
+import { SceneTree, treeOrder } from './scene-tree';
+import { StampShelf, STAMP_DRAG_PREFIX } from './stamp-shelf';
 import { Inspector } from './inspector';
 import { ViewportPanel, type ViewportHandle } from './viewport-panel';
 import { BudgetMeter } from './budget-meter';
@@ -34,18 +41,19 @@ export function typingTarget(t: EventTarget | null): boolean {
 }
 
 export function VenueEditor({ studio }: { studio: StudioApi }) {
-  const { venue, doc, selected, setSelected, run, seal } = studio;
+  const { venue, doc, selected, setSelected, selection, setSelection, clip, setClip, run, seal } = studio;
   const vp = useRef<ViewportHandle | null>(null);
   const [tool, setTool] = useState<Tool>('move');
   const [camera, setCamera] = useState<CameraMode>('orbit');
   const [snap, setSnap] = useState<SnapSettings>(DEFAULT_SNAP);
   const [grid, setGrid] = useState(true);
   const [phone, setPhone] = useState(false);
-  const [left, setLeft] = useState<'scene' | 'assets'>('assets');
+  const [left, setLeft] = useState<'scene' | 'assets' | 'stamps'>('assets');
   const [stats, setStats] = useState<BudgetSample | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
   const object = venue?.objects.find((o) => o.id === selected) ?? null;
+  const group = venue && selection.length > 1 ? selectedObjects(venue, selection) : undefined;
   const cast = useResolvedCast(doc, venue);   // track 3: the cast, decoded, stood on the hero's spot
 
   const place = useCallback((item: CatalogItem, at?: V3) => {
@@ -57,8 +65,39 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
   }, [venue, snap, run, setSelected]);
 
   const onTransform = useCallback((id: string, t: StudioTransform) => { if (venue) run(moveObject(venue, id, t)); }, [venue, run]);
-  const del = useCallback((id: string) => { if (!venue) return; const c = deleteObjects(venue, [id]); if (c) { run(c); setSelected(null); } }, [venue, run, setSelected]);
-  const dup = useCallback((id: string) => { if (!venue) return; const r = duplicate(venue, id); if (r) { run(r.cmd); setSelected(r.id); } }, [venue, run, setSelected]);
+  // §11: a group drag's release is ONE command (the viewport hands up the snapped delta about the drag's pivot)
+  const onGroupTransform = useCallback((ids: string[], d: GroupDelta, pivot: V3) => {
+    if (!venue) return;
+    const c = groupTransformCommand(venue, ids, d, { pivot });
+    if (c) run(c);
+  }, [venue, run]);
+  // every selection action takes the whole selection, in one step; `ids` defaults to it
+  const del = useCallback((ids: readonly string[] = selection) => { if (!venue) return; const c = groupDeleteCommand(venue, ids); if (c) { run(c); setSelection(ids.filter((id) => venue.objects.find((o) => o.id === id)?.locked)); } }, [venue, run, selection, setSelection]);
+  const dup = useCallback((ids: readonly string[] = selection) => { if (!venue) return; const r = duplicateSelection(venue, ids); if (r) { run(r.cmd); setSelection(r.ids); } }, [venue, run, selection, setSelection]);
+  const copy = useCallback(() => {
+    if (!venue) return;
+    const c = copySelection(venue, selection);
+    if (c) { setClip(c); setNote(`Copied ${c.objects.length === 1 ? c.objects[0].name : `${c.objects.length} objects`} — Ctrl+V pastes into any venue`); }
+  }, [venue, selection, setClip]);
+  const paste = useCallback(() => {
+    if (!venue || !clip) return;
+    const r = pasteClip(venue, clip, vp.current?.focusPoint() ?? clip.centre);
+    if (!r) { setNote(`This venue holds ${venue.objects.length} objects; the paste would pass the limit`); return; }
+    run(r.cmd); setClip(r.clip); setSelection(r.ids);
+  }, [venue, clip, run, setClip, setSelection]);
+  const flag = useCallback((key: 'hidden' | 'locked', ids: readonly string[] = selection) => { if (!venue) return; const c = groupFlagCommand(venue, ids, key); if (c) run(c); }, [venue, run, selection]);
+  const turn = useCallback((deg: number) => { if (!venue) return; const c = groupTransformCommand(venue, selection, { move: [0, 0, 0], turn: (deg * Math.PI) / 180, scale: 1 }); if (c) run(c); }, [venue, run, selection]);
+  const stampPlace = useCallback((st: StudioStamp, at?: V3) => {
+    if (!venue) return;
+    const r = placeStamp(venue, st, at ?? vp.current?.focusPoint() ?? [0, 0, 0], snap);
+    if (!r) { setNote(`No room for ${st.name} (a venue holds ${venue.objects.length} objects)`); return; }
+    run(r.cmd); setSelection(r.ids);
+  }, [venue, snap, run, setSelection]);
+  const saveStamp = useCallback((name?: string) => {
+    if (!venue) return;
+    const r = stampFromSelection(venue, selection, name ?? '', doc);
+    if (r) { run(r.cmd); setLeft('stamps'); setNote('Saved as a stamp — it is in the Stamps tab and the project'); }
+  }, [venue, selection, doc, run]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -68,7 +107,10 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
       if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) studio.redo(); else studio.undo(); return; }
       if (mod && k === 'y') { e.preventDefault(); studio.redo(); return; }
       if (mod && k === 's') { e.preventDefault(); studio.save(); return; }
-      if (mod && k === 'd') { e.preventDefault(); if (selected) dup(selected); return; }
+      if (mod && k === 'd') { e.preventDefault(); dup(); return; }
+      if (mod && k === 'c') { if (selection.length) { e.preventDefault(); copy(); } return; }
+      if (mod && k === 'v') { if (clip) { e.preventDefault(); paste(); } return; }
+      if (mod && k === 'a') { e.preventDefault(); if (venue) setSelection(venue.objects.filter((o) => !o.hidden).map((o) => o.id)); return; }
       if (mod || e.altKey) return;
       if (camera === 'fly' && ['w', 'a', 's', 'd', 'q', 'e'].includes(k)) return;   // the fly camera's keys
       switch (k) {
@@ -83,11 +125,20 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
         case 'g': setGrid((g) => !g); break;
         case 'n': setSnap((s) => ({ ...s, on: !s.on })); break;
         case 'escape': vp.current?.stopPreview(); setSelected(null); break;
-        case 'delete': case 'backspace': if (selected) { e.preventDefault(); del(selected); } break;
+        case 'delete': case 'backspace': if (selection.length) { e.preventDefault(); del(); } break;
+        case 'h': if (selection.length) flag('hidden'); break;
+        case 'l': if (selection.length) flag('locked'); break;
         case 'arrowleft': case 'arrowright': case 'arrowup': case 'arrowdown': {
           if (!selected || !venue) break;
           e.preventDefault();
           const dx = k === 'arrowleft' ? -1 : k === 'arrowright' ? 1 : 0, dz = k === 'arrowup' ? -1 : k === 'arrowdown' ? 1 : 0;
+          if (selection.length > 1) {
+            // §11: the group steps together (one coalesced step per run of nudges)
+            const step = snap.on ? snap.move : 0.1;
+            const c = groupTransformCommand(venue, selection, { move: [dx * step, 0, dz * step], turn: 0, scale: 1 }, { label: 'Nudge', group: `nudge:${selection.join(',')}` });
+            if (c) run(c);
+            break;
+          }
           const t = vp.current?.nudge(selected, dx, dz);
           if (t) run({ ...moveObject(venue, selected, t, 'Nudge'), group: `nudge:${selected}` });
           break;
@@ -97,7 +148,7 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [studio, selected, venue, camera, del, dup, run, setSelected]);
+  }, [studio, selected, selection, venue, camera, del, dup, copy, paste, flag, clip, snap, run, setSelected, setSelection]);
 
   if (!venue) return null;
   const target = targetOf(venue.base.target) ?? PLAYTEST_TARGETS[DEFAULT_TARGET];
@@ -106,17 +157,25 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
     <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_300px]">
       <aside className="flex min-h-0 flex-col border-r" style={{ borderColor: C.line, background: C.surface }} aria-label="Scene and assets">
         <div className="flex gap-1 px-2 pt-2" role="tablist">
-          {(['assets', 'scene'] as const).map((t) => (
+          {(['assets', 'stamps', 'scene'] as const).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={left === t} onClick={() => setLeft(t)} className="flex-1 rounded-md py-1 text-[12px] capitalize"
-              style={{ background: left === t ? 'rgba(0,229,255,0.12)' : 'transparent', color: left === t ? C.cyan : C.dim }}>{t === 'scene' ? `Scene · ${venue.objects.length}` : 'Assets'}</button>
+              style={{ background: left === t ? 'rgba(0,229,255,0.12)' : 'transparent', color: left === t ? C.cyan : C.dim }}>{t === 'scene' ? `Scene · ${venue.objects.length}` : t === 'stamps' ? 'Stamps' : 'Assets'}</button>
           ))}
         </div>
-        {left === 'assets'
-          ? <AssetBrowser onPlace={(i) => place(i)} />
-          : <SceneTree venues={doc.venues} activeId={doc.activeVenueId} venue={venue} selected={selected} onSelect={setSelected}
-              onToggle={(id, key) => { const o = venue.objects.find((x) => x.id === id); if (o) run(toggleFlag(venue, o, key)); }}
-              onSwitchVenue={(id) => { if (id !== doc.activeVenueId) { run(switchVenue(id)); setSelected(null); } }}
-              onAddVenue={() => { const r = addVenue(doc, target); run(r.cmd); setSelected(null); }} />}
+        {left === 'assets' && <AssetBrowser onPlace={(i) => place(i)} />}
+        {left === 'stamps' && (
+          <StampShelf project={doc} selectionCount={selection.length} onPlace={(st) => stampPlace(st)} onSave={(n) => saveStamp(n)}
+            onRename={(id, n) => run(renameStampCommand(id, n))} onDone={seal}
+            onRemove={(id) => { const c = removeStampCommand(doc, id); if (c) run(c); }} />
+        )}
+        {left === 'scene' && (
+          <SceneTree venues={doc.venues} activeId={doc.activeVenueId} venue={venue} selection={selection}
+            onSelectRow={(id, mods, anchor) => setSelection(treeSelect(treeOrder(venue.objects), selection, id, mods, anchor))}
+            onClear={() => setSelection([])}
+            onToggle={(ids, key) => flag(key, ids)}
+            onSwitchVenue={(id) => { if (id !== doc.activeVenueId) { run(switchVenue(id)); setSelection([]); } }}
+            onAddVenue={() => { const r = addVenue(doc, target); run(r.cmd); setSelection([]); }} />
+        )}
       </aside>
 
       <section className="flex min-h-0 flex-col" aria-label="Viewport">
@@ -136,18 +195,26 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
           <select aria-label="Snap step" value={snap.move} onChange={(e) => setSnap((s) => ({ ...s, move: Number(e.target.value) }))} className="rounded border bg-transparent px-1 py-0.5 text-[12px]" style={{ borderColor: C.line, color: C.text, background: C.surface }}>
             {SNAP_MOVES.map((m) => <option key={m} value={m}>{m} m · {snap.turn}°</option>)}
           </select>
+          <ToolButton title={clip ? `Paste ${clip.objects.length === 1 ? clip.objects[0].name : `${clip.objects.length} objects`} at the view's centre` : 'Paste (copy something first)'} shortcut="Ctrl+V" disabled={!clip} onClick={paste}><ClipboardPaste className="h-4 w-4" /></ToolButton>
+          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[11px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
           {note && <span className="ml-2 text-[11px]" style={{ color: C.gold }}>{note}</span>}
         </div>
-        <ViewportPanel ref={vp} venue={venue} cast={cast} selected={selected} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
-          onSelect={setSelected} onTransform={onTransform} onStats={setStats} onPreviewEnd={() => setNote(null)}
-          onDropItem={(id, at) => { const item = catalogItem(id); if (item) place(item, at); }} />
+        <ViewportPanel ref={vp} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
+          onPick={(id, mods) => setSelection(clickSelect(selection, id, mods.toggle ? 'toggle' : 'replace'))}
+          onBox={(ids, mode) => setSelection(boxSelect(selection, ids, mode))}
+          onTransform={onTransform} onGroupTransform={onGroupTransform} onStats={setStats} onPreviewEnd={() => setNote(null)}
+          onDropItem={(id, at) => {
+            if (id.startsWith(STAMP_DRAG_PREFIX)) { const st = allStamps(doc).find((x) => x.id === id.slice(STAMP_DRAG_PREFIX.length)); if (st) stampPlace(st, at); return; }
+            const item = catalogItem(id); if (item) place(item, at);
+          }} />
         <div className="border-t" style={{ borderColor: C.line, background: C.surface }}>
           <BudgetMeter sample={stats} budgetKey={target.budgetKey} phone={phone} onPhone={(v) => { setStats(null); setPhone(v); }} />
         </div>
       </section>
 
       <aside className="flex min-h-0 flex-col border-l" style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector">
-        <Inspector venue={venue} project={doc} object={object} run={run} seal={seal} onDelete={del} onDuplicate={dup}
+        <Inspector venue={venue} project={doc} object={object} run={run} seal={seal} onDelete={(id) => del([id])} onDuplicate={(id) => dup([id])}
+          group={group} groupActions={{ duplicate: () => dup(), copy, remove: () => del(), flag: (k) => flag(k), turn, saveStamp: () => saveStamp() }}
           onPreviewIntro={(k) => { const ok = vp.current?.previewIntro(k); setNote(ok ? 'Previewing the intro — Esc to stop' : 'Reduced motion is on: the intro is skipped, as in the mode'); }}
           onPreviewReplay={(a) => { vp.current?.previewReplay(a); setNote(`Looking through the ${a} angle — Esc or a camera button to leave`); }} />
       </aside>

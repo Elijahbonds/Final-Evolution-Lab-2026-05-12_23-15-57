@@ -2,9 +2,10 @@
 
 // The inspector: the selected object's fields, or — with nothing selected — the venue's: its light (mood), sky and haze,
 // ground, dressing, weather and the broadcast camera. Every field is a command (lib/nexus-studio/edits.ts); typing into one
-// is a single undo step until it loses focus.
+// is a single undo step until it loses focus. §11: with more than one object selected, the group's panel — its make-up and the
+// actions that take the whole selection in one step (duplicate, copy, hide, lock, turn, delete, save as a stamp).
 
-import { Copy, Film, Trash2, Clapperboard } from 'lucide-react';
+import { Copy, Film, Trash2, Clapperboard, ClipboardCopy, Eye, EyeOff, Lock, Unlock, RotateCcw, RotateCw, PackagePlus } from 'lucide-react';
 import {
   BACKDROPS, DECAL_KINDS, FIXTURE_ROLES, GROUND_KINDS, INTROS, LIMITS, MOODS, REPLAY_ANGLES,
   type StudioIntro, type StudioMood, type StudioObject, type StudioProject, type StudioReplayAngle, type StudioSky, type StudioVenue, type StudioWeather,
@@ -12,7 +13,7 @@ import {
 import { editObject, editVenue } from '@/lib/nexus-studio/edits';
 import type { Command, ObjectPatch } from '@/lib/nexus-studio/commands';
 import { catalogIdOf, catalogItem } from '@/lib/nexus-studio/catalog';
-import { targetOf } from '@/lib/nexus-studio/targets';
+import { targetOf, PLAYTEST_TARGETS } from '@/lib/nexus-studio/targets';
 import { readyWeathers } from '@/lib/babylon/nexus/weather';
 import { CastSlotField } from './characters';
 import { C, ColorField, NumberField, PanelTitle, Row, Select, TextField, Toggle, ToolButton } from './ui';
@@ -35,13 +36,71 @@ export interface InspectorProps {
   onPreviewReplay(angle: StudioReplayAngle): void;
   /** Track 3: the project, for the venue's character slot (its characters). */
   project?: StudioProject;
+  /** §11: every selected object, when more than one is (the group's panel replaces the object's). */
+  group?: readonly StudioObject[];
+  groupActions?: GroupActions;
+}
+
+/** §11: what the group's panel can do — each one command over the whole selection. */
+export interface GroupActions {
+  duplicate(): void;
+  copy(): void;
+  remove(): void;
+  flag(key: 'hidden' | 'locked'): void;
+  turn(deg: number): void;
+  saveStamp(): void;
+}
+
+const KIND_NAME: Record<StudioObject['type'], string> = {
+  fixture: 'light', crowdStand: 'stand', decal: 'mark', cameraMark: 'camera mark', specProp: 'dressing prop', kitProp: 'kit prop', meshyProp: 'scan',
+};
+
+/** Pure: a group's make-up, most first ("4 lights · 2 stands · 1 kit prop"). */
+export function groupSummary(objects: readonly StudioObject[]): string {
+  const n = new Map<StudioObject['type'], number>();
+  for (const o of objects) n.set(o.type, (n.get(o.type) ?? 0) + 1);
+  return [...n.entries()].sort((a, b) => b[1] - a[1]).map(([t, k]) => `${k} ${KIND_NAME[t]}${k === 1 ? '' : 's'}`).join(' · ');
 }
 
 export function Inspector(p: InspectorProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-4" data-testid="inspector">
-      {p.object ? <ObjectFields {...p} object={p.object} /> : <VenueFields {...p} />}
+      {p.group && p.group.length > 1 && p.groupActions ? <GroupFields objects={p.group} a={p.groupActions} /> : p.object ? <ObjectFields {...p} object={p.object} /> : <VenueFields {...p} />}
     </div>
+  );
+}
+
+function GroupFields({ objects, a }: { objects: readonly StudioObject[]; a: GroupActions }) {
+  const locked = objects.filter((o) => o.locked).length;
+  const allHidden = objects.every((o) => o.hidden), allLocked = locked === objects.length;
+  return (
+    <>
+      <PanelTitle right={
+        <span className="flex gap-1">
+          <ToolButton title="Duplicate the selection" shortcut="Ctrl+D" onClick={a.duplicate}><Copy className="h-3.5 w-3.5" /></ToolButton>
+          <ToolButton title="Copy (paste into any venue)" shortcut="Ctrl+C" onClick={a.copy}><ClipboardCopy className="h-3.5 w-3.5" /></ToolButton>
+          <ToolButton title="Delete the selection" shortcut="Del" onClick={a.remove} disabled={allLocked}><Trash2 className="h-3.5 w-3.5" style={{ color: allLocked ? undefined : C.crimson }} /></ToolButton>
+        </span>
+      }>{objects.length} objects</PanelTitle>
+      <p className="px-3 pb-2 text-[11px]" style={{ color: C.dim }} data-testid="group-summary">{groupSummary(objects)}{locked ? ` · ${locked} locked (they stay put)` : ''}</p>
+      <Row label="Move / turn" hint="The gizmo moves, turns and scales the group about its centre; one undo step per drag">
+        <span className="flex items-center gap-1">
+          <ToolButton title="Turn the group 15° left" onClick={() => a.turn(15)}><RotateCcw className="h-3.5 w-3.5" /></ToolButton>
+          <ToolButton title="Turn the group 15° right" onClick={() => a.turn(-15)}><RotateCw className="h-3.5 w-3.5" /></ToolButton>
+          <span className="text-[11px]" style={{ color: C.dim }}>W / E / R drag · arrows nudge</span>
+        </span>
+      </Row>
+      <Row label="Show / lock">
+        <span className="flex items-center gap-1">
+          <ToolButton title={allHidden ? 'Show all' : 'Hide all (not drawn, not exported)'} shortcut="H" onClick={() => a.flag('hidden')}>{allHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</ToolButton>
+          <ToolButton title={allLocked ? 'Unlock all' : 'Lock all (no moving or deleting)'} shortcut="L" onClick={() => a.flag('locked')}>{allLocked ? <Lock className="h-3.5 w-3.5" style={{ color: C.gold }} /> : <Unlock className="h-3.5 w-3.5" />}</ToolButton>
+        </span>
+      </Row>
+      <Row label="Stamp" hint="Keep this group in the project as a prefab stamp (the Stamps tab places it again)">
+        <ToolButton title="Save selection as stamp" onClick={a.saveStamp}><PackagePlus className="h-3.5 w-3.5" /> <span>Save as stamp</span></ToolButton>
+      </Row>
+      <p className="px-3 pt-2 text-[11px]" style={{ color: C.dim }}>Ctrl-click or Shift-click to add or drop one; Shift-drag a box in the view to add what it frames.</p>
+    </>
   );
 }
 
@@ -137,7 +196,16 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
     <>
       <PanelTitle>Venue</PanelTitle>
       <Row label="Name"><TextField label="Venue name" value={v.name} onChange={(n) => set({ name: n.slice(0, LIMITS.name) }, 'name')} onDone={seal} /></Row>
-      <Row label="Plays in" hint="The mode that loads this venue, and the court it is laid over"><span className="text-[12px]" style={{ color: C.text }}>{target?.label ?? v.base.target} <span style={{ color: C.dim }}>· {v.base.spec} court</span></span></Row>
+      <Row label="Plays in" hint="The mode that loads this venue, and the court it is laid over (one undo step to switch)">
+        <Select label="Plays in" value={v.base.target} options={Object.values(PLAYTEST_TARGETS).map((t) => ({ value: t.key, label: `${t.label} · ${t.spec}` }))}
+          onChange={(k) => {
+            const t = targetOf(k); if (!t || k === v.base.target) return;
+            // a weather the new mode's family cannot draw falls back to natural (the picker would not offer it)
+            const ok = readyWeathers(t.weatherFamily).some((w) => w.id === v.weather);
+            set({ base: { spec: t.spec, target: t.key }, ...(ok ? {} : { weather: 'natural' as StudioWeather }) }, 'plays in');
+          }} />
+      </Row>
+      {target?.furniture && <p className="px-3 pb-1 text-[11px]" style={{ color: C.dim }}>{target.label} lays its own field over the {v.base.spec} ground (shown in the view); the floor colours apply under it.</p>}
 
       {project && (<><PanelTitle>Cast</PanelTitle><CastSlotField project={project} venue={v} run={run} /></>)}
 
@@ -172,14 +240,20 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
         </span>
       </Row>
       <Row label="Court dressing" hint="The court's own CC0 set (VenueProps)"><Select label="Court dressing" value={v.baseDressing} options={[{ value: 'keep', label: 'Keep' }, { value: 'none', label: 'Bare' }]} onChange={(d) => set({ baseDressing: d }, 'dressing')} /></Row>
-      <Row label="Glossy floor" hint="GlossyFloor: a varnished mirror on a wooden court (desktop/TV), in the viewport and in the mode">
-        <Toggle label="Glossy floor" on={v.glossyFloor} onChange={(on) => set({ glossyFloor: on, ...(on && !v.ground?.kind ? { ground: { ...v.ground, kind: 'court' } } : {}) }, 'glossy floor')} />
-      </Row>
+      {!target?.furniture && (
+        <Row label="Glossy floor" hint="GlossyFloor: a varnished mirror on a wooden court (desktop/TV), in the viewport and in the mode">
+          <Toggle label="Glossy floor" on={v.glossyFloor} onChange={(on) => set({ glossyFloor: on, ...(on && !v.ground?.kind ? { ground: { ...v.ground, kind: 'court' } } : {}) }, 'glossy floor')} />
+        </Row>
+      )}
 
       <PanelTitle>Weather</PanelTitle>
-      <Row label="Weather" hint="WeatherFx: the look only; the mode's handling never reads it">
-        <Select label="Weather" value={v.weather} options={weathers.map((w) => ({ value: w.id as StudioWeather, label: w.name.charAt(0) + w.name.slice(1).toLowerCase() }))} onChange={(w) => set({ weather: w }, 'weather')} />
-      </Row>
+      {target?.modeWeather
+        ? <p className="px-3 text-[11px]" style={{ color: C.dim }} data-testid="mode-weather">{target.modeWeather}</p>
+        : (
+          <Row label="Weather" hint="WeatherFx: the look only; the mode's handling never reads it">
+            <Select label="Weather" value={v.weather} options={weathers.map((w) => ({ value: w.id as StudioWeather, label: w.name.charAt(0) + w.name.slice(1).toLowerCase() }))} onChange={(w) => set({ weather: w }, 'weather')} />
+          </Row>
+        )}
 
       <PanelTitle>Broadcast camera</PanelTitle>
       <Row label="Intro" hint="CameraDirector.establish: a crane over the venue, then the play camera. Skipped by the first press.">
@@ -203,7 +277,9 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
           );
         })}
       </ul>
-      <p className="px-3 pt-2 text-[11px]" style={{ color: C.dim }}>Tiebreak opens on the intro you pick. It has no replays, so the angles are kept for a mode that does.</p>
+      <p className="px-3 pt-2 text-[11px]" style={{ color: C.dim }}>{target?.replays
+        ? `${target.label} opens on the intro you pick and replays its big moments through the ticked angles, in this order${v.replayAngles.length ? '' : ' (none ticked: its own cut)'}.`
+        : `${target?.label ?? 'This mode'} opens on the intro you pick. It has no replays, so the angles are kept for a mode that does.`}</p>
     </>
   );
 }

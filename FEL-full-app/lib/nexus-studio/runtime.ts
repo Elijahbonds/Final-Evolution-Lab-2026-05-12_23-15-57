@@ -27,7 +27,8 @@ import { mountWeatherFx } from '../babylon/premium/WeatherFx';
 import type { LightRigHandle } from '../babylon/scene/LightRig';
 import type { QualityTier } from '../babylon/scene/QualityTier';
 import type { VenueMood } from '../babylon/scene/moods';
-import type { IntroKind } from '../babylon/scene/broadcastShots';
+import type { IntroKind, ReplayAngle } from '../babylon/scene/broadcastShots';
+import type { WeatherFamily } from '../babylon/core/WeatherKit';
 import type { HudValue } from '../babylon/core/ModeHarness';
 import type { ExportCrowd, ExportDecal, ExportFixture, ExportMeshyProp, StudioVenueExport } from './exportVenue';
 import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
@@ -70,6 +71,22 @@ export function studioMood(modeKey: string, fallback: VenueMood): VenueMood { re
 export function studioIntro(modeKey: string): IntroKind | undefined {
   const i = studioVenueFor(modeKey)?.intro;
   return i && i !== 'none' ? i : undefined;
+}
+
+/**
+ * §11: the intro for a mode that HAS its own (Football Rush opens on the walk-in): with a Studio venue the venue's choice —
+ * including 'none' — else the mode's own, exactly as it shipped.
+ */
+export function studioIntroOr(modeKey: string, fallback: IntroKind | undefined): IntroKind | undefined {
+  const exp = studioVenueFor(modeKey);
+  if (!exp) return fallback;
+  return exp.intro !== 'none' ? exp.intro : undefined;
+}
+
+/** §11: the replay angles a Studio venue picked for this mode's replays, or undefined (the replay director's own cut). */
+export function studioReplayAngles(modeKey: string): ReplayAngle[] | undefined {
+  const a = studioVenueFor(modeKey)?.replayAngles;
+  return a && a.length ? [...a] : undefined;
 }
 
 /** The dressing set's key for this export: registered on first use, so VenueProps and NexusVenue's surround see it. */
@@ -201,7 +218,7 @@ export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?:
 }
 
 /** The weather's look (never its gameplay: nothing here reads the kit's modifiers). 'natural' mounts nothing. */
-export function mountWeatherLayer(scene: Scene, lights: LightRigHandle | null, pick: string, family: 'court', opts: { tier: QualityTier; keepSky: boolean; seed?: number }): Layer {
+export function mountWeatherLayer(scene: Scene, lights: LightRigHandle | null, pick: string, family: WeatherFamily, opts: { tier: QualityTier; keepSky: boolean; seed?: number }): Layer {
   if (!lights || !pick || pick === 'natural') return { dispose() {} };
   const fx = mountWeatherFx(scene, lights, WeatherKit.fromPick(pick, family, opts.seed ?? 7), { tier: opts.tier, keepSky: opts.keepSky });
   const obs = scene.onBeforeRenderObservable.add(() => fx.update(Math.min(0.1, scene.getEngine().getDeltaTime() / 1000)));
@@ -297,7 +314,8 @@ export function mountStudioFor(modeKey: string, ctx: StudioModeCtx): StudioExtra
   const cast = exp.cast?.player ?? null;
   // the cast's own height and build only where this mode's fairness review allows it (targets.ts castFrame), else the standard frame
   if (cast) primeIdentity(castIdentity(cast, { frame: castFrameFor(modeKey) }));
-  const extras = mountStudioExtras(ctx, exp, { stepIntro: true });
+  // a mode that steps its own director (Football Rush's follow camera) runs the intro itself; a second stepper would double it
+  const extras = mountStudioExtras(ctx, exp, { stepIntro: targetOf(modeKey)?.stepsOwnDirector !== true });
   return {
     layers: extras.layers, scripts: extras.scripts,
     dispose() { extras.dispose(); if (cast) invalidateIdentity(); },
