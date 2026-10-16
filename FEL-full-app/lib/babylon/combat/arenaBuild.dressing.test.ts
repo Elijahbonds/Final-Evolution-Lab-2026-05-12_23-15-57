@@ -1,9 +1,10 @@
 // The arena dressing (lane/vis-combat, 2026-10-13): the plan as data, then the build on a NullEngine scene.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
+import type { AbstractMesh } from '@babylonjs/core';
+import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { COMBAT_ARENAS } from './arenas';
 import {
-  LANTERN_EVERY_M, LANTERN_HEX, RIG_CANS, buildArena, fireSpots, gateMaterial, lanternSpots, poolSpots, wantsLanterns, wantsOverheadRig,
+  LANTERN_EVERY_M, LANTERN_HEX, RIG_CANS, buildArena, fireSpots, gateMaterial, lanternSpots, mergeWallSet, poolSpots, wantsLanterns, wantsOverheadRig,
 } from './arenaBuild';
 import { floorStyleOf, wallStyleOf } from './arenaPaint';
 import { installOffscreenShim } from '../../../tests/helpers/canvasShim';
@@ -56,6 +57,66 @@ describe('the dressing plan', () => {
   });
   it('every arena has a floor overlay except one the venue already paints in full', () => {
     for (const a of COMBAT_ARENAS) expect(floorStyleOf(a), a.id).toBeTruthy();
+  });
+});
+
+// lane/owner-1016 (2026-10-16): a phone draws the walls as one mesh and the cap line as one (karate: 12 of 89 active meshes).
+describe('a phone merges the walls and caps into one mesh each', () => {
+  const build = (id: string, tier: string) => {
+    const scene = new Scene(new NullEngine());
+    (scene.metadata ??= {}).felTier = tier;
+    new FreeCamera('c', new Vector3(0, 2, -6), scene);
+    const a = arena(id), h = buildArena(scene, a);
+    const walls = scene.meshes.filter((m) => /^wall_arena_[a-z]+(_\d+)?$/.test(m.name) && !m.name.includes('_pillar_'));
+    const caps = scene.meshes.filter((m) => /^arena_[a-z]+_cap(_\d+)?$/.test(m.name));
+    return { scene, a, h, walls, caps };
+  };
+  const verts = (ms: { getTotalVertices(): number }[]) => ms.reduce((n, m) => n + m.getTotalVertices(), 0);
+  const union = (ms: AbstractMesh[]) => {
+    const lo = new Vector3(Infinity, Infinity, Infinity), hi = new Vector3(-Infinity, -Infinity, -Infinity);
+    for (const m of ms) { m.computeWorldMatrix(true); const b = m.getBoundingInfo().boundingBox; lo.minimizeInPlace(b.minimumWorld); hi.maximizeInPlace(b.maximumWorld); }
+    return [lo.x, lo.y, lo.z, hi.x, hi.y, hi.z].map((n) => +n.toFixed(4));
+  };
+
+  it('CONTROL: desktop and high keep a panel and a cap per wall', () => {
+    for (const tier of ['desktop', 'high']) {
+      const { a, walls, caps, h } = build('gauntlet', tier);
+      expect(walls.length, tier).toBe(a.walls.length);
+      expect(caps.length, tier).toBe(a.walls.length);
+      h.dispose();
+    }
+  });
+
+  it('mobile: one wall mesh and one cap mesh, the same geometry and bounds as the separate panels', () => {
+    const d = build('gauntlet', 'desktop'), m = build('gauntlet', 'mobile');
+    expect(m.walls.length).toBe(1);
+    expect(m.caps.length).toBe(1);
+    expect(m.walls[0].name).toBe('wall_arena_gauntlet');            // the camera's venue-shell test keys on `wall_`
+    expect(verts(m.walls)).toBe(verts(d.walls));
+    expect(verts(m.caps)).toBe(verts(d.caps));
+    expect(union(m.walls)).toEqual(union(d.walls));                 // CameraDirector's bounds read this union
+    expect(union(m.caps)).toEqual(union(d.caps));
+    expect(m.walls[0].material).toBeTruthy();
+    expect(m.walls[0].receiveShadows).toBe(true);
+    expect(m.walls[0].isPickable).toBe(false);
+    expect(m.walls[0].parent?.name).toBe('arena_gauntlet');
+    m.h.dispose(); d.h.dispose();
+    expect(m.scene.meshes.length, 'the merged meshes outlived the arena').toBe(0);
+  });
+
+  it('the cage keeps its rope panels on a phone (translucent rails, not a painted slab)', () => {
+    const { a, scene, h } = build('cage', 'mobile');
+    expect(scene.meshes.filter((x) => x.name.startsWith('wall_arena_cage_') && !x.name.includes('pillar')).length).toBe(a.walls.length);
+    h.dispose();
+  });
+
+  it('mergeWallSet refuses a root that is not at the origin (the bake would apply its transform twice)', () => {
+    const scene = new Scene(new NullEngine());
+    const root = new TransformNode('r', scene); root.position.set(5, 0, 0);
+    const a = MeshBuilder.CreateBox('a', { size: 1 }, scene), b = MeshBuilder.CreateBox('b', { size: 1 }, scene);
+    a.parent = root; b.parent = root;
+    expect(mergeWallSet([a, b], 'm', root)).toBeNull();
+    expect(scene.meshes.length).toBe(2);
   });
 });
 

@@ -134,7 +134,7 @@
       },
       "budget": {
         "drawCalls": 185,
-        "activeMeshes": 77,
+        "activeMeshes": 72,
         "skinnedBodies": 22,
         "textureMb": 98,
         "particles": 24

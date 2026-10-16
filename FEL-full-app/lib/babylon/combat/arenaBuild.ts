@@ -127,6 +127,22 @@ function upTo(v: Vector3): Quaternion {
   return Quaternion.RotationAxis(axis, Math.acos(c));
 }
 
+/**
+ * Merge static meshes that share a material into one, keeping the first one's look (parent, shadows, picking). The sources must
+ * hang off a root that sits at the origin, unrotated and unscaled: the merge bakes WORLD space, so any other root would apply
+ * its transform twice. Returns the merged mesh, or null when it did nothing (fewer than two, a moved root, mixed materials).
+ */
+export function mergeWallSet(list: Mesh[], name: string, root: TransformNode): Mesh | null {
+  if (list.length < 2 || !root.computeWorldMatrix(true).isIdentity()) return null;
+  const mat = list[0].material;
+  if (list.some((m) => m.material !== mat || m.isDisposed())) return null;
+  const receive = list[0].receiveShadows;
+  const merged = Mesh.MergeMeshes(list, true, true, undefined, false, false);
+  if (!merged) return null;
+  merged.name = name; merged.parent = root; merged.material = mat; merged.isPickable = false; merged.receiveShadows = receive;
+  return merged;
+}
+
 export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOptions = {}): ArenaHandle {
   const root = new TransformNode(`arena_${arena.id}`, scene);
   const lift = opts.lift ?? 0;
@@ -164,6 +180,7 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
   wallMat.backFaceCulling = true;
   const railMat = glow(scene, ropesArena ? `neon_arena_${arena.id}_rail_m` : `arena_${arena.id}_rail_m`, A);   // only the cage's ropes are named for the glow list: thin tubes, far from the bodies
   owned.push(railMat);
+  const wallPanels: Mesh[] = [], wallCaps: Mesh[] = [];   // a phone merges each set into one mesh (below)
   arena.walls.forEach((w, i) => {
     const dx = w.b.x - w.a.x, dz = w.b.z - w.a.z, len = Math.hypot(dx, dz);
     const thick = ropesArena ? 0.06 : 0.35;
@@ -176,6 +193,7 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
     m.position.set((w.a.x + w.b.x) / 2, lift + w.height / 2, (w.a.z + w.b.z) / 2);
     m.rotation.y = Math.atan2(w.nx, w.nz) + Math.PI;   // a plane's front faces −z; turn it to face along the inward normal
     m.material = wallMat; m.isPickable = false; m.parent = root; m.receiveShadows = true;
+    wallPanels.push(m);
     if (ropesArena) {
       // the top rail and two cables, so the panel reads as ropes rather than glass
       for (const y of [w.height, w.height * 0.66, w.height * 0.33]) {
@@ -186,8 +204,17 @@ export function buildArena(scene: Scene, arena: CombatArena, opts: ArenaBuildOpt
       // a cap line along the top, in the arena's accent, so the edge reads from the fight camera
       const cap = MeshBuilder.CreateBox(`arena_${arena.id}_cap_${i}`, { width: len + thick, height: 0.05, depth: thick + 0.04 }, scene);
       cap.position.copyFrom(m.position); cap.position.y = lift + w.height + 0.02; cap.rotation.y = Math.atan2(dx, dz) - Math.PI / 2; cap.material = railMat; cap.isPickable = false; cap.parent = root;
+      wallCaps.push(cap);
     }
   });
+  // PHONE (lane/owner-1016, 2026-10-16): the walls are one material and never move, so a phone draws them as ONE mesh (and the
+  // cap line as one): the gauntlet's six wall panels and six caps were 12 of karate's 89 active meshes (budget 77) and 12 draws.
+  // The same geometry, UVs and material; the camera's bounds read the union of the walls, which is unchanged. Not the cage (its
+  // panels and rails stay), and not desktop or high.
+  if (mobile && !ropesArena) {
+    mergeWallSet(wallPanels, `wall_arena_${arena.id}`, root);
+    mergeWallSet(wallCaps, `arena_${arena.id}_cap`, root);
+  }
   if (ropesArena) {
     // a cage corner post: a padded sleeve with an accent band, the turnbuckle pad every ring has, over the old thin post
     const padMat = pbr(scene, `arena_${arena.id}_pad_m`, '#10131c', 0.55, 0.05); owned.push(padMat);

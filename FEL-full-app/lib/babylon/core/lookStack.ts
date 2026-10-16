@@ -24,6 +24,7 @@ import type { VenueMood } from '../scene/moods';
 import { mountBackdrop, MOOD_TO_FAMILY, type BackdropFamily } from '../visual/Backdrops';
 import { autoInk, inkStyleFor } from '../visual/AnimeInk';
 import { mountLetterbox } from '../visual/Letterbox';
+import { installPhoneActiveTrim } from '../scene/phoneTrim';   // lane/owner-1016: a phone's active list leaves out the loaders' empty roots
 import { installPhoneTextureCap } from '../scene/phoneTextureCap';   // phone-perf: model textures ≤ 1024² on a phone
 
 export interface LookStackOpts {
@@ -72,6 +73,7 @@ export async function mountLookStack(o: LookStackOpts): Promise<LookStack> {
   // PHONE-PERF (2026-10-14): a phone uploads a glTF model's texture at 1024² at most (phoneTextureCap.ts); desktop untouched.
   // In the shared look stack so the Studio's phone preview counts the same texture memory a mode does.
   installPhoneTextureCap(engine, tier);
+  installPhoneActiveTrim(scene, tier);   // lane/owner-1016 (2026-10-16): empty `__root__` meshes leave the active list on a phone; no pixel changes (phoneTrim.ts)
   scene.metadata.felModeId = o.modeId;      // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
   o.onScene?.(scene, { engine, fit, tier });
   const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);

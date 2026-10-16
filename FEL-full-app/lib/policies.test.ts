@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { CURRENT_POLICY_VERSION, PRIVACY_CONTENT, TERMS_CONTENT } from './policies';
 import { BUSINESS_CONTACT_EMAIL, BUSINESS_LEGAL_NAME, REAL_MAILING_ADDRESS, isMailingAddressSet } from './legal/business';
 
@@ -24,6 +25,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   // address-only text that ships from PR #222 (LANE-SYNC, FE PM 10:19 PM PT Oct 12).
   '2026-10-14': 'd0dd0d8daf1d3367',  // LANE-SYNC: CREATOR-PLATFORM §1 Work-with-us bullet + BUSINESS-ADDRESS #2012 mailbox together
   '2026-10-14b': '6d4d960aced45bf7',  // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
+  '2026-10-16': 'f5be67c85745dff0',   // STUDIO-AI-DISCLOSURE: §1 and §2 name the Studio AI builder's requests (venue request + settings only, signed-in 13+, rate-limited)
 };
 
 describe('the policy version', () => {
@@ -53,8 +55,12 @@ describe('the policy version', () => {
   // the text; 2026-10-12 is now an earlier version and keeps its fingerprint below.
   // test changed (2026-10-13, owner-approved Parties line, this lane): was toBe('2026-10-13'). The version moves with
   // the text; 2026-10-13 is now an earlier version and keeps its fingerprint above.
+  // test changed (2026-10-16, owner-approved Studio AI builder disclosure, lane/owner-1016): was toBe('2026-10-14b'). The
+  // version moves with the text; 2026-10-14b is now an earlier version and keeps its fingerprint above.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-14b');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-16');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14b');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-13');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-12');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-07');
@@ -476,5 +482,49 @@ describe('privacy policy, Parties (PARTY-PRIVACY)', () => {
     expect(line).not.toContain('_');
     expect(line).not.toContain('`');
     expect(line).not.toContain('\n');
+  });
+});
+
+// STUDIO-AI-DISCLOSURE (2026-10-16): §1 and §2 name the Studio AI builder's requests. The facts they state are the route's
+// (app/api/cell/venue/route.ts) and the prompt builder's (lib/nexus-studio/aiEdits.ts); the second block holds the copy to
+// them, so the policy cannot drift from what the builder sends or who may use it.
+describe('the Studio AI builder is named in Privacy §1 and §2', () => {
+  const section = (n: number) => {
+    const at = PRIVACY_CONTENT.indexOf(`## ${n}. `);
+    const next = PRIVACY_CONTENT.indexOf('\n## ', at + 1);
+    return PRIVACY_CONTENT.slice(at, next);
+  };
+  const flat = (s: string) => s.replace(/\s+/g, ' ');
+
+  it('§1 lists the requests and says what is never sent with them', () => {
+    const s1 = flat(section(1));
+    expect(s1).toContain('**Studio AI builder requests:**');
+    expect(s1).toContain('the request you type and the venue it applies to');
+    expect(s1).toContain("the venue's settings and what is placed where");
+    expect(s1).toContain('never your account, age, birth year, character or health data');
+  });
+
+  it('§2 says they go to an AI model, for signed-in users 13 and over, rate-limited', () => {
+    const s2 = flat(section(2));
+    expect(s2).toContain('Studio AI builder requests are sent to an AI model');
+    expect(s2).toContain('signed-in users aged 13 and over');
+    expect(s2).toContain('requests are rate-limited');
+    expect(s2).toContain('Coach chat inputs are processed by AI models');   // the coach line is still there
+  });
+
+  it('the copy matches the code it describes', () => {
+    const route = readFileSync(join(__dirname, '..', 'app/api/cell/venue/route.ts'), 'utf8');
+    const edits = readFileSync(join(__dirname, 'nexus-studio/aiEdits.ts'), 'utf8');
+    const access = readFileSync(join(__dirname, 'nexus-studio/aiAccess.ts'), 'utf8');
+    expect(route).toMatch(/rateLimit\(`cell-venue:/);                 // "rate-limited"
+    expect(route).toContain('if (!userId) return NextResponse.json({ error: \'Unauthorized\' }');   // "signed-in"
+    expect(route).toContain('aiBuilderAllowed(');                      // the age gate
+    expect(access).toMatch(/under 13 and an unknown age are refused|Under 13 and an unknown age are refused/i);   // "13 and over"
+    // what is sent: the typed request and the venue brief, and nothing from the account
+    expect(route).toContain('aiVenueUser(prompt, venue)');
+    expect(edits).toContain('Venue now: ${JSON.stringify(venueBrief(v))}');
+    expect(edits).toContain('Creator asks: ${prompt');
+    const brief = edits.slice(edits.indexOf('export function venueBrief'), edits.indexOf('const ENUMS'));
+    expect(brief).not.toMatch(/dobYear|birth|email|user|session|character|health|account/i);
   });
 });

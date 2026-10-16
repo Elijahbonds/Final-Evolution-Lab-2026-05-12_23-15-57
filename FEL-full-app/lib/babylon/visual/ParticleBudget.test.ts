@@ -1,6 +1,8 @@
 // A9.8 (visual-foundation, 2026-10-06): one live-particle ceiling for every burst, and a lever a governor can turn.
 import { describe, expect, it } from 'vitest';
-import { MIN_BURST, PARTICLE_BUDGET, fitBurst, liveParticles, particleBudget, particleBudgetScale, setParticleBudgetScale } from './ParticleBudget';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { MIN_BURST, PARTICLE_BUDGET, PHONE_BURST_FLOOR, PHONE_MODE_CEILING, burstFloor, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSystemCap, setParticleBudgetScale } from './ParticleBudget';
 
 const sceneLike = (md: Record<string, unknown> | null, counts: number[] = []) =>
   ({ metadata: md, particleSystems: counts.map((n) => ({ getActiveCount: () => n })) }) as never;
@@ -41,5 +43,58 @@ describe('the scene budget', () => {
   });
   it('counts what is in the air across every system', () => {
     expect(liveParticles(sceneLike(null, [10, 0, 32]) as never)).toBe(42);
+  });
+});
+
+// lane/owner-1016 (2026-10-16): dunk and karate got a ceiling of their own on a PHONE (PR #281: 29 live against rows of 12 and 24).
+describe('a phone mode ceiling', () => {
+  const phone = (modeId: string) => ({ metadata: { felTier: 'mobile', felModeId: modeId } });
+
+  it('lowers the phone budget for dunk and karate only, and only on a phone', () => {
+    expect(particleBudget(phone('dunk') as never)).toBe(PHONE_MODE_CEILING.dunk);
+    expect(particleBudget(phone('karate') as never)).toBe(PHONE_MODE_CEILING.karate);
+    expect(particleBudget(phone('onevone') as never)).toBe(PARTICLE_BUDGET.mobile);               // another mode: the tier's, untouched
+    expect(particleBudget({ metadata: { felTier: 'desktop', felModeId: 'dunk' } } as never)).toBe(PARTICLE_BUDGET.desktop);
+    expect(particleBudget({ metadata: { felTier: 'high', felModeId: 'dunk' } } as never)).toBe(PARTICLE_BUDGET.high);
+    expect(phoneModeCeiling({ metadata: { felTier: 'mobile' } })).toBeNull();                       // no mode recorded
+  });
+
+  it('trims a burst to the room under it: a dunk spark burst beside a full trail', () => {
+    const s = phone('dunk') as never;
+    expect(fitBurst(20, 4, particleBudget(s), 1, burstFloor(s))).toBe(4);        // 20 sparks, 4 trail dots in the air, ceiling 8: 4 sparks
+    expect(fitBurst(20, 8, particleBudget(s), 1, burstFloor(s))).toBe(PHONE_BURST_FLOOR); // never below a readable few
+    expect(fitBurst(20, 4, PARTICLE_BUDGET.mobile)).toBe(20);   // CONTROL: without the ceiling it fires whole
+  });
+
+  it('under a ceiling a burst keeps two, not four: hits landing together do not each hold a full floor', () => {
+    expect(burstFloor(phone('karate') as never)).toBe(PHONE_BURST_FLOOR);
+    expect(burstFloor(phone('onevone') as never)).toBe(MIN_BURST);
+    expect(burstFloor({ metadata: { felTier: 'desktop', felModeId: 'karate' } } as never)).toBe(MIN_BURST);
+    // four hits at once in karate, each a star and four streaks, on a petal-sprinkled floor, ceiling 12: the sum stays inside the row (24)
+    const s = phone('karate') as never, ceiling = particleBudget(s);
+    let live = 4;                                                   // the petals
+    for (let hit = 0; hit < 4; hit++) { live += fitBurst(1, live, ceiling, 1, burstFloor(s)); live += fitBurst(4, live, ceiling, 1, burstFloor(s)); }
+    expect(live).toBeLessThanOrEqual(20);
+    expect(live).toBeLessThanOrEqual(24);
+    // CONTROL: the tier's floor of four (what ran) keeps 4 + 4 x (1 + 4) = 24 from a ceiling that is already spent
+    let old = 4;
+    for (let hit = 0; hit < 4; hit++) { old += fitBurst(1, old, ceiling); old += fitBurst(4, old, ceiling); }
+    expect(old).toBeGreaterThan(live);
+  });
+
+  it('sizes the steady systems to a share of it, on a phone in that mode only', () => {
+    expect(phoneSystemCap(phone('dunk') as never, 120, 0.5)).toBe(4);
+    expect(phoneSystemCap(phone('karate') as never, 60, 0.4)).toBe(4);
+    expect(phoneSystemCap(phone('onevone') as never, 120, 0.5)).toBe(120);
+    expect(phoneSystemCap({ metadata: { felTier: 'desktop', felModeId: 'dunk' } } as never, 120, 0.5)).toBe(120);
+    expect(phoneSystemCap(phone('dunk') as never, 4, 0.5)).toBe(4);   // never above what the system asked for
+  });
+
+  it('a ceiling is never above its mode\'s row in mobileBudget.json (the row is not raised; this is what holds the mode to it)', () => {
+    const t = JSON.parse(readFileSync(join(__dirname, '..', 'config', 'mobileBudget.json'), 'utf8')) as { modes: Record<string, { budget: { particles: number } }> };
+    for (const [mode, ceiling] of Object.entries(PHONE_MODE_CEILING)) {
+      expect(t.modes[mode], mode).toBeTruthy();
+      expect(ceiling, mode).toBeLessThanOrEqual(t.modes[mode].budget.particles);
+    }
   });
 });

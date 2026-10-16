@@ -19,7 +19,7 @@
 
 import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, ShadowGenerator } from '@babylonjs/core';
-import { fitBurst, liveParticles, particleBudget, particleBudgetScale } from '../visual/ParticleBudget';
+import { burstFloor, fitBurst, liveParticles, particleBudget, particleBudgetScale } from '../visual/ParticleBudget';
 import { mountChiRim } from '../visual/ChiRim';   // w3-atmos: the glow edge on the fighter's own contour
 import { paintAuraColumn, paintCrack, paintDot, paintLightPool, paintRing, paintSmoke, paintStar, type Ctx } from './fxPaint';
 
@@ -264,7 +264,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
   const cur = { star: { i: 0 }, streak: { i: 0 }, ring: { i: 0 }, smoke: { i: 0 }, chunk: { i: 0 } };
   const tmpA = new Vector3(), tmpB = new Vector3();
 
-  const budgeted = (n: number): number => fitBurst(n, liveParticles(scene), particleBudget(scene), particleBudgetScale(scene));
+  const budgeted = (n: number): number => fitBurst(n, liveParticles(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
 
   // ── ground rings and crack decals: a handful of flat meshes, enabled only while they live ──
   const grMat0 = ringTex(scene);
