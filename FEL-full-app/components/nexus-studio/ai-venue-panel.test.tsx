@@ -6,11 +6,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const ai = vi.hoisted(() => ({ state: 'loading' as 'loading' | 'available' | 'coming_soon' }));
 vi.mock('@/lib/abacus/useAiStatus', () => ({ useAiStatus: () => [ai.state, () => {}] }));
 
-import { AiVenuePanel, reviewOf } from './ai-venue-panel';
+import { AiVenuePanel, aiRequestBody, reviewOf } from './ai-venue-panel';
 import { AI_COMING_SOON_MESSAGE } from '@/lib/abacus/aiStatus';
 import { sanitizeAiEdits } from '@/lib/nexus-studio/aiEdits';
 import { starterProject, type StudioApi } from './use-studio';
-import { GOOD_ANSWER, HOSTILE_ANSWER } from '@/tests/helpers/aiVenue';
+import { GOOD_ANSWER, HOSTILE_ANSWER, SCRIPT_CAST_ANSWER } from '@/tests/helpers/aiVenue';
 
 const studio = (): StudioApi => {
   const doc = starterProject();
@@ -47,5 +47,33 @@ describe('the review list', () => {
     const bad = sanitizeAiEdits(HOSTILE_ANSWER);
     expect(reviewOf(bad.edits, bad.dropped).note).toMatch(/9 part\(s\)/);
     expect(reviewOf([], 0).note).toMatch(/nothing the Studio can apply/);
+  });
+});
+
+describe('studio-4b', () => {
+  it('"Explain this venue" sits beside the builder, behind the same switch', () => {
+    ai.state = 'coming_soon';
+    const explainButton = (h: string) => /<button([^>]*)>(?:(?!<\/button>)[\s\S])*Explain this venue/.exec(h.split('</button>').find((x) => x.includes('Explain this venue')) + '</button>')?.[1] ?? '';
+    expect(explainButton(html())).toContain('disabled=""');
+    ai.state = 'available';
+    const h = html();
+    expect(explainButton(h)).not.toContain('disabled=""');
+    expect(h).toContain('Read only: CELL describes it, nothing changes.');
+  });
+  it('what the panel sends: the typed request (or the explain pass) and the venue without its cast — never a character', () => {
+    const doc = starterProject();
+    const v = { ...doc.venues[0], cast: { player: 'c_secret', crowd: ['c_fan'] } };
+    const build = JSON.parse(aiRequestBody(v, { prompt: 'night court' }));
+    expect(build).toEqual({ prompt: 'night court', venue: doc.venues[0] });
+    const explain = JSON.parse(aiRequestBody(v, { explain: true }));
+    expect(explain).toEqual({ mode: 'explain', venue: doc.venues[0] });
+    expect(JSON.stringify([build, explain])).not.toContain('c_');
+  });
+  it('the review marks a cast that names nobody in the project', () => {
+    const r = sanitizeAiEdits(SCRIPT_CAST_ANSWER);
+    const rv = reviewOf(r.edits, r.dropped, { characters: [{ id: 'n', name: 'Nova' }, { id: 'a', name: 'Ace' }], scripts: [] });
+    expect(rv.lines).toHaveLength(4);
+    expect(rv.skipped.filter(Boolean)).toHaveLength(1);
+    expect(rv.skipped[3]).toMatch(/Zed/);
   });
 });

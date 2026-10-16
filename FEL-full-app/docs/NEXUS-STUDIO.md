@@ -307,6 +307,8 @@ drag nodes, drag from a port to connect (illegal or looping wires refused), Dele
   minimap of the graph; a second play-test mode (Football Rush replays: the replay shot becomes live).
 - Owner calls, answered 2026-10-14: the AI builder is open to teens 13–17 (§10.1); a cast keeps its own height and build,
   visual only (§10.5).
+- **Round 4 (2026-10-16, lane/studio-4b):** tracks 2–4 of this list are built — §12; the rival slot is an owner call (§12.2);
+  the second play-test mode is studio-4a's (§11).
 
 ### 10.5 Cast fairness (owner 2026-10-14: "Own height and build" — needs a scoring-fairness review first)
 
@@ -439,3 +441,246 @@ Both are on this branch and wired: `GlossyFloor.mountGlossyFloor` reads `scene.m
 `mountStudioExtras` set it from the venue's `glossyFloor`; `GlossyFloor.test.ts` holds the read), and the decal layer stamps
 once with `GroundDecals`' `persist` (no refresh; `stage.smoke.test.ts` "placed marks stay" runs three pool lives). Nothing left
 to route. §9's two "waits on the routed one-liners" lines were stale and are struck.
+
+## 12. Round 4, tracks 2–4 (2026-10-16, lane/studio-4b)
+
+Owner, 2026-10-16: "Nexus Studio next round". Track 1 (the editor) is studio-4a's (§11); this lane is the AI builder, the
+characters and the scripts. Nothing here changes a score, a timing window, a rule or a tuned number; no schema, no dependency,
+no legal or policy copy.
+
+### 12.1 Track 2: CELL proposes scripts and casts; "Explain this venue"
+
+- **The same review-then-apply step** (`aiEdits.ts`, the panel, `POST /api/cell/venue`). Two more ops in the closed vocabulary:
+  - `script`: a graph in the script vocabulary, read through `scripts.ts sanitizeGraph` (unknown kinds, code-shaped params, loops,
+    edges into an event are dropped), capped (4 per answer, 24 nodes), ids minted and laid out in the editor's columns by the
+    Studio (the model's coordinates are never used). A proposal with no event, no action or no wire is dropped. The new script is
+    **scoped to the venue it was asked for** (`venues: [id]`, §12.3); the creator can widen it.
+  - `cast` (`player` | `crowd`, or `character: null` to give the player their own look back).
+  Apply is still **one** command ("AI: …"): the venue settings, the placements, the scripts and the cast together; Undo takes it whole.
+- **Privacy (Privacy Policy §1).** A request carries the typed request and the venue's settings and placements, nothing else. So
+  the model is **never told which characters the project has** — no names, no ids, no look codes. A cast edit names a character
+  only as the creator typed it in the request, and the **browser** resolves that name against the project's characters
+  (`resolveCastName`: the exact name, else a unique partial match; ambiguous or unknown → the review strikes the line out and it is
+  not applied). The panel strips the venue's `cast` before sending (`venueForAi`); the server's brief never read it anyway.
+  Existing scripts are not sent. Tests hold it at the route (a body that carries a cast: the model hears none of it) and the panel.
+- **Explain this venue** — `{ mode: 'explain', venue }` → `{ summary }`: a read-only plain-language summary (no JSON mode, 400
+  tokens), the same venue brief and nothing more, behind the same gates in the same order (the ABACUS switch first, signed in, the
+  per-account rate limit — shared with building — `aiAccess`'s age line, the 400 kB body cap). The summary is sanitised on the
+  server and again in the panel (`sanitizeSummary`: no markup, no markdown marks, no control characters, no fenced block, capped at
+  1,200 characters) and shown as text. No edit comes from it.
+- **assumption:** the explain pass is covered by Privacy §1 (it sends the same data: the venue) and §3 ("the Coach and Studio
+  features use AI models"). §2's bullet says requests are sent "to work out changes to your venue"; if the owner wants §2 to name
+  the summary too, that is a legal-copy edit for the owner — not made here.
+
+### 12.2 Track 3: the crowd, "Edit in the Closet", the rival
+
+- **A crowd casting slot** (`VenueSettings.cast.crowd`, up to `LIMITS.crowdCast` = 4). Characters sit **among the fans, visual
+  only**: each takes one of the crowd's **own empty seats** — `cast.ts crowdCastSeats` lays the venue's stands with no gaps and
+  subtracts the seats the crowd fills (the same `layoutSeats`, the same seed), so no fan is moved or hidden and the crowd system is
+  untouched — nearest the play camera's eye, inside the card distance, past the camera line, at least 1.5 m apart; a packed stand
+  offers its rows' ends (the aisle). `castCrowd.test.ts` holds the seat layout to the crowd the mode really mounts (the same seat
+  count as `mountCrowdLayer`'s), and every cast seat off every fan's seat.
+  The body (`castLayer.ts mountCrowdCastLayer`) is the kit body in the character's look — the player preview's spawn and
+  identity — posed with the crowd's own `sit_idle` / `stand_idle` clip, spawned with **role `opponent` on the kit URL**: it never
+  counts as the scene's player (`CharacterLibrary.decideRole` would otherwise give the mode's own hero the opponent role) and, being
+  no hero URL and untinted, never takes a roster body. **None on the mobile tier** (assumption: the phone crowd is cards only by
+  design and each cast fan is a full skinned body). RIG-ADJACENT; GATE 0 (`scripts/gate0-animation-verification.ts`) ran first:
+  39 passed, 0 failed. Mounted in the editor (the `cast` layer; a stand edit re-seats it) and in the mode (`mountStudioExtras`).
+- **Edit in the Closet** (`castCloset.ts`). A same-device hand-off, nothing sent: the Studio writes the character's code under
+  `fel.nexusStudio.closetEdit` with a session id and opens `/closet?studioEdit=<session>`; the Closet tab opens that ONE character,
+  saves nothing to the account or the device's own look, and "Back to Nexus Studio" writes the edited code under
+  `fel.nexusStudio.closetReturn`; the Studio hears it (a `storage` event, or on focus), **decodes it** and applies it as one undo
+  step ("Edit look in the Closet"); both keys are cleared. Stale (6 h), foreign-session and malformed keys are ignored. Until the
+  Closet's half lands, the same panel offers the manual way: copy the code, paste the edited one back.
+  **Routed, not applied:** the Closet's half is `components/closet-view.tsx` — the creator lane's file (LANES §3). The diff
+  (≈45 lines, additive; with no `?studioEdit=` the Closet is unchanged): read the session in the hydration effect and open one
+  slot from it; skip `writeLocalLook`, `save` and `buy` while editing; swap "Save Look" for "Back to Nexus Studio" and the
+  consent / slot bar / publish block for one line saying nothing is saved. It type-checks (`tsc` clean with it applied) and was
+  proven in the capture rig with it applied (§12.4); the file in the lane is untouched. The diff is §12.5, for the holder
+  (`git apply` clean against `dc8e9db7`).
+- **The rival — owner call, not built.** Tiebreak's rival is a body the MODE spawns: a tinted spawn → the roster's pick and its
+  rotation (`rosterUrlFor`, `rotationFor`), its own name and look. Casting it is not data: the mode and the roster would have to
+  hand that choice over (a mode code change, and the roster's say on whose body an opponent wears). Recorded for the owner.
+
+### 12.3 Track 4: more events, per-venue scope, a minimap
+
+- **Two listen-only events**, each read off data a mode already puts out, through the host's pass-through taps:
+  - **Rally length** (`onRally`, N returns): the rally count a rallying mode posts on its HUD (`TiebreakMode hud()` → `rally`,
+    `RALLY_HUD_KEY`; a target may name its own key). Fires once as the count crosses N; again on a later rally. `Compare` reads
+    `rally` too.
+  - **Replay** (`onReplay`, starts | ends): a pass-through wrap of `ctx.highlight` — the harness's own call with the mode's
+    options; "starts" when a frame is drawn while the call is pending, "ends" when it settles. A replay the harness refuses settles
+    before a frame: no event. A script's OWN replay shot calls the harness directly, so a script can never feed itself. Live where
+    a mode replays (Football Rush's touchdown — studio-4a's second play-test target); Tiebreak has no replay.
+  `interpreter.wiring.test.ts` is unchanged and green: the interpreter still reaches only `{interpreter, scripts, doc}`; the host
+  imports nothing new and never reports, ends, cards or resets.
+- **Per-venue scope** (`StudioScript.venues?`: absent = every venue, a list = those, empty = none). `scriptsForVenue` picks what a
+  venue's play-test carries (the shell's one line). A scoped script is badged in the list; "Runs in" in its side panel.
+- **A minimap** of the graph in the canvas corner: every node in its group's colour, the wires, the view's frame; click or drag on
+  it to move the view (the zoom kept). The geometry is pure and tested (`minimapFrame`, `viewForMinimapPoint`).
+
+### 12.4 Proof and limits
+
+**On the capture rig** (esbuild bundle + Playwright/SwiftShader, no `next dev`; the model and the account stubbed at the network,
+no model called; shots in the session scratchpad `studio4/4b/shots/` and `studio4/4b/shots-play/`):
+- `t2-01`: CELL's proposal reviewed — a script ("Rally cheer", this venue), a venue setting, the player cast, a fan seated, and a
+  name nobody in the project has ("Zed") struck out and left out. `t2-02`: "Explain this venue" — the summary block, no edits.
+  `t2-03`: applied as ONE step (Undo says "AI: when a rally reaches 5…"); the script lands in the editor scoped to the venue. The
+  rig recorded both request bodies: `{prompt, venue}` and `{mode:'explain', venue}`, the venue without its `cast`, no character
+  name, id or code (`ai-requests.json`).
+- `t4-01` / `t4-02`: the minimap and the "Runs in" scope; a click on the map re-centres the canvas on that node.
+- `t3-01` / `t3-03`: three characters seated among the fans in the editor, on the real rig, in empty seats, hands on their laps
+  (the first capture showed the arms in the bind pose's T — fixed with `castFanKeys`). `t3-04`: the Characters panel (the player,
+  "In the crowd", "Edit in the Closet" waiting). `t3-05` / `t3-06`: the Closet in its Studio-edit mode (the routed diff applied
+  in the RIG ONLY), one character, "Back to Nexus Studio"; a spike added. `t3-07`: back in the Studio — one undo step ("Edit look
+  in the Closet"), the code changed (335 → 429 characters), the Closet tab closed itself, both hand-off keys cleared.
+- `shots-play/play-3-rally-banner`: the real Tiebreak, loaded through the dev `?venue=` path with the export: the "Rally → cheer +
+  banner" script fires "WHAT A RALLY" when the posted rally count reaches 2 (fired: banner, crowd), the cast player on the hero
+  spot, and the cast fans in the side stands the play camera frames (the first play-test showed them in the stands' near ends, out
+  of frame — fixed: seats in the camera's view first).
+
+**Tests.** New: `castCrowd.test.ts`, `castCloset.test.ts`, `characters.test.tsx`; extended: `scripts.test.ts`, `scriptHost.test.ts`,
+`aiEdits.test.ts`, `aiVenueRoute.test.ts`, `ai-venue-panel.test.tsx`, `script-editor.test.tsx`. 29 mutations of the key logic (the
+rally crossing, the replay taps, the scope, the minimap, the seats, the fan's role / tier / hands, the crowd cap, the Closet
+hand-off, the privacy strip, the cast-name match, the CELL script's sanitiser and scope, the explain sanitiser and gates) — all
+caught; the 4 that survived the first run were two weak tests (strengthened) and two dead checks (removed).
+
+**Limits / not done.**
+- The Closet's half of "Edit in the Closet" is routed, not applied (§12.2): until the creator lane (or the coordinator) applies the
+  diff, the button opens the account's own Closet and the manual path (copy / paste back) is the way.
+- The replay event is unit-tested on the host; it is live only in a mode that replays (Football Rush, studio-4a's target).
+- Cast fans: desktop / high only (the phone keeps its card crowd); they idle (sit / stand) and do not join the crowd's cheers.
+  Each is a skinned body: the editor's desktop meter read 27 bodies on the demo venue with the player + 3 fans cast (red against
+  the phone's 16; the phone column never mounts cast fans). The baseline without them was not measured separately.
+- The explain summary on the rig is a stubbed answer; a real model's wording is the owner's to judge.
+
+### 12.5 Routed: the Closet's half of "Edit in the Closet" (`components/closet-view.tsx`, the creator lane's file)
+
+Not applied in this lane. With no `?studioEdit=` in the URL every changed line is a no-op (the session reads as null).
+
+```diff
+--- a/FEL-full-app/components/closet-view.tsx
++++ b/FEL-full-app/components/closet-view.tsx
+@@ -48,6 +48,10 @@
+ import { REGION_LABELS, newLayer, updateLayer } from '@/lib/creator/look/paint';
+ import { clothLabel, randomiseClothes, resolveCloth } from '@/lib/creator/look/clothes';
+ import type { FeelCue } from '@/lib/babylon/creator/studio/feel';
++// NEXUS STUDIO "Edit in the Closet" (studio-4b, docs/NEXUS-STUDIO.md §12): /closet?studioEdit=<session> opens ONE character from
++// the Studio's hand-off on this device, saves nothing to the account or the device's look, and hands the edited code back.
++import { CLOSET_EDIT_PARAM, readClosetEdit, writeClosetReturn, type ClosetEditSession } from '@/lib/nexus-studio/castCloset';
++import { browserKV } from '@/lib/nexus-studio/storage';
+ 
+ // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
+ const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
+@@ -199,10 +203,24 @@
+   const [offer, setOffer] = useState<{ before: CreatorSlotV2 } | null>(null);
+   /** the look each slot had when it was opened or last saved — what Before shows */
+   const baseline = useRef(new Map<string, CreatorSlotV2>());
++  /** NEXUS STUDIO: set when this tab edits a Studio character (nothing is read from or saved to the account then) */
++  const [studioEdit, setStudioEdit] = useState<ClosetEditSession | null>(null);
+ 
+   useEffect(() => {
+     (async () => {
+       try {
++        const se = readClosetEdit(browserKV(), new URLSearchParams(window.location.search).get(CLOSET_EDIT_PARAM));
++        const sr = se ? await decodeSlotCode(se.code) : null;
++        if (se && sr?.ok) {
++          const s: CreatorSlotV2 = {
++            id: 'studio', label: sanitizeStampText(se.name) || 'STUDIO', body: sr.slot?.body ?? 'male', base: sr.base, doc: sr.doc, equipped: { ...defaultEquipped() },
++            ...(sr.slot?.sliders ? { sliders: sr.slot.sliders } : {}), ...(sr.slot?.frame ? { frame: sr.slot.frame } : {}), ...(sr.slot?.presentation ? { presentation: sr.slot.presentation } : {}),
++          };
++          setStudioEdit(se);
++          setSlots([s]); setActiveId(s.id); setSelectedId(s.id); setHist(createHistory(s));
++          setSavedSig(JSON.stringify([[s], s.id])); baseline.current = new Map([[s.id, s]]);
++          return;
++        }
+         // CREATOR-PLAN phase 4a: hero-body says which body this account plays and whether it owns a scan (a slot may pick it)
+         const [res, hb] = await Promise.all([
+           fetch('/api/v1/closet'),
+@@ -240,9 +258,9 @@
+   const storedFace = useMemo(() => buildStoredFace(allSlots, activeId), [allSlots, activeId]);
+   const activeEquippedNow = useMemo(() => ({ ...defaultEquipped(), ...(allSlots.find((s) => s.id === activeId)?.equipped ?? {}) }), [allSlots, activeId]);
+   useEffect(() => {
+-    if (!hydrated.current || loading) return;
++    if (!hydrated.current || loading || studioEdit) return;   // a Studio character is not the device's look
+     writeLocalLook({ ...(readLocalLook() ?? {}), face: storedFace as FaceConfig, equipped: activeEquippedNow, jersey });
+-  }, [storedFace, activeEquippedNow, jersey, loading]);
++  }, [storedFace, activeEquippedNow, jersey, loading, studioEdit]);
+   const sigNow = useMemo(() => JSON.stringify([allSlots, activeId]), [allSlots, activeId]);
+ 
+   /** Open a face's characters (a look saved before slots becomes one slot), each wearing `eq` unless it has its own. */
+@@ -310,6 +328,14 @@
+     return null;
+   };
+   const shareCode = (numbers: boolean) => encodeSlotCode(slot, { numbers });
++  /** NEXUS STUDIO: the edited character back to the Studio (its own share code, the numbers kept: it stays on this device) */
++  const backToStudio = async () => {
++    if (!studioEdit) return;
++    const ok = writeClosetReturn(browserKV(), studioEdit.session, await encodeSlotCode(slot, { numbers: true }), slot.label);
++    if (!ok) { toast.error('The Studio is no longer waiting for this look — copy its code from Share instead.'); return; }
++    toast.success('Sent back to Nexus Studio.');
++    window.close();
++  };
+ 
+   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
+   // Draft palette — the same mapping resolveIdentity() applies at spawn time,
+@@ -568,7 +594,7 @@
+ 
+   const buy = async (itemId: string) => {
+     const w = getWearable(itemId);
+-    if (!w) return;
++    if (!w || studioEdit) return;   // NEXUS STUDIO: a Studio character buys nothing on the account
+     setBuying(itemId);
+     try {
+       const res = await fetch('/api/v1/closet/buy', {
+@@ -586,6 +612,7 @@
+ 
+   // Phase 4a: a save stores every character and which one is played; "Play as" is a save with another one playing.
+   const save = async (playAs?: string) => {
++    if (studioEdit) return;   // NEXUS STUDIO: a Studio character is never saved over the account's Closet
+     setSaving(true);
+     try {
+       const active = playAs ?? activeId;
+@@ -662,9 +689,15 @@
+             )}
+           </div>
+           <div className="flex shrink-0 flex-col items-end gap-1.5">
++            {studioEdit ? (
++              <button onClick={() => { void backToStudio(); }} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300">
++                <Check className="h-4 w-4" /> Back to Nexus Studio
++              </button>
++            ) : (
+             <button onClick={() => save()} disabled={saving} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300 disabled:opacity-60">
+               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save Look
+             </button>
++            )}
+             <div className="flex gap-1" role="group" aria-label="Camera">
+               {STUDIO_SHOTS.map((sh, i) => <button key={sh} type="button" className={hudBtn} onClick={() => act({ shot: sh })} title={`${sh} (${i + 1})`}>{sh}</button>)}
+             </div>
+@@ -690,7 +723,7 @@
+           </div>
+         )}
+ 
+-        {offer && (
++        {offer && !studioEdit && (   /* NEXUS STUDIO: one character only — no "keep a copy" slot */
+           <div role="status" className="absolute left-1/2 top-[7.5rem] z-10 flex w-[min(420px,calc(100%-1.5rem))] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-[#FFD700]/40 bg-[#0c0c11]/92 px-3 py-2 text-[12px] text-white/80 backdrop-blur">
+             <span className="flex-1">Big change. Keep the look from before it as a new character?</span>
+             <button type="button" onClick={keepBefore} className="rounded-md bg-[#FFD700]/90 px-2.5 py-1 font-display text-[11px] font-bold uppercase text-black">Keep a copy</button>
+@@ -720,12 +753,16 @@
+         <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} /></div>
+         <div className="mb-4 space-y-3">
+           <p className="text-[11px] text-white/45">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
++          {studioEdit ? (
++            <p className="rounded-lg border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[12px] text-white/75" role="status">Editing <b>{studioEdit.name}</b> for Nexus Studio. Nothing here is saved to your Closet; <b>Back to Nexus Studio</b> hands the look back.</p>
++          ) : (<>
+           <LookConsent adult={adult} consent={consent} onChange={(next) => { setConsent(next); writeConsent(next); }} />
+           {/* CREATOR-PLAN phase 4a: the characters (up to 5) — select one to edit it, "Play as" to wear it in every mode */}
+           <SlotBar slots={allSlots} selected={selectedId} active={activeId} dirty={dirty}
+             onSelect={selectSlot} onPlayAs={(id) => { void save(id); }} onNew={newCharacter} onDuplicate={duplicateCharacter}
+             onRename={renameCharacter} onDelete={deleteCharacter} onPaste={pasteCharacter} onShare={shareCode} accent={accent} openPaste={openPaste} />
+           <PublishLookAsCard />{/* PIPELINES (2026-10-06): publish the look as a fashion card — under the characters, beside the Studio's Save Look */}
++          </>)}
+         </div>
+ 
+         {faceScan && scanning && (
+```

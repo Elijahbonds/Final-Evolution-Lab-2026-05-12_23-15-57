@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { AI_LIMITS, aiVenueSystem, aiVenueUser, compileAiEdits, describeEdit, parseAnswer, sanitizeAiEdits, venueBrief } from './aiEdits';
 import { createStack, execute, undo, redo, undoLabel } from './commands';
+import { catalogItem, instantiate } from './catalog';
 import { LIMITS, newProject, newVenue, sanitizeProject } from './doc';
 import { everyKindProject } from '@/tests/helpers/nexusStudio';
 import { GOOD_ANSWER, HOSTILE_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, floodAnswer } from '@/tests/helpers/aiVenue';
@@ -126,5 +127,148 @@ describe('what the model is told', () => {
     const lines = edits.map(describeEdit);
     expect(lines[0]).toMatch(/^Venue: name Night Beach Court · mood nightGame/);
     expect(lines).toContain('Place Floodlight at (-9.0, -14.0)');
+  });
+});
+
+// ── studio-4b ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+import { RALLY_PROMPT, SCRIPT_CAST_ANSWER, HOSTILE_SCRIPT_ANSWER, EXPLAIN_ANSWER } from '@/tests/helpers/aiVenue';
+import { aiExplainSystem, aiExplainUser, resolveCastName, reviewAiEdits, sanitizeSummary, venueForAi } from './aiEdits';
+import { NODE_KINDS, groupOf } from './scripts';
+import { createInterpreter } from './interpreter';
+
+function withCharacters() {
+  const p = fresh();
+  p.characters = [{ id: 'c_nova', name: 'Nova', lookCode: 'FEL2.secretlook.abcdefg' }, { id: 'c_ace', name: 'Ace', lookCode: 'FEL2.secretace.abcdefg' }];
+  return p;
+}
+
+describe('studio-4b: CELL proposes scripts and casts', () => {
+  const { edits, dropped } = sanitizeAiEdits(SCRIPT_CAST_ANSWER);
+  it('a script and three casts survive; the script is the vocabulary\'s own graph, laid out by the Studio', () => {
+    expect(dropped).toBe(0);
+    expect(edits.map((e) => e.op)).toEqual(['script', 'cast', 'cast', 'cast']);
+    const sc = edits[0] as Extract<typeof edits[number], { op: 'script' }>;
+    expect(sc.graph.nodes.map((n) => n.kind)).toEqual(['onRally', 'cooldown', 'crowd', 'banner']);
+    expect(sc.graph.edges).toHaveLength(3);
+    expect(sc.graph.nodes.map((n) => n.x)).toEqual([40, 280, 520, 520]);   // the model's 9999 is not used
+    expect(new Set(sc.graph.nodes.map((n) => n.id)).size).toBe(4);
+    for (const n of sc.graph.nodes) expect(['e', 'c', 'a1', 'a2']).not.toContain(n.id);   // minted, not the model's
+  });
+  it('apply is ONE step: the script (scoped to this venue), the player and the fans; a name nobody has is left out; Undo takes it all', () => {
+    const p = withCharacters();
+    const v = p.venues[0];
+    const c = compileAiEdits(v, edits, RALLY_PROMPT, p)!;
+    expect(c).toMatchObject({ scripts: 1, cast: 2 });
+    let s = execute(createStack(p), c.cmd);
+    expect(s.past).toHaveLength(1);
+    const built = s.doc;
+    expect(built.scripts).toHaveLength(1);
+    expect(built.scripts[0]).toMatchObject({ name: 'Rally cheer', enabled: true, venues: [v.id] });
+    expect(built.venues[0].cast).toEqual({ player: 'c_nova', crowd: ['c_ace'] });
+    // the script it adds runs: the rally reaches 5 → the crowd cheers and the banner
+    const fired: string[] = [];
+    const it2 = createInterpreter([{ id: 's', graph: built.scripts[0] }], (a) => fired.push(a.kind));
+    it2.emit({ type: 'rally', length: 5, prev: 4 }, { myScore: 0, theirScore: 0, momentum: 0, elapsed: 0, hero: null, rally: 5 });
+    expect(fired).toEqual(['crowd', 'banner']);
+    expect(sanitizeProject(JSON.parse(JSON.stringify(built)))).toMatchObject({ ok: true, dropped: 0 });
+    s = undo(s);
+    expect([s.doc.venues, s.doc.scripts, s.doc.characters]).toEqual([p.venues, p.scripts, p.characters]);   // (updatedAt is the stack's)
+  });
+  it('the review says which cast is left out, and why', () => {
+    const p = withCharacters();
+    const r = reviewAiEdits(edits, p);
+    expect(r[0].line).toMatch(/^Script “Rally cheer” \(this venue\): when Rally length, if … → Crowd reaction, HUD banner$/);
+    expect(r[1]).toEqual({ line: 'Cast “Nova” as the player' });
+    expect(r[2]).toEqual({ line: 'Seat “ace” among the fans → Ace' });
+    expect(r[3].skipped).toMatch(/no single character called “Zed”/);
+  });
+  it('without the project, scripts and casts are left out (never half-applied)', () => {
+    expect(compileAiEdits(fresh().venues[0], edits, 'x')).toBeNull();
+  });
+  it('names resolve exactly, then by a unique partial match; ambiguous or unknown is null', () => {
+    const cs = [{ id: '1', name: 'Nova' }, { id: '2', name: 'Nova Prime' }, { id: '3', name: 'Ace' }];
+    expect(resolveCastName(cs, '  nova ')?.id).toBe('1');
+    expect(resolveCastName(cs, 'prime')?.id).toBe('2');
+    expect(resolveCastName(cs, 'Aces')?.id).toBe('3');
+    expect(resolveCastName([...cs, { id: '4', name: 'nova' }], 'Nova')).toBeNull();
+    expect(resolveCastName(cs, 'Zed')).toBeNull();
+    expect(resolveCastName(cs, '')).toBeNull();
+  });
+  it('the crowd is capped; the player can be given their own look back', () => {
+    const p = withCharacters();
+    p.characters.push(...['B', 'C', 'D', 'E'].map((n) => ({ id: `c_${n}`, name: n })));
+    const many = ['Ace', 'B', 'C', 'D', 'E'].map((character) => ({ op: 'cast' as const, slot: 'crowd' as const, character }));
+    const c = compileAiEdits(p.venues[0], many, 'x', p)!;
+    expect(execute(createStack(p), c.cmd).doc.venues[0].cast?.crowd).toHaveLength(LIMITS.crowdCast);
+    const cast = { ...p, venues: [{ ...p.venues[0], cast: { player: 'c_nova' } }] };
+    const back = compileAiEdits(cast.venues[0], [{ op: 'cast', slot: 'player', character: null }], 'x', cast)!;
+    expect(execute(createStack(cast), back.cmd).doc.venues[0]).not.toHaveProperty('cast');
+  });
+  it('a hostile answer: no code, no unknown kind, no score node, no loop, no rival slot, no injected look', () => {
+    const r = sanitizeAiEdits(HOSTILE_SCRIPT_ANSWER);
+    expect(r.edits.map((e) => e.op)).toEqual(['script']);
+    expect(r.dropped).toBe(5);   // no action, a loop (no event), the rival, the injected look, a crowd with no name
+    const sc = r.edits[0] as Extract<typeof r.edits[number], { op: 'script' }>;
+    expect(sc.graph.nodes.map((n) => n.kind)).toEqual(['onScore', 'banner']);
+    expect(sc.graph.edges).toHaveLength(1);   // a → e (into an event) refused
+    const text = JSON.stringify(r.edits);
+    for (const bad of ['fetch', 'exec', 'process', 'setScore', 'javascript:', 'FEL2.injected', 'rival']) expect(text, bad).not.toContain(bad);
+    expect(sc.name).toBe('<script>alert(1)</script>');   // a name is a label the editor prints as text (as an object's name is)
+    expect(sc.graph.nodes[1].params).toMatchObject({ tone: 'score' });
+    expect(String(sc.graph.nodes[1].params.text)).toHaveLength(40);
+    // every kind a proposal can carry is one the vocabulary has
+    for (const n of sc.graph.nodes) expect(NODE_KINDS).toContain(n.kind);
+    expect(groupOf(sc.graph.nodes[1].kind)).toBe('action');
+  });
+  it('a flood of scripts is capped per answer', () => {
+    const one = JSON.parse(SCRIPT_CAST_ANSWER).edits[0];
+    const r = sanitizeAiEdits({ edits: Array.from({ length: 10 }, () => one) });
+    expect(r.edits).toHaveLength(AI_LIMITS.scripts);
+    expect(r.dropped).toBe(10 - AI_LIMITS.scripts);
+  });
+});
+
+describe('studio-4b: privacy — what a request carries', () => {
+  it('the browser sends the venue without its cast; the brief, the prompt and the explain pass carry no character, name or look', () => {
+    const p = withCharacters();
+    const v = { ...p.venues[0], cast: { player: 'c_nova', crowd: ['c_ace'] } };
+    expect(venueForAi(v)).not.toHaveProperty('cast');
+    expect(venueForAi(v)).toEqual(p.venues[0]);
+    for (const words of [aiVenueUser('make it a night court', v), aiExplainUser(v), aiVenueSystem(), aiExplainSystem()]) {
+      for (const secret of ['c_nova', 'c_ace', 'Nova', 'Ace', 'FEL2', 'secretlook']) expect(words, secret).not.toContain(secret);
+    }
+  });
+  it('the system words teach the script vocabulary and name-only casting', () => {
+    const sys = aiVenueSystem();
+    for (const s of ['"op":"script"', 'onRally(event; length:1..99)', 'onReplay(event; when:ends|starts)', 'banner(action;', '"op":"cast"', 'You are not told which characters exist']) expect(sys).toContain(s);
+  });
+});
+
+describe('studio-4b: the explain pass', () => {
+  it('a summary is text: no markup, no markdown, no control characters, no fenced block, capped', () => {
+    const s = sanitizeSummary(EXPLAIN_ANSWER);
+    expect(s).toBe('Night Court A night court under four floods. The far stand is packed.img src=x onerror=alert(1) Add palms on the left.');
+    expect(s).not.toMatch(/[<>*#`\u0007]/);
+    expect(sanitizeSummary('word. '.repeat(1000)).length).toBeLessThanOrEqual(AI_LIMITS.summary + 1);
+    expect(sanitizeSummary(42)).toBe('');
+    expect(sanitizeSummary('```json\n{}\n```')).toBe('');
+  });
+});
+
+describe('studio-4b (routed from studio-4a): a CELL scale is relative to the catalog\'s own placement scale', () => {
+  it('a kit item lands at its catalog scale × the answer\'s scale; a 1× answer is exactly a hand placement', () => {
+    const p = fresh();
+    const v = p.venues[0];
+    const id = 'kit:nature/tree_palmTall';
+    const hand = instantiate(catalogItem(id)!, [0, 0, -20]);
+    const c = compileAiEdits(v, [
+      { op: 'place', item: id, at: [-16, 0, -24], yaw: 0, scale: 1.5, set: {} },
+      { op: 'place', item: id, at: [16, 0, -24], yaw: 0, scale: 1, set: {} },
+    ], 'palms')!;
+    const placed = execute(createStack(p), c.cmd).doc.venues[0].objects;
+    expect(placed[0].t.s).toBeCloseTo(hand.t.s * 1.5, 9);
+    expect(placed[1].t.s).toBe(hand.t.s);
+    // the catalog's own scale, whatever it is (studio-4a: the kit's median, e.g. nature 4.6; 1 before that lane)
+    expect(hand.t.s).toBe((catalogItem(id) as { scale?: number }).scale ?? 1);
   });
 });

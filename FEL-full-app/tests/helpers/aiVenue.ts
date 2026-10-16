@@ -48,3 +48,42 @@ export function floodAnswer(n = 500): string {
 export function completionBody(content: string): Response {
   return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200, headers: { 'content-type': 'application/json' } });
 }
+
+// ── studio-4b: scripts, casts and the explain pass ───────────────────────────────────────────────────────────────────
+
+export const RALLY_PROMPT = 'when a rally reaches 5 the crowd cheers and a banner says WHAT A RALLY; cast Nova as the player and put Ace in the crowd';
+
+/** A model that proposes a script and casts by the names the creator typed (it is never told which characters exist). */
+export const SCRIPT_CAST_ANSWER = JSON.stringify({
+  edits: [
+    { op: 'script', name: 'Rally cheer', nodes: [
+      { id: 'e', kind: 'onRally', params: { length: 5 }, x: 9999, y: -9999 },
+      { id: 'c', kind: 'cooldown', params: { seconds: 2 } },
+      { id: 'a1', kind: 'crowd', params: { reaction: 'cheer', strength: 1 } },
+      { id: 'a2', kind: 'banner', params: { text: 'WHAT A RALLY', tone: 'heat', seconds: 2 } },
+    ], edges: [{ from: 'e', to: 'c' }, { from: 'c', to: 'a1' }, { from: 'c', to: 'a2' }] },
+    { op: 'cast', slot: 'player', character: 'Nova' },
+    { op: 'cast', slot: 'crowd', character: 'ace' },
+    { op: 'cast', slot: 'crowd', character: 'Zed' },
+  ],
+});
+
+/** Scripts and casts a model could abuse: code, loops, unknown kinds, a graph with no action, a rival slot, an injected look. */
+export const HOSTILE_SCRIPT_ANSWER = JSON.stringify({
+  edits: [
+    { op: 'script', name: '<script>alert(1)</script>', nodes: [
+      { id: 'e', kind: 'onScore', params: { side: 'me', code: 'fetch("/api/v1/wallet")' } },
+      { id: 'x', kind: 'exec', params: { code: 'process.exit()' } },
+      { id: 'a', kind: 'banner', params: { text: 'x'.repeat(500), tone: 'javascript:' } },
+      { id: 's', kind: 'setScore', params: { me: 99 } },
+    ], edges: [{ from: 'e', to: 'a' }, { from: 'a', to: 'e' }, { from: 'e', to: 'x' }, { from: 'e', to: 's' }] },
+    { op: 'script', name: 'no action', nodes: [{ id: 'e', kind: 'onTimer' }], edges: [] },
+    { op: 'script', name: 'loop', nodes: [{ id: 'a', kind: 'cooldown' }, { id: 'b', kind: 'chance' }], edges: [{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }] },
+    { op: 'cast', slot: 'rival', character: 'Nova' },
+    { op: 'cast', slot: 'player', character: { lookCode: 'FEL2.injected.0000000' } },
+    { op: 'cast', slot: 'crowd' },
+  ],
+});
+
+/** A model's summary for the explain pass, with the things a summary must not carry through. */
+export const EXPLAIN_ANSWER = '## Night Court\n\nA **night** court under four floods.\u0007 The far stand is packed.<img src=x onerror=alert(1)>\n```json\n{"edits":[]}\n```\nAdd palms on the left.';

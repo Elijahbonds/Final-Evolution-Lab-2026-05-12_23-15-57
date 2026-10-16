@@ -34,6 +34,7 @@ import type { ExportCrowd, ExportDecal, ExportFixture, ExportMeshyProp, StudioVe
 import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
 import { castFrameFor, targetOf } from './targets';
 import { castIdentity } from './cast';
+import { mountCrowdCastLayer } from './castLayer';
 import { mountScriptHost, type ScriptHost, type ScriptHostCtx } from './scriptHost';
 import { invalidateIdentity, primeIdentity } from '../babylon/core/playerIdentity';
 
@@ -259,6 +260,8 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
     decals: mountDecalLayer(scene, tier, exp.decals),
     crowd: mountCrowdLayer({ scene, momentum: ctx.momentum, phase: ctx.phase }, exp.crowd),
     weather: mountWeatherLayer(scene, ctx.lights ?? null, exp.weather, family, { tier, keepSky: !!exp.look.sky }),
+    // studio-4b: project characters seated among the fans (castLayer.ts), visual only; none on the mobile tier
+    crowdCast: mountCrowdCastLayer(scene, exp.cast?.crowd, exp.crowd, { tier, frame: castFrameFor(exp.target) }),
   };
   // A mode with a fixed camera (Tiebreak snaps once) never steps its director, so the intro it was given would never run.
   // The stepper runs it on the frame the mode set up when play began (that subject, that objective), and when the intro

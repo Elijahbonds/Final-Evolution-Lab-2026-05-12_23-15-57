@@ -7,7 +7,7 @@ import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abac
 import { rateLimit } from '@/lib/rate-limit';
 import { readDobYear, type GateDb } from '@/lib/privacy/scanSaveGate';
 import { AI_BUILDER_AGE_REFUSED, aiBuilderAllowed } from '@/lib/nexus-studio/aiAccess';
-import { AI_LIMITS, aiVenueSystem, aiVenueUser, sanitizeAiEdits } from '@/lib/nexus-studio/aiEdits';
+import { AI_LIMITS, aiExplainSystem, aiExplainUser, aiVenueSystem, aiVenueUser, sanitizeAiEdits, sanitizeSummary } from '@/lib/nexus-studio/aiEdits';
 import { sanitizeVenue } from '@/lib/nexus-studio/doc';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +28,11 @@ const VENUE_AI_MAX_BODY = 400_000;
  * through the import sanitiser.
  * What is sent: the prompt and the venue's settings and placements (venueBrief) — never the account, a character or a look.
  * What comes back is sanitised here AND again in the browser; the model's text itself is never returned or executed.
+ *
+ * studio-4b: the edits may also propose scripts and casts (aiEdits.ts; a cast names a character only as the creator typed it —
+ * the request carries no character). And `{ mode: 'explain', venue }` → `{ summary }`: a read-only, plain-language summary of the
+ * venue (no prompt; the same venue brief is sent, nothing more), through the same switch, sign-in, rate limit, age line and body
+ * cap, in the same order; the summary is plain text, sanitised here (sanitizeSummary) and shown as text.
  * No new environment variable or secret: it runs on CELL's existing key, behind CELL's existing switch.
  */
 export async function POST(req: Request) {
@@ -50,7 +55,18 @@ export async function POST(req: Request) {
     if (text.length > VENUE_AI_MAX_BODY) return NextResponse.json({ error: 'body_too_large' }, { status: 413 });
     let body: unknown = null;
     try { body = JSON.parse(text); } catch { body = null; }
-    const b = (body && typeof body === 'object' ? body : {}) as { prompt?: unknown; venue?: unknown };
+    const b = (body && typeof body === 'object' ? body : {}) as { prompt?: unknown; venue?: unknown; mode?: unknown };
+    if (b.mode === 'explain') {
+      const venue = sanitizeVenue(b.venue, new Set());
+      if (!venue) return NextResponse.json({ error: 'venue_required' }, { status: 400 });
+      const said = await completeText({
+        role: 'builder', maxTokens: 400,
+        messages: [{ role: 'system', content: aiExplainSystem() }, { role: 'user', content: aiExplainUser(venue) }],
+      });
+      const summary = sanitizeSummary(said);
+      if (!summary) return NextResponse.json({ error: 'ai_failed' }, { status: 502 });
+      return NextResponse.json({ summary }, { headers: { 'Cache-Control': 'no-store' } });
+    }
     const prompt = typeof b.prompt === 'string' ? b.prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim() : '';
     if (!prompt) return NextResponse.json({ error: 'prompt_required' }, { status: 400 });
     if (prompt.length > AI_LIMITS.prompt) return NextResponse.json({ error: 'prompt_too_long' }, { status: 400 });

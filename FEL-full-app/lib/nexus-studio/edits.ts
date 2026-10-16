@@ -79,12 +79,35 @@ export function removeCharacter(p: StudioProject, id: string): Command | null {
   if (!c) return null;
   const ops: Command['ops'] = [];
   for (const v of p.venues) {
-    if (v.cast?.player !== id) continue;
-    const { player: _gone, ...rest } = v.cast; void _gone;
-    ops.push({ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(rest).length ? rest : undefined } });
+    if (v.cast?.player !== id && !v.cast?.crowd?.includes(id)) continue;
+    ops.push({ op: 'patchVenue', venueId: v.id, patch: { cast: castWithout(v.cast!, id) } });
   }
   ops.push({ op: 'removeCharacter', id });
   return { label: `Delete ${c.name}`, ops };
+}
+
+/** A venue's cast with a character taken out of every slot (undefined when nothing is left). */
+function castWithout(cast: NonNullable<StudioVenue['cast']>, id: string): StudioVenue['cast'] {
+  const player = cast.player === id ? undefined : cast.player;
+  const crowd = (cast.crowd ?? []).filter((x) => x !== id);
+  const out = { ...(player ? { player } : {}), ...(crowd.length ? { crowd } : {}) };
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** studio-4b: seat a character among the venue's fans, or take it out (null when the crowd already has LIMITS.crowdCast). */
+export function toggleCrowdCast(v: StudioVenue, id: string): Command | null {
+  const crowd = v.cast?.crowd ?? [];
+  const on = !crowd.includes(id);
+  if (on && crowd.length >= LIMITS.crowdCast) return null;
+  const next = on ? [...crowd, id] : crowd.filter((x) => x !== id);
+  const cast = { ...(v.cast?.player ? { player: v.cast.player } : {}), ...(next.length ? { crowd: next } : {}) };
+  return { label: on ? 'Seat character in the crowd' : 'Take character out of the crowd', ops: [{ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(cast).length ? cast : undefined } }] };
+}
+
+/** studio-4b ("Edit in the Closet"): a character's look replaced by the code the Closet brought back — one undo step. */
+export function setCharacterLook(id: string, lookCode: string, name?: string): Command {
+  const clean = name?.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, LIMITS.name);
+  return { label: 'Edit look in the Closet', ops: [{ op: 'patchCharacter', id, patch: { lookCode, ...(clean ? { name: clean } : {}) } }] };
 }
 
 export function renameCharacter(id: string, name: string): Command {
@@ -93,7 +116,7 @@ export function renameCharacter(id: string, name: string): Command {
 
 /** Fill (or empty, with null) a venue's cast slot. */
 export function castCharacter(v: StudioVenue, slot: CastSlot, id: string | null): Command {
-  const cast = { ...v.cast };
+  const cast: NonNullable<StudioVenue['cast']> = { ...v.cast };
   if (id) cast[slot] = id; else delete cast[slot];
   return { label: id ? 'Cast character' : 'Uncast character', ops: [{ op: 'patchVenue', venueId: v.id, patch: { cast: Object.keys(cast).length ? cast : undefined } }] };
 }
@@ -115,6 +138,13 @@ export function removeScript(p: StudioProject, id: string): Command | null {
 export function editScript(id: string, patch: Partial<Omit<StudioScript, 'id'>>, label: string, group?: string): Command {
   const clean = patch.name !== undefined ? { ...patch, name: patch.name.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, LIMITS.name) || 'Script' } : patch;
   return { label, ...(group ? { group } : {}), ops: [{ op: 'patchScript', id, patch: clean }] };
+}
+
+/** Per-venue scope (studio-4b): `null` runs the script in every venue; a list runs it only in those (an empty list: none). */
+export function setScriptScope(s: StudioScript, venues: readonly string[] | null): Command {
+  const list = venues ? [...new Set(venues)] : undefined;
+  const label = !list ? 'Script: every venue' : list.length === 1 ? 'Script: one venue' : `Script: ${list.length} venues`;
+  return editScript(s.id, { venues: list }, label);
 }
 
 /** Add a node to a script. */
