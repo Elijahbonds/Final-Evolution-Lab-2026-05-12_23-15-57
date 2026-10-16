@@ -102,7 +102,8 @@ export function exportVenue(v: StudioVenue, cast?: ExportCast | null, scripts?: 
       props,
     },
     baseDressing: v.baseDressing, kit, meshy, fixtures, crowd, decals,
-    weather: v.weather, glossyFloor: v.glossyFloor, subject,
+    // §11: where the mode's weather is gameplay (targets.ts modeWeather) the venue does not set it
+    weather: target?.modeWeather ? 'natural' : v.weather, glossyFloor: v.glossyFloor, subject,
     ...(cast ? { cast } : {}),
     ...(runs.length ? { scripts: runs } : {}),
   };
