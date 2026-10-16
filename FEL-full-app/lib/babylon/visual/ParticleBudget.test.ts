@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MIN_BURST, PARTICLE_BUDGET, PHONE_BURST_FLOOR, PHONE_MODE_CEILING, PHONE_STEADY_CAP, burstFloor, committedParticles, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSteadyCap, phoneSystemCap, roomUsed, setParticleBudgetScale } from './ParticleBudget';
+import { MIN_BURST, PARTICLE_BUDGET, PHONE_BURST_FLOOR, PHONE_MODE_CEILING, PHONE_ONE_HIT_MODES, PHONE_STEADY_CAP, burstFloor, committedParticles, oneHitCeiling, reservedParticles, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSteadyCap, phoneSystemCap, roomUsed, setParticleBudgetScale } from './ParticleBudget';
 
 const sceneLike = (md: Record<string, unknown> | null, counts: number[] = []) =>
   ({ metadata: md, particleSystems: counts.map((n) => ({ getActiveCount: () => n })) }) as never;
@@ -136,5 +136,36 @@ describe('Karate VS on a phone', () => {
     expect(roomUsed({ metadata: phone().metadata, ...queued })).toBe(4);                   // a phone under a ceiling counts the queue
     expect(roomUsed({ metadata: { felTier: 'mobile', felModeId: 'onevone' }, ...queued })).toBe(1);   // CONTROL: any other scene counts the air only
     expect(roomUsed({ metadata: { felTier: 'desktop', felModeId: 'karate-vs' }, ...queued })).toBe(1);
+  });
+});
+
+// lane/kvs-combo (owner 2026-10-16, "Second hit drops streaks"): a ceiling that holds ONE hit. Its later overlapping hits keep their core only
+// (combatFx.test.ts), and its steady streams are counted at their capacity, so a hit landing while the petal is between lives leaves it its room.
+describe('a ceiling that holds one hit', () => {
+  const md = (felTier: string, felModeId: string) => ({ metadata: { felTier, felModeId } });
+  const stream = (active: number, cap: number, started = true) => ({ getActiveCount: () => active, manualEmitCount: -1, emitRate: 5, getCapacity: () => cap, isStarted: () => started });
+  const shot = (active: number, queued: number) => ({ getActiveCount: () => active, manualEmitCount: queued, emitRate: 0, getCapacity: () => 48, isStarted: () => true });
+
+  it('is Karate VS on a phone, and nothing else', () => {
+    expect([...PHONE_ONE_HIT_MODES]).toEqual(['karate-vs']);
+    expect(oneHitCeiling(md('mobile', 'karate-vs') as never)).toBe(true);
+    for (const id of ['karate', 'dunk', 'onevone', 'showdown']) expect(oneHitCeiling(md('mobile', id) as never), id).toBe(false);   // CONTROL: their ceilings hold more
+    for (const t of ['desktop', 'high']) expect(oneHitCeiling(md(t, 'karate-vs') as never), t).toBe(false);                           // CONTROL: phone only
+    expect(oneHitCeiling({ metadata: {} } as never)).toBe(false);
+  });
+
+  it('counts a steady stream at its capacity, however few are up; a one-shot burst and a stopped stream as they are', () => {
+    expect(reservedParticles({ particleSystems: [stream(0, 1), shot(1, 3)] })).toBe(5);    // the petal between lives still holds its one
+    expect(reservedParticles({ particleSystems: [stream(1, 1)] })).toBe(1);
+    expect(reservedParticles({ particleSystems: [stream(0, 4, false)] })).toBe(0);         // a stopped stream refills nothing
+    expect(committedParticles({ particleSystems: [stream(0, 1), shot(1, 3)] })).toBe(4);   // (the plain count would leave the petal's room to a burst)
+  });
+
+  it('reserves only there: karate and dunk measure their room as before (committed), desktop by what is in the air', () => {
+    const systems = [stream(0, 4), shot(1, 3)];
+    expect(roomUsed({ ...md('mobile', 'karate-vs'), particleSystems: systems })).toBe(8);
+    expect(roomUsed({ ...md('mobile', 'karate'), particleSystems: systems })).toBe(4);     // CONTROL: unchanged from kvs-skin
+    expect(roomUsed({ ...md('mobile', 'dunk'), particleSystems: systems })).toBe(4);
+    expect(roomUsed({ ...md('desktop', 'karate-vs'), particleSystems: systems })).toBe(1);
   });
 });

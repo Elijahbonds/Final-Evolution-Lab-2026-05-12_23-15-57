@@ -19,7 +19,7 @@
 
 import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, ShadowGenerator } from '@babylonjs/core';
-import { burstFloor, fitBurst, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSteadyCap, roomUsed } from '../visual/ParticleBudget';
+import { burstFloor, fitBurst, oneHitCeiling, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSteadyCap, roomUsed } from '../visual/ParticleBudget';
 import { mountChiRim } from '../visual/ChiRim';   // w3-atmos: the glow edge on the fighter's own contour
 import { paintAuraColumn, paintCrack, paintDot, paintLightPool, paintRing, paintSmoke, paintStar, type Ctx } from './fxPaint';
 
@@ -266,6 +266,23 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
 
   const budgeted = (n: number): number => fitBurst(n, roomUsed(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
 
+  // ── a later hit under a ceiling that holds one (lane/kvs-combo; ParticleBudget.PHONE_ONE_HIT_MODES: Karate VS on a phone) ──
+  // What each pooled hit system holds (in the air + queued this frame), which hit last fired it, and how an earlier hit's system gives way:
+  // its queued count is dropped and its live particles go back to the system's stock (no allocation; the system keeps running).
+  const held = (p: ParticleSystem): number => p.getActiveCount() + Math.max(0, p.manualEmitCount);
+  const firedAt = new Map<ParticleSystem, number>(); let hitSeq = 0;
+  const fire = (p: ParticleSystem, n: number): void => { p.manualEmitCount = n; firedAt.set(p, hitSeq); };
+  const room = (): number => particleBudget(scene) - roomUsed(scene);
+  const byAge = (a: ParticleSystem, b: ParticleSystem): number => (firedAt.get(a) ?? 0) - (firedAt.get(b) ?? 0);
+  const giveWay = (oldestFirst: ParticleSystem[], need: number): void => {
+    for (const p of oldestFirst) {
+      if (room() >= need) return;
+      p.manualEmitCount = 0;
+      const live = p.particles;
+      while (live.length) p.recycleParticle(live[live.length - 1]);
+    }
+  };
+
   // ── ground rings and crack decals: a handful of flat meshes, enabled only while they live ──
   const grMat0 = ringTex(scene);
   const groundRings: GroundRing[] = [];
@@ -328,16 +345,38 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
   warm(groundRings[0].mat, groundRings[0].mesh); warm(cracks[0].mat, cracks[0].mesh);
   for (const a of auras.values()) { warm(a.colMat, a.col); warm(a.poolMat, a.pool); try { if (a.motesOn) a.motes.isReady(); } catch { /* headless */ } }
 
+  const ringAt = (at: Vector3, L: HitLook, hot: Color4, body: Color4): void => {
+    const r = nextOf(rings, cur.ring);
+    (r.emitter as Vector3).copyFrom(at);
+    r.color1 = hot; r.color2 = body; r.colorDead = new Color4(body.r, body.g, body.b, 0);
+    r.minScaleX = r.minScaleY = L.ring * 0.9; r.maxScaleX = r.maxScaleY = L.ring;
+    fire(r, 1);
+  };
+
   const fx: CombatFx = {
     hit(at, from, kind, tint) {
       const L = HIT_LOOK[kind], plan = planHit(kind, tier);
       const hot = c4(L.colors[0]), body = c4(tint ?? L.colors[1]);
+      hitSeq++;
+      // lane/kvs-combo (owner 2026-10-16, "Second hit drops streaks"): on a phone whose ceiling holds ONE hit, a hit that lands while an earlier
+      // hit's burst is still live (in the air or queued) shows its core flash only, its star and its kind's ring, and gives up its streaks.
+      // Room for that core is made by the earlier hits' STREAKS first (oldest first); only if the star alone still finds none (a fourth
+      // blow inside ~0.3 s) does the oldest earlier hit's ring, then its star, give way, so the newest blow always flashes. Its ring needs room left over.
+      const later = oneHitCeiling(scene) && [stars, streaks, rings].some((pool) => pool.some((p) => held(p) > 0));
+      if (later) {
+        giveWay(streaks.filter((p) => held(p) > 0).sort(byAge), plan.ring ? 2 : 1);
+        giveWay([...rings, ...stars].filter((p) => held(p) > 0).sort((a, b) => byAge(a, b) || (rings.includes(a) ? -1 : 1)), 1);
+      }
       // the star: one bright glint, a little bigger than the blow
       const s = nextOf(stars, cur.star);
       (s.emitter as Vector3).copyFrom(at);
       s.color1 = hot; s.color2 = body; s.colorDead = new Color4(body.r, body.g, body.b, 0);
       s.minScaleX = s.minScaleY = L.star * 0.85; s.maxScaleX = s.maxScaleY = L.star;   // (the gradient is the shape; the scale is the metres)
-      s.manualEmitCount = 1;
+      fire(s, 1);
+      if (later) {
+        if (plan.ring && room() >= 1) ringAt(at, L, hot, body);
+        return;
+      }
       // the streaks fly along the blow (a cone round the direction away from the attacker), with a lift
       const k = nextOf(streaks, cur.streak);
       (k.emitter as Vector3).copyFrom(at);
@@ -351,15 +390,9 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       k.minLifeTime = L.life * 0.6; k.maxLifeTime = L.life;
       k.minScaleX = 0.03 + 0.02 * L.star; k.maxScaleX = 0.045 + 0.03 * L.star;   // width, metres
       k.minScaleY = 0.2 + 0.17 * L.star; k.maxScaleY = 0.3 + 0.25 * L.star;      // length along the flight, metres
-      if (plan.ring) {
-        const r = nextOf(rings, cur.ring);
-        (r.emitter as Vector3).copyFrom(at);
-        r.color1 = hot; r.color2 = body; r.colorDead = new Color4(body.r, body.g, body.b, 0);
-        r.minScaleX = r.minScaleY = L.ring * 0.9; r.maxScaleX = r.maxScaleY = L.ring;
-        r.manualEmitCount = 1;
-      }
+      if (plan.ring) ringAt(at, L, hot, body);
       // (after the star and the ring are queued, so that on a phone under a mode ceiling the streaks are trimmed to the room THEY leave: ParticleBudget.roomUsed)
-      k.manualEmitCount = budgeted(plan.streaks);
+      fire(k, budgeted(plan.streaks));
       if (plan.dust > 0.2 && tier !== 'mobile') {
         const d = nextOf(smokes, cur.smoke);
         tmpA.copyFrom(at); tmpA.y = Math.max(0.1, at.y - 0.9);   // dust lifts off the floor under the blow, not off the body

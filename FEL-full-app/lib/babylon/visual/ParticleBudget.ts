@@ -54,6 +54,28 @@ export function phoneSteadyCap(scene: { metadata?: unknown }, kind: string, othe
   const pinned = PHONE_STEADY_CAP[md.felModeId]?.[kind];
   return pinned === undefined ? otherwise : Math.min(otherwise, pinned);
 }
+/**
+ * A CEILING THAT HOLDS ONE HIT (lane/kvs-combo; owner 2026-10-16: "Second hit drops streaks"). At Karate VS's 5 one hit fills the room
+ * (a star, two or three streaks, a ring, beside the one petal), so two hits whose lives overlapped peaked at 9 and three at 13 for ~0.3 s.
+ * On a phone in a mode listed here:
+ *  - a hit that lands while an earlier hit's burst is still live (in the air, or queued this frame) shows only its CORE flash (its star,
+ *    and its ring where its kind has one) and gives up its streaks; when even that core finds no room, the earlier hits' streaks give way
+ *    for it, oldest first, and only then (a fourth blow inside ~0.3 s) the oldest earlier hit's ring, then its star, so the newest blow
+ *    always flashes its star. A later hit's ring is drawn only when room is left; it never takes an earlier hit's core (combat/combatFx.ts).
+ *  - a steady stream (a started system with an emit rate: the dojo's one petal) is counted at its CAPACITY, not at what is in the air.
+ *    The petal is between lives about 1% of the time (it dies, the next is born ~0.2 s later); a hit landing in that gap took the petal's
+ *    room as streaks, the petal came back, and the scene held 6 against 5 (combatFx.test.ts's staged sweep found it). Reserved, a hit is
+ *    the same with the petal up or between lives.
+ * Karate (endless, 12) and dunk (8) are not listed: their ceilings hold more than one hit, and they keep exactly what they had.
+ */
+export const PHONE_ONE_HIT_MODES: ReadonlySet<string> = new Set(['karate-vs']);
+
+/** True on a phone in a mode whose ceiling holds one hit (PHONE_ONE_HIT_MODES). */
+export function oneHitCeiling(scene: { metadata?: unknown }): boolean {
+  const id = (scene.metadata as Md)?.felModeId;
+  return !!id && phoneModeCeiling(scene) !== null && PHONE_ONE_HIT_MODES.has(id);
+}
+
 /** The fewest particles a burst is trimmed to under a phone mode ceiling (the tier's MIN_BURST is 4): four hits landing at once must not each keep four. */
 export const PHONE_BURST_FLOOR = 2;
 
@@ -116,9 +138,26 @@ export function committedParticles(scene: { particleSystems: ReadonlyArray<{ get
   return n;
 }
 
-/** The count a burst measures its room against: committed on a phone in a ceiling mode, live everywhere else. */
-export function roomUsed(scene: { metadata?: unknown; particleSystems: ReadonlyArray<{ getActiveCount(): number; manualEmitCount?: number }> }): number {
-  return phoneModeCeiling(scene) === null ? liveParticles(scene) : committedParticles(scene);
+/** A system that refills itself (started, fed by an emit rate rather than a one-shot count): what it will hold again, however few are up now. */
+type Sys = { getActiveCount(): number; manualEmitCount?: number; emitRate?: number; getCapacity?(): number; isStarted?(): boolean };
+function isStream(ps: Sys): boolean {
+  return (ps.manualEmitCount ?? -1) < 0 && (ps.emitRate ?? 0) > 0 && typeof ps.getCapacity === 'function' && (ps.isStarted?.() ?? false);
+}
+
+/** `committedParticles`, with every steady stream counted at its capacity (a mode whose ceiling holds one hit: PHONE_ONE_HIT_MODES). */
+export function reservedParticles(scene: { particleSystems: ReadonlyArray<Sys> }): number {
+  let n = 0;
+  for (const ps of scene.particleSystems) {
+    const held = ps.getActiveCount() + Math.max(0, ps.manualEmitCount ?? 0);
+    n += isStream(ps) ? Math.max(held, ps.getCapacity?.() ?? 0) : held;
+  }
+  return n;
+}
+
+/** The count a burst measures its room against: reserved in a one-hit ceiling mode, committed in any other phone ceiling mode, live everywhere else. */
+export function roomUsed(scene: { metadata?: unknown; particleSystems: ReadonlyArray<Sys> }): number {
+  if (phoneModeCeiling(scene) === null) return liveParticles(scene);
+  return oneHitCeiling(scene) ? reservedParticles(scene) : committedParticles(scene);
 }
 
 /**
