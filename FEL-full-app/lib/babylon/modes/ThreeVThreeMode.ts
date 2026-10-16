@@ -53,13 +53,14 @@ import { MeshBuilder, Vector3, StandardMaterial, Color3 } from '@babylonjs/core'
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
+import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
 import { mountPostureLayer, type PostureLayer, type PostureFeed } from '../anim/PostureLayer';
 import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on every body
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
 import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
-import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
+import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, SLIDE_MIN_SPACE_M, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { clankOffRim } from '../anim/ballRig';
@@ -122,7 +123,7 @@ import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM D
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
+  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
   ANKLE_STUMBLE_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / moveImpulse are the renderer's — anim/handleMotion)
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, type ChainState, type HandleMove,
   moveRate, moveFadeSec,   // MOVE PACE
@@ -940,6 +941,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       agentCtl = agentBridge() ? new AgentControlSource() : null;
       if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
+      me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
       // 0/1/2 is a real matchup. Three defenders with no assignment all solved
@@ -1523,7 +1525,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (!pausedDribble && !me.slot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; me.drib.pause(true); me.tree.hold('bball_hesi', { fadeSec: moveFadeSec(false), speedRatio: 0.25 }); console.info("[3V3-STICK] PAUSIN'"); }
             continue;
           }
-          const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, hand: carries.get(me)?.hand ?? 'Right', escape: !!me.slot.intent.sprint, brace: !!me.slot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+          const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: carries.get(me)?.hand ?? 'Right', escape: !!me.slot.intent.sprint, brace: !!me.slot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
           // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
           // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
           // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
@@ -3211,6 +3213,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // today), then the clip — WITH OR WITHOUT a live foe (U17: the clip played only `if (foe)`) — the ball's path, and the impulse signed by
     // the move (U18). The side is the ball's end side (the other hand for a crossing move), not "away from the man".
     const turboMove = !!me.slot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS
+    const lastMove = chain.last;   // H2: the double moves read the move before this one
     const r = requestMove(meHost(), {
       move, hint: dirHint, cutSide, turbo: turboMove, impulse: variant !== 'slide',   // H2: the slide's body is its hop (below), not the impulse
       path: move === 'steezo_roll' ? 'momentum_btb' : undefined,   // the roll's wrap here; startSpin's pull is its way back
@@ -3225,6 +3228,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     });
     if (!r.owned || !r.outcome) return false;        // not in my hands yet — the gate IS the upgrade
     const outcome = r.outcome;
+    { const dbl = !outcome.restarted ? doubleMoveOf(lastMove, move) : null; if (dbl) { bannerFlash(ctx, dbl.label, 700); console.info(`[3V3-HANDLE] double move ${dbl.id} (${lastMove} → ${move}, chain ${outcome.chain.length})`); } }   // H2: the double moves
     if (variant === 'slide') {   // H2 THE BTB SLIDE: the body hops sideways the way the ball went, the chest kept on him (a space move)
       const toRimL = RIM_FLOOR.subtract(me.char.root.position); toRimL.y = 0;
       me.drib.slide(r.endHand, toRimL.x, toRimL.z, turboMove);

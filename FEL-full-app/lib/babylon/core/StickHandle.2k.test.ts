@@ -35,7 +35,9 @@ describe('the 2K map, relative to the ball hand', () => {
 
 describe('H2: the BTB SLIDE — the behind-the-back thrown set (owner 2026-10-16)', () => {
   bothHands('set (slow, space): down-away is the slide', flick(-0.75, 0.75), 'btb_slide', { speed01: 0.2, pressured: false });
-  bothHands('pressured: it stays the behind-the-back', flick(-0.75, 0.75), 'behind_back', { speed01: 0.2, pressured: true });
+  bothHands('pressured (no arm\'s-length read given): it stays the behind-the-back', flick(-0.75, 0.75), 'behind_back', { speed01: 0.2, pressured: true });
+  bothHands('crowded — a body inside arm\'s length: it stays the behind-the-back', flick(-0.75, 0.75), 'behind_back', { speed01: 0.2, pressured: true, crowded: true });
+  bothHands('inside the 2 m ring but beyond arm\'s length: still the slide (a slide steps off a man playing you at arm\'s length)', flick(-0.75, 0.75), 'btb_slide', { speed01: 0.2, pressured: true, crowded: false });
   bothHands('at pace: it stays the behind-the-back', flick(-0.75, 0.75), 'behind_back', { speed01: 0.35, pressured: false });
   bothHands('with R2 it is still the momentum wrap, set or not', flick(-0.75, 0.75), 'momentum_btb', { speed01: 0.1, escape: true });
   it('the slide goes the way the ball goes: away from the ball hand', () => {

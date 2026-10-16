@@ -161,16 +161,24 @@ export interface StickRead {
   brace?: boolean;
   /** Seconds since the last stick move landed (Infinity when none). */
   sinceMoveSec?: number;
+  /** H2: a live body inside arm's length (SLIDE_MIN_SPACE_M) — no room to slide. Unset: `pressured` stands in for it. */
+  crowded?: boolean;
 }
 export const MOMENTUM_MIN_SPEED01 = 0.4;
 /**
  * THE BTB SLIDE (owner, 2026-10-16: "add a curry slide like behind the back"; on screen it has a generic name, no real names). The
  * behind-the-back flick (down-away) thrown SET — slower than this share of top speed, with no body inside the pressure ring — is the
- * slide: the ball wraps behind the back while the body hops sideways the way the ball went, to make space. At pace or pressured it stays
- * the plain behind-the-back; with R2 it is still the momentum wrap. A space move only: it chains like the behind-the-back it is (the
- * decision is behind_back's), no shot window (owner, same round). 0.35 is the read moveFromContext already uses for "space and no hurry".
+ * slide: the ball wraps behind the back while the body hops sideways the way the ball went, to make space. At pace, or with a body
+ * inside arm's length, it stays the plain behind-the-back; with R2 it is still the momentum wrap. A space move only: it chains like the
+ * behind-the-back it is (the decision is behind_back's), no shot window (owner, same round). 0.35 is the read moveFromContext already
+ * uses for "space and no hurry".
+ * "WITH SPACE" is a body beyond arm's length (SLIDE_MIN_SPACE_M, the 1v1 close-out's ARMS_LENGTH 1.25 m + a hand), not the 2 m pressure
+ * ring. assumption, measured: the 1v1 rival settles ~2 m off a set handler and closes inside 2.0 m on any stop (the first reel: 2.07 →
+ * under 2.0 in the frame the stick read), so the ring made the slide all but unreachable in 1v1 — and a slide is thrown at a man
+ * playing you at arm's length or more, to step off him.
  */
 export const SLIDE_MAX_SPEED01 = 0.35;
+export const SLIDE_MIN_SPACE_M = 1.3;
 /** A behind-the-back thrown inside this much of another move is the AGGRESSIVE one (the momentum wrap). */
 export const AGGRESSIVE_BTB_SEC = 0.7;
 
@@ -206,7 +214,7 @@ export function stickMoveFor(g: StickGesture, r: StickRead): { move: StickMove; 
       if (d8 === 'left') return { move: 'between_legs', side: away };
       if (d8 === 'upleft') return { move: escape ? 'momentum_cross' : 'crossover', side: away };
       if (d8 === 'up') return { move: 'in_and_out', side: toward };
-      if (d8 === 'downleft') return { move: escape ? 'momentum_btb' : r.speed01 < SLIDE_MAX_SPEED01 && !r.pressured ? 'btb_slide' : 'behind_back', side: away };   // H2: set = the slide
+      if (d8 === 'downleft') return { move: escape ? 'momentum_btb' : r.speed01 < SLIDE_MAX_SPEED01 && !(r.crowded ?? r.pressured) ? 'btb_slide' : 'behind_back', side: away };   // H2: set, with room = the slide
       if (d8 === 'down') return { move: escape ? 'snatchback' : 'stepback', side: away };
       if (d8 === 'upright') return { move: 'size_up', side: toward };
       // down-toward (F2, H-02 "never a dead stick"): the step-back to the ball side — R2 makes it the snatchback

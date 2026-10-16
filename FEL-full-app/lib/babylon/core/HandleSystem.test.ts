@@ -840,3 +840,32 @@ describe('MOVES_UNLOCKED_GATE (H2: unlock all moves until H9)', () => {
     expect(cc('double_cross', { ...st, since: 0.6 }, BASE_H2, MOVES_UNLOCKED_GATE)).toBe(false);   // past 50's window: the gate does not widen it
   });
 });
+
+// ── H2 (owner, 2026-10-16): the DOUBLE MOVES chain through the spam guard ───────────────────────────────────────────────────────────
+import { doubleMoveOf, DOUBLE_MOVES, pushChain as pc2, canChain as cc2, resolveHandleMove as rhm2, chainWindowSec as cws2 } from './HandleSystem';
+describe('the double moves (H2): behind → behind, between → behind', () => {
+  const after = (m: 'behind_back' | 'between_legs') => pc2(m, { last: null, since: Infinity, length: 0 }, 50);
+  it('behind then behind inside the window CHAINS (the spam guard lets this one repeat), and is named', () => {
+    const st = { ...after('behind_back'), since: 0.3 };
+    expect(cc2('behind_back', st, 50, 100)).toBe(true);
+    expect(pc2('behind_back', st, 50).length).toBe(2);
+    expect(doubleMoveOf('behind_back', 'behind_back')?.id).toBe('double_behind');
+  });
+  it('between then behind is the between-behind; it chained before H2 too, and is named now', () => {
+    expect(doubleMoveOf('between_legs', 'behind_back')?.id).toBe('between_behind');
+    expect(cc2('behind_back', { ...after('between_legs'), since: 0.3 }, 50, 100)).toBe(true);
+  });
+  it('every other repeat is still spam: crossover → crossover, between → between restart the chain', () => {
+    for (const m of ['crossover', 'between_legs', 'in_and_out'] as const) {
+      const st = { ...pc2(m, { last: null, since: Infinity, length: 0 }, 50), since: 0.2 };
+      expect(cc2(m, st, 50, 100), m).toBe(false);
+      expect(doubleMoveOf(m, m), m).toBeNull();
+    }
+    expect(Object.keys(DOUBLE_MOVES).sort()).toEqual(['behind_back>behind_back', 'between_legs>behind_back']);
+  });
+  it('the window is the player\'s handle\'s: a second behind after it is a fresh move, not a double', () => {
+    const st = { ...after('behind_back'), since: cws2(50) + 0.01 };
+    const o = rhm2('behind_back', st, 50, { present: true, closing: false, set: false, within: true }, () => 0.99, 100);
+    expect(o.restarted).toBe(true); expect(o.chain.length).toBe(1);
+  });
+});

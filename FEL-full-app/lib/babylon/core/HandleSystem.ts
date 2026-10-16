@@ -241,16 +241,31 @@ export const MAX_CHAIN = 4;
 /** The moves only the RIGHT STICK produces (StickHandle.stickMoveFor) — moveFromContext never names them. */
 export const STICK_ONLY: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross', 'momentum_btb', 'steezo_roll', 'stepback']);
 export const MOMENTUM_REPEATABLE: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross']);
+/**
+ * THE DOUBLE MOVES (H2, owner 2026-10-16: "add double moves … like double behind the back or a between the legs behind the back";
+ * generic names, no real names). Two flicks inside the chain window: behind-the-back then behind-the-back is the DOUBLE BEHIND (the ball
+ * wraps back the way it came), between-the-legs then behind-the-back the BETWEEN-BEHIND. They CHAIN — the second is a link, the tier and
+ * the ankle odds are a combo's — so the spam guard (no repeat back to back) lets this one repeat through. The renderer plays the second
+ * on the first's ball (a request while a move runs QUEUES behind it: one continuous path, the second wrap from the first's catch hand).
+ * Keyed "last>next".
+ */
+export const DOUBLE_MOVES: Readonly<Record<string, { id: 'double_behind' | 'between_behind'; label: string }>> = {
+  'behind_back>behind_back': { id: 'double_behind', label: 'DOUBLE BEHIND' },
+  'between_legs>behind_back': { id: 'between_behind', label: 'BETWEEN-BEHIND' },
+};
+export function doubleMoveOf(last: HandleMove | null, next: HandleMove): { id: 'double_behind' | 'between_behind'; label: string } | null {
+  return last ? DOUBLE_MOVES[`${last}>${next}`] ?? null : null;
+}
 export function canChain(next: HandleMove, state: ChainState, handle: number, gate: number = handle): boolean {
   if (!hasMove(next, gate)) return false;   // H2: `gate` owns the move (MOVES_UNLOCKED_GATE); `handle` still sets the window
   if (state.last === null) return true;                 // opening a chain is always allowed
-  if (state.last === next && !MOMENTUM_REPEATABLE.has(next)) return false;   // no double-tapping one move into a "combo" — except the MOMENTUM SPAM (2K17): the cross chains into itself
+  if (state.last === next && !MOMENTUM_REPEATABLE.has(next) && !doubleMoveOf(state.last, next)) return false;   // no double-tapping one move into a "combo" — except the MOMENTUM SPAM (2K17): the cross chains into itself — and the DOUBLE BEHIND (H2)
   return state.since <= chainWindowSec(handle);
 }
 
 /** Advance the chain. A move outside the window STARTS a new chain rather than extending the old one. */
 export function pushChain(next: HandleMove, state: ChainState, handle: number): ChainState {
-  const continues = state.last !== null && (state.last !== next || MOMENTUM_REPEATABLE.has(next)) && state.since <= chainWindowSec(handle)
+  const continues = state.last !== null && (state.last !== next || MOMENTUM_REPEATABLE.has(next) || !!doubleMoveOf(state.last, next)) && state.since <= chainWindowSec(handle)
     && state.length < MAX_CHAIN;
   return { last: next, since: 0, length: continues ? state.length + 1 : 1 };
 }

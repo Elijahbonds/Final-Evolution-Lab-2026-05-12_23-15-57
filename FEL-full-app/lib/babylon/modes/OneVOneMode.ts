@@ -105,7 +105,7 @@ import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPl
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
+  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose,
   ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / flickClip / moveImpulse are the renderer's — anim/handleMotion)
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
@@ -138,7 +138,7 @@ import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 // HOOPS KINETIC (owner brief 2026-09-18): the parry-vault, the momentum drift and its ankle-breaker, the footstool board, the drive-by steal.
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, FOOTSTOOL, footstoolRead, DRIVE_BY, driveByRead } from '../core/HoopsKinetic';
-import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
+import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, SLIDE_MIN_SPACE_M, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
@@ -184,6 +184,7 @@ import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: 
 import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
+import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { AiMover } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
@@ -1041,6 +1042,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meDribbleSM = new DribbleStateMachine();
       void meDribbleSM;
       meAnimTree = new BasketballAnimTree(me.animator);
+      meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
       foeFootPlant = new FootPlant(foe.skeleton, foe.meshes[0] as never);   // HOOPS MOTION phase 3b: every body plants
@@ -1592,7 +1594,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold('bball_hesi', { fadeSec: moveFadeSec(false), speedRatio: 0.25 }); console.info("[1V1-STICK] PAUSIN'"); }
               continue;
             }
-            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
             // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
             // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
             // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
@@ -2148,7 +2150,12 @@ export const OneVOneMode: ModeDefinition = (() => {
             // its hands would reach for a ball that is not there; the capture no longer stands in for bball_crossover_* (it plays by its own
             // name), so he names it — the authored clip only on a rig that did not build the capture.
             const cap = `bball_mc_crossover_${dec.crossover === 'left' ? 'left' : 'right'}`;
-            foeAnimTree.beat(foe.animator.clipNames.has(cap) ? cap : dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', { fadeSec: 0.12 });
+            // H2a: HIS BALL CROSSES AGAIN (4f's §4.20, pulled forward). 4c held it until 4f, which never ran — the probe's ai_1v1_cross read
+            // the ball cross 6/10 at finish-release and 0/10 on the rebased p4. Through the renderer now: no decision, no impulse, no chain
+            // (his move is AttackerBrain's), the crossover's path on his carry, his capture's clip; a crossover to the hand the ball is
+            // already in moves no ball (toSide's old rule).
+            const crosses = !!foeCarry && (foeCarry.hand === 'Left' ? 'left' : 'right') !== dec.crossover;
+            requestMove(foeHost(), { move: 'crossover', hint: dec.crossover, decide: { kind: 'none' }, clip: foe.animator.clipNames.has(cap) ? cap : dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', fadeSec: 0.12, speedRatio: 1, path: crosses ? undefined : false });
             // (4b review F4) HIS BALL STAYS IN HIS HAND UNTIL 4f routes him through HandleMotion (plan §4.20: a path timed inside his poke
             // window). 4b ran the hero's crossover path here (toSide → runMove): the ledger's L1 (his crossover's foot slide p90, the mean of
             // the attempts, ≤ 13.78 cm) read 15.61 | 15.04 against base 12.54 | 13.73; with his ball held it reads 13.0 | 13.05, and
@@ -3297,6 +3304,8 @@ export const OneVOneMode: ModeDefinition = (() => {
    *  plays the crossover (flickClip), so the flick always moves the hands. */
   /** HOOPS MOTION phase 4b: this body as the handle renderer sees it (anim/handleMotion) — its carry, its tree's beat, its impulse (forward
    *  along the facing, lateral + toward the athlete's right). */
+  /** H2a: the rival as the renderer sees him (his crossover's ball path) — his carry and his tree's beat; no impulse (AttackerBrain moves him). */
+  function foeHost(): HandleHost { return { carry: foeCarry, beat: (clip, o) => foeAnimTree.beat(clip, o) }; }
   function meHost(): HandleHost {
     return {
       carry: meCarry,
@@ -3328,6 +3337,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // once, on this frame; then the clip, the ball's path (the carry's runMove — the ball crosses now: 3a measured it drawn on the right
     // 99–100 % of every R-stick handle) and the impulse, signed by the move (U18 — THE BODY GOES WITH THE BALL: it went away from him).
     const turboMove = !!meSlot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS (1.25× real — H2, was 1.35× — and a shorter fade)
+    const lastMove = chain.last;   // H2: the double moves read the move before this one
     const r = requestMove(meHost(), {
       move, hint: dirHint, cutSide, flick, turbo: turboMove, impulse: variant !== 'slide',   // H2: the slide's body is its hop (below), not the impulse
       path: move === 'steezo_roll' ? 'momentum_btb' : undefined,   // the roll's wrap here; the spin that follows it (startSpin) is its pull back
@@ -3342,6 +3352,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (!r.owned || !r.outcome) return false;        // not in my hands yet — the gate IS the upgrade
     const outcome = r.outcome;
     chain = outcome.chain;
+    { const dbl = !outcome.restarted ? doubleMoveOf(lastMove, move) : null; if (dbl) { bannerFlash(ctx, dbl.label, 700); console.info(`[1V1-HANDLE] double move ${dbl.id} (${lastMove} → ${move}, chain ${chain.length})`); } }   // H2: the double moves
     if (variant === 'slide') {   // H2 THE BTB SLIDE: the body hops sideways the way the ball went, the chest kept on him (a space move)
       const toRimL = RIM_FLOOR.subtract(me.root.position); toRimL.y = 0;
       meDribble.slide(r.endHand, toRimL.x, toRimL.z, turboMove);

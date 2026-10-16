@@ -173,15 +173,32 @@ export class DribbleController {
   /** THE BTB SLIDE (H2, owner 2026-10-16: "add a curry slide like behind the back"): the ball wraps behind the back and the body hops
    *  SIDEWAYS the way it went — `side` is the athlete's (the ball's end hand) — with a little give away from the rim (`tx, tz` = toward
    *  it), the chest kept on the man like the step-back's (no turn to run). A space move: the launch is armed, no shot window.
-   *  New numbers (assumption, not felt yet — the reel shows them): 3.0 m/s, the step-back's hop (3.6) less a little, since the slide
-   *  goes across rather than away; 0.25 of it away from the rim; 0.35 s of launch, the step-back's. ≈ 0.8 m of slide by the catch. */
+   *  The hop is COMMITTED (CourtMovement.holdFor): thrown set, the stick is home, and the stop's decel bled a written 3 m/s in a step —
+   *  measured on the first reel, 0.26 m of travel in 0.9 s. It leaves after the clip's load (SLIDE_DELAY_SEC) and holds its speed through
+   *  the skip (SLIDE_HOLD_SEC), then the stop takes it.
+   *  New numbers (assumption, not felt yet — the reel shows them): 3.0 m/s (+0.3 on the turbo), the step-back's hop (3.6) less a little
+   *  since the slide goes across rather than away; 0.25 of it away from the rim; out at 0.06 s, held 0.24 s: ≈ 0.75 m, plus the stop. */
   static readonly SLIDE_HOP_SPEED = 3.0;
   static readonly SLIDE_BACK = 0.25;
+  static readonly SLIDE_DELAY_SEC = 0.06;
+  static readonly SLIDE_HOLD_SEC = 0.24;
+  private pendingSlide: { x: number; z: number; speed: number; left: number } | null = null;
   slide(side: 'left' | 'right', tx: number, tz: number, sprint: boolean): void {
     const { rx, rz } = this.frame(); const sgn = side === 'right' ? 1 : -1;
     const n = Math.hypot(tx, tz) || 1, b = DribbleController.SLIDE_BACK;
-    this.cutTo(rx * sgn * (1 - b) - (tx / n) * b, rz * sgn * (1 - b) - (tz / n) * b, DribbleController.SLIDE_HOP_SPEED + (sprint ? 0.3 : 0), false);
-    this.movement.launchFor(0.35); this.movement.noteBurst(0.3);
+    const dx = rx * sgn * (1 - b) - (tx / n) * b, dz = rz * sgn * (1 - b) - (tz / n) * b, m = Math.hypot(dx, dz) || 1;
+    this.pendingCut = null;
+    this.pendingSlide = { x: dx / m, z: dz / m, speed: DribbleController.SLIDE_HOP_SPEED + (sprint ? 0.3 : 0), left: DribbleController.SLIDE_DELAY_SEC };
+    this.movement.cutGrace(DribbleController.SLIDE_DELAY_SEC + DribbleController.SLIDE_HOLD_SEC + 0.1);
+    this.movement.noteBurst(0.3);
+  }
+  /** The slide's hop leaves (after the load): the velocity written, held through the skip, the chest where it was. */
+  private stepSlide(dt: number): void {
+    const p = this.pendingSlide; if (!p) return;
+    p.left -= dt; if (p.left > 0) return;
+    this.pendingSlide = null; this.pendingCut = null;
+    this.movement.vel.set(p.x * p.speed, 0, p.z * p.speed);
+    this.movement.holdFor(DribbleController.SLIDE_HOLD_SEC); this.movement.launchFor(0.35);
   }
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
@@ -199,6 +216,7 @@ export class DribbleController {
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
     this.clock += dt;
     this.stepCut(dt);
+    this.stepSlide(dt);   // H2: the BTB slide's committed hop
     this.crossoverCooldown = Math.max(0, this.crossoverCooldown - dt);
     this.hesiCooldown = Math.max(0, this.hesiCooldown - dt);
     this.hesiBoostLeft = Math.max(0, this.hesiBoostLeft - dt);
@@ -221,7 +239,12 @@ export class DribbleController {
     // three frames of held pull-back wrapped facing π → 0 and the tap
     // exploded you toward your own basket).
     const facingX = Math.sin(this.movement.facing), facingZ = Math.cos(this.movement.facing);
+    const holding = this.movement.holding;   // H2: inside a committed hop the stick reads no gesture (it would rewrite the hop)
     const state = this.movement.update(dt, moveX, moveY, sprint);
+    if (holding) {
+      this.sprintWas = sprint && mag > 0.05;
+      return { crossover: false, hesitation: false, speed01: state.speed01, facingRad: this.movement.facing, planting: false, gear: state.gear ?? 'stop', intensity01: state.intensity01 ?? state.speed01, paceChange: false };
+    }
     const dir = committed ? new Vector3(moveX / mag, 0, -moveY / mag) : null;
     const back = dir ? dir.x * facingX + dir.z * facingZ : 0;
     const fwd = back !== 0 ? -back : 0;

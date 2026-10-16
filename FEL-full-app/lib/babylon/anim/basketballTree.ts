@@ -20,6 +20,7 @@ import type { CharacterAnimator } from './CharacterAnimator';
 import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
 import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
+import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs keep running under a handle move
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -234,6 +235,23 @@ export class BasketballAnimTree {
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
   constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'> & Partial<Pick<CharacterAnimator, 'freezeAtEnd'>>) {}
+  /** H2 (moveLegs): the body's legs layer, and whether the beat in flight runs it (a handle move's beat, MOVE_LEGS_BEAT). */
+  private legs: MoveLegs | null = null;
+  private legsBeat = false;
+  attachLegs(legs: MoveLegs): void { this.legs = legs; }
+  /** H2: drive the legs layer for this frame — under a move beat, the loop the body would be in and its stride rate; after it, fading. */
+  private stepLegs(input: AnimTreeInput): void {
+    const l = this.legs; if (!l) return;
+    const dtSec = input.dtSec ?? 1 / 60, speedMps = input.speedMps ?? 0;
+    if (this.legsBeat && this.override?.kind === 'beat') {
+      const c = this.owned(chooseBasketballClip({ ...input, crossover: false, moveActive: true }));
+      const rate = c.loop ? rateFor(c.state, speedMps, this.ref) : null;
+      l.drive({ loopClip: c.loop && rate !== null ? c.clip : null, rate: rate ?? 1, speedMps, dtSec });
+    } else if (l.live) {
+      const st = this.current ?? 'speed_dribble';
+      l.end({ rate: rateFor(st, speedMps, this.ref) ?? 1, speedMps, dtSec });
+    }
+  }
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
   private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
 
@@ -259,6 +277,7 @@ export class BasketballAnimTree {
   }
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
+    this.stepLegs(input);
     const raw = this.owned(chooseBasketballClip(input));
     if (this.settledState && raw.state !== this.settledState) this.settledState = null;
     const c = this.settledState ? this.owned(chooseBasketballClip(withoutTrigger(input, this.settledState))) : raw;
@@ -279,7 +298,9 @@ export class BasketballAnimTree {
         const r0 = rateFor(c.state, input.speedMps ?? 0, this.ref);
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null) this.strideFilter.set(r0);
-        this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
+        // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
+        const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
+        this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });
       } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
@@ -324,6 +345,9 @@ export class BasketballAnimTree {
 
   private playBeat(clip: string, opts: TreeBeatOpts, state: BasketballAnimState | null): void {
     const tok = ++this.token;
+    // H2 (moveLegs): a handle move's beat on a moving body runs the legs layer, seeded from the loop it cuts (its stride phase)
+    this.legsBeat = !!this.legs && MOVE_LEGS_BEAT.test(clip);
+    if (this.legsBeat) this.legs!.begin(this.strideClip);
     this.override = { kind: 'beat', clip, state };
     this.animator.play(clip, {
       loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame

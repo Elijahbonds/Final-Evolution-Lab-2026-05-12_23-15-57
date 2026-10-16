@@ -35,17 +35,18 @@ describe('4b review F3: reactToBreak\'s bite side is phase 3\'s (the side named,
   });
 });
 
-// 4b review F4: the rival's crossover keeps its ball until 4f (plan §4.20) routes him through HandleMotion — the ledger's L1 was over its
-// limit in two runs with the hero's crossover path on his carry, and under it in two with his ball held (p4/4c/review/f4-rival.txt).
-describe('4b review F4: the rival\'s crossover plays its clip and runs no crossing path (until 4f)', () => {
-  it('1v1: the beat stays; foeCarry.toSide is not called', () => {
+// 4b review F4: the rival's crossover kept its ball "until 4f (plan §4.20) routes him through HandleMotion". H2a does that (owner H2 scope:
+// everything the old plan had) and REWROTE this block's first case — the pin was the interim state it names: the ball held, the plain beat.
+// Measured why it could not stay: the probe's ai_1v1_cross read his ball cross 6/10 at finish-release and 0/10 on the rebased p4.
+describe('the rival\'s crossover (4f §4.20, H2a): through the renderer — his capture, his ball crossing, no decision, no impulse', () => {
+  it('1v1: requestMove on his host, decide none, the capture by name, the crossing path only when the ball is in the other hand; no toSide', () => {
     const one = src('OneVOneMode.ts');
     const at = one.indexOf("if (dec.crossover) {");
     const block = one.slice(at, at + 2400);
-    // (phase 4c) the beat names the CAPTURE he played before 4c (opponentMotion swapped it in for bball_crossover_*; since 4c the hero's
-    // crossover is the v2 clip keyed on a ball path his held ball does not run) — the authored clip only on a rig without the capture
     expect(block).toMatch(/const cap = `bball_mc_crossover_\$\{dec\.crossover === 'left' \? 'left' : 'right'\}`;/);
-    expect(block).toMatch(/foeAnimTree\.beat\(foe\.animator\.clipNames\.has\(cap\) \? cap : dec\.crossover === 'left' \? 'bball_crossover_left' : 'bball_crossover_right', \{ fadeSec: 0\.12 \}\);/);
+    expect(block).toMatch(/const crosses = !!foeCarry && \(foeCarry\.hand === 'Left' \? 'left' : 'right'\) !== dec\.crossover;/);
+    expect(block).toMatch(/requestMove\(foeHost\(\), \{ move: 'crossover', hint: dec\.crossover, decide: \{ kind: 'none' \}, clip: foe\.animator\.clipNames\.has\(cap\) \? cap : [^}]*fadeSec: 0\.12, speedRatio: 1, path: crosses \? undefined : false \}\);/);
+    expect(one).toMatch(/function foeHost\(\): HandleHost \{ return \{ carry: foeCarry, beat: \(clip, o\) => foeAnimTree\.beat\(clip, o\) \}; \}/);   // no impulse: AttackerBrain moves him
     expect(one).not.toMatch(/^\s*foeCarry\?\.toSide\(/m);
   });
   it('(phase 4c) the capture he names is the one that stood in for the authored crossover before 4c, and still builds by that name', async () => {

@@ -289,7 +289,7 @@ const CATALOGUE: ActionDef[] = [
   A('hero_1v1_dunk', 'game dunk off the drive', 'game dunks', 'dunk', '1v1-off', withReps(['o_dunk', 'o_dunk_base', 'o_dunk_wing', 'o_dunk_slow', 'o_dunk_jog', 'o_dunk_poster', 'o_dunk_standing', 'o_dunk_spin']), { body: 'me', clip: DUNK }, 700, 2000),
   A('hero_1v1_cross', 'crossover (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_cross', 'o_crossover_stand', 'o_crossover_fast']), { body: 'me', clip: /crossover|momentum_cross/ }, 400, 1000),   // (4c: the crossover at a run is the momentum cross, its own clip since 4c)
   A('hero_1v1_between', 'between the legs (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_between', 'o_between_stand', 'o_between_fast']), { body: 'me', clip: /between/ }, 400, 1000),
-  A('hero_1v1_behind', 'behind the back (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_behind', 'o_behind_stand', 'o_behind_fast']), { body: 'me', clip: /behind/ }, 400, 1000),
+  A('hero_1v1_behind', 'behind the back (R stick)', 'handles', 'handle', '1v1-off', withReps(['o_behind', 'o_behind_stand', 'o_behind_fast']), { body: 'me', clip: /behind|btb_slide/ }, 400, 1000),
   A('hero_1v1_spin', 'spin move (R stick sweep)', 'handles', 'handle', '1v1-off', withReps(['o_spin', 'o_spin_stand', 'o_spin_fast']), { body: 'me', clip: /spin(?!_layup)/ }, 400, 1100),
   A('hero_1v1_hesi', 'hesitation (R stick toward the ball)', 'handles', 'handle', '1v1-off', withReps(['o_hesi', 'o_hesi_stand', 'o_hesi_fast']), { body: 'me', clip: /hesi|jab/ }, 400, 1000),
   A('hero_1v1_inout', 'in-and-out (R stick up)', 'handles', 'handle', '1v1-off', withReps(['o_inout', 'o_inout_stand', 'o_inout_fast']), { body: 'me', clip: /feint|in_and_out|inout/ }, 400, 1000),
@@ -400,7 +400,7 @@ const CATALOGUE: ActionDef[] = [
     ['hero_1v1_pivot', 'pivot (L1 planted + the stick across; front and reverse)', ['o_pivot', 'o_pivot_rev'], /\[HM-INPUT\] pivot/, 400, 1000],
     ['hero_1v1_steezo', 'steezo roll (R2 + the sweep; off the drop-step range and on it)', ['o_steezo_far', 'o_steezo_near'], /\[HM-INPUT\] sweep steezo/, 400, 1500],
   ] as const).map(([id, label, takes, mark, pre, post]) => ({ ...A(id, label, 'handles', 'handle', '1v1-off', withReps([...takes]), { body: 'me', mark }, pre, post), supplemental: true })),
-  ...([['hero_3v3_between', 'between the legs (R stick)', 't_between', /between/], ['hero_3v3_behind', 'behind the back (R stick)', 't_behind', /behind/], ['hero_3v3_spin', 'spin move (R stick sweep)', 't_spin', /spin(?!_layup)/],
+  ...([['hero_3v3_between', 'between the legs (R stick)', 't_between', /between/], ['hero_3v3_behind', 'behind the back (R stick)', 't_behind', /behind|btb_slide/], ['hero_3v3_spin', 'spin move (R stick sweep)', 't_spin', /spin(?!_layup)/],
     ['hero_3v3_hesi', 'hesitation (R stick toward the ball)', 't_hesi', /hesi|jab/], ['hero_3v3_inout', 'in-and-out (R stick up)', 't_inout', /feint|in_and_out|inout/]] as const)
     .map(([id, label, take, clip]) => { const mv = take.slice(2); return { ...A(id, label, 'handles', 'handle', '3v3-off', withReps([take, `t_${mv}_stand`, `t_${mv}_fast`]), { body: 'me', clip }, 400, 1000), supplemental: true }; }),
 ];
