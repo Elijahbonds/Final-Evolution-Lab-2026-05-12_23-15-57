@@ -46,7 +46,7 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'app/play/mirror/assess/_components/skeleton.ts': [[LANDMARKS, 'the bones and joints drawn'], [['0.35', '160', '0.9', '2.5', '110', '6', '1.5', '240', '200', '2.4', '0.2', '0.08', '1e-6'], 'drawing: visibility for the frozen view, line widths, alpha, radii, guide lengths, padding']],
   'app/play/mirror/assess/_components/use-voice.ts': [[['1.02'], 'speech rate']],
   // MIRROR step 2 (fault replay)
-  'app/play/mirror/assess/_components/fault-replay.tsx': [[['240', '320'], 'the replay canvas drawing size and max width in px (a size, not a grade)']],
+  'app/play/mirror/assess/_components/fault-replay.tsx': [[['240', '320'], 'the replay canvas drawing size and max width in px (a size, not a grade)'], [['50'], 'replay playback pace in ms (UI pacing, grades nothing)']],
   'lib/screen/rep-memory.ts': [],
 };
 const NONE = [

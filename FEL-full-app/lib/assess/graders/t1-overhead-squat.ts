@@ -16,7 +16,7 @@ import {
 import { aroundPeak, bestReps, medianRep, segment, type Rep } from '../reps';
 import {
   confidenceOf, metric, poseHz, scorable, sideResult, weightedScore, worseSide,
-  type FrozenRep, type MetricResult, type TestResult,
+  repClip, type FrozenRep, type MetricResult, type TestResult,
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 
@@ -140,7 +140,12 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
     if (m.fault) {
       const worst = scored.reduce((a, b) => ((b.metrics.find((x) => x.id === id)!.score ?? 101) < (a.metrics.find((x) => x.id === id)!.score ?? 101) ? b : a));
       const fi = worst.worstFrame[id];
-      if (fi !== undefined && frames[fi]) frozen.push({ metric: id, ...(m.side ? { side: m.side } : {}), rep: worst.rep.index, image: frames[fi].image.map((l) => ({ ...l })), aspect });
+      const top = scored.reduce((a, b) => ((b.metrics.find((x) => x.id === id)!.score ?? -1) > (a.metrics.find((x) => x.id === id)!.score ?? -1) ? b : a));
+      if (fi !== undefined && frames[fi]) frozen.push({
+        metric: id, ...(m.side ? { side: m.side } : {}), rep: worst.rep.index, image: frames[fi].image.map((l) => ({ ...l })), aspect,
+        worstClip: repClip(frames, worst.rep.index, worst.rep.start, worst.rep.end),
+        ...(top !== worst ? { bestClip: repClip(frames, top.rep.index, top.rep.start, top.rep.end) } : {}),
+      });
     }
     return m;
   };
@@ -153,7 +158,12 @@ export function gradeT1(raw: T1Capture, ctx: GradeContext): TestResult {
   });
   if (heel.fault && heelReps[0]) {
     const s = heelReps.reduce((a, b) => (b.heelMax > a.heelMax ? b : a));
-    frozen.push({ metric: 'heelRise', ...(oneSide ? { side: oneSide } : {}), rep: s.rep.index, image: cap.side[s.worstFrame.heelRise].image.map((l) => ({ ...l })), aspect });
+    const flat = sScored.find((r) => !r.heelRose);
+    frozen.push({
+      metric: 'heelRise', ...(oneSide ? { side: oneSide } : {}), rep: s.rep.index, image: cap.side[s.worstFrame.heelRise].image.map((l) => ({ ...l })), aspect,
+      worstClip: repClip(cap.side, s.rep.index, s.rep.start, s.rep.end),
+      ...(flat ? { bestClip: repClip(cap.side, flat.rep.index, flat.rep.start, flat.rep.end) } : {}),
+    });
   }
 
   const metrics = [

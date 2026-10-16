@@ -19,7 +19,10 @@ let held: FrozenRep[] | null = null;
 /** Keep the frozen worst-rep frames of a finished adult screen, in this page's memory only (copied, never shared). */
 export function holdReplay(tests: readonly TestResult[]): void {
   const frames = tests.flatMap((t) => t.frozen ?? []);
-  held = frames.length ? frames.map((f) => ({ ...f, image: f.image.map((l) => ({ ...l })) })) : null;
+  const copy = (c: FrozenRep['worstClip']) => (c ? { rep: c.rep, frames: c.frames.map((fr) => fr.map((l) => ({ ...l }))) } : undefined);
+  held = frames.length
+    ? frames.map((f) => ({ ...f, image: f.image.map((l) => ({ ...l })), ...(f.worstClip ? { worstClip: copy(f.worstClip) } : {}), ...(f.bestClip ? { bestClip: copy(f.bestClip) } : {}) }))
+    : null;
 }
 
 /** The held frames, or null. Reading does not clear: the results page clears when it is left. */
