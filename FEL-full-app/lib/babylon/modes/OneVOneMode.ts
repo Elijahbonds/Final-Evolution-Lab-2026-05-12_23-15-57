@@ -185,7 +185,8 @@ import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
-import { AiMover } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
+import { AiMover } from '../core/AiMovement';
+import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
@@ -194,7 +195,9 @@ import { dunkStingers } from '../audio/mic/names';
 import { HOOPERS } from '../audio/mic/cast';
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
-import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
+/** H2c (dev log): the defender states the stepping pass added or re-routed. */
+const H2C_STEP_STATES: ReadonlySet<string> = new Set(['defend_run', 'defend_run_right', 'run', 'closeout']);   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
@@ -559,6 +562,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** HOOPS MOTION phase 3b: the rival's movement — his slide at 3.6 m/s (sprint 1.2×) and his drive's own wish, on the hero's accel 26 /
    *  decel 34 (it was unit steer × 3.6 in one frame: 216 m/s²). */
   const foeMover = new AiMover(3.6);
+  let foeReact: DefReaction | null = null;   // H2c: the rival's read of a fake — his mover takes the step (core/DefenderReact)
+  let lastFoeStepState = '';   // H2c (dev log): the rival's last tree state, for the stepping states' lines
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
   // ── the DEFENSE contest package (D1–D3) ──
   let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
@@ -733,7 +738,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1510,8 +1515,9 @@ export const OneVOneMode: ModeDefinition = (() => {
             });
             SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
             if (bought) {
+              const rr = retreatFrom(defGeo());   // H2c: he gives up ~0.3 m (a drop step) under the stun
               foeStunSec = Math.max(foeStunSec, 0.3);
-              foeAnimTree.beat('bball_contact_react', { fadeSec: 0.07 });
+              if (rr) defReact(rr); else foeAnimTree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               bannerFlash(ctx, 'HE BIT THE JAB — GO!', 600);
               micBite();   // THE MIC
@@ -1612,7 +1618,9 @@ export const OneVOneMode: ModeDefinition = (() => {
               // `continue`); the between step crosses, so its clip is named for the side the ball ends on (one value, S31)
               const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', MOVES_UNLOCKED_GATE);   // H2: the whole cycle, unlocked
               const su = requestMove(meHost(), { move: sizeUpMoveOf(suClip), hint: pick.side ?? undefined, decide: { kind: 'none' }, fadeSec: moveFadeSec(sprintOk), speedRatio: 1 });
-              console.info(`[1V1-HANDLE] size-up ${su.clip ?? suClip} (handle ${handle})`); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue;
+              console.info(`[1V1-HANDLE] size-up ${su.clip ?? suClip} (handle ${handle})`); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 });
+              if (sizeUpMoveOf(suClip) === 'yoyo') defReact(shadeToward(defGeo(), su.endHand));   // H2c: he shades the yoyo's ball side (the size-up's other steps read nothing)
+              continue;
             }
             if (pick.move === 'stepback') {
               // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
@@ -1733,7 +1741,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               foeStunSec = 0.45;
               SoundKit.play('impact', { pitch: 1.1, volume: 0.35 });
               ctx.feel?.impact?.(0.2);
-              foeAnimTree.beat('bball_contact_react');
+              if (foeReact?.kind !== 'standup') foeAnimTree.beat('bball_def_standup', { fadeSec: 0.06 });   // H2c: he STANDS UP (it played the contact react); doMove's hesi may have started it this frame
               bannerFlash(ctx, 'BIT ON THE HESI!');
               micBite();   // THE MIC
             } else {
@@ -1748,8 +1756,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         // dunk for the animation eye (every layup play the lab drove became a contested pull-up)
         if (dummyFoe) { foeIntent.moveX = 0; foeIntent.moveY = 0; foeIntent.steal = false; foeIntent.contest = false; foeIntent.action = false; foeIntent.sprint = false; }
         // HOOPS MOTION phase 3b: the brain's intent is a wish; the mover gives the velocity the body has (a stagger stands him still, as before)
-        if (foeStunSec > 0) foeMover.stop(); else observeFoe(ctx, dt);   // (the physics step and the contacts moved him last frame: he carries the speed he really had)
-        const foeMove = foeMover.stepIntent(dt, foeStunSec > 0 ? { moveX: 0, moveY: 0 } : foeIntent);
+        // H2c: a reaction (core/DefenderReact) owns his feet for its beat — through the mover, under a stun too (the jab's retreat)
+        const foeReacting = !!foeReact && !foeFloored;
+        if (foeStunSec > 0 && !foeReacting) foeMover.stop(); else observeFoe(ctx, dt);   // (the physics step and the contacts moved him last frame: he carries the speed he really had)
+        const foeMove = foeReacting ? foeMover.track(dt, reactionWish(foeReact!)) : foeMover.stepIntent(dt, foeStunSec > 0 ? { moveX: 0, moveY: 0 } : foeIntent);
         const foeVel = _foeVel.copyFrom(foeMove.vel);   // IMPROVE (2026-10-06) #15: a kept copy (nothing below calls the mover again this frame)
         plantFoe(foeMove.planting, dt);
         foeVelLast.copyFrom(foeVel);   // HOOPS-MOVE-KIT-A M2: the drive contest reads set vs moving
@@ -1757,7 +1767,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // same world-space number otherwise)
         meMotion.update(meDribble.vel.x, meDribble.vel.z, me.root.rotation.y, dt);
         foeMotion.update(foeVel.x, foeVel.z, foe.root.rotation.y, dt);
-        if (foeStunSec === 0) {
+        if (foeStunSec === 0 || foeReacting) {
           // closing speed toward the handler feeds the hesi bite read
           const toMe = me.root.position.subtractToRef(foe.root.position, _toMe); toMe.y = 0;   // IMPROVE (2026-10-06) #15
           foeClosingSpeed = toMe.lengthSquared() > 1e-4
@@ -1767,8 +1777,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           driveBody('foe', foe.root, foeVel, dt);
           // BIOMECH-HOOPS-WAVE1 G1: a defender's chest stays ON the handler through the slide (he used to face his travel —
           // a sideways-shuffling run); beyond range he runs to his spot facing the travel; every turn a slew
-          facePlay(foe.root, foeVel, foeStunSec > 0 ? null : me.root.position, DEFEND_FACE_RANGE, dt);
+          facePlay(foe.root, foeVel, foeStunSec > 0 && !foeReacting ? null : me.root.position, DEFEND_FACE_RANGE, dt);   // H2c: a reaction keeps his chest on me (a drop step is not a turn and run)
         }
+        if (foeReacting) foeReact = stepReaction(foeReact!, dt, foeVel);   // H2c
         foeSpeed01 = Math.min(1, foeVel.length() / 3.6);
         if (foeBrain && foeBrain.job !== lastFoeJob) { lastFoeJob = foeBrain.job; console.info(`[1V1-DEF] rival job ${lastFoeJob}`); }   // DEFENSE-LOOK: the lab reads the closeout / recover
         foeAnimTree.update({
@@ -1777,8 +1788,11 @@ export const OneVOneMode: ModeDefinition = (() => {
           speed01: Math.min(1, foeVel.length() / 3.6), crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
           defending: true, bracing: !!foeBrain?.boxing, staggered: false, slideDir: slideDirFor(foe.root.rotation.y, foeVel),   // O2: the seal stance while boxing
-          retreat: retreatFor(foe.root.position, foeVel, me.root.position), closeout: foeBrain?.job === 'closeout' && distXZ(foe.root.position, me.root.position) < 2.4, intense: foeBrain?.job === 'onball' && distXZ(foe.root.position, me.root.position) < 2.0,   // DEFENSE-LOOK
+          retreat: retreatFor(foe.root.position, foeVel, me.root.position), closeout: (foeBrain?.job === 'closeout' && distXZ(foe.root.position, me.root.position) < 2.4) || closeoutFor(foe.root.position, foeVel, me.root.position, Math.min(1, foeVel.length() / 3.6)),   // H2c: the chop wherever he runs the last 2.6 m at me
+          defendRun: defendRunFor(foe.root.rotation.y, foeVel, foeAnimTree.state), approach: approachFor(foe.root.position, foeVel, me.root.position, foeAnimTree.state),   // H2c: the crossover step; the sprint at me before the chop
+          intense: foeBrain?.job === 'onball' && distXZ(foe.root.position, me.root.position) < 2.0,   // DEFENSE-LOOK
         });
+        if (process.env.NODE_ENV === 'development') { const st = foeAnimTree.state ?? ''; if (st !== lastFoeStepState && (H2C_STEP_STATES.has(st) || H2C_STEP_STATES.has(lastFoeStepState))) console.info(`[1V1-DEF] rival steps ${lastFoeStepState || '-'} → ${st} at ${foeVel.length().toFixed(1)} m/s`); lastFoeStepState = st; }   // H2c: the lab reads the crossover step / the sprint / the chop
         // same standoff fix as the defensive poke: bodies rest ~1.1m apart
         // HOOPS-MOVE-KIT-B: a SEALED post man cannot be poked from behind — the body is between him and the ball, which is
         // what the seal is for (the ball is held out on the ball side). Front the post (get on my chest side) and the poke
@@ -2081,6 +2095,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           hasBall: false, shooting: false, dunking: false, driving: false,
           defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(defYaw, meDribble.vel),
           retreat: retreatFor(me.root.position, meDribble.vel, foe.root.position), closeout: closeoutFor(me.root.position, meDribble.vel, foe.root.position, drib.speed01), intense: sitting,   // DEFENSE-LOOK
+          defendRun: defendRunFor(defYaw, meDribble.vel, meAnimTree.state), approach: approachFor(me.root.position, meDribble.vel, foe.root.position, meAnimTree.state),   // H2c
         });
         const dist = Vector3.Distance(me.root.position, foe.root.position);
         // D3: X HELD = the grounded hand-up (verticality) — a hold the tree never interrupts; re-held after a reach beat
@@ -2143,7 +2158,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             travelOffRad: travelOff(foe.root.rotation.y, foeW),
             ballHand: foeCarry?.hand === 'Left' ? 'left' : 'right',   // HOOPS MOTION phase 4b: his loops in his ball hand
           });
-          if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_hesi', { fadeSec: 0.1 }); }   // the step-back reads as a check: the body loads
+          if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_stepback_rival', { fadeSec: 0.08 }); }   // H2c (plan §4.21): his own 0.30 s step-back (it played the hesi)
           if (dec.crossover) {
             // the ball SWITCHES hands — the read. A same-hand shuffle (dec.step without a crossover) keeps the dribble loop.
             // HOOPS MOTION phase 4c: HIS crossover keeps the CAPTURE (06_13) it played through opponentMotion's swap until 4f routes him through
@@ -2372,7 +2387,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
@@ -3269,7 +3284,7 @@ export const OneVOneMode: ModeDefinition = (() => {
    * crossover should rarely break anyone and a three-deep chain at a real handle should look inevitable.
    */
   /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
-  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, moveDir: 'left' | 'right' = 'right'): void {
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, moveDir: 'left' | 'right' = 'right', readMs = 0): void {   // H2c: `readMs` — the soft break's stumble beats when the ball crosses (readBeatMs)
     if (outcome.broke === 'none') return;
     const tier = outcome.tier;
     const odds = outcome.odds;
@@ -3297,7 +3312,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
     } else {
       foeStunSec = ANKLE_BREAK_STUN_SEC;
-      foeAnimTree.beat(ANKLE_STUMBLE_CLIP);   // …and the softer one is a STUMBLE, not a hit react: he caught it, late
+      { const stumble = (): void => { if (!foeFloored) foeAnimTree.beat(ANKLE_STUMBLE_CLIP); }; if (readMs > 16) later(readMs, stumble); else stumble(); }   // …and the softer one is a STUMBLE, not a hit react: he caught it, late (H2c, plan 4f: when the ball crosses, not on the input frame)
       // THE BITE (Phase 6): his feet went with the fake — the root lunges toward the side the ball LEFT, under the stumble
       { const f = meDribble.facing; const right = new Vector3(Math.cos(f), 0, -Math.sin(f)); const bite = right.scale(moveDir === 'right' ? -1 : 1);
         victimSlide = { dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[1V1-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
@@ -3314,6 +3329,16 @@ export const OneVOneMode: ModeDefinition = (() => {
    *  along the facing, lateral + toward the athlete's right). */
   /** H2a: the rival as the renderer sees him (his crossover's ball path) — his carry and his tree's beat; no impulse (AttackerBrain moves him). */
   function foeHost(): HandleHost { return { carry: foeCarry, beat: (clip, o) => foeAnimTree.beat(clip, o) }; }
+  /** H2c: the geometry the rival's reads take (core/DefenderReact). */
+  function defGeo(): DefReadGeometry { return { handler: me.root.position, handlerYaw: me.root.rotation.y, defender: foe.root.position, live: foeStunSec === 0 && !foeFloored }; }
+  /** H2c: start the rival's reaction — his mover takes the step (the defence step below), his tree the beat. */
+  function defReact(r: DefReaction | null): void {
+    if (!r || foeFloored) return;
+    foeReact = r;
+    const clip = reactClip(r, sideOfVector(foe.root.rotation.y, r.dir));   // the lunge's side: the athlete's side he steps to
+    if (clip) foeAnimTree.beat(clip, { fadeSec: 0.06 });
+    console.info(`[1V1-DEF] react ${r.kind}${r.tune.dist > 0 ? ` ${r.tune.dist} m` : ''}${clip ? ` → ${clip}` : ''}`);
+  }
   function meHost(): HandleHost {
     return {
       carry: meCarry,
@@ -3431,7 +3456,13 @@ export const OneVOneMode: ModeDefinition = (() => {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    reactToBreak(ctx, outcome, biteDir);
+    reactToBreak(ctx, outcome, biteDir, r.ball === 'started' ? readBeatMs(meCarry?.move) : 0);
+    // H2c (owner decision 3): the read that did NOT break him still moves him — a look and a small real effect (core/DefenderReact)
+    if (outcome.broke === 'none') {
+      if (lungesOn(move)) defReact(lungeFor(defGeo(), move, biteDir));
+      else if (move === 'yoyo') defReact(shadeToward(defGeo(), r.endHand));
+      else if (move === 'hesi') defReact(standUpOn(defGeo(), foeCloseMemory));
+    }
     return true;
   }
 

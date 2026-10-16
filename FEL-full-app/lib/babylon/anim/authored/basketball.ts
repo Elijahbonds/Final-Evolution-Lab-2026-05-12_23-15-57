@@ -45,6 +45,9 @@ export const BASKETBALL_CLIPS = [
   'bball_pivot_v2_left', 'bball_pivot_v2_right', // H2b (plan §4.16): the pivot at real speed, the root owns the turn
   'bball_snatch_back_v2_left', 'bball_snatch_back_v2_right',   // H2b (plan §4.13): the snatchback on its own crossing path, timed to the hop
   'bball_shimmy_quick',                          // H2b (plan §4.23): the post hook's R2 shimmy (it played the hesi at 1.5×)
+  'bball_def_retreat', 'bball_def_lunge_left', 'bball_def_lunge_right', 'bball_def_standup',   // H2c: the defender's reactions (core/DefenderReact)
+  'bball_def_cross_run_left', 'bball_def_cross_run_right',   // H2c: the crossover step (lateral past a slide's reach)
+  'bball_stepback_rival',                        // H2c (plan §4.21): the rival's 0.30 s step-back (it played the hesi)
   'bball_ankle_stumble', 'bball_ankle_slip',
   'bball_stepback_gather',
   'bball_hop_step', 'bball_euro_step',
@@ -186,6 +189,19 @@ export function buildStepbackGather(scene: Scene, sk: Skeleton): AnimationGroup 
     { t: 0.28, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0],  Neck: [-2, 0, 0] }, hands: { Right: [0.20, 1.06, 0.02] as V3, Left: [-0.06, 1.04, 0.04] as V3 }, hipsY: -0.05, feet: feetAt(-0.05, { Left: [-0.18, ANKLE_Y + 0.06, 0.36], Right: [0.21, ANKLE_Y, -0.26] }), kneesFront: true },   // the trail foot lands, the lead foot leaves, the ball swept back with them
     { t: 0.38, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],   Neck: [-4, 0, 0] }, hands: { Right: [0.16, 1.18, 0.14] as V3, Left: [-0.08, 1.16, 0.16] as V3 }, hipsY: -0.09, feet: feetAt(-0.09, { Left: [-0.19, ANKLE_Y + 0.02, 0.12], Right: [0.21, ANKLE_Y, -0.20] }), kneesFront: true },   // THE SET STEP: the lead foot back under
     { t: 0.46, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  Neck: [-6, 0, 0] }, hands: { Right: [0.14, 1.28, 0.24] as V3, Left: [-0.10, 1.26, 0.26] as V3 }, hipsY: -0.11, feet: feetAt(-0.11, { Left: [-0.19, ANKLE_Y, 0.06], Right: [0.21, ANKLE_Y, -0.10] }), kneesFront: true },   // SET: squared and loaded — a step-back you cannot shoot out of is a retreat
+  ]);
+}
+
+/** THE RIVAL'S STEP-BACK (H2c, plan §4.21): his own 0.30 s cut — AttackerBrain's step-back is STEPBACK_SEC 0.3 at 3.2 m/s and the gather
+ *  clip takes over at 0.30 s, so the hero's 0.46 s gather would be cut before its set. The push off the lead foot, the trail foot reaching
+ *  back in the air, the plant loaded for the gather (the set is folded into the gather's tell). It played the hesitation. Feet keyed as
+ *  ankles in the body frame: the root goes back ~0.96 m under it, so the pushing foot reads further in front as he leaves it. */
+export function buildStepbackRival(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return buildPoseClip(scene, sk, 'bball_stepback_rival', 0.30, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [-4, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06, feet: feetAt(-0.06, STANCE_FEET), kneesFront: true },
+    { t: 0.08, bones: { Hips: [0, 0, 0], Spine: [26, 0, 0], Neck: [-8, 0, 0] }, hands: { Right: [0.28, 0.84, 0.36] as V3, Left: [0.04, 0.88, 0.34] as V3 }, hipsY: -0.14, feet: feetAt(-0.14, { Left: [-0.19, ANKLE_Y, 0.30], Right: [0.20, ANKLE_Y + 0.06, -0.10] }), kneesFront: true },   // the push off the lead foot
+    { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0], Neck: [-4, 0, 0] }, hands: { Right: [0.22, 1.00, 0.10] as V3, Left: [-0.02, 1.00, 0.12] as V3 }, hipsY: -0.06, feet: feetAt(-0.06, { Left: [-0.18, ANKLE_Y + 0.04, 0.40], Right: [0.21, ANKLE_Y + 0.04, -0.30] }), kneesFront: true },   // in the air going back
+    { t: 0.30, bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-6, 0, 0] }, hands: { Right: [0.18, 1.10, 0.18] as V3, Left: [-0.06, 1.08, 0.20] as V3 }, hipsY: -0.12, feet: feetAt(-0.12, { Left: [-0.19, ANKLE_Y + 0.02, 0.22], Right: [0.21, ANKLE_Y, -0.12] }), kneesFront: true },   // planted, loaded for the gather
   ]);
 }
 
@@ -729,6 +745,80 @@ export function buildCloseout(scene: Scene, sk: Skeleton): AnimationGroup | null
     key(0.2, [-10, 0, 8], [-26, 0, -8], 16, 34),
     key(0.4, [-26, 0, 8], [-10, 0, -8], 34, 16),
   ]);
+}
+
+// ── H2c (owner decision 3): THE DEFENDER REACTS — the look of core/DefenderReact's four reads (his mover takes the step) ─────────────────
+// (functions, not consts: ANKLE_Y is declared further down this module, so a module-level read of it would throw at load)
+const defFeet = () => ({ Left: [-0.26, ANKLE_Y, 0.06] as V3, Right: [0.26, ANKLE_Y, 0.06] as V3 });   // the defensive stance, wider than the handler's
+const DEF_HANDS = { Left: [-0.36, 1.05, 0.30] as V3, Right: [0.36, 1.05, 0.30] as V3 };
+/** THE RETREAT (the jab he bought): a drop step — the right foot goes back, the left follows, the chest stays on the handler, the hands
+ *  come in. 0.36 s; DefenderReact moves the root ~0.3 m back under it. */
+export function buildDefRetreat(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const DEF_FEET = defFeet();
+  return buildPoseClip(scene, sk, 'bball_def_retreat', 0.36, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [22, 0, 0], Neck: [-6, 0, 0] }, hands: DEF_HANDS, hipsY: -0.12, feet: feetAt(-0.12, DEF_FEET), kneesFront: true },
+    { t: 0.12, bones: { Hips: [0, -6, 0], Spine: [14, 4, 0], Neck: [-8, 0, 0] }, hands: { Left: [-0.30, 1.00, 0.24] as V3, Right: [0.30, 1.00, 0.22] as V3 }, hipsY: -0.08, feet: feetAt(-0.08, { Left: DEF_FEET.Left, Right: [0.26, ANKLE_Y + 0.06, -0.12] }), kneesFront: true },   // the drop: the right foot back
+    { t: 0.24, bones: { Hips: [0, -4, 0], Spine: [16, 2, 0], Neck: [-8, 0, 0] }, hands: { Left: [-0.32, 1.02, 0.26] as V3, Right: [0.32, 1.02, 0.26] as V3 }, hipsY: -0.10, feet: feetAt(-0.10, { Left: [-0.26, ANKLE_Y + 0.04, -0.02], Right: [0.26, ANKLE_Y, -0.14] }), kneesFront: true },   // …the left follows
+    { t: 0.36, bones: { Hips: [0, 0, 0], Spine: [22, 0, 0], Neck: [-6, 0, 0] }, hands: DEF_HANDS, hipsY: -0.12, feet: feetAt(-0.12, DEF_FEET), kneesFront: true },
+  ]);
+}
+const defLungeKeys = (F = defFeet()): PoseKey[] => [   // `_right`: he throws his weight to HIS right (the athlete's); `_left` is its mirror
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [22, 0, 0], Neck: [-6, 0, 0] }, hands: DEF_HANDS, hipsY: -0.12, feet: feetAt(-0.12, F), kneesFront: true },
+  { t: 0.10, bones: { Hips: [0, -8, -4], Spine: [20, -6, -6], Neck: [-6, 4, 0] }, hands: { Left: [-0.24, 1.10, 0.20] as V3, Right: [0.52, 0.92, 0.40] as V3 }, hipsY: -0.16, feet: feetAt(-0.16, { Left: F.Left, Right: [0.42, ANKLE_Y + 0.03, 0.10] }), kneesFront: true },   // the weight thrown, the near hand reaching for the ball that went the other way
+  { t: 0.22, bones: { Hips: [0, -10, -5], Spine: [18, -8, -6], Neck: [-6, 6, 0] }, hands: { Left: [-0.22, 1.08, 0.20] as V3, Right: [0.54, 0.90, 0.42] as V3 }, hipsY: -0.18, feet: feetAt(-0.18, { Left: [-0.18, ANKLE_Y, 0.04], Right: [0.44, ANKLE_Y, 0.10] }), kneesFront: true },   // committed: the step is down
+  { t: 0.40, bones: { Hips: [0, -2, 0], Spine: [22, 0, 0], Neck: [-6, 0, 0] }, hands: DEF_HANDS, hipsY: -0.12, feet: feetAt(-0.12, { Left: [-0.22, ANKLE_Y, 0.06], Right: [0.30, ANKLE_Y, 0.08] }), kneesFront: true },   // recovering
+];
+/** THE LUNGE (a crossing that did not break him): one committed step the wrong way, the near hand reaching. `side` is the athlete's side
+ *  he steps to. 0.4 s; DefenderReact moves the root ~0.25 m under it. */
+export function buildDefLunge(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildPoseClip(scene, sk, `bball_def_lunge_${side}`, 0.4, side === 'right' ? defLungeKeys() : defLungeKeys().map(mirrorKey));
+}
+/** THE STAND-UP (the hesitation he was closing on): he comes UP out of his stance — the hips rise 0.10, the chest goes tall, the hands
+ *  drop — then sinks back. 0.45 s; DefenderReact stops his slide for the first 0.2 s. */
+export function buildDefStandup(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const DEF_FEET = defFeet();
+  const up = { Left: [-0.22, ANKLE_Y, 0.06] as V3, Right: [0.22, ANKLE_Y, 0.06] as V3 };
+  return buildPoseClip(scene, sk, 'bball_def_standup', 0.45, [
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [22, 0, 0], Neck: [-6, 0, 0] }, hands: DEF_HANDS, hipsY: -0.12, feet: feetAt(-0.12, DEF_FEET), kneesFront: true },
+    { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0], Neck: [-8, 0, 0] }, hands: { Left: [-0.26, 0.94, 0.14] as V3, Right: [0.26, 0.94, 0.14] as V3 }, hipsY: -0.02, feet: feetAt(-0.02, up), kneesFront: true },   // UP: he read "he is stopping"
+    { t: 0.30, bones: { Hips: [0, 0, 0], Spine: [4, 0, 0], Neck: [-8, 0, 0] }, hands: { Left: [-0.26, 0.92, 0.12] as V3, Right: [0.26, 0.92, 0.12] as V3 }, hipsY: -0.01, feet: feetAt(-0.01, up), kneesFront: true },
+    { t: 0.45, bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [-6, 0, 0] }, hands: { Left: [-0.32, 1.02, 0.26] as V3, Right: [0.32, 1.02, 0.26] as V3 }, hipsY: -0.08, feet: feetAt(-0.08, DEF_FEET), kneesFront: true },   // too late: sinking back
+  ]);
+}
+
+/**
+ * THE CROSSOVER STEP (H2c — "stepping defensive slides"; owner 2026-10-14: "don't cap the defender's 4.2 m/s; author stepping clips
+ * instead"). Sideways faster than a slide can step (DEF_RUN_ENTER_MPS 2.8 — the slower slide capture is at 1.65× its own cadence
+ * there), a defender opens his hips to the run and crosses the trail foot over in front, the chest still turned back on the ball. A
+ * loop of two steps, 0.5 s: each foot is planted for 0.25 s while the body travels 0.70 m over it (keyed in the body frame: a planted
+ * foot runs from +0.35 to −0.35 along the travel, so it stays on the floor at the paced speed, DEF_RUN_STRIDE_MPS 2.8 at rate 1); the
+ * trail (left) foot crosses IN FRONT of the lead, the lead foot comes through behind. `side` is the travel's (the athlete's): `_right`
+ * travels to his right, `_left` is its mirror.
+ */
+const defCrossRunKeys = (): PoseKey[] => {
+  const keys: PoseKey[] = [];
+  const X = 0.35, LIFT = 0.13;
+  for (let k = 0; k <= 8; k++) {
+    const p = k / 8;   // 0..1 over the loop
+    const stance = (q: number) => X - 4 * X * q;                                   // q 0..0.5: +X → −X (planted)
+    const swing = (q: number) => -X + 4 * X * (q - 0.5);                           // q 0.5..1: −X → +X (in the air)
+    const lift = (q: number) => LIFT * Math.sin(Math.PI * (q - 0.5) / 0.5);
+    const pl = (p + 0.5) % 1;                                                       // the left foot runs half a loop behind
+    const right: V3 = p <= 0.5 ? [stance(p), ANKLE_Y, -0.02] : [swing(p), ANKLE_Y + lift(p), -0.07];   // the lead foot comes through BEHIND
+    const left: V3 = pl <= 0.5 ? [stance(pl), ANKLE_Y, 0.06] : [swing(pl), ANKLE_Y + lift(pl), 0.06 + 0.12 * Math.sin(Math.PI * (pl - 0.5) / 0.5)];   // the trail foot crosses IN FRONT
+    const bob = -0.10 - 0.025 * Math.cos(4 * Math.PI * p);                          // lowest at each mid-stance
+    const pump = 0.04 * Math.sin(2 * Math.PI * p);
+    keys.push({
+      t: 0.5 * p,
+      bones: { Hips: [0, -30 + 6 * Math.sin(2 * Math.PI * p), 0], Spine: [16, 20, 0], Neck: [-6, 10, 0] },   // the hips open to the run, the chest back on the ball
+      hands: { Right: [0.42, 1.02, 0.16 + pump] as V3, Left: [-0.30, 1.00, 0.26 - pump] as V3 },
+      hipsY: bob, feet: feetAt(bob, { Left: left, Right: right }), kneesFront: true,
+    });
+  }
+  return keys;
+};
+export function buildDefCrossRun(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildPoseClip(scene, sk, `bball_def_cross_run_${side}`, 0.5, side === 'right' ? defCrossRunKeys() : defCrossRunKeys().map(mirrorKey), { smooth: true });
 }
 
 /** The hard slide: sat down — hips a hand lower than the stance slide, thighs wider, chest tall. Loops. */

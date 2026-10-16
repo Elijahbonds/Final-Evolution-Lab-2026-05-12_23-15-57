@@ -62,7 +62,8 @@ type Step =
  *  top speed) and on its length (≤ 0.2 s): the strip's toDataURL stalls the frame it lands in, which ate the jab 20 times in 23 takes
  *  while the same tap with no recording landed 6 / 6 on both trees. `stripMs`: this scenario's strip spacing (the spin's 0.6 s turn and
  *  its step-out outrun the default 10 × 70 ms). */
-interface Scen { id: string; title: string; modes: ('1v1' | '3v3')[]; steps: Step[]; tail: number; landed?: string; luck?: number; stripDelay?: number; stripMs?: number }
+/** `focus: 'foe'` (H2c): the move view crops round the nearest defender instead of the hero (the defender scenarios). */
+interface Scen { id: string; title: string; modes: ('1v1' | '3v3')[]; steps: Step[]; tail: number; landed?: string; luck?: number; stripDelay?: number; stripMs?: number; focus?: 'foe' }
 const JOG = 0.55, RUN = 0.85;
 const SCENS: Scen[] = [
   { id: 'cross', title: 'crossover (R stick up-away) at a jog', modes: ['1v1', '3v3'], tail: 1300,
@@ -107,6 +108,19 @@ const SCENS: Scen[] = [
     steps: [{ at: 0, ls: 'foe', mag: 0.5 }, { at: 600, ls: 'none' }, { at: 0, mark: 'flick' }, { at: 0, rs: 'toward', hold: 1400 }, { at: 500, still: 'move' }] },
   { id: 'sizeup3', title: 'size-ups x3 (R stick up-toward, standing)', modes: ['3v3'], tail: 900,
     steps: [{ at: 0, ls: 'none' }, { at: 400, mark: 'flick' }, { at: 0, rs: 'upToward' }, { at: 300, still: 'move' }, { at: 400, rs: 'upToward' }, { at: 700, rs: 'upToward' }] },
+  // H2c: the defender reads the fakes (core/DefenderReact) and steps (the crossover step, the sprint then the chop)
+  { id: 'lunge', title: 'H2c lunge: a crossover in his face that does not break him (R stick up-away at a jog)', modes: ['1v1', '3v3'], tail: 1100, landed: 'react lunge', stripMs: 60, focus: 'foe',
+    steps: [{ at: 0, ls: 'foe', mag: JOG }, { at: 650, mark: 'flick' }, { at: 0, rs: 'upAway' }, { at: 250, still: 'move' }] },
+  { id: 'shade', title: 'H2c shade: the yoyo size-up, standing (R stick up-toward)', modes: ['1v1', '3v3'], tail: 900, landed: 'react shade', focus: 'foe',
+    steps: [{ at: 0, ls: 'none' }, { at: 400, mark: 'flick' }, { at: 0, rs: 'upToward' }, { at: 300, still: 'move' }] },
+  { id: 'standup', title: 'H2c stand-up: the hesitation he was closing on (R stick toward at a jog)', modes: ['1v1', '3v3'], tail: 1100, landed: 'react standup|BIT ON THE HESI', focus: 'foe',
+    steps: [{ at: 0, ls: 'foe', mag: 0.6 }, { at: 650, mark: 'flick' }, { at: 0, rs: 'toward' }, { at: 250, still: 'move' }] },
+  { id: 'jabbite', title: 'H2c retreat: the jab he buys (a left-stick tap from triple threat)', modes: ['3v3'], tail: 1100, landed: 'react retreat', stripDelay: 160, focus: 'foe',
+    steps: [{ at: 0, ls: 'none' }, { at: 150, mark: 'flick' }, { at: 0, ls: 'foe', mag: 0.9, tap: 120 }, { at: 200, still: 'move' }] },
+  { id: 'latdrive', title: 'H2c the defender steps: a hard lateral drive (R2 + the left stick to my right)', modes: ['1v1', '3v3'], tail: 500, landed: 'steps [a-z_-]+ → defend_run', stripDelay: 300, stripMs: 120, focus: 'foe',
+    steps: [{ at: 0, ls: 'none' }, { at: 200, r2: true }, { at: 0, ls: 'side', mag: 1 }, { at: 0, mark: 'flick' }, { at: 700, still: 'move' }, { at: 900, ls: 'none' }, { at: 0, r2: false }] },
+  { id: 'approach', title: 'H2c the defender closes: I back away 1.2 s and stop — his sprint, then the chop', modes: ['1v1'], tail: 1400, landed: 'steps [a-z_-]+ → (run|closeout)', stripMs: 110, focus: 'foe',
+    steps: [{ at: 0, ls: 'away', mag: RUN }, { at: 1200, ls: 'none' }, { at: 0, mark: 'flick' }, { at: 500, still: 'move' }] },
   { id: 'lcross', title: 'left-stick reversal at a jog (the crossover the LS throws)', modes: ['1v1', '3v3'], tail: 1300,
     steps: [{ at: 0, ls: 'foeR', mag: 0.7 }, { at: 700, mark: 'flick' }, { at: 0, ls: 'foeL', mag: 0.7 }, { at: 250, still: 'move' }] },
 ];
@@ -139,10 +153,11 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
     // a take a strip or a steal ruined before the move landed is thrown again (RETRY times): the reel is about the move
     let out: any = null, size = 0, flickAt = -1, t0 = 0;
     for (let attempt = 1; attempt <= RETRY; attempt++) {
-      await page.evaluate(({ m, L }) => {
+      await page.evaluate(({ m, L, F }) => {
         const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; const R = (window as any).__R;
         R.neutral(); S.offense(); if (typeof S.luck === 'function') S.luck(L);
-      }, { m: mode, L: sc.luck ?? null });
+        R.focus = F ? () => { const fr = m === '1v1' ? S.foeRoot : S.nearestFoeRoot(); return fr ? R.top(fr) : R.hero(); } : null; R.cx0 = undefined;
+      }, { m: mode, L: sc.luck ?? null, F: sc.focus === 'foe' });
       // the ball in my hands, the carry live (a rival's shot or loose ball still in the air can outlive one reset: ask again)
       for (let i = 0; i < 90; i++) {
         const ok = await page.evaluate((m) => { const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; const c = S.carry(); return c.mine && c.active && (m !== '1v1' || S.possession() === 'mine'); }, mode);

@@ -44,7 +44,7 @@ export const LIB = String.raw`(() => {
       // at the body's scale, and the game's camera is not touched. The full frame rides in a corner inset. R.zoom 1: the plain frame.
       const W = src.width, H = src.height;
       if (R.zoom > 1) {
-        const h = R.hero(); const cam = s.activeCamera;
+        const h = R.focus ? R.focus() : R.hero(); const cam = s.activeCamera;   // H2c: R.focus — a defender scenario crops round HIM
         if (h && cam) {
           const V = h.position.constructor; const p = h.getAbsolutePosition(); const q = V.TransformCoordinates(new V(p.x, p.y + 1.0, p.z), cam.getTransformationMatrix());
           const tx = (q.x + 1) / 2 * W, ty = (1 - q.y) / 2 * H;

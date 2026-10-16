@@ -54,6 +54,7 @@ import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
 import { mountPostureLayer, type PostureLayer, type PostureFeed } from '../anim/PostureLayer';
 import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on every body
@@ -124,7 +125,7 @@ import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPl
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
   CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
-  ANKLE_STUMBLE_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / moveImpulse are the renderer's — anim/handleMotion)
+  ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / moveImpulse are the renderer's — anim/handleMotion)   // (H2c: the slip, as 1v1's)
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, type ChainState, type HandleMove,
   moveRate, moveFadeSec,   // MOVE PACE
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
@@ -146,7 +147,9 @@ import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10P
 import { scramSwitch } from '../core/Matchups';
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel, type AmbientHandle } from '../visual/EffectsKit';
-import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
+/** H2c (dev log): the defender states the stepping pass added or re-routed. */
+const H2C_STEP_STATES: ReadonlySet<string> = new Set(['defend_run', 'defend_run_right', 'run', 'closeout']);   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
@@ -230,6 +233,8 @@ interface Body {
   /** HOOPS MOTION phase 3b: an AI body's movement (its brain's wish reached at the hero's accel 26 / decel 34; null for the hero, whose
    *  dribble controller is his), and every body's plant-and-cut foot pin (FootPlant, as 1v1's hero had alone). */
   mover: AiMover | null; plant: FootPlant | null; wasPlanting: boolean;
+  /** H2c: a defender's read of a fake (core/DefenderReact) — his mover takes the step for its beat. */
+  react?: DefReaction | null;
   /** IMPROVE (2026-10-06) #14: the body layers' level of detail (threevthreeRules.lodFor), the skinned mesh the frustum test reads,
    *  and the posture feed kept for the far body's off frames. */
   lod: Lod; lodMesh: AbstractMesh | null; feedKept: PostureFeed | null; feedOdd: boolean;
@@ -370,6 +375,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let paintSec = 0, paintWarned = false;          // the three-second clock, and whether the ref has warned yet
   let goaltendCalled = false;                    // one call per shot
   const lastFoeJobs = new Map<Body, string>();   // DEFENSE-LOOK: job-change log
+  const lastFoeStepStates = new Map<Body, string>();   // H2c (dev log): each defender's last tree state, for the stepping states' lines
   let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
   let chargeLastGap = -1;                        // last frame's gap to the driver, for the closing RATE
@@ -805,7 +811,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration (nor a run: the movers stand, the pins let go)
-    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; b.layers?.reset(); }
+    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; b.react = null; b.layers?.reset(); }
     me.char.root.position.set(0, 0, 6);
     // MODE-STICK-FACE (2026-09-07): face the rim AND tell the dribble so. The movement layer's facing starts at 0 no
     // matter which way the model spawned, and a push AGAINST the facing is a back-pedal that keeps the chest where it
@@ -1542,7 +1548,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // HOOPS MOTION phase 4b: its move's clip AND ball in place — no decision, no impulse, no link (1v1's)
             const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', MOVES_UNLOCKED_GATE);   // H2: the whole cycle, unlocked
             const su = requestMove(meHost(), { move: sizeUpMoveOf(suClip), hint: pick.side ?? undefined, decide: { kind: 'none' }, fadeSec: moveFadeSec(sprintOk), speedRatio: 1 });
-            console.info(`[3V3-HANDLE] size-up ${su.clip ?? suClip} (handle ${handle})`); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue;
+            console.info(`[3V3-HANDLE] size-up ${su.clip ?? suClip} (handle ${handle})`); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 });
+            if (sizeUpMoveOf(suClip) === 'yoyo') { const nfY = nearestLiveFoe(); if (nfY) defReactOn(nfY, shadeToward(defGeoFor(nfY), su.endHand)); }   // H2c: he shades the yoyo's ball side
+            continue;
           }
           if (pick.move === 'stepback') {
             // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
@@ -1693,8 +1701,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             });
             SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
             if (bought && nf) {
+              const rr = retreatFrom(defGeoFor(nf));   // H2c: he gives up ~0.3 m (a drop step) under the stun
               nf.stunSec = Math.max(nf.stunSec, 0.3);
-              nf.tree.beat('bball_contact_react', { fadeSec: 0.07 });
+              if (rr) defReactOn(nf, rr); else nf.tree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               putHud(ctx, { banner: 'HE BIT THE JAB — GO!' });
               mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } });   // THE MIC
@@ -1786,7 +1795,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (Vector3.Distance(f.char.root.position, me.char.root.position) < 2.4 && (foeCloseMem[fi] ?? 0) > 0.8) {
               f.stunSec = 0.45;
               bit = true;
-              f.tree.beat(ANKLE_STUMBLE_CLIP);       // he bit the hesi and had to catch himself
+              if (f.react?.kind !== 'standup') f.tree.beat('bball_def_standup', { fadeSec: 0.06 });   // H2c: he bit the hesi and STOOD UP (it played the ankle stumble); doMove's hesi may have started it this frame
               break;                                   // only the man you shook
             }
           }
@@ -1815,6 +1824,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         shooting, dunking, driving: iAmCarrier && sprintOk && drib.speed01 > 0.6 && Vector3.Dot(me.drib.vel, RIM.subtract(me.char.root.position)) > 0,
         defending: carrierId === 'foeTeam', bracing: meBoxing, staggered: false, slideDir: slideDirFor(me.char.root.rotation.y, me.drib.vel),
         retreat: retreatFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null), closeout: closeoutFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.speed01), intense: !!me.slot.intent.intense,   // DEFENSE-LOOK
+        defendRun: carrierId === 'foeTeam' && defendRunFor(me.char.root.rotation.y, me.drib.vel, me.tree.state), approach: carrierId === 'foeTeam' && approachFor(me.char.root.position, me.drib.vel, driver?.char.root.position ?? null, me.tree.state),   // H2c
       });
       bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach' || meHandUp);
       Object.assign(me.bio, { posting, spinning: !!spin });   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
@@ -1857,6 +1867,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: false,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball)
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
           retreat: retreatFor(body.char.root.position, vel, driver?.char.root.position ?? null),   // DEFENSE-LOOK
+          defendRun: carrierId === 'foeTeam' && defendRunFor(body.char.root.rotation.y, vel, body.tree.state), approach: carrierId === 'foeTeam' && approachFor(body.char.root.position, vel, driver?.char.root.position ?? null, body.tree.state),   // H2c
         });
         bioTick(body, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', carrierId === mateId && !passFlight.active, Infinity, false);
         if (carrierId === (i === 0 ? 'mate0' : 'mate1') && Vector3.Distance(body.char.root.position, RIM) < 3.5 && Math.random() < 0.01) {
@@ -1880,7 +1891,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       for (let fi = 0; fi < foes.length; fi++) {
         const f = foes[fi];
         if (f.floored && f.stunSec === 0) { f.floored = false; f.tree.beat('karate_get_up'); }   // BIOMECH-HOOPS-WAVE1: a posterized body gets up when the stun ends
-        if (f.stunSec > 0) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); f.speed01 = 0; f.vel.setAll(0); f.mover?.stop(); unplant(f); bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false); continue; }
+        if (f.stunSec > 0 && !(f.react && !f.floored)) { foeCloseMem[fi] = Math.max(0, (foeCloseMem[fi] ?? 0) - dt * 2.5); f.speed01 = 0; f.vel.setAll(0); f.mover?.stop(); unplant(f); bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false); continue; }
         if (f === driver) {
           unplant(f);   // (3b review) the scripted drive moves his root metres: a pin taken just before would hold one foot back for the whole drive
           f.vel.setAll(0);   // the rival driving on their possession: the scripted drive moves him, he faces the rim, his tree carries the ball
@@ -1898,8 +1909,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         }
         const intent = f.slot.intent;
         f.mover!.observe(f.char.root.position, dt);
-        const fst = f.mover!.stepIntent(dt, intent);   // HOOPS MOTION phase 3b: 3.8 m/s (sprint 1.2×) at the hero's accel / decel (it was 0 or 3.8 in one frame)
+        const fst = f.react ? f.mover!.track(dt, reactionWish(f.react)) : f.mover!.stepIntent(dt, intent);   // HOOPS MOTION phase 3b: 3.8 m/s (sprint 1.2×) at the hero's accel / decel (it was 0 or 3.8 in one frame)   // H2c: a reaction owns his feet for its beat
         const vel = fst.vel.clone();
+        if (f.react) f.react = stepReaction(f.react, dt, vel);
         plantBody(f, fst.planting, dt);
         f.vel.copyFrom(vel);
         const cb = carrierBody();
@@ -1925,8 +1937,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           speedMps: Math.hypot(vel.x, vel.z),
           speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: false, shooting: false, dunking: false, driving: false,
           defending: carrierId !== 'foeTeam', bracing: !!db?.boxing, staggered: false, slideDir: slideDirFor(f.char.root.rotation.y, vel),
-          retreat: retreatFor(f.char.root.position, vel, carrierBody()?.char.root.position ?? null), closeout: db?.job === 'closeout' && distXZ(f.char.root.position, carrierBody()?.char.root.position ?? f.char.root.position) < 2.4, intense: db?.job === 'onball' && distXZ(f.char.root.position, carrierBody()?.char.root.position ?? f.char.root.position) < 2.0,   // DEFENSE-LOOK
+          retreat: retreatFor(f.char.root.position, vel, carrierBody()?.char.root.position ?? null), closeout: (db?.job === 'closeout' && distXZ(f.char.root.position, carrierBody()?.char.root.position ?? f.char.root.position) < 2.4) || closeoutFor(f.char.root.position, vel, carrierBody()?.char.root.position ?? null, f.speed01),   // H2c: the chop wherever he runs the last 2.6 m at the ball
+          defendRun: carrierId !== 'foeTeam' && defendRunFor(f.char.root.rotation.y, vel, f.tree.state), approach: carrierId !== 'foeTeam' && approachFor(f.char.root.position, vel, carrierBody()?.char.root.position ?? null, f.tree.state),   // H2c
+          intense: db?.job === 'onball' && distXZ(f.char.root.position, carrierBody()?.char.root.position ?? f.char.root.position) < 2.0,   // DEFENSE-LOOK
         });
+        if (process.env.NODE_ENV === 'development' && carrierId !== 'foeTeam') { const st = f.tree.state ?? '', was = lastFoeStepStates.get(f) ?? ''; if (st !== was && (H2C_STEP_STATES.has(st) || H2C_STEP_STATES.has(was))) console.info(`[3V3-DEF] foe${fi} steps ${was || '-'} → ${st} at ${vel.length().toFixed(1)} m/s`); lastFoeStepStates.set(f, st); }   // H2c (dev log)
         bioTick(f, dt, carrierId === 'foeTeam' ? 'offense' : 'defense', false, Infinity, false);
       }
 
@@ -3155,7 +3170,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    * of three rather than one man, its clips, its banners.
    */
   /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
-  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, foe: Body | null, move: HandleMove, moveDir: 'left' | 'right' = 'right'): void {
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, foe: Body | null, move: HandleMove, moveDir: 'left' | 'right' = 'right', readMs = 0): void {   // H2c: `readMs` (see 1v1)
     if (outcome.broke === 'none' || !foe) return;
 
     swing('ankle_break');
@@ -3167,7 +3182,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // the same knockdown + floor hold every other body-down in this mode uses — one way down, one way up
       foe.floored = true;
       foe.stunSec = ANKLE_BREAK_STUN_SEC * 1.8;
-      foe.tree.beat(SPORT_CLIP.karateKnockdown, { settleTo: { clip: 'karate_floor_hold' } });
+      foe.tree.beat(ANKLE_SLIP_CLIP, { settleTo: { clip: 'karate_floor_hold' } });   // H2c: HE SLIPPED, HE WAS NOT PUNCHED (1v1's since 09-17; 3v3 still played the karate knockdown)
       SoundKit.play('thud', { volume: 0.8 });   // a body hits the floor; a floor does not ring
       ctx.feel?.impact?.(0.55);
       ctx.juice.shake(0.09, 140);
@@ -3176,7 +3191,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       bannerClearLater(ctx, 1100);
     } else {
       foe.stunSec = ANKLE_BREAK_STUN_SEC;
-      foe.tree.beat('bball_contact_react');
+      { const f0 = foe; const stumble = (): void => { if (!f0.floored) f0.tree.beat(ANKLE_STUMBLE_CLIP); }; if (readMs > 16) later(readMs, stumble); else stumble(); }   // H2c: the STUMBLE, as 1v1's (it played the contact react), when the ball crosses (plan 4f)
       // THE BITE (Phase 6): his feet went with the fake — the root lunges toward the side the ball LEFT, under the stumble
       if (foe) { const f = me.drib.facing; const right = new Vector3(Math.cos(f), 0, -Math.sin(f)); const bite = right.scale(moveDir === 'right' ? -1 : 1);
         victimSlide = { body: foe, dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[3V3-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
@@ -3291,8 +3306,24 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    reactToBreak(ctx, outcome, foe, move, biteDir);
+    reactToBreak(ctx, outcome, foe, move, biteDir, r.ball === 'started' ? readBeatMs(carries.get(me)?.move) : 0);
+    // H2c (owner decision 3): the read that did NOT break him still moves him — a look and a small real effect (core/DefenderReact)
+    if (outcome.broke === 'none' && foe) {
+      if (lungesOn(move)) defReactOn(foe, lungeFor(defGeoFor(foe), move, biteDir));
+      else if (move === 'yoyo') defReactOn(foe, shadeToward(defGeoFor(foe), r.endHand));
+      else if (move === 'hesi') defReactOn(foe, standUpOn(defGeoFor(foe), foeCloseMem[foes.indexOf(foe)] ?? 0));
+    }
     return true;
+  }
+  /** H2c: the geometry a defender's read takes (core/DefenderReact). */
+  function defGeoFor(f: Body): DefReadGeometry { return { handler: me.char.root.position, handlerYaw: me.char.root.rotation.y, defender: f.char.root.position, live: f.stunSec <= 0 && !f.floored }; }
+  /** H2c: start a defender's reaction — his mover takes the step (the defenders' loop), his tree the beat. */
+  function defReactOn(f: Body, r: DefReaction | null): void {
+    if (!r || f.floored) return;
+    f.react = r;
+    const clip = reactClip(r, sideOfVector(f.char.root.rotation.y, r.dir));   // the lunge's side: the athlete's side he steps to
+    if (clip) f.tree.beat(clip, { fadeSec: 0.06 });
+    console.info(`[3V3-DEF] react ${r.kind}${r.tune.dist > 0 ? ` ${r.tune.dist} m` : ''}${clip ? ` → ${clip}` : ''}`);
   }
 
   function nearestLiveFoe(): Body | null {
