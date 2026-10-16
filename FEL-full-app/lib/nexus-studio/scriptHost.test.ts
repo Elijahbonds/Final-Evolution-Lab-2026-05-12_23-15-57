@@ -111,6 +111,7 @@ describe('studio-4b: the rally the HUD posts, and the mode\'s own replay', () =>
     vi.spyOn(SoundKit, 'play').mockImplementation(() => {});
     const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [ev, b], edges: [newEdge(ev.id, b.id)] }], { rallyKey: 'volley' });
     r.ctx.setHud({ rally: 5 });
+    expect(host.fired).toHaveLength(0);   // the default key is not this target's
     r.ctx.setHud({ volley: 2 });
     expect(host.fired).toHaveLength(1);
     host.dispose();

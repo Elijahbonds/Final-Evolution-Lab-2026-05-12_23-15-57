@@ -66,6 +66,15 @@ describe('the seats: the crowd\'s own empty ones', () => {
       expect(pastLine(s.pos, crowdVenueOf(packed).camera)).toBeGreaterThanOrEqual(packed.camera.margin);
     }
   });
+  it('an aisle in front of the camera line is never offered, even when it is the nearest', () => {
+    const crowd = crowdOf();
+    // one packed stand along the west side, long enough that its near end runs past the play camera (z = 15.8)
+    const long: ExportCrowd = { ...crowd, stands: [{ ...crowd.stands[0], front: [-11.5, 0, 5], width: 40, gaps: 0 }] };
+    const v = crowdVenueOf(long);
+    const seats = crowdCastSeats(long, 4);
+    expect(seats.length).toBeGreaterThan(0);
+    for (const s of seats) expect(pastLine(s.pos, v.camera)).toBeGreaterThanOrEqual(v.camera.margin);
+  });
   it('no stand, or nobody cast: no seat', () => {
     expect(crowdCastSeats(null, 3)).toEqual([]);
     expect(crowdCastSeats(crowdOf(), 0)).toEqual([]);

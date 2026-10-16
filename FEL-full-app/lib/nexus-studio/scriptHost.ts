@@ -157,10 +157,10 @@ export function mountScriptHost(ctx: ScriptHostCtx, scripts: readonly ExportScri
   // the replay tap: the mode's call goes to the harness's own highlight, unchanged; a frame drawn while it is pending means the
   // replay is on screen ("starts"), and its end is when the harness's promise settles ("ends"). A call the harness refuses (no
   // replay recorded, one already playing, not in play) settles before a frame: no event.
-  let replayPending = 0, replayShown = false, frame = 0, replayFrame = 0;
+  let replayPending = 0, replayShown = false;
   if (origHighlight && hearsReplay) {
     ctx.highlight = (opts?: never) => {
-      replayPending++; replayFrame = frame;
+      replayPending++;
       return origHighlight.call(ctx, opts).finally(() => {
         replayPending = Math.max(0, replayPending - 1);
         if (replayShown && replayPending === 0) { replayShown = false; interp.emit({ type: 'replay', phase: 'ends' }, snapshot()); }
@@ -169,8 +169,7 @@ export function mountScriptHost(ctx: ScriptHostCtx, scripts: readonly ExportScri
   }
   let started = false, ended = false;
   const obs = scene.onBeforeRenderObservable.add(() => {
-    frame++;
-    if (replayPending > 0 && !replayShown && frame > replayFrame) { replayShown = true; interp.emit({ type: 'replay', phase: 'starts' }, snapshot()); }
+    if (replayPending > 0 && !replayShown) { replayShown = true; interp.emit({ type: 'replay', phase: 'starts' }, snapshot()); }
     const dt = Math.min(0.1, scene.getEngine().getDeltaTime() / 1000);
     const phase = ctx.phase?.() ?? 'playing';
     if (phase === 'playing') {

@@ -224,8 +224,7 @@ export function resolveCastName(characters: readonly Pick<StudioCharacter, 'id' 
   const n = norm(name);
   if (!n) return null;
   const exact = characters.filter((c) => norm(c.name) === n);
-  if (exact.length === 1) return exact[0];
-  if (exact.length > 1) return null;
+  if (exact.length === 1) return exact[0];   // two characters with the same name: the partial match below finds both → null
   const near = characters.filter((c) => norm(c.name).includes(n) || n.includes(norm(c.name)));
   return near.length === 1 ? near[0] : null;
 }
