@@ -6,7 +6,8 @@ import {
   Texture, Vector3, Color3,
 } from '@babylonjs/core';
 import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
-import { fitBurst, liveParticles, particleBudget, particleBudgetScale } from './ParticleBudget';
+import { phoneHalf } from '../scene/phoneTrim';
+import { burstFloor, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneSystemCap } from './ParticleBudget';
 
 /** IMPROVE (2026-10-06): what `EffectsKit.ambient` mounted — a mode that disposes it takes the gulls' planes, their material and
  *  their per-frame observers with it (they outlived every mode before: 4 planes, 4 materials, 4 observers never removed). */
@@ -221,7 +222,7 @@ export const EffectsKit = {
     // IMPROVE (2026-10-06): everything mounted here is kept, so the handle can take it down (callers that ignore it are unchanged)
     const owned: { dispose(): void }[] = [], observers: Observer<Scene>[] = [];
     if (family === 'dojo') {                               // drifting petals
-      const ps = baseSystem(scene, 'amb_petals', 60);
+      const ps = baseSystem(scene, 'amb_petals', phoneSystemCap(scene, 60, 0.4));   // lane/owner-1016: a phone in karate keeps at most 40% of its particle ceiling in petals (ParticleBudget.ts)
       ps.emitter = new Vector3(0, 5, 0);
       ps.minEmitBox = new Vector3(-9, 0, -9); ps.maxEmitBox = new Vector3(9, 0, 9);
       ps.color1 = new Color4(1, 0.6, 0.7, 0.8); ps.color2 = new Color4(1, 0.8, 0.85, 0.6);
@@ -251,7 +252,7 @@ export const EffectsKit = {
       m.emissiveColor = new Color3(0.93, 0.93, 0.96); m.disableLighting = true;
       m.diffuseColor = Color3.Black(); m.backFaceCulling = false;
       owned.push(m);   // (the texture is the scene's cached one, shared by name: the scene's teardown takes it)
-      for (let i = 0; i < 4; i++) {
+      for (let i = 0; i < phoneHalf(scene, 4); i++) {   // lane/owner-1016: a phone keeps half the flock (phoneTrim.phoneHalf)
         const gull = MeshBuilder.CreatePlane(`gull_${i}`, { width: 0.9, height: 0.45 }, scene);
         gull.billboardMode = Mesh.BILLBOARDMODE_ALL;
         gull.isPickable = false;
@@ -290,7 +291,7 @@ export const EffectsKit = {
   /** Comet trail parented to the ball. Call once; runs while ball moves. */
   ballTrail(scene: Scene, ball: AbstractMesh, hex = '#ffb36b'): ParticleSystem {
     prewarmBurstShaders(scene);
-    const ps = baseSystem(scene, 'fx_ball_trail', 120);
+    const ps = baseSystem(scene, 'fx_ball_trail', phoneSystemCap(scene, 120, 0.5));   // lane/owner-1016: a phone in the dunk keeps at most half its particle ceiling in the trail (ParticleBudget.ts)
     ps.emitter = ball;
     ps.minEmitPower = 0; ps.maxEmitPower = 0;    // a trail is the PATH the ball took: the particles stay where they were laid
     applyTrail(ps, 'soft', hex);
@@ -312,7 +313,7 @@ export const EffectsKit = {
     const k = Math.max(0.25, Math.min(BURST_SCALE_MAX, scale));
     // A9.8: the scene's particle budget — a burst that fits fires whole, one that does not is trimmed to the room left
     // (never below a readable few). ParticleBudget.ts.
-    const count = fitBurst(Math.max(4, Math.round(cfg.count * k)), liveParticles(scene), particleBudget(scene), particleBudgetScale(scene));
+    const count = fitBurst(Math.max(4, Math.round(cfg.count * k)), liveParticles(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
     // IMPROVE (2026-10-06): a pooled system when one is idle; the old one-off (self-disposing) only when all are busy
     const pooled = pooledBurst(scene, kind);
     const ps = pooled ?? baseSystem(scene, `fx_${kind}_${Date.now()}`, count);

@@ -279,3 +279,32 @@ describe('burst looks and the particle budget', () => {
     setParticleBudgetScale(scene, 1);
   });
 });
+
+// lane/owner-1016 (2026-10-16): a phone in the dunk / karate sizes the steady systems to its particle ceiling
+// (ParticleBudget.PHONE_MODE_CEILING): the ball trail and the dojo's petals can hold only so many alive, whatever the clock.
+describe('a phone sizes the trail and the petals to the mode ceiling', () => {
+  const scene2 = (tier: string, modeId: string) => {
+    const s = new Scene(new NullEngine());
+    (s.metadata ??= {}).felTier = tier; s.metadata.felModeId = modeId;
+    new FreeCamera('cp', new Vector3(0, 1, -3), s);
+    return s;
+  };
+  it('CONTROL: another tier, or another mode, keeps the full capacity', () => {
+    expect(EffectsKit.ballTrail(scene2('desktop', 'dunk'), MeshBuilder.CreateSphere('b1', {})).getCapacity()).toBe(120);
+    expect(EffectsKit.ballTrail(scene2('mobile', 'onevone'), MeshBuilder.CreateSphere('b2', {})).getCapacity()).toBe(120);
+    const d = scene2('desktop', 'karate'); EffectsKit.ambient(d, 'dojo');
+    expect(d.particleSystems.find((p) => p.name === 'amb_petals')!.getCapacity()).toBe(60);
+  });
+  it('mobile dunk: the trail holds at most half the ceiling (8 -> 4)', () => {
+    const s = scene2('mobile', 'dunk');
+    const ps = EffectsKit.ballTrail(s, MeshBuilder.CreateSphere('b3', {}, s));
+    expect(ps.getCapacity()).toBe(4);
+    for (let i = 0; i < 300; i++) ps.animate();      // a long run-up
+    expect(ps.getActiveCount()).toBeLessThanOrEqual(4);
+  });
+  it('mobile karate: the petals hold at most 40% of the ceiling (12 -> 4)', () => {
+    const s = scene2('mobile', 'karate');
+    EffectsKit.ambient(s, 'dojo');
+    expect(s.particleSystems.find((p) => p.name === 'amb_petals')!.getCapacity()).toBe(4);
+  });
+});
