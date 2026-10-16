@@ -41,6 +41,7 @@ import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PAS
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
+import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
@@ -632,6 +633,15 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // vis-board: replayDof === false runs the replay without depth of field (a white or surface-led look it would flatten).
       replay = def.replay ? new ReplayDirector(scene, camera, raceBodies?.length ? raceBodies : cast?.bodies?.length ? cast.bodies : characterRoots(scene, heroRef.current), cast?.loose ?? [], (def.replayDof === false ? null : mountReplayDof(scene, lights.pipeline, tier))) : null;
       for (const n of replayTrack) replay?.track(n);
+      // SHADER PRE-WARM (lane/owner-1016, 2026-10-16; owner: "pre-warm shaders on phones at load"). Behind the boot splash — the
+      // phase is still 'loading' — and AFTER the 20 s watchdog above is cleared, so it cannot trip it; it has its own cap
+      // (shaderPrewarm.ts) and READY comes either way. Phone tier only; dev keeps warmAll after READY (below).
+      if (prewarmWanted(tier)) {
+        console.info('[FEL-PERF] shader pre-warm start');
+        const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });
+        if (warm.timedOut) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames)`);
+        else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
+      }
       setPhase('ready');
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.

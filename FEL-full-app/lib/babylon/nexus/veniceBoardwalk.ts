@@ -16,6 +16,7 @@
 // DUNK-VENICE-ENV-2 (2026-09-28), the Venice dunk only: a baked hero palm behind the backboard and a boardwalk row with its
 // vendors and crowd behind the hoop (mountVeniceDunkDressing — placements in venuePropSets.ts), the sea as water, a sand with
 // no streaks, and the FLIGHT NIGHT sign up on the row's roof.
+import { phoneHalf } from '../scene/phoneTrim';   // lane/owner-1016: a phone keeps half the gulls
 import { Color3, DynamicTexture, InstancedMesh, Mesh, MeshBuilder, PBRMaterial, SceneLoader, StandardMaterial, Texture, TransformNode, Vector3, VertexData } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { mountStreetCourt, STREET_COURT_PALETTE, VENICE_DUNK_COURT_PALETTE } from '../visual/CourtSurface';
@@ -201,12 +202,12 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   }
   const flagTex = signTexture(scene, ['FEL'], { bg: '#B03A2E', fg: '#FFF4E0', accent: '#F2B84B', w: 256, h: 640 });
   for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
-  // Pass 7 phase 5 — air: six gulls wheel over the northern water on slow ellipses (billboards on a painted chevron).
+  // Pass 7 phase 5 — air: six gulls (three on a phone) wheel over the northern water on slow ellipses (billboards on a painted chevron).
   // Cheap: six unlit planes and one observer.
   const gullTex = new DynamicTexture('vb_gull_tex', 64, scene, false);
   { const c = gullTex.getContext() as CanvasRenderingContext2D; c.clearRect(0, 0, 64, 64); c.strokeStyle = '#2A2630'; c.lineWidth = 5; c.lineCap = 'round'; c.beginPath(); c.moveTo(6, 40); c.quadraticCurveTo(20, 22, 32, 34); c.quadraticCurveTo(44, 22, 58, 40); c.stroke(); gullTex.update(false); gullTex.hasAlpha = true; }
   const gullMat = new StandardMaterial('vb_gull_mat', scene); gullMat.emissiveTexture = gullTex; gullMat.opacityTexture = gullTex; gullMat.emissiveColor = Color3.Black(); gullMat.diffuseColor = Color3.Black(); gullMat.disableLighting = true; gullMat.backFaceCulling = false;
-  const gulls = Array.from({ length: 6 }, (_, i) => { const g = MeshBuilder.CreatePlane(`vb_gull_${i}`, { size: 1.6 }, scene); g.material = gullMat; g.billboardMode = Mesh.BILLBOARDMODE_ALL; g.parent = holder; g.isPickable = false; return g; });
+  const gulls = Array.from({ length: phoneHalf(scene, 6) }, (_, i) => { const g = MeshBuilder.CreatePlane(`vb_gull_${i}`, { size: 1.6 }, scene); g.material = gullMat; g.billboardMode = Mesh.BILLBOARDMODE_ALL; g.parent = holder; g.isPickable = false; return g; });
   // (drifting cloud planes read as hard white blobs against the dome — the painted dome carries the clouds; the gulls stay)
   let ta = 0;
   const air = scene.onBeforeRenderObservable.add(() => {

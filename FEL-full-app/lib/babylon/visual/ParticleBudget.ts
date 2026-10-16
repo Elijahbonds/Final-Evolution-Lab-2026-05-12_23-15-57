@@ -22,7 +22,36 @@ export const PARTICLE_BUDGET: Record<'mobile' | 'desktop' | 'high', number> = { 
 /** The fewest particles a burst is trimmed to: below this a hit stops reading as a hit. */
 export const MIN_BURST = 4;
 
-type Md = { felTier?: string; felParticleScale?: number } | null | undefined;
+/**
+ * A PHONE'S CEILING FOR ONE MODE (lane/owner-1016, 2026-10-16; owner: "bring Dunk and Karate under their phone budgets").
+ * The live-particle rows of mobileBudget.json are small on purpose (a mode's phone budget is what it measured plus headroom)
+ * and PR #281 found dunk at 29 live against a row of 12 and karate at 29 against 24: the ball trail and a spark burst in the
+ * dunk, the dojo's drifting petals and three hits' stars and streaks in karate. The tier's 900 never binds at those sizes, so a
+ * mode on this list gets its own ceiling on a PHONE only: bursts are trimmed to the room under it (never below MIN_BURST), and
+ * the mode's steady systems (the ball trail, the dojo's petals) are sized to a share of it (`phoneSystemCap`), so the sum
+ * stays inside the row whatever the clock. A ceiling is never above the row's budget (particleBudget.test.ts reads the table).
+ */
+export const PHONE_MODE_CEILING: Readonly<Record<string, number>> = { dunk: 8, karate: 12 };
+/** The fewest particles a burst is trimmed to under a phone mode ceiling (the tier's MIN_BURST is 4): four hits landing at once must not each keep four. */
+export const PHONE_BURST_FLOOR = 2;
+
+type Md = { felTier?: string; felModeId?: string; felParticleScale?: number } | null | undefined;
+
+/** The phone ceiling for the scene's mode, or null (another tier, or a mode without one). */
+export function phoneModeCeiling(scene: { metadata?: unknown }): number | null {
+  const md = scene.metadata as Md;
+  if (md?.felTier !== 'mobile' || !md.felModeId) return null;
+  return PHONE_MODE_CEILING[md.felModeId] ?? null;
+}
+
+/**
+ * A steady system's capacity (the most it can hold alive at once): `desktopCap` everywhere, except on a phone in a mode with a
+ * ceiling, where it is `share` of that ceiling (at least 3). Capacity bounds live particles whatever the emit rate or clock.
+ */
+export function phoneSystemCap(scene: { metadata?: unknown }, desktopCap: number, share: number): number {
+  const c = phoneModeCeiling(scene);
+  return c === null ? desktopCap : Math.min(desktopCap, Math.max(3, Math.floor(c * share)));
+}
 
 /** The governor's lever: every burst and the ceiling × k (0.2..1). */
 export function setParticleBudgetScale(scene: Scene, k: number): void {
@@ -36,8 +65,14 @@ export function particleBudgetScale(scene: { metadata?: unknown }): number {
 /** The scene's ceiling, from the tier the harness recorded (desktop when there is none: a test scene, the Closet). */
 export function particleBudget(scene: { metadata?: unknown }): number {
   const t = (scene.metadata as Md)?.felTier;
-  const base = t === 'mobile' || t === 'high' ? PARTICLE_BUDGET[t] : PARTICLE_BUDGET.desktop;
+  const tier = t === 'mobile' || t === 'high' ? PARTICLE_BUDGET[t] : PARTICLE_BUDGET.desktop;
+  const base = Math.min(tier, phoneModeCeiling(scene) ?? Infinity);   // a phone's mode ceiling (above): only ever lowers the tier's
   return Math.round(base * particleBudgetScale(scene));
+}
+
+/** The fewest a burst keeps in this scene: MIN_BURST, or PHONE_BURST_FLOOR on a phone in a mode with its own ceiling. */
+export function burstFloor(scene: { metadata?: unknown }): number {
+  return phoneModeCeiling(scene) === null ? MIN_BURST : PHONE_BURST_FLOOR;
 }
 
 /** Particles in the air right now, over every system in the scene. */
@@ -51,9 +86,9 @@ export function liveParticles(scene: { particleSystems: ReadonlyArray<{ getActiv
  * Pure: how many particles a burst that wants `want` gets, with `live` in the air under `budget`, at scale `k`.
  * Whole when it fits; trimmed to the room left when it does not; never below MIN_BURST (or `want`, if smaller).
  */
-export function fitBurst(want: number, live: number, budget: number, k = 1): number {
+export function fitBurst(want: number, live: number, budget: number, k = 1, minBurst = MIN_BURST): number {
   const scaled = Math.max(1, Math.round(want * k));
-  const floor = Math.min(MIN_BURST, scaled);
+  const floor = Math.min(minBurst, scaled);
   const room = Math.max(0, budget - live);
   return Math.max(floor, Math.min(scaled, room));
 }

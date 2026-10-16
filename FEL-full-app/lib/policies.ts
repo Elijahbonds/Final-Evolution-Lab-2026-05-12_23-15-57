@@ -73,7 +73,18 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // (prisma/pending/2026-10-13-party-report.sql); its retention is PARTY_REPORT_RETENTION_DAYS in lib/party/social/reports.ts.
 // Stacked on the LANE-SYNC text above: 2026-10-14 is the text without this bullet. (The lane first called it 2026-10-13b on a
 // branch; that label never shipped.)
-export const CURRENT_POLICY_VERSION = '2026-10-14b';
+// STUDIO-AI-DISCLOSURE (2026-10-16; owner approved this legal-copy edit, "NAME the Studio AI builder's requests, with a
+// policy version bump"): §1 gains a bullet and §2 a bullet naming the Studio AI builder's requests (app/api/cell/venue/route.ts,
+// lib/nexus-studio/aiEdits.ts). §1/§2 listed only "Coach chat inputs" as going to AI models, and §3 says only that "the Coach
+// and Studio features use AI models". What the bullets say was read from the route and the prompt builder, not from the brief:
+// the model is sent the request the person typed and the venue's settings and placements (aiVenueUser/venueBrief) and nothing
+// else (no account, age, birth year, character or health data; the age is read from the database for the gate only); the
+// builder is for signed-in users 13 and over (lib/nexus-studio/aiAccess.ts: teens and adults, never under 13 or an unknown
+// age); and each account is rate-limited (6 a minute, 120 a day). No re-acceptance, the same reasoning as every bump above:
+// nothing reads User.policyVersion back, so a bump re-labels /privacy and /terms and changes what new signups store, and this
+// edit adds a disclosure of what the Service already did (the Studio is held behind NEXUS_STUDIO_ENABLED, off) rather than
+// widening what it collects or who sees it. 2026-10-14b is the text without these two bullets.
+export const CURRENT_POLICY_VERSION = '2026-10-16';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -161,6 +172,7 @@ export const PRIVACY_CONTENT = `
   are stored with every value.
 - **Game session data:** mode, score, duration, win/loss.
 - **Coach chat inputs:** messages sent to the AI coach.
+- **Studio AI builder requests:** if you use the AI builder in Studio, the request you type and the venue it applies to (the venue's settings and what is placed where). Nothing else is sent with them: never your account, age, birth year, character or health data.
 - **Work-with-us inquiries:** if you send an inquiry through Work with us, we store your name, email and message, with the brand, budget range, dates and what you need that you tell us, only to reply to you. We keep it for 12 months, then delete it. We do not store your IP address.
 
 ## 2. How We Use Your Data
@@ -168,6 +180,7 @@ export const PRIVACY_CONTENT = `
 - To operate and improve the Service.
 - To compute your Player Readiness Quotient (PRQ).
 - Coach chat inputs are processed by AI models to generate responses.
+- Studio AI builder requests are sent to an AI model to work out changes to your venue. The builder is available to signed-in users aged 13 and over, and requests are rate-limited.
 - **Parties.** When you join a party, the other members see the party name you choose (never your account name or email) and what you are playing. Party messages, quick chat, emotes and voice go live between the members and are never recorded or stored — not by us, and not on your device beyond the open page. Voice is peer-to-peer and only between verified adults (18+); accounts under 18, or whose age we don't know, can use preset quick chat and emotes only, and their parties are invite-only. If you block someone, we remember that on your device. If you report someone, we keep the report — who reported whom, in which party, when and why — but no conversation, because none is kept. We keep a report for 12 months, then delete it.
 
 ## 3. AI-Generated Content
