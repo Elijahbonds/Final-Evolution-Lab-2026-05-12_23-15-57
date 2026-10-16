@@ -368,18 +368,32 @@ describe('two and three hits overlapping under Karate VS\'s phone ceiling', () =
   });
 
   it('a hit landing while the petal is between lives leaves the petal its room (it was 6 against 5 when the petal came back)', () => {
-    const { sc, fx, done } = dojo();
-    const petal = sc.particleSystems.find((p) => p.name === 'amb_petals')!;
-    let gap = false;
-    for (let i = 0; i < 4000 && !gap; i++) { step(sc); gap = petal.getActiveCount() === 0; }
-    expect(gap, 'found a moment between petals').toBe(true);
-    fx.hit(AT, FROM, 'light');
-    expect(queued(sc, 'cfx_streak_')).toBe(3);                   // what it gets with the petal up: 5 - petal - star
-    let worst = 0, back = false;
-    for (let i = 0; i < 60; i++) { step(sc); worst = Math.max(worst, live(sc)); back ||= petal.getActiveCount() === 1 && queued(sc, 'cfx_') + sc.particleSystems.filter((p) => p.name.startsWith('cfx_streak_')).reduce((n, p) => n + p.getActiveCount(), 0) > 0; }
-    expect(back, 'the petal came back while the streaks were still up').toBe(true);
-    expect(worst).toBeLessThanOrEqual(5);
-    done();
+    // When the petal returns is up to the particle system's Math.random: about 1 run in 10 it came back only after the
+    // streaks had died, so the scenario never happened and the precondition failed (CI on dc8e9db7). Seed the random
+    // source so the run is repeatable, and replay the scenario until the petal does return over live streaks; every
+    // attempt must hold the ceiling.
+    let s = 0x9e3779b9;
+    const rnd = vi.spyOn(Math, 'random').mockImplementation(() => {
+      s = (s + 0x6d2b79f5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    });
+    try {
+      let back = false;
+      for (let attempt = 0; attempt < 12 && !back; attempt++) {
+        const { sc, fx, done } = dojo();
+        const petal = sc.particleSystems.find((p) => p.name === 'amb_petals')!;
+        let gap = false;
+        for (let i = 0; i < 4000 && !gap; i++) { step(sc); gap = petal.getActiveCount() === 0; }
+        expect(gap, 'found a moment between petals').toBe(true);
+        fx.hit(AT, FROM, 'light');
+        expect(queued(sc, 'cfx_streak_')).toBe(3);               // what it gets with the petal up: 5 - petal - star
+        let worst = 0;
+        for (let i = 0; i < 60; i++) { step(sc); worst = Math.max(worst, live(sc)); back ||= petal.getActiveCount() === 1 && queued(sc, 'cfx_') + sc.particleSystems.filter((p) => p.name.startsWith('cfx_streak_')).reduce((n, p) => n + p.getActiveCount(), 0) > 0; }
+        expect(worst, `attempt ${attempt}`).toBeLessThanOrEqual(5);
+        done();
+      }
+      expect(back, 'the petal came back while the streaks were still up').toBe(true);
+    } finally { rnd.mockRestore(); }
   });
 
   it('CONTROL: desktop and high keep every streak of an overlapping hit, and nothing gives way', () => {
