@@ -650,21 +650,20 @@ describe('MOVE_CLIP', () => {
   });
 
   it('the sided moves name a different clip for each side — that was the bug, on the crossover itself', () => {
-    for (const move of ['crossover', 'in_and_out', 'between_legs', 'behind_back', 'double_cross', 'shammgod'] as HandleMove[]) {
+    // (H2b added the snatchback: its v2 crosses the ball on its own path, so it is named for the side the ball ends on — plan §4.13)
+    for (const move of ['crossover', 'in_and_out', 'between_legs', 'behind_back', 'double_cross', 'shammgod', 'snatch_back'] as HandleMove[]) {
       const l = moveClip(move, 'left'), r = moveClip(move, 'right');
       expect(l).toBeTruthy(); expect(r).toBeTruthy();
       expect(l).not.toBe(r);
     }
   });
 
-  // H2b rewrote this case's list (plan §4.8): the hesi left it — its v2 clip is played in the ball's hand (a right-hand clip and its mirror)
-  it('the sideless ones give the same clip either way, and the mode-owned ones give none; the hesi plays in the ball\'s hand', () => {
+  // H2b rewrote this case's list (plan §4.8, §4.13): the hesi and the yoyo left it — their v2 clips are played in the ball's hand (a
+  // right-hand clip and its mirror) — and so did its last sideless member, the snatchback (sided now: the case above)
+  it('no handle move is sideless any more, and the mode-owned ones give none; the hesi plays in the ball\'s hand', () => {
     expect(moveClip('hesi', 'right')).toBe('bball_hesi_v2_right'); expect(moveClip('hesi', 'left')).toBe('bball_hesi_v2_left');
     expect(moveClip('yoyo', 'right')).toBe('bball_yoyo_v2_right'); expect(moveClip('yoyo', 'left')).toBe('bball_yoyo_v2_left');   // (H2b: the yoyo too)
-    for (const move of ['snatch_back'] as HandleMove[]) {
-      expect(moveClip(move, 'left')).toBe(moveClip(move, 'right'));
-      expect(moveClip(move, 'left')).toBeTruthy();
-    }
+    expect(moveClip('snatch_back', 'left')).toBe('bball_snatch_back_v2_left'); expect(moveClip('snatch_back', 'right')).toBe('bball_snatch_back_v2_right');
     // a spin turns the whole body and an off-the-head throws the ball at somebody: the modes render those
     expect(moveClip('spin', 'left')).toBeNull();
     expect(moveClip('off_the_head', 'left')).toBeNull();

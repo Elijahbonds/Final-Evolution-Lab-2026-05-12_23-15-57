@@ -169,7 +169,12 @@ export class DribbleController {
     // step-back keeps the chest where it is (on the man, the rim); the body hops backwards.
     this.cutTo(-tx / n, -tz / n, DribbleController.STEPBACK_HOP_SPEED + (sprint ? 0.4 : 0), false);
     this.movement.launchFor(0.35); this.movement.noteBurst(0.35);
+    // H2b (plan §4.12): the hop is the same hop whatever the left stick is doing — the stick-home hop (≈ 0.45 m, stopped by 0.3 s, the
+    // chest kept on the rim). With the stick held at the rim it used to run backwards at 3.7 m/s for a second and turn the body round.
+    this.movement.ignoreStickFor(DribbleController.STEPBACK_COMMIT_SEC);
   }
+  /** H2b: how long a step-back ignores the left stick — the stick-home hop's own length (3.6 m/s to a stop by ~0.3 s). */
+  static readonly STEPBACK_COMMIT_SEC = 0.3;
   /** THE BTB SLIDE (H2, owner 2026-10-16: "add a curry slide like behind the back"): the ball wraps behind the back and the body hops
    *  SIDEWAYS the way it went — `side` is the athlete's (the ball's end hand) — with a little give away from the rim (`tx, tz` = toward
    *  it), the chest kept on the man like the step-back's (no turn to run). A space move: the launch is armed, no shot window.

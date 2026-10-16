@@ -1631,15 +1631,16 @@ export const OneVOneMode: ModeDefinition = (() => {
               // man, it can break ankles like anything else at its price. The stepback hop + the cross below is its body.
               // HOOPS MOTION phase 4b: its own read (custom, on the input frame as today), then the render — the ball crosses on the snatchback's
               // path in the hop (the switchHand toggle is gone: plan §4.13)
-              requestMove(meHost(), {
-                move: 'snatch_back', clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,
+              const snr = requestMove(meHost(), {
+                move: 'snatch_back', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,   // H2b (plan §4.13): its own v2 clip (MOVE_CLIP), not the step-back's gather
                 decide: { kind: 'custom', run: () => {
                   const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE }, roll, MOVES_UNLOCKED_GATE);
                   chain = sno.chain;
-                  console.info(`[1V1-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
+                  console.info(`[1V1-HANDLE] move snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
                   reactToBreak(ctx, sno, pick.side ?? 'right');
                 } },
               });
+              console.info(`[1V1-HANDLE] snatch_back → ${snr.clip ?? 'no clip'} ball ${snr.startHand}→${snr.endHand}`);   // H2b: the clip that really played (it named bball_snatch_back, a clip the move did not play)
               // THE SNATCHBACK (2K: step-back with R2, steezo's staple): the hop off the rim AND the ball to the other hand
               // in the same beat — the cross is what makes it an escape rather than a set-up for the jumper
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
@@ -1830,7 +1831,7 @@ export const OneVOneMode: ModeDefinition = (() => {
 
         // shot start — drive context first: a hot drive DUNKS instead of metering
         if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
-          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); micBite(); } }   // THE MIC: the bite
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_shimmy_quick', { fadeSec: 0.05, speedRatio: 1 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 });   /* H2b (plan §4.23): its own 0.22 s sell, not the hesi at 1.5× */ if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); micBite(); } }   // THE MIC: the bite
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
@@ -2302,6 +2303,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         nearestDefender: foeStunSec > 0 ? Infinity : foeDist, shot: meShotWin, flight: dunkFlight, landed: meLandSec > 0, celebrate: meCelebrateSec > 0,
         reaching: meAnimTree.held === 'bball_steal_reach' || meAnimTree.held === 'bball_block_reach' || meHandUp, staggered: meStunSec > 0 && !meFloored && possession === 'defense', floored: meFloored,
         posting, spinning: !!spin,   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
+        hesi: meDribble.hanging,     // H2b (plan §4.8): the hitch's posture through the hang
       } satisfies HoopsPostureInput);
       Object.assign(foeBio, {
         role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,

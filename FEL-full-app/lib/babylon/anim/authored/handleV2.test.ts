@@ -15,7 +15,7 @@ import { BALL_ELBOW_POLE } from '../ballCarry';
 import { pathAt } from '../handlePaths';
 import { buildPoseClip } from '../poseClip';
 import {
-  buildCrossover, buildMomentumCross, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildShammgod, buildBtbSlide, SLIDE_V2_KEYS, buildHesiV2, buildYoyoV2, buildPausin,
+  buildCrossover, buildMomentumCross, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildShammgod, buildBtbSlide, SLIDE_V2_KEYS, buildHesiV2, buildYoyoV2, buildPausin, buildSnatchBackV2,
   carryStanceAtBind, handleV2Keys, mirrorKey, buildHesi, BASKETBALL_CLIPS, V2_KEYS as KEYS_OF, V2_BALL_POLE,
 } from './basketball';
 import { pathFor, strokeStretch, type PathMove } from '../handlePaths';
@@ -80,6 +80,8 @@ const CLIPS: { name: string; move: PathMove; build: (s: Scene, k: Skeleton) => A
   { name: 'bball_yoyo_v2_left', move: 'yoyo', build: (s, k) => buildYoyoV2(s, k, 'left'), mirrored: true },
   { name: 'bball_pausin_right', move: 'pausin', build: (s, k) => buildPausin(s, k, 'right'), mirrored: false },   // H2b (plan §4.18)
   { name: 'bball_pausin_left', move: 'pausin', build: (s, k) => buildPausin(s, k, 'left'), mirrored: true },
+  { name: 'bball_snatch_back_v2_left', move: 'snatch_back', build: (s, k) => buildSnatchBackV2(s, k, 'left'), mirrored: false },   // H2b (plan §4.13)
+  { name: 'bball_snatch_back_v2_right', move: 'snatch_back', build: (s, k) => buildSnatchBackV2(s, k, 'right'), mirrored: true },
 ];
 
 for (const body of Object.keys(BODIES)) {

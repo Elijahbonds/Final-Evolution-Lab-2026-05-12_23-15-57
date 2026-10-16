@@ -26,7 +26,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump, buildElbow, buildSpinElbow } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildMomentumCross, buildBtbSlide, buildHesiV2, buildYoyoV2, buildPausin, buildJab, buildPivotV2, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
+  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildMomentumCross, buildBtbSlide, buildHesiV2, buildYoyoV2, buildPausin, buildJab, buildPivotV2, buildSnatchBackV2, buildShimmyQuick, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
   buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildLandAbsorb,   // HOOPS-DEPTH S4
@@ -198,6 +198,9 @@ export function registerAuthoredClips(
     ['bball_jab', () => buildJab(scene, skeleton)],                         // H2b (plan §4.11)
     ['bball_pivot_v2_left', () => buildPivotV2(scene, skeleton, 'left')],   // H2b (plan §4.16)
     ['bball_pivot_v2_right', () => buildPivotV2(scene, skeleton, 'right')],
+    ['bball_snatch_back_v2_left', () => buildSnatchBackV2(scene, skeleton, 'left')],   // H2b (plan §4.13)
+    ['bball_snatch_back_v2_right', () => buildSnatchBackV2(scene, skeleton, 'right')],
+    ['bball_shimmy_quick', () => buildShimmyQuick(scene, skeleton)],                   // H2b (plan §4.23)
     ['bball_hesi', () => buildHesi(scene, skeleton)],
     // THE HANDLE (2026-09-16): HandleSystem's twelve moves had three clips between them
     ['bball_in_and_out_left', () => buildInAndOut(scene, skeleton, 'left')],

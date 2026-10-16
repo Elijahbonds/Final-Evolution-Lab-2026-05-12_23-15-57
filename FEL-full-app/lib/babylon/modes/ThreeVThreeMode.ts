@@ -578,6 +578,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     Object.assign(b.bio, {
       role, hasBall, speed01: b.speed01, nearestDefender, shot: b.shotWin, flight: b === me ? dunkFlight : null, landed: b.landSec > 0, celebrate: b.celebrateSec > 0,
       reaching: reaching || (b !== me && (foeHandUp === b || b.jumpAge !== Infinity)), staggered: b === me ? meStunSec > 0 && !meFloored : b.stunSec > 0 && !b.floored, floored: b === me ? meFloored : b.floored,
+      hesi: b === me && me.drib.hanging,   // H2b (plan §4.8): the hitch's posture through the hang
     } satisfies HoopsPostureInput);
   }
 
@@ -1559,15 +1560,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // man, it can break ankles like anything else at its price. The stepback hop + the cross below is its body.
             // HOOPS MOTION phase 4b: its own read first (custom, as today), then the render — the ball crosses on the snatchback's path in the
             // hop (the switchHand toggle is gone: plan §4.13)
-            requestMove(meHost(), {
-              move: 'snatch_back', clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,
+            const snr = requestMove(meHost(), {
+              move: 'snatch_back', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,   // H2b (plan §4.13): its own v2 clip (MOVE_CLIP)
               decide: { kind: 'custom', run: () => {
                 const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll, MOVES_UNLOCKED_GATE);
                 chain = sno.chain;
-                console.info(`[3V3-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
+                console.info(`[3V3-HANDLE] move snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
                 reactToBreak(ctx, sno, nfS, 'snatch_back', pick.side ?? 'right');
               } },
             });
+            console.info(`[3V3-HANDLE] snatch_back → ${snr.clip ?? 'no clip'} ball ${snr.startHand}→${snr.endHand}`);   // H2b: the clip that really played (it named bball_snatch_back, a clip the move did not play)
             // THE SNATCHBACK (2K: step-back with R2): the hop off the rim AND the ball to the other hand in the same beat
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
@@ -2086,7 +2088,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // test): a trigger still held past the meter's end restarted a shot with the ball in the air (a second gather on top of
       // the arc, measured)
       if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
-          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } }); } } }   // THE MIC: the bite
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_shimmy_quick', { fadeSec: 0.05, speedRatio: 1 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 });   /* H2b (plan §4.23) */ { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } }); } } }   // THE MIC: the bite
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }

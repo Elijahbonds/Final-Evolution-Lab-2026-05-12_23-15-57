@@ -31,7 +31,7 @@ const oneVOne = (s: Site, handle = 100) => {
   return {
     doMove: (move: HandleMove, hint?: Side, cutSide?: Side, flick = false): HandleRequest => ({ move, hint, cutSide, flick, impulse: true, path: move === 'steezo_roll' ? 'momentum_btb' : undefined, decide: { kind: 'resolve', run: () => { const o = resolve(move, READ_IN_RANGE); s.chain = o.chain; return o; } } }),
     stepback: (): HandleRequest => ({ move: 'stepback', clip: 'bball_stepback_gather', path: false, decide: { kind: 'chainOnly', run: () => { s.chain = resolve('stepback', { present: false, closing: false, set: true, within: false }).chain; } } }),
-    snatchback: (): HandleRequest => ({ move: 'snatch_back', clip: 'bball_stepback_gather', decide: { kind: 'custom', run: () => { s.chain = resolve('snatch_back', { ...READ_IN_RANGE, set: false }).chain; } } }),
+    snatchback: (): HandleRequest => ({ move: 'snatch_back', decide: { kind: 'custom', run: () => { s.chain = resolve('snatch_back', { ...READ_IN_RANGE, set: false }).chain; } } }),
     sizeUp: (clip: string, side: Side): HandleRequest => ({ move: sizeUpMoveOf(clip), hint: side, decide: { kind: 'none' }, fadeSec: 0.08, speedRatio: 1 }),
     spin: (): HandleRequest => ({ move: 'spin', decide: { kind: 'none' }, clip: null, path: 'spin' }),
     jab: (): HandleRequest => ({ move: 'jab', clip: 'bball_jab', decide: { kind: 'custom', run: () => { roll(); } } }),
@@ -43,7 +43,7 @@ const threeVThree = (s: Site, handle = 100) => {
   return {
     doMove: (move: HandleMove, hint?: Side, cutSide?: Side): HandleRequest => ({ move, hint, cutSide, impulse: true, path: move === 'steezo_roll' ? 'momentum_btb' : undefined, decide: { kind: 'resolve', run: () => { const o = resolve(move, READ_IN_RANGE); s.chain = o.chain; return o; } } }),
     stepback: (): HandleRequest => ({ move: 'stepback', clip: 'bball_stepback_gather', path: false, decide: { kind: 'chainOnly', run: () => { s.chain = resolve('stepback', { present: false, closing: false, set: true, within: false }, roll).chain; } } }),
-    snatchback: (): HandleRequest => ({ move: 'snatch_back', clip: 'bball_stepback_gather', decide: { kind: 'custom', run: () => { s.chain = resolve('snatch_back', { ...READ_IN_RANGE, set: false }, roll).chain; } } }),
+    snatchback: (): HandleRequest => ({ move: 'snatch_back', decide: { kind: 'custom', run: () => { s.chain = resolve('snatch_back', { ...READ_IN_RANGE, set: false }, roll).chain; } } }),
     sizeUp: (clip: string, side: Side): HandleRequest => ({ move: sizeUpMoveOf(clip), hint: side, decide: { kind: 'none' }, fadeSec: 0.08, speedRatio: 1 }),
     spin: (): HandleRequest => ({ move: 'spin', decide: { kind: 'none' }, clip: null, path: 'spin' }),
     jab: (): HandleRequest => ({ move: 'jab', clip: 'bball_jab', fadeSec: 0.05, speedRatio: 1, decide: { kind: 'custom', run: () => { Math.random(); } } }),
@@ -254,11 +254,21 @@ describe('the modes\' call sites (contract: the source)', () => {
       expect(fn, name).toMatch(/decide: \{ kind: 'resolve', run: \(\) => resolveHandleMove\(move, chain, handle, \{/);
       expect(fn, name).toMatch(roll);
       expect(src, name).toMatch(/move: 'stepback', decide: \{ kind: 'chainOnly'/);
-      expect(src, name).toMatch(/move: 'snatch_back', clip: 'bball_stepback_gather'[\s\S]{0,200}decide: \{ kind: 'custom'/);
+      // H2b rewrote the snatchback's pin (same intent: it decides itself): it plays its own v2 (MOVE_CLIP), no longer the step-back's gather
+      expect(src, name).toMatch(/move: 'snatch_back', fadeSec[\s\S]{0,300}decide: \{ kind: 'custom'/);
+      expect(src, name).not.toMatch(/move: 'snatch_back', clip: 'bball_stepback_gather'/);
       // H2b rewrote the jab's clip in this pin (same intent: the jab decides itself): it plays its own bball_jab, not the hesi stand-in
       expect(src, name).toMatch(/move: 'jab', clip: 'bball_jab'[\s\S]{0,200}decide: \{ kind: 'custom'/);
       expect(src, name).toMatch(/move: sizeUpMoveOf\(suClip\), hint: pick\.side \?\? undefined, decide: \{ kind: 'none' \}/);
       expect(src, name).toMatch(/requestMove\(meHost\(\), \{ move: 'spin', decide: \{ kind: 'none' \}, clip: null, path: 'spin' \}\)/);
+    }
+  });
+  it('H2b (plan §4.23): the post hook\'s R2 shimmy plays its own 0.22 s sell at rate 1 — no shimmy beat plays the hesitation any more', () => {
+    for (const [name, src] of [['1v1', one], ['3v3', three]] as const) {
+      const at = src.indexOf('stickShot.shimmy && !stickShot.shimmied'); expect(at, name).toBeGreaterThan(0);
+      const beat = src.slice(at, at + 400);
+      expect(beat, name).toMatch(/beat\('bball_shimmy_quick', \{ fadeSec: 0\.05, speedRatio: 1 \}\)/);
+      expect(beat, name).not.toMatch(/bball_hesi/);
     }
   });
   it('no switchHand() toggle is left in a move path, and the hero\'s left-stick crossover no longer moves the ball on its own (toSide): it is doMove\'s cut side', () => {
