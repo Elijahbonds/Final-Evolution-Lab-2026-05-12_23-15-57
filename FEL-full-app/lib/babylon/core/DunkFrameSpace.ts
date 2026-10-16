@@ -10,11 +10,12 @@
 // new Quaternion; `a.multiply(b)` IS `a.multiplyToRef(b, new Quaternion())`; `Quaternion.Inverse(q)` and `InverseToRef` both set
 // (−x, −y, −z, w); `Quaternion.Identity()` is (0, 0, 0, 1); `Vector3.Forward()` is (0, 0, 1). Each product keeps its operands in
 // the same order. DunkFrameSpace.test.ts proves it bit for bit (Object.is) against the frozen allocating forms in
-// tests/helpers/dunkFrameSpaceLegacy.ts, over randomized chains, and counts zero Quaternion / Vector3 constructions per call.
+// tests/helpers/dunkFrameSpaceLegacy.ts, over randomized chains, and counts zero Quaternion / Vector3 constructions per call. The
+// world-matrix walk below is proven the same way: the same nodes in the same order as the getChildTransformNodes walk.
 //
 // The `out` a caller passes is the caller's own scratch (DunkMode passes its `_ppD`, which `ppAxis` reads next — the side effect
 // is kept). No input may be one of this module's scratches; no `out` may be a node's own rotation.
-import { Quaternion, Vector3, type TransformNode } from '@babylonjs/core';
+import { Quaternion, TransformNode, Vector3, type Node } from '@babylonjs/core';
 import { chainRotationToRef } from '../anim/TwoBoneIK';
 
 const _chain = new Quaternion(), _rp = new Quaternion(), _inv = new Quaternion(), _a = new Quaternion(), _b = new Quaternion(), _q = new Quaternion();
@@ -48,4 +49,23 @@ export function rotateInFrame(n: TransformNode, frame: TransformNode, rho: Quate
   const Rp = parentChainToRef(n, frame, _rp);
   const q = n.rotationQuaternion!;
   Quaternion.InverseToRef(Rp, _a).multiplyToRef(rho, _b); _b.multiplyToRef(Rp, _a); _a.multiplyToRef(q, _q); q.copyFrom(_q);
+}
+
+// ── The world-matrix walk (step 4 of the posture copy) ─────────────────────────────────────────────────────────────────────────
+// It was `const walk = (n) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); }` — a fresh
+// closure, a fresh child array (and its predicate closure and iterator) per bone per frame. This visits the SAME nodes in the SAME
+// order: getChildTransformNodes(true) lists the node's direct children that are TransformNodes, in `_children` order, as a snapshot
+// taken before descending; here the snapshot is a pooled list per depth (the pattern rig-perf put in PostureLayer's walkFrom).
+const walkPool: (TransformNode | null)[][] = [];
+/** computeWorldMatrix(true) on `n` and every TransformNode below it, parents first, children in order — no garbage. */
+export function computeWorldMatricesDown(n: TransformNode, depth = 0): void {
+  n.computeWorldMatrix(true);
+  const kids = (n as unknown as { _children: Node[] | null })._children;
+  if (!kids || kids.length === 0) return;
+  const list = walkPool[depth] ?? (walkPool[depth] = []);
+  // filled by count (never `length = 0`, which drops V8's backing store and re-allocates it on the next push)
+  let len = 0;
+  for (let i = 0; i < kids.length; i++) { const c = kids[i]; if (c instanceof TransformNode) list[len++] = c; }
+  // the snapshot is read before any deeper call reuses a deeper slot; a deeper level never touches this depth's list
+  for (let i = 0; i < len; i++) { const c = list[i]!; list[i] = null; computeWorldMatricesDown(c, depth + 1); }   // cleared as read: the pool holds no node alive
 }

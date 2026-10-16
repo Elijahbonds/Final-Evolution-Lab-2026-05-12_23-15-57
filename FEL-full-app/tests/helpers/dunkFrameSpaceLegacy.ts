@@ -28,3 +28,5 @@ export function rotateInFrame(n: TransformNode, rho: Quaternion, ppFrame: Transf
   const q = n.rotationQuaternion!;
   Quaternion.Inverse(Rp).multiply(rho).multiply(Rp).multiplyToRef(q, _ppQ); q.copyFrom(_ppQ);
 }
+/** Step 4 of the posture copy, as it stood: fresh world matrices top-down from the hips. */
+export const walk = (n: TransformNode): void => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); };

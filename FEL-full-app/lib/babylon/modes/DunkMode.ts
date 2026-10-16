@@ -65,7 +65,7 @@ import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '..
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
 import { frameAbove } from '../anim/TwoBoneIK';
-import { chainDeltaToRef, localDeltaToRef, forwardByToRef, rotateInFrame as rotateInFrameOf } from '../core/DunkFrameSpace';   // DUNK-GARBAGE: the posture copy's frame-space math, no per-call allocation
+import { chainDeltaToRef, localDeltaToRef, forwardByToRef, rotateInFrame as rotateInFrameOf, computeWorldMatricesDown } from '../core/DunkFrameSpace';   // DUNK-GARBAGE: the posture copy's frame-space math, no per-call allocation
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the runway answers its MOTION
 import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, clonePose, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose, type PostureWindow, type PostureInput } from '../core/DunkPosture';   // DUNK-POSTURE: the Posture Poses layer
 import type { PlayOpts } from '../anim/CharacterAnimator';
@@ -3304,6 +3304,7 @@ export const DunkMode: ModeDefinition = (() => {
   // DUNK-GARBAGE (2026-10-16): the inverse, the chain, the parent chain and the forward moved to DunkFrameSpace's scratch; the yaw
   // axis is one constant (RotationAxisToRef only reads it — `Vector3.Up()` made a new one per joint a frame).
   const _ppAxis = new Vector3(), PP_UP = new Vector3(0, 1, 0);
+  const _ppK = Quaternion.Identity();   // DUNK-GARBAGE: the stance's keyed pose (bindFrame.keyedToRef — keyed's arithmetic, no garbage)
   /** The bone's own axis (x, y, z in its bind frame) in frame space this frame: `_ppD` must hold the bone's chain × bind⁻¹. */
   const ppAxis = (x: number, y: number, z: number): Vector3 => _ppAxis.set(x, y, z).rotateByQuaternionToRef(_ppD, _ppAxis).normalize();
   /** chain rotation × bind⁻¹ into `_ppD`, without allocating (DUNK-GARBAGE 2026-10-16: the chain too — DunkFrameSpace). */
@@ -3402,7 +3403,7 @@ export const DunkMode: ModeDefinition = (() => {
     const P = ppPose, w = POSTURE_OFF ? 0 : clamp(P.weight, 0, 1);
     const bf = hipsBf;
     // 1) the stance: thoracic, clavicles, head — absolute from bind, the clip's (or the held) value under it by 1 − w
-    const stanceW = (p: PpNode | null, deg: [number, number, number], ww: number) => { if (!p) return; const base = ppBase(p); Quaternion.SlerpToRef(base, bf.keyed(p.n, deg), ww, _ppQ); p.n.rotationQuaternion!.copyFrom(_ppQ); ppCommit(p); };
+    const stanceW = (p: PpNode | null, deg: [number, number, number], ww: number) => { if (!p) return; const base = ppBase(p); Quaternion.SlerpToRef(base, bf.keyedToRef(p.n, deg, _ppK), ww, _ppQ); p.n.rotationQuaternion!.copyFrom(_ppQ); ppCommit(p); };
     const stance = (p: PpNode | null, deg: [number, number, number]) => stanceW(p, deg, w);
     // 0) the lumbar lean, ADDED to the clip's Spine (a pitch about the bone's own right axis in frame space, +X = forward)
     if (ppNodes.spine && Math.abs(P.lean) * w > 0.05) {
@@ -3516,9 +3517,8 @@ export const DunkMode: ModeDefinition = (() => {
       }
     }
     // 4) fresh world matrices top-down from the hips (a forced compute reads the parent's CACHED matrix): the reach solves
-    //    against this frame's shoulders, the ball rides this frame's hand
-    const walk = (n: TransformNode) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); };
-    walk(hipsNode);
+    //    against this frame's shoulders, the ball rides this frame's hand (DUNK-GARBAGE: the same walk, on pooled child lists)
+    computeWorldMatricesDown(hipsNode);
   }
   /** Dev probes (`__FEL_DEV__.dunkPosture`): the live window / stance / corrections, and an override to force a stance. */
   const postureDevHandle = {

@@ -5,12 +5,15 @@
 //  2. NO GARBAGE — a call constructs no Quaternion and no Vector3 (counted in Babylon's own constructors). The counter is checked
 //     first against a known answer: the frozen helpers construct exactly 9 quaternions and 2 vectors per round.
 //  3. THE WIRING — DunkMode's per-frame helpers call DunkFrameSpace and no allocating form is left in them.
+//  4. THE REST OF THE COPY — the world-matrix walk visits the same nodes in the same order as the getChildTransformNodes walk (same
+//     matrices, no Babylon child list), and the stance's bindFrame.keyedToRef gives keyed's quaternion bit for bit, no construction.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { NullEngine, Quaternion, Scene, TransformNode, Vector3 } from '@babylonjs/core';
+import { Bone, FreeCamera, Matrix, Mesh, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3, type Node, type Nullable } from '@babylonjs/core';
 import * as Legacy from '@/tests/helpers/dunkFrameSpaceLegacy';
 import { countConstructions } from '@/tests/helpers/constructionCount';
-import { chainDeltaToRef, forwardByToRef, localDeltaToRef, parentChainToRef, rotateInFrame } from './DunkFrameSpace';
+import { chainDeltaToRef, computeWorldMatricesDown, forwardByToRef, localDeltaToRef, parentChainToRef, rotateInFrame } from './DunkFrameSpace';
+import { bindFrame } from '../anim/bindFrame';
 
 function mulberry32(seed: number): () => number {
   let t = seed >>> 0;
@@ -131,9 +134,86 @@ describe('DunkFrameSpace: the posture copy without garbage', () => {
     expect(helpers.length).toBeGreaterThan(200);
     for (const bad of ['chainRotation(', 'Quaternion.Identity()', 'Quaternion.Inverse(', '.multiply(', 'Vector3.Forward()', 'new Quaternion', 'new Vector3', '.clone()']) expect(helpers).not.toContain(bad);
     for (const good of ['chainDeltaToRef(p.n, ppFrame!, p.bindChain, _ppD)', 'localDeltaToRef(n, local, ppFrame!, bindChain, _ppD)', 'forwardByToRef(_ppD, _ppV)', 'rotateInFrameOf(n, ppFrame!, rho)']) expect(helpers).toContain(good);
-    const at = src.indexOf('function applyPostureLayer'), apply = src.slice(at, src.indexOf('const walk = (n: TransformNode) =>', at));
+    const at = src.indexOf('function applyPostureLayer'), apply = src.slice(at, src.indexOf('computeWorldMatricesDown(hipsNode);', at) + 40);
     expect(apply.length).toBeGreaterThan(2000);
     expect(apply).not.toContain('Vector3.Up()');
     expect(apply.match(/RotationAxisToRef\(PP_UP, /g)?.length).toBe(2);
+    // the stance's key into scratch, and the walk on pooled lists
+    expect(apply).toContain('Quaternion.SlerpToRef(base, bf.keyedToRef(p.n, deg, _ppK), ww, _ppQ)');
+    expect(apply).not.toContain('bf.keyed(');
+    expect(apply).not.toContain('getChildTransformNodes');
+    expect(apply).toContain('computeWorldMatricesDown(hipsNode);');
+  });
+});
+
+describe('DunkFrameSpace: the world-matrix walk and the stance key, without garbage', () => {
+  /** A random hierarchy under a reflected root: TransformNodes, Meshes (TransformNodes too), and nodes that are NOT
+   *  TransformNodes (a camera) whose subtree the walk must skip, exactly as getChildTransformNodes(true) skips it. */
+  function randTree(rnd: () => number): TransformNode {
+    const root = new TransformNode('root', scene); root.scaling.set(1, 1, -1);
+    const all: Node[] = [root];
+    for (let i = 0; i < 40; i++) {
+      const parent = all[Math.floor(rnd() * all.length)]!;
+      const k = rnd();
+      const n: Node = k < 0.1 ? new FreeCamera(`cam${i}`, Vector3.Zero(), scene, false) : k < 0.3 ? new Mesh(`m${i}`, scene) : new TransformNode(`t${i}`, scene);
+      n.parent = parent;
+      if (n instanceof TransformNode && !(n instanceof FreeCamera)) { n.position.set(s(rnd), s(rnd), s(rnd)); n.rotationQuaternion = randQ(rnd); }
+      all.push(n);
+    }
+    return root;
+  }
+  /** Which nodes computeWorldMatrix(true) runs on, in order, while `fn` runs. */
+  function visits(fn: () => void): string[] {
+    const seen: string[] = []; const orig = TransformNode.prototype.computeWorldMatrix;
+    TransformNode.prototype.computeWorldMatrix = function (this: TransformNode, force?: boolean, camWorld?: Nullable<Matrix>) { if (force === true) seen.push(this.name); return orig.call(this, force, camWorld); };
+    try { fn(); } finally { TransformNode.prototype.computeWorldMatrix = orig; }
+    return seen;
+  }
+  it('visits exactly the nodes the getChildTransformNodes walk visited, in the same order, with the same matrices', () => {
+    const rnd = mulberry32(420);
+    let total = 0;
+    for (let t = 0; t < 30; t++) {
+      const root = randTree(rnd);
+      const start = root.getChildTransformNodes(true)[0] ?? root;
+      const a = visits(() => Legacy.walk(start)); const ma = start.getChildTransformNodes(false).map((n) => n.getWorldMatrix().asArray().slice());
+      const b = visits(() => computeWorldMatricesDown(start)); const mb = start.getChildTransformNodes(false).map((n) => n.getWorldMatrix().asArray().slice());
+      expect(b).toEqual(a);
+      expect(mb.every((m, i) => m.every((v, j) => Object.is(v, ma[i]![j])))).toBe(true);
+      total += a.length;
+      root.dispose();
+    }
+    expect(total).toBeGreaterThan(300);
+    // no Babylon child-list call, and no node kept alive by the pool
+    const root = randTree(rnd); let lists = 0; const orig = TransformNode.prototype.getChildTransformNodes;
+    TransformNode.prototype.getChildTransformNodes = function (this: TransformNode, ...a: Parameters<typeof orig>) { lists++; return orig.apply(this, a); };
+    try { computeWorldMatricesDown(root); } finally { TransformNode.prototype.getChildTransformNodes = orig; }
+    expect(lists).toBe(0);
+    root.dispose();
+  });
+  it('the stance key: bindFrame.keyedToRef gives keyed\'s quaternion bit for bit, with no construction (randomized skeletons)', () => {
+    const rnd = mulberry32(99);
+    const out = new Quaternion(); let n = 0;
+    for (let t = 0; t < 20; t++) {
+      const root = new TransformNode('__root__', scene); root.scaling.set(1, 1, -1);
+      const sk = new Skeleton(`sk${t}`, `sk${t}`, scene);
+      let pb: Bone | null = null; let pn: TransformNode = root; const nodes: TransformNode[] = [];
+      for (let i = 0; i < 6; i++) {
+        const rest = Matrix.Compose(Vector3.One(), randQ(rnd).normalize(), new Vector3(s(rnd), s(rnd), s(rnd)));
+        const b: Bone = new Bone(`b${i}`, sk, pb, rest, rest);
+        const tn = new TransformNode(`n${i}`, scene); tn.parent = pn; tn.rotationQuaternion = randQ(rnd); b.linkTransformNode(tn);
+        nodes.push(tn); pb = b; pn = tn;
+      }
+      const bf = bindFrame(sk);
+      for (const node of nodes) for (let k = 0; k < 10; k++) {
+        const deg: [number, number, number] = [s(rnd) * 90, s(rnd) * 90, s(rnd) * 90];
+        const want = bf.keyed(node, deg);
+        expect(bf.keyedToRef(node, deg, out)).toBe(out);
+        same(out, want, 'keyedToRef'); n++;
+      }
+      const c = countConstructions(() => { for (const node of nodes) bf.keyedToRef(node, [10, -20, 30], out); });
+      expect(c).toEqual({ quaternions: 0, vector3s: 0 });
+      sk.dispose(); root.dispose();
+    }
+    expect(n).toBe(1200);
   });
 });
