@@ -12,10 +12,11 @@
 // No schema change: the run is read from SessionRun as it is, and the binding is the MatchEvent payload that already exists.
 import { arenaModeKey } from '@/lib/arena';
 import { RUN_STATUS } from '@/lib/sessions/sessionRuns';
+import { runTierOf, STAKED_TIER } from '@/lib/sessions/runTier';
 
 export type DuelRunVerdict =
   | { ok: true; runId: string; score: number }
-  | { ok: false; code: 'NO_RUN' | 'RUN_NOT_YOURS' | 'RUN_NOT_FINISHED' | 'RUN_WRONG_MODE' | 'RUN_BEFORE_DUEL' | 'RUN_ALREADY_USED' | 'SCORE_MISMATCH'; detail: string; status: number };
+  | { ok: false; code: 'NO_RUN' | 'RUN_NOT_YOURS' | 'RUN_NOT_FINISHED' | 'RUN_WRONG_MODE' | 'RUN_BEFORE_DUEL' | 'RUN_ALREADY_USED' | 'SCORE_MISMATCH' | 'RUN_NOT_STAKED'; detail: string; status: number };
 
 const FINISHED: readonly string[] = [RUN_STATUS.paid, RUN_STATUS.recorded];
 
@@ -34,6 +35,11 @@ export async function readDuelRun(
   if (run.userId !== a.userId) return { ok: false, code: 'RUN_NOT_YOURS', detail: 'That run is not yours.', status: 403 };
   if (arenaModeKey(run.mode) !== arenaModeKey(a.match.mode)) {
     return { ok: false, code: 'RUN_WRONG_MODE', detail: 'That run was played in a different mode from this duel.', status: 422 };
+  }
+  // TIER-SERVER: a duel settles only on a run the server started as a head-to-head, at the staked tier (its own copy)
+  const t = runTierOf(run);
+  if (!t.staked || t.tier !== STAKED_TIER) {
+    return { ok: false, code: 'RUN_NOT_STAKED', detail: 'That run was not started as a duel run at the duel tier (PRO).', status: 422 };
   }
   if (!FINISHED.includes(run.status) || !Number.isInteger(run.score)) {
     return { ok: false, code: 'RUN_NOT_FINISHED', detail: 'That run has not been finished and recorded yet.', status: 409 };

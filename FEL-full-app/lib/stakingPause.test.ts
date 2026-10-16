@@ -313,7 +313,7 @@ describe('a duel that already exists on a paused mode still finishes', () => {
   it('a dance QUICK MATCH opened before the pause takes the score, draws the house and settles', async () => {
     h.matches = [duel()];
     // ARENA-SETTLE-SERVER: the 4000 is the score of a dance run the server finished for this player after the duel opened
-    h.runs['run-d1'] = { id: 'run-d1', userId: USER, mode: 'dance', status: 'paid', score: 4000, startedAt: new Date(Date.now() + 1000) };
+    h.runs['run-d1'] = { id: 'run-d1', userId: USER, mode: 'dance', result: { tier: 'pro', staked: true }, status: 'paid', score: 4000, startedAt: new Date(Date.now() + 1000) };
     const res = await submitPOST(post({ matchId: 'd-1', score: 4000, runId: 'run-d1' }));
     expect(res.status).toBe(200);
     const body = await res.json();

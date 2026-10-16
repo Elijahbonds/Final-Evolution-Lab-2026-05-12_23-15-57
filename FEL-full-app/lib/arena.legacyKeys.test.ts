@@ -301,7 +301,7 @@ describe('a staked music rival and endless free play', () => {
     db.matches = [legacyMatch({ mode: 'threePoint', matchType: 'GHOST_DUEL', status: 'ACTIVE', player1Id: USER, player2Id: HOUSE })];
     db.sessions = [{ userId: USER, mode: 'threePoint', score: 14, createdAt: new Date('2026-09-19T00:00:00Z') }];
     // ARENA-SETTLE-SERVER: the 12 is a threePoint run the server finished for the player after the duel opened
-    db.runs['run-3p'] = { id: 'run-3p', userId: USER, mode: 'threePoint', status: 'paid', score: 12, startedAt: new Date('2026-09-20T00:01:00Z') };
+    db.runs['run-3p'] = { id: 'run-3p', userId: USER, mode: 'threePoint', result: { tier: 'pro', staked: true }, status: 'paid', score: 12, startedAt: new Date('2026-09-20T00:01:00Z') };
     await submitPOST(post({ matchId: 'legacy-1', score: 12, runId: 'run-3p' }));
     expect(db.duelQueries).toEqual([]);
     expect(db.sessionQueries.map((w) => w.mode)).toEqual(['threePoint', 'threePoint']);
