@@ -21,7 +21,7 @@ vi.mock('@/lib/db', () => ({
 
 import { POST } from '@/app/api/cell/venue/route';
 import { newVenue } from './doc';
-import { GOOD_ANSWER, HOSTILE_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, completionBody } from '@/tests/helpers/aiVenue';
+import { EXPLAIN_ANSWER, GOOD_ANSWER, HOSTILE_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, RALLY_PROMPT, SCRIPT_CAST_ANSWER, completionBody } from '@/tests/helpers/aiVenue';
 
 const saved = { flag: process.env.ABACUS_ENABLED, key: process.env.ABACUSAI_API_KEY };
 let fetchSpy: ReturnType<typeof vi.fn>;
@@ -173,6 +173,73 @@ describe('ABACUS_ENABLED=true', () => {
   it('a provider failure is a 502 with no detail', async () => {
     fetchSpy.mockImplementationOnce(async () => new Response('upstream secret detail', { status: 500 }));
     const res = await POST(req({ prompt: 'x', venue: venue() }));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'ai_failed' });
+  });
+});
+
+// ── studio-4b: scripts and casts in the answer; the explain pass ─────────────────────────────────────────────────────
+describe('studio-4b', () => {
+  beforeEach(() => { process.env.ABACUS_ENABLED = 'true'; });
+  const sentWords = () => JSON.stringify(JSON.parse(((fetchSpy.mock.calls.at(-1) as unknown[])[1] as { body: string }).body).messages);
+  const castVenue = () => ({ ...venue(), cast: { player: 'c_secret_player', crowd: ['c_secret_fan'] } });
+
+  it('scripts and casts come back sanitised; the model hears no cast, even when a body carries one', async () => {
+    answer = SCRIPT_CAST_ANSWER;
+    const body = await (await POST(req({ prompt: RALLY_PROMPT, venue: castVenue() }))).json();
+    expect(body.edits.map((e: { op: string }) => e.op)).toEqual(['script', 'cast', 'cast', 'cast']);
+    const words = sentWords();
+    expect(words).toContain(RALLY_PROMPT);   // the names the creator typed are the typed request
+    expect(words).not.toMatch(/c_secret|FEL\d\./);
+  });
+
+  it('explain: a plain-text summary, sanitised; the model hears the venue brief and nothing else; no edits', async () => {
+    answer = EXPLAIN_ANSWER;
+    const res = await POST(req({ mode: 'explain', venue: castVenue() }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Object.keys(body)).toEqual(['summary']);
+    expect(body.summary).toMatch(/^Night Court A night court under four floods\./);
+    expect(body.summary).not.toMatch(/[<>*#`]|edits/);
+    const sent = JSON.parse(((fetchSpy.mock.calls.at(-1) as unknown[])[1] as { body: string }).body);
+    expect(sent).not.toHaveProperty('response_format');   // plain text, not the JSON edit mode
+    const words = JSON.stringify(sent.messages);
+    expect(words).toContain('Explain the creator');
+    expect(words).not.toMatch(/c_secret|adult|teen|dobYear|birth|email/i);
+    expect(words).not.toContain((m.session as { user: { id: string } }).user.id);
+  });
+
+  it('explain keeps every gate, in the same order: the switch first, signed in, the age line, the capped body, a venue', async () => {
+    delete process.env.ABACUS_ENABLED;
+    expect((await POST(req({ mode: 'explain', venue: venue() }))).status).toBe(503);
+    expect(getServerSession.spy).not.toHaveBeenCalled();
+    process.env.ABACUS_ENABLED = 'true';
+    m.session = null;
+    expect((await POST(req({ mode: 'explain', venue: venue() }))).status).toBe(401);
+    const y = new Date().getFullYear();
+    for (const [year, status] of [[y - 10, 403], [null, 403], [y - 15, 200], [1980, 200]] as const) {
+      m.session = { user: { id: `ex-${++users}` } };
+      m.dobYear = year;
+      answer = EXPLAIN_ANSWER;
+      expect((await POST(req({ mode: 'explain', venue: venue() }))).status, `dobYear ${year}`).toBe(status);
+    }
+    expect((await POST(req(null, 'x'.repeat(400_001)))).status).toBe(413);
+    fetchSpy.mockClear();
+    expect((await POST(req({ mode: 'explain', venue: { base: {} } }))).status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('explain shares the account\'s rate limit with building', async () => {
+    answer = EXPLAIN_ANSWER;
+    let last = 200;
+    for (let i = 0; i < 4; i++) last = (await POST(req({ prompt: 'x', venue: venue() }))).status;
+    for (let i = 0; i < 3; i++) last = (await POST(req({ mode: 'explain', venue: venue() }))).status;
+    expect(last).toBe(429);
+  });
+
+  it('a summary that sanitises to nothing is a 502 with no detail', async () => {
+    answer = '```json\n{"edits":[]}\n```';
+    const res = await POST(req({ mode: 'explain', venue: venue() }));
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: 'ai_failed' });
   });

@@ -10,14 +10,25 @@
 // and only catalog items can be placed (no gameplay prop: the catalog has no hoop, net or goal you could score on).
 // Nothing in an answer is ever evaluated or executed: it is JSON read field by field from allow-lists.
 //
+// studio-4b: CELL also proposes SCRIPTS (an event → condition → action graph in the script vocabulary, through scripts.ts
+// sanitizeGraph — data, never code; scoped to the venue it was asked for) and CASTS (a project character as the player or among
+// the fans), through the same review-then-apply step. And an EXPLAIN pass: a read-only, plain-language summary of the venue.
+//
+// PRIVACY (Privacy Policy §1, "Studio AI builder requests"): a request carries the typed request and the venue — its settings and
+// what is placed where — and nothing else: never the account, age, birth year, character or health data. So the model is NOT
+// told which characters the project has (not their names, not their looks). A cast edit names a character the way the CREATOR
+// named it in the typed request, and the browser resolves that name against the project's own characters (resolveCastName); a
+// name that matches none is shown in the review and left out. Existing scripts are not sent either: a proposal is a new script.
+//
 // Pure: no fetch, no DOM, no Babylon. The prompt words live here too, so the server route stays a thin, testable shell.
 
 import type { Command, Op } from './commands';
 import { catalog, catalogItem, instantiate } from './catalog';
 import {
-  LIMITS, OBJECT_TYPES, clampNum, sanitizeObject, sanitizeVenue, wrapAngle,
-  type StudioObject, type StudioObjectType, type StudioVenue, type V3, type VenueSettings,
+  LIMITS, OBJECT_TYPES, clampNum, newId, sanitizeObject, sanitizeVenue, wrapAngle,
+  type StudioCharacter, type StudioObject, type StudioObjectType, type StudioScript, type StudioVenue, type V3, type VenueSettings,
 } from './doc';
+import { NODE_KINDS, NODE_SPECS, groupOf, sanitizeGraph, type ParamSpec, type ScriptGraph } from './scripts';
 import { targetOf } from './targets';
 
 // ── the vocabulary ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -32,7 +43,11 @@ type AiObjectKey = (typeof AI_OBJECT_KEYS)[number];
 export type AiEdit =
   | { op: 'venue'; set: Partial<Pick<VenueSettings, AiVenueKey>> }
   | { op: 'place'; item: string; at: V3; yaw: number; scale: number; name?: string; set: Partial<Record<AiObjectKey, unknown>> }
-  | { op: 'clear'; type: StudioObjectType | 'all' };
+  | { op: 'clear'; type: StudioObjectType | 'all' }
+  /** studio-4b: a new script for this venue (the graph already through sanitizeGraph, laid out by the Studio) */
+  | { op: 'script'; name: string; graph: ScriptGraph }
+  /** studio-4b: cast a character the creator NAMED (resolved in the browser), or empty the player slot (`character: null`) */
+  | { op: 'cast'; slot: 'player' | 'crowd'; character: string | null };
 
 export const AI_LIMITS = {
   /** edits in one answer */
@@ -44,6 +59,13 @@ export const AI_LIMITS = {
   prompt: 600,
   /** how far from the court centre an answer may place (metres) */
   reach: 80,
+  /** scripts one answer may propose, and nodes in each */
+  scripts: 4,
+  scriptNodes: 24,
+  /** cast edits one answer may make */
+  casts: 1 + 4,
+  /** the explain pass's summary (characters) */
+  summary: 1200,
 } as const;
 
 // ── sanitise: an untrusted answer → edits ───────────────────────────────────────────────────────────────────────────
@@ -102,6 +124,31 @@ function objectSet(raw: unknown): Partial<Record<AiObjectKey, unknown>> {
   return out;
 }
 
+/** A proposed script: the graph through the script vocabulary's own sanitiser, capped, then laid out in columns (event →
+ *  condition → action) — the model's coordinates are never used. Null when it has no event or no action (it would do nothing). */
+function scriptEdit(e: Json): AiEdit | null {
+  const nodes = own(e, 'nodes');
+  const g = sanitizeGraph({ enabled: true, nodes: Array.isArray(nodes) ? nodes.slice(0, AI_LIMITS.scriptNodes) : [], edges: own(e, 'edges') });
+  if (!g.nodes.some((n) => groupOf(n.kind) === 'event') || !g.nodes.some((n) => groupOf(n.kind) === 'action') || !g.edges.length) return null;
+  // fresh ids (the model's ids are labels inside one answer; the Studio mints its own), and the editor's own columns
+  const ids = new Map(g.nodes.map((n) => [n.id, newId('node')]));
+  const row: Record<string, number> = { event: 0, condition: 0, action: 0 };
+  const col: Record<string, number> = { event: 40, condition: 280, action: 520 };
+  const laid = g.nodes.map((n) => { const grp = groupOf(n.kind); const y = 40 + row[grp]++ * 88; return { ...n, id: ids.get(n.id)!, x: col[grp], y }; });
+  const edges = g.edges.map((x) => ({ id: newId('edge'), from: ids.get(x.from)!, to: ids.get(x.to)! }));
+  return { op: 'script', name: label(own(e, 'name')) ?? 'CELL script', graph: { enabled: true, nodes: laid, edges } };
+}
+
+/** A cast edit: the slot, and the character's name as the creator wrote it (null empties the player slot). */
+function castEdit(e: Json): AiEdit | null {
+  const slot = own(e, 'slot');
+  if (slot !== 'player' && slot !== 'crowd') return null;
+  const c = own(e, 'character');
+  if (c === null && slot === 'player') return { op: 'cast', slot, character: null };
+  const name = label(c);
+  return name ? { op: 'cast', slot, character: name } : null;
+}
+
 export interface SanitisedEdits { edits: AiEdit[]; dropped: number }
 
 /**
@@ -113,11 +160,13 @@ export function sanitizeAiEdits(answer: unknown): SanitisedEdits {
   if (typeof raw === 'string') raw = parseAnswer(raw);
   const list = Array.isArray(raw) ? raw : isObj(raw) && Array.isArray(own(raw, 'edits')) ? (own(raw, 'edits') as unknown[]) : [];
   const edits: AiEdit[] = [];
-  let dropped = 0, placed = 0;
+  let dropped = 0, placed = 0, scripts = 0, casts = 0;
   for (const e of list) {
     if (edits.length >= AI_LIMITS.edits) { dropped++; continue; }
     if (!isObj(e)) { dropped++; continue; }
     const op = own(e, 'op');
+    if (op === 'script') { const x = scripts < AI_LIMITS.scripts ? scriptEdit(e) : null; if (x) { edits.push(x); scripts++; } else dropped++; continue; }
+    if (op === 'cast') { const x = casts < AI_LIMITS.casts ? castEdit(e) : null; if (x) { edits.push(x); casts++; } else dropped++; continue; }
     if (op === 'venue') { const v = venueSet(own(e, 'set')); if (v) edits.push(v); else dropped++; continue; }
     if (op === 'clear') {
       const t = own(e, 'type');
@@ -161,17 +210,55 @@ export function parseAnswer(text: string): unknown {
 
 // ── compile: edits → one command ────────────────────────────────────────────────────────────────────────────────────
 
-export interface Compiled { cmd: Command; placed: number; removed: number; settings: string[] }
+export interface Compiled { cmd: Command; placed: number; removed: number; settings: string[]; scripts: number; cast: number }
 
-/** The edits as one command on `v` (one undo step), or null when they change nothing. Ids are minted here. */
-export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt: string): Compiled | null {
+/** The project around the venue, for the edits that reach past it (scripts are added to the project; casts name its characters). */
+export interface AiProjectCtx { characters: readonly Pick<StudioCharacter, 'id' | 'name'>[]; scripts: readonly Pick<StudioScript, 'id'>[] }
+
+/**
+ * A character the creator named → the project's character: the exact name (case and spacing aside); else, if exactly one
+ * character's name contains it or is contained by it, that one. Ambiguous or unknown: null (the review says so).
+ */
+export function resolveCastName(characters: readonly Pick<StudioCharacter, 'id' | 'name'>[], name: string): Pick<StudioCharacter, 'id' | 'name'> | null {
+  const norm = (x: string) => x.toLowerCase().replace(/\s+/g, ' ').trim();
+  const n = norm(name);
+  if (!n) return null;
+  const exact = characters.filter((c) => norm(c.name) === n);
+  if (exact.length === 1) return exact[0];
+  if (exact.length > 1) return null;
+  const near = characters.filter((c) => norm(c.name).includes(n) || n.includes(norm(c.name)));
+  return near.length === 1 ? near[0] : null;
+}
+
+/** The edits as one command on `v` (one undo step), or null when they change nothing. Ids are minted here. Scripts and casts need
+ *  the project (`ctx`); without it they are left out. */
+export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt: string, ctx?: AiProjectCtx): Compiled | null {
   const ops: Op[] = [];
   const seen = new Set(v.objects.map((o) => o.id));
   const removed = new Set<string>();
   let patch: Partial<VenueSettings> = {};
-  let placed = 0;
+  let placed = 0, scripts = 0, cast = 0;
+  let player = v.cast?.player;
+  const crowd = [...(v.cast?.crowd ?? [])];
+  let castTouched = false;
   for (const e of edits) {
     if (e.op === 'venue') { patch = { ...patch, ...e.set }; continue; }
+    if (e.op === 'script') {
+      if (!ctx || ctx.scripts.length + scripts >= LIMITS.scripts) continue;
+      const script: StudioScript = { id: newId('script'), name: e.name, ...e.graph, venues: [v.id] };   // scoped to the venue it was asked for
+      ops.push({ op: 'addScript', script });
+      scripts++;
+      continue;
+    }
+    if (e.op === 'cast') {
+      if (!ctx) continue;
+      if (e.slot === 'player' && e.character === null) { if (player) { player = undefined; castTouched = true; cast++; } continue; }
+      const c = resolveCastName(ctx.characters, e.character ?? '');
+      if (!c) continue;
+      if (e.slot === 'player') { if (player !== c.id) { player = c.id; castTouched = true; cast++; } continue; }
+      if (!crowd.includes(c.id) && crowd.length < LIMITS.crowdCast) { crowd.push(c.id); castTouched = true; cast++; }
+      continue;
+    }
     if (e.op === 'clear') {
       for (const o of v.objects) if (!o.locked && !removed.has(o.id) && (e.type === 'all' || o.type === e.type)) { removed.add(o.id); ops.push({ op: 'removeObject', venueId: v.id, id: o.id }); }
       continue;
@@ -191,10 +278,14 @@ export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt:
     placed++;
   }
   const settings = Object.keys(patch);
-  if (settings.length) ops.unshift({ op: 'patchVenue', venueId: v.id, patch });
+  if (castTouched) {
+    const next = { ...(player ? { player } : {}), ...(crowd.length ? { crowd } : {}) };
+    patch = { ...patch, cast: Object.keys(next).length ? next : undefined };
+  }
+  if (settings.length || castTouched) ops.unshift({ op: 'patchVenue', venueId: v.id, patch });
   if (!ops.length) return null;
   const words = prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 48);
-  return { cmd: { label: `AI: ${words || 'venue'}${prompt.trim().length > 48 ? '…' : ''}`, ops }, placed, removed: removed.size, settings };
+  return { cmd: { label: `AI: ${words || 'venue'}${prompt.trim().length > 48 ? '…' : ''}`, ops }, placed, removed: removed.size, settings, scripts, cast };
 }
 
 /** One line per edit, for the review list the creator reads before Apply. */
@@ -208,11 +299,37 @@ export function describeEdit(e: AiEdit): string {
     return `Venue: ${Object.entries(e.set).map(([k, val]) => say(k, val)).join(' · ')}`;
   }
   if (e.op === 'clear') return e.type === 'all' ? 'Clear every unlocked object' : `Clear every unlocked ${e.type}`;
+  if (e.op === 'script') {
+    const byId = new Map(e.graph.nodes.map((n) => [n.id, n]));
+    const events = e.graph.nodes.filter((n) => groupOf(n.kind) === 'event').map((n) => NODE_SPECS[n.kind].label);
+    const actions = e.graph.nodes.filter((n) => groupOf(n.kind) === 'action').map((n) => NODE_SPECS[n.kind].label);
+    const ifs = e.graph.edges.filter((x) => groupOf(byId.get(x.to)!.kind) === 'condition').length;
+    return `Script “${e.name}” (this venue): when ${events.join(' / ')}${ifs ? ', if …' : ''} → ${actions.join(', ')}`;
+  }
+  if (e.op === 'cast') return e.character === null ? 'Cast: the player’s own look again' : e.slot === 'player' ? `Cast “${e.character}” as the player` : `Seat “${e.character}” among the fans`;
   const item = catalogItem(e.item);
   return `Place ${e.name ?? item?.label ?? e.item} at (${e.at[0].toFixed(1)}, ${e.at[2].toFixed(1)})`;
 }
 
+/** The review list against the project: each line, plus why a cast is left out (no such character, ambiguous, a full crowd). */
+export function reviewAiEdits(edits: readonly AiEdit[], ctx: AiProjectCtx): Array<{ line: string; skipped?: string }> {
+  return edits.map((e) => {
+    const line = describeEdit(e);
+    if (e.op !== 'cast' || e.character === null) return { line };
+    const c = resolveCastName(ctx.characters, e.character);
+    return c ? { line: c.name === e.character ? line : `${line} → ${c.name}` } : { line, skipped: `no single character called “${e.character}” in this project — left out` };
+  });
+}
+
 // ── the prompt (what the server sends) ──────────────────────────────────────────────────────────────────────────────
+
+/** What the browser sends as the venue: the venue WITHOUT its cast (character ids are character data; Privacy Policy §1 lets the
+ *  request carry the typed request and the venue's settings and placements only). The server's brief never reads a cast either. */
+export function venueForAi(v: StudioVenue): StudioVenue {
+  const { cast: _cast, ...rest } = v;
+  void _cast;
+  return rest;
+}
 
 /** What the model is told about the venue: its settings and what stands where. No account, no character, no look. */
 export function venueBrief(v: StudioVenue): Record<string, unknown> {
@@ -245,9 +362,56 @@ export function aiVenueSystem(): string {
     'Keep everything at least 2 m off the court lines. Floodlights (fixture:flood) stand at the corners/sides, 12–20 m tall.',
     'A crowd stand (crowd:bleacher / crowd:standing) is placed at its FRONT edge; set width (2–80) and rows (1–12); gaps 0..0.9 (0 = packed).',
     `Catalog ids: ${ids}.`,
+    // studio-4b: scripts and casts
+    'Scripts (presentation only: they never change a score, a timer or a rule) — add one when the creator asks for a reaction:',
+    ' {"op":"script","name":"...","nodes":[{"id":"a","kind":<kind>,"params":{...}}],"edges":[{"from":"a","to":"b"}]}',
+    ' Edges run event → condition|action and condition → condition|action; at least one event and one action.',
+    `Script kinds: ${scriptKinds()}.`,
+    'Casts: the creator may NAME one of their characters in the request. You are not told which characters exist; use the name',
+    ' exactly as the creator wrote it: {"op":"cast","slot":"player"|"crowd","character":"<name>"} ({"slot":"player","character":null}',
+    ` gives the player their own look back). The crowd seats up to ${LIMITS.crowdCast} named characters among the fans.`,
   ].join('\n');
+}
+
+/** The script vocabulary in one line for the model: each kind and its parameters (enum options inline). */
+function scriptKinds(): string {
+  return NODE_KINDS.map((k) => {
+    const ps = (NODE_SPECS[k].params as readonly ParamSpec[]).map((p) => (p.type === 'enum' ? `${p.key}:${p.options.join('|')}` : p.type === 'number' ? `${p.key}:${p.min}..${p.max}` : `${p.key}:${p.type}`));
+    return `${k}(${groupOf(k)}${ps.length ? '; ' + ps.join(', ') : ''})`;
+  }).join(' ');
 }
 
 export function aiVenueUser(prompt: string, v: StudioVenue): string {
   return `Venue now: ${JSON.stringify(venueBrief(v))}\nCreator asks: ${prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, AI_LIMITS.prompt)}`;
+}
+
+// ── the explain pass (studio-4b): read-only, plain words ─────────────────────────────────────────────────────────────
+
+/** The system words for "Explain this venue": a plain-language summary, no edits, no markup. */
+export function aiExplainSystem(): string {
+  return [
+    'You are CELL inside Nexus Studio. Explain the creator\'s sports venue in plain language: what it looks like, the light and',
+    'the weather, where the crowd and the lights are, and one thing that might make it better. Six short sentences at most.',
+    'Plain text only: no lists, no markdown, no code, no links. Do not suggest JSON or edits. Frame (metres): the court is centred',
+    'at 0,0; the play camera stands at z=+16 looking toward −z; "far" is −z, "left" is −x.',
+  ].join('\n');
+}
+
+export function aiExplainUser(v: StudioVenue): string {
+  return `Venue: ${JSON.stringify(venueBrief(v))}`;
+}
+
+/** The model's summary → text the panel shows AS TEXT: control characters and markup marks out, whitespace folded, capped. */
+export function sanitizeSummary(text: unknown): string {
+  if (typeof text !== 'string') return '';
+  const s = text
+    .replace(/```[\s\S]*?```/g, ' ')                  // a fenced block is not a summary
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '')  // control characters (newlines and tabs fold below)
+    .replace(/[<>]/g, '')                              // never markup, even as text
+    .replace(/[*_#`]+/g, '')                           // markdown marks
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (s.length <= AI_LIMITS.summary) return s;
+  const cut = s.slice(0, AI_LIMITS.summary);
+  return `${cut.slice(0, Math.max(cut.lastIndexOf('. ') + 1, AI_LIMITS.summary - 40)).trim()}…`;
 }
