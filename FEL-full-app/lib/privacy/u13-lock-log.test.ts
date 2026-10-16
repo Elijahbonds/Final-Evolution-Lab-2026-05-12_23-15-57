@@ -46,7 +46,9 @@ const UA = 'AgeScreenTest/1.0';
 // pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
 // PARTY-PRIVACY (this lane) prisma/pending/2026-10-13-party-report.sql RETENTION comment only (12 months, with the delete
 // statement; pending SQL only, no column or index added) at 521c52c1.
-const PARENT = '521c52c1466eef149872a469b631e31572b318f2';
+// RATE-LIMIT-WIRE (PR #289 QA rework) prisma/pending/2026-10-16-rate-limits.sql (pending SQL only, one new table approved
+// by Elijah; schema.prisma untouched) at 5b7c3f7e.
+const PARENT = '5b7c3f7e3bef69cebbb86cbe736e5d55499a5079';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
