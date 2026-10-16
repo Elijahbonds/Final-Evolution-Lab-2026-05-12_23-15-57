@@ -236,7 +236,7 @@ export async function POST(req: Request) {
     // MUSIC-SUITE P2 FIX PASS (2026-09-25): until the shell forwards `stats` (ROOM_STATS_FORWARDED, a held file), a
     // session without them is an old-contract client and keeps its own music win (the room applies the rule itself) —
     // this refused every honest win while the card said "set won". A mode the catalogue does not know wins nothing.
-    const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score });
+    const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score, opponentScore });
     if (claimedWon && !won && !floorOnly) {
       const read = readMusicSet(stats, duration);
       console.info('session win refused:', mode, !isCatalogueMode(mode) ? 'not a catalogue mode' : read ? `accuracy ${read.accuracy.toFixed(3)} over ${read.bars} bars${read.issues.length ? ` (${read.issues.slice(0, 3).join('; ')})` : ''}` : 'no set counts');
