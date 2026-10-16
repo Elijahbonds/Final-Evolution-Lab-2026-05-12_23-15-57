@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
-import { computePrqDelta, MODE_ATTRS, PRQ_CAMERA_SOURCE, prqScore, prqGrade } from '@/lib/prq';
+import { computePrqDelta, MODE_ATTRS, PRQ_ATTRS, PRQ_CAMERA_SOURCE, prqScore, prqGrade } from '@/lib/prq';
 import { sanitizeTallies } from '@/lib/game-systems';
 import { createPrqEntry } from '@/lib/prq-entries';
 import { addSeasonXp, bookSeasonTierUps } from '@/lib/season/season-service';
@@ -156,6 +156,21 @@ async function claimPlayStreak(tx: Prisma.TransactionClient, userId: string, see
   await tx.playerProfile.updateMany({ where: { userId, lastActiveAt: { lt: stamp } }, data: { lastActiveAt: stamp } });
   return false;
 }
+
+/**
+ * PRQ-ATTR-RACE (found 2026-10-14; owner sign-off 2026-10-16): a run's trained attributes, each the row's own value + the
+ * run's PRQ delta, capped at 100 and kept to 2 dp — today's rule, unchanged. `row` must be the profile as it is NOW, read
+ * under its row lock inside the paying transaction: computed from the read taken before the transaction and written as a
+ * literal, two runs finishing at once each wrote stale + their own delta and one run's gain was lost (measured: two
+ * dunkContest finishes left power 51.2, not 52.4), while both runs' answers and prq ledger rows claimed theirs.
+ */
+function trainedAttrValues(row: Record<string, unknown> | null | undefined, attrs: readonly string[], prqDelta: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const a of attrs) out[a] = Math.min(100, Math.round((Number(row?.[a] ?? 0) + prqDelta) * 100) / 100);
+  return out;
+}
+/** The eight PRQ attributes, as a Prisma select (prqScore reads all of them). */
+const PRQ_SELECT = Object.fromEntries(PRQ_ATTRS.map((a) => [a, true])) as Record<(typeof PRQ_ATTRS)[number], true>;
 
 export async function POST(req: Request) {
   try {
@@ -386,14 +401,9 @@ export async function POST(req: Request) {
       // (FOLLOW-UP 2026-09-29: skateboarding and surfing are paid at most what 4 × their best run seen would pay —
       // session-payout finitePayCapScore; the score itself is recorded as sent)
       const payout = sessionPayout({ score: payScore, won, endless, durationSec: duration, payCapScore: finitePayCapScore(rulesMode) });
-      // Distribute PRQ delta to mode-relevant attributes
-      const attrData: Record<string, any> = {};
-      for (const a of attrs) {
-        const cur = Number((profile as any)?.[a] ?? 0);
-        attrData[a] = Math.min(100, Math.round((cur + prqDelta) * 100) / 100);
-      }
+      // (the PRQ delta goes to the mode's attributes inside the transaction, on the row as it is then — trainedAttrValues)
       // (the win's credits only: the streak's share is added in the transaction, once its claim is won)
-      return { prqDelta, payout, xp: payout.xp, shards: payout.shards, credits: payout.winCredits, attrData };
+      return { prqDelta, payout, xp: payout.xp, shards: payout.shards, credits: payout.winCredits };
     };
     type Plan = ReturnType<typeof planFor>;
     const freePlan: Plan = planFor(false);
@@ -419,14 +429,16 @@ export async function POST(req: Request) {
         //    After the run's claim and before the ledger, so the ledger files what this run is actually paid, and inside
         //    the run's transaction, so a run that rolls back (a replay, a ledger conflict) releases the duel's claim with it.
         const plan: Plan = arena && arenaPlan && (await claimMusicSessionPay(tx as never, arena.matchId, userId)) ? arenaPlan : freePlan;
-        let { payout, xp, shards, credits, attrData } = plan;
+        let { payout, xp, shards, credits } = plan;
         let economyCapNote: string | null = null;
+        let profileLocked = false;
         try {
           // SECURITY (ECONOMY-CAPS review, daily-cap TOCTOU): lock the user's PlayerProfile row before summing
           // today's earnings, so two concurrent finishes of the same user on different runs cannot both read the
           // same stale sum and each collect the full remaining headroom. The second finish's sum now waits on the
           // first's commit. The lock is released with the transaction.
           await lockPlayerForDailyCap(tx, userId);
+          profileLocked = true;
           const earnedToday = await sumEarnedToday(tx, userId, now);
           const caps = applyEconomyCaps({ xp, shards }, earnedToday);
           xp = caps.xp;
@@ -465,9 +477,19 @@ export async function POST(req: Request) {
           await settleGrant(tx, { userId, runId: run.id, grantType: 'xp', amount: xp, metadata: { arenaSet: true, arenaMatchId: arena.matchId, rejudged: arena.rejudged } });
         }
 
+        // 3. PRQ-ATTR-RACE: the trained attributes and the PRQ this run starts from, from the row as it is NOW — read under
+        //    the profile row lock, so a run that finished a moment ago is in it and no other writer moves it until this
+        //    commits (trainedAttrValues). The daily-cap check above normally holds the lock already; it is taken here if
+        //    that check could not take it, so this read never depends on it.
+        if (!profileLocked) await lockPlayerForDailyCap(tx, userId);
+        const row = (await tx.playerProfile.findUnique({ where: { userId }, select: PRQ_SELECT })) ?? profile;
+        const prqBefore = prqScore(row as any);
+        const attrData = trainedAttrValues(row as Record<string, unknown>, attrs, plan.prqDelta);
+
         // labCredits/xp/shards are pure counters — atomic increments so two
         // concurrent session submissions can't both read the same stale value
         // and drop one grant (the lost-update race a literal computed write allows).
+        // (PRQ-ATTR-RACE: the attributes are literals, computed from the locked read just above.)
         // (STREAK-CLAIM-RACE: the streak fields and lastActiveAt are written by claimPlayStreak above, never here.)
         const updated = await tx.playerProfile.update({
           where: { userId },
@@ -479,7 +501,7 @@ export async function POST(req: Request) {
         });
         // the streak day as the row has it now (this run's claim, or the one that beat it)
         const streakDays = Number.isFinite(Number((updated as any)?.streakDays)) ? Number((updated as any).streakDays) : streak.streakDays;
-        const prqDeltaRounded = Math.round((prqScore(updated as any) - before) * 100) / 100;
+        const prqDeltaRounded = Math.round((prqScore(updated as any) - prqBefore) * 100) / 100;
         await settleGrant(tx, { userId, runId: run.id, grantType: 'prq', amount: prqDeltaRounded });
         const createdSession = await tx.gameSession.create({
           data: { userId, mode, score: paidScore, opponentScore, won, xp, shards, prqDelta: prqDeltaRounded, credits, duration, hits, misses, dodges, combos, maxCombo, runId: run.id },
@@ -573,7 +595,7 @@ export async function POST(req: Request) {
           streakDays,
           streakBonus,
           prqDelta: prqDeltaRounded,
-          prqBefore: before,
+          prqBefore,
           prqAfter: after,
           grade: prqGrade(after),
           labCredits: (updated as any).labCredits,

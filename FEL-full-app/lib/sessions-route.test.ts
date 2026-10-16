@@ -82,11 +82,15 @@ vi.mock('@/lib/db', () => {
       },
     },
     playerProfile: {
+      // PRQ-ATTR-RACE: the paying transaction's read under the row lock sees the row as committed (h.profile), never h.staleRead
+      findUnique: async () => ({ ...h.profile }),
       update: async ({ data }: { data: Record<string, unknown> }) => {
         h.writes.push('profile');
         h.updates.push(data);
         // MUSIC-SUITE P3: the streak fields persist, so the next request reads what this one wrote
         for (const k of ['streakDays', 'lastStreakAt', 'lastActiveAt'] as const) if (data[k] !== undefined) h.profile[k] = data[k];
+        // PRQ-ATTR-RACE: so do the PRQ attributes (a literal number is what the row then holds)
+        for (const k of ['strength', 'speed', 'endurance', 'agility', 'power', 'flexibility', 'recovery', 'mental']) if (typeof data[k] === 'number') h.profile[k] = data[k];
         const plain = Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'number'));
         return { ...h.profile, ...plain, labCredits: 100 };
       },
@@ -142,9 +146,29 @@ vi.mock('@/lib/db', () => {
       throw new Error(`unexpected raw SQL in test: ${sql} (${args.length} args)`);
     },
   };
+  // PRQ-ATTR-RACE: the PlayerProfile row lock. A transaction's SELECT … FOR UPDATE holds it until the transaction ends,
+  // and another transaction's FOR UPDATE waits for that — as Postgres makes it wait for the commit. Without this, two
+  // runs racing through Promise.all both "locked" at once and a read under the lock could not be told from a stale one.
+  let rowLock: Promise<void> | null = null;
+  const transaction = async (fn: (t: typeof tx) => unknown) => {
+    let held = false;
+    let release = () => {};
+    const t = {
+      ...tx,
+      $queryRawUnsafe: async (sql: string, ...args: unknown[]) => {
+        if (/FOR UPDATE/.test(sql) && !held) {
+          while (rowLock) await rowLock;
+          rowLock = new Promise<void>((r) => { release = () => { rowLock = null; r(); }; });
+          held = true;
+        }
+        return tx.$queryRawUnsafe(sql, ...args);
+      },
+    };
+    try { return await fn(t); } finally { if (held) release(); }
+  };
   return {
     prisma: {
-      $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx),
+      $transaction: transaction,
       sessionRun: {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
@@ -215,6 +239,7 @@ import { canonicalModeKey } from '@/lib/game-data';
 import { MODE_SCORE_RULES, SCORE_COLUMN_MAX } from '@/lib/sessions/modeScoreRules';
 import { ENDLESS_SESSION_CEILING, endlessCeilingFor, sessionShards, sessionXp } from '@/lib/session-payout';
 import { applyPerRunCap, PER_RUN_SHARDS, PER_RUN_XP } from '@/lib/economy-caps';
+import { prqScore } from '@/lib/prq';
 
 let runSeq = 0;
 /** ECONOMY-SESSIONS-HARDEN: an open run the server started `durationSec` ago, as POST /api/sessions/start leaves it. */
@@ -1355,5 +1380,43 @@ describe('STREAK-CLAIM-RACE: the day\'s streak Lab Credits are paid once, howeve
     const rs = [await dunk(), await dunk(), await dunk()];
     expect(rs.map((r) => r.body.streakBonus)).toEqual([20, 0, 0]);
     expect(rs.map((r) => r.body.streakDays)).toEqual([4, 4, 4]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRQ-ATTR-RACE (found 2026-10-14 during STREAK-CLAIM-RACE): the play path computed each trained attribute as
+// (the profile read BEFORE the transaction) + this run's delta and wrote it as a literal number, so two runs finishing at
+// once each wrote stale + their own delta and one run's gain was lost — while both runs' prq ledger rows and answers
+// claimed their deltas. h.staleRead is the race: every request reads the row as it was before any of them wrote.
+// ---------------------------------------------------------------------------
+
+describe('PRQ-ATTR-RACE: every run\'s PRQ gain lands, however many finish at once', () => {
+  const dunk = () => post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+  const TRAINED = ['power', 'speed', 'flexibility'] as const;       // MODE_ATTRS.dunkContest
+  /** The prq ledger rows filed so far, summed — what the runs SAY they added to the player's PRQ. */
+  const filedPrq = () => h.grants.filter((g) => g.grantType === 'prq').reduce((n, g) => n + Number(g.amount), 0);
+
+  it('the control: two runs one after the other each add their gain, and the ledger adds up to the row', async () => {
+    const start = prqScore(h.profile as never);
+    await dunk();
+    const gain = Number(h.profile.power) - 50;
+    expect(gain).toBeGreaterThan(0);
+    await dunk();
+    for (const a of TRAINED) expect(Number(h.profile[a]), a).toBeCloseTo(50 + 2 * gain, 2);
+    expect(Math.abs(filedPrq() - (prqScore(h.profile as never) - start))).toBeLessThan(0.11);   // prqScore is rounded to 0.1
+  });
+
+  it('two runs finishing together each add their gain (measured before the fix: power 51.2, not 52.4)', async () => {
+    await dunk();                                                    // one run's gain on this fixture
+    const gain = Number(h.profile.power) - 50;
+    for (const a of TRAINED) h.profile[a] = 50;
+    h.grants = [];
+    const start = prqScore(h.profile as never);
+    h.staleRead = { ...h.profile };
+    await Promise.all([dunk(), dunk()]);
+    for (const a of TRAINED) expect(Number(h.profile[a]), a).toBeCloseTo(50 + 2 * gain, 2);
+    // the two prq ledger rows add up to what the row gained — each says what IT added, not the other run's gain too
+    expect(h.grants.filter((g) => g.grantType === 'prq')).toHaveLength(2);
+    expect(Math.abs(filedPrq() - (prqScore(h.profile as never) - start))).toBeLessThan(0.11);
   });
 });

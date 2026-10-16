@@ -51,6 +51,8 @@ vi.mock('@/lib/db', () => {
       },
     },
     playerProfile: {
+      // PRQ-ATTR-RACE: the paying transaction re-reads the attributes under the row lock
+      findUnique: async () => ({ ...h.profile }),
       update: async ({ data }: { data: Row }) => {
         h.writes.push('profile');
         h.updates.push(data);
@@ -75,7 +77,18 @@ vi.mock('@/lib/db', () => {
         return { count: 1 };
       },
     },
-    gameSession: { create: async ({ data }: { data: Row }) => { h.writes.push('session'); h.sessions.push(data); return { id: 's1', ...data }; } },
+    gameSession: {
+      create: async ({ data }: { data: Row }) => { h.writes.push('session'); h.sessions.push(data); return { id: 's1', ...data }; },
+      // the daily-cap check's sum (lib/economy-caps-db.ts sumEarnedToday): today's session rows
+      aggregate: async () => ({ _sum: { xp: h.sessions.reduce((n, s) => n + Number(s.xp ?? 0), 0), shards: h.sessions.reduce((n, s) => n + Number(s.shards ?? 0), 0) } }),
+    },
+    walletLedgerEntry: { aggregate: async () => ({ _sum: { delta: 0 } }) },
+    // PRQ-ATTR-RACE: the daily-cap check locks the PlayerProfile row first (SELECT … FOR UPDATE). Without this the check
+    // threw (CAP_CHECK_FAILED, caught) and every run here was paid 0 XP and 0 shards since ECONOMY-CAPS landed.
+    $queryRawUnsafe: async (sql: string) => {
+      if (/FOR UPDATE/.test(sql)) return [{ '?column?': 1 }];
+      throw new Error(`unexpected raw SQL in test: ${sql}`);
+    },
     prqEntry: { findFirst: async () => { h.writes.push('read:camera-prq'); return null; } },
     workoutScan: { createMany: async ({ data }: { data: Row[] }) => { h.writes.push('workoutScan.createMany'); h.scans.push(...data); return { count: data.length }; } },
   };
