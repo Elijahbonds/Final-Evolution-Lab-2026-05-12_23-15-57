@@ -192,18 +192,27 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
   }
   if (legs.length === 0) return { dispose() { /* no legs */ }, debug };
 
+  // RIG-PERF (2026-10-16): no garbage per frame. The root's pose, each clip ankle, the swing steps and the contact read go through
+  // the scratches below instead of fresh clones and literals (the same values, the same arithmetic); the legs loop is indexed.
+  // A contact state still changes object only when stepContact makes a new one, as before.
   const target = new Vector3();
+  const rootPos = new Vector3(), ankle = new Vector3(), rel = new Vector3();
+  const rootRot = new Quaternion(), rootInv = new Quaternion();
+  const rootStepS = { x: 0, z: 0 }, relStep = { x: 0, z: 0 }, ankleXYZ = { x: 0, y: 0, z: 0 };
   const obs = scene.onAfterAnimationsObservable.add(() => {
     opts.root.computeWorldMatrix(true);
-    const rootPos = opts.root.getAbsolutePosition().clone();
-    const rootRot = opts.root.absoluteRotationQuaternion.clone();
+    rootPos.copyFrom(opts.root.getAbsolutePosition());
+    rootRot.copyFrom(opts.root.absoluteRotationQuaternion);
     const dt = Math.min(0.1, Math.max(1e-4, scene.getEngine().getDeltaTime() / 1000));
-    for (const leg of legs) {
+    for (let li = 0; li < legs.length; li++) {
+      const leg = legs[li];
       leg.ankle.computeWorldMatrix(true);
-      const ankle = leg.ankle.getAbsolutePosition().clone();   // the CLIP's ankle (the pin below is written after the clips, and they overwrite it next frame)
+      ankle.copyFrom(leg.ankle.getAbsolutePosition());   // the CLIP's ankle (the pin below is written after the clips, and they overwrite it next frame)
       const pc = leg.prevClip, pr = leg.prevRoot;
-      const rootStep = pr ? { x: rootPos.x - pr.x, z: rootPos.z - pr.z } : null;
-      const clipSpeed = pc && pr && rootStep ? swingSpeed(rootStep, { x: (ankle.x - rootPos.x) - (pc.x - pr.x), z: (ankle.z - rootPos.z) - (pc.z - pr.z) }, dt) : undefined;
+      let rootStep: { x: number; z: number } | null = null;
+      if (pr) { rootStepS.x = rootPos.x - pr.x; rootStepS.z = rootPos.z - pr.z; rootStep = rootStepS; }
+      let clipSpeed: number | undefined;
+      if (pc && pr && rootStep) { relStep.x = (ankle.x - rootPos.x) - (pc.x - pr.x); relStep.z = (ankle.z - rootPos.z) - (pc.z - pr.z); clipSpeed = swingSpeed(rootStep, relStep, dt); }
       const jumped = !!rootStep && Math.hypot(rootStep.x, rootStep.z) > 2;   // a teleport (a reset)
       // MOVEMENT POLISH (2026-10-06): A BODY IN THE AIR HAS NO PLANTED FOOT. The contact reads the ankle's height above the ROOT, and a
       // jump lifts the root with the ankle — so the foot planted at take-off stayed pinned to the floor's XZ while the body flew on, and
@@ -214,7 +223,9 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       if (jumped) { debug[leg.side === 'Left' ? 'left' : 'right'] = { planted: false, pin: { x: ankle.x, y: ankle.y, z: ankle.z } }; leg.fadeLeft = 0; leg.claimPin = null; continue; }   // a teleport: nothing to hold
       const key = leg.side === 'Left' ? 'left' : 'right';
       const prev = debug[key];
-      const next = flying ? { planted: false, pin: prev.pin } : stepContact(prev, ankle.y - rootPos.y, { x: ankle.x, y: ankle.y, z: ankle.z }, params, clipSpeed);
+      let next: ContactState;
+      if (flying) next = prev.planted ? { planted: false, pin: prev.pin } : prev;   // an unplanted state is kept as it is (it was copied to the same values)
+      else { ankleXYZ.x = ankle.x; ankleXYZ.y = ankle.y; ankleXYZ.z = ankle.z; next = stepContact(prev, ankle.y - rootPos.y, ankleXYZ, params, clipSpeed); }
       debug[key] = next;
       // S30: a claimed leg is the claimant's (the contact state above still reads the clip); the claim's end hands the foot over from its pin
       const claim = legClaims.get(skeleton)?.get(leg.side);
@@ -222,7 +233,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       let handover = false;
       if (leg.claimPin) {
         handover = true;
-        if (next.planted) { leg.rootAtPlant.copyFrom(rootPos); leg.claimPin.subtract(rootPos).applyRotationQuaternionToRef(Quaternion.Inverse(rootRot), leg.pinLocal); }
+        if (next.planted) { leg.rootAtPlant.copyFrom(rootPos); leg.claimPin.subtractToRef(rootPos, rel).applyRotationQuaternionToRef(Quaternion.InverseToRef(rootRot, rootInv), leg.pinLocal); }
         else { leg.fadeLeft = RELEASE_FADE_SEC; leg.fadeW = intensity; leg.fadeTarget.copyFrom(leg.claimPin); }
         leg.claimPin = null;
       }
@@ -241,7 +252,7 @@ export function mountFootPlanting(scene: Scene, skinned: AbstractMesh, skeleton:
       if (!prev.planted && !handover) {
         // touchdown: remember where the foot is, in the root's frame
         leg.rootAtPlant.copyFrom(rootPos);
-        ankle.subtract(rootPos).applyRotationQuaternionToRef(Quaternion.Inverse(rootRot), leg.pinLocal);
+        ankle.subtractToRef(rootPos, rel).applyRotationQuaternionToRef(Quaternion.InverseToRef(rootRot, rootInv), leg.pinLocal);
       }
       leg.pinLocal.applyRotationQuaternionToRef(rootRot, target).addInPlace(leg.rootAtPlant);
       target.y = ankle.y;   // the clip's height (a heel lift inside the window still reads)

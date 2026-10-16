@@ -189,6 +189,17 @@ export function makeHingeArm(arm: ArmChain, bindUpper: Quaternion, bindF: Quater
   return { arm, h, bindF: bindF.clone(), axisF: fL, tau: 0, stamp: -10 };
 }
 const wrapPi = (x: number): number => { let v = x; while (v > Math.PI) v -= 2 * Math.PI; while (v < -Math.PI) v += 2 * Math.PI; return v; };
+// RIG-PERF (2026-10-16, owner: "optimise the rig layers"): the hinge runs on every hoops arm after every writer, every frame — 7 % of
+// the 3v3's garbage (40 KB a frame) in fresh vectors, quaternions, a matrix clone and a closure. Its intermediates are these module
+// scratches now (not re-entrant; nothing it calls hinges again). Same arithmetic in the same order: each ToRef form is the allocating
+// form's own maths, and the parent's inverse is invertToRef (clone().invert() made the same 16 numbers); rigLayers.equivalence.test.ts
+// holds every bone to the pre-change hinge bit for bit.
+const IDENTITY_M: Readonly<Matrix> = Matrix.Identity();
+const _hToP = new Matrix();
+const _hS = new Vector3(), _hE = new Vector3(), _hP = new Vector3(), _ha = new Vector3(), _hb = new Vector3(), _hn = new Vector3(), _hw = new Vector3();
+const _hp = new Vector3(), _hnp = new Vector3(), _ht = new Vector3(), _hcBind = new Vector3(), _hdNow = new Vector3();
+const _hqU0 = new Quaternion(), _hqF0 = new Quaternion(), _hq1 = new Quaternion(), _hq2 = new Quaternion(), _hqUinv = new Quaternion();
+const _hSwing = new Quaternion(), _hBase = new Quaternion(), _hWant = new Quaternion();
 /** Apply the hinge to `H.arm` (call after every writer of the arm). `stamp` counts drawn frames; a gap re-seeds the twist.
  *  All in the upper arm's PARENT frame, from local rotations and that frame's inverse world matrix — never a node's decomposed world
  *  rotation, which a reflected import root corrupts (Babylon folds the mirror into the rotation). */
@@ -198,38 +209,37 @@ export function hingeArmApply(H: HingeArm, dt: number, stamp: number, twistRateD
   if (!qU || !qF) return;
   u.computeWorldMatrix(true); fo.computeWorldMatrix(true); ha.computeWorldMatrix(true);
   const par = u.parent as TransformNode | null;
-  const toP = par ? par.getWorldMatrix().clone().invert() : Matrix.Identity();
-  const inP = (v: Vector3) => Vector3.TransformCoordinates(v, toP);
-  const S = inP(u.getAbsolutePosition()), E = inP(fo.getAbsolutePosition()), P = inP(ha.getAbsolutePosition());
-  const a = E.subtract(S), b = P.subtract(E); if (a.lengthSquared() < 1e-12 || b.lengthSquared() < 1e-12) return;
+  const toP = par ? par.getWorldMatrix().invertToRef(_hToP) : IDENTITY_M;
+  const S = Vector3.TransformCoordinatesToRef(u.getAbsolutePosition(), toP, _hS), E = Vector3.TransformCoordinatesToRef(fo.getAbsolutePosition(), toP, _hE), P = Vector3.TransformCoordinatesToRef(ha.getAbsolutePosition(), toP, _hP);
+  const a = E.subtractToRef(S, _ha), b = P.subtractToRef(E, _hb); if (a.lengthSquared() < 1e-12 || b.lengthSquared() < 1e-12) return;
   a.normalize(); b.normalize();
   const theta = Math.acos(Math.max(-1, Math.min(1, Vector3.Dot(a, b))));
-  const qU0 = qU.clone(), qF0 = qF.clone();
+  const qU0 = _hqU0.copyFrom(qU), qF0 = _hqF0.copyFrom(qF);
   // (1) the upper arm's roll: its hinge onto the bend plane, fading out as the arm straightens (a straight arm has no plane)
   const w = Math.min(1, Math.max(0, (theta - 5 * DEG) / (15 * DEG)));
   if (w > 0) {
-    const n = Vector3.Cross(a, b).normalize();
-    const hw = H.h.applyRotationQuaternion(qU);
-    const hp = hw.subtract(a.scale(Vector3.Dot(hw, a))), np = n.subtract(a.scale(Vector3.Dot(n, a)));
+    const n = Vector3.CrossToRef(a, b, _hn).normalize();
+    const hw = H.h.applyRotationQuaternionToRef(qU, _hw);
+    const hp = hw.subtractToRef(a.scaleToRef(Vector3.Dot(hw, a), _ht), _hp), np = n.subtractToRef(a.scaleToRef(Vector3.Dot(n, a), _ht), _hnp);
     if (hp.lengthSquared() > 1e-8 && np.lengthSquared() > 1e-8) {
       hp.normalize(); np.normalize();
-      const roll = Math.atan2(Vector3.Dot(Vector3.Cross(hp, np), a), Vector3.Dot(hp, np)) * w;
-      if (Math.abs(roll) > 1e-5) qU.copyFrom(Quaternion.RotationAxis(a, roll).multiply(qU));   // about the upper arm's own line: the elbow stays
+      const roll = Math.atan2(Vector3.Dot(Vector3.CrossToRef(hp, np, _ht), a), Vector3.Dot(hp, np)) * w;
+      if (Math.abs(roll) > 1e-5) qU.copyFrom(Quaternion.RotationAxisToRef(a, roll, _hq1).multiplyToRef(qU, _hq2));   // about the upper arm's own line: the elbow stays
     }
   }
   // (2) the forearm: the bend that carries its bind line onto the solved one (the hand lands exactly where it was solved, whatever the
   // rig's bind elbow), then its own twist
-  const qUinv = Quaternion.Inverse(qU);
-  const cBind = H.axisF.applyRotationQuaternion(H.bindF).normalize();                       // the forearm's line at bind, in the upper arm
-  const dNow = b.applyRotationQuaternion(qUinv).normalize();                                // …and where it is solved now
-  const swing = new Quaternion(); Quaternion.FromUnitVectorsToRef(cBind, dNow, swing);
-  const base = swing.multiply(H.bindF);
-  const want = qUinv.multiply(qU0).multiply(qF0);                                            // the writers' forearm, under the rolled upper arm
-  const tauWant = twistAbout(Quaternion.Inverse(base).multiply(want), H.axisF);
+  const qUinv = Quaternion.InverseToRef(qU, _hqUinv);
+  const cBind = H.axisF.applyRotationQuaternionToRef(H.bindF, _hcBind).normalize();          // the forearm's line at bind, in the upper arm
+  const dNow = b.applyRotationQuaternionToRef(qUinv, _hdNow).normalize();                     // …and where it is solved now
+  const swing = Quaternion.FromUnitVectorsToRef(cBind, dNow, _hSwing);
+  const base = swing.multiplyToRef(H.bindF, _hBase);
+  const want = qUinv.multiplyToRef(qU0, _hq1).multiplyToRef(qF0, _hWant);                    // the writers' forearm, under the rolled upper arm
+  const tauWant = twistAbout(Quaternion.InverseToRef(base, _hq1).multiplyToRef(want, _hq2), H.axisF);
   // (3) the twist follows, no faster than a forearm turns (a gap starts free)
   const fresh = H.stamp !== stamp - 1 || dt <= 0;
   H.tau = fresh ? tauWant : H.tau + Math.max(-twistRateDeg * DEG * dt, Math.min(twistRateDeg * DEG * dt, wrapPi(tauWant - H.tau)));
   H.stamp = stamp;
-  qF.copyFrom(base.multiply(Quaternion.RotationAxis(H.axisF, H.tau)));
+  qF.copyFrom(base.multiplyToRef(Quaternion.RotationAxisToRef(H.axisF, H.tau, _hq1), _hq2));
   u.computeWorldMatrix(true); fo.computeWorldMatrix(true); ha.computeWorldMatrix(true);
 }
