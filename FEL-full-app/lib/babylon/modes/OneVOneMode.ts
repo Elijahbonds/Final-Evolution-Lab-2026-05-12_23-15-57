@@ -170,7 +170,7 @@ import {   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit — M4 the fade, M5 th
 import {   // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7 the running hook, M8 the pump + step-through, M9 the pivot,
   // M10 the floater over length, M11 the reverse, M12 the glass, M13 the hop step, M14 the euro
   runningHook, HOOK_ON_ME, isPumpFake, planStepThrough, PUMP_MAX_SEC, STEP_THROUGH_SEC, PUMP_BITE_RANGE, PUMP_BITE_CHANCE, PUMP_BITE_STUN,
-  pivotFrom, planPivot, PIVOT_MAX_SPEED,
+  pivotFrom, planPivot, pivotFreeFoot, PIVOT_MAX_SPEED,
   rimProtected, isReverseFinish, reverseSide,
   inBankBand, bankPoint, BANK_PCT_BONUS,
   planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable,
@@ -1494,7 +1494,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             // HOOPS MOTION phase 4b: the jab through the renderer — its decision is the threat's own (custom: jabBiteOdds / throwJab / roll,
             // unchanged, on this frame), the clip is today's (bball_hesi — 4e authors the jab's own), the ball a pound in the same hand
             requestMove(meHost(), {
-              move: 'jab', clip: 'bball_hesi', turbo: !!meSlot.intent.sprint,   // the sharpest authored weight-shift: the jab (MOVE PACE: snaps on the turbo)
+              move: 'jab', clip: 'bball_jab', turbo: !!meSlot.intent.sprint,   // the sharpest authored weight-shift: the jab (MOVE PACE: snaps on the turbo)
               decide: { kind: 'custom', run: () => {
                 odds = live ? jabBiteOdds({
                   defenderDist: dist,
@@ -1582,16 +1582,16 @@ export const OneVOneMode: ModeDefinition = (() => {
         // it is replayed through the exact same loop below, so every gate (handle locks, chains, escape timing) still runs.
         if (shooting || dunking || finish || gather || spin) stickLockClearAt = null; else if (stickLockClearAt === null) stickLockClearAt = performance.now();   // H1 H-04
         if (carrying && possession === 'mine') stickGestures.push(...rStick.tick(performance.now() / 1000));   // H1 H-03: a still thumb still reaches the hold clock
-        if (pausedDribble && (!(carrying && possession === 'mine') || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); console.info("[1V1-STICK] PAUSIN' let go quietly"); }
+        if (pausedDribble && (!(carrying && possession === 'mine') || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); if (carrying && !shooting && !dunking) meCarry?.runMove('pausin_release'); console.info("[1V1-STICK] PAUSIN' let go quietly"); }
         if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) {
           stickGestures.unshift(bufferedGesture); bufferedGesture = null;
         } else if (bufferedGesture && !bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) bufferedGesture = null;   // H-04: the buffer survives the lock, then 220 ms
         if (stickGestures.length && carrying && !shooting && !dunking && !finish && !gather && !spin) {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
-            if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
+            if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); meCarry?.runMove('pausin_release'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
             if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
-              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold('bball_hesi', { fadeSec: moveFadeSec(false), speedRatio: 0.25 }); console.info("[1V1-STICK] PAUSIN'"); }
+              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold(`bball_pausin_${meCarry?.hand === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); meCarry?.runMove('pausin');   /* H2b (plan §4.18): its own hold, the ball held out on its path */ console.info("[1V1-STICK] PAUSIN'"); }
               continue;
             }
             const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
@@ -3017,7 +3017,10 @@ export const OneVOneMode: ModeDefinition = (() => {
     const plan = pivotRead ? planPivot(me.root.position, me.root.rotation.y, pivotRead.side, pivotRead.reverse)
       : planSpin(me.root.position, me.root.rotation.y, RIM_FLOOR, defPos, side);
     spin = { plan, t: 0, beat: !!pivotRead };   // a pivot has no shoulder-clear beat: nobody was beaten
-    spinClip = pivotRead ? 'bball_pivot' : 'bball_spin';
+    // H2b (plan §4.16): the pivot plays its v2 at real speed, named by the FREE foot — planPivot keeps the pivot foot opposite the turn
+    // on a front pivot (the turn's side steps) and on the turn's side on a reverse (the other foot steps). The capture that stood in for
+    // bball_pivot ran 2.6× real with its own hip yaw on top of the root's turn.
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : 'bball_spin';
     spinCooldown = SPIN_COOLDOWN_SEC;
     if (posting) { posting = false; }
     // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the SPIN's ball is its pull — the start hand palms it at the hips, lets it go on the exit
@@ -3052,9 +3055,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-MOVE] spin shoulder clear beaten ${beaten}`);
     }
     if (spin.t < spin.plan.sec) return;
-    const exitYaw = Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
+    // H2b (plan §4.14): NO END SNAP — the body is where the planted sweep left it, and the step-out (≤ 135°) is the loop's own turn
+    // toward the exit run below; a pivot (no step-out) lands on its exit as it always did
+    const exitYaw = spin.plan.stepOut ? spinYaw(spin.plan, spin.plan.sec) : Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
     face(me.root, exitYaw);
     meDribble.setFacing(exitYaw);
+    if (spin.plan.stepOut) meDribble.turnTo(Math.atan2(spin.plan.exit.x, spin.plan.exit.z));   // H2b: the step-out, turned on the way out
     // M6 the spin comes out INTO the drive; M9 a pivot is a turn in place — it hands nothing back, the feet are still set
     meDribble.vel.copyFrom(spinClip === 'bball_pivot' ? new Vector3(0, 0, 0) : spin.plan.exit.scale(SPIN_EXIT_SPEED));
     spin = null;

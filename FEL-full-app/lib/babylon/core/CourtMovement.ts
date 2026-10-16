@@ -127,6 +127,16 @@ export class CourtMovement {
    *  facing is held: a committed hop is ballistic, not a stick-driven run (released, the stop would bleed a 3 m/s hop in a step).
    *  Nothing calls it but a move that asks; at 0 the update is exactly what it was. */
   holdFor(sec: number): void { this.holdLeft = Math.max(this.holdLeft, sec); }
+  /** H2b (the spin's step-out, plan §4.14): turn the facing to `yaw` at `rateRad` per second, the short way, whatever the stick
+   *  says — the body comes out of a spin on its exit run with the stick at home too. Cleared on arrival or by stop(). */
+  turnTo(yaw: number, rateRad: number): void { this.slew = { yaw, rate: Math.max(0.1, rateRad) }; }
+  private slew: { yaw: number; rate: number } | null = null;
+  private stepSlew(dt: number): void {
+    const s = this.slew; if (!s) return;
+    let d = s.yaw - this.facing; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    const step = s.rate * dt;
+    if (Math.abs(d) <= step) { this.facing = s.yaw; this.slew = null; } else this.facing += Math.sign(d) * step;
+  }
   get holding(): boolean { return this.holdLeft > 0; }
   private holdLeft = 0;
   get paused(): boolean { return this.pausedNow; }
@@ -145,6 +155,7 @@ export class CourtMovement {
     this.cutGraceLeft = Math.max(0, this.cutGraceLeft - dt);
     const mag = this.pausedNow ? 0 : Math.min(1, Math.hypot(moveX, moveY));   // pausin': the stick is ignored
     const t = this.tune;
+    this.stepSlew(dt);   // H2b: a pending step-out turn (turnTo)
     if (this.holdLeft > 0) {   // H2: a committed hop (holdFor) — the velocity and the facing as the move wrote them
       this.holdLeft = Math.max(0, this.holdLeft - dt);
       this.sprintWas = sprint && mag > 0.05;
@@ -269,7 +280,7 @@ export class CourtMovement {
   }
 
   /** Hard stop (possession change, whistle). Keeps facing. */
-  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.holdLeft = 0; }
+  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.holdLeft = 0; this.slew = null; }
 }
 
 /** Binds a character root to a Havok capsule. KINEMATIC (ANIMATED motion

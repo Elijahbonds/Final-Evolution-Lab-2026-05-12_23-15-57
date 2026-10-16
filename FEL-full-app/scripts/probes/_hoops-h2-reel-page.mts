@@ -90,6 +90,11 @@ export const LIB = String.raw`(() => {
   R.tap = (i, ms) => { R.btn(i, true); setTimeout(() => R.btn(i, false), ms || 70); };
   R.flick = (x, y, ms) => { pad.axes[2] = x; pad.axes[3] = y; setTimeout(() => { pad.axes[2] = 0; pad.axes[3] = 0; }, ms || 90); };
   R.rs = (x, y) => { pad.axes[2] = x; pad.axes[3] = y; };
+  // H2b: the right stick rolled round the ring (sign +1 clockwise on screen, from the ball hand's side), deg in ms — the spin's rotation
+  R.roll = (sign, ms, deg, a0) => { const t0 = performance.now(); const span = ((deg || 220) * Math.PI) / 180; const start = a0 === undefined ? Math.PI : a0;
+    const id = setInterval(() => { const k = Math.min(1, (performance.now() - t0) / (ms || 240)); const a = start + sign * span * k; pad.axes[2] = Math.cos(a); pad.axes[3] = Math.sin(a); if (k >= 1) { clearInterval(id); setTimeout(() => { pad.axes[2] = 0; pad.axes[3] = 0; }, 30); } }, 8); };
+  // H2b: the left stick out and home again inside ms (the jab's TAP), timed in-page
+  R.lsTap = (ms) => { setTimeout(() => { pad.axes[0] = 0; pad.axes[1] = 0; }, ms || 120); };
   R.neutral = () => { pad.axes[0] = 0; pad.axes[1] = 0; pad.axes[2] = 0; pad.axes[3] = 0; for (const b of pad.buttons) { b.pressed = false; b.value = 0; } };
   R.logSince = (t, re) => window.__LOG.filter((l) => l.t >= t && (!re || new RegExp(re).test(l.m)));
   s.onBeforeRenderObservable.add(() => {

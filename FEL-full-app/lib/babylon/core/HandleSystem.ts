@@ -95,9 +95,9 @@ export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
  */
 export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => string) | null>> = {
   crossover: (d) => `bball_crossover_${d}`,
-  hesi: () => 'bball_hesi',
+  hesi: (d) => `bball_hesi_v2_${d}`,   // H2b (plan §4.8): the v2 hesitation on its float path, in the ball's hand (`d` = the hand: a hesi keeps it)
   in_and_out: (d) => `bball_in_and_out_${d}`,
-  yoyo: () => 'bball_yoyo',
+  yoyo: (d) => `bball_yoyo_v2_${d}`,   // H2b (plan §4.9): the v2 yoyo on its path, in the ball's hand
   between_legs: (d) => `bball_between_legs_${d}`,
   behind_back: (d) => `bball_behind_back_${d}`,
   spin: null,             // the mode turns the body; there is no hand shape that says "spin" on its own

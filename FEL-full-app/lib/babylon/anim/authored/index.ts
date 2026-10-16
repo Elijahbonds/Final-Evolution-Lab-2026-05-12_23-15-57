@@ -26,7 +26,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump, buildElbow, buildSpinElbow } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildMomentumCross, buildBtbSlide, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
+  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildMomentumCross, buildBtbSlide, buildHesiV2, buildYoyoV2, buildPausin, buildJab, buildPivotV2, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
   buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildLandAbsorb,   // HOOPS-DEPTH S4
@@ -189,6 +189,15 @@ export function registerAuthoredClips(
     ['bball_momentum_cross_right', () => buildMomentumCross(scene, skeleton, 'right')],
     ['bball_btb_slide_left', () => buildBtbSlide(scene, skeleton, 'left')],     // H2 (owner 2026-10-16): the BTB slide
     ['bball_btb_slide_right', () => buildBtbSlide(scene, skeleton, 'right')],
+    ['bball_hesi_v2_left', () => buildHesiV2(scene, skeleton, 'left')],     // H2b (plan §4.8): the hesitation on its float path
+    ['bball_hesi_v2_right', () => buildHesiV2(scene, skeleton, 'right')],
+    ['bball_yoyo_v2_left', () => buildYoyoV2(scene, skeleton, 'left')],     // H2b (plan §4.9)
+    ['bball_yoyo_v2_right', () => buildYoyoV2(scene, skeleton, 'right')],
+    ['bball_pausin_left', () => buildPausin(scene, skeleton, 'left')],      // H2b (plan §4.18)
+    ['bball_pausin_right', () => buildPausin(scene, skeleton, 'right')],
+    ['bball_jab', () => buildJab(scene, skeleton)],                         // H2b (plan §4.11)
+    ['bball_pivot_v2_left', () => buildPivotV2(scene, skeleton, 'left')],   // H2b (plan §4.16)
+    ['bball_pivot_v2_right', () => buildPivotV2(scene, skeleton, 'right')],
     ['bball_hesi', () => buildHesi(scene, skeleton)],
     // THE HANDLE (2026-09-16): HandleSystem's twelve moves had three clips between them
     ['bball_in_and_out_left', () => buildInAndOut(scene, skeleton, 'left')],

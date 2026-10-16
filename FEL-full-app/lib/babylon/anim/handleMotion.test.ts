@@ -34,7 +34,7 @@ const oneVOne = (s: Site, handle = 100) => {
     snatchback: (): HandleRequest => ({ move: 'snatch_back', clip: 'bball_stepback_gather', decide: { kind: 'custom', run: () => { s.chain = resolve('snatch_back', { ...READ_IN_RANGE, set: false }).chain; } } }),
     sizeUp: (clip: string, side: Side): HandleRequest => ({ move: sizeUpMoveOf(clip), hint: side, decide: { kind: 'none' }, fadeSec: 0.08, speedRatio: 1 }),
     spin: (): HandleRequest => ({ move: 'spin', decide: { kind: 'none' }, clip: null, path: 'spin' }),
-    jab: (): HandleRequest => ({ move: 'jab', clip: 'bball_hesi', decide: { kind: 'custom', run: () => { roll(); } } }),
+    jab: (): HandleRequest => ({ move: 'jab', clip: 'bball_jab', decide: { kind: 'custom', run: () => { roll(); } } }),
   };
 };
 const threeVThree = (s: Site, handle = 100) => {
@@ -46,7 +46,7 @@ const threeVThree = (s: Site, handle = 100) => {
     snatchback: (): HandleRequest => ({ move: 'snatch_back', clip: 'bball_stepback_gather', decide: { kind: 'custom', run: () => { s.chain = resolve('snatch_back', { ...READ_IN_RANGE, set: false }, roll).chain; } } }),
     sizeUp: (clip: string, side: Side): HandleRequest => ({ move: sizeUpMoveOf(clip), hint: side, decide: { kind: 'none' }, fadeSec: 0.08, speedRatio: 1 }),
     spin: (): HandleRequest => ({ move: 'spin', decide: { kind: 'none' }, clip: null, path: 'spin' }),
-    jab: (): HandleRequest => ({ move: 'jab', clip: 'bball_hesi', fadeSec: 0.05, speedRatio: 1, decide: { kind: 'custom', run: () => { Math.random(); } } }),
+    jab: (): HandleRequest => ({ move: 'jab', clip: 'bball_jab', fadeSec: 0.05, speedRatio: 1, decide: { kind: 'custom', run: () => { Math.random(); } } }),
   };
 };
 
@@ -208,7 +208,8 @@ describe('the sides: one value for the clip and the ball (S31 / U10), and the re
       const { host, log } = body('Right');
       const r = requestMove(host, oneVOne(s).sizeUp(clip, 'right'));
       expect(log.impulses).toEqual([]); expect(log.beats).toHaveLength(1);
-      expect(r.clip).toBe(clip === 'bball_between_legs_right' ? 'bball_between_legs_left' : clip);
+      // (H2b rewrote the yoyo's expectation: the yoyo step plays its move's v2 clip in the ball's hand, bball_yoyo_v2_right)
+      expect(r.clip).toBe(clip === 'bball_between_legs_right' ? 'bball_between_legs_left' : clip === 'bball_yoyo' ? 'bball_yoyo_v2_right' : clip);
     }
     expect(s.chain.length).toBe(0); expect(s.resolves).toBe(0);
   });
@@ -254,7 +255,8 @@ describe('the modes\' call sites (contract: the source)', () => {
       expect(fn, name).toMatch(roll);
       expect(src, name).toMatch(/move: 'stepback', decide: \{ kind: 'chainOnly'/);
       expect(src, name).toMatch(/move: 'snatch_back', clip: 'bball_stepback_gather'[\s\S]{0,200}decide: \{ kind: 'custom'/);
-      expect(src, name).toMatch(/move: 'jab', clip: 'bball_hesi'[\s\S]{0,200}decide: \{ kind: 'custom'/);
+      // H2b rewrote the jab's clip in this pin (same intent: the jab decides itself): it plays its own bball_jab, not the hesi stand-in
+      expect(src, name).toMatch(/move: 'jab', clip: 'bball_jab'[\s\S]{0,200}decide: \{ kind: 'custom'/);
       expect(src, name).toMatch(/move: sizeUpMoveOf\(suClip\), hint: pick\.side \?\? undefined, decide: \{ kind: 'none' \}/);
       expect(src, name).toMatch(/requestMove\(meHost\(\), \{ move: 'spin', decide: \{ kind: 'none' \}, clip: null, path: 'spin' \}\)/);
     }

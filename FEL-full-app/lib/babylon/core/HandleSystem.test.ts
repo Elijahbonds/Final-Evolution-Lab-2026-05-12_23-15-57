@@ -657,8 +657,11 @@ describe('MOVE_CLIP', () => {
     }
   });
 
-  it('the sideless ones give the same clip either way, and the mode-owned ones give none', () => {
-    for (const move of ['hesi', 'yoyo', 'snatch_back'] as HandleMove[]) {
+  // H2b rewrote this case's list (plan §4.8): the hesi left it — its v2 clip is played in the ball's hand (a right-hand clip and its mirror)
+  it('the sideless ones give the same clip either way, and the mode-owned ones give none; the hesi plays in the ball\'s hand', () => {
+    expect(moveClip('hesi', 'right')).toBe('bball_hesi_v2_right'); expect(moveClip('hesi', 'left')).toBe('bball_hesi_v2_left');
+    expect(moveClip('yoyo', 'right')).toBe('bball_yoyo_v2_right'); expect(moveClip('yoyo', 'left')).toBe('bball_yoyo_v2_left');   // (H2b: the yoyo too)
+    for (const move of ['snatch_back'] as HandleMove[]) {
       expect(moveClip(move, 'left')).toBe(moveClip(move, 'right'));
       expect(moveClip(move, 'left')).toBeTruthy();
     }

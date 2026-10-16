@@ -200,6 +200,9 @@ export class DribbleController {
     this.movement.vel.set(p.x * p.speed, 0, p.z * p.speed);
     this.movement.holdFor(DribbleController.SLIDE_HOLD_SEC); this.movement.launchFor(0.35);
   }
+  /** H2b (the spin's step-out): turn to `yaw` at `rateRad` /s whatever the stick says (CourtMovement.turnTo). */
+  static readonly STEP_OUT_RATE = 9.4;   // 540°/s: the loop's own turn at pace (plan §4.14), 135° (the most a step-out can be) in 0.25 s
+  turnTo(yaw: number, rateRad = DribbleController.STEP_OUT_RATE): void { this.movement.turnTo(yaw, rateRad); }
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
     this.movement.pause(on);
@@ -210,8 +213,34 @@ export class DribbleController {
   hesitate(): void {
     const v = this.movement.vel; const n = v.length();
     if (n > 0.05) this.pendingCut = { x: v.x / n, z: v.z / n, speed: n * 0.12, left: DribbleController.CUT_BLEND_SEC };
-    this.hesiCooldown = DribbleController.HESI_COOLDOWN_SEC; this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC;
+    this.hesiCooldown = DribbleController.HESI_COOLDOWN_SEC; this.enterHang();
     this.movement.launchFor(0.5); this.movement.noteBurst(0.3);
+  }
+  /**
+   * THE HANG (H2b, hoops-motion plan §4.8 — G7: "root ≤ 0.5 m/s for ≥ 150 ms, then ≥ 3 m/s within 300 ms"). The two hesitations
+   * did not share a pause: the R-stick's hesitate() eased to 12 % of the speed and the EXPLODE-OUT fired on the first forward push
+   * — with the stick still forward, the pause lasted ONE frame; the left-stick tap's pull-then-push wrote the explode on the same
+   * frame. Both now enter one hang: for HESI_HANG_SEC the body is held at ≤ HESI_HANG_MAX_MPS and the stick moves nothing; the
+   * latest forward push inside it is REMEMBERED and the explode leaves on the hang's last frame. The explode window counts from
+   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.18 s later than it was — that pause IS
+   * the hesitation the defender bites on.
+   */
+  static readonly HESI_HANG_SEC = 0.18;
+  static readonly HESI_HANG_MAX_MPS = 0.3;
+  private hangLeft = 0;
+  private hangPush: Vector3 | null = null;
+  private enterHang(): void {
+    this.hangLeft = DribbleController.HESI_HANG_SEC; this.hangPush = null;
+    this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC + DribbleController.HESI_HANG_SEC;
+  }
+  /** Is the body inside a hesitation's hang? */
+  get hanging(): boolean { return this.hangLeft > 0; }
+  private explodeAlong(dir: Vector3): void {
+    const top = DEFAULT_MOVEMENT.maxSpeed;
+    this.pendingCut = null;
+    this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.movement.vel.length() + this.crossoverBoost))));
+    this.movement.facing = Math.atan2(dir.x, dir.z);
+    this.hesiBoostLeft = 0;
   }
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
     this.clock += dt;
@@ -240,7 +269,20 @@ export class DribbleController {
     // exploded you toward your own basket).
     const facingX = Math.sin(this.movement.facing), facingZ = Math.cos(this.movement.facing);
     const holding = this.movement.holding;   // H2: inside a committed hop the stick reads no gesture (it would rewrite the hop)
-    const state = this.movement.update(dt, moveX, moveY, sprint);
+    // H2b THE HANG: the stick moves nothing, the body is held near still, the latest forward push is remembered
+    const hanging = this.hangLeft > 0;
+    if (hanging) {
+      this.hangLeft = Math.max(0, this.hangLeft - dt);
+      if (mag > 0.5) { const d = new Vector3(moveX, 0, -moveY).normalize(); if (d.x * facingX + d.z * facingZ > 0.3) this.hangPush = d; }
+    }
+    const state = this.movement.update(dt, hanging ? 0 : moveX, hanging ? 0 : moveY, sprint);
+    if (hanging) {
+      const v = this.movement.vel, n = v.length();
+      if (n > DribbleController.HESI_HANG_MAX_MPS) v.scaleInPlace(DribbleController.HESI_HANG_MAX_MPS / n);
+      if (this.hangLeft === 0 && this.hangPush) { this.explodeAlong(this.hangPush); this.hangPush = null; }   // the explode, on the hang's last frame
+      this.sprintWas = sprint && mag > 0.05;
+      return { crossover: false, hesitation: false, speed01: Math.min(1, this.movement.vel.length() / DEFAULT_MOVEMENT.maxSpeed), facingRad: this.movement.facing, planting: false, gear: state.gear ?? 'stop', intensity01: state.intensity01 ?? state.speed01, paceChange: false };
+    }
     if (holding) {
       this.sprintWas = sprint && mag > 0.05;
       return { crossover: false, hesitation: false, speed01: state.speed01, facingRad: this.movement.facing, planting: false, gear: state.gear ?? 'stop', intensity01: state.intensity01 ?? state.speed01, paceChange: false };
@@ -267,17 +309,11 @@ export class DribbleController {
       if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC && this.hesiCooldown === 0) {
         hesitation = true;
         this.hesiCooldown = DribbleController.HESI_COOLDOWN_SEC;
-        this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC;
+        this.enterHang();   // H2b: the shared hang (the explode window counts from its end)
         { const v = this.movement.vel, n = v.length(); if (n > 0.05) this.pendingCut = { x: v.x / n, z: v.z / n, speed: n * 0.12, left: DribbleController.CUT_BLEND_SEC }; }   // the plant, eased (STICK HANDLE)
-        // A flick straight back OUT (pull then push in one motion) explodes
-        // on the same frame instead of waiting for the next push.
-        if (dir && fwd > 0.3) {
-          const top = DEFAULT_MOVEMENT.maxSpeed;
-          this.pendingCut = null;   // the burst is written now — the eased plant must not keep dragging it down
-          this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.crossoverBoost * 1.5))));
-          this.movement.facing = Math.atan2(dir.x, dir.z);
-          this.hesiBoostLeft = 0;
-        }
+        // A flick straight back OUT (pull then push in one motion) is the explode — remembered, and it leaves on the hang's last
+        // frame (H2b; it used to be written on this same frame, a hesitation with no pause in it).
+        if (dir && fwd > 0.3) this.hangPush = dir.clone();
       }
       this.pullbackSec = -1;
     }
