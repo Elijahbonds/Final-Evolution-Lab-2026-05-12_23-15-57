@@ -1,6 +1,6 @@
 // athleteRoster — distinct bodies for rivals/NPCs so a contested screen is not
-// the hero GLB cloned with a tint. Baked by scripts/avatar/roster.mts into
-// public/models/athletes/<key>.glb (proportions + kit colorway baked in).
+// the hero GLB cloned with a tint. Built by scripts/avatar/rivals.mts into
+// public/models/rivals/<key>.glb (2026-10-16: MPFB2 forge bodies; the Meshy athletes/ bodies before them are REPLACED_MESHY).
 //
 // WIRING — CharacterLibrary.spawn(), GLB path only: when a caller passes the
 // shared hero URL AND a tint (the universal "this is not the player" signal in
@@ -40,50 +40,50 @@ export const RETIRED_ATHLETES: Readonly<Record<string, string>> = {
   amir: 'torn: 1,112 edges (the arm smeared into a plank off the head)',
 };
 
+/**
+ * THE MESHY BODIES ARE OFF THE ROSTER (owner, 2026-10-16: "the meshy opponents need to be replaced by our models because they are
+ * broken, make our npcs look better than the meshy models, replace them all but my own"). Every one of these is a Meshy export
+ * weighted by nearest-vertex transfer from the owner's scan (scripts/meshy/skin-transfer.py): eleven tore badly enough to retire
+ * (above), and the kept ones were measured on /dev/model (STRETCH=1 _model-sheet.mts, the clips the retired list was measured on):
+ * 40–81 triangle edges pulled past 20 cm and a 30–44 cm worst edge, against 0 edges and 5–19 cm on the forge rivals that replace
+ * them — and ONE mesh with one material, so no team colour or fit ever reached a Meshy rival. The files stay on disk; the owner's
+ * own hero (DEFAULT_HERO_URL) is not a roster body and is unchanged.
+ */
+export const REPLACED_MESHY: readonly string[] = [
+  'sage', 'flint', 'onyx', 'dune', 'cobalt', 'vega', 'iris', 'm22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-421d2cdb', 'm22-9e24fc5b', 'm22-367df58a', 'm22-4d4c6f8f', 'm22-feb2aabc', 'm22-bb13bdbe', 'm22-242b6fd6', 'm22-5cf665ee', 'm22-bdb3bfb8', 'm22-c4822d61', 'm22-350e6667', 'm22-50acc34e', 'm22-2d171b36', 'm22-d81daaf0', 'm22-b3a4e54f', 'm22-b5bcf955', 'm22-f760a342',
+];
+
+/**
+ * THE FORGE RIVALS (2026-10-16; scripts/avatar/rivals.mts → public/models/rivals/): 24 people built from MPFB2 (MakeHuman, CC0) on
+ * our own rig — each its own build (MakeHuman's sex, age, muscle, weight, proportions and race weights, two face targets, height
+ * 1.70–2.08 m), skin, hair and brows, wearing the kit's garment contract (Kit_<slot>_<item>, jersey/shorts/shoes materials), so
+ * applyKit dresses them for the sport, the fits colour them and a team's colour reaches their jersey. Generic names, no real people.
+ */
 export const ATHLETE_ROSTER: RosterAthlete[] = [
-  // Phase 3 (2026-09-02): four more bodies so a 3v3 never repeats a look.
-  { key: 'sage', url: '/models/athletes/sage.glb' },
-  // Phase 6 (owner, 2026-09-19: "rig the other models … same normal static posture as the ones that animate", then
-  // "separate those models"). The Meshy people who were not basketball players carried no rig, so nothing could spawn
-  // them — and they do not come one to a file: "Athletic Male NPC 1" is FIVE men standing shoulder to shoulder inside
-  // a single mesh. Fed whole to the skin transfer all five were skinned to one skeleton and the idle tore the sheet
-  // apart, which is exactly what it did the first time. They are cut into people first (scripts/meshy/split-row.py,
-  // at the valleys in the vertex histogram — the one thing that separates figures standing in a line), then each one
-  // goes through the same transfer onto the same 22-bone skeleton as the eight. One rig, one clip set, one idle.
-  { key: 'flint', url: '/models/athletes/flint.glb' },
-  { key: 'onyx', url: '/models/athletes/onyx.glb' },
-  { key: 'dune', url: '/models/athletes/dune.glb' },
-  { key: 'cobalt', url: '/models/athletes/cobalt.glb' },
-  { key: 'vega', url: '/models/athletes/vega.glb' },
-  { key: 'iris', url: '/models/athletes/iris.glb' },
-  // wren and the crowd's bramble are BUILT but OUT: on those two the transfer bound the arms to the chest — not a
-  // vertex reached an arm bone — so the anatomical repair below has no arm cluster to split and their arms would
-  // swing from the sternum. The files stay on disk; they are not spawned until the transfer can find their arms.
-  // MODELS PASS (owner drop 2026-09-22, cast by look — docs/CAST-MESHY-2026-09-22.md): 22 Meshy characters on the same 22-bone rig
-  // via scripts/meshy/batch-meshy22.sh (skin-transfer.py onto the T-posed donor). The 0.6 / 1K pack: rivals and crowd never
-  // carry the 2K. Keys are the source id until the owner names them.
-  { key: 'm22-6d8c65ad', url: '/models/athletes/m22-6d8c65ad.glb' },
-  { key: 'm22-dab1e0f7', url: '/models/athletes/m22-dab1e0f7.glb' },
-  { key: 'm22-df555984', url: '/models/athletes/m22-df555984.glb' },
-  { key: 'm22-c19ac82e', url: '/models/athletes/m22-c19ac82e.glb' },
-  { key: 'm22-2ef63bb6', url: '/models/athletes/m22-2ef63bb6.glb' },
-  { key: 'm22-421d2cdb', url: '/models/athletes/m22-421d2cdb.glb' },
-  { key: 'm22-9e24fc5b', url: '/models/athletes/m22-9e24fc5b.glb' },
-  { key: 'm22-367df58a', url: '/models/athletes/m22-367df58a.glb' },
-  { key: 'm22-4d4c6f8f', url: '/models/athletes/m22-4d4c6f8f.glb' },
-  { key: 'm22-feb2aabc', url: '/models/athletes/m22-feb2aabc.glb' },
-  { key: 'm22-bb13bdbe', url: '/models/athletes/m22-bb13bdbe.glb' },
-  { key: 'm22-242b6fd6', url: '/models/athletes/m22-242b6fd6.glb' },
-  { key: 'm22-5cf665ee', url: '/models/athletes/m22-5cf665ee.glb' },
-  { key: 'm22-bdb3bfb8', url: '/models/athletes/m22-bdb3bfb8.glb' },
-  { key: 'm22-c4822d61', url: '/models/athletes/m22-c4822d61.glb' },
-  { key: 'm22-350e6667', url: '/models/athletes/m22-350e6667.glb' },
-  { key: 'm22-50acc34e', url: '/models/athletes/m22-50acc34e.glb' },
-  { key: 'm22-2d171b36', url: '/models/athletes/m22-2d171b36.glb' },
-  { key: 'm22-d81daaf0', url: '/models/athletes/m22-d81daaf0.glb' },
-  { key: 'm22-b3a4e54f', url: '/models/athletes/m22-b3a4e54f.glb' },
-  { key: 'm22-b5bcf955', url: '/models/athletes/m22-b5bcf955.glb' },
-  { key: 'm22-f760a342', url: '/models/athletes/m22-f760a342.glb' },
+  { key: 'ace', url: '/models/rivals/ace.glb' },
+  { key: 'blaze', url: '/models/rivals/blaze.glb' },
+  { key: 'bolt', url: '/models/rivals/bolt.glb' },
+  { key: 'colt', url: '/models/rivals/colt.glb' },
+  { key: 'dash', url: '/models/rivals/dash.glb' },
+  { key: 'echo', url: '/models/rivals/echo.glb' },
+  { key: 'fable', url: '/models/rivals/fable.glb' },
+  { key: 'grit', url: '/models/rivals/grit.glb' },
+  { key: 'halo', url: '/models/rivals/halo.glb' },
+  { key: 'jinx', url: '/models/rivals/jinx.glb' },
+  { key: 'kite', url: '/models/rivals/kite.glb' },
+  { key: 'lux', url: '/models/rivals/lux.glb' },
+  { key: 'mako', url: '/models/rivals/mako.glb' },
+  { key: 'nyx', url: '/models/rivals/nyx.glb' },
+  { key: 'orbit', url: '/models/rivals/orbit.glb' },
+  { key: 'quill', url: '/models/rivals/quill.glb' },
+  { key: 'rook', url: '/models/rivals/rook.glb' },
+  { key: 'sol', url: '/models/rivals/sol.glb' },
+  { key: 'tusk', url: '/models/rivals/tusk.glb' },
+  { key: 'umber', url: '/models/rivals/umber.glb' },
+  { key: 'volt', url: '/models/rivals/volt.glb' },
+  { key: 'wisp', url: '/models/rivals/wisp.glb' },
+  { key: 'yara', url: '/models/rivals/yara.glb' },
+  { key: 'zeal', url: '/models/rivals/zeal.glb' },
 ];
 
 /** MODELS PASS phase 7: which roster bodies a mode's rivals and crowd draw from (the whole roster when a mode has none). The
@@ -91,39 +91,37 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
  *
  * ASSET-POLISH (2026-10-05): the rival now rotates every match, so a one- or two-body cast meant the same face every
  * time or a flip-flop between two. Every rival cast is at least four now (freerun and sprint keep their three runners).
- * Additions follow docs/CAST-MESHY-2026-09-22.md's own fit column wherever it gives one (hoops, combat); football,
- * soccer, snowboard and who-scene-it had too few tagged bodies, and their additions are a judgement by outfit
- * (athletes for the field sports, hoodies for the snow, casual for the quiz). The doc records which is which.
+ * FORGE RIVALS (2026-10-16): recast from the 24 forge rivals by build — leapers and bigs for the dunks, shooters for the
+ * three-point line, the broad and the compact for the fights, the lighter builds for the boards and the snow, everyone for the
+ * party modes; hoops casts mix men and women. Every cast is still ≥ 3 and repeats no body. (The Meshy casts are in git.)
  */
 export const MODE_CAST: Record<string, readonly string[]> = {
-  baseball: ['m22-6d8c65ad', 'm22-50acc34e', 'm22-2d171b36', 'm22-b5bcf955', 'm22-f760a342'],
-  bigair: ['m22-feb2aabc', 'm22-242b6fd6', 'm22-bdb3bfb8', 'm22-350e6667'],
-  // BRAINBRAWL-RESIDUAL (2026-09-24): a quiz show's contestants, host and audience, dressed for a studio. Without a cast
-  // the P2 tint hashed onto the whole roster and landed on the shirtless beach body (feb2aabc): the eye read P2 as naked.
-  brainbrawl: ['m22-5cf665ee', 'm22-bdb3bfb8', 'm22-242b6fd6', 'm22-350e6667', 'm22-50acc34e', 'm22-f760a342', 'm22-df555984', 'm22-421d2cdb'],
-  carnival: ['m22-4d4c6f8f', 'm22-242b6fd6', 'm22-5cf665ee', 'm22-c4822d61', 'm22-50acc34e', 'm22-b3a4e54f'],
-  dance: ['m22-421d2cdb', 'm22-9e24fc5b', 'm22-5cf665ee', 'm22-f760a342'],
-  duel: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
-  dunk: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
-  dunkduel: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
-  football: ['m22-dab1e0f7', 'm22-df555984', 'm22-6d8c65ad', 'm22-c19ac82e'],
-  freerun: ['m22-c19ac82e', 'm22-421d2cdb', 'm22-367df58a'],
-  golf: ['m22-421d2cdb', 'm22-9e24fc5b', 'm22-c4822d61', 'm22-50acc34e', 'm22-2d171b36', 'm22-d81daaf0', 'm22-b5bcf955'],
-  karate: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-350e6667', 'm22-2ef63bb6'],
-  karate_vs: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
-  mixedcombat: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
-  onevone: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
-  showdown: ['m22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6', 'm22-350e6667'],
-  skateboard: ['m22-bb13bdbe', 'm22-242b6fd6', 'm22-5cf665ee', 'm22-bdb3bfb8', 'm22-c4822d61', 'm22-b3a4e54f'],
-  snowboard_slalom: ['m22-242b6fd6', 'm22-350e6667', 'm22-bdb3bfb8', 'm22-5cf665ee'],
-  soccer: ['m22-df555984', 'm22-dab1e0f7', 'm22-c19ac82e', 'm22-2ef63bb6'],
-  sprint: ['m22-c19ac82e', 'm22-2ef63bb6', 'm22-367df58a'],
-  surf: ['m22-4d4c6f8f', 'm22-feb2aabc', 'm22-bb13bdbe', 'm22-bdb3bfb8', 'm22-d81daaf0', 'm22-b3a4e54f', 'm22-f760a342'],
-  tennis: ['m22-df555984', 'm22-c19ac82e', 'm22-421d2cdb', 'm22-9e24fc5b', 'm22-2d171b36', 'm22-b5bcf955'],
-  threepoint: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-bb13bdbe'],
-  threevthree: ['m22-6d8c65ad', 'm22-dab1e0f7', 'm22-df555984', 'm22-2ef63bb6'],
-  volleyball: ['m22-2ef63bb6', 'm22-9e24fc5b', 'm22-367df58a', 'm22-4d4c6f8f', 'm22-feb2aabc', 'm22-bb13bdbe', 'm22-2d171b36', 'm22-d81daaf0'],
-  who_scene_it: ['m22-50acc34e', 'm22-5cf665ee', 'm22-f760a342', 'm22-c4822d61'],
+  baseball: ['blaze', 'rook', 'orbit', 'sol', 'zeal', 'fable'],
+  bigair: ['colt', 'jinx', 'wisp', 'volt', 'kite'],
+  brainbrawl: ['halo', 'sol', 'quill', 'fable', 'yara', 'rook', 'kite', 'zeal'],
+  carnival: ['lux', 'halo', 'jinx', 'umber', 'wisp', 'bolt'],
+  dance: ['lux', 'echo', 'kite', 'yara', 'volt', 'nyx'],
+  duel: ['grit', 'blaze', 'rook', 'nyx', 'zeal'],
+  dunk: ['ace', 'lux', 'volt', 'grit', 'mako', 'tusk', 'bolt', 'umber'],
+  dunkduel: ['ace', 'lux', 'volt', 'grit', 'mako', 'tusk', 'bolt', 'umber'],
+  football: ['grit', 'orbit', 'tusk', 'blaze', 'fable', 'dash'],
+  freerun: ['volt', 'colt', 'wisp', 'dash'],
+  golf: ['fable', 'rook', 'quill', 'sol', 'halo', 'jinx', 'zeal'],
+  karate: ['grit', 'blaze', 'rook', 'nyx', 'zeal', 'orbit'],
+  karate_vs: ['grit', 'blaze', 'rook', 'nyx', 'zeal', 'orbit'],
+  mixedcombat: ['grit', 'blaze', 'rook', 'nyx', 'zeal', 'tusk'],
+  onevone: ['ace', 'lux', 'volt', 'dash', 'grit', 'bolt', 'echo', 'umber'],
+  showdown: ['grit', 'blaze', 'rook', 'nyx', 'zeal', 'tusk'],
+  skateboard: ['colt', 'jinx', 'wisp', 'zeal', 'sol', 'quill'],
+  snowboard_slalom: ['colt', 'kite', 'jinx', 'wisp', 'quill'],
+  soccer: ['dash', 'sol', 'volt', 'halo', 'kite', 'colt'],
+  sprint: ['volt', 'dash', 'echo', 'ace'],
+  surf: ['colt', 'wisp', 'jinx', 'yara', 'lux', 'kite', 'sol'],
+  tennis: ['halo', 'quill', 'jinx', 'sol', 'kite', 'dash'],
+  threepoint: ['jinx', 'quill', 'dash', 'sol', 'halo', 'colt'],
+  threevthree: ['ace', 'lux', 'volt', 'dash', 'grit', 'mako', 'tusk', 'orbit', 'echo', 'umber', 'nyx', 'bolt'],
+  volleyball: ['echo', 'umber', 'kite', 'yara', 'halo', 'volt', 'mako', 'wisp'],
+  who_scene_it: ['fable', 'quill', 'sol', 'halo', 'rook', 'yara'],
 };
 
 /** THE hero — the one body every mode spawns unless it asks for a specific file. Owner decision 2026-09-05 (Ship Pass 6):

@@ -14,7 +14,7 @@
  *   5. weights are normalized per vertex
  *   6. every GLB has a sibling manifest whose clip names match the GLB's
  *
- * Runs on: public/models/fel-hero.glb + public/models/athletes/*.glb.
+ * Runs on: public/models/fel-hero.glb + public/models/athletes/*.glb + public/models/rivals/*.glb.
  * No browser, no server — pure gltf-transform reads.
  */
 
@@ -49,6 +49,10 @@ const targets = ['public/models/fel-hero.glb'];
 const athletesDir = 'public/models/athletes';
 if (existsSync(athletesDir)) {
   for (const f of readdirSync(athletesDir)) if (f.endsWith('.glb')) targets.push(join(athletesDir, f));
+}
+const rivalsDir = 'public/models/rivals';   // 2026-10-16: the forge rivals (scripts/avatar/rivals.mts) — the roster now
+if (existsSync(rivalsDir)) {
+  for (const f of readdirSync(rivalsDir)) if (f.endsWith('.glb')) targets.push(join(rivalsDir, f));
 }
 check(targets.length >= 2, `avatar targets found (${targets.length}: hero + roster)`);
 

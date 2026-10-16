@@ -17,6 +17,10 @@ const URLS = (process.env.URLS ?? '/models/athletes/flint.glb').split(',');
 const NAMES = (process.env.NAMES ?? '').split(',').filter(Boolean);
 const SPORT = process.env.SPORT ?? 'tennis_swing';
 const STATIC = process.env.STATIC === '1';   // props / vehicles: loaded as meshes on the viewer's static path, no clips
+// STRETCH=1 (rival bodies, 2026-10-16): the viewer's torn-skin read (M.stretch — RETIRED_ATHLETES' measure) over the clips the
+// retired list was measured on, sampled through each clip; TORN = ≥ 300 edges past 20 cm, SPIKE = an edge grown ≥ 55 cm
+const STRETCH = process.env.STRETCH === '1';
+const STRETCH_CLIPS = (process.env.STRETCH_CLIPS ?? 'idle_stand,run,dunk_finish_tomahawk,jumpshot').split(',');
 fs.mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ executablePath: chromiumExe(), args: ['--use-gl=angle', '--use-angle=metal'] });
 const p = await b.newPage({ viewport: { width: 560, height: 720 } });
@@ -54,10 +58,26 @@ for (let i = 0; i < URLS.length; i++) {
     const sport = await sample(600); row.sportTee = `${sport.tee}/${sport.samples}`;
     await p.screenshot({ path: `${OUT}/${name}-sport.png` });
     await model("M.play('idle_stand')");
+    if (STRETCH) {
+      const per: Record<string, { over20: number; maxGrowCm: number; nan: number }> = {};
+      for (const c of STRETCH_CLIPS) {
+        const has = await model(`M.play(${JSON.stringify(c)})`); if (!has) continue;
+        let over20 = 0, maxGrowCm = 0, nan = 0;
+        for (let k = 0; k < 6; k++) {
+          await p.waitForTimeout(160);
+          const ms = (await model('M.stretch ? M.stretch() : []')) as { over20: number; maxGrowCm: number; nanVerts: number }[] | null;
+          for (const m of ms ?? []) { over20 = Math.max(over20, m.over20); maxGrowCm = Math.max(maxGrowCm, m.maxGrowCm); nan = Math.max(nan, m.nanVerts); }
+        }
+        per[c] = { over20, maxGrowCm, nan };
+      }
+      const worstTorn = Math.max(0, ...Object.values(per).map((v) => v.over20)), worstSpike = Math.max(0, ...Object.values(per).map((v) => v.maxGrowCm));
+      row.stretch = { per, worstTorn, worstSpike, verdict: worstTorn >= 300 ? 'TORN' : worstSpike >= 55 ? 'SPIKE' : 'clean' };
+      await model("M.play('idle_stand')");
+    }
   }
   row.errors = errors.slice(0, 4);
   rows.push(row);
-  console.log(JSON.stringify({ name, ready: row.ready, error: err, joints: report?.joints, height: report?.height, verts: report?.verts, clips: report?.clipCount, idleTee: row.idleTee, runTee: row.runTee, sportTee: row.sportTee, runClip: row.runClip, sportClip: row.sportClip, errors: row.errors }));
+  console.log(JSON.stringify({ name, ready: row.ready, error: err, joints: report?.joints, height: report?.height, verts: report?.verts, clips: report?.clipCount, idleTee: row.idleTee, runTee: row.runTee, stretch: (row.stretch as { verdict?: string; worstTorn?: number; worstSpike?: number } | undefined) ? `${(row.stretch as { verdict: string }).verdict} ${(row.stretch as { worstTorn: number }).worstTorn}e/${(row.stretch as { worstSpike: number }).worstSpike}cm` : undefined, sportTee: row.sportTee, runClip: row.runClip, sportClip: row.sportClip, errors: row.errors }));
 }
 fs.writeFileSync(`${OUT}/sheet.json`, JSON.stringify(rows, null, 2));
 const tile = (r: Record<string, unknown>) => `<div class="c"><h3>${r.name}</h3><div class="row"><img src="${r.name}-front.png"><img src="${r.name}-turn.png"><img src="${r.name}-run.png"><img src="${r.name}-sport.png"></div><p>${r.error ? `<b style="color:#f66">REJECTED</b> ${r.error}` : `${(r.report as Record<string, unknown>)?.joints} joints · ${(r.report as Record<string, unknown>)?.height} m · ${(r.report as Record<string, unknown>)?.verts} verts · idle T ${r.idleTee} · run T ${r.runTee} · ${SPORT} T ${r.sportTee}`}</p><p class="cast">cast: <i>hero of ____ · rival of ____ · crowd</i></p></div>`;

@@ -117,7 +117,7 @@ describe('the rival you face walks on, and is somebody', () => {
     expect(new Set(bodies).size).toBe(DUNK_RIVALS.length);
     for (const r of DUNK_RIVALS) {
       expect(ATHLETE_ROSTER.map((a) => a.key), r.name).toContain(r.body);
-      expect(rosterBodyUrl(r.body), r.name).toMatch(/^\/models\/athletes\/.+\.glb$/);
+      expect(rosterBodyUrl(r.body), r.name).toMatch(/^\/models\/rivals\/.+\.glb$/);   // (2026-10-16: the forge rivals' folder; was athletes/, the Meshy bodies)
     }
   });
 });
