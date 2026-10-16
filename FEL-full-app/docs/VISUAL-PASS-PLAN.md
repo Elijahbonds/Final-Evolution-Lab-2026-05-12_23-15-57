@@ -1101,3 +1101,31 @@ What a phone does now in Karate VS (modeId `karate-vs`; every line phone tier on
 of rings with a third hit landing at **13**, for about 0.3 s. Ordinary play on the rig (a fake player against the rival) never overlapped two: 5 at the
 worst of 699 frames. `CHECK=1` reads the worst frame of a run and passes; a combo string on a real phone can go over the row for a moment. If the
 owner wants that held too, the choice is a row of 9 (not done: the row is the owner's) or a second hit inside a tenth of a second giving up its streaks.
+
+## Who Scene It: the false "SKINNING STALL" on char_65 (kvs-skin, 2026-10-16)
+
+Owner, 2026-10-16: fix the check, keep the real-stall guard. **Root cause (measured, not the near-still idle the report guessed):** `SkinningGuard` said the six sampled
+bones of `char_65` did not move in 45 frames. They moved by exactly 0 (a drawn body's moved by up to 0.99 in the same window; the instrumented guard logged
+`drawn: 0` of 45 frames for char_65 and `drawn: 29` for the host). char_65 is a contestant standing outside a portrait phone's frame: its meshes are enabled
+but never in the scene's active-mesh list, and a skeleton is only prepared (`Skeleton.prepare`, from `Scene._prepareSkeleton`) for a skinned mesh the scene
+selects to draw. An undrawn body's bones cannot move whatever its clip does, so "no bone moved" described the camera. The guard then set
+`computeBonesUsingShaders = false` for good, so the body is CPU-skinned whenever it is on screen after that (a phone turned sideways, a second seat).
+Rotated to landscape the same body is drawn from the start and the guard never fires (measured), which is the other half of the proof.
+
+`SkinningGuard` v4 judges only a body that was drawn: it watches until a skinned mesh of the body is in the active list (giving up after 3600 frames, about a
+minute), takes the baseline after that frame's prepare, and judges after 45 further drawn frames. A stall is now the skeleton not following its own
+animation: no sampled bone moved while the animated nodes they are linked to did (past 10 x the bone epsilon). A clip that moves no node (a near-still
+idle) is not called a stall. Not-playing and a parked playhead still say nothing. The baseline used to be taken at spawn, before the first prepare, so a
+drawn body always read as "moved" and a stall after its first frame could not be seen; now it can (tested: `scene.skeletonsEnabled = false` on a drawn body).
+
+Garbage per frame, `who_scene_it`, sampling heap profiler (the `lane/rig-perf` method: 4096 B interval, 180 frames after 420 of play, phone profile, `RASTER=4`, `SEED=7`;
+shader pre-warm off in both so the old guard's stall reproduces: with the pre-warm's three frames the stall is masked by accident, base 90 KB/frame):
+
+| scenario | before (v3) | after (v4) |
+|---|---|---|
+| portrait, char_65 off screen | 123 KB/frame, STALL logged | 107 KB/frame, none |
+| portrait, then turned to landscape (the body comes on screen) | **365 KB/frame**, STALL logged, 6 active meshes CPU-skinned | **116 KB/frame**, none, 0 CPU-skinned (8 GPU) |
+| landscape from the start | 110 KB/frame, none | 99 KB/frame, none |
+| shader pre-warm on (real tree), portrait | 90 KB/frame (stall masked) | 65 KB/frame |
+
+The turned-sideways row is the cost of the false alarm: about 250 KB/frame. Single runs on a shared box move 10-25 KB between identical builds; the 250 KB step is far outside that.
