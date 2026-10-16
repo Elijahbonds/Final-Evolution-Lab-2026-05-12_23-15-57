@@ -19,13 +19,13 @@
 // Held-pose memory per node (raw / out / layered): if the node's value equals this layer's last write, no clip rewrote
 // it → the remembered raw is the base; else it is a fresh clip value. An absolute stance on a held bone is fine either
 // way; an additive one (the lean, the aim, the eyes, the hips) would compound every frame without it.
-import { Quaternion, Vector3 } from '@babylonjs/core';
-import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
-import { bindFrame, type BindFrame } from './bindFrame';
-import { chainRotation, frameAbove } from './TwoBoneIK';
+import { Quaternion, TransformNode, Vector3 } from '@babylonjs/core';
+import type { Node, Scene, Skeleton } from '@babylonjs/core';
+import { bindFrame, type BindFrame, type Deg3 } from './bindFrame';
+import { chainRotationToRef, frameAbove } from './TwoBoneIK';
 import { boneNode } from './boneLookup';
-import { POSTURE, easePose, clonePose, chestAimCorrection, hipYawStrip, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose } from '../core/DunkPosture';
-import { LEGS, easeLegPose, cloneLegPose, FOOT_PITCH_CAP, type LegPose } from '../core/DunkLegs';
+import { POSTURE, easePoseInto, clonePose, chestAimCorrection, hipYawStrip, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose } from '../core/DunkPosture';
+import { LEGS, easeLegPoseInto, cloneLegPose, FOOT_PITCH_CAP, type LegPose } from '../core/DunkLegs';
 
 /** Clavicle key signs (measured on the shipped hero, DUNK-POSTURE): +Z lifts the LEFT clavicle / drops the right; +Y pulls
  *  the left BACK / the right forward. */
@@ -33,7 +33,33 @@ export const CLAVICLE_SIGN = { Left: { shrug: 1, forward: -1 }, Right: { shrug: 
 /** Dev probes only: `?noposture=1` plays the clips with no Posture Poses layer (the before / after of a biomech pass). */
 export const POSTURE_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]noposture=1/.test(location.search);
 
-interface PpNode { n: TransformNode; raw: Quaternion; out: Quaternion; layered: boolean; bindChain: Quaternion }
+interface PpNode { n: TransformNode; raw: Quaternion; out: Quaternion; layered: boolean; bindChain: Quaternion; bindChainInv: Quaternion }
+
+// RIG-PERF (2026-10-16, owner: "optimise the rig layers"): THE LAYER WRITES NO GARBAGE PER FRAME. It was a fifth of everything the
+// phone profile allocated in a 3v3 (six bodies): a fresh child list per bone per frame in the world-matrix walk, a chainRotation and
+// a quaternion inverse per frame-space read, closures and literal arrays per apply, a new eased pose object per tick. Every
+// intermediate is now a scratch on the layer (or the module, for the stateless ones), the walk reads each node's own child list,
+// the bind chains' inverses are taken once (they never change), and the eased pose is written in place. The arithmetic is the
+// same expressions in the same order (Babylon's ToRef forms are the allocating forms' own maths); rigLayers.equivalence.test.ts
+// holds every bone to the pre-change layer bit for bit.
+const UP: Readonly<Vector3> = new Vector3(0, 1, 0);
+const RIGHT: Readonly<Vector3> = new Vector3(1, 0, 0);
+const FORWARD: Readonly<Vector3> = new Vector3(0, 0, 1);   // Vector3.Forward() (left-handed), as every read below used
+const SIDES = ['Left', 'Right'] as const;
+/** Pooled child-list snapshots per walk depth: the walk visits exactly what getChildTransformNodes(true) listed — the node's direct
+ *  children that are TransformNodes, in order, snapshotted before descending — without a fresh array per node per frame. */
+const walkPool: (TransformNode | null)[][] = [];
+function walkFrom(n: TransformNode, depth: number): void {
+  n.computeWorldMatrix(true);
+  const kids = (n as unknown as { _children: Node[] | null })._children;
+  if (!kids || kids.length === 0) return;
+  const list = walkPool[depth] ?? (walkPool[depth] = []);
+  // filled by count (never `length = 0`, which drops V8's backing store and re-allocates it on the next push)
+  let len = 0;
+  for (let i = 0; i < kids.length; i++) { const c = kids[i]; if (c instanceof TransformNode) list[len++] = c; }
+  // the snapshot is read before any deeper call reuses a deeper pool slot; a deeper level never touches this depth's list
+  for (let i = 0; i < len; i++) { const c = list[i]!; list[i] = null; walkFrom(c, depth + 1); }   // cleared as read: the pool holds no node alive
+}
 
 /** What the mode wants this frame: the target stance and feet (eased inside), the point the chest squares to, the point
  *  the eyes go to (defaults to `aim`), an extra hips yaw (the dunk's spin layer; 0 otherwise). */
@@ -67,6 +93,10 @@ export class PostureLayer {
   private readonly footPitch = { Left: 0, Right: 0 };
   private readonly hipsRaw = Quaternion.Identity(); private readonly hipsOut = Quaternion.Identity(); private hipsLayered = false;
   private readonly _q = Quaternion.Identity(); private readonly _d = Quaternion.Identity(); private readonly _rho = Quaternion.Identity(); private readonly _v = new Vector3();
+  private readonly _rp = Quaternion.Identity(); private readonly _ch = Quaternion.Identity(); private readonly _k = Quaternion.Identity(); private readonly _ax = new Vector3();
+  private readonly _a = Quaternion.Identity(); private readonly _b = Quaternion.Identity(); private readonly _deg: Deg3 = [0, 0, 0];
+  private readonly feetSide = { Left: { foot: null as PpNode | null, toe: null as PpNode | null }, Right: { foot: null as PpNode | null, toe: null as PpNode | null } };
+  private readonly poseBuf: PosturePose; private readonly legsBuf: LegPose;
 
   constructor(private readonly skeleton: Skeleton, private readonly root: TransformNode, readonly tag = 'PP') {
     const hipsNode = boneNode(skeleton, 'Hips');
@@ -75,6 +105,10 @@ export class PostureLayer {
     this.hips = this.nodeFor('Hips');
     this.nodes = { spine: this.nodeFor('Spine'), spine1: this.nodeFor('Spine1'), spine2: this.nodeFor('Spine2'), neck: this.nodeFor('Neck'), head: this.nodeFor('Head'), Left: this.nodeFor('LeftShoulder'), Right: this.nodeFor('RightShoulder') };
     this.feet = { LeftFoot: this.nodeFor('LeftFoot'), RightFoot: this.nodeFor('RightFoot'), LeftToeBase: this.nodeFor('LeftToeBase'), RightToeBase: this.nodeFor('RightToeBase') };
+    this.feetSide.Left.foot = this.feet.LeftFoot; this.feetSide.Left.toe = this.feet.LeftToeBase;
+    this.feetSide.Right.foot = this.feet.RightFoot; this.feetSide.Right.toe = this.feet.RightToeBase;
+    // the eased pose and feet live in these two buffers from the first tick on (an override still clones, as it did)
+    this.poseBuf = clonePose(this.pose); this.legsBuf = cloneLegPose(this.legs);
     // the frame's yaw sense: a +yaw in frame space is a +yaw in world unless the import root reflects (Babylon's glTF
     // (1, 1, −1) root) — read off the frame's own world matrix rather than assumed
     this.sign = this.frame && this.frame.getWorldMatrix().determinant() < 0 ? -1 : 1;
@@ -87,43 +121,45 @@ export class PostureLayer {
     const n = boneNode(this.skeleton, name); if (!n || !this.bf) return null;
     if (!n.rotationQuaternion) n.rotationQuaternion = Quaternion.FromEulerVector(n.rotation);
     const b = this.bf.bind.get(n); const Rp = this.bf.parentRot.get(n) ?? Quaternion.Identity();
-    return { n, raw: n.rotationQuaternion.clone(), out: n.rotationQuaternion.clone(), layered: false, bindChain: b ? Rp.multiply(b.q) : Quaternion.Identity() };
+    const bindChain = b ? Rp.multiply(b.q) : Quaternion.Identity();
+    // bindChain never changes after this: its inverse (every frame-space read used Quaternion.Inverse(bindChain)) is taken once
+    return { n, raw: n.rotationQuaternion.clone(), out: n.rotationQuaternion.clone(), layered: false, bindChain, bindChainInv: Quaternion.Inverse(bindChain) };
   }
   private static qEq(a: Quaternion, b: Quaternion): boolean { return Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6 && Math.abs(a.z - b.z) < 1e-6 && Math.abs(a.w - b.w) < 1e-6; }
   /** The clip's value this frame — or, on a held pose (no animation rewrote the node), the value it held before this
    *  layer wrote it. The layer's own last write is never mistaken for a clip's: it cannot compound. */
   private base(p: PpNode): Quaternion { const q = p.n.rotationQuaternion!; if (!(p.layered && PostureLayer.qEq(q, p.out))) p.raw.copyFrom(q); return p.raw; }
   private commit(p: PpNode): void { p.out.copyFrom(p.n.rotationQuaternion!); p.layered = true; }
-  /** The parent's chain rotation against the frame (identity at the frame itself). */
-  private Rp(n: TransformNode): Quaternion { const par = n.parent as TransformNode | null; return par && par !== this.frame ? chainRotation(par, this.frame!) : Quaternion.Identity(); }
+  /** The parent's chain rotation against the frame (identity at the frame itself), into the layer's `_rp`. */
+  private Rp(n: TransformNode): Quaternion { const par = n.parent as TransformNode | null; return par && par !== this.frame ? chainRotationToRef(par, this.frame!, this._rp) : this._rp.copyFromFloats(0, 0, 0, 1); }
   /** The frame-space yaw of a node's rotation `local` against its bind chain (the clip's own turn: 0 at bind). */
   private frameYawOf(p: PpNode, local: Quaternion): number {
-    this.Rp(p.n).multiplyToRef(local, this._q); this._q.multiplyToRef(Quaternion.Inverse(p.bindChain), this._d);
-    Vector3.Forward().rotateByQuaternionToRef(this._d, this._v);
+    this.Rp(p.n).multiplyToRef(local, this._q); this._q.multiplyToRef(p.bindChainInv, this._d);
+    FORWARD.rotateByQuaternionToRef(this._d, this._v);
     return Math.atan2(this._v.x, this._v.z);
   }
   /** The frame-space forward of a node NOW against its bind chain: x/z = the yaw, y = the elevation. */
   private frameForwardOf(p: PpNode, out: Vector3): Vector3 {
-    chainRotation(p.n, this.frame!).multiplyToRef(Quaternion.Inverse(p.bindChain), this._d);
-    return Vector3.Forward().rotateByQuaternionToRef(this._d, out);
+    chainRotationToRef(p.n, this.frame!, this._ch).multiplyToRef(p.bindChainInv, this._d);
+    return FORWARD.rotateByQuaternionToRef(this._d, out);
   }
   /** Rotate a node by `rho` in frame space (q' = Rp⁻¹ ∘ ρ ∘ Rp ∘ q): the node turns about the frame's axis wherever the
    *  chain above it is — the way the solver writes a world delta back as a local. */
   private rotateInFrame(n: TransformNode, rho: Quaternion): void {
     const Rp = this.Rp(n); const q = n.rotationQuaternion!;
-    Quaternion.Inverse(Rp).multiply(rho).multiply(Rp).multiplyToRef(q, this._q); q.copyFrom(this._q);
+    Quaternion.InverseToRef(Rp, this._a).multiplyToRef(rho, this._b); this._b.multiplyToRef(Rp, this._a); this._a.multiplyToRef(q, this._q); q.copyFrom(this._q);
   }
-  /** The bone's own right axis in frame space (+X = forward bend on every clip key). */
+  /** The bone's own right axis in frame space (+X = forward bend on every clip key), into the layer's `_ax` (read it at once). */
   private rightAxisOf(p: PpNode): Vector3 {
-    chainRotation(p.n, this.frame!).multiplyToRef(Quaternion.Inverse(p.bindChain), this._d);
-    return Vector3.Right().rotateByQuaternionToRef(this._d, new Vector3()).normalize();
+    chainRotationToRef(p.n, this.frame!, this._ch).multiplyToRef(p.bindChainInv, this._d);
+    return RIGHT.rotateByQuaternionToRef(this._d, this._ax).normalize();
   }
   /** The root's WORLD facing (the yaw of its +z through the world matrix — a normal transform). An Euler read is wrong
    *  under a mirrored import root (Babylon's glTF `__root__` carries a 180° yaw AND a (1, 1, −1) scale, which face +z
    *  together); the live hero has no mirror, so both agree there. */
   private rootYaw(): number {
     this.root.computeWorldMatrix(true);
-    Vector3.TransformNormalToRef(Vector3.Forward(), this.root.getWorldMatrix(), this._v);
+    Vector3.TransformNormalToRef(FORWARD, this.root.getWorldMatrix(), this._v);
     return Math.atan2(this._v.x, this._v.z);
   }
 
@@ -132,8 +168,8 @@ export class PostureLayer {
   tick(dt: number, feed: PostureFeed): void {
     const k = lowPassK(clamp(dt, 0, 0.05), POSTURE_TAU);
     if (feed.window !== undefined && feed.window !== this.window) { this.window = feed.window; console.info(`[${this.tag}] ${feed.window}`); }
-    this.pose = this.override ? clonePose(this.override) : easePose(this.pose, feed.pose, k);
-    if (feed.legs) this.legs = easeLegPose(this.legs, feed.legs, k);
+    this.pose = this.override ? clonePose(this.override) : easePoseInto(this.poseBuf, this.pose, feed.pose, k);
+    if (feed.legs) this.legs = easeLegPoseInto(this.legsBuf, this.legs, feed.legs, k);
   }
   /** tick + apply. */
   step(dt: number, feed: PostureFeed): void { this.tick(dt, feed); this.apply(dt, feed.aim, feed.eyes === undefined ? feed.aim : feed.eyes, feed.spinYaw ?? 0); }
@@ -158,23 +194,21 @@ export class PostureLayer {
       const yaw = spinYaw + hipYawStrip(this.clipHipYaw, keep);
       if (Math.abs(yaw) < 1e-4) { if (held) q.copyFrom(this.hipsRaw); this.hipsLayered = false; }
       else {
-        const D = bf.keyedQ(h.n, Quaternion.RotationAxis(Vector3.Up(), yaw)).multiply(Quaternion.Inverse(h.bindChain));
-        D.multiplyToRef(this.hipsRaw, q); this.hipsOut.copyFrom(q); this.hipsLayered = true;
+        bf.keyedQToRef(h.n, Quaternion.RotationAxisToRef(UP, yaw, this._rho), this._k).multiplyToRef(h.bindChainInv, this._d);
+        this._d.multiplyToRef(this.hipsRaw, q); this.hipsOut.copyFrom(q); this.hipsLayered = true;
       }
       h.n.computeWorldMatrix(true);
     }
-    // 1) the stance: thoracic, clavicles, head — absolute from bind, the clip's (or the held) value under it by 1 − w
-    const stanceW = (p: PpNode | null, deg: [number, number, number], ww: number) => { if (!p) return; const base = this.base(p); Quaternion.SlerpToRef(base, bf.keyed(p.n, deg), ww, this._q); p.n.rotationQuaternion!.copyFrom(this._q); this.commit(p); };
-    const stance = (p: PpNode | null, deg: [number, number, number]) => stanceW(p, deg, w);
+    // 1) the stance: thoracic, clavicles, head — absolute from bind, the clip's (or the held) value under it by 1 − w (stanceW)
     // 0) the lumbar lean, ADDED to the clip's Spine (a pitch about the bone's own right axis in frame space, +X = forward)
     if (N.spine) {
       const sp = N.spine; const base = this.base(sp); sp.n.rotationQuaternion!.copyFrom(base);
       if (Math.abs(P.lean) * w > 0.05) { Quaternion.RotationAxisToRef(this.rightAxisOf(sp), P.lean * w * Math.PI / 180, this._rho); this.rotateInFrame(sp.n, this._rho); }
       this.commit(sp);
     }
-    stance(N.spine1, P.spine1); stance(N.spine2, P.spine2);
-    for (const side of ['Left', 'Right'] as const) stance(N[side], [0, CLAVICLE_SIGN[side].forward * P.forward, CLAVICLE_SIGN[side].shrug * P.shrug]);
-    stance(N.neck, P.neck); stance(N.head, P.head);
+    this.stanceW(N.spine1, P.spine1, w); this.stanceW(N.spine2, P.spine2, w);
+    for (let si = 0; si < 2; si++) { const side = SIDES[si]; const d = this._deg; d[0] = 0; d[1] = CLAVICLE_SIGN[side].forward * P.forward; d[2] = CLAVICLE_SIGN[side].shrug * P.shrug; this.stanceW(N[side], d, w); }
+    this.stanceW(N.neck, P.neck, w); this.stanceW(N.head, P.head, w);
     // 2) the chest aim: the chest's frame-space yaw vs where the aim is (the spin subtracted), split over the two thoracic
     //    bones, capped at a hip–shoulder separation, eased so the aim never jitters against the clip
     if (N.spine2) {
@@ -182,8 +216,8 @@ export class PostureLayer {
       const want = aim ? chestAimCorrection(this.chestYaw, spinYaw, rootErr, this.sign) * P.chestAim * w : 0;
       this.aimRad += (want - this.aimRad) * kAim;
       if (Math.abs(this.aimRad) > 1e-4) {
-        const parts: [PpNode | null, number][] = [[N.spine1, AIM_SPLIT[0]], [N.spine2, AIM_SPLIT[1]]];
-        for (const [p, k] of parts) { if (!p) continue; Quaternion.RotationAxisToRef(Vector3.Up(), this.aimRad * k, this._rho); this.rotateInFrame(p.n, this._rho); this.commit(p); }
+        // over the two thoracic bones in order: Spine1 then Spine2
+        for (let pi = 0; pi < 2; pi++) { const p = pi === 0 ? N.spine1 : N.spine2, k = AIM_SPLIT[pi]; if (!p) continue; Quaternion.RotationAxisToRef(UP, this.aimRad * k, this._rho); this.rotateInFrame(p.n, this._rho); this.commit(p); }
       }
     }
     // 3) the eyes: the neck and the head turn and tilt toward the eyes target on top of the chest — measured on the head,
@@ -201,10 +235,11 @@ export class PostureLayer {
         wantPitch = clamp(el - headEl, -HEAD_PITCH_CAP, HEAD_PITCH_CAP) * P.eyes * w;
       }
       this.headYaw += (wantYaw - this.headYaw) * kAim; this.headPitch += (wantPitch - this.headPitch) * kAim;
-      const parts: [PpNode | null, number][] = [[N.neck, EYES_SPLIT[0]], [hp, EYES_SPLIT[1]]];
-      for (const [p, k] of parts) {
+      // over the neck then the head
+      for (let pi = 0; pi < 2; pi++) {
+        const p = pi === 0 ? N.neck : hp, k = EYES_SPLIT[pi];
         if (!p) continue;
-        if (Math.abs(this.headYaw) > 1e-4) { Quaternion.RotationAxisToRef(Vector3.Up(), this.headYaw * k, this._rho); this.rotateInFrame(p.n, this._rho); }
+        if (Math.abs(this.headYaw) > 1e-4) { Quaternion.RotationAxisToRef(UP, this.headYaw * k, this._rho); this.rotateInFrame(p.n, this._rho); }
         // pitch about the bone's own right axis in frame space (+X = forward / down in every clip key, so up is −pitch)
         if (Math.abs(this.headPitch) > 1e-4) { Quaternion.RotationAxisToRef(this.rightAxisOf(p), -this.headPitch * k, this._rho); this.rotateInFrame(p.n, this._rho); }
         this.commit(p);
@@ -213,8 +248,9 @@ export class PostureLayer {
     // 3b) the feet and the toes: an absolute WORLD foot elevation per window (0 = the sole flat on the floor whatever the
     //     shin does, − = pointed), measured on the foot's own forward in frame space, corrected about its right axis, capped
     { const L = this.legs, wl = POSTURE_OFF ? 0 : clamp(L.weight, 0, 1);
-      for (const side of ['Left', 'Right'] as const) {
-        const pf = this.feet[`${side}Foot`];
+      for (let si = 0; si < 2; si++) {
+        const side = SIDES[si];
+        const pf = this.feetSide[side].foot;
         if (pf) {
           const base = this.base(pf); pf.n.rotationQuaternion!.copyFrom(base);
           let want = 0;
@@ -226,19 +262,25 @@ export class PostureLayer {
           if (Math.abs(this.footPitch[side]) > 1e-4) { Quaternion.RotationAxisToRef(this.rightAxisOf(pf), -this.footPitch[side], this._rho); this.rotateInFrame(pf.n, this._rho); }   // +X tips the toes down: up is −pitch
           this.commit(pf);
         }
-        if (wl > 0.001) stanceW(this.feet[`${side}ToeBase`], [L.toeCurl, 0, 0], wl);
+        if (wl > 0.001) { const d = this._deg; d[0] = L.toeCurl; d[1] = 0; d[2] = 0; this.stanceW(this.feetSide[side].toe, d, wl); }
       }
     }
     // 4) fresh world matrices top-down from the hips (a forced compute reads the parent's CACHED matrix): a reach solves
     //    against this frame's shoulders, the ball rides this frame's hand
-    const walk = (n: TransformNode) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); };
-    walk(this.hips.n);
+    walkFrom(this.hips.n, 0);
+  }
+
+  /** A stance write: absolute `deg` from bind, the clip's (or the held) value under it by 1 − `ww`. */
+  private stanceW(p: PpNode | null, deg: Deg3, ww: number): void {
+    if (!p) return;
+    const base = this.base(p);
+    Quaternion.SlerpToRef(base, this.bf!.keyedToRef(p.n, deg, this._k), ww, this._q); p.n.rotationQuaternion!.copyFrom(this._q); this.commit(p);
   }
 
   /** Dev readouts (degrees). */
   get(): { window: string; pose: PosturePose; legs: LegPose; aimDeg: number; chestYawDeg: number; clipHipYawDeg: number; headYawDeg: number; headPitchDeg: number; sign: number; off: boolean; ok: boolean } {
     const R = 180 / Math.PI;
-    return { window: this.window, pose: this.pose, legs: this.legs, aimDeg: this.aimRad * R, chestYawDeg: this.chestYaw * R, clipHipYawDeg: this.clipHipYaw * R, headYawDeg: this.headYaw * R, headPitchDeg: this.headPitch * R, sign: this.sign, off: POSTURE_OFF, ok: this.ok };
+    return { window: this.window, pose: clonePose(this.pose), legs: cloneLegPose(this.legs), aimDeg: this.aimRad * R, chestYawDeg: this.chestYaw * R, clipHipYawDeg: this.clipHipYaw * R, headYawDeg: this.headYaw * R, headPitchDeg: this.headPitch * R, sign: this.sign, off: POSTURE_OFF, ok: this.ok };
   }
 }
 

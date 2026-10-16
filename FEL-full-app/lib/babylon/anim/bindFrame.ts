@@ -28,9 +28,17 @@ export interface BindFrame {
   keyed(n: TransformNode, deg: Deg3): Quaternion;
   /** a world-space delta from rest (the forge's pose vocabulary) → the same local quaternion */
   keyedQ(n: TransformNode, delta: Quaternion): Quaternion;
+  /** keyed into `out`, no garbage (the per-frame form). `out` must be the caller's own quaternion. */
+  keyedToRef(n: TransformNode, deg: Deg3, out: Quaternion): Quaternion;
+  /** keyedQ into `out`, no garbage (the per-frame form). `out` must not be `delta`. */
+  keyedQToRef(n: TransformNode, delta: Quaternion, out: Quaternion): Quaternion;
 }
 
 const cache = new WeakMap<Skeleton, BindFrame>();
+// RIG-PERF (2026-10-16): the ToRef forms' scratches. keyedQToRef is keyedQ's arithmetic step for step: Rp.clone().invert() is
+// Quaternion.invert — the conjugate, scaled by 1/|Rp|² unless that is 0 or 1 — then × delta × Rp × bind, left to right.
+const IDENTITY: Readonly<Quaternion> = Quaternion.Identity();
+const _e = new Quaternion(), _i = new Quaternion(), _a = new Quaternion(), _b = new Quaternion();
 
 export function bindFrame(sk: Skeleton): BindFrame {
   const hit = cache.get(sk); if (hit) return hit;
@@ -56,6 +64,13 @@ export function bindFrame(sk: Skeleton): BindFrame {
       const b = bind.get(n)?.q ?? Quaternion.Identity(); const Rp = parentRot.get(n) ?? Quaternion.Identity();
       // Babylon: a.multiply(b) applies b first. Conjugate the delta into the parent's frame, then apply it after the bind rotation.
       return Rp.clone().invert().multiply(delta).multiply(Rp).multiply(b);
+    },
+    keyedToRef(n, deg, out) { return bf.keyedQToRef(n, Quaternion.FromEulerAnglesToRef(deg[0] * D2R, deg[1] * D2R, deg[2] * D2R, _e), out); },
+    keyedQToRef(n, delta, out) {
+      const b = bind.get(n)?.q ?? IDENTITY; const Rp = parentRot.get(n) ?? IDENTITY;
+      Rp.conjugateToRef(_i); const ls = Rp.lengthSquared(); if (!(ls == 0 || ls == 1)) _i.scaleInPlace(1 / ls);
+      _i.multiplyToRef(delta, _a); _a.multiplyToRef(Rp, _b);
+      return _b.multiplyToRef(b, out);
     },
   };
   cache.set(sk, bf);
