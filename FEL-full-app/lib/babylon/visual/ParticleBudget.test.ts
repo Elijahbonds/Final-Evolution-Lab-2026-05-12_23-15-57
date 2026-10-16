@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { MIN_BURST, PARTICLE_BUDGET, PHONE_BURST_FLOOR, PHONE_MODE_CEILING, burstFloor, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSystemCap, setParticleBudgetScale } from './ParticleBudget';
+import { MIN_BURST, PARTICLE_BUDGET, PHONE_BURST_FLOOR, PHONE_MODE_CEILING, PHONE_STEADY_CAP, burstFloor, committedParticles, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSteadyCap, phoneSystemCap, roomUsed, setParticleBudgetScale } from './ParticleBudget';
 
 const sceneLike = (md: Record<string, unknown> | null, counts: number[] = []) =>
   ({ metadata: md, particleSystems: counts.map((n) => ({ getActiveCount: () => n })) }) as never;
@@ -92,9 +92,49 @@ describe('a phone mode ceiling', () => {
 
   it('a ceiling is never above its mode\'s row in mobileBudget.json (the row is not raised; this is what holds the mode to it)', () => {
     const t = JSON.parse(readFileSync(join(__dirname, '..', 'config', 'mobileBudget.json'), 'utf8')) as { modes: Record<string, { budget: { particles: number } }> };
+    // the table's rows are keyed by the REGISTRY key (`karate_vs`); the ceiling by the harness's modeId (`karate-vs`): same mode, two spellings
+    // (test changed: lane/kvs-skin looks the row up under both spellings; the assertion itself is the same, and no row is raised)
     for (const [mode, ceiling] of Object.entries(PHONE_MODE_CEILING)) {
-      expect(t.modes[mode], mode).toBeTruthy();
-      expect(ceiling, mode).toBeLessThanOrEqual(t.modes[mode].budget.particles);
+      const row = t.modes[mode] ?? t.modes[mode.replace(/-/g, '_')];
+      expect(row, mode).toBeTruthy();
+      expect(ceiling, mode).toBeLessThanOrEqual(row.budget.particles);
     }
+  });
+});
+
+// lane/kvs-skin (2026-10-16): Karate VS read 18-26 live (55 over 12 s) against a row of 5. Its ceiling is the row itself.
+describe('Karate VS on a phone', () => {
+  const phone = (modeId = 'karate-vs') => ({ metadata: { felTier: 'mobile', felModeId: modeId } });
+
+  it('has a ceiling of exactly its row (5), on a phone only', () => {
+    const t = JSON.parse(readFileSync(join(__dirname, '..', 'config', 'mobileBudget.json'), 'utf8')) as { modes: Record<string, { budget: { particles: number } }> };
+    expect(t.modes.karate_vs.budget.particles).toBe(5);                                    // the row is NOT raised
+    expect(PHONE_MODE_CEILING['karate-vs']).toBe(5);
+    expect(particleBudget(phone() as never)).toBe(5);
+    expect(burstFloor(phone() as never)).toBe(PHONE_BURST_FLOOR);
+    expect(particleBudget({ metadata: { felTier: 'desktop', felModeId: 'karate-vs' } } as never)).toBe(PARTICLE_BUDGET.desktop);   // CONTROL: desktop unchanged
+    expect(particleBudget({ metadata: { felTier: 'high', felModeId: 'karate-vs' } } as never)).toBe(PARTICLE_BUDGET.high);
+    expect(burstFloor({ metadata: { felTier: 'desktop', felModeId: 'karate-vs' } } as never)).toBe(MIN_BURST);
+    expect(particleBudget(phone('showdown') as never)).toBe(PARTICLE_BUDGET.mobile);       // CONTROL: its peers keep the tier's
+  });
+
+  it('pins its steady systems: one petal, no aura motes, and only on that phone', () => {
+    expect(PHONE_STEADY_CAP['karate-vs']).toEqual({ petals: 1, motes: 0 });
+    expect(phoneSteadyCap(phone() as never, 'petals', 60)).toBe(1);
+    expect(phoneSteadyCap(phone() as never, 'motes', 40)).toBe(0);
+    expect(phoneSteadyCap(phone() as never, 'petals', 1)).toBe(1);                         // never above what the system asked for
+    expect(phoneSteadyCap(phone() as never, 'unlisted', 40)).toBe(40);                     // a system the mode does not pin keeps its own cap
+    expect(phoneSteadyCap(phone('karate') as never, 'petals', 4)).toBe(4);                 // CONTROL: karate (endless) is not pinned
+    expect(phoneSteadyCap(phone('karate') as never, 'motes', 40)).toBe(40);
+    expect(phoneSteadyCap({ metadata: { felTier: 'desktop', felModeId: 'karate-vs' } } as never, 'petals', 60)).toBe(60);
+    expect(phoneSteadyCap({ metadata: {} } as never, 'petals', 60)).toBe(60);
+  });
+
+  it('counts what is queued, not only what is in the air, so same-frame bursts do not each take the whole room', () => {
+    const queued = { particleSystems: [{ getActiveCount: () => 1, manualEmitCount: 0 }, { getActiveCount: () => 0, manualEmitCount: 3 }, { getActiveCount: () => 0, manualEmitCount: -1 }] };
+    expect(committedParticles(queued)).toBe(4);                                            // 1 live + 3 queued; a stream's -1 is not a queue
+    expect(roomUsed({ metadata: phone().metadata, ...queued })).toBe(4);                   // a phone under a ceiling counts the queue
+    expect(roomUsed({ metadata: { felTier: 'mobile', felModeId: 'onevone' }, ...queued })).toBe(1);   // CONTROL: any other scene counts the air only
+    expect(roomUsed({ metadata: { felTier: 'desktop', felModeId: 'karate-vs' }, ...queued })).toBe(1);
   });
 });

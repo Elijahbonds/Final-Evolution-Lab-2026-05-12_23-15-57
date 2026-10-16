@@ -31,7 +31,29 @@ export const MIN_BURST = 4;
  * the mode's steady systems (the ball trail, the dojo's petals) are sized to a share of it (`phoneSystemCap`), so the sum
  * stays inside the row whatever the clock. A ceiling is never above the row's budget (particleBudget.test.ts reads the table).
  */
-export const PHONE_MODE_CEILING: Readonly<Record<string, number>> = { dunk: 8, karate: 12 };
+export const PHONE_MODE_CEILING: Readonly<Record<string, number>> = {
+  dunk: 8, karate: 12,
+  // lane/kvs-skin (2026-10-16; owner: "TRIM to the budget, phone-only, do not raise the row"): Karate VS reads 18-26 live (55 over 12 s) against a row of 5.
+  // Keyed by the harness's modeId ('karate-vs'); the table's row is `karate_vs` (the registry key). 5 holds ONE hit at its readable minimum
+  // (a star, two streaks, a ring) beside a single petal; see PHONE_STEADY_CAP for what gives way and docs/VISUAL-PASS-PLAN.md for the measured minimum.
+  'karate-vs': 5,
+};
+
+/**
+ * Steady systems that give way, by NAME, in a mode whose ceiling is too tight for a share of it (lane/kvs-skin). `phoneSystemCap` sizes a
+ * steady system to a share of the ceiling with a floor of 3; at a ceiling of 5 that floor is more than half of it, so Karate VS pins its
+ * two steady systems here instead: ONE dojo petal in the air, and NO chi-aura motes (the aura keeps its column, its light pool and its
+ * lit edge; the motes were the only particles in it). Everything here is phone-only and per mode; a mode not listed keeps its own cap.
+ */
+export const PHONE_STEADY_CAP: Readonly<Record<string, Readonly<Record<string, number>>>> = { 'karate-vs': { petals: 1, motes: 0 } };
+
+/** The capacity of the steady system `kind` on this scene: the mode's pinned cap on a phone, `otherwise` everywhere else. */
+export function phoneSteadyCap(scene: { metadata?: unknown }, kind: string, otherwise: number): number {
+  const md = (scene.metadata as Md);
+  if (md?.felTier !== 'mobile' || !md.felModeId) return otherwise;
+  const pinned = PHONE_STEADY_CAP[md.felModeId]?.[kind];
+  return pinned === undefined ? otherwise : Math.min(otherwise, pinned);
+}
 /** The fewest particles a burst is trimmed to under a phone mode ceiling (the tier's MIN_BURST is 4): four hits landing at once must not each keep four. */
 export const PHONE_BURST_FLOOR = 2;
 
@@ -80,6 +102,23 @@ export function liveParticles(scene: { particleSystems: ReadonlyArray<{ getActiv
   let n = 0;
   for (const ps of scene.particleSystems) n += ps.getActiveCount();
   return n;
+}
+
+/**
+ * What is spoken for in the scene: the particles in the air plus those queued to be emitted on the next update (`manualEmitCount`).
+ * A burst fired this frame is not in the air until the system updates, so a second burst in the same frame (a hit's star, then its
+ * streaks, then a glitch beside it) read the same empty room and each took all of it. Only a phone in a mode with its own ceiling
+ * counts them (`roomUsed`): every other scene keeps the plain live count it always had.
+ */
+export function committedParticles(scene: { particleSystems: ReadonlyArray<{ getActiveCount(): number; manualEmitCount?: number }> }): number {
+  let n = 0;
+  for (const ps of scene.particleSystems) n += ps.getActiveCount() + Math.max(0, ps.manualEmitCount ?? 0);
+  return n;
+}
+
+/** The count a burst measures its room against: committed on a phone in a ceiling mode, live everywhere else. */
+export function roomUsed(scene: { metadata?: unknown; particleSystems: ReadonlyArray<{ getActiveCount(): number; manualEmitCount?: number }> }): number {
+  return phoneModeCeiling(scene) === null ? liveParticles(scene) : committedParticles(scene);
 }
 
 /**

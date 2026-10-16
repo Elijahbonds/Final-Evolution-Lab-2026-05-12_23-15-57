@@ -1071,3 +1071,33 @@ costs a CPU-bound fraction of a second): +12 to +28 s (3v3), +16 to +20 s (dunk)
 GPU driver compiles in hardware and in parallel; this rig cannot say how long that takes, so the 8 s cap is the owner's number to judge on a
 real device. Desktop is left as it was (it is not free: the pre-warm compiles about 14 programs a session never asks for, and the owner asked for the phone).
 
+## Phone: Karate VS under its particle row (kvs-skin, 2026-10-16)
+
+Owner, 2026-10-16: "Karate VS phone particles (18–26 vs a budget of 5): TRIM to the budget, phone-only. Do not raise the row." Rig as above
+(`_perf-sweep.mts` phone profile in the esbuild bundle, `RASTER=4` `SEED=7`; the page's live particles summed over every system, per frame), base =
+`lane/finish-release` + `lane/owner-1016`. **The row is not raised (5).**
+
+Where the live particles were (12 s of play, worst frame **55**; 8 s: 29): the dojo's petals 36 (cap 60, 5 a second, 6–10 s of life: about 40 at steady
+state), four hits' streaks 9 each (the phone's half of a heavy hit's 18), the foe's chi-aura motes 9, and a star and a ring per hit. combatFx's hit language
+was 11 for one heavy hit on a phone; the petals were three quarters of the frame.
+
+| | worst frame, 12 s (seed 7) | one hit | steady systems |
+|---|---|---|---|
+| before | 55 (8 s: 29) | star 1 + streaks 4–14 + ring 0–1 | petals up to 60, aura motes up to 40 each |
+| after | **5** (699 frames: 12 with none, 1 for most of the rest, never over 5) | star 1 + streaks 2–3 + ring 0–1 | petals 1, aura motes 0 |
+
+What a phone does now in Karate VS (modeId `karate-vs`; every line phone tier only, desktop and high are untouched):
+- `ParticleBudget.PHONE_MODE_CEILING['karate-vs'] = 5`, the row itself, through the same mechanism as dunk and karate. A burst's room is measured
+  against what is **in the air plus what is queued** (`roomUsed`: `manualEmitCount`), so a hit's star, then its ring, then its streaks, and a glitch burst
+  beside them in the same frame no longer each read an empty room and take all of it. Only a phone under a ceiling counts the queue.
+- Dojo petals 60 → 1 (`PHONE_STEADY_CAP`; karate's own cap of 4 is untouched). Chi-aura motes 40 → 0: the aura keeps its column, its light pool and its lit
+  edge (`ChiRim`); the motes were its only particles.
+- A hit keeps its readable minimum: the star (1), its ring where the kind has one (heavy, special, parry, break, guard), and the streaks trimmed to the
+  room that is left, never below two, so the direction of the blow still reads. A light jab is a star and three streaks, a heavy hit a star, a ring and two streaks: 5 each with the petal in the air.
+- A blink (the rival's substitution) lays two afterimages, not four, and one puff where it lands, not two.
+
+**The measured minimum, and what 5 cannot hold.** One readable hit of any kind fits (4 particles, 5 with the petal in the air). Two hits whose lives overlap
+(star 0.1–0.18 s, ring 0.2–0.3 s, streaks 0.1–0.34 s) do not: each keeps the star and two streaks, so a staged pair in one frame peaked at **9** and a pair
+of rings with a third hit landing at **13**, for about 0.3 s. Ordinary play on the rig (a fake player against the rival) never overlapped two: 5 at the
+worst of 699 frames. `CHECK=1` reads the worst frame of a run and passes; a combo string on a real phone can go over the row for a moment. If the
+owner wants that held too, the choice is a row of 9 (not done: the row is the owner's) or a second hit inside a tenth of a second giving up its streaks.

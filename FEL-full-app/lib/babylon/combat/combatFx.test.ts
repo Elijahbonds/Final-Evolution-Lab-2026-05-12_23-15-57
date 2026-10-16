@@ -1,8 +1,10 @@
 // The fight's hit language (lane/vis-combat, 2026-10-13): the tables first, then the mount on a NullEngine scene.
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { FreeCamera, MeshBuilder, NullEngine, Scene, TransformNode, Vector3 } from '@babylonjs/core';
 import { HIT_KINDS, HIT_LOOK, TIER_SCALE, auraLook, mountCombatFx, planHit, type HitKind } from './combatFx';
 import { installOffscreenShim } from '../../../tests/helpers/canvasShim';
+import { EffectsKit } from '../visual/EffectsKit';
+import { PARTICLE_BUDGET, committedParticles, particleBudget } from '../visual/ParticleBudget';
 
 installOffscreenShim();
 
@@ -187,5 +189,82 @@ describe('the mount', () => {
     fx.dispose();
     expect(scene.meshes.length).toBe(before + 1);
     expect(scene.particleSystems.length).toBe(sysBefore);
+  });
+});
+
+// lane/kvs-skin (2026-10-16): Karate VS read 18-26 live on a phone against a row of 5. A ceiling of 5, ONE petal and no aura motes; the hit keeps
+// its readable minimum (a star, two or more streaks, a ring where its kind has one) and is trimmed to the room that is left.
+describe('a hit under Karate VS\'s phone ceiling', () => {
+  const mk = (md: Record<string, unknown>) => { const sc = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 2, -6), sc); sc.metadata = md; return sc; };
+  const sum = (sc: Scene, prefix: string) => sc.particleSystems.filter((p) => p.name.startsWith(prefix)).reduce((n, p) => n + Math.max(0, p.manualEmitCount), 0);
+  const PHONE = { felTier: 'mobile', felModeId: 'karate-vs' };
+
+  it('one hit of ANY kind, beside the one petal, stays inside the budget and keeps its star, its streaks and its ring', () => {
+    for (const kind of HIT_KINDS) {
+      const sc = mk(PHONE);
+      const amb = EffectsKit.ambient(sc, 'dojo');
+      const petals = sc.particleSystems.find((p) => p.name === 'amb_petals')!;
+      expect(petals.getCapacity(), 'one petal').toBe(1);
+      // the petal is in the air nearly all the time (6-10 s of life, a new one within 0.2 s), and a live particle is what the room is measured against;
+      // a NullEngine does not step particles, so the system's one live particle is stood in for here (its capacity, asserted above, is what bounds it)
+      const live = vi.spyOn(petals, 'getActiveCount').mockReturnValue(1);
+      const fx = mountCombatFx(sc);
+      fx.hit(new Vector3(0, 1.2, 0), { x: 0, z: 2 }, kind);
+      const star = sum(sc, 'cfx_star_'), streaks = sum(sc, 'cfx_streak_'), ring = sum(sc, 'cfx_ringp_');
+      expect(star, `${kind} star`).toBe(1);
+      expect(streaks, `${kind} streaks`).toBeGreaterThanOrEqual(2);          // the direction still reads
+      expect(ring > 0, `${kind} ring`).toBe(planHit(kind, 'mobile').ring);   // a parry / heavy / special / break is still answered by its ring
+      expect(committedParticles(sc), kind).toBeLessThanOrEqual(particleBudget(sc as never));   // the petal in the air, the star, the streaks, the ring: 5 at most
+      live.mockRestore(); fx.dispose(); amb.dispose(); sc.dispose();
+    }
+  });
+
+  it('the chi aura has no motes (the column, its light and the lit edge stay), however full the meter', () => {
+    const sc = mk(PHONE), fx = mountCombatFx(sc), root = new TransformNode('fighter', sc);
+    fx.aura('me', root, 1, '#ffd36b'); fx.aura('foe', root, 1, '#ff4d5e');
+    for (let i = 0; i < 120; i++) fx.tick(1 / 60);
+    const motes = sc.particleSystems.filter((p) => p.name.startsWith('cfx_aura_motes_'));
+    expect(motes.length).toBe(2);
+    for (const m of motes) { expect(m.emitRate, m.name).toBe(0); expect(m.getCapacity(), m.name).toBe(1); }   // (never fed: a motes system emits at L.motes x 3 a second once an aura is up)
+    expect(sc.meshes.find((m) => m.name === 'cfx_aura_me')!.isEnabled()).toBe(true);   // the column itself is up
+    fx.dispose(); sc.dispose();
+  });
+
+  it('the hit streaks are the same size on desktop and on another phone mode as before (CONTROL: nothing else moved)', () => {
+    for (const [md, tier] of [[{ felTier: 'desktop', felModeId: 'karate-vs' }, 'desktop'], [{ felTier: 'mobile', felModeId: 'onevone' }, 'mobile'], [{ felTier: 'high', felModeId: 'karate-vs' }, 'high']] as const) {
+      const sc = mk(md), fx = mountCombatFx(sc);
+      fx.hit(new Vector3(0, 1.2, 0), { x: 0, z: 2 }, 'heavy');
+      expect(sum(sc, 'cfx_streak_'), tier).toBe(planHit('heavy', tier).streaks);
+      const root = new TransformNode('fighter', sc);
+      fx.aura('me', root, 1, '#ffd36b');
+      for (let i = 0; i < 30; i++) fx.tick(1 / 60);
+      expect(sc.particleSystems.find((p) => p.name === 'cfx_aura_motes_me')!.emitRate, `${tier} motes`).toBeGreaterThan(0);
+      expect(sc.particleSystems.find((p) => p.name === 'cfx_aura_motes_me')!.getCapacity(), `${tier} motes cap`).toBe(40);
+      fx.dispose(); sc.dispose();
+    }
+    expect(PARTICLE_BUDGET.mobile).toBeGreaterThan(5);
+  });
+
+  it('a second hit in the same frame is trimmed to what the first left, and still shows its star and two streaks', () => {
+    const sc = mk(PHONE), fx = mountCombatFx(sc);
+    fx.hit(new Vector3(0, 1.2, 0), { x: 0, z: 2 }, 'light');
+    const first = committedParticles(sc);
+    fx.hit(new Vector3(1, 1.2, 0), { x: 0, z: 2 }, 'light');
+    expect(sum(sc, 'cfx_star_')).toBe(2);
+    expect(committedParticles(sc) - first).toBe(3);   // a star and the floor of two streaks: no more than a hit can be cut to
+    fx.dispose(); sc.dispose();
+  });
+
+  it('a blink keeps two afterimages and the puff where the body lands, and not the second puff', () => {
+    const sc = mk(PHONE), fx = mountCombatFx(sc);
+    fx.blink(new Vector3(0, 0, 0), new Vector3(4, 0, 0));
+    expect(sc.particleSystems.find((p) => p.name === 'cfx_ghost')!.manualEmitCount).toBe(2);
+    expect(sc.particleSystems.filter((p) => p.name.startsWith('cfx_smoke_')).filter((p) => p.manualEmitCount > 0).length).toBe(1);
+    fx.dispose(); sc.dispose();
+    const sd = mk({ felTier: 'mobile', felModeId: 'showdown' }), fd = mountCombatFx(sd);   // CONTROL: another phone mode keeps four afterimages and both puffs
+    fd.blink(new Vector3(0, 0, 0), new Vector3(4, 0, 0));
+    expect(sd.particleSystems.find((p) => p.name === 'cfx_ghost')!.manualEmitCount).toBe(4);
+    expect(sd.particleSystems.filter((p) => p.name.startsWith('cfx_smoke_')).filter((p) => p.manualEmitCount > 0).length).toBe(2);
+    fd.dispose(); sd.dispose();
   });
 });

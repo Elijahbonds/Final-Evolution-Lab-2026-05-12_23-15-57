@@ -7,7 +7,7 @@ import {
 } from '@babylonjs/core';
 import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
 import { phoneHalf } from '../scene/phoneTrim';
-import { burstFloor, fitBurst, liveParticles, particleBudget, particleBudgetScale, phoneSystemCap } from './ParticleBudget';
+import { burstFloor, fitBurst, particleBudget, particleBudgetScale, phoneSteadyCap, phoneSystemCap, roomUsed } from './ParticleBudget';
 
 /** IMPROVE (2026-10-06): what `EffectsKit.ambient` mounted — a mode that disposes it takes the gulls' planes, their material and
  *  their per-frame observers with it (they outlived every mode before: 4 planes, 4 materials, 4 observers never removed). */
@@ -222,7 +222,7 @@ export const EffectsKit = {
     // IMPROVE (2026-10-06): everything mounted here is kept, so the handle can take it down (callers that ignore it are unchanged)
     const owned: { dispose(): void }[] = [], observers: Observer<Scene>[] = [];
     if (family === 'dojo') {                               // drifting petals
-      const ps = baseSystem(scene, 'amb_petals', phoneSystemCap(scene, 60, 0.4));   // lane/owner-1016: a phone in karate keeps at most 40% of its particle ceiling in petals (ParticleBudget.ts)
+      const ps = baseSystem(scene, 'amb_petals', phoneSteadyCap(scene, 'petals', phoneSystemCap(scene, 60, 0.4)));   // lane/owner-1016: a phone in karate keeps at most 40% of its particle ceiling in petals (ParticleBudget.ts); lane/kvs-skin: Karate VS (ceiling 5) keeps ONE
       ps.emitter = new Vector3(0, 5, 0);
       ps.minEmitBox = new Vector3(-9, 0, -9); ps.maxEmitBox = new Vector3(9, 0, 9);
       ps.color1 = new Color4(1, 0.6, 0.7, 0.8); ps.color2 = new Color4(1, 0.8, 0.85, 0.6);
@@ -313,7 +313,7 @@ export const EffectsKit = {
     const k = Math.max(0.25, Math.min(BURST_SCALE_MAX, scale));
     // A9.8: the scene's particle budget — a burst that fits fires whole, one that does not is trimmed to the room left
     // (never below a readable few). ParticleBudget.ts.
-    const count = fitBurst(Math.max(4, Math.round(cfg.count * k)), liveParticles(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
+    const count = fitBurst(Math.max(4, Math.round(cfg.count * k)), roomUsed(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
     // IMPROVE (2026-10-06): a pooled system when one is idle; the old one-off (self-disposing) only when all are busy
     const pooled = pooledBurst(scene, kind);
     const ps = pooled ?? baseSystem(scene, `fx_${kind}_${Date.now()}`, count);

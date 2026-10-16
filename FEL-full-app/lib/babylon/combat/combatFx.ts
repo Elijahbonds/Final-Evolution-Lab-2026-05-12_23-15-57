@@ -19,7 +19,7 @@
 
 import { Color3, Color4, DynamicTexture, Mesh, MeshBuilder, ParticleSystem, StandardMaterial, Texture, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, ShadowGenerator } from '@babylonjs/core';
-import { burstFloor, fitBurst, liveParticles, particleBudget, particleBudgetScale } from '../visual/ParticleBudget';
+import { burstFloor, fitBurst, particleBudget, particleBudgetScale, phoneModeCeiling, phoneSteadyCap, roomUsed } from '../visual/ParticleBudget';
 import { mountChiRim } from '../visual/ChiRim';   // w3-atmos: the glow edge on the fighter's own contour
 import { paintAuraColumn, paintCrack, paintDot, paintLightPool, paintRing, paintSmoke, paintStar, type Ctx } from './fxPaint';
 
@@ -199,7 +199,7 @@ interface GroundRing { mesh: Mesh; mat: StandardMaterial; t: number; life: numbe
 interface Crack { mesh: Mesh; mat: StandardMaterial; t: number; life: number }
 interface Aura {
   key: string; root: TransformNode; col: Mesh; colMat: StandardMaterial; pool: Mesh; poolMat: StandardMaterial;
-  motes: ParticleSystem; moteAt: Vector3; level: number; target: number; hex: string; t: number;
+  motes: ParticleSystem; motesOn: boolean; moteAt: Vector3; level: number; target: number; hex: string; t: number;
 }
 interface Ghost { ps: ParticleSystem; pts: Vector3[]; at: number }
 
@@ -264,7 +264,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
   const cur = { star: { i: 0 }, streak: { i: 0 }, ring: { i: 0 }, smoke: { i: 0 }, chunk: { i: 0 } };
   const tmpA = new Vector3(), tmpB = new Vector3();
 
-  const budgeted = (n: number): number => fitBurst(n, liveParticles(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
+  const budgeted = (n: number): number => fitBurst(n, roomUsed(scene), particleBudget(scene), particleBudgetScale(scene), burstFloor(scene));
 
   // ── ground rings and crack decals: a handful of flat meshes, enabled only while they live ──
   const grMat0 = ringTex(scene);
@@ -299,7 +299,10 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     const pool = MeshBuilder.CreateGround(`cfx_aura_pool_${key}`, { width: 1, height: 1 }, scene);
     pool.material = poolMat; pool.parent = root; pool.position.y = 0.03; pool.setEnabled(false); uncast(scene, pool);
     const moteAt = new Vector3();
-    const motes = sys(scene, `cfx_aura_motes_${key}`, 40, dot, true);
+    // lane/kvs-skin: a phone in a mode whose ceiling cannot spare them (Karate VS, 5) has no motes: the system stays built (capacity 1, never started)
+    // so nothing below needs a second path, and the column, the light pool and the lit edge carry the aura (ParticleBudget.PHONE_STEADY_CAP)
+    const moteCap = phoneSteadyCap(scene, 'motes', 40);
+    const motes = sys(scene, `cfx_aura_motes_${key}`, Math.max(1, moteCap), dot, true);
     motes.emitter = moteAt;
     motes.minEmitBox = new Vector3(-0.42, 0, -0.42); motes.maxEmitBox = new Vector3(0.42, 0.25, 0.42);
     motes.direction1 = new Vector3(-0.08, 1, -0.08); motes.direction2 = new Vector3(0.08, 1.5, 0.08);
@@ -307,8 +310,8 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     motes.minScaleX = motes.minScaleY = 0.05; motes.maxScaleX = motes.maxScaleY = 0.12; motes.addSizeGradient(0, 1); motes.addSizeGradient(1, 0.1);
     motes.gravity = new Vector3(0, 0.4, 0);
     motes.manualEmitCount = -1;   // a steady stream, not a manual burst
-    motes.stop();   // started only while the aura is on (an idle emitter costs nothing but is not free)
-    const a: Aura = { key, root, col, colMat, pool, poolMat, motes, moteAt, level: 0, target: 0, hex: '', t: 0 };
+    motes.stop();   // started only while the aura is on (and never, when the mode has pinned the motes to none) (an idle emitter costs nothing but is not free)
+    const a: Aura = { key, root, col, colMat, pool, poolMat, motes, motesOn: moteCap > 0, moteAt, level: 0, target: 0, hex: '', t: 0 };
     applyAuraColour(a, '#ffd36b');   // gold until a mode says otherwise
     owned.push({ dispose: () => { col.dispose(false, true); pool.dispose(false, true); motes.dispose(); poolMat.dispose(); colMat.dispose(); } });
     return a;
@@ -323,7 +326,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
     try { mat.forceCompilation?.(mesh); } catch { /* a headless engine has nothing to compile */ }
   };
   warm(groundRings[0].mat, groundRings[0].mesh); warm(cracks[0].mat, cracks[0].mesh);
-  for (const a of auras.values()) { warm(a.colMat, a.col); warm(a.poolMat, a.pool); try { a.motes.isReady(); } catch { /* headless */ } }
+  for (const a of auras.values()) { warm(a.colMat, a.col); warm(a.poolMat, a.pool); try { if (a.motesOn) a.motes.isReady(); } catch { /* headless */ } }
 
   const fx: CombatFx = {
     hit(at, from, kind, tint) {
@@ -348,7 +351,6 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
       k.minLifeTime = L.life * 0.6; k.maxLifeTime = L.life;
       k.minScaleX = 0.03 + 0.02 * L.star; k.maxScaleX = 0.045 + 0.03 * L.star;   // width, metres
       k.minScaleY = 0.2 + 0.17 * L.star; k.maxScaleY = 0.3 + 0.25 * L.star;      // length along the flight, metres
-      k.manualEmitCount = budgeted(plan.streaks);
       if (plan.ring) {
         const r = nextOf(rings, cur.ring);
         (r.emitter as Vector3).copyFrom(at);
@@ -356,6 +358,8 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
         r.minScaleX = r.minScaleY = L.ring * 0.9; r.maxScaleX = r.maxScaleY = L.ring;
         r.manualEmitCount = 1;
       }
+      // (after the star and the ring are queued, so that on a phone under a mode ceiling the streaks are trimmed to the room THEY leave: ParticleBudget.roomUsed)
+      k.manualEmitCount = budgeted(plan.streaks);
       if (plan.dust > 0.2 && tier !== 'mobile') {
         const d = nextOf(smokes, cur.smoke);
         tmpA.copyFrom(at); tmpA.y = Math.max(0.1, at.y - 0.9);   // dust lifts off the floor under the blow, not off the body
@@ -413,14 +417,15 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
 
     blink(from, to, tint) {
       const hex = tint ?? '#cfe8ff';
-      const n = tier === 'mobile' ? 4 : 7;
+      const tight = phoneModeCeiling(scene) !== null;   // lane/kvs-skin: a phone under a mode ceiling draws what fits (below)
+      const n = tight ? 2 : tier === 'mobile' ? 4 : 7;   // phone-only, ceiling modes: two afterimages (both ends of the flicker), not four
       ghost.pts.length = 0;
       for (let i = 0; i < n; i++) { const t = i / (n - 1); ghost.pts.push(new Vector3(from.x + (to.x - from.x) * t, from.y + 0.95, from.z + (to.z - from.z) * t)); }
       ghost.at = 0;
       ghost.ps.color1 = c4(hex, 0.55); ghost.ps.color2 = c4(hex, 0.4); ghost.ps.colorDead = c4(hex, 0);
       (ghost.ps.emitter as Vector3).set(0, 0, 0);
       ghost.ps.manualEmitCount = n;
-      fx.puff(tmpB.set(from.x, from.y + 0.2, from.z), 1);
+      if (!tight) fx.puff(tmpB.set(from.x, from.y + 0.2, from.z), 1);   // (phone under a ceiling: the puff where it lands only; the afterimages mark where it left)
       fx.puff(tmpB.set(to.x, to.y + 0.2, to.z), 1.25);
     },
 
@@ -459,7 +464,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
         if (a.level < 0.02 && a.target <= 0) { if (a.col.isEnabled()) { a.col.setEnabled(false); a.pool.setEnabled(false); a.motes.stop(); } continue; }
         const L = auraLook(a.level, tier);
         if (!L.on) continue;
-        if (!a.col.isEnabled()) { a.col.setEnabled(true); a.pool.setEnabled(true); a.motes.start(); }
+        if (!a.col.isEnabled()) { a.col.setEnabled(true); a.pool.setEnabled(true); if (a.motesOn) a.motes.start(); }
         const pulse = 1 + Math.sin(a.t * 9) * 0.05;
         a.col.scaling.set(L.radius * 2 * pulse, L.height, L.radius * 2 * pulse); a.col.position.y = L.height / 2;
         a.col.rotation.y = a.t * 1.1;
@@ -467,7 +472,7 @@ export function mountCombatFx(scene: Scene, opts: { tier?: FxTier } = {}): Comba
         a.colMat.alpha = L.alpha * (0.85 + Math.sin(a.t * 13) * 0.15);
         a.pool.scaling.set(2.6 + a.level * 0.8, 1, 2.6 + a.level * 0.8); a.poolMat.alpha = L.pool * (0.85 + Math.sin(a.t * 7) * 0.15);
         a.root.computeWorldMatrix(false); a.moteAt.copyFrom(a.root.getAbsolutePosition());
-        a.motes.emitRate = L.motes * 3;
+        if (a.motesOn) a.motes.emitRate = L.motes * 3;
       }
     },
 
