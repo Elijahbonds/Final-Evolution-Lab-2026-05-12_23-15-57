@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { AI_LIMITS, aiVenueSystem, aiVenueUser, compileAiEdits, describeEdit, parseAnswer, sanitizeAiEdits, venueBrief } from './aiEdits';
 import { createStack, execute, undo, redo, undoLabel } from './commands';
+import { catalogItem, instantiate } from './catalog';
 import { LIMITS, newProject, newVenue, sanitizeProject } from './doc';
 import { everyKindProject } from '@/tests/helpers/nexusStudio';
 import { GOOD_ANSWER, HOSTILE_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, floodAnswer } from '@/tests/helpers/aiVenue';
@@ -251,5 +252,23 @@ describe('studio-4b: the explain pass', () => {
     expect(sanitizeSummary('word. '.repeat(1000)).length).toBeLessThanOrEqual(AI_LIMITS.summary + 1);
     expect(sanitizeSummary(42)).toBe('');
     expect(sanitizeSummary('```json\n{}\n```')).toBe('');
+  });
+});
+
+describe('studio-4b (routed from studio-4a): a CELL scale is relative to the catalog\'s own placement scale', () => {
+  it('a kit item lands at its catalog scale × the answer\'s scale; a 1× answer is exactly a hand placement', () => {
+    const p = fresh();
+    const v = p.venues[0];
+    const id = 'kit:nature/tree_palmTall';
+    const hand = instantiate(catalogItem(id)!, [0, 0, -20]);
+    const c = compileAiEdits(v, [
+      { op: 'place', item: id, at: [-16, 0, -24], yaw: 0, scale: 1.5, set: {} },
+      { op: 'place', item: id, at: [16, 0, -24], yaw: 0, scale: 1, set: {} },
+    ], 'palms')!;
+    const placed = execute(createStack(p), c.cmd).doc.venues[0].objects;
+    expect(placed[0].t.s).toBeCloseTo(hand.t.s * 1.5, 9);
+    expect(placed[1].t.s).toBe(hand.t.s);
+    // the catalog's own scale, whatever it is (studio-4a: the kit's median, e.g. nature 4.6; 1 before that lane)
+    expect(hand.t.s).toBe((catalogItem(id) as { scale?: number }).scale ?? 1);
   });
 });

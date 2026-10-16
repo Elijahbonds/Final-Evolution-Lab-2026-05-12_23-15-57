@@ -268,7 +268,10 @@ export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt:
     const base = instantiate(item, e.at, e.yaw) as unknown as Record<string, unknown>;
     // only the fields this object's kind has survive sanitizeObject (a stand's rows, a fixture's height, a prop's colour)
     for (const k of AI_OBJECT_KEYS) if (e.set[k] !== undefined) base[k] = e.set[k];
-    base.t = { ...(base.t as object), s: e.scale };
+    // the answer's scale is RELATIVE to the catalog's own placement scale (studio-4a §11: a Kenney kit item is placed at its kit's
+    // venue-set median, e.g. nature ×4.6 — the models are toy-sized at 1×), so "scale 1.4" is a palm 1.4× its natural size
+    const t0 = base.t as { s?: number };
+    base.t = { ...(base.t as object), s: (typeof t0.s === 'number' && Number.isFinite(t0.s) ? t0.s : 1) * e.scale };
     if (e.name) base.name = e.name;
     // the import path's sanitiser: clamps every number, drops a bad colour, re-mints an id the venue already has
     const o: StudioObject | null = sanitizeObject(base, seen);
@@ -351,7 +354,7 @@ export function aiVenueSystem(): string {
     'You are CELL inside Nexus Studio. You dress a sports venue by answering with JSON ONLY: {"edits":[...]} — no prose, no code.',
     'Edits (nothing else is read):',
     ' {"op":"venue","set":{name?,mood?,sky?:{top,bottom,fog,sun:"#rrggbb",ambient?:0..2,fogDensity?:0..0.08},backdrop?,paintedSky?:bool,ground?:{color?,line?,kind?},weather?,intro?,glossyFloor?:bool,baseDressing?}}',
-    ' {"op":"place","item":<catalog id>,"at":[x,z],"yaw":degrees,"scale":0.25..4,"name"?,"set"?:{color?,tint?,height?,width?,rows?,gaps?,posture?:"seated"|"standing",benches?}}',
+    ' {"op":"place","item":<catalog id>,"at":[x,z],"yaw":degrees,"scale":0.25..4 (relative to the item’s natural size; 1 = as placed by hand),"name"?,"set"?:{color?,tint?,height?,width?,rows?,gaps?,posture?:"seated"|"standing",benches?}}',
     ' {"op":"row","item":<catalog id>,"from":[x,z],"to":[x,z],"count":1..16,"yaw":degrees,"set"?}',
     ' {"op":"clear","type"?:"fixture"|"crowdStand"|"kitProp"|"specProp"|"meshyProp"|"decal"|"all"}',
     `Values: ${ENUMS}. Colours are "#rrggbb".`,
