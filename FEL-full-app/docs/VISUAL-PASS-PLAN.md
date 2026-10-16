@@ -1023,3 +1023,51 @@ pass, a 1024² texture → +5 MB, a fixed burn ×4–5 under the throttle, a kno
 - **Findings for the owner.** dunk and karate already exceed their activeMeshes and particles budgets on finish-release; the animation
   layers (PostureLayer, TwoBoneIK, FootPlanting) are the next CPU/GC lever and are rig code (sign-off); production does not pre-warm
   materials (`warmAll` is dev-only), so phones compile shaders mid-play.
+
+## Phone: Dunk and Karate under budget, and shaders pre-warmed at load (owner-1016, 2026-10-16)
+
+Owner, 2026-10-16: "bring Dunk/Karate under their phone mesh and particle budgets" and "pre-warm shaders on phones at load (longer load,
+no mid-play stall)". Rig as above (`_perf-sweep.mts`, phone profile, esbuild bundle, `PAGE=` `RASTER=4` `SEED=7`, `CHECK=1`), base =
+`origin/lane/finish-release` 0a4a250b. Counts are exact; load times are from a software-GL box and are NOT a phone's (below).
+
+**Dunk and Karate** (worst frame of a 6 s run; the rows are NOT raised, karate's activeMeshes row is lowered 77 → 72):
+
+| | active meshes (row) | particles (row) | draws max |
+|---|---|---|---|
+| dunk | 84 → 74 (81) | 29 → 8 (12) | 144 → 143 |
+| karate | 89–96 → 59 (72) | 21–29 → 13 (24) | 157 → 112 |
+
+`CHECK=1`: dunk and karate inside their budgets. Eight more phone modes (1v1, 3v3, 3-Point, Karate VS, Mixed Combat, Showdown, Duel, Dunk
+Duel) were run after: active meshes fell or held (3v3 93 → 74, 1v1 67 → 55, 3-Point 82 → 72), nothing grew. **Finding, not mine:**
+`karate_vs.particles` reads 18–26 against a row of 5 (measured 4 on 2026-10-06; combatFx's hit effects arrived 2026-10-13); `CHECK=1` fails
+on that row with or without this lane.
+
+What a phone does now (every line phone tier only; desktop and high are untouched):
+- *No visible change:* empty glTF `__root__` meshes leave the active list (9 in karate, 5 in dunk; `scene/phoneTrim`); the contact discs
+  under every body are one thin-instanced mesh (`visual/contactShadow`: karate's 10 meshes / 10 draws / 10 materials become 1); the gauntlet's six
+  wall panels and six caps are one mesh each (`combat/arenaBuild` `mergeWallSet`: same geometry, UVs and material, same bounds for the camera).
+- *Visible, small:* half the gulls (Venice boardwalk 6 → 3; `EffectsKit.ambient` 4 → 2); the dunk's ball trail holds at most 4 live dots
+  (was up to 9) and its bursts are trimmed to a live ceiling of 8 (`ParticleBudget.PHONE_MODE_CEILING`); karate's dojo petals at most 4 alive
+  (was 13 in 6 s, about 40 at steady state) and its hit bursts keep at least 2 particles when the ceiling of 12 is spent (was 4).
+- A ceiling is never above its mode's row (`ParticleBudget.test.ts` reads `mobileBudget.json`), and the capacity caps bound the steady
+  systems whatever the clock: the probe's 6 s window under-reads the petals.
+
+**Shader pre-warm** (`core/shaderPrewarm.ts`, called from `ModeHarness` after `def.load()` and before READY; phone tier only):
+`scene.isReady()` is polled (it starts every material, shadow-depth, outline and particle compile in parallel, for disabled meshes too),
+then three frames are drawn behind the splash for the post-process passes, then the engine's `areAllEffectsReady()`; capped at 8 s, after
+which READY comes anyway. The 20 s load watchdog is **not touched and not raised**: it is cleared when `load()` returns, before the pre-warm
+runs, so the pre-warm cannot trip it and has its own cap. Development still runs `warmAll` after READY.
+GL program links by phase (every `linkProgram`, tagged with the harness phase), same seed and play, before → after:
+
+| mode | loading | ready (behind the READY card) | **playing** |
+|---|---|---|---|
+| 3v3 | 16 → 79 | 31 → 0 | **22 → 3** |
+| dunk | 16 → 95 | 43 → 0 | **12 → 4** |
+| karate | 17 → 63 | 27 → 0 | **9 → 2** |
+
+What is left is whatever a mode first asks for on START: the bloom's 2-tap blur, and a few PBR variants (an alpha-tested thin-instanced one,
+a UV1 one). **Load time** (loading → playing, base and lane side by side on the same box; the box is a shared 4-core with software GL, where a PBR link
+costs a CPU-bound fraction of a second): +12 to +28 s (3v3), +16 to +20 s (dunk), +17 to +38 s (karate); the pre-warm itself 18–46 s. A phone's
+GPU driver compiles in hardware and in parallel; this rig cannot say how long that takes, so the 8 s cap is the owner's number to judge on a
+real device. Desktop is left as it was (it is not free: the pre-warm compiles about 14 programs a session never asks for, and the owner asked for the phone).
+
