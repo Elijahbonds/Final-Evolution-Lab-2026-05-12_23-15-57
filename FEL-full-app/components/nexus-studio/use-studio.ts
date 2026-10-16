@@ -13,6 +13,8 @@ import { activeVenue, newProject, newVenue, type StudioProject, type StudioVenue
 import { AUTOSAVE_MS, browserKV, loadProject, saveProject } from '@/lib/nexus-studio/storage';
 import { DEFAULT_TARGET, PLAYTEST_TARGETS } from '@/lib/nexus-studio/targets';
 import { resolveCast, type ExportCast } from '@/lib/nexus-studio/cast';
+import { liveSelection } from '@/lib/nexus-studio/group';
+import type { StudioClip } from '@/lib/nexus-studio/clipboard';
 
 type Action =
   | { type: 'exec'; cmd: Command }
@@ -47,7 +49,13 @@ export type SaveState = 'saved' | 'unsaved' | 'saving' | 'no-storage' | 'error';
 
 export function useStudio() {
   const [stack, dispatch] = useReducer(reducer, null, () => createStack(starterProject()));
-  const [selected, setSelected] = useState<string | null>(null);
+  // §11: the selection is a list (the last id is the primary: the inspector's and the single gizmo's); `selected` and
+  // `setSelected` keep the one-object API every older caller uses
+  const [selection, setSelection] = useState<string[]>([]);
+  const selected: string | null = selection[selection.length - 1] ?? null;
+  const setSelected = useCallback((id: string | null) => setSelection(id ? [id] : []), []);
+  // §11: the clipboard is editor state, not document: it outlives a venue switch (paste into another venue) and a track switch
+  const [clip, setClip] = useState<StudioClip | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -89,13 +97,16 @@ export function useStudio() {
 
   const run = useCallback((cmd: Command) => dispatch({ type: 'exec', cmd }), []);
   const venue: StudioVenue | null = useMemo(() => activeVenue(stack.doc), [stack.doc]);
-  // a selection that no longer exists (deleted, undone away, another venue) is dropped
-  useEffect(() => { if (selected && !venue?.objects.some((o) => o.id === selected)) setSelected(null); }, [venue, selected]);
+  // a selection that no longer exists (deleted, undone away, another venue) is dropped, id by id
+  useEffect(() => {
+    const live = liveSelection(venue, selection);
+    if (live.length !== selection.length) setSelection(live);
+  }, [venue, selection]);
 
   return {
-    stack, doc: stack.doc, venue, selected, setSelected, run,
+    stack, doc: stack.doc, venue, selected, setSelected, selection, setSelection, clip, setClip, run,
     undo: () => dispatch({ type: 'undo' }), redo: () => dispatch({ type: 'redo' }), seal: () => dispatch({ type: 'seal' }),
-    open: (doc: StudioProject) => { dispatch({ type: 'open', doc }); setSelected(null); },
+    open: (doc: StudioProject) => { dispatch({ type: 'open', doc }); setSelection([]); },
     canUndo: canUndo(stack), canRedo: canRedo(stack), undoLabel: undoLabel(stack), redoLabel: redoLabel(stack),
     dirty, saveState, saveError, save, loaded,
   };
