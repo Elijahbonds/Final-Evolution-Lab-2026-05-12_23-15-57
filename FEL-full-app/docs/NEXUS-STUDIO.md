@@ -405,6 +405,13 @@ sanitised to 32 stamps × 64 objects). Placing a stamp (click: the view's centre
 command** with fresh ids; renaming coalesces per stamp; deleting a stamp leaves its placed copies. New ops: `addStamp`,
 `removeStamp`, `patchStamp` (the last removal drops the key, so undoing the first save is exact).
 
+**Kit scale (found proving the Palm avenue in the browser).** A Kenney model is toy-sized at 1× (the nature palm's GLB is
+1.25 m tall), but the asset browser placed kit items at 1× inside a proxy sized for a 7 m palm. A kit item is now placed at its
+kit's median scale in `VENUE_PROP_SETS` (`catalog.ts kitScale`: nature 4.6, racing 2.4, mini-arena 2.4, city-suburban 2.2,
+venice 1; a kit no set places stays 1×), and its proxy is the life-size reach divided by that scale. Objects already in a project
+keep their own scale. **Routed** (lane studio-4b's file): `aiEdits.ts` sets `t.s = e.scale` over that default, so CELL's kit
+props still land at 1×; `s: base.t.s * e.scale` would make CELL's scale relative to it.
+
 ### 11.4 Football Rush: the second play-test target (`targets.ts`, `runtime.ts`, `stage.ts`, `FootballRushMode.ts`)
 
 - **The row** (`targets.ts football`): spec `football_rush`, the `gridiron` preset, `crowdVenues` FOOTBALL's look line, the
