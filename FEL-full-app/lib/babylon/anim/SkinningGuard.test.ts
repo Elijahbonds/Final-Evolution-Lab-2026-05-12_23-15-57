@@ -4,6 +4,7 @@
 // `scene.render()` (tests/helpers/skinnedBody.ts), so drawn / undrawn / never-prepared are the engine's doing.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SKINNING_GUARD_FRAMES, SKINNING_GUARD_MAX_WATCH, SkinningGuard } from './SkinningGuard';
+import { findBone } from './boneLookup';
 import { makeSkinnedStage, type SkinnedStage } from '../../../tests/helpers/skinnedBody';
 
 let st: SkinnedStage, err: ReturnType<typeof vi.spyOn>;
@@ -22,7 +23,7 @@ afterEach(() => { vi.restoreAllMocks(); st.dispose(); });
 
 describe('SkinningGuard: the harness is the engine (CONTROLS)', () => {
   it('a drawn body\'s bones follow its animated nodes, an undrawn one\'s do not', () => {
-    const bone = st.skeleton.bones.find((b) => b.name === 'LeftArm')!;
+    const bone = findBone(st.skeleton, 'LeftArm')!;   // (the one way to find a bone: boneLookup; gate0-rig-tests bans the exact-match find)
     st.run(2, 0.6);
     const a = bone.getWorldMatrix().clone();
     st.run(20, 0.6, 2);
