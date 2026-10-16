@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { SITE_ORIGIN } from '@/lib/seo/publicPages';
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -17,5 +18,7 @@ export default function robots(): MetadataRoute.Robots {
         '/coach/review',
       ],
     },
+    // Owner, 2026-10-16: the sitemap is filled (app/sitemap.ts); tell the crawlers where it is.
+    sitemap: `${SITE_ORIGIN}/sitemap.xml`,
   };
 }
