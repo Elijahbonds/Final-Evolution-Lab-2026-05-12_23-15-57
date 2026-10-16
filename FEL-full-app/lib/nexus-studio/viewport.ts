@@ -3,12 +3,17 @@
 // no new dependency), a grid, snapping, the intro and replay previews, and the budget sample.
 //
 // THE EDIT LOOP. A drag moves the object's proxy (the gizmo's handle) and ONE command is committed on release; the venue
-// then re-realises through the runtime path, so the frame after the release is the frame the mode will draw. Every mesh
+// then re-realises through the runtime path, so the frame after the release is the frame the mode will draw.
+//
+// MULTI-SELECT (§11). The selection is a list. With more than one object the gizmo grabs a pivot at the group's centre; the
+// members' proxies follow it rigidly while it drags (group.ts applyDelta) and the release commits the group's snapped delta
+// as ONE command (the shell builds it with groupTransformCommand). A box drawn on the canvas selects what it frames
+// (`idsInRect`: each proxy's centre projected the way Babylon's own pick un-projects). Every mesh
 // the editor makes is `__studio_*`: LightRig never makes a `__` mesh a shadow caster, the glow and the mirror skip it, and
 // the export never sees it.
 
 import {
-  Color3, GizmoManager, LinesMesh, Mesh, MeshBuilder, PointerEventTypes, StandardMaterial, TransformNode, Vector3,
+  Color3, GizmoManager, LinesMesh, Matrix, Mesh, MeshBuilder, PointerEventTypes, StandardMaterial, TransformNode, Vector3,
   type AbstractEngine, type AbstractMesh, type Observer, type PointerInfo, type Scene,
 } from '@babylonjs/core';
 import type { ExportCast } from './cast';
@@ -17,6 +22,7 @@ import { mountStage, type Stage, type StageLayer } from './stage';
 import { proxyBox } from './catalog';
 import { snapTransform, yawOfQuaternion, DEFAULT_SNAP, type SnapSettings } from './snap';
 import { textureMb, type BudgetSample } from './budget';
+import { applyDelta, groupCentre, snapDelta, type GroupDelta } from './group';
 import { replayShot } from '../babylon/scene/broadcastShots';
 import type { StudioObject, StudioTransform, StudioVenue, V3 } from './doc';
 import type { QualityTier } from '../babylon/scene/QualityTier';
@@ -26,6 +32,10 @@ export type CameraMode = 'orbit' | 'pan' | 'fly';
 
 export interface ViewportCallbacks {
   onSelect(id: string | null): void;
+  /** §11: a click with its modifier (Ctrl / ⌘ toggles). When given, it is called INSTEAD of onSelect. */
+  onPick?(id: string | null, mods: { toggle: boolean }): void;
+  /** §11: a group drag ended: the group's snapped change about `pivot` (the selection's centre when the drag began). */
+  onGroupTransform?(ids: string[], d: GroupDelta, pivot: V3): void;
   /** A gizmo drag ended: the object's new transform (snapped). */
   onTransform(id: string, t: StudioTransform): void;
   onStats?(s: BudgetSample): void;
@@ -60,7 +70,12 @@ export class StudioViewport {
   private exp: StudioVenueExport | null = null;
   private venue: StudioVenue | null = null;
   private proxies = new Map<string, Proxy>();
-  private selected: string | null = null;
+  /** §11: the selection, in order (the last is the primary). */
+  private selectedIds: string[] = [];
+  private get selected(): string | null { return this.selectedIds[this.selectedIds.length - 1] ?? null; }
+  /** §11: the group gizmo's handle, and the group as the drag found it. */
+  private pivot: TransformNode | null = null;
+  private groupDrag: { pivot: V3; members: Array<{ px: Proxy; t: StudioTransform; type: StudioObject['type'] }> } | null = null;
   private gizmos: GizmoManager | null = null;
   private tool: Tool = 'move';
   private camMode: CameraMode = 'orbit';
@@ -102,6 +117,8 @@ export class StudioViewport {
   get scene(): Scene | null { return this.stage?.scene ?? null; }
   get currentStage(): Stage | null { return this.stage; }
   get selection(): string | null { return this.selected; }
+  /** §11: every selected id, in order. */
+  get selectionIds(): readonly string[] { return this.selectedIds; }
 
   /** Mount (or re-mount) the stage for a venue. `tier` forces the meter's Phone/Desktop switch. */
   async load(venue: StudioVenue, tier?: QualityTier): Promise<void> {
@@ -119,8 +136,7 @@ export class StudioViewport {
       this.stage = stage; this.exp = exp; this.venue = venue;
       this.setupEditor(stage);
       this.syncProxies(venue);
-      if (this.selected && !this.proxies.has(this.selected)) this.select(null);
-      else this.select(this.selected);
+      this.setSelection(this.selectedIds);
       if (!this.engineOverride) {
         stage.engine.stopRenderLoop();
         stage.engine.runRenderLoop(() => { if (this.stage?.scene.activeCamera) this.stage.scene.render(); });
@@ -150,8 +166,8 @@ export class StudioViewport {
     }
     this.exp = exp;
     this.syncProxies(venue);
-    if (this.selected && !this.proxies.has(this.selected)) this.select(null);
-    else if (this.selected) this.attachGizmo();
+    if (this.selectedIds.some((id) => !this.proxies.has(id))) this.setSelection(this.selectedIds);
+    else if (this.selectedIds.length) { for (const px of this.proxies.values()) this.styleProxy(px); this.attachGizmo(); }
   }
 
   // ── editor furniture ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -164,6 +180,7 @@ export class StudioViewport {
     this.markMat = new StandardMaterial('__studio_mark_m', scene);
     this.markMat.emissiveColor = Color3.FromHexString('#ffd700'); this.markMat.diffuseColor = Color3.Black(); this.markMat.disableLighting = true; this.markMat.alpha = 0.7;
     this.grid = buildGrid(scene); this.grid.setEnabled(this.gridOn);
+    this.pivot = new TransformNode('__studio_group_pivot', scene);
     const gm = new GizmoManager(scene, 2);
     gm.usePointerToAttachGizmos = false;
     gm.clearGizmoOnEmptyPointerEvent = false;
@@ -192,8 +209,30 @@ export class StudioViewport {
     if (moved > 5 || (pi.event as PointerEvent).button !== 0) return;
     if (this.gizmos?.isHovered) return;
     const id = this.pickAt(scene.pointerX, scene.pointerY);
+    const ev = pi.event as PointerEvent;
+    if (this.cb.onPick) { this.cb.onPick(id, { toggle: !!(ev.ctrlKey || ev.metaKey) }); return; }
     this.select(id);
     this.cb.onSelect(id);
+  }
+
+  /** §11: the objects whose proxy centre falls inside a canvas rectangle (CSS pixels, any two corners), front of the camera only. */
+  idsInRect(a: { x: number; y: number }, b: { x: number; y: number }): string[] {
+    const scene = this.stage?.scene, cam = scene?.activeCamera; if (!scene || !cam) return [];
+    const engine = scene.getEngine();
+    const w = engine.getRenderWidth(), h = engine.getRenderHeight(), hw = engine.getHardwareScalingLevel();
+    const vp = cam.viewport.toGlobal(w, h);
+    const view = cam.getViewMatrix();
+    const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+    const out: string[] = [];
+    for (const [id, px] of this.proxies) {
+      if (!px.holder.isEnabled()) continue;
+      const c = px.box.getBoundingInfo().boundingBox.centerWorld;
+      if (Vector3.TransformCoordinates(c, view).z <= 0) continue;   // behind the camera
+      const sp = Vector3.Project(c, Matrix.Identity(), scene.getTransformMatrix(), vp);
+      const x = sp.x * hw, y = sp.y * hw;   // render pixels → the CSS pixels a pointer reports (Babylon's own pick scales the other way)
+      if (x >= x0 && x <= x1 && y >= y0 && y <= y1) out.push(id);
+    }
+    return out;
   }
 
   /** The object under a canvas point (its pick proxy), or null. */
@@ -246,7 +285,7 @@ export class StudioViewport {
         this.proxies.set(o.id, px);
       }
       px.obj = o;
-      if (!this.dragging || this.selected !== o.id) {
+      if (!this.dragging || !this.selectedIds.includes(o.id)) {
         px.holder.position.set(o.t.p[0], o.t.p[1], o.t.p[2]);
         px.holder.rotationQuaternion = null; px.holder.rotation.set(0, o.t.ry, 0);
         px.holder.scaling.setAll(o.type === 'crowdStand' ? 1 : o.t.s);
@@ -257,7 +296,7 @@ export class StudioViewport {
   }
 
   private styleProxy(px: Proxy): void {
-    const sel = px.obj.id === this.selected;
+    const sel = this.selectedIds.includes(px.obj.id);
     // the camera mark has no drawn body of its own: it always shows; everything else shows its box when selected
     px.box.isVisible = sel || px.obj.type === 'cameraMark';
     px.box.showBoundingBox = sel;
@@ -265,16 +304,67 @@ export class StudioViewport {
 
   // ── selection and gizmos ──────────────────────────────────────────────────────────────────────────────────────────
 
-  select(id: string | null): void {
-    this.selected = id && this.proxies.has(id) ? id : null;
+  select(id: string | null): void { this.setSelection(id ? [id] : []); }
+
+  /** §11: select a list of objects (ids with no proxy — hidden, gone — are left out). */
+  setSelection(ids: readonly string[]): void {
+    const next = ids.filter((id, i) => this.proxies.has(id) && ids.indexOf(id) === i);
+    this.selectedIds = next;
     for (const px of this.proxies.values()) this.styleProxy(px);
     this.attachGizmo();
   }
 
+  /** The unlocked selected proxies (what a group drag moves). */
+  private movers(): Proxy[] {
+    return this.selectedIds.map((id) => this.proxies.get(id)).filter((px): px is Proxy => !!px && !px.obj.locked);
+  }
+
   private attachGizmo(): void {
-    const gm = this.gizmos; if (!gm) return;
-    const px = this.selected ? this.proxies.get(this.selected) : null;
-    gm.attachToNode(px && !px.obj.locked && this.tool !== 'select' ? px.holder : null);
+    const gm = this.gizmos; if (!gm || this.dragging) return;
+    if (this.tool === 'select' || !this.selectedIds.length) { gm.attachToNode(null); return; }
+    if (this.selectedIds.length === 1) {
+      const px = this.proxies.get(this.selectedIds[0]);
+      gm.attachToNode(px && !px.obj.locked ? px.holder : null);
+      return;
+    }
+    // a group: the gizmo grabs a pivot at the movable members' centre, unturned and unscaled (the drag's zero)
+    const movers = this.movers();
+    const pv = this.pivot;
+    if (!movers.length || !pv) { gm.attachToNode(null); return; }
+    const c = groupCentre(movers.map((px) => px.obj));
+    pv.position.set(c[0], c[1], c[2]); pv.rotationQuaternion = null; pv.rotation.set(0, 0, 0); pv.scaling.setAll(1);
+    gm.attachToNode(pv);
+  }
+
+  /** The pivot's change since the drag began, unsnapped. */
+  private pivotDelta(start: V3): GroupDelta {
+    const pv = this.pivot!;
+    const q = pv.rotationQuaternion;
+    return {
+      move: [pv.position.x - start[0], pv.position.y - start[1], pv.position.z - start[2]],
+      turn: q ? yawOfQuaternion(q.x, q.y, q.z, q.w) : pv.rotation.y,
+      scale: pv.scaling.x > 0 ? pv.scaling.x : 1,
+    };
+  }
+
+  private placeProxy(px: Proxy, t: StudioTransform): void {
+    const h = px.holder;
+    h.position.set(t.p[0], t.p[1], t.p[2]); h.rotationQuaternion = null; h.rotation.set(0, t.ry, 0);
+    h.scaling.setAll(px.obj.type === 'crowdStand' ? 1 : t.s);
+  }
+
+  private beginDrag(): void {
+    this.groupDrag = null;
+    if (this.selectedIds.length < 2 || !this.pivot) return;
+    const p = this.pivot.position;
+    this.groupDrag = { pivot: [p.x, p.y, p.z], members: this.movers().map((px) => ({ px, t: structuredClone(px.obj.t), type: px.obj.type })) };
+  }
+
+  /** While a group drags, its members' proxies follow the pivot rigidly (the frame the release will commit, before the snap). */
+  private followDrag(): void {
+    const g = this.groupDrag; if (!g) return;
+    const d = this.pivotDelta(g.pivot);
+    for (const m of g.members) this.placeProxy(m.px, applyDelta({ t: m.t, type: m.type }, g.pivot, d));
   }
 
   setTool(tool: Tool): void { this.tool = tool; this.applyTool(); this.attachGizmo(); }
@@ -292,8 +382,9 @@ export class StudioViewport {
     for (const giz of [g.positionGizmo, g.rotationGizmo, g.scaleGizmo]) {
       if (!giz || (giz as unknown as { __studioWired?: boolean }).__studioWired) continue;
       (giz as unknown as { __studioWired?: boolean }).__studioWired = true;
-      giz.onDragStartObservable.add(() => { this.dragging = true; this.detachCameraInput(); });
-      giz.onDragEndObservable.add(() => { this.dragging = false; this.attachCameraInput(); this.commitDrag(); });
+      giz.onDragStartObservable.add(() => { this.dragging = true; this.detachCameraInput(); this.beginDrag(); });
+      giz.onDragObservable.add(() => this.followDrag());
+      giz.onDragEndObservable.add(() => { this.dragging = false; this.attachCameraInput(); if (this.groupDrag) this.commitGroupDrag(); else this.commitDrag(); });
     }
   }
 
@@ -303,6 +394,16 @@ export class StudioViewport {
     if (g.positionGizmo) g.positionGizmo.snapDistance = this.snap.on ? this.snap.move : 0;
     if (g.rotationGizmo) g.rotationGizmo.snapDistance = this.snap.on ? (this.snap.turn * Math.PI) / 180 : 0;
     if (g.scaleGizmo) g.scaleGizmo.snapDistance = this.snap.on ? this.snap.scale : 0;
+  }
+
+  /** §11: a group drag's release — the group's delta snapped (so the members keep their spacing), handed up as one change. */
+  private commitGroupDrag(): void {
+    const g = this.groupDrag; this.groupDrag = null;
+    if (!g) return;
+    const d = snapDelta(this.pivotDelta(g.pivot), this.snap);
+    for (const m of g.members) this.placeProxy(m.px, applyDelta({ t: m.t, type: m.type }, g.pivot, d));
+    this.cb.onGroupTransform?.(g.members.map((m) => m.px.obj.id), d, g.pivot);
+    this.attachGizmo();
   }
 
   /** The proxy's transform after a drag, snapped and clamped, as the document's transform. */
@@ -347,7 +448,14 @@ export class StudioViewport {
     const s = this.stage; if (!s) return;
     this.setCamera(this.camMode === 'fly' ? 'orbit' : this.camMode);
     const px = this.selected ? this.proxies.get(this.selected) : null;
-    if (px) {
+    if (this.selectedIds.length > 1) {
+      // §11: frame the whole group: its centre, far enough back to hold its widest spread
+      const objs = this.selectedIds.map((id) => this.proxies.get(id)?.obj).filter((o): o is StudioObject => !!o);
+      const c = groupCentre(objs);
+      const spread = Math.max(...objs.map((o) => Math.hypot(o.t.p[0] - c[0], o.t.p[2] - c[2]) + Math.max(...proxyBox(o).size) * (o.type === 'crowdStand' ? 1 : o.t.s) / 2));
+      s.orbit.setTarget(new Vector3(c[0], c[1] + 1, c[2]));
+      s.orbit.radius = Math.max(6, spread * 2.4);
+    } else if (px) {
       const b = proxyBox(px.obj), k = px.obj.type === 'crowdStand' ? 1 : px.obj.t.s;
       const c = px.box.getAbsolutePosition();
       s.orbit.setTarget(c.clone());
@@ -446,6 +554,7 @@ export class StudioViewport {
     for (const o of this.observers.splice(0)) o.remove();
     if (this.statsTimer) { clearInterval(this.statsTimer); this.statsTimer = null; }
     this.gizmos?.dispose(); this.gizmos = null;
+    this.groupDrag = null; this.pivot = null;   // the pivot is the scene's: disposed with it
     for (const px of this.proxies.values()) px.holder.dispose();
     this.proxies.clear();
     this.grid = null;

@@ -118,6 +118,9 @@ export interface StudioCharacter { id: string; name: string; lookCode?: string }
 /** Track 4: an event → condition → action graph (scripts.ts), run by interpreter.ts in every venue the project plays —
  *  or, with `venues` (studio-4b, per-venue scope), only in those venues (an empty list: in none). Absent = every venue. */
 export interface StudioScript extends ScriptGraph { id: string; name: string; venues?: string[] }
+/** Track 1 (§11): a prefab stamp — a small group of objects saved under a name, laid out about its own origin (x, z centred;
+ *  heights as placed). Placing it adds copies with fresh ids, as one command. Optional: a project without any reads the same. */
+export interface StudioStamp { id: string; name: string; objects: StudioObject[] }
 
 export interface StudioProject {
   kind: typeof STUDIO_DOC_KIND;
@@ -130,6 +133,9 @@ export interface StudioProject {
   activeVenueId: string;
   characters: StudioCharacter[];
   scripts: StudioScript[];
+  /** Track 1 (§11): the project's own prefab stamps ("save selection as stamp"). Absent = none; no version bump (an older
+   *  reader drops the key, a newer one reads a project without it). */
+  stamps?: StudioStamp[];
 }
 
 // ── limits ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -140,6 +146,9 @@ export const LIMITS = {
   objects: 600,
   characters: 64,
   scripts: 64,
+  /** prefab stamps per project, and objects per stamp */
+  stamps: 32,
+  stampObjects: 64,
   /** |x|, |z| of a placement (the biggest venue's surround is ~140 m across). */
   reach: 400,
   heightMin: -20,
@@ -440,6 +449,18 @@ export function sanitizeProject(raw: unknown, now = new Date()): ParseResult {
     if (!player && !crowd.length) delete v.cast;
     else v.cast = { ...(player ? { player } : {}), ...(crowd.length ? { crowd } : {}) };
   }
+  const stamps: StudioStamp[] = [];
+  for (const st of Array.isArray(x.stamps) ? x.stamps : []) {
+    if (!isObj(st) || stamps.length >= LIMITS.stamps) continue;
+    const stampSeen = new Set<string>();
+    const objects: StudioObject[] = [];
+    for (const o of Array.isArray(st.objects) ? st.objects : []) {
+      if (objects.length >= LIMITS.stampObjects) break;
+      const so = sanitizeObject(o, stampSeen);
+      if (so) objects.push(so);
+    }
+    if (objects.length) stamps.push({ id: idOr(st.id, 'stamp', seen), name: str(st.name, LIMITS.name, 'Stamp'), objects });
+  }
   const at = now.toISOString();
   const activeVenueId = typeof x.activeVenueId === 'string' && venues.some((v) => v.id === x.activeVenueId) ? x.activeVenueId : venues[0].id;
   const iso = (s: unknown) => (typeof s === 'string' && !Number.isNaN(Date.parse(s)) ? new Date(s).toISOString() : at);
@@ -451,6 +472,7 @@ export function sanitizeProject(raw: unknown, now = new Date()): ParseResult {
       name: str(x.name, LIMITS.name, 'Untitled project'),
       createdAt: iso(x.createdAt), updatedAt: iso(x.updatedAt),
       venues, activeVenueId, characters, scripts,
+      ...(stamps.length ? { stamps } : {}),
     },
   };
 }

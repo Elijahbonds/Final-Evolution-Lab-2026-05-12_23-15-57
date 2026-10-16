@@ -5,6 +5,11 @@
 //
 // `size` is the pick proxy's box (metres, before the object's scale): what the viewport hit-tests and the gizmo grabs.
 // It is a reach, not a measurement — the model draws through the real VenueProps / meshyProps path.
+//
+// §11 KIT SCALE. A Kenney model is a toy-sized unit (the nature kit's palm is 1.36 m tall at scale 1; measured from the GLBs'
+// POSITION bounds 2026-10-16), so every venue set places it scaled up — the nature kit at a median 4.6×. A kit item is placed
+// at its kit's own median scale from VENUE_PROP_SETS (`kitScale`), and its proxy is the life-size reach divided by that scale,
+// so a placed palm stands ~6 m tall inside a box its own size. (Before, items landed at 1× — a 1.4 m palm in a 7 m box.)
 
 import manifest from '../../public/models/props/manifest.json';
 import { VENUE_PROP_SETS } from '../babylon/visual/venuePropSets';
@@ -27,6 +32,8 @@ export interface CatalogItem {
   /** The object, minus its id and transform. */
   proto: ObjectProto;
   size: V3;
+  /** §11: the scale it is placed at (a kit's venue-set median; 1 for everything else). */
+  scale?: number;
 }
 
 const KIT_GROUP: Record<string, CatalogGroup> = {
@@ -79,6 +86,17 @@ function kitModels(): Array<{ kit: string; model: string }> {
   return out;
 }
 
+let kitScales: Map<string, number> | null = null;
+/** §11: the scale the venue sets place `kit`'s models at (their median, VENUE_PROP_SETS); 1 for a kit no set places. */
+export function kitScale(kit: string): number {
+  if (!kitScales) {
+    const by = new Map<string, number[]>();
+    for (const set of Object.values(VENUE_PROP_SETS)) for (const p of set) { const a = by.get(p.kit) ?? []; a.push(p.scale ?? 1); by.set(p.kit, a); }
+    kitScales = new Map([...by].map(([k, v]) => { v.sort((a, b) => a - b); return [k, v[Math.floor(v.length / 2)]] as [string, number]; }));
+  }
+  return kitScales.get(kit) ?? 1;
+}
+
 let built: CatalogItem[] | null = null;
 
 export function catalog(): CatalogItem[] {
@@ -89,7 +107,8 @@ export function catalog(): CatalogItem[] {
   }
   for (const { kit, model } of kitModels()) {
     const label = prettyModel(model);
-    items.push({ id: `kit:${kit}/${model}`, label, group: KIT_GROUP[kit], source: `Kenney ${kit} kit (CC0)`, proto: { type: 'kitProp', kit, model, name: label }, size: kitSize(model) });
+    const k = kitScale(kit), reach = kitSize(model);
+    items.push({ id: `kit:${kit}/${model}`, label, group: KIT_GROUP[kit], source: `Kenney ${kit} kit (CC0)`, proto: { type: 'kitProp', kit, model, name: label }, size: [reach[0] / k, reach[1] / k, reach[2] / k], ...(k !== 1 ? { scale: k } : {}) });
   }
   for (const key of MESHY_KEYS) {
     const label = prettyModel(key);
@@ -142,6 +161,6 @@ export function proxyBox(o: StudioObject): { size: V3; centre: V3 } {
 
 /** A new object from a catalog item, standing at `p`. */
 export function instantiate(item: CatalogItem, p: V3 = [0, 0, 0], ry = 0): StudioObject {
-  const t: StudioTransform = { ...IDENTITY, p: [...p] as V3, ry };
+  const t: StudioTransform = { ...IDENTITY, p: [...p] as V3, ry, s: item.scale ?? 1 };
   return { ...JSON.parse(JSON.stringify(item.proto)), id: newId(item.proto.type), t } as StudioObject;
 }

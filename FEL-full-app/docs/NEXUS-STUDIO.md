@@ -218,10 +218,12 @@ scratchpad `nexus-studio/`):
   bleachers with fans, banner), opens on the walk-in intro and hands back its own fixed camera when the intro ends.
 
 **Not done / known gaps** (each is a next step, not a hidden failure):
-- Glossy floor and persistent decals wait on the routed one-liners (§8); the decal layer's refresh is the stopgap.
-- Replay angles are exported but only a mode that replays reads them; Tiebreak has no replays.
+- ~~Glossy floor and persistent decals wait on the routed one-liners (§8)~~ — landed on `lane/nexus-studio-2` (§8) and wired
+  (checked again in round 4, §11.5).
+- ~~Replay angles are exported but only a mode that replays reads them~~ — live in Football Rush since round 4 (§11.4).
 - The editor shows the drag on a proxy box and re-draws the real prop on release (a kit prop is a thin instance).
-- No server save (no route stores a project; §2.1). No multi-select, copy/paste between venues, or prefab groups yet.
+- No server save (no route stores a project; §2.1). ~~No multi-select, copy/paste between venues, or prefab groups yet~~ —
+  round 4 (§11.1–§11.3).
 - Play-test runs in a development build only, by design (the load path is dev-only).
 
 **Next, by track:**
@@ -360,6 +362,85 @@ regardless. No gameplay value, no tuned number and no TiebreakMode line changed:
 was measured for the scale, not driven through a match (vitest cannot load it). The Closet's Studio/photo `presentation` size is not
 carried (it is the Closet stage's own); reach stays frozen.
 
+
+## 11. Round 4, track 1: the editor (2026-10-16, lane/studio-4a)
+
+Owner 2026-10-16: "Nexus Studio next round". Five items; each is one undo step wherever it edits, and undo is exact (every op
+records its own inverse, §2.2).
+
+### 11.1 Multi-select and group move (`group.ts`, `viewport.ts`, `viewport-panel.tsx`, `scene-tree.tsx`)
+
+- **The selection is a list** (UI state, never the document; the last id is the primary, so `selected` / `setSelected` keep
+  their meaning for every older caller). In the view: a click selects one, **Ctrl/⌘-click** toggles (a Ctrl-drag still pans),
+  **Shift-click** toggles, **Shift-drag** draws a box that adds what it frames; with the **Select tool (Q)** a drag from empty
+  ground draws a box that replaces the selection. **Ctrl/⌘+A** selects every visible object. In the scene tree: click,
+  Ctrl/⌘-click to toggle, Shift-click for a range in the tree's own order.
+- **The box** is drawn in the DOM; a capture-phase listener takes the pointer before the canvas, so the camera never orbits
+  under it. `idsInRect` projects each proxy's centre the way Babylon's own pick un-projects (render pixels × the hardware
+  scaling level), and skips anything behind the camera.
+- **The group gizmo.** With more than one object the gizmo grabs a pivot at the movable members' centre (the middle of their
+  positions' box). While it drags, the members' proxies follow it rigidly (`applyDelta`: p' = pivot + move + R(turn)·(scale·(p −
+  pivot)), ry' = ry + turn, s' = s·scale; a crowd stand keeps its own size). On release the GROUP's delta is snapped (the grid
+  step, the turn step, the scale step), so the members keep their spacing exactly, and handed up as **one command**
+  (`groupTransformCommand`). Locked members stay put.
+- **Delete, hide and lock** take the whole selection, one step each (`groupDeleteCommand`, `groupFlagCommand`: if any member is
+  off, all go on; else all go off). A tree row's eye / lock acts on the whole selection when the row is in it; **H** / **L** on
+  the keyboard. The arrows nudge the group one grid step (consecutive nudges coalesce). The inspector shows the group's panel:
+  its make-up, duplicate, copy, delete, hide, lock, turn ±15°, save as stamp.
+
+### 11.2 Copy / paste / duplicate (`clipboard.ts`)
+
+**Ctrl/⌘+C** copies the selection (a deep copy about its centre) into the editor's clipboard — editor state, so it outlives a
+venue switch and a track switch. **Ctrl/⌘+V** pastes into the active venue — the same one or **another venue of the project** —
+centred on the view's centre; pasting again over the source with the camera unmoved steps one offset (1 m, x and z) further
+each time. **Ctrl/⌘+D** is copy + paste-over-itself in one step. Every pasted object gets a **fresh id**, goes through the import
+path's own sanitiser (`sanitizeObject`) and arrives unlocked; a paste that would pass the venue's 600-object cap is refused whole.
+
+### 11.3 Prefab stamps (`stamps.ts`, `stamp-shelf.tsx`)
+
+A third left tab, **Stamps**. The built-in shelf is made from catalog items (so every piece is something the asset browser can
+place and the export knows): **Lamp row** (5 lamp posts), **Bleacher pair** (two seated bleachers facing across 24 m), **Flood
+corner set** (4 floods on a 36 × 24 m box, each tipped at the middle), **Palm avenue** (10 palms), **Lantern string** (6
+lanterns). **Save selection as stamp** keeps the selection, re-centred on its own middle, in the project
+(`StudioProject.stamps`, optional — **no version bump**: an older reader drops the key, a newer one reads a project without it;
+sanitised to 32 stamps × 64 objects). Placing a stamp (click: the view's centre, snapped; or drag it into the view) is **one
+command** with fresh ids; renaming coalesces per stamp; deleting a stamp leaves its placed copies. New ops: `addStamp`,
+`removeStamp`, `patchStamp` (the last removal drops the key, so undoing the first save is exact).
+
+**Kit scale (found proving the Palm avenue in the browser).** A Kenney model is toy-sized at 1× (the nature palm's GLB is
+1.25 m tall), but the asset browser placed kit items at 1× inside a proxy sized for a 7 m palm. A kit item is now placed at its
+kit's median scale in `VENUE_PROP_SETS` (`catalog.ts kitScale`: nature 4.6, racing 2.4, mini-arena 2.4, city-suburban 2.2,
+venice 1; a kit no set places stays 1×), and its proxy is the life-size reach divided by that scale. Objects already in a project
+keep their own scale. **Routed** (lane studio-4b's file): `aiEdits.ts` sets `t.s = e.scale` over that default, so CELL's kit
+props still land at 1×; `s: base.t.s * e.scale` would make CELL's scale relative to it.
+
+### 11.4 Football Rush: the second play-test target (`targets.ts`, `runtime.ts`, `stage.ts`, `FootballRushMode.ts`)
+
+- **The row** (`targets.ts football`): spec `football_rush`, the `gridiron` preset, `crowdVenues` FOOTBALL's look line, the
+  `football` budget row, `/dev/mode/football?venue=` (dev only). The inspector's **Plays in** switches a venue between Tiebreak
+  and Football Rush in one step.
+- **The mode's opt-in** (`FootballRushMode.ts`, shared file, Tiebreak's shape): `get mood()` → `studioMood('football',
+  'nightGame')`, `get intro()` → `studioIntroOr('football', 'walkIn')` (the venue's choice, 'none' included), the look line
+  `studioLookFor('football') ?? readPlaceLook('football')`, `mountStudioFor('football', ctx)` + its dispose, and
+  `angles: studioReplayAngles('football')` on the touchdown `ctx.highlight` — **so a venue's replay angles are LIVE** (in the
+  order ticked; none ticked = the director's own cut). With no `?venue=`, and always in production (`studioLoadAllowed`), every
+  line resolves to exactly what the mode shipped with (`football.test.ts`). No gameplay value, timing window, weather modifier or
+  tuned number changed.
+- **What the mode keeps.** Football Rush steps its own director (a follow camera), so the Studio adds no intro stepper there
+  (`stepsOwnDirector`). Its **weather is gameplay** (rain softens the cut, snow drags the run) and stays the start screen's pick:
+  a venue does not set it — the export carries `'natural'` and the inspector says why (`modeWeather`). It lays its own turf over
+  the spec, so a glossy floor is not offered or exported for it. A cast plays on the **standard frame** (no fairness review yet,
+  §10.5 "any other mode").
+- **The editor** stands the mode's own field in the viewport — `VenueKit.buildGridiron` and `mountFootballFx` with the mode's
+  own arguments — and hides the spec's ground under it as the mode does (`venue_ground_under`). Editor-side only; the mode
+  builds its own.
+
+### 11.5 The routed one-liners (§8), checked again
+
+Both are on this branch and wired: `GlossyFloor.mountGlossyFloor` reads `scene.metadata.felStudioGround` first (the stage and
+`mountStudioExtras` set it from the venue's `glossyFloor`; `GlossyFloor.test.ts` holds the read), and the decal layer stamps
+once with `GroundDecals`' `persist` (no refresh; `stage.smoke.test.ts` "placed marks stay" runs three pool lives). Nothing left
+to route. §9's two "waits on the routed one-liners" lines were stale and are struck.
 
 ## 12. Round 4, tracks 2–4 (2026-10-16, lane/studio-4b)
 
