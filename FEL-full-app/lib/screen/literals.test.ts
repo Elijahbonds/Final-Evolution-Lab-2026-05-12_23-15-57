@@ -34,7 +34,7 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'lib/assess/prqWrite.ts': [[['32', '1024', '3', '10', '64', '8', '9', '31', '16', '1000', '100', '50', '240', '5000', '7', '21', '8192'], 'record-validation bounds (sizes, key lengths, plausible ranges) and rounding: what the server would accept, not a grade (no server save in this ship)']],
   'lib/assess/thresholds.ts': [],
   'lib/screen/checks.ts': [], 'lib/screen/store.ts': [], 'lib/screen/flow.ts': [], 'lib/screen/copy.ts': [], 'lib/screen/PROPOSED-program-lanes.ts': [],
-  'lib/screen/age.ts': [], 'lib/screen/routes.ts': [],
+  'lib/screen/age.ts': [], 'lib/screen/routes.ts': [], 'lib/screen/week1-dunk.ts': [],
   'lib/screen/kid.ts': [[['10'], 'one decimal of rounding for the change line (as lib/assess/why.ts rounds the jump)']],
   'lib/screen/config.ts': [[['9'], 'a regex character class (a-z0-9)']],
   'lib/screen/ui.ts': [[['16', '3', '0.5', '6', '1200'], 'UI constants: the skeleton\'s One Euro (1, 16, 3), its visibility floor, the tracking-loss window and the Done beat — grade nothing (gate 2)'], [LANDMARKS, 'landmark indices and count'], [['2'], 'PART_RESTART_MAX (SCREEN A): the one auto-retry plus one more restart per part, then the part waits — UI pacing, it grades nothing']],
@@ -45,6 +45,9 @@ const ALLOWED: Record<string, [string[], string][]> = {
   'app/play/mirror/assess/_components/live-hud.tsx': [[['100', '1000'], 'percent, ms → s'], [['0.55', '3'], 'flash opacity and distance read in a comment (not a grade)'], [['160', '40', '320', '25'], 'SCREEN A: the big rep counter\'s clamp (px/vh, at least 30% of the stage) and the pain tap\'s minimum share of the screen height — sizes, not grades']],
   'app/play/mirror/assess/_components/skeleton.ts': [[LANDMARKS, 'the bones and joints drawn'], [['0.35', '160', '0.9', '2.5', '110', '6', '1.5', '240', '200', '2.4', '0.2', '0.08', '1e-6'], 'drawing: visibility for the frozen view, line widths, alpha, radii, guide lengths, padding']],
   'app/play/mirror/assess/_components/use-voice.ts': [[['1.02'], 'speech rate']],
+  // MIRROR step 2 (fault replay)
+  'app/play/mirror/assess/_components/fault-replay.tsx': [[['240', '320'], 'the replay canvas drawing size and max width in px (a size, not a grade)']],
+  'lib/screen/rep-memory.ts': [],
 };
 const NONE = [
   'app/play/mirror/assess/_components/camera-help.tsx', 'app/play/mirror/assess/_components/not-saved.tsx', 'app/play/mirror/assess/_components/results-page.tsx',

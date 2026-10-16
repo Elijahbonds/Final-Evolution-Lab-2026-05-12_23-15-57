@@ -15,7 +15,7 @@ choice, 2026-09-03):
 
 Rules adopted as written, from now on:
 - **GATE 0** before animation work: verify the rig's naming and rest state; say so. (Here: `gateContainerRig` on load; fel-hero passes as 22 unprefixed bones.)
-- **SHIP FIREWALL**: no Nexus/Cell orchestration code in this repo.
+- **SHIP FIREWALL**: no Nexus/Cell orchestration code in this repo. — lifted for /studio (Nexus Studio) by the owner 2026-10-14; see docs/NEXUS-STUDIO.md.
 - **TESTS** green before every commit; report the count (currently 33 suites / 213 tests).
 - Explore → Plan → Implement → Verify. **Wait for sign-off** on anything touching physics, the rig, or the shared Profile object.
 - Show diffs, not files. **Risk level on every change: LOW / MEDIUM / RIG-ADJACENT.**

@@ -332,7 +332,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { kind: 'lamp', position: [12, 0, -8] },
     ],
     actors: [{ id: 'you', role: 'player', position: [0, 0, 6], facing: Math.PI, color: '#FF9F0A' }],
-    camera: { alpha: -Math.PI / 2, beta: 1.1, radius: 20, target: [0, 1.4, 0], fov: 0.92 },
+    // BUG SWEEP (2026-10-14): alpha −π/2 stood this camera behind the wall, so every mount warned "[NEXUS] framing: camera for "skateboarding" sits behind the wall" (the same residue as brain_brawl above). Scenery-only camera; +π/2 puts it on the audience side. Nothing else about the shot changes.
+    camera: { alpha: Math.PI / 2, beta: 1.1, radius: 20, target: [0, 1.4, 0], fov: 0.92 },
   },
 
   snowboarding: {
@@ -418,7 +419,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { id: 'you', role: 'player', position: [-3, 0.5, 2], facing: Math.PI, color: '#FF9F0A' },
       { id: 'foe', role: 'foe', position: [3, 0.5, 2], facing: Math.PI, color: '#0A84FF' },
     ],
-    camera: { alpha: -Math.PI / 2, beta: 1.12, radius: 14, target: [0, 1.5, 0], fov: 0.88 },
+    // BUG SWEEP (2026-10-14): alpha −π/2 stood this camera behind the wall, so every mount warned "[NEXUS] framing: camera for "who_scene_it" sits behind the wall" (the same residue as brain_brawl above). Scenery-only camera; +π/2 puts it on the audience side. Nothing else about the shot changes.
+    camera: { alpha: Math.PI / 2, beta: 1.12, radius: 14, target: [0, 1.5, 0], fov: 0.88 },
   },
 
   market_browse: {
@@ -436,7 +438,8 @@ export const VENUE_SPECS: Record<string, NexusWebSpec> = {
       { kind: 'lamp', position: [-9, 0, -5] },
     ],
     actors: [],
-    camera: { alpha: -Math.PI / 2, beta: 1.05, radius: 17, target: [0, 1.6, -1], fov: 0.9 },
+    // BUG SWEEP (2026-10-14): alpha −π/2 stood this camera behind the wall, so every mount warned "[NEXUS] framing: camera for "market_browse" sits behind the wall" (the same residue as brain_brawl above). Scenery-only camera; +π/2 puts it on the audience side. Nothing else about the shot changes.
+    camera: { alpha: Math.PI / 2, beta: 1.05, radius: 17, target: [0, 1.6, -1], fov: 0.9 },
   },
 
   // ── ship pass 4 (2026-09-04): specs sized to the modes' real play, with the baked maps ──

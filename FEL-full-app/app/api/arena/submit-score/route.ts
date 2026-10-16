@@ -20,10 +20,11 @@ import { recordServerEvent } from '@/lib/analytics-server';
 import { forWire } from '@/lib/mp/dunkCard';
 import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena-score-integrity';
 import { isExpired } from '@/lib/arena-reclaim';
+import { readDuelRun } from '@/lib/arena-duel-run';
 
 /**
  * POST /api/arena/submit-score
- * Body: { matchId, score }
+ * Body: { matchId, score, runId } (runId: the server run the score came from; every mode but music)
  * Records the caller's score for their Arena duel. When BOTH players have
  * submitted, the duel auto-settles atomically: higher score takes the pot
  * (minus rake); a tie refunds both players.
@@ -60,14 +61,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const matchId = String(body?.matchId ?? '');
-  const score = Number(body?.score);
+  const postedScore = Number(body?.score);
   // THE CARD (2026-09-13, owner: "in multiplayer we should see other peoples dunk and score"). Optional: a duel from a
   // client that does not send one settles on the mode's ceiling alone, and a card that does not parse is dropped. It
   // rides in the MatchEvent payload that already exists, so there is no schema change and no migration.
   // HOTFIX (2026-09-24): a card that parses must ADD UP — checked with the ceiling inside the transaction below, where
   // the match's mode is known, and stored only on a Flight Night duel.
   if (!matchId) return NextResponse.json({ error: 'matchId is required' }, { status: 400 });
-  if (!Number.isInteger(score) || score < 0) {
+  if (!Number.isInteger(postedScore) || postedScore < 0) {
     return NextResponse.json({ error: 'score must be a non-negative integer' }, { status: 400 });
   }
 
@@ -115,10 +116,23 @@ export async function POST(req: NextRequest) {
 
       // HOTFIX (2026-09-24): the score must be inside this mode's limit, and a dunk card must add up to it. A refusal
       // throws before the first write, so nothing is recorded, no ghost is drawn and nothing settles.
+      const score = postedScore;
       const check = checkStakeScore({ mode: match.mode, score, card: body?.card, killSwitch: killSwitchOn(), ...(rejudge?.ok ? { rejudged: rejudge.score } : {}) });
       if (!check.ok) throw new ArenaError(check.code, check.detail, STAKE_REFUSAL_STATUS);
       if (!check.ceilingApplied) console.warn(`[arena/submit-score] ${match.mode}: NEXT_PUBLIC_DISABLE_3D=1 serves the fallback game, whose scale the ceiling table does not describe — ceiling not applied`);
       const card = check.card;
+
+      // ARENA-SETTLE-SERVER (QA top-5 #1, 2026-10-15): every other mode settled on the number in the body, so a player could
+      // POST the ceiling without playing and take the pot. A duel score is now the score of a run the SERVER started and
+      // finished for this player in this mode after the duel opened (/api/sessions start + finish, SessionRun), named by
+      // `runId`, used for no other duel; the posted score must equal it. No run, a foreign or unfinished run, or another
+      // number is refused before anything is written (lib/arena-duel-run.ts). Music keeps its own rejudge above.
+      let duelRunId: string | null = null;
+      if (!isMusicDuel(match.mode)) {
+        const dr = await readDuelRun(tx, { runId: body?.runId, userId, match, postedScore });
+        if (!dr.ok) throw new ArenaError(dr.code, dr.detail, dr.status);
+        duelRunId = dr.runId;
+      }
 
       // Idempotent per player: first submission wins, later ones are ignored.
       const alreadySubmitted = isP1 ? match.player1Score !== null : match.player2Score !== null;
@@ -151,7 +165,7 @@ export async function POST(req: NextRequest) {
         const plaus = attempt?.finish ? musicTapPlausibility(match.id, attempt.finish.taps) : null;
         if (plaus?.flagged) console.warn(`[arena/submit-score] ${matchId}: a music set timed to ${plaus.spreadMs} ms over ${plaus.hits} hits — machine-exact; recorded for review`);
         await appendMatchEvent(tx, matchId, 'SCORE_SUBMITTED', userId, {
-          player: isP1 ? 'p1' : 'p2', score, ...(card ? { card: forWire(card) } : {}),
+          player: isP1 ? 'p1' : 'p2', score, ...(duelRunId ? { runId: duelRunId } : {}), ...(card ? { card: forWire(card) } : {}),
           ...(rejudge?.ok ? { rejudged: true, taps: rejudge.taps, ...(rejudge.forfeit ? { forfeit: 'unfinished_attempt' } : {}) } : {}),
           ...(plaus ? { plausibility: plaus } : {}),
         });

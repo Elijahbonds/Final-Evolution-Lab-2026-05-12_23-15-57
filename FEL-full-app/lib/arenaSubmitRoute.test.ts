@@ -5,7 +5,11 @@
 // ladder (which pays Lab Credits) is held to its mode's ceiling; and a duel never shows the opponent's score to beat.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ tx: null as unknown, userLookups: 0, db: {} as Record<string, any> }));
+const h = vi.hoisted(() => ({
+  tx: null as unknown, userLookups: 0, db: {} as Record<string, any>,
+  // ARENA-SETTLE-SERVER: the SessionRun rows the route can read, and the match the request is about
+  runs: {} as Record<string, Record<string, unknown>>, match: null as Record<string, unknown> | null, autoRun: true,
+}));
 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => ({ user: { id: 'u1' } })) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
@@ -37,13 +41,18 @@ interface Writes { updates: Record<string, unknown>[]; events: { eventType: stri
 interface StoredEvent { matchId: string; userId: string | null; eventType: string; payload: string; createdAt: Date; seq: number }
 function fakeTx(match: Record<string, unknown>, stored: StoredEvent[] = []): Writes {
   const writes: Writes = { updates: [], events: [] };
+  h.match = match;
   h.tx = {
+    sessionRun: { findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null) },
+    $queryRaw: async () => [],   // the run row's FOR UPDATE lock (raced in arenaDuelRunRace.test.ts)
     competitionMatch: {
       findUnique: async () => ({ ...match }),
       update: async ({ data }: { data: Record<string, unknown> }) => { writes.updates.push(data); Object.assign(match, data); return { ...match }; },
     },
     matchEvent: {
-      findFirst: async () => null,
+      // ARENA-SETTLE-SERVER: lib/arena-duel-run.ts's "was this run already submitted" read, over the stored rows
+      findFirst: async ({ where }: { where?: { userId?: string; eventType?: string; matchId?: { not: string }; payload?: { contains: string } } } = {}) =>
+        (where?.payload ? stored.find((e) => e.userId === where.userId && e.matchId !== where.matchId?.not && e.eventType === where.eventType && e.payload.includes(where.payload!.contains)) ?? null : null),
       create: async ({ data }: { data: { eventType: string; payload: string } }) => { writes.events.push({ eventType: data.eventType, payload: JSON.parse(data.payload) }); },
       // MUSIC-SUITE P6: lib/arena-music.ts readMusicAttempt's read of the player's attempt rows
       findMany: async ({ where }: { where: { matchId: string; userId: string; eventType: { in: string[] } } }) => stored
@@ -60,7 +69,20 @@ const arenaMatch = (over: Record<string, unknown> = {}) => ({
   player1Id: 'u1', player2Id: 'u2', player1Score: null, player2Score: null, entryFeeCents: 50, rakePercent: 10, ...over,
 });
 
+/** ARENA-SETTLE-SERVER: a finished server run of the caller's, in the duel's mode, started after the duel opened. */
+const finishedRun = (over: Record<string, unknown> = {}) => ({
+  id: 'r1', userId: 'u1', mode: String(h.match?.mode ?? 'hoops1v1'), result: { tier: 'pro', staked: true }, status: 'paid', score: 0,
+  startedAt: new Date(new Date(String(h.match?.createdAt ?? '2026-09-01')).getTime() + 60_000), ...over,
+});
+
 async function arenaPost(body: unknown) {
+  // every non-music duel score below comes from a run the server finished with that score (the player played it), unless
+  // a test names its own runId or switches this off; the ARENA-SETTLE-SERVER block tests the refusals directly
+  const b = body as Record<string, unknown>;
+  if (h.autoRun && b && b.runId === undefined && h.match && String(h.match.mode) !== 'music' && String(h.match.mode) !== 'musicAcademy') {
+    h.runs.r1 = finishedRun({ score: Number(b.score ?? 0) });
+    body = { ...b, runId: 'r1' };
+  }
   const { POST } = await import('@/app/api/arena/submit-score/route');
   const res = await POST(new Request('http://fel.local/api/arena/submit-score', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) as never);
   return { status: res.status, json: await res.json() as Record<string, unknown> };
@@ -70,7 +92,7 @@ const attempt = (round: number, judges: number[], total: number): DunkAttempt =>
 const card = forWire([attempt(1, [9, 9, 9], 46), attempt(1, [8, 8, 8], 41), attempt(2, [10, 10, 10], 60), attempt(2, [7, 8, 7], 38)].reduce(addAttempt, emptyCard()));
 
 describe('POST /api/arena/submit-score', () => {
-  beforeEach(() => { h.tx = null; });
+  beforeEach(() => { h.tx = null; h.runs = {}; h.autoRun = true; });
 
   it('refuses a score above the mode ceiling with a 422 and the reason, and writes nothing', async () => {
     const writes = fakeTx(arenaMatch());
@@ -377,5 +399,80 @@ describe('the opponent\'s score is not shown before your own run (low finding: t
   it('an opponent who has not posted is simply not in yet', async () => {
     db(match({ player1Score: null }));
     expect(await detail()).toMatchObject({ oppScore: null, oppSubmitted: false });
+  });
+});
+
+// ARENA-SETTLE-SERVER (QA top-5 #1, qa-top5-risk-2026-10-15.md): QA's repro, join a hoops1v1 duel and POST
+// { matchId, score: 13 } without playing, settled in the caller's favour. A duel score is now a server run's score.
+describe('POST /api/arena/submit-score: the score is a server run\'s', () => {
+  beforeEach(() => { h.tx = null; h.runs = {}; h.autoRun = false; });
+
+  const settledNothing = (w: Writes) => {
+    expect(w.updates).toHaveLength(0);
+    expect(w.events).toHaveLength(0);
+  };
+
+  it('QA repro: the ceiling (13) with no run is refused 409 NO_RUN; nothing is written and nothing settles, even with the other score in', async () => {
+    const w = fakeTx(arenaMatch({ player2Score: 5 }));
+    const r = await arenaPost({ matchId: 'm1', score: 13 });
+    expect(r).toMatchObject({ status: 409, json: { error: 'NO_RUN' } });
+    settledNothing(w);
+  });
+
+  it('a runId the server never started is refused the same way', async () => {
+    const w = fakeTx(arenaMatch({ player2Score: 5 }));
+    const r = await arenaPost({ matchId: 'm1', score: 13, runId: 'forged' });
+    expect(r).toMatchObject({ status: 409, json: { error: 'NO_RUN' } });
+    settledNothing(w);
+  });
+
+  it('a real run that scored 3 cannot be posted as 13: 422 SCORE_MISMATCH, nothing written', async () => {
+    const w = fakeTx(arenaMatch({ player2Score: 5 }));
+    h.runs.r1 = finishedRun({ score: 3 });
+    const r = await arenaPost({ matchId: 'm1', score: 13, runId: 'r1' });
+    expect(r).toMatchObject({ status: 422, json: { error: 'SCORE_MISMATCH' } });
+    settledNothing(w);
+  });
+
+  it('settles on the run\'s score when it is the one posted, and names the run in the event', async () => {
+    const w = fakeTx(arenaMatch({ player2Score: 5 }));
+    h.runs.r1 = finishedRun({ score: 11 });
+    const r = await arenaPost({ matchId: 'm1', score: 11, runId: 'r1' });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ settled: true, p1Score: 11, p2Score: 5, winnerId: 'u1' });
+    expect(w.events[0]).toMatchObject({ eventType: 'SCORE_SUBMITTED', payload: { player: 'p1', score: 11, runId: 'r1' } });
+  });
+
+  it('refuses someone else\'s run, a run in another mode, an unfinished run, and a run played before the duel opened', async () => {
+    const cases: [Record<string, unknown>, number, string][] = [
+      [{ userId: 'u2' }, 403, 'RUN_NOT_YOURS'],
+      [{ mode: 'threePoint' }, 422, 'RUN_WRONG_MODE'],
+      [{ status: 'open', score: null }, 409, 'RUN_NOT_FINISHED'],
+      [{ status: 'rejected' }, 409, 'RUN_NOT_FINISHED'],
+      [{ startedAt: new Date('2026-08-31') }, 422, 'RUN_BEFORE_DUEL'],
+    ];
+    for (const [over, status, error] of cases) {
+      const w = fakeTx(arenaMatch({ player2Score: 5 }));
+      h.runs.r1 = finishedRun({ score: 11, ...over });
+      const r = await arenaPost({ matchId: 'm1', score: 11, runId: 'r1' });
+      expect(r, error).toMatchObject({ status, json: { error } });
+      settledNothing(w);
+    }
+  });
+
+  it('one run counts for one duel: a run already submitted elsewhere is refused 409 RUN_ALREADY_USED', async () => {
+    const used: StoredEvent = { matchId: 'm0', userId: 'u1', eventType: 'SCORE_SUBMITTED', payload: JSON.stringify({ player: 'p1', score: 11, runId: 'r1' }), createdAt: new Date('2026-09-02'), seq: 1 };
+    const w = fakeTx(arenaMatch({ player2Score: 5 }), [used]);
+    h.runs.r1 = finishedRun({ score: 11 });
+    const r = await arenaPost({ matchId: 'm1', score: 11, runId: 'r1' });
+    expect(r).toMatchObject({ status: 409, json: { error: 'RUN_ALREADY_USED' } });
+    settledNothing(w);
+  });
+
+  it('a ghost duel draws no house score for a score with no run', async () => {
+    const w = fakeTx(arenaMatch({ matchType: 'GHOST_DUEL' }));
+    const r = await arenaPost({ matchId: 'm1', score: 13 });
+    expect(r.status).toBe(409);
+    settledNothing(w);
   });
 });

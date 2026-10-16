@@ -4,19 +4,17 @@
 import type { HudCue } from './danceTracks';
 import { Scene, TargetCamera, Vector3, SceneInstrumentation, Ray } from '@babylonjs/core';
 import { FloatingOriginCurrentScene } from '@babylonjs/core/Materials/floatingOriginMatrixOverrides';
-import { createEngine } from './createEngine';
+import { mountLookStack } from './lookStack';   // NEXUS STUDIO §4.1: the look stack, shared with the Studio's editor viewport
 import type { AbstractMesh, TransformNode } from '@babylonjs/core';
 import { mountPlayerRing, modeOwnsPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (all modes, 2026-09-17)
 import { readPlayerIcon } from '../visual/playerIcon';
 import { cachedIdentity } from './playerIdentity';
-import { mountLightRig, liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
+import { liftBlackMaterials, type LightRigHandle } from '../scene/LightRig';
 import { mountIblShadows, type IblShadowsHandle } from '../scene/IblShadows';
-import { detectRenderTier, mountSsao, tierRigSettings, type SsaoHandle } from '../scene/QualityTier';
 import type { VenueMood } from '../scene/moods';
 import { resolveModeMood } from '../scene/moodResolver';   // A9.4: mood follows the place
 import { InputBus, type FelInput, type BodyPacket } from './InputBus';
 import { CameraDirector, type FOLLOW_PRESETS } from './CameraDirector';
-import { mountLetterbox } from '../visual/Letterbox';   // vis-foundation-2 A9.12: the cinematic bars
 import { mountSweat } from './skinShading';   // vis-foundation-2 A9.14: the hero's skin shines as they work
 import { wave2Look } from '../scene/lookPolicy';
 import type { IntroKind } from '../scene/broadcastShots';
@@ -40,11 +38,9 @@ import { VoiceKit } from '../audio/mic/VoiceKit';
 import { QaTrace } from './QaTrace';
 import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
-import { autoInk, inkStyleFor } from '../visual/AnimeInk';    // M59: anime ink outlines
-import { mountBackdrop, MOOD_TO_FAMILY } from '../visual/Backdrops'; // M61: painted backdrops
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
-import { applyCanvasFit, watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
+import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
@@ -304,49 +300,50 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 /** runMode's mount itself: everything from the engine to the disposer, with the body seam and the card already up. */
 async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam, store: SessionWriter): Promise<() => void> {
   const { claimed, floor, session, evidence } = seam;
-  const engine = await createEngine(opts.canvas);
-  // M95 (Pass 2): a phone reports devicePixelRatio 3, so the backing buffer is
-  // 9 pixels per CSS pixel — fill rate is the dominant cost on mobile GPUs and
-  // the extra 8 are invisible at arm's length. Cap the ratio at 2 and cap total
-  // backing pixels; no-op on a 1x desktop.
-  const fit = applyCanvasFit(engine, opts.canvas);
-  // Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps. Decided once, here,
-  // from the same fill-rate signal the canvas fit used.
-  const tier = detectRenderTier(opts.canvas, fit, engine);   // visual-foundation: + the GPU, the high tier and the Graphics menu
-  const scene = new Scene(engine);
-  (scene.metadata ??= {}).felTier = tier;   // read by CharacterLibrary for per-spawn quality
-  scene.metadata.felModeId = def.modeId;   // read by kit.applyKit for the sport's default kit (owner decision 2026-09-05)
-  // PERF-GUARD (owner, 2026-10-06: "cool + smooth"): phones render at a steady 60 or 30 instead of every vsync, the
-  // resolution and the cheap effects step down when frames run slow or the phone heats up, and nothing renders behind a
-  // pause, an end card or a hidden tab. A hidden page pauses a playing game first (the START pause, so the resume is the
-  // one every mode already handles). See perfGuard.ts; the policy is PerfGovernor.ts.
-  const guard = mountPerfGuard({
-    engine, scene, tier, fit, publish: devOrAgentHooks(),
-    onHidden: () => { if (phase === 'playing') { releaseBody(); setPhase('paused'); store.setPause('input'); } },
+  // THE LOOK STACK (lib/babylon/core/lookStack.ts; NEXUS STUDIO §4.1, 2026-10-14): engine → canvas fit → tier → scene →
+  // camera → rig → SSAO → backdrop → ink → director → letterbox, the same calls in the same order as they always ran here,
+  // extracted so the Nexus Studio's editor viewport mounts exactly this. The harness's own work runs in the hooks at the
+  // point it always ran (the perf guard and the agent bridge right after the scene; the mood read once after the camera).
+  // M95 (Pass 2): a phone reports devicePixelRatio 3, so the backing buffer is 9 pixels per CSS pixel — fill rate is the
+  // dominant cost on mobile GPUs and the extra 8 are invisible at arm's length; the canvas fit caps the ratio at 2 and the
+  // total backing pixels (no-op on a 1x desktop). Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps, the tier decided
+  // once from the same fill-rate signal (visual-foundation: + the GPU, the high tier and the Graphics menu).
+  let guard!: ReturnType<typeof mountPerfGuard>;
+  let declaredMood!: VenueMood;
+  const look = await mountLookStack({
+    canvas: opts.canvas,
+    modeId: def.modeId,
+    camPreset: def.camPreset,
+    onScene: (scene, { engine, fit, tier }) => {
+      // PERF-GUARD (owner, 2026-10-06: "cool + smooth"): phones render at a steady 60 or 30 instead of every vsync, the
+      // resolution and the cheap effects step down when frames run slow or the phone heats up, and nothing renders behind a
+      // pause, an end card or a hidden tab. A hidden page pauses a playing game first (the START pause, so the resume is the
+      // one every mode already handles). See perfGuard.ts; the policy is PerfGovernor.ts.
+      guard = mountPerfGuard({
+        engine, scene, tier, fit: fit!, publish: devOrAgentHooks(),
+        onHidden: () => { if (phase === 'playing') { releaseBody(); setPhase('paused'); store.setPause('input'); } },
+      });
+      if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
+      // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
+      // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
+      installAgentBridge(AGENT_MODES);
+    },
+    // def.mood / def.backdrop may be getters (see ModeDefinition.mood): each is read ONCE, so the rig, the post pipeline,
+    // the backdrop and the ambient bed all agree on one mood for the life of the mount.
+    mood: () => {
+      declaredMood = def.mood;   // read once — it may be a per-venue getter
+      // A9.4 (visual-foundation): MOOD FOLLOWS THE PLACE — the picked arena / place look decides the light for the modes the
+      // resolver knows (combat, net, football, golf, derby, penalty, carnival, dance, brainbrawl); every other mode keeps its own.
+      const { mood: resolved, why: moodWhy } = resolveModeMood(def.modeId, declaredMood);
+      if (resolved !== declaredMood) console.info(`[FEL-MOOD] ${def.modeId}: ${declaredMood} → ${resolved} (${moodWhy})`);
+      return resolved;
+    },
+    backdrop: () => def.backdrop,
   });
-  if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
-  // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
-  // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
-  installAgentBridge(AGENT_MODES);
-  const camera = new TargetCamera('cam', new Vector3(0, 3, -8), scene);
-  const declaredMood = def.mood;   // read once — it may be a per-venue getter
-  // A9.4 (visual-foundation): MOOD FOLLOWS THE PLACE — the picked arena / place look decides the light for the modes the
-  // resolver knows (combat, net, football, golf, derby, penalty, carnival, dance, brainbrawl); every other mode keeps its own.
-  const { mood, why: moodWhy } = resolveModeMood(def.modeId, declaredMood);
-  if (mood !== declaredMood) console.info(`[FEL-MOOD] ${def.modeId}: ${declaredMood} → ${mood} (${moodWhy})`);
-  const lights = mountLightRig(scene, mood, tier);
-  // Desktop tier only: SSAO grounds feet and darkens the crease between close
-  // bodies. Attached to the one gameplay camera; disposed with the mode.
-  const ssao: SsaoHandle | null = tierRigSettings(tier, mood).ssao ? mountSsao(scene, camera) : null;
-  // M61: painted sky + horizon backdrop (2 meshes, unlit, auto-rotating)
-  // def.mood / def.backdrop may be getters (see ModeDefinition.mood): read each ONCE here so the rig, the
-  // post pipeline, the backdrop and the ambient bed all agree on one mood for the life of the mount.
-  const backdrop = mountBackdrop(scene, def.backdrop ?? MOOD_TO_FAMILY[mood] ?? 'park', mood);
-  // M59: anime ink outlines on every skinned character (auto-hooks spawns)
-  const unink = autoInk(scene, inkStyleFor(def.modeId));   // A9.6: the anime line for the party modes, a distance-true contour for the sports
+  // Desktop tier only: SSAO grounds feet and darkens the crease between close bodies (attached to the one gameplay camera,
+  // disposed with the mode); M61 the painted backdrop; M59 the ink; A9.12 the director's letterbox.
+  const { engine, fit, tier, scene, camera, mood, lights, ssao, backdrop, unink, camDirector, letterbox } = look;
   const input = opts.input ?? new InputBus();
-  const camDirector = new CameraDirector(scene, camera, def.camPreset);
-  const letterbox = mountLetterbox(scene, opts.canvas, () => camDirector.cinematic01);   // A9.12: the intro's and the replays' bars
   const sweat = wave2Look(def.modeId) ? mountSweat(scene, () => heroRef.current, () => phase === 'playing') : null;   // A9.14
 
   // M67: dev-only frame-budget monitor. mount() is a no-op in production, so

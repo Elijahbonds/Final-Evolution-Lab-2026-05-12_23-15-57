@@ -24,6 +24,7 @@
 // Reliability: clipRegistry/installSafePlay, per-phase watchdogs, groundLock,
 // fight-preset framing, SoundKit/EffectsKit — all standard since M42.
 
+import { timeOutVerdict, roundsExhausted } from './roundVerdict';
 import { EvadeMoves } from '../core/EvadeMoves';
 import { FOCUS, FocusMeter, WALL_RUN, wallRunAvailableOn, startWallRunOn, wallRunOnAt, wallRunOnSide, startWallKick, wallKickAt, kickHits, type WallRunOn, type WallKickState } from '../core/MatrixFocus';   // MATRIX FOCUS (2026-09-18): bullet time held on the right trigger
 import { readCombatArena, arenasFor, arenaClamp, knockTo, hazardAt, describeArena, crowdRing, CROWD_GAP, CROWD_PHASE, ROPES, type CombatArena, type ArenaWall } from '../combat/arenas';   // COMBAT ARENAS (2026-09-18)
@@ -68,7 +69,7 @@ import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';   // COMBAT DI
 import { DefenseController, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';   // the substitution the break pays: its chi, its read-and-punish window
 import { CHI } from '../core/ResourceMeter';
 import { DUEL } from './duelRules';   // subWhiffMs: the beat a swing in flight finds nobody (Showdown's and Duel's 400 ms)
-import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick — PRO on a staked / head-to-head run (QA #259)
 import { threatLandsIn, RivalCombatBrain, type RivalResource } from '../core/RivalCombatBrain';   // IMPROVE (2026-10-06): the shared rival (it dashes now)
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats and banners on the game clock
 import { versusScore, versusScoreParts, type VersusTally } from '../core/VersusScore';   // IMPROVE (2026-10-06): a result a replay can beat
@@ -189,7 +190,7 @@ export const KarateVSMode: ModeDefinition = (() => {
   let myAttacks: Record<'jab' | 'kick' | 'heavy', AttackDef> = KARATE_ATTACKS;
   let phase: Phase = 'intro';
   let phaseSec = 0;
-  let round = 1, myWins = 0, foeWins = 0;
+  let round = 1, myWins = 0, foeWins = 0, drawnRounds = 0;   // DUEL-IDLE-FIX family: a level round on the clock
   /** PRQ gates what this body can do (FighterStyle). No scan is plumbed into the modes yet, so both
    *  fighters start at the baseline; `?fight=` overrides MY ratings so the earned routes can be driven. */
   let myRatings: FightRatings = { ...BASELINE_RATINGS };
@@ -704,7 +705,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           if (bannerText) banner(ctx, bannerText, route ? 0.9 : 0.7);
           if (defState.hp <= 0) endRound(ctx, mine);
           // COMBAT DIFFICULTY (2026-10-13): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker)
-          else if (mine && breaker.hit(now() / 1000, readTier(), defState.chi >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
+          else if (mine && breaker.hit(now() / 1000, runTier(), defState.chi >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
           break;
         }
       }
@@ -793,9 +794,23 @@ export const KarateVSMode: ModeDefinition = (() => {
   }
 
   /** `why` (IMPROVE 2026-10-06): what ended it, said before the result — 'TIME' at the bell, 'BURNED!' in a pit. */
-  function endRound(ctx: ModeContext, playerWon: boolean, why?: string): void {
+  function endRound(ctx: ModeContext, verdict: boolean | null, why?: string): void {
     if (phase !== 'fighting') return;
     setPhase('roundOver');
+    // WIN-SERVER / LB family (an idle Storm Duel timed out 100–100 and the tie went to the player): a level round on the
+    // clock (null) is nobody's — replayed; afterRound ends a best-of whose rounds all ran out with nobody at 2 as not won
+    if (verdict === null) {
+      drawnRounds++;
+      slowmoSec = 0; applyTimeScales();
+      endStrike(true); endStrike(false);
+      ctx.setHud({ wins: myWins, foeWins });
+      banner(ctx, `TIME — DRAWN ROUND ${round} — NO POINT`, Infinity);
+      slam(ctx, 'TIME!');
+      if (!dragon.landed) dragon.abort();
+      koCue.arm({ kind: 'time', decidesMatch: false, victim: 0 }, motionPolicy().reduced);
+      return;
+    }
+    const playerWon = verdict;
     if (playerWon) { myWins++; tally.hpLeftOnWins.push(meState.hp / meState.maxHp); } else foeWins++;
     // IMPROVE (2026-10-06): the parry slow-mo ends with the round (it only ticks in the fight, so the KO held the bodies at 0.3)
     slowmoSec = 0; applyTimeScales();
@@ -823,9 +838,9 @@ export const KarateVSMode: ModeDefinition = (() => {
   /** The round-over beat is over: the next round, or the result. */
   function afterRound(ctx: ModeContext): void {
     banner(ctx, '', 0);
-    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN) {
+    if (myWins >= ROUNDS_TO_WIN || foeWins >= ROUNDS_TO_WIN || roundsExhausted(myWins + foeWins + drawnRounds, ROUNDS_TO_WIN)) {
       setPhase('matchOver');
-      const won = myWins > foeWins;
+      const won = myWins >= ROUNDS_TO_WIN;
       SoundKit.play('whistle');
       if (won) { matchPunch(ctx); EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(0, 2, 0)), 'confetti'); }
       // IMPROVE (2026-10-06): the rounds (myWins * 100 - foeWins * 40, as ever) plus the HP kept in the rounds won, the
@@ -855,12 +870,12 @@ export const KarateVSMode: ModeDefinition = (() => {
       // bar is only a special when this rival can throw the DRAGON at all
       const shift = brain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
       if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
-      brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, readTier()));
+      brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, runTier()));
       brain.setCanSpecial(hasFightMove('dragon', foeRatings));
       // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
       // POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before resetRound fills the HP
       brain.setStepping(false);
-      foePower = rivalPower(RIVAL_POWER_BASE.karateVs, readTier());
+      foePower = rivalPower(RIVAL_POWER_BASE.karateVs, runTier());
       applyRivalPower(foeState, foePower);
       knock.clear();
       // the rival's dash, and the beats still waiting from the last round (IMPROVE 2026-10-06: never cleared before)
@@ -904,7 +919,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     setPhase('walkIn');
     banner(ctx, '', 0);
     ctx.setHud({
-      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[readTier()]?.name ?? 'PRO').toUpperCase(),
+      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[runTier()]?.name ?? 'PRO').toUpperCase(),
       meName: 'YOU', meSub: blendName(readBlend()).toUpperCase(),
     });
     SoundKit.play('whoosh', { pitch: 0.55, volume: 0.3 });
@@ -1012,7 +1027,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       // read once at mount — a style cannot change mid-fight, and re-deriving it per strike would be work
       // on the hot path for a value that never moves
       myAttacks = styleAttacks(KARATE_ATTACKS, blendTraits(readBlend()), MIN_STARTUP_SEC * 1000);
-      round = 1; myWins = 0; foeWins = 0; matchLatch = false; heavyAt = 0;
+      round = 1; myWins = 0; foeWins = 0; drawnRounds = 0; matchLatch = false; heavyAt = 0;
       // IMPROVE (2026-10-06): a fresh match — the clocks, the banner, the tally
       clock = 0; meTimers.clear(); foeTimers.clear(); bannerSlot.clear(); foeDash = null;
       tally.hpLeftOnWins = []; tally.perfectDodges = 0; tally.routes = 0; timeHud = -1; guardHud = -1; foeGuardHud = -1;
@@ -1044,6 +1059,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
+      ctx0 = ctx;   // bug sweep 2026-10-14: stickDirToFoe reads ctx0.camDirector, and update() is what used to set it — a stick push and an attack in the first playing frame, before any update(), threw
       SoundKit.unlock();
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       // P7: who is driving — a real press or push is the pad's (the body's own outputs carry src 'body')
@@ -1118,7 +1134,7 @@ export const KarateVSMode: ModeDefinition = (() => {
       else if (phase === 'roundOver' && phaseSec >= ROUND_OVER_SEC) { afterRound(ctx); return; }
       if (phaseSec > BUDGET_SEC[phase]) {
         // the round clock running out is the BELL, not a fault: TIME, and the round goes to whoever has more HP left
-        if (phase === 'fighting') { console.info('[KVS] time — round decided on HP'); SoundKit.play('whistle'); endRound(ctx, meState.hp >= foeState.hp, 'TIME'); }
+        if (phase === 'fighting') { console.info('[KVS] time — round decided on HP'); SoundKit.play('whistle'); endRound(ctx, timeOutVerdict(meState.hp, foeState.hp), 'TIME'); }
         else { console.warn(`[FEL-WATCHDOG] karate-vs stuck in "${phase}" — auto-advancing`); if (phase === 'roundOver') afterRound(ctx); }
         return;
       }

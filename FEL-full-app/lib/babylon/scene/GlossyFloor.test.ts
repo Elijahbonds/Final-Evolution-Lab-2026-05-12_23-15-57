@@ -77,6 +77,19 @@ describe('mountGlossyFloor', () => {
     h.dispose();
     expect(pm.roughness).toBe(0.66);
   });
+  it('NEXUS STUDIO: a Studio venue that asks for the glossy floor (scene.metadata.felStudioGround) gets it; without the ask, the mode\'s own answer', () => {
+    const s = new Scene(new NullEngine());
+    (s.metadata ??= {}).felModeId = 'tiebreak';   // tennis: no glossy floor of its own
+    const floor = MeshBuilder.CreateGround('venue_ground', { width: 20, height: 20 }, s); const m = new PBRMaterial('g', s); m.roughness = 0.8; floor.material = m;
+    expect(mountGlossyFloor(s, 'desktop', null)).toBeNull();   // the control: Tiebreak's own court is matte
+    s.metadata.felStudioGround = 'court';
+    const h = mountGlossyFloor(s, 'desktop', null)!;
+    expect(h).not.toBeNull(); expect(h.floor).toBe(floor); expect(m.roughness).toBe(VARNISH_ROUGHNESS);
+    h.dispose();
+    expect(mountGlossyFloor(s, 'mobile', null)).toBeNull();   // still never on a phone
+    s.metadata.felStudioGround = 'sand';
+    expect(mountGlossyFloor(s, 'desktop', null)).toBeNull();   // a named floor that is not a wooden court stays matte
+  });
   it('a venue without that plane (another court location) mounts nothing for it', () => {
     const s = new Scene(new NullEngine());
     (s.metadata ??= {}).felModeId = 'threepoint';

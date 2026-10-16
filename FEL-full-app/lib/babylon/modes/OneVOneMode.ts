@@ -205,8 +205,7 @@ import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/Mo
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
-import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2: the shared OPPONENT pick
-import { tierForRun } from './threevthreeRules';   // QA #259: a staked / head-to-head run plays PRO, whatever the pick
+import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA #259/#262: the OPPONENT pick, PRO on a staked / head-to-head run (every mode reads runTier)
 import type { AmbientHandle } from '../visual/EffectsKit';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
   ONEVONE_TIER, attackerPatience, winRule, gameWinner, onePointAway, winBy2Requested, readWinBy2Pick, type WinRule,
@@ -908,7 +907,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** #2 #3 / NB-1: the OPPONENT pick and the win rule as they stand now — read at load AND again at TAP TO START (onPlay). */
   function readRules(): { knobs: typeof knobs; winCond: WinRule } {
     return {
-      knobs: ONEVONE_TIER[tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())] ?? ONEVONE_TIER.pro,
+      knobs: ONEVONE_TIER[runTier()] ?? ONEVONE_TIER.pro,
       winCond: winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' })),
     };
   }
@@ -933,7 +932,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       foeBrain?.setAggression(knobs.defenderAggression);
       nerveTheAttacker();
       putHud(ctx, { winBy2: winCond.winBy2 });
-      console.info(`[1V1-RULES] at start: opponent ${tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] at start: opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
     },
 
     async load(ctx: ModeContext) {
@@ -982,9 +981,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       // the pips (#10), the box (#4); the OPPONENT pick (#2) and the win rule (#3) are read for this run
       modeClock = 0; bannerUntil = 0; timers.length = 0; lastUpdateMs = -1; meFlightTick = null; foeFlightTick = null;
       hudMemo.clear(); hintShown = ''; hintAt = 0; hintPossession = null; pips = ''; box = emptyBox();
-      knobs = ONEVONE_TIER[tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())] ?? ONEVONE_TIER.pro;
+      knobs = ONEVONE_TIER[runTier()] ?? ONEVONE_TIER.pro;
       winCond = winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' }));
-      console.info(`[1V1-RULES] opponent ${tierForRun(typeof window !== 'undefined' ? window.location.search : '', readTier())} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
