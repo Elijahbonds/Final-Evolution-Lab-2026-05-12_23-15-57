@@ -105,8 +105,9 @@ export interface VenueSettings {
   replayAngles: StudioReplayAngle[];
   /** Ask for the planar-mirror floor (scene/GlossyFloor.ts) — desktop/high, a wooden court. */
   glossyFloor: boolean;
-  /** Track 3: who the venue casts — a project character's id per slot (cast.ts). Absent = the player's own look. */
-  cast?: { player?: string };
+  /** Track 3: who the venue casts — a project character's id per slot (cast.ts). Absent = the player's own look.
+   *  `crowd` (studio-4b): characters seated among the crowd's fans, visual only (at most LIMITS.crowdCast). */
+  cast?: { player?: string; crowd?: string[] };
 }
 
 export interface StudioVenue extends VenueSettings { id: string; objects: StudioObject[] }
@@ -114,8 +115,9 @@ export interface StudioVenue extends VenueSettings { id: string; objects: Studio
 /** Track 3: a character is a Closet look (its share code, lib/creator/look/shareCode). A code that is not code-shaped, or
  *  longer than the Closet's own ceiling, is dropped whole (a truncated code is a corrupt one). */
 export interface StudioCharacter { id: string; name: string; lookCode?: string }
-/** Track 4: an event → condition → action graph (scripts.ts), run by interpreter.ts in every venue the project plays. */
-export interface StudioScript extends ScriptGraph { id: string; name: string }
+/** Track 4: an event → condition → action graph (scripts.ts), run by interpreter.ts in every venue the project plays —
+ *  or, with `venues` (studio-4b, per-venue scope), only in those venues (an empty list: in none). Absent = every venue. */
+export interface StudioScript extends ScriptGraph { id: string; name: string; venues?: string[] }
 
 export interface StudioProject {
   kind: typeof STUDIO_DOC_KIND;
@@ -151,6 +153,8 @@ export const LIMITS = {
   fixtureHeight: [0.3, 40] as const,
   /** lib/creator/look/shareCode MAX_SHARE_CODE_CHARS: the longest code the Closet itself reads. */
   code: 50_000,
+  /** characters a venue may seat among its crowd's fans (each is a real skinned body: the phone ceiling is 16) */
+  crowdCast: 4,
 };
 /** The share-code shape (cast.ts holds the decode): FEL<version>.<base64url>.<checksum>. */
 const CODE = /^FEL\d{1,3}\.[A-Za-z0-9_-]+\.[0-9a-z]{7}$/;
@@ -362,9 +366,27 @@ export function sanitizeVenue(x: unknown, seen: Set<string>): StudioVenue | null
     intro: oneOf(x.intro, INTROS) ?? 'none',
     replayAngles: angles,
     glossyFloor: x.glossyFloor === true,
-    ...(isObj(x.cast) && typeof x.cast.player === 'string' && ID.test(x.cast.player) ? { cast: { player: x.cast.player } } : {}),
+    ...sanitizeCastRefs(x.cast),
     objects,
   };
+}
+
+/** A venue's cast slots: a character id per slot, the crowd a short list of distinct ids. Nothing usable = no `cast`. */
+function sanitizeCastRefs(x: unknown): { cast?: { player?: string; crowd?: string[] } } {
+  if (!isObj(x)) return {};
+  const player = typeof x.player === 'string' && ID.test(x.player) ? x.player : undefined;
+  const crowd: string[] = [];
+  for (const c of Array.isArray(x.crowd) ? x.crowd : []) if (typeof c === 'string' && ID.test(c) && !crowd.includes(c) && crowd.length < LIMITS.crowdCast) crowd.push(c);
+  if (!player && !crowd.length) return {};
+  return { cast: { ...(player ? { player } : {}), ...(crowd.length ? { crowd } : {}) } };
+}
+
+/** A script's venue scope: absent (every venue) or a list of distinct venue ids (possibly empty: no venue). */
+function sanitizeScope(x: unknown): { venues?: string[] } {
+  if (!Array.isArray(x)) return {};
+  const venues: string[] = [];
+  for (const v of x) if (typeof v === 'string' && ID.test(v) && !venues.includes(v) && venues.length < LIMITS.venues) venues.push(v);
+  return { venues };
 }
 
 export type ParseResult = { ok: true; project: StudioProject; dropped: number } | { ok: false; error: string };
@@ -406,10 +428,18 @@ export function sanitizeProject(raw: unknown, now = new Date()): ParseResult {
   for (const s of Array.isArray(x.scripts) ? x.scripts : []) {
     if (!isObj(s) || scripts.length >= LIMITS.scripts) continue;
     // the graph through its own sanitiser: known node kinds, params per spec, allowed and acyclic edges — data, never code
-    scripts.push({ id: idOr(s.id, 'script', seen), name: str(s.name, LIMITS.name, 'Script'), ...sanitizeGraph(s) });
+    scripts.push({ id: idOr(s.id, 'script', seen), name: str(s.name, LIMITS.name, 'Script'), ...sanitizeGraph(s), ...sanitizeScope(s.venues) });
   }
-  // a cast that names a character the project does not have is dropped (the venue plays the player's own look)
-  for (const v of venues) if (v.cast?.player && !characters.some((c) => c.id === v.cast!.player)) delete v.cast;
+  // a cast that names a character the project does not have is dropped (the venue plays the player's own look; the crowd
+  // keeps the characters it still has)
+  const known = (id: string) => characters.some((c) => c.id === id);
+  for (const v of venues) {
+    if (!v.cast) continue;
+    const player = v.cast.player && known(v.cast.player) ? v.cast.player : undefined;
+    const crowd = (v.cast.crowd ?? []).filter(known);
+    if (!player && !crowd.length) delete v.cast;
+    else v.cast = { ...(player ? { player } : {}), ...(crowd.length ? { crowd } : {}) };
+  }
   const at = now.toISOString();
   const activeVenueId = typeof x.activeVenueId === 'string' && venues.some((v) => v.id === x.activeVenueId) ? x.activeVenueId : venues[0].id;
   const iso = (s: unknown) => (typeof s === 'string' && !Number.isNaN(Date.parse(s)) ? new Date(s).toISOString() : at);

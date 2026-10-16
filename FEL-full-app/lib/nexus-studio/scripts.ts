@@ -46,9 +46,14 @@ export const NODE_SPECS = {
   onModeStart: { group: 'event', label: 'Play starts', hint: 'READY becomes playing.', params: [] },
   onModeEnd: { group: 'event', label: 'Play ends', hint: 'The mode ends its session.', params: [] },
   onTimer: { group: 'event', label: 'Timer', hint: 'Every N seconds of play (or once, after N).', params: [{ key: 'seconds', label: 'Seconds', type: 'number', min: 0.5, max: 600, step: 0.5, dflt: 10 }, { key: 'repeat', label: 'Repeat', type: 'enum', options: ['every', 'once'], dflt: 'every' }] },
+  // studio-4b: two more events, each read off data a mode ALREADY puts out (nothing new is asked of a mode): the rally count a
+  // rallying mode posts on its HUD (TiebreakMode hud() `rally`), and the mode's own broadcast replay (ctx.highlight, which a
+  // replaying mode calls — Football Rush after a touchdown). The host hears both without changing either (scriptHost.ts).
+  onRally: { group: 'event', label: 'Rally length', hint: 'The rally reaches this many returns (read off the HUD a rallying mode posts: Tiebreak).', params: [{ key: 'length', label: 'Returns', type: 'number', min: 1, max: 99, step: 1, dflt: 5 }] },
+  onReplay: { group: 'event', label: 'Replay', hint: 'The mode\'s own broadcast replay starts or ends (a mode that replays: Football Rush\'s touchdown).', params: [{ key: 'when', label: 'When', type: 'enum', options: ['ends', 'starts'], dflt: 'ends' }] },
   onZone: { group: 'event', label: 'Zone enter', hint: 'The hero steps into a circle on the ground.', params: [{ key: 'x', label: 'Centre x', type: 'number', min: -80, max: 80, step: 0.5, dflt: 0 }, { key: 'z', label: 'Centre z', type: 'number', min: -80, max: 80, step: 0.5, dflt: 0 }, { key: 'r', label: 'Radius', type: 'number', min: 0.5, max: 30, step: 0.5, dflt: 2 }] },
   // conditions
-  compare: { group: 'condition', label: 'Compare', hint: 'Pass when a value compares true.', params: [{ key: 'value', label: 'Value', type: 'enum', options: ['myScore', 'theirScore', 'lead', 'momentum', 'elapsed', 'fires'], dflt: 'lead' }, { key: 'op', label: 'Is', type: 'enum', options: ['>', '>=', '==', '<=', '<'], dflt: '>=' }, { key: 'to', label: 'Than', type: 'number', min: -999, max: 999, step: 1, dflt: 1 }] },
+  compare: { group: 'condition', label: 'Compare', hint: 'Pass when a value compares true.', params: [{ key: 'value', label: 'Value', type: 'enum', options: ['myScore', 'theirScore', 'lead', 'momentum', 'elapsed', 'fires', 'rally'], dflt: 'lead' }, { key: 'op', label: 'Is', type: 'enum', options: ['>', '>=', '==', '<=', '<'], dflt: '>=' }, { key: 'to', label: 'Than', type: 'number', min: -999, max: 999, step: 1, dflt: 1 }] },
   cooldown: { group: 'condition', label: 'Cooldown', hint: 'Pass at most once every N seconds.', params: [{ key: 'seconds', label: 'Seconds', type: 'number', min: 0.1, max: 600, step: 0.5, dflt: 3 }] },
   chance: { group: 'condition', label: 'Chance', hint: 'Pass this often (0–1).', params: [{ key: 'p', label: 'Chance', type: 'number', min: 0, max: 1, step: 0.05, dflt: 0.5 }] },
   // actions (presentation only)
@@ -181,6 +186,18 @@ export function graphNotes(g: ScriptGraph): string[] {
     if (grp !== 'action' && !out.has(n.id)) notes.push(`${NODE_SPECS[n.kind].label} leads nowhere.`);
   }
   return notes;
+}
+
+// ── per-venue scope (studio-4b) ─────────────────────────────────────────────────────────────────────────────────────
+
+/** Does a script run in this venue? No `venues` list: every venue. A list: only those (an empty list: none). */
+export function scriptRunsIn(s: { venues?: readonly string[] }, venueId: string): boolean {
+  return !s.venues || s.venues.includes(venueId);
+}
+
+/** The scripts a venue's play-test carries: the ones whose scope includes it (exportVenue then keeps the enabled ones). */
+export function scriptsForVenue<T extends { venues?: readonly string[] }>(scripts: readonly T[], venueId: string): T[] {
+  return scripts.filter((s) => scriptRunsIn(s, venueId));
 }
 
 /** The example the brief names, built the editor's way: on a point won → the crowd cheers + a banner (+ a burst, cooled). */

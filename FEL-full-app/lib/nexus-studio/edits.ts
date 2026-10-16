@@ -117,6 +117,13 @@ export function editScript(id: string, patch: Partial<Omit<StudioScript, 'id'>>,
   return { label, ...(group ? { group } : {}), ops: [{ op: 'patchScript', id, patch: clean }] };
 }
 
+/** Per-venue scope (studio-4b): `null` runs the script in every venue; a list runs it only in those (an empty list: none). */
+export function setScriptScope(s: StudioScript, venues: readonly string[] | null): Command {
+  const list = venues ? [...new Set(venues)] : undefined;
+  const label = !list ? 'Script: every venue' : list.length === 1 ? 'Script: one venue' : `Script: ${list.length} venues`;
+  return editScript(s.id, { venues: list }, label);
+}
+
 /** Add a node to a script. */
 export function addScriptNode(s: StudioScript, kind: NodeKind, x: number, y: number): { cmd: Command; id: string } {
   const node = newNode(kind, x, y);

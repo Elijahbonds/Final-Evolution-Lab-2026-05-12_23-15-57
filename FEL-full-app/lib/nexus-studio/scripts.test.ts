@@ -1,6 +1,7 @@
 // Track 4: the script graph as data (scripts.ts) and its interpreter (interpreter.ts), headless.
 import { describe, expect, it } from 'vitest';
-import { NODE_KINDS, NODE_SPECS, SCRIPT_LIMITS, edgeAllowed, graphNotes, newEdge, newNode, pointWonGraph, sanitizeGraph, sanitizeParams, wouldCycle, type ScriptGraph } from './scripts';
+import { NODE_KINDS, NODE_SPECS, SCRIPT_LIMITS, edgeAllowed, graphNotes, newEdge, newNode, pointWonGraph, sanitizeGraph, sanitizeParams, scriptRunsIn, scriptsForVenue, wouldCycle, type ScriptGraph } from './scripts';
+import { sanitizeProject, serializeProject } from './doc';
 import { ACTIONS_PER_SECOND, createInterpreter, type ScriptAction, type ScriptState } from './interpreter';
 import { createStack, execute, undo } from './commands';
 import { exportVenue, parseVenueExport } from './exportVenue';
@@ -18,7 +19,9 @@ describe('the vocabulary', () => {
     const groups = Object.fromEntries(NODE_KINDS.map((k) => [k, NODE_SPECS[k].group]));
     expect(Object.entries(groups).filter(([, g]) => g === 'action').map(([k]) => k).sort()).toEqual(['banner', 'burst', 'camera', 'crowd', 'lights', 'sound']);
     expect(Object.entries(groups).filter(([, g]) => g === 'condition').map(([k]) => k).sort()).toEqual(['chance', 'compare', 'cooldown']);
-    expect(Object.entries(groups).filter(([, g]) => g === 'event').map(([k]) => k).sort()).toEqual(['onModeEnd', 'onModeStart', 'onMomentum', 'onScore', 'onTier', 'onTimer', 'onZone']);
+    // test changed: (studio-4b) the event list gained onRally and onReplay — two listen-only events read off data a mode already
+    // puts out (the HUD's rally count, the mode's own replay call). Nothing was removed; the action list is unchanged.
+    expect(Object.entries(groups).filter(([, g]) => g === 'event').map(([k]) => k).sort()).toEqual(['onModeEnd', 'onModeStart', 'onMomentum', 'onRally', 'onReplay', 'onScore', 'onTier', 'onTimer', 'onZone']);
   });
   it('edges run event/condition → condition/action, never into an event or out of an action', () => {
     expect(edgeAllowed('onScore', 'crowd')).toBe(true);
@@ -155,5 +158,70 @@ describe('scripts in the project and the export', () => {
     const back = parseVenueExport(JSON.stringify({ ...exp, scripts: [...exp.scripts!, { id: 'evil', nodes: [{ id: 'n', kind: 'exec', params: { code: 'x' } }], edges: [] }] }));
     expect(back?.scripts?.map((x) => x.id)).toEqual(['sc1']);
     expect(back?.scripts?.[0].edges).toHaveLength(4);
+  });
+});
+
+describe('studio-4b: rally and replay events', () => {
+  it('"Rally length" fires once as the posted count crosses its length, again on a later rally, never on the way down', () => {
+    const ev = newNode('onRally', 0, 0, { length: 5 }), a = newNode('banner', 0, 0, { text: 'FIVE!' });
+    const r = run({ enabled: true, nodes: [ev, a], edges: [newEdge(ev.id, a.id)] });
+    for (let k = 1; k <= 7; k++) r.it.emit({ type: 'rally', length: k, prev: k - 1 }, S({ rally: k }));
+    expect(r.got).toHaveLength(1);                                               // 4 → 5 only
+    r.it.emit({ type: 'rally', length: 2, prev: 0 }, S({ rally: 2 }));          // a new rally, short
+    r.it.emit({ type: 'rally', length: 6, prev: 2 }, S({ rally: 6 }));          // a jump past 5 still crosses it
+    expect(r.got).toHaveLength(2);
+    expect(sanitizeParams('onRally', { length: 500 })).toEqual({ length: 99 });
+  });
+  it('compare reads the rally', () => {
+    const ev = newNode('onScore', 0, 0, { side: 'me' }), cmp = newNode('compare', 0, 0, { value: 'rally', op: '>=', to: 4 }), a = newNode('crowd', 0, 0);
+    const r = run({ enabled: true, nodes: [ev, cmp, a], edges: [newEdge(ev.id, cmp.id), newEdge(cmp.id, a.id)] });
+    r.it.emit({ type: 'score', side: 'me' }, S({ rally: 3 }));
+    r.it.emit({ type: 'score', side: 'me' }, S({ rally: 4 }));
+    r.it.emit({ type: 'score', side: 'me' }, S());   // a mode that does not rally: 0
+    expect(r.got).toHaveLength(1);
+  });
+  it('"Replay" fires on the phase it names', () => {
+    const ends = newNode('onReplay', 0, 0, { when: 'ends' }), starts = newNode('onReplay', 0, 0, { when: 'starts' }), a = newNode('banner', 0, 0), b = newNode('sound', 0, 0);
+    const r = run({ enabled: true, nodes: [ends, starts, a, b], edges: [newEdge(ends.id, a.id), newEdge(starts.id, b.id)] });
+    r.it.emit({ type: 'replay', phase: 'starts' }, S());
+    r.it.emit({ type: 'replay', phase: 'ends' }, S());
+    expect(r.kinds()).toEqual(['sound', 'banner']);
+    expect(sanitizeParams('onReplay', { when: 'midway' })).toEqual({ when: 'ends' });
+  });
+});
+
+describe('studio-4b: per-venue scope', () => {
+  it('no list: every venue; a list: only those; an empty list: none', () => {
+    expect(scriptRunsIn({}, 'v1')).toBe(true);
+    expect(scriptRunsIn({ venues: ['v1'] }, 'v1')).toBe(true);
+    expect(scriptRunsIn({ venues: ['v1'] }, 'v2')).toBe(false);
+    expect(scriptRunsIn({ venues: [] }, 'v1')).toBe(false);
+    const list = [{ id: 'a' }, { id: 'b', venues: ['v2'] }, { id: 'c', venues: [] as string[] }];
+    expect(scriptsForVenue(list, 'v1').map((x) => x.id)).toEqual(['a']);
+    expect(scriptsForVenue(list, 'v2').map((x) => x.id)).toEqual(['a', 'b']);
+  });
+  it('a venue export carries only the scripts scoped to it', () => {
+    const p = everyKindProject();
+    const g = pointWonGraph();
+    const v = p.venues[0];
+    const scripts = [{ id: 'all', name: 'All', ...g }, { id: 'here', name: 'Here', ...g, venues: [v.id] }, { id: 'there', name: 'There', ...g, venues: ['venue_other'] }];
+    expect(exportVenue(v, null, scriptsForVenue(scripts, v.id)).scripts?.map((x) => x.id)).toEqual(['all', 'here']);
+  });
+  it('the scope survives a save and an import; a bad scope is cleaned, not widened to every venue', () => {
+    const p = everyKindProject();
+    const v = p.venues[0];
+    const g = pointWonGraph();
+    const raw = JSON.parse(serializeProject({ ...p, scripts: [{ id: 'sc', name: 'S', ...g, venues: [v.id] }] }));
+    const back = sanitizeProject(raw);
+    expect(back.ok && back.project.scripts[0].venues).toEqual([v.id]);
+    raw.scripts[0].venues = [v.id, v.id, 7, '<x>', 'venue_gone'];
+    const dirty = sanitizeProject(raw);
+    expect(dirty.ok && dirty.project.scripts[0].venues).toEqual([v.id, 'venue_gone']);   // ids kept (a later venue may carry one); junk dropped
+    raw.scripts[0].venues = ['<x>'];
+    const none = sanitizeProject(raw);
+    expect(none.ok && none.project.scripts[0].venues).toEqual([]);                       // still scoped (to nothing), never "every venue"
+    delete raw.scripts[0].venues;
+    const every = sanitizeProject(raw);
+    expect(every.ok && 'venues' in every.project.scripts[0]).toBe(false);
   });
 });

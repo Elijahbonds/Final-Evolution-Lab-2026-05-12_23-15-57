@@ -24,6 +24,8 @@ export interface ScriptState {
   elapsed: number;
   /** the hero's ground position, or null */
   hero: readonly [number, number] | null;
+  /** the rally's length as the mode posts it (0 where the mode does not rally) */
+  rally?: number;
 }
 
 export type ScriptEvent =
@@ -31,7 +33,11 @@ export type ScriptEvent =
   | { type: 'momentum'; kind: string }
   | { type: 'tier'; tier: string; prev: string }
   | { type: 'modeStart' }
-  | { type: 'modeEnd' };
+  | { type: 'modeEnd' }
+  /** the rally count the mode posts went from `prev` to `length` */
+  | { type: 'rally'; length: number; prev: number }
+  /** the mode's own broadcast replay started or ended */
+  | { type: 'replay'; phase: 'starts' | 'ends' };
 
 export interface ScriptAction {
   kind: Extract<NodeKind, 'crowd' | 'burst' | 'banner' | 'camera' | 'lights' | 'sound'>;
@@ -80,6 +86,7 @@ export function createInterpreter(scripts: readonly RunnableScript[], sink: (a: 
       case 'momentum': return s.momentum;
       case 'elapsed': return s.elapsed;
       case 'fires': return fires;
+      case 'rally': return s.rally ?? 0;
       default: return 0;
     }
   };
@@ -163,6 +170,11 @@ export function createInterpreter(scripts: readonly RunnableScript[], sink: (a: 
         }
         case 'modeStart': for (const node of eventNodes('onModeStart')) n += run(node.id, s); break;
         case 'modeEnd': for (const node of eventNodes('onModeEnd')) n += run(node.id, s); break;
+        case 'rally':
+          // fires once as the count CROSSES the node's length (a rally that reaches 5 fires "5" once; the next rally may again)
+          for (const node of eventNodes('onRally')) { const at = num(node.params.length, 5); if (e.prev < at && e.length >= at) n += run(node.id, s); }
+          break;
+        case 'replay': for (const node of eventNodes('onReplay')) if (node.params.when === e.phase) n += run(node.id, s); break;
       }
       return n;
     },

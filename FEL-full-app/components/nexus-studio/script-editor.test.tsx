@@ -3,9 +3,10 @@
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ScriptsTrack, paramSummary, wirePath, NODE_W, NODE_H } from './script-editor';
+import { ScriptsTrack, paramSummary, wirePath, NODE_W, NODE_H, MINIMAP, minimapFrame, viewForMinimapPoint, scopeSummary } from './script-editor';
 import { starterProject, type StudioApi } from './use-studio';
-import { addScript, addScriptNode, connectNodes, deleteFromScript, moveScriptNode, setNodeParam } from '@/lib/nexus-studio/edits';
+import { addScript, addScriptNode, connectNodes, deleteFromScript, moveScriptNode, setNodeParam, setScriptScope, addVenue } from '@/lib/nexus-studio/edits';
+import { PLAYTEST_TARGETS } from '@/lib/nexus-studio/targets';
 import { createStack, execute, seal, undo } from '@/lib/nexus-studio/commands';
 import { newNode } from '@/lib/nexus-studio/scripts';
 
@@ -72,5 +73,84 @@ describe('editing a graph is commands', () => {
     const ch = sc2.nodes.at(-1)!;
     const s3 = execute(s2, connectNodes(sc2, cool.id, ch.id)!);
     expect(connectNodes(s3.doc.scripts[0], ch.id, cool.id)).toBeNull();   // a loop
+  });
+});
+
+describe('studio-4b: the minimap', () => {
+  const canvas = { w: 1000, h: 600 };
+  it('fits every node and the visible canvas inside the map, aspect kept', () => {
+    const nodes = [{ x: 0, y: 0 }, { x: 2000, y: 900 }];
+    const view = { x: 20, y: 20, k: 1 };
+    const f = minimapFrame(nodes, view, canvas);
+    const toMap = (x: number, y: number) => [f.ox + (x - f.minX) * f.s, f.oy + (y - f.minY) * f.s];
+    for (const n of nodes) {
+      const [x0, y0] = toMap(n.x, n.y), [x1, y1] = toMap(n.x + NODE_W, n.y + NODE_H);
+      expect(x0).toBeGreaterThanOrEqual(0); expect(y0).toBeGreaterThanOrEqual(0);
+      expect(x1).toBeLessThanOrEqual(MINIMAP.w + 1e-9); expect(y1).toBeLessThanOrEqual(MINIMAP.h + 1e-9);
+    }
+    // the view's frame is the canvas's visible world, scaled: its aspect is the canvas's
+    expect(f.viewRect.w / f.viewRect.h).toBeCloseTo(canvas.w / canvas.h, 6);
+    expect(f.viewRect.w).toBeCloseTo((canvas.w / view.k) * f.s, 6);
+    // zooming in shrinks the frame; panning moves it
+    const zoomed = minimapFrame(nodes, { x: 20, y: 20, k: 2 }, canvas);
+    expect(zoomed.viewRect.w).toBeLessThan(f.viewRect.w);
+  });
+  it('a click on the map centres the canvas there (the zoom kept); a click on the frame\'s own centre changes nothing', () => {
+    const nodes = [{ x: 0, y: 0 }, { x: 1600, y: 1200 }];
+    const view = { x: -300, y: -100, k: 1.5 };
+    const f = minimapFrame(nodes, view, canvas);
+    const cx = f.viewRect.x + f.viewRect.w / 2, cy = f.viewRect.y + f.viewRect.h / 2;
+    const same = viewForMinimapPoint(cx, cy, f, view, canvas);
+    expect(same.x).toBeCloseTo(view.x, 6); expect(same.y).toBeCloseTo(view.y, 6); expect(same.k).toBe(1.5);
+    // the far node's centre, clicked on the map, lands at the canvas's centre
+    const nx = 1600 + NODE_W / 2, ny = 1200 + NODE_H / 2;
+    const v = viewForMinimapPoint(f.ox + (nx - f.minX) * f.s, f.oy + (ny - f.minY) * f.s, f, view, canvas);
+    expect(nx * v.k + v.x).toBeCloseTo(canvas.w / 2, 6);
+    expect(ny * v.k + v.y).toBeCloseTo(canvas.h / 2, 6);
+  });
+  it('an empty graph still draws a frame', () => {
+    const f = minimapFrame([], { x: 0, y: 0, k: 1 }, canvas);
+    expect(f.viewRect.w).toBeGreaterThan(0);
+    expect(Number.isFinite(f.s)).toBe(true);
+  });
+  it('the canvas draws the map: one mark per node and the view\'s frame', () => {
+    const s = withScript();
+    const html = renderToStaticMarkup(createElement(ScriptsTrack, { studio: { doc: s.doc, run: () => {}, seal: () => {} } as unknown as StudioApi }));
+    expect(html).toContain('data-testid="script-minimap"');
+    expect(html.match(/data-testid="minimap-node"/g)).toHaveLength(5);
+    expect(html).toContain('data-testid="minimap-view"');
+  });
+});
+
+describe('studio-4b: a script\'s venue scope', () => {
+  it('every venue → one venue → none → every venue, one undo step each, exact undo', () => {
+    let s = withScript();
+    const v1 = s.doc.venues[0].id;
+    const added = addVenue(s.doc, PLAYTEST_TARGETS.tiebreak);
+    s = execute(s, added.cmd);
+    const sc = () => s.doc.scripts[0];
+    expect(scopeSummary(sc(), s.doc.venues)).toBe('every venue');
+    s = execute(s, setScriptScope(sc(), [v1]));
+    expect(sc().venues).toEqual([v1]);
+    expect(scopeSummary(sc(), s.doc.venues)).toBe(s.doc.venues[0].name);
+    s = execute(s, setScriptScope(sc(), [v1, added.id, v1]));
+    expect(sc().venues).toEqual([v1, added.id]);
+    expect(scopeSummary(sc(), s.doc.venues)).toBe('2 venues');
+    s = execute(s, setScriptScope(sc(), []));
+    expect(scopeSummary(sc(), s.doc.venues)).toBe('no venue');
+    s = execute(s, setScriptScope(sc(), null));
+    expect('venues' in sc()).toBe(false);
+    s = undo(s); expect(sc().venues).toEqual([]);
+    s = undo(s); expect(sc().venues).toEqual([v1, added.id]);
+    s = undo(s); s = undo(s);
+    expect('venues' in sc()).toBe(false);
+  });
+  it('the side panel shows the scope; a scoped script is badged in the list', () => {
+    let s = withScript();
+    s = execute(s, setScriptScope(s.doc.scripts[0], [s.doc.venues[0].id]));
+    const html = renderToStaticMarkup(createElement(ScriptsTrack, { studio: { doc: s.doc, run: () => {}, seal: () => {} } as unknown as StudioApi }));
+    expect(html).toContain('data-testid="script-scope"');
+    expect(html).toContain('Runs in');
+    expect(html).toContain(`title="Runs in ${s.doc.venues[0].name}"`);
   });
 });

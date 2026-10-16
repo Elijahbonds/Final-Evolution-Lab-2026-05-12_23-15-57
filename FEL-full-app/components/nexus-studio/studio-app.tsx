@@ -10,6 +10,7 @@ import { Undo2, Redo2, Save, Download, Upload, Play, Box, Sparkles, UserRound, W
 import { StudioShell } from '@/components/studio/studio-shell';
 import { parseProject } from '@/lib/nexus-studio/doc';
 import { exportVenue } from '@/lib/nexus-studio/exportVenue';
+import { scriptsForVenue } from '@/lib/nexus-studio/scripts';
 import { browserKV, encodeInline, exportFile, writePlaytest } from '@/lib/nexus-studio/storage';
 import { importProject, renameProject } from '@/lib/nexus-studio/edits';
 import { targetOf } from '@/lib/nexus-studio/targets';
@@ -58,7 +59,7 @@ export function NexusStudioApp() {
     const t = targetOf(venue.base.target);
     if (!t) { setMessage('This venue has no mode to play it in yet.'); return; }
     if (!studioLoadAllowed()) { setMessage('Play-test runs in a development build only (the mode’s ?venue= load path is dev-only).'); return; }
-    const exp = exportVenue(venue, cast, doc.scripts);   // tracks 3 + 4: the cast (decoded, synchronously: a popup must open in the click) and the scripts ride the export
+    const exp = exportVenue(venue, cast, scriptsForVenue(doc.scripts, venue.id));   // tracks 3 + 4: the cast (decoded, synchronously: a popup must open in the click) and the scripts this venue runs (studio-4b: per-venue scope) ride the export
     const w = writePlaytest(browserKV(), exp);
     const param = w.ok ? exp.venueId : encodeInline(exp);
     if (!param) { setMessage(`Could not hand the venue over: ${w.ok ? '' : w.error}`); return; }

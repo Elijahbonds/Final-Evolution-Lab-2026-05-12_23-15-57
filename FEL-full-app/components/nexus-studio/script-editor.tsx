@@ -7,15 +7,18 @@
 //
 // What a script can do is closed (lib/nexus-studio/scripts.ts): it listens to the mode and does presentation. The graph is data;
 // nothing in it is ever evaluated.
+//
+// studio-4b: a MINIMAP of the whole graph in the canvas corner (the view's frame on it; click or drag it to move the view), and a
+// script's per-venue SCOPE (every venue, or the venues ticked) in the script's side panel.
 
-import { useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
-import { Plus, Trash2, Workflow, Zap, Filter, Sparkles, Power } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as RKeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
+import { Plus, Trash2, Workflow, Zap, Filter, Sparkles, Power, MapPin } from 'lucide-react';
 import {
-  NODE_KINDS, NODE_SPECS, edgeAllowed, graphNotes, groupOf, wouldCycle,
+  NODE_KINDS, NODE_SPECS, edgeAllowed, graphNotes, groupOf, scriptRunsIn, wouldCycle,
   type NodeGroup, type NodeKind, type ParamSpec, type ScriptNode,
 } from '@/lib/nexus-studio/scripts';
-import { addScript, addScriptNode, connectNodes, deleteFromScript, editScript, moveScriptNode, removeScript, setNodeParam } from '@/lib/nexus-studio/edits';
-import type { StudioScript } from '@/lib/nexus-studio/doc';
+import { addScript, addScriptNode, connectNodes, deleteFromScript, editScript, moveScriptNode, removeScript, setNodeParam, setScriptScope } from '@/lib/nexus-studio/edits';
+import type { StudioScript, StudioVenue } from '@/lib/nexus-studio/doc';
 import type { StudioApi } from './use-studio';
 import { C, NumberField, PanelTitle, Row, Select, TextField, Toggle } from './ui';
 
@@ -34,6 +37,8 @@ export function paramSummary(n: Pick<ScriptNode, 'kind' | 'params'>): string {
     case 'onTier': return `${p.tier} · ${p.dir}`;
     case 'onTimer': return `${p.repeat} ${p.seconds} s`;
     case 'onZone': return `(${p.x}, ${p.z}) r ${p.r}`;
+    case 'onRally': return `${p.length} returns`;
+    case 'onReplay': return `replay ${p.when}`;
     case 'compare': return `${p.value} ${p.op} ${p.to}`;
     case 'cooldown': return `${p.seconds} s`;
     case 'chance': return `${Math.round(Number(p.p) * 100)} %`;
@@ -45,6 +50,43 @@ export function paramSummary(n: Pick<ScriptNode, 'kind' | 'params'>): string {
     case 'sound': return String(p.cue);
     default: return '';
   }
+}
+
+// ── the minimap (pure geometry, tested) ───────────────────────────────────────────────────────────────────────────
+
+export const MINIMAP = { w: 176, h: 112, pad: 60 } as const;
+export interface View { x: number; y: number; k: number }
+export interface MinimapFrame {
+  /** map pixels per world unit */
+  s: number;
+  /** the world point drawn at the map's (ox, oy) */
+  minX: number; minY: number; ox: number; oy: number;
+  /** the canvas's visible world, in map pixels */
+  viewRect: { x: number; y: number; w: number; h: number };
+}
+
+/** Pure: fit the graph AND the visible part of the canvas into the minimap, so the view's frame is always on it. */
+export function minimapFrame(nodes: readonly { x: number; y: number }[], view: View, canvas: { w: number; h: number }, map: { w: number; h: number; pad: number } = MINIMAP): MinimapFrame {
+  const vx0 = -view.x / view.k, vy0 = -view.y / view.k, vx1 = (canvas.w - view.x) / view.k, vy1 = (canvas.h - view.y) / view.k;
+  let x0 = vx0, y0 = vy0, x1 = vx1, y1 = vy1;
+  for (const n of nodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x + NODE_W); y1 = Math.max(y1, n.y + NODE_H); }
+  x0 -= map.pad; y0 -= map.pad; x1 += map.pad; y1 += map.pad;
+  const s = Math.min(map.w / Math.max(1, x1 - x0), map.h / Math.max(1, y1 - y0));
+  const ox = (map.w - (x1 - x0) * s) / 2, oy = (map.h - (y1 - y0) * s) / 2;
+  return { s, minX: x0, minY: y0, ox, oy, viewRect: { x: ox + (vx0 - x0) * s, y: oy + (vy0 - y0) * s, w: (vx1 - vx0) * s, h: (vy1 - vy0) * s } };
+}
+
+/** Pure: the view that centres the canvas on the world point under a minimap pixel (the zoom is kept). */
+export function viewForMinimapPoint(mx: number, my: number, f: MinimapFrame, view: View, canvas: { w: number; h: number }): View {
+  const wx = (mx - f.ox) / f.s + f.minX, wy = (my - f.oy) / f.s + f.minY;
+  return { x: canvas.w / 2 - wx * view.k, y: canvas.h / 2 - wy * view.k, k: view.k };
+}
+
+/** Pure: where a script runs, in words. */
+export function scopeSummary(s: Pick<StudioScript, 'venues'>, venues: readonly Pick<StudioVenue, 'id' | 'name'>[]): string {
+  if (!s.venues) return 'every venue';
+  const names = venues.filter((v) => s.venues!.includes(v.id)).map((v) => v.name);
+  return !names.length ? 'no venue' : names.length === 1 ? names[0] : `${names.length} venues`;
 }
 
 /** Pure: the wire between two nodes (output port on the right edge, input port on the left), as an SVG path. */
@@ -72,16 +114,17 @@ export function ScriptsTrack({ studio }: { studio: StudioApi }) {
               <button type="button" onClick={() => setActiveId(s.id)} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px]" style={{ background: s.id === script?.id ? 'rgba(0,229,255,0.1)' : 'transparent', color: s.enabled ? C.text : C.dim }}>
                 <Workflow className="h-3.5 w-3.5 shrink-0" style={{ color: s.id === script?.id ? C.cyan : C.dim }} aria-hidden />
                 <span className="truncate">{s.name}</span>
+                {s.venues && <span className="shrink-0 rounded px-1 text-[9px]" style={{ background: 'rgba(255,215,0,0.12)', color: C.gold }} title={`Runs in ${scopeSummary(s, doc.venues)}`}>{scopeSummary(s, doc.venues)}</span>}
                 <span className="ml-auto text-[10px]" style={{ color: C.dim }}>{s.nodes.length}</span>
               </button>
             </li>
           ))}
           {!doc.scripts.length && <li className="px-3 py-2 text-[12px]" style={{ color: C.dim }}>No scripts yet. Start from “Point won → cheer”.</li>}
         </ul>
-        <p className="mt-auto px-3 py-3 text-[11px]" style={{ color: C.dim }}>Scripts run in every venue this project play-tests. They only listen and put on a show: they never touch the score, the clock or the rules.</p>
+        <p className="mt-auto px-3 py-3 text-[11px]" style={{ color: C.dim }}>A script runs in every venue this project play-tests, unless you pick its venues. Scripts only listen and put on a show: they never touch the score, the clock or the rules.</p>
       </aside>
       {script ? <GraphCanvas key={script.id} script={script} run={run} seal={seal} /> : <div className="flex items-center justify-center text-[13px]" style={{ color: C.dim }}>Make a script to start.</div>}
-      {script ? <ScriptSide script={script} run={run} seal={seal} onDelete={() => { const c = removeScript(doc, script.id); if (c) { run(c); setActiveId(null); } }} /> : <aside style={{ background: C.surface }} />}
+      {script ? <ScriptSide script={script} venues={doc.venues} activeVenueId={doc.activeVenueId} run={run} seal={seal} onDelete={() => { const c = removeScript(doc, script.id); if (c) { run(c); setActiveId(null); } }} /> : <aside style={{ background: C.surface }} />}
     </div>
   );
 }
@@ -92,6 +135,16 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
   const [selected, setSelected] = useState<string | null>(null);
   const [drag, setDrag] = useState<null | { kind: 'node'; id: string; dx: number; dy: number } | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number } | { kind: 'wire'; from: string; x: number; y: number }>(null);
   const byId = useMemo(() => new Map(script.nodes.map((n) => [n.id, n])), [script.nodes]);
+  const [size, setSize] = useState({ w: 900, h: 600 });
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => { const r = el.getBoundingClientRect(); if (r.width && r.height) setSize({ w: r.width, h: r.height }); };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const toWorld = (e: { clientX: number; clientY: number }) => {
     const r = svgRef.current?.getBoundingClientRect();
@@ -164,9 +217,28 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
           })}
         </g>
       </svg>
-      <div className="pointer-events-none absolute bottom-2 left-3 text-[11px]" style={{ color: C.dim }}>Drag a node · drag from a node’s right dot to connect · Delete removes · drag empty space to pan · wheel to zoom</div>
+      <div className="pointer-events-none absolute bottom-2 left-3 text-[11px]" style={{ color: C.dim }}>Drag a node · drag from a node’s right dot to connect · Delete removes · drag empty space to pan · wheel to zoom · the map moves the view</div>
+      <Minimap nodes={script.nodes} edges={script.edges} view={view} canvas={size} selected={selected} onView={setView} />
       {selected && byId.get(selected) && <NodeInspector script={script} node={byId.get(selected)!} run={run} seal={seal} />}
     </section>
+  );
+}
+
+/** The whole graph, small: nodes in their group's colour, the wires, the view's frame. Click or drag on it to move the view. */
+function Minimap({ nodes, edges, view, canvas, selected, onView }: { nodes: readonly ScriptNode[]; edges: StudioScript['edges']; view: View; canvas: { w: number; h: number }; selected: string | null; onView(v: View): void }) {
+  const f = minimapFrame(nodes, view, canvas);
+  const [down, setDown] = useState(false);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const at = (e: RPointerEvent<SVGSVGElement>) => { const r = e.currentTarget.getBoundingClientRect(); onView(viewForMinimapPoint(e.clientX - r.left, e.clientY - r.top, f, view, canvas)); };
+  const mx = (x: number) => f.ox + (x - f.minX) * f.s, my = (y: number) => f.oy + (y - f.minY) * f.s;
+  return (
+    <svg width={MINIMAP.w} height={MINIMAP.h} className="absolute bottom-7 right-3 rounded-md border" style={{ borderColor: C.line, background: 'rgba(12,12,17,0.9)', cursor: 'pointer' }}
+      role="img" aria-label="Map of the whole script" data-testid="script-minimap"
+      onPointerDown={(e) => { e.stopPropagation(); setDown(true); at(e); }} onPointerMove={(e) => { if (down) at(e); }} onPointerUp={() => setDown(false)} onPointerLeave={() => setDown(false)}>
+      {edges.map((e) => { const a = byId.get(e.from), b = byId.get(e.to); return a && b ? <line key={e.id} x1={mx(a.x + NODE_W)} y1={my(a.y + NODE_H / 2)} x2={mx(b.x)} y2={my(b.y + NODE_H / 2)} stroke="#3a4656" strokeWidth={1} /> : null; })}
+      {nodes.map((n) => <rect key={n.id} x={mx(n.x)} y={my(n.y)} width={Math.max(2, NODE_W * f.s)} height={Math.max(2, NODE_H * f.s)} rx={1.5} fill={GROUP_COLOUR[groupOf(n.kind)]} fillOpacity={n.id === selected ? 1 : 0.55} data-testid="minimap-node" />)}
+      <rect x={f.viewRect.x} y={f.viewRect.y} width={f.viewRect.w} height={f.viewRect.h} fill="rgba(255,255,255,0.05)" stroke="#ffffff" strokeOpacity={0.7} strokeWidth={1} data-testid="minimap-view" />
+    </svg>
   );
 }
 
@@ -192,7 +264,36 @@ function NodeInspector({ script, node, run, seal }: { script: StudioScript; node
   );
 }
 
-function ScriptSide({ script, run, seal, onDelete }: { script: StudioScript; run: StudioApi['run']; seal(): void; onDelete(): void }) {
+/** Where the script runs: every venue, or the venues ticked (studio-4b). One undo step per change. */
+function ScopeField({ script, venues, activeVenueId, run }: { script: StudioScript; venues: readonly StudioVenue[]; activeVenueId: string; run: StudioApi['run'] }) {
+  const every = !script.venues;
+  const set = (ids: string[] | null) => run(setScriptScope(script, ids));
+  return (
+    <div className="px-3 pb-2" data-testid="script-scope">
+      <div className="flex items-center gap-2 text-[12px]" style={{ color: C.text }}>
+        <MapPin className="h-3.5 w-3.5" style={{ color: every ? C.dim : C.gold }} aria-hidden />
+        <span>Runs in</span>
+        <Toggle label="Every venue" on={every} onChange={(on) => set(on ? null : [activeVenueId])} />
+        <span style={{ color: C.dim }}>{every ? 'every venue' : scopeSummary(script, venues)}</span>
+      </div>
+      {!every && (
+        <ul className="mt-1 space-y-0.5 pl-5">
+          {venues.map((v) => (
+            <li key={v.id}>
+              <label className="flex items-center gap-1.5 text-[12px]" style={{ color: C.text }}>
+                <input type="checkbox" checked={scriptRunsIn(script, v.id)} onChange={(e) => set(e.target.checked ? [...script.venues!, v.id] : script.venues!.filter((x) => x !== v.id))} />
+                {v.name}{v.id === activeVenueId ? <span style={{ color: C.dim }}> · open now</span> : null}
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!every && !script.venues!.length && <p className="mt-1 text-[11px]" style={{ color: C.gold }}>Ticks no venue: the script runs nowhere.</p>}
+    </div>
+  );
+}
+
+function ScriptSide({ script, venues, activeVenueId, run, seal, onDelete }: { script: StudioScript; venues: readonly StudioVenue[]; activeVenueId: string; run: StudioApi['run']; seal(): void; onDelete(): void }) {
   const notes = graphNotes(script);
   const place = (kind: NodeKind) => {
     const col = { event: 40, condition: 280, action: 520 }[groupOf(kind)];
@@ -204,6 +305,7 @@ function ScriptSide({ script, run, seal, onDelete }: { script: StudioScript; run
       <PanelTitle right={<button type="button" aria-label="Delete script" onClick={onDelete} className="rounded p-0.5 hover:bg-white/5"><Trash2 className="h-3.5 w-3.5" style={{ color: C.dim }} /></button>}>Script</PanelTitle>
       <Row label="Name"><TextField label="Script name" value={script.name} onChange={(n) => run(editScript(script.id, { name: n }, 'Rename script', `script:${script.id}:name`))} onDone={seal} /></Row>
       <Row label="On"><span className="flex items-center gap-2"><Toggle label="Script on" on={script.enabled} onChange={(on) => run(editScript(script.id, { enabled: on }, on ? 'Turn script on' : 'Turn script off'))} /><Power className="h-3.5 w-3.5" style={{ color: script.enabled ? C.emerald : C.dim }} aria-hidden /></span></Row>
+      <ScopeField script={script} venues={venues} activeVenueId={activeVenueId} run={run} />
       {(['event', 'condition', 'action'] as const).map((g) => {
         const Icon = GROUP_ICON[g];
         return (

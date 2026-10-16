@@ -91,3 +91,83 @@ describe('on a point won → the crowd cheers and a banner shows', () => {
     host.dispose();
   });
 });
+
+describe('studio-4b: the rally the HUD posts, and the mode\'s own replay', () => {
+  it('"Rally length 3" fires as the posted rally count reaches 3; the mode\'s HUD passes through unchanged', () => {
+    const r = rig();
+    const ev = newNode('onRally', 0, 0, { length: 3 }), b = newNode('banner', 0, 0, { text: 'RALLY!' });
+    const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [ev, b], edges: [newEdge(ev.id, b.id)] }], {});
+    r.setPhase('playing'); r.frames(1);
+    const posts = [{ rally: 0, myPts: 0 }, { rally: 1 }, { rally: 2 }, { rally: 3 }, { rally: 4 }, { rally: 0, myPts: 1 }, { rally: 3 }];
+    for (const u of posts) r.ctx.setHud(u);
+    expect(r.hud.filter((u) => !(STUDIO_HUD.banner in u))).toEqual(posts);   // every mode update, unchanged, in order
+    expect(host.fired.map((a) => a.kind)).toEqual(['banner', 'banner']);    // 2 → 3, and again in the next rally
+    host.dispose();
+    expect(r.ctx.setHud).toBe(r.harnessSetHud);
+  });
+  it('a target that names its own rally key is read there', () => {
+    const r = rig();
+    const ev = newNode('onRally', 0, 0, { length: 2 }), b = newNode('sound', 0, 0);
+    vi.spyOn(SoundKit, 'play').mockImplementation(() => {});
+    const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [ev, b], edges: [newEdge(ev.id, b.id)] }], { rallyKey: 'volley' });
+    r.ctx.setHud({ rally: 5 });
+    r.ctx.setHud({ volley: 2 });
+    expect(host.fired).toHaveLength(1);
+    host.dispose();
+  });
+  it('"Replay starts / ends": a replay on screen (a frame drawn while the mode\'s call is pending), then its end; the harness gets the call', async () => {
+    const r = rig();
+    let finish: () => void = () => {};
+    const harnessHighlight = vi.fn((_o?: unknown) => new Promise<void>((res) => { finish = res; }));
+    r.ctx.highlight = harnessHighlight as unknown as typeof r.ctx.highlight;
+    const starts = newNode('onReplay', 0, 0, { when: 'starts' }), ends = newNode('onReplay', 0, 0, { when: 'ends' });
+    const a = newNode('sound', 0, 0, { cue: 'whistle' }), b = newNode('banner', 0, 0, { text: 'WHAT A RUN' });
+    vi.spyOn(SoundKit, 'play').mockImplementation(() => {});
+    const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [starts, ends, a, b], edges: [newEdge(starts.id, a.id), newEdge(ends.id, b.id)] }], {});
+    r.setPhase('playing'); r.frames(1);
+    const opts = { lastSeconds: 2.6 };
+    const done = (r.ctx.highlight as (o: unknown) => Promise<void>)(opts);   // the MODE asks for its replay
+    expect(harnessHighlight).toHaveBeenCalledWith(opts);                      // the harness's own call, with the mode's options
+    expect(host.fired).toHaveLength(0);                                       // not on screen yet
+    r.frames(3);
+    expect(host.fired.map((x) => x.kind)).toEqual(['sound']);                 // starts, once
+    finish(); await done;
+    expect(host.fired.map((x) => x.kind)).toEqual(['sound', 'banner']);       // ends
+    host.dispose();
+    expect(r.ctx.highlight).toBe(harnessHighlight);                           // the harness's own back
+  });
+  it('a replay the harness refuses (it settles before a frame) is no event', async () => {
+    const r = rig();
+    const harnessHighlight = vi.fn(async () => {});
+    r.ctx.highlight = harnessHighlight;
+    const ends = newNode('onReplay', 0, 0, { when: 'ends' }), starts = newNode('onReplay', 0, 0, { when: 'starts' }), a = newNode('crowd', 0, 0), b = newNode('crowd', 0, 0);
+    const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [ends, starts, a, b], edges: [newEdge(ends.id, a.id), newEdge(starts.id, b.id)] }], { crowd: { react: vi.fn() } });
+    r.setPhase('playing');
+    await (r.ctx.highlight as () => Promise<void>)();
+    r.frames(2);
+    expect(harnessHighlight).toHaveBeenCalledTimes(1);
+    expect(host.fired).toHaveLength(0);
+    host.dispose();
+  });
+  it('a script\'s OWN replay (a camera shot) calls the harness directly and never feeds the script\'s replay events', () => {
+    const r = rig();
+    const harnessHighlight = vi.fn(() => new Promise<void>(() => {}));   // stays on screen
+    r.ctx.highlight = harnessHighlight;
+    const t = newNode('onTimer', 0, 0, { seconds: 0.5, repeat: 'once' }), cam = newNode('camera', 0, 0, { shot: 'replay' });
+    const st = newNode('onReplay', 0, 0, { when: 'starts' }), snd = newNode('crowd', 0, 0);
+    const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [t, cam, st, snd], edges: [newEdge(t.id, cam.id), newEdge(st.id, snd.id)] }], { crowd: { react: vi.fn() } });
+    r.setPhase('playing'); r.frames(10);
+    expect(harnessHighlight).toHaveBeenCalledTimes(1);           // the script's replay ran…
+    expect(host.fired.map((x) => x.kind)).toEqual(['camera']);   // …and was not heard as "replay starts"
+    host.dispose();
+  });
+  it('no script listens: neither the rally nor the replay is tapped', () => {
+    const r = rig();
+    const own = r.ctx.highlight;
+    const t = newNode('onTimer', 0, 0), s = newNode('sound', 0, 0);
+    const host = mountScriptHost(r.ctx, [{ id: 'sc', enabled: true, nodes: [t, s], edges: [newEdge(t.id, s.id)] }], {});
+    expect(r.ctx.setHud).toBe(r.harnessSetHud);
+    expect(r.ctx.highlight).toBe(own);
+    host.dispose();
+  });
+});
