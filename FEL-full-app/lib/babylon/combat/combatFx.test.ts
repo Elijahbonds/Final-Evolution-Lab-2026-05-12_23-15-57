@@ -245,13 +245,16 @@ describe('a hit under Karate VS\'s phone ceiling', () => {
     expect(PARTICLE_BUDGET.mobile).toBeGreaterThan(5);
   });
 
-  it('a second hit in the same frame is trimmed to what the first left, and still shows its star and two streaks', () => {
+  // lane/kvs-combo changed this case (owner 2026-10-16, "Second hit drops streaks"): it held that the second hit kept a star and two streaks (+3,
+  // so a pair reached 8-9 against the 5). Now the second hit keeps its star only (a light has no ring), and the first hit's streaks give way for it.
+  it('a second hit in the same frame shows its star, gives up its streaks, and the first hit\'s streaks make the room for it', () => {
     const sc = mk(PHONE), fx = mountCombatFx(sc);
     fx.hit(new Vector3(0, 1.2, 0), { x: 0, z: 2 }, 'light');
-    const first = committedParticles(sc);
+    expect(committedParticles(sc)).toBe(5);           // the first fills the room: a star and four streaks
     fx.hit(new Vector3(1, 1.2, 0), { x: 0, z: 2 }, 'light');
-    expect(sum(sc, 'cfx_star_')).toBe(2);
-    expect(committedParticles(sc) - first).toBe(3);   // a star and the floor of two streaks: no more than a hit can be cut to
+    expect(sum(sc, 'cfx_star_')).toBe(2);              // both blows flash
+    expect(sum(sc, 'cfx_streak_')).toBe(0);            // the second gave up its streaks; the first's gave way to its star
+    expect(committedParticles(sc)).toBeLessThanOrEqual(5);
     fx.dispose(); sc.dispose();
   });
 
@@ -266,5 +269,145 @@ describe('a hit under Karate VS\'s phone ceiling', () => {
     expect(sd.particleSystems.find((p) => p.name === 'cfx_ghost')!.manualEmitCount).toBe(4);
     expect(sd.particleSystems.filter((p) => p.name.startsWith('cfx_smoke_')).filter((p) => p.manualEmitCount > 0).length).toBe(2);
     fd.dispose(); sd.dispose();
+  });
+});
+
+// lane/kvs-combo (owner 2026-10-16, "Second hit drops streaks"): one hit fills Karate VS's 5, so two hits whose lives overlapped peaked at 9 and
+// three at 13. A hit landing while an earlier hit's burst is live keeps its CORE (its star, and its ring when its kind has one and room is left)
+// and gives up its streaks; the earlier hits' streaks give way for that core, oldest first, and only then (a fourth blow) the oldest earlier
+// ring, then star. These run the particle clock for real: `animate(true)` steps a system 0.01 s of particle age on a NullEngine (the plain
+// `animate()` waits for a GPU-ready texture that a NullEngine never has), so a burst flies, ages and dies here as it does on the phone.
+describe('two and three hits overlapping under Karate VS\'s phone ceiling', () => {
+  const mk = (md: Record<string, unknown>) => { const sc = new Scene(new NullEngine()); new FreeCamera('c', new Vector3(0, 2, -6), sc); sc.metadata = md; return sc; };
+  const PHONE = { felTier: 'mobile', felModeId: 'karate-vs' };
+  const step = (sc: Scene, n = 1) => { for (let i = 0; i < n; i++) for (const p of sc.particleSystems) (p as unknown as { animate(w: boolean): void }).animate(true); };
+  const live = (sc: Scene) => sc.particleSystems.reduce((n, p) => n + p.getActiveCount(), 0);
+  const queued = (sc: Scene, prefix: string) => sc.particleSystems.filter((p) => p.name.startsWith(prefix)).reduce((n, p) => n + Math.max(0, p.manualEmitCount), 0);
+  const heldBy = (sc: Scene, name: string) => { const p = sc.particleSystems.find((q) => q.name === name)!; return p.getActiveCount() + Math.max(0, p.manualEmitCount); };
+  const AT = new Vector3(0, 1.2, 0), FROM = { x: 0, z: 2 };
+  /** A dojo phone scene with its one petal already in the air (the petal is what the room is measured beside, as on the rig). */
+  const dojo = (md: Record<string, unknown> = PHONE) => {
+    const sc = mk(md), amb = EffectsKit.ambient(sc, 'dojo'), fx = mountCombatFx(sc);
+    for (let i = 0; i < 400 && sc.particleSystems.find((p) => p.name === 'amb_petals')!.getActiveCount() < 1; i++) step(sc);
+    expect(sc.particleSystems.find((p) => p.name === 'amb_petals')!.getActiveCount(), 'the petal is up').toBeGreaterThanOrEqual(1);
+    return { sc, fx, done: () => { fx.dispose(); amb.dispose(); sc.dispose(); } };
+  };
+  /** Fires `hits` (kind, at step) and runs the clock until all of it has died; returns the worst live and committed count on any step. */
+  const stage = (sc: Scene, fx: ReturnType<typeof mountCombatFx>, hits: ReadonlyArray<readonly [HitKind, number]>) => {
+    let worst = live(sc), stars = 0;
+    for (let t = 0; t <= 60; t++) {
+      for (const [kind, at] of hits) if (at === t) {
+        const starSys = sc.particleSystems.filter((p) => p.name.startsWith('cfx_star_')), before = starSys.map((p) => Math.max(0, p.manualEmitCount));
+        fx.hit(AT.add(new Vector3(0.2 * t, 0, 0)), FROM, kind);
+        stars += starSys.some((p, i) => p.manualEmitCount > before[i]) ? 1 : 0;   // this blow queued a star (an earlier one may have given way for it)
+        worst = Math.max(worst, committedParticles(sc));
+      }
+      step(sc);
+      worst = Math.max(worst, live(sc));
+    }
+    return { worst, stars };
+  };
+
+  it('a hit landing while the first burst is in the air keeps its star and ring and gives up its streaks', () => {
+    const { sc, fx, done } = dojo();
+    fx.hit(AT, FROM, 'heavy'); step(sc, 3);
+    expect(live(sc)).toBe(5);                                    // the petal and the first hit: a star, two streaks, a ring
+    fx.hit(AT, FROM, 'parry');
+    expect(queued(sc, 'cfx_star_')).toBe(1);                     // the second blow flashes
+    expect(queued(sc, 'cfx_ringp_')).toBe(1);                    // and is answered by its ring
+    expect(queued(sc, 'cfx_streak_')).toBe(0);                   // with no streaks of its own
+    expect(heldBy(sc, 'cfx_streak_0')).toBe(0);                  // the first hit's streaks gave way for that core
+    expect(heldBy(sc, 'cfx_star_0') + heldBy(sc, 'cfx_ringp_0')).toBe(2);   // its star and ring did not
+    expect(committedParticles(sc)).toBeLessThanOrEqual(5);
+    done();
+  });
+
+  it('a staged pair and a staged three of every kind never hold more than 5, on any step, and every blow flashes its star', () => {
+    const { sc, fx, done } = dojo();
+    const gaps = [0, 1, 3, 6, 10, 16];
+    for (const a of HIT_KINDS) for (const b of HIT_KINDS) for (const g of gaps) {
+      const r = stage(sc, fx, [[a, 0], [b, g]]);
+      expect(r.worst, `${a}+${b} @${g}`).toBeLessThanOrEqual(5);
+      expect(r.stars, `${a}+${b} @${g} stars`).toBe(2);
+    }
+    for (const a of HIT_KINDS) for (const b of HIT_KINDS) for (const c of HIT_KINDS) for (const [g1, g2] of [[0, 0], [0, 4], [3, 6], [5, 12]]) {
+      const r = stage(sc, fx, [[a, 0], [b, g1], [c, g2]]);
+      expect(r.worst, `${a}+${b}+${c} @${g1},${g2}`).toBeLessThanOrEqual(5);
+      expect(r.stars, `${a}+${b}+${c} stars`).toBe(3);
+    }
+    const four = stage(sc, fx, [['parry', 0], ['break', 0], ['heavy', 0], ['special', 0]]);   // a fourth blow in one frame: the oldest core gives way
+    expect(four.worst).toBeLessThanOrEqual(5); expect(four.stars).toBe(4);
+    done();
+  });
+
+  it('the earlier hits give way oldest first: streaks before any core, then the oldest hit\'s ring', () => {
+    const { sc, fx, done } = dojo();
+    fx.hit(AT, FROM, 'parry');                                   // star_0, streak_0 (2), ringp_0: the room is full
+    fx.hit(AT, FROM, 'break');                                   // streak_0 gives way; star_1 + ringp_1
+    expect(heldBy(sc, 'cfx_streak_0')).toBe(0);
+    expect([heldBy(sc, 'cfx_star_1'), heldBy(sc, 'cfx_ringp_1')]).toEqual([1, 1]);
+    fx.hit(AT, FROM, 'heavy');                                   // no streaks left: the OLDEST hit's ring gives way for star_2; no room for its ring
+    expect(heldBy(sc, 'cfx_ringp_0')).toBe(0);
+    expect([heldBy(sc, 'cfx_star_0'), heldBy(sc, 'cfx_star_1'), heldBy(sc, 'cfx_ringp_1'), heldBy(sc, 'cfx_star_2')]).toEqual([1, 1, 1, 1]);
+    expect(heldBy(sc, 'cfx_ringp_2')).toBe(0);
+    expect(committedParticles(sc)).toBe(5);
+    done();
+  });
+
+  it('a lone phone hit is what it was (kvs-skin): its star, its ring, and the streaks the room leaves; and the rule waits for the burst to die', () => {
+    for (const kind of HIT_KINDS) {
+      const { sc, fx, done } = dojo();
+      fx.hit(AT, FROM, kind);
+      const ring = planHit(kind, 'mobile').ring ? 1 : 0;
+      expect([queued(sc, 'cfx_star_'), queued(sc, 'cfx_ringp_'), queued(sc, 'cfx_streak_')], kind).toEqual([1, ring, 5 - 1 - 1 - ring]);
+      step(sc, 60);                                              // the burst dies: the next blow is a lone hit again, streaks and all
+      fx.hit(AT, FROM, kind);
+      expect(queued(sc, 'cfx_streak_'), `${kind} again`).toBe(5 - 1 - 1 - ring);
+      done();
+    }
+  });
+
+  it('a hit landing while the petal is between lives leaves the petal its room (it was 6 against 5 when the petal came back)', () => {
+    const { sc, fx, done } = dojo();
+    const petal = sc.particleSystems.find((p) => p.name === 'amb_petals')!;
+    let gap = false;
+    for (let i = 0; i < 4000 && !gap; i++) { step(sc); gap = petal.getActiveCount() === 0; }
+    expect(gap, 'found a moment between petals').toBe(true);
+    fx.hit(AT, FROM, 'light');
+    expect(queued(sc, 'cfx_streak_')).toBe(3);                   // what it gets with the petal up: 5 - petal - star
+    let worst = 0, back = false;
+    for (let i = 0; i < 60; i++) { step(sc); worst = Math.max(worst, live(sc)); back ||= petal.getActiveCount() === 1 && queued(sc, 'cfx_') + sc.particleSystems.filter((p) => p.name.startsWith('cfx_streak_')).reduce((n, p) => n + p.getActiveCount(), 0) > 0; }
+    expect(back, 'the petal came back while the streaks were still up').toBe(true);
+    expect(worst).toBeLessThanOrEqual(5);
+    done();
+  });
+
+  it('CONTROL: desktop and high keep every streak of an overlapping hit, and nothing gives way', () => {
+    for (const tier of ['desktop', 'high'] as const) {
+      const { sc, fx, done } = dojo({ felTier: tier, felModeId: 'karate-vs' });
+      fx.hit(AT, FROM, 'heavy'); step(sc, 3);
+      const first = live(sc);
+      fx.hit(AT, FROM, 'heavy');
+      expect(queued(sc, 'cfx_streak_'), tier).toBe(planHit('heavy', tier).streaks);
+      expect(queued(sc, 'cfx_ringp_'), tier).toBe(1);
+      expect(live(sc), `${tier} first hit untouched`).toBe(first);
+      done();
+    }
+  });
+
+  it('CONTROL: karate (endless, ceiling 12) and a phone mode without a ceiling get exactly what they did before', () => {
+    // karate: the first heavy queues its star and ring and asks 9 streaks into the 10 left under 12 (all 9); the second, beside it, finds no room and is
+    // trimmed to the PHONE_BURST_FLOOR of 2, as before this lane: it keeps its streaks, and the first keeps all of its (these numbers pass on daa55fb4's code).
+    const k = mk({ felTier: 'mobile', felModeId: 'karate' }), fk = mountCombatFx(k);
+    fk.hit(AT, FROM, 'heavy');
+    expect([queued(k, 'cfx_star_'), queued(k, 'cfx_ringp_'), queued(k, 'cfx_streak_')]).toEqual([1, 1, 9]);
+    fk.hit(AT, FROM, 'heavy');
+    expect([queued(k, 'cfx_star_'), queued(k, 'cfx_ringp_'), queued(k, 'cfx_streak_')]).toEqual([2, 2, 11]);
+    expect(heldBy(k, 'cfx_streak_0')).toBe(9);
+    fk.dispose(); k.dispose();
+    const o = mk({ felTier: 'mobile', felModeId: 'onevone' }), fo = mountCombatFx(o);
+    fo.hit(AT, FROM, 'heavy'); fo.hit(AT, FROM, 'heavy');
+    expect(queued(o, 'cfx_streak_')).toBe(2 * planHit('heavy', 'mobile').streaks);
+    fo.dispose(); o.dispose();
   });
 });

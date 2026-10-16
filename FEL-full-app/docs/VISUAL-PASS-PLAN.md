@@ -1102,6 +1102,45 @@ of rings with a third hit landing at **13**, for about 0.3 s. Ordinary play on t
 worst of 699 frames. `CHECK=1` reads the worst frame of a run and passes; a combo string on a real phone can go over the row for a moment. If the
 owner wants that held too, the choice is a row of 9 (not done: the row is the owner's) or a second hit inside a tenth of a second giving up its streaks.
 
+## Phone: Karate VS combos inside the row (kvs-combo, 2026-10-16)
+
+Owner, 2026-10-16, on the choice above: **"Second hit drops streaks"**: keep the row and the ceiling at 5; a hit that lands while a hit burst is still live
+shows only its core flash and gives up its streaks; phone tier, under a ceiling, only. Same rig (esbuild bundle, `RASTER=4`, `SEED=7`, live particles over
+every system per frame), base = `lane/kvs-combo` at `a7472bdd` (kvs-skin's trim merged). **The row is not raised (5).**
+
+**Giving up the later hit's streaks alone does not fit.** One hit already fills the 5 (petal 1, star 1, streaks 2–3, ring 0–1). A later hit's star and ring
+on top is 7; its star alone, 6. So two more things were needed, both phone-only and in Karate VS only (`ParticleBudget.PHONE_ONE_HIT_MODES`):
+- **The earlier hits' streaks give way to the later hit's core**, oldest first (a pooled streak system's queue is dropped and its live sparks go back to its
+  stock, at the instant the new star flashes beside them). Only if the star alone still finds no room (a fourth blow inside ~0.3 s) does the oldest
+  earlier hit's ring, then its star, give way, so the newest blow always flashes. A later hit's ring is drawn only when room is left after the streaks
+  have given way; it never takes an earlier hit's core.
+- **The petal is counted at its capacity (1), not at what is in the air.** It is between lives about 1% of the time (dies, the next is born ~0.2 s later);
+  a hit landing in that gap took the petal's room as a fourth streak and the scene held **6** when the petal came back, even for a lone hit (the
+  headless sweep found it; the rig's 699 frames had missed it). Any started system with an emit rate is reserved this way; in Karate VS that is the petal
+  only (the rig lists every system: the hit pools, smoke, chunks and ghost are one-shot, the motes and the pre-warm system are stopped).
+
+What a later overlapping hit draws now: **its star; its ring (heavy, special, parry, break, guard) when room is left; no streaks.** The earlier hit loses
+its streaks (cut short, not its star or ring) when the later core needs their room. A KVS route payoff (the strike and the route's heavy/special land in
+the same frame, `KarateVSMode.ts`) therefore reads as the strike's star plus the payoff's star and ring.
+
+| staged on the rig (996 frames, peak live over each event's 60 frames) | before | after |
+|---|---|---|
+| light + special, same frame | 9 | 4 |
+| parry + break, same frame | 9 | 5 |
+| heavy, heavy 4 frames later | 9 | 5 |
+| medium, special 8 frames later | 9 | 5 |
+| three in one frame (light, special, heavy) | 13 | 5 |
+| three, 4 frames apart (parry, break, heavy) | 16 | 5 |
+| three, 6 frames apart (light, medium, heavy) | 10 | 5 |
+| four in one frame | 18 | 5 |
+| one heavy (control) | 5 | 5 |
+| **worst frame of the run** | **18** | **5** |
+
+Unstaged play (12 s, seed 7): 5 before and 5 after (701/702 frames; ordinary play does not overlap two hits). Headless sweep (`combatFx.test.ts`, the
+particle clock stepped for real): every pair of the seven kinds at gaps of 0–16 steps, every triple at four spacings, and a four-in-one-frame peaked at
+9–10, 13–14 and 17 before, and at **5** after; a lone hit at 40 petal phases was 6 before (the petal gap) and 5 after. Desktop and high: unchanged.
+Karate (endless, 12) and dunk (8): not in the list, unchanged (their tests hold the exact counts kvs-skin left).
+
 ## Who Scene It: the false "SKINNING STALL" on char_65 (kvs-skin, 2026-10-16)
 
 Owner, 2026-10-16: fix the check, keep the real-stall guard. **Root cause (measured, not the near-still idle the report guessed):** `SkinningGuard` said the six sampled
