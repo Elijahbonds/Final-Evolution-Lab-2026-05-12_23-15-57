@@ -64,7 +64,8 @@ import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtr
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '../core/CourtMovement';
 import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
-import { chainRotation, frameAbove } from '../anim/TwoBoneIK';
+import { frameAbove } from '../anim/TwoBoneIK';
+import { chainDeltaToRef, localDeltaToRef, forwardByToRef, rotateInFrame as rotateInFrameOf } from '../core/DunkFrameSpace';   // DUNK-GARBAGE: the posture copy's frame-space math, no per-call allocation
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the runway answers its MOTION
 import { POSTURE, posturePose, chestAimCorrection, hipYawStrip, easePose, clonePose, lowPassK, wrapRad, clamp, POSTURE_TAU, AIM_TAU, AIM_SPLIT, EYES_SPLIT, HEAD_YAW_CAP, HEAD_PITCH_CAP, type PosturePose, type PostureWindow, type PostureInput } from '../core/DunkPosture';   // DUNK-POSTURE: the Posture Poses layer
 import type { PlayOpts } from '../anim/CharacterAnimator';
@@ -3300,29 +3301,28 @@ export const DunkMode: ModeDefinition = (() => {
   const _ppQ = Quaternion.Identity(), _ppD = Quaternion.Identity(), _ppV = new Vector3(), _ppRho = Quaternion.Identity();
   // IMPROVE (2026-10-06): the posture layer's per-joint axis and inverse are scratch — `Vector3.Right().rotateByQuaternionToRef(_ppD,
   // new Vector3())` and `Quaternion.Inverse(bindChain)` made three objects a joint a frame. Each axis is consumed by the very next call.
-  const _ppAxis = new Vector3(), _ppInv = Quaternion.Identity();
+  // DUNK-GARBAGE (2026-10-16): the inverse, the chain, the parent chain and the forward moved to DunkFrameSpace's scratch; the yaw
+  // axis is one constant (RotationAxisToRef only reads it — `Vector3.Up()` made a new one per joint a frame).
+  const _ppAxis = new Vector3(), PP_UP = new Vector3(0, 1, 0);
   /** The bone's own axis (x, y, z in its bind frame) in frame space this frame: `_ppD` must hold the bone's chain × bind⁻¹. */
   const ppAxis = (x: number, y: number, z: number): Vector3 => _ppAxis.set(x, y, z).rotateByQuaternionToRef(_ppD, _ppAxis).normalize();
-  /** chain rotation × bind⁻¹ into `_ppD`, without allocating the inverse. */
-  const ppDelta = (p: PpNode): void => { chainRotation(p.n, ppFrame!).multiplyToRef(Quaternion.InverseToRef(p.bindChain, _ppInv), _ppD); };
+  /** chain rotation × bind⁻¹ into `_ppD`, without allocating (DUNK-GARBAGE 2026-10-16: the chain too — DunkFrameSpace). */
+  const ppDelta = (p: PpNode): void => { chainDeltaToRef(p.n, ppFrame!, p.bindChain, _ppD); };
   /** The frame-space yaw of a node's rotation `local` against its bind chain (the clip's own turn: 0 at bind). */
   function frameYawOf(n: TransformNode, local: Quaternion, bindChain: Quaternion): number {
-    const par = n.parent as TransformNode | null; const Rp = par && par !== ppFrame ? chainRotation(par, ppFrame!) : Quaternion.Identity();
-    Rp.multiplyToRef(local, _ppQ); _ppQ.multiplyToRef(Quaternion.Inverse(bindChain), _ppD);
-    Vector3.Forward().rotateByQuaternionToRef(_ppD, _ppV);
+    localDeltaToRef(n, local, ppFrame!, bindChain, _ppD);
+    forwardByToRef(_ppD, _ppV);
     return Math.atan2(_ppV.x, _ppV.z);
   }
   /** The frame-space forward of a node NOW against its bind chain: x/z = the yaw, y = the elevation. */
   function frameForwardOf(p: PpNode, out: Vector3): Vector3 {
-    chainRotation(p.n, ppFrame!).multiplyToRef(Quaternion.Inverse(p.bindChain), _ppD);
-    return Vector3.Forward().rotateByQuaternionToRef(_ppD, out);
+    chainDeltaToRef(p.n, ppFrame!, p.bindChain, _ppD);
+    return forwardByToRef(_ppD, out);
   }
   /** Rotate a node by `rho` in frame space (q' = Rp⁻¹ ∘ ρ ∘ Rp ∘ q): the node turns about the frame's axis, wherever the
    *  chain above it is — the way the solver writes a world delta back as a local. */
   function rotateInFrame(n: TransformNode, rho: Quaternion): void {
-    const par = n.parent as TransformNode | null; const Rp = par && par !== ppFrame ? chainRotation(par, ppFrame!) : Quaternion.Identity();
-    const q = n.rotationQuaternion!;
-    Quaternion.Inverse(Rp).multiply(rho).multiply(Rp).multiplyToRef(q, _ppQ); q.copyFrom(_ppQ);
+    rotateInFrameOf(n, ppFrame!, rho);
   }
   const qEq = (a: Quaternion, b: Quaternion): boolean => Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6 && Math.abs(a.z - b.z) < 1e-6 && Math.abs(a.w - b.w) < 1e-6;
   /** The clip's value this frame — or, on a held pose (no animation rewrote the node), the value it held before this layer
@@ -3461,7 +3461,7 @@ export const DunkMode: ModeDefinition = (() => {
       ppAim += (want - ppAim) * kAim;
       if (Math.abs(ppAim) > 1e-4) {
         const parts: [PpNode | null, number][] = [[ppNodes.spine1, AIM_SPLIT[0]], [ppNodes.spine2, AIM_SPLIT[1]]];
-        for (const [p, k] of parts) { if (!p) continue; Quaternion.RotationAxisToRef(Vector3.Up(), ppAim * k, _ppRho); rotateInFrame(p.n, _ppRho); ppCommit(p); }
+        for (const [p, k] of parts) { if (!p) continue; Quaternion.RotationAxisToRef(PP_UP, ppAim * k, _ppRho); rotateInFrame(p.n, _ppRho); ppCommit(p); }
       }
     }
     // 3) the eyes: the neck and the head turn and tilt toward the iron on top of the chest (a dunker watches the rim, not the
@@ -3480,7 +3480,7 @@ export const DunkMode: ModeDefinition = (() => {
       const parts: [PpNode | null, number][] = [[ppNodes.neck, EYES_SPLIT[0]], [hp, EYES_SPLIT[1]]];
       for (const [p, k] of parts) {
         if (!p) continue;
-        if (Math.abs(ppHeadYaw) > 1e-4) { Quaternion.RotationAxisToRef(Vector3.Up(), ppHeadYaw * k, _ppRho); rotateInFrame(p.n, _ppRho); }
+        if (Math.abs(ppHeadYaw) > 1e-4) { Quaternion.RotationAxisToRef(PP_UP, ppHeadYaw * k, _ppRho); rotateInFrame(p.n, _ppRho); }
         if (Math.abs(ppHeadPitch) > 1e-4) {
           // pitch about the bone's own right axis in frame space (+X = forward / down in every clip key, so up is −pitch)
           ppDelta(p);
