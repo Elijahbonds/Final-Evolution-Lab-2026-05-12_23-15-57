@@ -48,7 +48,7 @@ const UA = 'AgeScreenTest/1.0';
 // statement; pending SQL only, no column or index added) at 521c52c1.
 // RATE-LIMIT-WIRE (PR #289 QA rework) prisma/pending/2026-10-16-rate-limits.sql (pending SQL only, one new table approved
 // by Elijah; schema.prisma untouched) at 5b7c3f7e.
-const PARENT = '5b7c3f7e3bef69cebbb86cbe736e5d55499a5079';
+const PARENT = '5eb5f5949edb68e8d3fa0059bd4486613c8a67c8';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
