@@ -135,6 +135,7 @@ export function useClosetEdit(studio: Pick<StudioApi, 'doc' | 'run'>) {
   const [editing, setEditing] = useState<{ session: string; characterId: string; name: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const runRef = useRef(studio.run); runRef.current = studio.run;
+  const docRef = useRef(studio.doc); docRef.current = studio.doc;
   const apply = useCallback(async (characterId: string, code: string, name?: string): Promise<string | null> => {
     const r = await decodeCharacter({ name: name ?? 'Character', lookCode: code });
     if (!r.ok) return r.error;
@@ -145,7 +146,13 @@ export function useClosetEdit(studio: Pick<StudioApi, 'doc' | 'run'>) {
   }, []);
   useEffect(() => {
     if (!editing) return;
-    const check = () => { const r = takeClosetReturn(browserKV(), editing.session); if (r && r.characterId === editing.characterId) void apply(r.characterId, r.code, r.name); };
+    const check = () => {
+      const r = takeClosetReturn(browserKV(), editing.session);
+      if (!r || r.characterId !== editing.characterId) return;
+      // the Closet shows a slot's label in capitals: a name that only changed case is not a rename
+      const now = docRef.current.characters.find((c) => c.id === r.characterId)?.name ?? '';
+      void apply(r.characterId, r.code, r.name && r.name.toLowerCase() !== now.toLowerCase() ? r.name : undefined);
+    };
     const onStorage = (e: StorageEvent) => { if (e.key === CLOSET_RETURN_KEY) check(); };
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', check);
@@ -190,7 +197,7 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
   const crowd = venue?.cast?.crowd ?? [];
   return (
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6" data-testid="characters-track">
-      <div className="w-full max-w-2xl rounded-xl border" style={{ borderColor: C.line, background: C.surface }}>
+      <div className="w-full max-w-3xl rounded-xl border" style={{ borderColor: C.line, background: C.surface }}>
         <PanelTitle right={<span className="text-[11px]" style={{ color: C.dim }}>Closet share codes · {doc.characters.length}</span>}>Characters</PanelTitle>
         <p className="px-3 text-[12px]" style={{ color: C.dim }}>A character is a Closet look. Cast one as a venue’s player: the viewport stands it on the hero’s spot on the real rig, and Play-test dresses the mode’s hero in it. Seat up to {CROWD_CAST_MAX} among the fans (visual only). Edit the look itself in the Closet.</p>
         <AddCharacter onAdd={(c) => run(addCharacter(doc, c).cmd)} />
@@ -209,19 +216,19 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
               <div className="flex items-center gap-2 px-3 py-2">
                 <UserRound className="h-4 w-4 shrink-0" style={{ color: cast ? C.gold : C.dim }} aria-hidden />
                 <span className="w-44"><TextField label={`Name of ${c.name}`} value={c.name} onChange={(n) => run(renameCharacter(c.id, n))} onDone={seal} /></span>
-                <span className="truncate font-mono text-[10px]" style={{ color: C.dim }} title={c.lookCode}>{c.lookCode?.slice(0, 18)}…</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[10px]" style={{ color: C.dim }} title={c.lookCode}>{c.lookCode?.slice(0, 18)}…</span>
                 {venue && (
-                  <button type="button" onClick={() => { run(castCharacter(venue, 'player', cast ? null : c.id)); if (!cast) onPreview?.(); }} className="ml-auto rounded-md border px-2 py-0.5 text-[11px]" style={{ borderColor: cast ? C.gold : C.line, color: cast ? C.gold : C.text }}>
+                  <button type="button" onClick={() => { run(castCharacter(venue, 'player', cast ? null : c.id)); if (!cast) onPreview?.(); }} className="shrink-0 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px]" style={{ borderColor: cast ? C.gold : C.line, color: cast ? C.gold : C.text }}>
                     {cast ? `Player in ${venue.name}` : `Cast in ${venue.name}`}
                   </button>
                 )}
                 {venue && (
                   <button type="button" disabled={crowdFull} aria-pressed={inCrowd} title={crowdFull ? `The crowd seats ${CROWD_CAST_MAX} characters at most` : 'Seat among the fans (visual only)'}
-                    onClick={() => { const cmd = toggleCrowdCast(venue, c.id); if (cmd) run(cmd); }} className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: inCrowd ? C.gold : C.line, color: inCrowd ? C.gold : C.text }}>
+                    onClick={() => { const cmd = toggleCrowdCast(venue, c.id); if (cmd) run(cmd); }} className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: inCrowd ? C.gold : C.line, color: inCrowd ? C.gold : C.text }}>
                     <Users className="h-3 w-3" aria-hidden /> {inCrowd ? 'In the crowd' : 'Seat in the crowd'}
                   </button>
                 )}
-                <button type="button" disabled={!c.lookCode} onClick={() => closet.start(c)} title="Open this look in the Closet Studio and bring the edit back" className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: closet.editing?.characterId === c.id ? C.gold : C.line, color: C.text }}>
+                <button type="button" disabled={!c.lookCode} onClick={() => closet.start(c)} title="Open this look in the Closet Studio and bring the edit back" className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: closet.editing?.characterId === c.id ? C.gold : C.line, color: C.text }}>
                   <PenLine className="h-3 w-3" aria-hidden /> Edit in the Closet
                 </button>
                 <button type="button" aria-label={`Delete ${c.name}`} onClick={() => { const cmd = removeCharacter(doc, c.id); if (cmd) run(cmd); }} className="rounded p-1 hover:bg-white/5"><Trash2 className="h-3.5 w-3.5" style={{ color: C.dim }} /></button>

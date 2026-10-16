@@ -7,7 +7,9 @@ vi.mock('../babylon/scene/EnvironmentIBL', () => ({ mountEnvironmentIBL: () => (
 
 import { FreeCamera, NullEngine, Scene, Vector3 } from '@babylonjs/core';
 import { CAST_SPACING_M, CROWD_CAST_MAX, CROWD_SEED, crowdCastSeats, crowdVenueOf, resolveCast, sanitizeCast, type CastMember } from './cast';
-import { mountCrowdCastLayer } from './castLayer';
+import { CAST_FAN_HANDS, castFanKeys, mountCrowdCastLayer } from './castLayer';
+import { crowdClipKeys } from '../babylon/visual/crowd/crowdClips';
+import { REF_ARM_LEN } from '../babylon/anim/poseClip';
 import { mountCrowdLayer } from './runtime';
 import { exportVenue, parseVenueExport, type ExportCrowd } from './exportVenue';
 import { addCharacter, removeCharacter, toggleCrowdCast } from './edits';
@@ -110,6 +112,26 @@ describe('the bodies: opponent-role spawns on the kit URL, none on a phone', () 
     expect(layer.seats).toEqual([]);
     expect(spawn).not.toHaveBeenCalled();
     scene.dispose(); engine.dispose();
+  });
+});
+
+describe('the fan\'s pose: the crowd\'s own keys, plus hands', () => {
+  it('every key is the crowd clip\'s key (torso, legs, hips height) with both hands placed below the shoulder, inside an arm\'s reach', () => {
+    for (const posture of ['seated', 'standing'] as const) {
+      const keys = castFanKeys(posture), crowd = crowdClipKeys(posture === 'seated' ? 'sit_idle' : 'stand_idle');
+      expect(keys).toHaveLength(crowd.length);
+      keys.forEach((k, i) => {
+        const { handsRel, ...rest } = k;
+        expect(rest).toEqual(crowd[i]);
+        for (const side of ['Left', 'Right'] as const) {
+          const h = handsRel![side]!;
+          expect(h[1]).toBeLessThan(-0.3);                                    // down, not out in the T
+          expect(Math.hypot(...h)).toBeLessThanOrEqual(REF_ARM_LEN);          // reachable
+          expect(Math.sign(h[0])).toBe(side === 'Left' ? -1 : 1);             // each hand on its own side
+        }
+      });
+    }
+    expect(CAST_FAN_HANDS.seated.Left![2]).toBeGreaterThan(CAST_FAN_HANDS.standing.Left![2]);   // seated: forward, on the lap
   });
 });
 

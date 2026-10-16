@@ -87,6 +87,22 @@ describe('Edit in the Closet', () => {
     expect(r.listeners.get('storage')?.size ?? 0).toBe(0);   // nothing left listening once the look came back
     m.unmount();
   });
+  it('a name that only changed case (the Closet shows labels in capitals) is not a rename', async () => {
+    const r = rig();
+    const s = await project(1);
+    const c = s.doc.characters[0];
+    const ran: Command[] = [];
+    let api!: ReturnType<typeof useClosetEdit>;
+    const m = mount(() => { api = useClosetEdit({ doc: s.doc, run: (cmd: Command) => { ran.push(cmd); } } as unknown as StudioApi); return null; });
+    api.start(c);
+    const session = (r.open.mock.calls[0][0] as string).split('=')[1];
+    writeClosetReturn(r.kv, session, c.lookCode!, c.name.toUpperCase());
+    r.fire('storage', { key: CLOSET_RETURN_KEY });
+    for (let i = 0; i < 20 && !ran.length; i++) await flush();
+    expect(ran[0].ops[0]).toMatchObject({ op: 'patchCharacter', patch: { lookCode: c.lookCode } });
+    expect((ran[0].ops[0] as { patch: Record<string, unknown> }).patch).not.toHaveProperty('name');
+    m.unmount();
+  });
   it('the manual path: a pasted code that does not decode changes nothing and says why; a good one is one command', async () => {
     rig();
     const s = await project(1);

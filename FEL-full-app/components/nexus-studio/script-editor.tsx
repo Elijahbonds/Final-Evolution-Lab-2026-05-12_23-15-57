@@ -274,7 +274,7 @@ function ScopeField({ script, venues, activeVenueId, run }: { script: StudioScri
         <MapPin className="h-3.5 w-3.5" style={{ color: every ? C.dim : C.gold }} aria-hidden />
         <span>Runs in</span>
         <Toggle label="Every venue" on={every} onChange={(on) => set(on ? null : [activeVenueId])} />
-        <span style={{ color: C.dim }}>{every ? 'every venue' : scopeSummary(script, venues)}</span>
+        <span style={{ color: C.dim }}>{every ? 'every venue' : 'only the venues ticked'}</span>
       </div>
       {!every && (
         <ul className="mt-1 space-y-0.5 pl-5">
