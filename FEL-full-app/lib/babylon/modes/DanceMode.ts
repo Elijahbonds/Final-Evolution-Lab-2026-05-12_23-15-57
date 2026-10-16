@@ -66,7 +66,7 @@ import {
   DancePerformance, generateRoutine, beatDuration, MISS_AFTER, type Judgement, type DanceStep,
 } from '../core/DanceCore';
 import {
-  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor, styleBeatsFor,
+  DEFAULT_TRACK_ID, trackById, cycleTrack, trackFromQuery, pickBanner, PICK_TIMEOUT_SEC, stepsFor, styleBeatsFor, freeSpansFor,
   gradeFor, bodySpeedFor, cueLane, CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type DanceTrack, type HudCue,
 } from '../core/danceTracks';
 // BIOMECH-WAVE2 (2026-09-09) — the game-wide bar on the stage family (SPEC-FEL-BIOMECH-GAMEWIDE asks dance for "G2 +
@@ -149,6 +149,11 @@ import {
 } from '../dance/chartPlay';
 import { readBest, recordBest, bestLine } from '../dance/danceBests';
 import { moveFadeSec, STEP_FADE_SEC } from '../dance/floorPhase';
+import { padStore } from '../dance/ui/padStore';   // lane/dance-extras: what the phone pad's buttons are for, handed to TouchOverlay's dance pad
+// lane/dance-extras (2026-10-14): the FREESTYLE section — pure decisions in dance/freestyle.ts (a chart marks it; no step is inside it; every
+// face button picks the move; STYLE only, GROOVE_STYLE per freestyle slot, never the judge), wired here to the dancer, the HUD, the pad
+// and the stage.
+import { FreestyleDeck, FREE_CUE_COLOR, freeSpanAt, nextFreeSpan, routeFreestyle, freeStyleFor, legendLine, freeName, type FreeSpan } from '../dance/freestyle';
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
@@ -477,6 +482,12 @@ export const DanceMode: ModeDefinition = (() => {
   /** #10: the chart's groove beats (whole beats far from every step) and the ones already tapped this run. */
   let grooves: number[] = [];
   let grooveTaken = new Set<number>();
+  /** lane/dance-extras: the chart's FREESTYLE sections (song beats), the one the song is inside now, the STYLE tally when it began, and the
+   *  deck each button draws its move from (dance/freestyle.ts). None for any chart that does not mark one. */
+  let freeSpans: FreeSpan[] = [];
+  let freeCur: FreeSpan | null = null;
+  let freeStyleAt = 0;
+  const freeDeck = new FreestyleDeck();
   /** #10 / #13: STYLE — groove taps and held freezes. Its own tally: never added to the (Arena-staked) score. */
   let style = 0;
   /** #13: the source of the tap being judged right now (onInput sets it around perf.hit; onJudged reads it), and the
@@ -502,6 +513,7 @@ export const DanceMode: ModeDefinition = (() => {
     offsetSumMs = 0; offsetHits = 0;
     sections = new SectionTally(track.song);
     fumbled = new Set(); grooves = []; grooveTaken = new Set(); style = 0;
+    freeSpans = []; freeCur = null; freeStyleAt = 0; freeDeck.reset(); dressing?.freestyle(false);
     tapSrc = null; hold = null; laneAt = -Infinity; countDigit = 0;
     lastStep = null;
   }
@@ -1003,6 +1015,7 @@ export const DanceMode: ModeDefinition = (() => {
     // up and Stoop speaks; #3 the run's average timing offset, with the calibrate link when it leans; #9 the section
     // with the most misses; #4 the run goes into this device's best for the track.
     banner.cancel(); hold = null;
+    freeCur = null; dressing?.freestyle(false);   // lane/dance-extras: a run that ends inside a freestyle section ends it
     const fc = isFullCombo(r.counts);
     const offset = offsetSummary(offsetSumMs, offsetHits);
     const practise = sections.line();
@@ -1101,8 +1114,16 @@ export const DanceMode: ModeDefinition = (() => {
     return `${pickBanner(track)}  ·  ${level.toUpperCase()}${matchMode ? '  ·  MATCH A B X Y' : ''}${best ? `  ·  ${best}` : ''}`;
   }
 
+  /** lane/dance-extras (2026-10-14): what the phone pad's four buttons are for right now (ui/padModel.ts, drawn by
+   *  TouchOverlay's dance branch, handed over by ui/padStore.ts). Display only: it reads state the room already holds and the
+   *  pad sends the same events a gamepad does, so nothing here is read back by the judge. */
+  function publishPad(mode: 'pick' | 'play'): void {
+    padStore.set({ mode: mode === 'pick' ? 'pick' : matchMode ? 'match' : 'any', matchOn: matchMode, free: {} });
+  }
+
   function showPick(ctx: ModeContext): void {
     playPreview(track);
+    publishPad('pick');
     ctx.setHud({
       round: pickRound(),
       banner: pickLine(),
@@ -1133,6 +1154,7 @@ export const DanceMode: ModeDefinition = (() => {
     pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;
     SoundKit.play('uiTick', { pitch: what === 'match' ? 1.4 : what === 'up' ? 1.1 : 1, volume: 0.3 });
     ctx.setHud({ banner: pickLine() });
+    publishPad('pick');
   }
 
   /** IMPROVE (2026-10-06, #8): GO AGAIN in place — a finished run back to the pick screen on the same stage (the engine,
@@ -1182,8 +1204,11 @@ export const DanceMode: ModeDefinition = (() => {
     // rare pre-P7 export with steps but no real-audio payload.
     // IMPROVE (2026-10-06, #11): the chosen level thins (EASY) or fills (HARD) the chart for this run; NORMAL is the
     // chart as authored. #10: the groove beats are read off the chart actually played.
-    const routine = chartForLevel(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }), level);
+    // lane/dance-extras: the chart's FREESTYLE sections hold no step at any level — HARD's fill leaves them empty (chartForLevel keepClear)
+    const freeSecs = freeSpansFor(track);
+    const routine = chartForLevel(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }), level, freeSecs);
     resetImproveRun();
+    freeSpans = freeSecs;
     // MUSIC-SUITE P9 re-land (2026-10-13): an authored chart brings its OWN style taps (accents, doubles, freestyle slots —
     // dance/chart.ts, via styleBeatsFor); any other chart (the export, a community song, a fallback) keeps the computed
     // groove beats. Either way they pay STYLE only, never a step and never score.
@@ -1240,6 +1265,7 @@ export const DanceMode: ModeDefinition = (() => {
     startAt = 0;
     countArmed = false;
     ctx.setHud({ round: track.name, banner: '4', nextStep: '', nextStepIn: null });
+    publishPad('play');
     console.log(`[FEL-DANCE] track ${track.id} ${track.bpm}bpm ${track.bars} bars d${track.difficulty} · kit voices ${kit?.voices ?? 0}`);
   }
 
@@ -1298,6 +1324,67 @@ export const DanceMode: ModeDefinition = (() => {
   }
 
   /**
+   * lane/dance-extras (2026-10-14): ONE PRESS INSIDE A FREESTYLE SECTION (dance/freestyle.ts has the design). Returns whether the room took
+   * it: every face button (a trigger pull / SPACE is an A) dances the move its deck gives it, and a press on one of the section's own
+   * slots banks GROOVE_STYLE into the STYLE tally — the only thing it ever pays. It never reaches perf.hit, so it cannot cost a wild tap,
+   * break the combo or move the score, and MATCH is not asked: X and Y dance too with MATCH off. A press the judge would take for a step
+   * (a scored move within MISS_AFTER: the section's edges) is the step's and is NOT taken here (false: pressAt judges it as before).
+   */
+  function freestylePress(ctx: ModeContext, e: FelInput, anyTap: boolean): boolean {
+    if (!freeCur || phase !== 'playing') return false;
+    const a = audioNow();
+    if (!clock.accepting(a, MISS_AFTER)) return false;
+    const heardNow = clock.song(a) - latencySec;
+    const bd = beatDuration(track.bpm);
+    const route = routeFreestyle({
+      e, tap: anyTap, upcoming: perf.upcoming(heardNow, STOOP_LOOKAHEAD), heardNow, beatPos: (heardNow - startAt) / bd, beatSec: bd, styleBeats: grooves, taken: grooveTaken,
+    });
+    if (!route) return false;
+    const pick = freeDeck.press(route.slot);
+    playStep({ clipId: pick.clipId, beat: (heardNow - startAt) / bd, holdBeats: CLIP_BY_ID.get(pick.clipId)?.beats ?? 4, mirrored: pick.mirrored });
+    if (route.slotBeat !== null) grooveTaken.add(route.slotBeat);
+    style += freeStyleFor(route);
+    if (route.slotBeat !== null) {
+      ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.1, 0)), freeName(pick.clipId), '#fde047');
+      SoundKit.play('uiTick', { pitch: 1.5, volume: 0.3 });
+    } else SoundKit.play('uiTick', { pitch: 1.2, volume: 0.12 });
+    const legend = freeDeck.legend();
+    padStore.set({ free: legend });
+    ctx.setHud({ nextStep: `YOUR MOVE · ${legendLine(legend)}`, nextStepIn: null });
+    return true;
+  }
+
+  /** lane/dance-extras: the section begins — the cue the player sees and hears: a banner, the HUD chip, the pad's buttons turning into
+   *  the moves they will dance, the LED wall's word and a burst on the stage, the crowd's cheer. Display only. */
+  function enterFreestyle(ctx: ModeContext, span: FreeSpan): void {
+    freeCur = span; freeStyleAt = style; freeDeck.reset();
+    const legend = freeDeck.legend();
+    padStore.set({ mode: 'free', free: legend });
+    dressing?.freestyle(true);
+    crowd?.cheer(0.5);
+    SoundKit.play('uiTick', { pitch: 1.8, volume: 0.4 });
+    queueStoop('dance.freestyle');   // Stoop's own line for it ("This bar is yours …": rendered since P8, unwired until a chart could mark one); the queue never talks over a judge window
+    flashBanner(ctx, 'FREESTYLE — YOUR MOVE', 1600, { round: 'FREESTYLE', nextStep: `YOUR MOVE · ${legendLine(legend)}`, nextStepIn: null });
+  }
+
+  /** lane/dance-extras: the section ends — what it earned, and MATCH (if it is on) is back. Display only. */
+  function exitFreestyle(ctx: ModeContext): void {
+    const gained = style - freeStyleAt;
+    freeCur = null;
+    padStore.set({ mode: matchMode ? 'match' : 'any', free: {} });
+    dressing?.freestyle(false);
+    SoundKit.play('uiTick', { pitch: 1.0, volume: 0.35 });
+    flashBanner(ctx, `FREESTYLE OVER${gained > 0 ? ` · +${gained} STYLE` : ''}${matchMode ? ' · MATCH IS BACK' : ''}`, 1500, { round: track.name });
+  }
+
+  /** lane/dance-extras: once a frame, on the heard clock: did the song cross into or out of a freestyle section? */
+  function trackFreestyle(ctx: ModeContext, songBeat: number): void {
+    const at = freeSpanAt(freeSpans, songBeat);
+    if (at === freeCur) return;
+    if (at) enterFreestyle(ctx, at); else exitFreestyle(ctx);
+  }
+
+  /**
    * IMPROVE (2026-10-06): the lane, the NOW call and its countdown into `hud`, from this tick's upcoming() list. On top of
    * danceTracks.cueLane (movement play's, unchanged): #12 in MATCH mode each marker shows its face button and the call
    * names it; #13 a freeze says HOLD; #10 the groove beats ride the lane as faint ♪ markers (optional, bonus only).
@@ -1319,10 +1406,23 @@ export const DanceMode: ModeDefinition = (() => {
         const dt = startAt + grooves[i] * bd - heard;
         if (dt > CUE_LOOKAHEAD_SEC) break;
         if (grooveTaken.has(grooves[i])) continue;
-        cues.push({ in: Math.round(dt * 1000) / 1000, name: 'groove', family: 'groove', glyph: '♪', color: 'rgba(255,255,255,0.3)', mirrored: false, move: 'tap' });
+        // lane/dance-extras: a slot inside a FREESTYLE section is a gold ★ — "your move" — not a faint groove note
+        const inFree = freeSpans.length > 0 && freeSpanAt(freeSpans, grooves[i]) !== null;
+        cues.push(inFree
+          ? { in: Math.round(dt * 1000) / 1000, name: 'your move', family: 'free', glyph: '★', color: FREE_CUE_COLOR, mirrored: false, move: 'tap' }
+          : { in: Math.round(dt * 1000) / 1000, name: 'groove', family: 'groove', glyph: '♪', color: 'rgba(255,255,255,0.3)', mirrored: false, move: 'tap' });
         added = true;
       }
       if (added) cues.sort((x, y) => x.in - y.in);
+    }
+    // lane/dance-extras: the section itself rides the lane as it comes (a gold ★★ at its first beat), so it is seen before it starts
+    if (freeSpans.length && !freeCur) {
+      const nxt = nextFreeSpan(freeSpans, (heard - startAt) / beatDuration(track.bpm));
+      const dt = nxt ? startAt + nxt.start * beatDuration(track.bpm) - heard : Infinity;
+      if (nxt && dt <= CUE_LOOKAHEAD_SEC) {
+        cues.push({ in: Math.round(dt * 1000) / 1000, name: 'freestyle', family: 'free', glyph: '★★', color: FREE_CUE_COLOR, mirrored: false, move: 'tap' });
+        cues.sort((x, y) => x.in - y.in);
+      }
     }
     hud.cues = cues;
     const next = upcoming[0];
@@ -1332,6 +1432,8 @@ export const DanceMode: ModeDefinition = (() => {
       hud.nextStep = matchMode ? `${name} · ${buttonForStep(next.step)}` : name;
       hud.nextStepIn = Math.max(0, Math.round((next.time - heard) * 100) / 100);
     }
+    // lane/dance-extras: inside a FREESTYLE section the prompt line is the legend — what each button dances — not the next scored step
+    if (freeCur) { hud.nextStep = `YOUR MOVE · ${legendLine(freeDeck.legend())}`; hud.nextStepIn = null; }
   }
 
   /** IMPROVE (2026-10-06, #13): the freeze's release, `deltaSec` after its last beat (− = let go early). STYLE only. */
@@ -1348,6 +1450,7 @@ export const DanceMode: ModeDefinition = (() => {
     camPreset: 'overShoulder',
 
     async load(ctx: ModeContext) {
+      padStore.reset();   // a fresh room: the phone pad is back to its default until the pick screen says what it is for
       // MUSIC-SUITE P2 FIX PASS (2026-09-25): 'playback' for THIS room (the band through an iPhone's silent switch —
       // assumption, not tried on a device), claimed before SoundKit's context is asked for and given back on dispose.
       // It was set inside SoundKit for every mode, where (assumed) it also stopped the player's own music app.
@@ -1551,6 +1654,9 @@ export const DanceMode: ModeDefinition = (() => {
       }
       // IMPROVE (#12): in MATCH mode every face button is a tap, and which one it was matters
       const btn = matchMode ? matchPress(e, t.tap) : null;
+      // lane/dance-extras: inside a FREESTYLE section every face button picks the move and MATCH is not asked (freestylePress); a press
+      // the judge would take for a step is not taken there, and goes on below exactly as before
+      if (freeCur && freestylePress(ctx, e, t.tap)) return;
       if (!t.tap && !btn) return;
       if (phase === 'countin') {
         // MUSIC-SUITE P2 FIX PASS (2026-09-25): a tap inside beat 0's early window is a tap on beat 0. This returned for
@@ -1698,6 +1804,7 @@ export const DanceMode: ModeDefinition = (() => {
       // way to publish timing (published = rendered): a dot that pops on
       // every beat, decaying through it.
       const songBeat = (heard - startAt) / bd;
+      if (freeSpans.length) trackFreestyle(ctx, songBeat);   // lane/dance-extras: the freestyle section's entry and exit
 
       // MUSIC-SUITE P8 (2026-09-25): the front audience camera + the lamp/LED-wall/podium pulse — the SAME heard
       // clock the beat-pulse dot above reads, so what the camera does and what the HUD shows agree. `perf.combo`
@@ -1735,6 +1842,7 @@ export const DanceMode: ModeDefinition = (() => {
     },
 
     dispose() {
+      padStore.reset();
       stopPreview();   // MUSIC-SUITE P7 (six-songs): leaving the room is a blur too
       stoopQueue.clear(); VoiceKit.stop('booth', 0.12);   // MUSIC-SUITE P8: Stoop never bleeds into the next room
       releaseSession?.(); releaseSession = null;

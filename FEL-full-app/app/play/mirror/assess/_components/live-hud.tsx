@@ -13,7 +13,7 @@ import { useEffect, useRef } from 'react';
 import type { RunnerView } from '@/lib/assess/runner';
 import { testDef, type Side } from '@/lib/assess/protocol';
 import { SCREEN_TEST_NAMES } from '@/lib/screen/copy';
-import { cueFlash, cueRep, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
+import { cuesDue, cueFlash, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
 
 /** SCREEN A: a rep is up on these steps — voice and colour only, no reading. */
 const NO_READING: ReadonlySet<RunnerView['step']> = new Set(['calibrate', 'calibrateSide', 'countdown', 'active', 'paused']);
@@ -22,24 +22,13 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
   view: RunnerView; voiceOn?: boolean; onPain: (pain: boolean) => void; onTakeoff: (s: Side) => void; onStop: () => void;
 }) {
   const v = view;
-  const lastFlash = useRef<RunnerView['flash']>(null);
-  const lastMark = useRef<string>('');
+  const lastCue = useRef(0);
 
+  // exactly one tone per pulse: a counted rep (one 'captured' pulse) plays once, each countdown beat beeps once
+  const newest = v.flashCues?.[v.flashCues.length - 1]?.id ?? 0;
   useEffect(() => {
-    if (v.flash && v.flash !== lastFlash.current) {
-      lastFlash.current = v.flash;
-      cueFlash(v.flash);
-    }
-  }, [v.flash]);
-
-  useEffect(() => {
-    const key = v.reps.marks.join(',');
-    if (key !== lastMark.current && v.reps.marks.length) {
-      const m = v.reps.marks[v.reps.marks.length - 1];
-      if (m) cueRep(m);
-      lastMark.current = key;
-    }
-  }, [v.reps.marks]);
+    for (const c of cuesDue(lastCue.current, v.flashCues)) { lastCue.current = c.id; cueFlash(c.kind); }
+  }, [newest]); // eslint-disable-line react-hooks/exhaustive-deps -- keyed on the newest pulse id only
 
   const noReading = NO_READING.has(v.step) && voiceOn;        // voice off: the caption under the picture carries the words
   const inTest = v.step === 'position' || v.step === 'countdown' || v.step === 'active' || v.step === 'paused' || v.step === 'calibrateSide';
@@ -53,7 +42,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
     <div className="absolute inset-0">
       {/* full-screen colour flash */}
       {flashColour ? (
-        <div key={v.flash} className="pointer-events-none absolute inset-0 z-[5] animate-pulse" style={{ backgroundColor: flashColour, opacity: 0.55, animationDuration: `${FLASH_MS}ms` }} aria-hidden />
+        <div key={newest || v.flash} className="pointer-events-none absolute inset-0 z-[5] animate-pulse" style={{ backgroundColor: flashColour, opacity: 0.55, animationDuration: `${FLASH_MS}ms` }} aria-hidden />
       ) : null}
 
       {/* move header: readable from ~3 m — never while a rep is up (SCREEN A) */}

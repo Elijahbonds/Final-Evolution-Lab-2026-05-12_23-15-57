@@ -18,8 +18,7 @@ import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import {
-  HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType,
-} from './tv-hud';
+  HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType, HudLowerThird } from './tv-hud';
 import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
@@ -513,6 +512,23 @@ export function makeTimingHost(opts: TimingHostOpts) {
         <TimingPrompt hud={hud} />
 
         <HudBanner text={typeof hud.banner === 'string' ? hud.banner : ''} tone="good" />
+
+        {/* WAVE 3 (lane/w3-present): the shootout's lower third — "PENALTY 3 OF 5" (or SUDDEN DEATH) slides in as each kick's round starts, with the
+            tally, from the round label and the goals the mode already sends (penalty only: the key is the round label). */}
+        {modeKey === 'penalty' && (() => {
+          const label = typeof hud.round === 'string' ? hud.round : '';
+          const m = /^KICK (\d+)\/(\d+)$/.exec(label);
+          return (
+            <HudLowerThird
+              enabled={phase === 'playing'}
+              cardKey={label}
+              tone="you"
+              kicker="SHOOTOUT"
+              title={m ? `PENALTY ${m[1]} OF ${m[2]}` : label}
+              sub={`YOU ${hnode(hud.goals, 0)} – ${hnode(hud.themGoals, 0)} THEM`}
+            />
+          );
+        })()}
         </HudFrame>
 
         <BootSplash

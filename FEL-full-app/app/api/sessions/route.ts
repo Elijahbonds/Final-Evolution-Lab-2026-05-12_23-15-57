@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { finishTierRefusal, runTierOf } from '@/lib/sessions/runTier';
 import { applyLc, sessionWalletGrant } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
 import { getServerSession } from 'next-auth';
@@ -206,6 +207,9 @@ export async function POST(req: Request) {
       // swept to expired before anyone finished it (lib/sessions/sessionRuns.ts startRun)
       return send({ status: 422, body: { ok: false, paid: false, replayed: true, reason: run.status === RUN_STATUS.expired ? 'RUN_EXPIRED' : 'RUN_CLOSED', runId } });
     }
+    // TIER-SERVER: a staked run is played at the tier the server recorded at its start; a finish claiming another is refused
+    const tierRefusal = finishTierRefusal(run, body?.tier);
+    if (tierRefusal) return send(await refuse(userId, mode, tierRefusal, 422, { serverTier: runTierOf(run).tier }, { id: run.id, close: 'rejected' }));
     if (canonicalModeKey(mode) !== run.mode) return send(await refuse(userId, mode, 'RUN_MODE_MISMATCH', 422, { runMode: run.mode }, { id: run.id, close: 'rejected' }));
     const now = new Date();
     if (now.getTime() > run.expiresAt.getTime()) return send(await refuse(userId, mode, 'RUN_EXPIRED', 422, {}, { id: run.id, close: 'expired' }));
@@ -232,7 +236,7 @@ export async function POST(req: Request) {
     // MUSIC-SUITE P2 FIX PASS (2026-09-25): until the shell forwards `stats` (ROOM_STATS_FORWARDED, a held file), a
     // session without them is an old-contract client and keeps its own music win (the room applies the rule itself) —
     // this refused every honest win while the card said "set won". A mode the catalogue does not know wins nothing.
-    const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score });
+    const won = floorOnly ? false : sessionWon(rulesMode, claimedWon, stats, duration, { score, opponentScore });
     if (claimedWon && !won && !floorOnly) {
       const read = readMusicSet(stats, duration);
       console.info('session win refused:', mode, !isCatalogueMode(mode) ? 'not a catalogue mode' : read ? `accuracy ${read.accuracy.toFixed(3)} over ${read.bars} bars${read.issues.length ? ` (${read.issues.slice(0, 3).join('; ')})` : ''}` : 'no set counts');
@@ -555,7 +559,7 @@ export async function POST(req: Request) {
             : { attempts: form.attempts.length, stored: 0, power: null, dropped: formIssues.length, saved: false, reason: SCAN_SAVE_REFUSED.error },
         };
         // 3. The answer is stored with the payout it describes, so a retry after the commit always gets it back.
-        await storePaidResult(tx, run.id, { result: { status: 200, body: payload }, sessionId: sid ?? null });
+        await storePaidResult(tx, run.id, { result: { status: 200, body: payload }, sessionId: sid ?? null, run });
         return { payload, season, mastery, plan };
       }, { maxWait: 10_000, timeout: 30_000 });
     } catch (e) {

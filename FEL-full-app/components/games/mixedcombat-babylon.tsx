@@ -15,6 +15,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode, hnum } from './hud-format';
 import { HudFrame, HudLine, HudText } from './tv-hud';
 import { CombatEdgeCall, CombatHudBand, CombatRound, CombatStat } from './combat-hud-band';   // QA P1-09: the banner line sits below the HUD, above the juice overlay
+import { ReplayBug } from './fight-presentation';   // WAVE 3 (lane/w3-present)
 
 type Hud = Record<string, HudValue>;
 
@@ -108,7 +109,9 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
     emit({ t: 'button', btn: 'START', pressed: true });
   }, [emit]);
 
-  const showHud = phase === 'playing';
+  // WAVE 3: a KO replay (hud.replay) is the shot — the stat band steps aside and the REPLAY tag says how to skip it
+  const replaying = Number(hud.replay) === 1;
+  const showHud = phase === 'playing' && !replaying;
   // Edge danger — the ring-out is the signature, so the warning must be on the bezel, pulsing, the moment a back nears
   // the rim. In the HUD band's banner line (QA P1-09): at top-22% it sat on the stacked HP / GUARD chips of a short stage.
   const edgeAlert = typeof hud.edge === 'string' && hud.edge ? (
@@ -153,6 +156,7 @@ export default function MixedCombatBabylon({ onEnd }: GameProps) {
       {(phase === 'playing' || phase === 'countdown') && (
         <HudLine text={typeof hud.hint === 'string' ? hud.hint : ''} className="bottom-[13%]" size="label" alpha={0.8} maxWidthClass="max-w-lg" />
       )}
+      <ReplayBug on={replaying} />
       </HudFrame>
 
       <BootSplash

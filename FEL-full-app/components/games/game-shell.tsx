@@ -11,6 +11,7 @@ import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { PhysicalGamepadPoller } from '@/lib/gamepad-bridge';
 import { getScheme } from '@/lib/input-schemes';
 import { isBabylon } from '@/components/three/flags';
+import { lazyRunFor } from '@/lib/sessions/lazyRun';   // NB-4: a hoops run waits for TAP TO START only when Babylon loads
 import { canFullscreen, isFullscreen, toggleFullscreen } from '@/lib/ui/fullscreen';
 import { consoleLayout, consoleStageVars, type ConsoleLayout } from '@/lib/ui/consoleView';
 import { VirtualController } from './virtual-controller';
@@ -27,12 +28,20 @@ import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
+import { sendFinish, flushFinishes, settled, type FinishDeps } from '@/lib/sessions/finishOutbox';   // QA-H2: a finish survives a reload
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
 } from '@/lib/carnival-run';
+
+/** QA-H2: this device's finish outbox (lib/sessions/finishOutbox), and the browser's fetch and timer for its retries. */
+const finishStore = (): Storage | null => { try { return window.localStorage; } catch { return null; } };
+const FINISH_DEPS: FinishDeps = {
+  fetch: (url, init) => fetch(url, init),
+  sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+};
 
 export interface GameResult {
   score: number;
@@ -160,6 +169,7 @@ function GameShellInner({
   /** The wallet coins this run's earn reports were granted (BRAINBRAWL-POLISH-2 N10), and whether a cap cut the coin earn —
    *  null until a grant lands, and left null for a refused earn or a zero grant nothing capped (no "+0" tile). */
   const [recapCoins, setRecapCoins] = useState<{ coins: number; capped: boolean } | null>(null);
+  const finishUser = useRef<string | null>(null);   // QA-H2: the signed-in user a finish is saved under (/api/profile)
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
@@ -196,7 +206,11 @@ function GameShellInner({
   const serverRun = useRef<Promise<string | null> | null>(null);
   const startServerRun = useCallback((): Promise<string | null> => {
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
-    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode, ...(playtestRun ? { playtest: true } : {}) }) })
+    return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      mode, ...(playtestRun ? { playtest: true } : {}),
+      // TIER-SERVER: the head-to-head this run is for, so the server records its tier (PRO) at the start
+      ...(arenaMatchId ? { arenaMatchId } : {}), ...(mpCode ? { mp: mpCode } : {}), ...(challengeCode ? { c: challengeCode } : {}),
+    }) })
       .then((r) => (r?.ok ? r.json() : null))
       .then((j) => {
         if (j && typeof j.runId === 'string') {
@@ -212,7 +226,7 @@ function GameShellInner({
         import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
         return null;
       });
-  }, [mode, agentRun, playtestRun]);
+  }, [mode, agentRun, playtestRun, arenaMatchId, mpCode, challengeCode]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);
@@ -240,10 +254,25 @@ function GameShellInner({
   }, [scheme, gameKey, babylonOwnsInput]);
 
   useEffect(() => { runLive.current = result === null; }, [result]);
+  const lazyRun = useRef(lazyRunFor(mode));
+  lazyRun.current = lazyRunFor(mode);
   useEffect(() => {
     inputCount.current = 0;
     runMark.current = markRun(sessionStore.record());
-    serverRun.current = startServerRun();
+    // NB-4 (hoops grade 0d16f5dd): a harness game asks for its server run when play STARTS (TAP TO START: the harness's
+    // ready → playing, sessionStore.beginRun), not when the page mounts — an idle or bounced visit opens no run. Every
+    // other game still asks at mount, as before.
+    let stopWaiting: (() => void) | null = null;
+    if (lazyRun.current) {
+      serverRun.current = null;
+      let seen = sessionStore.record()?.runId ?? 0;
+      stopWaiting = sessionStore.subscribe(() => {
+        const id = sessionStore.record()?.runId ?? 0;
+        if (id > seen) { seen = id; serverRun.current = startServerRun(); }
+      });
+    } else {
+      serverRun.current = startServerRun();
+    }
     const mark = () => { if (runLive.current) inputCount.current += 1; };
     window.addEventListener('keydown', mark);
     window.addEventListener('pointerdown', mark);
@@ -252,6 +281,7 @@ function GameShellInner({
       window.removeEventListener('keydown', mark);
       window.removeEventListener('pointerdown', mark);
       window.removeEventListener('touchstart', mark);
+      stopWaiting?.();
     };
   }, [gameKey, startServerRun]);
 
@@ -264,6 +294,10 @@ function GameShellInner({
         if (!live) return;
         if (j?.grade) {
           setProfile({ prq: j?.prq ?? 50, grade: j.grade, display: readPrqDisplay(j) });
+          // QA-H2: who is signed in; a finish a reload cut off is re-sent once that is known, and only that user's
+          // (the server finishes a runId once: never paid twice)
+          finishUser.current = typeof j?.profile?.userId === 'string' ? j.profile.userId : null;
+          void flushFinishes(finishStore(), FINISH_DEPS, Date.now(), finishUser.current);
         } else {
           router.replace('/login');
         }
@@ -285,10 +319,7 @@ function GameShellInner({
       // this run's server run, read now (a REPLAY swaps in the next one). Not cleared: a game that ends the same run twice
       // finishes the same runId twice, and the server answers the second with the first's stored result (replayed)
       const started = serverRun.current ?? Promise.resolve(null);
-      started.then((runId) => fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      started.then((runId) => sendFinish(finishStore(), runId, { ...FINISH_DEPS, fetch: (_url, init) => fetch('/api/sessions', init) }, Date.now(), JSON.stringify({
           mode,
           // ECONOMY-SESSIONS-HARDEN: the run the server started; the server checks the score as sent (a whole number >= 0,
           // within the mode's rules) and times the run itself — `duration` is only the room's own figure now
@@ -318,10 +349,10 @@ function GameShellInner({
           // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
           ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
             const form = formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st); return form ? { form } : {}; })(),
-        }),
-      }))
-        // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card
-        .then((r) => (r ? r.json().catch(() => null) : null))
+        }), finishUser.current))
+        // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card. An answer
+        // that is not about the run (401/403/404/408/429: still in the outbox) reads as NOT_SAVED
+        .then((r) => (r && settled(r) ? r.json().catch(() => null) : null))
         .then(async (j) => {
           if (j?.ok) {
             // ECONOMY-CAPS (c): a replayed finish returns the stored body verbatim — no second reward card.
@@ -396,13 +427,15 @@ function GameShellInner({
                 // integers); some modes accrue fractional points internally
                 // (e.g. the carnival gauntlet at 0.4/unit).
                 const arenaScore = Math.max(0, Math.round(res?.score ?? 0));
+                // ARENA-SETTLE-SERVER: the duel settles on the score of the server run this finish closed, named by its runId
+                const duelRunId = await started;
                 const ar = await fetch('/api/arena/submit-score', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   // the dunk card rides along when the mode produced one, so the other player can see what
                   // was actually thrown rather than only the number it added up to
                   body: JSON.stringify({
-                    matchId: arenaMatchId, score: arenaScore,
+                    matchId: arenaMatchId, score: arenaScore, ...(duelRunId ? { runId: duelRunId } : {}),
                     ...((res as { detail?: { card?: unknown } })?.detail?.card ? { card: (res as { detail?: { card?: unknown } }).detail!.card } : {}),
                   }),
                 }).then(async (r2) => {
@@ -489,10 +522,11 @@ function GameShellInner({
               }).catch(() => {}); // best-effort, never block the recap
             }
           } else if (mine()) {
-            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, ...(j?.reason ? { unpaid: unpaidReason(j.reason, j.detail) } : {}) });
+            // QA-H2: no answer after the retries — say so (the outbox re-sends it on the next game page), never a silent card
+            setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, ...(j?.reason ? { unpaid: unpaidReason(j.reason, j.detail) } : !j ? { unpaid: 'NOT_SAVED' } : {}) });
           }
         })
-        .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0 }); });
+        .catch(() => { if (mine()) setRecap({ xp: 0, shards: 0, credits: 0, prqDelta: 0, prqAfter: 0, unpaid: 'NOT_SAVED' }); });
     },
     [mode, storyNodeId, signatureFlag, arenaMatchId, carnivalFlag, mpCode, challengeCode]
   );
@@ -503,7 +537,13 @@ function GameShellInner({
   const inPlace = useRef<(() => boolean) | null>(null);
   const registerReplay = useCallback((fn: (() => boolean) | null) => { inPlace.current = fn; }, []);
 
+  // QA-H1: a double-tap / mash on PLAY AGAIN is one replay (two went out in the same ms → two server runs, one orphaned).
+  // Re-armed once the next run's result clears the card.
+  const replaying = useRef(false);
+  useEffect(() => { if (result !== null) replaying.current = false; }, [result]);
   const replay = () => {
+    if (replaying.current) return;
+    replaying.current = true;
     setResult(null);
     setRecap(null);
     setRecapCoins(null);

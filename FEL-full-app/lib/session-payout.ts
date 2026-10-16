@@ -69,8 +69,15 @@
  * the route (route.ts:135-146, moved to streakStep() below unchanged for every play session).
  */
 
+import { VERSUS_SCORE } from '@/lib/babylon/core/VersusScore';
+/** KarateVSMode ROUNDS_TO_WIN (a Babylon file; held to it by roundVerdict.test.ts). */
+const KVS_ROUNDS_TO_WIN = 2;
+import { roundMatchWon } from '@/lib/babylon/modes/roundVerdict';
+import { SHOWDOWN } from '@/lib/babylon/modes/showdownRules';
+import { DUEL, DUEL_SCORE } from '@/lib/babylon/modes/duelRules';
+import { gameWinner, winRule } from '@/lib/babylon/modes/onevoneRules';
 import { canonicalModeKey, MODE_INFO } from '@/lib/game-data';
-import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax } from '@/lib/arena-score-integrity';
+import { scoreCeilingFor, killSwitchOn, SCORE_CEILINGS, sessionRulesMax, MIRRORED } from '@/lib/arena-score-integrity';
 import { performSetMax } from '@/lib/babylon/music/performSet';
 
 /**
@@ -341,9 +348,13 @@ export function readDanceAccuracy(stats: RoomStats | null): number | null {
  */
 export function sessionWon(
   mode: string, claimedWon: boolean, stats: RoomStats | null, durationSec: number,
-  opts: { score?: number; statsForwarded?: boolean } = {},
+  opts: { score?: number; statsForwarded?: boolean; opponentScore?: number } = {},
 ): boolean {
   if (!isCatalogueMode(mode)) return false;                  // P2 FIX PASS (D): no rules to win by
+  // WIN-SERVER (QA top-5 #2, 2026-10-15): a head-to-head hoops game is won on the board, not on the client's word. The
+  // route sends the score and the opponent's score it stores; the claim must agree with the rules (the less-paying answer).
+  const judged = judgeHeadToHead(canonicalModeKey(mode), opts.score, opts.opponentScore);
+  if (judged !== null) return claimedWon && judged;
   if (canonicalModeKey(mode) === 'music') {
     // P2 FIX PASS (A): a client that predates the contract sent no stats at all — its room applied the rule itself, and
     // a won set always scored (a hit is at least 50 points)
@@ -351,6 +362,41 @@ export function sessionWon(
     return claimedWon && musicSetWon(readMusicSet(stats, durationSec));
   }
   return claimedWon;
+}
+
+/**
+ * WIN-SERVER: the server's own result of a head-to-head hoops game, or null for a mode it does not judge here.
+ *  · hoops1v1: first to 11 (lib/babylon/modes/onevoneRules.ts gameWinner), or the win-by-2 option (cap 15); a won game is
+ *    one either rule ends in this player's favour. 3–11 is not a win under any of them.
+ *  · hoops3v3: the game ends at 21 or on the buzzer, so the winner is whoever has more; a tie is not a win.
+ *  · showdown, duel (DUEL-IDLE-FIX): the rounds to win, read back off the score and the foe's rounds (roundVerdict.ts).
+ * A score missing from the call (a caller that is not the finish route) leaves the old answer to the caller.
+ */
+export const SERVER_JUDGED_WIN_MODES: readonly string[] = ['hoops1v1', 'hoops3v3', 'showdown', 'duel', 'karateVersus'];
+/** DUEL-IDLE-FIX: the round modes' scoring, as each posts it (ShowdownMode endRound: rounds × 100 − foe rounds × 40;
+ *  duelRules duelScore: the same plus ring-outs and guard impacts). opponentScore is the foe's rounds in both shells. */
+export const ROUND_MODE_RULES: Readonly<Record<string, { roundsToWin: number; winPts: number; lossPts: number; extraMax: number; perWinExtra?: number }>> = {
+  showdown: { roundsToWin: SHOWDOWN.roundsToWin, winPts: 100, lossPts: 40, extraMax: 0 },
+  // WIN-SERVER, Karate VS (Storm Duel): core/VersusScore — rounds, the HP kept on each round WON (≤ 25 a round), the
+  // perfect dodges and routes (capped, flat); opponentScore is the foe's rounds (karate-vs-babylon.tsx)
+  karateVersus: {
+    roundsToWin: KVS_ROUNDS_TO_WIN, winPts: VERSUS_SCORE.winPts, lossPts: VERSUS_SCORE.lossPts, perWinExtra: VERSUS_SCORE.hpPtsPerRoundWon,
+    extraMax: VERSUS_SCORE.dodgeCap * VERSUS_SCORE.dodgePts + VERSUS_SCORE.routeCap * VERSUS_SCORE.routePts,
+  },
+  duel: {
+    roundsToWin: DUEL.roundsToWin, winPts: DUEL_SCORE.winPts, lossPts: DUEL_SCORE.lossPts,
+    extraMax: DUEL.roundsToWin * DUEL_SCORE.ringOutPts + DUEL_SCORE.impactCap * DUEL_SCORE.impactPts,
+  },
+};
+export function judgeHeadToHead(modeKey: string, score: number | undefined, opponentScore: number | undefined): boolean | null {
+  if (!SERVER_JUDGED_WIN_MODES.includes(modeKey)) return null;
+  if (!Number.isFinite(score) || !Number.isFinite(opponentScore)) return null;
+  const me = Number(score), foe = Number(opponentScore);
+  if (modeKey === 'hoops1v1') {
+    return gameWinner(me, foe, winRule(MIRRORED.onevoneTarget, false)) === 'me' || gameWinner(me, foe, winRule(MIRRORED.onevoneTarget, true)) === 'me';
+  }
+  if (ROUND_MODE_RULES[modeKey]) return roundMatchWon(me, foe, ROUND_MODE_RULES[modeKey]);
+  return me > foe;
 }
 
 /** The accuracy (0..1) PRQ scales dance and music by (lib/prq.ts), or null when the room sent no counts to read it from. */

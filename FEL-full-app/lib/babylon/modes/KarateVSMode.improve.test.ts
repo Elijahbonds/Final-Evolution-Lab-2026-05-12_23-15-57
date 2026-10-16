@@ -173,7 +173,8 @@ describe('the mode wiring (source pins)', () => {
     expect(CODE).toContain("foeResource.max = hasFightMove('dragon', foeRatings) ? CHI_MAX : Infinity;");
   });
   it('#10 / #13 a visible round clock, TIME at the bell, and a FIGHT! beat at every round start', () => {
-    expect(CODE).toContain("endRound(ctx, meState.hp >= foeState.hp, 'TIME')");
+    // WIN-SERVER (2026-10-15): the bell decides on HP, and level HP is a drawn round, not the player's (roundVerdict.ts)
+    expect(CODE).toContain("endRound(ctx, timeOutVerdict(meState.hp, foeState.hp), 'TIME')");
     expect(CODE).toContain('ctx.setHud({ timeLeft: left })');
     expect(CODE).toContain("setPhase('ready')");
     expect(CODE).toContain("if (phase === 'ready' && phaseSec >= READY_SEC) fight(ctx);");
@@ -192,5 +193,16 @@ describe('the mode wiring (source pins)', () => {
   });
   it('#19 a phone gets the smaller crowd', () => {
     expect(CODE).toContain("ctx.scene.metadata?.felTier === 'mobile' ? spots.filter((_, i) => i % 4 === 0).slice(0, KVS_PHONE_ONLOOKERS) : spots");
+  });
+});
+
+describe('bug sweep 2026-10-14: an attack pressed before the first update() does not throw', () => {
+  it('onInput records the context itself, because stickDirToFoe reads ctx0.camDirector and update() was the only writer', () => {
+    const at = CODE.indexOf('onInput(ctx: ModeContext, e: FelInput) {');
+    expect(at).toBeGreaterThan(-1);
+    const first = CODE.slice(at, at + 200);
+    expect(first, 'ctx0 is assigned in the first statements of onInput').toMatch(/ctx0 = ctx;/);
+    // the stick read lives in swing(), above, and is reached from onInput: the assignment has to be at the top of onInput
+    expect(CODE.indexOf('stickDirToFoe()')).toBeGreaterThan(-1);
   });
 });

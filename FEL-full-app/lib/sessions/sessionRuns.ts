@@ -13,6 +13,8 @@
  * The run id is the one idempotency key: the wallet rows the run writes are keyed run:<runId>:<grant>.
  */
 
+import { keepTier, startResult } from '@/lib/sessions/runTier';
+import type { Tier } from '@/lib/babylon/core/Difficulty';
 import type { Prisma, PrismaClient } from '@/public/_prisma/client';
 import { canonicalModeKey } from '@/lib/game-data';
 import { MAX_DURATION_FLOOR_MS, RUN_GRACE_MS, ruleFor } from './modeScoreRules';
@@ -56,7 +58,7 @@ export function runLifetimeMs(mode: string): number {
   return (ruleFor(mode)?.maxDurationMs ?? MAX_DURATION_FLOOR_MS) + RUN_GRACE_MS;
 }
 
-export async function startRun(db: Db, a: { userId: string; mode: string; eligibility: Eligibility; agentRun?: boolean; now?: Date }): Promise<StartedRun> {
+export async function startRun(db: Db, a: { userId: string; mode: string; eligibility: Eligibility; agentRun?: boolean; now?: Date; tier?: { tier: Tier | null; staked: boolean } }): Promise<StartedRun> {
   const now = a.now ?? new Date();
   const modeSlug = canonicalModeKey(a.mode);
   const agentRun = a.agentRun === true;
@@ -71,6 +73,8 @@ export async function startRun(db: Db, a: { userId: string; mode: string; eligib
       payoutEligible: a.eligibility.payoutEligible, ineligibleReason: a.eligibility.reason,
       agentRun,
       startedAt: now, expiresAt: new Date(now.getTime() + runLifetimeMs(modeSlug)),
+      // TIER-SERVER: the server's tier, in the result JSON the run already has (lib/sessions/runTier.ts)
+      ...(a.tier ? { result: startResult(a.tier) as any } : {}),
     },
   });
   return {
@@ -109,10 +113,12 @@ export async function closeRun(
   db: Db, runId: string,
   a: { status: Exclude<RunStatus, 'open' | 'paid'>; result: StoredResult; score?: number | null; durationMs?: number | null; rejectReason?: string | null; now?: Date },
 ): Promise<StoredResult> {
+  // TIER-SERVER: the start's tier is carried into the stored answer; the answer never replaces it
+  const before = await findRun(db, runId);
   const res = await (db as any).sessionRun.updateMany({
     where: { id: runId, status: RUN_STATUS.open },
     data: {
-      status: a.status, finishedAt: a.now ?? new Date(), result: a.result as any,
+      status: a.status, finishedAt: a.now ?? new Date(), result: keepTier(a.result, before) as any,
       score: a.score ?? null, durationMs: a.durationMs ?? null, rejectReason: a.rejectReason ?? null,
     },
   });
@@ -157,6 +163,7 @@ export async function settleGrant(tx: Prisma.TransactionClient, a: { userId: str
 }
 
 /** Store the paid run's answer (inside the paying transaction, so a retry after the commit always finds it). */
-export async function storePaidResult(tx: Prisma.TransactionClient, runId: string, a: { result: StoredResult; sessionId: string | null }): Promise<void> {
-  await (tx as any).sessionRun.update({ where: { id: runId }, data: { result: a.result as any, sessionId: a.sessionId } });
+export async function storePaidResult(tx: Prisma.TransactionClient, runId: string, a: { result: StoredResult; sessionId: string | null; run?: { result?: unknown } | null }): Promise<void> {
+  // TIER-SERVER: the start's tier (off the run as the finish read it) is carried into the stored answer; never replaced
+  await (tx as any).sessionRun.update({ where: { id: runId }, data: { result: keepTier(a.result, a.run) as any, sessionId: a.sessionId } });
 }
