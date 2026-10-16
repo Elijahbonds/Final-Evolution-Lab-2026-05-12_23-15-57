@@ -105,7 +105,7 @@ import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPl
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
+  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, moveDisplayName, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose,
   ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / flickClip / moveImpulse are the renderer's — anim/handleMotion)
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
@@ -186,6 +186,7 @@ import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PH
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { AiMover } from '../core/AiMovement';
+import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
@@ -562,6 +563,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** HOOPS MOTION phase 3b: the rival's movement — his slide at 3.6 m/s (sprint 1.2×) and his drive's own wish, on the hero's accel 26 /
    *  decel 34 (it was unit steer × 3.6 in one frame: 216 m/s²). */
   const foeMover = new AiMover(3.6);
+  let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)
   let foeReact: DefReaction | null = null;   // H2c: the rival's read of a fake — his mover takes the step (core/DefenderReact)
   let lastFoeStepState = '';   // H2c (dev log): the rival's last tree state, for the stepping states' lines
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
@@ -738,7 +740,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1579,6 +1581,13 @@ export const OneVOneMode: ModeDefinition = (() => {
           // the ball leaves the palm while I carry; a crossover swaps hands
           // STICK HANDLE: pausin' holds the ball out. HOOPS MOTION phase 4b (U19): …unless a move's path has it (PAUSIN's `hold` segment)
           meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move));
+          { // H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
+            const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.hand === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
+              dribbling: !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble,
+              defenderDist: foeStunSec === 0 && !foeFloored ? distXZ(me.root.position, foe.root.position) : Infinity });
+            strongHand = sh.state;
+            if (sh.back && meCarry?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[1V1-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
+          }
           // (the left-stick crossover's ball goes with its move now: doMove below, the cut's side as the reversal's end side — plan §3.4)
         // STICK HANDLE (2K17, owner 2026-09-17): the right stick's gestures become moves while the ball is on the floor — a
         // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
@@ -1606,7 +1615,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
             const own0 = pick0 ? ownedStickMove(pick0.move, MOVES_UNLOCKED_GATE) : null;   // H2: every move unlocked until H9   // H1 H-02: every gated move falls back, never a dead stick
             const locked = !!own0 && own0.locked;
-            if (locked) refuse(ctx, `${pick0!.move.replace(/_/g, ' ').toUpperCase()} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);
+            if (locked) refuse(ctx, `${moveDisplayName(pick0!.move)} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);   // H2d (Q7): the generic name, never a player's
             const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
             if (!pick) continue;
             if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;   // a size-up is rhythm, not the move the aggressive BTB chains off
@@ -2387,7 +2396,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;

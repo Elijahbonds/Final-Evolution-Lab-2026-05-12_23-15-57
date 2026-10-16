@@ -871,3 +871,28 @@ describe('the double moves (H2): behind → behind, between → behind', () => {
     expect(o.restarted).toBe(true); expect(o.chain.length).toBe(1);
   });
 });
+
+import { MOVE_DISPLAY_NAME, moveDisplayName, moveClip as mc4g, MOVE_HANDLE as MH4g, type HandleMove as HM4g } from './HandleSystem';
+import { MOCAP_OPPONENT_CLIPS } from '../anim/authored/mocapOpponents';
+import { readFileSync } from 'node:fs';
+describe('H2d (plan 4g): the names table and the turbo', () => {
+  it('owner Q7: every handle move has a generic on-screen name, and no on-screen name is a real player\'s', () => {
+    for (const m of Object.keys(MH4g) as HM4g[]) expect(MOVE_DISPLAY_NAME[m], m).toBeTruthy();
+    const players = /shammgod|steezo|iverson|crawford|curry|kyrie|jordan|kobe|irving|hardaway/i;
+    for (const n of Object.values(MOVE_DISPLAY_NAME)) expect(n).not.toMatch(players);
+    for (const id of ['shammgod', 'steezo_roll', 'snatchback', 'size_up', 'btb_slide']) expect(moveDisplayName(id)).not.toMatch(players);
+    expect(moveDisplayName('shammgod')).toBe('PUSH-PULL CROSS'); expect(moveDisplayName('steezo_roll')).toBe('WRAP SPIN');
+    // the screen text the modes build goes through the table (the refuse chip built the name from the id before)
+    for (const f of ['lib/babylon/modes/OneVOneMode.ts', 'lib/babylon/modes/ThreeVThreeMode.ts', 'lib/babylon/modes/onevoneRules.ts']) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, f).not.toMatch(/\.move\.replace\(\/_\/g, ' '\)\.toUpperCase\(\)/);
+      expect(src.match(/'[^'\n]*'|`[^`\n]*`/g)?.filter((lit) => /STEEZO|SHAMMGOD|Steezo|Shammgod/.test(lit)) ?? [], f).toEqual([]);
+    }
+  });
+  it('the turbo retune (plan §3.1): no handle move\'s clip is a capture any more, so the flat turbo IS moveRateFor (real × MOVE_TURBO_REAL)', () => {
+    const captured = new Set(MOCAP_OPPONENT_CLIPS.map((c) => c.replaces));
+    for (const m of Object.keys(MH4g) as HM4g[]) for (const d of ['left', 'right'] as const) {
+      const c = mc4g(m, d); if (c) expect(captured.has(c), `${m} ${d} → ${c} is replaced by a capture`).toBe(false);
+    }
+  });
+});

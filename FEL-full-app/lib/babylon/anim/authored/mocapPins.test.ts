@@ -80,7 +80,8 @@ describe('the seven TEMP speed pins play the duration they did before the fps fi
 
 describe('the hoops captures: loops at real speed, one-shots on their beat', () => {
   const LOOPS = ['bball_mc_run', 'bball_mc_dribble_run', 'bball_mc_drive', 'bball_mc_defend_slide_right', 'bball_mc_defend_slide_left', 'bball_mc_defend_backpedal',
-    'bball_mc_defend_slide_hard_right', 'bball_mc_defend_slide_hard_left', 'bball_mc_dribble_walk', 'bball_mc_dribble_jog', 'bball_mc_dribble_idle', 'bball_mc_defend_stance'];
+    'bball_mc_defend_slide_hard_right', 'bball_mc_defend_slide_hard_left', 'bball_mc_dribble_walk', 'bball_mc_dribble_jog', 'bball_mc_dribble_idle', 'bball_mc_defend_stance',
+    'bball_mc_dribble_side_left', 'bball_mc_dribble_side_right', 'bball_mc_dribble_back'];   // H2d (plan §4.19): the carrier's side and back dribbles
   it.each(LOOPS)('%s: no `duration` in the manifest, played span = cut span (0.9–1.15× real at rate 1)', (name) => {
     const e = entry(name)!, b = built(name)!;
     expect(e.loop).toBe(true);
@@ -107,6 +108,7 @@ describe('HOOPS_STRIDE_CAPTURE: each state paces against the clip it plays (scri
     bball_mc_run: 4.69, bball_mc_dribble_run: 4.57, bball_mc_drive: 4.57, bball_mc_dribble_jog: 3.87, bball_mc_dribble_walk: 0.97,
     bball_mc_defend_slide_left: 2.4, bball_mc_defend_slide_right: 1.7, bball_mc_defend_slide_hard_left: 2.69, bball_mc_defend_slide_hard_right: 2.69,
     bball_mc_defend_backpedal: 3.31,
+    bball_mc_dribble_side_left: 1.42, bball_mc_dribble_side_right: 1.42, bball_mc_dribble_back: 1.17,   // H2d (scripts/mocap/clip-strides.mts)
   };
   // a hoops rig (the 1v1 scope) owns the captures the scope allows and the tree's own clips
   const hoops = scopeForMode('onevone');

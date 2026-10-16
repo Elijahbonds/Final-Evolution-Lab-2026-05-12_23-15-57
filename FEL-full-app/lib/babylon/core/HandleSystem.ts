@@ -81,6 +81,23 @@ export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
 };
 
 /**
+ * THE NAMES A PLAYER READS (H2d, owner Q7: "generic and cleanly named, no real players"). The internal ids keep the moves' street names
+ * (`shammgod`, `steezo_roll`); the screen never shows them. Every chip, banner and help line goes through moveDisplayName.
+ */
+export const MOVE_DISPLAY_NAME: Readonly<Record<HandleMove, string>> = {
+  crossover: 'CROSSOVER', hesi: 'HESITATION', in_and_out: 'IN AND OUT', yoyo: 'YO-YO', between_legs: 'BETWEEN THE LEGS',
+  behind_back: 'BEHIND THE BACK', spin: 'SPIN', slip_slide: 'SLIP AND SLIDE', double_cross: 'DOUBLE CROSS', snatch_back: 'SNATCHBACK',
+  shammgod: 'PUSH-PULL CROSS', off_the_head: 'OFF THE HEAD', momentum_cross: 'MOMENTUM CROSS', momentum_btb: 'MOMENTUM BEHIND THE BACK',
+  steezo_roll: 'WRAP SPIN', stepback: 'STEP-BACK',
+};
+/** The stick's own move names (StickHandle.StickMove) that are not handle moves. */
+const STICK_DISPLAY_NAME: Readonly<Record<string, string>> = { snatchback: 'SNATCHBACK', size_up: 'SIZE-UP', btb_slide: 'BTB SLIDE' };
+/** The on-screen name of a handle move or a stick move — never a real player's name (MOVE_DISPLAY_NAME). */
+export function moveDisplayName(id: string): string {
+  return (MOVE_DISPLAY_NAME as Readonly<Record<string, string>>)[id] ?? STICK_DISPLAY_NAME[id] ?? id.replace(/_/g, ' ').toUpperCase();
+}
+
+/**
  * THE BODY FOR EACH MOVE (2026-09-16).
  *
  * This table did not exist, and its absence is why the vocabulary was invisible: the animation tree has ONE

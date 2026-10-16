@@ -39,7 +39,7 @@ export function ballToAthleteHand(ball: AbstractMesh, body: { skeleton: Skeleton
 
 /** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops the `_left` twins are made of (the tree's CLIP_FOR names — each resolves to
  *  the capture this rig plays for it, installOpponentMotion's variantFor). */
-export const LEFT_TWIN_LOOPS = ['bball_dribble_idle', 'bball_dribble_walk', 'bball_dribble_jog', 'bball_dribble_run'] as const;
+export const LEFT_TWIN_LOOPS = ['bball_dribble_idle', 'bball_dribble_walk', 'bball_dribble_jog', 'bball_dribble_run', 'bball_dribble_side_left', 'bball_dribble_side_right', 'bball_dribble_back'] as const;   // (H2d: the carrier's side and back dribbles)
 /**
  * The dribble loops with the ball in the athlete's LEFT hand, made at spawn as runtime mirrors (the groupMirror path phase 3 uses — no
  * manifest row, no generated clip): each loop this rig plays (the capture for its name, or the authored clip) is cloned — its animations

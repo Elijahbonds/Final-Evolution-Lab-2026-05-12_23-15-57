@@ -136,9 +136,11 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   defend_backpedal: { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.14 },
   // …and the same three reads for a body that still has the ball. These are the shared lateral loops; the carry rig
   // owns the ball hand independently, so the ball stays in the palm through them.
-  carry_slide:       { clip: 'strafe_left', loop: true, fadeSec: 0.14 },
-  carry_slide_right: { clip: 'strafe_right', loop: true, fadeSec: 0.14 },
-  carry_back:        { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.16 },
+  // H2d (plan §4.19): the carrier's own lateral and backward DRIBBLES (CMU 06_09 / 06_06 — opponent-clips.json); they played the generic
+  // strafe and the defender's backpedal, with no ball arm. A rig without the captures plays those still (CARRY_LEGACY, owned()).
+  carry_slide:       { clip: 'bball_dribble_side_left', loop: true, fadeSec: 0.14 },
+  carry_slide_right: { clip: 'bball_dribble_side_right', loop: true, fadeSec: 0.14 },
+  carry_back:        { clip: 'bball_dribble_back', loop: true, fadeSec: 0.16 },
   closeout:        { clip: 'bball_closeout', loop: true, fadeSec: 0.12 },
   defend_slide_hard: { clip: 'bball_defend_slide_hard_left', loop: true, fadeSec: 0.14 },
   defend_slide_hard_right: { clip: 'bball_defend_slide_hard_right', loop: true, fadeSec: 0.14 },
@@ -181,12 +183,16 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
   else state = i.hasBall ? 'idle_dribble' : 'watch';
   const pick = CLIP_FOR[state];
-  return { state, ...pick, clip: i.ballHand === 'left' && LEFT_TWIN_STATES.has(state) ? leftTwinOf(pick.clip) : pick.clip };
+  return { state, ...pick, clip: i.ballHand === 'left' && LEFT_TWIN_STATES.has(state) ? leftTwinOf(CLIP_FOR[CROSS_TWIN[state] ?? state].clip) : pick.clip };
 }
-/** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops that have a `_left` twin — the loops a ball hand dribbles in. carry_slide(_right)
- *  and carry_back play the generic strafe / the defender's backpedal today (no ball arm in them, and a mirrored strafe_left IS a strafe
- *  right), so they get none until 4g's side and back dribble captures; protect's stance has no ball arm either. */
-export const LEFT_TWIN_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive']);
+/** H2d: a LATERAL loop's left-hand twin is the mirror of the OTHER side's clip — a mirror flips the travel with the hand (the side dribble
+ *  that steps left with the right hand, mirrored, steps right with the left hand). The forward and backward loops twin themselves. */
+const CROSS_TWIN: Partial<Record<BasketballAnimState, BasketballAnimState>> = { carry_slide: 'carry_slide_right', carry_slide_right: 'carry_slide' };
+/** H2d: what a carrier state plays on a rig that has neither its capture nor a twin of it (the strafes and the backpedal it always played). */
+const CARRY_LEGACY: Partial<Record<BasketballAnimState, string>> = { carry_slide: 'strafe_left', carry_slide_right: 'strafe_right', carry_back: 'bball_defend_backpedal' };
+/** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops that have a `_left` twin — the loops a ball hand dribbles in. H2d (plan §4.19):
+ *  the carrier's side and back dribbles join them (the side ones twin across, CROSS_TWIN); protect's stance has no ball arm. */
+export const LEFT_TWIN_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive', 'carry_slide', 'carry_slide_right', 'carry_back']);
 /** A dribble loop's left-hand twin (the name hoopsHand.leftDribbleTwins registers it under). */
 export const leftTwinOf = (clip: string): string => `${clip}_left`;
 
@@ -282,9 +288,12 @@ export class BasketballAnimTree {
   }
   /** A `_left` twin this rig does not have plays the loop it twins (never the resolver's fallback). */
   private owned(c: AnimChoice): AnimChoice {
-    if (!c.clip.endsWith('_left') || !LEFT_TWIN_STATES.has(c.state)) return c;
     const names = (this.animator as { clipNames?: Set<string> }).clipNames;
-    return names && !names.has(c.clip) ? { ...c, clip: CLIP_FOR[c.state].clip } : c;
+    const twinned = c.clip.endsWith('_left') && LEFT_TWIN_STATES.has(c.state) && names && !names.has(c.clip) ? { ...c, clip: CLIP_FOR[c.state].clip } : c;
+    // H2d: a carrier state whose capture this rig does not have (its name resolves to `bball_mc_…`) plays what it always played
+    const legacy = CARRY_LEGACY[twinned.state];
+    if (legacy && names && !names.has(twinned.clip) && !names.has(twinned.clip.replace(/^bball_/, 'bball_mc_'))) return { ...twinned, clip: legacy };
+    return twinned;
   }
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
