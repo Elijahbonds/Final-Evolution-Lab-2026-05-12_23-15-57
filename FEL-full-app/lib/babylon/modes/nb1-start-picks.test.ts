@@ -32,7 +32,7 @@ describe('NB-1: the start screen picks apply to the game about to be played', ()
     expect(on).toContain('nerveTheAttacker()');
     expect(on).toContain('putHud(ctx, { winBy2: winCond.winBy2 })');
     expect(on).toMatch(/if \(myScore !== 0 \|\| foeScore !== 0\) return;/);
-    expect(one).toMatch(/function readRules\(\)[\s\S]{0,200}readTier\(\)[\s\S]{0,300}readWinBy2Pick\(\)/);
+    expect(one).toMatch(/function readRules\(\)[\s\S]{0,200}runTier\(\)[\s\S]{0,300}readWinBy2Pick\(\)/);   // QA #262: the pick through runTier (PRO when staked)
   });
 
   it('3v3: onPlay reads the tier as load does (PRO on staked / head-to-head runs kept); onPlay re-arms every defender', () => {

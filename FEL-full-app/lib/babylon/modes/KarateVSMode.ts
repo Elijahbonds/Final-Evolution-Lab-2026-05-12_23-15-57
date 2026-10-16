@@ -69,7 +69,7 @@ import { ComboBreaker, COMBO_BREAK } from '../core/ComboBreaker';   // COMBAT DI
 import { DefenseController, SUBSTITUTION_CHI_COST } from '../core/DefenseSystem';   // the substitution the break pays: its chi, its read-and-punish window
 import { CHI } from '../core/ResourceMeter';
 import { DUEL } from './duelRules';   // subWhiffMs: the beat a swing in flight finds nobody (Showdown's and Duel's 400 ms)
-import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick
+import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick — PRO on a staked / head-to-head run (QA #259)
 import { threatLandsIn, RivalCombatBrain, type RivalResource } from '../core/RivalCombatBrain';   // IMPROVE (2026-10-06): the shared rival (it dashes now)
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats and banners on the game clock
 import { versusScore, versusScoreParts, type VersusTally } from '../core/VersusScore';   // IMPROVE (2026-10-06): a result a replay can beat
@@ -705,7 +705,7 @@ export const KarateVSMode: ModeDefinition = (() => {
           if (bannerText) banner(ctx, bannerText, route ? 0.9 : 0.7);
           if (defState.hp <= 0) endRound(ctx, mine);
           // COMBAT DIFFICULTY (2026-10-13): a rival stun-locked by a long mashed chain substitutes out of it (ComboBreaker)
-          else if (mine && breaker.hit(now() / 1000, readTier(), defState.chi >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
+          else if (mine && breaker.hit(now() / 1000, runTier(), defState.chi >= SUBSTITUTION_CHI_COST)) comboBreak(ctx);
           break;
         }
       }
@@ -870,12 +870,12 @@ export const KarateVSMode: ModeDefinition = (() => {
       // bar is only a special when this rival can throw the DRAGON at all
       const shift = brain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
       if (shift.label) console.info(`[KAR-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
-      brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, readTier()));
+      brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, runTier()));
       brain.setCanSpecial(hasFightMove('dragon', foeRatings));
       // COMBAT DIFFICULTY (2026-10-06): nothing here reads the line, so a read is a guard, never a sidestep; and the rival's
       // POWER for the pick (hp, damage, guard — FightCore.rivalPower), on before resetRound fills the HP
       brain.setStepping(false);
-      foePower = rivalPower(RIVAL_POWER_BASE.karateVs, readTier());
+      foePower = rivalPower(RIVAL_POWER_BASE.karateVs, runTier());
       applyRivalPower(foeState, foePower);
       knock.clear();
       // the rival's dash, and the beats still waiting from the last round (IMPROVE 2026-10-06: never cleared before)
@@ -919,7 +919,7 @@ export const KarateVSMode: ModeDefinition = (() => {
     setPhase('walkIn');
     banner(ctx, '', 0);
     ctx.setHud({
-      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[readTier()]?.name ?? 'PRO').toUpperCase(),
+      intro: 'foe', foeName: 'RIVAL SENSEI', foeSub: (TIER_PROFILES[runTier()]?.name ?? 'PRO').toUpperCase(),
       meName: 'YOU', meSub: blendName(readBlend()).toUpperCase(),
     });
     SoundKit.play('whoosh', { pitch: 0.55, volume: 0.3 });
