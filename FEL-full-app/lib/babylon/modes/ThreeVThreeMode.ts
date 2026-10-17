@@ -742,18 +742,25 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (busy) { console.info('[3V3-OFF] call for the ball — teammate busy, AI logic stands'); return; }
     SoundKit.play('uiTick', { pitch: 1.2, volume: 0.4 });
     releaseBall(ball);
-    // H2e (owner): THE ALLEY-OOP, RECEIVED — a call made while cutting hard at the rim brings a LOB, led to where I will be, above the head;
-    // the catch is the dunk (the pass's arrival, below)
-    const oop = oopCut(me.char.root.position, me.drib.vel, RIM_FLOOR);
-    passType = oop ? 'lob' : 'chest';
     passTargetId = 'me';
     lastPasserWasMe = false;   // the mate threw this one, not me — no assist to credit on whatever I do next
     slingPass = false;
+    // H2e (owner): THE ALLEY-OOP, RECEIVED — a call made while cutting hard at the rim brings a LOB, led to where I will be, above the head;
+    // the catch is the dunk (the pass's arrival, below)
+    if (oopCut(me.char.root.position, me.drib.vel, RIM_FLOOR)) {
+      passType = 'lob';
+      const toOop = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.lob).add(new Vector3(0, 2.4, 0));
+      passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toOop, 'lob', 1);
+      bannerFlash(ctx, 'LOB!', 500); mic?.expect({ moment: 'game.alleyoop' });
+      console.info('[3V3-OFF] alley-oop lob to me on the cut');
+      console.info('[3V3-OFF] call for the ball answered — mate passes it back');
+      return;
+    }
+    passType = 'chest';
     // HOOPS-10PHASE-2 phase 6: led the same way the live pass is — a call made mid-cut still arrives on me, not
     // behind me.
-    const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED[passType]).add(new Vector3(0, oop ? 2.4 : 1.2, 0));
-    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, passType, 1);
-    if (oop) { bannerFlash(ctx, 'LOB!', 500); mic?.expect({ moment: 'game.alleyoop' }); console.info('[3V3-OFF] alley-oop lob to me on the cut'); }
+    const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
+    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, 'chest', 1);
     console.info('[3V3-OFF] call for the ball answered — mate passes it back');
   }
 

@@ -22,7 +22,7 @@ describe('more dunks are wired (H2e)', () => {
     expect(three).toMatch(/giveBallTo\('me'\);[^\n]*\n\s*startDunk\(ctx, 'standing', [^\n]*PUTBACK_DUNK\);/);
   });
   it('3v3: a call for the ball on a cut at the rim is a lob, and my lob\'s catch is the dunk', () => {
-    expect(three).toMatch(/const oop = oopCut\(me\.char\.root\.position, me\.drib\.vel, RIM_FLOOR\);\s*passType = oop \? 'lob' : 'chest';/);
+    expect(three).toMatch(/if \(oopCut\(me\.char\.root\.position, me\.drib\.vel, RIM_FLOOR\)\) \{\s*passType = 'lob';[\s\S]{0,200}passFlight\.start\([^;]*toOop, 'lob', 1\);/);   // the lob is its own branch: the chest call stays as it was
     expect(three).toMatch(/if \(passType === 'lob' && passTargetId === 'me'\) \{[\s\S]{0,300}startDunk\(ctx, 'dunk', [^\n]*ALLEY_OOP\);/);
   });
 });
