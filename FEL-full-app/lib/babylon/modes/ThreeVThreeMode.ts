@@ -880,7 +880,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           else { const db = new DefenderBrain(knobs.defenderAggression, markIndex); defenderBrains.push(db); marks.push(markIndex ?? 0); brain = db; }   // #3: the tier's poke (0.55 = PRO)
         }
         const char = ai
-          ? await CharacterPipeline.spawnNpc(ctx.scene, cfg.heroUrl, { position: pos, tint, startClip: SPORT_CLIP.idle })
+          ? await CharacterPipeline.spawnNpc(ctx.scene, cfg.heroUrl, { position: pos, tint, rosterSeed: `${tint}@${pos.x.toFixed(1)},${pos.z.toFixed(1)}`, startClip: SPORT_CLIP.idle })   // rival bodies (2026-10-16): one person per spot, not one per team
           : await CharacterPipeline.spawnPlayer(ctx.scene, cfg.heroUrl, { position: pos, startClip: SPORT_CLIP.idle });
         // TEAM KITS (suite pass, 2026-09-16). Six kit bodies in the roster's own tops read as one pickup crowd — the eye
         // had no way to tell a teammate from a defender but the hero's purple. The AI bodies wear their team's jersey

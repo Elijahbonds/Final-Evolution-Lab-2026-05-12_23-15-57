@@ -1,0 +1,27 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "yara",
+  "sex": "female",
+  "note": "wing, south asian",
+  "source": "MPFB2 (MakeHuman, CC0) — scripts/avatar/rivals.mts",
+  "rig": "MPFB2 mixamo rig folded to the 22-bone FEL spec (scripts/avatar/import-mpfb.mts)",
+  "skin": "cutoff3d_indian_female_skin",
+  "hair": "elvs_french_braid_variation",
+  "macro": {
+    "age": 0.521,
+    "muscle": 0.7,
+    "weight": 0.45,
+    "height": 0.5,
+    "proportions": 0.75,
+    "african": 0.3,
+    "asian": 0.5,
+    "caucasian": 0.2
+  },
+  "look": {
+    "scale": 1.099,
+    "jersey": "#ff9f1c",
+    "shorts": "#2ec4b6"
+  }
+}

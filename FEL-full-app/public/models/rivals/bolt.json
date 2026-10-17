@@ -1,0 +1,27 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "bolt",
+  "sex": "male",
+  "note": "slasher, mid",
+  "source": "MPFB2 (MakeHuman, CC0) — scripts/avatar/rivals.mts",
+  "rig": "MPFB2 mixamo rig folded to the 22-bone FEL spec (scripts/avatar/import-mpfb.mts)",
+  "skin": "young_asian_male",
+  "hair": "short04",
+  "macro": {
+    "age": 0.518,
+    "muscle": 0.75,
+    "weight": 0.45,
+    "height": 0.5,
+    "proportions": 0.75,
+    "african": 0.45,
+    "asian": 0.25,
+    "caucasian": 0.3
+  },
+  "look": {
+    "scale": 1.062,
+    "jersey": "#d00000",
+    "shorts": "#ffba08"
+  }
+}

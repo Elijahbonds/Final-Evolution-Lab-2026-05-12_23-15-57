@@ -1,0 +1,27 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "fable",
+  "sex": "male",
+  "note": "veteran big, heavy",
+  "source": "MPFB2 (MakeHuman, CC0) — scripts/avatar/rivals.mts",
+  "rig": "MPFB2 mixamo rig folded to the 22-bone FEL spec (scripts/avatar/import-mpfb.mts)",
+  "skin": "middleage_caucasian_male",
+  "hair": null,
+  "macro": {
+    "age": 0.5599999999999999,
+    "muscle": 0.7,
+    "weight": 0.65,
+    "height": 0.5,
+    "proportions": 0.6,
+    "african": 0.15,
+    "asian": 0.05,
+    "caucasian": 0.8
+  },
+  "look": {
+    "scale": 1.147,
+    "jersey": "#2a2a2e",
+    "shorts": "#8a8d91"
+  }
+}

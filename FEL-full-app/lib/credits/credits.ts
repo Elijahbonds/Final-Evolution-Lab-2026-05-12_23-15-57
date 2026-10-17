@@ -222,14 +222,15 @@ export const CREDITS: Credit[] = [
     section: 'models',
     title: 'MakeHuman community assets (MPFB2)',
     by: 'MakeHuman Community',
-    used: 'The kit bodies the hero is built from, with their skins, hair and clothes.',
+    used: 'The kit bodies the hero is built from, and the rival and NPC bodies, with their skins, hair and clothes.',
     licence: 'CC0',
     licenceUrl: OPEN_LICENCES.CC0,
     status: 'open',
     link: 'https://github.com/makehumancommunity/mpfb2',
-    recordedIn: ['public/models/skins/manifest.json', 'scripts/avatar/skins/export-skins.mts', 'scripts/avatar/mpfb/dress-kit.py', 'docs/history/HUMAN-MODEL-RESEARCH.md'],
+    recordedIn: ['public/models/skins/manifest.json', 'scripts/avatar/skins/export-skins.mts', 'scripts/avatar/mpfb/dress-kit.py', 'docs/history/HUMAN-MODEL-RESEARCH.md',
+      'scripts/avatar/rivals.mts', 'scripts/avatar/mpfb/rival.py', 'public/models/rivals/*.json'],
     // HOTFIX (2026-09-24): models/_forge/ left this entry for 'fel': it holds the code-built FORGE hero, not a kit body.
-    covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/'],
+    covers: ['models/skins/', 'models/fel-hero.glb', 'models/fel-hero.json', 'models/fel-hero.mobile.glb', 'models/candidates/', 'models/rivals/'],
     manifestLicences: ['CC0 (MakeHuman community assets)'],
   },
   {

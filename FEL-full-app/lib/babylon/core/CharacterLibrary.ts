@@ -60,6 +60,9 @@ export interface SpawnOpts {
   position?: Vector3;
   yawRad?: number;
   tint?: string;            // hex — mob/team variety
+  /** The roster pick's seed when it should not be the tint (2026-10-16: a 3v3 team shares one jersey tint, so its three
+   *  bodies hashed to ONE person; each body passes its own seed and the team still wears one colour). Default: the tint. */
+  rosterSeed?: string;
   /** Who this is, for the accessory deal: a rival's name gets their signature, anything else gets a look it keeps. */
   name?: string;
   /** An explicit accessory set (implies accessories on). */
@@ -87,6 +90,8 @@ export interface SpawnOpts {
 // that is disposed, or hidden (the carnival hides its hub host while an event spawns its own player), no longer counts.
 const livePlayers = new WeakMap<Scene, Set<TransformNode>>();
 const opponentSeq = new WeakMap<Scene, number>();
+/** The roster bodies standing in each scene (one person per body; see spawn). */
+const dealtBodies = new WeakMap<Scene, Set<string>>();
 /** One rival rotation per scene, i.e. per match (asset-polish 2026-10-05): taken the first time the scene spawns an
  *  opponent and held for the rest of it, so every body in this match is consistent and the NEXT match is shifted. */
 const sceneRotation = new WeakMap<Scene, number>();
@@ -243,12 +248,19 @@ export const CharacterLibrary = {
     // falls back to the requested URL; the roster can never brick a spawn.
     // An untinted OPPONENT on the hero URL seeds the roster pick by its order in the scene, so a dunk duel's P2 and a
     // three-point field of rivals are distinct bodies — and none of them is the player's.
-    let rosterSeed = opts.tint;
+    let rosterSeed = opts.rosterSeed ?? opts.tint;
     if (!rosterSeed && role === 'opponent' && heroRequest) {
       const n = opponentSeq.get(scene) ?? 0; opponentSeq.set(scene, n + 1);
       rosterSeed = `opponent-${n}`;
     }
-    const rosterUrl = role === 'opponent' ? rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed, (scene.metadata?.felModeId as string | undefined) ?? null, rotationFor(scene)) : null;   // phase 7: the mode's cast
+    const pickRoster = (step: number) => rosterUrlFor(heroRequest ? DEFAULT_HERO_URL : url, rosterSeed, (scene.metadata?.felModeId as string | undefined) ?? null, rotationFor(scene) + step);   // phase 7: the mode's cast
+    let rosterUrl = role === 'opponent' ? pickRoster(0) : null;
+    // ONE PERSON PER BODY IN A SCENE (2026-10-16, the forge rivals): seeds hash over a cast, and five 3v3 seeds collided on every
+    // rotation (measured: 40 of 40 had a repeat among the five AI bodies) — a body already standing in this scene steps the pick
+    // along the cast to the next person, until the cast runs out (then a repeat is the only answer).
+    const dealt = dealtBodies.get(scene) ?? new Set<string>(); dealtBodies.set(scene, dealt);
+    for (let step = 1; rosterUrl && dealt.has(rosterUrl) && step < 64; step++) rosterUrl = pickRoster(step);
+    if (rosterUrl) dealt.add(rosterUrl);
     let effectiveUrl = url;
     let rosterPicked = false;
     let container: AssetContainer;
@@ -392,6 +404,7 @@ export const CharacterLibrary = {
       root, meshes, skeleton, animator, secondary,
       dispose() {
         livePlayers.get(scene)?.delete(root);
+        if (rosterPicked) dealtBodies.get(scene)?.delete(effectiveUrl);   // the person is free for the next spawn
         accDispose?.();   // an accessory that outlives its body is a torus floating over the court
         planting?.dispose();
         secondary.dispose();

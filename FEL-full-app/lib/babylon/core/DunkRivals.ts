@@ -34,7 +34,9 @@ export interface DunkRival {
   signature: string;
   tint: string;
   /** Their face: the athleteRoster key of the body they wear, every night. Five rivals, five people (asset-polish
-   *  2026-10-05: every rival used to spawn on the same roster body, so TY, PILOT, ZO and STACK all had CASS's face). */
+   *  2026-10-05: every rival used to spawn on the same roster body, so TY, PILOT, ZO and STACK all had CASS's face).
+   *  2026-10-16: forge rivals (the Meshy bodies are off the roster) — CASS the slim shooter, TY the broad one, PILOT the tall
+   *  wing, ZO the showman, STACK the leaper. */
   body: string;
 }
 
@@ -43,11 +45,11 @@ export interface DunkRival {
  * rather than a hand-written list, so adding a rival out of order fails rather than quietly inverting it.
  */
 export const DUNK_RIVALS: readonly DunkRival[] = [
-  { id: 'cass',  name: 'CASS',   tag: 'Never misses. Never amazes.',        reach: 0.86, risk: 0.70, signature: 'TOMAHAWK',         tint: '#8fe0a0', body: 'm22-bb13bdbe' },
-  { id: 'ty',    name: 'TY',     tag: 'Power. All night, every night.',      reach: 0.94, risk: 0.86, signature: 'WINDMILL',         tint: '#ffd75e', body: 'm22-6d8c65ad' },
-  { id: 'pilot', name: 'PILOT',  tag: 'Reads the room, then takes it.',      reach: 1.00, risk: 1.00, signature: '360',              tint: '#22d3ee', body: 'm22-c19ac82e' },
-  { id: 'zo',    name: 'ZO',     tag: 'Here for the highlight, not the win.', reach: 1.12, risk: 1.22, signature: 'EASTBAY',          tint: '#ff7b54', body: 'm22-dab1e0f7' },
-  { id: 'stack', name: 'STACK',  tag: 'Goes for the impossible one first.',  reach: 1.24, risk: 1.45, signature: 'BETWEEN THE LEGS', tint: '#ff006e', body: 'm22-df555984' },
+  { id: 'cass',  name: 'CASS',   tag: 'Never misses. Never amazes.',        reach: 0.86, risk: 0.70, signature: 'TOMAHAWK',         tint: '#8fe0a0', body: 'jinx' },
+  { id: 'ty',    name: 'TY',     tag: 'Power. All night, every night.',      reach: 0.94, risk: 0.86, signature: 'WINDMILL',         tint: '#ffd75e', body: 'grit' },
+  { id: 'pilot', name: 'PILOT',  tag: 'Reads the room, then takes it.',      reach: 1.00, risk: 1.00, signature: '360',              tint: '#22d3ee', body: 'ace' },
+  { id: 'zo',    name: 'ZO',     tag: 'Here for the highlight, not the win.', reach: 1.12, risk: 1.22, signature: 'EASTBAY',          tint: '#ff7b54', body: 'lux' },
+  { id: 'stack', name: 'STACK',  tag: 'Goes for the impossible one first.',  reach: 1.24, risk: 1.45, signature: 'BETWEEN THE LEGS', tint: '#ff006e', body: 'volt' },
 ] as const;
 
 export const DEFAULT_RIVAL: DunkRival = DUNK_RIVALS[2];
