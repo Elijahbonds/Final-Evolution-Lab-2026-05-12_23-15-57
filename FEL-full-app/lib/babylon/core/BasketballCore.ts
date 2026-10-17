@@ -77,7 +77,7 @@ export class DribbleController {
   static readonly EXPLODE_FLOOR = 0.7;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
-    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS });   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS, turnRateDegAtSpeed: 720 });   // H3a: 540 → 720°/s, the handler turns quicker (FEEL NUMBER)   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
     this.crossoverBoost = cfg.crossoverBoost;
   }
   private crossoverBoost: number;
