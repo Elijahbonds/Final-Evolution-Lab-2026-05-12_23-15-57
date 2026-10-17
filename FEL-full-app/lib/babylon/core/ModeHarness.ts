@@ -609,6 +609,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     let timedOut = false;
     const watchdog = setTimeout(() => {
       timedOut = true;
+      // ship-ready (2026-10-17): counted, like a load that throws (below). On the phone rig, def.load() alone ran 24–35 s in
+      // dunk, threepoint and karate; without this line production cannot say how many real phones end on this screen.
+      reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);
       setPhase('error', 'Load timed out — check your connection and retry.');
     }, LOAD_WATCHDOG_MS);
     try {
@@ -639,7 +642,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       if (prewarmWanted(tier)) {
         console.info('[FEL-PERF] shader pre-warm start');
         const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });
-        if (warm.timedOut) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames)`);
+        // ship-ready (2026-10-17): capHit, not timedOut — a scene that turned ready but lost its warm frames to the cap was not reported
+        if (warm.capHit) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames, scene ${warm.ready ? 'ready' : 'not ready'})`);
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
       }
       setPhase('ready');
