@@ -74,7 +74,7 @@ import { clankOffRim } from '../anim/ballRig';
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush on the game's dunks
 import { RIM_RADIUS } from '../core/RimPhysics';
 import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
-import { syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
+import { syncedShotSpeed, RELEASE_FRAME_01, jumperHop, jumperHopY, JUMPER_HANG_SCALE, type JumperHop } from '../core/BallHandling';
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -559,7 +559,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   const roll = (): number => defenseLuck ?? Math.random();   // dev: the roll VALUE forced (0 = every chance lands, 0.99 = none)
   const JUMP_SEC = 0.75, JUMP_APEX = 0.46;
   const JUMPER_HOP_APEX = 0.30;   // DEFENSE-LOOK: a jump shot leaves the floor
-  let riseHop: { t: number; dur: number } | null = null;
+  let riseHop: { t: number; hop: JumperHop; sync: number; hung: boolean } | null = null;
   /** HOOPS MOTION phase 3b: the AI bodies' run tops (what they always moved at — now reached at the hero's accel / decel; a sprint is
    *  AI_SPRINT_X of it). */
   const MATE_RUN_MPS = 4.2, FOE_RUN_MPS = 3.8;
@@ -1244,8 +1244,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (victimSlide) { const step = slideStep(victimSlide.left, dt, victimSlide.mps ?? undefined); victimSlide.body.char.root.position.addInPlace(victimSlide.dir.scale(step)); victimSlide.left -= step; if (victimSlide.left <= 1e-4) victimSlide = null; }   // DUNK-FANATIC
       if (riseHop && !finish && !dunking) {   // DEFENSE-LOOK: the jump shot's hop
         riseHop.t += dt;
-        me.char.root.position.y = Math.max(0, Math.sin(Math.min(1, riseHop.t / riseHop.dur) * Math.PI) * JUMPER_HOP_APEX);
-        if (riseHop.t >= riseHop.dur) { riseHop = null; me.char.root.position.y = 0; me.tree.beat('bball_land_absorb', { fadeSec: 0.08 }); }   // HOOPS-DEPTH S4: feet-down is an absorb, not the loop
+        me.char.root.position.y = jumperHopY(riseHop.hop, riseHop.t);   // H3d: the load on the floor, the apex at the release, a gravity arc
+        // H3d: a late release HANGS at the set point — the held clip used to run past its release frame and loop back to the dip
+        if (!riseHop.hung && me.shotWin === 'load' && riseHop.t >= riseHop.hop.releaseSec) { riseHop.hung = true; me.char.animator.setPlaybackScale('jumpshot', riseHop.sync * JUMPER_HANG_SCALE); }
+        if (riseHop.t >= riseHop.hop.landSec) { riseHop = null; me.char.root.position.y = 0; me.tree.beat('bball_land_absorb', { fadeSec: 0.08 }); }   // HOOPS-DEPTH S4: feet-down is an absorb, not the loop
       } else if (riseHop) riseHop = null;
       for (const f of foes) f.reachCooldown = Math.max(0, f.reachCooldown - dt);
       // D1–D3 clocks
@@ -2790,10 +2792,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
   function beginRise(): void {
     me.shotWin = 'load'; me.shotSec = 0;
-    riseHop = { t: 0, dur: shotMeter.riseSec + 0.32 };   // DEFENSE-LOOK: leave the floor with the rise, land a beat after the release
     const clipSec = me.char.animator.durationOf('jumpshot') ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    me.tree.hold('jumpshot', { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, releaseFrameOf(me.char.animator, 'jumpshot', RELEASE_FRAME_01)), fadeSec: 0.08 });
+    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, releaseFrameOf(me.char.animator, 'jumpshot', RELEASE_FRAME_01));
+    riseHop = { t: 0, hop: jumperHop(shotMeter.riseSec, greenInRise01, JUMPER_HOP_APEX), sync, hung: false };   // H3d: the hop timed to the release (BallHandling.jumperHop)
+    me.tree.hold('jumpshot', { speedRatio: sync, fadeSec: 0.08 });
   }
   /** M3: a layup / floater — the ball into the finishing hand, the finish clip paced to the green, the stride and the hop. */
   function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null, sideIn?: 'left' | 'right', preSec = 0): void {

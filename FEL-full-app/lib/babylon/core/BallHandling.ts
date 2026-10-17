@@ -205,6 +205,37 @@ export class PassFlight {
   }
 }
 
+// ── H3d: the jump shot's hop ──────────────────────────────────────────────
+/**
+ * H3d (owner 2026-10-17, D8: the SHOT MOTION feels off — stiff / floaty, the ball leaving the hands at the wrong moment). Measured on
+ * the set jumper (h3d-base, the motion probe): the root left the floor 16 ms into the rise — during the capture's own knee dip, so the
+ * load happened in the air — rode a sine of rise + 0.32 s (over a second airborne for a 0.30 m jump; a body that rises 0.30 m is up
+ * 0.49 s) and peaked ~200 ms before the release. Now: the load on the floor, the take-off timed so the jump's apex lands
+ * JUMPER_APEX_AFTER_RELEASE_SEC after the release frame (the meter's green — a jumper lets go at the top, a hair before it), and a
+ * gravity arc (the air time a body that rises `apexM` really has). TUNED (new): the apex 30 ms after the release, the load at least
+ * JUMPER_MIN_LOAD_SEC.
+ */
+export const JUMPER_G = 9.81, JUMPER_APEX_AFTER_RELEASE_SEC = 0.03, JUMPER_MIN_LOAD_SEC = 0.08;
+/** The jumpshot clip's pace after its release frame while the ball is still in the hands (a late release): it HANGS at the set point. It
+ *  was HELD as a loop: past the clip's end it wrapped back to the dip and a late ball left a hand on its way down (1.09 m, measured).
+ *  TUNED (new). */
+export const JUMPER_HANG_SCALE = 0.1;
+export interface JumperHop { takeoffSec: number; apexSec: number; landSec: number; airSec: number; releaseSec: number; apexM: number }
+/** The hop for a rise of `riseSec` whose release (the green) sits at `greenInRise01` of it; times from the rise's start. Pure. */
+export function jumperHop(riseSec: number, greenInRise01: number, apexM: number): JumperHop {
+  const airSec = 2 * Math.sqrt((2 * Math.max(0, apexM)) / JUMPER_G);
+  const releaseSec = Math.max(0, greenInRise01) * Math.max(0, riseSec);
+  const takeoffSec = Math.max(JUMPER_MIN_LOAD_SEC, releaseSec + JUMPER_APEX_AFTER_RELEASE_SEC - airSec / 2);
+  return { takeoffSec, apexSec: takeoffSec + airSec / 2, landSec: takeoffSec + airSec, airSec, releaseSec, apexM };
+}
+/** The root's height `t` s into the rise: on the floor through the load, a gravity arc to `apexM`, the floor again at landSec. Pure. */
+export function jumperHopY(h: JumperHop, t: number): number {
+  const u = t - h.takeoffSec;
+  if (u <= 0 || t >= h.landSec) return 0;
+  const v0 = (JUMPER_G * h.airSec) / 2;
+  return Math.max(0, v0 * u - 0.5 * JUMPER_G * u * u);
+}
+
 // ── Animation-synced shot release ──────────────────────────────────────────
 /** Fraction of the jumpshot clip where the ball visually leaves the hand. */
 export const RELEASE_FRAME_01 = 0.45;
