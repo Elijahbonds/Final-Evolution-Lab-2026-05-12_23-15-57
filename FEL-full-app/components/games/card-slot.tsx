@@ -9,15 +9,20 @@
 // CONTROLS SCREEN (console-view lane, 2026-10-06): the collapsed BUTTONS map that lived here is now the READY card's
 // CONTROLS panel (controls-panel.tsx) — open, per device, and on the pause too — so this is the card row alone.
 
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
+import { SessionContext } from 'next-auth/react';
 import type { SlotCard } from '@/lib/creator/cardSlot';
 
 export function CardSlot({ modeId }: { modeId: string }) {   // modeId: the slot is per mode (the card row is shared today)
   const [cards, setCards] = useState<SlotCard[]>([]);
   const [equipped, setEquipped] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // FIRST-DUNK-BUDGET (2026-10-17): asked only for a signed-in player. A guest's read was a 401 on every /try run (the card row is
+  // signed-in only anyway). The context, not useSession(), as PartyInvite reads it: a splash with no provider is a guest.
+  const signedIn = useContext(SessionContext)?.status === 'authenticated';
 
   useEffect(() => {
+    if (!signedIn) return;
     let live = true;
     fetch('/api/v1/card-slot').then((r) => (r.ok ? r.json() : null)).then((j) => {
       if (!live || !j) return;
@@ -25,7 +30,7 @@ export function CardSlot({ modeId }: { modeId: string }) {   // modeId: the slot
       setEquipped(typeof j.equipped === 'string' ? j.equipped : null);
     }).catch(() => {});
     return () => { live = false; };
-  }, []);
+  }, [signedIn]);
 
   const equip = async (id: string | null) => {
     if (busy || id === equipped) return;

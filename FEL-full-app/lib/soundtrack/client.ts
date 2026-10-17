@@ -14,7 +14,7 @@ import { musicFocus, claimMusicFocus } from './focus';
 import { stageForPhase } from './policy';
 import { cachedSrc } from './cache';
 import { readRunTrack } from './runTrack';
-import type { SoundtrackStage } from './types';
+import type { SoundtrackCatalogue, SoundtrackStage, SoundtrackTrack } from './types';
 
 export { claimMusicFocus };
 /** The Dunk walk-out's catalogue source (routed: the Dunk lane mounts it). */
@@ -106,3 +106,20 @@ export function setSoundtrackStage(phaseOrStage: string | null): void {
 export const enterBed = (): void => setSoundtrackStage('bed');
 /** …and this on teardown. */
 export const exitBed = (): void => setSoundtrackStage(null);
+
+/** How long one read of the catalogue answers every asker on the page (the route itself is CDN-cached 5 min). */
+const CATALOGUE_TTL_MS = 5 * 60_000;
+let catalogueRead: { at: number; p: Promise<SoundtrackTrack[] | null> } | null = null;
+/**
+ * FIRST-DUNK-BUDGET (2026-10-17): the soundtrack catalogue, read ONCE for the page (and again after CATALOGUE_TTL_MS). The dock and
+ * the Dunk walk-out each fetched /api/v1/soundtrack on every /try run. Null when the read failed (a failure is not remembered).
+ */
+export function fetchSoundtrackTracks(): Promise<SoundtrackTrack[] | null> {
+  const t = Date.now();
+  if (catalogueRead && t - catalogueRead.at < CATALOGUE_TTL_MS) return catalogueRead.p;
+  const p = fetch('/api/v1/soundtrack').then((r) => (r.ok ? r.json() : null)).then((c: SoundtrackCatalogue | null) => (Array.isArray(c?.tracks) ? c!.tracks : null)).catch(() => null);
+  const read = { at: t, p };
+  catalogueRead = read;
+  void p.then((tracks) => { if (!tracks && catalogueRead === read) catalogueRead = null; });
+  return p;
+}

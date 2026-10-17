@@ -15,7 +15,9 @@ export type MeshyPropKey = 'hoop' | 'ball-basketball' | 'ball-soccer' | 'ball-te
 export type BallKind = 'basketball' | 'soccer' | 'tennis' | 'volleyball';
 export type BoardKind = 'skateboard' | 'snowboard' | 'surfboard';
 
-export const MESHY_PROP_URL = (key: MeshyPropKey): string => `/models/meshy/${key}.glb`;
+/** The ONE folder the baked props load from (FIRST-DUNK-BUDGET, 2026-10-17: VenueProps' 'meshy' kit reads it too). */
+export const MESHY_DIR = '/models/meshy/';
+export const MESHY_PROP_URL = (key: MeshyPropKey): string => `${MESHY_DIR}${key}.glb`;
 
 /**
  * Where the scan's rim ring sits relative to its bottom-centre pivot, in metres, measured on the baked mesh with Blender
