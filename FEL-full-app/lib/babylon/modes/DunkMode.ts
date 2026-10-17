@@ -1246,6 +1246,11 @@ export const DunkMode: ModeDefinition = (() => {
     if (contestSetStarted || ctx.scene.isDisposed) return;
     contestSetStarted = true;
     console.info('[DUNK-BUDGET] dunk 1 is in — the contest set loads now (his body first)');
+    // FDB-2 (2026-10-17): the same moment on the page's own clock. AM's run counted CASS's body (rivals/jinx.glb) "before dunk 1",
+    // but it is the line after this one — requested 2.3 ms after the console line (measured, prod build) — and a harness that
+    // stamps the console line when its own process receives it can land later than the request. Resource Timing's startTime
+    // and this mark share one clock: a request with startTime >= the mark's is after dunk 1.
+    try { performance.mark('fel:dunk1-in'); } catch { /* no User Timing: the console line still says it */ }
     rivalArrival = bringRival(ctx);
     void rivalArrival.finally(() => {
       if (ctx.scene.isDisposed) return;
