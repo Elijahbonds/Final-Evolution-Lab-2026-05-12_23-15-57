@@ -83,6 +83,7 @@ export function ModelViewer() {
         };
         w.__FEL_MODEL = {
           ready: true, url, report, elbows,
+          scene: body.root.getScene(),   // style pass (2026-10-16): probes read the bones and the accessories' sizes off it
           play: (name: string) => { body?.animator.play(name, { loop: true }); return body?.animator.clipNames.has(name) ?? false; },
           turn: (deg: number) => { if (body) body.root.rotation.y = (deg * Math.PI) / 180; },
           clips: () => Array.from(body?.animator.clipNames ?? []),

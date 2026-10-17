@@ -134,6 +134,19 @@ for (const path of targets) {
     if (m.builtAtSpawn) check(clipNames.length === 0, `built-at-spawn manifest: the GLB carries no baked clips (${clipNames.length})`);
     else check(missingClips.length === 0, `manifest covers every GLB clip (${names.size}/${clipNames.length})`);
   }
+
+  // THE CASUAL WARDROBE (style pass, owner 2026-10-16; scripts/avatar/rivalWear.mts): a forge rival carries ONE outfit — one top
+  // and one bottom, so applyKit shows them in every mode — its cloth printed (a felprint map on the top and on the bottom) and its
+  // accessory signature on the armature (extras.look, which CharacterLibrary hangs instead of a seeded deal)
+  if (path.includes('models/rivals')) {
+    const kit = root.listNodes().filter((n) => n.getMesh()).map((n) => n.getName()).filter((n) => n.startsWith('Kit_'));
+    const tops = kit.filter((n) => n.startsWith('Kit_tops_')), bottoms = kit.filter((n) => n.startsWith('Kit_shorts_'));
+    check(tops.length === 1 && bottoms.length === 1, `one top and one bottom (${tops.join(',')} / ${bottoms.join(',')})`);
+    const printed = root.listMaterials().filter((mt) => /^(jersey|shorts)\./.test(mt.getName()) && /felprint/.test(`${mt.getBaseColorTexture()?.getName() ?? ''} ${mt.getBaseColorTexture()?.getURI() ?? ''}`));
+    check(printed.length >= 2, `the top and the bottom are printed (${printed.length} felprint maps)`);
+    const look = root.listNodes().map((n) => (n.getExtras() as { look?: { items?: unknown } } | null)?.look).find(Boolean);
+    check(!!look && Array.isArray(look.items), 'the armature carries its accessory signature (extras.look)');
+  }
 }
 
 console.log(`\navatar-pipeline: ${checks} checks ${failures ? `— ${failures} FAILED` : 'green'}`);

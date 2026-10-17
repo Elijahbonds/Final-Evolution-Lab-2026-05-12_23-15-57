@@ -29,6 +29,8 @@ import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { prune, quantize } from '@gltf-transform/functions';
 import sharp from 'sharp';
+import { RIVAL_WEAR, garmentFor, TOP_ID, BOTTOM_ID, BAGGY, TONAL_LO } from './rivalWear.mts';
+import { writePrints } from './rivalPrints.mts';
 
 type Sex = 'male' | 'female';
 type HairKey = 'cap' | 'afro' | 'buzz' | 'bun' | 'ponytail' | 'braids';
@@ -40,37 +42,34 @@ export interface RivalSpec {
   /** an MPFB hair asset, or null (shaved) */
   hair: string | null; hairKey: HairKey | null;
   brows: string;
-  /** the top the rival wears on the tee slot (the tank is the same for everyone: the court kit) */
-  tee: string; shoes: [string, string];
 }
-const TEE_M = 'elvs_crude_t-shirt_male', TEE_F = 'toigo_basic_tucked_t-shirt', TEE_F2 = 'joepal_crude_t-shirt_female';
 const M = (age: number, muscle: number, weight: number, height: number, proportions: number, african: number, asian: number, caucasian: number) => ({ age, muscle, weight, height, proportions, african, asian, caucasian });
 /** The 24 rivals. Builds: lean / athletic / power / heavy; heights from the macro (0.4 ≈ 1.70 m … 0.95 ≈ 2.0 m on a male). */
 export const RIVALS: RivalSpec[] = [
-  { key: 'ace',   sex: 'male',   note: 'tall wing, lean',            macro: M(0.40, 0.70, 0.40, 0.90, 0.80, 0.90, 0.05, 0.05), face: { 'head-oval': 0.5, 'nose-scale-horiz-incr': 0.3 },      skin: 'young_african_male',                hair: 'short02', hairKey: 'buzz',     brows: 'eyebrow003', tee: TEE_M, shoes: ['shoes02', 'shoes01'] },
-  { key: 'blaze', sex: 'male',   note: 'power guard, stocky',        macro: M(0.45, 0.90, 0.60, 0.45, 0.70, 0.10, 0.05, 0.85), face: { 'head-square': 0.6, 'chin-jaw-drop-incr': 0.2 },       skin: 'toigo_light_skin_male_ginger',      hair: 'short04', hairKey: 'cap',      brows: 'eyebrow005', tee: TEE_M, shoes: ['shoes05', 'shoes01'] },
-  { key: 'colt',  sex: 'male',   note: 'young, wiry',                macro: M(0.30, 0.60, 0.35, 0.65, 0.75, 0.20, 0.70, 0.10), face: { 'head-round': 0.4, 'eyebrows-trans-up': 0.3 },         skin: 'young_asian_male',                  hair: 'cortu_short_messy_hair', hairKey: 'cap', brows: 'eyebrow001', tee: TEE_M, shoes: ['shoes06', 'shoes02'] },
-  { key: 'dash',  sex: 'male',   note: 'quick guard, fade',          macro: M(0.35, 0.75, 0.40, 0.55, 0.75, 0.80, 0.00, 0.20), face: { 'head-invertedtriangular': 0.5 },                     skin: 'middleage_african_male',            hair: 'short03', hairKey: 'buzz',     brows: 'eyebrow002', tee: TEE_M, shoes: ['shoes01', 'shoes05'] },
-  { key: 'echo',  sex: 'female', note: 'tall forward, braids',       macro: M(0.38, 0.75, 0.45, 0.85, 0.80, 0.85, 0.05, 0.10), face: { 'head-oval': 0.4 },                                   skin: 'young_african_female',              hair: 'braid01', hairKey: 'braids',   brows: 'eyebrow008', tee: TEE_F, shoes: ['shoes02', 'shoes06'] },
-  { key: 'fable', sex: 'male',   note: 'veteran big, heavy',         macro: M(0.60, 0.70, 0.75, 0.85, 0.60, 0.15, 0.05, 0.80), face: { 'head-rectangular': 0.5, 'nose-scale-horiz-incr': 0.2 }, skin: 'middleage_caucasian_male',          hair: null,      hairKey: null,       brows: 'eyebrow006', tee: TEE_M, shoes: ['shoes05', 'shoes02'] },
-  { key: 'grit',  sex: 'male',   note: 'enforcer, broad',            macro: M(0.48, 0.95, 0.65, 0.75, 0.65, 0.60, 0.00, 0.40), face: { 'head-square': 0.7 },                                 skin: 'mindfront_skin_male_african_middleage', hair: null, hairKey: null,         brows: 'eyebrow004', tee: TEE_M, shoes: ['shoes01', 'shoes06'] },
-  { key: 'halo',  sex: 'female', note: 'point guard, ponytail',      macro: M(0.32, 0.65, 0.40, 0.45, 0.80, 0.05, 0.10, 0.85), face: { 'head-invertedtriangular': 0.4 },                                  skin: 'young_caucasian_female',            hair: 'ponytail01', hairKey: 'ponytail', brows: 'eyebrow007', tee: TEE_F, shoes: ['shoes06', 'shoes01'] },
-  { key: 'jinx',  sex: 'male',   note: 'shooter, slim',              macro: M(0.33, 0.55, 0.35, 0.70, 0.80, 0.05, 0.20, 0.75), face: { 'head-triangular': 0.4 },                             skin: 'toigo_light_skin_male_freckles',    hair: 'culturalibre_hair_02', hairKey: 'cap', brows: 'eyebrow009', tee: TEE_M, shoes: ['shoes02', 'shoes05'] },
-  { key: 'kite',  sex: 'female', note: 'athletic wing, bun',         macro: M(0.36, 0.75, 0.45, 0.70, 0.75, 0.10, 0.75, 0.15), face: { 'head-round': 0.3 },                                  skin: 'young_asian_female',                hair: 'rehmanpolanski_hair_bun_brown', hairKey: 'bun', brows: 'eyebrow001', tee: TEE_F2, shoes: ['shoes01', 'shoes02'] },
-  { key: 'lux',   sex: 'male',   note: 'showman, afro',              macro: M(0.34, 0.75, 0.45, 0.75, 0.75, 0.90, 0.00, 0.10), face: { 'head-diamond': 0.4 },                                skin: 'young_african_male',                hair: 'afro01',  hairKey: 'afro',     brows: 'eyebrow003', tee: TEE_M, shoes: ['shoes06', 'shoes05'] },
-  { key: 'mako',  sex: 'male',   note: 'center, very tall',          macro: M(0.42, 0.80, 0.55, 0.98, 0.65, 0.30, 0.30, 0.40), face: { 'head-rectangular': 0.4, 'chin-jaw-drop-incr': 0.15 },  skin: 'middleage_asian_male',              hair: 'short01', hairKey: 'cap',      brows: 'eyebrow002', tee: TEE_M, shoes: ['shoes05', 'shoes06'] },
-  { key: 'nyx',   sex: 'female', note: 'lockdown, cornrows',         macro: M(0.40, 0.85, 0.50, 0.65, 0.70, 0.75, 0.00, 0.25), face: { 'head-square': 0.3 },                                 skin: 'middleage_african_female',          hair: 'elvs_double_mh_braid', hairKey: 'braids', brows: 'eyebrow004', tee: TEE_F, shoes: ['shoes02', 'shoes01'] },
-  { key: 'orbit', sex: 'male',   note: 'bruiser, heavy',             macro: M(0.52, 0.65, 0.85, 0.70, 0.55, 0.35, 0.05, 0.60), face: { 'head-round': 0.6 },                                  skin: 'toigo_light_skin_male_bronze',      hair: 'short03', hairKey: 'buzz',     brows: 'eyebrow006', tee: TEE_M, shoes: ['shoes01', 'shoes02'] },
-  { key: 'quill', sex: 'female', note: 'shooter, bob',               macro: M(0.30, 0.55, 0.40, 0.55, 0.80, 0.05, 0.05, 0.90), face: { 'head-oval': 0.3 },                                   skin: 'young_caucasian_female2',           hair: 'bob02',   hairKey: 'cap',      brows: 'eyebrow009', tee: TEE_F2, shoes: ['shoes06', 'shoes05'] },
-  { key: 'rook',  sex: 'male',   note: 'grinder, compact',           macro: M(0.46, 0.85, 0.55, 0.40, 0.70, 0.25, 0.10, 0.65), face: { 'head-square': 0.5 },                                 skin: 'onlytheghosts_old_eurasian_male',   hair: 'short01', hairKey: 'cap',      brows: 'eyebrow005', tee: TEE_M, shoes: ['shoes05', 'shoes01'] },
-  { key: 'sol',   sex: 'male',   note: 'athletic, south asian',      macro: M(0.38, 0.75, 0.45, 0.65, 0.75, 0.30, 0.55, 0.15), face: { 'head-oval': 0.4, 'nose-scale-horiz-incr': 0.2 },     skin: 'mindfront_aksel_skin',              hair: 'culturalibre_hair_05', hairKey: 'cap', brows: 'eyebrow002', tee: TEE_M, shoes: ['shoes02', 'shoes06'] },
-  { key: 'tusk',  sex: 'male',   note: 'big man, beard-age',         macro: M(0.55, 0.80, 0.70, 0.92, 0.60, 0.70, 0.00, 0.30), face: { 'head-rectangular': 0.6 },                            skin: 'middleage_african_male',            hair: null,      hairKey: null,       brows: 'eyebrow006', tee: TEE_M, shoes: ['shoes06', 'shoes01'] },
-  { key: 'umber', sex: 'female', note: 'power forward, afro',        macro: M(0.42, 0.85, 0.55, 0.80, 0.70, 0.80, 0.00, 0.20), face: { 'head-round': 0.3 },                                  skin: 'young_african_female',              hair: 'afro01',  hairKey: 'afro',     brows: 'eyebrow008', tee: TEE_F, shoes: ['shoes05', 'shoes02'] },
-  { key: 'volt',  sex: 'male',   note: 'leaper, lean',               macro: M(0.28, 0.80, 0.35, 0.82, 0.85, 0.55, 0.05, 0.40), face: { 'head-invertedtriangular': 0.4 },                     skin: 'young_caucasian_male2',             hair: 'short02', hairKey: 'buzz',     brows: 'eyebrow001', tee: TEE_M, shoes: ['shoes01', 'shoes06'] },
-  { key: 'wisp',  sex: 'female', note: 'quick, long hair',           macro: M(0.28, 0.60, 0.35, 0.50, 0.80, 0.20, 0.50, 0.30), face: { 'head-invertedtriangular': 0.3 },                                  skin: 'onlytheghosts_young_eurasian_female', hair: 'long01', hairKey: 'cap',      brows: 'eyebrow007', tee: TEE_F2, shoes: ['shoes02', 'shoes05'] },
-  { key: 'yara',  sex: 'female', note: 'wing, south asian',          macro: M(0.34, 0.70, 0.45, 0.65, 0.75, 0.30, 0.50, 0.20), face: { 'head-oval': 0.3 },                                   skin: 'cutoff3d_indian_female_skin',       hair: 'elvs_french_braid_variation', hairKey: 'braids', brows: 'eyebrow008', tee: TEE_F, shoes: ['shoes06', 'shoes02'] },
-  { key: 'zeal',  sex: 'male',   note: 'two-way guard, tattooed',    macro: M(0.40, 0.80, 0.45, 0.60, 0.75, 0.05, 0.05, 0.90), face: { 'head-diamond': 0.3 },                                skin: 'ken1138_caucasian_male_tattooed_skin', hair: 'culturalibre_hair_06', hairKey: 'cap', brows: 'eyebrow003', tee: TEE_M, shoes: ['shoes05', 'shoes06'] },
-  { key: 'bolt',  sex: 'male',   note: 'slasher, mid',               macro: M(0.32, 0.75, 0.45, 0.68, 0.75, 0.45, 0.25, 0.30), face: { 'head-triangular': 0.3 },                             skin: 'young_asian_male',                  hair: 'short04', hairKey: 'cap',      brows: 'eyebrow004', tee: TEE_M, shoes: ['shoes02', 'shoes01'] },
+  { key: 'ace',   sex: 'male',   note: 'tall wing, lean',            macro: M(0.40, 0.70, 0.40, 0.90, 0.80, 0.90, 0.05, 0.05), face: { 'head-oval': 0.5, 'nose-scale-horiz-incr': 0.3 },      skin: 'young_african_male',                hair: 'short02', hairKey: 'buzz',     brows: 'eyebrow003' },
+  { key: 'blaze', sex: 'male',   note: 'power guard, stocky',        macro: M(0.45, 0.90, 0.60, 0.45, 0.70, 0.10, 0.05, 0.85), face: { 'head-square': 0.6, 'chin-jaw-drop-incr': 0.2 },       skin: 'toigo_light_skin_male_ginger',      hair: 'short04', hairKey: 'cap',      brows: 'eyebrow005' },
+  { key: 'colt',  sex: 'male',   note: 'young, wiry',                macro: M(0.30, 0.60, 0.35, 0.65, 0.75, 0.20, 0.70, 0.10), face: { 'head-round': 0.4, 'eyebrows-trans-up': 0.3 },         skin: 'young_asian_male',                  hair: 'cortu_short_messy_hair', hairKey: 'cap', brows: 'eyebrow001' },
+  { key: 'dash',  sex: 'male',   note: 'quick guard, fade',          macro: M(0.35, 0.75, 0.40, 0.55, 0.75, 0.80, 0.00, 0.20), face: { 'head-invertedtriangular': 0.5 },                     skin: 'middleage_african_male',            hair: 'short03', hairKey: 'buzz',     brows: 'eyebrow002' },
+  { key: 'echo',  sex: 'female', note: 'tall forward, braids',       macro: M(0.38, 0.75, 0.45, 0.85, 0.80, 0.85, 0.05, 0.10), face: { 'head-oval': 0.4 },                                   skin: 'young_african_female',              hair: 'braid01', hairKey: 'braids',   brows: 'eyebrow008' },
+  { key: 'fable', sex: 'male',   note: 'veteran big, heavy',         macro: M(0.60, 0.70, 0.75, 0.85, 0.60, 0.15, 0.05, 0.80), face: { 'head-rectangular': 0.5, 'nose-scale-horiz-incr': 0.2 }, skin: 'middleage_caucasian_male',          hair: null,      hairKey: null,       brows: 'eyebrow006' },
+  { key: 'grit',  sex: 'male',   note: 'enforcer, broad',            macro: M(0.48, 0.95, 0.65, 0.75, 0.65, 0.60, 0.00, 0.40), face: { 'head-square': 0.7 },                                 skin: 'mindfront_skin_male_african_middleage', hair: null, hairKey: null,         brows: 'eyebrow004' },
+  { key: 'halo',  sex: 'female', note: 'point guard, ponytail',      macro: M(0.32, 0.65, 0.40, 0.45, 0.80, 0.05, 0.10, 0.85), face: { 'head-invertedtriangular': 0.4 },                                  skin: 'young_caucasian_female',            hair: 'ponytail01', hairKey: 'ponytail', brows: 'eyebrow007' },
+  { key: 'jinx',  sex: 'male',   note: 'shooter, slim',              macro: M(0.33, 0.55, 0.35, 0.70, 0.80, 0.05, 0.20, 0.75), face: { 'head-triangular': 0.4 },                             skin: 'toigo_light_skin_male_freckles',    hair: 'culturalibre_hair_02', hairKey: 'cap', brows: 'eyebrow009' },
+  { key: 'kite',  sex: 'female', note: 'athletic wing, bun',         macro: M(0.36, 0.75, 0.45, 0.70, 0.75, 0.10, 0.75, 0.15), face: { 'head-round': 0.3 },                                  skin: 'young_asian_female',                hair: 'rehmanpolanski_hair_bun_brown', hairKey: 'bun', brows: 'eyebrow001' },
+  { key: 'lux',   sex: 'male',   note: 'showman, afro',              macro: M(0.34, 0.75, 0.45, 0.75, 0.75, 0.90, 0.00, 0.10), face: { 'head-diamond': 0.4 },                                skin: 'young_african_male',                hair: 'afro01',  hairKey: 'afro',     brows: 'eyebrow003' },
+  { key: 'mako',  sex: 'male',   note: 'center, very tall',          macro: M(0.42, 0.80, 0.55, 0.98, 0.65, 0.30, 0.30, 0.40), face: { 'head-rectangular': 0.4, 'chin-jaw-drop-incr': 0.15 },  skin: 'middleage_asian_male',              hair: 'short01', hairKey: 'cap',      brows: 'eyebrow002' },
+  { key: 'nyx',   sex: 'female', note: 'lockdown, cornrows',         macro: M(0.40, 0.85, 0.50, 0.65, 0.70, 0.75, 0.00, 0.25), face: { 'head-square': 0.3 },                                 skin: 'middleage_african_female',          hair: 'elvs_double_mh_braid', hairKey: 'braids', brows: 'eyebrow004' },
+  { key: 'orbit', sex: 'male',   note: 'bruiser, heavy',             macro: M(0.52, 0.65, 0.85, 0.70, 0.55, 0.35, 0.05, 0.60), face: { 'head-round': 0.6 },                                  skin: 'toigo_light_skin_male_bronze',      hair: 'short03', hairKey: 'buzz',     brows: 'eyebrow006' },
+  { key: 'quill', sex: 'female', note: 'shooter, bob',               macro: M(0.30, 0.55, 0.40, 0.55, 0.80, 0.05, 0.05, 0.90), face: { 'head-oval': 0.3 },                                   skin: 'young_caucasian_female2',           hair: 'bob02',   hairKey: 'cap',      brows: 'eyebrow009' },
+  { key: 'rook',  sex: 'male',   note: 'grinder, compact',           macro: M(0.46, 0.85, 0.55, 0.40, 0.70, 0.25, 0.10, 0.65), face: { 'head-square': 0.5 },                                 skin: 'onlytheghosts_old_eurasian_male',   hair: 'short01', hairKey: 'cap',      brows: 'eyebrow005' },
+  { key: 'sol',   sex: 'male',   note: 'athletic, south asian',      macro: M(0.38, 0.75, 0.45, 0.65, 0.75, 0.30, 0.55, 0.15), face: { 'head-oval': 0.4, 'nose-scale-horiz-incr': 0.2 },     skin: 'mindfront_aksel_skin',              hair: 'culturalibre_hair_05', hairKey: 'cap', brows: 'eyebrow002' },
+  { key: 'tusk',  sex: 'male',   note: 'big man, beard-age',         macro: M(0.55, 0.80, 0.70, 0.92, 0.60, 0.70, 0.00, 0.30), face: { 'head-rectangular': 0.6 },                            skin: 'middleage_african_male',            hair: null,      hairKey: null,       brows: 'eyebrow006' },
+  { key: 'umber', sex: 'female', note: 'power forward, afro',        macro: M(0.42, 0.85, 0.55, 0.80, 0.70, 0.80, 0.00, 0.20), face: { 'head-round': 0.3 },                                  skin: 'young_african_female',              hair: 'afro01',  hairKey: 'afro',     brows: 'eyebrow008' },
+  { key: 'volt',  sex: 'male',   note: 'leaper, lean',               macro: M(0.28, 0.80, 0.35, 0.82, 0.85, 0.55, 0.05, 0.40), face: { 'head-invertedtriangular': 0.4 },                     skin: 'young_caucasian_male2',             hair: 'short02', hairKey: 'buzz',     brows: 'eyebrow001' },
+  { key: 'wisp',  sex: 'female', note: 'quick, long hair',           macro: M(0.28, 0.60, 0.35, 0.50, 0.80, 0.20, 0.50, 0.30), face: { 'head-invertedtriangular': 0.3 },                                  skin: 'onlytheghosts_young_eurasian_female', hair: 'long01', hairKey: 'cap',      brows: 'eyebrow007' },
+  { key: 'yara',  sex: 'female', note: 'wing, south asian',          macro: M(0.34, 0.70, 0.45, 0.65, 0.75, 0.30, 0.50, 0.20), face: { 'head-oval': 0.3 },                                   skin: 'cutoff3d_indian_female_skin',       hair: 'elvs_french_braid_variation', hairKey: 'braids', brows: 'eyebrow008' },
+  { key: 'zeal',  sex: 'male',   note: 'two-way guard, tattooed',    macro: M(0.40, 0.80, 0.45, 0.60, 0.75, 0.05, 0.05, 0.90), face: { 'head-diamond': 0.3 },                                skin: 'ken1138_caucasian_male_tattooed_skin', hair: 'culturalibre_hair_06', hairKey: 'cap', brows: 'eyebrow003' },
+  { key: 'bolt',  sex: 'male',   note: 'slasher, mid',               macro: M(0.32, 0.75, 0.45, 0.68, 0.75, 0.45, 0.25, 0.30), face: { 'head-triangular': 0.3 },                             skin: 'young_asian_male',                  hair: 'short04', hairKey: 'cap',      brows: 'eyebrow004' },
 ];
 
 /**
@@ -85,7 +84,8 @@ export function bakedMacro(m: RivalSpec['macro']): RivalSpec['macro'] {
   const c = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
   return { ...m, height: 0.5, muscle: c(m.muscle, 0.35, 0.75), weight: c(m.weight, 0.35, 0.65), proportions: c(m.proportions, 0.6, 0.8), age: 0.47 + c(m.age, 0, 1) * 0.15 };   // MakeHuman's age: 0.5 = 25 years, 0.3 ≈ 17 (a teen's head on a man) — adults only, 24–35
 }
-/** Each rival's height (the armature's scale) and colourway (the jersey, the shorts; the shoes keep their own maps). */
+/** Each rival's height (the armature's scale). Its `jersey` / `shorts` are the first build's colourway, kept for the record: the
+ *  style pass bakes rivalWear.mts's (RIVAL_WEAR[key].jersey / .shorts). */
 export const RIVAL_LOOK: Readonly<Record<string, { scale: number; jersey: string; shorts: string }>> = {
   ace:   { scale: 1.07, jersey: '#f2f2ee', shorts: '#1d2a6b' }, blaze: { scale: 1.034, jersey: '#c8102e', shorts: '#111114' },
   colt:  { scale: 1.082, jersey: '#2e8b57', shorts: '#f0f0ea' }, dash:  { scale: 1.0, jersey: '#ffb81c', shorts: '#4b2e83' },
@@ -114,30 +114,44 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 if (process.argv[1]?.endsWith('rivals.mts')) {
   for (const r of RIVALS) {
     if (ONLY.size && !ONLY.has(r.key)) continue;
+    // THE CASUAL WARDROBE (style pass, owner 2026-10-16; rivalWear.ts): one garment per slot — applyKit shows a slot's only
+    // garment in every mode — the top and the bottom printed and shaped in Blender (mpfb/style.py)
+    const w = RIVAL_WEAR[r.key];
+    if (!w) throw new Error(`${r.key}: no wardrobe in rivalWear.ts`);
+    const topId = TOP_ID[w.top], botId = BOTTOM_ID[w.bottom];
+    const topPrints = await writePrints(TMP, `${r.key}-top`, w.front, w.back);
     const spec = { key: r.key, sex: r.sex, macro: bakedMacro(r.macro), face: r.face, skin: r.skin, hair: r.hair, hairKey: r.hairKey, brows: r.brows,
-      tops: { top_bonds: 'toigo_keyhole_tank_top', top_lab: r.tee }, shorts: { shorts_court: 'cortu_jeans_shorts' },
-      shoes: { shoes_evo: r.shoes[0], shoes_flight: r.shoes[1] } };
+      tops: { [topId]: garmentFor(w.top, r.sex, r.key) }, shorts: { [botId]: garmentFor(w.bottom, r.sex, r.key) },
+      shoes: { shoes_evo: w.shoes[0], shoes_flight: w.shoes[1] },
+      style: {
+        tops: { [topId]: { ...(w.top === 'tank' ? { sleeveless: { threshold: 0.5 } } : {}), print: { size: 512, lo: TONAL_LO[w.top], ...topPrints, frontAt: w.top === 'tank' ? 'chestBig' : 'chest', bands: w.topBands ?? [] } } },
+        shorts: { [botId]: { ...(w.bottom === 'baggy' ? { baggy: BAGGY } : {}), print: { size: 256, lo: TONAL_LO[w.bottom], bands: w.bottomBands ?? [] } } },
+      } };
     const specFile = join(TMP, `${r.key}.json`), raw = join(TMP, `${r.key}-mpfb.glb`), fel = join(TMP, `${r.key}-fel.glb`);
     writeFileSync(specFile, JSON.stringify(spec));
     const t0 = Date.now();
     const log = execFileSync(BLENDER, ['-b', '--python', join(HERE, 'mpfb/rival.py'), '--', '--spec', specFile, '--out', raw], { encoding: 'utf8', maxBuffer: 64 << 20 });
-    const failed = log.split('\n').filter((l) => /^RIVAL .*FAILED/.test(l));
+    const failed = log.split('\n').filter((l) => /^(RIVAL|STYLE) .*FAILED/.test(l));
+    if (process.env.STYLE_LOG) for (const l of log.split('\n').filter((x) => /^STYLE /.test(x))) console.log(`   ${r.key} ${l}`);
     if (!existsSync(raw)) { console.error(`✘ ${r.key}: Blender wrote nothing\n${log.slice(-2000)}`); process.exitCode = 1; continue; }
     execFileSync('npx', ['tsx', join(HERE, 'import-mpfb.mts'), raw, fel, '--no-quantize'], { encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'pipe'] });
     const doc = await io.readBinary(new Uint8Array(readFileSync(fel)));
     const root = doc.getRoot();
     const skin = root.listSkins()[0]; const hips = skin.listJoints()[0]; const armature = hips.getParentNode() ?? root.listNodes()[0];
-    armature.setExtras({ ...(armature.getExtras() ?? {}), hairStyle: r.hairKey ?? 'bald', athlete: r.key });
-    const look = RIVAL_LOOK[r.key] ?? { scale: 1, jersey: '#f2f2ee', shorts: '#222222' };
+    // `look`: the rival's accessory signature (CharacterLibrary hangs it instead of a seeded deal)
+    armature.setExtras({ ...(armature.getExtras() ?? {}), hairStyle: r.hairKey ?? 'bald', athlete: r.key, look: w.look });
+    const look = { scale: (RIVAL_LOOK[r.key] ?? { scale: 1 }).scale, jersey: w.jersey, shorts: w.shorts };
     armature.setScale([look.scale, look.scale, look.scale]);
-    // THE KIT'S CLOTH IS PLAIN CLOTH: MakeHuman's tank and shorts carry their own prints (the tank a leopard pattern) under every
-    // tint — the fits and the team colours multiply the map (playerIdentity.tintSlot). The jersey's and the shorts' colour maps go;
-    // their normal maps (the weave) stay; the colourway is the base colour. The shoes keep their maps.
+    // THE CLOTH'S OWN MAP IS THE PRINT (style pass). MakeHuman's garments carry their own colour maps (the keyhole tank a leopard
+    // pattern) under every tint — the fits and the team colours multiply the map (playerIdentity.tintSlot). style.py replaced the
+    // top's and the bottom's with a TONAL print (grey on white: the garment's own seams and pockets, the graphic, the bands), so
+    // that map stays and anything else on the cloth goes; the colourway is the base colour. The shoes keep their maps.
+    const printOf = (m: ReturnType<typeof root.listMaterials>[number]) => { const t = m.getBaseColorTexture(); return t && /felprint/.test(`${t.getName()} ${t.getURI()}`) ? t : null; };
     for (const mat of root.listMaterials()) {
       const n = mat.getName();
       const hex = n.startsWith('jersey') ? look.jersey : n.startsWith('shorts') ? look.shorts : null;
       if (!hex) continue;
-      mat.setBaseColorTexture(null);
+      if (!printOf(mat)) mat.setBaseColorTexture(null);
       const [cr, cg, cb] = hexRgb(hex); mat.setBaseColorFactor([cr, cg, cb, 1]); mat.setMetallicFactor(0); mat.setRoughnessFactor(0.78);
     }
     // A BODY THAT STANDS BACK FROM THE CAMERA, ON A PHONE BUDGET. Measured in play (1v1, first build): vram 262 → 352 MB against the
@@ -147,9 +161,10 @@ if (process.argv[1]?.endsWith('rivals.mts')) {
     for (const mat of root.listMaterials()) { mat.setNormalTexture(null); mat.setOcclusionTexture(null); mat.setMetallicRoughnessTexture(null); }
     const skinMaps = new Set(root.listMaterials().filter((m) => m.getName() === 'skin').map((m) => m.getBaseColorTexture()).filter(Boolean));
     const hairMaps = new Set(root.listMaterials().filter((m) => m.getName().startsWith('hair')).map((m) => m.getBaseColorTexture()).filter(Boolean));
+    const topPrint = new Set(root.listMaterials().filter((m) => m.getName().startsWith('jersey')).map(printOf).filter(Boolean));   // the graphic and the number: 512² to read at play distance
     for (const t of root.listTextures()) {
       const img = t.getImage(); if (!img) continue;
-      const px = skinMaps.has(t) ? 1024 : hairMaps.has(t) ? 512 : 256;
+      const px = skinMaps.has(t) ? 1024 : hairMaps.has(t) || topPrint.has(t) ? 512 : 256;
       t.setImage(new Uint8Array(await sharp(img).resize(px, px, { fit: 'fill' }).webp({ quality: 80 }).toBuffer())).setMimeType('image/webp');
     }
     // ONE SKELETON A BODY. MPFB exports every garment with its own glTF skin over the same 22 joints, and Babylon makes a Skeleton

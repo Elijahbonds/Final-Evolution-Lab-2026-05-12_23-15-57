@@ -87,7 +87,85 @@ def decimate(name, ratio):
     m = obj.modifiers.new('fel_decimate', 'DECIMATE'); m.ratio = ratio; m.use_collapse_triangulate = True
     bpy.context.view_layer.objects.active = obj
     bpy.ops.object.modifier_apply(modifier='fel_decimate')
-for name in kit_objects: decimate(name, 0.35 if name.startswith('Kit_shoes') else 0.6)
+# THE CASUAL WARDROBE (style pass, owner 2026-10-16): the shapes the library does not have, made from the fitted garments it
+# does — before the decimation, which skips a shaped garment (it was densified on purpose). scripts/avatar/mpfb/style.py.
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import style
+import numpy as np
+STYLE = SPEC.get('style') or {}
+# THE LANDMARKS ARE READ OFF THE FITTED GEOMETRY, not the armature: its rest bones are the default build's (a woman's Spine2
+# read 1.298 m, the man's, while her tee topped out at 1.351 m — her chest print sat above her shirt).
+def zrange(obj):
+    zs = [v.co.z for v in obj.data.vertices]; return min(zs), max(zs)
+# the baggy short's hem and crotch as shares of the pant's own length (measured on the first build: hem 4 cm under the knee
+# at 0.40, the crotch at 0.80)
+HEM_SHARE, CROTCH_SHARE = 0.40, 0.80
+shaped = set()
+for slot in ('tops', 'shorts'):
+    for item_id, st in (STYLE.get(slot) or {}).items():
+        obj = bpy.data.objects.get(f'Kit_{slot}_{item_id}')
+        if obj is None: print('STYLE', slot, item_id, 'FAILED no garment'); continue
+        if st.get('baggy'):
+            b = st['baggy']
+            style.densify(obj, 1)
+            z0, z1 = zrange(obj); L = z1 - z0
+            hem = z0 + HEM_SHARE * L; crotch = z0 + CROTCH_SHARE * L
+            axes = style.leg_axes(basemesh, crotch, hem + 0.04, max(z0 + 0.08, hem - 0.3))
+            cut = style.cut_below(obj, hem)
+            moved = style.loosen_legs(obj, axes, crotch, hem, float(b.get('loosen', 0.045)))
+            st['_axes'] = axes; st['_crotch'] = crotch
+            shaped.add(obj.name); print('STYLE baggy', item_id, 'hem', round(hem, 3), 'cut', cut, 'moved', moved, 'verts', len(obj.data.vertices))
+        elif st.get('densify'):
+            style.densify(obj, 1); shaped.add(obj.name)
+        if st.get('sleeveless'):
+            cut = style.cut_sleeves(obj, float(st['sleeveless'].get('threshold', 0.5)))
+            print('STYLE sleeveless', item_id, 'cut', cut, 'verts', len(obj.data.vertices))
+for name in kit_objects:
+    if name not in shaped: decimate(name, 0.35 if name.startswith('Kit_shoes') else 0.6)
+def _diffuse(obj):
+    for m in obj.data.materials:
+        if m and m.use_nodes:
+            for nd in m.node_tree.nodes:
+                if nd.type == 'TEX_IMAGE' and nd.image and 'diffuse' in (nd.label + nd.name).lower(): return nd.image
+    return None
+# THE GAME DRAWS A FORGE BODY MIRRORED LEFT-RIGHT against Blender (measured 2026-10-16: blaze's front "7" reads right on the
+# GLB re-imported into Blender and backwards on /dev/model — the codebase's "hand as drawn" vs the rig-named hand). So a print is
+# painted mirrored, to read right where it is seen. `style.mirror: false` in a spec paints it as Blender shows it.
+MIRROR = bool(STYLE.get('mirror', True))
+def boxes(top):
+    """Where a print sits on this top, in the body's metres (x across, z up): under its own neckline."""
+    _, zt = zrange(top)
+    return {
+        'chest': (-0.13, 0.13, zt - 0.32, zt - 0.06),
+        'chestBig': (-0.155, 0.155, zt - 0.42, zt - 0.05),
+        'back': (-0.155, 0.155, zt - 0.40, zt - 0.03),
+    }
+for slot in ('tops', 'shorts'):
+    for item_id, st in (STYLE.get(slot) or {}).items():
+        pr = st.get('print'); obj = bpy.data.objects.get(f'Kit_{slot}_{item_id}')
+        if not pr or obj is None: continue
+        try:
+            size = int(pr.get('size', 512))
+            base = style.tonal_from(_diffuse(obj), size, lo=float(pr.get('lo', 0.62)))
+            layers = []
+            ys = [v.co.y for v in obj.data.vertices]; cy = (min(ys) + max(ys)) / 2   # the garment's own mid-depth: front is -Y
+            BOX = boxes(obj) if slot == 'tops' else {}
+            if pr.get('front'): layers.append({'kind': 'front', 'box': BOX[pr.get('frontAt', 'chest')], 'decal': style.load_decal(pr['front']), 'cy': cy, 'mirror': MIRROR})
+            if pr.get('back'): layers.append({'kind': 'back', 'box': BOX[pr.get('backAt', 'back')], 'decal': style.load_decal(pr['back']), 'cy': cy, 'mirror': MIRROR})
+            for band in pr.get('bands', []):
+                L = dict(band)
+                if L['kind'] == 'yoke': L['z'] = zrange(obj)[1] - float(L.get('below', 0.12))
+                if L['kind'] == 'stripe':
+                    if '_axes' not in st: print('STYLE stripe', item_id, 'FAILED not a baggy short'); continue
+                    L['axes'] = st['_axes']; L['zmax'] = st['_crotch'] + float(L.get('above', 0.0))
+                layers.append(L)
+            arr = style.paint(obj, size, base, layers)
+            if os.environ.get('STYLE_DEBUG'):
+                zz = zrange(obj); print('STYLE debug', item_id, 'z', round(zz[0], 3), round(zz[1], 3), 'cy', round(cy, 3), 'box', [round(b, 3) for b in BOX.get(pr.get('frontAt', 'chest'), (0, 0, 0, 0))])
+            style.set_print(obj, arr, f"felprint_{SPEC['key']}_{slot}")
+            print('STYLE print', item_id, size, 'layers', len(layers), 'mean', round(float(arr.mean()), 3))
+        except Exception as e: print('STYLE print', item_id, 'FAILED', repr(e)[:240])
 for name in hair_objects: decimate(name, 0.5)
 decimate('eyes', 0.5)
 import bmesh
