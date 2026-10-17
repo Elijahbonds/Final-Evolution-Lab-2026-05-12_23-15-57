@@ -26,5 +26,16 @@ describe('the player-asked finishes are wired in both modes (H2e)', () => {
       expect(src).toMatch(/gather = null; shooting = false; tapRelease = null;/);   // the conversion drops the held release
       expect(src).toMatch(/squeezeVel\.copyFrom\([^)]*\); tapRelease = null;/);      // a new squeeze never inherits one
     });
+    it(`${name}: a double-tapped hop ends in a finish, and tapped it releases itself, untimed (owner 2026-10-16, decisions 17-19)`, () => {
+      const act = name === '1v1' ? 'meSlot.intent.action' : 'meIntent.action';
+      expect(src).toMatch(/if \(force\?\.hopVel\) plan = planHopStep\(force\.hopVel, [^,]+, RIM_FLOOR, hopThen\(dist\)\);/);
+      expect(src).toMatch(/\{ squeezeAt = -1; hopRelease = 'armed';/);
+      expect(src).toContain(`if (${act} && hopRelease === 'armed') { hopRelease = hopReleaseOnButtonUp(hopRelease, gather?.plan.kind === 'hop');`);
+      const auto = src.indexOf("if (hopRelease === 'auto') { if (hopAutoReleaseNow(hopRelease, t, shotMeter.greenCenter01)) {");
+      expect(auto).toBeGreaterThan(0);
+      expect(auto).toBeLessThan(src.indexOf(`else if (${act} && pumpNow) doPump();`));   // the tap's button-up is no pump
+      expect(src).toMatch(/shotMeter\.release\(\); meter3d\?\.end\(HOP_AUTO_QUALITY\); stickShot = null; (void resolveMyShot|releaseJumper)\(ctx, HOP_AUTO_QUALITY\);/);
+      expect(src).toMatch(/tapRelease = null; hopRelease = null;/);
+    });
   }
 });

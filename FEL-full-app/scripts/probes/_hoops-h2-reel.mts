@@ -144,6 +144,11 @@ const SCENS: Scen[] = [
     steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 160, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 420 }, { at: 300, still: 'move' }] },
   { id: 'hoptap', title: 'H2e hop step: Square tapped, then pressed again and held (the hop, then its finish)', modes: ['3v3'], tail: 1400, landed: 'hop step on the double tap', landedBefore: 'SHOT\\] gather|footwork|finish',
     steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 0.8 }, { at: 300, untilRim: 4.0 }, { at: 0, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 420 }, { at: 300, still: 'move' }] },
+  // decisions 17-19 (owner 2026-10-16): tap-tap — the hop, and its finish releases itself, untimed
+  { id: 'hoptaptap', title: 'Hop step, tap-tap: both presses quick (the finish releases itself, untimed)', modes: ['1v1'], tail: 1500, landed: 'hop finish released itself', landedBefore: 'hop step on the double tap', luck: 0.99,
+    steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 160, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 60 }, { at: 300, still: 'move' }] },
+  { id: 'hoptaptap', title: 'Hop step, tap-tap: both presses quick (the finish releases itself, untimed)', modes: ['3v3'], tail: 1500, landed: 'hop finish released itself', landedBefore: 'hop step on the double tap',
+    steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 0.8 }, { at: 300, untilRim: 4.0 }, { at: 0, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 60 }, { at: 300, still: 'move' }] },
   { id: 'skipg', title: 'H2e skip gather: Square with the left stick away from him (him off the lane)', modes: ['1v1'], tail: 1400, landed: 'footwork skip', landedBefore: 'SHOT\\] gather|footwork|finish', luck: 0.99,
     steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 120, foeAt: [2.6, 1.2] }, { at: 0, ls: 'awayFoe', mag: 0.9 }, { at: 40, mark: 'flick' }, { at: 0, press: 2, ms: 420 }, { at: 350, still: 'move' }] },
   { id: 'skipg', title: 'H2e skip gather: Square with the left stick away from him', modes: ['3v3'], tail: 1400, landed: 'footwork skip', landedBefore: 'SHOT\\] gather|footwork|finish',

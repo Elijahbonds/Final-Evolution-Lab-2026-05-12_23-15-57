@@ -187,7 +187,7 @@ import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { AiMover } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
-import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, type DoubleTapRead } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
+import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, CONTEST_TRICK, contestTricksOn, trickPctFor, putbackDunkOn, PUTBACK_DUNK } from '../core/GameDunks';   // H2e: more dunks
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
@@ -567,6 +567,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const foeMover = new AiMover(3.6);
   let squeezeAt = -1, squeezeHeldWas = false; const squeezeVel = new Vector3();   // H2e: the last squeeze (its time and velocity), for the double tap
   let tapRelease: ReturnType<typeof meterRelease> | 'pump' | null = null;   // H2e: the first press's quick release, held while the hop is still on
+  let hopRelease: HopRelease = null;   // the double-tapped hop's finish: 'armed' from the second press, 'auto' once that press came up during the hop (decisions 17-19)
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)
@@ -746,7 +747,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1872,12 +1873,12 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (edge && carrying && !dunking && !posting && hopOnDoubleTap(tapRead())) {
             if (finish) { finish = null; contact?.setAirborne('me', false); me.root.position.y = 0; }
             gather = null; shooting = false; tapRelease = null;   // the held release is the hop's now: the second press is its meter
-            if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; console.info('[1V1-MOVE] hop step on the double tap'); }
+            if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[1V1-MOVE] hop step on the double tap'); }
           }
         }
         if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
-          squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null;   // H2e: the double tap reads this press
+          squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null; hopRelease = null;   // H2e: the double tap reads this press
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
           // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
           // inside 2.6 m of the rim metered a jumper). The range is a floor distance; judge it against the rim's floor point.
@@ -1939,8 +1940,13 @@ export const OneVOneMode: ModeDefinition = (() => {
           const postPump = !!finish && (finish.plan.style === 'hook' || finish.plan.style === 'fadeaway') && finish.t < PUMP_MAX_SEC;
           const pumpNow = isPumpFake(t * shotMeter.durationSec) && (!finish || postPump);
           const doPump = (): void => { if (finish) { finish = null; me.root.position.y = 0; contact?.setAirborne('me', false); meAnimTree.release(); } pumpFake(ctx, defPos); };
+          // the double-tapped hop (owner 2026-10-16, decisions 17-19): its second press up DURING the hop is a tap — that button-up is no
+          // pump and no early release; the finish releases itself, untimed ('held'), at its own release key (the green centre). Held past
+          // the hop, the player times it on the meter as ever
+          if (meSlot.intent.action && hopRelease === 'armed') { hopRelease = hopReleaseOnButtonUp(hopRelease, gather?.plan.kind === 'hop'); if (hopRelease === 'auto') console.info('[1V1-MOVE] hop tapped: the finish releases itself'); }
+          if (hopRelease === 'auto') { if (hopAutoReleaseNow(hopRelease, t, shotMeter.greenCenter01)) { hopRelease = null; shotMeter.release(); meter3d?.end(HOP_AUTO_QUALITY); stickShot = null; releaseJumper(ctx, HOP_AUTO_QUALITY); console.info(`[1V1-MOVE] hop finish released itself at t ${t.toFixed(2)} (untimed)`); } }
           // H2e: a double tap's FIRST release is held while a second press could still make the hop (core/FinishFootwork), then sent as taken
-          if (meSlot.intent.action && !tapRelease && !posting && tapReleaseHeld(tapRead())) { tapRelease = pumpNow ? 'pump' : meterRelease(); console.info('[1V1-MOVE] tap release held for the double tap'); }
+          else if (meSlot.intent.action && !tapRelease && !posting && tapReleaseHeld(tapRead())) { tapRelease = pumpNow ? 'pump' : meterRelease(); console.info('[1V1-MOVE] tap release held for the double tap'); }
           else if (tapRelease) { if (!tapReleaseHeld(tapRead())) { const r = tapRelease; tapRelease = null; if (r === 'pump') doPump(); else { stickShot = null; releaseJumper(ctx, r); } } }
           else if (meSlot.intent.action && pumpNow) doPump();
           else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, meterRelease()); }   // POST HOOK: the stick let go = the release
@@ -2414,7 +2420,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
@@ -2942,7 +2948,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // (the baseline foot around him into a layup), pulled OFF the rim with R2 it is the SHIMMY FADE (the shoulders sell
     // both ways, then the fade); a pump-fake window still opens the step-through / up-and-under from the seal (the
     // footwork was gated off in the post entirely — the post had no up-and-under). The euro and the hop stay perimeter moves.
-    if (force?.hopVel) plan = planHopStep(force.hopVel, me.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');   // H2e: the player asked for it
+    if (force?.hopVel) plan = planHopStep(force.hopVel, me.root.position, RIM_FLOOR, hopThen(dist));   // H2e: the player asked for it
     else if (posting) {
       const toRimP = RIM_FLOOR.subtract(me.root.position); toRimP.y = 0; toRimP.normalize();
       if (stickAtRim01(mx, -my, toRimP) >= POST_DROP_STICK_MIN) plan = planDropStep(me.root.position, RIM_FLOOR, yaw, defenderPos);

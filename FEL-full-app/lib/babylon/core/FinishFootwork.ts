@@ -6,6 +6,9 @@
 //   press's quick RELEASE is held back while the hop is still on (tapReleaseHeld) — a tapped finish shot the ball on that release, and a
 //   tapped rise pump-faked, so the second press found no ball (1v1) or a pump (3v3). The second press is the hop's own meter: hold it to
 //   the green. No second press: the held release goes out as it was taken (the quality read at the release, the pump a pump).
+//   (Owner 2026-10-16, decisions 17-19.) A double-tapped hop always ends in a FINISH (hopThen: a layup in close, a floater beyond). TAP-TAP —
+//   the second press up while the hop's gather is still running — and the finish RELEASES ITSELF, untimed (the meter's 'held' grade), at
+//   its own release key (the meter's green centre). Tap then press-and-hold: the player times it on the meter, as before.
 //
 //   THE SKIP GATHER on SQUARE + THE LEFT STICK AWAY FROM HIM. A long, low step away from the defender with the ball swung away from him,
 //   a skip onto two feet, and a layup off the high glass on the away hand. With help in the lane (euroAvailable) the same input stays the
@@ -14,6 +17,7 @@
 // Pure: the modes call these with the geometry and run the plans through their footwork (startFootwork).
 import { Vector3 } from '@babylonjs/core';
 import { bodyRight, HOP_RANGE, type FinishSide, type GatherPlan } from './HoopsMoves';
+import type { ShotQuality } from './BasketballCore';
 
 /** The second Square must come this soon after the first (s). */
 export const HOP_TAP_SEC = 0.25;
@@ -46,6 +50,26 @@ export function hopOnDoubleTap(r: DoubleTapRead): boolean {
  *  press now. The modes keep the release (the meter's quality, or the pump) and send it once this goes false. */
 export function tapReleaseHeld(r: DoubleTapRead): boolean {
   return hopOnDoubleTap({ ...r, sinceSqueezeSec: Math.max(r.sinceSqueezeSec, 1e-3) });
+}
+
+/** The double-tapped hop's finish: a layup inside this floor distance to the rim (m; the hop's own 'layup' line), a floater beyond — never
+ *  a jumper (decision 19: a quick release off a rise was a pump fake). */
+export const HOP_LAYUP_INSIDE_M = 2.8;
+export function hopThen(rimDist: number): 'layup' | 'floater' {
+  return rimDist < HOP_LAYUP_INSIDE_M ? 'layup' : 'floater';
+}
+/** The double tap's release, per possession of the hop: 'armed' from the second press, 'auto' once that press came up during the hop's
+ *  gather (a tap), null otherwise (none, or held past the gather: timed). */
+export type HopRelease = 'armed' | 'auto' | null;
+/** The grade a hop finish that released itself gets: untimed, the meter's own 'held' (decision 18). */
+export const HOP_AUTO_QUALITY: ShotQuality = 'held';
+/** The second press came up: still in the hop's gather, it is a tap and the finish will release itself; past it, the player is timing. */
+export function hopReleaseOnButtonUp(state: HopRelease, inHopGather: boolean): HopRelease {
+  return state === 'armed' && inHopGather ? 'auto' : state === 'auto' ? 'auto' : null;
+}
+/** Release the self-releasing finish now? At its release key: the meter's green centre (0..1). */
+export function hopAutoReleaseNow(state: HopRelease, meterT: number, greenCenter01: number): boolean {
+  return state === 'auto' && meterT >= greenCenter01;
 }
 
 /** The skip gather lives in this band from the rim (m) — far enough to take a long step, near enough to lay it off the glass. */

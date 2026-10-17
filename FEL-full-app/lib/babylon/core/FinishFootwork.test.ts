@@ -1,10 +1,30 @@
 // H2e (owner 2026-10-16): the hop step on a double tap of Square; the skip gather on Square + the left stick away from him.
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
-import { hopOnDoubleTap, tapReleaseHeld, HOP_TAP_SEC, HOP_CONVERT_SEC, HOP_TAP_MIN_SPEED, skipAvailable, skipAwaySide, planSkipGather, SKIP_MIN, SKIP_MAX, SKIP_A_SEC, SKIP_B_SEC, type DoubleTapRead } from './FinishFootwork';
+import { hopOnDoubleTap, tapReleaseHeld, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, HOP_LAYUP_INSIDE_M, HOP_TAP_SEC, HOP_CONVERT_SEC, HOP_TAP_MIN_SPEED, skipAvailable, skipAwaySide, planSkipGather, SKIP_MIN, SKIP_MAX, SKIP_A_SEC, SKIP_B_SEC, type DoubleTapRead } from './FinishFootwork';
 import { gatherTravel, gatherLabel, gatherWish, HOP_RANGE } from './HoopsMoves';
 
 const tap = (o: Partial<DoubleTapRead> = {}): DoubleTapRead => ({ sinceSqueezeSec: 0.12, gatherSec: 0.08, speed: 4, rimDist: 3.5, hopAlready: false, dunking: false, ...o });
+
+describe('the double-tapped hop releases itself (owner 2026-10-16, decisions 17-19)', () => {
+  it('always ends in a finish: a layup in close, a floater beyond (never a jumper)', () => {
+    expect(hopThen(HOP_LAYUP_INSIDE_M - 0.1)).toBe('layup');
+    expect(hopThen(HOP_LAYUP_INSIDE_M + 0.1)).toBe('floater');
+    expect(hopThen(4.9)).toBe('floater');
+  });
+  it('tap-tap (the second press up during the hop) is the self-release; up after the hop, the player is timing it', () => {
+    expect(hopReleaseOnButtonUp('armed', true)).toBe('auto');
+    expect(hopReleaseOnButtonUp('armed', false)).toBeNull();
+    expect(hopReleaseOnButtonUp(null, true)).toBeNull();           // no double tap: nothing to release by itself
+    expect(hopReleaseOnButtonUp('auto', false)).toBe('auto');      // a later button-up does not take it back
+  });
+  it('the self-release goes at the finish\'s own release key (the green centre), untimed', () => {
+    expect(hopAutoReleaseNow('auto', 0.61, 0.62)).toBe(false);
+    expect(hopAutoReleaseNow('auto', 0.62, 0.62)).toBe(true);
+    expect(hopAutoReleaseNow('armed', 0.9, 0.62)).toBe(false);    // held: the player times it
+    expect(HOP_AUTO_QUALITY).toBe('held');
+  });
+});
 
 describe('the hop step on a double tap (hopOnDoubleTap)', () => {
   it('a second press inside HOP_TAP_SEC, the gather still young, on a drive in range: the hop', () => expect(hopOnDoubleTap(tap())).toBe(true));

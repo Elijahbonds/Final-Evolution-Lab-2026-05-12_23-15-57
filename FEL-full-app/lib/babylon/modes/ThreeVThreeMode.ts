@@ -57,7 +57,7 @@ import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running unde
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
-import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, type DoubleTapRead } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
+import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, putbackDunkOn, PUTBACK_DUNK, oopCut, ALLEY_OOP, CONTEST_TRICK, contestTricksOn, trickPctFor } from '../core/GameDunks';
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';   // H2 leftovers: the in-air trick stick (1v1's)   // H2e: more dunks   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
 import { mountPostureLayer, type PostureLayer, type PostureFeed } from '../anim/PostureLayer';
@@ -382,6 +382,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const lastFoeStepStates = new Map<Body, string>();
   let squeezeAt = -1, squeezeHeldWas = false; const squeezeVel = new Vector3();   // H2e: the last squeeze, for the double tap
   let tapRelease: ReturnType<typeof meterRelease> | 'pump' | null = null;   // H2e: the first press's quick release, held while the hop is still on (see 1v1)
+  let hopRelease: HopRelease = null;   // the double-tapped hop's finish: 'armed' from the second press, 'auto' once that press came up during the hop (decisions 17-19)
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.char.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)   // H2c (dev log): each defender's last tree state, for the stepping states' lines
@@ -831,7 +832,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration (nor a run: the movers stand, the pins let go)
-    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; b.react = null; b.layers?.reset(); } strongHand = STRONG_HAND_IDLE; tapRelease = null;   // H2d / H2e
+    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; b.react = null; b.layers?.reset(); } strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null;   // H2d / H2e
     me.char.root.position.set(0, 0, 6);
     // MODE-STICK-FACE (2026-09-07): face the rim AND tell the dribble so. The movement layer's facing starts at 0 no
     // matter which way the model spawned, and a push AGAINST the facing is a back-pedal that keeps the chest where it
@@ -2153,14 +2154,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (edge && iAmCarrier && !dunking && !posting && hopOnDoubleTap(tapRead())) {
             if (finish) { finish = null; me.char.root.position.y = 0; }
             gather = null; shooting = false; tapRelease = null;   // the held release is the hop's now: the second press is its meter
-            if (startFootwork(ctx, wish.x, -wish.z, nearestLiveFoe()?.char.root.position ?? null, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; console.info('[3V3-MOVE] hop step on the double tap'); }
+            if (startFootwork(ctx, wish.x, -wish.z, nearestLiveFoe()?.char.root.position ?? null, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[3V3-MOVE] hop step on the double tap'); }
           }
         }
         if (iAmCarrier && !shooting && !dunking && !finish && !spin && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && (meIntent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20)
         const nearestFoePos = foes.reduce<Vector3 | null>((best, f) =>
           !best || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(best, me.char.root.position)
             ? f.char.root.position : best, null);
-        squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(me.drib.vel); tapRelease = null;   // H2e: the double tap reads this press
+        squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(me.drib.vel); tapRelease = null; hopRelease = null;   // H2e: the double tap reads this press
         // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
         // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (same bug 1v1 fixed in ade7c3f).
         // The range is a floor distance; judge it against the rim's floor point.
@@ -2207,8 +2208,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const postPump = !!finish && (finish.plan.style === 'hook' || finish.plan.style === 'fadeaway') && finish.t < PUMP_MAX_SEC;
         const pumpNow = isPumpFake(t * shotMeter.durationSec) && (!finish || postPump);
         const doPump = (): void => { if (finish) { finish = null; me.char.root.position.y = 0; me.tree.release(); } pumpFake(ctx, nearestLiveFoe()); };
+        // the double-tapped hop (decisions 17-19, see 1v1): its second press up during the hop — the finish releases itself, untimed
+        if (meIntent.action && hopRelease === 'armed') { hopRelease = hopReleaseOnButtonUp(hopRelease, gather?.plan.kind === 'hop'); if (hopRelease === 'auto') console.info('[3V3-MOVE] hop tapped: the finish releases itself'); }
+        if (hopRelease === 'auto') { if (hopAutoReleaseNow(hopRelease, t, shotMeter.greenCenter01)) { hopRelease = null; shotMeter.release(); meter3d?.end(HOP_AUTO_QUALITY); stickShot = null; void resolveMyShot(ctx, HOP_AUTO_QUALITY); console.info(`[3V3-MOVE] hop finish released itself at t ${t.toFixed(2)} (untimed)`); } }
         // H2e: a double tap's FIRST release is held while a second press could still make the hop (core/FinishFootwork), then sent as taken
-        if (meIntent.action && !tapRelease && !posting && tapReleaseHeld(tapRead())) { tapRelease = pumpNow ? 'pump' : meterRelease(); console.info('[3V3-MOVE] tap release held for the double tap'); }
+        else if (meIntent.action && !tapRelease && !posting && tapReleaseHeld(tapRead())) { tapRelease = pumpNow ? 'pump' : meterRelease(); console.info('[3V3-MOVE] tap release held for the double tap'); }
         else if (tapRelease) { if (!tapReleaseHeld(tapRead())) { const r = tapRelease; tapRelease = null; if (r === 'pump') doPump(); else { stickShot = null; void resolveMyShot(ctx, r); } } }
         else if (meIntent.action && pumpNow) doPump();
         else if (meIntent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) {   // POST HOOK: the stick let go = the release
@@ -2785,7 +2789,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const dist = distXZ(me.char.root.position, RIM_FLOOR);
     let plan: GatherPlan | null = null;
     // THE POST GAME (2026-09-18, the 1v1's): out of the seal — the drop step, the shimmy fade, or the pump's step-through
-    if (force?.hopVel) plan = planHopStep(force.hopVel, me.char.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');   // H2e: the player asked for it
+    if (force?.hopVel) plan = planHopStep(force.hopVel, me.char.root.position, RIM_FLOOR, hopThen(dist));   // H2e: the player asked for it
     else if (posting) {
       const toRimP = RIM_FLOOR.subtract(me.char.root.position); toRimP.y = 0; toRimP.normalize();
       if (stickAtRim01(mx, -my, toRimP) >= POST_DROP_STICK_MIN) plan = planDropStep(me.char.root.position, RIM_FLOOR, yaw, defenderPos);
