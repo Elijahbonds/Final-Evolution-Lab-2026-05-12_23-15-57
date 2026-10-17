@@ -134,8 +134,11 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
   hold.setFacing(Math.PI);
   run(hold, Array(60).fill([0, 1]));
   run(hold, Array(30).fill([0, -1]));         // held past the tap window
-  run(hold, [[0, 0]]);
-  ok(hold.vel.z <= 0.01, 'a held pull-back (retreat) never fires the boost');
+  // H3a: the held pull-back now actually RETREATS (a straight pull-back used to keep him running forward — the reversal bug), so the
+  // body moves toward its own half by design. REWRITTEN (same intent): on the release, no hesitation fires and nothing bursts.
+  const beforeRelease = hold.vel.length();
+  const rel = hold.update(DT, 0, 0, false);
+  ok(!rel.hesitation && hold.vel.length() <= beforeRelease + 1e-6, 'a held pull-back (retreat) never fires the boost');
 }
 
 // ── D. the steal window is real ────────────────────────────────────────────

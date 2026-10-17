@@ -108,6 +108,9 @@ export interface BallCarry {
   reset(): void;
   /** Hoops: the two-hand chest carry's weight (0..1), eased — a jog with the ball held (3PT). */
   setHold(k: number): void;
+  /** H3b: the PROTECT's weight (0..1), eased (GUARD_SEC) — the bounce lower and beside-behind the hip, the off forearm up as a bar
+   *  between the ball and the defender (plan phase 9's shield). At rest only: a moving body's off arm is the pace swing's. */
+  setGuard(k: number): void;
   dispose(): void;
   readonly active: boolean;
   readonly phase: number;
@@ -157,6 +160,24 @@ export const OFF_SWING_M = 0.16;
 /** The stride lock: the bounce's phase when the foot OPPOSITE the ball hand strikes (the ball arriving at the palm as that foot
  *  plants — arm and leg in opposition, the way the arms swing), how hard it is pulled on, and from what ground speed (m/s). */
 export const STRIDE_PHI_AT_STRIKE = 0.92, STRIDE_LOCK_GAIN = 3, STRIDE_LOCK_MIN_MPS = 1.4;
+/**
+ * H3b (owner 2026-10-16: "idle dribbling felt off" — the bounce rhythm wrong, the ball and the hand don't meet). AT REST THE BALL KEEPS
+ * THE CLIP'S TIME. The bounce ran on its own clock (HOOPS_DRIBBLE.hzIdle 1.7 Hz) over a dribble capture that bounces once in 0.77 s
+ * (1.3 Hz), so the body's dribble — the shoulder, the elbow, the hand's own push — drifted through the ball and back every few bounces.
+ * The clock now reads the clip's ball hand (as the clip poses it, before the reach) and locks the bounce to its tops the way the stride
+ * lock locks it to a foot: the ball at the palm (phase CLIP_PHI_AT_PEAK) when the clip's hand peaks. Under CLIP_LOCK_MAX_MPS of root
+ * speed (at rest); a top counts past CLIP_PEAK_MIN_M of rise.
+ */
+export const CLIP_PHI_AT_PEAK = 0, CLIP_LOCK_GAIN = 3, CLIP_LOCK_MAX_MPS = 0.4, CLIP_PEAK_MIN_M = 0.03, CLIP_LOCK_HZ_MAX = 2.6;
+/**
+ * H3b: THE PROTECT (setGuard). TUNED (new): the bounce moves GUARD_BACK_M back (beside-behind the hip, away from a defender in front —
+ * it bounced 0.16 m AHEAD of the hip into him) and GUARD_OUT_M wider, and the palm drops GUARD_DROP_M with the hips' sink; the off hand
+ * goes to GUARD_BAR (root-local: x toward the ball side × the side sign, y, z) with its elbow out toward the off side (GUARD_BAR_POLE),
+ * the forearm across the front between the ball and him. Eased over GUARD_SEC.
+ */
+export const GUARD_BACK_M = 0.22, GUARD_OUT_M = 0.06, GUARD_DROP_M = 0.06, GUARD_SEC = 0.15;
+export const GUARD_BAR: readonly [number, number, number] = [0.15, 1.06, 0.34];   // the hand across the front, ahead of the ball's hip (measured: at x 0.04 the forearm sat 0.37 m off the ball→defender line, a bar on 17 % of pressured frames)
+export const GUARD_BAR_POLE: readonly [number, number, number] = [-0.7, -0.15, 0.3];
 /** HOOPS MOTION phase 4b (plan §3.3, U20): a gap between two strikes of the lock foot shorter than this share of the stride is never
  *  averaged into it — the half-gap a hand change leaves (the new lock foot's first strike, about half a stride after the old one's). */
 export const LOCK_MIN_GAP_K = 0.7;
@@ -422,6 +443,22 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const lastRoot = new Vector3(); let rootSeen = false;
   const feet = footNodes.map(() => ({ down: false, floor: Number.POSITIVE_INFINITY }));
   let lockStrikeAt = Number.NEGATIVE_INFINITY, lockPeriod = 0.6, lockHz = 0;
+  // H3b: the clip's ball-hand clock (CLIP_PHI_AT_PEAK): the hand's height as the clip posed it, its last two samples, the low since the
+  // last top, the last top's time, the period between tops, and how many tops this hand has had
+  let handY1 = Number.NaN, handY2 = Number.NaN, handLow = Number.POSITIVE_INFINITY, handTopAt = Number.NEGATIVE_INFINITY, handPeriod = 0.77, handTops = 0;
+  let handClockSide: 'Left' | 'Right' | null = null;
+  // …and where this carry DREW that hand last frame (root-local), and whether its reach was on: a clip that does not key the arm leaves
+  // the arm where the reach put it, and that is the reach's own motion, not the clip's — read as one, the clock locks to itself
+  const drawnHand = new Vector3(), _hl = new Vector3(), _hq = new Quaternion(); let drawnHandAt = -1, drawnHandSide: 'Left' | 'Right' | null = null, reachedAt = -1;
+  const handRootLocal = (sd: 'Left' | 'Right', out: Vector3): boolean => {
+    const n = handNodes[sd]; if (!n) return false;
+    n.computeWorldMatrix(true); opts.root.computeWorldMatrix(true);
+    Quaternion.InverseToRef(opts.root.absoluteRotationQuaternion ?? Quaternion.Identity(), _hq);
+    n.getAbsolutePosition().subtractToRef(opts.root.getAbsolutePosition(), out).applyRotationQuaternionInPlace(_hq);
+    return true;
+  };
+  let guardTarget = 0, guardK = 0;   // H3b: the protect (setGuard)
+  const pg: DribbleParams = { ...p };   // the stroke with the protect's palm drop (written each pass; no garbage)
   // HOOPS MOTION phase 4b (U20): the last strike of EACH foot (the athlete's side it is drawn on), so a hand change re-seeds the lock from
   // its new lock foot's own last strike; and when a catch could not be timed to that foot, the clock the lock's gain eases back from
   const strikeAt: Record<'right' | 'left', number> = { right: Number.NEGATIVE_INFINITY, left: Number.NEGATIVE_INFINITY };
@@ -542,6 +579,21 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // stride — at gain 0 the bounce runs at the stride's own rate, so the miss is walked in, not snapped
     const gain = STRIDE_LOCK_GAIN * Math.min(1, Math.max(0, (clock - lockEaseAt) / Math.max(0.3, lockPeriod)));
     lockHz = active && rootSpeed > STRIDE_LOCK_MIN_MPS && since < 2 * lockPeriod ? strideLockHz(phase, since, lockPeriod, STRIDE_PHI_AT_STRIKE, gain) : 0;
+    // H3b: AT REST, THE CLIP'S HAND (CLIP_PHI_AT_PEAK). Read before this pass reaches for anything: the hand as the clip posed it.
+    const hn = active && !mv && rootSpeed < CLIP_LOCK_MAX_MPS ? handNodes[side] : null;   // (tops counted at rest only: a walk's arm is not the idle's)
+    if (!hn || handClockSide !== side) { handY1 = handY2 = Number.NaN; handLow = Number.POSITIVE_INFINITY; handTops = 0; handClockSide = hn ? side : null; }
+    const held = !!hn && drawnHandAt === stamp - 1 && reachedAt === stamp - 1 && drawnHandSide === side && handRootLocal(side, _hl) && Vector3.DistanceSquared(_hl, drawnHand) < 1e-6;
+    if (hn && !held) {
+      hn.computeWorldMatrix(true);
+      const y = hn.getAbsolutePosition().y - rp.y;
+      if (handY1 > handY2 && handY1 >= y && handY1 - handLow > CLIP_PEAK_MIN_M) {   // last frame was a top
+        const at = clock - dt, gap = at - handTopAt;
+        if (gap > 0.3 && gap < 1.5) handPeriod += (gap - handPeriod) * 0.5;
+        if (gap > 0.25) { handTopAt = at; handTops++; handLow = handY1; }
+      }
+      handLow = Math.min(handLow, y); handY2 = handY1; handY1 = y;
+    }
+    if (hn && !lockHz && rootSpeed < CLIP_LOCK_MAX_MPS && handTops >= 2 && clock - handTopAt < 2 * handPeriod) lockHz = strideLockHz(phase, clock - handTopAt, handPeriod, CLIP_PHI_AT_PEAK, CLIP_LOCK_GAIN, CLIP_LOCK_HZ_MAX);
   };
   /** The two-hand chest carry (3PT's jog): each palm on its side of the ball, solved off this frame's shoulders. */
   const applyHold = (dt: number): void => {
@@ -647,6 +699,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** After the frame rendered: the ball as drawn, and (while held) the ball arm's locals as drawn. */
   const sampleDrawn = (): void => {
     opts.ball.computeWorldMatrix(true); drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;
+    if (active && !mv && handRootLocal(side, drawnHand)) { drawnHandAt = stamp; drawnHandSide = side; }   // (H3b: the clip clock's held-pose read)
     const held = ballHandNow();
     if (held) {
       const bones = armOf[held];
@@ -894,11 +947,15 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         if (startOff.length() > 1.3) startOff = null;   // a ball that was nowhere near (a reset) just starts
       }
     }
+    // H3b: the protect's weight, eased (at rest only: a body on the move lets it go)
+    guardK += ((lastSpeed01 <= 0.15 ? guardTarget : 0) - guardK) * Math.min(1, dt / GUARD_SEC);
     if (mv) { applyMove(dt); applyWrists(dt); return; }   // HOOPS MOTION phase 4b: a move's path owns the ball and the hands
-    const s = dribbleAtPushed(phase, p);
+    pg.palmY = p.palmY - GUARD_DROP_M * guardK;
+    const s = dribbleAtPushed(phase, pg);
     pushK += (Math.min(1, Math.max(0, lastSpeed01)) - pushK) * Math.min(1, dt / 0.25);
-    const push = PUSH_AHEAD_M * pushK;
-    const bx = s.ball.x * sx, bz = s.ball.z;
+    const push = PUSH_AHEAD_M * pushK - GUARD_BACK_M * guardK;
+    const out = GUARD_OUT_M * guardK;
+    const bx = (s.ball.x + out) * sx, bz = s.ball.z;
     // the ball's facing follows the body's at a ball's pace (BALL_YAW_RATE); a snap or a reset (> 90°) just takes the new one
     { const ry = rootYaw(); if (ballYaw == null) ballYaw = ry; let d = ry - ballYaw; d -= 2 * Math.PI * Math.round(d / (2 * Math.PI)); ballYaw = Math.abs(d) > Math.PI / 2 ? ry : ballYaw + Math.max(-BALL_YAW_RATE * dt, Math.min(BALL_YAW_RATE * dt, d)); }
     // THE BALL BOUNCES ON THE FLOOR, NOT ON THE ROOT (ballToWorld): a hop mid-dribble (the step-back) carried the ball up with the body and
@@ -914,14 +971,15 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // mid-bounce starts from
     { const was = _mv.copyFrom(lastLocal); ballLocalOf(world, push, lastLocal); if (lastLocalAt === stamp - 1 && dt > 0) lastVel.copyFrom(lastLocal).subtractInPlace(was).scaleInPlace(1 / dt); else lastVel.setAll(0); lastLocalAt = stamp; }
     if (arm && armW > 0) {
-      handLocal.set(s.hand.x * sx, s.hand.y, s.hand.z + push);
+      handLocal.set((s.hand.x + out) * sx, s.hand.y, s.hand.z + push);
       toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6));
       reachShaped(arm, handT, pole, w * armW * ks, frameDt, stamp);
+      if (w * armW * ks > 0.05) reachedAt = stamp;   // (H3b: the clip clock's held-pose read)
       if (prevArm && ks < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - ks), frameDt, stamp);
-      if (!(offArm && lastSpeed01 > 0.35)) offW = 0;
+      if (!(offArm && (lastSpeed01 > 0.35 || guardK > 0.01))) offW = 0;
       if (offArm && lastSpeed01 > 0.35) {
         const ow = Math.min(1, (lastSpeed01 - 0.35) / 0.3) * armW;
         const knee = kneeForward(-sx);
@@ -930,6 +988,12 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         offLocal.set(-sx * 0.28, baseY + 0.16 * Math.max(0, swing) - 0.03 * Math.max(0, -swing), 0.10 + OFF_SWING_M * swing);
         toWorld(offLocal.x, offLocal.y, offLocal.z, offT); offW = ow;
         toWorld(-sx * OFF_ELBOW_POLE[0], OFF_ELBOW_POLE[1], OFF_ELBOW_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
+        reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
+      } else if (offArm && guardK > 0.01) {   // H3b: the protect's arm bar (GUARD_BAR)
+        const ow = guardK * armW;
+        offLocal.set(sx * GUARD_BAR[0], GUARD_BAR[1] - GUARD_DROP_M * guardK, GUARD_BAR[2]);
+        toWorld(offLocal.x, offLocal.y, offLocal.z, offT); offW = ow;
+        toWorld(sx * GUARD_BAR_POLE[0], GUARD_BAR_POLE[1], GUARD_BAR_POLE[2], offPole).subtractInPlace(opts.root.getAbsolutePosition());
         reachShaped(offArm, offT, offPole, ow, frameDt, stamp);
       }
     }
@@ -1002,8 +1066,10 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (s0 !== side) { side = s0; arm = armChain(opts.skeleton, side); offArm = armChain(opts.skeleton, otherSideOf(side)); }
       if (mv) { const m = mv; mv = null; m.opts.onEvent?.('cancel', m.name); } queued = null;
       prevArm = null; switchLeft = 0; startOff = null;
+      guardTarget = 0; guardK = 0;
     },
     setHold(k: number) { holdTarget = Math.min(1, Math.max(0, k)); },
+    setGuard(k: number) { guardTarget = Math.min(1, Math.max(0, k)); },
     update(dt, speed01, wantActive, hz, releaseSec) {
       if (hoops) pendingDt += dt;
       if (wantActive !== active) {

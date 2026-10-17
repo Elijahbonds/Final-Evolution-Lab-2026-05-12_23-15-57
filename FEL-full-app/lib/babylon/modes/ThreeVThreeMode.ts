@@ -63,7 +63,9 @@ import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BON
 import { mountPostureLayer, type PostureLayer, type PostureFeed } from '../anim/PostureLayer';
 import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on every body
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
-import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { hoopsPose, hoopsWindow, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, PROTECT_SINK_M, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { HandlerLook } from '../core/HoopsLook';   // H3b: the handler reads the defender
+import { mountLandingAbsorb, type LandingAbsorbHandle } from '../anim/LandingAbsorb';   // H3b: the protect's lower stance
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, SLIDE_MIN_SPACE_M, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17)
@@ -319,6 +321,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let myJumpAge = Infinity;                      // block-jump timer (defense)
   const passFlight = new PassFlight();
   const carries = new Map<Body, BallCarry>();   // live dribble per body on my team
+  const meLook = new HandlerLook();                // H3b: my chest and eyes with the ball (HoopsLook)
+  let meSink: LandingAbsorbHandle | null = null;   // H3b: the protect's sink (the hips down, the feet kept)
   let meSpeed01 = 0;
   let meIntensity01 = 0, meGear = 'stop';   // DRIBBLE PACE
   let scuff: ScuffState = { ...SCUFF_IDLE };
@@ -568,7 +572,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // Before this, six bodies in the same window were byte-identical however differently they were moving.
     const airborne = b.jumpAge !== Infinity;
     const dyn = dynamicPose(pose, b.motion.signals(b.speed01, b === me ? meIntensity01 * 0.7 : 0, airborne), window);   // DRIBBLE PACE: the sprint reads as work
-    return { pose: dyn, legs, aim: objectiveFor(b), eyes: def ? ballWorld() : RIM, window };
+    const mine = b === me && b.bio.hasBall;   // H3b: with the ball, my chest and eyes are HoopsLook's (the rim, or the defender at the gap)
+    return { pose: dyn, legs, aim: mine ? meLook.aim : objectiveFor(b), eyes: mine ? meLook.eyes : def ? ballWorld() : RIM, window };
   }
   /** IMPROVE (2026-10-06) #14: the posture's feed through the level of detail — off-screen: none (the layer skips its pass); far: the
    *  feed rebuilt every other frame (the layer still writes every frame, so nothing flickers); otherwise every frame, as ever. */
@@ -958,6 +963,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // right after this body's posture layer; the ball and the hinge (the arms' last writer) come once the carries are on
         body.layers = mountMotionLayers({ scene: ctx.scene, skeleton: char.skeleton, root: char.root, hinge: false });
         if (ai) body.layers.setGate(() => body.lod === 0);   // IMPROVE (2026-10-06) #14: a far or off-screen off-ball body skips the drag and the lean
+        if (!ai) { meSink?.dispose(); meSink = mountLandingAbsorb(ctx.scene, char.skeleton, char.root, { auto: false, first: true }); }   // H3b: first — the carry reaches for the ball off the sunk body
         return body;
       };
 
@@ -1864,6 +1870,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       });
       bioTick(me, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', iAmCarrier && !passFlight.active, nearestFoeDist, me.tree.held === 'bball_block_reach' || meHandUp);
       Object.assign(me.bio, { posting, spinning: !!spin });   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
+      { // H3b: with the ball, my chest and eyes read the nearest defender (HoopsLook); at rest under pressure, the protect (the guard, the sink)
+        const nf = nearestLiveFoe(), win = hoopsWindow(me.bio);
+        meLook.update({ self: me.char.root.position, ball: ballWorld(), rim: RIM, defender: nf ? nf.char.root.position : null, window: win, speed01: me.speed01, dt });
+        const protecting = me.bio.hasBall && win === 'protect';
+        carries.get(me)?.setGuard(protecting ? 1 : 0); meSink?.hold(protecting ? PROTECT_SINK_M : 0);
+      }
 
       // teammates: move via their brain; if they're carrying, chase the hoop a little
       for (let i = 0; i < mates.length; i++) {
@@ -2276,6 +2288,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       net?.dispose(); net = null;
       carries.forEach((c) => c.dispose()); carries.clear(); carryList = [];
       meReach?.dispose(); meReach = null;
+      meSink?.dispose(); meSink = null;   // H3b
       for (const b of [me, ...mates, ...foes]) { b?.posture?.dispose(); if (b) b.posture = null; b?.plant?.dispose(); b?.layers?.dispose(); if (b) b.layers = null; }   // (+ HOOPS MOTION phase 3c: the motion layers)   // BIOMECH-HOOPS-WAVE1 · HOOPS MOTION phase 3b: the foot pins
       threeVenue?.dispose(); threeVenue = null;  // M74
       me?.char.dispose(); mates.forEach((m) => m.char.dispose()); foes.forEach((f) => f.char.dispose());
