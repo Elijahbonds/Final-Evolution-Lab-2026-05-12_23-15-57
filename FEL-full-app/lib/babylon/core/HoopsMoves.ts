@@ -839,7 +839,9 @@ export function planEuro(shooter: Vector3, rimFloor: Vector3, yaw: number, sell:
   return { kind: 'euro', sec: EURO_A_SEC + EURO_B_SEC, v0: new Vector3(0, 0, 0), toRim, then, side: cross,
     legs: [{ dir: leg(s, 0.85), sec: EURO_A_SEC, speed: EURO_A_SPEED }, { dir: leg(-s, 0.95), sec: EURO_B_SEC, speed: EURO_B_SPEED }] };
 }
-/** Which way the stick sells the first step (null = no euro asked for). */
+/** Which way the stick sells the first step (null = no euro asked for). `yaw` is the frame the push is read in: the modes pass the LINE
+ *  TO THE RIM (H2 leftovers) — the body's facing follows the stick at 10 rad/s, so a held sell read off it turned "forward" inside ~0.1 s
+ *  (the skip gather's measured failure, core/FinishFootwork). */
 export function euroSell(wishX: number, wishZ: number, yaw: number): FinishSide | null {
   const m = Math.hypot(wishX, wishZ);
   if (m < 0.3) return null;

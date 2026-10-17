@@ -49,7 +49,7 @@ const want = (id: string): boolean => ONLY.includes('all') || ONLY.includes(id);
 type Step =
   | { at: number; ls: 'foe' | 'away' | 'none' | 'across' | 'foeR' | 'foeL' | 'side' | 'backSide' | 'sideL' | 'back' | 'awayFoe' | 'rim' | 'fwd'; mag?: number; tap?: number }
   | { at: number; press: number; ms: number }   // H2e: a pad button pressed for ms (0 Cross/PASS · 2 Square/SHOT)
-  | { at: number; seam: string }                // H2e: the mode's dev seam (e.g. 'poster': the drive-dunk geometry)
+  | { at: number; seam: string; arg?: string }   // H2e: the mode's dev seam (e.g. 'poster': the drive-dunk geometry); H2 leftovers: one argument
   | { at: number; rimMark: true; ahead?: number } // H2e: the rim — off the 3v3 seam's jobs() while I have the ball, or `ahead` m along my facing (1v1 after the poster seam)
   | { at: number; untilFlight: true }           // H2e: wait (≤ 1.5 s) until my dunk's flight is running (the seam's flightK)
   | { at: number; untilRim: number }           // H2e: wait (≤ 3 s) until I am this close to the rim (R.rimXZ)
@@ -69,7 +69,7 @@ type Step =
  *  while the same tap with no recording landed 6 / 6 on both trees. `stripMs`: this scenario's strip spacing (the spin's 0.6 s turn and
  *  its step-out outrun the default 10 × 70 ms). */
 /** `focus: 'foe'` (H2c): the move view crops round the nearest defender instead of the hero (the defender scenarios). */
-interface Scen { id: string; title: string; modes: ('1v1' | '3v3')[]; steps: Step[]; tail: number; landed?: string; landedBefore?: string; luck?: number; stripDelay?: number; stripMs?: number; focus?: 'foe' }
+interface Scen { id: string; title: string; modes: ('1v1' | '3v3')[]; steps: Step[]; tail: number; landed?: string; landedBefore?: string; luck?: number; zoom?: number; stripDelay?: number; stripMs?: number; focus?: 'foe' }
 const JOG = 0.55, RUN = 0.85;
 const SCENS: Scen[] = [
   { id: 'cross', title: 'crossover (R stick up-away) at a jog', modes: ['1v1', '3v3'], tail: 1300,
@@ -144,6 +144,11 @@ const SCENS: Scen[] = [
     steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 160, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 420 }, { at: 300, still: 'move' }] },
   { id: 'hoptap', title: 'H2e hop step: Square tapped, then pressed again and held (the hop, then its finish)', modes: ['3v3'], tail: 1400, landed: 'hop step on the double tap', landedBefore: 'SHOT\\] gather|footwork|finish',
     steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 0.8 }, { at: 300, untilRim: 4.0 }, { at: 0, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 420 }, { at: 300, still: 'move' }] },
+  // decisions 17-19 (owner 2026-10-16): tap-tap — the hop, and its finish releases itself, untimed
+  { id: 'hoptaptap', title: 'Hop step, tap-tap: both presses quick (the finish releases itself, untimed)', modes: ['1v1'], tail: 1500, landed: 'hop finish released itself', landedBefore: 'hop step on the double tap', luck: 0.99,
+    steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 160, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 60 }, { at: 300, still: 'move' }] },
+  { id: 'hoptaptap', title: 'Hop step, tap-tap: both presses quick (the finish releases itself, untimed)', modes: ['3v3'], tail: 1500, landed: 'hop finish released itself', landedBefore: 'hop step on the double tap',
+    steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 0.8 }, { at: 300, untilRim: 4.0 }, { at: 0, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 130, press: 2, ms: 60 }, { at: 300, still: 'move' }] },
   { id: 'skipg', title: 'H2e skip gather: Square with the left stick away from him (him off the lane)', modes: ['1v1'], tail: 1400, landed: 'footwork skip', landedBefore: 'SHOT\\] gather|footwork|finish', luck: 0.99,
     steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 120, foeAt: [2.6, 1.2] }, { at: 0, ls: 'awayFoe', mag: 0.9 }, { at: 40, mark: 'flick' }, { at: 0, press: 2, ms: 420 }, { at: 350, still: 'move' }] },
   { id: 'skipg', title: 'H2e skip gather: Square with the left stick away from him', modes: ['3v3'], tail: 1400, landed: 'footwork skip', landedBefore: 'SHOT\\] gather|footwork|finish',
@@ -154,6 +159,24 @@ const SCENS: Scen[] = [
     steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 1 }, { at: 0, r2: true }, { at: 300, untilRim: 2.6 }, { at: 0, foeAt: [3.0, 0] }, { at: 0, foeAt: [-3.0, -1.0] }, { at: 0, foeAt: [3.5, -2.5] }, { at: 0, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 0, untilFlight: true }, { at: 0, rs: 'up', hold: 250 }, { at: 500, still: 'move' }, { at: 300, r2: false }] },
   { id: 'oop', title: 'H2e alley-oop: pass to a mate, cut at the rim, call for it (Cross)', modes: ['3v3'], tail: 1800, landed: 'alley-oop', landedBefore: 'call for the ball',
     steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'none' }, { at: 100, press: 0, ms: 80 }, { at: 700, ls: 'rim', mag: 1 }, { at: 0, r2: true }, { at: 250, untilRim: 5.0 }, { at: 0, mark: 'flick' }, { at: 0, press: 0, ms: 80 }, { at: 700, still: 'move' }, { at: 300, r2: false }] },
+  // H2 leftovers: the euro read off the rim line, the 3v3 trick stick, the mates' oop and the AI putbacks (3v3 probes lobTo / boardAt),
+  // and the 1v1 trick's ball released at the iron
+  { id: 'euro', title: 'H2L euro: help in the lane, the left stick HELD across, then Square', modes: ['1v1'], tail: 1400, landed: 'footwork euro', landedBefore: 'SHOT\\] gather|footwork|finish', luck: 0.99,
+    steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 100, ls: 'side', mag: 0.9 }, { at: 150, mark: 'flick' }, { at: 0, press: 2, ms: 420 }, { at: 350, still: 'move' }] },
+  { id: 'euro', title: 'H2L euro: help in the lane, the left stick HELD across, then Square', modes: ['3v3'], tail: 1400, landed: 'footwork euro', landedBefore: 'SHOT\\] gather|footwork|finish', luck: 0.99,
+    steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 0.85 }, { at: 300, untilRim: 4.0 }, { at: 0, ls: 'side', mag: 0.9 }, { at: 150, mark: 'flick' }, { at: 0, press: 2, ms: 420 }, { at: 350, still: 'move' }] },
+  { id: 'eurohold', title: 'H2L euro, the sell HELD longer (0.3 s): help in the lane, the left stick across, then Square', modes: ['1v1'], tail: 1400, landed: 'footwork euro', landedBefore: 'SHOT\\] gather|footwork|finish', luck: 0.99,
+    steps: [{ at: 0, seam: 'poster' }, { at: 0, rimMark: true, ahead: 5.2 }, { at: 0, ls: 'rim', mag: 0.75 }, { at: 60, ls: 'side', mag: 0.9 }, { at: 300, mark: 'flick' }, { at: 0, press: 2, ms: 420 }, { at: 350, still: 'move' }] },
+  { id: 'trick', title: 'H2L trick stick: R2 dunk, the right stick flicked UP in the window (k 0.30-0.50)', modes: ['1v1'], tail: 2200, landed: 'trick ', luck: 0.99,
+    steps: [{ at: 0, seam: 'standing' }, { at: 350, ls: 'fwd', mag: 0.25 }, { at: 0, r2: true }, { at: 200, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 0, untilFlight: true }, { at: 200, rs: 'up' }, { at: 500, still: 'move' }, { at: 300, r2: false }] },
+  { id: 'trick', title: 'H2L trick stick: R2 drive dunk, the right stick flicked UP in the window (k 0.30-0.50)', modes: ['3v3'], tail: 2200, landed: 'trick ', landedBefore: '-DUNK\\]', luck: 0.99,
+    steps: [{ at: 0, rimMark: true }, { at: 0, ls: 'rim', mag: 1 }, { at: 0, r2: true }, { at: 300, untilRim: 2.6 }, { at: 0, foeAt: [3.0, 0] }, { at: 0, foeAt: [-3.0, -1.0] }, { at: 0, foeAt: [3.5, -2.5] }, { at: 0, mark: 'flick' }, { at: 0, press: 2, ms: 60 }, { at: 0, untilFlight: true }, { at: 200, rs: 'up' }, { at: 500, still: 'move' }, { at: 300, r2: false }] },
+  { id: 'mateoop', title: 'H2L a mate\'s alley-oop: the lob to mate0 on his cut (probe lobTo)', modes: ['3v3'], tail: 2400, zoom: 1.4, landed: 'mate ALLEY-OOP', landedBefore: 'probe lob',
+    steps: [{ at: 0, mark: 'flick' }, { at: 0, seam: 'lobTo', arg: 'mate0' }, { at: 900, still: 'move' }] },
+  { id: 'mateputback', title: 'H2L a mate\'s putback: his own offensive board at the iron (probe boardAt, every roll landing)', modes: ['3v3'], tail: 2400, zoom: 1.4, luck: 0, landed: 'PUTBACK DUNK by mate0', landedBefore: 'BOARD\\] (TIP-IN|mate0 secures)',
+    steps: [{ at: 0, mark: 'flick' }, { at: 0, seam: 'boardAt', arg: 'mate0' }, { at: 500, still: 'move' }] },
+  { id: 'foeputback', title: 'H2L the rival\'s putback: his own offensive board at the iron (probe boardAt, every roll landing)', modes: ['3v3'], tail: 2600, zoom: 1.4, luck: 0, landed: 'PUTBACK DUNK by foe0', landedBefore: 'BOARD\\] (TIP-IN|foe0 secures)',
+    steps: [{ at: 0, mark: 'flick' }, { at: 0, seam: 'boardAt', arg: 'foe0' }, { at: 500, still: 'move' }] },
   { id: 'lcross', title: 'left-stick reversal at a jog (the crossover the LS throws)', modes: ['1v1', '3v3'], tail: 1300,
     steps: [{ at: 0, ls: 'foeR', mag: 0.7 }, { at: 700, mark: 'flick' }, { at: 0, ls: 'foeL', mag: 0.7 }, { at: 250, still: 'move' }] },
 ];
@@ -186,11 +209,11 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
     // a take a strip or a steal ruined before the move landed is thrown again (RETRY times): the reel is about the move
     let out: any = null, size = 0, flickAt = -1, t0 = 0;
     for (let attempt = 1; attempt <= RETRY; attempt++) {
-      await page.evaluate(({ m, L, F }) => {
-        const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; const R = (window as any).__R;
+      await page.evaluate(({ m, L, F, Z }) => {
+        const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; const R = (window as any).__R; R.zoom = Z;
         R.neutral(); R.rimXZ = null; S.offense(); if (typeof S.luck === 'function') S.luck(L);
         R.focus = F ? () => { const fr = m === '1v1' ? S.foeRoot : S.nearestFoeRoot(); return fr ? R.top(fr) : R.hero(); } : null; R.cx0 = undefined;
-      }, { m: mode, L: sc.luck ?? null, F: sc.focus === 'foe' });
+      }, { m: mode, L: sc.luck ?? null, F: sc.focus === 'foe', Z: sc.zoom ?? ZOOM });
       // the ball in my hands, the carry live (a rival's shot or loose ball still in the air can outlive one reset: ask again)
       for (let i = 0; i < 90; i++) {
         const ok = await page.evaluate((m) => { const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; const c = S.carry(); return c.mine && c.active && (m !== '1v1' || S.possession() === 'mine'); }, mode);
@@ -233,7 +256,7 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
         }, { m: mode, sign: st.rot, ms: st.ms ?? 240 });
         else if ('l1' in st) await page.evaluate((on) => (window as any).__R.btn(4, on), st.l1);
         else if ('press' in st) await page.evaluate(({ b, ms }) => (window as any).__R.tap(b, ms), { b: st.press, ms: st.ms });
-        else if ('seam' in st) await page.evaluate(({ m, name }) => { const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; return S[name]?.(); }, { m: mode, name: st.seam });
+        else if ('seam' in st) await page.evaluate(({ m, name, arg }) => { const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree; return S[name]?.(arg); }, { m: mode, name: st.seam, arg: st.arg });
         else if ('rimMark' in st) await page.evaluate(({ m, ahead }) => { const R = (window as any).__R; const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree;
           if (ahead) { const h = R.hero(); const p = R.pos(h); R.rimXZ = { x: p.x + Math.sin(h.rotation.y) * ahead, z: p.z + Math.cos(h.rotation.y) * ahead }; return; }
           const j = S.jobs?.().find((x: { id: string }) => x.id === 'me'); if (j) R.rimXZ = { x: j.objX, z: j.objZ }; }, { m: mode, ahead: st.ahead ?? 0 });
