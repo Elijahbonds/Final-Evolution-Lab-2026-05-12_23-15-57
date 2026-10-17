@@ -8,7 +8,8 @@
 // process happens to receive a console line (that is how AM's run put rivals/jinx.glb, the request after the mark, before it).
 // Bytes are each response's encoded body + headers (Playwright's request.sizes()), workers included: the Draco wrapper is fetched
 // by the decoder's worker, and never shows in the page's own Resource Timing (it is counted under worker/unknown).
-// Exit 1 if any request went to *.babylonjs.com, or the dunk never came.
+// Exit 1 if any request went to *.babylonjs.com, a song preview (/audio/songs/*/preview.mp3) started before the mark (FDB-2:
+// /try's soundtrack waits for dunk 1), or the dunk never came.
 import { chromium } from 'playwright-core';
 import { chromiumExe } from './_chromium.mts';
 
@@ -32,6 +33,7 @@ await page.addInitScript(() => { try { performance.setResourceTimingBufferSize(5
 
 await page.goto(`${BASE}/links`, { waitUntil: 'load', timeout: 120_000 });
 await sleep(1500);
+const clickAt = await page.evaluate(() => performance.now());   // the page's clock: /links → /try is one document
 await page.click('a[data-link="play"]');
 const t0 = Date.now();
 let state = '';
@@ -70,7 +72,8 @@ for (const b of bytes) {
 const mb = (n: number) => (n / 1e6).toFixed(2);
 before.sort((a, b) => b.bytes - a.bytes);
 console.log(`dunk 1: ${clock.mark == null ? 'NEVER' : 'in'}`);
-console.log(`before dunk 1: ${mb(before.reduce((a, b) => a + b.bytes, 0))} MB (includes /links) · after: ${mb(after)} MB · worker/unknown: ${mb(unknown)} MB`);
+const fromClick = before.filter((b) => (startOf.get(b.url) ?? 0) >= clickAt);
+console.log(`before dunk 1: ${mb(fromClick.reduce((a, b) => a + b.bytes, 0))} MB from the click (${mb(before.reduce((a, b) => a + b.bytes, 0))} MB with /links) · after: ${mb(after)} MB · worker/unknown: ${mb(unknown)} MB`);
 for (const b of before.filter((x) => x.bytes >= 20_000)) console.log(`  ${(b.bytes / 1024).toFixed(0).padStart(6)} KB  ${b.url.replace(BASE, '')}`);
 const offClock = [...bytes].filter((b) => !b.url.startsWith('data:') && !b.url.startsWith('blob:') && (clock.mark == null || !startOf.has(b.url)));
 console.log(`worker/unknown: ${offClock.map((b) => `${b.url.replace(BASE, '')} ${(b.bytes / 1024).toFixed(0)} KB`).join(' · ') || 'none'}`);
@@ -78,7 +81,11 @@ const firstGlbAfter = clock.mark == null ? null : clock.res.filter((r) => /\.glb
 if (firstGlbAfter) console.log(`first GLB after the mark: ${firstGlbAfter.name.replace(BASE, '')} (+${(firstGlbAfter.start - clock.mark!).toFixed(1)} ms)`);
 console.log(`/favicon.svg requests: ${bytes.filter((b) => /\/favicon\.svg/.test(b.url)).length}`);
 console.log(`hosts: ${[...hosts].map(([h, n]) => `${h} ×${n}`).join(' · ')}`);
+const previews = clock.res.filter((r) => /\/audio\/songs\/[^/]+\/preview\.mp3/.test(r.name));
+const early = clock.mark == null ? previews : previews.filter((r) => r.start < clock.mark!);
+console.log(`song previews: ${previews.map((r) => `${r.name.replace(BASE, '')} ${clock.mark == null ? '' : `${r.start < clock.mark ? '' : '+'}${((r.start - clock.mark) / 1000).toFixed(2)} s`}`).join(' · ') || 'none'}`);
+console.log(early.length ? `FAIL: ${early.length} song preview(s) before the fel:dunk1-in mark` : 'song previews before dunk 1: 0');
 const cdn = [...hosts.keys()].filter((h) => /(^|\.)babylonjs\.com$/.test(h));
 console.log(cdn.length ? `FAIL: requests to ${cdn.join(', ')}` : 'babylonjs.com requests: 0');
 await browser.close();
-process.exit(cdn.length || clock.mark == null ? 1 : 0);
+process.exit(cdn.length || early.length || clock.mark == null ? 1 : 0);

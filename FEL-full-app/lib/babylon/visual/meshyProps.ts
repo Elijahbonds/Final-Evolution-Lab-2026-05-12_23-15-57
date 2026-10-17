@@ -28,6 +28,12 @@ export const DRACO_DECODER_URLS = {
   wasmBinaryUrl: '/loaders/draco/draco_decoder.wasm',
   fallbackUrl: '/loaders/draco/draco_decoder.js',
 } as const;
+/**
+ * How many Draco decode workers: Babylon's own default (half the cores, at most 4), but NEVER 0 (PM call, FDB-2 2026-10-17).
+ * Zero workers means Babylon decodes in-thread, and in-thread Babylon 9.23 leaves the hoop's int8 normals and uint16 UVs
+ * unnormalized — the glTF accessor's `normalized` flag is only applied on the worker path — so the hoop renders untextured
+ * (its UVs read 0–65535). Do not set `numWorkers: 0`, not even as a CSP workaround: allow `blob:` workers instead.
+ */
 export function dracoWorkerCount(hardwareConcurrency: number | undefined): number {
   const cores = Number.isFinite(hardwareConcurrency) ? Math.floor(hardwareConcurrency as number) : 2;
   return Math.max(1, Math.min(4, Math.floor(cores / 2)));

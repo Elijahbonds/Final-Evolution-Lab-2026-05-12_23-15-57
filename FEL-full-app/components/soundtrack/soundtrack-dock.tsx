@@ -19,7 +19,7 @@ import { isQuickScreenPath } from '@/lib/screen/routes';
 import { AGE_BLOCK_COOKIE, AGE_BLOCK_STORAGE_KEY, AGE_BLOCK_VALUE } from '@/lib/privacy/ageScreen';
 import { reducedMotion } from '@/lib/a11y/reducedMotion';
 import { fetchSoundtrackTracks, getSoundtrackPlayer, preloadSoundKit, saveDataOn, unlockSoundtrackFromGesture } from '@/lib/soundtrack/client';
-import { isGamePath } from '@/lib/soundtrack/policy';
+import { isGamePath, linkPath } from '@/lib/soundtrack/policy';
 import { NowPlayingCard, useSoundtrack } from './now-playing-card';
 import { RunTrackPick } from '@/components/pipelines/run-track-pick';
 
@@ -51,8 +51,8 @@ export function SoundtrackDock() {
     // FIRST-DUNK-BUDGET: the page's one catalogue read (the Dunk walk-out reads the same answer); a failed read leaves the menus quiet
     void fetchSoundtrackTracks().then((tracks) => { if (live && tracks) p.setCatalogue(tracks); });
 
-    const gesture = () => {
-      unlockSoundtrackFromGesture();
+    const gesture = (e: Event) => {
+      unlockSoundtrackFromGesture(tappedLinkPath(e.target));   // FDB-2: a tap on the way into /try starts nothing on the way out
       for (const t of ['pointerdown', 'keydown', 'touchend'] as const) window.removeEventListener(t, gesture, true);
     };
     for (const t of ['pointerdown', 'keydown', 'touchend'] as const) window.addEventListener(t, gesture, true);
@@ -71,6 +71,16 @@ export function SoundtrackDock() {
 
   if (quick || chipHiddenOn(pathname)) return null;
   return <DockChip pathname={pathname} />;
+}
+
+/**
+ * FDB-2: the same-site path the first tap is navigating to, when it is on a link that opens here (not a new tab or a
+ * download); null for anything else. The player holds /try's soundtrack from this tap (policy.holdsForFirstDunk).
+ */
+export function tappedLinkPath(target: EventTarget | null, base: string = window.location.href): string | null {
+  const a = (target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null | undefined;
+  if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return null;
+  return linkPath(a.getAttribute('href'), base);
 }
 
 /**
@@ -111,7 +121,7 @@ function DockChip({ pathname }: { pathname: string }) {
   const [strip, setStrip] = useState<HTMLElement | null>(null);
   useEffect(() => { setStrip(document.querySelector<HTMLElement>('[data-tabbar-strip]')); }, [pathname, status]);
   if (!snap) return null;
-  const hiddenFor = snap.silent === 'own-music' || snap.silent === 'age-locked' || snap.silent === 'data-saver' || snap.silent === 'waiting-for-tap' || snap.silent === 'no-tracks';
+  const hiddenFor = snap.silent === 'own-music' || snap.silent === 'age-locked' || snap.silent === 'data-saver' || snap.silent === 'waiting-for-tap' || snap.silent === 'no-tracks' || snap.silent === 'first-dunk';
   if (hiddenFor || snap.trackCount === 0) return null;
   const p = getSoundtrackPlayer();
   const pulse = snap.playing && !reducedMotion();

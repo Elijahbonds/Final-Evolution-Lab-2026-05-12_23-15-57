@@ -79,6 +79,7 @@ export class SoundtrackPlayer {
   private level = DEFAULT_LEVEL;
   private cond: Omit<PlayConditions, 'enabled' | 'hasTracks'> = {
     pathname: '/', unlocked: false, saveData: false, hidden: false, ageLocked: false, focusHeld: false, requested: null,
+    firstDunkIn: false, headingTo: null,
   };
   private shuffler: Shuffler;
   private tracker = new PlayTracker();
@@ -96,7 +97,11 @@ export class SoundtrackPlayer {
 
   // ── inputs ─────────────────────────────────────────────────────────────────────────────────────────────────────────
   setCatalogue(tracks: SoundtrackTrack[]): void { this.tracks = tracks.slice(); void this.apply(); }
-  setPathname(pathname: string): void { if (pathname !== this.cond.pathname) { this.cond.pathname = pathname; void this.apply(); } }
+  setPathname(pathname: string): void { if (pathname !== this.cond.pathname) { this.cond.pathname = pathname; this.cond.headingTo = null; void this.apply(); } }
+  /** FDB-2: the page is on its way to `path` (the tapped link that unlocked us), or null once it is not. See policy.holdsForFirstDunk. */
+  headTo(path: string | null): void { if (path !== this.cond.headingTo) { this.cond.headingTo = path; void this.apply(); } }
+  /** FDB-2: the guest's first dunk is in (DunkMode's contest set): /try's soundtrack may start. Once per page load. */
+  setFirstDunkIn(on: boolean): void { if (on !== this.cond.firstDunkIn) { this.cond.firstDunkIn = on; void this.apply(); } }
   /** The first user gesture on the page. */
   unlock(): void { if (!this.cond.unlocked) { this.cond.unlocked = true; void this.apply(); } }
   setHidden(hidden: boolean): void { this.cond.hidden = hidden; void this.apply(); }

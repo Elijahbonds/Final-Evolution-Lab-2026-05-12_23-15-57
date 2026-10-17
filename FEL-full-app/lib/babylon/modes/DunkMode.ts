@@ -134,6 +134,7 @@ import { landMarks, plantMarks, stampCourt } from '../hoops/courtMarks';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
+import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -1251,6 +1252,8 @@ export const DunkMode: ModeDefinition = (() => {
     // stamps the console line when its own process receives it can land later than the request. Resource Timing's startTime
     // and this mark share one clock: a request with startTime >= the mark's is after dunk 1.
     try { performance.mark('fel:dunk1-in'); } catch { /* no User Timing: the console line still says it */ }
+    // FDB-2 (PM, 2026-10-17): the menu soundtrack's first song (a 0.43–0.51 MB preview) waited on /try for this moment; it starts now
+    soundtrackFirstDunkIn();
     rivalArrival = bringRival(ctx);
     void rivalArrival.finally(() => {
       if (ctx.scene.isDisposed) return;
