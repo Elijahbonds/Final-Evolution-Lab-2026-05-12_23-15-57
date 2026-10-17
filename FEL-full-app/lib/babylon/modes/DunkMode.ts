@@ -27,7 +27,7 @@ import { nextPropCategory, stepPropInCategory, guestSlamFactor, idleTip, trickIn
 import { readWalkOut, saveWalkOut, countPlay, musicCredential, type WalkOut } from '../music/WalkOut';
 import { resolveWalkOut, walkOutLine, type WalkOutCue } from '../music/WalkOutCue';
 // PIPELINES (2026-10-06): the walk-out plays on the MUSIC bus, from your song or a soundtrack hype track, credited.
-import { WalkOutPlayer, walkOutSourceLine } from '../music/WalkOutSource';
+import { WalkOutPlayer } from '../music/WalkOutSource';
 import { StudioLibrary } from '../music/StudioLibrary';
 import { Color3, Color4, MeshBuilder, Space, StandardMaterial, Tools, Vector3, type Mesh } from '@babylonjs/core';
 import { TransformNode } from '@babylonjs/core';
@@ -92,8 +92,7 @@ import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, next
 import { GLASS, wallRunMiss, launchProfile, doubleLaunchAllowed, DOUBLE_LAUNCH, overdriveDunk, cornerPanes, paneRebound, BUS_RUN, busRunPose, alongPane, busRunDone, cornerRideFor, type CornerRide, type GlassPane } from '../core/DunkParkour';
 import { SKY, skyTierFor, skyTapAllowed, skyTapRefusal, type SkyTier } from '../core/SkyTier';
 import { readSeasonLane, specialOpen, specialLockLine, SPECIAL_PROPS, type SeasonLane } from '../core/SeasonSpecials';   // SEASON SPECIALS (owner, 2026-09-18): the PRO lane's   // THE SKY TIER (owner, 2026-09-18): a blimp / a rocket / … over the lane, per court
-import { spawnMeshyProp } from '../visual/meshyProps';
-import { SceneLoader } from '@babylonjs/core';
+import { copyKitModel } from '../visual/VenueProps';   // FIRST-DUNK-BUDGET: the corner bus and tent share the venue's one download
 import { mergeByMaterial } from '../scene/mergeByMaterial';   // IMPROVE (2026-10-06): the station and the sky tier, one draw per material
 import { runwayTrickById, DUNK_TRICKS, slamReadout, slamExecution, signatureFor, landingDustScale, netSplashScale, NET_SPLASH_DROP, type SlamReadout } from '../core/DunkSystem';
 import { dunkCard, slamIsClean } from '../core/DunkCard';
@@ -389,7 +388,8 @@ const BUDGET_SEC: Record<Phase, number> = {
 };
 
 export const DunkMode: ModeDefinition = (() => {
-  let player: SpawnedCharacter, rival: SpawnedCharacter, teammate: SpawnedCharacter | null = null;
+  // FIRST-DUNK-BUDGET (2026-10-17): `rival` is null until his body arrives with the contest set (bringRival), after dunk 1
+  let player: SpawnedCharacter, rival: SpawnedCharacter | null = null, teammate: SpawnedCharacter | null = null;
   let dunkVenue: VenueHandle | null = null;  // M74
   let obstacle: DunkObstacle | null = null, obstacleToken = 0;   // DUNK-CONTROL-JUICE: a real mesh with a sampled hitbox
   let ball: AbstractMesh, ballSim: BallSim, replay: DunkReplayRecorder;
@@ -505,6 +505,9 @@ export const DunkMode: ModeDefinition = (() => {
   // THE CORNER PROPS (owner: no glass on the sidelines — the hoopbus parked across one front corner, an event tent with the
   // scene's sign across the other; their faces are the rebound / wall-run surfaces the pure panes describe)
   let vectorAt = -1e9, vectorWallRun = false, doubleLaunched = false, doubleLaunchLift = 0, sideProps: TransformNode[] = [], panes: GlassPane[] = [];
+  // FIRST-DUNK-BUDGET (2026-10-17): the corner panes that have their prop parked on them. The props load after dunk 1 now, and
+  // a face nobody can see is not one the run rebounds off or wall-runs along: each pane counts once its prop stands on it.
+  let parkedPanes: GlassPane[] = [];
   // THE SKY TIER: what hangs over the lane in this court, and whether the dunker has tapped off it this flight
   let skyTier: SkyTier | null = null, skyRoot: TransformNode | null = null, skyTapped = false, skyBob = 0, skyKick = 0;
   // THE BACKBOARD (owner, 2026-09-18): L1 with the d-pad UP is the flip OFF THE TOP OF THE BOARD; L1 HELD after the kick is a RUN
@@ -595,11 +598,11 @@ export const DunkMode: ModeDefinition = (() => {
   /** The glass: the run reflects off it with the speed kept — the launch that follows is a vector launch. */
   function tryGlass(ctx: ModeContext, vx: number, vz: number): void {
     if (performance.now() - vectorAt < 600) return;   // one rebound per contact
-    const r = paneRebound(player.root.position.x, player.root.position.z, vx, vz, panes);
+    const r = paneRebound(player.root.position.x, player.root.position.z, vx, vz, parkedPanes);
     if (!r) {
       // A NEAR MISS IS TOLD NOW. Running past the ride's face at speed used to be silence, so there was nothing to
       // correct — the same line caught it one attempt and missed the next with no word either way.
-      const miss = wallRunMiss(player.root.position.x, player.root.position.z, vx, vz, panes);
+      const miss = wallRunMiss(player.root.position.x, player.root.position.z, vx, vz, parkedPanes);
       if (miss && performance.now() - rideMissAt > 1200) {
         rideMissAt = performance.now();
         flash(ctx, miss === 'slow' ? `TOO SLOW FOR THE ${ride.short} — hold the run into it`
@@ -1224,10 +1227,65 @@ export const DunkMode: ModeDefinition = (() => {
     while (turn !== 'player' && token === rivalSwapToken && !ctx.scene.isDisposed) await new Promise((r) => setTimeout(r, 250));
     if (token !== rivalSwapToken || ctx.scene.isDisposed) { ctx.groundLock?.untrack(next.root); next.dispose(); return; }
     const old = rival;
-    next.root.position.copyFrom(old.root.position); next.root.rotation.y = old.root.rotation.y;
+    if (old) { next.root.position.copyFrom(old.root.position); next.root.rotation.y = old.root.rotation.y; }   // (none yet: he stands where he spawned)
     rival = next;
-    ctx.groundLock?.untrack(old.root); old.dispose();
+    if (old) { ctx.groundLock?.untrack(old.root); old.dispose(); }
     rivalClipToken++; rivalClip(SPORT_CLIP.idle, { loop: true });
+  }
+
+  // ── FIRST-DUNK-BUDGET (2026-10-17): THE CONTEST SET ────────────────────────────────────────────────────────────────────
+  // Dunk 1 loads what dunk 1 needs — the court, the hoop, the ball and you (PM: "before dunk 1, load only the Venice court, the
+  // ball, the hoop and one player"). The first download was ~25 MB, and a phone on 4G was still pulling it when the load timer
+  // failed it. The rest comes once your first dunk is in: his body first (his turn follows your second dunk), then the venue's
+  // dressing and its onlookers, the corner bus and tent, the booth's voices and a catalogue walk-out. A guest who leaves after
+  // one dunk never downloads it.
+  let contestSetStarted = false;
+  let rivalArrival: Promise<void> | null = null;
+  let awaitingRival = false;   // his turn is up and his body is still on its way: the judging beat holds (rivalRound)
+  function startContestSet(ctx: ModeContext): void {
+    if (contestSetStarted || ctx.scene.isDisposed) return;
+    contestSetStarted = true;
+    console.info('[DUNK-BUDGET] dunk 1 is in — the contest set loads now (his body first)');
+    rivalArrival = bringRival(ctx);
+    void rivalArrival.finally(() => {
+      if (ctx.scene.isDisposed) return;
+      // the venue's set and the corner props in one breath: the tent and the bus are each one download, shared (copyKitModel)
+      void dunkVenue?.mountDressing();
+      parkCornerProps(ctx);
+      mic?.loadAudio();
+      if (!walkCue) void walkPlayer.prepare(null, (line) => ctx.setHud({ walkOutNow: line })).then(() => { if (!ended && !ctx.scene.isDisposed) startWalkOut(); });
+    });
+  }
+  /** His body, tried again (backing off) until it lands: on a dead line the night waits at his turn instead of failing. */
+  async function bringRival(ctx: ModeContext): Promise<void> {
+    for (let tries = 0; !rival && !ctx.scene.isDisposed; tries++) {
+      try {
+        // spawnNpc is explicit: the rival must NEVER wear the player's identity, or you end up dunking against yourself.
+        rival = await spawnRivalBody(ctx, foe);
+      } catch (e) {
+        const wait = Math.min(8000, 1000 * 2 ** tries);
+        console.warn(`[DUNK-BUDGET] the rival's body did not load (try ${tries + 1}) — again in ${wait} ms`, e);
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  /** The corner props: the bus (Orbit's shuttle) across the right corner, the tent across the left. A face counts for the
+   *  rebound and the wall run once its prop stands on it (parkedPanes) — nobody kicks off a bus they cannot see. */
+  function parkCornerProps(ctx: ModeContext): void {
+    const scene = ctx.scene;
+    // ORBIT parks a SPACE SHUTTLE where every other court parks the hoopbus (owner, 2026-09-18: "make the bus a space shuttle
+    // in the space one", then his own Meshy export: "swap that shuttle in for the other one" — baked to 6.4 m by scripts/meshy/bake-prop.py)
+    const rideKey = ride.kind === 'shuttle' ? 'shuttle' : 'hoopbus';
+    void copyKitModel(scene, 'meshy', rideKey, `dunk_${rideKey}`).then((r) => {
+      if (scene.isDisposed) return;
+      parkOnPane(r, panes[0], 6.4); sideProps.push(r); parkedPanes.push(panes[0]);
+      const { max } = r.getHierarchyBoundingVectors(true); console.info(`[DUNK-PARKOUR] ${rideKey} parked on the right corner (roof ${max.y.toFixed(2)} m)`);
+    }).catch((e) => console.warn(`[DUNK-PARKOUR] ${rideKey} did not load`, e));
+    if (ride.kind !== 'shuttle') void copyKitModel(scene, 'racing', 'tent', 'dunk_tent').then((root) => {
+      if (scene.isDisposed) return;
+      parkOnPane(root, panes[1], 4.2); sideProps.push(root); parkedPanes.push(panes[1]);
+      console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
+    }).catch((e) => console.warn('[DUNK-PARKOUR] tent did not load', e));
   }
   function bindBody(ctx: ModeContext): void {
     // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
@@ -1291,39 +1349,31 @@ export const DunkMode: ModeDefinition = (() => {
       foe = takeNextRival();
       walkOut = readWalkOut(); walkCounted = false;
       walkCue = resolveWalkOut(walkOut, walkOut ? StudioLibrary.get(walkOut.songId) : null);
-      void walkPlayer.prepare(walkCue, (line) => ctx.setHud({ walkOutNow: line }));   // PIPELINES: no song → a soundtrack track
+      // PIPELINES: no song → a soundtrack track. FIRST-DUNK-BUDGET: that track is the catalogue's (a download) and comes with the
+      // contest set; your own song is a local mixdown and walks out now, as it always did.
+      contestSetStarted = false; rivalArrival = null; awaitingRival = false;
+      if (walkCue) void walkPlayer.prepare(walkCue, (line) => ctx.setHud({ walkOutNow: line }));
       // M74: try Nexus venue first; fallback to VenueKit if no spec
-      dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location });
+      // FIRST-DUNK-BUDGET: the venue's dressing (its CC0 set, the parked bus and sedan, the onlookers) waits for the contest set
+      dunkVenue = mountVenue(ctx, 'basketball_dunk', { keepGameplayCamera: true, location: ctx.location, deferDressing: true });
       if (!dunkVenue) { VenueKit.buildCourt(ctx.scene); applyOceanCourt(ctx.scene, 'venice'); }
       findGlass(ctx.scene);
       // DUNK PARKOUR: the corner props — the hoopbus across the right front corner, the event tent (with the scene's sign) across
       // the left; their faces are what the run rebounds off / wall-runs along (the pure panes in core/DunkParkour)
       for (const p of sideProps) p.dispose(); sideProps = [];
       panes = cornerPanes(GLASS.halfX, gatherLine());
+      parkedPanes = [];
       // THE SKY TIER: the court's own thing over the lane (a rocket in Orbit, a balloon at Blossom, …), its underside a surface for R1;
       // Venice hangs nothing (the blimp is out — owner: "the grey thing on top of the hoop, its an eye sore")
       skyRoot?.dispose(); skyTier = skyTierFor(ctx.location); skyRoot = skyTier ? buildSkyTier(ctx.scene, skyTier, gatherLine() - SKY.zAhead) : null; skyTapped = false;
       void readSeasonLane().then((lane) => { seasonLane = lane; console.info(`[DUNK-SEASON] lane ${lane} — specials ${specialOpen(lane) ? 'OPEN' : 'LOCKED'}`); ctx.setHud({ specials: specialOpen(lane) ? 'PRO' : 'LOCKED' }); });
       console.info(skyTier ? `[DUNK-SKY] ${skyTier.tag} over the lane (underside ${SKY.underY} m)` : '[DUNK-SKY] nothing over this lane');
-      {
-        const scene = ctx.scene; const loc = ctx.location;
-        ride = cornerRideFor(loc);
-        // ORBIT parks a SPACE SHUTTLE where every other court parks the hoopbus (owner, 2026-09-18: "make the bus a space shuttle
-        // in the space one", then his own Meshy export: "swap that shuttle in for the other one" — baked to 6.4 m by scripts/meshy/bake-prop.py)
-        const rideKey = ride.kind === 'shuttle' ? 'shuttle' : 'hoopbus';
-        void spawnMeshyProp(scene, rideKey, null, `dunk_${rideKey}`).then((r) => { if (!r || scene.isDisposed) return; parkOnPane(r, panes[0], 6.4); sideProps.push(r); const { max } = r.getHierarchyBoundingVectors(true); console.info(`[DUNK-PARKOUR] ${rideKey} parked on the right corner (roof ${max.y.toFixed(2)} m)`); });
-        if (ride.kind === 'shuttle') {   // ORBIT's other corner (owner, 2026-09-18: "replace the red tent with a space station")
-          const st = buildSpaceStation(scene); parkOnPane(st, panes[1], 5.0); sideProps.push(st);
-          st.freezeWorldMatrix(); for (const m of st.getChildMeshes()) m.freezeWorldMatrix();   // IMPROVE (2026-10-06): parked for good — static from here
-          console.info('[DUNK-PARKOUR] space station on the left corner');
-        } else void SceneLoader.ImportMeshAsync('', '/models/props/racing/', 'tent.glb', scene).then((r) => {
-          if (scene.isDisposed) { for (const m of r.meshes) m.dispose(); return; }
-          const root = new TransformNode('dunk_tent', scene);
-          for (const m of r.meshes) if (!m.parent) m.parent = root;
-          for (const m of root.getChildMeshes()) { m.isPickable = false; m.receiveShadows = true; }
-          parkOnPane(root, panes[1], 4.2); sideProps.push(root);
-          console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
-        }).catch((e) => console.warn('[DUNK-PARKOUR] tent did not load', e));
+      ride = cornerRideFor(ctx.location);
+      if (ride.kind === 'shuttle') {   // ORBIT's other corner (owner, 2026-09-18: "replace the red tent with a space station")
+        // built, not downloaded: it stands from the first dunk (the shuttle across the other corner comes with the contest set)
+        const st = buildSpaceStation(ctx.scene); parkOnPane(st, panes[1], 5.0); sideProps.push(st); parkedPanes.push(panes[1]);
+        st.freezeWorldMatrix(); for (const m of st.getChildMeshes()) m.freezeWorldMatrix();   // IMPROVE (2026-10-06): parked for good — static from here
+        console.info('[DUNK-PARKOUR] space station on the left corner');
       }
       // spawnPlayer, not CharacterLibrary.spawn — this is the route that applies
       // the player's own identity: closet wardrobe colours, skin tone, and body
@@ -1350,9 +1400,8 @@ export const DunkMode: ModeDefinition = (() => {
       }
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, player.root, { color: '#ffd75e', icon: readPlayerIcon() });   // PLAYER RING: the contest's gold
       ctx.groundLock?.track(player.root, player.skeleton);
-      // spawnNpc is explicit: the rival must NEVER wear the player's identity,
-      // or you end up dunking against yourself.
-      rival = await spawnRivalBody(ctx, foe);
+      // FIRST-DUNK-BUDGET: the rival's body comes with the contest set (bringRival), after dunk 1 — his turn is after two of yours
+      if (rival) { ctx.groundLock?.untrack(rival.root); rival.dispose(); rival = null; }
       dunkVenue?.hidePlaceholders();  // M74: drop stand-ins now that real chars are in
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -1375,7 +1424,8 @@ export const DunkMode: ModeDefinition = (() => {
       stands?.dispose(); stands = mountModeCrowd(ctx, 'dunk');   // w3-crowds: the boardwalk crowd either side of the rim's line; it hears the dunks
       (ctx.scene.metadata ??= {}).felHoops = { rimFx, judgesTable, probe: () => ({ phase, clipTime, turn }) };   // for the rig's probes (read only)
       phoneFlashes?.dispose(); phoneFlashes = new PhoneFlashes(ctx.scene, new Vector3(rim.x, 0, rim.z + 5));   // DUNK MOTION phase 12
-      mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES } }); micOpened = false; micFiller = false;
+      // FIRST-DUNK-BUDGET: the booth's words now (its captions), its voices (~6 MB) with the contest set
+      mic?.dispose(); mic = new ModeMic(ctx, { groups: ['dunk', 'names'], court: ctx.location, players: { ...DUNK_RIVAL_VOICES }, deferAudio: true }); micOpened = false; micFiller = false;
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       // `dunkRival` because a probe cannot find the opponent by looking: the nearest body to the hero at floor height is
       // as often a courtside spectator, and one has been measured by mistake before. The mode knows which body it is.
@@ -1400,7 +1450,7 @@ export const DunkMode: ModeDefinition = (() => {
       practice = false; playerJumps = 0; guestFactor = 1; revealTail = -1; revealHold = false; hangPrompt = false; idleSec = 0; idleTipShown = null; lineHint = ''; for (const k of Object.keys(propMemory)) delete propMemory[k as PropCategory];   // IMPROVE (2026-10-06): a new mount is a new guest
       resetLob(); resetRunway(); win = 'run';
       setPhase('approach');
-      startWalkOut();
+      if (walkCue) startWalkOut();   // FIRST-DUNK-BUDGET: a catalogue walk-out starts with the contest set (startContestSet)
       if (prop !== 'none') void setupProp(ctx);   // (dev ?prop=: the first attempt of the night stands on it too)
       ctx.setHud({
         round: `${round}/${TOTAL_ROUNDS}`, dunkNum: `${dunkInRound + 1}/${DUNKS_PER_ROUND}`, nightCard: null, nightNum: night,
@@ -1408,7 +1458,8 @@ export const DunkMode: ModeDefinition = (() => {
         // F4 (review): this was a 130-character run-on naming six controls. The first run needs two.
         hint: (runwayHint = 'HOLD to run · tap JUMP at the line — then SLAM on NOW!'),
         // one line, phrased by the module: a mode must not invent its own wording for somebody's track
-        walkOutNow: walkOutLine(walkCue) || walkOutSourceLine(walkPlayer.catalogueSource),
+        // FIRST-DUNK-BUDGET: a catalogue walk-out credits itself when it comes (with the contest set) — the last mount's pick is not tonight's
+        walkOutNow: walkOutLine(walkCue),
         attempt: stakesLabel(stakes, calledLabel()),
         rivalName: foe.name,
         dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '', runBack: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read, no RUN IT BACK
@@ -2412,7 +2463,7 @@ export const DunkMode: ModeDefinition = (() => {
           rivalCamCut = true;
           ctx.camDirector.setFixed(new Vector3(rim.x + 2.9, 1.15, rim.z + 1.9), 1.5, true);
         }
-        ctx.camDirector.update(rival.root.position, ZERO_VEL as Vector3, rim);
+        ctx.camDirector.update((rival ?? player).root.position, ZERO_VEL as Vector3, rim);
       } else if (phase === 'cinematic' && rimCamCut) {
         // The position is fixed; the AIM tracks. This is the half that was missing — the camera used to
         // hold both and the subject walked out of frame. See the cut above.
@@ -2504,7 +2555,7 @@ export const DunkMode: ModeDefinition = (() => {
   };
 
   function watchdog(ctx: ModeContext): void {
-    if (phaseSec <= BUDGET_SEC[phase] || finishing) return;
+    if (phaseSec <= BUDGET_SEC[phase] || finishing || awaitingRival) return;
     console.warn(`[FEL-DUNK] watchdog tripped in phase "${phase}" after ${phaseSec.toFixed(1)}s — auto-resolving`);
     switch (phase) {
       case 'approach':
@@ -2516,7 +2567,7 @@ export const DunkMode: ModeDefinition = (() => {
       case 'cinematic': resolveDunk(ctx); break;
       case 'resolve': void finishAttempt(ctx, qteHit); break;
       case 'judging': void advanceAfterJudging(ctx); break;
-      case 'rivalTurn': rival.root.position.set(3.2, 0, CFG.rimZ + 3); rival.root.rotation.y = 0; void advanceAfterRivalTurn(ctx); break;   // soft-OPEN #3: the rival is parked + idled by the advance
+      case 'rivalTurn': if (rival) { rival.root.position.set(3.2, 0, CFG.rimZ + 3); rival.root.rotation.y = 0; } void advanceAfterRivalTurn(ctx); break;   // soft-OPEN #3: the rival is parked + idled by the advance
       case 'fieldCut': finishCut(ctx); break;   // dunk-next phase 5: the highlights never hold the night
     }
   }
@@ -3800,7 +3851,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  in the sign's own frame (core/DunkLob.paneLobVelocity), flown in the world, reflected by the sign (BallPhysics.sweptPaneHit). */
   function throwCornerLob(ctx: ModeContext, from: Vector3, tf: number): void {
     const to = catchPointNow(CORNER_CATCH_CLIP_T);
-    const pane = panes.reduce<GlassPane | null>((b, p) => !b || Math.hypot(p.cx - from.x, p.cz - from.z) < Math.hypot(b.cx - from.x, b.cz - from.z) ? p : b, null);
+    const pane = parkedPanes.reduce<GlassPane | null>((b, p) => !b || Math.hypot(p.cx - from.x, p.cz - from.z) < Math.hypot(b.cx - from.x, b.cz - from.z) ? p : b, null);
     const g = pane ? paneLobVelocity(v3(from), v3(to), pane, tf) : null;
     const along = pane && g ? Math.abs((g.hitWorld.x - pane.cx) * -pane.nz + (g.hitWorld.z - pane.cz) * pane.nx) : Infinity;
     if (!pane || !g || along > pane.half + 0.3 || g.hitWorld.y < 0.3 || g.hitWorld.y > 4.3) {
@@ -3867,7 +3918,7 @@ export const DunkMode: ModeDefinition = (() => {
       else if (ballSim.prevPos.z >= glass.z + ballSim.radius && ballSim.pos.z < glass.z + ballSim.radius && lob.kind === 'glass') { lob.over = true; const y = ballSim.pos.y; console.info(`[LOB] ${y > glass.yMax ? 'OVER' : 'WIDE OF'} THE GLASS (${ballSim.pos.x.toFixed(2)},${y.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, y > glass.yMax ? 'OVER THE GLASS' : 'WIDE OF THE GLASS', 700); SoundKit.play('crowdGroan', { volume: 0.4 }); }
     }
     // the corner billboards (DUNK PARKOUR): the toss off a sign comes back off it
-    if (lob.kind === 'corner' && !lob.glass) for (const pn of panes) {
+    if (lob.kind === 'corner' && !lob.glass) for (const pn of parkedPanes) {
       const hit = ballSim.sweptPaneHit(pn.cx, pn.cz, pn.nx, pn.nz, pn.half + 0.3, 0.2, 4.3, GLASS_E_N, GLASS_E_T);
       if (hit) { lob.glass = true; runwayDifficulty += 0.6; console.info(`[LOB] OFF THE BUS at (${hit.x.toFixed(2)},${hit.y.toFixed(2)},${hit.z.toFixed(2)}) @${lob.t.toFixed(2)} s`); flash(ctx, `OFF THE ${ride.short}!`, 600); SoundKit.play('impact', { pitch: 1.6, volume: 0.45 }); EffectsKit.burst(ctx.scene, hit, 'sparks'); break; }
     }
@@ -3916,10 +3967,12 @@ export const DunkMode: ModeDefinition = (() => {
    *  its own. A loop bumps the token so any pending chain dies with it (the turn-end idle). */
   function rivalClip(name: string, opts: PlayOpts = {}): void {
     const token = ++rivalClipToken;
-    if (opts.loop) { rival.animator.play(name, opts); return; }
-    rival.animator.play(name, { ...opts, onEnd: () => {
+    const body = rival;
+    if (!body) return;   // FIRST-DUNK-BUDGET: not here yet (bringRival)
+    if (opts.loop) { body.animator.play(name, opts); return; }
+    body.animator.play(name, { ...opts, onEnd: () => {
       if (token !== rivalClipToken) return;
-      if (opts.onEnd) opts.onEnd(); else rival.animator.play(SPORT_CLIP.idle, { loop: true });
+      if (opts.onEnd) opts.onEnd(); else body.animator.play(SPORT_CLIP.idle, { loop: true });
     } });
   }
 
@@ -4116,6 +4169,7 @@ export const DunkMode: ModeDefinition = (() => {
   async function finishAttempt(ctx: ModeContext, made: boolean): Promise<void> {
     if (finishing) return;
     finishing = true;
+    if (turn === 'player') startContestSet(ctx);   // FIRST-DUNK-BUDGET: your first dunk is in — the contest set loads now
     ctx.setHud({ bannerHigh: false });   // the flush is through: the replay and the judges' banners sit back in the middle
     mic?.release();   // a miss never reaches the iron: the booth's hold ends here
     hangPrompt = false;
@@ -4535,7 +4589,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   async function advanceAfterJudging(ctx: ModeContext): Promise<void> {
-    if (phase !== 'judging') return;   // already advanced (watchdog vs normal path race)
+    if (phase !== 'judging' || awaitingRival) return;   // already advanced (watchdog vs normal path race), or advancing: his body is on its way
     revealTail = -1; revealHold = false;   // IMPROVE (2026-10-06): one advance per reveal, whoever got here first
     clearBanner(ctx); ctx.setHud({ judgeReveal: null });
     if (turn === 'rival') {   // phase 11: the rival's own count, then the runway back
@@ -4664,7 +4718,9 @@ export const DunkMode: ModeDefinition = (() => {
   function aiFeed(ctx: ModeContext, e: FelInput): void { aiFeeding = true; try { def.onInput?.(ctx, e); } finally { aiFeeding = false; } }
   /** The dunker changes: the rival takes the runway (or hands it back), and the pipeline re-binds to the new body. */
   function swapBodies(ctx: ModeContext): void {
-    const was = player; player = rival; rival = was;
+    const next = rival;
+    if (!next) { console.error('[DUNK-RIVAL] no rival body to swap in — the turn stays with the dunker'); return; }   // rivalRound waits for him
+    rival = player; player = next;
     bindBody(ctx);
     attachBallToHand(ball, player.skeleton, hand('RightHand')); ebState.inLeftHand = hs('Right') === 'Left';
     const combos = [...usedCombos]; usedCombos.clear();
@@ -4730,6 +4786,15 @@ export const DunkMode: ModeDefinition = (() => {
     }
   }
   async function rivalRound(ctx: ModeContext): Promise<void> {
+    // FIRST-DUNK-BUDGET: his body comes with the contest set (dunk 1 started it). On a slow line his turn waits for it, the judging
+    // beat holding (the watchdog and every advance stand down while it does).
+    if (!rival) {
+      startContestSet(ctx);   // the guard, not the path: dunk 1 has always started it by now
+      awaitingRival = true;
+      console.info('[DUNK-BUDGET] his turn is up — waiting on his body');
+      try { await rivalArrival; } finally { awaitingRival = false; }
+      if (!rival || ended || ctx.scene.isDisposed) return;
+    }
     // THE PLAYER WATCHES FROM THE SIDE (2026-09-15): the bench opposite the rival's, facing the ring, in the idle
     player.root.position.set(-3.2, 0, CFG.rimZ + 3);
     player.root.rotation.y = Math.atan2(rim.x - -3.2, rim.z - (CFG.rimZ + 3));
@@ -5072,8 +5137,7 @@ export const DunkMode: ModeDefinition = (() => {
     void swapRivalBody(ctx, foe);
     startField(ctx);   // dunk-next phase 5: a new night, a new field (the live rival and the next two in the roster)
     // the rival goes back to the bench spot he spawned on, in the idle loop
-    rival.root.position.set(3.2, 0, CFG.rimZ + 3);
-    rival.root.rotation.y = 0;
+    if (rival) { rival.root.position.set(3.2, 0, CFG.rimZ + 3); rival.root.rotation.y = 0; }
     rivalClipToken++; rivalClip(SPORT_CLIP.idle, { loop: true });
     ctx.heroRef.current = player.root;
     ctx.camDirector.suspended = false;

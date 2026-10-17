@@ -13,7 +13,9 @@ import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
-import { MODES } from '@/lib/babylon/modes/registry';
+// FIRST-DUNK-BUDGET (2026-10-17): the dunk itself, not the registry. MODES statically imports all 29 modes, so the /try chunk carried
+// every game's code (1,026 modules, against 503 for the dunk's own graph) and parsed it on the main thread before the first dunk.
+import { DunkMode } from '@/lib/babylon/modes/DunkMode';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
@@ -51,9 +53,12 @@ export interface DunkBabylonProps extends GameProps {
    *  It lives inside the card on purpose — a claim that is a sibling of GO AGAIN can
    *  never be a wall in front of it, which is exactly what a modal was. */
   cardSlot?: React.ReactNode;
+  /** FIRST-DUNK-BUDGET (2026-10-17): the host KNOWS the visitor is signed out (/try's guest shell), so the harness sends no
+   *  read a guest is refused (HarnessOpts.guest). Absent everywhere else: not known, asked as before. */
+  guest?: boolean;
 }
 
-export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = false }: DunkBabylonProps) {
+export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = false, guest = false }: DunkBabylonProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const endedRef = useRef(false);
@@ -67,6 +72,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   onEndRef.current = onEnd;
   onCardRef.current = onCard;
   const continuousRef = useRef(continuous);
+  const guestRef = useRef(guest);
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -130,12 +136,13 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     // Deferring by a tick lets the phantom mount be cancelled before it builds.
     const startTimer = setTimeout(() => {
       if (disposed) return;
-      runMode(MODES.dunk, {
+      runMode(DunkMode, {
         canvas,
         location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
         applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
         input: bus,
         continuous: continuousRef.current,
+        guest: guestRef.current,
         cardSink,
         onPhase: (p, cd) => {
           setPhase(p);

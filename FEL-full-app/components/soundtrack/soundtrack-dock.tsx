@@ -15,9 +15,8 @@ import { useEffect, useState } from 'react';
 import { isQuickScreenPath } from '@/lib/screen/routes';
 import { AGE_BLOCK_COOKIE, AGE_BLOCK_STORAGE_KEY, AGE_BLOCK_VALUE } from '@/lib/privacy/ageScreen';
 import { reducedMotion } from '@/lib/a11y/reducedMotion';
-import { getSoundtrackPlayer, preloadSoundKit, saveDataOn, unlockSoundtrackFromGesture } from '@/lib/soundtrack/client';
+import { fetchSoundtrackTracks, getSoundtrackPlayer, preloadSoundKit, saveDataOn, unlockSoundtrackFromGesture } from '@/lib/soundtrack/client';
 import { isGamePath } from '@/lib/soundtrack/policy';
-import type { SoundtrackCatalogue } from '@/lib/soundtrack/types';
 import { NowPlayingCard, useSoundtrack } from './now-playing-card';
 import { RunTrackPick } from '@/components/pipelines/run-track-pick';
 
@@ -46,9 +45,8 @@ export function SoundtrackDock() {
     p.setHidden(document.visibilityState === 'hidden');
 
     let live = true;
-    fetch('/api/v1/soundtrack').then((r) => (r.ok ? r.json() : null)).then((c: SoundtrackCatalogue | null) => {
-      if (live && c?.tracks) p.setCatalogue(c.tracks);
-    }).catch(() => { /* the menus stay quiet */ });
+    // FIRST-DUNK-BUDGET: the page's one catalogue read (the Dunk walk-out reads the same answer); a failed read leaves the menus quiet
+    void fetchSoundtrackTracks().then((tracks) => { if (live && tracks) p.setCatalogue(tracks); });
 
     const gesture = () => {
       unlockSoundtrackFromGesture();
