@@ -13,9 +13,10 @@ import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
-// FIRST-DUNK-BUDGET (2026-10-17): the dunk itself, not the registry. MODES statically imports all 29 modes, so the /try chunk carried
-// every game's code (1,026 modules, against 503 for the dunk's own graph) and parsed it on the main thread before the first dunk.
-import { DunkMode } from '@/lib/babylon/modes/DunkMode';
+// FIRST-DUNK-BUDGET (2026-10-17): MODES.dunk from the registry's dunk entry alone (dunkRegistry.ts — the same definition object), not
+// from registry.ts, which statically imports all 29 modes: the /try chunk carried every game's code (1,026 files against the dunk's
+// own 505) and parsed it on the main thread before the first dunk.
+import { MODES } from '@/lib/babylon/modes/dunkRegistry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
@@ -136,7 +137,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
     // Deferring by a tick lets the phantom mount be cancelled before it builds.
     const startTimer = setTimeout(() => {
       if (disposed) return;
-      runMode(DunkMode, {
+      runMode(MODES.dunk, {
         canvas,
         location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
         applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal

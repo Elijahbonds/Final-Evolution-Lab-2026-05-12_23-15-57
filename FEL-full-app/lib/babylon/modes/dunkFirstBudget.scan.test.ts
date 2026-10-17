@@ -36,15 +36,18 @@ function staticGraph(entry: string): Set<string> {
 }
 
 describe('the /try chunk is the dunk, not every game', () => {
-  it('the dunk host boots DunkMode itself, not the 29-mode registry', () => {
+  it('the dunk host mounts MODES.dunk from the registry\'s dunk entry alone, not the 29-mode registry', () => {
+    // MODES.dunk is the spelling registry.drift.test's door check reads; dunkRegistry.test holds the entry to registry.ts's own
     const host = read('components/games/dunk-babylon.tsx');
-    expect(host).toContain("import { DunkMode } from '@/lib/babylon/modes/DunkMode';");
-    expect(host).toContain('runMode(DunkMode, {');
+    expect(host).toContain("import { MODES } from '@/lib/babylon/modes/dunkRegistry';");
+    expect(host).toContain('runMode(MODES.dunk, {');
     expect(host).not.toMatch(/from '@\/lib\/babylon\/modes\/registry'/);
   });
-  it('its static graph reaches no other mode (control: the registry reaches them all)', () => {
+  it('its static graph reaches no other mode and not registry.ts (control: the registry reaches them all)', () => {
     const modes = (g: Set<string>) => [...g].filter((f) => /lib\/babylon\/modes\/[A-Z]\w*Mode\.ts$/.test(f)).map((f) => path.basename(f)).sort();
-    expect(modes(staticGraph('components/games/dunk-babylon.tsx'))).toEqual(['DunkMode.ts']);
+    const host = staticGraph('components/games/dunk-babylon.tsx');
+    expect(modes(host)).toEqual(['DunkMode.ts']);
+    expect([...host].some((f) => f.endsWith('lib/babylon/modes/registry.ts'))).toBe(false);
     expect(modes(staticGraph('lib/babylon/modes/registry.ts')).length).toBeGreaterThan(20);
   });
 });
