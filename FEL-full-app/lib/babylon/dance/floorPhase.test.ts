@@ -78,7 +78,11 @@ describe('where the charts cut a floor move', () => {
     // test changed (lane/dance-extras, 2026-10-14): evolution 9 → 8. Its second hook now opts in to the CAPTURED helicopter (chart phrase ehBc),
     // a 4-beat move that is back on its feet (rise at beat 3) before the next step, where the 8-beat windmill it stood in for was cut mid-floor
     // (it is on the floor from beat ¾ to 7): one fewer switch made while the body is down. The other five songs are untouched.
-    expect(cuts).toEqual({ warmup: 2, cypher: 6, goldenhour: 4, battle: 9, canals: 9, evolution: 8 });
+    // test changed (lane/dance-options, owner 2026-10-17, Q1 A): battle 9 → 8 and canals 9 → 8. Their charts now spell the captured
+    // helicopter (battle's second hook) and headstand spin (canals' second verse) where the 8-beat windmill stood in: a 4-beat floor move that
+    // is back on its feet (rise at beat 3) before the next step, where the windmill was cut mid-floor. Measured before the change by
+    // scripts/dance-options-measure.ts (variant A3). The other four songs are untouched.
+    expect(cuts).toEqual({ warmup: 2, cypher: 6, goldenhour: 4, battle: 8, canals: 8, evolution: 8 });
   });
 });
 

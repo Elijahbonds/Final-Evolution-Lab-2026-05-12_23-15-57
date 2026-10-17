@@ -153,7 +153,11 @@ import { padStore } from '../dance/ui/padStore';   // lane/dance-extras: what th
 // lane/dance-extras (2026-10-14): the FREESTYLE section — pure decisions in dance/freestyle.ts (a chart marks it; no step is inside it; every
 // face button picks the move; STYLE only, GROOVE_STYLE per freestyle slot, never the judge), wired here to the dancer, the HUD, the pad
 // and the stage.
-import { FreestyleDeck, FREE_CUE_COLOR, freeSpanAt, nextFreeSpan, routeFreestyle, freeStyleFor, legendLine, freeName, type FreeSpan } from '../dance/freestyle';
+// lane/dance-options (owner 2026-10-17): + the VARIETY bonus at a section's end (Q2) and the EXIT GRACE after it (Q6)
+import {
+  FreestyleDeck, FREE_CUE_COLOR, freeSpanAt, nextFreeSpan, routeFreestyle, freeStyleFor, legendLine, freeName, varietyBonus, exitGraceForgives,
+  type FreeSpan, type PadSlot,
+} from '../dance/freestyle';
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
@@ -488,6 +492,10 @@ export const DanceMode: ModeDefinition = (() => {
   let freeCur: FreeSpan | null = null;
   let freeStyleAt = 0;
   const freeDeck = new FreestyleDeck();
+  /** lane/dance-options: the buttons that took a slot in the section being danced (its VARIETY), and the song beat of the last press made
+   *  inside a section (the EXIT GRACE reads it). */
+  let freeButtons = new Set<PadSlot>();
+  let freeLastPress: number | null = null;
   /** #10 / #13: STYLE — groove taps and held freezes. Its own tally: never added to the (Arena-staked) score. */
   let style = 0;
   /** #13: the source of the tap being judged right now (onInput sets it around perf.hit; onJudged reads it), and the
@@ -514,6 +522,7 @@ export const DanceMode: ModeDefinition = (() => {
     sections = new SectionTally(track.song);
     fumbled = new Set(); grooves = []; grooveTaken = new Set(); style = 0;
     freeSpans = []; freeCur = null; freeStyleAt = 0; freeDeck.reset(); dressing?.freestyle(false);
+    freeButtons = new Set(); freeLastPress = null;   // lane/dance-options
     tapSrc = null; hold = null; laneAt = -Infinity; countDigit = 0;
     lastStep = null;
   }
@@ -1015,6 +1024,7 @@ export const DanceMode: ModeDefinition = (() => {
     // up and Stoop speaks; #3 the run's average timing offset, with the calibrate link when it leans; #9 the section
     // with the most misses; #4 the run goes into this device's best for the track.
     banner.cancel(); hold = null;
+    if (freeCur) style += varietyBonus(freeButtons);   // lane/dance-options: a section the run ends inside still pays its VARIETY
     freeCur = null; dressing?.freestyle(false);   // lane/dance-extras: a run that ends inside a freestyle section ends it
     const fc = isFullCombo(r.counts);
     const offset = offsetSummary(offsetSumMs, offsetHits);
@@ -1319,6 +1329,14 @@ export const DanceMode: ModeDefinition = (() => {
         }
       }
     }
+    // lane/dance-options (owner 2026-10-17, Q6): the EXIT GRACE (dance/freestyle.ts exitGraceForgives). A press the judge would call a WILD
+    // tap (no step within its reach), made within EXIT_GRACE_SEC after a freestyle section ends by a player who was still pressing in that
+    // section's last moment, is the section's follow-through: absorbed, no cost. A press that would catch a step still does, and a step
+    // nobody hit still expires a MISS (DancePerformance, untouched).
+    if (freeSpans.length && phase === 'playing' && !pressTarget(near ?? perf.upcoming(heardNow, STOOP_LOOKAHEAD), heardNow)) {
+      const bd = beatDuration(track.bpm);
+      if (exitGraceForgives({ spans: freeSpans, beatPos: (heardNow - startAt) / bd, beatSec: bd, lastSectionPressBeat: freeLastPress })) return;
+    }
     tapSrc = tapSource(e);
     try { void perf.hit(heardNow); } finally { tapSrc = null; }
   }
@@ -1336,13 +1354,15 @@ export const DanceMode: ModeDefinition = (() => {
     if (!clock.accepting(a, MISS_AFTER)) return false;
     const heardNow = clock.song(a) - latencySec;
     const bd = beatDuration(track.bpm);
+    if (matchPress(e, anyTap)) freeLastPress = (heardNow - startAt) / bd;   // lane/dance-options: the EXIT GRACE reads the section's last press
     const route = routeFreestyle({
       e, tap: anyTap, upcoming: perf.upcoming(heardNow, STOOP_LOOKAHEAD), heardNow, beatPos: (heardNow - startAt) / bd, beatSec: bd, styleBeats: grooves, taken: grooveTaken,
+      matchOn: matchMode,   // lane/dance-options (Q6): a wrong button in the section's last moment dances, never fumbles the next step
     });
     if (!route) return false;
     const pick = freeDeck.press(route.slot);
     playStep({ clipId: pick.clipId, beat: (heardNow - startAt) / bd, holdBeats: CLIP_BY_ID.get(pick.clipId)?.beats ?? 4, mirrored: pick.mirrored });
-    if (route.slotBeat !== null) grooveTaken.add(route.slotBeat);
+    if (route.slotBeat !== null) { grooveTaken.add(route.slotBeat); freeButtons.add(route.slot); }   // lane/dance-options: the section's VARIETY
     style += freeStyleFor(route);
     if (route.slotBeat !== null) {
       ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.1, 0)), freeName(pick.clipId), '#fde047');
@@ -1358,6 +1378,7 @@ export const DanceMode: ModeDefinition = (() => {
    *  the moves they will dance, the LED wall's word and a burst on the stage, the crowd's cheer. Display only. */
   function enterFreestyle(ctx: ModeContext, span: FreeSpan): void {
     freeCur = span; freeStyleAt = style; freeDeck.reset();
+    freeButtons = new Set();
     const legend = freeDeck.legend();
     padStore.set({ mode: 'free', free: legend });
     dressing?.freestyle(true);
@@ -1369,12 +1390,17 @@ export const DanceMode: ModeDefinition = (() => {
 
   /** lane/dance-extras: the section ends — what it earned, and MATCH (if it is on) is back. Display only. */
   function exitFreestyle(ctx: ModeContext): void {
+    // lane/dance-options (owner 2026-10-17, Q2): the section's VARIETY — +50 STYLE for each different button that took a slot, past the
+    // first, at most +150 (dance/freestyle.ts varietyBonus). The STYLE tally only, like every other line here.
+    const variety = varietyBonus(freeButtons);
+    style += variety;
+    freeButtons = new Set();
     const gained = style - freeStyleAt;
     freeCur = null;
     padStore.set({ mode: matchMode ? 'match' : 'any', free: {} });
     dressing?.freestyle(false);
     SoundKit.play('uiTick', { pitch: 1.0, volume: 0.35 });
-    flashBanner(ctx, `FREESTYLE OVER${gained > 0 ? ` · +${gained} STYLE` : ''}${matchMode ? ' · MATCH IS BACK' : ''}`, 1500, { round: track.name });
+    flashBanner(ctx, `FREESTYLE OVER${gained > 0 ? ` · +${gained} STYLE` : ''}${variety > 0 ? ` (VARIETY +${variety})` : ''}${matchMode ? ' · MATCH IS BACK' : ''}`, 1500, { round: track.name });
   }
 
   /** lane/dance-extras: once a frame, on the heard clock: did the song cross into or out of a freestyle section? */
