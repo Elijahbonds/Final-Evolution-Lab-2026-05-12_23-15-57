@@ -247,7 +247,7 @@ export function AccountSaveView({ a }: { a: AccountSaveApi }) {
         <Icon className={`h-3.5 w-3.5 ${s.status === 'saving' ? 'animate-spin' : ''}`} aria-hidden /> {LABEL[s.status]}
       </button>
       {s.panelOpen && (
-        <div role="dialog" aria-label="Your account’s projects" className="absolute right-0 top-full z-30 mt-1 w-[min(92vw,360px)] rounded-lg border p-3 text-[12px] shadow-xl"
+        <div role="dialog" aria-label="Your account’s projects" className="fixed inset-x-2 top-28 z-30 max-h-[70vh] overflow-y-auto rounded-lg border p-3 text-[12px] shadow-xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-1 sm:w-[360px]"
           style={{ background: C.surface, borderColor: C.line, color: C.text }} data-testid="account-panel">
           {s.status === 'offer' && (
             <div className="mb-3">
