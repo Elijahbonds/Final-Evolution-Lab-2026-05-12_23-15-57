@@ -24,6 +24,7 @@ import {
   studioLook, mountMeshyLayer, mountFixtureLayer, mountDecalLayer, mountCrowdLayer, mountWeatherLayer, type Layer,
 } from './runtime';
 import { mountCastLayer, mountCrowdCastLayer, type CastLayer, type CrowdCastLayer } from './castLayer';
+import type { CrowdReactions } from './castCheer';
 import { VenueKit } from '../babylon/visual/VenueKit';
 import { mountFootballFx } from '../babylon/court/FootballFx';
 
@@ -111,7 +112,12 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
   let venue: VenueHandle | null = null;
   const layers: Partial<Record<Exclude<StageLayer, 'venue' | 'cast'>, Layer>> & { cast?: CastLayer; crowdCast?: CrowdCastLayer } = {};
   // studio-4b: the characters seated among the fans sit in the stands' empty seats, so a stand edit re-seats them too
-  const mountCrowdCast = (): void => { layers.crowdCast?.dispose(); layers.crowdCast = mountCrowdCastLayer(scene, exp.cast?.crowd, exp.crowd, { tier, frame: castFrameFor(exp.target) }); };
+  // studio-5: they hear the crowd layer's reactions (castCheer.ts), so a crowd re-mount re-mounts them on the new crowd
+  const mountCrowdCast = (): void => {
+    layers.crowdCast?.dispose();
+    const hears = (layers.crowd as { crowd?: CrowdReactions | null } | undefined)?.crowd ?? null;
+    layers.crowdCast = mountCrowdCastLayer(scene, exp.cast?.crowd, exp.crowd, { tier, frame: castFrameFor(exp.target), hears });
+  };
   const subject = (): Vector3 => Vector3.FromArray(exp.subject ?? target?.subject ?? [0, 0, 0]);
   const objective = (): Vector3 => Vector3.FromArray(target?.objective ?? [0, 0, -10]);
   const mountLayer = (name: StageLayer): void => {
