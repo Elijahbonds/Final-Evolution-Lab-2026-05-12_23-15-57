@@ -6,11 +6,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const ai = vi.hoisted(() => ({ state: 'loading' as 'loading' | 'available' | 'coming_soon' }));
 vi.mock('@/lib/abacus/useAiStatus', () => ({ useAiStatus: () => [ai.state, () => {}] }));
 
-import { AiVenuePanel, aiRequestBody, reviewOf } from './ai-venue-panel';
+import { AiVenuePanel, aiCtxOf, aiRequestBody, reviewOf } from './ai-venue-panel';
 import { AI_COMING_SOON_MESSAGE } from '@/lib/abacus/aiStatus';
 import { sanitizeAiEdits } from '@/lib/nexus-studio/aiEdits';
 import { starterProject, type StudioApi } from './use-studio';
-import { GOOD_ANSWER, HOSTILE_ANSWER, SCRIPT_CAST_ANSWER } from '@/tests/helpers/aiVenue';
+import { GOOD_ANSWER, HOSTILE_ANSWER, SCRIPT_CAST_ANSWER, STAMP_ANSWER } from '@/tests/helpers/aiVenue';
 
 const studio = (): StudioApi => {
   const doc = starterProject();
@@ -75,5 +75,20 @@ describe('studio-4b', () => {
     expect(rv.lines).toHaveLength(4);
     expect(rv.skipped.filter(Boolean)).toHaveLength(1);
     expect(rv.skipped[3]).toMatch(/Zed/);
+  });
+});
+
+describe('studio-5: stamps', () => {
+  it('review and apply read the project\'s own stamps (never sent); a stamp nobody has is struck out', () => {
+    const doc = starterProject();
+    const own = { id: 'stamp_own', name: 'Bench Gang', objects: [] as never[] };
+    const ctx = aiCtxOf({ ...doc, stamps: [own] });
+    expect(ctx.stamps).toEqual([own]);
+    expect(aiCtxOf(doc).stamps).toEqual([]);
+    const r = sanitizeAiEdits(STAMP_ANSWER);
+    const rv = reviewOf(r.edits, r.dropped, aiCtxOf({ ...doc, stamps: [{ ...own, objects: doc.venues[0].objects.slice(0, 2) }] }));
+    expect(rv.skipped.map(Boolean)).toEqual([false, false, false, false, true]);
+    expect(rv.lines[3]).toMatch(/this project’s stamp/);
+    expect(JSON.stringify(JSON.parse(aiRequestBody(doc.venues[0], { prompt: 'x' })))).not.toContain('stamp_own');
   });
 });

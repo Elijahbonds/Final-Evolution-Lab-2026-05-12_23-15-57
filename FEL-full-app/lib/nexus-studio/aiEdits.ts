@@ -20,15 +20,24 @@
 // named it in the typed request, and the browser resolves that name against the project's own characters (resolveCastName); a
 // name that matches none is shown in the review and left out. Existing scripts are not sent either: a proposal is a new script.
 //
+// studio-5 (§13.2): CELL also proposes STAMPS — a prefab group (stamps.ts) placed at a spot and turned, as one more op in the
+// closed vocabulary, through the same review-then-apply step and the same one command. The model is told the BUILT-IN stamps
+// (app content, like the catalog's ids). It is NOT told the project's own stamps: they are project data, not the venue's settings
+// or placements (Privacy Policy §1 lets a request carry those and the typed request only), and their names are free text a
+// creator typed. A project stamp is reached the way a character is: the creator names it in the request, the model repeats the
+// name, and the browser resolves it against the project's own stamps (resolveStamp); a name that matches none is shown in the
+// review and left out.
+//
 // Pure: no fetch, no DOM, no Babylon. The prompt words live here too, so the server route stays a thin, testable shell.
 
 import type { Command, Op } from './commands';
 import { catalog, catalogItem, instantiate } from './catalog';
 import {
   LIMITS, OBJECT_TYPES, clampNum, newId, sanitizeObject, sanitizeVenue, wrapAngle,
-  type StudioCharacter, type StudioObject, type StudioObjectType, type StudioScript, type StudioVenue, type V3, type VenueSettings,
+  type StudioCharacter, type StudioObject, type StudioObjectType, type StudioScript, type StudioStamp, type StudioVenue, type V3, type VenueSettings,
 } from './doc';
 import { NODE_KINDS, NODE_SPECS, groupOf, sanitizeGraph, type ParamSpec, type ScriptGraph } from './scripts';
+import { builtInStamps, stampCopies } from './stamps';
 import { targetOf } from './targets';
 
 // ── the vocabulary ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -47,7 +56,10 @@ export type AiEdit =
   /** studio-4b: a new script for this venue (the graph already through sanitizeGraph, laid out by the Studio) */
   | { op: 'script'; name: string; graph: ScriptGraph }
   /** studio-4b: cast a character the creator NAMED (resolved in the browser), or empty the player slot (`character: null`) */
-  | { op: 'cast'; slot: 'player' | 'crowd'; character: string | null };
+  | { op: 'cast'; slot: 'player' | 'crowd'; character: string | null }
+  /** studio-5: a prefab stamp — a built-in's id or name, or a project stamp's name as the creator wrote it (resolved in the browser) —
+   *  placed with its origin at `at`, turned `yaw` (radians) */
+  | { op: 'stamp'; stamp: string; at: V3; yaw: number };
 
 export const AI_LIMITS = {
   /** edits in one answer */
@@ -64,6 +76,8 @@ export const AI_LIMITS = {
   scriptNodes: 24,
   /** cast edits one answer may make */
   casts: 1 + 4,
+  /** stamps one answer may place (their pieces count toward `placed`) */
+  stamps: 6,
   /** the explain pass's summary (characters) */
   summary: 1200,
 } as const;
@@ -149,6 +163,13 @@ function castEdit(e: Json): AiEdit | null {
   return name ? { op: 'cast', slot, character: name } : null;
 }
 
+/** A stamp edit: the stamp's name or id (text, capped), where its origin goes, and its turn. */
+function stampEdit(e: Json): AiEdit | null {
+  const name = label(own(e, 'stamp'));
+  const p = xz(own(e, 'at'));
+  return name && p ? { op: 'stamp', stamp: name, at: [p[0], 0, p[1]], yaw: yawOf(own(e, 'yaw')) } : null;
+}
+
 export interface SanitisedEdits { edits: AiEdit[]; dropped: number }
 
 /**
@@ -160,13 +181,14 @@ export function sanitizeAiEdits(answer: unknown): SanitisedEdits {
   if (typeof raw === 'string') raw = parseAnswer(raw);
   const list = Array.isArray(raw) ? raw : isObj(raw) && Array.isArray(own(raw, 'edits')) ? (own(raw, 'edits') as unknown[]) : [];
   const edits: AiEdit[] = [];
-  let dropped = 0, placed = 0, scripts = 0, casts = 0;
+  let dropped = 0, placed = 0, scripts = 0, casts = 0, stamps = 0;
   for (const e of list) {
     if (edits.length >= AI_LIMITS.edits) { dropped++; continue; }
     if (!isObj(e)) { dropped++; continue; }
     const op = own(e, 'op');
     if (op === 'script') { const x = scripts < AI_LIMITS.scripts ? scriptEdit(e) : null; if (x) { edits.push(x); scripts++; } else dropped++; continue; }
     if (op === 'cast') { const x = casts < AI_LIMITS.casts ? castEdit(e) : null; if (x) { edits.push(x); casts++; } else dropped++; continue; }
+    if (op === 'stamp') { const x = stamps < AI_LIMITS.stamps ? stampEdit(e) : null; if (x) { edits.push(x); stamps++; } else dropped++; continue; }
     if (op === 'venue') { const v = venueSet(own(e, 'set')); if (v) edits.push(v); else dropped++; continue; }
     if (op === 'clear') {
       const t = own(e, 'type');
@@ -210,23 +232,42 @@ export function parseAnswer(text: string): unknown {
 
 // ── compile: edits → one command ────────────────────────────────────────────────────────────────────────────────────
 
-export interface Compiled { cmd: Command; placed: number; removed: number; settings: string[]; scripts: number; cast: number }
+export interface Compiled { cmd: Command; placed: number; removed: number; settings: string[]; scripts: number; cast: number; /** studio-5: stamps placed (their pieces are in `placed`) */ stamps: number }
 
 /** The project around the venue, for the edits that reach past it (scripts are added to the project; casts name its characters). */
-export interface AiProjectCtx { characters: readonly Pick<StudioCharacter, 'id' | 'name'>[]; scripts: readonly Pick<StudioScript, 'id'>[] }
+export interface AiProjectCtx {
+  characters: readonly Pick<StudioCharacter, 'id' | 'name'>[];
+  scripts: readonly Pick<StudioScript, 'id'>[];
+  /** studio-5: the project's own stamps (StudioProject.stamps), which a stamp edit may name; the built-ins need no project */
+  stamps?: readonly StudioStamp[];
+}
 
 /**
  * A character the creator named → the project's character: the exact name (case and spacing aside); else, if exactly one
  * character's name contains it or is contained by it, that one. Ambiguous or unknown: null (the review says so).
  */
 export function resolveCastName(characters: readonly Pick<StudioCharacter, 'id' | 'name'>[], name: string): Pick<StudioCharacter, 'id' | 'name'> | null {
+  return byName(characters, name);
+}
+
+/** The name rule casts and stamps share: exact (case and spacing aside), else one unique partial match; else null. */
+function byName<T extends { name: string }>(list: readonly T[], name: string): T | null {
   const norm = (x: string) => x.toLowerCase().replace(/\s+/g, ' ').trim();
   const n = norm(name);
   if (!n) return null;
-  const exact = characters.filter((c) => norm(c.name) === n);
-  if (exact.length === 1) return exact[0];   // two characters with the same name: the partial match below finds both → null
-  const near = characters.filter((c) => norm(c.name).includes(n) || n.includes(norm(c.name)));
+  const exact = list.filter((c) => norm(c.name) === n);
+  if (exact.length === 1) return exact[0];   // two with the same name: the partial match below finds both → null
+  const near = list.filter((c) => norm(c.name).includes(n) || n.includes(norm(c.name)));
   return near.length === 1 ? near[0] : null;
+}
+
+/**
+ * studio-5: the stamp a stamp edit names — a built-in by its id (`stamp:lampRow`), else by name among the built-ins and the
+ * project's own stamps together (byName: exact, else one unique partial match). Ambiguous or unknown: null (the review says so).
+ */
+export function resolveStamp(name: string, project: readonly StudioStamp[] = []): StudioStamp | null {
+  const built = builtInStamps();
+  return built.find((b) => b.id === name.trim()) ?? byName([...built, ...project], name);
 }
 
 /** The edits as one command on `v` (one undo step), or null when they change nothing. Ids are minted here. Scripts and casts need
@@ -236,7 +277,7 @@ export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt:
   const seen = new Set(v.objects.map((o) => o.id));
   const removed = new Set<string>();
   let patch: Partial<VenueSettings> = {};
-  let placed = 0, scripts = 0, cast = 0;
+  let placed = 0, scripts = 0, cast = 0, stamps = 0;
   let player = v.cast?.player;
   const crowd = [...(v.cast?.crowd ?? [])];
   let castTouched = false;
@@ -256,6 +297,18 @@ export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt:
       if (!c) continue;
       if (e.slot === 'player') { if (player !== c.id) { player = c.id; castTouched = true; cast++; } continue; }
       if (!crowd.includes(c.id) && crowd.length < LIMITS.crowdCast) { crowd.push(c.id); castTouched = true; cast++; }
+      continue;
+    }
+    if (e.op === 'stamp') {
+      // the whole stamp or none of it (a half-placed stamp is a broken one — stamps.ts placeStamp's rule), inside the venue's cap
+      // and the answer's placement cap
+      const st = resolveStamp(e.stamp, ctx?.stamps);
+      if (!st?.objects.length) continue;
+      if (v.objects.length - removed.size + placed + st.objects.length > LIMITS.objects || placed + st.objects.length > AI_LIMITS.placed) continue;
+      const copies = stampCopies(st, e.at, e.yaw, seen);
+      for (const object of copies) ops.push({ op: 'addObject', venueId: v.id, object });
+      placed += copies.length;
+      stamps++;
       continue;
     }
     if (e.op === 'clear') {
@@ -287,7 +340,7 @@ export function compileAiEdits(v: StudioVenue, edits: readonly AiEdit[], prompt:
   if (settings.length || castTouched) ops.unshift({ op: 'patchVenue', venueId: v.id, patch });
   if (!ops.length) return null;
   const words = prompt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 48);
-  return { cmd: { label: `AI: ${words || 'venue'}${prompt.trim().length > 48 ? '…' : ''}`, ops }, placed, removed: removed.size, settings, scripts, cast };
+  return { cmd: { label: `AI: ${words || 'venue'}${prompt.trim().length > 48 ? '…' : ''}`, ops }, placed, removed: removed.size, settings, scripts, cast, stamps };
 }
 
 /** One line per edit, for the review list the creator reads before Apply. */
@@ -309,6 +362,10 @@ export function describeEdit(e: AiEdit): string {
     return `Script “${e.name}” (this venue): when ${events.join(' / ')}${ifs ? ', if …' : ''} → ${actions.join(', ')}`;
   }
   if (e.op === 'cast') return e.character === null ? 'Cast: the player’s own look again' : e.slot === 'player' ? `Cast “${e.character}” as the player` : `Seat “${e.character}” among the fans`;
+  if (e.op === 'stamp') {
+    const turn = Math.round((e.yaw * 180) / Math.PI);
+    return `Stamp “${e.stamp}” at (${e.at[0].toFixed(1)}, ${e.at[2].toFixed(1)})${turn ? `, turned ${turn}°` : ''}`;
+  }
   const item = catalogItem(e.item);
   return `Place ${e.name ?? item?.label ?? e.item} at (${e.at[0].toFixed(1)}, ${e.at[2].toFixed(1)})`;
 }
@@ -317,6 +374,14 @@ export function describeEdit(e: AiEdit): string {
 export function reviewAiEdits(edits: readonly AiEdit[], ctx: AiProjectCtx): Array<{ line: string; skipped?: string }> {
   return edits.map((e) => {
     const line = describeEdit(e);
+    if (e.op === 'stamp') {
+      const st = resolveStamp(e.stamp, ctx.stamps);
+      if (!st) return { line, skipped: `no single stamp called “${e.stamp}” on the shelf — left out` };
+      const own = !st.id.startsWith('stamp:');
+      // a built-in asked for by its id reads by its name; a partial match says which stamp it found
+      const said = st.id === e.stamp ? describeEdit({ ...e, stamp: st.name }) : st.name === e.stamp ? line : `${line} → ${st.name}`;
+      return { line: `${said} (${st.objects.length} piece${st.objects.length === 1 ? '' : 's'}${own ? ', this project’s stamp' : ''})` };
+    }
     if (e.op !== 'cast' || e.character === null) return { line };
     const c = resolveCastName(ctx.characters, e.character);
     return c ? { line: c.name === e.character ? line : `${line} → ${c.name}` } : { line, skipped: `no single character called “${e.character}” in this project — left out` };
@@ -372,6 +437,12 @@ export function aiVenueSystem(): string {
     'Casts: the creator may NAME one of their characters in the request. You are not told which characters exist; use the name',
     ' exactly as the creator wrote it: {"op":"cast","slot":"player"|"crowd","character":"<name>"} ({"slot":"player","character":null}',
     ` gives the player their own look back). The crowd seats up to ${LIMITS.crowdCast} named characters among the fans.`,
+    // studio-5: stamps
+    'Stamps (prefab groups of catalog items, placed whole) — use one when it fits the request:',
+    ' {"op":"stamp","stamp":<stamp id>,"at":[x,z],"yaw":degrees} — "at" is the stamp\'s centre; yaw turns the whole group about it.',
+    `Built-in stamps: ${builtInStamps().map((b) => `${b.id} (${b.name})`).join(', ')}.`,
+    'The creator may also NAME a stamp of their own in the request. You are not told which they have; use the name exactly as the',
+    ' creator wrote it in "stamp".',
   ].join('\n');
 }
 
