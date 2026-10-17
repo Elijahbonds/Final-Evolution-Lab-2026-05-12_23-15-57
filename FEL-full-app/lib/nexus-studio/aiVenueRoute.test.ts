@@ -21,7 +21,7 @@ vi.mock('@/lib/db', () => ({
 
 import { POST } from '@/app/api/cell/venue/route';
 import { newVenue } from './doc';
-import { EXPLAIN_ANSWER, GOOD_ANSWER, HOSTILE_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, RALLY_PROMPT, SCRIPT_CAST_ANSWER, completionBody } from '@/tests/helpers/aiVenue';
+import { EXPLAIN_ANSWER, GOOD_ANSWER, HOSTILE_ANSWER, HOSTILE_STAMP_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, RALLY_PROMPT, SCRIPT_CAST_ANSWER, STAMP_ANSWER, STAMP_PROMPT, completionBody } from '@/tests/helpers/aiVenue';
 
 const saved = { flag: process.env.ABACUS_ENABLED, key: process.env.ABACUSAI_API_KEY };
 let fetchSpy: ReturnType<typeof vi.fn>;
@@ -191,6 +191,23 @@ describe('studio-4b', () => {
     const words = sentWords();
     expect(words).toContain(RALLY_PROMPT);   // the names the creator typed are the typed request
     expect(words).not.toMatch(/c_secret|FEL\d\./);
+  });
+
+  // studio-5 (§13.2)
+  it('stamps come back sanitised; the model hears the built-in shelf, never a project stamp, even when a body smuggles one in', async () => {
+    answer = HOSTILE_STAMP_ANSWER;
+    const hostile = await (await POST(req({ prompt: STAMP_PROMPT, venue: venue() }))).json();
+    expect(hostile.edits).toHaveLength(6);
+    expect(hostile.dropped).toBe(6);
+    expect(JSON.stringify(hostile)).not.toMatch(/hoop|evil|objects/);
+    answer = STAMP_ANSWER;
+    const smuggled = { ...venue(), stamps: [{ id: 'stamp_secret', name: 'Grandma Stamp', objects: [{ type: 'fixture', name: 'Grandma lamp' }] }] };
+    const body = await (await POST(req({ prompt: STAMP_PROMPT, venue: smuggled }))).json();
+    expect(body.edits.map((e: { op: string; stamp: string }) => `${e.op}:${e.stamp}`)).toEqual(['stamp:stamp:lampRow', 'stamp:Lamp row', 'stamp:stamp:floodCorners', 'stamp:Bench Gang', 'stamp:Disco Ball Tower']);
+    const words = sentWords();
+    expect(words).toContain(STAMP_PROMPT);       // a project stamp named by the creator is the typed request
+    expect(words).toContain('stamp:lampRow');    // the built-in shelf, in the system words
+    expect(words).not.toMatch(/Grandma|stamp_secret/);
   });
 
   it('explain: a plain-text summary, sanitised; the model hears the venue brief and nothing else; no edits', async () => {

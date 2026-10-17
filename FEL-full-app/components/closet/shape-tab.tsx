@@ -37,7 +37,13 @@ export interface ShapeTabProps {
   canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
   /** false: the numbers stay on this device (the adult's numbers opt-in is off, or a teen) */
   numbersSaved: boolean;
+  /** NEXUS STUDIO (studio-5): only set in the Closet's Studio-edit mode, which has no look-numbers consent: the note says the shape
+   *  goes back to the Studio with the look (a share code always carries the doc) */
+  studioEdit?: boolean;
 }
+
+/** The Shape tab's note in Studio-edit mode (studio-5). */
+export const STUDIO_EDIT_SHAPE_NOTE = 'Shape numbers go back to Nexus Studio with this look; nothing here is saved to your Closet.';
 
 function Section({ title, note, onReset, children }: { title: string; note: string; onReset?: () => void; children: ReactNode }) {
   return (
@@ -109,7 +115,8 @@ export function ShapeTab(p: ShapeTabProps) {
         <NumSlider label="Size" value={p.presentation ?? 1} min={PRESENTATION_RANGE[0]} max={PRESENTATION_RANGE[1]} step={0.01}
           onChange={(v) => p.onPresentation(v, 'presentation')} />
       </Section>
-      {!p.numbersSaved && <p className="text-[10px] leading-snug text-white/40">Shape numbers stay on this device unless you allow saving look numbers.</p>}
+      {p.studioEdit ? <p className="text-[10px] leading-snug text-white/40">{STUDIO_EDIT_SHAPE_NOTE}</p>
+        : !p.numbersSaved && <p className="text-[10px] leading-snug text-white/40">Shape numbers stay on this device unless you allow saving look numbers.</p>}
     </div>
   );
 }

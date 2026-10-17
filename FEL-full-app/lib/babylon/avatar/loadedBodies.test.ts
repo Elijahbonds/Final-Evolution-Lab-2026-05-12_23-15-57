@@ -9,7 +9,9 @@ import { auditRig } from './RigValidator';
 
 const FEL_JOINTS = 22;
 const files = ['public/models/fel-hero.glb', 'public/models/fel-hero.mobile.glb', 'public/models/candidates/fel-kit-male.glb', 'public/models/candidates/fel-kit-female.glb',
-  ...(existsSync('public/models/athletes') ? readdirSync('public/models/athletes').filter((f) => f.endsWith('.glb')).map((f) => `public/models/athletes/${f}`) : [])]
+  ...(existsSync('public/models/athletes') ? readdirSync('public/models/athletes').filter((f) => f.endsWith('.glb')).map((f) => `public/models/athletes/${f}`) : []),
+  // 2026-10-16: the forge rivals (scripts/avatar/rivals.mts) — the roster now
+  ...(existsSync('public/models/rivals') ? readdirSync('public/models/rivals').filter((f) => f.endsWith('.glb')).map((f) => `public/models/rivals/${f}`) : [])]
   .filter((f) => existsSync(f));
 
 async function load(file: string) {

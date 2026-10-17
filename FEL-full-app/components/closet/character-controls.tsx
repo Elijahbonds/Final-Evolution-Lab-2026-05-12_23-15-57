@@ -38,10 +38,17 @@ export function ColourRow({ label, swatches, value, onPick, group }: {
 
 const BODY_LABEL: Record<SlotBody, string> = { male: 'Male', female: 'Female', scan: 'My scan' };
 
-/** The slot's body and its height / build. `scan` is offered only when the server said this account owns one. */
-export function BodyControls({ body, frame, scanOwned, numbersSaved, onBody, onFrame }: {
+/** NEXUS STUDIO "Edit in the Closet" (studio-5): the Body note in Studio-edit mode, where the look-numbers consent is hidden and
+ *  the height and build always go back to the Studio with the look (they are not "numbers" in a share code). */
+export const STUDIO_EDIT_FRAME_NOTE = ' Height and build go back to Nexus Studio with this look; nothing here is saved to your Closet.';
+
+/** The slot's body and its height / build. `scan` is offered only when the server said this account owns one.
+ *  `studioEdit` (only set in the Closet's Studio-edit mode): the note says where the height and build go instead of pointing at a
+ *  consent control that mode does not show. */
+export function BodyControls({ body, frame, scanOwned, numbersSaved, onBody, onFrame, studioEdit }: {
   body: SlotBody; frame: SlotFrame | null; scanOwned: boolean; numbersSaved: boolean;
   onBody: (b: SlotBody) => void; onFrame: (f: SlotFrame | null, group?: string) => void;
+  studioEdit?: boolean;
 }) {
   const bodies: SlotBody[] = scanOwned ? ['male', 'female', 'scan'] : ['male', 'female'];
   const f = frame ?? { heightScale: 1, buildScale: 1 };
@@ -64,7 +71,7 @@ export function BodyControls({ body, frame, scanOwned, numbersSaved, onBody, onF
             onChange={(v) => onFrame({ ...f, buildScale: v }, 'frame:build')} />
           <p className="text-[10px] leading-snug text-white/40">
             Looks only: ranked and fixed-frame modes play every body at 1.0.
-            {!numbersSaved && ' Height and build stay on this device unless you allow saving look numbers above.'}
+            {studioEdit ? STUDIO_EDIT_FRAME_NOTE : !numbersSaved && ' Height and build stay on this device unless you allow saving look numbers above.'}
           </p>
         </div>
       )}

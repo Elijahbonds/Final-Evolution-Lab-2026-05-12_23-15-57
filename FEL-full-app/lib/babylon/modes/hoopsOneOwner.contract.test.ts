@@ -73,14 +73,21 @@ describe('1v1 (S2): a left-stick crossover plays ONE beat, from the move picker'
     expect(block.slice(0, 1600)).toMatch(/doMove\(ctx, moveFromContext\(\{/);
   });
   it('(3d review) the flick always has a body: the crossover block marks its doMove as a flick, and a flick\'s clip is flickClip (the crossover for off the head)', () => {
+    // HOOPS MOTION phase 4b: the flick is rendered by anim/handleMotion (one renderer for both modes) — the crossover block still marks
+    // its doMove as a flick (and passes the cut's side: the reversal's end side), doMove hands `flick` to requestMove, and the renderer
+    // plays flickClip for a flick and beats it on this body's tree (meHost)
     const block = mode.slice(mode.indexOf('if (drib.crossover && !finish && !posting) {'));
-    expect(block.slice(0, 1800)).toMatch(/inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,\s*\}, handle\), undefined, true\);/);
+    // H2 rewrote this pin (same intent — the flick is marked a flick): the read picks at the unlock gate now, not the handle
+    expect(block.slice(0, 2400)).toMatch(/inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,\s*\}, MOVES_UNLOCKED_GATE\), undefined, true, cutSide\);/);
     const fn = mode.slice(mode.indexOf('function doMove('), mode.indexOf('function doMove(') + 2400);
-    expect(fn).toMatch(/function doMove\(ctx: ModeContext, move: HandleMove, dirHint\?: 'left' \| 'right', flick = false\)/);
-    expect(fn).toMatch(/const clip = flick \? flickClip\(move, moveDir\) : moveClip\(move, moveDir\);/);
-    expect(fn).toMatch(/if \(clip\) meAnimTree\.beat\(clip,/);
+    expect(fn).toMatch(/function doMove\(ctx: ModeContext, move: HandleMove, dirHint\?: 'left' \| 'right', flick = false, cutSide\?: 'left' \| 'right'(, variant\?: 'slide')?\)/);   // (H2: + the BTB slide's variant)
+    expect(fn).toMatch(/requestMove\(meHost\(\), \{\s*move, hint: dirHint, cutSide, flick,/);
+    expect(mode).toMatch(/beat: \(clip, o\) => meAnimTree\.beat\(clip, o\)/);
+    const hm = readFileSync('lib/babylon/anim/handleMotion.ts', 'utf8');
+    expect(hm).toMatch(/req\.flick \? flickClip\(rendered, clipDir\) : moveClip\(rendered, clipDir\)/);
+    expect(hm).toMatch(/if \(clip\) host\.beat\(clip,/);
     // every other doMove (the right-stick gestures, the hesi) keeps its own clip or none: only the crossover block is a flick
     const calls = mode.match(/doMove\(ctx, [^;]*;/g) ?? [];
-    expect(calls.filter((c) => /, true\);$/.test(c))).toHaveLength(1);
+    expect(calls.filter((c) => /, true(, cutSide)?\);$/.test(c))).toHaveLength(1);
   });
 });

@@ -365,8 +365,15 @@
     await act(Object.assign({ actionHeld: 0, action: true }, hold || {}), 80);
   };
   const Rs = (x, y) => bus().emit({ t: 'stick', side: 'R', x, y });
-  const flick = async (x, y) => { Rs(x, y); await sleep(30); Rs(x * 0.9, y * 0.9); await sleep(60); Rs(0, 0); };
-  const sweep = async () => { for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; Rs(Math.cos(a) * 0.95, Math.sin(a) * 0.95); await sleep(28); } Rs(0, 0); };
+  /** PHASE 4.0: an INPUT MARK — the probe's own line, stamped on the virtual clock the moment a driver throws an input ('[HM-INPUT] …',
+   *  recorded only while recording). The game logs what it DID; this is what was ASKED, for h4's move.latency and the anchors of the
+   *  takes whose input the game logs nothing for (PAUSIN's hold, the slow sweeps, the held flick). Probe-only: no game state moves. */
+  const inMark = (msg) => { if (R.on && HM.marks.length < 6000) HM.marks.push({ t: C.vt, msg: '[HM-INPUT] ' + msg }); };
+  HM.inMark = inMark;
+  const flick = async (x, y, name) => { inMark('flick ' + (name || '') + ' ' + x.toFixed(2) + ',' + y.toFixed(2)); Rs(x, y); await sleep(30); Rs(x * 0.9, y * 0.9); await sleep(60); Rs(0, 0); };
+  /** The half-circle sweep: 9 samples `stepMs` apart (28 ms = the catalogue's ≈ 804°/s; PHASE 4.0: 45 ms ≈ 500°/s and 59 ms ≈ 380°/s are the
+   *  minimum-rate sweeps of plan §5.3) */
+  const sweep = async (stepMs, name) => { inMark('sweep ' + (name || '') + ' ' + (stepMs || 28) + 'ms'); for (let i = 0; i <= 8; i++) { const a = -Math.PI / 2 + (i / 8) * Math.PI; Rs(Math.cos(a) * 0.95, Math.sin(a) * 0.95); await sleep(stepMs || 28); } Rs(0, 0); };
   // PHASE 3a: the stick map's "hand" is the ATHLETE's (the carry's `hand`, as drawn); `side` is the rig's (rig LeftHand = his right since
   // the hoops family was mirrored). Before phase 3 the two were the same word for different things, and `side` was all there was.
   const ballMir = () => { const s = seam(); const c = s && s.carry ? s.carry() : null; const h = c ? c.hand || c.side : ''; return h === 'Left' ? -1 : 1; };
@@ -374,7 +381,7 @@
   const tapKey = async (k, ms) => { key(k, true); await sleep(ms || 70); key(k, false); };
   HM.key = key; HM.tapKey = tapKey;
   // the 2K right-stick gestures, written for the ball in the RIGHT hand (x flips for the left) — the lab's rstick table
-  const HANDLE = { hesi: [1, 0], between: [-1, 0], crossover: [-0.75, -0.75], inout: [0, -1], behind: [-0.75, 0.75], sizeup: [0.75, -0.75] };
+  const HANDLE = { hesi: [1, 0], between: [-1, 0], crossover: [-0.75, -0.75], inout: [0, -1], behind: [-0.75, 0.75], sizeup: [0.75, -0.75], down: [0, 1] };   // PHASE 4.0: down = the step-back (R2: the snatchback)
 
   const P = (HM.plays = {});
   P.idle = async (o) => { await act({ moveX: 0, moveY: 0 }, o.ms || 1500); };
@@ -460,8 +467,124 @@
   P.handle = async (o) => {
     const jog = act({ moveX: 0, moveY: 0.35 }, 1700);
     await sleep(500);
-    if (o.move === 'spin') await sweep(); else { const v = HANDLE[o.move] || HANDLE.crossover; await flick(v[0] * ballMir(), v[1]); }
+    if (o.move === 'spin') await sweep(28, o.move); else { const v = HANDLE[o.move] || HANDLE.crossover; await flick(v[0] * ballMir(), v[1], o.move); }
     await jog;
+  };
+  // ── PHASE 4.0 (plan §5.3): the handles' new takes ─────────────────────────────────────────────────────────────────────
+  /** The stick direction (unit, in the mode's camera-relative stick space) toward the rim, and the perpendicular to its right. */
+  const rimFrame = () => { const r = stickTo(RIM.x, RIM.z) || { x: 0, y: 1 }; const l = Math.hypot(r.x, r.y) || 1; const f = { x: r.x / l, y: r.y / l }; return { f, p: { x: f.y, y: -f.x } }; };
+  /** THE LEFT-STICK REVERSAL (DribbleController's crossover: a committed stick, a head of steam, reversed inside 0.25 s with a rim-ward
+   *  part kept). facing 'rim': the two legs lean toward the rim; 'cam': toward the camera (the body faces the camera — the stick-sign
+   *  case). mag 0.7 = the jog, 1 + R2 = at speed. `pre` = R-stick flicks thrown on the first leg (the chain the double cross and the
+   *  Shammgod need), `leg1` the first leg's length. */
+  P.lcross = async (o) => {
+    const fr = o.facing === 'cam' ? { f: { x: 0, y: -1 }, p: { x: 1, y: 0 } } : rimFrame();
+    const m = o.mag ?? 0.7, sprint = !!o.sprint, a = 0.44, b = 0.9;
+    const leg = (s) => ({ moveX: (fr.f.x * a + fr.p.x * b * s) * m, moveY: (fr.f.y * a + fr.p.y * b * s) * m, sprint });
+    const leg1 = act(leg(1), o.leg1 ?? 600);
+    for (const [at, mv] of (o.pre || [])) { await sleep(at); const v = HANDLE[mv] || HANDLE.crossover; await flick(v[0] * ballMir(), v[1], mv); }
+    await leg1;
+    inMark('lcross ' + (o.facing || 'rim') + ' ' + m.toFixed(2) + (sprint ? ' R2' : ''));
+    await act(leg(-1), o.leg2 ?? 700);
+  };
+  /** THE MOMENTUM MOVES / THE SNATCHBACK (R2 held = the escape): a jog, then R2 with the flick. */
+  P.escape = async (o) => {
+    await act({ moveX: 0, moveY: o.jog ?? 0.8, sprint: false }, o.lead ?? 500);
+    const v = HANDLE[o.move] || HANDLE.crossover;
+    const run = act({ moveX: 0, moveY: o.jog ?? 0.8, sprint: true }, 900);
+    await sleep(34); await flick(v[0] * ballMir(), v[1], o.move + ' R2');
+    await run;
+  };
+  /** THE SIZE-UP ×n: up-toward flicks `gap` ms apart, standing (a size-up does not travel). */
+  P.sizeup = async (o) => {
+    const hold = act({ moveX: 0, moveY: 0 }, 400 + (o.n ?? 3) * (o.gap ?? 450) + 300);
+    await sleep(400);
+    for (let i = 0; i < (o.n ?? 3); i++) { await flick(HANDLE.sizeup[0] * ballMir(), HANDLE.sizeup[1], 'sizeup'); await sleep((o.gap ?? 450) - 90); }
+    await hold;
+  };
+  /** THE JAB: triple threat (standing, the ball held or dribbled at the check), the left stick TAPPED toward the rim (isJabInput: out
+   *  past 0.45 for ≤ JAB_MAX_HOLD_SEC 0.2 s) and let go. */
+  P.jab = async (o) => {
+    await act({ moveX: 0, moveY: 0 }, o.wait ?? 600);
+    const fr = rimFrame();
+    inMark('jab tap');
+    await act({ moveX: fr.f.x * 0.9, moveY: fr.f.y * 0.9 }, o.tapMs ?? 100);
+    await act({ moveX: 0, moveY: 0 }, 900);
+  };
+  /** PAUSIN' (plan §5.3: hold 0.5 s, then release with a forward push): the R stick parked past the hold ring (0.66 — under the flick
+   *  ring, so no flick fires on the way out) for `holdMs`, then home with the left stick pushing forward on R2. */
+  P.pausin = async (o) => {
+    const jog = act({ moveX: 0, moveY: 0.6 }, (o.lead ?? 500) + (o.holdMs ?? 500));
+    await sleep(o.lead ?? 500);
+    // the reader is fed only on a stick EVENT (InputBus emits on change): a parked real stick reads noise, so the hold carries a
+    // ±0.004 wobble every 100 ms — without it the hold gesture (0.26 s past 0.6) never reaches the reader today (plan §3.6)
+    inMark('pausin-hold'); Rs(0, -0.4); await sleep(17); Rs(0, -0.66);
+    for (let t = 100, k = 0; t <= (o.holdMs ?? 500); t += 100, k++) { await sleep(100); Rs(k % 2 ? 0.004 : -0.004, -0.66); }
+    await jog;
+    inMark('pausin-release'); Rs(0, 0);
+    await act({ moveX: 0, moveY: 0.9, sprint: true }, 900);
+  };
+  /** THE HESI EXPLODE (plan §5.3): jog in at 0.6, then the hesi — 'flick' (the R stick toward the ball hand), 'tap' (the left-stick
+   *  pull-back tap, let go home) or 'pullpush' (pulled back, then straight out forward: the same-frame explode) — and the stick at 0.9
+   *  with R2 `after` ms later. */
+  P.hesix = async (o) => {
+    const fr = rimFrame();
+    await act({ moveX: fr.f.x * 0.6, moveY: fr.f.y * 0.6 }, o.lead ?? 600);
+    if (o.how === 'flick') { const jog = act({ moveX: fr.f.x * 0.6, moveY: fr.f.y * 0.6 }, o.after ?? 220); await flick(HANDLE.hesi[0] * ballMir(), HANDLE.hesi[1], 'hesi'); await jog; }
+    else {
+      inMark('hesi ' + o.how);
+      await act({ moveX: -fr.f.x * 0.95, moveY: -fr.f.y * 0.95 }, o.pullMs ?? 110);
+      if (o.how === 'tap') await act({ moveX: 0, moveY: 0 }, o.after ?? 110);
+    }
+    inMark('explode');
+    await act({ moveX: fr.f.x * 0.9, moveY: fr.f.y * 0.9, sprint: true }, 900);
+  };
+  /** THE MINIMUM-RATE SWEEP (§3.6: 9 samples `stepMs` apart) at a jog, and THE FLICK HELD AT THE RING (one sample past the ring, then no
+   *  further samples for `holdMs` — InputBus emits a stick event only on change). */
+  P.slowsweep = async (o) => {
+    const jog = act({ moveX: 0, moveY: 0.35 }, 1700);
+    await sleep(500);
+    if (o.held) { inMark('flickhold'); Rs(0, -0.95); await sleep(o.holdMs ?? 500); Rs(0, 0); }
+    else await sweep(o.stepMs ?? 45, 'slow');
+    await jog;
+  };
+  /** THE SPIN INTO A SHOT: at the rim from the check, the sweep, then the squeeze inside the spin's gather window. */
+  P.spinshot = async (o) => {
+    const fr = rimFrame();
+    await act({ moveX: fr.f.x * (o.mag ?? 0.6), moveY: fr.f.y * (o.mag ?? 0.6) }, o.lead ?? 450);
+    const sw = sweep(28, 'spin'); await act({ moveX: fr.f.x * 0.6, moveY: fr.f.y * 0.6 }, o.at ?? 650); await sw;
+    inMark('spin-shot');
+    await shoot(o.charge ?? 0.8, { moveX: fr.f.x * 0.5, moveY: fr.f.y * 0.5 }, o.green);
+  };
+  /** THE POST HOOK WITH R2 (the hook's shimmy beat): P.posthook's stick with the sprint held. */
+  P.hookshimmy = async () => {
+    await driveTo(3.4, 1);
+    const post = act({ brace: true, sprint: true }, 1600);
+    await sleep(500); inMark('hook R2'); Rs(0.7, -0.7); await sleep(200); Rs(0.72, -0.7); await sleep(200); Rs(0.72, -0.7); await sleep(250); Rs(0, 0);
+    await post; await sleep(600);
+  };
+  /** THE PIVOT (L1 planted + the stick swung across the body, standing): a front pivot to `side`, `reverse` swung across and back. */
+  P.pivot = async (o) => {
+    await act({ moveX: 0, moveY: 0 }, 500);
+    await act({ moveX: 0, moveY: 0, brace: true }, 250);
+    const fr = rimFrame(); const s = o.side === 'left' ? -1 : 1; const back = o.reverse ? -0.5 : 0;
+    inMark('pivot ' + (o.side || 'right') + (o.reverse ? ' reverse' : ''));
+    await act({ moveX: fr.p.x * 0.9 * s + fr.f.x * back, moveY: fr.p.y * 0.9 * s + fr.f.y * back, brace: true }, 350);
+    await act({ moveX: 0, moveY: 0, brace: true }, 700);
+  };
+  /** THE STEEZO ROLL: R2 + the sweep. `stop` = driven to that many metres first, inside the drop step's 6.5 m (the drop step + momentum
+   *  cross, then PAUSIN' or the wrap and the spin); `far` = walked out to 7.6 m first and thrown running ACROSS the arc, outside it (the
+   *  roll: the momentum behind the back, then the spin). */
+  P.steezo = async (o) => {
+    if (o.stop) await driveTo(o.stop, 0.8, null, 2600);
+    else if (o.far) await toPoint(RIM.x + 1.2, RIM.z + 7.6, 2600);
+    else await act({ moveX: 0, moveY: 0.5 }, 400);
+    const fr = rimFrame(); const d = o.far ? fr.p : fr.f;
+    const run = act({ moveX: d.x * 0.8, moveY: d.y * 0.8, sprint: true }, o.far ? 400 : 50);
+    await run;
+    const run2 = act({ moveX: d.x * 0.8, moveY: d.y * 0.8, sprint: true }, 1400);
+    await sweep(28, 'steezo R2' + (o.far ? ' far' : ''));
+    await run2;
   };
   P.posthook = async () => {
     await driveTo(3.4, 1);
@@ -543,7 +666,7 @@
   P.handleV = async (o) => {
     const jog = act({ moveX: 0, moveY: o.jog, sprint: !!o.sprint }, 1700);
     await sleep(500);
-    if (o.move === 'spin') await sweep(); else { const v = HANDLE[o.move] || HANDLE.crossover; await flick(v[0] * ballMir(), v[1]); }
+    if (o.move === 'spin') await sweep(28, o.move); else { const v = HANDLE[o.move] || HANDLE.crossover; await flick(v[0] * ballMir(), v[1], o.move); }
     await jog;
   };
   /** The 1v1 rival only dunks a lane he has BEATEN (AttackerBrain: beaten && !inLane at layup range): get beaten on purpose —

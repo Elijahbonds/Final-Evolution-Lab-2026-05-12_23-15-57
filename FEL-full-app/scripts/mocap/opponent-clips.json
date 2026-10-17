@@ -17,18 +17,18 @@
   },
   {
    "name": "bball_mc_crossover_right",
-   "replaces": "bball_crossover_right",
+   "replaces": "bball_crossover_capture_right",
    "source": "cmu",
    "file": "cmu/06/06_13.bvh",
    "from": 6.2,
    "to": 6.68,
    "duration": 0.45,
    "reRoot": true,
-   "note": "low freestyle: the LEFT hand carries across to the right hip (going right)"
+   "note": "low freestyle: the LEFT hand carries across to the right hip (going right) · HOOPS MOTION phase 4c (2026-09-29): no longer stands in for bball_crossover_right — the v2 authored crossover, keyed on its ball path, is the default; this capture plays by its own name under the dev A/B ?hm4cross=cap (handleMotion.crossClip)"
   },
   {
    "name": "bball_mc_crossover_left",
-   "replaces": "bball_crossover_left",
+   "replaces": "bball_crossover_capture_left",
    "source": "cmu",
    "file": "cmu/06/06_13.bvh",
    "from": 6.2,
@@ -36,7 +36,7 @@
    "duration": 0.45,
    "reRoot": true,
    "mirror": true,
-   "note": "the same capture mirrored"
+   "note": "the same capture mirrored · HOOPS MOTION phase 4c (2026-09-29): no longer stands in for bball_crossover_left — the v2 authored crossover, keyed on its ball path, is the default; this capture plays by its own name under the dev A/B ?hm4cross=cap (handleMotion.crossClip)"
   },
   {
    "name": "bball_mc_hesi",
@@ -583,19 +583,19 @@
    "note": "the hard slide mirrored · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
-   "name": "bball_mc_feint_right",
-   "replaces": "bball_in_and_out_right",
+   "name": "bball_mc_rip_right",
+   "replaces": "bball_rip_right",
    "source": "cmu",
    "file": "cmu/78/78_20.bvh",
    "from": 0.35,
    "to": 1.05,
    "duration": 0.55,
    "reRoot": true,
-   "note": "FeintLeftMoveRight: the body sells left (hips drop to -0.32) and explodes right — the in-and-out's shape, captured (2026-09-17)"
+   "note": "FeintLeftMoveRight: the body sells left (hips drop to -0.32) and explodes right — the in-and-out's shape, captured (2026-09-17) · HOOPS MOTION phase 4c (2026-09-29, plan §4.7): a two-hand RIP, not an in-and-out (MAP gap 8) — renamed from bball_mc_feint_right, no longer the in-and-out (the v2 authored one-hand in-and-out is); kept for phase 9's rip-through"
   },
   {
-   "name": "bball_mc_feint_left",
-   "replaces": "bball_in_and_out_left",
+   "name": "bball_mc_rip_left",
+   "replaces": "bball_rip_left",
    "source": "cmu",
    "file": "cmu/78/78_20.bvh",
    "from": 0.35,
@@ -603,7 +603,7 @@
    "duration": 0.55,
    "reRoot": true,
    "mirror": true,
-   "note": "the feint mirrored"
+   "note": "the feint mirrored · HOOPS MOTION phase 4c (2026-09-29, plan §4.7): a two-hand RIP, not an in-and-out (MAP gap 8) — renamed from bball_mc_feint_left, no longer the in-and-out (the v2 authored one-hand in-and-out is); kept for phase 9's rip-through"
   },
   {
    "name": "bball_mc_dribble_walk",
@@ -730,6 +730,49 @@
     0.05
    ],
    "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — TWO-HAND FLUSH: a wide wind-up (16.3–16.4), the crouch, and both hands together straight up to 16.73"
+  },
+  {
+   "name": "bball_mc_dribble_side_left",
+   "replaces": "bball_dribble_side_left",
+   "source": "cmu",
+   "file": "cmu/06/06_09.bvh",
+   "from": 0.75,
+   "to": 1.42,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.8
+   ],
+   "note": "H2d (plan §4.19, 2026-10-16): SIDEWAYS DRIBBLE — CMU 06_09 'basketball - sideways dribble': the right hand dribbles while the body steps to its LEFT (measured: hips 2.8 units to his left over 2 s, 0.6 forward), one step cycle = one bounce (~0.65 s). Plays under carry_slide (travel left); its legs-mirrored twin is carry_slide_right, and the left-hand cases are the runtime mirrors of the opposite side's clip (basketballTree)."
+  },
+  {
+   "name": "bball_mc_dribble_side_right",
+   "replaces": "bball_dribble_side_right",
+   "source": "cmu",
+   "file": "cmu/06/06_09.bvh",
+   "from": 0.75,
+   "to": 1.42,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.8
+   ],
+   "mirrorLegs": true,
+   "note": "H2d: the same sideways dribble with its LEGS mirrored (mirrorLegs) — the body steps to its RIGHT with the ball still in the right hand (the hand leading). No capture goes that way with the right hand."
+  },
+  {
+   "name": "bball_mc_dribble_back",
+   "replaces": "bball_dribble_back",
+   "source": "cmu",
+   "file": "cmu/06/06_06.bvh",
+   "from": 1.2,
+   "to": 2.25,
+   "loop": true,
+   "refineLoop": [
+    0.9,
+    1.2
+   ],
+   "note": "H2d (plan §4.19): BACKWARD DRIBBLE — CMU 06_06 'basketball - backward dribble': the right hand dribbles while the body backs straight up (measured: 3.1 units back over 2.8 s, 0.5 to the side); one step cycle (~1.05 s: the right foot lifts at 0.3, 1.35, 2.4 s). Plays under carry_back (it played the defender's backpedal)."
   }
  ]
 }

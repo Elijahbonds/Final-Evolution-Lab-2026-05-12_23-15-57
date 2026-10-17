@@ -27,7 +27,7 @@ import { Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, Quaternion, Vector3 } f
 import type { Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { bareBoneName, boneNode } from '../anim/boneLookup';
 import { applyFabric } from './fabric';
-import { TUBE_SPANS, tubeFit, type TubeFit, type TubeSpan } from './accessoryFit';
+import { TUBE_SPANS, tubeFit, headRing, type TubeFit, type TubeSpan } from './accessoryFit';
 import { isBodyMesh, isShrunk, scheduleBodyMask, skinnedWorld } from './bodyMask';
 
 export type AccessoryId = 'headband' | 'wristbands' | 'armsleeve' | 'legsleeve' | 'crewsocks' | 'chain';
@@ -81,7 +81,7 @@ export function rigScale(skeleton: Skeleton): number {
 const REFIT_WAIT_FRAMES = 180;
 /** The reference-body diameters (m, parent end → child end) a tube falls back to when the skin cannot be read. */
 const TUBE_DEFAULTS: Record<keyof typeof TUBE_SPANS, [number, number]> = {
-  armsleeve: [0.105, 0.082], armsleeve2: [0.082, 0.070], legsleeve: [0.125, 0.10], crewsocks: [0.10, 0.092],
+  armsleeve: [0.105, 0.082], armsleeve2: [0.082, 0.070], legsleeve: [0.125, 0.10], crewsocks: [0.10, 0.092], wristband: [0.072, 0.068],
 };
 
 function band(scene: Scene, name: string, diameter: number, thickness: number, mat: PBRMaterial, k = 1): Mesh {
@@ -210,6 +210,28 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
   type TubeKind = keyof typeof TUBE_SPANS;
   interface TubeSpec { kind: TubeKind; name: string; from: string; to: string; mat: PBRMaterial }
   const tubes: { spec: TubeSpec; mesh: Mesh; fitted: boolean }[] = [];
+  // THE HEADBAND IS MEASURED TOO (style pass, 2026-10-16): placed off the Head bone at the reference size, then refitted on the
+  // first readable frame to a ring round the head's own skin at the brow (accessoryFit.headRing). Off the bone alone it was a
+  // 0.27 m hoop over a forge rival's head (k 1.14, and the forge rig's Head bone sits under its shoulder joints).
+  const headbands: { mesh: Mesh; mat: PBRMaterial; fitted: boolean }[] = [];
+  const fitHeadband = (h: { mesh: Mesh; mat: PBRMaterial; fitted: boolean }, P: Float32Array): boolean => {
+    const ring = headRing(P);
+    const node = boneNode(skeleton, 'Head');
+    if (!ring || !node) return false;
+    node.computeWorldMatrix(true);
+    const Wm = node.getWorldMatrix(); const s = Math.hypot(Wm.m[0], Wm.m[1], Wm.m[2]) || 1;   // bone-local units per world metre
+    const nm = MeshBuilder.CreateTorus(h.mesh.name, { diameter: (ring.r * 2) / s, thickness: 0.022 / s, tessellation: 20 }, scene);
+    nm.material = h.mat; nm.isPickable = false; nm.receiveShadows = false;
+    nm.parent = node;
+    nm.position.copyFrom(Vector3.TransformCoordinates(new Vector3(ring.c.x, ring.c.y, ring.c.z), Matrix.Invert(Wm)));
+    // level in the world, tipped back a touch (the band rides higher at the back of the head): the body frame's tilt, in the bone's space
+    const worldRot = Quaternion.RotationAxis(right, -0.12);
+    const parentRot = new Quaternion(); Wm.decompose(undefined, parentRot);
+    nm.rotationQuaternion = Quaternion.Inverse(parentRot).multiply(worldRot);
+    const i = made.indexOf(h.mesh); if (i >= 0) made.splice(i, 1);
+    h.mesh.dispose(); h.mesh = nm; h.fitted = true; made.push(nm);
+    return true;
+  };
   const measure = (spec: TubeSpec, P: Float32Array | null): TubeFit | null => {
     const j = P ? joints(spec.from, spec.to) : null;
     const limb = j ? limbPoints(spec.from) : null;
@@ -266,10 +288,11 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
         // showed. The brow is about 0.13 above that origin and a little forward.
         const m = band(scene, `${tag}_headband`, 0.175, 0.026, mat('headband', accent, 'band'), k);
         on('Head', m, new Vector3(0, 0.132, 0.018), new Vector3(0.14, 0, 0));
+        headbands.push({ mesh: m, mat: m.material as PBRMaterial, fitted: false });
       } else if (id === 'wristbands') {
+        // a short tube on the forearm's own skin (style pass: the fixed torus was 0.16 m across a forge rival's wrist)
         for (const s of ['Left', 'Right'] as const) {
-          const m = band(scene, `${tag}_wrist_${s}`, 0.085, 0.028, mat(`wrist_${s}`, accent, 'band'), k);
-          onSegment(`${s}ForeArm`, `${s}Hand`, 0.86, m);
+          tube({ kind: 'wristband', name: `${tag}_wrist_${s}`, from: `${s}ForeArm`, to: `${s}Hand`, mat: mat(`wrist_${s}`, accent, 'band') });
         }
       } else if (id === 'armsleeve') {
         // THE SHOOTING SLEEVE: below the deltoid to the elbow, then the elbow to above the wrist, on ONE arm — a compression
@@ -306,7 +329,7 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
   // garments at the same moment for the same reason) — on the first frame the body is at its real size, then rebuilt on
   // the limb's own skin and handed to the wardrobe's trim. A body that cannot be read in REFIT_WAIT_FRAMES keeps the
   // reference sizes and says so.
-  if (bodyMesh && tubes.some((t) => !t.fitted)) {
+  if (bodyMesh && (tubes.some((t) => !t.fitted) || headbands.some((h) => !h.fitted))) {
     let waited = 0;
     const late = (): void => {
       try {
@@ -322,9 +345,14 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
           const i = made.indexOf(t.mesh); if (i >= 0) made.splice(i, 1);
           t.mesh.dispose(); t.mesh = nm; t.fitted = true; changed = true;
         }
+        for (const h of headbands) {
+          if (h.fitted || h.mesh.isDisposed()) continue;
+          if (!P || !fitHeadband(h, P)) { pending = true; continue; }
+          changed = true;
+        }
         if (changed) { console.info(`[FEL-ACC] ${tag}: measured after ${waited + 1} frame(s) — ${tubes.map(tubeLine).join(' · ')}`); scheduleBodyMask([bodyMesh]); }
         if (pending && waited++ < REFIT_WAIT_FRAMES) scene.onAfterRenderObservable.addOnce(late);
-        else if (pending) console.warn(`[FEL-ACC] ${tag}: ${tubes.filter((t) => !t.fitted).map((t) => t.spec.kind).join(', ')} kept the reference sizes — the skin could not be read in ${REFIT_WAIT_FRAMES} frames (${P ? `${P.length / 3} skin points, shrunk ${isShrunk(bodyMesh)}` : 'no skin'})`);
+        else if (pending) console.warn(`[FEL-ACC] ${tag}: ${[...tubes.filter((t) => !t.fitted).map((t) => t.spec.kind), ...headbands.filter((h) => !h.fitted).map(() => 'headband')].join(', ')} kept the reference sizes — the skin could not be read in ${REFIT_WAIT_FRAMES} frames (${P ? `${P.length / 3} skin points, shrunk ${isShrunk(bodyMesh)}` : 'no skin'})`);
       } catch (e) { console.warn(`[FEL-ACC] ${tag}: refit skipped: ${String((e as Error)?.message ?? e).slice(0, 120)}`); }
     };
     scene.onAfterRenderObservable.addOnce(late);
@@ -334,7 +362,7 @@ export function attachAccessories(scene: Scene, skeleton: Skeleton, root: Transf
     disposed = true;
     for (const m of made) { try { m.dispose(); } catch { /* already gone with the scene */ } }
     for (const m of mats) { try { m.dispose(); } catch { /* already gone */ } }
-    made.length = 0; mats.length = 0; tubes.length = 0;
+    made.length = 0; mats.length = 0; tubes.length = 0; headbands.length = 0;
   };
 }
 
@@ -421,6 +449,21 @@ export const RIVAL_LOOKS: Readonly<Record<string, { items: readonly AccessoryId[
   REIGN: { items: ['headband', 'wristbands'], accent: '#2a9d8f', side: 'Right' },
   PRIME: { items: ['armsleeve', 'legsleeve', 'chain'], accent: '#1d3557', side: 'Left' },
 };
+
+/**
+ * A forge rival's own signature, baked into its body (style pass, owner 2026-10-16: scripts/avatar/rivalWear.ts stamps
+ * `{ items, accent, side }` on the armature's extras as `look`). Null when the body carries none, or what it carries is not a
+ * look: unknown and retired pieces are dropped, so a stale body can never hang crew socks. `accent` (a dealt fit's) wins over the
+ * baked one, so the accessories still answer the colours the body is wearing.
+ */
+export function bakedLook(raw: unknown, accent?: Color3): AccessorySet | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as { items?: unknown; accent?: unknown; side?: unknown };
+  if (!Array.isArray(r.items)) return null;
+  const items = r.items.filter((i): i is AccessoryId => typeof i === 'string' && (ACCESSORY_IDS as readonly string[]).includes(i) && !RETIRED_ACCESSORIES.includes(i as AccessoryId));
+  const hex = typeof r.accent === 'string' && /^#[0-9a-f]{6}$/i.test(r.accent) ? r.accent : '#111418';
+  return { items, accent: accent ?? Color3.FromHexString(hex), side: r.side === 'Left' ? 'Left' : 'Right' };
+}
 
 /** A rival's signature if they have one, otherwise the deterministic look their name earns them. */
 export function lookFor(name: string): AccessorySet {

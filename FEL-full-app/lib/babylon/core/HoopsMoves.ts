@@ -34,7 +34,9 @@ export type GatherKind = 'set' | 'pullup' | 'stepback'
   // rise — the footwork IS the move, and the meter runs through it exactly as it runs through the pull-up's plant.
   | 'stepthrough' | 'hop' | 'euro'
   // THE POST GAME (2026-09-18): the shimmy before a fade, the drop step around the man into a finish
-  | 'shimmy' | 'dropstep';
+  | 'shimmy' | 'dropstep'
+  // H2e (owner 2026-10-16): the long, low SKIP GATHER into a high-glass finish (core/FinishFootwork)
+  | 'skip';
 /** Planar speed under which the feet count as set (a standstill / the last shuffle): no gather, the rise starts now. */
 export const GATHER_SET_SPEED = 1.0;
 /** The pull-up gather: a walking pull-up plants in 0.2 s, a full-speed one (the 1-dribble off the check) in 0.34 s. */
@@ -65,6 +67,8 @@ export interface GatherPlan {
   legs?: Array<{ dir: Vector3; sec: number; speed: number }>;
   /** The finish's side once the feet land (the euro finishes on the crossing hand). */
   side?: FinishSide;
+  /** H2e: the finish it ends in is laid off the glass (the skip gather's high-glass layup). */
+  glass?: boolean;
 }
 
 /** Plan the gather from the body at the squeeze. `stickBack01` = how far the stick is pulled AWAY from the rim (0..1). */
@@ -111,7 +115,7 @@ export function gatherTravel(plan: GatherPlan): number {
 export function gatherLabel(kind: GatherKind, base: string): string {
   return kind === 'pullup' ? 'PULL-UP' : kind === 'stepback' ? 'STEP-BACK'
     : kind === 'stepthrough' ? 'STEP-THROUGH' : kind === 'hop' ? 'HOP STEP' : kind === 'euro' ? 'EURO STEP'
-    : kind === 'shimmy' ? 'SHIMMY FADE' : kind === 'dropstep' ? 'DROP STEP' : base;
+    : kind === 'shimmy' ? 'SHIMMY FADE' : kind === 'dropstep' ? 'DROP STEP' : kind === 'skip' ? 'SKIP GATHER' : base;
 }
 
 /** How far the stick is pulled AWAY from the rim, 0..1, from a world-planar wish direction (mx, −my in the dribble's
@@ -500,6 +504,29 @@ export interface SpinPlan {
   /** Metres carried down the exit line over the turn — SPIN_TRAVEL for a spin, ZERO for a pivot (M9: the planted foot
    *  never moves, and a pivot that slid 1.25 m down the lane would be a travel, not a turn). */
   travel: number;
+  /** H2b (plan §4.14): the yaw left to turn after the planted sweep (signed, |·| ≤ 135°) — the step-out, which the loop's own turn
+   *  rate takes on the way out (no end snap). 0 / absent: the sweep lands on the exit. */
+  stepOut?: number;
+}
+
+/**
+ * THE SPIN LANDS WHERE IT GOES (H2b, hoops-motion plan §4.14). The sweep was a fixed full revolution and the exit facing was then
+ * written in ONE frame: a drive straight at the rim snapped ~14°, a post spin 166–194° (the seal faces away from the rim). Now the
+ * planted sweep is the turn to the exit in the spin's direction, held to π…1.5π (a spin is at least a half turn and the body cannot
+ * whip more in SPIN_SEC), taking whichever of d / d + 2π leaves the smaller remainder; the remainder (≤ 135° by construction) is the
+ * step-out, turned by the loop after the plant. Worked: a drive at the rim d ≈ 14° → sweep 270°, step-out +104°; a post spin
+ * d ≈ 180° → sweep 180°, step-out 0.
+ */
+export const SPIN_SWEEP_MIN = Math.PI, SPIN_SWEEP_MAX = Math.PI * 1.5;
+export function spinSweepFor(yaw0: number, exitYaw: number, sign: 1 | -1): { sweep: number; stepOut: number } {
+  const TAU = Math.PI * 2;
+  const d = ((((exitYaw - yaw0) * sign) % TAU) + TAU) % TAU;   // the turn to the exit, in the spin's direction, [0, 2π)
+  let best = { s: SPIN_SWEEP_MIN, r: Infinity };
+  for (const c of [d, d + TAU]) {
+    const s = Math.min(SPIN_SWEEP_MAX, Math.max(SPIN_SWEEP_MIN, c)), r = c - s;
+    if (Math.abs(r) < Math.abs(best.r)) best = { s, r };
+  }
+  return { sweep: best.s * sign, stepOut: best.r * sign };
 }
 
 /** Plan the spin: plant the foot on the DEFENDER's side and swing the body the other way, coming out on the exit line —
@@ -517,7 +544,8 @@ export function planSpin(shooter: Vector3, yaw: number, rimFloor: Vector3, defen
   if (d > 1e-4) toRim.scaleInPlace(1 / d); else toRim.copyFrom(new Vector3(Math.sin(yaw), 0, Math.cos(yaw)));
   const a = SPIN_EXIT_DEG * Math.PI / 180 * sign;                  // lean the exit past his shoulder
   const exit = new Vector3(toRim.x * Math.cos(a) + toRim.z * Math.sin(a), 0, -toRim.x * Math.sin(a) + toRim.z * Math.cos(a));
-  return { sec: SPIN_SEC, side: turn, yaw0: yaw, sweep: SPIN_SWEEP * sign, pivot, r0, exit, travel: SPIN_TRAVEL };
+  const { sweep, stepOut } = spinSweepFor(yaw, Math.atan2(exit.x, exit.z), sign as 1 | -1);   // H2b: the planted sweep + the step-out (no end snap)
+  return { sec: SPIN_SEC, side: turn, yaw0: yaw, sweep, pivot, r0, exit, travel: SPIN_TRAVEL, stepOut };
 }
 /** The turn's eased clock 0..1 (smoothstep: it winds up and it settles — a pivot, not a snap). */
 export function spinEase(k01: number): number {
@@ -693,6 +721,13 @@ export function planPivot(shooter: Vector3, yaw: number, side: FinishSide, rever
   return { sec: PIVOT_SEC, side, yaw0: yaw, sweep, pivot, r0: new Vector3(shooter.x - pivot.x, 0, shooter.z - pivot.z), exit: fwd, travel: 0 };
 }
 
+/** H2b (plan §4.16): the FREE foot of a pivot — the one that steps, which names its clip (`bball_pivot_v2_<free>`). planPivot keeps the
+ *  pivot foot opposite the turn on a front pivot, so the turn's own side steps; on a reverse the pivot foot is the turn's side and the
+ *  other one steps. */
+export function pivotFreeFoot(side: FinishSide, reverse: boolean): FinishSide {
+  return reverse ? (side === 'right' ? 'left' : 'right') : side;
+}
+
 // ── M10: the floater over length ────────────────────────────────────────────
 /** A body inside this of the rim, in the lane, is protecting it. */
 export const PROTECT_RIM_RANGE = 2.0, PROTECT_RIM_LATERAL = 1.3;
@@ -804,7 +839,9 @@ export function planEuro(shooter: Vector3, rimFloor: Vector3, yaw: number, sell:
   return { kind: 'euro', sec: EURO_A_SEC + EURO_B_SEC, v0: new Vector3(0, 0, 0), toRim, then, side: cross,
     legs: [{ dir: leg(s, 0.85), sec: EURO_A_SEC, speed: EURO_A_SPEED }, { dir: leg(-s, 0.95), sec: EURO_B_SEC, speed: EURO_B_SPEED }] };
 }
-/** Which way the stick sells the first step (null = no euro asked for). */
+/** Which way the stick sells the first step (null = no euro asked for). `yaw` is the frame the push is read in: the modes pass the LINE
+ *  TO THE RIM (H2 leftovers) — the body's facing follows the stick at 10 rad/s, so a held sell read off it turned "forward" inside ~0.1 s
+ *  (the skip gather's measured failure, core/FinishFootwork). */
 export function euroSell(wishX: number, wishZ: number, yaw: number): FinishSide | null {
   const m = Math.hypot(wishX, wishZ);
   if (m < 0.3) return null;

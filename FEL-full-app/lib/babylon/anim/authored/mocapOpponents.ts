@@ -42,7 +42,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_crossover_right', replaces: 'bball_crossover_right', duration: 0.45, loop: false,
+    name: 'bball_mc_crossover_right', replaces: 'bball_crossover_capture_right', duration: 0.45, loop: false,
     source: 'cmu:06_13.bvh 6.20–6.68s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [25,1,0]},hands: {Left: [-0.27,1.17,0.32],Right: [0.19,1,0.16]},poles: {Left: [-0.13,-0.68,-0.72],Right: [0.08,-0.13,-0.99]},feet: {Left: [-0.01,0.32,0.29],Right: [0.08,0.31,-0.21]},hipsY: -0.24},
@@ -58,7 +58,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_crossover_left', replaces: 'bball_crossover_left', duration: 0.45, loop: false,
+    name: 'bball_mc_crossover_left', replaces: 'bball_crossover_capture_left', duration: 0.45, loop: false,
     source: 'cmu:06_13.bvh 6.20–6.68s mirrored', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [25,-1,0]},hands: {Left: [-0.19,1,0.16],Right: [0.27,1.17,0.32]},poles: {Left: [-0.08,-0.13,-0.99],Right: [0.13,-0.68,-0.72]},feet: {Left: [-0.08,0.31,-0.21],Right: [0.01,0.32,0.29]},hipsY: -0.24},
@@ -815,7 +815,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_feint_right', replaces: 'bball_in_and_out_right', duration: 0.55, loop: false,
+    name: 'bball_mc_rip_right', replaces: 'bball_rip_right', duration: 0.55, loop: false,
     source: 'cmu:78_20.bvh 0.35–1.05s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [15,11,0]},hands: {Left: [-0.25,1.51,0.49],Right: [-0.15,1.51,0.46]},poles: {Left: [-0.15,-0.92,0.36],Right: [0.2,-0.84,0.51]},feet: {Left: [-0.22,0.27,-0.06],Right: [0.16,0.32,-0.31]},hipsY: -0.2},
@@ -833,7 +833,7 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
     ],
   },
   {
-    name: 'bball_mc_feint_left', replaces: 'bball_in_and_out_left', duration: 0.55, loop: false,
+    name: 'bball_mc_rip_left', replaces: 'bball_rip_left', duration: 0.55, loop: false,
     source: 'cmu:78_20.bvh 0.35–1.05s mirrored', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
     keys: [
       {t: 0,bones: {Hips: [0,0,0],Spine: [15,-11,0]},hands: {Left: [0.15,1.51,0.46],Right: [0.25,1.51,0.49]},poles: {Left: [-0.2,-0.84,0.51],Right: [0.15,-0.92,0.36]},feet: {Left: [-0.16,0.32,-0.31],Right: [0.22,0.27,-0.06]},hipsY: -0.2},
@@ -1037,9 +1037,97 @@ export const MOCAP_OPPONENT_CLIPS: MocapOpponentClip[] = [
       {t: 0.55,bones: {Hips: [0,21,0],Spine: [-8,0,0]},hands: {Left: [-0.23,2.01,-0.14],Right: [0.16,2.07,-0.04]},poles: {Left: [-0.9,-0.06,0.44]},feet: {Left: [0.05,0.28,-0.42],Right: [0.38,0.27,-0.22]},hipsY: -0.2},
     ],
   },
+  {
+    name: 'bball_mc_dribble_side_left', replaces: 'bball_dribble_side_left', duration: 0.66, loop: true,
+    source: 'cmu:06_09.bvh 0.80–1.45s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    keys: [
+      {t: 0,bones: {Hips: [0,-4,0],Spine: [20,0,0]},hands: {Left: [-0.14,1.04,0.06],Right: [0.34,0.96,0.22]},poles: {Left: [-0.12,0.04,-0.99],Right: [-0.4,-0.54,-0.74]},feet: {Left: [-0.24,0.28,0],Right: [0.4,0.3,-0.1]},hipsY: -0.21},
+      {t: 0.05,bones: {Hips: [0,-3,0],Spine: [21,-2,0]},hands: {Left: [-0.15,1.05,0.05],Right: [0.37,1.02,0.21]},poles: {Left: [-0.11,0.1,-0.99],Right: [-0.38,-0.56,-0.74]},feet: {Left: [-0.17,0.27,0],Right: [0.35,0.3,-0.1]},hipsY: -0.2},
+      {t: 0.1,bones: {Hips: [0,-2,0],Spine: [22,-3,0]},hands: {Left: [-0.17,1.05,0.04],Right: [0.38,1.08,0.21]},poles: {Left: [-0.08,0.14,-0.99],Right: [-0.32,-0.59,-0.74]},feet: {Left: [-0.11,0.26,0],Right: [0.25,0.3,-0.09]},hipsY: -0.19},
+      {t: 0.15,bones: {Hips: [0,-1,0],Spine: [23,-4,0]},hands: {Left: [-0.18,1.06,0.03],Right: [0.37,1.14,0.22]},poles: {Left: [-0.03,0.16,-0.99],Right: [-0.22,-0.63,-0.75]},feet: {Left: [-0.08,0.26,0.01],Right: [0.13,0.31,-0.08]},hipsY: -0.19},
+      {t: 0.2,bones: {Hips: [0,1,0],Spine: [24,-5,0]},hands: {Left: [-0.2,1.06,0.03],Right: [0.34,1.18,0.24]},poles: {Left: [0,0.18,-0.98],Right: [-0.1,-0.65,-0.76]},feet: {Left: [-0.09,0.26,0.02],Right: [0.04,0.3,-0.06]},hipsY: -0.19},
+      {t: 0.25,bones: {Hips: [0,3,0],Spine: [24,-5,0]},hands: {Left: [-0.2,1.07,0.03],Right: [0.3,1.21,0.24]},poles: {Left: [0.03,0.18,-0.98],Right: [0.03,-0.65,-0.76]},feet: {Left: [-0.14,0.27,0.02],Right: [0,0.29,-0.07]},hipsY: -0.2},
+      {t: 0.3,bones: {Hips: [0,3,0],Spine: [23,-4,0]},hands: {Left: [-0.2,1.07,0.02],Right: [0.25,1.21,0.25]},poles: {Left: [0.07,0.16,-0.98],Right: [0.14,-0.64,-0.76]},feet: {Left: [-0.22,0.28,0.01],Right: [0.01,0.27,-0.09]},hipsY: -0.2},
+      {t: 0.35,bones: {Hips: [0,3,0],Spine: [22,-4,0]},hands: {Left: [-0.2,1.07,0.02],Right: [0.21,1.17,0.26]},poles: {Left: [0.12,0.12,-0.99],Right: [0.2,-0.62,-0.76]},feet: {Left: [-0.31,0.3,0.02],Right: [0.05,0.27,-0.1]},hipsY: -0.2},
+      {t: 0.41,bones: {Hips: [0,3,0],Spine: [23,-4,0]},hands: {Left: [-0.19,1.07,0.03],Right: [0.18,1.1,0.28]},poles: {Left: [0.13,0.09,-0.99],Right: [0.22,-0.59,-0.78]},feet: {Left: [-0.38,0.32,0.03],Right: [0.1,0.28,-0.1]},hipsY: -0.21},
+      {t: 0.46,bones: {Hips: [0,2,0],Spine: [23,-3,0]},hands: {Left: [-0.18,1.06,0.04],Right: [0.18,1.02,0.3]},poles: {Left: [0.1,0.09,-0.99],Right: [0.2,-0.54,-0.81]},feet: {Left: [-0.43,0.33,0.03],Right: [0.16,0.28,-0.11]},hipsY: -0.21},
+      {t: 0.51,bones: {Hips: [0,0,0],Spine: [24,-1,0]},hands: {Left: [-0.17,1.05,0.05],Right: [0.2,0.95,0.3]},poles: {Left: [0.05,0.1,-0.99],Right: [0.09,-0.51,-0.85]},feet: {Left: [-0.44,0.33,0.03],Right: [0.23,0.29,-0.12]},hipsY: -0.22},
+      {t: 0.56,bones: {Hips: [0,-2,0],Spine: [23,-1,0]},hands: {Left: [-0.15,1.05,0.05],Right: [0.29,0.92,0.25]},poles: {Left: [-0.03,0.09,-0.99],Right: [-0.25,-0.51,-0.81]},feet: {Left: [-0.35,0.31,0],Right: [0.34,0.29,-0.12]},hipsY: -0.22},
+      {t: 0.61,bones: {Hips: [0,-3,0],Spine: [21,0,0]},hands: {Left: [-0.15,1.05,0.06],Right: [0.34,0.94,0.23]},poles: {Left: [-0.09,0.07,-0.99],Right: [-0.4,-0.53,-0.75]},feet: {Left: [-0.27,0.29,-0.01],Right: [0.4,0.3,-0.11]},hipsY: -0.22},
+      {t: 0.66,bones: {Hips: [0,-4,0],Spine: [20,0,0]},hands: {Left: [-0.14,1.04,0.06],Right: [0.34,0.96,0.22]},poles: {Left: [-0.12,0.04,-0.99],Right: [-0.4,-0.54,-0.74]},feet: {Left: [-0.24,0.28,0],Right: [0.4,0.3,-0.1]},hipsY: -0.21},
+    ],
+  },
+  {
+    name: 'bball_mc_dribble_side_right', replaces: 'bball_dribble_side_right', duration: 0.66, loop: true,
+    source: 'cmu:06_09.bvh 0.80–1.45s legs mirrored', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    keys: [
+      {t: 0,bones: {Hips: [0,4,0],Spine: [20,0,0]},hands: {Left: [-0.14,1.04,0.06],Right: [0.34,0.96,0.22]},poles: {Left: [-0.12,0.04,-0.99],Right: [-0.4,-0.54,-0.74]},feet: {Left: [-0.4,0.3,-0.1],Right: [0.24,0.28,0]},hipsY: -0.21},
+      {t: 0.05,bones: {Hips: [0,3,0],Spine: [21,2,0]},hands: {Left: [-0.15,1.05,0.05],Right: [0.37,1.02,0.21]},poles: {Left: [-0.11,0.1,-0.99],Right: [-0.38,-0.56,-0.74]},feet: {Left: [-0.35,0.3,-0.1],Right: [0.17,0.27,0]},hipsY: -0.2},
+      {t: 0.1,bones: {Hips: [0,2,0],Spine: [22,3,0]},hands: {Left: [-0.17,1.05,0.04],Right: [0.38,1.08,0.21]},poles: {Left: [-0.08,0.14,-0.99],Right: [-0.32,-0.59,-0.74]},feet: {Left: [-0.25,0.3,-0.09],Right: [0.11,0.26,0]},hipsY: -0.19},
+      {t: 0.15,bones: {Hips: [0,1,0],Spine: [23,4,0]},hands: {Left: [-0.18,1.06,0.03],Right: [0.37,1.14,0.22]},poles: {Left: [-0.03,0.16,-0.99],Right: [-0.22,-0.63,-0.75]},feet: {Left: [-0.13,0.31,-0.08],Right: [0.08,0.26,0.01]},hipsY: -0.19},
+      {t: 0.2,bones: {Hips: [0,-1,0],Spine: [24,5,0]},hands: {Left: [-0.2,1.06,0.03],Right: [0.34,1.18,0.24]},poles: {Left: [0,0.18,-0.98],Right: [-0.1,-0.65,-0.76]},feet: {Left: [-0.04,0.3,-0.06],Right: [0.09,0.26,0.02]},hipsY: -0.19},
+      {t: 0.25,bones: {Hips: [0,-3,0],Spine: [24,5,0]},hands: {Left: [-0.2,1.07,0.03],Right: [0.3,1.21,0.24]},poles: {Left: [0.03,0.18,-0.98],Right: [0.03,-0.65,-0.76]},feet: {Left: [0,0.29,-0.07],Right: [0.14,0.27,0.02]},hipsY: -0.2},
+      {t: 0.3,bones: {Hips: [0,-3,0],Spine: [23,4,0]},hands: {Left: [-0.2,1.07,0.02],Right: [0.25,1.21,0.25]},poles: {Left: [0.07,0.16,-0.98],Right: [0.14,-0.64,-0.76]},feet: {Left: [-0.01,0.27,-0.09],Right: [0.22,0.28,0.01]},hipsY: -0.2},
+      {t: 0.35,bones: {Hips: [0,-3,0],Spine: [22,4,0]},hands: {Left: [-0.2,1.07,0.02],Right: [0.21,1.17,0.26]},poles: {Left: [0.12,0.12,-0.99],Right: [0.2,-0.62,-0.76]},feet: {Left: [-0.05,0.27,-0.1],Right: [0.31,0.3,0.02]},hipsY: -0.2},
+      {t: 0.41,bones: {Hips: [0,-3,0],Spine: [23,4,0]},hands: {Left: [-0.19,1.07,0.03],Right: [0.18,1.1,0.28]},poles: {Left: [0.13,0.09,-0.99],Right: [0.22,-0.59,-0.78]},feet: {Left: [-0.1,0.28,-0.1],Right: [0.38,0.32,0.03]},hipsY: -0.21},
+      {t: 0.46,bones: {Hips: [0,-2,0],Spine: [23,3,0]},hands: {Left: [-0.18,1.06,0.04],Right: [0.18,1.02,0.3]},poles: {Left: [0.1,0.09,-0.99],Right: [0.2,-0.54,-0.81]},feet: {Left: [-0.16,0.28,-0.11],Right: [0.43,0.33,0.03]},hipsY: -0.21},
+      {t: 0.51,bones: {Hips: [0,0,0],Spine: [24,1,0]},hands: {Left: [-0.17,1.05,0.05],Right: [0.2,0.95,0.3]},poles: {Left: [0.05,0.1,-0.99],Right: [0.09,-0.51,-0.85]},feet: {Left: [-0.23,0.29,-0.12],Right: [0.44,0.33,0.03]},hipsY: -0.22},
+      {t: 0.56,bones: {Hips: [0,2,0],Spine: [23,1,0]},hands: {Left: [-0.15,1.05,0.05],Right: [0.29,0.92,0.25]},poles: {Left: [-0.03,0.09,-0.99],Right: [-0.25,-0.51,-0.81]},feet: {Left: [-0.34,0.29,-0.12],Right: [0.35,0.31,0]},hipsY: -0.22},
+      {t: 0.61,bones: {Hips: [0,3,0],Spine: [21,0,0]},hands: {Left: [-0.15,1.05,0.06],Right: [0.34,0.94,0.23]},poles: {Left: [-0.09,0.07,-0.99],Right: [-0.4,-0.53,-0.75]},feet: {Left: [-0.4,0.3,-0.11],Right: [0.27,0.29,-0.01]},hipsY: -0.22},
+      {t: 0.66,bones: {Hips: [0,4,0],Spine: [20,0,0]},hands: {Left: [-0.14,1.04,0.06],Right: [0.34,0.96,0.22]},poles: {Left: [-0.12,0.04,-0.99],Right: [-0.4,-0.54,-0.74]},feet: {Left: [-0.4,0.3,-0.1],Right: [0.24,0.28,0]},hipsY: -0.21},
+    ],
+  },
+  {
+    name: 'bball_mc_dribble_back', replaces: 'bball_dribble_back', duration: 1.06, loop: true,
+    source: 'cmu:06_06.bvh 1.25–2.30s', license: "CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu) — free in commercial products, not for resale of the data",
+    keys: [
+      {t: 0,bones: {Hips: [0,5,0],Spine: [5,-10,0]},hands: {Left: [-0.24,1.05,0.03],Right: [0.34,1.17,0.13]},poles: {Left: [0.04,-0.2,-0.98],Right: [-0.01,-0.59,-0.81]},feet: {Left: [-0.03,0.25,-0.08],Right: [0.06,0.3,-0.02]},hipsY: -0.18},
+      {t: 0.05,bones: {Hips: [0,7,0],Spine: [4,-10,0]},hands: {Left: [-0.25,1.05,0],Right: [0.33,1.21,0.1]},poles: {Left: [0.08,-0.19,-0.98],Right: [-0.09,-0.62,-0.78]},feet: {Left: [-0.05,0.25,-0.03],Right: [0.09,0.32,-0.12]},hipsY: -0.18},
+      {t: 0.1,bones: {Hips: [0,8,0],Spine: [3,-10,0]},hands: {Left: [-0.25,1.06,-0.01],Right: [0.33,1.23,0.07]},poles: {Left: [0.11,-0.18,-0.98],Right: [-0.18,-0.64,-0.74]},feet: {Left: [-0.06,0.24,0.01],Right: [0.12,0.34,-0.2]},hipsY: -0.17},
+      {t: 0.15,bones: {Hips: [0,7,0],Spine: [3,-9,0]},hands: {Left: [-0.25,1.07,-0.02],Right: [0.34,1.23,0.05]},poles: {Left: [0.13,-0.17,-0.98],Right: [-0.24,-0.65,-0.72]},feet: {Left: [-0.09,0.24,0.05],Right: [0.15,0.34,-0.27]},hipsY: -0.17},
+      {t: 0.2,bones: {Hips: [0,5,0],Spine: [4,-7,0]},hands: {Left: [-0.25,1.07,-0.02],Right: [0.34,1.21,0.05]},poles: {Left: [0.14,-0.17,-0.98],Right: [-0.29,-0.62,-0.73]},feet: {Left: [-0.11,0.24,0.1],Right: [0.17,0.33,-0.31]},hipsY: -0.17},
+      {t: 0.25,bones: {Hips: [0,0,0],Spine: [6,-5,0]},hands: {Left: [-0.24,1.07,0],Right: [0.35,1.15,0.06]},poles: {Left: [0.13,-0.16,-0.98],Right: [-0.32,-0.57,-0.76]},feet: {Left: [-0.14,0.24,0.16],Right: [0.18,0.3,-0.32]},hipsY: -0.17},
+      {t: 0.3,bones: {Hips: [0,-3,0],Spine: [8,-5,0]},hands: {Left: [-0.24,1.06,0.02],Right: [0.36,1.07,0.07]},poles: {Left: [0.06,-0.14,-0.99],Right: [-0.35,-0.53,-0.77]},feet: {Left: [-0.17,0.24,0.23],Right: [0.16,0.28,-0.29]},hipsY: -0.17},
+      {t: 0.35,bones: {Hips: [0,-5,0],Spine: [10,-5,0]},hands: {Left: [-0.22,1.06,0.04],Right: [0.37,1.02,0.08]},poles: {Left: [-0.03,-0.11,-0.99],Right: [-0.4,-0.55,-0.74]},feet: {Left: [-0.2,0.24,0.26],Right: [0.12,0.26,-0.23]},hipsY: -0.17},
+      {t: 0.4,bones: {Hips: [0,-6,0],Spine: [11,-6,0]},hands: {Left: [-0.21,1.06,0.06],Right: [0.38,0.99,0.06]},poles: {Left: [-0.11,-0.1,-0.99],Right: [-0.53,-0.59,-0.61]},feet: {Left: [-0.2,0.24,0.23],Right: [0.1,0.25,-0.18]},hipsY: -0.17},
+      {t: 0.45,bones: {Hips: [0,-6,0],Spine: [11,-7,0]},hands: {Left: [-0.2,1.07,0.08],Right: [0.37,0.98,0.04]},poles: {Left: [-0.13,-0.11,-0.99],Right: [-0.63,-0.56,-0.53]},feet: {Left: [-0.19,0.25,0.15],Right: [0.08,0.25,-0.12]},hipsY: -0.18},
+      {t: 0.5,bones: {Hips: [0,-6,0],Spine: [11,-9,0]},hands: {Left: [-0.2,1.08,0.09],Right: [0.37,0.99,0.02]},poles: {Left: [-0.14,-0.11,-0.98],Right: [-0.69,-0.5,-0.52]},feet: {Left: [-0.16,0.27,0.05],Right: [0.08,0.25,-0.07]},hipsY: -0.18},
+      {t: 0.55,bones: {Hips: [0,-6,0],Spine: [11,-10,0]},hands: {Left: [-0.2,1.09,0.08],Right: [0.36,1.02,-0.01]},poles: {Left: [-0.16,-0.1,-0.98],Right: [-0.73,-0.48,-0.49]},feet: {Left: [-0.12,0.29,-0.06],Right: [0.07,0.24,-0.03]},hipsY: -0.17},
+      {t: 0.6,bones: {Hips: [0,-6,0],Spine: [11,-11,0]},hands: {Left: [-0.2,1.09,0.08],Right: [0.36,1.07,-0.04]},poles: {Left: [-0.18,-0.08,-0.98],Right: [-0.74,-0.48,-0.46]},feet: {Left: [-0.09,0.31,-0.16],Right: [0.07,0.24,0.01]},hipsY: -0.17},
+      {t: 0.66,bones: {Hips: [0,-4,0],Spine: [9,-13,0]},hands: {Left: [-0.21,1.09,0.07],Right: [0.37,1.13,-0.07]},poles: {Left: [-0.18,-0.07,-0.98],Right: [-0.72,-0.53,-0.45]},feet: {Left: [-0.07,0.32,-0.25],Right: [0.07,0.23,0.05]},hipsY: -0.16},
+      {t: 0.71,bones: {Hips: [0,-3,0],Spine: [8,-16,0]},hands: {Left: [-0.22,1.09,0.07],Right: [0.37,1.19,-0.09]},poles: {Left: [-0.17,-0.08,-0.98],Right: [-0.65,-0.61,-0.45]},feet: {Left: [-0.05,0.32,-0.31],Right: [0.06,0.24,0.1]},hipsY: -0.17},
+      {t: 0.76,bones: {Hips: [0,-1,0],Spine: [8,-17,0]},hands: {Left: [-0.23,1.08,0.07],Right: [0.39,1.25,-0.08]},poles: {Left: [-0.15,-0.12,-0.98],Right: [-0.52,-0.72,-0.46]},feet: {Left: [-0.03,0.3,-0.33],Right: [0.07,0.24,0.15]},hipsY: -0.17},
+      {t: 0.81,bones: {Hips: [0,1,0],Spine: [8,-17,0]},hands: {Left: [-0.24,1.07,0.09],Right: [0.39,1.3,-0.05]},poles: {Left: [-0.14,-0.16,-0.98],Right: [-0.35,-0.8,-0.49]},feet: {Left: [-0.03,0.28,-0.32],Right: [0.06,0.24,0.21]},hipsY: -0.17},
+      {t: 0.86,bones: {Hips: [0,1,0],Spine: [9,-15,0]},hands: {Left: [-0.24,1.07,0.1],Right: [0.4,1.34,0]},poles: {Left: [-0.12,-0.19,-0.97],Right: [-0.19,-0.82,-0.54]},feet: {Left: [-0.02,0.26,-0.28],Right: [0.06,0.23,0.23]},hipsY: -0.16},
+      {t: 0.91,bones: {Hips: [0,2,0],Spine: [9,-11,0]},hands: {Left: [-0.24,1.06,0.09],Right: [0.38,1.31,0.07]},poles: {Left: [-0.06,-0.22,-0.97],Right: [-0.04,-0.75,-0.65]},feet: {Left: [-0.02,0.24,-0.19],Right: [0.06,0.26,0.16]},hipsY: -0.17},
+      {t: 0.96,bones: {Hips: [0,3,0],Spine: [8,-9,0]},hands: {Left: [-0.23,1.06,0.07],Right: [0.36,1.25,0.12]},poles: {Left: [0,-0.22,-0.97],Right: [0.02,-0.66,-0.74]},feet: {Left: [-0.02,0.25,-0.13],Right: [0.06,0.28,0.07]},hipsY: -0.17},
+      {t: 1.01,bones: {Hips: [0,4,0],Spine: [7,-9,0]},hands: {Left: [-0.24,1.05,0.05],Right: [0.35,1.2,0.14]},poles: {Left: [0.03,-0.21,-0.98],Right: [0.01,-0.61,-0.79]},feet: {Left: [-0.03,0.25,-0.09],Right: [0.06,0.29,0]},hipsY: -0.18},
+      {t: 1.06,bones: {Hips: [0,5,0],Spine: [5,-10,0]},hands: {Left: [-0.24,1.05,0.03],Right: [0.34,1.17,0.13]},poles: {Left: [0.04,-0.2,-0.98],Right: [-0.01,-0.59,-0.81]},feet: {Left: [-0.03,0.25,-0.08],Right: [0.06,0.3,-0.02]},hipsY: -0.18},
+    ],
+  },
 ];
 
 // HOOPS MOTION phase 3c: a LOOP is smoothed as one (poseClip `periodic`: the end slopes read across the seam closeLoop made)
 export function buildMocapOpponentClip(scene: Scene, sk: Skeleton, clip: MocapOpponentClip): AnimationGroup | null {
   return buildPoseClip(scene, sk, clip.name, clip.duration, clip.keys, { periodic: clip.loop });
 }
+
+/** HOOPS MOTION phase 4a (plan §3.1): the REAL seconds of motion in each hoops capture one-shot — its window `to − from` in the capture's
+ *  true seconds (scripts/mocap/sources.mts CMU_TRUE_FPS) — the `realSec` HandleSystem.moveRateFor plays a move at real speed from (the clip
+ *  is `duration` long, so real speed is duration / realSec). The loops are left out: StrideMatch paces them. */
+export const MOCAP_REAL_SEC: Readonly<Record<string, number>> = {
+  bball_mc_crossover_right: 0.48,
+  bball_mc_crossover_left: 0.48,
+  bball_mc_hesi: 0.55,
+  bball_mc_jumpshot: 1.17,
+  bball_mc_follow_through: 0.65,
+  bball_mc_spin: 0.75,
+  bball_mc_layup_gather: 0.95,
+  bball_mc_pump_fake: 1.35,
+  bball_mc_step_through: 0.9,
+  bball_mc_pivot: 1.1,
+  bball_mc_layup_gather_left: 0.95,
+  bball_mc_pullup_gather: 0.45,
+  bball_mc_rip_right: 0.7,
+  bball_mc_rip_left: 0.7,
+};

@@ -20,6 +20,7 @@ import {
   buildShimmy, buildDropStep,                        // 2026-09-18: the post game
   buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildSnatchBack,
   buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip,   // 2026-09-16: the handle, and the ankles
+  carryStanceAtBind,   // HOOPS MOTION phase 4c: the v2 handle clips play on this body's own stroke (its times stretched)
   buildIdleStandHoops,   // HOOPS MOTION phase 3b (review): the ball-less watch with knees
 } from './basketball';
 import { basketballClipTable } from '../basketballTree';
@@ -27,6 +28,7 @@ import { HOOPS_OVERHEAD_CLIPS, anatomicalByDefault, closesLoop, withOverheadTran
 import { mirrorGroupsInPlace } from '../groupMirror';
 import { MOCAP_OPPONENT_CLIPS, buildMocapOpponentClip } from './mocapOpponents';
 import { CLIP_ALIASES } from '../clipAliases';
+import { strokeStretch } from '../handlePaths';
 
 let scene: Scene; let sk: Skeleton;
 const bind = new Map<TransformNode, { p: Vector3; q: Quaternion }>(); let root: TransformNode;
@@ -219,14 +221,16 @@ describe('basketball packages on the forge rig', () => {
     at(g, 0); const before = pos('RightHand').z;
     at(g, 0.15); expect(pos('RightHand').z).toBeGreaterThan(before + 0.2);
   });
-  it('crossover turns the hips and sweeps the ball hand across', () => {
+  it('crossover turns the hips and pushes the ball hand in toward the midline (phase 4c v2: at its own path\'s times on this body)', () => {
+    rest(); const k = strokeStretch(carryStanceAtBind(sk));   // (a longer stroke plays slower: the clip rides the carry's path on this body)
     const g = buildCrossover(scene, sk, 'left')!;
     at(g, 0); const x0 = pos('RightHand').x;
-    at(g, 0.2);
+    at(g, 0.19 * k);   // the crossing: the floor contact
     const hips = boneNode(sk, 'Hips')!; hips.computeWorldMatrix(true);
     const yaw = Math.abs(hips.rotationQuaternion!.toEulerAngles().y);
     expect(yaw).toBeGreaterThan(0.3);
-    expect(Math.abs(pos('RightHand').x - x0)).toBeGreaterThan(0.12);
+    at(g, 0.08 * k);   // the release: the push hand in toward the midline
+    expect(x0 - pos('RightHand').x).toBeGreaterThan(0.08);
   });
   it('follow-through starts overhead, snaps the shooting wrist forward and comes down the front (never a T)', () => {
     const g = buildFollowThrough(scene, sk)!;
@@ -515,47 +519,47 @@ describe('basketball packages on the forge rig', () => {
   // ── THE HANDLE (owner, 2026-09-16) ────────────────────────────────────────────────────────────────────────
   // Twelve moves in HandleSystem shared one hardwired crossover clip. Each of these measures the ONE thing that
   // tells its move apart from the others at dribble distance, because that is all a defender gets.
-  it('BETWEEN THE LEGS gets DOWN to the ball — lower than a crossover, and the stance opens to make room', () => {
-    // Measured against the crossover rather than against an absolute height: the hand target is IK-clamped by what
-    // the arm can reach from the torso it is given (dropping the target 0.22 m moved the hand 5 mm), so what
-    // separates this move from a low crossover is how far the whole BODY sits down to put the ball under itself.
-    rest(); const cross = buildCrossover(scene, sk, 'right')!;
-    at(cross, 0.2);
-    const crossBall = pos('RightHand').y, crossHips = pos('Hips').y;
-    const crossFeet = Math.abs(pos('LeftFoot').x - pos('RightFoot').x);
-    rest(); const g = buildBetweenLegsDribble(scene, sk, 'right')!;
-    at(g, 0.18);
-    expect(pos('RightHand').y).toBeLessThan(crossBall - 0.1);                     // the ball lower than a crossover's
-    expect(pos('Hips').y).toBeLessThan(crossHips - 0.1);                          // because the body went down to it
-    expect(pos('RightHand').y).toBeLessThan(pos('Hips').y);                       // and it IS under him
-    expect(Math.abs(pos('LeftFoot').x - pos('RightFoot').x)).toBeGreaterThan(crossFeet);   // room for it to pass
+  // HOOPS MOTION phase 4c: the v2 clips are built on their ball path (buildHandleV2) — `dir` is the side the ball ENDS on (a crossing move's
+  // `_left` is the right hand's), each key's time is its path's, stretched by this body's stroke. The contacts themselves are handleV2.test's.
+  const kOf = () => { rest(); return strokeStretch(carryStanceAtBind(sk)); };
+  it('BETWEEN THE LEGS gets DOWN to the ball — lower than a crossover, the stance split front to back to make room', () => {
+    const k = kOf();
+    const cross = buildCrossover(scene, sk, 'left')!;
+    at(cross, 0.19 * k);
+    const crossHips = pos('Hips').y;
+    rest(); const g = buildBetweenLegsDribble(scene, sk, 'left')!;
+    at(g, 0.19 * k);
+    expect(pos('Hips').y).toBeLessThan(crossHips - 0.1);                          // the body went down to it
+    // the split stance: the trail foot stepped back ≥ 0.2 m behind the planted lead foot — room for it to pass. (4c: measured absolute —
+    // the crossover's own feet swing 0.24 m apart in z at its crossing, turned with its 24° hip yaw, so "wider than the crossover's" read
+    // the crossover's hips, not a stance.)
+    expect(pos('LeftFoot').z - pos('RightFoot').z).toBeGreaterThan(0.2);          // (+z is his front on this rig: the Shammgod's push below)
+    at(g, 0.10 * k);
+    expect(pos('RightHand').y).toBeLessThan(pos('Hips').y);                       // the push goes down UNDER him
   });
 
   it('BEHIND THE BACK wraps the ball BEHIND the hips — the only move here where it goes backwards', () => {
-    rest(); const g = buildBehindBackDribble(scene, sk, 'right')!;
-    at(g, 0.18);
-    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);                       // behind the hip line
+    const k = kOf(); const g = buildBehindBackDribble(scene, sk, 'left')!;
+    at(g, 0.14 * k);
+    expect(pos('RightHand').z).toBeLessThan(pos('Hips').z);                       // behind the hip line (the release)
   });
 
   it('IN AND OUT keeps its hand: the off hand never takes the ball, which is what makes it not a crossover', () => {
-    rest(); const g = buildInAndOut(scene, sk, 'right')!;
-    at(g, 0.16); const offOut = pos('LeftHand').clone();
-    at(g, 0.28);
+    const k = kOf(); const g = buildInAndOut(scene, sk, 'right')!;
+    at(g, 0.08 * k); const offOut = pos('LeftHand').clone();
+    at(g, 0.24 * k);
     expect(Vector3.Distance(pos('LeftHand'), offOut)).toBeLessThan(0.18);         // the off hand stayed put
   });
 
-  it('the SHAMMGOD pushes the ball away on a long arm, then takes it back with the OTHER hand', () => {
-    rest(); const g = buildShammgod(scene, sk, 'right')!;
-    at(g, 0.2);
-    const push = pos('RightHand');
-    expect(push.z).toBeGreaterThan(pos('Hips').z + 0.4);                          // shoved out in FRONT
-    const offStart = pos('LeftHand').x;
-    at(g, 0.46);
-    // `dir` is the side the ball ENDS on, so a shammgod to the RIGHT finishes with the OFF hand carrying it right.
-    // Asserted as a movement across the body rather than an absolute x: reaching across is the most IK-clamped
-    // thing in this file, and the eye reads the travel, not the coordinate.
-    expect(pos('LeftHand').x).toBeGreaterThan(offStart + 0.3);
-    expect(pos('LeftHand').x).toBeGreaterThan(0);                                 // …and it ended on the right side
+  it('the SHAMMGOD pushes the ball away on a long arm, then the OTHER hand takes it in front and pulls it across', () => {
+    const k = kOf(); const g = buildShammgod(scene, sk, 'left')!;   // the right hand's push: the ball ends LEFT
+    at(g, 0.14 * k);
+    expect(pos('RightHand').z).toBeGreaterThan(pos('Hips').z + 0.4);              // shoved out in FRONT
+    at(g, 0.34 * k);
+    expect(pos('LeftHand').z).toBeGreaterThan(pos('Hips').z + 0.3);               // the other hand arrives on it out there
+    const caught = pos('LeftHand').x;
+    at(g, 0.58 * k);
+    expect(pos('LeftHand').x).toBeLessThan(caught - 0.1);                         // …and takes it across to its own side
   });
 
   it('the SNATCH BACK goes forward and then rips the ball BEHIND the hip line', () => {
@@ -567,13 +571,14 @@ describe('basketball packages on the forge rig', () => {
   });
 
   it('the DOUBLE CROSS crosses TWICE, and the second one is the lower of the two', () => {
-    rest(); const g = buildDoubleCross(scene, sk, 'right')!;
-    at(g, 0.16); const start = pos('RightHand').x, hip1 = pos('Hips').y;
-    at(g, 0.3);
-    expect(pos('RightHand').x).toBeLessThan(start - 0.4);                         // ONE: across to the other side
-    at(g, 0.44);
-    expect(pos('RightHand').x).toBeGreaterThan(start - 0.2);                      // TWO: and back, which is where it ends
+    const k = kOf(); const g = buildDoubleCross(scene, sk, 'right')!;   // the right hand's: it ends back in the right
+    at(g, 0.17 * k); const hip1 = pos('Hips').y;
+    at(g, 0.27 * k);
+    expect(pos('LeftHand').x).toBeLessThan(-0.15);                                // ONE: the left hand has it on the left
+    at(g, 0.43 * k);
     expect(pos('Hips').y).toBeLessThan(hip1);                                     // lower: the one that gets him
+    at(g, 0.51 * k);
+    expect(pos('RightHand').x).toBeGreaterThan(0.15);                             // TWO: and back, which is where it ends
   });
 
   it('the YOYO goes nowhere — the ball moves and the body does not', () => {

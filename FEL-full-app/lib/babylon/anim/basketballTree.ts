@@ -20,6 +20,7 @@ import type { CharacterAnimator } from './CharacterAnimator';
 import { rateFor, StrideRateFilter, strideRef } from '../core/StrideMatch';
 import { boneNode, findBone } from './boneLookup';
 import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
+import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs keep running under a handle move
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -27,6 +28,7 @@ export type BasketballAnimState =
   | 'drive' | 'run' | 'gather' | 'shot_release' | 'layup' | 'dunk'   // ANIM CLEAN-UP (2026-09-18): 'run' is the ball-less run; 'drive' is the sprint WITH the ball
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
   | 'defend_backpedal' | 'closeout' | 'defend_slide_hard' | 'defend_slide_hard_right'   // DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide
+  | 'defend_run' | 'defend_run_right'   // H2c: the crossover step — lateral faster than a slide can step
   | 'watch'
   | 'floor'
   | 'carry_slide' | 'carry_slide_right' | 'carry_back'   // THE CRAB WALK FIX (2026-09-19): travelling off the facing
@@ -72,6 +74,12 @@ export interface AnimTreeInput {
   retreat?: boolean;
   /** Closing the last two metres on a catch — chop steps under a high hand. */
   closeout?: boolean;
+  /** H2c ("stepping defensive slides"; owner 2026-10-14: don't cap the defender's 4.2 m/s, author stepping clips instead): travelling
+   *  SIDEWAYS faster than a slide can step (defendRunFor) — the crossover step. Optional: a mode that does not pass it slides as before. */
+  defendRun?: boolean;
+  /** H2c ("a sprinting chop-step close-out"): running AT the man from beyond the chop range (approachFor) — the sprint, then the closeout's
+   *  chop. It played a lateral slide loop while the body ran forward: a crab walk. */
+  approach?: boolean;
   /** Sitting down on him (L2 / an AI on the ball inside two metres) — the hard slide. */
   intense?: boolean;
   /**
@@ -83,6 +91,13 @@ export interface AnimTreeInput {
   floored?: boolean;
   celebrating?: boolean;
   dejected?: boolean;
+  /** HOOPS MOTION phase 4b (plan §3.5, U4): the athlete's hand the ball is in (the carry's, its destination during a move). 'left' plays the
+   *  dribble loops' `_left` twins (hoopsHand.leftDribbleTwins: the right-hand loops mirrored at spawn) where the rig has them. Default
+   *  right: a mode that does not pass it plays the loops it always did. */
+  ballHand?: 'left' | 'right';
+  /** HOOPS MOTION phase 4b: a handle move's renderer owns the ball (HandleMotion; carry.move) — the tree never chooses its own crossover
+   *  state then (one source for a move's beat). */
+  moveActive?: boolean;
 }
 
 export interface AnimChoice { state: BasketballAnimState; clip: string; loop: boolean; fadeSec: number }
@@ -121,12 +136,16 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   defend_backpedal: { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.14 },
   // …and the same three reads for a body that still has the ball. These are the shared lateral loops; the carry rig
   // owns the ball hand independently, so the ball stays in the palm through them.
-  carry_slide:       { clip: 'strafe_left', loop: true, fadeSec: 0.14 },
-  carry_slide_right: { clip: 'strafe_right', loop: true, fadeSec: 0.14 },
-  carry_back:        { clip: 'bball_defend_backpedal', loop: true, fadeSec: 0.16 },
+  // H2d (plan §4.19): the carrier's own lateral and backward DRIBBLES (CMU 06_09 / 06_06 — opponent-clips.json); they played the generic
+  // strafe and the defender's backpedal, with no ball arm. A rig without the captures plays those still (CARRY_LEGACY, owned()).
+  carry_slide:       { clip: 'bball_dribble_side_left', loop: true, fadeSec: 0.14 },
+  carry_slide_right: { clip: 'bball_dribble_side_right', loop: true, fadeSec: 0.14 },
+  carry_back:        { clip: 'bball_dribble_back', loop: true, fadeSec: 0.16 },
   closeout:        { clip: 'bball_closeout', loop: true, fadeSec: 0.12 },
   defend_slide_hard: { clip: 'bball_defend_slide_hard_left', loop: true, fadeSec: 0.14 },
   defend_slide_hard_right: { clip: 'bball_defend_slide_hard_right', loop: true, fadeSec: 0.14 },
+  defend_run:       { clip: 'bball_def_cross_run_left', loop: true, fadeSec: 0.12 },    // H2c: the crossover step (authored; DEF_RUN_STRIDE_MPS)
+  defend_run_right: { clip: 'bball_def_cross_run_right', loop: true, fadeSec: 0.12 },
   // BIOMECH-HOOPS-WAVE1 (2026-09-08): a body with no ball that is NOT defending (the shooter watching his arc, the rival
   // after his release) stands and watches — it used to drop into the defensive slide stance (G5: the follow-through's
   // silhouette died into a crouch the moment the hold released).
@@ -148,12 +167,14 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.defending) {
     state = i.bracing ? 'box_out'
       : i.closeout ? 'closeout'
+      : i.approach ? 'run'   // H2c: the sprint at him, before the chop
       : i.speed01 > 0.2
         ? (i.retreat ? 'defend_backpedal'
+          : i.defendRun ? (i.slideDir === 'right' ? 'defend_run_right' : 'defend_run')   // H2c: past a slide's reach, the crossover step
           : i.intense ? (i.slideDir === 'right' ? 'defend_slide_hard_right' : 'defend_slide_hard')
           : (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide'))
         : 'defend_idle';
-  } else if (i.crossover && i.hasBall) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';   // HOOPS MOTION phase 3b: a crossover is a ball move — a ball-less body never plays one
+  } else if (i.crossover && i.hasBall && !i.moveActive) state = i.crossoverDir === 'right' ? 'crossover_right' : 'crossover';   // HOOPS MOTION phase 3b: a crossover is a ball move — a ball-less body never plays one (phase 4b: nor while HandleMotion renders one)
   // TRAVELLING OFF THE FACING: slide, do not run. Only above a real walking pace and never inside a drive, so a
   // size-up reads as a size-up and a drive still reads as a drive.
   else if (lateralState(i)) state = lateralState(i)!;
@@ -161,8 +182,19 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.speed01 > 0.15) state = i.hasBall ? (i.speed01 < 0.42 ? 'walk_dribble' : i.speed01 > 0.74 ? 'sprint_dribble' : 'speed_dribble') : 'run';   // DRIBBLE GEARS: the loop follows the gear (walk 1.6 / jog 4.2 / sprint 6.4 m/s of 6.4)
   else if (i.nearestDefender < 1.4 && i.hasBall) state = 'protect';
   else state = i.hasBall ? 'idle_dribble' : 'watch';
-  return { state, ...CLIP_FOR[state] };
+  const pick = CLIP_FOR[state];
+  return { state, ...pick, clip: i.ballHand === 'left' && LEFT_TWIN_STATES.has(state) ? leftTwinOf(CLIP_FOR[CROSS_TWIN[state] ?? state].clip) : pick.clip };
 }
+/** H2d: a LATERAL loop's left-hand twin is the mirror of the OTHER side's clip — a mirror flips the travel with the hand (the side dribble
+ *  that steps left with the right hand, mirrored, steps right with the left hand). The forward and backward loops twin themselves. */
+const CROSS_TWIN: Partial<Record<BasketballAnimState, BasketballAnimState>> = { carry_slide: 'carry_slide_right', carry_slide_right: 'carry_slide' };
+/** H2d: what a carrier state plays on a rig that has neither its capture nor a twin of it (the strafes and the backpedal it always played). */
+const CARRY_LEGACY: Partial<Record<BasketballAnimState, string>> = { carry_slide: 'strafe_left', carry_slide_right: 'strafe_right', carry_back: 'bball_defend_backpedal' };
+/** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops that have a `_left` twin — the loops a ball hand dribbles in. H2d (plan §4.19):
+ *  the carrier's side and back dribbles join them (the side ones twin across, CROSS_TWIN); protect's stance has no ball arm. */
+export const LEFT_TWIN_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive', 'carry_slide', 'carry_slide_right', 'carry_back']);
+/** A dribble loop's left-hand twin (the name hoopsHand.leftDribbleTwins registers it under). */
+export const leftTwinOf = (clip: string): string => `${clip}_left`;
 
 /** LATERAL / BACKWARD travel, or null when the body is going where it is pointed. The window is deliberately wide
  *  (past 50° off the nose) so the facing slew's own catch-up does not flicker the loop on every turn. */
@@ -220,6 +252,23 @@ export class BasketballAnimTree {
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
   constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'> & Partial<Pick<CharacterAnimator, 'freezeAtEnd'>>) {}
+  /** H2 (moveLegs): the body's legs layer, and whether the beat in flight runs it (a handle move's beat, MOVE_LEGS_BEAT). */
+  private legs: MoveLegs | null = null;
+  private legsBeat = false;
+  attachLegs(legs: MoveLegs): void { this.legs = legs; }
+  /** H2: drive the legs layer for this frame — under a move beat, the loop the body would be in and its stride rate; after it, fading. */
+  private stepLegs(input: AnimTreeInput): void {
+    const l = this.legs; if (!l) return;
+    const dtSec = input.dtSec ?? 1 / 60, speedMps = input.speedMps ?? 0;
+    if (this.legsBeat && this.override?.kind === 'beat') {
+      const c = this.owned(chooseBasketballClip({ ...input, crossover: false, moveActive: true }));
+      const rate = c.loop ? rateFor(c.state, speedMps, this.ref) : null;
+      l.drive({ loopClip: c.loop && rate !== null ? c.clip : null, rate: rate ?? 1, speedMps, dtSec });
+    } else if (l.live) {
+      const st = this.current ?? 'speed_dribble';
+      l.end({ rate: rateFor(st, speedMps, this.ref) ?? 1, speedMps, dtSec });
+    }
+  }
   /** The stride references for THIS rig: a body running the CMU loops paces against their stride, not the authored one. */
   private get ref() { return strideRef(!!(this.animator as { clipNames?: Set<string> }).clipNames?.has('bball_mc_run')); }
 
@@ -231,17 +280,27 @@ export class BasketballAnimTree {
   private stateSince = 0;
   private static readonly DWELL_SEC = 0.22;
   private static readonly DWELL_GROUPS: ReadonlyArray<ReadonlySet<BasketballAnimState>> = [
-    new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out']),
+    new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out', 'defend_run', 'defend_run_right', 'run']),   // (H2c: the crossover step and the sprint at him dwell with the slides)
     new Set(['idle_dribble', 'protect', 'speed_dribble', 'walk_dribble', 'sprint_dribble', 'drive', 'run', 'watch']),
   ];
   private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
     return !!a && BasketballAnimTree.DWELL_GROUPS.some((g) => g.has(a) && g.has(b));
   }
+  /** A `_left` twin this rig does not have plays the loop it twins (never the resolver's fallback). */
+  private owned(c: AnimChoice): AnimChoice {
+    const names = (this.animator as { clipNames?: Set<string> }).clipNames;
+    const twinned = c.clip.endsWith('_left') && LEFT_TWIN_STATES.has(c.state) && names && !names.has(c.clip) ? { ...c, clip: CLIP_FOR[c.state].clip } : c;
+    // H2d: a carrier state whose capture this rig does not have (its name resolves to `bball_mc_…`) plays what it always played
+    const legacy = CARRY_LEGACY[twinned.state];
+    if (legacy && names && !names.has(twinned.clip) && !names.has(twinned.clip.replace(/^bball_/, 'bball_mc_'))) return { ...twinned, clip: legacy };
+    return twinned;
+  }
   update(input: AnimTreeInput): BasketballAnimState {
     this.last = input;
-    const raw = chooseBasketballClip(input);
+    this.stepLegs(input);
+    const raw = this.owned(chooseBasketballClip(input));
     if (this.settledState && raw.state !== this.settledState) this.settledState = null;
-    const c = this.settledState ? chooseBasketballClip(withoutTrigger(input, this.settledState)) : raw;
+    const c = this.settledState ? this.owned(chooseBasketballClip(withoutTrigger(input, this.settledState))) : raw;
     if (this.override) {
       // a mode-owned hold is never interrupted; a beat yields only to a priority state
       const yields = this.override.kind === 'beat' && PRIORITY.has(c.state) && c.state !== this.override.state;
@@ -249,7 +308,9 @@ export class BasketballAnimTree {
     }
     const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
     if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
-    if (c.state !== this.current) {
+    // (phase 4b) the same loop state in the other hand is its twin: replayed with the state's own fade
+    const handChanged = c.state === this.current && c.loop && !!this.strideClip && c.clip !== this.strideClip;
+    if (c.state !== this.current || handChanged) {
       this.current = c.state; this.stateSince = now;
       if (c.loop) {
         this.token++; this.override = null;
@@ -257,7 +318,9 @@ export class BasketballAnimTree {
         const r0 = rateFor(c.state, input.speedMps ?? 0, this.ref);
         this.strideClip = c.loop ? c.clip : null;
         if (r0 !== null) this.strideFilter.set(r0);
-        this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1 });
+        // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
+        const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
+        this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });
       } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
@@ -302,6 +365,9 @@ export class BasketballAnimTree {
 
   private playBeat(clip: string, opts: TreeBeatOpts, state: BasketballAnimState | null): void {
     const tok = ++this.token;
+    // H2 (moveLegs): a handle move's beat on a moving body runs the legs layer, seeded from the loop it cuts (its stride phase)
+    this.legsBeat = !!this.legs && MOVE_LEGS_BEAT.test(clip);
+    if (this.legsBeat) this.legs!.begin(this.strideClip);
     this.override = { kind: 'beat', clip, state };
     this.animator.play(clip, {
       loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame
@@ -405,6 +471,31 @@ export function closeoutFor(pos: { x: number; z: number }, vel: { x: number; z: 
   const dx = man.x - pos.x, dz = man.z - pos.z; const dl = Math.hypot(dx, dz); if (dl < 0.9 || dl > 2.6) return false;
   const sp = Math.hypot(vel.x, vel.z); if (sp < 0.4) return false;
   return (vel.x * dx + vel.z * dz) / (sp * dl) > 0.6;
+}
+
+/** H2c: the crossover step's lateral speeds (m/s): in above ENTER, out below EXIT (a body on the line does not flip every frame; the
+ *  tree's dwell holds the rest). FEEL NUMBERS (new, flagged): 2.8 is where the slower slide capture (78_30 right, 1.70 m/s) needs
+ *  1.65× its real cadence — the fastest a slide still reads as a slide (the owner's "choppy / crab walky" was the slides at their caps). */
+export const DEF_RUN_ENTER_MPS = 2.8, DEF_RUN_EXIT_MPS = 2.4;
+/** H2c: is this defender travelling SIDEWAYS (off his facing) faster than a slide can step? `state` is his tree's current state (the
+ *  hysteresis: already in the crossover step, he stays in it down to EXIT). Backwards travel is the backpedal's, not this. */
+export function defendRunFor(yaw: number, vel: { x: number; z: number }, state: string | null | undefined): boolean {
+  const lat = Math.abs(vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw));
+  const fwd = vel.x * Math.sin(yaw) + vel.z * Math.cos(yaw);
+  if (fwd < -0.6 * lat) return false;
+  return lat > (state === 'defend_run' || state === 'defend_run_right' ? DEF_RUN_EXIT_MPS : DEF_RUN_ENTER_MPS);
+}
+/** H2c: the chop's reach — beyond this a defender running at his man SPRINTS (the run); inside it closeoutFor chops (0.9–2.6 m). In at
+ *  APPROACH_MIN_MPS and 0.7 of his line; already running, out only below APPROACH_EXIT_MPS or off 0.5 of it (the AI's speed wobbles ±0.5 m/s
+ *  round 2 m/s on a chase — measured on the first H2c reel: run ↔ slide every 0.23 s, the tree's dwell, without it). */
+export const APPROACH_MIN_M = 2.6, APPROACH_MIN_MPS = 1.8, APPROACH_EXIT_MPS = 1.2;
+/** H2c: is this defender running AT his man from beyond the chop range? `state` is his tree's current state (the hysteresis). */
+export function approachFor(pos: { x: number; z: number }, vel: { x: number; z: number }, man: { x: number; z: number } | null, state?: string | null): boolean {
+  if (!man) return false;
+  const dx = man.x - pos.x, dz = man.z - pos.z; const dl = Math.hypot(dx, dz); if (dl <= APPROACH_MIN_M) return false;
+  const running = state === 'run';
+  const sp = Math.hypot(vel.x, vel.z); if (sp < (running ? APPROACH_EXIT_MPS : APPROACH_MIN_MPS)) return false;
+  return (vel.x * dx + vel.z * dz) / (sp * dl) > (running ? 0.5 : 0.7);
 }
 
 /** The state table, read-only — for the stride-matching drift test (StrideMatch.test): a looping state that walks must be matched. */

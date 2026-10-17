@@ -20,12 +20,48 @@ export interface TubeSpan { from: number; to: number }
 export interface V3 { x: number; y: number; z: number }
 
 /** Where each tube lives on its segment (0 = the parent joint, 1 = the child joint). */
-export const TUBE_SPANS: Record<'armsleeve' | 'armsleeve2' | 'legsleeve' | 'crewsocks', TubeSpan> = {
+export const TUBE_SPANS: Record<'armsleeve' | 'armsleeve2' | 'legsleeve' | 'crewsocks' | 'wristband', TubeSpan> = {
   armsleeve: { from: 0.34, to: 0.97 },    // below the deltoid, down to the elbow — never inside the shoulder
   armsleeve2: { from: 0.06, to: 0.80 },   // from the elbow to above the wrist (the wristband's place)
   legsleeve: { from: 0.30, to: 0.80 },    // under the calf's widest, above the shoe's collar
   crewsocks: { from: 0.68, to: 0.90 },
+  // style pass (2026-10-16): the wristband is a short tube MEASURED on the forearm's skin, in the stretch the shooting sleeve leaves
+  // for it — a fixed torus scaled off the shoulder span was 0.16 m across on a forge rival's 6 cm wrist (k 1.14, offset bones)
+  wristband: { from: 0.80, to: 0.93 },
 };
+/** THE HEADBAND, MEASURED (style pass): the band sits this far under the crown (m: the brow line on a MakeHuman head and the
+ *  scan), centred on the head's own skin in a slab there and standing HEAD_EASE off it (the hair under the band). */
+export const BROW_BELOW_CROWN = 0.085;
+export const HEAD_EASE = 0.012;
+/** The head's slab: skin within this of the brow line, within HEAD_CAP of the head's own centre line (the ears, not the shoulders). */
+export const HEAD_HALF = 0.012, HEAD_CAP = 0.13;
+/** A ring round the head at the brow, off the skin `P` (world, y up): its centre and radius plus HEAD_EASE; null when the slab
+ *  is too thin to read. The crown is the skin's highest point; the head's centre line the centroid of the skin above the chin. */
+export function headRing(P: ArrayLike<number>): { c: V3; r: number; n: number } | null {
+  let top = -Infinity;
+  for (let i = 1; i < P.length; i += 3) if (P[i] > top) top = P[i];
+  if (!Number.isFinite(top)) return null;
+  // the head: the skin within 0.22 m of the crown (above the chin), its own centre line in x and z
+  let hx = 0, hz = 0, hn = 0;
+  for (let i = 0; i + 2 < P.length; i += 3) if (P[i + 1] > top - 0.22) { hx += P[i]; hz += P[i + 2]; hn++; }
+  if (!hn) return null;
+  hx /= hn; hz /= hn;
+  const y = top - BROW_BELOW_CROWN;
+  const pts: number[] = []; let sx = 0, sz = 0;
+  for (let i = 0; i + 2 < P.length; i += 3) {
+    if (Math.abs(P[i + 1] - y) > HEAD_HALF) continue;
+    if (Math.hypot(P[i] - hx, P[i + 2] - hz) > HEAD_CAP) continue;
+    pts.push(P[i], P[i + 2]); sx += P[i]; sz += P[i + 2];
+  }
+  const n = pts.length / 2;
+  if (n < TUBE_MIN_RING) return null;
+  sx /= n; sz /= n;
+  const ds: number[] = [];
+  for (let i = 0; i < pts.length; i += 2) ds.push(Math.hypot(pts[i] - sx, pts[i + 1] - sz));
+  ds.sort((a, b) => a - b);
+  const r = ds[Math.min(n - 1, Math.max(0, Math.ceil(0.9 * n) - 1))];
+  return { c: { x: sx, y, z: sz }, r: r + HEAD_EASE, n };
+}
 /** Metres a ring stands off the skin it was measured on. */
 export const TUBE_EASE = 0.006;
 /** Metres each side of a ring's plane the skin is sampled in. */

@@ -105,9 +105,9 @@ import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPl
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
-  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, moveImpulse,
-  moveClip, flickClip, ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,
+  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, moveDisplayName, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
+  resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose,
+  ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / flickClip / moveImpulse are the renderer's — anim/handleMotion)
   // bodyRight lives in HoopsMoves with the rest of the body-frame helpers
   type ChainState, type HandleMove,
   hasMove, MOVE_HANDLE, type MoveOutcome,   // the stick's snatchback is gated on the same rating doMove gates on
@@ -122,8 +122,10 @@ import {
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10PHASE-2 phase 8: the tip-in
 import { attachBallToHand, gatherBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
-import { rightHandHoops, rightHandBall, hoopsHand } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
-import { sideAwayFrom, sideOfVector } from '../anim/athleteSide';                             // HOOPS MOTION phase 3: the one visual-side helper
+import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
+import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves
+import { findBone } from '../anim/boneLookup';
+import { sideAwayFrom, sideOfVector } from '../anim/athleteSide';               // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
 import { mountRimReach, rimReachWeight, type RimReachHandle } from '../anim/rimReach';   // HAND AND RIM (owner, 2026-09-18): the ball hand meets the iron on a game dunk
 import { isFinishStyle, planDropStep, planShimmyFade, stickAtRim01, POST_DROP_STICK_MIN, SHIMMY_CONTEST_CUT } from '../core/HoopsMoves';
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush — over the lip, down the axis, out of the net — on the game's dunks
@@ -136,7 +138,7 @@ import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 // HOOPS KINETIC (owner brief 2026-09-18): the parry-vault, the momentum drift and its ankle-breaker, the footstool board, the drive-by steal.
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, FOOTSTOOL, footstoolRead, DRIVE_BY, driveByRead } from '../core/HoopsKinetic';
-import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
+import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, SLIDE_MIN_SPACE_M, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17): the right stick is the dribble stick on the floor (2K17 vocabulary)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
 import { PlayerSlot, LocalInputSource, AISource } from '../core/PlayerSlot';
@@ -155,7 +157,7 @@ import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: th
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
-import { trickFromFlick, trickWindow, judgeFlick, trickPct, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
+import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
@@ -168,7 +170,7 @@ import {   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit — M4 the fade, M5 th
 import {   // HOOPS-MOVE-KIT-B wave 2 (2026-09-08): M7 the running hook, M8 the pump + step-through, M9 the pivot,
   // M10 the floater over length, M11 the reverse, M12 the glass, M13 the hop step, M14 the euro
   runningHook, HOOK_ON_ME, isPumpFake, planStepThrough, PUMP_MAX_SEC, STEP_THROUGH_SEC, PUMP_BITE_RANGE, PUMP_BITE_CHANCE, PUMP_BITE_STUN,
-  pivotFrom, planPivot, PIVOT_MAX_SPEED,
+  pivotFrom, planPivot, pivotFreeFoot, PIVOT_MAX_SPEED,
   rimProtected, isReverseFinish, reverseSide,
   inBankBand, bankPoint, BANK_PCT_BONUS,
   planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable,
@@ -182,7 +184,12 @@ import { BOX_OUT_RANGE } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O2: 
 import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
-import { AiMover } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
+import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { AiMover } from '../core/AiMovement';
+import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
+import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
+import { familyFromStick, FAMILY_PICK_K, CONTEST_TRICK, contestTricksOn, trickPctFor, putbackDunkOn, PUTBACK_DUNK } from '../core/GameDunks';   // H2e: more dunks
+import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
 import { SoundKit } from '../audio/SoundKit';
@@ -191,7 +198,9 @@ import { dunkStingers } from '../audio/mic/names';
 import { HOOPERS } from '../audio/mic/cast';
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
-import { retreatFor, closeoutFor } from '../anim/basketballTree';   // DEFENSE-LOOK (2026-09-17)
+import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
+/** H2c (dev log): the defender states the stepping pass added or re-routed. */
+const H2C_STEP_STATES: ReadonlySet<string> = new Set(['defend_run', 'defend_run_right', 'run', 'closeout']);   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
 import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
@@ -556,6 +565,14 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** HOOPS MOTION phase 3b: the rival's movement — his slide at 3.6 m/s (sprint 1.2×) and his drive's own wish, on the hero's accel 26 /
    *  decel 34 (it was unit steer × 3.6 in one frame: 216 m/s²). */
   const foeMover = new AiMover(3.6);
+  let squeezeAt = -1, squeezeHeldWas = false; const squeezeVel = new Vector3();   // H2e: the last squeeze (its time and velocity), for the double tap
+  let tapRelease: ReturnType<typeof meterRelease> | 'pump' | null = null;   // H2e: the first press's quick release, held while the hop is still on
+  let hopRelease: HopRelease = null;   // the double-tapped hop's finish: 'armed' from the second press, 'auto' once that press came up during the hop (decisions 17-19)
+  const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
+    speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
+  let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)
+  let foeReact: DefReaction | null = null;   // H2c: the rival's read of a fake — his mover takes the step (core/DefenderReact)
+  let lastFoeStepState = '';   // H2c (dev log): the rival's last tree state, for the stepping states' lines
   const devContacts: { t: number; severity: string; closing: number; attacker: string; victim: string; attackerSpeed: number }[] = [];   // dev: the last Havok contact events (probes)
   // ── the DEFENSE contest package (D1–D3) ──
   let bumpAge = Infinity;                       // D2: seconds since the last hard body contact with the handler (the strip window)
@@ -730,7 +747,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -958,6 +975,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       // HOOPS MOTION phase 3 (owner round 2: right-handed everywhere): the whole bball_* family too, captures included (built by
       // installOpponentMotion at spawn) — a clip's side is now the side the athlete is drawn doing it on
       console.info(`[HOOPS-HAND] 1v1 right-handed hoops: ${rightHandHoops(me.animator, me.skeleton)} / ${rightHandHoops(foe.animator, foe.skeleton)} clips mirrored`);
+      // HOOPS MOTION phase 4b (U4): the dribble loops in the LEFT hand — runtime mirrors of the right-handed loops, for the tree's ballHand
+      console.info(`[HOOPS-HAND] 1v1 left-hand dribble loops: ${leftDribbleTwins(me.animator, me.skeleton).length} / ${leftDribbleTwins(foe.animator, foe.skeleton).length}`);
       onevoneVenue?.hidePlaceholders();  // M74
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -1037,6 +1056,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meDribbleSM = new DribbleStateMachine();
       void meDribbleSM;
       meAnimTree = new BasketballAnimTree(me.animator);
+      meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
       foeFootPlant = new FootPlant(foe.skeleton, foe.meshes[0] as never);   // HOOPS MOTION phase 3b: every body plants
@@ -1065,6 +1085,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       meReach = mountRimReach({ scene: ctx.scene, skeleton: me.skeleton, root: me.root, ball, rim: RIM, ringR: RIM_RADIUS });
       foeReach = mountRimReach({ scene: ctx.scene, skeleton: foe.skeleton, root: foe.root, ball, rim: RIM, ringR: RIM_RADIUS });
       meLayers.mountHinge(); foeLayers.mountHinge();   // HOOPS MOTION phase 3c: the hinged arm LAST — after the carries and the rim reaches
+      // HOOPS MOTION phase 4b (U21): a handle move's contact hands are the carry's reach over the clip's own keys — the drag skips them
+      { const mc = meCarry, fc = foeCarry; meLayers.setContactHands(() => mc?.move?.contactRig ?? []); foeLayers.setContactHands(() => fc?.move?.contactRig ?? []); }
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
@@ -1451,7 +1473,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (gather.t >= gather.plan.sec) {
             const plan = gather.plan; gather = null;
             // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
-            if (plan.then && plan.then !== 'rise') startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec);
+            if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather lays it off the high glass
             else beginRise();
           }
         }
@@ -1482,21 +1504,29 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (jabEligible && stickHeld > 0 && isJabInput(stickHeld, stickPeak) && canJab(threat)) {
             const dist = distXZ(me.root.position, foe.root.position);
             const live = foeStunSec === 0 && !foeFloored;
-            const odds = live ? jabBiteOdds({
-              defenderDist: dist,
-              defenderClosing: foeVelLast.length() > 1.4,
-              defenderSet: foeVelLast.length() < 0.6,
-              handle,
-              shownThisPossession: threat.shown,
-            }) : 0;
-            const bought = live && roll() < odds;
-            threat = throwJab(threat, bought);
-            burstArmed = bought;
-            meAnimTree.beat('bball_hesi', { fadeSec: moveFadeSec(!!meSlot.intent.sprint), speedRatio: moveRate(!!meSlot.intent.sprint) });   // the sharpest authored weight-shift: the jab (MOVE PACE: snaps on the turbo)
+            let odds = 0, bought = false;
+            // HOOPS MOTION phase 4b: the jab through the renderer — its decision is the threat's own (custom: jabBiteOdds / throwJab / roll,
+            // unchanged, on this frame), the clip is today's (bball_hesi — 4e authors the jab's own), the ball a pound in the same hand
+            requestMove(meHost(), {
+              move: 'jab', clip: 'bball_jab', turbo: !!meSlot.intent.sprint,   // the sharpest authored weight-shift: the jab (MOVE PACE: snaps on the turbo)
+              decide: { kind: 'custom', run: () => {
+                odds = live ? jabBiteOdds({
+                  defenderDist: dist,
+                  defenderClosing: foeVelLast.length() > 1.4,
+                  defenderSet: foeVelLast.length() < 0.6,
+                  handle,
+                  shownThisPossession: threat.shown,
+                }) : 0;
+                bought = live && roll() < odds;
+                threat = throwJab(threat, bought);
+                burstArmed = bought;
+              } },
+            });
             SoundKit.play('whoosh', { pitch: 1.25, volume: 0.28 });
             if (bought) {
+              const rr = retreatFrom(defGeo());   // H2c: he gives up ~0.3 m (a drop step) under the stun
               foeStunSec = Math.max(foeStunSec, 0.3);
-              foeAnimTree.beat('bball_contact_react', { fadeSec: 0.07 });
+              if (rr) defReact(rr); else foeAnimTree.beat('bball_contact_react', { fadeSec: 0.07 });
               ctx.feel?.impact?.(0.2);
               bannerFlash(ctx, 'HE BIT THE JAB — GO!', 600);
               micBite();   // THE MIC
@@ -1514,7 +1544,14 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         spinCooldown = Math.max(0, spinCooldown - dt); stepbackWindow = Math.max(0, stepbackWindow - dt);
         spinArmed = Math.max(0, spinArmed - dt);
-        if (spin) stepSpin(ctx, dt);
+        if (spin) {
+          stepSpin(ctx, dt);
+          // HOOPS MOTION phase 4b (U19): the spin's pull is a path on the carry — ticked through the turn while it runs; once it has been
+          // caught the ball is parked in that hand until the spin hands the drive back (the carry was never ticked in a spin before)
+          // (only while the spin is still on after this step: the frame it ends, the dribble block below ticks the carry — never twice)
+          if (spin && meCarry?.move) meCarry.update(dt, drib.speed01, carrying && !shooting && !dunking);
+          else if (spin && meCarry?.active) meCarry.update(0, 0, false);
+        }
         else if (updatePost(ctx, dt, mx, my, defPos)) { /* the seal owns the stick */ }
         else if (spinArmed > 0 && spinCooldown <= 0 && carrying && !shooting && !dunking && !finish && !gather) {
           // M6: off the body I just met, on the swing ACROSS MY PATH — read against the travel, not the body's yaw, which
@@ -1535,6 +1572,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             // always resolves an owned move: the crossover is its floor). The tree's own crossover state played a beat here first, and doMove's
             // cut it in the same frame: two plays in one frame, the loop the first was fading from stopped dead under the second (MAP S2)
             speed01: drib.speed01, crossover: false, crossoverDir: mx >= 0 ? 'right' : 'left', moveRate: moveRate(sprintOk), nearestDefender: nearestDef,
+            ballHand: meCarry?.hand === 'Left' ? 'left' : 'right', moveActive: !!meCarry?.move,   // HOOPS MOTION phase 4b: the loops in the ball's hand
             hasBall: carrying && !loose, shooting, dunking,   // (3b review) make-it-take-it sets `carrying` while the ball is still in the net: 24 dribble frames on a make's exit
             driving: sprintOk && drib.speed01 > 0.6   // IMPROVE (2026-10-06) #15: the dot toward the rim, without a new vector
               && meDribble.vel.x * (RIM.x - me.root.position.x) + meDribble.vel.y * (RIM.y - me.root.position.y) + meDribble.vel.z * (RIM.z - me.root.position.z) > 0,
@@ -1548,8 +1586,16 @@ export const OneVOneMode: ModeDefinition = (() => {
           wasPlanting = drib.planting;
           meFootPlant.update(dt);
           // the ball leaves the palm while I carry; a crossover swaps hands
-          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !pausedDribble);   // STICK HANDLE: pausin' holds the ball out
-          if (drib.crossover && !finish && !posting) meCarry?.toSide(sideOfVector(yawBeforeCut, { x: mx, z: -my }));   // HOOPS-MOVE-KIT-A: no size-up reads inside a finish's hop (KIT-B: nor inside a seal). HOOPS MOTION phase 3: the ball to the hand on the side the cut goes (V:1v1 N2: it was a toggle), crossing in front — a path, not a jump
+          // STICK HANDLE: pausin' holds the ball out. HOOPS MOTION phase 4b (U19): …unless a move's path has it (PAUSIN's `hold` segment)
+          meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move));
+          { // H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
+            const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.hand === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
+              dribbling: !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble,
+              defenderDist: foeStunSec === 0 && !foeFloored ? distXZ(me.root.position, foe.root.position) : Infinity });
+            strongHand = sh.state;
+            if (sh.back && meCarry?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[1V1-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
+          }
+          // (the left-stick crossover's ball goes with its move now: doMove below, the cut's side as the reversal's end side — plan §3.4)
         // STICK HANDLE (2K17, owner 2026-09-17): the right stick's gestures become moves while the ball is on the floor — a
         // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
         // flick the MOMENTUM BEHIND THE BACK (slow: the hesi), a hold is PAUSIN' (frozen, the ball out, the release explodes),
@@ -1558,55 +1604,72 @@ export const OneVOneMode: ModeDefinition = (() => {
         // it is replayed through the exact same loop below, so every gate (handle locks, chains, escape timing) still runs.
         if (shooting || dunking || finish || gather || spin) stickLockClearAt = null; else if (stickLockClearAt === null) stickLockClearAt = performance.now();   // H1 H-04
         if (carrying && possession === 'mine') stickGestures.push(...rStick.tick(performance.now() / 1000));   // H1 H-03: a still thumb still reaches the hold clock
-        if (pausedDribble && (!(carrying && possession === 'mine') || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); console.info("[1V1-STICK] PAUSIN' let go quietly"); }
+        if (pausedDribble && (!(carrying && possession === 'mine') || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); if (carrying && !shooting && !dunking) meCarry?.runMove('pausin_release'); console.info("[1V1-STICK] PAUSIN' let go quietly"); }
         if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) {
           stickGestures.unshift(bufferedGesture); bufferedGesture = null;
         } else if (bufferedGesture && !bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) bufferedGesture = null;   // H-04: the buffer survives the lock, then 220 ms
         if (stickGestures.length && carrying && !shooting && !dunking && !finish && !gather && !spin) {
           const foeDistS = distXZ(me.root.position, foe.root.position); const foeLiveS = foeStunSec === 0 && !foeFloored;
           for (const g of stickGestures) {
-            if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
+            if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); meCarry?.runMove('pausin_release'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
             if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
-              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold('bball_hesi', { fadeSec: moveFadeSec(false), speedRatio: 0.25 }); console.info("[1V1-STICK] PAUSIN'"); }
+              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold(`bball_pausin_${meCarry?.hand === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); meCarry?.runMove('pausin');   /* H2b (plan §4.18): its own hold, the ball held out on its path */ console.info("[1V1-STICK] PAUSIN'"); }
               continue;
             }
-            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
             // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
             // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
             // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
-            const own0 = pick0 ? ownedStickMove(pick0.move, handle) : null;   // H1 H-02: every gated move falls back, never a dead stick
+            const own0 = pick0 ? ownedStickMove(pick0.move, MOVES_UNLOCKED_GATE) : null;   // H2: every move unlocked until H9   // H1 H-02: every gated move falls back, never a dead stick
             const locked = !!own0 && own0.locked;
-            if (locked) refuse(ctx, `${pick0!.move.replace(/_/g, ' ').toUpperCase()} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);
+            if (locked) refuse(ctx, `${moveDisplayName(pick0!.move)} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);   // H2d (Q7): the generic name, never a player's
             const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
             if (!pick) continue;
             if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;   // a size-up is rhythm, not the move the aggressive BTB chains off
             console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(meCarry?.hand ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
             // THE 2K PRO STICK (2026-09-18): the size-up (a package animation in place, no travel), the L2 step-back dribble
             // (a hop off the rim that arms the step-back jumper), the L2 spin — none of them a chain move
-            if (pick.move === 'size_up') { const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', handle); console.info(`[1V1-HANDLE] size-up ${suClip} (handle ${handle})`); meAnimTree.beat(suClip, { fadeSec: moveFadeSec(sprintOk) }); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 }); continue; }
+            if (pick.move === 'size_up') {
+              // HOOPS MOTION phase 4b: the size-up plays its move's clip AND its ball in place — no decision, no impulse, no link (today's early
+              // `continue`); the between step crosses, so its clip is named for the side the ball ends on (one value, S31)
+              const suClip = sizeUpClipFor(sizeUpN++, pick.side ?? 'right', MOVES_UNLOCKED_GATE);   // H2: the whole cycle, unlocked
+              const su = requestMove(meHost(), { move: sizeUpMoveOf(suClip), hint: pick.side ?? undefined, decide: { kind: 'none' }, fadeSec: moveFadeSec(sprintOk), speedRatio: 1 });
+              console.info(`[1V1-HANDLE] size-up ${su.clip ?? suClip} (handle ${handle})`); SoundKit.play('whoosh', { pitch: 1.5, volume: 0.25 });
+              if (sizeUpMoveOf(suClip) === 'yoyo') defReact(shadeToward(defGeo(), su.endHand));   // H2c: he shades the yoyo's ball side (the size-up's other steps read nothing)
+              continue;
+            }
             if (pick.move === 'stepback') {
               // A LINK, NOT A SIDE EFFECT (Phase 4): the step-back takes its place in the chain like any other move, so a step-back
               // into a cross reads as a combo and the tier is real. It is rated 0 — the gate is what you chain into it.
-              chain = resolveHandleMove('stepback', chain, handle, { present: false, closing: false, set: true, within: false }, roll).chain;
+              // HOOPS MOTION phase 4b: through the renderer — a link with no read (chainOnly), its own clip, no path (the carry bounces through
+              // the hop), no impulse (the hop is the controller's)
+              requestMove(meHost(), { move: 'stepback', decide: { kind: 'chainOnly', run: () => { chain = resolveHandleMove('stepback', chain, handle, { present: false, closing: false, set: true, within: false }, roll, MOVES_UNLOCKED_GATE).chain; } }, clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1, path: false });
               console.info(`[1V1-HANDLE] link stepback (chain ${chain.length}, handle ${handle})`);
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, sprintOk); stepbackWindow = STEPBACK_WINDOW_SEC;
-              meAnimTree.beat('bball_stepback_gather', { fadeSec: moveFadeSec(sprintOk) }); SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
+              SoundKit.play('whoosh', { pitch: 0.9, volume: 0.35 }); ctx.feel?.impact?.(0.1);
               continue;
             }
             if (pick.move === 'snatchback') {
               // The snatchback is a real move in the vocabulary (snatch_back, 80) and it LINKS — and, thrown deep against a closing
               // man, it can break ankles like anything else at its price. The stepback hop + the cross below is its body.
-              const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE }, roll);
-              chain = sno.chain;
-              console.info(`[1V1-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
-              reactToBreak(ctx, sno, pick.side ?? 'right');
+              // HOOPS MOTION phase 4b: its own read (custom, on the input frame as today), then the render — the ball crosses on the snatchback's
+              // path in the hop (the switchHand toggle is gone: plan §4.13)
+              const snr = requestMove(meHost(), {
+                move: 'snatch_back', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,   // H2b (plan §4.13): its own v2 clip (MOVE_CLIP), not the step-back's gather
+                decide: { kind: 'custom', run: () => {
+                  const sno = resolveHandleMove('snatch_back', chain, handle, { present: foeStunSec <= 0 && !foeFloored, closing: foeVelLast.length() > 1.4, set: false, within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE }, roll, MOVES_UNLOCKED_GATE);
+                  chain = sno.chain;
+                  console.info(`[1V1-HANDLE] move snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
+                  reactToBreak(ctx, sno, pick.side ?? 'right');
+                } },
+              });
+              console.info(`[1V1-HANDLE] snatch_back → ${snr.clip ?? 'no clip'} ball ${snr.startHand}→${snr.endHand}`);   // H2b: the clip that really played (it named bball_snatch_back, a clip the move did not play)
               // THE SNATCHBACK (2K: step-back with R2, steezo's staple): the hop off the rim AND the ball to the other hand
               // in the same beat — the cross is what makes it an escape rather than a set-up for the jumper
               const toRimS = RIM_FLOOR.subtract(me.root.position); toRimS.y = 0;
               meDribble.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
-              meCarry?.switchHand();
-              meAnimTree.beat('bball_stepback_gather', { fadeSec: moveFadeSec(sprintOk) }); SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
+              SoundKit.play('whoosh', { pitch: 1.05, volume: 0.4 }); ctx.feel?.impact?.(0.14);
               continue;
             }
             if (pick.move === 'spin') {
@@ -1633,6 +1696,10 @@ export const OneVOneMode: ModeDefinition = (() => {
               }
               meDribble.momentumBtb(pick.side ?? 'right', sprintOk); const sideS = pick.side ?? undefined; later(180, () => { if (carrying && !spin && !shooting && !dunking) { spinCooldown = 0; startSpin(ctx, foeStunSec > 0 ? null : foe.root.position, sideS); } }); }
             if (g.kind === 'flick') { chainBeforeFlick = chain; flickAt = performance.now() / 1000; flickMove = pick.move; }
+            if (pick.move === 'btb_slide') {   // H2 THE BTB SLIDE (owner 2026-10-16): the behind-the-back's decision and chain, its own clip and hop
+              if (doMove(ctx, 'behind_back', pick.side ?? undefined, false, undefined, 'slide')) { SoundKit.play('whoosh', { pitch: 1.2, volume: 0.4 }); ctx.feel?.impact?.(0.1); }
+              continue;
+            }
             if (doMove(ctx, pick.move, pick.side ?? undefined)) {SoundKit.play('whoosh', { pitch: pick.move === 'momentum_cross' ? 1.45 : 1.3, volume: 0.4 }); ctx.feel?.impact?.(0.1); }   // H1: no whoosh for a refused move
           }
           stickGestures = [];
@@ -1658,6 +1725,10 @@ export const OneVOneMode: ModeDefinition = (() => {
             const toRim = RIM_FLOOR.subtract(me.root.position); toRim.y = 0;
             const foeDist = distXZ(me.root.position, foe.root.position);
             const foeLive = foeStunSec === 0 && !foeFloored;
+            // HOOPS MOTION phase 4b (plan §3.4, U10/S31): the cut's side — read against the facing BEFORE the cut (3a review) — is the
+            // reversal's END side: the clip's side and the ball's destination are one value now (a crossing pick crosses to it, or plays its
+            // same-hand twin when the ball is there already; a same-hand pick keeps the hand)
+            const cutSide = sideOfVector(yawBeforeCut, { x: mx, z: -my });
             doMove(ctx, moveFromContext({
               speed01: drib.speed01,
               retreating: Vector3.Dot(meDribble.vel, toRim) < -0.2,
@@ -1667,7 +1738,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               // priced moves that no situation can ever produce
               chainLength: chain.length,
               inHisChest: foeLive && foeDist < OFF_THE_HEAD_RANGE,
-            }, handle), undefined, true);   // (3d review: a flick — off the head's body is the crossover)
+            }, MOVES_UNLOCKED_GATE), undefined, true, cutSide);   // H2: the read picks from every move (unlocked until H9)   // (3d review: a flick — off the head's body is the crossover)
           }
           // HESITATION — the pullback plant. You spent your momentum; if the
           // defender was CLOSING on you, they bite and you own the next beat
@@ -1686,7 +1757,7 @@ export const OneVOneMode: ModeDefinition = (() => {
               foeStunSec = 0.45;
               SoundKit.play('impact', { pitch: 1.1, volume: 0.35 });
               ctx.feel?.impact?.(0.2);
-              foeAnimTree.beat('bball_contact_react');
+              if (foeReact?.kind !== 'standup') foeAnimTree.beat('bball_def_standup', { fadeSec: 0.06 });   // H2c: he STANDS UP (it played the contact react); doMove's hesi may have started it this frame
               bannerFlash(ctx, 'BIT ON THE HESI!');
               micBite();   // THE MIC
             } else {
@@ -1701,8 +1772,10 @@ export const OneVOneMode: ModeDefinition = (() => {
         // dunk for the animation eye (every layup play the lab drove became a contested pull-up)
         if (dummyFoe) { foeIntent.moveX = 0; foeIntent.moveY = 0; foeIntent.steal = false; foeIntent.contest = false; foeIntent.action = false; foeIntent.sprint = false; }
         // HOOPS MOTION phase 3b: the brain's intent is a wish; the mover gives the velocity the body has (a stagger stands him still, as before)
-        if (foeStunSec > 0) foeMover.stop(); else observeFoe(ctx, dt);   // (the physics step and the contacts moved him last frame: he carries the speed he really had)
-        const foeMove = foeMover.stepIntent(dt, foeStunSec > 0 ? { moveX: 0, moveY: 0 } : foeIntent);
+        // H2c: a reaction (core/DefenderReact) owns his feet for its beat — through the mover, under a stun too (the jab's retreat)
+        const foeReacting = !!foeReact && !foeFloored;
+        if (foeStunSec > 0 && !foeReacting) foeMover.stop(); else observeFoe(ctx, dt);   // (the physics step and the contacts moved him last frame: he carries the speed he really had)
+        const foeMove = foeReacting ? foeMover.track(dt, reactionWish(foeReact!)) : foeMover.stepIntent(dt, foeStunSec > 0 ? { moveX: 0, moveY: 0 } : foeIntent);
         const foeVel = _foeVel.copyFrom(foeMove.vel);   // IMPROVE (2026-10-06) #15: a kept copy (nothing below calls the mover again this frame)
         plantFoe(foeMove.planting, dt);
         foeVelLast.copyFrom(foeVel);   // HOOPS-MOVE-KIT-A M2: the drive contest reads set vs moving
@@ -1710,7 +1783,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         // same world-space number otherwise)
         meMotion.update(meDribble.vel.x, meDribble.vel.z, me.root.rotation.y, dt);
         foeMotion.update(foeVel.x, foeVel.z, foe.root.rotation.y, dt);
-        if (foeStunSec === 0) {
+        if (foeStunSec === 0 || foeReacting) {
           // closing speed toward the handler feeds the hesi bite read
           const toMe = me.root.position.subtractToRef(foe.root.position, _toMe); toMe.y = 0;   // IMPROVE (2026-10-06) #15
           foeClosingSpeed = toMe.lengthSquared() > 1e-4
@@ -1720,8 +1793,9 @@ export const OneVOneMode: ModeDefinition = (() => {
           driveBody('foe', foe.root, foeVel, dt);
           // BIOMECH-HOOPS-WAVE1 G1: a defender's chest stays ON the handler through the slide (he used to face his travel —
           // a sideways-shuffling run); beyond range he runs to his spot facing the travel; every turn a slew
-          facePlay(foe.root, foeVel, foeStunSec > 0 ? null : me.root.position, DEFEND_FACE_RANGE, dt);
+          facePlay(foe.root, foeVel, foeStunSec > 0 && !foeReacting ? null : me.root.position, DEFEND_FACE_RANGE, dt);   // H2c: a reaction keeps his chest on me (a drop step is not a turn and run)
         }
+        if (foeReacting) foeReact = stepReaction(foeReact!, dt, foeVel);   // H2c
         foeSpeed01 = Math.min(1, foeVel.length() / 3.6);
         if (foeBrain && foeBrain.job !== lastFoeJob) { lastFoeJob = foeBrain.job; console.info(`[1V1-DEF] rival job ${lastFoeJob}`); }   // DEFENSE-LOOK: the lab reads the closeout / recover
         foeAnimTree.update({
@@ -1730,8 +1804,11 @@ export const OneVOneMode: ModeDefinition = (() => {
           speed01: Math.min(1, foeVel.length() / 3.6), crossover: false, nearestDefender: Infinity,
           hasBall: false, shooting: false, dunking: false, driving: false,
           defending: true, bracing: !!foeBrain?.boxing, staggered: false, slideDir: slideDirFor(foe.root.rotation.y, foeVel),   // O2: the seal stance while boxing
-          retreat: retreatFor(foe.root.position, foeVel, me.root.position), closeout: foeBrain?.job === 'closeout' && distXZ(foe.root.position, me.root.position) < 2.4, intense: foeBrain?.job === 'onball' && distXZ(foe.root.position, me.root.position) < 2.0,   // DEFENSE-LOOK
+          retreat: retreatFor(foe.root.position, foeVel, me.root.position), closeout: (foeBrain?.job === 'closeout' && distXZ(foe.root.position, me.root.position) < 2.4) || closeoutFor(foe.root.position, foeVel, me.root.position, Math.min(1, foeVel.length() / 3.6)),   // H2c: the chop wherever he runs the last 2.6 m at me
+          defendRun: defendRunFor(foe.root.rotation.y, foeVel, foeAnimTree.state), approach: approachFor(foe.root.position, foeVel, me.root.position, foeAnimTree.state),   // H2c: the crossover step; the sprint at me before the chop
+          intense: foeBrain?.job === 'onball' && distXZ(foe.root.position, me.root.position) < 2.0,   // DEFENSE-LOOK
         });
+        if (process.env.NODE_ENV === 'development') { const st = foeAnimTree.state ?? ''; if (st !== lastFoeStepState && (H2C_STEP_STATES.has(st) || H2C_STEP_STATES.has(lastFoeStepState))) console.info(`[1V1-DEF] rival steps ${lastFoeStepState || '-'} → ${st} at ${foeVel.length().toFixed(1)} m/s`); lastFoeStepState = st; }   // H2c: the lab reads the crossover step / the sprint / the chop
         // same standoff fix as the defensive poke: bodies rest ~1.1m apart
         // HOOPS-MOVE-KIT-B: a SEALED post man cannot be poked from behind — the body is between him and the ball, which is
         // what the seal is for (the ball is held out on the ball side). Front the post (get on my chest side) and the poke
@@ -1784,14 +1861,24 @@ export const OneVOneMode: ModeDefinition = (() => {
 
         // shot start — drive context first: a hot drive DUNKS instead of metering
         if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
-          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); micBite(); } }   // THE MIC: the bite
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; meAnimTree.beat('bball_shimmy_quick', { fadeSec: 0.05, speedRatio: 1 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 });   /* H2b (plan §4.23): its own 0.22 s sell, not the hesi at 1.5× */ if (foeStunSec === 0 && !foeFloored && distXZ(me.root.position, foe.root.position) < 2.0 && roll() < 0.45) { foeStunSec = 0.4; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); micBite(); } }   // THE MIC: the bite
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
         if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press('shot');
+        { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP — a second Square inside HOP_TAP_SEC of the first, on a drive, turns the
+          // gather that press started (or the pump its quick release made) into the hop step (core/FinishFootwork)
+          const held = meSlot.intent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
+          if (edge && carrying && !dunking && !posting && hopOnDoubleTap(tapRead())) {
+            if (finish) { finish = null; contact?.setAirborne('me', false); me.root.position.y = 0; }
+            gather = null; shooting = false; tapRelease = null;   // the held release is the hop's now: the second press is its meter
+            if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[1V1-MOVE] hop step on the double tap'); }
+          }
+        }
         if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
+          squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null; hopRelease = null;   // H2e: the double tap reads this press
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
           // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
           // inside 2.6 m of the rim metered a jumper). The range is a floor distance; judge it against the rim's floor point.
@@ -1823,7 +1910,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             // (the carry's deactivate sat inside the !shooting guard, so the ball stayed at its last bounce point on the floor
             // through the whole meter and the arc started from there — measured ball–hand 1.56 m in the load)
             meCarry?.update(0, 0, false);
-            if (!ball.parent) gatherBallToHand(ball, me.skeleton, meCarry?.handBone ?? hoopsHand(me));
+            gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the jumper gathers in the RIGHT hand, whichever the dribble was in
             const contest = contestLevel(me.root.position, defenderPos);
             shotContest = contest;
             currentShot = classifyShot(me.root.position, meDribble.vel, RIM, contest, posting ? post : faceUpRead(defenderPos));
@@ -1851,10 +1938,17 @@ export const OneVOneMode: ModeDefinition = (() => {
           // a quick release out of the seal was an EARLY hook, never a fake. Let go inside the pump window before the hop
           // has really left and the hook / fade is cancelled into the pump; the step-through / up-and-under follows.
           const postPump = !!finish && (finish.plan.style === 'hook' || finish.plan.style === 'fadeaway') && finish.t < PUMP_MAX_SEC;
-          if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && (!finish || postPump)) {
-            if (finish) { finish = null; me.root.position.y = 0; contact?.setAirborne('me', false); meAnimTree.release(); }
-            pumpFake(ctx, defPos);
-          }
+          const pumpNow = isPumpFake(t * shotMeter.durationSec) && (!finish || postPump);
+          const doPump = (): void => { if (finish) { finish = null; me.root.position.y = 0; contact?.setAirborne('me', false); meAnimTree.release(); } pumpFake(ctx, defPos); };
+          // the double-tapped hop (owner 2026-10-16, decisions 17-19): its second press up DURING the hop is a tap — that button-up is no
+          // pump and no early release; the finish releases itself, untimed ('held'), at its own release key (the green centre). Held past
+          // the hop, the player times it on the meter as ever
+          if (meSlot.intent.action && hopRelease === 'armed') { hopRelease = hopReleaseOnButtonUp(hopRelease, gather?.plan.kind === 'hop'); if (hopRelease === 'auto') console.info('[1V1-MOVE] hop tapped: the finish releases itself'); }
+          if (hopRelease === 'auto') { if (hopAutoReleaseNow(hopRelease, t, shotMeter.greenCenter01)) { hopRelease = null; shotMeter.release(); meter3d?.end(HOP_AUTO_QUALITY); stickShot = null; releaseJumper(ctx, HOP_AUTO_QUALITY); console.info(`[1V1-MOVE] hop finish released itself at t ${t.toFixed(2)} (untimed)`); } }
+          // H2e: a double tap's FIRST release is held while a second press could still make the hop (core/FinishFootwork), then sent as taken
+          else if (meSlot.intent.action && !tapRelease && !posting && tapReleaseHeld(tapRead())) { tapRelease = pumpNow ? 'pump' : meterRelease(); console.info('[1V1-MOVE] tap release held for the double tap'); }
+          else if (tapRelease) { if (!tapReleaseHeld(tapRead())) { const r = tapRelease; tapRelease = null; if (r === 'pump') doPump(); else { stickShot = null; releaseJumper(ctx, r); } } }
+          else if (meSlot.intent.action && pumpNow) doPump();
           else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, meterRelease()); }   // POST HOOK: the stick let go = the release
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
@@ -2034,6 +2128,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           hasBall: false, shooting: false, dunking: false, driving: false,
           defending: true, bracing: intent.brace ?? false, staggered: false, slideDir: slideDirFor(defYaw, meDribble.vel),
           retreat: retreatFor(me.root.position, meDribble.vel, foe.root.position), closeout: closeoutFor(me.root.position, meDribble.vel, foe.root.position, drib.speed01), intense: sitting,   // DEFENSE-LOOK
+          defendRun: defendRunFor(defYaw, meDribble.vel, meAnimTree.state), approach: approachFor(me.root.position, meDribble.vel, foe.root.position, meAnimTree.state),   // H2c
         });
         const dist = Vector3.Distance(me.root.position, foe.root.position);
         // D3: X HELD = the grounded hand-up (verticality) — a hold the tree never interrupts; re-held after a reach beat
@@ -2094,12 +2189,29 @@ export const OneVOneMode: ModeDefinition = (() => {
             hasBall: true, shooting: false, dunking: false, driving: dec.phase === 'blowby',
             defending: false, bracing: false, staggered: false,
             travelOffRad: travelOff(foe.root.rotation.y, foeW),
+            ballHand: foeCarry?.hand === 'Left' ? 'left' : 'right',   // HOOPS MOTION phase 4b: his loops in his ball hand
           });
-          if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_hesi', { fadeSec: 0.1 }); }   // the step-back reads as a check: the body loads
+          if (dec.phase === 'stepback' && !stepbackShown) { stepbackShown = true; foeAnimTree.beat('bball_stepback_rival', { fadeSec: 0.08 }); }   // H2c (plan §4.21): his own 0.30 s step-back (it played the hesi)
           if (dec.crossover) {
             // the ball SWITCHES hands — the read. A same-hand shuffle (dec.step without a crossover) keeps the dribble loop.
-            foeAnimTree.beat(dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', { fadeSec: 0.12 });
-            foeCarry?.toSide(dec.crossover);   // HOOPS MOTION phase 3: to the side the step ends on (bodySide, drawn), a crossing path — not a toggle
+            // HOOPS MOTION phase 4c: HIS crossover keeps the CAPTURE (06_13) it played through opponentMotion's swap until 4f routes him through
+            // HandleMotion (plan §4.20). The v2 authored crossover is keyed on the hero's ball PATH, and his ball is held (4b review F4), so
+            // its hands would reach for a ball that is not there; the capture no longer stands in for bball_crossover_* (it plays by its own
+            // name), so he names it — the authored clip only on a rig that did not build the capture.
+            const cap = `bball_mc_crossover_${dec.crossover === 'left' ? 'left' : 'right'}`;
+            // H2a: HIS BALL CROSSES AGAIN (4f's §4.20, pulled forward). 4c held it until 4f, which never ran — the probe's ai_1v1_cross read
+            // the ball cross 6/10 at finish-release and 0/10 on the rebased p4. Through the renderer now: no decision, no impulse, no chain
+            // (his move is AttackerBrain's), the crossover's path on his carry, his capture's clip; a crossover to the hand the ball is
+            // already in moves no ball (toSide's old rule).
+            const crosses = !!foeCarry && (foeCarry.hand === 'Left' ? 'left' : 'right') !== dec.crossover;
+            requestMove(foeHost(), { move: 'crossover', hint: dec.crossover, decide: { kind: 'none' }, clip: foe.animator.clipNames.has(cap) ? cap : dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', fadeSec: 0.12, speedRatio: 1, path: crosses ? undefined : false });
+            // (4b review F4) HIS BALL STAYS IN HIS HAND UNTIL 4f routes him through HandleMotion (plan §4.20: a path timed inside his poke
+            // window). 4b ran the hero's crossover path here (toSide → runMove): the ledger's L1 (his crossover's foot slide p90, the mean of
+            // the attempts, ≤ 13.78 cm) read 15.61 | 15.04 against base 12.54 | 13.73; with his ball held it reads 13.0 | 13.05, and
+            // attempts 2–6 replay base's own take for take — the path changed the plays sampled (pooled over every planted frame
+            // 12.98 | 13.06 with it, 12.97 | 12.25 without, base 12.71 | 13.55: p4/4c/review/f4-rival.txt). assumption: "the old
+            // behaviour" is no crossing path — phase 3's floor-point lerp is gone (it crossed his ball in 7/10 | 2/10 at base; now 0/10).
+            // (The call was foeCarry?.toSide(dec.crossover).)
             SoundKit.play('whoosh', { pitch: 1.3, volume: 0.3 });
           }
           if (dec.phase === 'gather') {
@@ -2239,6 +2351,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         nearestDefender: foeStunSec > 0 ? Infinity : foeDist, shot: meShotWin, flight: dunkFlight, landed: meLandSec > 0, celebrate: meCelebrateSec > 0,
         reaching: meAnimTree.held === 'bball_steal_reach' || meAnimTree.held === 'bball_block_reach' || meHandUp, staggered: meStunSec > 0 && !meFloored && possession === 'defense', floored: meFloored,
         posting, spinning: !!spin,   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
+        hesi: meDribble.hanging,     // H2b (plan §4.8): the hitch's posture through the hang
       } satisfies HoopsPostureInput);
       Object.assign(foeBio, {
         role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,
@@ -2307,7 +2420,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
@@ -2410,8 +2523,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster' | 'standing', force?: HoopsDunk): void {   // STICK HANDLE: pausin' forces its 360
     dunking = true; shooting = false; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     box.fga++;   // IMPROVE (2026-10-06) #4
-    meShotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
+    meShotWin = 'none'; dunkFlush = null; let resolved = false, released = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1 (H2 leftovers: `released` — see the resolve)
     let trickThrown = false;                       // one trick per flight: the stick is a commitment, not a masher
+    let familyPicked = !!force, trickArmed = true;   // H2e: the family by the stick at the takeoff; the trick stick waits for the stick to come home after it
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
     const from = me.root.position.clone();
     const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
@@ -2421,6 +2535,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     const c = contestDrive(from, landing, defenderPos, defenderPos ? foeVelLast : null, kind === 'standing' ? 'dunk' : kind);
     if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
     driveContest = c;
+    // H2e: on a breakaway with the game going my way the trick stick throws the dunk contest's four (core/GameDunks)
+    const contestTricks = contestTricksOn({ contested: c.contested, nearestDefenderM: defenderPos ? distXZ(from, defenderPos) : Infinity, momentum01: mbus.score01 });
     // SHOWTIME (owner, 2026-09-17): R2 in, the right stick held BACK on an open lane — or any contact dunk — and the
     // dunk contest's vocabulary comes to the game: a long flight with a slow hang, a side camera, and a flush you TIME.
     const showtime = showtimeAsked(kind, lookY);
@@ -2467,7 +2583,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const lateral01 = speedNow > 0.1 && toRimNow2.lengthSquared() > 1e-4
       ? Math.min(1, Math.abs(driveDir.x * toRimNow2.normalize().z - driveDir.z * toRimNow2.x) / speedNow)
       : 0;
-    const picked = force ?? (showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
+    let picked: HoopsDunk = force ?? (showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
       speed: speedNow,
       lateral01,
       contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
@@ -2557,16 +2673,27 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (!contact?.isReady) foe.root.position.y = ride.lift;
         if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.14, holdEnd: true }); }
       }
-      if (!trickThrown && !showtime) {
+      // H2e (owner): THE FAMILY BY THE STICK — pushed at the takeoff (k < FAMILY_PICK_K), the right stick names the dunk, no timing:
+      // up one hand, down two, right the windmill, left the cradle. A flick there used to be a trick thrown 'early' (a miss)
+      if (!familyPicked && !showtime && k < FAMILY_PICK_K) {
+        const fam = familyFromStick(lookX, lookY);
+        if (fam) {
+          familyPicked = true; trickArmed = false;
+          if (fam.clip !== picked.clip) { picked = fam; dunkLabel = picked.label; micName = picked.label; meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, Math.max(0.2, (flightTotal - flightMs) / 1000)) }); ctx.setHud({ shotType: picked.label }); }
+          console.info(`[1V1-DUNK] family by the stick: ${picked.label}`);
+        }
+      }
+      if (!trickArmed && Math.hypot(lookX, lookY) < 0.3) trickArmed = true;   // the stick came home: the next push is a trick
+      if (!trickThrown && !showtime && trickArmed) {
         const asked = trickFromFlick(lookX, lookY);
         if (asked) {
           trickThrown = true;
           const judge = judgeFlick(k, trickWin);
-          const spec = STICK_TRICK[asked];
+          const spec = (contestTricks ? CONTEST_TRICK : STICK_TRICK)[asked];   // H2e: a breakaway with momentum throws the contest's four
           meter3d?.end(judge === 'green' ? 'perfect' : judge === 'early' ? 'early' : 'late');
           if (judge === 'green') {
             const onTheBump = c.bumpK !== null;
-            made = roll() < trickPct(c.pct, asked, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
+            made = roll() < trickPctFor(c.pct, spec, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
             meAnimTree.beat(spec.clip, { holdEnd: true, speedRatio: dunkSpeedRatio({ clip: spec.clip, label: spec.label, sec: 0.7, flashy: true }, flightTotal / 1000) });
             ctx.setHud({ shotType: spec.label });
             micName = spec.label; mic?.crowd('crowd.ooh', 1);   // THE MIC: the stands gasp at the trick; the call will name it
@@ -2575,7 +2702,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             bannerFlash(ctx, onTheBump ? `${spec.label} ON HIM!` : spec.label, 900);
           } else {
             // a trick you could not land is a decision with a price — that is what makes throwing one mean anything
-            made = roll() < trickPct(c.pct, asked, judge);
+            made = roll() < trickPctFor(c.pct, spec, judge);
             bannerFlash(ctx, judge === 'early' ? 'TOO EARLY!' : 'TOO LATE!', 700);
           }
           resolved = true;
@@ -2633,10 +2760,12 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (k < 0.55) ball.position.copyFrom(Vector3.Lerp(from.add(new Vector3(0, 1.2, 0)), glassDunk, g));
         else ball.position.copyFrom(Vector3.Lerp(glassDunk, RIM, Math.min(1, (k - 0.55) / 0.35)));
       }
-      if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
+      // H2 leftovers: on `released`, not `resolved` — a thrown trick sets `resolved` (its make is decided), and this release keyed on it,
+      // so after any trick the ball never left the hand: no flush through the net on a make, no clank and no board on a miss
+      if (!released && !swatted && k >= DRIVE_DUNK.resolveK) {
         // G6: the slam resolves AT THE IRON — the ball leaves the hand at the rim; a make flushes through the net, a miss
         // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)
-        resolved = true;
+        resolved = true; released = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
         else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
@@ -2810,7 +2939,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** M8 / M13 / M14: the FOOTWORK squeezes — a step-through inside the pump window, a euro when the stick sells a side
    *  against help, a hop step off an explosive gather. Each is a GatherPlan with real legs that ends IN a finish; the
    *  meter runs through the footwork exactly as it runs through the pull-up's plant. Returns whether one took the squeeze. */
-  function startFootwork(ctx: ModeContext, mx: number, my: number, defenderPos: Vector3 | null): boolean {
+  function startFootwork(ctx: ModeContext, mx: number, my: number, defenderPos: Vector3 | null, force?: { hopVel?: Vector3 }): boolean {   // H2e: `force.hopVel` — the double tap's hop, off the first press's drive
     const contest = contestLevel(me.root.position, defenderPos);
     const yaw = me.root.rotation.y;
     const dist = distXZ(me.root.position, RIM_FLOOR);
@@ -2819,7 +2948,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     // (the baseline foot around him into a layup), pulled OFF the rim with R2 it is the SHIMMY FADE (the shoulders sell
     // both ways, then the fade); a pump-fake window still opens the step-through / up-and-under from the seal (the
     // footwork was gated off in the post entirely — the post had no up-and-under). The euro and the hop stay perimeter moves.
-    if (posting) {
+    if (force?.hopVel) plan = planHopStep(force.hopVel, me.root.position, RIM_FLOOR, hopThen(dist));   // H2e: the player asked for it
+    else if (posting) {
       const toRimP = RIM_FLOOR.subtract(me.root.position); toRimP.y = 0; toRimP.normalize();
       if (stickAtRim01(mx, -my, toRimP) >= POST_DROP_STICK_MIN) plan = planDropStep(me.root.position, RIM_FLOOR, yaw, defenderPos);
       else if (meSlot.intent.sprint && stickBack01(mx, -my, toRimP) >= POST_FADE_STICK_MIN) plan = planShimmyFade(me.root.position, RIM_FLOOR);
@@ -2829,8 +2959,14 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     else if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.root.position, RIM_FLOOR, yaw, defenderPos);   // M8
     else if (euroAvailable(meDribble.vel, me.root.position, RIM_FLOOR, defenderPos)) {                                        // M14
-      const sell = euroSell(mx, -my, yaw);
+      const sell = euroSell(mx, -my, yawTo(me.root.position, RIM_FLOOR));   // H2 leftovers: read across the line to the rim, not the facing (the skip's own fix: the facing follows the stick, so a held sell read forward)
       if (sell) plan = planEuro(me.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
+    }
+    // H2e (owner): THE SKIP GATHER — the stick held AWAY from him with no help in the lane (help: the euro above takes the same input)
+    if (!plan && !posting && skipAvailable(meDribble.vel, me.root.position, RIM_FLOOR)) {
+      const lineYaw = yawTo(me.root.position, RIM_FLOOR);   // read across the line to the rim: the body's facing follows the stick (~0.1 s), so a held push read off it turns forward
+      const away = skipAwaySide(mx, -my, lineYaw, me.root.position, defenderPos);
+      if (away) plan = planSkipGather(meDribble.vel, me.root.position, RIM_FLOOR, away, lineYaw);
     }
     // M13: the explosive two-foot gather. The face-up READS beat it — a body on my hip is a hook over him, a body sitting
     // at the rim is a floater over him, a drive across the rim is a reverse — because hopping into a chest is not a move.
@@ -2852,7 +2988,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     shotContest = plan.kind === 'shimmy' ? contest * SHIMMY_CONTEST_CUT : contest;   // the shimmy sells: the contest that reaches the fade is cut
     pumpWindow = 0;
     meCarry?.update(0, 0, false);
-    if (!ball.parent) gatherBallToHand(ball, me.skeleton, meCarry?.handBone ?? hoopsHand(me));
+    gatherToShootingHand();   // HOOPS MOTION phase 4b (U14): the footwork's gather is the right hand's too
     currentShot = plan.then === 'rise' ? classifyShot(me.root.position, meDribble.vel, RIM, contest) : { style: plan.then as ShotStyle, label: gatherLabel(plan.kind, 'FINISH'), pctMod: plan.then === 'floater' ? 1.0 : plan.then === 'fadeaway' ? 0.86 : 1.18, drift: 'none' };
     // ACROBATIC LAYUPS (2026-09-18): a hop that was going to RISE but classifies as a finish (the running layup band, the
     // scoop, the hang) ends IN that finish — it used to rise as a jumper under a "HANG & FINISH" label (measured)
@@ -2867,6 +3003,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       : plan.kind === 'hop' ? 'bball_hop_step'
       : plan.kind === 'shimmy' ? 'bball_shimmy'
       : plan.kind === 'dropstep' ? (plan.side === 'left' ? 'bball_drop_step_left' : 'bball_drop_step')
+      : plan.kind === 'skip' ? `bball_skip_gather_${plan.side ?? 'right'}`   // H2e: the ball swung to the away side
       : plan.side === 'left' ? 'bball_euro_step' : 'bball_euro_step_left';
     const clipSec = me.animator.durationOf(clip) ?? plan.sec;
     meAnimTree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
@@ -2954,11 +3091,20 @@ export const OneVOneMode: ModeDefinition = (() => {
     const plan = pivotRead ? planPivot(me.root.position, me.root.rotation.y, pivotRead.side, pivotRead.reverse)
       : planSpin(me.root.position, me.root.rotation.y, RIM_FLOOR, defPos, side);
     spin = { plan, t: 0, beat: !!pivotRead };   // a pivot has no shoulder-clear beat: nobody was beaten
-    spinClip = pivotRead ? 'bball_pivot' : 'bball_spin';
+    // H2b (plan §4.16): the pivot plays its v2 at real speed, named by the FREE foot — planPivot keeps the pivot foot opposite the turn
+    // on a front pivot (the turn's side steps) and on the turn's side on a reverse (the other foot steps). The capture that stood in for
+    // bball_pivot ran 2.6× real with its own hip yaw on top of the root's turn.
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : 'bball_spin';
     spinCooldown = SPIN_COOLDOWN_SEC;
     if (posting) { posting = false; }
-    meCarry?.update(0, 0, false);   // the ball comes into the hands for the turn (the clip holds it at the chest)
-    if (!ball.parent) gatherBallToHand(ball, me.skeleton, meCarry?.handBone ?? hoopsHand(me));
+    // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the SPIN's ball is its pull — the start hand palms it at the hips, lets it go on the exit
+    // side, the other hand catches it (the hand change the decode asks for) — a path the carry plays through the turn (the spin branch
+    // ticks it). It was parked (update(0, 0, false)) and gathered to the hand it was in. The PIVOT keeps its held ball (§4.16).
+    const pulled = !pivotRead && requestMove(meHost(), { move: 'spin', decide: { kind: 'none' }, clip: null, path: 'spin' }).ball !== 'none';
+    if (!pulled) {
+      meCarry?.update(0, 0, false);   // the ball comes into the hands for the turn (the clip holds it at the chest)
+      if (!ball.parent) gatherBallToHand(ball, me.skeleton, meCarry?.handBone ?? hoopsHand(me));
+    }
     const clipSec = me.animator.durationOf(spinClip) ?? plan.sec;
     meAnimTree.beat(spinClip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
     SoundKit.play('whoosh', { pitch: pivotRead ? 0.95 : 1.25, volume: pivotRead ? 0.2 : 0.35 });
@@ -2983,9 +3129,12 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-MOVE] spin shoulder clear beaten ${beaten}`);
     }
     if (spin.t < spin.plan.sec) return;
-    const exitYaw = Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
+    // H2b (plan §4.14): NO END SNAP — the body is where the planted sweep left it, and the step-out (≤ 135°) is the loop's own turn
+    // toward the exit run below; a pivot (no step-out) lands on its exit as it always did
+    const exitYaw = spin.plan.stepOut ? spinYaw(spin.plan, spin.plan.sec) : Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
     face(me.root, exitYaw);
     meDribble.setFacing(exitYaw);
+    if (spin.plan.stepOut) meDribble.turnTo(Math.atan2(spin.plan.exit.x, spin.plan.exit.z));   // H2b: the step-out, turned on the way out
     // M6 the spin comes out INTO the drive; M9 a pivot is a turn in place — it hands nothing back, the feet are still set
     meDribble.vel.copyFrom(spinClip === 'bball_pivot' ? new Vector3(0, 0, 0) : spin.plan.exit.scale(SPIN_EXIT_SPEED));
     spin = null;
@@ -3192,7 +3341,7 @@ export const OneVOneMode: ModeDefinition = (() => {
    * crossover should rarely break anyone and a three-deep chain at a real handle should look inevitable.
    */
   /** The defender's ankles, from any move's outcome — doMove's and the stick's alike (Phase 4). */
-  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, moveDir: 'left' | 'right' = 'right'): void {
+  function reactToBreak(ctx: ModeContext, outcome: MoveOutcome, moveDir: 'left' | 'right' = 'right', readMs = 0): void {   // H2c: `readMs` — the soft break's stumble beats when the ball crosses (readBeatMs)
     if (outcome.broke === 'none') return;
     const tier = outcome.tier;
     const odds = outcome.odds;
@@ -3220,7 +3369,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[1V1-HANDLE] HARD ankle break, chain ${chain.length} handle ${handle}`);
     } else {
       foeStunSec = ANKLE_BREAK_STUN_SEC;
-      foeAnimTree.beat(ANKLE_STUMBLE_CLIP);   // …and the softer one is a STUMBLE, not a hit react: he caught it, late
+      { const stumble = (): void => { if (!foeFloored) foeAnimTree.beat(ANKLE_STUMBLE_CLIP); }; if (readMs > 16) later(readMs, stumble); else stumble(); }   // …and the softer one is a STUMBLE, not a hit react: he caught it, late (H2c, plan 4f: when the ball crosses, not on the input frame)
       // THE BITE (Phase 6): his feet went with the fake — the root lunges toward the side the ball LEFT, under the stumble
       { const f = meDribble.facing; const right = new Vector3(Math.cos(f), 0, -Math.sin(f)); const bite = right.scale(moveDir === 'right' ? -1 : 1);
         victimSlide = { dir: bite, left: ANKLE_BITE.dist, mps: ANKLE_BITE.mps }; console.info(`[1V1-HANDLE] bite ${moveDir === 'right' ? 'left' : 'right'} ${ANKLE_BITE.dist} m`); }
@@ -3233,27 +3382,83 @@ export const OneVOneMode: ModeDefinition = (() => {
 
   /** `flick`: a left-stick crossover's move (HOOPS MOTION phase 3d, S2 — this is its one beat source): a move with no clip of its own
    *  plays the crossover (flickClip), so the flick always moves the hands. */
-  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', flick = false): boolean {   // H1: false when the handle refused it   // STICK HANDLE: the stick's side wins over the defender read
+  /** HOOPS MOTION phase 4b: this body as the handle renderer sees it (anim/handleMotion) — its carry, its tree's beat, its impulse (forward
+   *  along the facing, lateral + toward the athlete's right). */
+  /** H2a: the rival as the renderer sees him (his crossover's ball path) — his carry and his tree's beat; no impulse (AttackerBrain moves him). */
+  function foeHost(): HandleHost { return { carry: foeCarry, beat: (clip, o) => foeAnimTree.beat(clip, o) }; }
+  /** H2c: the geometry the rival's reads take (core/DefenderReact). */
+  function defGeo(): DefReadGeometry { return { handler: me.root.position, handlerYaw: me.root.rotation.y, defender: foe.root.position, live: foeStunSec === 0 && !foeFloored }; }
+  /** H2c: start the rival's reaction — his mover takes the step (the defence step below), his tree the beat. */
+  function defReact(r: DefReaction | null): void {
+    if (!r || foeFloored) return;
+    foeReact = r;
+    const clip = reactClip(r, sideOfVector(foe.root.rotation.y, r.dir));   // the lunge's side: the athlete's side he steps to
+    if (clip) foeAnimTree.beat(clip, { fadeSec: 0.06 });
+    console.info(`[1V1-DEF] react ${r.kind}${r.tune.dist > 0 ? ` ${r.tune.dist} m` : ''}${clip ? ` → ${clip}` : ''}`);
+  }
+  function meHost(): HandleHost {
+    return {
+      carry: meCarry,
+      beat: (clip, o) => meAnimTree.beat(clip, o),
+      impulse: (forward, lateral) => {
+        const yaw = me.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), rx = fz, rz = -fx;
+        meDribble.vel.addInPlace(new Vector3(fx * forward + rx * lateral, 0, fz * forward + rz * lateral));
+      },
+    };
+  }
+  /**
+   * HOOPS MOTION phase 4b (U14, S6): a SHOT's or a FOOTWORK's gather takes the ball to the RIGHT hand as drawn (hoopsHand) — the palm-to-palm
+   * gather, both hands onto it — whichever hand the dribble had it in. With real crossings the dribble is in the left hand half the time,
+   * and the jumper gathered there (`meCarry?.handBone`: the carry's hand). A deliberate off-hand finish keeps startFinish's
+   * hoopsHand(me, side); a ball that is someone else's (a steal on this frame) or already released is left alone.
+   */
+  function gatherToShootingHand(): void {
+    if ((ball.metadata as { felReleased?: boolean } | undefined)?.felReleased) return;
+    const p = ball.parent;
+    if (p && p !== findBone(me.skeleton, 'LeftHand')?.getTransformNode() && p !== findBone(me.skeleton, 'RightHand')?.getTransformNode()) return;
+    gatherBallToHand(ball, me.skeleton, hoopsHand(me));
+  }
+  /** `cutSide`: the left-stick reversal's (plan §3.4 — the ball's end side for a crossing pick, the same-hand twin when the ball is there). */
+  function doMove(ctx: ModeContext, move: HandleMove, dirHint?: 'left' | 'right', flick = false, cutSide?: 'left' | 'right', variant?: 'slide'): boolean {   // H1: false when the handle refused it   // H2: `variant` 'slide' = the BTB slide   // STICK HANDLE: the stick's side wins over the defender read
     // THE DECISION IS SHARED (HandleSystem.resolveHandleMove); what stays here is the RENDERING — this
     // mode's clips, banners and defender. 3v3 renders the same outcome its own way, so a tuning change to
     // the chain or the odds lands in both games instead of one.
-    const outcome = resolveHandleMove(move, chain, handle, {
-      present: foeStunSec <= 0 && !foeFloored,
-      closing: foeVelLast.length() > 1.4 && facingCos(foe.root.rotation.y, foe.root.position, me.root.position) > 0,
-      set: foeVelLast.length() < 0.6,
-      within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE,
-    }, roll);
-    if (!outcome.owned) return false;                      // not in my hands yet — the gate IS the upgrade
+    // HOOPS MOTION phase 4b: …and the rendering of the MOVE is one module for both modes (anim/handleMotion): the decision below runs first,
+    // once, on this frame; then the clip, the ball's path (the carry's runMove — the ball crosses now: 3a measured it drawn on the right
+    // 99–100 % of every R-stick handle) and the impulse, signed by the move (U18 — THE BODY GOES WITH THE BALL: it went away from him).
+    const turboMove = !!meSlot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS (1.25× real — H2, was 1.35× — and a shorter fade)
+    const lastMove = chain.last;   // H2: the double moves read the move before this one
+    const r = requestMove(meHost(), {
+      move, hint: dirHint, cutSide, flick, turbo: turboMove, impulse: variant !== 'slide',   // H2: the slide's body is its hop (below), not the impulse
+      path: move === 'steezo_roll' ? 'momentum_btb' : undefined,   // the roll's wrap here; the spin that follows it (startSpin) is its pull back
+      decide: { kind: 'resolve', run: () => resolveHandleMove(move, chain, handle, {
+        present: foeStunSec <= 0 && !foeFloored,
+        closing: foeVelLast.length() > 1.4 && facingCos(foe.root.rotation.y, foe.root.position, me.root.position) > 0,
+        set: foeVelLast.length() < 0.6,
+        within: distXZ(me.root.position, foe.root.position) < SHAKE_RANGE,
+      }, roll, MOVES_UNLOCKED_GATE) },   // H2: owned at the unlock gate, priced at the player's handle
+      clipFor: variant === 'slide' ? (d) => `bball_btb_slide_${d}` : undefined,
+    });
+    if (!r.owned || !r.outcome) return false;        // not in my hands yet — the gate IS the upgrade
+    const outcome = r.outcome;
     chain = outcome.chain;
+    { const dbl = !outcome.restarted ? doubleMoveOf(lastMove, move) : null; if (dbl) { bannerFlash(ctx, dbl.label, 700); console.info(`[1V1-HANDLE] double move ${dbl.id} (${lastMove} → ${move}, chain ${chain.length})`); } }   // H2: the double moves
+    if (variant === 'slide') {   // H2 THE BTB SLIDE: the body hops sideways the way the ball went, the chest kept on him (a space move)
+      const toRimL = RIM_FLOOR.subtract(me.root.position); toRimL.y = 0;
+      meDribble.slide(r.endHand, toRimL.x, toRimL.z, turboMove);
+      console.info(`[1V1-HANDLE] btb slide ${r.endHand} at ${meDribble.vel.length().toFixed(1)} m/s`);
+    }
 
     // THE MOVE ITSELF. Everything below renders what the move DID — the banner, the defender, the chain — and
     // nothing rendered the move: the tree's one crossover state (hardwired to `bball_crossover_left`) was the
-    // body for all twelve of them. The ball ends on the side away from him, which is the side the move was for.
-    const moveDir: 'left' | 'right' = dirHint ?? sideAwayFrom(me.root.position, me.root.rotation.y, foe.root.position);   // HOOPS MOTION phase 3: the one visual-side helper
-    const clip = flick ? flickClip(move, moveDir) : moveClip(move, moveDir);
-    const turboMove = !!meSlot.intent.sprint;   // MOVE PACE: on the turbo the move SNAPS (1.35×, a shorter fade)
-    if (clip) meAnimTree.beat(clip, { fadeSec: moveFadeSec(turboMove), speedRatio: moveRate(turboMove) });
-    console.info(`[1V1-HANDLE] move ${move} ${moveDir} → ${clip ?? 'mode-owned'} rate ${moveRate(turboMove).toFixed(2)} (chain ${chain.length}, handle ${handle})`);
+    // body for all twelve of them. (Phase 4b: the side is the ball's END side — a crossing move's is the other hand, whatever the
+    // defender read says; phase 3's `sideAwayFrom` named the clip and the ball went nowhere.)
+    const moveDir: 'left' | 'right' = r.clipDir;
+    // …but THE BITE keeps its phase-3 side (4b review F3): reactToBreak's ANKLE_BITE slide is gameplay, and plan §3.7 keeps it where it was —
+    // the side the call site named, else away from him (sideAwayFrom), NOT the ball's end hand (that flipped the defender's lunge on a
+    // reversal cut away from him and on every hesi / momentum cross with no side of its own)
+    const biteDir: 'left' | 'right' = dirHint ?? sideAwayFrom(me.root.position, me.root.rotation.y, foe.root.position);
+    console.info(`[1V1-HANDLE] move ${move} ${moveDir} → ${r.clip ?? 'mode-owned'} rate ${moveRate(turboMove).toFixed(2)} (chain ${chain.length}, handle ${handle})${r.twin ? ` (same-hand twin ${r.rendered})` : ''} ball ${r.ball} ${r.startHand[0].toUpperCase()}→${r.endHand[0].toUpperCase()}`);
 
     // OFF THE HEAD is the only move where the ball leaves your hands, so it resolves HERE rather than
     // through the ankle-break roll below. Everything else in this vocabulary is a decision about a chain;
@@ -3299,28 +3504,22 @@ export const OneVOneMode: ModeDefinition = (() => {
       return true;
     }
     // THE BODY GOES WHERE THE MOVE SAYS. One shot, never a per-frame scale (that compounds into a
-    // teleport — same reason the jab burst is written the way it is). The lateral sign is AWAY from him,
-    // which is the mode's read rather than the table's.
-    {
-      const imp = moveImpulse(move);
-      if (imp.forward !== 0 || imp.lateral !== 0) {
-        const yaw = me.root.rotation.y;
-        const fx = Math.sin(yaw), fz = Math.cos(yaw);
-        const rx = fz, rz = -fx;
-        const toFoe = foe.root.position.subtract(me.root.position);
-        const side = (toFoe.x * rx + toFoe.z * rz) > 0 ? -1 : 1;    // go the other way from him
-        meDribble.vel.addInPlace(new Vector3(
-          fx * imp.forward + rx * imp.lateral * side, 0, fz * imp.forward + rz * imp.lateral * side,
-        ));
-      }
-    }
+    // teleport — same reason the jab burst is written the way it is). Phase 4b: applied by the renderer above (requestMove's impulse,
+    // impulseFor — signed by the move, U18), where this block applied moveImpulse away from him.
+    if (r.impulse) console.info(`[1V1-HANDLE] impulse ${move} forward ${r.impulse.forward.toFixed(1)} lateral ${r.impulse.lateral.toFixed(1)} (${r.impulse.lateral >= 0 ? 'right' : 'left'})`);
     const tier = outcome.tier;
     if (process.env.NODE_ENV === 'development') console.info(`[1V1-HANDLE] move ${move} chain ${chain.length} (${tier})`);
     if (tier !== 'single') {
       SoundKit.play('whoosh', { pitch: 1.1 + chain.length * 0.12, volume: 0.35 });
       ctx.feel?.impact?.(0.08 * chain.length);
     }
-    reactToBreak(ctx, outcome, moveDir);
+    reactToBreak(ctx, outcome, biteDir, r.ball === 'started' ? readBeatMs(meCarry?.move) : 0);
+    // H2c (owner decision 3): the read that did NOT break him still moves him — a look and a small real effect (core/DefenderReact)
+    if (outcome.broke === 'none') {
+      if (lungesOn(move)) defReact(lungeFor(defGeo(), move, biteDir));
+      else if (move === 'yoyo') defReact(shadeToward(defGeo(), r.endHand));
+      else if (move === 'hesi') defReact(standUpOn(defGeo(), foeCloseMemory));
+    }
     return true;
   }
 
@@ -3436,6 +3635,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     // HOOPS-10PHASE-2 phase 8: THE TIP-IN. Caught right at/near the rim off your own miss, it goes straight back
     // up in one motion instead of the ordinary putback (which still hands the ball out for a normal
     // dribble/gather/shoot). A missed tip just falls through to the existing putback flow below, unchanged.
+    // H2e (owner): THE PUTBACK DUNK — an offensive board at the iron goes straight back up as a slam: mine with R2 held, his half the time
+    if (putbackDunkOn({ offensive, atIron: isTipInEligible(ballAt, RIM, true), who, sprintHeld: !!meSlot.intent.sprint, roll })) {
+      if (who === 'me') { securePutback(ctx, contested); startDunk(ctx, 'standing', PUTBACK_DUNK); console.info('[1V1-BOARD] PUTBACK DUNK by me'); }
+      else { foePutback(ctx, contested); foeDunk(ctx, PUTBACK_DUNK); console.info('[1V1-BOARD] PUTBACK DUNK by the rival'); }
+      return;
+    }
     if (offensive && isTipInEligible(ballAt, RIM, true)) {
       const contest = contestLevel(who === 'me' ? me.root.position : foe.root.position, who === 'me' ? foe.root.position : me.root.position);
       if (roll() < tipInMakeChance(contest)) {
@@ -3580,7 +3785,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** D1: the rival THROWS IT DOWN on a lane he has beaten — a real flight (the drive dunk's clock) I can SWAT with a timed
    *  jump inside range while he is in the air; a body in his path is bumped, and floored if he finishes through it. */
-  function foeDunk(ctx: ModeContext): void {
+  function foeDunk(ctx: ModeContext, force?: HoopsDunk): void {   // H2e: `force` — the putback slam
     defPhase = 'shot'; gatherShown = false; foeShotWin = 'none';
     foeCarry?.update(0, 0, false);
     const toDunkHandF = dunkHandPass(ball, foe.skeleton);   // DUNK MOTION phase 11: his dunking hand too
@@ -3599,7 +3804,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // a straight one flushes, a body in the lane is a poster
     { const toRimF = RIM_FLOOR.subtract(from); toRimF.y = 0; const vF = foeVelLast.clone(); vF.y = 0; const sp = vF.length();
       const lat = sp > 0.1 && toRimF.lengthSquared() > 1e-4 ? Math.min(1, Math.abs(vF.x * toRimF.normalize().z - vF.z * toRimF.x) / sp) : 0;
-      const pickedF = pickHoopsDunk({ speed: Math.max(sp, 4.5), lateral01: lat, contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0, poster: inLane, momentum01: 1 - mbus.score01, roll, standing: false });
+      const pickedF = force ?? pickHoopsDunk({ speed: Math.max(sp, 4.5), lateral01: lat, contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0, poster: inLane, momentum01: 1 - mbus.score01, roll, standing: false });
       foeAnimTree.beat(pickedF.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(pickedF, DRIVE_DUNK.flightMs / 1000) });
       ctx.setHud({ shotType: pickedF.label });
       console.info(`[1V1-DEF] rival dunk ${pickedF.label} (${pickedF.clip})`); }
