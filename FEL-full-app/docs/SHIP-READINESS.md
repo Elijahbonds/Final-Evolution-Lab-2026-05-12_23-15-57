@@ -368,3 +368,17 @@ Recommendation first in each.
    already)*; (b) schedule it the same way.
 6. **`.env.example` (§3.4).** (a) **A lane adds the 20 names it is missing, empty, with one comment line each**
    *(recommended; documentation only, nothing deploys from it)*; (b) leave it.
+
+---
+
+## 7. Gate
+
+At `84048afc` (the code as it ships from this lane; this section is the only change after it), from `FEL-full-app/`,
+with the database variables unset, under the shared heavy-job lock:
+
+| Step | Result |
+|---|---|
+| `npx tsc --noEmit` | 0 errors |
+| `npm run lint` | clean |
+| `npx tsx scripts/ci-suite.ts` | 203 passed, 0 failed, 11 skipped (the DB suites, no `DATABASE_URL`) |
+| `npx vitest run lib/babylon lib/nav components/shell` | 802 files, 10,020 tests passed, 0 failed |
