@@ -348,6 +348,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
       return;
     }
     toast.success('Sent back to Nexus Studio.');
+    walkDo('saved');   // studio-5: the hand-back is this mode's save — it completes the walkthrough's last step (walkthrough-card.tsx)
     window.close();
   };
 
@@ -747,7 +748,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
         )}
 
         <div className="pointer-events-none absolute bottom-14 left-3 z-10 max-md:hidden">
-          <WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} />
+          <WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} />
         </div>
 
         {photoOpen && (
@@ -765,7 +766,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
       {/* scroll-padding: whatever the editor scrolls into view (a picked row, a focused field) lands below the sticky tabs */}
       <aside aria-label="Editor" className="min-h-0 flex-1 scroll-pt-16 overflow-y-auto border-t border-white/10 bg-[#0a0a0f] px-4 py-4 md:scroll-pt-28 md:border-l md:border-t-0">
         {/* a phone's stage is small: the walkthrough sits at the top of the editor there */}
-        <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} /></div>
+        <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} {...(studioEdit ? { studioEdit: true } : {})} /></div>
         <div className="mb-4 space-y-3">
           <p className="text-[11px] text-white/45">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
           {studioEdit ? (
@@ -845,7 +846,8 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
               <Group title={`Body — ${slot.label || 'this character'}`}>
                 <BodyControls body={slot.body} frame={slot.frame ?? null} scanOwned={scanOwned} numbersSaved={consent.saveLookNumbers && adult}
                   onBody={(b) => setSlot((s) => ({ ...s, body: b }))}
-                  onFrame={(f: SlotFrame | null, g?: string) => setSlot((s) => { const n = { ...s }; if (f) n.frame = f; else delete n.frame; return n; }, g)} />
+                  onFrame={(f: SlotFrame | null, g?: string) => setSlot((s) => { const n = { ...s }; if (f) n.frame = f; else delete n.frame; return n; }, g)}
+                  {...(studioEdit ? { studioEdit: true } : {})} />
               </Group>
               {/* CREATOR-PLAN phase 4a (tool #5): any colour for skin, hair and eyes */}
               <Group title="Skin Tone"><ColourRow label="Skin tone" swatches={SKIN_TONES} value={face.skinTone} group="colour:skin" onPick={(h, g) => setFace((p) => ({ ...p, skinTone: h }), g)} /></Group>
@@ -886,7 +888,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
               <ShapeTab shape={doc?.shape ?? emptyCreatorDoc().shape} presentation={slot.presentation?.scale ?? null}
                 onShape={setShape} onPresentation={setPresentation} locks={shapeLocks} onLocks={setShapeLocks} onRoll={rollShape}
                 canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)}
-                numbersSaved={consent.saveLookNumbers && adult} />
+                numbersSaved={consent.saveLookNumbers && adult} {...(studioEdit ? { studioEdit: true } : {})} />
             </motion.div>
           )}
 
