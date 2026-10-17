@@ -886,7 +886,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (ai) {
           const side = aiKind === 'teammate' ? 'mine' : 'theirs';
           tintGarmentSlot(char, SLOT_KEYS.jersey, TEAM_JERSEY[side]);
-          tintGarmentSlot(char, SLOT_KEYS.shorts, TEAM_SHORTS[side]);
+          // STYLE PASS S3 (owner 2026-10-16): the team colour is on the TOP; the bottoms stay the player's own. The shorts take it
+          // only on a body whose top the jersey keys miss (HP-5's fallback: such a body would otherwise wear no team colour at all)
+          const topTinted = char.meshes.some((m) => SLOT_KEYS.jersey.some((k) => `${m.name} ${m.material?.name ?? ''}`.toLowerCase().includes(k)));
+          if (!topTinted) tintGarmentSlot(char, SLOT_KEYS.shorts, TEAM_SHORTS[side]);
         }
         char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
         neverBindPose(char.animator, SPORT_CLIP.idle);

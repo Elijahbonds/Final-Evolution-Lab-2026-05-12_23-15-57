@@ -30,7 +30,7 @@ import { pickedVocab } from '../combat/styleVocab';
 /** The modes a picked fighting style's moves play in (The Hundred + the versus fights). */
 const STYLE_FIGHT_MODES: ReadonlySet<string> = new Set(['karate', 'karate_vs', 'mixedcombat', 'duel', 'showdown']);
 import { applySkinShading } from './skinShading';
-import { attachAccessories, lookFor, type AccessorySet } from './accessories';
+import { attachAccessories, lookFor, bakedLook, type AccessorySet } from './accessories';
 import { optOutAccessories, playerWearsOwnAccessories } from './playerAccessories';
 import { fitForName, wearFit } from './fits';
 import { applyKit } from './kit';
@@ -371,8 +371,12 @@ export const CharacterLibrary = {
     // CharacterPipeline.spawnPlayer, and in both editor previews alike. NPCs, rivals and named spawns keep the deal, and
     // so does a spawn with its own skin tone (it never takes the identity below, so it would otherwise stand bare).
     const playerDressesSelf = playerWearsOwnAccessories(role, rosterPicked, opts);
+    // STYLE PASS (owner 2026-10-16): a forge rival carries its own signature (rivalWear.ts → the armature's `look` extra) and wears
+    // it in every mode; the seeded deal is for bodies that carry none
+    const baked = bakedLook([root, ...root.getChildTransformNodes(false)].map((n) => n.metadata?.gltf?.extras?.look).find((v) => v != null),
+      fit ? Color3.FromHexString(fit.accent) : undefined);
     const accDispose = wantsAccessories && !playerDressesSelf
-      ? attachAccessories(scene, skeleton, root, opts.look ?? {
+      ? attachAccessories(scene, skeleton, root, opts.look ?? baked ?? {
           ...lookFor(opts.name ?? opts.tint ?? `char_${spawnCounter}`),
           ...(fit ? { accent: Color3.FromHexString(fit.accent) } : {}),   // the accessories wear the fit's accent
         }, `acc_${spawnCounter}`)
