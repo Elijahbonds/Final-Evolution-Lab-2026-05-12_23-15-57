@@ -67,10 +67,6 @@ const NOT_IMPORTED: Record<string, string> = {
   // staged until the live database is back). lib/sessions/sessionsHardening.scan.test.ts fails the day a route imports it
   // without that GO; wiring it is two lines per sessions route, then this line goes.
   'lib/sessions/runRateLimit.ts': 'STAGED, not wired to prod — the sessions rate limits wait for the FE PM\'s GO (live DB back)',
-  // STUDIO-SAVE (2026-10-17, design lane): the Studio save-to-account route's handlers, tested on an in-memory store. The
-  // route needs the StudioProjectSave table, which is the owner's call (docs/NEXUS-STUDIO-SAVE.md). Wiring
-  // app/api/studio/projects/** to it means deleting this line.
-  'lib/nexus-studio/cloudRoute.ts': 'STAGED, not wired to prod — the Studio save-to-account handlers wait for the owner\'s OK on the StudioProjectSave table',
   // STORE-PRICES (2026-10-04): Elijah's approved coach-store prices, typed and flag-gated (COACH_STORE_ENABLED,
   // still off). No route, page or component reads from it yet — this tip writes no database rows and the
   // sellable six still read their price from MarketplaceListing.priceUsd. It is the typed source of truth the

@@ -20,9 +20,18 @@ function withCast(): StudioProject {
 const year = (age: number) => NOW.getFullYear() - age;
 
 describe('who may save to the account', () => {
-  it('ships the recommended defaults: verified adults only, look codes stay on the device', () => {
-    expect(STUDIO_SAVE_AUDIENCE).toBe('adults');
+  it('ships the owner\'s answers: teens 13+ and adults (Q1), look codes stay on the device (Q2)', () => {
+    expect(STUDIO_SAVE_AUDIENCE).toBe('teens-and-adults');
     expect(LOOK_CODES_IN_ACCOUNT).toBe(false);
+  });
+
+  it('with the shipped audience: 13–17 and adults may save; under 13, a year that may still be 12, and unknown may not', () => {
+    const may = (dobYear: number | null) => cloudSavePolicy({ signedIn: true, dobYear, now: NOW }).allowed;
+    // only the year is stored: a gap of 14 is certainly 13, a gap of 13 may still be 12 (ageScreen's careful line)
+    expect([14, 15, 16, 17, 18, 19, 40].map((a) => may(year(a)))).toEqual([true, true, true, true, true, true, true]);
+    expect([13, 12, 10, 5].map((a) => may(year(a)))).toEqual([false, false, false, false]);
+    expect(may(null)).toBe(false);
+    expect(cloudSavePolicy({ signedIn: false, dobYear: year(16), now: NOW }).allowed).toBe(false);
   });
 
   it('a guest, an unknown age and an under-13 are never allowed', () => {
@@ -35,10 +44,10 @@ describe('who may save to the account', () => {
   });
 
   it('a verified adult may; a teen only when the audience includes teens', () => {
-    expect(cloudSavePolicy({ signedIn: true, dobYear: year(19), now: NOW })).toEqual({ allowed: true, reason: 'ok' });
-    expect(cloudSavePolicy({ signedIn: true, dobYear: year(16), now: NOW })).toEqual({ allowed: false, reason: 'age' });
+    expect(cloudSavePolicy({ signedIn: true, dobYear: year(19), now: NOW, audience: 'adults' })).toEqual({ allowed: true, reason: 'ok' });
+    expect(cloudSavePolicy({ signedIn: true, dobYear: year(16), now: NOW, audience: 'adults' })).toEqual({ allowed: false, reason: 'age' });
     // a year gap of exactly 18 may still be 17: not verified 18+
-    expect(cloudSavePolicy({ signedIn: true, dobYear: year(18), now: NOW }).allowed).toBe(false);
+    expect(cloudSavePolicy({ signedIn: true, dobYear: year(18), now: NOW, audience: 'adults' }).allowed).toBe(false);
     expect(cloudSavePolicy({ signedIn: true, dobYear: year(16), now: NOW, audience: 'teens-and-adults' }).allowed).toBe(true);
   });
 });

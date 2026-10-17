@@ -153,6 +153,10 @@ export function spyPrisma(db: SpyDb): any {
       if (String(prop).startsWith('$executeRaw')) {
         return async (...a: unknown[]) => { db.calls.push({ op: String(prop), args: a }); return 0; };
       }
+      // a read-only raw query (an advisory lock: `SELECT pg_advisory_xact_lock(...)::text`): recorded, not a write, no rows
+      if (String(prop).startsWith('$queryRaw')) {
+        return async (...a: unknown[]) => { db.calls.push({ op: String(prop), args: a }); return []; };
+      }
       return table(db, String(prop));
     },
   });

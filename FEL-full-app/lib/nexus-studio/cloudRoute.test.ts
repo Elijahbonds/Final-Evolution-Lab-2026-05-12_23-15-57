@@ -54,8 +54,8 @@ describe('the order of checks', () => {
     expect(keys).toContain('studio-save:read:minute:user_1');
   });
 
-  it('a teen, an unknown age and an under-13 get one neutral 403 and nothing is written, whatever the body', async () => {
-    for (const dob of [TEEN, null, NOW.getFullYear() - 10]) {
+  it('an unknown age, an under-13 and a year that may still be 12 get one neutral 403 and nothing is written, whatever the body', async () => {
+    for (const dob of [null, NOW.getFullYear() - 10, NOW.getFullYear() - 12, NOW.getFullYear() - 13]) {
       const r = rig({ dob });
       for (const text of [body(project()), 'not json']) {
         const a = await putProject(r.deps, 'p1', text);
@@ -65,10 +65,14 @@ describe('the order of checks', () => {
     }
   });
 
-  it('teens may save only when the audience says so (owner decision Q1, the other answer)', async () => {
-    const r = rig({ dob: TEEN, audience: 'teens-and-adults' });
-    const p = project();
-    expect((await putProject(r.deps, p.id, body(p))).status).toBe(200);
+  it('teens 13–17 save under the shipped audience (owner Q1); under the adults-only audience a teen is refused', async () => {
+    for (const age of [14, 15, 16, 17]) {
+      const r = rig({ dob: NOW.getFullYear() - age });
+      const p = project();
+      expect((await putProject(r.deps, p.id, body(p))).status).toBe(200);
+    }
+    const strict = rig({ dob: TEEN, audience: 'adults' });
+    expect((await putProject(strict.deps, 'p1', body(project()))).status).toBe(403);
   });
 });
 
@@ -131,7 +135,7 @@ describe('saving', () => {
     expect(r.store.rows.size).toBe(0);
   });
 
-  it('the quota is checked before the write: the 21st project is refused', async () => {
+  it('the quota is checked inside the store\'s write, after the revision: the 21st project is refused', async () => {
     const r = rig();
     for (let i = 0; i < CLOUD_LIMITS.projects; i++) {
       const p = { ...project(), id: `proj_${i}` };
@@ -140,6 +144,10 @@ describe('saving', () => {
     const extra = { ...project(), id: 'proj_extra' };
     expect(await putProject(r.deps, extra.id, body(extra))).toMatchObject({ status: 403, body: { error: 'quota_projects' } });
     expect(r.store.rows.get('user_1')!.size).toBe(CLOUD_LIMITS.projects);
+    // a stale write to a full account is still a conflict, not a quota answer (the revision is checked first)
+    expect((await putProject(r.deps, 'proj_0', body({ ...project(), id: 'proj_0' }, 7))).status).toBe(409);
+    // replacing an existing project in a full account is fine
+    expect((await putProject(r.deps, 'proj_0', body({ ...project(), id: 'proj_0', name: 'Again' }, 1))).status).toBe(200);
   });
 
   it('a store that throws is a 503, and the log line names the event and the error class only', async () => {
@@ -170,6 +178,16 @@ describe('reading and deleting what is stored', () => {
     expect(out.projects.map((x) => x.projectId)).toEqual([b.id, a.id]);
     expect(out.quota).toMatchObject({ projects: 2, maxProjects: CLOUD_LIMITS.projects, maxBytes: CLOUD_LIMITS.accountBytes });
     expect(JSON.stringify(l.body)).not.toMatch(/venues|objects/);
+    expect(out).toMatchObject({ saving: { enabled: true, allowed: true } });
+  });
+
+  it('the list says whether this account may save: the switch, then the age rule (read only when the switch is on)', async () => {
+    const off = rig({ writesEnabled: false });
+    expect((await listProjects(off.deps)).body).toMatchObject({ saving: { enabled: false, allowed: false }, projects: [] });
+    expect(off.dobYear).not.toHaveBeenCalled();
+    expect((await listProjects(rig({ dob: NOW.getFullYear() - 10 }).deps)).body).toMatchObject({ saving: { enabled: true, allowed: false } });
+    expect((await listProjects(rig({ dob: null }).deps)).body).toMatchObject({ saving: { enabled: true, allowed: false } });
+    expect((await listProjects(rig({ dob: TEEN }).deps)).body).toMatchObject({ saving: { enabled: true, allowed: true } });
   });
 
   it('a get returns the project through the sanitiser again; another account\'s id is simply not found', async () => {

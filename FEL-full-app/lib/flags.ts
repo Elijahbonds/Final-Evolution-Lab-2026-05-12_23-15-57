@@ -40,6 +40,15 @@ export function isNexusStudioEnabled(): boolean {
   return envOn('NEXUS_STUDIO_ENABLED');
 }
 
+/**
+ * STUDIO SAVE (owner, 2026-10-17, Q9) — Nexus Studio projects saved to the account (docs/NEXUS-STUDIO-SAVE.md). Default OFF,
+ * and ON only together with NEXUS_STUDIO_ENABLED. Off: PUT /api/studio/projects/:id is a 404 and the Studio shows no account
+ * panel. Reading, exporting and deleting what was already saved are never behind it.
+ */
+export function isStudioCloudSaveEnabled(): boolean {
+  return isNexusStudioEnabled() && envOn('STUDIO_CLOUD_SAVE_ENABLED');
+}
+
 /** Standard 403 body for a disabled feature. */
 export const FEATURE_DISABLED = { error: 'feature_disabled', message: 'This feature is not currently enabled.' } as const;
 

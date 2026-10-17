@@ -1,6 +1,6 @@
-// SAVE TO ACCOUNT: the pure half (docs/NEXUS-STUDIO-SAVE.md). DESIGN STAGE (owner, 2026-10-17: "Studio: save to account").
-// No table exists and no route stores a project yet. The table is an owner decision, so this file is only the logic that
-// needs no schema: who may save, what is stored, the size caps and quota maths, and how two devices agree.
+// SAVE TO ACCOUNT: the pure half (docs/NEXUS-STUDIO-SAVE.md; owner, 2026-10-17: "Studio: save to account", answers Q0–Q9).
+// The logic that needs no database: who may save, what is stored, the size caps and quota maths, and how two devices agree.
+// The route (cloudRoute.ts) and the Studio's account panel (cloudSync.ts, components/nexus-studio/account-save.tsx) use it.
 //
 // THE DEVICE STAYS FIRST. localStorage (storage.ts) is still the save the editor makes 1.5 s after an edit. The account
 // copy is a second layer on top of it. When that layer fails, is refused or is offline, the device copy is unchanged.
@@ -46,9 +46,10 @@ export function jsonBytes(v: unknown): number {
 // ── who may save (OWNER DECISIONS Q1 and Q2) ─────────────────────────────────────────────────────────────────────────
 
 export type StudioSaveAudience = 'adults' | 'teens-and-adults';
-/** Q1. Recommended: verified adults only, the rule AdventureSave and Mirror progress already use. Teens keep the device save. */
-export const STUDIO_SAVE_AUDIENCE: StudioSaveAudience = 'adults';
-/** Q2. Recommended: a character's look code is never stored in the account copy; it stays on the device that has it. */
+/** Q1 (owner, 2026-10-17: "teens 13+ and adults"; the design had recommended adults only): signed-in teens (13–17) and adults,
+ *  the AI builder's bands. Under 13 and an unknown age are never allowed. */
+export const STUDIO_SAVE_AUDIENCE: StudioSaveAudience = 'teens-and-adults';
+/** Q2 (owner, 2026-10-17): a character's look code is never stored in the account copy; it stays on the device that has it. */
 export const LOOK_CODES_IN_ACCOUNT = false;
 
 export type CloudSaveReason = 'ok' | 'guest' | 'age';
@@ -139,7 +140,11 @@ export function quotaCheck(
 export function projectFingerprint(p: StudioProject): string {
   const { updatedAt: _ignored, ...rest } = p;
   void _ignored;
-  const s = canonicalJson(rest);
+  return hash53(canonicalJson(rest));
+}
+
+/** cyrb53 of a string, base 36. Not a security hash: a content fingerprint, and the device's per-account key. */
+export function hash53(s: string): string {
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
   for (let i = 0; i < s.length; i++) {
     const ch = s.charCodeAt(i);
