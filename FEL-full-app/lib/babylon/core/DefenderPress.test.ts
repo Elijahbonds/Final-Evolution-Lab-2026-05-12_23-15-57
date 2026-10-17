@@ -39,3 +39,21 @@ describe('DefenderBrain — the press keeps PRESS_GAP off a standing handler (H3
     expect(rows[rows.length - 1].d).toBeGreaterThan(DefenderBrain.PRESS_GAP - 0.2 - 1e-6);
   });
 });
+
+// H3c: his man HAS the ball only with it in his hands (HAS_BALL_M) — a screener beside the handler is not the handler. At 1.8 m the
+// screener's defender left him to close out on the ball too (two or more defenders on the ball in 11 % of the frames someone had it).
+describe('DefenderBrain — the man with the ball (H3c)', () => {
+  const at = (mark: Vector3, ball: Vector3) => {
+    const brain = new DefenderBrain(0.6, 1, () => 0.99);
+    const handler = new Vector3(0, 0, 6.5), self = mark.add(new Vector3(0, 0, -1.5));
+    for (let t = 0; t < 1; t += DT) brain.decide(DT, self, ball, HOOP, [], [handler, mark]);
+    return brain.job;
+  };
+  it('a screener 1.4 m off the handler: his man plays him (deny), not the ball', () => {
+    expect(at(new Vector3(1.4, 0, 6.5), new Vector3(0.3, 0.9, 6.5))).not.toMatch(/onball|closeout/);
+  });
+  it('the man with the ball in his hands: on the ball', () => {
+    const mark = new Vector3(1.4, 0, 6.5);
+    expect(at(mark, mark.add(new Vector3(0.3, 0.9, 0.1)))).toMatch(/onball|closeout/);
+  });
+});

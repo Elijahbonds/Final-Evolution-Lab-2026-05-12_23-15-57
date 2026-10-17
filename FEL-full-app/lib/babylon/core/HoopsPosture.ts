@@ -65,8 +65,10 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
   pump:      P({ lean: 2,  spine1: [-4, 0, 0],  spine2: [-10, 0, 0], neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 10, forward: -3, eyes: 1,   chestAim: 0.9,  weight: 1 }),
   footwork:  P({ lean: 11, spine1: [7, 0, 0],   spine2: [-4, 0, 0],  neck: [-4, 0, 0], head: [-10, 0, 0], shrug: 4,  forward: 4,  eyes: 1,   chestAim: 0.25, weight: 0.85 }),
   // defense: low, chest ON the handler through the slide, eyes on the ball
-  defend:    P({ lean: 10, spine1: [8, 0, 0],   spine2: [-6, 0, 0],  neck: [-6, 0, 0], head: [-10, 0, 0], shrug: 2,  forward: 4,  eyes: 1,   chestAim: 0.8,  weight: 0.9 }),
-  slide:     P({ lean: 8,  spine1: [8, 0, 0],   spine2: [-6, 0, 0],  neck: [-6, 0, 0], head: [-10, 0, 0], shrug: 2,  forward: 4,  eyes: 1,   chestAim: 0.9,  weight: 1 }),
+  // H3c: SIT DOWN, CHEST UP. The deep CMU captures under these windows are raised DEFENSE_RAISE_M (a squat on these bodies); with the
+  // knees straighter, their forward lean read as a man bent over at the waist (the sheet). The lean comes back: 10 / 8 → −6, Spine1 8 → 2.
+  defend:    P({ lean: -6, spine1: [2, 0, 0],   spine2: [-6, 0, 0],  neck: [-6, 0, 0], head: [-10, 0, 0], shrug: 2,  forward: 4,  eyes: 1,   chestAim: 0.8,  weight: 0.9 }),
+  slide:     P({ lean: -6, spine1: [2, 0, 0],   spine2: [-6, 0, 0],  neck: [-6, 0, 0], head: [-10, 0, 0], shrug: 2,  forward: 4,  eyes: 1,   chestAim: 0.9,  weight: 1 }),
   reach:     P({ lean: 6,  spine1: [4, 0, 0],   spine2: [-8, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 10, forward: -2, eyes: 1,   chestAim: 0.9,  weight: 0.8 }),
   // the drive dunk's flight: the contest's own stances (DunkPosture) — one table for every dunker
   rise: POSTURE.rise, hang: POSTURE.hang, extend: POSTURE.extend, jam: POSTURE.jam, brace: POSTURE.brace,
@@ -133,6 +135,12 @@ export const PROTECT_RANGE = 1.4;
 /** H3b (plan phase 9's gate: "hips ≥ 5 cm lower than unpressured"): the protect sits this much lower (m) — the hips sink with the
  *  legs re-solved under them (anim/LandingAbsorb's hold), the carry's palm with them (ballCarry.GUARD_DROP_M). TUNED (new). */
 export const PROTECT_SINK_M = 0.06;
+/** H3c (owner 2026-10-16: "situational awareness"; the reels: defenders waiting in a near-kneeling crouch): the CMU 78 defensive captures
+ *  (the stance, the slides, the backpedal) sit the hips 0.63–0.68 m up on these bodies, ~40 cm under standing (1.04–1.07 m) — thighs past
+ *  parallel, the trailing knee at the floor. A defender's stance is ~20–25 cm down. The STANDING ones (basketballTree.DEEP_DEFENSE_STATES:
+ *  the stance, the box-out) raise the hips this much (m), the legs re-solved under them so the feet stay where the capture put them
+ *  (anim/LandingAbsorb's hold, negative; never past a leg's reach). The slides keep their depth (see DEEP_DEFENSE_STATES). TUNED (new). */
+export const DEFENSE_RAISE_M = 0.15;
 
 export function hoopsWindow(i: HoopsPostureInput): HoopsWindow {
   if (i.floored) return 'floor';

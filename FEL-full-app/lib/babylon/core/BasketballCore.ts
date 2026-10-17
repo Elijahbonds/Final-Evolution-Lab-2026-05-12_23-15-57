@@ -695,6 +695,11 @@ export class DefenderBrain implements AIBehavior {
    *  steer's dead zone never closed (1.2 m of phantom altitude) and he crept on into the handler: 0.85 m root to root from the arc,
    *  the torsos interpenetrating on 197 of the hold take's frames. 1.05 m is his reach on the ball's side, chest to chest. */
   static readonly PRESS_GAP = 1.05;
+  /** H3c (owner 2026-10-16: "situational awareness"): his man HAS the ball within this (m, the root to the ball, flat). It was 1.8, so a
+   *  screener stood beside the handler read as the handler and his defender left him to close out on the ball too: two or more
+   *  defenders on the ball in 11 % of the frames someone had it (_aware-read, h3c-base). A ball in the hands or on the dribble is
+   *  inside ~0.7 m of the root. */
+  static readonly HAS_BALL_M = 1.0;
 
   /**
    * @param markIndex which opponent this defender is assigned to. Null keeps the
@@ -733,7 +738,7 @@ export class DefenderBrain implements AIBehavior {
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
-    const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    const markHasBall = mark ? distXZ(mark, ball) < DefenderBrain.HAS_BALL_M : false;
     // A LIVE BALL outranks everything. Measured in 3v3: after a miss every one of the six bodies sat
     // 8-19 m from the ball holding its seal or its crash lane, and the board fell through to the dice
     // roll — because no job in the system meant "go and get the actual ball".

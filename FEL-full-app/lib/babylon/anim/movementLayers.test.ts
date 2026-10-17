@@ -11,6 +11,7 @@ import { bendPole, mountSteerGrip } from './SteerGrip';
 import { mountFootPlanting } from './FootPlanting';
 import { boneNode } from './boneLookup';
 import { buildIdleStand } from './authored/locomotion';
+import { buildDefendSlide } from './authored/basketball';
 import { buildPoseClip, REF_HIPS_Y } from './poseClip';
 import { seatedKeys, STEER_LOCK_RAD } from './authored/seated';
 
@@ -91,6 +92,29 @@ describe('LandingAbsorb on the hero rig', () => {
     expect(Vector3.Distance(r.pos('LeftLeg'), ctl.pos('LeftLeg'))).toBeLessThan(0.002);   // and its own knees
     ctl.dispose(); r.dispose();
   }, 60_000);
+  // H3b/H3c: a HELD hold — the hoops protect sinks the hips (+), the deep defensive captures are raised (−); the feet stay either way
+  for (const m of [0.06, -0.05]) {   // (the authored slide sits shallower than the CMU captures the game raises by 0.15: its legs straighten sooner)
+    it(`hold(${m}): the hips ${m > 0 ? 'sink' : 'rise'} by it, eased in, the feet stay put; hold(0) hands the pose back`, async () => {
+      const ctl = await rig(), r = await rig();
+      for (const x of [ctl, r]) {
+        loop(m < 0 ? buildDefendSlide(x.scene, x.sk, 'left') : buildIdleStand(x.scene, x.sk));   // (a raise lifts a crouch: the slide's bent knees)
+        x.frame(10);
+      }
+      const h = mountLandingAbsorb(r.scene, r.sk, r.root, { auto: false });
+      h.hold(m);
+      let footMove = 0, last = 0;
+      for (let i = 0; i < 60; i++) {
+        ctl.frame(); r.frame();
+        last = ctl.pos('Hips').y - r.pos('Hips').y;   // + = r sits lower
+        footMove = Math.max(footMove, Vector3.Distance(r.pos('LeftFoot'), ctl.pos('LeftFoot')), Vector3.Distance(r.pos('RightFoot'), ctl.pos('RightFoot')));
+      }
+      expect(last).toBeCloseTo(m, 2);
+      expect(footMove).toBeLessThan(0.02);
+      h.hold(0); ctl.frame(60); r.frame(60);
+      expect(Math.abs(r.pos('Hips').y - ctl.pos('Hips').y)).toBeLessThan(0.002);
+      ctl.dispose(); r.dispose();
+    }, 60_000);
+  }
 });
 
 describe('SteerGrip', () => {

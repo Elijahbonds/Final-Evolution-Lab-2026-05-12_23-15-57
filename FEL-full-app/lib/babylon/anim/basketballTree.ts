@@ -204,6 +204,11 @@ export const leftTwinOf = (clip: string): string => `${clip}_left`;
  *  (ballCarry's clip lock), so the ball keeps this tempo too: 1.56 Hz at rest, 1.88 Hz in the protect. The two states share the
  *  loop, so a change between them only eases the tempo (the loop carries on). TUNED (new). */
 export const REST_TEMPO: Partial<Record<BasketballAnimState, number>> = { idle_dribble: 1.2, protect: 1.45 };
+/** H3c: the STANDING states on the CMU 78 defensive stance capture — it sits ~40 cm under standing (HoopsPosture.DEFENSE_RAISE_M): the
+ *  bodies waiting in a near-kneeling squat. The slides and the backpedal sit as deep, but they MOVE: raised with the legs re-solved, a
+ *  slide's trailing leg swung through its push (thigh pops to 4,800°/s on the hero's slides, against none with the raise off — the same
+ *  takes, measured), so they keep their capture's depth. */
+export const DEEP_DEFENSE_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['defend_idle', 'box_out']);
 
 /** LATERAL / BACKWARD travel, or null when the body is going where it is pointed. The window is deliberately wide
  *  (past 50° off the nose) so the facing slew's own catch-up does not flicker the loop on every turn. */
