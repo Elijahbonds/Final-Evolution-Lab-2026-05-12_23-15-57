@@ -34,7 +34,9 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
   // the ball: a handler sits low, chest tall, eyes up (film: the run loop rounds the chest and drops the eyes)
   dribble:   P({ lean: 5,  spine1: [3, 0, 0],   spine2: [-5, 0, 0],  neck: [-4, 0, 0], head: [-10, 0, 0], shrug: 0,  forward: 2,  eyes: 0.6, chestAim: 0.3,  weight: 0.75 }),
   drive:     P({ lean: 12, spine1: [8, 0, 0],   spine2: [-4, 0, 0],  neck: [-4, 0, 0], head: [-12, 0, 0], shrug: 3,  forward: 4,  eyes: 0.8, chestAim: 0.4,  weight: 0.85 }),
-  protect:   P({ lean: 9,  spine1: [10, 0, 0],  spine2: [-2, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 4,  forward: 6,  eyes: 0.6, chestAim: 0,    weight: 0.85 }),
+  // H3b (plan phase 9's shield): the chest turns side-on — HoopsLook aims it PROTECT_TURN off the defender toward the ball, so the off
+  // shoulder goes into him — and the eyes stay on him (eyes 0.6 → 0.9, chestAim 0 → 0.8: it used to square to nothing at all)
+  protect:   P({ lean: 9,  spine1: [10, 0, 0],  spine2: [-2, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 4,  forward: 6,  eyes: 0.9, chestAim: 0.8,  weight: 0.85 }),
   // H2b (plan §4.8): THE HESITATION'S HITCH — through the hang the handler comes UP: no lean, the chest tall and open, the head up, the
   // eyes on the man (he reads "he is stopping"). The hesi clip's own rise (Spine 14 → 4°) is kept by the layer instead of being pulled
   // back to the dribble's lean.
@@ -128,6 +130,9 @@ export const SLIDE_SPEED01 = 0.2;
 export const DRIVE_SPEED01 = 0.6;
 /** A defender inside this is a protect read (the tree's line). */
 export const PROTECT_RANGE = 1.4;
+/** H3b (plan phase 9's gate: "hips ≥ 5 cm lower than unpressured"): the protect sits this much lower (m) — the hips sink with the
+ *  legs re-solved under them (anim/LandingAbsorb's hold), the carry's palm with them (ballCarry.GUARD_DROP_M). TUNED (new). */
+export const PROTECT_SINK_M = 0.06;
 
 export function hoopsWindow(i: HoopsPostureInput): HoopsWindow {
   if (i.floored) return 'floor';

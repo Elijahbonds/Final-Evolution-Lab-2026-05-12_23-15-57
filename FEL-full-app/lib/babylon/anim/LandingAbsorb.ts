@@ -68,15 +68,24 @@ export interface LandingAbsorbOpts {
   auto?: boolean;
   /** 0..1 scale on the sink (mobile can pass less). Default 1. */
   intensity?: number;
+  /** H3b: run FIRST in the after-animations pass, before the layers that place a hand or a ball off the body (the ball carry): a sink
+   *  applied after them carries the reached hand down off its target. Default false (Free Run's order, unchanged). */
+  first?: boolean;
 }
 
 export interface LandingAbsorbHandle {
   /** A touchdown at `vImpact` m/s (the mode knows its own landing). A harder landing during an absorb restarts it deeper. */
   impact(vImpact: number): void;
+  /** H3b: a HELD sink (m) — a lower stance the body sits in (the hoops protect), eased in and out over HOLD_SEC; the drop is the deeper of
+   *  it and a landing's. 0 lets it go. */
+  hold(m: number): void;
   /** The sink being applied now (m), for probes. */
   readonly drop: number;
   dispose(): void;
 }
+
+/** H3b: how fast a held sink (`hold`) eases in and out (s). */
+export const HOLD_SEC = 0.18;
 
 export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: TransformNode, opts: LandingAbsorbOpts = {}): LandingAbsorbHandle {
   const hips = boneNode(skeleton, 'Hips');
@@ -90,7 +99,7 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
   const legTracks = legs.map((l) => ({ hip: new AdditiveQuat(), knee: new AdditiveQuat(), l }));
   const fromClip = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (!q) return; const [x, y, z, w] = t.baseFor(q.x, q.y, q.z, q.w); q.set(x, y, z, w); };
   const wroteLeg = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (q) t.wrote(q.x, q.y, q.z, q.w); };
-  let depth = 0, t = 0, drop = 0, applied = false;
+  let depth = 0, t = 0, drop = 0, applied = false, holdTarget = 0, held = 0;
   const inv = new Matrix(), worldDown = new Vector3(), local = new Vector3();
   const start = (v: number) => { const d = absorbDepth(v) * intensity; if (d > (depth > 0 ? absorbAt(t, depth) : 0)) { depth = d; t = 0; } };
   const obs: Observer<Scene> | null = !hips || legs.length < 2 ? null : scene.onAfterAnimationsObservable.add(() => {
@@ -99,6 +108,8 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     root.computeWorldMatrix(true);
     if (detector) { const v = detector.step(root.getAbsolutePosition().y, dt); if (v > 0) start(v); }
     if (depth > 0) { t += dt; drop = absorbAt(t, depth); if (t >= absorbSec(depth)) { depth = 0; drop = 0; } } else drop = 0;
+    held += (holdTarget - held) * Math.min(1, dt / HOLD_SEC); if (held < 1e-5 && holdTarget === 0) held = 0;
+    drop = Math.max(drop, held);
     const p = hips.position;
     const base = { x: track.x.baseFor(p.x), y: track.y.baseFor(p.y), z: track.z.baseFor(p.z) };
     for (const t of legTracks) { fromClip(t.l.hip, t.hip); fromClip(t.l.knee, t.knee); }
@@ -121,9 +132,10 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     hips.computeWorldMatrix(true);
     legs.forEach((l, i) => solveChainInFrame(l.hip, l.knee, l.ankle, feet[i], bendPole(hipW[i], knees[i], feet[i], root.forward), 1));
     for (const t of legTracks) { wroteLeg(t.l.hip, t.hip); wroteLeg(t.l.knee, t.knee); }
-  });
+  }, undefined, !!opts.first);
   return {
     impact: (v: number) => start(v),
+    hold: (m: number) => { holdTarget = Math.max(0, Number.isFinite(m) ? m : 0) * intensity; },
     get drop() { return drop; },
     dispose() { if (obs) scene.onAfterAnimationsObservable.remove(obs); },
   };

@@ -3,7 +3,7 @@
 // are (the rig's LEFT arm on the root's +x: the athlete's right).
 import { describe, expect, it } from 'vitest';
 import { Bone, FreeCamera, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
-import { mountBallCarry, dribbleWristDeg, moveWristDeg, MOVE_WRIST_DEG, WRIST_DEG, HELD_STEP_M, HELD_MPS, type BallCarry } from './ballCarry';
+import { mountBallCarry, dribbleWristDeg, moveWristDeg, MOVE_WRIST_DEG, WRIST_DEG, HELD_STEP_M, HELD_MPS, CLIP_PHI_AT_PEAK, GUARD_BACK_M, GUARD_BAR, type BallCarry } from './ballCarry';
 import { attachBallToHand, releaseBall, ballGathering } from './ballRig';
 import { HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, PUSHED_PEAK_RATE, dribbleAtPushed, pushedBounce01, strideLockHz, STRIDE_LOCK_HZ_MAX } from './Dribble';
 
@@ -579,4 +579,75 @@ describe('review of 3a: the carry after physics, and its caps as speeds', () => 
     });
   }
   it('HELD_STEP_M is the 60 fps step of HELD_MPS', () => { expect(HELD_STEP_M).toBeCloseTo(HELD_MPS / 60, 12); });
+});
+
+// H3b (owner 2026-10-16: "idle dribbling felt off" — the rhythm wrong, the ball and the hand don't meet): at rest the bounce keeps the
+// CLIP's time. It ran at its own 1.7 Hz over a capture that bounces at 1.3 Hz, drifting through the body's dribble and back.
+describe('the dribble at rest keeps the clip\'s time (H3b clip lock)', () => {
+  /** The "clip": the ball arm's forearm swung each frame (as an animation would pose it before the carry's pass), the hand topping
+   *  once every `T` s, at t = T/4 + kT. */
+  const run = (T: number, sec: number) => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const el = r.nodes.LeftForeArm; let t = 0; const atTops: number[] = [], wraps: number[] = [];
+    let prevPh = 0;
+    for (let i = 0; i < Math.round(sec * 60); i++) {
+      t += 1 / 60;
+      el.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4 + 0.5 * Math.sin((2 * Math.PI * t) / T));
+      d.frame(1 / 60, 0, true);
+      const ph = carry.phase; if (ph < prevPh) wraps.push(t); prevPh = ph;
+      const u = (t - T / 4) / T; if (t > 3 && Math.abs(u - Math.round(u)) * T < 0.5 / 60) atTops.push(ph);
+    }
+    carry.dispose();
+    return { atTops, wraps };
+  };
+  for (const T of [0.64, 0.53]) {
+    it(`a clip whose hand tops every ${T} s: the ball is at the palm (phase ${CLIP_PHI_AT_PEAK}) at the clip's tops, one bounce a top`, () => {
+      const { atTops, wraps } = run(T, 6);
+      expect(atTops.length).toBeGreaterThan(3);
+      for (const ph of atTops) { const e = Math.abs(ph - CLIP_PHI_AT_PEAK - Math.round(ph - CLIP_PHI_AT_PEAK)); expect(e).toBeLessThan(0.08); }   // within ~40 ms of the top
+      const late = wraps.filter((w) => w > 3), gaps = late.slice(1).map((w, i) => w - late[i]);
+      for (const g of gaps) expect(Math.abs(g - T)).toBeLessThan(0.05);
+    });
+  }
+  it('a clip whose hand never moves leaves the bounce on its own clock (the old idle rate)', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const el = r.nodes.LeftForeArm, still = el.rotationQuaternion!.clone(); const wraps: number[] = []; let prev = 0, t = 0;
+    for (let i = 0; i < 360; i++) { t += 1 / 60; el.rotationQuaternion!.copyFrom(still); d.frame(1 / 60, 0, true); if (carry.phase < prev) wraps.push(t); prev = carry.phase; }
+    const gaps = wraps.slice(1).map((w, i) => w - wraps[i]);
+    for (const g of gaps) expect(Math.abs(g - 1 / HOOPS_DRIBBLE.hzIdle)).toBeLessThan(0.04);
+    carry.dispose();
+  });
+});
+
+describe('the protect (H3b setGuard)', () => {
+  it('at rest the bounce moves back beside the hip and the off forearm comes across the front; on the move, and when it is let go, it goes', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const local = (p: Vector3) => p.subtract(r.root.getAbsolutePosition()).applyRotationQuaternion(Quaternion.Inverse(r.root.rotationQuaternion!));
+    const ballZ = () => { const zs: number[] = []; for (let i = 0; i < 60; i++) { d.frame(1 / 60, 0, true); zs.push(local(r.ball.getAbsolutePosition()).z); } return zs.reduce((a, b) => a + b, 0) / zs.length; };
+    const z0 = ballZ();
+    carry.setGuard(1); ballZ();   // (eased in over GUARD_SEC)
+    const z1 = ballZ();
+    expect(z0 - z1).toBeGreaterThan(GUARD_BACK_M * 0.9);
+    const off = local(r.nodes.RightHand.getAbsolutePosition());   // the off hand (the rig's Right: the athlete's left)
+    expect(off.z).toBeGreaterThan(0.15);                          // in front of the body…
+    expect(Math.abs(off.y - GUARD_BAR[1])).toBeLessThan(0.25);   // …at the bar's height
+    const moving: number[] = [];
+    for (let i = 0; i < 60; i++) { d.frame(1 / 60, 0.6, true, () => { r.root.position.z -= 4 / 60; }); if (i > 30) moving.push(local(r.ball.getAbsolutePosition()).z); }
+    expect(Math.min(...moving)).toBeGreaterThan(z0 - 0.02);   // on the move the guard lets go (the push ahead takes over)
+    carry.setGuard(0); ballZ();
+    expect(Math.abs(ballZ() - z0)).toBeLessThan(0.03);        // let go at rest: back where it bounced
+    carry.dispose();
+  });
 });
