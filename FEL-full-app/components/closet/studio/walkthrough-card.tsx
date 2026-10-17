@@ -7,10 +7,18 @@
 import { X } from 'lucide-react';
 import { WALK_COPY, WALK_SECONDS, WALK_STEPS, walkCurrent, type WalkState } from '@/lib/creator/look/studio/walkthrough';
 
-export function WalkthroughCard({ state, onNext, onSkip }: { state: WalkState; onNext: () => void; onSkip: () => void }) {
+/** NEXUS STUDIO "Edit in the Closet" (studio-5): the Studio-edit mode has no Save Look. Its last step is the hand-back, which the
+ *  Closet completes when "Back to Nexus Studio" succeeds (the way a save completes the live Closet's). */
+export const STUDIO_EDIT_SAVE_COPY = {
+  title: 'Send it back',
+  body: 'Back to Nexus Studio hands this look to the Studio as one undo step. Nothing here is saved to your Closet.',
+  tab: null,
+} as const;
+
+export function WalkthroughCard({ state, onNext, onSkip, studioEdit }: { state: WalkState; onNext: () => void; onSkip: () => void; studioEdit?: boolean }) {
   const step = walkCurrent(state);
   if (!step) return null;
-  const copy = WALK_COPY[step];
+  const copy = studioEdit && step === 'save' ? STUDIO_EDIT_SAVE_COPY : WALK_COPY[step];
   return (
     <div role="dialog" aria-label="Studio walkthrough" className="pointer-events-auto w-[min(320px,calc(100vw-2rem))] rounded-xl border border-cyan-400/40 bg-[#0c0c11]/90 p-3 shadow-[0_12px_40px_rgba(0,0,0,0.55)] backdrop-blur">
       <div className="flex items-center justify-between">
