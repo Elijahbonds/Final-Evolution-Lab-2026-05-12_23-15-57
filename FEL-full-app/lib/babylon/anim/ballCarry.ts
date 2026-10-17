@@ -81,6 +81,8 @@ export interface CarryMoveOpts {
 /** The move under way (plan §3.3's `move`). */
 export interface CarryMoveState {
   name: string; t: number; k: number;
+  /** H2c: the path's length (s) and the defender's read point on it (k, MOVE_SHAPE.readAtK) — the beat that times his clip to the ball. */
+  duration: number; readAtK: number | null;
   /** How exposed the ball is now (the move's shape; 0 outside its k range). */
   exposed01: number;
   /** The athlete's hands inside CONTACT_FADE_SEC of a contact (the motion layers' drag skips them). */
@@ -967,7 +969,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get move() {
       const m = mv; if (!m) return null;
       const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t);
-      return { name: m.name, t: m.t, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand };
+      return { name: m.name, t: m.t, duration: m.path.duration, readAtK: m.path.readAtK, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand };
     },
     runMove(spec: PathMove | HandlePath, o?: CarryMoveOpts) { return runMoveImpl(spec, o); },
     queueMove(move: PathMove, o: CarryMoveOpts = {}) {

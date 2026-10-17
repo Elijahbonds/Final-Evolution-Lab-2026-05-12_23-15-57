@@ -32,7 +32,9 @@ describe('the AI bodies move with the hero\'s weight (AiMover)', () => {
     expect(three).toMatch(/const MATE_RUN_MPS = 4\.2, FOE_RUN_MPS = 3\.8/);
     expect(three).not.toMatch(/new Vector3\(intent\.moveX, 0, -intent\.moveY\)\.scale\(/);
     expect(three).toMatch(/const mst = mv\.stepIntent\(dt, intent\)/);
-    expect(three).toMatch(/const fst = f\.mover!\.stepIntent\(dt, intent\)/);
+    // H2c REWROTE this pin (same intent: the defender's velocity is his mover's output): a reaction (core/DefenderReact) steers the same
+    // mover with its own wish for its beat — `track`, never a root write
+    expect(three).toMatch(/const fst = f\.react \? f\.mover!\.track\(dt, reactionWish\(f\.react\)\) : f\.mover!\.stepIntent\(dt, intent\)/);
     expect(fnBody(three, 'function resetPossession(')).toMatch(/b\.mover\?\.stop\(\)/);
     // each observes where its body really is before it steps (the contacts and the clamps move a root too)
     expect(three).toMatch(/mv\.observe\(body\.char\.root\.position, dt\);[^\n]*\n\s*const mst = mv\.stepIntent/);
@@ -84,7 +86,9 @@ describe('every body plants (FootPlanting at the spawn, FootPlant on the cut)', 
     expect(three).toMatch(/plantBody\(f, fst\.planting, dt\)/);
     // (3b review) the branches that skip the mover release the pin: the stun (and knockdown) and the scripted drive
     expect(fnBody(three, 'function unplant(')).toMatch(/b\.plant\?\.release\(\); b\.wasPlanting = false;/);
-    expect(three).toMatch(/if \(f\.stunSec > 0\) \{[^\n]*f\.mover\?\.stop\(\); unplant\(f\);[^\n]*continue; \}/);
+    // H2c REWROTE this pin (same intent: a stunned defender stands, his mover stopped and his pin released): a reaction under a stun (the
+    // jab's retreat) runs on through the mover instead — the rest of the stun stands him still as before
+    expect(three).toMatch(/if \(f\.stunSec > 0 && !\(f\.react && !f\.floored\)\) \{[^\n]*f\.mover\?\.stop\(\); unplant\(f\);[^\n]*continue; \}/);
     expect(three).toMatch(/if \(f === driver\) \{\s+unplant\(f\);/);
     // every `continue` in the defenders' loop comes after a plant update or a release
     const cbAt = three.indexOf('        const cb = carrierBody();'), loop = three.slice(three.lastIndexOf('for (let fi = 0; fi < foes.length; fi++) {', cbAt), cbAt);

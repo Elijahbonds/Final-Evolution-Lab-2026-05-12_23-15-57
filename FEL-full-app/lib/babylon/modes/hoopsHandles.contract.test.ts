@@ -16,13 +16,14 @@ describe('4b review F3: reactToBreak\'s bite side is phase 3\'s (the side named,
     const fn = fnOf(src('OneVOneMode.ts'), 'doMove');
     expect(fn).toMatch(/const moveDir: 'left' \| 'right' = r\.clipDir;/);
     expect(fn).toMatch(/const biteDir: 'left' \| 'right' = dirHint \?\? sideAwayFrom\(me\.root\.position, me\.root\.rotation\.y, foe\.root\.position\);/);
-    expect(fn).toMatch(/reactToBreak\(ctx, outcome, biteDir\);/);
+    // (H2c rewrote this pin's tail, same intent — the bite side handed over is biteDir: reactToBreak takes the read's beat time after it)
+    expect(fn).toMatch(/reactToBreak\(ctx, outcome, biteDir[,)]/);
     expect(fn).not.toMatch(/reactToBreak\(ctx, outcome, moveDir\)/);
   });
   it('3v3: the same, with its no-foe default (phase 3\'s `dirHint ?? \'right\'` when nobody is there)', () => {
     const fn = fnOf(src('ThreeVThreeMode.ts'), 'doMove');
     expect(fn).toMatch(/const biteDir: 'left' \| 'right' = dirHint \?\? \(foe \? sideAwayFrom\(me\.char\.root\.position, me\.char\.root\.rotation\.y, foe\.char\.root\.position\) : 'right'\);/);
-    expect(fn).toMatch(/reactToBreak\(ctx, outcome, foe, move, biteDir\);/);
+    expect(fn).toMatch(/reactToBreak\(ctx, outcome, foe, move, biteDir[,)]/);   // (H2c: the same tail rewrite as 1v1's)
   });
   it('the side: a defender on my left → the move goes right → he bites LEFT (the side the ball left); reactToBreak reads it that way', () => {
     // facing +z (yaw 0), his body 1 m to my left (−x: athleteRight(0) = +x)

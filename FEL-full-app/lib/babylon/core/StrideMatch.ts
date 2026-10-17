@@ -59,7 +59,10 @@ export interface StrideRef {
  * better than this — but it was disobeying an authoring decision about how the run should look to win a metric.
  * Honouring the alias and calibrating on top of it is the correct trade, and it costs about 1.5 points.
  */
-export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 2.8 };
+/** H2c: the crossover step's authored stride (bball_def_cross_run_*: 0.70 m a step, 0.25 s a step → 2.8 m/s at rate 1) — the authored
+ *  table's jog, so the state paces the same on every rig (StrideMatch.test). */
+export const DEF_RUN_STRIDE_MPS = 2.8;
+export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 2.8 };   // (H2c: the crossover step's own number is the capture table's — every hoops rig carries the captures)
 
 /**
  * The same references for the CAPTURED hoops loops (HOOPS MOVEMENT, 2026-09-15) — the hero and the AI both run CMU 78
@@ -102,6 +105,7 @@ export const HOOPS_STRIDE_CAPTURE: StrideRef = {
   byState: {
     defend_slide_right: 1.7, defend_slide_hard: 2.69, defend_slide_hard_right: 2.69, defend_backpedal: 3.31, carry_back: 3.31,
     closeout: HOOPS_STRIDE.run, carry_slide: HOOPS_STRIDE.slide, carry_slide_right: HOOPS_STRIDE.slide,
+    defend_run: DEF_RUN_STRIDE_MPS, defend_run_right: DEF_RUN_STRIDE_MPS,   // H2c: authored on every rig (no capture)
   },
   rateMaxByState: { defend_slide_right: 2.34 },
 };
@@ -175,6 +179,9 @@ export function strideKindFor(state: string): StrideKind {
       return 'run';
     case 'drive': case 'sprint_dribble': return 'sprint';   // HOOPS MOTION 2b: the dribbling sprint, split off the run
     case 'speed_dribble': return 'jog';        // DRIBBLE GEARS: the jog loop is its own capture now
+    // H2c: the crossover step is a run-jog over the side, AUTHORED for the authored table's jog (DEF_RUN_STRIDE_MPS = HOOPS_STRIDE.jog 2.8):
+    // an authored clip paces the same on a captured rig (its byState number below) as on an authored one
+    case 'defend_run': case 'defend_run_right': return 'jog';
     case 'walk_dribble': return 'walk';
     case 'defend_slide': case 'defend_slide_right':
     // HOOPS-DEPTH S7 (2026-09-23): the defensive states added AFTER this list (DEFENSE-LOOK 09-17, THE CRAB WALK FIX 09-19) were never

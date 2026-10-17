@@ -28,6 +28,7 @@ export type BasketballAnimState =
   | 'drive' | 'run' | 'gather' | 'shot_release' | 'layup' | 'dunk'   // ANIM CLEAN-UP (2026-09-18): 'run' is the ball-less run; 'drive' is the sprint WITH the ball
   | 'contact_stagger' | 'defend_slide' | 'defend_slide_right' | 'defend_idle' | 'box_out'
   | 'defend_backpedal' | 'closeout' | 'defend_slide_hard' | 'defend_slide_hard_right'   // DEFENSE-LOOK (2026-09-17): the retreat, the closeout, the sat-down slide
+  | 'defend_run' | 'defend_run_right'   // H2c: the crossover step — lateral faster than a slide can step
   | 'watch'
   | 'floor'
   | 'carry_slide' | 'carry_slide_right' | 'carry_back'   // THE CRAB WALK FIX (2026-09-19): travelling off the facing
@@ -73,6 +74,12 @@ export interface AnimTreeInput {
   retreat?: boolean;
   /** Closing the last two metres on a catch — chop steps under a high hand. */
   closeout?: boolean;
+  /** H2c ("stepping defensive slides"; owner 2026-10-14: don't cap the defender's 4.2 m/s, author stepping clips instead): travelling
+   *  SIDEWAYS faster than a slide can step (defendRunFor) — the crossover step. Optional: a mode that does not pass it slides as before. */
+  defendRun?: boolean;
+  /** H2c ("a sprinting chop-step close-out"): running AT the man from beyond the chop range (approachFor) — the sprint, then the closeout's
+   *  chop. It played a lateral slide loop while the body ran forward: a crab walk. */
+  approach?: boolean;
   /** Sitting down on him (L2 / an AI on the ball inside two metres) — the hard slide. */
   intense?: boolean;
   /**
@@ -135,6 +142,8 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   closeout:        { clip: 'bball_closeout', loop: true, fadeSec: 0.12 },
   defend_slide_hard: { clip: 'bball_defend_slide_hard_left', loop: true, fadeSec: 0.14 },
   defend_slide_hard_right: { clip: 'bball_defend_slide_hard_right', loop: true, fadeSec: 0.14 },
+  defend_run:       { clip: 'bball_def_cross_run_left', loop: true, fadeSec: 0.12 },    // H2c: the crossover step (authored; DEF_RUN_STRIDE_MPS)
+  defend_run_right: { clip: 'bball_def_cross_run_right', loop: true, fadeSec: 0.12 },
   // BIOMECH-HOOPS-WAVE1 (2026-09-08): a body with no ball that is NOT defending (the shooter watching his arc, the rival
   // after his release) stands and watches — it used to drop into the defensive slide stance (G5: the follow-through's
   // silhouette died into a crouch the moment the hold released).
@@ -156,8 +165,10 @@ export function chooseBasketballClip(i: AnimTreeInput): AnimChoice {
   else if (i.defending) {
     state = i.bracing ? 'box_out'
       : i.closeout ? 'closeout'
+      : i.approach ? 'run'   // H2c: the sprint at him, before the chop
       : i.speed01 > 0.2
         ? (i.retreat ? 'defend_backpedal'
+          : i.defendRun ? (i.slideDir === 'right' ? 'defend_run_right' : 'defend_run')   // H2c: past a slide's reach, the crossover step
           : i.intense ? (i.slideDir === 'right' ? 'defend_slide_hard_right' : 'defend_slide_hard')
           : (i.slideDir === 'right' ? 'defend_slide_right' : 'defend_slide'))
         : 'defend_idle';
@@ -263,7 +274,7 @@ export class BasketballAnimTree {
   private stateSince = 0;
   private static readonly DWELL_SEC = 0.22;
   private static readonly DWELL_GROUPS: ReadonlyArray<ReadonlySet<BasketballAnimState>> = [
-    new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out']),
+    new Set(['defend_idle', 'defend_slide', 'defend_slide_right', 'defend_slide_hard', 'defend_slide_hard_right', 'defend_backpedal', 'closeout', 'box_out', 'defend_run', 'defend_run_right', 'run']),   // (H2c: the crossover step and the sprint at him dwell with the slides)
     new Set(['idle_dribble', 'protect', 'speed_dribble', 'walk_dribble', 'sprint_dribble', 'drive', 'run', 'watch']),
   ];
   private sameGroup(a: BasketballAnimState | null, b: BasketballAnimState): boolean {
@@ -451,6 +462,31 @@ export function closeoutFor(pos: { x: number; z: number }, vel: { x: number; z: 
   const dx = man.x - pos.x, dz = man.z - pos.z; const dl = Math.hypot(dx, dz); if (dl < 0.9 || dl > 2.6) return false;
   const sp = Math.hypot(vel.x, vel.z); if (sp < 0.4) return false;
   return (vel.x * dx + vel.z * dz) / (sp * dl) > 0.6;
+}
+
+/** H2c: the crossover step's lateral speeds (m/s): in above ENTER, out below EXIT (a body on the line does not flip every frame; the
+ *  tree's dwell holds the rest). FEEL NUMBERS (new, flagged): 2.8 is where the slower slide capture (78_30 right, 1.70 m/s) needs
+ *  1.65× its real cadence — the fastest a slide still reads as a slide (the owner's "choppy / crab walky" was the slides at their caps). */
+export const DEF_RUN_ENTER_MPS = 2.8, DEF_RUN_EXIT_MPS = 2.4;
+/** H2c: is this defender travelling SIDEWAYS (off his facing) faster than a slide can step? `state` is his tree's current state (the
+ *  hysteresis: already in the crossover step, he stays in it down to EXIT). Backwards travel is the backpedal's, not this. */
+export function defendRunFor(yaw: number, vel: { x: number; z: number }, state: string | null | undefined): boolean {
+  const lat = Math.abs(vel.x * Math.cos(yaw) - vel.z * Math.sin(yaw));
+  const fwd = vel.x * Math.sin(yaw) + vel.z * Math.cos(yaw);
+  if (fwd < -0.6 * lat) return false;
+  return lat > (state === 'defend_run' || state === 'defend_run_right' ? DEF_RUN_EXIT_MPS : DEF_RUN_ENTER_MPS);
+}
+/** H2c: the chop's reach — beyond this a defender running at his man SPRINTS (the run); inside it closeoutFor chops (0.9–2.6 m). In at
+ *  APPROACH_MIN_MPS and 0.7 of his line; already running, out only below APPROACH_EXIT_MPS or off 0.5 of it (the AI's speed wobbles ±0.5 m/s
+ *  round 2 m/s on a chase — measured on the first H2c reel: run ↔ slide every 0.23 s, the tree's dwell, without it). */
+export const APPROACH_MIN_M = 2.6, APPROACH_MIN_MPS = 1.8, APPROACH_EXIT_MPS = 1.2;
+/** H2c: is this defender running AT his man from beyond the chop range? `state` is his tree's current state (the hysteresis). */
+export function approachFor(pos: { x: number; z: number }, vel: { x: number; z: number }, man: { x: number; z: number } | null, state?: string | null): boolean {
+  if (!man) return false;
+  const dx = man.x - pos.x, dz = man.z - pos.z; const dl = Math.hypot(dx, dz); if (dl <= APPROACH_MIN_M) return false;
+  const running = state === 'run';
+  const sp = Math.hypot(vel.x, vel.z); if (sp < (running ? APPROACH_EXIT_MPS : APPROACH_MIN_MPS)) return false;
+  return (vel.x * dx + vel.z * dz) / (sp * dl) > (running ? 0.5 : 0.7);
 }
 
 /** The state table, read-only — for the stride-matching drift test (StrideMatch.test): a looping state that walks must be matched. */
