@@ -347,8 +347,8 @@ function sectionC(): void {
   console.log('\n## (c) more or longer freestyle sections — each variant applied to the shipped chart\n');
   for (const v of C_VARIANTS) {
     console.log(`\n### ${v.key} — ${v.label}\n`);
-    console.log('| song | valid | sections (bars) | freestyle share of the song | scored (cap) | NORMAL Δ | same steps? | STYLE taps | taps/min (band) | next step after a section (ms, least) |');
-    console.log('|---|---|---|---|---|---|---|---|---|---|');
+    console.log('| song | valid | sections (bars) | freestyle share of the song | scored (cap) | NORMAL Δ | HARD Δ (steps) | same steps? | STYLE taps | taps/min (band) | next step after a section (ms, least) |');
+    console.log('|---|---|---|---|---|---|---|---|---|---|---|');
     for (const song of SONGS) {
       const base = read(chartFor(song.id)!, song);
       const chart = v.make(chartFor(song.id)!, song);
@@ -359,8 +359,8 @@ function sectionC(): void {
       const edgeMs = Math.min(...r.freeSpans.map((f) => { const nx = steps.find((x) => x.beat >= f.end - 1e-9); return nx ? Math.round((nx.beat - f.end) * beatDuration(song.bpm) * 1000) : Infinity; }));
       const band = `${Math.round(song.targetTapsPerMin * 0.8 * 10) / 10}–${Math.round(song.targetTapsPerMin * 1.25 * 10) / 10}`;
       res[song.id] ??= {};
-      res[song.id][v.key] = { edgeMs, valid: r.problems.length === 0, problems: r.problems, sections: r.freeSpans.length, bars, scored: r.scored, normal: r.normal, normalDelta: r.normal - base.normal, sameSteps: r.shape === base.shape, styleTaps: r.styleTaps, tapsPerMin: r.tapsPerMin };
-      console.log(`| ${song.id} | ${r.problems.length ? `**NO (${r.problems.length})**` : 'yes'} | ${r.freeSpans.length} (${bars}) | ${Math.round((bars / song.bars) * 1000) / 10} % | ${r.scored} (${r.cap}) | ${r.normal - base.normal} | ${r.shape === base.shape ? 'yes' : '**no**'} | ${r.styleTaps} (${r.styleTaps - base.styleTaps >= 0 ? '+' : ''}${r.styleTaps - base.styleTaps}) | ${r.tapsPerMin} (${band}) | ${edgeMs === Infinity ? '–' : edgeMs} |`);
+      res[song.id][v.key] = { edgeMs, valid: r.problems.length === 0, problems: r.problems, sections: r.freeSpans.length, bars, scored: r.scored, normal: r.normal, normalDelta: r.normal - base.normal, hardDelta: r.hard - base.hard, hardStepsDelta: r.hardSteps - base.hardSteps, sameSteps: r.shape === base.shape, styleTaps: r.styleTaps, tapsPerMin: r.tapsPerMin };
+      console.log(`| ${song.id} | ${r.problems.length ? `**NO (${r.problems.length})**` : 'yes'} | ${r.freeSpans.length} (${bars}) | ${Math.round((bars / song.bars) * 1000) / 10} % | ${r.scored} (${r.cap}) | ${r.normal - base.normal} | ${r.hard - base.hard} (${r.hardSteps - base.hardSteps}) | ${r.shape === base.shape ? 'yes' : '**no**'} | ${r.styleTaps} (${r.styleTaps - base.styleTaps >= 0 ? '+' : ''}${r.styleTaps - base.styleTaps}) | ${r.tapsPerMin} (${band}) | ${edgeMs === Infinity ? '–' : edgeMs} |`);
     }
     for (const song of SONGS) {
       const x = res[song.id][v.key] as { problems: string[] };
@@ -438,6 +438,42 @@ function sectionD(): void {
     console.log(`| ${song.id} | ${waves.length} | ${waves.filter((w) => w.gap >= 4).length} | ${waves.filter((w) => w.gap >= 2).length} |`);
   }
   res.waveRoom = room;
+  // Q5: canals' opt-in moonwalk (kvDc) is demoted by the cap. Put it instead on a scored wave note with 4+ beats of room (that one
+  // placement only, as a new phrase id), and read the chart again.
+  {
+    const song = songFor('canals')!;
+    const chart = chartFor('canals')!;
+    const base = read(chart, song);
+    const plan = planChart(chart, song);
+    const steps = stepsFromPresses(plan.scored);
+    const cands = plan.scored.filter((p, i) => categoryOf(steps[i]) === 'wave' && (steps[i + 1]?.beat ?? Infinity) - steps[i].beat >= 4);
+    const moved: Record<string, unknown> = {};
+    console.log('\nCanals: the captured moonwalk moved from its demoted note to a scored wave note with 4+ beats of room:\n');
+    console.log('| target | valid | scored (cap) | NORMAL Δ | same steps? | HARD Δ (steps) | moonwalk scored, plays |');
+    console.log('|---|---|---|---|---|---|---|');
+    for (const t of cands) {
+      const c = clone(chart);
+      // the placement: section t.section, the phrase t.phrase at the bar t.bar falls in
+      const sec = c.sections[t.section];
+      let bar = sec.bar, pi = -1;
+      for (let k = 0; k < sec.play.length; k++) { const ph = c.phrases[sec.play[k]]; if (t.bar >= bar && t.bar < bar + ph.bars) { pi = k; break; } bar += ph.bars; }
+      const pid = sec.play[pi];
+      const nid = `${pid}__MW`;
+      c.phrases[nid] = clone(c.phrases[pid]);
+      const off = t.beat - (bar - 1) * 4;
+      const note = c.phrases[nid].notes!.find((n) => Math.abs(n.b - off) < 1e-9 && n.m);
+      if (!note) continue;
+      note.m = 'dance_pop_moonwalk';
+      sec.play[pi] = nid;
+      // and kvDc goes back to the short name it stood beside (kvD), so the chart names the capture once
+      c.sections.forEach((x) => { x.play = x.play.map((q) => (q === 'kvDc' ? 'kvD' : q)); });
+      const r = read(c, song);
+      const mw = r.captured.filter((x) => x.id === 'dance_pop_moonwalk');
+      moved[`beat ${t.beat}`] = { valid: r.problems.length === 0, scored: r.scored, normalDelta: r.normal - base.normal, sameSteps: r.shape === base.shape, hardDelta: r.hard - base.hard, moonwalk: mw };
+      console.log(`| beat ${t.beat} (${pid}) | ${r.problems.length ? `**NO** ${r.problems[0]}` : 'yes'} | ${r.scored} (${r.cap}) | ${r.normal - base.normal} | ${r.shape === base.shape ? 'yes' : '**no**'} | ${r.hard - base.hard} (${r.hardSteps - base.hardSteps}) | ${mw.map((x) => `${Math.round(x.played * 100)}%`).join(', ') || 'no'} |`);
+    }
+    res.canalsMoonwalk = moved;
+  }
   // in a FREESTYLE section the move plays from one press to the next: pressing every slot shows `every` beats of each move
   console.log('\nIn a freestyle section a move plays from one press to the next. Pressing every slot (the chart\'s `every`): ');
   for (const song of SONGS) {
