@@ -609,6 +609,9 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     let timedOut = false;
     const watchdog = setTimeout(() => {
       timedOut = true;
+      // ship-ready (2026-10-17): counted, like a load that throws (below). On the phone rig, def.load() alone ran 24–35 s in
+      // dunk, threepoint and karate; without this line production cannot say how many real phones end on this screen.
+      reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);
       setPhase('error', 'Load timed out — check your connection and retry.');
     }, LOAD_WATCHDOG_MS);
     try {

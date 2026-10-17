@@ -154,6 +154,12 @@ describe('the harness runs it where it cannot trip the watchdog', () => {
   it('the watchdog is still 20 s (it is not raised: the pre-warm runs after it)', () => {
     expect(src).toMatch(/const LOAD_WATCHDOG_MS = 20_000;/);
   });
+  it('a load the watchdog ends is reported to the diag before the error screen, like a load that throws', () => {
+    const arm = src.indexOf('const watchdog = setTimeout(() => {');
+    const fire = src.indexOf("setPhase('error', 'Load timed out", arm);
+    expect(arm).toBeGreaterThan(0);
+    expect(src.slice(arm, fire)).toContain("reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);");
+  });
   it('development still warms every material after READY', () => {
     expect(src).toContain('if (DEV) void perf.warmAll();');
   });
