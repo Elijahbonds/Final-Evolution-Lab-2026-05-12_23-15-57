@@ -1439,6 +1439,18 @@ exports.Prisma.AdventureSaveScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.StudioProjectSaveScalarFieldEnum = {
+  userId: 'userId',
+  projectId: 'projectId',
+  name: 'name',
+  version: 'version',
+  rev: 'rev',
+  bytes: 'bytes',
+  doc: 'doc',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1730,7 +1742,8 @@ exports.Prisma.ModelName = {
   Booking: 'Booking',
   CallSignal: 'CallSignal',
   CoachStoreReferral: 'CoachStoreReferral',
-  AdventureSave: 'AdventureSave'
+  AdventureSave: 'AdventureSave',
+  StudioProjectSave: 'StudioProjectSave'
 };
 
 /**

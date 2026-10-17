@@ -152,6 +152,8 @@ model User {
 
   // ADVENTURE PHASE B (2026-10-07): the Adventure's server save, one row per account. See AdventureSave below.
   adventureSave AdventureSave?
+  // STUDIO SAVE (owner-approved 2026-10-17): Nexus Studio projects saved to the account. See StudioProjectSave below.
+  studioProjectSaves StudioProjectSave[]
 }
 
 model PlayerProfile {
@@ -2497,4 +2499,30 @@ model AdventureSave {
   version   Int
   doc       Json
   updatedAt DateTime @default(now())
+}
+
+/// STUDIO SAVE (2026-10-17, docs/NEXUS-STUDIO-SAVE.md): one row per Nexus Studio project saved to an account. Matches the live
+/// table from prisma/pending/2026-10-17-studio-project-save.sql (applied by the owner in the deploy session). Written only through
+/// lib/nexus-studio/cloudRoute.ts: who may write (cloudSavePolicy: teens 13+ and adults), the import gate and the size cap
+/// (prepareUpload), the quota (quotaCheck, inside the store's per-account lock) and the revision rule (rev = the base the writer
+/// saw, then rev + 1).
+model StudioProjectSave {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  /// StudioProject.id: doc.ts's id shape, minted on the device; unique per account, not across accounts
+  projectId String
+  /// StudioProject.name (at most 60 characters), so the list never reads a document
+  name      String
+  /// STUDIO_DOC_VERSION of `doc`
+  version   Int
+  /// The server revision: 1 on create, +1 on every write
+  rev       Int
+  /// UTF-8 bytes of `doc`'s JSON as written: the quota reads this, never the documents
+  bytes     Int
+  /// The sanitised StudioProject, with no look codes
+  doc       Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  @@id([userId, projectId])
 }
