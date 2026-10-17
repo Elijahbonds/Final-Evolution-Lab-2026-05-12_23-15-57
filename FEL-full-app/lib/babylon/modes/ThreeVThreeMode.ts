@@ -56,7 +56,8 @@ import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
-import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
+import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';
+import { stepAiHand, AI_HAND_IDLE, AI_HAND_RANGE_M, type AiHandState } from '../core/AiBallHand';   // hoops-handle (owner 10-17): the AI handlers' ball hand   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, putbackDunkOn, PUTBACK_DUNK, oopCut, ALLEY_OOP, CONTEST_TRICK, contestTricksOn, trickPctFor } from '../core/GameDunks';
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';   // H2 leftovers: the in-air trick stick (1v1's)   // H2e: more dunks   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
@@ -385,6 +386,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let hopRelease: HopRelease = null;   // the double-tapped hop's finish: 'armed' from the second press, 'auto' once that press came up during the hop (decisions 17-19)
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.char.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
+  let aiHand: AiHandState = AI_HAND_IDLE, aiHandBody: Body | null = null, aiCrosses = 0;   // hoops-handle (owner 10-17): the AI handler's hand clock, whose it is, and his crossings (logged)
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)   // H2c (dev log): each defender's last tree state, for the stepping states' lines
   let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
@@ -926,7 +928,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         rightHandHoops(char.animator, char.skeleton);   // HOOPS MOTION phase 3: the whole bball_* family too (captures included) — all six
-        if (!ai) leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the hero's dribble loops in the left hand too
+        leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand)
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
         // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
@@ -1178,13 +1180,26 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
       // HOOPS MOTION phase 3: an AI dribbler's pace is his own ground speed (a fixed 0.5 pushed a walking mate's ball out like a sprint)
       for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
-      { // H2d (plan §3.8, Q8): my ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
+      if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): my ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
         const myC = carries.get(me); const nfH = nearestLiveFoe();
         const sh = stepStrongHand(strongHand, dt, { hand: myC?.hand === 'Left' ? 'left' : 'right', speed01: meSpeed01, moveActive: !!myC?.move,
           dribbling: !!myC?.active && cbNow === me && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble && !passFlight.active && !arc.active,
           defenderDist: nfH ? distXZ(me.char.root.position, nfH.char.root.position) : Infinity });
         strongHand = sh.state;
         if (sh.back && myC?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[3V3-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
+      }
+      { // hoops-handle (owner 10-17: "only dribbles right handed"): THE AI HANDLER'S HAND — my mate with the ball, or their driver, keeps it in
+        // the hand away from the man on him and crosses it over when he comes round (core/AiBallHand): a front crossing on his carry, no roll,
+        // no odds, no move — what is drawn, never what happens
+        const ab = cbNow && cbNow !== me ? cbNow : null; const ac = ab ? carries.get(ab) : undefined;
+        if (ab !== aiHandBody) { aiHand = AI_HAND_IDLE; aiHandBody = ab; }
+        if (ab && ac) {
+          const opp = (isFoe(ab) ? [me, ...mates] : foes).reduce<Body | null>((best, o) => o.stunSec > 0 || o.floored ? best : !best || distXZ(o.char.root.position, ab.char.root.position) < distXZ(best.char.root.position, ab.char.root.position) ? o : best, null);
+          const near = opp && distXZ(opp.char.root.position, ab.char.root.position) < AI_HAND_RANGE_M ? opp : null;
+          const st = stepAiHand(aiHand, dt, { hand: ac.hand === 'Left' ? 'left' : 'right', away: near ? sideAwayFrom(ab.char.root.position, ab.char.root.rotation.y, near.char.root.position) : null, dribbling: ac.active && !ballReleased, moveActive: !!ac.move });
+          aiHand = st.state;
+          if (st.cross && ac.runMove('crossover', { pace: 1 })) { aiCrosses++; console.info(`[3V3-HANDLE] ai hand ${isFoe(ab) ? `foe${foes.indexOf(ab)}` : `mate${mates.indexOf(ab)}`} crosses → ${ac.hand} #${aiCrosses}`); }
+        }
       }
 
       // poll every body; tick stagger timers
@@ -1900,7 +1915,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         body.speed01 = Math.min(1, vel.length() / MATE_RUN_MPS);
         body.tree.update({
           speedMps: Math.hypot(vel.x, vel.z),
-          speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: false,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball)
+          speed01: body.speed01, crossover: false, nearestDefender: Infinity, ballHand: carries.get(body)?.hand === 'Left' ? 'left' : 'right', moveActive: !!carries.get(body)?.move, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: false,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball)
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
           retreat: retreatFor(body.char.root.position, vel, driver?.char.root.position ?? null),   // DEFENSE-LOOK
           defendRun: carrierId === 'foeTeam' && defendRunFor(body.char.root.rotation.y, vel, body.tree.state), approach: carrierId === 'foeTeam' && approachFor(body.char.root.position, vel, driver?.char.root.position ?? null, body.tree.state),   // H2c
@@ -1937,7 +1952,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const driveMpsNow = Math.hypot(driverVelEst.x, driverVelEst.z);
           f.char.root.rotation.y = slewYaw(f.char.root.rotation.y, yawTo(f.char.root.position, RIM), FACE_RIM_RATE, dt);
           f.speed01 = driveK < 1 && driveMps > 0 ? 0.9 : 0;   // IMPROVE (2026-10-06) #1: a catch-and-shoot (driveMps 0) stands, it does not run in place
-          if (!foeDunkFlight) f.tree.update({ speedMps: driveMpsNow, speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: driverHasBall(), shooting: false, dunking: false, driving: driveK < 1 && driveMps > 0, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
+          if (!foeDunkFlight) f.tree.update({ speedMps: driveMpsNow, speed01: f.speed01, crossover: false, nearestDefender: Infinity, ballHand: carries.get(f)?.hand === 'Left' ? 'left' : 'right', moveActive: !!carries.get(f)?.move, hasBall: driverHasBall(), shooting: false, dunking: false, driving: driveK < 1 && driveMps > 0, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
           bioTick(f, dt, 'offense', driverHasBall(), Infinity, false);
           if (foeDunkFlight) f.bio.flight = foeDunkFlight;
           chokeClamp(f.char.root.position);   // CHOKEPOINT: the scripted drive skips the clamp line below — 2 of 546 samples inside a rail, measured

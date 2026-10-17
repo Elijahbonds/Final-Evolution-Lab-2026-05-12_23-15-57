@@ -136,6 +136,21 @@ export function dribbleAtPushed(phase: number, p: DribbleParams = HOOPS_DRIBBLE,
   return { phase: ph, ballY, ball: { x: p.side, y: ballY, z: p.forward }, hand: { x: p.side, y: handY, z: p.forward }, handWeight };
 }
 
+/**
+ * hoops-handle (2026-10-17, "no hand passing through the ball"): the least reach weight that keeps the ball hand ABOVE the rising ball.
+ * The carry eases the ball arm toward 0.6 while the ball is down, so the rest of the arm is the clip's — and a clip with no ball arm
+ * (the 1v1's PROTECT stance, every idle with the rival inside 1.4 m) holds the hand at the hip, 0.86 m: the ball rose THROUGH the wrist
+ * on every bounce (rig, base: 24 of 210 frames, the wrist 4.5 cm from the ball's centre). Heights in metres, world or root — one frame:
+ * `clipY` the hand as the clip posed it, `targetY` the dribble's hand target (on the ball's top, or waiting above it), `ballTopY` the ball's
+ * top. 0 when the clip's hand is already clear of the ball (the weight stays the dribble's own).
+ */
+export const HAND_CLEAR_M = 0.01;
+export function clearOfBallWeight(clipY: number, targetY: number, ballTopY: number, clear = HAND_CLEAR_M): number {
+  const need = ballTopY + clear - clipY;
+  if (!(need > 0) || !(targetY - clipY > 1e-4)) return 0;
+  return Math.min(1, need / (targetY - clipY));
+}
+
 /** The bounce the stride clock asks for: one a stride, the ball at `phiAtStrike` when the lock foot strikes. `sinceStrike` s since
  *  that foot's last strike, `period` s a stride. Pulled onto the stride at `gain` (per second of phase error), capped. */
 export function strideLockHz(phase: number, sinceStrike: number, period: number, phiAtStrike: number, gain = 3, hzMax = STRIDE_LOCK_HZ_MAX): number {
