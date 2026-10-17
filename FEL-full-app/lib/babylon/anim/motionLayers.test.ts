@@ -132,6 +132,29 @@ describe('mountMotionLayers — the layers\' rules on a hoops body', () => {
     mm.dispose(); scene.onBeforeAnimationsObservable.remove(c); ball.dispose();
   });
 
+  it('HOOPS MOTION phase 4b (U21): a handle move\'s CONTACT HANDS follow their clip exactly (setContactHands — the dribbled ball is not parented, so the ball arm was dragged); off the ball, dragged again', () => {
+    restBind();
+    const L = MotionLayers.forBody(sk);
+    const shR = L.arms.Right!.shoulder, shL = L.arms.Left!.shoulder;
+    const r0 = bind.get(shR)!.clone(), r1 = r0.multiply(Quaternion.RotationAxis(new Vector3(0, 0, 1), 0.8));
+    const l0 = bind.get(shL)!.clone(), l1 = l0.multiply(Quaternion.RotationAxis(new Vector3(0, 0, 1), -0.8));
+    let t = 0; const c = clip(() => new Map([[shR, t % 2 ? r1 : r0], [shL, t % 2 ? l1 : l0]]));
+    const mm = mountMotionLayers({ scene, skeleton: sk, root, lean: false, hinge: false, ball: null });
+    let hands: ('Left' | 'Right')[] = [];
+    mm.setContactHands(() => hands);
+    for (let i = 0; i < 10; i++) scene.render();
+    hands = ['Right']; t = 1; scene.render();
+    expect(deg(shR.rotationQuaternion!, r1)).toBeLessThan(0.01);    // on the ball (or fading onto it): the clip's own key
+    expect(deg(shL.rotationQuaternion!, l1)).toBeGreaterThan(5);    // the other arm: still dragged
+    hands = ['Right', 'Left']; t = 2; scene.render();
+    expect(deg(shR.rotationQuaternion!, r0)).toBeLessThan(0.01); expect(deg(shL.rotationQuaternion!, l0)).toBeLessThan(0.01);
+    hands = []; t = 2; scene.render();                                // off the ball: the follower starts again from the clip (LimbDrag)…
+    t = 3; scene.render();
+    expect(deg(shR.rotationQuaternion!, r1)).toBeGreaterThan(5);    // …and drags again
+    mm.setContactHands(null);
+    mm.dispose(); scene.onBeforeAnimationsObservable.remove(c);
+  });
+
   it('the drag\'s dt is the ANIMATION clock: at animationTimeScale 0.25 the follower moves a quarter as far per frame', () => {
     expect(animDt(1 / 60, 0.25)).toBeCloseTo(1 / 240, 12);
     expect(animDt(0.2, 1)).toBe(0.05);                                // a hitch is clamped

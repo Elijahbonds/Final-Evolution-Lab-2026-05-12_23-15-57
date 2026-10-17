@@ -60,7 +60,7 @@ function myJumpAgeGuard(): boolean {
 {
   const src = readFileSync('lib/babylon/modes/ThreeVThreeMode.ts', 'utf8');
   ok(src.includes('TEAM_SHORTS') && src.includes("SLOT_KEYS.shorts"),
-    'HP-5 both jersey and shorts tinted per team');
+    'HP-5 the jersey tinted per team (the shorts as the fallback when no jersey mesh matches: style pass S3)');
   ok(src.includes('-4.8, 0, 5.8') && src.includes('-0.8 - i * 1.1'),
     'WA-15 wider off-ball spawn spread');
   const { minSeen } = runFloorSim();

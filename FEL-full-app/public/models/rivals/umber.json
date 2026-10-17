@@ -1,0 +1,27 @@
+{
+  "fps": 30,
+  "clips": [],
+  "builtAtSpawn": true,
+  "athlete": "umber",
+  "sex": "female",
+  "note": "power forward, afro",
+  "source": "MPFB2 (MakeHuman, CC0) — scripts/avatar/rivals.mts",
+  "rig": "MPFB2 mixamo rig folded to the 22-bone FEL spec (scripts/avatar/import-mpfb.mts)",
+  "skin": "young_african_female",
+  "hair": "afro01",
+  "macro": {
+    "age": 0.5329999999999999,
+    "muscle": 0.75,
+    "weight": 0.55,
+    "height": 0.5,
+    "proportions": 0.7,
+    "african": 0.8,
+    "asian": 0,
+    "caucasian": 0.2
+  },
+  "look": {
+    "scale": 1.082,
+    "jersey": "#5f9a63",
+    "shorts": "#f2e8cf"
+  }
+}

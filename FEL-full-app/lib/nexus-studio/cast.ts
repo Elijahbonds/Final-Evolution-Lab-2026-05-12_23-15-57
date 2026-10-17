@@ -131,7 +131,11 @@ export function crowdVenueOf(crowd: ExportCrowd): CrowdVenue {
   };
 }
 
-export interface CastSeat { pos: V3; yaw: number; posture: StandSpec['posture']; stand: string; /** 'gap': an empty seat; 'aisle': a row's end */ kind: 'gap' | 'aisle' }
+export interface CastSeat {
+  pos: V3; yaw: number; posture: StandSpec['posture']; stand: string; /** 'gap': an empty seat; 'aisle': a row's end */ kind: 'gap' | 'aisle';
+  /** studio-5: where along its row, 0..1 — the crowd's reaction ripple (crowdReact.delayFor) reaches it there */
+  along?: number;
+}
 
 /** The crowd layout's seed (crowdStands.mountCrowd's default): the gaps are the ones the mounted crowd leaves. */
 export const CROWD_SEED = 11;
@@ -164,7 +168,7 @@ export function crowdCastSeats(crowd: ExportCrowd | null | undefined, n: number,
   const face = (st: StandSpec, pos: V3) => lerpAngle(st.yaw, Math.atan2(venue.focus[0] - pos[0], venue.focus[2] - pos[2]), 0.7);
   const byId = new Map(venue.stands.map((st) => [st.id, st]));
   const gaps: CastSeat[] = all.filter((s) => !filled.has(key(s)) && s.dist <= CARD_BEYOND_M)
-    .map((s) => ({ pos: s.pos, yaw: face(byId.get(s.stand)!, s.pos), posture: s.posture, stand: s.stand, kind: 'gap' as const, dist: s.dist }));
+    .map((s) => ({ pos: s.pos, yaw: face(byId.get(s.stand)!, s.pos), posture: s.posture, stand: s.stand, kind: 'gap' as const, along: s.along, dist: s.dist }));
   const aisles: Array<CastSeat & { dist: number }> = [];
   for (const st of venue.stands) {
     for (let r = st.firstRow ?? 0; r < st.rows; r++) {
@@ -172,7 +176,7 @@ export function crowdCastSeats(crowd: ExportCrowd | null | undefined, n: number,
         const pos = standPoint(st, side * (st.width / 2 + 0.45), r);
         if (pastLine(pos, venue.camera) < venue.camera.margin) continue;
         const dist = Math.hypot(pos[0] - venue.eye[0], pos[1] - venue.eye[1], pos[2] - venue.eye[2]);
-        if (dist <= CARD_BEYOND_M) aisles.push({ pos, yaw: face(st, pos), posture: st.posture, stand: st.id, kind: 'aisle', dist });
+        if (dist <= CARD_BEYOND_M) aisles.push({ pos, yaw: face(st, pos), posture: st.posture, stand: st.id, kind: 'aisle', along: side < 0 ? 0 : 1, dist });
       }
     }
   }
@@ -184,7 +188,7 @@ export function crowdCastSeats(crowd: ExportCrowd | null | undefined, n: number,
     for (const s of pool) {
       if (out.length >= n) break;
       if (!far(s.pos)) continue;
-      out.push({ pos: s.pos, yaw: s.yaw, posture: s.posture, stand: s.stand, kind: s.kind });
+      out.push({ pos: s.pos, yaw: s.yaw, posture: s.posture, stand: s.stand, kind: s.kind, ...(s.along !== undefined ? { along: s.along } : {}) });
     }
   }
   return out;

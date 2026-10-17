@@ -25,6 +25,14 @@ describe('hoops posture windows', () => {
     expect(hoopsWindow(I({ role: 'offense', hasBall: false, speed01: 0.5 }))).toBe('run');
     expect(hoopsWindow(I({ role: 'offense', hasBall: false, speed01: 0.0 }))).toBe('idle');
   });
+  it('H2b (plan §4.8): the hesitation\'s hang is the HITCH — tall, no lean, the head up, the eyes on him — ahead of protect / drive / dribble', () => {
+    for (const speed01 of [0.05, 0.3, 0.8]) expect(hoopsWindow(I({ role: 'offense', hasBall: true, speed01, nearestDefender: 1.0, hesi: true }))).toBe('hesi');
+    expect(hoopsWindow(I({ role: 'offense', hasBall: false, speed01: 0.3, hesi: true }))).toBe('run');   // no ball, no hesitation
+    expect(hoopsWindow(I({ role: 'offense', hasBall: true, speed01: 0.9, shot: 'load', hesi: true }))).toBe('load');   // a shot still wins
+    const h = HOOPS_POSTURE.hesi;
+    expect(h.lean).toBe(0); expect(h.spine1[0]).toBe(-4); expect(h.spine2[0]).toBe(-10); expect(h.head[0]).toBe(-14); expect(h.eyes).toBe(1); expect(h.weight).toBe(1); expect(h.hipYawKeep).toBe(1);
+    expect(h.lean).toBeLessThan(HOOPS_POSTURE.dribble.lean);
+  });
   it('the shot windows override the loco, in order', () => {
     expect(hoopsWindow(I({ role: 'offense', hasBall: true, speed01: 0.9, shot: 'load' }))).toBe('load');
     expect(hoopsWindow(I({ role: 'offense', shot: 'release' }))).toBe('release');

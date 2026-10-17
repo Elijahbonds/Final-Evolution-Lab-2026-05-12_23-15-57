@@ -106,3 +106,36 @@ describe('every rival cast has people to rotate through', () => {
     }
   });
 });
+
+// THE FORGE RIVALS REPLACE THE MESHY BODIES (owner, 2026-10-16: "replace them all but my own"). The Meshy bodies tear (their
+// weights are a nearest-vertex transfer) and carry no garment slot; the forge rivals are MPFB2 bodies on our own rig.
+import { REPLACED_MESHY } from './athleteRoster';
+import { existsSync, readFileSync } from 'node:fs';
+describe('the forge rivals (2026-10-16)', () => {
+  it('every roster body is a forge rival under /models/rivals/, on disk with its manifest saying where it came from', () => {
+    expect(ATHLETE_ROSTER.length).toBeGreaterThanOrEqual(20);
+    for (const a of ATHLETE_ROSTER) {
+      expect(a.url, a.key).toBe(`/models/rivals/${a.key}.glb`);
+      expect(existsSync(`public${a.url}`), a.url).toBe(true);
+      const m = JSON.parse(readFileSync(`public/models/rivals/${a.key}.json`, 'utf8')) as { source: string; builtAtSpawn: boolean; athlete: string };
+      expect(m.source, a.key).toMatch(/^MPFB2/); expect(m.builtAtSpawn).toBe(true); expect(m.athlete).toBe(a.key);
+    }
+  });
+  it('no Meshy body is dealt: not on the roster, not in a cast, not by name, not by any seed or rotation', () => {
+    expect(REPLACED_MESHY.length).toBe(29);
+    const keys = ATHLETE_ROSTER.map((a) => a.key);
+    for (const k of REPLACED_MESHY) { expect(keys, k).not.toContain(k); expect(rosterBodyUrl(k), k).toBeNull(); }
+    for (const [mode, cast] of Object.entries(MODE_CAST)) for (const k of cast) expect(REPLACED_MESHY, `${mode} casts ${k}`).not.toContain(k);
+    for (const mode of [null, 'aeroaces', 'derby', 'penalty', ...Object.keys(MODE_CAST)]) for (let r = 0; r < 30; r++) for (let i = 0; i < 6; i++) {
+      expect(rosterUrlFor(DEFAULT_HERO_URL, `opponent-${i}`, mode, r), `${mode} r${r}`).toMatch(/^\/models\/rivals\//);
+    }
+  });
+  it('the owner\'s own hero is not a roster body and is unchanged', () => {
+    expect(DEFAULT_HERO_URL).toBe('/models/elijah-meshy.glb');
+    expect(ATHLETE_ROSTER.map((a) => a.url)).not.toContain(DEFAULT_HERO_URL);
+  });
+  it('a 3v3 team (one jersey tint) gets one person per spot: the spot seeds the pick, so three teammates are three bodies', () => {
+    const picks = new Set(['-4.5,-0.8', '0.0,-1.9', '4.5,-3.0'].map((p) => rosterUrlFor(DEFAULT_HERO_URL, `#ff2d78@${p}`, 'threevthree', 0)));
+    expect(picks.size).toBeGreaterThanOrEqual(2);
+  });
+});
