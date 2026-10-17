@@ -730,6 +730,49 @@
     0.05
    ],
    "note": "the owner's own DeepMotion take (dunk-finder.mts, 2026-09-18: \"identify what dunk is what\") — TWO-HAND FLUSH: a wide wind-up (16.3–16.4), the crouch, and both hands together straight up to 16.73"
+  },
+  {
+   "name": "bball_mc_dribble_side_left",
+   "replaces": "bball_dribble_side_left",
+   "source": "cmu",
+   "file": "cmu/06/06_09.bvh",
+   "from": 0.75,
+   "to": 1.42,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.8
+   ],
+   "note": "H2d (plan §4.19, 2026-10-16): SIDEWAYS DRIBBLE — CMU 06_09 'basketball - sideways dribble': the right hand dribbles while the body steps to its LEFT (measured: hips 2.8 units to his left over 2 s, 0.6 forward), one step cycle = one bounce (~0.65 s). Plays under carry_slide (travel left); its legs-mirrored twin is carry_slide_right, and the left-hand cases are the runtime mirrors of the opposite side's clip (basketballTree)."
+  },
+  {
+   "name": "bball_mc_dribble_side_right",
+   "replaces": "bball_dribble_side_right",
+   "source": "cmu",
+   "file": "cmu/06/06_09.bvh",
+   "from": 0.75,
+   "to": 1.42,
+   "loop": true,
+   "refineLoop": [
+    0.55,
+    0.8
+   ],
+   "mirrorLegs": true,
+   "note": "H2d: the same sideways dribble with its LEGS mirrored (mirrorLegs) — the body steps to its RIGHT with the ball still in the right hand (the hand leading). No capture goes that way with the right hand."
+  },
+  {
+   "name": "bball_mc_dribble_back",
+   "replaces": "bball_dribble_back",
+   "source": "cmu",
+   "file": "cmu/06/06_06.bvh",
+   "from": 1.2,
+   "to": 2.25,
+   "loop": true,
+   "refineLoop": [
+    0.9,
+    1.2
+   ],
+   "note": "H2d (plan §4.19): BACKWARD DRIBBLE — CMU 06_06 'basketball - backward dribble': the right hand dribbles while the body backs straight up (measured: 3.1 units back over 2.8 s, 0.5 to the side); one step cycle (~1.05 s: the right foot lifts at 0.3, 1.35, 2.4 s). Plays under carry_back (it played the defender's backpedal)."
   }
  ]
 }

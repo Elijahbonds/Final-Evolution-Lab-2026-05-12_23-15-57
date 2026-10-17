@@ -47,7 +47,7 @@ const want = (id: string): boolean => ONLY.includes('all') || ONLY.includes(id);
 /** One step of a pad script: ms after the previous step, then what the pad does. Right-stick flicks are in the 2K map's words, read
  *  against the ball hand at that moment: toward / away / up / down / upAway / upToward / downAway / downToward. */
 type Step =
-  | { at: number; ls: 'foe' | 'away' | 'none' | 'across' | 'foeR' | 'foeL' | 'side' | 'backSide'; mag?: number; tap?: number }
+  | { at: number; ls: 'foe' | 'away' | 'none' | 'across' | 'foeR' | 'foeL' | 'side' | 'backSide' | 'sideL' | 'back'; mag?: number; tap?: number }
   | { at: number; rot: 1 | -1; ms?: number }
   | { at: number; l1: boolean }
   | { at: number; rs: 'toward' | 'away' | 'up' | 'down' | 'upAway' | 'upToward' | 'downAway' | 'downToward'; hold?: number }
@@ -121,6 +121,17 @@ const SCENS: Scen[] = [
     steps: [{ at: 0, ls: 'none' }, { at: 200, r2: true }, { at: 0, ls: 'side', mag: 1 }, { at: 0, mark: 'flick' }, { at: 700, still: 'move' }, { at: 900, ls: 'none' }, { at: 0, r2: false }] },
   { id: 'approach', title: 'H2c the defender closes: I back away 1.2 s and stop — his sprint, then the chop', modes: ['1v1'], tail: 1400, landed: 'steps [a-z_-]+ → (run|closeout)', stripMs: 110, focus: 'foe',
     steps: [{ at: 0, ls: 'away', mag: RUN }, { at: 1200, ls: 'none' }, { at: 0, mark: 'flick' }, { at: 500, still: 'move' }] },
+  // H2d: the carrier's side and back dribbles (plan §4.19), the strong hand coming back (§3.8), the off arm at a sprint
+  { id: 'sideR', title: 'H2d side dribble to my RIGHT (the left stick to my right, half push, standing start)', modes: ['1v1', '3v3'], tail: 300, landed: '', stripMs: 110, luck: 0.99,
+    steps: [{ at: 0, ls: 'none' }, { at: 200, mark: 'flick' }, { at: 0, ls: 'side', mag: 0.45 }, { at: 600, still: 'move' }, { at: 700, ls: 'none' }] },
+  { id: 'sideL', title: 'H2d side dribble to my LEFT', modes: ['1v1', '3v3'], tail: 300, landed: '', stripMs: 110, luck: 0.99,
+    steps: [{ at: 0, ls: 'none' }, { at: 200, mark: 'flick' }, { at: 0, ls: 'sideL', mag: 0.45 }, { at: 600, still: 'move' }, { at: 700, ls: 'none' }] },
+  { id: 'backdrib', title: 'H2d back dribble (the left stick straight back)', modes: ['1v1', '3v3'], tail: 300, landed: '', stripMs: 110, luck: 0.99,
+    steps: [{ at: 0, ls: 'none' }, { at: 200, mark: 'flick' }, { at: 0, ls: 'back', mag: 0.45 }, { at: 600, still: 'move' }, { at: 700, ls: 'none' }] },
+  { id: 'strong', title: 'H2d the strong hand: a crossover at a jog, then stop — the ball goes back to the right hand', modes: ['1v1', '3v3'], tail: 1400, landed: 'strong hand back', stripDelay: 500, stripMs: 120,
+    steps: [{ at: 0, ls: 'foe', mag: JOG }, { at: 650, rs: 'upAway' }, { at: 500, ls: 'none' }, { at: 0, mark: 'flick' }, { at: 600, still: 'move' }] },
+  { id: 'sprintball', title: 'H2d the off arm at a sprint with the ball (R2 + the stick at the rim)', modes: ['1v1', '3v3'], tail: 300, landed: '', stripDelay: 400, stripMs: 90,
+    steps: [{ at: 0, r2: true }, { at: 0, ls: 'foe', mag: 1 }, { at: 0, mark: 'flick' }, { at: 900, still: 'move' }, { at: 600, ls: 'none' }, { at: 0, r2: false }] },
   { id: 'lcross', title: 'left-stick reversal at a jog (the crossover the LS throws)', modes: ['1v1', '3v3'], tail: 1300,
     steps: [{ at: 0, ls: 'foeR', mag: 0.7 }, { at: 700, mark: 'flick' }, { at: 0, ls: 'foeL', mag: 0.7 }, { at: 250, still: 'move' }] },
 ];
@@ -172,7 +183,7 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
       await page.evaluate((m) => {
         const R = (window as any).__R; const md = (window as any).__FEL_DEV__.scene.metadata; const S = m === '1v1' ? md.onevone : md.threevthree;
         R.rows = []; R.sampling = true;
-        R.sample = (now: number) => { const h = R.hero(); const p = h ? R.pos(h) : { x: 0, y: 0, z: 0 }; const fr = m === '1v1' ? S.foeRoot : S.nearestFoeRoot(); const f = fr ? R.pos(R.top(fr)) : null; const c = S.carry(); return { t: now, x: p.x, z: p.z, hand: c.hand, foe: f ? Math.hypot(f.x - p.x, f.z - p.z) : -1 }; };
+        R.sample = (now: number) => { const h = R.hero(); const p = h ? R.pos(h) : { x: 0, y: 0, z: 0 }; const fr = m === '1v1' ? S.foeRoot : S.nearestFoeRoot(); const f = fr ? R.pos(R.top(fr)) : null; const c = S.carry(); return { t: now, x: p.x, z: p.z, yaw: h ? h.rotation.y : 0, hand: c.hand, foe: f ? Math.hypot(f.x - p.x, f.z - p.z) : -1 }; };
       }, mode);
       flickAt = -1;
       for (const st of sc.steps) {
@@ -183,8 +194,10 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
           const p = R.pos(h), f = R.pos(R.top(fr)); let dx = f.x - p.x, dz = f.z - p.z;
           const n = Math.hypot(dx, dz) || 1; const b0 = R.basis();
         if (ls === 'foeR' || ls === 'foeL') { const sx = ls === 'foeR' ? 2 : -2; dx = dx / n + b0.r.x * sx; dz = dz / n + b0.r.z * sx; }   // toward him, mostly sideways: a reversal of the two reads dot −0.6 (the controller's < −0.4)
-        else if (ls === 'side' || ls === 'backSide') { const h0 = R.hero(); const yaw = h0 ? h0.rotation.y : 0; const rx = Math.cos(yaw), rz = -Math.sin(yaw);   // the body's right
-          dx = rx; dz = rz; if (ls === 'backSide') { dx -= Math.sin(yaw) * 0.8; dz -= Math.cos(yaw) * 0.8; } }   // across and BACK: the reverse pivot's read
+        else if (ls === 'side' || ls === 'backSide' || ls === 'sideL' || ls === 'back') { const h0 = R.hero(); const yaw = h0 ? h0.rotation.y : 0; const rx = Math.cos(yaw), rz = -Math.sin(yaw);   // the body's right
+          dx = rx; dz = rz; if (ls === 'backSide') { dx -= Math.sin(yaw) * 0.8; dz -= Math.cos(yaw) * 0.8; }   // across and BACK: the reverse pivot's read
+          if (ls === 'sideL') { dx = -rx; dz = -rz; }                                   // H2d: the body's left
+          if (ls === 'back') { dx = -Math.sin(yaw); dz = -Math.cos(yaw); } }             // H2d: straight back off the facing
         else if (ls === 'away') { dx = -dx; dz = -dz; } else if (ls === 'across') { const ax = (window as any).__PAD.axes[0]; const b = R.basis(); const sx = ax >= 0 ? -1 : 1; dx = b.r.x * sx + dx * 0.3; dz = b.r.z * sx + dz * 0.3; }
           R.steer(dx, dz, mag ?? 0.5); if (tap) R.lsTap(tap);
         }, { m: mode, ls: st.ls, mag: st.mag, tap: st.tap ?? 0 });
@@ -225,13 +238,19 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
         for (const p of spd) { if (p.v <= 0.5) { if (run0 < 0) run0 = p.t; if (p.t - run0 > hang.ms) hang = { ms: p.t - run0, end: p.t }; } else run0 = -1; }
         const go = hang.end > 0 ? spd.find((p) => p.t > hang.end && p.v >= 3.0) : undefined;
         const g7 = { hangMs: Math.round(hang.ms), explodeMs: go ? Math.round(go.t - hang.end) : -1, minV: spd.length ? +Math.min(...spd.map((p) => p.v)).toFixed(2) : -1 };
+        // H2d, THE CRAB WALK re-check: of the frames the hero moves faster than the tree's 0.2 gate (1.28 m/s), how many travel more than 50°
+        // off his facing (the tree's lateral / backward states) — the owner's 09-19 "crab walky" was 71 % of moving frames sideways
+        let movingN = 0, offN = 0;
+        for (let i = 1; i < after.length; i++) { const dt = (after[i].t - after[i - 1].t) / 1000; if (dt <= 0) continue; const vx = (after[i].x - after[i - 1].x) / dt, vz = (after[i].z - after[i - 1].z) / dt; if (Math.hypot(vx, vz) < 1.28) continue; movingN++;
+          const yaw = (after[i] as unknown as { yaw: number }).yaw; let d = Math.atan2(vx, vz) - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) > (50 * Math.PI) / 180) offN++; }
+        const crab = { moving: movingN, offFacing: offN, share: movingN ? +(offN / movingN).toFixed(2) : 0 };
         const stills = R.stills; R.stills = {}; const strip = R.strip ?? []; R.strip = [];
         return { b64: R.b64 as string, dur: R.recDur as number, log: R.logSince(t0, logRe).map((l: { t: number; m: string }) => `+${Math.round(l.t - t0)}ms ${l.m}`),
-          handAtFlick: f?.hand ?? '', handEnd: e?.hand ?? '', handsAfter: hands, foeAtFlick: f ? +f.foe.toFixed(2) : -1, travel09: +travel.toFixed(2), g7, stills, strip, err: R.err };
+          handAtFlick: f?.hand ?? '', handEnd: e?.hand ?? '', handsAfter: hands, foeAtFlick: f ? +f.foe.toFixed(2) : -1, travel09: +travel.toFixed(2), g7, crab, stills, strip, err: R.err };
       }, { t0, flickAt, logRe: LOG_RE });
       const fRel = flickAt > 0 ? flickAt - t0 : 0; const msOf = (l: string) => Number(/^\+(\d+)ms/.exec(l)?.[1] ?? 0);
       const landedRe = new RegExp(sc.landed ?? '-(STICK|HANDLE)\\]');
-      const moved = out.log.some((l: string) => landedRe.test(l) && msOf(l) >= fRel - 20);
+      const moved = sc.landed === '' || out.log.some((l: string) => landedRe.test(l) && msOf(l) >= fRel - 20);   // (landed '': a locomotion take, nothing to wait for)
       const ruined = out.log.some((l: string) => /STRIP|STOLEN|stolen|steal by|lost it/i.test(l) && msOf(l) <= fRel + 500);   // a strip inside the move's half-second; one after it is the game
       if (moved && !ruined) break;
       say(`${id}: attempt ${attempt} ${!moved ? 'the move never landed' : 'a strip / steal inside the move'} — again`);
@@ -247,7 +266,7 @@ async function runMode(mode: '1v1' | '3v3'): Promise<void> {
     const { b64: _b, stills: _s, strip: _st, ...rest } = out;
     meas[id] = { ...rest, bytes: size, title: sc.title, label: LABEL };
     fs.writeFileSync(MEAS, JSON.stringify({ ...meas, _meta: { label: LABEL, seed: SEED, base: BASE, qs: QS, updated: new Date().toISOString(), tree } }, null, 1));
-    say(`${id}: ${(size / 1024).toFixed(0)} KB ${out.dur?.toFixed(1)} s · hand ${out.handAtFlick}→${out.handEnd} · foe ${out.foeAtFlick} m · travel ${out.travel09} m · G7 hang ${out.g7.hangMs} ms → 3 m/s in ${out.g7.explodeMs} ms`);
+    say(`${id}: ${(size / 1024).toFixed(0)} KB ${out.dur?.toFixed(1)} s · hand ${out.handAtFlick}→${out.handEnd} · foe ${out.foeAtFlick} m · travel ${out.travel09} m · G7 hang ${out.g7.hangMs} ms → 3 m/s in ${out.g7.explodeMs} ms · off-facing ${out.crab.offFacing}/${out.crab.moving} moving frames`);
     for (const l of out.log.slice(0, Number(process.env.LOG_N ?? 8))) say(`   ${l}`);
   }
   await browser.close();

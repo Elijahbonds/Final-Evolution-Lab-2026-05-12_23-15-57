@@ -55,7 +55,8 @@ import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
-import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
+import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
+import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
 import { mountPostureLayer, type PostureLayer, type PostureFeed } from '../anim/PostureLayer';
 import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on every body
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
@@ -124,7 +125,7 @@ import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM D
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
-  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
+  CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, moveDisplayName, tickChain, moveFromContext, resolveHandleMove, SHAKE_RANGE,
   ANKLE_STUMBLE_CLIP, ANKLE_SLIP_CLIP, ANKLE_BITE,   // (phase 4b: moveClip / moveImpulse are the renderer's — anim/handleMotion)   // (H2c: the slip, as 1v1's)
   OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose, type ChainState, type HandleMove,
   moveRate, moveFadeSec,   // MOVE PACE
@@ -375,7 +376,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let paintSec = 0, paintWarned = false;          // the three-second clock, and whether the ref has warned yet
   let goaltendCalled = false;                    // one call per shot
   const lastFoeJobs = new Map<Body, string>();   // DEFENSE-LOOK: job-change log
-  const lastFoeStepStates = new Map<Body, string>();   // H2c (dev log): each defender's last tree state, for the stepping states' lines
+  const lastFoeStepStates = new Map<Body, string>();
+  let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)   // H2c (dev log): each defender's last tree state, for the stepping states' lines
   let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
   let chargeLastGap = -1;                        // last frame's gap to the driver, for the closing RATE
@@ -811,7 +813,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration (nor a run: the movers stand, the pins let go)
-    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; b.react = null; b.layers?.reset(); }
+    for (const b of everyBody()) { b.motion.reset(); b.mover?.stop(); b.plant?.release(); b.wasPlanting = false; b.react = null; b.layers?.reset(); } strongHand = STRONG_HAND_IDLE;   // H2d
     me.char.root.position.set(0, 0, 6);
     // MODE-STICK-FACE (2026-09-07): face the rim AND tell the dribble so. The movement layer's facing starts at 0 no
     // matter which way the model spawned, and a push AGAINST the facing is a back-pedal that keeps the chest where it
@@ -1150,6 +1152,14 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       const ballReleased = !!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased;
       // HOOPS MOTION phase 3: an AI dribbler's pace is his own ground speed (a fixed 0.5 pushed a walking mate's ball out like a sprint)
       for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
+      { // H2d (plan §3.8, Q8): my ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
+        const myC = carries.get(me); const nfH = nearestLiveFoe();
+        const sh = stepStrongHand(strongHand, dt, { hand: myC?.hand === 'Left' ? 'left' : 'right', speed01: meSpeed01, moveActive: !!myC?.move,
+          dribbling: !!myC?.active && cbNow === me && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble && !passFlight.active && !arc.active,
+          defenderDist: nfH ? distXZ(me.char.root.position, nfH.char.root.position) : Infinity });
+        strongHand = sh.state;
+        if (sh.back && myC?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[3V3-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
+      }
 
       // poll every body; tick stagger timers
       net?.tick(me.slot.intent);   // no-op without ?net=
@@ -1538,7 +1548,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
           const own0 = pick0 ? ownedStickMove(pick0.move, MOVES_UNLOCKED_GATE) : null;   // H2: every move unlocked until H9   // H1 H-02: every gated move falls back, never a dead stick
           const locked = !!own0 && own0.locked;
-          if (locked) refuse(ctx, `${pick0!.move.replace(/_/g, ' ').toUpperCase()} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);
+          if (locked) refuse(ctx, `${moveDisplayName(pick0!.move)} NEEDS HANDLE ${own0!.need} — YOURS ${handle}`);   // H2d (Q7): the generic name, never a player's
           const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
           if (!pick) continue;
           if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;

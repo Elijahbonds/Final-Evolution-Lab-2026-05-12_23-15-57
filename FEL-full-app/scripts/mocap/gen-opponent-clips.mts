@@ -36,6 +36,9 @@ interface Entry {
    *  (mocapRetarget RetargetOpts.reRoot). Per entry, default off; set on the hoops one-shots only (bball_mc_*, not a loop) — every other
    *  entry regenerates byte-identical (authored/mocapPins.test.ts pins the non-hoops rows). */
   reRoot?: boolean;
+  /** H2d (plan §4.19): mirror the LEGS, hips and spine but keep the hands and their poles — the same stepping the other way with the ball
+   *  still in its hand (a sideways dribble captured one way only: the ball hand trailing becomes the ball hand leading). Default off. */
+  mirrorLegs?: boolean;
 }
 const ROOT = join(process.env.HOME ?? '', 'Downloads/fel-mocap-sources');
 const CROUCH_DROP_K = Number(process.env.CROUCH_DROP_K ?? 1);   // LOWER STANCES: the drop's calibration against the floor test
@@ -92,6 +95,7 @@ for (const e of manifest.clips) {
   if (e.loop && e.refineLoop) [from, to] = refineLoop(s, from, to, e.refineLoop);
   if (!STYLES && !e.loop && /^bball_mc_/.test(e.name)) realSec.push([e.name, +(to - from).toFixed(3)]);
   const r = RT.retargetToPoseKeys(s, { from, to, duration: e.duration, loop: e.loop, mirror: e.mirror, hipsYRange: e.hipsYRange, aim: e.aim, rootTrack: e.rootTrack, smoothSec: e.smoothSec, reRoot: e.reRoot });
+  if (e.mirrorLegs) for (let i = 0; i < r.keys.length; i++) { const k = r.keys[i]; r.keys[i] = { ...RT.mirrorKey(k), hands: k.hands, poles: k.poles }; }   // H2d: the steps the other way, the hands as captured
   if (e.extend) {
     const ex = e.extend; const m = !!e.mirror;
     const tgt = (side: 'Left' | 'Right') => { const src = m ? (side === 'Left' ? ex.Right : ex.Left) : ex[side]; return src ? [m ? -src[0] : src[0], src[1], src[2]] as [number, number, number] : null; };
@@ -134,7 +138,7 @@ ${r.keys.map((k) => `      ${JSON.stringify(k).replace(/"(\w+)":/g, '$1: ')},`).
   }
   out.push(`  {
     name: '${e.name}', replaces: '${e.replaces}', duration: ${r.duration}, loop: ${!!e.loop},${STYLES ? ` style: '${e.style}', label: '${e.label ?? e.name}',` : ''}
-    source: '${e.source}:${e.file.split('/').pop()}${e.anim ? '#' + e.anim : ''} ${from.toFixed(2)}–${to.toFixed(2)}s${e.mirror ? ' mirrored' : ''}', license: ${JSON.stringify(LICENSE[e.source])},
+    source: '${e.source}:${e.file.split('/').pop()}${e.anim ? '#' + e.anim : ''} ${from.toFixed(2)}–${to.toFixed(2)}s${e.mirror ? ' mirrored' : ''}${e.mirrorLegs ? ' legs mirrored' : ''}', license: ${JSON.stringify(LICENSE[e.source])},
     keys: [
 ${r.keys.map((k) => `      ${JSON.stringify(k).replace(/"(\w+)":/g, '$1: ')},`).join('\n')}
     ],${r.root ? `\n    root: [\n${r.root.map((k) => `      ${JSON.stringify(k)},`).join('\n')}\n    ],` : ''}

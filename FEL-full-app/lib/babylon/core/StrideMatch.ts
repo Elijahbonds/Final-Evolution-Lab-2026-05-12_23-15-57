@@ -82,8 +82,11 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
  *     walk_dribble                        bball_mc_dribble_walk (06_01)           0.97   walk
  *     defend_slide / defend_slide_right   bball_mc_defend_slide_left / _right     2.40 / 1.70   (78_30, the two ways)
  *     defend_slide_hard(_right)           bball_mc_defend_slide_hard_* (78_26)    2.69
- *     defend_backpedal, carry_back        bball_mc_defend_backpedal (78_24)       3.31
- *     closeout; carry_slide(_right)       AUTHORED (bball_closeout; strafe_*)     3.6; 2.0 — HOOPS_STRIDE's, unchanged
+ *     defend_backpedal                    bball_mc_defend_backpedal (78_24)       3.31
+ *     carry_slide(_right), carry_back     bball_mc_dribble_side_* (06_09), _back (06_06)   1.42; 1.17   (H2d, plan §4.19: the carrier's own
+ *                                                                                          side and back dribbles; they played the strafes
+ *                                                                                          and the defender's backpedal)
+ *     closeout                            AUTHORED (bball_closeout)               3.6 — HOOPS_STRIDE's, unchanged
  *
  * (Before phase 3b no tree state played bball_mc_run; `run` asked for run_forward, the dribbling drive.) The previous table (run 3.6, slide 2.0,
  * walk 0.72, jog 2.8, one number per kind) was calibrated by the foot-slide probe while the loops played 0.79–1.37× their
@@ -103,8 +106,9 @@ export const HOOPS_STRIDE: StrideRef = { run: 3.6, slide: 2.0, walk: 0.72, jog: 
 export const HOOPS_STRIDE_CAPTURE: StrideRef = {
   run: 4.69, sprint: 4.57, jog: 3.87, walk: 0.97, slide: 2.4,
   byState: {
-    defend_slide_right: 1.7, defend_slide_hard: 2.69, defend_slide_hard_right: 2.69, defend_backpedal: 3.31, carry_back: 3.31,
-    closeout: HOOPS_STRIDE.run, carry_slide: HOOPS_STRIDE.slide, carry_slide_right: HOOPS_STRIDE.slide,
+    defend_slide_right: 1.7, defend_slide_hard: 2.69, defend_slide_hard_right: 2.69, defend_backpedal: 3.31,
+    carry_slide: 1.42, carry_slide_right: 1.42, carry_back: 1.17,   // H2d: the carrier's side / back dribble captures (06_09, 06_06), measured
+    closeout: HOOPS_STRIDE.run,
     defend_run: DEF_RUN_STRIDE_MPS, defend_run_right: DEF_RUN_STRIDE_MPS,   // H2c: authored on every rig (no capture)
   },
   rateMaxByState: { defend_slide_right: 2.34 },
