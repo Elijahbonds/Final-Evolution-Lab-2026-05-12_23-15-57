@@ -176,7 +176,8 @@ import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
-  THREEV_TIER, tierForRun, cutOff, kickTarget, openness, catchAndShoot, KICK_READ_FROM_K, KICK_READ_TO_K, SWING_PICK_M,
+  THREEV_TIER, tierForRun, cutOff, kickTarget, openness, catchAndShoot, KICK_READ_FROM_K, KICK_READ_TO_K, SWING_PICK_M, laneClear,
+  mateCall, MATE_LANE_M, KICK_OPEN_M,   // H3e: my teammate with the ball reads and plays
   rivalPoints, goaltendAward, rivalReleasePct, passPreviewLabel, MARK_COLOR, hintFor, emptyBox, lodFor, type Lod,
 } from './threevthreeRules';
 import type { FelInput } from '../core/InputBus';
@@ -334,6 +335,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // my teammates now guard a man (a DefenderBrain each: deny, and the low man's help on a drive) and their men off the ball space the
   // floor (a TeammateBrain each, at the wings and the top). A box-out or a loose ball stays with the body's own brain (the mode drives those).
   const mateDef = new Map<Body, DefenderBrain>(), foeOff = new Map<Body, TeammateBrain>();
+  // H3e: my teammate with the ball — since he caught it, whether he is driving and for how long (threevthreeRules.mateCall)
+  const mateBall = [{ since: 0, driving: false, driveSec: 0 }, { since: 0, driving: false, driveSec: 0 }];
+  let mateBallOf: string = '';
   let mateMarksTok = -1;
   const FOE_SPACE_ANGLES = [Math.PI * 0.3, 0, -Math.PI * 0.3];
   /** This teammate's defence brain in their possession — its man assigned once per possession (the driver is mine to guard: each teammate
@@ -812,6 +816,18 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const toMe = leadPoint(body.char.root.position, me.char.root.position, me.drib.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
     passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toMe, 'chest', 1);
     console.info('[3V3-OFF] call for the ball answered — mate passes it back');
+  }
+
+  /** H3e: my teammate MOVES THE BALL ON (his read, threevthreeRules.mateCall): a chest pass led to the open man — me, or the other mate. */
+  function mateSwing(ctx: ModeContext, idx: number, to: 'me' | 'mate0' | 'mate1', heldSec: number): void {
+    if (passFlight.active || mateShooting) return;
+    const body = mates[idx], target = to === 'me' ? me : mates[to === 'mate0' ? 0 : 1];
+    releaseBall(ball);
+    passTargetId = to; lastPasserWasMe = false; slingPass = false; passType = 'chest';
+    const toT = leadPoint(body.char.root.position, target.char.root.position, to === 'me' ? me.drib.vel : target.vel, PASS_SPEED.chest).add(new Vector3(0, 1.2, 0));
+    passFlight.start(body.char.root.position.add(new Vector3(0, 1.2, 0)), toT, 'chest', 1);
+    if (to === 'me') ctx.juice.callout('BALL BACK', '#22d3ee', 380);
+    console.info(`[3V3-OFF] mate${idx} reads: swing it to ${to} (${heldSec.toFixed(2)} s after the catch)`);
   }
 
   /**
@@ -1928,7 +1944,27 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       for (let i = 0; i < mates.length; i++) {
         const body = mates[i];
         // H3c: in their possession a teammate guards his man (mateDefBrain) — unless the mode has him boxing out or chasing
-        const intent = swapped(body) ? mateDefBrain(body).decide(dt, body.char.root.position, ballWorld(), RIM, allyPositions(), foePositions()) : body.slot.intent;
+        let intent = swapped(body) ? mateDefBrain(body).decide(dt, body.char.root.position, ballWorld(), RIM, allyPositions(), foePositions()) : body.slot.intent;
+        // H3e: WITH THE BALL HE READS AND PLAYS (threevthreeRules.mateCall) — he used to dribble on the spot until I called for it
+        const myId = i === 0 ? 'mate0' : 'mate1';
+        if (carrierId === myId && !passFlight.active && !mateShooting && !shooting && !body.floored && body.stunSec <= 0 && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased) {
+          const st = mateBall[i];
+          if (mateBallOf !== myId) { mateBallOf = myId; st.since = 0; st.driving = false; st.driveSec = 0; }
+          st.since += dt; if (st.driving) st.driveSec += dt;
+          const p = body.char.root.position, defs = foePositions();
+          const other = mates[1 - i];
+          const meOpen = openness(me.char.root.position, defs) >= KICK_OPEN_M && laneClear(p, me.char.root.position, defs);
+          const otherOpen = !!other && openness(other.char.root.position, defs) >= KICK_OPEN_M && laneClear(p, other.char.root.position, defs);
+          const call = mateCall({ sinceCatchSec: st.since, rimDist: distXZ(p, RIM_FLOOR), open: openness(p, defs), laneToRim: laneClear(p, RIM_FLOOR, defs, MATE_LANE_M), driving: st.driving, driveSec: st.driveSec, passOpen: meOpen || otherOpen });
+          if (call === 'shoot') { console.info(`[3V3-OFF] mate${i} reads: shoot (${st.since.toFixed(2)} s after the catch, ${st.driving ? 'off the drive' : 'off the catch'})`); mateBallOf = ''; void teammateShoots(ctx, body, i); }
+          else if (call === 'pass') { mateBallOf = ''; mateSwing(ctx, i, meOpen || !otherOpen ? 'me' : (other === mates[0] ? 'mate0' : 'mate1'), st.since); }
+          else if (call === 'drive') {
+            if (!st.driving) console.info(`[3V3-OFF] mate${i} reads: drive (${st.since.toFixed(2)} s after the catch)`);
+            st.driving = true;
+            const d = RIM_FLOOR.subtract(p); d.y = 0; const dl = d.length();
+            if (dl > 1e-3) intent = { ...intent, moveX: d.x / dl, moveY: -d.z / dl, sprint: true };
+          }
+        } else if (mateBallOf === myId) mateBallOf = '';
         const inMyWake = carrierId === 'me' && slipstreamRead(body.char.root.position, me.char.root.position, me.drib.vel);   // HOOPS KINETIC 3v3
         // HOOPS MOTION phase 3b: the brain's intent reached at the hero's accel / decel (it was 0 or 4.2 m/s in one frame); the burst, the
         // synergy and the slipstream scale his tops
@@ -1960,15 +1996,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         body.speed01 = Math.min(1, vel.length() / MATE_RUN_MPS);
         body.tree.update({
           speedMps: Math.hypot(vel.x, vel.z),
-          speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: false,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball)
+          speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: mateBallOf === (i === 0 ? 'mate0' : 'mate1') && mateBall[i].driving,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball) · H3e: his drive
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
           retreat: retreatFor(body.char.root.position, vel, driver?.char.root.position ?? null),   // DEFENSE-LOOK
           defendRun: carrierId === 'foeTeam' && defendRunFor(body.char.root.rotation.y, vel, body.tree.state), approach: carrierId === 'foeTeam' && approachFor(body.char.root.position, vel, driver?.char.root.position ?? null, body.tree.state),   // H2c
         });
         bioTick(body, dt, carrierId === 'foeTeam' ? 'defense' : 'offense', carrierId === mateId && !passFlight.active, Infinity, false);
-        if (carrierId === (i === 0 ? 'mate0' : 'mate1') && Vector3.Distance(body.char.root.position, RIM) < 3.5 && Math.random() < 0.01) {
-          void teammateShoots(ctx, body, i);
-        }
       }
 
       // THE SWITCH (lock deferred item, 2026-09-03): a beaten defender whose man

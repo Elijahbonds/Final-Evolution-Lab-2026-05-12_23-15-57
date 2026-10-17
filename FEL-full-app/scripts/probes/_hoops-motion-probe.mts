@@ -342,6 +342,8 @@ const CATALOGUE: ActionDef[] = [
   A('hero_3v3_catch', 'catch (a pass from a teammate comes to me)', 'passes/catches', 'catch', '3v3-off', '*', { body: 'me', ballTo: true, from: 'mate*', minFree: 3, arrives: true }, 600, 800),
   A('hero_3v3_rebound', 'rebound', 'rebounds/box-out', 'rebound', '3v3-off', withReps(['t_rebound', 't_rebound2', 't_rebound3', 't_rebound4']), { body: 'me', ballTo: true, minFree: 20, still: true }, 900, 700),
   A('ai_3v3_catch', 'teammate catches my pass', 'passes/catches', 'catch', '3v3-off', withReps(['t_pass', 't_pass2', 't_pass3', 't_oop', 't_passlong1']), { body: 'mate*', ballTo: true, from: 'me', minFree: 3, arrives: true }, 600, 900),
+  // H3e (owner 2026-10-17: pace and flow — the possession stalled after a pass): what the teammate DOES with my pass, four seconds on
+  A('ai_3v3_after_catch', 'teammate with my pass: the read after the catch', 'passes/catches', 'catch', '3v3-off', withReps(['t_pass', 't_pass2', 't_pass3']), { body: 'mate*', ballTo: true, from: 'me', minFree: 3, arrives: true }, 200, 4000),
   A('ai_3v3_mate_shot', 'teammate shoots (the alley-oop off my lob)', 'jumpers', 'shot', '3v3-off', withReps(['t_pass', 't_pass2', 't_pass3', 't_oop', 't_oopwait1', 't_passrim1', 't_passlong1']), { body: 'mate*', clip: /jumpshot|layup|oop|^dunk_(?!.*celeb)/ }, 500, 1600),
   A('ai_3v3_closeout', 'defender closeout', 'defense', 'defense', '3v3-off', '*', { body: 'foe*', clip: /closeout/ }, 300, 900),
   A('ai_3v3_contest', 'defender contest (hand up)', 'defense', 'defense', '3v3-off', '*', { body: 'foe*', clip: /hand_up/ }, 300, 1000),

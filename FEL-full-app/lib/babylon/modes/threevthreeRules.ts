@@ -100,6 +100,36 @@ export function catchAndShoot(open: number, distToRim: number, knobs: ThreeVThre
   return open >= SHOOT_OPEN_M && distToRim >= SHOOT_MIN_RIM_M && roll < knobs.catchShoot;
 }
 
+// ── H3e: MY TEAMMATE WITH THE BALL READS AND PLAYS ────────────────────────────────────────────────────────────────────
+/**
+ * H3e (owner 2026-10-17: pace and flow — "the passer standing ~4 s after a pass"). My teammate with my pass shot only inside 3.5 m of
+ * the rim, on a 1 %-a-frame roll, and never moved the ball on unless I called for it: on every pass of the probe's (h3e-base, three
+ * attempts) he dribbled the whole four seconds without a decision while the possession stood still. Now he READS: a beat to catch
+ * it (MATE_SETTLE_SEC), then the shot off the catch when he is open in range (the rival's own SHOOT_OPEN_M), a drive when his lane
+ * to the rim is clear (finished at MATE_FINISH_M, or after MATE_DRIVE_MAX_SEC), the swing to the open man after MATE_READ_SEC — and
+ * never the ball held past MATE_HOLD_MAX_SEC. TUNED (new).
+ */
+export const MATE_SETTLE_SEC = 0.35, MATE_READ_SEC = 0.9, MATE_HOLD_MAX_SEC = 1.8;
+export const MATE_SHOOT_RANGE_M = 7.3, MATE_DRIVE_FROM_M = 8.5, MATE_FINISH_M = 2.4, MATE_DRIVE_MAX_SEC = 1.6, MATE_LANE_M = 0.9;
+export type MateCall = 'hold' | 'shoot' | 'drive' | 'pass';
+export interface MateRead {
+  /** Since he caught it (s). */ sinceCatchSec: number;
+  /** His floor distance to the rim (m). */ rimDist: number;
+  /** His openness: the nearest defender (m). */ open: number;
+  /** Nobody of theirs on his line to the rim (laneClear at MATE_LANE_M). */ laneToRim: boolean;
+  /** He is on a drive he started, and for how long (s). */ driving: boolean; driveSec: number;
+  /** A man of ours is open with a clear lane (the swing's target exists). */ passOpen: boolean;
+}
+export function mateCall(r: MateRead): MateCall {
+  if (r.sinceCatchSec < MATE_SETTLE_SEC) return 'hold';
+  if (r.driving) return r.rimDist <= MATE_FINISH_M || r.driveSec >= MATE_DRIVE_MAX_SEC ? 'shoot' : 'drive';
+  if (r.open >= SHOOT_OPEN_M && r.rimDist <= MATE_SHOOT_RANGE_M) return 'shoot';
+  if (r.laneToRim && r.rimDist <= MATE_DRIVE_FROM_M) return 'drive';
+  if (r.sinceCatchSec >= MATE_READ_SEC && r.passOpen) return 'pass';
+  if (r.sinceCatchSec >= MATE_HOLD_MAX_SEC) return r.rimDist <= MATE_SHOOT_RANGE_M ? 'shoot' : 'pass';
+  return 'hold';
+}
+
 // ── #2 WHAT A RIVAL RELEASE IS WORTH, AND HOW OFTEN IT GOES IN ───────────────────────────────────────────────────────
 /** A dunk and a layup are twos; a jumper is worth what the arc says (BasketballCore.isThree at the release spot). */
 export function rivalPoints(kind: 'dunk' | 'layup' | 'jumper', beyondArc: boolean): 2 | 3 {
