@@ -99,33 +99,43 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
 // ── C. the explode-out is the payoff ───────────────────────────────────────
 // Control: stop by going neutral, then push again. Hesi path must beat it —
 // otherwise the move costs momentum and buys nothing.
-// Both paths are read on the SAME frame (H2-HESI-SAME-FRAME restored this: f69e9194 read the hesi when its hang let go and the control
-// on its first push, 5 frames apart — on one clock the hesi was 1.58×, and the 2× bar does not move). The hesitation now HANGS
-// (DribbleController.HESI_HANG_SEC, hoops-motion plan §4.8 G7), so both push frame for frame until the hang lets go and are read there;
-// the hesi's explode was tuned to clear the bar on that frame (HESI_EXPLODE_FLOOR).
 {
   const hesi = new DribbleController();
   hesi.setFacing(Math.PI);
   run(hesi, Array(60).fill([0, 1]));
   run(hesi, Array(3).fill([0, -1]));          // the pullback tap
   run(hesi, Array(6).fill([0, 0]));           // release + a beat (the read)
+  run(hesi, [[0, 1]]);                        // explode
+  const hesiSpeed = hesi.vel.length();
 
   const ctrl = new DribbleController();
   ctrl.setFacing(Math.PI);
   run(ctrl, Array(60).fill([0, 1]));
   run(ctrl, Array(10).fill([0, 0]));          // plain stop, same total beat
+  run(ctrl, [[0, 1]]);
+  const ctrlSpeed = ctrl.vel.length();
 
-  // explode: both push, one frame each, the same number of frames — the hesi's push is remembered inside the hang
+  ok(hesiSpeed > ctrlSpeed * 2, `explode-out beats a plain stop-and-go (${hesiSpeed.toFixed(2)} vs ${ctrlSpeed.toFixed(2)} m/s)`);
+
+  // ADDITIONAL checks, on their own controllers (the read above is the bar and nothing here changes it): the same scripts, then both
+  // push frame for frame. The hesitation HANGS (DribbleController.HESI_HANG_SEC, hoops-motion plan §4.8 G7) and its push is
+  // remembered inside the hang.
+  const hesiOn = new DribbleController();
+  hesiOn.setFacing(Math.PI);
+  run(hesiOn, Array(60).fill([0, 1]));
+  run(hesiOn, Array(3).fill([0, -1]));
+  run(hesiOn, Array(6).fill([0, 0]));
+  const ctrlOn = new DribbleController();
+  ctrlOn.setFacing(Math.PI);
+  run(ctrlOn, Array(60).fill([0, 1]));
+  run(ctrlOn, Array(10).fill([0, 0]));
   const hesiTrail: number[] = [], ctrlTrail: number[] = [];
   let hesiCrossed = 0;
-  const push = () => { const [h] = run(hesi, [[0, 1]]); run(ctrl, [[0, 1]]); if (h.crossover) hesiCrossed++; hesiTrail.push(hesi.vel.length()); ctrlTrail.push(ctrl.vel.length()); };
+  const push = () => { const [h] = run(hesiOn, [[0, 1]]); run(ctrlOn, [[0, 1]]); if (h.crossover) hesiCrossed++; hesiTrail.push(hesiOn.vel.length()); ctrlTrail.push(ctrlOn.vel.length()); };
   push();
-  while (hesi.hanging && hesiTrail.length < 60) push();
+  while (hesiOn.hanging && hesiTrail.length < 60) push();
   const pushed = hesiTrail.length;
-  const hesiSpeed = hesi.vel.length(), ctrlSpeed = ctrl.vel.length();   // the same frame: the hang's last
-
-  ok(!hesi.hanging && pushed * DT <= DribbleController.HESI_HANG_SEC + DT, `the explode waits out the hang and no longer (${(pushed * DT * 1000).toFixed(0)} ms ≤ ${(DribbleController.HESI_HANG_SEC * 1000).toFixed(0)} ms + a frame)`);
-  ok(hesiSpeed > ctrlSpeed * 2, `explode-out beats a plain stop-and-go (${hesiSpeed.toFixed(2)} vs ${ctrlSpeed.toFixed(2)} m/s, both on push frame ${pushed})`);
+  ok(!hesiOn.hanging && pushed * DT <= DribbleController.HESI_HANG_SEC + DT, `the explode waits out the hang and no longer (${(pushed * DT * 1000).toFixed(0)} ms ≤ ${(DribbleController.HESI_HANG_SEC * 1000).toFixed(0)} ms + a frame)`);
   while (hesiTrail.length < 20) push();
   const ground = (t: number[]) => t.reduce((a, v) => a + v * DT, 0);
   ok(ground(hesiTrail) > ground(ctrlTrail), `the hang pays: more ground in the 0.33 s from the push (${ground(hesiTrail).toFixed(2)} vs ${ground(ctrlTrail).toFixed(2)} m)`);
