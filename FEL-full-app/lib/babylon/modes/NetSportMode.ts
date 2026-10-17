@@ -31,6 +31,7 @@ import { installSafePlay } from '../anim/clipRegistry';
 import { NetAnimTree, TENNIS_CLIPS, VOLLEYBALL_CLIPS, NET_CONTACT_SEC, type NetClipSet } from '../anim/netTree';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
+import { mountStudioFor, studioIntroOr, studioLookFor, studioMood, studioReplayAngles, type StudioExtras } from '@/lib/nexus-studio/runtime';   // NEXUS STUDIO §13.3: a dev-only ?venue= for Volleyball (null without one, in production, and for Tennis: no target row)
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { EffectsKit } from '../visual/EffectsKit';
@@ -216,6 +217,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let me: SpawnedCharacter, foe: SpawnedCharacter;
   let ball: AbstractMesh;
   let venue: VenueHandle | null = null;
+  let studio: StudioExtras | null = null;   // NEXUS STUDIO: a dev-only ?venue='s extras (null without one)
   let beach: { dispose(): void; update(dt: number, camera: Camera): void } | null = null;      // P5
   let fx: NetCourtFx | null = null;                 // VIS-COURT: the dressing, the net, the surface's reaction, the swing trails
   const pacer = new HighlightPacer();               // VIS-COURT: how often a winner is replayed
@@ -528,7 +530,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     restSec = 1.4;
     // VIS-COURT: a winner is replayed from the broadcast angles (skippable; the harness holds update() while it plays) — never the
     // point that ends the match (returned above: the end card is what the player is waiting for), and not in reduced motion
-    if (pacer.offer(winnerReason(why, side === 0), { reduced: !motionPolicy().travel })) void ctx.highlight?.({ lastSeconds: 3.4 });
+    if (pacer.offer(winnerReason(why, side === 0), { reduced: !motionPolicy().travel })) void ctx.highlight?.({ lastSeconds: 3.4, angles: studioReplayAngles(o.modeId) });   // NEXUS STUDIO: a dev-only ?venue='s angles, else the director's own cut
     else pacer.tick();
   }
 
@@ -1164,16 +1166,18 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   return {
     modeId: o.modeId,
-    mood: 'goldenHour',
+    get mood() { return studioMood(o.modeId, 'goldenHour'); },   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one (Volleyball only)
     camPreset: 'net',   // see CameraDirector: 'hoops' is an isolation cam and a running net player outruns it
-    intro: 'walkIn',    // VIS-COURT: the broadcast intro — a crane over the court, then a shot on the player (the first serve waits for it)
+    get intro() { return studioIntroOr(o.modeId, 'walkIn'); },    // VIS-COURT: the broadcast intro — a crane over the court, then a shot on the player (the first serve waits for it). NEXUS STUDIO: 'walkIn' unless a dev-only ?venue= picks one
     replay: true,       // VIS-COURT: the winning rally, replayed (ctx.highlight in awardPoint)
     replayCast: () => ({ bodies: [me?.root, foe?.root, setter?.root, foeSetter?.root].filter((r): r is NonNullable<typeof r> => !!r), loose: ball ? [ball] : [] }),
 
     async load(ctx: ModeContext) {
-      venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true, look: readPlaceLook(o.venueId) });   // PLACE: the splash's pick (tennis / volleyball)   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
+      const look = studioLookFor(o.modeId) ?? readPlaceLook(o.venueId);   // NEXUS STUDIO: the place pick unless a dev-only ?venue= lays a Studio look
+      venue = mountVenue(ctx, o.venueId, { keepGameplayCamera: true, look });   // PLACE: the splash's pick (tennis / volleyball)   // M104 gap: tennis and volleyball rendered through the venue orbit camera — the hero sat at 44 px, cut off at the frame's bottom
+      studio?.dispose(); studio = mountStudioFor(o.modeId, ctx);   // NEXUS STUDIO: null without a dev-only ?venue= (and always for Tennis)
       // VIS-COURT: the Gym is a room, not a beach (the sand plate and the sea stood under it) — the hall replaces the beach there
-      const placeId = readPlaceLook(o.venueId)?.id;
+      const placeId = look?.id;
       try { fx = mountNetCourtFx(ctx.scene, { modeId: o.modeId, placeId, cfg: o.cfg, cage: !!o.cage, tier: ctx.lights.tier }); } catch (e) { console.warn('[FEL-COURT] court fx unavailable — the rally plays without it:', e); fx = null; }   // a picture never costs the mode its load
       if (process.env.NODE_ENV === 'development') (ctx.scene.metadata ??= {}).felCourt = { fx, highlight: (opts?: Parameters<NonNullable<ModeContext['highlight']>>[0]) => ctx.highlight?.(opts) };   // the capture driver stages contacts and replays through it
       if (o.beach && !fx?.indoors) beach = buildBeach(ctx.scene, ctx.lights.tier === 'mobile' ? null : { night: placeId === 'night-beach' });   // P5: sand to the horizon, the sea past the far baseline (VIS-COURT: alive on desktop)
@@ -1282,7 +1286,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       ctx.heroRef.current = me.root;
       // WEATHER (the start screen's chip; tennis only — the beach court has no chip yet) and the landing ring
       weather = WeatherKit.fromPick(o.cfg.touchesPerSide === 1 ? readWeather(o.modeId) : 'natural', 'court', Math.floor(Date.now() / 1000) % 100000);
-      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!readPlaceLook(o.venueId)?.sky });   // a place with its own sky keeps it
+      weatherFx?.dispose(); weatherFx = mountWeatherFx(ctx.scene, ctx.lights, weather, { tier: ctx.lights.tier, keepSky: !!look?.sky });   // a place with its own sky keeps it (NEXUS STUDIO: a Studio look's own sky too)
       // IMPROVE #1: volleyball gets a ring too — where the incoming ball comes down, the comfortable reach wide, so a
       // sport that grades your feet with reachOf shows you where to put them
       landing?.dispose(); landing = o.cfg.touchesPerSide === 1 ? mountRing(ctx.scene, '#22d3ee', 1.4) : mountRing(ctx.scene, '#ffd75e', COMFORT_M * 2); landing.show(false);
@@ -1576,6 +1580,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       beach?.dispose(); beach = null; fx?.dispose(); fx = null;   // P5 / VIS-COURT
       trail = null;   // the scene owns the system; the handle must not outlive the match
       venue?.dispose(); venue = null;
+      studio?.dispose(); studio = null;   // NEXUS STUDIO
       posture?.dispose(); posture = null;
       recoverMark?.dispose(); recoverMark = null;
       landing?.dispose(); landing = null; weatherFx?.dispose(); weatherFx = null;

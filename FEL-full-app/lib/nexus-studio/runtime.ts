@@ -49,10 +49,14 @@ let cache: { key: string; exp: StudioVenueExport | null } | null = null;
 
 /**
  * The Studio venue this page asks `modeKey` to load, or null (no `?venue=`, a production build, a venue made for another
- * mode, nothing under that id). Read three times per mount (mood, intro, look) and cached on the page's query.
+ * mode, nothing under that id, a mode with no play-test target row). Read three times per mount (mood, intro, look) and cached
+ * on the page's query.
  */
 export function studioVenueFor(modeKey: string, search?: string, kv?: KV | null, env?: string): StudioVenueExport | null {
   if (!studioLoadAllowed(env)) return null;
+  // §13.3: only a play-test target loads a venue (targets.ts). NetSportMode reads its venue by its own modeId and builds Tennis
+  // too; Tennis has no row (its weather is gameplay and it has had no review), so it never loads one, whatever the page carries.
+  if (!targetOf(modeKey)) return null;
   let q = search;
   if (q === undefined) { try { q = typeof window !== 'undefined' ? window.location.search : ''; } catch { q = ''; } }
   const param = new URLSearchParams(q).get('venue');

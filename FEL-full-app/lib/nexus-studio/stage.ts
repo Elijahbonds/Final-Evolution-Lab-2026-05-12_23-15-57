@@ -90,7 +90,7 @@ export async function mountStage(opts: StageOpts): Promise<Stage> {
   let fly!: UniversalCamera;
   const look = await mountLookStack({
     canvas, engine: opts.engine, tier: opts.tier,
-    modeId: exp.target,
+    modeId: target?.modeId ?? exp.target,   // §13.3: the definition's own modeId where it is not the registry key (Derby: 'baseball')
     camPreset: target?.camPreset ?? 'court',
     mood: () => exp.mood,
     onCamera: (scene) => {
