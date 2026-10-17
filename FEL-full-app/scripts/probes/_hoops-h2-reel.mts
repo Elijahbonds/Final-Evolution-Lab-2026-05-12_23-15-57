@@ -138,6 +138,12 @@ const SCENS: Scen[] = [
     steps: [{ at: 0, ls: 'foe', mag: JOG }, { at: 650, rs: 'upAway' }, { at: 500, ls: 'none' }, { at: 0, mark: 'flick' }, { at: 600, still: 'move' }] },
   { id: 'sprintball', title: 'H2d the off arm at a sprint with the ball (R2 + the stick at the rim)', modes: ['1v1', '3v3'], tail: 300, landed: '', stripDelay: 400, stripMs: 90,
     steps: [{ at: 0, r2: true }, { at: 0, ls: 'foe', mag: 1 }, { at: 0, mark: 'flick' }, { at: 900, still: 'move' }, { at: 600, ls: 'none' }, { at: 0, r2: false }] },
+  // H3d (owner 2026-10-17, D8/D9: the shot motion; the meter readable): a set jumper — Square held to about the green, standing
+  { id: 'jumper', title: 'H3d set jumper: Square held ~0.43 s from standing (the load, the rise, the release at the top, the meter)', modes: ['1v1', '3v3'], tail: 1500, landed: '', luck: 0.99, stripMs: 70,
+    steps: [{ at: 0, ls: 'none' }, { at: 450, mark: 'flick' }, { at: 0, press: 2, ms: 430 }, { at: 1300, still: 'end' }] },
+  // H3b (owner 2026-10-17, "idle dribbling felt off"): standing with the ball, the stick home — the idle dribble / the protect
+  { id: 'idlehold', title: 'H3b idle: standing with the ball, the stick home, for 3 s (the dribble at rest)', modes: ['1v1', '3v3'], tail: 400, landed: '', luck: 0.99, stripMs: 140,
+    steps: [{ at: 0, ls: 'none' }, { at: 600, mark: 'flick' }, { at: 1400, still: 'move' }, { at: 1400, still: 'end' }] },
   // H2e: the player-asked finishes and the new dunks. 1v1 starts off the poster seam (me 5.2 m out at speed, facing the rim); 3v3 reads the
   // rim off jobs() and drives at it. The double tap's SECOND press is the hop's meter: held to the green.
   { id: 'hoptap', title: 'H2e hop step: Square tapped, then pressed again and held (the hop, then its finish)', modes: ['1v1'], tail: 1400, landed: 'hop step on the double tap', landedBefore: 'SHOT\\] gather|footwork|finish', luck: 0.99,

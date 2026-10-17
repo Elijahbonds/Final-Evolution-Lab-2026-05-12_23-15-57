@@ -34,7 +34,7 @@ const VERDICT_HEX: Record<Exclude<MeterVerdict, null>, string> = {
 // shader composites the six layers in the order they used to stack, back to front, each at its own colour and alpha — the "over"
 // of the layers, blended once, is the same pixel the six blends made. Same public API, same look; the numbers below are the old
 // planes' sizes.
-const QW = W + 0.05, QH = H + 0.03;   // the marker's width, the frame's height
+const QW = W + 0.08, QH = H + 0.06;   // the marker's outline width, the frame's height (+ the marker outline at either end)
 
 const VERT = `precision highp float;
 attribute vec3 position;
@@ -65,7 +65,11 @@ void main(void) {
   acc = layer(acc, uFillColor, 0.95 * k, ax <= 0.5 * (w - 0.02) && y >= foot && y <= foot + uBox.z);                        // the fill
   acc = layer(acc, vec3(0.223529, 1.0, 0.533333), 0.55 * k, ax <= 0.5 * w && abs(y - uGreen.x) <= uGreen.y);               // the green (39ff88)
   acc = layer(acc, vec3(0.909804, 1.0, 0.941176), 0.9 * k, ax <= 0.5 * w && abs(y - uGreen.x) <= uGreen.z);                 // the perfect band (e8fff0)
-  acc = layer(acc, uMarkColor, k, ax <= 0.5 * (w + 0.05) && abs(y - uBox.w) <= 0.01);                                       // the marker
+  // H3d (owner 2026-10-17, D9: "keep the meter, make it readable"): the window's EDGES, solid and a touch wider than the bar — the
+  // green at 0.55 over the cyan fill read teal once the fill passed it, and the window was gone just when it mattered
+  acc = layer(acc, vec3(0.7, 1.0, 0.82), k, ax <= 0.5 * (w + 0.05) && abs(abs(y - uGreen.x) - uGreen.y) <= 0.007);            // the window's edges
+  acc = layer(acc, vec3(0.03, 0.05, 0.08), 0.85 * k, ax <= 0.5 * (w + 0.075) && abs(y - uBox.w) <= 0.024);                  // the marker's outline
+  acc = layer(acc, uMarkColor, k, ax <= 0.5 * (w + 0.055) && abs(y - uBox.w) <= 0.014);                                     // the marker
   if (acc.a <= 0.0001) discard;
   gl_FragColor = vec4(acc.rgb / acc.a, acc.a);
 }`;
@@ -116,6 +120,9 @@ export function mountShotMeter3D(scene: Scene): ShotMeter3DHandle {
       if (!shown || fading > 0) return;
       const k = Math.max(0, Math.min(1, t)); lastT = k;
       fillTop = Math.max(0.001, k * H); markY = yOf(k);
+      // H3d (D9): the fill turns the window's green while the marker is IN it — the release frame is due now (the shot clip is paced so
+      // its release key lands on the window's centre)
+      if (Math.abs(markY - greenY) <= greenHalf) fillColor.copyFromFloats(0.62, 1, 0.74); else fillColor.copyFromFloats(0x22 / 255, 0xd3 / 255, 0xee / 255);
       upload();
       const cam: Camera | null = scene.activeCamera;
       if (cam) cam.getDirectionToRef(RIGHT_AXIS, right); else right.copyFrom(RIGHT_AXIS);

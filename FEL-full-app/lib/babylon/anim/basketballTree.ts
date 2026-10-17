@@ -109,7 +109,11 @@ const CLIP_FOR: Record<BasketballAnimState, { clip: string; loop: boolean; fadeS
   sprint_dribble:  { clip: 'bball_dribble_run', loop: true, fadeSec: 0.12 },    // the sprint (78_06), its own pace
   crossover:       { clip: 'bball_crossover_left', loop: false, fadeSec: 0.12 },   // H1 H-05
   crossover_right: { clip: 'bball_crossover_right', loop: false, fadeSec: 0.12 },
-  protect:         { clip: 'bball_defend_stance', loop: true, fadeSec: 0.2 },
+  // H3b (owner 2026-10-16: "idle dribbling felt off"): THE PROTECT IS A DRIBBLE. It played the DEFENDER's stance — no ball arm, so the
+  // carry's reach dragged a stance arm after a ball it never bounced (16 cm off the ball at every top, the hand travelling 72 cm a
+  // bounce) for 96 % of a handler's time at rest. The shield is the body's (HoopsPosture's protect window, the carry's guard, the
+  // hips' sink) over the same dribble loop, quicker (REST_TEMPO).
+  protect:         { clip: 'bball_dribble_idle', loop: true, fadeSec: 0.2 },
   // ANIM CLEAN-UP (owner, 2026-09-18: "fix the off arm while running"). The DRIVE — a sprint at the rim with the ball —
   // played the plain run: both arms pumping while the ball-carry IK dragged the ball arm back to the bounce beside the
   // hip, so the off arm swung like a sprinter's and the ball arm stuck out behind. The dribbling sprint capture (78_06)
@@ -191,10 +195,20 @@ const CROSS_TWIN: Partial<Record<BasketballAnimState, BasketballAnimState>> = { 
 /** H2d: what a carrier state plays on a rig that has neither its capture nor a twin of it (the strafes and the backpedal it always played). */
 const CARRY_LEGACY: Partial<Record<BasketballAnimState, string>> = { carry_slide: 'strafe_left', carry_slide_right: 'strafe_right', carry_back: 'bball_defend_backpedal' };
 /** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops that have a `_left` twin — the loops a ball hand dribbles in. H2d (plan §4.19):
- *  the carrier's side and back dribbles join them (the side ones twin across, CROSS_TWIN); protect's stance has no ball arm. */
-export const LEFT_TWIN_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive', 'carry_slide', 'carry_slide_right', 'carry_back']);
+ *  the carrier's side and back dribbles join them (the side ones twin across, CROSS_TWIN). H3b: and protect, a dribble now. */
+export const LEFT_TWIN_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['idle_dribble', 'protect', 'walk_dribble', 'speed_dribble', 'sprint_dribble', 'drive', 'carry_slide', 'carry_slide_right', 'carry_back']);
 /** A dribble loop's left-hand twin (the name hoopsHand.leftDribbleTwins registers it under). */
 export const leftTwinOf = (clip: string): string => `${clip}_left`;
+/** H3b (owner 2026-10-16: "the bounce rhythm wrong"): the dribble AT REST plays quicker than its capture (CMU 06_12, one bounce in
+ *  0.77 s: 1.3 Hz, a lazy bounce), and the protect quicker again — low and hard. The carry's bounce locks to the clip's own hand
+ *  (ballCarry's clip lock), so the ball keeps this tempo too: 1.56 Hz at rest, 1.88 Hz in the protect. The two states share the
+ *  loop, so a change between them only eases the tempo (the loop carries on). TUNED (new). */
+export const REST_TEMPO: Partial<Record<BasketballAnimState, number>> = { idle_dribble: 1.2, protect: 1.45 };
+/** H3c: the STANDING states on the CMU 78 defensive stance capture — it sits ~40 cm under standing (HoopsPosture.DEFENSE_RAISE_M): the
+ *  bodies waiting in a near-kneeling squat. The slides and the backpedal sit as deep, but they MOVE: raised with the legs re-solved, a
+ *  slide's trailing leg swung through its push (thigh pops to 4,800°/s on the hero's slides, against none with the raise off — the same
+ *  takes, measured), so they keep their capture's depth. */
+export const DEEP_DEFENSE_STATES: ReadonlySet<BasketballAnimState> = new Set<BasketballAnimState>(['defend_idle', 'box_out']);
 
 /** LATERAL / BACKWARD travel, or null when the body is going where it is pointed. The window is deliberately wide
  *  (past 50° off the nose) so the facing slew's own catch-up does not flicker the loop on every turn. */
@@ -251,6 +265,8 @@ export class BasketballAnimTree {
   /** The stride rate for the loop that is running, smoothed so a cadence never stutters. */
   private strideFilter = new StrideRateFilter();
   private strideClip: string | null = null;
+  /** H3b: the loop the tree itself last played, while it is still the one playing (anything else the tree plays clears it). */
+  private loopPlaying: string | null = null;
   constructor(private animator: Pick<CharacterAnimator, 'play' | 'setPlaybackScale'> & Partial<Pick<CharacterAnimator, 'freezeAtEnd'>>) {}
   /** H2 (moveLegs): the body's legs layer, and whether the beat in flight runs it (a handle move's beat, MOVE_LEGS_BEAT). */
   private legs: MoveLegs | null = null;
@@ -315,19 +331,23 @@ export class BasketballAnimTree {
       if (c.loop) {
         this.token++; this.override = null;
         // adopt the new state's stride rate rather than sliding from the old one
-        const r0 = rateFor(c.state, input.speedMps ?? 0, this.ref);
+        const r0 = rateFor(c.state, input.speedMps ?? 0, this.ref) ?? REST_TEMPO[c.state] ?? null;
+        // H3b: a state that plays the loop already running (idle ↔ protect) keeps it: only the tempo eases (below). A replay at another
+        // speed restarted the clip from its first frame.
+        const carryOn = !handChanged && this.loopPlaying === c.clip;
         this.strideClip = c.loop ? c.clip : null;
-        if (r0 !== null) this.strideFilter.set(r0);
+        if (r0 !== null && !carryOn) this.strideFilter.set(r0);
         // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
         const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
-        this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });
+        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });
+        this.loopPlaying = c.clip;
       } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every
     // frame. Only locomotion states have a rate; a shot or a knockdown returns null and is left alone.
-    if (this.strideClip && !this.override && input.speedMps !== undefined) {
-      const want = rateFor(c.state, input.speedMps, this.ref);
+    if (this.strideClip && !this.override) {
+      const want = (input.speedMps !== undefined ? rateFor(c.state, input.speedMps, this.ref) : null) ?? REST_TEMPO[c.state] ?? null;   // H3b: the dribble's tempo at rest
       if (want !== null) this.animator.setPlaybackScale(this.strideClip, this.strideFilter.step(want, input.dtSec ?? 1 / 60));   // IMPROVE (2026-10-06) #9: the real frame's dt when the mode passes it
     }
     return c.state;
@@ -338,7 +358,7 @@ export class BasketballAnimTree {
 
   /** A mode-owned loop the tree never interrupts — until release(). */
   hold(clip: string, opts: TreeHoldOpts = {}): void {
-    this.token++;
+    this.token++; this.loopPlaying = null;
     this.override = { kind: 'hold', clip, state: null };
     this.current = null;
     this.animator.play(clip, { loop: true, fadeSec: opts.fadeSec ?? 0.12, speedRatio: opts.speedRatio ?? 1 });
@@ -361,10 +381,10 @@ export class BasketballAnimTree {
   get held(): string | null { return this.override?.clip ?? null; }
   get state(): BasketballAnimState | null { return this.override?.state ?? this.current; }
 
-  reset(): void { this.token++; this.override = null; this.current = null; this.settledState = null; }
+  reset(): void { this.token++; this.override = null; this.current = null; this.settledState = null; this.loopPlaying = null; }
 
   private playBeat(clip: string, opts: TreeBeatOpts, state: BasketballAnimState | null): void {
-    const tok = ++this.token;
+    const tok = ++this.token; this.loopPlaying = null;
     // H2 (moveLegs): a handle move's beat on a moving body runs the legs layer, seeded from the loop it cuts (its stride phase)
     this.legsBeat = !!this.legs && MOVE_LEGS_BEAT.test(clip);
     if (this.legsBeat) this.legs!.begin(this.strideClip);

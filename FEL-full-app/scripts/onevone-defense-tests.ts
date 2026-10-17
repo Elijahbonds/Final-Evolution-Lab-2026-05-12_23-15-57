@@ -155,7 +155,7 @@ function possession(defender: (t: number, rival: Vector3) => Vector3, opts: { se
 {
   type Play = { clip: string; loop: boolean; onEnd?: () => void; restart?: boolean };
   const plays: Play[] = [];
-  const fake = { play: (clip: string, o: Play) => { plays.push({ clip, loop: !!o.loop, onEnd: o.onEnd, restart: o.restart }); return null; } } as never;
+  const fake = { play: (clip: string, o: Play) => { plays.push({ clip, loop: !!o.loop, onEnd: o.onEnd, restart: o.restart }); return null; }, setPlaybackScale: () => {} } as never;   // (H3b: the tree's contract has setPlaybackScale — the rest tempo sets it on a mode that passes no speed)
   const BASE: AnimTreeInput = { speed01: 0, crossover: false, nearestDefender: 5, hasBall: true, shooting: false, dunking: false, driving: false, defending: false, bracing: false, staggered: false };
   const tree = new BasketballAnimTree(fake);
   tree.update(BASE); tree.update(BASE);

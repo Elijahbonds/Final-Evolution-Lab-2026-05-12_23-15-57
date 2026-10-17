@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { Bone, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
-import { mountBallCarry, movePushK, MOVE_PUSH_EASE, STRIDE_PHI_AT_STRIKE, LOCK_MIN_GAP_K, SNAP_TURN_RAD, type BallCarry, type CarryMoveEvent } from './ballCarry';
+import { mountBallCarry, movePushK, MOVE_PUSH_EASE, STRIDE_PHI_AT_STRIKE, LOCK_MIN_GAP_K, SNAP_TURN_RAD, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG, type BallCarry, type CarryMoveEvent } from './ballCarry';
 import { requestMove, type HandleHost } from './handleMotion';
 import { attachBallToHand } from './ballRig';
 import { pathFor, pathAt, PAUSIN_MAX_SEC } from './handlePaths';
@@ -351,7 +351,11 @@ describe('the modes\' wiring (U19)', () => {
 });
 
 describe('the contact schedule on the arms (plan §3.3)', () => {
-  it('between contacts the arm is the clip\'s (weight 0): a stub clip pose read back unchanged in the flight; on the ball the carry reaches for it', () => {
+  // H3d REWROTE the flight check (same intent: between contacts the CARRY does not drive the arm — the clip owns it). It read the clip's
+  // pose back exactly on every flight frame: the arm snapped from the reach to the clip in one frame (140° on this rig) — the move pops
+  // H3a found. The hand-over eases now (MOVE_EASE_SEC / MOVE_EASE_RATE_DEG / MOVE_ARM_RATE_DEG): in the flight the arm only ever goes
+  // TOWARD the clip's pose, no faster than the ease lets it, and gets there.
+  it('between contacts the arm is the clip\'s (weight 0): in the flight it eases to the stub clip pose and reaches it; on the ball the carry reaches for it', () => {
     const s = setup();
     const sh = s.r.nodes.LeftArm, el = s.r.nodes.LeftForeArm, rsh = s.r.nodes.RightArm;
     const clipSh = sh.rotationQuaternion!.clone(), clipEl = el.rotationQuaternion!.clone(), clipR = rsh.rotationQuaternion!.clone();
@@ -359,20 +363,25 @@ describe('the contact schedule on the arms (plan §3.3)', () => {
     const off = (a: Quaternion, b: Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(a, b)))) * 180 / Math.PI;
     let n = 0; while (n++ < 200 && !(n > 60 && s.carry.phase < 0.03)) s.d.frame(1 / 60, 0.3, true, clip);
     s.carry.runMove('crossover');
-    let inFlight = 0, onBall = 0;
+    let inFlight = 0, onBall = 0, reached = 0; let prevL: number | null = null, prevR: number | null = null;
+    const step = Math.max(MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG) / 60 + 1e-6;
     for (let i = 0; i < 40; i++) {
       const m0 = s.carry.move; if (!m0) break;
       s.d.frame(1 / 60, 0.3, true, clip);
       const m = s.carry.move; if (!m) break;
       // (the move's state is read after the frame; the pass drew the sample of this t)
-      if (m.reach.right === 0 && m.reach.left === 0) {   // no hand on it or fading onto / off it: both arms the clip's own
+      if (m.reach.right === 0 && m.reach.left === 0) {   // no hand on it or fading onto / off it: both arms heading to the clip's own
         inFlight++;
-        expect(off(sh.rotationQuaternion!, clipSh)).toBeLessThan(1e-3);   // the push arm (rig Left)
-        expect(off(rsh.rotationQuaternion!, clipR)).toBeLessThan(1e-3);   // the catch arm (rig Right)
-      }
+        const dL = off(sh.rotationQuaternion!, clipSh), dR = off(rsh.rotationQuaternion!, clipR);   // the push arm (rig Left), the catch arm (rig Right)
+        if (prevL !== null) { expect(dL).toBeLessThanOrEqual(prevL + 1e-6); expect(prevL - dL).toBeLessThanOrEqual(step); }
+        if (prevR !== null) { expect(dR).toBeLessThanOrEqual(prevR + 1e-6); expect(prevR - dR).toBeLessThanOrEqual(step); }
+        prevL = dL; prevR = dR;
+        if (dL < 1e-3 && dR < 1e-3) reached++;
+      } else { prevL = null; prevR = null; }
       if (m.reach.left === 1) { onBall++; expect(off(rsh.rotationQuaternion!, clipR)).toBeGreaterThan(0.5); }   // the catch: the carry's reach
     }
     expect(inFlight).toBeGreaterThan(0); expect(onBall).toBeGreaterThan(0);
+    expect(reached).toBeGreaterThan(0);   // the flight ends on the clip's own pose
     s.carry.dispose();
   });
 });
