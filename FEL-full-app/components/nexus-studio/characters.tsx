@@ -11,8 +11,8 @@
 //
 // studio-4b: THE CROWD — a character can be seated among a venue's fans (visual only; castLayer.ts), and EDIT IN THE CLOSET — a
 // character's code handed to the Closet Studio in another tab and the edited code brought back as one undo step, on this device
-// (lib/nexus-studio/castCloset.ts). Until the Closet's half lands (routed: it is the creator lane's file) the same panel offers
-// the manual path: copy the code, paste the edited one back.
+// (lib/nexus-studio/castCloset.ts; the Closet's half is in components/closet-view.tsx). The same panel also offers the manual
+// path: copy the code, paste the edited one back.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { UserRound, ClipboardPaste, Shirt, Trash2, Loader2, Users, PenLine, Copy, X } from 'lucide-react';

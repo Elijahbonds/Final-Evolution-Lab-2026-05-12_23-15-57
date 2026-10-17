@@ -10,8 +10,8 @@
 // Both keys are cleared when the Studio takes the return. A session goes stale after CLOSET_EDIT_TTL_MS. Everything read here is
 // untrusted (another tab, another build): shapes are checked, codes must be code-shaped, strings are capped.
 //
-// The Closet side (components/closet-view.tsx) is the creator lane's file: its change is ROUTED, not applied here (§12), and
-// the Studio offers the manual path meanwhile (copy the code; paste the edited one back).
+// The Closet side is in components/closet-view.tsx, the creator lane's file. It was routed from studio-4b and applied on
+// lane/closet-studio (§12.2, §12.5). The Studio also keeps the manual path: copy the code, paste the edited one back.
 //
 // Pure: storage is injected (storage.ts KV); no DOM, no fetch.
 
