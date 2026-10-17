@@ -490,14 +490,36 @@ no legal or policy copy.
   `fel.nexusStudio.closetEdit` with a session id and opens `/closet?studioEdit=<session>`; the Closet tab opens that ONE character,
   saves nothing to the account or the device's own look, and "Back to Nexus Studio" writes the edited code under
   `fel.nexusStudio.closetReturn`; the Studio hears it (a `storage` event, or on focus), **decodes it** and applies it as one undo
-  step ("Edit look in the Closet"); both keys are cleared. Stale (6 h), foreign-session and malformed keys are ignored. Until the
-  Closet's half lands, the same panel offers the manual way: copy the code, paste the edited one back.
-  **Routed, not applied:** the Closet's half is `components/closet-view.tsx` — the creator lane's file (LANES §3). The diff
-  (≈45 lines, additive; with no `?studioEdit=` the Closet is unchanged): read the session in the hydration effect and open one
-  slot from it; skip `writeLocalLook`, `save` and `buy` while editing; swap "Save Look" for "Back to Nexus Studio" and the
-  consent / slot bar / publish block for one line saying nothing is saved. It type-checks (`tsc` clean with it applied) and was
-  proven in the capture rig with it applied (§12.4); the file in the lane is untouched. The diff is §12.5, for the holder
-  (`git apply` clean against `dc8e9db7`).
+  step ("Edit look in the Closet"); both keys are cleared. Stale (6 h), foreign-session and malformed keys are ignored. The same
+  panel also offers the manual way: copy the code, paste the edited one back.
+  **The Closet's half is applied** (`lane/closet-studio`, owner 2026-10-16 "Apply it"; `components/closet-view.tsx` is the
+  creator lane's file, LANES §3). §12.5's diff went in as written (`git apply` clean), with three fixes, below. With no
+  `?studioEdit=` the Closet runs exactly as before, and the hand-off's storage is not touched. A session that `readClosetEdit`
+  rejects (stale, foreign or malformed), or a code that does not decode, also gives the normal Closet. In edit mode the hydration
+  effect opens one slot from the code and returns before any account fetch. `writeLocalLook`, `save` and `buy` are gated.
+  "Save Look" becomes "Back to Nexus Studio", and the consent, the slot bar (with Play as, New, Paste and Share) and the publish
+  card are replaced by one line saying nothing is saved. So no consent write, publish or second character can be reached either.
+  The HUD's Code button is hidden too: it opens the slot bar's paste, so with no slot bar it would do nothing (added here).
+  The three fixes:
+  1. "Back to Nexus Studio" sends **no name**. The slot label is the jersey-plate form of the Studio's name (`sanitizeStampText`:
+     upper case, 12 characters, A–Z 0–9), and this tab has no rename. So the diff's `slot.label` would have renamed "Nova" to
+     "NOVA" in the Studio on every round trip, and cut "Zoë" to "ZO".
+  2. When the Studio is no longer waiting, the diff's toast pointed at Share, which sits in the slot bar this tab hides. Now the
+     code is copied to the clipboard for the Studio's manual paste. If that fails, the toast names Photo › Code.
+  3. The session is read only when the param is present. `browserKV()` probes storage with a write, so the plain live `/closet`
+     no longer does anything new.
+  **Face numbers and the face scan** (coordinator follow-up, 2026-10-17). Edit mode has no consent step, so it adds no face data:
+  - The look goes back with its face sculpt numbers only if the code that came in carried them. A slot code holds the numbers
+    as `k.sliders`, which `decodeSlotCode` returns as `slot.sliders`. A code without them goes back without them, even after
+    a sculpt edit. The height and build are not "numbers" in the code format and always travel.
+  - The face-scan entry ("Scan My Face" and its capture) is hidden in edit mode, whatever `FACE_SCAN_ENABLED` says.
+  Tested in `components/closet/closet-studio-edit.test.tsx`: the whole ClosetView runs on the test hook runtime, with fetch and
+  storage stubbed and read back.
+  **Follow-ups (left as they are, for the creator lane):**
+  - In edit mode, the Body controls' note in `components/closet/character-controls.tsx` still says height and build stay on
+    this device "unless you allow saving look numbers above". That consent control is hidden there.
+  - The first-visit walkthrough's "save" step can't be completed in edit mode, which has no Save Look. It can only be
+    skipped.
 - **The rival — owner call, not built.** Tiebreak's rival is a body the MODE spawns: a tinted spawn → the roster's pick and its
   rotation (`rosterUrlFor`, `rotationFor`), its own name and look. Casting it is not data: the mode and the roster would have to
   hand that choice over (a mode code change, and the roster's say on whose body an opponent wears). Recorded for the owner.
@@ -546,17 +568,19 @@ hand-off, the privacy strip, the cast-name match, the CELL script's sanitiser an
 caught; the 4 that survived the first run were two weak tests (strengthened) and two dead checks (removed).
 
 **Limits / not done.**
-- The Closet's half of "Edit in the Closet" is routed, not applied (§12.2): until the creator lane (or the coordinator) applies the
-  diff, the button opens the account's own Closet and the manual path (copy / paste back) is the way.
+- The Closet's half of "Edit in the Closet" was routed from this lane and has since been applied, on `lane/closet-studio`
+  (§12.2, §12.5).
 - The replay event is unit-tested on the host; it is live only in a mode that replays (Football Rush, studio-4a's target).
 - Cast fans: desktop / high only (the phone keeps its card crowd); they idle (sit / stand) and do not join the crowd's cheers.
   Each is a skinned body: the editor's desktop meter read 27 bodies on the demo venue with the player + 3 fans cast (red against
   the phone's 16; the phone column never mounts cast fans). The baseline without them was not measured separately.
 - The explain summary on the rig is a stubbed answer; a real model's wording is the owner's to judge.
 
-### 12.5 Routed: the Closet's half of "Edit in the Closet" (`components/closet-view.tsx`, the creator lane's file)
+### 12.5 The Closet's half of "Edit in the Closet" (`components/closet-view.tsx`, the creator lane's file): applied
 
-Not applied in this lane. With no `?studioEdit=` in the URL every changed line is a no-op (the session reads as null).
+**Applied 2026-10-16 on `lane/closet-studio`** (owner: "Apply it"), with the three fixes listed in §12.2. The diff below is kept
+as history: it is what studio-4b routed, not what is in the file now. Read `components/closet-view.tsx` for the current code.
+As routed: with no `?studioEdit=` in the URL every changed line is a no-op (the session reads as null).
 
 ```diff
 --- a/FEL-full-app/components/closet-view.tsx

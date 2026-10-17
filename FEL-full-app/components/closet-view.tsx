@@ -48,6 +48,10 @@ import { fitsBudget, updatePart } from '@/lib/creator/look/parts';
 import { REGION_LABELS, newLayer, updateLayer } from '@/lib/creator/look/paint';
 import { clothLabel, randomiseClothes, resolveCloth } from '@/lib/creator/look/clothes';
 import type { FeelCue } from '@/lib/babylon/creator/studio/feel';
+// NEXUS STUDIO "Edit in the Closet" (studio-4b, docs/NEXUS-STUDIO.md §12): /closet?studioEdit=<session> opens ONE character from
+// the Studio's hand-off on this device, saves nothing to the account or the device's look, and hands the edited code back.
+import { CLOSET_EDIT_PARAM, readClosetEdit, writeClosetReturn, type ClosetEditSession } from '@/lib/nexus-studio/castCloset';
+import { browserKV } from '@/lib/nexus-studio/storage';
 
 // The 3D preview is client-only (Babylon engine on a canvas) — never SSR it.
 const AvatarPreview = dynamic(() => import('@/components/closet/avatar-preview'), { ssr: false });
@@ -138,7 +142,7 @@ const PASTE_ERRORS: Record<DecodeError, string> = {
   invalid: 'That code holds no character.',
 };
 
-export function ClosetView({ adult = false, fullBleed = false, faceScan = false }: { adult?: boolean; fullBleed?: boolean; /** STORE-READY B1: /closet passes isFaceScanEnabled(); default OFF everywhere else (dev/studio). */ faceScan?: boolean }) {
+export function ClosetView({ adult = false, fullBleed = false, faceScan: faceScanFlag = false }: { adult?: boolean; fullBleed?: boolean; /** STORE-READY B1: /closet passes isFaceScanEnabled(); default OFF everywhere else (dev/studio). */ faceScan?: boolean }) {
   // CREATOR-PLAN phase 4a (owner, 2026-10-06: "5 max slots"): the Closet edits ONE CHARACTER at a time, the selected
   // slot. Its working copy is an undo history of that slot alone (phase 1's history held the whole face, slots and all,
   // in every step): switching slots is not a step, and each slot keeps its own history while you switch between them.
@@ -199,10 +203,29 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
   const [offer, setOffer] = useState<{ before: CreatorSlotV2 } | null>(null);
   /** the look each slot had when it was opened or last saved — what Before shows */
   const baseline = useRef(new Map<string, CreatorSlotV2>());
+  /** NEXUS STUDIO: set when this tab edits a Studio character (nothing is read from or saved to the account then).
+   *  `numbers`: the code that came in carried face sculpt numbers (the code's `k.sliders`); only then do they go back. */
+  const [studioEdit, setStudioEdit] = useState<(ClosetEditSession & { numbers: boolean }) | null>(null);
+  /** STORE-READY B1's flag, and never while editing a Studio character: a scan is face data, and that tab has no consent step */
+  const faceScan = faceScanFlag && !studioEdit;
 
   useEffect(() => {
     (async () => {
       try {
+        // only a hand-off URL touches the hand-off (browserKV probes storage with a write; a plain /closet does nothing new)
+        const param = new URLSearchParams(window.location.search).get(CLOSET_EDIT_PARAM);
+        const se = param ? readClosetEdit(browserKV(), param) : null;
+        const sr = se ? await decodeSlotCode(se.code) : null;
+        if (se && sr?.ok) {
+          const s: CreatorSlotV2 = {
+            id: 'studio', label: sanitizeStampText(se.name) || 'STUDIO', body: sr.slot?.body ?? 'male', base: sr.base, doc: sr.doc, equipped: { ...defaultEquipped() },
+            ...(sr.slot?.sliders ? { sliders: sr.slot.sliders } : {}), ...(sr.slot?.frame ? { frame: sr.slot.frame } : {}), ...(sr.slot?.presentation ? { presentation: sr.slot.presentation } : {}),
+          };
+          setStudioEdit({ ...se, numbers: !!sr.slot?.sliders });
+          setSlots([s]); setActiveId(s.id); setSelectedId(s.id); setHist(createHistory(s));
+          setSavedSig(JSON.stringify([[s], s.id])); baseline.current = new Map([[s.id, s]]);
+          return;
+        }
         // CREATOR-PLAN phase 4a: hero-body says which body this account plays and whether it owns a scan (a slot may pick it)
         const [res, hb] = await Promise.all([
           fetch('/api/v1/closet'),
@@ -240,9 +263,9 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
   const storedFace = useMemo(() => buildStoredFace(allSlots, activeId), [allSlots, activeId]);
   const activeEquippedNow = useMemo(() => ({ ...defaultEquipped(), ...(allSlots.find((s) => s.id === activeId)?.equipped ?? {}) }), [allSlots, activeId]);
   useEffect(() => {
-    if (!hydrated.current || loading) return;
+    if (!hydrated.current || loading || studioEdit) return;   // a Studio character is not the device's look
     writeLocalLook({ ...(readLocalLook() ?? {}), face: storedFace as FaceConfig, equipped: activeEquippedNow, jersey });
-  }, [storedFace, activeEquippedNow, jersey, loading]);
+  }, [storedFace, activeEquippedNow, jersey, loading, studioEdit]);
   const sigNow = useMemo(() => JSON.stringify([allSlots, activeId]), [allSlots, activeId]);
 
   /** Open a face's characters (a look saved before slots becomes one slot), each wearing `eq` unless it has its own. */
@@ -310,6 +333,23 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
     return null;
   };
   const shareCode = (numbers: boolean) => encodeSlotCode(slot, { numbers });
+  /** NEXUS STUDIO: the edited character back to the Studio as its own share code. The face sculpt numbers go back only if the
+   *  code that came in carried them, so a round trip never adds numbers the Closet's consent step never saw. */
+  const backToStudio = async () => {
+    if (!studioEdit) return;
+    // No name goes back: the label here is the jersey-plate form of the Studio's name (upper case, 12 characters) and this
+    // tab has no rename, so sending it would only rename "Nova" to "NOVA" in the Studio on every round trip.
+    const code = await encodeSlotCode(slot, { numbers: studioEdit.numbers });
+    if (!writeClosetReturn(browserKV(), studioEdit.session, code)) {
+      // Share sits in the slot bar, which this tab does not show: copy the code here for the Studio's manual paste
+      const copied = await (navigator.clipboard?.writeText(code).then(() => true, () => false) ?? Promise.resolve(false));
+      toast.error(copied ? 'The Studio is no longer waiting for this look. Its code is copied: paste it into the character in Nexus Studio.'
+        : 'The Studio is no longer waiting for this look. Photo › Code copies its code to paste into Nexus Studio.');
+      return;
+    }
+    toast.success('Sent back to Nexus Studio.');
+    window.close();
+  };
 
   const accent = useMemo(() => skins.find((s) => s.id === skinCardId)?.accent || '#00E5FF', [skins, skinCardId]);
   // Draft palette — the same mapping resolveIdentity() applies at spawn time,
@@ -568,7 +608,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
 
   const buy = async (itemId: string) => {
     const w = getWearable(itemId);
-    if (!w) return;
+    if (!w || studioEdit) return;   // NEXUS STUDIO: a Studio character buys nothing on the account
     setBuying(itemId);
     try {
       const res = await fetch('/api/v1/closet/buy', {
@@ -586,6 +626,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
 
   // Phase 4a: a save stores every character and which one is played; "Play as" is a save with another one playing.
   const save = async (playAs?: string) => {
+    if (studioEdit) return;   // NEXUS STUDIO: a Studio character is never saved over the account's Closet
     setSaving(true);
     try {
       const active = playAs ?? activeId;
@@ -662,9 +703,15 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
             )}
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {studioEdit ? (
+              <button onClick={() => { void backToStudio(); }} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300">
+                <Check className="h-4 w-4" /> Back to Nexus Studio
+              </button>
+            ) : (
             <button onClick={() => save()} disabled={saving} className="pointer-events-auto flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2 max-md:px-3 max-md:py-1.5 font-display text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_18px_rgba(0,229,255,0.35)] transition hover:bg-cyan-300 disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Save Look
             </button>
+            )}
             <div className="flex gap-1" role="group" aria-label="Camera">
               {STUDIO_SHOTS.map((sh, i) => <button key={sh} type="button" className={hudBtn} onClick={() => act({ shot: sh })} title={`${sh} (${i + 1})`}>{sh}</button>)}
             </div>
@@ -673,7 +720,8 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
               <button type="button" className={hudBtn} style={on(compare)} onClick={() => setCompare((c) => !c)} aria-pressed={compare} title="Before / after (B, pad Select)"><SplitSquareHorizontal className="h-3.5 w-3.5" /> <span className="max-md:hidden">Before</span></button>
               <button type="button" className={hudBtn} style={on(showPose)} onClick={() => setShowPose((v) => !v)} aria-pressed={showPose} title="Poses and venue light"><Sun className="h-3.5 w-3.5" /> <span className="max-md:hidden">Pose</span></button>
               <button type="button" className={hudBtn} onClick={() => setPhotoOpen(true)} title="Photo mode (P, pad Start)"><Camera className="h-3.5 w-3.5" /> <span className="max-md:hidden">Photo</span></button>
-              <button type="button" className={hudBtn} onClick={() => setOpenPaste((n) => n + 1)} title="Paste a share code as a new character"><ClipboardPaste className="h-3.5 w-3.5" /> <span className="max-md:hidden">Code</span></button>
+              {/* NEXUS STUDIO: hidden while editing a Studio character (it opens the slot bar's paste, which that tab does not show) */}
+              {!studioEdit && <button type="button" className={hudBtn} onClick={() => setOpenPaste((n) => n + 1)} title="Paste a share code as a new character"><ClipboardPaste className="h-3.5 w-3.5" /> <span className="max-md:hidden">Code</span></button>}
             </div>
           </div>
         </div>
@@ -690,7 +738,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
           </div>
         )}
 
-        {offer && (
+        {offer && !studioEdit && (   /* NEXUS STUDIO: one character only — no "keep a copy" slot */
           <div role="status" className="absolute left-1/2 top-[7.5rem] z-10 flex w-[min(420px,calc(100%-1.5rem))] -translate-x-1/2 flex-wrap items-center gap-2 rounded-xl border border-[#FFD700]/40 bg-[#0c0c11]/92 px-3 py-2 text-[12px] text-white/80 backdrop-blur">
             <span className="flex-1">Big change. Keep the look from before it as a new character?</span>
             <button type="button" onClick={keepBefore} className="rounded-md bg-[#FFD700]/90 px-2.5 py-1 font-display text-[11px] font-bold uppercase text-black">Keep a copy</button>
@@ -720,12 +768,16 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
         <div className="mb-3 md:hidden"><WalkthroughCard state={walk} onNext={() => walkDo('next')} onSkip={() => walkDo('skip')} /></div>
         <div className="mb-4 space-y-3">
           <p className="text-[11px] text-white/45">Design your avatar&apos;s face, gear, and card skin. Everyone belongs here — the options are built to represent you. Tap the body to choose a region, drag the stage to spin, pinch or scroll to zoom.</p>
+          {studioEdit ? (
+            <p className="rounded-lg border border-cyan-400/30 bg-cyan-400/5 px-3 py-2 text-[12px] text-white/75" role="status">Editing <b>{studioEdit.name}</b> for Nexus Studio. Nothing here is saved to your Closet; <b>Back to Nexus Studio</b> hands the look back.</p>
+          ) : (<>
           <LookConsent adult={adult} consent={consent} onChange={(next) => { setConsent(next); writeConsent(next); }} />
           {/* CREATOR-PLAN phase 4a: the characters (up to 5) — select one to edit it, "Play as" to wear it in every mode */}
           <SlotBar slots={allSlots} selected={selectedId} active={activeId} dirty={dirty}
             onSelect={selectSlot} onPlayAs={(id) => { void save(id); }} onNew={newCharacter} onDuplicate={duplicateCharacter}
             onRename={renameCharacter} onDelete={deleteCharacter} onPaste={pasteCharacter} onShare={shareCode} accent={accent} openPaste={openPaste} />
           <PublishLookAsCard />{/* PIPELINES (2026-10-06): publish the look as a fashion card — under the characters, beside the Studio's Save Look */}
+          </>)}
         </div>
 
         {faceScan && scanning && (
