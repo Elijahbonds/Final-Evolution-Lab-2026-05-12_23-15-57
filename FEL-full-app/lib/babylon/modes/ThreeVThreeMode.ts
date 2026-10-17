@@ -959,11 +959,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           mover: ai ? new AiMover(aiKind === 'teammate' ? MATE_RUN_MPS : FOE_RUN_MPS) : null, plant: char.meshes[0] ? new FootPlant(char.skeleton, char.meshes[0] as never) : null, wasPlanting: false,
           lod: 0, lodMesh: char.meshes.find((m) => !!m.skeleton) ?? char.meshes[0] ?? null, feedKept: null, feedOdd: false };   // IMPROVE (2026-10-06) #14
         body.posture = mountPostureLayer(ctx.scene, char.skeleton, char.root, () => postureFeed(body), `3V3-PP-${ai ? aiKind : 'me'}`);   // IMPROVE (2026-10-06) #14: through the level of detail
-        if (!ai) { meSink?.dispose(); meSink = mountLandingAbsorb(ctx.scene, char.skeleton, char.root, { auto: false, first: true }); }   // H3b: first — the carry reaches for the ball off the sunk body
         // HOOPS MOTION phase 3c: THE MOTION LAYERS, mounted here (plan §3: "3v3 inside spawnBody") — the drag insert-first, the side lean
         // right after this body's posture layer; the ball and the hinge (the arms' last writer) come once the carries are on
         body.layers = mountMotionLayers({ scene: ctx.scene, skeleton: char.skeleton, root: char.root, hinge: false });
         if (ai) body.layers.setGate(() => body.lod === 0);   // IMPROVE (2026-10-06) #14: a far or off-screen off-ball body skips the drag and the lean
+        if (!ai) { meSink?.dispose(); meSink = mountLandingAbsorb(ctx.scene, char.skeleton, char.root, { auto: false, first: true }); }   // H3b: first — the carry reaches for the ball off the sunk body
         return body;
       };
 

@@ -592,10 +592,11 @@ describe('the dribble at rest keeps the clip\'s time (H3b clip lock)', () => {
     attachBallToHand(r.ball, r.sk, 'LeftHand');
     const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
     const d = driver(scene, carry, r.ball);
-    const el = r.nodes.LeftForeArm; let t = 0; const atTops: number[] = [], wraps: number[] = [];
+    const sh = r.nodes.LeftArm, el = r.nodes.LeftForeArm, clipSh = sh.rotationQuaternion!.clone(); let t = 0; const atTops: number[] = [], wraps: number[] = [];
     let prevPh = 0;
     for (let i = 0; i < Math.round(sec * 60); i++) {
       t += 1 / 60;
+      sh.rotationQuaternion!.copyFrom(clipSh);   // a clip poses the whole arm every frame (the reach's last solve never survives it)
       el.rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), 0.4 + 0.5 * Math.sin((2 * Math.PI * t) / T));
       d.frame(1 / 60, 0, true);
       const ph = carry.phase; if (ph < prevPh) wraps.push(t); prevPh = ph;
@@ -619,8 +620,8 @@ describe('the dribble at rest keeps the clip\'s time (H3b clip lock)', () => {
     attachBallToHand(r.ball, r.sk, 'LeftHand');
     const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
     const d = driver(scene, carry, r.ball);
-    const el = r.nodes.LeftForeArm, still = el.rotationQuaternion!.clone(); const wraps: number[] = []; let prev = 0, t = 0;
-    for (let i = 0; i < 360; i++) { t += 1 / 60; el.rotationQuaternion!.copyFrom(still); d.frame(1 / 60, 0, true); if (carry.phase < prev) wraps.push(t); prev = carry.phase; }
+    const sh = r.nodes.LeftArm, el = r.nodes.LeftForeArm, stillSh = sh.rotationQuaternion!.clone(), still = el.rotationQuaternion!.clone(); const wraps: number[] = []; let prev = 0, t = 0;
+    for (let i = 0; i < 360; i++) { t += 1 / 60; sh.rotationQuaternion!.copyFrom(stillSh); el.rotationQuaternion!.copyFrom(still); d.frame(1 / 60, 0, true); if (carry.phase < prev) wraps.push(t); prev = carry.phase; }
     const gaps = wraps.slice(1).map((w, i) => w - wraps[i]);
     for (const g of gaps) expect(Math.abs(g - 1 / HOOPS_DRIBBLE.hzIdle)).toBeLessThan(0.04);
     carry.dispose();
@@ -636,6 +637,7 @@ describe('the protect (H3b setGuard)', () => {
     const d = driver(scene, carry, r.ball);
     const local = (p: Vector3) => p.subtract(r.root.getAbsolutePosition()).applyRotationQuaternion(Quaternion.Inverse(r.root.rotationQuaternion!));
     const ballZ = () => { const zs: number[] = []; for (let i = 0; i < 60; i++) { d.frame(1 / 60, 0, true); zs.push(local(r.ball.getAbsolutePosition()).z); } return zs.reduce((a, b) => a + b, 0) / zs.length; };
+    ballZ();   // (past the activation's fade from the palm)
     const z0 = ballZ();
     carry.setGuard(1); ballZ();   // (eased in over GUARD_SEC)
     const z1 = ballZ();
@@ -648,6 +650,23 @@ describe('the protect (H3b setGuard)', () => {
     expect(Math.min(...moving)).toBeGreaterThan(z0 - 0.02);   // on the move the guard lets go (the push ahead takes over)
     carry.setGuard(0); ballZ();
     expect(Math.abs(ballZ() - z0)).toBeLessThan(0.03);        // let go at rest: back where it bounced
+    carry.dispose();
+  });
+});
+
+// H3b: a clip that does NOT key the arm leaves it where the carry's reach drew it; the clip clock must not read that as the clip's hand
+// (it locked to its own reach: on this rig, whose arm nothing re-poses, the hop test's bounce never reached the floor)
+describe('the clip clock ignores a held pose (H3b)', () => {
+  it('nothing re-poses the arm: the bounce stays on its own clock', () => {
+    const scene = new Scene(new NullEngine());
+    const r = rig(scene);
+    attachBallToHand(r.ball, r.sk, 'LeftHand');
+    const carry = mountBallCarry({ scene, ball: r.ball, root: r.root, skeleton: r.sk, hoops: true });
+    const d = driver(scene, carry, r.ball);
+    const wraps: number[] = []; let prev = 0, t = 0;
+    for (let i = 0; i < 360; i++) { t += 1 / 60; d.frame(1 / 60, 0, true); if (carry.phase < prev) wraps.push(t); prev = carry.phase; }
+    const gaps = wraps.slice(1).map((w, i) => w - wraps[i]);
+    for (const g of gaps) expect(Math.abs(g - 1 / HOOPS_DRIBBLE.hzIdle)).toBeLessThan(0.04);
     carry.dispose();
   });
 });

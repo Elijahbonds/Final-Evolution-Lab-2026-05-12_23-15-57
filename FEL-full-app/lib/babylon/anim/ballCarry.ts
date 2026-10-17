@@ -447,6 +447,16 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   // last top, the last top's time, the period between tops, and how many tops this hand has had
   let handY1 = Number.NaN, handY2 = Number.NaN, handLow = Number.POSITIVE_INFINITY, handTopAt = Number.NEGATIVE_INFINITY, handPeriod = 0.77, handTops = 0;
   let handClockSide: 'Left' | 'Right' | null = null;
+  // …and where this carry DREW that hand last frame (root-local), and whether its reach was on: a clip that does not key the arm leaves
+  // the arm where the reach put it, and that is the reach's own motion, not the clip's — read as one, the clock locks to itself
+  const drawnHand = new Vector3(), _hl = new Vector3(), _hq = new Quaternion(); let drawnHandAt = -1, drawnHandSide: 'Left' | 'Right' | null = null, reachedAt = -1;
+  const handRootLocal = (sd: 'Left' | 'Right', out: Vector3): boolean => {
+    const n = handNodes[sd]; if (!n) return false;
+    n.computeWorldMatrix(true); opts.root.computeWorldMatrix(true);
+    Quaternion.InverseToRef(opts.root.absoluteRotationQuaternion ?? Quaternion.Identity(), _hq);
+    n.getAbsolutePosition().subtractToRef(opts.root.getAbsolutePosition(), out).applyRotationQuaternionInPlace(_hq);
+    return true;
+  };
   let guardTarget = 0, guardK = 0;   // H3b: the protect (setGuard)
   const pg: DribbleParams = { ...p };   // the stroke with the protect's palm drop (written each pass; no garbage)
   // HOOPS MOTION phase 4b (U20): the last strike of EACH foot (the athlete's side it is drawn on), so a hand change re-seeds the lock from
@@ -572,7 +582,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     // H3b: AT REST, THE CLIP'S HAND (CLIP_PHI_AT_PEAK). Read before this pass reaches for anything: the hand as the clip posed it.
     const hn = active && !mv && rootSpeed < CLIP_LOCK_MAX_MPS ? handNodes[side] : null;   // (tops counted at rest only: a walk's arm is not the idle's)
     if (!hn || handClockSide !== side) { handY1 = handY2 = Number.NaN; handLow = Number.POSITIVE_INFINITY; handTops = 0; handClockSide = hn ? side : null; }
-    if (hn) {
+    const held = !!hn && drawnHandAt === stamp - 1 && reachedAt === stamp - 1 && drawnHandSide === side && handRootLocal(side, _hl) && Vector3.DistanceSquared(_hl, drawnHand) < 1e-6;
+    if (hn && !held) {
       hn.computeWorldMatrix(true);
       const y = hn.getAbsolutePosition().y - rp.y;
       if (handY1 > handY2 && handY1 >= y && handY1 - handLow > CLIP_PEAK_MIN_M) {   // last frame was a top
@@ -581,8 +592,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         if (gap > 0.25) { handTopAt = at; handTops++; handLow = handY1; }
       }
       handLow = Math.min(handLow, y); handY2 = handY1; handY1 = y;
-      if (!lockHz && rootSpeed < CLIP_LOCK_MAX_MPS && handTops >= 2 && clock - handTopAt < 2 * handPeriod) lockHz = strideLockHz(phase, clock - handTopAt, handPeriod, CLIP_PHI_AT_PEAK, CLIP_LOCK_GAIN, CLIP_LOCK_HZ_MAX);
     }
+    if (hn && !lockHz && rootSpeed < CLIP_LOCK_MAX_MPS && handTops >= 2 && clock - handTopAt < 2 * handPeriod) lockHz = strideLockHz(phase, clock - handTopAt, handPeriod, CLIP_PHI_AT_PEAK, CLIP_LOCK_GAIN, CLIP_LOCK_HZ_MAX);
   };
   /** The two-hand chest carry (3PT's jog): each palm on its side of the ball, solved off this frame's shoulders. */
   const applyHold = (dt: number): void => {
@@ -688,6 +699,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** After the frame rendered: the ball as drawn, and (while held) the ball arm's locals as drawn. */
   const sampleDrawn = (): void => {
     opts.ball.computeWorldMatrix(true); drawnBall.copyFrom(opts.ball.getAbsolutePosition()); drawnAt = stamp;
+    if (active && !mv && handRootLocal(side, drawnHand)) { drawnHandAt = stamp; drawnHandSide = side; }   // (H3b: the clip clock's held-pose read)
     const held = ballHandNow();
     if (held) {
       const bones = armOf[held];
@@ -965,6 +977,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
       const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6));
       reachShaped(arm, handT, pole, w * armW * ks, frameDt, stamp);
+      if (w * armW * ks > 0.05) reachedAt = stamp;   // (H3b: the clip clock's held-pose read)
       if (prevArm && ks < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - ks), frameDt, stamp);
       if (!(offArm && (lastSpeed01 > 0.35 || guardK > 0.01))) offW = 0;
       if (offArm && lastSpeed01 > 0.35) {

@@ -34,8 +34,8 @@ describe('DefenderBrain — the press keeps PRESS_GAP off a standing handler (H3
       expect(Math.min(...rows.map((r) => r.d))).toBeGreaterThan(0.9);
     });
   }
-  it('a defender who starts inside the gap backs out to it', () => {
+  it('a defender who starts inside the gap backs out to it (to within the press\'s 0.2 m settle)', () => {
     const rows = standOff(new Vector3(0, 0, 6.5), 0.6);
-    expect(rows[rows.length - 1].d).toBeGreaterThan(DefenderBrain.PRESS_GAP - 0.1);
+    expect(rows[rows.length - 1].d).toBeGreaterThan(DefenderBrain.PRESS_GAP - 0.2 - 1e-6);
   });
 });
