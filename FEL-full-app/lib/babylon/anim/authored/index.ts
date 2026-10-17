@@ -26,7 +26,7 @@ import { buildJuke, buildSpinMove, buildTackledFall, buildCarryRun, buildTouchdo
 import { buildHitReact, buildKnockdown, buildGuardStep, buildShuffle, buildBlockHold, buildGuardImpact, buildParry, buildFloorHold, buildGetUp, buildWindupHold, buildEvade, buildLeanDodge, buildCombatRoll, buildCombatJump, buildElbow, buildSpinElbow } from './karate';
 import { buildFreeRunAirHold, buildFreeRunTuck, buildFreeRunSlide } from './freerun';
 import {
-  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildMomentumCross, buildBtbSlide, buildHesiV2, buildYoyoV2, buildPausin, buildJab, buildPivotV2, buildSnatchBackV2, buildShimmyQuick, buildDefRetreat, buildDefLunge, buildDefStandup, buildDefCrossRun, buildStepbackRival, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
+  buildDribbleIdle, buildIdleStandHoops, buildCrossover, buildMomentumCross, buildBtbSlide, buildHesiV2, buildYoyoV2, buildPausin, buildJab, buildPivotV2, buildSnatchBackV2, buildShimmyQuick, buildDefRetreat, buildDefLunge, buildDefStandup, buildDefCrossRun, buildStepbackRival, buildSkipGather, buildHesi, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble,
   buildDoubleCross, buildSnatchBack, buildShammgod, buildYoyo, buildAnkleStumble, buildAnkleSlip, buildStepbackGather, buildLayupGather, buildMikan, buildUpAndUnder, buildFingerRoll, buildDefendSlide, buildBlockReach, buildStealReach, buildFollowThrough,
   buildPullupGather, buildFloater, buildHandUp, buildScreenSet,   // HOOPS-MOVE-KIT-A
   buildLandAbsorb,   // HOOPS-DEPTH S4
@@ -208,6 +208,8 @@ export function registerAuthoredClips(
     ['bball_def_cross_run_left', () => buildDefCrossRun(scene, skeleton, 'left')],     // H2c: the crossover step
     ['bball_def_cross_run_right', () => buildDefCrossRun(scene, skeleton, 'right')],
     ['bball_stepback_rival', () => buildStepbackRival(scene, skeleton)],                // H2c (plan §4.21)
+    ['bball_skip_gather_left', () => buildSkipGather(scene, skeleton, 'left')],         // H2e: the skip gather
+    ['bball_skip_gather_right', () => buildSkipGather(scene, skeleton, 'right')],
     ['bball_hesi', () => buildHesi(scene, skeleton)],
     // THE HANDLE (2026-09-16): HandleSystem's twelve moves had three clips between them
     ['bball_in_and_out_left', () => buildInAndOut(scene, skeleton, 'left')],

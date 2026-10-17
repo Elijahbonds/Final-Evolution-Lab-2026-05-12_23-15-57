@@ -157,7 +157,7 @@ import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: th
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
-import { trickFromFlick, trickWindow, judgeFlick, trickPct, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
+import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
   planGather, gatherWish, gatherLabel, gatherTravel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
@@ -187,6 +187,8 @@ import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { AiMover } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
+import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, type DoubleTapRead } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
+import { familyFromStick, FAMILY_PICK_K, CONTEST_TRICK, contestTricksOn, trickPctFor, putbackDunkOn, PUTBACK_DUNK } from '../core/GameDunks';   // H2e: more dunks
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';
 import { rightHandDunks, dunkHandPass } from '../anim/dunkHand';   // DUNK MOTION phase 11: right-handed game dunks
@@ -563,6 +565,10 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** HOOPS MOTION phase 3b: the rival's movement — his slide at 3.6 m/s (sprint 1.2×) and his drive's own wish, on the hero's accel 26 /
    *  decel 34 (it was unit steer × 3.6 in one frame: 216 m/s²). */
   const foeMover = new AiMover(3.6);
+  let squeezeAt = -1, squeezeHeldWas = false; const squeezeVel = new Vector3();   // H2e: the last squeeze (its time and velocity), for the double tap
+  let tapRelease: ReturnType<typeof meterRelease> | 'pump' | null = null;   // H2e: the first press's quick release, held while the hop is still on
+  const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
+    speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)
   let foeReact: DefReaction | null = null;   // H2c: the rival's read of a fake — his mover takes the step (core/DefenderReact)
   let lastFoeStepState = '';   // H2c (dev log): the rival's last tree state, for the stepping states' lines
@@ -740,7 +746,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'mine'; carrying = true; shooting = false; dunking = false; defPhase = 'over';
     currentShot = null; myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     arc.active = false;
     meShotWin = 'none'; foeShotWin = 'none'; dunkFlight = null; dunkFlush = null; meLandSec = 0; meCelebrateSec = 0;   // BIOMECH-HOOPS-WAVE1
@@ -1466,7 +1472,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (gather.t >= gather.plan.sec) {
             const plan = gather.plan; gather = null;
             // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
-            if (plan.then && plan.then !== 'rise') startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec);
+            if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, defPos, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather lays it off the high glass
             else beginRise();
           }
         }
@@ -1860,8 +1866,18 @@ export const OneVOneMode: ModeDefinition = (() => {
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
         if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press('shot');
+        { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP — a second Square inside HOP_TAP_SEC of the first, on a drive, turns the
+          // gather that press started (or the pump its quick release made) into the hop step (core/FinishFootwork)
+          const held = meSlot.intent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
+          if (edge && carrying && !dunking && !posting && hopOnDoubleTap(tapRead())) {
+            if (finish) { finish = null; contact?.setAirborne('me', false); me.root.position.y = 0; }
+            gather = null; shooting = false; tapRelease = null;   // the held release is the hop's now: the second press is its meter
+            if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; console.info('[1V1-MOVE] hop step on the double tap'); }
+          }
+        }
         if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
+          squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null;   // H2e: the double tap reads this press
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can
           // NEVER be inside DUNK_RANGE (2.8 m), so the drive dunk had never fired in play (measured: every squeeze at speed
           // inside 2.6 m of the rim metered a jumper). The range is a floor distance; judge it against the rim's floor point.
@@ -1921,10 +1937,12 @@ export const OneVOneMode: ModeDefinition = (() => {
           // a quick release out of the seal was an EARLY hook, never a fake. Let go inside the pump window before the hop
           // has really left and the hook / fade is cancelled into the pump; the step-through / up-and-under follows.
           const postPump = !!finish && (finish.plan.style === 'hook' || finish.plan.style === 'fadeaway') && finish.t < PUMP_MAX_SEC;
-          if (meSlot.intent.action && isPumpFake(t * shotMeter.durationSec) && (!finish || postPump)) {
-            if (finish) { finish = null; me.root.position.y = 0; contact?.setAirborne('me', false); meAnimTree.release(); }
-            pumpFake(ctx, defPos);
-          }
+          const pumpNow = isPumpFake(t * shotMeter.durationSec) && (!finish || postPump);
+          const doPump = (): void => { if (finish) { finish = null; me.root.position.y = 0; contact?.setAirborne('me', false); meAnimTree.release(); } pumpFake(ctx, defPos); };
+          // H2e: a double tap's FIRST release is held while a second press could still make the hop (core/FinishFootwork), then sent as taken
+          if (meSlot.intent.action && !tapRelease && !posting && tapReleaseHeld(tapRead())) { tapRelease = pumpNow ? 'pump' : meterRelease(); console.info('[1V1-MOVE] tap release held for the double tap'); }
+          else if (tapRelease) { if (!tapReleaseHeld(tapRead())) { const r = tapRelease; tapRelease = null; if (r === 'pump') doPump(); else { stickShot = null; releaseJumper(ctx, r); } } }
+          else if (meSlot.intent.action && pumpNow) doPump();
           else if (meSlot.intent.action || t >= 1 || (stickShot?.started && Math.hypot(postStick.x, postStick.y) < 0.35)) { stickShot = null; releaseJumper(ctx, meterRelease()); }   // POST HOOK: the stick let go = the release
         }
         pumpWindow = Math.max(0, pumpWindow - dt);
@@ -2396,7 +2414,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
-    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE;
+    threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null;
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false;
@@ -2501,6 +2519,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     box.fga++;   // IMPROVE (2026-10-06) #4
     meShotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
     let trickThrown = false;                       // one trick per flight: the stick is a commitment, not a masher
+    let familyPicked = !!force, trickArmed = true;   // H2e: the family by the stick at the takeoff; the trick stick waits for the stick to come home after it
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
     const from = me.root.position.clone();
     const landing = new Vector3(RIM.x, 0, RIM.z + DRIVE_DUNK.landAheadZ);
@@ -2510,6 +2529,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     const c = contestDrive(from, landing, defenderPos, defenderPos ? foeVelLast : null, kind === 'standing' ? 'dunk' : kind);
     if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
     driveContest = c;
+    // H2e: on a breakaway with the game going my way the trick stick throws the dunk contest's four (core/GameDunks)
+    const contestTricks = contestTricksOn({ contested: c.contested, nearestDefenderM: defenderPos ? distXZ(from, defenderPos) : Infinity, momentum01: mbus.score01 });
     // SHOWTIME (owner, 2026-09-17): R2 in, the right stick held BACK on an open lane — or any contact dunk — and the
     // dunk contest's vocabulary comes to the game: a long flight with a slow hang, a side camera, and a flush you TIME.
     const showtime = showtimeAsked(kind, lookY);
@@ -2556,7 +2577,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const lateral01 = speedNow > 0.1 && toRimNow2.lengthSquared() > 1e-4
       ? Math.min(1, Math.abs(driveDir.x * toRimNow2.normalize().z - driveDir.z * toRimNow2.x) / speedNow)
       : 0;
-    const picked = force ?? (showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
+    let picked: HoopsDunk = force ?? (showtime ? pickShowtime({ roll, contact: kind === 'poster', momentum01: mbus.score01 }) : pickHoopsDunk({
       speed: speedNow,
       lateral01,
       contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0,
@@ -2646,16 +2667,27 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (!contact?.isReady) foe.root.position.y = ride.lift;
         if (!posterVictim.reacted && ride.s > 0.35) { posterVictim.reacted = true; foeAnimTree.beat('bball_contact_react', { fadeSec: 0.14, holdEnd: true }); }
       }
-      if (!trickThrown && !showtime) {
+      // H2e (owner): THE FAMILY BY THE STICK — pushed at the takeoff (k < FAMILY_PICK_K), the right stick names the dunk, no timing:
+      // up one hand, down two, right the windmill, left the cradle. A flick there used to be a trick thrown 'early' (a miss)
+      if (!familyPicked && !showtime && k < FAMILY_PICK_K) {
+        const fam = familyFromStick(lookX, lookY);
+        if (fam) {
+          familyPicked = true; trickArmed = false;
+          if (fam.clip !== picked.clip) { picked = fam; dunkLabel = picked.label; micName = picked.label; meAnimTree.beat(picked.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked, Math.max(0.2, (flightTotal - flightMs) / 1000)) }); ctx.setHud({ shotType: picked.label }); }
+          console.info(`[1V1-DUNK] family by the stick: ${picked.label}`);
+        }
+      }
+      if (!trickArmed && Math.hypot(lookX, lookY) < 0.3) trickArmed = true;   // the stick came home: the next push is a trick
+      if (!trickThrown && !showtime && trickArmed) {
         const asked = trickFromFlick(lookX, lookY);
         if (asked) {
           trickThrown = true;
           const judge = judgeFlick(k, trickWin);
-          const spec = STICK_TRICK[asked];
+          const spec = (contestTricks ? CONTEST_TRICK : STICK_TRICK)[asked];   // H2e: a breakaway with momentum throws the contest's four
           meter3d?.end(judge === 'green' ? 'perfect' : judge === 'early' ? 'early' : 'late');
           if (judge === 'green') {
             const onTheBump = c.bumpK !== null;
-            made = roll() < trickPct(c.pct, asked, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
+            made = roll() < trickPctFor(c.pct, spec, judge) + (onTheBump ? CONTACT_TRICK_BONUS : 0);
             meAnimTree.beat(spec.clip, { holdEnd: true, speedRatio: dunkSpeedRatio({ clip: spec.clip, label: spec.label, sec: 0.7, flashy: true }, flightTotal / 1000) });
             ctx.setHud({ shotType: spec.label });
             micName = spec.label; mic?.crowd('crowd.ooh', 1);   // THE MIC: the stands gasp at the trick; the call will name it
@@ -2664,7 +2696,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             bannerFlash(ctx, onTheBump ? `${spec.label} ON HIM!` : spec.label, 900);
           } else {
             // a trick you could not land is a decision with a price — that is what makes throwing one mean anything
-            made = roll() < trickPct(c.pct, asked, judge);
+            made = roll() < trickPctFor(c.pct, spec, judge);
             bannerFlash(ctx, judge === 'early' ? 'TOO EARLY!' : 'TOO LATE!', 700);
           }
           resolved = true;
@@ -2899,7 +2931,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** M8 / M13 / M14: the FOOTWORK squeezes — a step-through inside the pump window, a euro when the stick sells a side
    *  against help, a hop step off an explosive gather. Each is a GatherPlan with real legs that ends IN a finish; the
    *  meter runs through the footwork exactly as it runs through the pull-up's plant. Returns whether one took the squeeze. */
-  function startFootwork(ctx: ModeContext, mx: number, my: number, defenderPos: Vector3 | null): boolean {
+  function startFootwork(ctx: ModeContext, mx: number, my: number, defenderPos: Vector3 | null, force?: { hopVel?: Vector3 }): boolean {   // H2e: `force.hopVel` — the double tap's hop, off the first press's drive
     const contest = contestLevel(me.root.position, defenderPos);
     const yaw = me.root.rotation.y;
     const dist = distXZ(me.root.position, RIM_FLOOR);
@@ -2908,7 +2940,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     // (the baseline foot around him into a layup), pulled OFF the rim with R2 it is the SHIMMY FADE (the shoulders sell
     // both ways, then the fade); a pump-fake window still opens the step-through / up-and-under from the seal (the
     // footwork was gated off in the post entirely — the post had no up-and-under). The euro and the hop stay perimeter moves.
-    if (posting) {
+    if (force?.hopVel) plan = planHopStep(force.hopVel, me.root.position, RIM_FLOOR, dist < 2.8 ? 'layup' : 'rise');   // H2e: the player asked for it
+    else if (posting) {
       const toRimP = RIM_FLOOR.subtract(me.root.position); toRimP.y = 0; toRimP.normalize();
       if (stickAtRim01(mx, -my, toRimP) >= POST_DROP_STICK_MIN) plan = planDropStep(me.root.position, RIM_FLOOR, yaw, defenderPos);
       else if (meSlot.intent.sprint && stickBack01(mx, -my, toRimP) >= POST_FADE_STICK_MIN) plan = planShimmyFade(me.root.position, RIM_FLOOR);
@@ -2920,6 +2953,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     else if (euroAvailable(meDribble.vel, me.root.position, RIM_FLOOR, defenderPos)) {                                        // M14
       const sell = euroSell(mx, -my, yaw);
       if (sell) plan = planEuro(me.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
+    }
+    // H2e (owner): THE SKIP GATHER — the stick held AWAY from him with no help in the lane (help: the euro above takes the same input)
+    if (!plan && !posting && skipAvailable(meDribble.vel, me.root.position, RIM_FLOOR)) {
+      const lineYaw = yawTo(me.root.position, RIM_FLOOR);   // read across the line to the rim: the body's facing follows the stick (~0.1 s), so a held push read off it turns forward
+      const away = skipAwaySide(mx, -my, lineYaw, me.root.position, defenderPos);
+      if (away) plan = planSkipGather(meDribble.vel, me.root.position, RIM_FLOOR, away, lineYaw);
     }
     // M13: the explosive two-foot gather. The face-up READS beat it — a body on my hip is a hook over him, a body sitting
     // at the rim is a floater over him, a drive across the rim is a reverse — because hopping into a chest is not a move.
@@ -2956,6 +2995,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       : plan.kind === 'hop' ? 'bball_hop_step'
       : plan.kind === 'shimmy' ? 'bball_shimmy'
       : plan.kind === 'dropstep' ? (plan.side === 'left' ? 'bball_drop_step_left' : 'bball_drop_step')
+      : plan.kind === 'skip' ? `bball_skip_gather_${plan.side ?? 'right'}`   // H2e: the ball swung to the away side
       : plan.side === 'left' ? 'bball_euro_step' : 'bball_euro_step_left';
     const clipSec = me.animator.durationOf(clip) ?? plan.sec;
     meAnimTree.beat(clip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
@@ -3587,6 +3627,12 @@ export const OneVOneMode: ModeDefinition = (() => {
     // HOOPS-10PHASE-2 phase 8: THE TIP-IN. Caught right at/near the rim off your own miss, it goes straight back
     // up in one motion instead of the ordinary putback (which still hands the ball out for a normal
     // dribble/gather/shoot). A missed tip just falls through to the existing putback flow below, unchanged.
+    // H2e (owner): THE PUTBACK DUNK — an offensive board at the iron goes straight back up as a slam: mine with R2 held, his half the time
+    if (putbackDunkOn({ offensive, atIron: isTipInEligible(ballAt, RIM, true), who, sprintHeld: !!meSlot.intent.sprint, roll })) {
+      if (who === 'me') { securePutback(ctx, contested); startDunk(ctx, 'standing', PUTBACK_DUNK); console.info('[1V1-BOARD] PUTBACK DUNK by me'); }
+      else { foePutback(ctx, contested); foeDunk(ctx, PUTBACK_DUNK); console.info('[1V1-BOARD] PUTBACK DUNK by the rival'); }
+      return;
+    }
     if (offensive && isTipInEligible(ballAt, RIM, true)) {
       const contest = contestLevel(who === 'me' ? me.root.position : foe.root.position, who === 'me' ? foe.root.position : me.root.position);
       if (roll() < tipInMakeChance(contest)) {
@@ -3731,7 +3777,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   /** D1: the rival THROWS IT DOWN on a lane he has beaten — a real flight (the drive dunk's clock) I can SWAT with a timed
    *  jump inside range while he is in the air; a body in his path is bumped, and floored if he finishes through it. */
-  function foeDunk(ctx: ModeContext): void {
+  function foeDunk(ctx: ModeContext, force?: HoopsDunk): void {   // H2e: `force` — the putback slam
     defPhase = 'shot'; gatherShown = false; foeShotWin = 'none';
     foeCarry?.update(0, 0, false);
     const toDunkHandF = dunkHandPass(ball, foe.skeleton);   // DUNK MOTION phase 11: his dunking hand too
@@ -3750,7 +3796,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // a straight one flushes, a body in the lane is a poster
     { const toRimF = RIM_FLOOR.subtract(from); toRimF.y = 0; const vF = foeVelLast.clone(); vF.y = 0; const sp = vF.length();
       const lat = sp > 0.1 && toRimF.lengthSquared() > 1e-4 ? Math.min(1, Math.abs(vF.x * toRimF.normalize().z - vF.z * toRimF.x) / sp) : 0;
-      const pickedF = pickHoopsDunk({ speed: Math.max(sp, 4.5), lateral01: lat, contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0, poster: inLane, momentum01: 1 - mbus.score01, roll, standing: false });
+      const pickedF = force ?? pickHoopsDunk({ speed: Math.max(sp, 4.5), lateral01: lat, contest01: c.contested ? Math.min(1, Math.max(0, 1 - Math.abs(c.lateral))) : 0, poster: inLane, momentum01: 1 - mbus.score01, roll, standing: false });
       foeAnimTree.beat(pickedF.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(pickedF, DRIVE_DUNK.flightMs / 1000) });
       ctx.setHud({ shotType: pickedF.label });
       console.info(`[1V1-DEF] rival dunk ${pickedF.label} (${pickedF.clip})`); }
