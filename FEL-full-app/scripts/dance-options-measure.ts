@@ -13,6 +13,7 @@
 // It prints markdown tables (the doc quotes them) and, given a path, writes every number as JSON.
 
 import { writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import {
   chartFor, CHART_SONG_IDS, chartStats, planChart, stepsFromPresses, styleBeatsFromPresses, validateChart, SCORED_STEP_CAP,
   type DanceChart,
@@ -23,7 +24,7 @@ import {
 import { DancePerformance, beatDuration, DANCE_LIBRARY, type DanceStep } from '../lib/babylon/core/DanceCore';
 import { CAPTURED_MOVES, isCapturedMove } from '../lib/babylon/dance/moves';
 import { onFloor } from '../lib/babylon/dance/floorPhase';
-import { FREESTYLE_PAD, type FreeSpan, type PadSlot } from '../lib/babylon/dance/freestyle';
+import { FREESTYLE_PAD, VARIETY_CAP, EXIT_GRACE_SEC, type FreeSpan, type PadSlot } from '../lib/babylon/dance/freestyle';
 import { songFor, type FelSong } from '../lib/babylon/dance/felSongs';
 import { danceCeiling } from '../lib/arena-score-integrity';
 import { closedCycle, MOVE_CAPTURES } from '../lib/babylon/anim/danceClips';
@@ -32,6 +33,15 @@ import { runChain, type TimedInput } from '../tests/helpers/dancePressChain';
 import type { FelInput } from '../lib/babylon/core/InputBus';
 
 const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+/** The OPTIONS (sections a–d) are measured on the charts as they shipped before the owner chose (2ab6a314, the commit this lane was cut
+ *  from), read from git, so the doc's option tables stay reproducible after the build; the BUILT section compares those with today's. */
+const BASE_REF = '2ab6a314';
+const baseCache = new Map<string, DanceChart>();
+function baseChart(id: string): DanceChart {
+  if (!baseCache.has(id)) baseCache.set(id, JSON.parse(execSync(`git show ${BASE_REF}:FEL-full-app/lib/babylon/dance/charts/${id}.json`, { encoding: 'utf8' })) as DanceChart);
+  return clone(baseCache.get(id)!);
+}
 const SONGS: FelSong[] = CHART_SONG_IDS.map((id) => songFor(id)!).sort((a, b) => a.difficulty - b.difficulty);
 const out: Record<string, unknown> = {};
 
@@ -156,7 +166,7 @@ function sectionA(): void {
   const res: Record<string, Record<string, ChartRead>> = {};
   const sites: Record<string, Record<string, { scored: number; demoted: number }>> = {};
   for (const song of SONGS) {
-    const chart = chartFor(song.id)!;
+    const chart = baseChart(song.id);
     sites[song.id] = aliasSites(chart, song);
     res[song.id] = {};
     for (const v of A_VARIANTS) res[song.id][v.key] = withBeats(v.beats ?? {}, () => read(flipped(chart, v.names), song));
@@ -172,7 +182,7 @@ function sectionA(): void {
       throw new Error(`control failed on ${song.id}: the probe does not read the shipped chart the way the repo's tests do`);
     }
   }
-  console.log('\nControls: on the shipped charts the probe reads the flawless scores chart.test.ts pins and the mid-floor switches floorPhase.test.ts pins, on all six songs.');
+  console.log(`\nControls: on the charts at ${BASE_REF} the probe reads the flawless scores chart.test.ts pins and the mid-floor switches floorPhase.test.ts pins, on all six songs.`);
 
   console.log('\n## (a) alias sites in the shipped charts (danced through every section; scored / demoted to a STYLE tap by the cap)\n');
   console.log('| song | ' + Object.keys(FLIP).join(' | ') + ' |');
@@ -234,7 +244,7 @@ function sectionB(): void {
   console.log('|' + header.map(() => '---').join('|') + '|');
   const bonusRows: string[] = [];
   for (const song of SONGS) {
-    const plan = planChart(chartFor(song.id)!, song);
+    const plan = planChart(baseChart(song.id), song);
     const steps = stepsFromPresses(plan.scored);
     const styleBeats = styleBeatsFromPresses(plan.style);
     const spans = plan.freeSpans;
@@ -246,7 +256,7 @@ function sectionB(): void {
       ...styleBeats.filter((b) => !inSpan(b)).map((b) => ({ at: b * bd, ev: press('A') })),
     ];
     const endAt = (Math.max(...steps.map((s) => s.beat + s.holdBeats)) + 4) * bd;
-    const plain = runChain({ steps, bpm: song.bpm, match: true, inputs: base, styleBeats, freeSpans: spans, endAt });
+    const plain = runChain({ steps, bpm: song.bpm, match: true, inputs: base, styleBeats, freeSpans: spans, endAt, edgeFix: false });
     const freezes = steps.filter((s) => categoryOf(s) === 'freeze').length;
     const styleMax = styleBeats.length * GROOVE_STYLE + freezes * HOLD_STYLE_CLEAN;
     const nearStep = (at: number) => steps.some((s) => Math.abs(s.beat * bd - at) <= 0.2);
@@ -262,7 +272,7 @@ function sectionB(): void {
         else slots.filter((b) => b >= f.start && b < f.end).forEach((b, i) => all.push({ at: b * bd, btn: m.button(i) }));
       }
       const run = (ps: { at: number; btn: PadSlot }[]) =>
-        runChain({ steps, bpm: song.bpm, match: true, inputs: [...base, ...ps.map((p) => ({ at: p.at, ev: press(p.btn) }))], styleBeats, freeSpans: spans, endAt });
+        runChain({ steps, bpm: song.bpm, match: true, inputs: [...base, ...ps.map((p) => ({ at: p.at, ev: press(p.btn) }))], styleBeats, freeSpans: spans, endAt, edgeFix: false });
       // A press the judge would take for a step is the step's (routeFreestyle), so a mash that runs to the section's last instant can catch
       // the step right after it EARLY, or take the first STYLE tap after the section (then the player's own press for that tap is a wild
       // tap). That is measured on the whole mash (scoreDelta) and reported, not hidden; the STYLE tally below is read off the presses that
@@ -279,7 +289,7 @@ function sectionB(): void {
         if (s !== undefined) taken.add(s);
         return { btn: p.btn, move: r.moves[i], slot: s !== undefined, offMs: s === undefined ? Infinity : Math.abs(s - beat) * bd * 1000 };
       });
-      const slotStyle = r.style - plain.style;
+      const slotStyle = (r.style - r.variety) - (plain.style - plain.variety);   // the slots' own STYLE (the built variety is read by B1 below)
       if (slotStyle !== tagged.filter((t) => t.slot).length * GROOVE_STYLE) throw new Error(`${song.id} ${m.key}: slot tally mismatch (${slotStyle})`);
       const bonuses = Object.fromEntries(B_RULES.map((b) => {
         let n = 0;
@@ -350,8 +360,8 @@ function sectionC(): void {
     console.log('| song | valid | sections (bars) | freestyle share of the song | scored (cap) | NORMAL Δ | HARD Δ (steps) | same steps? | STYLE taps | taps/min (band) | next step after a section (ms, least) |');
     console.log('|---|---|---|---|---|---|---|---|---|---|---|');
     for (const song of SONGS) {
-      const base = read(chartFor(song.id)!, song);
-      const chart = v.make(chartFor(song.id)!, song);
+      const base = read(baseChart(song.id), song);
+      const chart = v.make(baseChart(song.id), song);
       const r = read(chart, song);
       const bars = r.freeSpans.reduce((n, f) => n + (f.end - f.start) / 4, 0);
       // the EDGE: how soon after a section ends the next scored step comes (a press in its last 200 ms is that step's, judged early)
@@ -409,7 +419,7 @@ function sectionD(): void {
   // where moonwalk / robot are danced today (opt-in + freestyle) and where they would be once (a) flips them
   const sites: Record<string, unknown> = {};
   for (const song of SONGS) {
-    const chart = chartFor(song.id)!;
+    const chart = baseChart(song.id);
     for (const [k, beats] of [['D0', 4], ['D2', 2], ['D3', 8]] as const) {
       const r = withBeats({ dance_pop_moonwalk: beats, dance_pop_robot: beats }, () => read(flipped(chart, ['moonwalk', 'robot']), song));
       const pops = r.captured.filter((c) => c.id === 'dance_pop_moonwalk' || c.id === 'dance_pop_robot');
@@ -432,7 +442,7 @@ function sectionD(): void {
   console.log('|---|---|---|---|');
   const room: Record<string, unknown> = {};
   for (const song of SONGS) {
-    const steps = stepsFromPresses(planChart(chartFor(song.id)!, song).scored);
+    const steps = stepsFromPresses(planChart(baseChart(song.id), song).scored);
     const waves = steps.map((x, i) => ({ x, gap: (steps[i + 1]?.beat ?? Infinity) - x.beat })).filter(({ x }) => categoryOf(x) === 'wave');
     room[song.id] = { waves: waves.length, room4: waves.filter((w) => w.gap >= 4).length, room2: waves.filter((w) => w.gap >= 2).length };
     console.log(`| ${song.id} | ${waves.length} | ${waves.filter((w) => w.gap >= 4).length} | ${waves.filter((w) => w.gap >= 2).length} |`);
@@ -442,7 +452,7 @@ function sectionD(): void {
   // placement only, as a new phrase id), and read the chart again.
   {
     const song = songFor('canals')!;
-    const chart = chartFor('canals')!;
+    const chart = baseChart('canals');
     const base = read(chart, song);
     const plan = planChart(chart, song);
     const steps = stepsFromPresses(plan.scored);
@@ -477,7 +487,7 @@ function sectionD(): void {
   // in a FREESTYLE section the move plays from one press to the next: pressing every slot shows `every` beats of each move
   console.log('\nIn a freestyle section a move plays from one press to the next. Pressing every slot (the chart\'s `every`): ');
   for (const song of SONGS) {
-    const c = chartFor(song.id)!;
+    const c = baseChart(song.id);
     const every = Object.values(c.phrases).find((ph) => ph.free?.freestyle)!.free!.every;
     const of = (id: string) => `${Math.round(Math.min(1, every / (CAPTURED_MOVES.find((m) => m.id === id)?.beats ?? DANCE_LIBRARY.find((m) => m.id === id)!.beats)) * 100)}%`;
     console.log(`- ${song.id}: a slot every ${every} beat(s) → ${of('dance_pop_moonwalk')} of a moonwalk or robot, ${of('dance_power_windmill')} of a windmill, ${of('dance_wave_arm')} of an arm wave`);
@@ -485,8 +495,83 @@ function sectionD(): void {
   out.retime = res;
 }
 
+// ── BUILT (owner 2026-10-17: Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, Q6 the follow-up) — the charts before (2ab6a314) and as they ship now ─────────
+
+function sectionBuilt(): void {
+  const rows: Record<string, unknown> = {};
+  console.log('\n## BUILT — before (2ab6a314) and after, per song\n');
+  console.log(`STYLE max = every STYLE tap × ${GROOVE_STYLE} + every freeze released clean × ${HOLD_STYLE_CLEAN} + (after) each section's VARIETY cap ${VARIETY_CAP}.\n`);
+  console.log('| song | valid | scored (cap) | same scored steps? | NORMAL | EASY | HARD (steps) | STYLE taps | sections | STYLE max | mid-floor switches | captured moves scored (cut early) |');
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|');
+  for (const song of SONGS) {
+    const b = read(baseChart(song.id), song), a = read(chartFor(song.id)!, song);
+    const maxA = a.styleMax + a.freeSpans.length * VARIETY_CAP;
+    const arrow = (x: number | string, y: number | string) => (x === y ? `${y}` : `${x} → **${y}**`);
+    const cut = a.captured.filter((c) => c.played < 1);
+    rows[song.id] = { before: b, after: a, styleMaxAfter: maxA };
+    console.log(`| ${song.id} | ${b.problems.length ? 'NO' : 'yes'} → ${a.problems.length ? '**NO**' : 'yes'} | ${a.scored} (${a.cap}) | ${a.shape === b.shape ? 'yes' : '**no**'} | ${arrow(b.normal, a.normal)} | ${arrow(b.easy, a.easy)} | ${arrow(b.hard, a.hard)} (${arrow(b.hardSteps, a.hardSteps)}) | ${arrow(b.styleTaps, a.styleTaps)} | ${arrow(b.freeSpans.length, a.freeSpans.length)} | ${arrow(b.styleMax, maxA)} | ${arrow(b.floorSwitches, a.floorSwitches)} | ${arrow(b.captured.length, a.captured.length)}${cut.length ? ` (${cut.map((c) => `${c.id.replace('dance_', '')}@${c.beat}: ${Math.round(c.played * 100)}%`).join(', ')})` : ''} |`);
+  }
+  const canals = (rows.canals as { after: ChartRead }).after.captured.find((c) => c.id === 'dance_pop_moonwalk');
+  console.log(`\nCanals' moonwalk (Q5): ${canals ? `scored at beat ${canals.beat}, plays ${Math.round(canals.played * 100)} % of its clip before the next step` : '**not scored**'}.`);
+
+  // the EDGE (Q6): a player still pressing in a section's last moment, then dancing on with presses up to 90 ms late (the GREAT window)
+  console.log(`\n### The section's edge (Q6), before and after — EXIT_GRACE_SEC ${Math.round(EXIT_GRACE_SEC * 1000)} ms\n`);
+  console.log('Players: mashing all four buttons through each section (8 a second); or ONE press 20 / 60 / 100 / 150 / 190 ms before the section ends with the next step\'s own button ("right") or another ("wrong"). Then every step and STYLE tap after the section pressed 0 / 30 / 60 / 90 ms late. A loss = the combo broken or a MISS that playing on without the last-moment press does not have.\n');
+  console.log('| song | MATCH | runs with a loss: before → after | worst loss (combo steps + misses): before → after | follow-throughs graced (after) |');
+  console.log('|---|---|---|---|---|');
+  const edge: Record<string, unknown> = {};
+  for (const song of SONGS) for (const match of [true, false]) {
+    const plan = planChart(chartFor(song.id)!, song);
+    const steps = stepsFromPresses(plan.scored), sb = styleBeatsFromPresses(plan.style), spans = plan.freeSpans, bd = beatDuration(song.bpm);
+    const inSpan = (b: number) => spans.some((f) => b >= f.start && b < f.end);
+    const nearEnd = (b: number) => spans.some((f) => b >= f.end && (b - f.end) * bd < 1);
+    const endAt = (Math.max(...steps.map((x) => x.beat + x.holdBeats)) + 4) * bd;
+    const after = (e: number): TimedInput[] => [
+      ...steps.map((x) => ({ at: x.beat * bd + (nearEnd(x.beat) ? e / 1000 : 0), ev: press(buttonForStep(x)) })),
+      ...sb.filter((x) => !inSpan(x)).map((x) => ({ at: x * bd + (nearEnd(x) ? e / 1000 : 0), ev: press('A') })),
+    ];
+    const nextBtn = (f: FreeSpan): PadSlot => buttonForStep(steps.find((x) => x.beat >= f.end) ?? steps[0]);
+    let lossB = 0, lossA = 0, worstB = 0, worstA = 0, graced = 0;
+    for (const e of [0, 30, 60, 90]) for (const model of ['mash', 'right20', 'right60', 'right100', 'right150', 'right190', 'wrong20', 'wrong60', 'wrong100', 'wrong150', 'wrong190']) {
+      const sec: TimedInput[] = [];
+      for (const f of spans) {
+        if (model === 'mash') { let i = 0; for (let t = f.start * bd + 0.01; t < f.end * bd; t += 0.125) sec.push({ at: t, ev: press((['A', 'B', 'X', 'Y'] as const)[i++ % 4]) }); }
+        else { const d = Number(model.replace(/\D+/g, '')); const nb = nextBtn(f); sec.push({ at: f.end * bd - d / 1000, ev: press(model.startsWith('right') ? nb : nb === 'A' ? 'B' : 'A') }); }
+      }
+      const clean = runChain({ steps, bpm: song.bpm, match, inputs: after(e), styleBeats: sb, freeSpans: spans, endAt });
+      const loss = (r: ReturnType<typeof runChain>) => Math.max(0, clean.maxCombo - r.maxCombo) + Math.max(0, r.counts.MISS - clean.counts.MISS);
+      const rb = runChain({ steps, bpm: song.bpm, match, inputs: [...after(e), ...sec], styleBeats: sb, freeSpans: spans, endAt, edgeFix: false });
+      const ra = runChain({ steps, bpm: song.bpm, match, inputs: [...after(e), ...sec], styleBeats: sb, freeSpans: spans, endAt });
+      if (loss(rb)) lossB++;
+      if (loss(ra)) lossA++;
+      worstB = Math.max(worstB, loss(rb)); worstA = Math.max(worstA, loss(ra)); graced += ra.graced;
+    }
+    edge[`${song.id}:${match ? 'match' : 'any'}`] = { lossB, lossA, worstB, worstA, graced };
+    console.log(`| ${song.id} | ${match ? 'on' : 'off'} | ${lossB} / 44 → ${lossA} / 44 | ${worstB} → ${worstA} | ${graced} |`);
+  }
+  // flawless play, with every section danced on every slot with all four buttons: the score is the flawless pin, the combo full, and
+  // the STYLE gains exactly the VARIETY the sections pay
+  console.log('\n### Flawless play with the sections danced (all four buttons on every slot)\n');
+  console.log('| song | flawless score | full combo | STYLE without the section presses | STYLE with them | of which VARIETY |');
+  console.log('|---|---|---|---|---|---|');
+  for (const song of SONGS) {
+    const plan = planChart(chartFor(song.id)!, song);
+    const steps = stepsFromPresses(plan.scored), sb = styleBeatsFromPresses(plan.style), spans = plan.freeSpans, bd = beatDuration(song.bpm);
+    const inSpan = (b: number) => spans.some((f) => b >= f.start && b < f.end);
+    const endAt = (Math.max(...steps.map((x) => x.beat + x.holdBeats)) + 4) * bd;
+    const base: TimedInput[] = [...steps.map((x) => ({ at: x.beat * bd, ev: press(buttonForStep(x)) })), ...sb.filter((x) => !inSpan(x)).map((x) => ({ at: x * bd, ev: press('A') }))];
+    const dance: TimedInput[] = sb.filter(inSpan).map((x, i) => ({ at: x * bd, ev: press((['A', 'B', 'X', 'Y'] as const)[i % 4]) }));
+    const r0 = runChain({ steps, bpm: song.bpm, match: true, inputs: base, styleBeats: sb, freeSpans: spans, endAt });
+    const r1 = runChain({ steps, bpm: song.bpm, match: true, inputs: [...base, ...dance], styleBeats: sb, freeSpans: spans, endAt });
+    if (r1.score !== r0.score || r1.maxCombo !== steps.length) throw new Error(`${song.id}: dancing the sections moved the score`);
+    console.log(`| ${song.id} | ${r1.score} | ${r1.maxCombo === steps.length ? 'yes' : 'NO'} | ${r0.style} | ${r1.style} | ${r1.variety} |`);
+  }
+  out.built = { rows, edge };
+}
+
 sectionA();
 sectionB();
 sectionC();
 sectionD();
+sectionBuilt();
 if (process.argv[2]) writeFileSync(process.argv[2], JSON.stringify(out, null, 1));

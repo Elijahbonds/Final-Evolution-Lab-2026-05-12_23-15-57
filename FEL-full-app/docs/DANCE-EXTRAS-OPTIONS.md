@@ -8,7 +8,11 @@ dance-extras lane (`d600da41`, merged in #279) left four choices open:
 - **(c)** more or longer freestyle sections;
 - **(d)** re-time the moonwalk and the robot.
 
-**Nothing here changes the game.** Each option has 2–5 variants. Every variant was run on the six shipped charts
+**The owner chose on 2026-10-17, and the choices are built.** See [Chosen and built](#chosen-and-built) at the end. The option
+tables below are the measurements the owner chose from. They were taken on the charts as they shipped at `2ab6a314`,
+and the script still reads those charts from git, so the tables reproduce.
+
+Each option has 2–5 variants. Every variant was run on the six shipped charts
 through the same pure functions the room uses to play a chart, by `scripts/dance-options-measure.ts`:
 
 - `planChart` + `validateChart`;
@@ -423,3 +427,128 @@ costs that combo).
 - **A. Leave it for now; revisit if Q3 adds sections.** *(recommended)*
 - B. Plan a small follow-up: the section's last half-beat stops being freestyle, and the next step's cue shows through
   the section.
+
+---
+
+## Chosen and built
+
+The owner's answers (2026-10-17): Q1 A, Q2 A, Q3 A, Q4 A, Q5 A, and for Q6 the small follow-up.
+
+`npx tsx scripts/dance-options-measure.ts` prints all of the following in its BUILT section. It compares the charts at
+`2ab6a314` with the charts as they ship now.
+
+### What was built
+
+| Choice | What changed |
+|---|---|
+| **Q1 A**: five short names → captures | The chart files spell `dance_toprock_kick`, `dance_power_helicopter`, `dance_power_headstand`, `dance_pop_moonwalk` and `dance_pop_robot` wherever they said `kickstep`, `helicopter`, `headstand`, `moonwalk` or `robot`. That is goldenhour 1 note, battle 2, canals 3, evolution 4. `CHART_MOVES` is unchanged. Evolution's opt-in phrase `ehBc` is `ehB` itself now and was removed. `sidefreeze` stays the baby freeze. |
+| **Q2 A**: variety bonus | `dance/freestyle.ts` `varietyBonus`: +50 STYLE for each different button that took a slot in a section, past the first, at most +150, counted when the section ends. One button earns none, however often it is pressed. A press off the beat adds no button. The exit banner reads `FREESTYLE OVER · +n STYLE (VARIETY +m)`. **TUNED: (new) variety +50/button, cap +150, owner 2026-10-17.** |
+| **Q3 A**: second section | Each song's first hook plays its own marked freestyle phrase in place of its last free phrase. These are the same slots, so no new phrase was needed (`fs2`, `bfreeFS`, `kfreeFS`, `efreeH`). |
+| **Q4 A**: timing | Unchanged. |
+| **Q5 A**: canals' moonwalk | A new phrase `khAm` is `khA` with its arm wave on beat 4 spelled `dance_pop_moonwalk`. It plays at the first hook's first placement, beat 84. `kvDc` is `kvD` again. |
+| **Q6**: the edge | Two parts, both in `dance/freestyle.ts`, wired in `DanceMode`, and mirrored in `tests/helpers/dancePressChain.ts`. (1) Inside a section, MATCH never fumbles the next step: a press with another button in the section's last moment dances its move instead (`routeFreestyle` `matchOn`). (2) The **exit grace** (`exitGraceForgives`): a press the judge would call a wild tap is absorbed if it lands within `EXIT_GRACE_SEC` after a section ends, and the player pressed inside that section within `MISS_AFTER` of its end. **TUNED: (new) grace window 100 ms.** |
+
+**Why Q6 has two parts.** The measurement found the combo break has two causes:
+
+- **MATCH on: the wrong button.** A last-moment press with another button fumbled the next step, a MISS. This was the
+  bigger cause: every model broke on every song.
+- **Any mode: an early catch.** A last-moment press caught the step early, so the on-beat press after it was a wild tap.
+
+A grace window alone cannot fix the first cause: a fumbled step is not a wild tap.
+
+**Why 100 ms.** Measured against all six songs with MATCH on and off. The players:
+
+- one press 20 / 60 / 100 / 150 / 190 ms before a section ends, with the next step's button or another;
+- or mashing all four buttons through the section;
+- then dancing on with presses up to 90 ms late (the GREAT window).
+
+A window of 90 ms still lets 5–11 of those runs break on five songs; 95 ms clears them all. 100 ms is 95 ms rounded to a
+whole step: the GREAT window plus 10 ms.
+
+### Before and after, per song
+
+| Song | NORMAL flawless | EASY | Scored steps | HARD flawless (steps) | Sections | STYLE max | Mid-floor switches | Captured moves scored |
+|---|---|---|---|---|---|---|---|---|
+| warmup | 9,555 (same) | 8,700 (same) | identical | 12,240 → 11,780 (32 → 31) | 1 → 2 | 1,600 → 1,900 | 2 | 0 |
+| cypher | 10,875 (same) | 8,700 (same) | identical | 21,930 → 19,740 (51 → 47) | 1 → 2 | 3,000 → 3,300 | 6 | 0 |
+| goldenhour | 12,240 (same) | 9,125 (same) | identical | 24,200 → 23,625 (55 → 54) | 1 → 2 | 3,850 → 4,150 | 4 | 0 → 1 |
+| battle | 15,105 (same) | 11,325 (same) | identical | 22,490 → 21,375 (52 → 50) | 1 → 2 | 5,450 → 5,750 | 9 → 8 | 0 → 2 |
+| canals | 16,605 (same) | 14,130 (same) | identical | 23,055 → 22,490 (53 → 52) | 1 → 2 | 7,100 → 7,400 | 9 → 8 | 0 → 3 |
+| evolution | 19,740 (same) | 14,615 (same) | identical | 28,980 → 27,755 (63 → 61) | 1 → 2 | 8,100 → 8,400 | 8 | 2 → 7 |
+
+How to read the table:
+
+- **Scored steps "identical"** means the same times, families and mirrors, and the same STYLE taps (23 / 51 / 71 / 97 /
+  130 / 150 on the six songs) and the same demotions.
+- **STYLE max** is every STYLE tap × 50, plus every freeze released clean × 150, plus each section's variety cap (150).
+- **The HARD changes are the sum of the measured pieces.** They all come from the second section, because HARD's fill
+  keeps clear of sections. Against the same charts with the short names spelled back, the flip itself moves no HARD
+  number.
+- **Pay.** HARD is free play only, and every flawless HARD run is above the per-run XP cap (a score of about 9,400).
+- **Canals' moonwalk** is scored at beat 84 and plays 100 % of its clip.
+- **Cut early:** battle's helicopter at 148 and evolution's robots at 52 and 148 play 75 % before the next step, as
+  measured for option A3.
+
+**The section's edge, before → after:** the same players as the 100 ms measurement above, 44 runs a song in each mode.
+
+| | warmup | cypher | goldenhour | battle | canals | evolution |
+|---|---|---|---|---|---|---|
+| Runs with a broken combo or a MISS, MATCH on | 44 → 0 | 44 → 0 | 44 → 0 | 44 → 0 | 44 → 0 | 41 → 0 |
+| The same, MATCH off | 0 → 0 | 20 → 0 | 0 → 0 | 44 → 0 | 6 → 0 | 8 → 0 |
+
+**Flawless play with the sections danced** (all four buttons on every slot): the score is the flawless pin on every
+song, a full combo, and STYLE gains exactly the slots plus 300 of variety (150 for each of the two sections).
+
+### Tests (all new or changed tests are flagged in the commits)
+
+- **New, `lib/babylon/dance/danceOptions.test.ts`:**
+  - the variety rule: one button 0, two +50, three +100, four +150, the cap holds;
+  - mashing one button through every section earns 0;
+  - three buttons on the slots earn +100 a section; off-beat buttons add nothing; the bonus leaves the score, combo,
+    counts and labels unchanged;
+  - the MATCH pass-through, and the grace's bounds: the window, the last-moment condition, no section;
+  - on every shipped chart:
+    - last-moment presses, right or wrong button, MATCH on and off, followed by presses up to 90 ms late, keep a full
+      combo with no MISS;
+    - without the fix the same players break, so the case is real;
+    - a step nobody presses is still a MISS that breaks the combo;
+    - a flawless run is unchanged, with nothing graced;
+  - Q1 on all six charts against the short-name form (the same steps, STYLE, demotions, and NORMAL / EASY / HARD);
+  - the captured moves scored per song;
+  - canals' moonwalk scored and whole;
+  - the two sections per song;
+  - the HARD pins.
+- **Changed:**
+  - `floorPhase.test.ts`: battle 9 → 8 and canals 9 → 8 mid-floor switches.
+  - `freestyle.test.ts`: one section a song → two, at the first and the last hook's ends.
+  - `danceFreestyleWiring.test.ts`: the STYLE writers gain the variety's two.
+  - `moves.test.ts`: the two opt-in phrase comparisons are gone with their phrases; their promise is held on all six
+    charts in the new file.
+
+**Mutation check:** 25 of 26 mutants killed.
+
+- The mutants covered:
+  - the variety rule and its cap;
+  - the room's and the chain's slot buttons;
+  - the exit payment and the finish payment;
+  - the MATCH pass-through, three ways;
+  - the grace's value, 90 and 300 ms;
+  - each grace condition;
+  - the chain's grace and the room's grace, and where the grace sits;
+  - the room's `matchOn` and the room's last-press note;
+  - four chart edits.
+- The survivor is equivalent. Removing `Math.min(VARIETY_CAP, …)` changes nothing, because four buttons can pay at most
+  3 × 50 = 150.
+
+**On the real room** (the esbuild + Playwright static rig, headless Chromium, swiftshader, playtest build):
+
+- **Warmup's new first-hook section opens and closes.** The room sent `ENTER … FREESTYLE — YOUR MOVE` at about 53 s,
+  which is bar 19.
+- **The exit banner pays variety.** Bursts of A, B, X and Y were aimed at the four slots; two different buttons took
+  slots. The banner read **`FREESTYLE OVER · +150 STYLE (VARIETY +50) · MATCH IS BACK`**: 100 for the two slots plus 50
+  variety, which is the rule.
+- **Canals' captured moonwalk is a scored step.** The lane cues `MOONWALK · X` about 43 s in. The frames show the hero
+  in the capture's bent-knee pose, and the step expires as a MISS because nothing pressed it.
+- **The frames** are in the lane's scratch evidence: `round5/dance-options/shots/section/` and `…/moonwalk-portrait/`.
+  They were taken with a screenshot that stalls the page under swiftshader, so each frame is a moment or two after the
+  event the log names.
