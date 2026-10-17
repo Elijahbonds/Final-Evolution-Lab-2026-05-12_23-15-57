@@ -48,6 +48,7 @@ export const BASKETBALL_CLIPS = [
   'bball_def_retreat', 'bball_def_lunge_left', 'bball_def_lunge_right', 'bball_def_standup',   // H2c: the defender's reactions (core/DefenderReact)
   'bball_def_cross_run_left', 'bball_def_cross_run_right',   // H2c: the crossover step (lateral past a slide's reach)
   'bball_stepback_rival',                        // H2c (plan §4.21): the rival's 0.30 s step-back (it played the hesi)
+  'bball_skip_gather_left', 'bball_skip_gather_right',   // H2e: the skip gather (core/FinishFootwork)
   'bball_ankle_stumble', 'bball_ankle_slip',
   'bball_stepback_gather',
   'bball_hop_step', 'bball_euro_step',
@@ -203,6 +204,22 @@ export function buildStepbackRival(scene: Scene, sk: Skeleton): AnimationGroup |
     { t: 0.18, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0], Neck: [-4, 0, 0] }, hands: { Right: [0.22, 1.00, 0.10] as V3, Left: [-0.02, 1.00, 0.12] as V3 }, hipsY: -0.06, feet: feetAt(-0.06, { Left: [-0.18, ANKLE_Y + 0.04, 0.40], Right: [0.21, ANKLE_Y + 0.04, -0.30] }), kneesFront: true },   // in the air going back
     { t: 0.30, bones: { Hips: [0, 0, 0], Spine: [14, 0, 0], Neck: [-6, 0, 0] }, hands: { Right: [0.18, 1.10, 0.18] as V3, Left: [-0.06, 1.08, 0.20] as V3 }, hipsY: -0.12, feet: feetAt(-0.12, { Left: [-0.19, ANKLE_Y + 0.02, 0.22], Right: [0.21, ANKLE_Y, -0.12] }), kneesFront: true },   // planted, loaded for the gather
   ]);
+}
+
+/** THE SKIP GATHER (H2e, owner 2026-10-16: the long, low gather into a high-glass finish; core/FinishFootwork). 0.52 s, the plan's two
+ *  legs: step A (0–0.32) long and LOW — the lead foot reaches 0.5 m out, the hips down 0.22, the ball swung wide and low to the away side
+ *  (both hands, the off hand guarding); step B (0.32–0.52) the SKIP onto two feet — both feet off the floor through 0.36, down square at
+ *  0.44, the ball rising to the away shoulder for the high glass. `side` is the away side (the ball's); `_left` is the mirror. */
+const skipGatherKeys = (): PoseKey[] => [
+  { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0], Neck: [-4, 0, 0] }, hands: { Right: [0.30, 1.00, 0.26] as V3, Left: [0.04, 1.02, 0.30] as V3 }, hipsY: -0.10, feet: feetAt(-0.10, STANCE_FEET), kneesFront: true },
+  { t: 0.14, bones: { Hips: [0, -8, 0], Spine: [26, 6, 0], Neck: [-8, 0, 0] }, hands: { Right: [0.46, 0.86, 0.16] as V3, Left: [0.18, 0.92, 0.22] as V3 }, hipsY: -0.22, feet: feetAt(-0.22, { Left: [-0.19, ANKLE_Y, -0.18], Right: [0.20, ANKLE_Y + 0.02, 0.48] }), kneesFront: true },   // the long low step, the ball swung away
+  { t: 0.28, bones: { Hips: [0, -6, 0], Spine: [24, 4, 0], Neck: [-8, 0, 0] }, hands: { Right: [0.48, 0.84, 0.18] as V3, Left: [0.20, 0.90, 0.24] as V3 }, hipsY: -0.20, feet: feetAt(-0.20, { Left: [-0.17, ANKLE_Y + 0.06, -0.02], Right: [0.20, ANKLE_Y, 0.30] }), kneesFront: true },
+  { t: 0.36, bones: { Hips: [0, -3, 0], Spine: [14, 2, 0], Neck: [-6, 0, 0] }, hands: { Right: [0.40, 1.06, 0.22] as V3, Left: [0.14, 1.06, 0.26] as V3 }, hipsY: -0.06, feet: feetAt(-0.06, { Left: [-0.16, ANKLE_Y + 0.16, 0.10], Right: [0.18, ANKLE_Y + 0.12, 0.16] }), kneesFront: true },   // the skip: both feet off
+  { t: 0.44, bones: { Hips: [0, 0, 0], Spine: [18, 0, 0], Neck: [-6, 0, 0] }, hands: { Right: [0.30, 1.28, 0.22] as V3, Left: [0.08, 1.26, 0.26] as V3 }, hipsY: -0.16, feet: feetAt(-0.16, { Left: [-0.17, ANKLE_Y, 0.10], Right: [0.17, ANKLE_Y, 0.10] }), kneesFront: true },   // two feet down, loaded
+  { t: 0.52, bones: { Hips: [0, 0, 0], Spine: [8, 0, 0], Neck: [-10, 0, 0] }, hands: { Right: [0.26, 1.52, 0.24] as V3, Left: [0.04, 1.46, 0.26] as V3 }, hipsY: -0.08, feet: feetAt(-0.08, { Left: [-0.17, ANKLE_Y, 0.10], Right: [0.17, ANKLE_Y, 0.10] }), kneesFront: true },   // rising for the glass
+];
+export function buildSkipGather(scene: Scene, sk: Skeleton, side: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildPoseClip(scene, sk, `bball_skip_gather_${side}`, 0.52, side === 'right' ? skipGatherKeys() : skipGatherKeys().map(mirrorKey), { smooth: true });
 }
 
 /** The FLOATER (HOOPS-MOVE-KIT-A M3): a runner off the stride — the knee comes up, the ball to the chest, then a one-hand

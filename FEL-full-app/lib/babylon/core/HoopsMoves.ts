@@ -34,7 +34,9 @@ export type GatherKind = 'set' | 'pullup' | 'stepback'
   // rise — the footwork IS the move, and the meter runs through it exactly as it runs through the pull-up's plant.
   | 'stepthrough' | 'hop' | 'euro'
   // THE POST GAME (2026-09-18): the shimmy before a fade, the drop step around the man into a finish
-  | 'shimmy' | 'dropstep';
+  | 'shimmy' | 'dropstep'
+  // H2e (owner 2026-10-16): the long, low SKIP GATHER into a high-glass finish (core/FinishFootwork)
+  | 'skip';
 /** Planar speed under which the feet count as set (a standstill / the last shuffle): no gather, the rise starts now. */
 export const GATHER_SET_SPEED = 1.0;
 /** The pull-up gather: a walking pull-up plants in 0.2 s, a full-speed one (the 1-dribble off the check) in 0.34 s. */
@@ -65,6 +67,8 @@ export interface GatherPlan {
   legs?: Array<{ dir: Vector3; sec: number; speed: number }>;
   /** The finish's side once the feet land (the euro finishes on the crossing hand). */
   side?: FinishSide;
+  /** H2e: the finish it ends in is laid off the glass (the skip gather's high-glass layup). */
+  glass?: boolean;
 }
 
 /** Plan the gather from the body at the squeeze. `stickBack01` = how far the stick is pulled AWAY from the rim (0..1). */
@@ -111,7 +115,7 @@ export function gatherTravel(plan: GatherPlan): number {
 export function gatherLabel(kind: GatherKind, base: string): string {
   return kind === 'pullup' ? 'PULL-UP' : kind === 'stepback' ? 'STEP-BACK'
     : kind === 'stepthrough' ? 'STEP-THROUGH' : kind === 'hop' ? 'HOP STEP' : kind === 'euro' ? 'EURO STEP'
-    : kind === 'shimmy' ? 'SHIMMY FADE' : kind === 'dropstep' ? 'DROP STEP' : base;
+    : kind === 'shimmy' ? 'SHIMMY FADE' : kind === 'dropstep' ? 'DROP STEP' : kind === 'skip' ? 'SKIP GATHER' : base;
 }
 
 /** How far the stick is pulled AWAY from the rim, 0..1, from a world-planar wish direction (mx, −my in the dribble's
