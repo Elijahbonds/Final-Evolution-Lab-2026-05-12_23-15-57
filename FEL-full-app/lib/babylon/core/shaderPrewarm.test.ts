@@ -68,6 +68,25 @@ describe('prewarmScene', () => {
     expect(r2.ms).toBeLessThan(50 + 40 + 1);
   });
 
+  it('capHit: a scene that turns ready only after the cap draws no warm frames, and says the cap was hit (timedOut alone did not)', async () => {
+    // ship-ready (2026-10-17): on the phone rig, skateboard turned ready at 8.56 s against the 8 s cap, drew 0 of 3 frames,
+    // and reported timedOut: false, so the harness sent no diag. capHit is what the harness reports now.
+    const late = fake(6);                                        // ready at the 6th question (t = 200 ms), the cap at 180 ms
+    let drawn = 0;
+    const r = await prewarmScene(late.scene as never, { ...late.deps, capMs: 180, renderFrame: () => { drawn++; } });
+    expect(drawn).toBe(0);
+    expect(r).toMatchObject({ ready: true, timedOut: false, capHit: true, frames: 0 });
+    const cutMid = fake(1);                                      // ready at once, the cap lands between the frames
+    const r2 = await prewarmScene(cutMid.scene as never, { ...cutMid.deps, capMs: 50, pollMs: 40, renderFrame: () => {} });
+    expect(r2.frames).toBeGreaterThan(0);
+    expect(r2.frames).toBeLessThan(PREWARM_FRAMES);
+    expect(r2).toMatchObject({ ready: true, timedOut: false, capHit: true });
+    const inTime = fake(1);                                      // every frame drawn inside the cap: not a cap hit
+    expect(await prewarmScene(inTime.scene as never, { ...inTime.deps, renderFrame: () => {} })).toMatchObject({ ready: true, frames: PREWARM_FRAMES, capHit: false });
+    const never = fake(null);                                    // never ready: timed out, and so a cap hit
+    expect(await prewarmScene(never.scene as never, { ...never.deps, capMs: 200 })).toMatchObject({ timedOut: true, capHit: true });
+  });
+
   it('waits for the engine\'s programs too (the post-process passes the scene does not know about)', async () => {
     const f = fake(1);
     let engineAsks = 0;
@@ -124,6 +143,13 @@ describe('the harness runs it where it cannot trip the watchdog', () => {
     expect(ready).toBeGreaterThan(warm);
     expect(src.slice(src.lastIndexOf('if (', warm), warm)).toContain('prewarmWanted(tier)');
     expect(src).toContain('renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady()');
+  });
+  it('reports every cap hit to the diag, the frames the cap cut included (capHit, not timedOut)', () => {
+    const warm = src.indexOf('await prewarmScene(scene');
+    const ready = src.indexOf("setPhase('ready');", warm);
+    const block = src.slice(warm, ready);
+    expect(block).toContain("if (warm.capHit) reportDiag('load', `shader pre-warm hit its cap");
+    expect(block).not.toContain('if (warm.timedOut)');
   });
   it('the watchdog is still 20 s (it is not raised: the pre-warm runs after it)', () => {
     expect(src).toMatch(/const LOAD_WATCHDOG_MS = 20_000;/);

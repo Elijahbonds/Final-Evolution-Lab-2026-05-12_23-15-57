@@ -43,6 +43,12 @@ export interface PrewarmResult {
   ready: boolean;
   /** The cap ran out first (the splash was released with some programs still compiling). */
   timedOut: boolean;
+  /**
+   * The cap cut the pre-warm short: it timed out, OR the scene was ready but the cap stopped the warm frames (so the
+   * post-process programs those frames compile were left for the first frames after READY). `timedOut` alone missed the
+   * second case: on the ship-ready rig (docs/SHIP-READINESS.md §1) the cap cut 6 of 9 phone loads short and 1 said `timedOut`.
+   */
+  capHit: boolean;
   /** Warm frames drawn. */
   frames: number;
   /** Milliseconds spent, by the injected clock. */
@@ -71,8 +77,8 @@ export async function prewarmScene(scene: Pick<Scene, 'isReady' | 'isDisposed'>,
   const now = deps.now ?? (() => performance.now());
   const wait = deps.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const t0 = now();
-  let polls = 0, frames = 0, readyMs = -1;
-  const done = (ready: boolean, timedOut: boolean): PrewarmResult => ({ ready, timedOut, frames, ms: now() - t0, readyMs, polls });
+  let polls = 0, frames = 0, readyMs = -1, framesCut = false;
+  const done = (ready: boolean, timedOut: boolean): PrewarmResult => ({ ready, timedOut, capHit: timedOut || framesCut, frames, ms: now() - t0, readyMs, polls });
   // until the scene says it is ready (this is what starts the compiles); false = out of time or torn down
   const untilReady = async (): Promise<boolean | 'dead'> => {
     for (;;) {
@@ -89,7 +95,8 @@ export async function prewarmScene(scene: Pick<Scene, 'isReady' | 'isDisposed'>,
   if (r === 'dead') return done(false, false);
   if (r) readyMs = now() - t0;
   if (r && deps.renderFrame) {
-    for (let i = 0; i < (deps.frames ?? PREWARM_FRAMES) && now() - t0 < capMs; i++) {
+    for (let i = 0; i < (deps.frames ?? PREWARM_FRAMES); i++) {
+      if (now() - t0 >= capMs) { framesCut = true; break; }       // the cap stops the frames too (and says so: capHit)
       if (scene.isDisposed) return done(false, false);
       try { deps.renderFrame(); frames++; } catch { break; }   // a frame that throws is the render loop's to report, later
       await wait(pollMs);

@@ -639,7 +639,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       if (prewarmWanted(tier)) {
         console.info('[FEL-PERF] shader pre-warm start');
         const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });
-        if (warm.timedOut) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames)`);
+        // ship-ready (2026-10-17): capHit, not timedOut — a scene that turned ready but lost its warm frames to the cap was not reported
+        if (warm.capHit) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames, scene ${warm.ready ? 'ready' : 'not ready'})`);
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
       }
       setPhase('ready');
