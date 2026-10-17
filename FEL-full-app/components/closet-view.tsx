@@ -142,7 +142,7 @@ const PASTE_ERRORS: Record<DecodeError, string> = {
   invalid: 'That code holds no character.',
 };
 
-export function ClosetView({ adult = false, fullBleed = false, faceScan = false }: { adult?: boolean; fullBleed?: boolean; /** STORE-READY B1: /closet passes isFaceScanEnabled(); default OFF everywhere else (dev/studio). */ faceScan?: boolean }) {
+export function ClosetView({ adult = false, fullBleed = false, faceScan: faceScanFlag = false }: { adult?: boolean; fullBleed?: boolean; /** STORE-READY B1: /closet passes isFaceScanEnabled(); default OFF everywhere else (dev/studio). */ faceScan?: boolean }) {
   // CREATOR-PLAN phase 4a (owner, 2026-10-06: "5 max slots"): the Closet edits ONE CHARACTER at a time, the selected
   // slot. Its working copy is an undo history of that slot alone (phase 1's history held the whole face, slots and all,
   // in every step): switching slots is not a step, and each slot keeps its own history while you switch between them.
@@ -203,8 +203,11 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
   const [offer, setOffer] = useState<{ before: CreatorSlotV2 } | null>(null);
   /** the look each slot had when it was opened or last saved — what Before shows */
   const baseline = useRef(new Map<string, CreatorSlotV2>());
-  /** NEXUS STUDIO: set when this tab edits a Studio character (nothing is read from or saved to the account then) */
-  const [studioEdit, setStudioEdit] = useState<ClosetEditSession | null>(null);
+  /** NEXUS STUDIO: set when this tab edits a Studio character (nothing is read from or saved to the account then).
+   *  `numbers`: the code that came in carried face sculpt numbers (the code's `k.sliders`); only then do they go back. */
+  const [studioEdit, setStudioEdit] = useState<(ClosetEditSession & { numbers: boolean }) | null>(null);
+  /** STORE-READY B1's flag, and never while editing a Studio character: a scan is face data, and that tab has no consent step */
+  const faceScan = faceScanFlag && !studioEdit;
 
   useEffect(() => {
     (async () => {
@@ -218,7 +221,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
             id: 'studio', label: sanitizeStampText(se.name) || 'STUDIO', body: sr.slot?.body ?? 'male', base: sr.base, doc: sr.doc, equipped: { ...defaultEquipped() },
             ...(sr.slot?.sliders ? { sliders: sr.slot.sliders } : {}), ...(sr.slot?.frame ? { frame: sr.slot.frame } : {}), ...(sr.slot?.presentation ? { presentation: sr.slot.presentation } : {}),
           };
-          setStudioEdit(se);
+          setStudioEdit({ ...se, numbers: !!sr.slot?.sliders });
           setSlots([s]); setActiveId(s.id); setSelectedId(s.id); setHist(createHistory(s));
           setSavedSig(JSON.stringify([[s], s.id])); baseline.current = new Map([[s.id, s]]);
           return;
@@ -330,12 +333,13 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan = false 
     return null;
   };
   const shareCode = (numbers: boolean) => encodeSlotCode(slot, { numbers });
-  /** NEXUS STUDIO: the edited character back to the Studio (its own share code, the numbers kept: it stays on this device) */
+  /** NEXUS STUDIO: the edited character back to the Studio as its own share code. The face sculpt numbers go back only if the
+   *  code that came in carried them, so a round trip never adds numbers the Closet's consent step never saw. */
   const backToStudio = async () => {
     if (!studioEdit) return;
     // No name goes back: the label here is the jersey-plate form of the Studio's name (upper case, 12 characters) and this
     // tab has no rename, so sending it would only rename "Nova" to "NOVA" in the Studio on every round trip.
-    const code = await encodeSlotCode(slot, { numbers: true });
+    const code = await encodeSlotCode(slot, { numbers: studioEdit.numbers });
     if (!writeClosetReturn(browserKV(), studioEdit.session, code)) {
       // Share sits in the slot bar, which this tab does not show: copy the code here for the Studio's manual paste
       const copied = await (navigator.clipboard?.writeText(code).then(() => true, () => false) ?? Promise.resolve(false));

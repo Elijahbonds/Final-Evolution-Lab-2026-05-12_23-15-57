@@ -508,8 +508,18 @@ no legal or policy copy.
      code is copied to the clipboard for the Studio's manual paste. If that fails, the toast names Photo › Code.
   3. The session is read only when the param is present. `browserKV()` probes storage with a write, so the plain live `/closet`
      no longer does anything new.
+  **Face numbers and the face scan** (coordinator follow-up, 2026-10-17). Edit mode has no consent step, so it adds no face data:
+  - The look goes back with its face sculpt numbers only if the code that came in carried them. A slot code holds the numbers
+    as `k.sliders`, which `decodeSlotCode` returns as `slot.sliders`. A code without them goes back without them, even after
+    a sculpt edit. The height and build are not "numbers" in the code format and always travel.
+  - The face-scan entry ("Scan My Face" and its capture) is hidden in edit mode, whatever `FACE_SCAN_ENABLED` says.
   Tested in `components/closet/closet-studio-edit.test.tsx`: the whole ClosetView runs on the test hook runtime, with fetch and
   storage stubbed and read back.
+  **Follow-ups (left as they are, for the creator lane):**
+  - In edit mode, the Body controls' note in `components/closet/character-controls.tsx` still says height and build stay on
+    this device "unless you allow saving look numbers above". That consent control is hidden there.
+  - The first-visit walkthrough's "save" step can't be completed in edit mode, which has no Save Look. It can only be
+    skipped.
 - **The rival — owner call, not built.** Tiebreak's rival is a body the MODE spawns: a tinted spawn → the roster's pick and its
   rotation (`rosterUrlFor`, `rotationFor`), its own name and look. Casting it is not data: the mode and the roster would have to
   hand that choice over (a mode code change, and the roster's say on whose body an opponent wears). Recorded for the owner.

@@ -22,9 +22,12 @@ import { PublishLookAsCard } from '@/components/pipelines/publish-look';
 import { CLOSET_EDIT_KEY, CLOSET_EDIT_TTL_MS, CLOSET_RETURN_KEY, startClosetEdit, takeClosetReturn } from '@/lib/nexus-studio/castCloset';
 import { LOCAL_CONSENT_KEY, LOCAL_LOOK_KEY } from '@/lib/creator/localLook';
 import { WALK_KEY } from '@/lib/creator/look/studio/walkthrough';
-import { decodeSlotCode } from '@/lib/creator/look/shareCode';
+import { faceMorphList } from '@/lib/creator/look/faceMorphList';
+import { decodeSlotCode, encodeSlotCode } from '@/lib/creator/look/shareCode';
 
 const SESSION = 'ce_session0001';
+/** The Fine-tune slider for the faceLong morph (its aria-label is the slider's label). */
+const sliderLabel = faceMorphList(['faceLong'])[0].label;
 const flush = () => new Promise((r) => setTimeout(r, 0));
 const until = async (ok: () => boolean) => { for (let i = 0; i < 200 && !ok(); i++) await flush(); expect(ok()).toBe(true); };
 
@@ -46,8 +49,8 @@ function rig(search: string, kv: MemoryKV = memoryKV()) {
   }));
   return { kv, writes, close, calls };
 }
-const open = async (): Promise<Mounted> => {
-  const m = mount(() => ClosetView({}));
+const open = async (props: { faceScan?: boolean } = {}): Promise<Mounted> => {
+  const m = mount(() => ClosetView(props));
   await until(() => /Save Look|Back to Nexus Studio/.test(textOf(m.tree as never)));
   return m;
 };
@@ -66,8 +69,23 @@ const buyButtons = async (m: Mounted) => {
   expect(b.length).toBeGreaterThan(0);
   return b;
 };
-const handOff = async (kv: MemoryKV, at = Date.now(), name = 'Nova') =>
-  startClosetEdit(kv, { id: 'char_1', name, lookCode: await castCode() }, at, SESSION);
+const handOff = async (kv: MemoryKV, at = Date.now(), name = 'Nova', lookCode?: string) =>
+  startClosetEdit(kv, { id: 'char_1', name, lookCode: lookCode ?? await castCode() }, at, SESSION);
+/** The Fine-tune (sculpt) slider for a face morph: an edit that writes the slot's face numbers. */
+const sculpt = async (m: Mounted, label: string, value: number) => {
+  const hits = findAll(tree(m), (el) => el.type === 'input' && el.props.type === 'range' && el.props['aria-label'] === label);
+  expect(hits, label).toHaveLength(1);
+  hits[0].props.onChange({ target: { value: String(value) } });
+  await flush();
+};
+/** Send the look back and decode what the Studio would take. */
+const sendBack = async (m: Mounted, kv: MemoryKV) => {
+  button(tree(m), /Back to Nexus Studio/).props.onClick();
+  await until(() => kv.data.has(CLOSET_RETURN_KEY));
+  const d = await decodeSlotCode(takeClosetReturn(kv, SESSION)!.code);
+  if (!d.ok) throw new Error('the return does not decode');
+  return d;
+};
 
 afterEach(() => { vi.unstubAllGlobals(); vi.mocked(toast.success).mockClear(); vi.mocked(toast.error).mockClear(); });
 
@@ -169,6 +187,40 @@ describe('?studioEdit=<session> with the Studio\'s hand-off on this device', () 
     expect(r.kv.data.has(CLOSET_RETURN_KEY)).toBe(false);
     expect(r.close).not.toHaveBeenCalled();
     m.unmount();
+  });
+});
+
+describe('face numbers and the face scan in edit mode (no consent step there)', () => {
+  it('a code that came in WITHOUT face numbers goes back without them, even after a sculpt edit', async () => {
+    const r = rig(`?studioEdit=${SESSION}`);
+    await handOff(r.kv);   // castCode(): CAST_SLOT has no sliders, and a share code leaves them out by default
+    expect((await decodeSlotCode(JSON.parse(r.kv.getItem(CLOSET_EDIT_KEY)!).code) as { slot?: { sliders?: unknown } }).slot?.sliders).toBeUndefined();
+    const m = await open();
+    await sculpt(m, sliderLabel, 60);
+    const d = await sendBack(m, r.kv);
+    expect(d.slot?.sliders).toBeUndefined();
+    expect(d.slot?.body).toBe('female');   // the rest of the look still travels
+    m.unmount();
+  });
+  it('a code that came in WITH face numbers keeps them, and a sculpt edit to them goes back', async () => {
+    const r = rig(`?studioEdit=${SESSION}`);
+    await handOff(r.kv, Date.now(), 'Nova', await encodeSlotCode({ ...CAST_SLOT, sliders: { faceRound: 0.25 } }, { numbers: true }));
+    const m = await open();
+    await sculpt(m, sliderLabel, 60);
+    const d = await sendBack(m, r.kv);
+    expect(d.slot?.sliders).toEqual({ faceLong: 0.6, faceRound: 0.25 });
+    m.unmount();
+  });
+  it('no face-scan entry while editing a Studio character, even with the flag on; the live Closet keeps it', async () => {
+    const r = rig(`?studioEdit=${SESSION}`);
+    await handOff(r.kv);
+    const m = await open({ faceScan: true });
+    expect(textOf(tree(m))).not.toContain('Scan My Face');
+    m.unmount();
+    rig('');
+    const n = await open({ faceScan: true });
+    expect(textOf(tree(n))).toContain('Scan My Face');
+    n.unmount();
   });
 });
 
