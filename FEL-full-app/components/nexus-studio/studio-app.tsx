@@ -20,6 +20,7 @@ import { VenueEditor } from './venue-editor';
 import { CharactersTrack } from './characters';
 import { ScriptsTrack } from './script-editor';
 import { AiVenuePanel } from './ai-venue-panel';
+import { AccountSave } from './account-save';
 import { C, ToolButton } from './ui';
 
 export type Track = 'venue' | 'ai' | 'characters' | 'scripts';
@@ -94,6 +95,7 @@ export function NexusStudioApp() {
           <span className="mx-1 flex items-center gap-1 text-[11px]" style={{ color: studio.saveState === 'saved' ? C.dim : studio.saveState === 'error' || studio.saveState === 'no-storage' ? C.ember : C.gold }} title={studio.saveError ?? undefined} data-testid="save-state">
             <SaveIcon className="h-3.5 w-3.5" aria-hidden /> {SAVE_LABEL[studio.saveState]}
           </span>
+          <AccountSave studio={studio} />
           <ToolButton title="Save now" shortcut="Ctrl+S" onClick={() => studio.save()}><Save className="h-4 w-4" /></ToolButton>
           <ToolButton title="Export the project (.nexus.json)" onClick={doExport}><Download className="h-4 w-4" /></ToolButton>
           <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /></ToolButton>
