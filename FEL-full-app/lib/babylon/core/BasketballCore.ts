@@ -245,6 +245,10 @@ export class DribbleController {
     this.hangLeft = DribbleController.HESI_HANG_SEC; this.hangPush = null;
     this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC + DribbleController.HESI_HANG_SEC;
     this.explodeFloor = DribbleController.HESI_EXPLODE_FLOOR;
+    // the hesitation spends the run's direction: the hang returns before a direction is recorded, so the pull-back stayed the last
+    // one (0.22 s old after the hang) and the explode's own push read as a reversal of it — a phantom crossover whose cooldown ate
+    // the real one (H2-HESI-SAME-FRAME, measured)
+    this.lastDirAge = Infinity;
   }
   /** Is the body inside a hesitation's hang? */
   get hanging(): boolean { return this.hangLeft > 0; }

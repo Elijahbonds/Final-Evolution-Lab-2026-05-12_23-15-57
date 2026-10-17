@@ -117,7 +117,8 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
 
   // explode: both push, one frame each, the same number of frames — the hesi's push is remembered inside the hang
   const hesiTrail: number[] = [], ctrlTrail: number[] = [];
-  const push = () => { run(hesi, [[0, 1]]); run(ctrl, [[0, 1]]); hesiTrail.push(hesi.vel.length()); ctrlTrail.push(ctrl.vel.length()); };
+  let hesiCrossed = 0;
+  const push = () => { const [h] = run(hesi, [[0, 1]]); run(ctrl, [[0, 1]]); if (h.crossover) hesiCrossed++; hesiTrail.push(hesi.vel.length()); ctrlTrail.push(ctrl.vel.length()); };
   push();
   while (hesi.hanging && hesiTrail.length < 60) push();
   const pushed = hesiTrail.length;
@@ -128,6 +129,20 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
   while (hesiTrail.length < 20) push();
   const ground = (t: number[]) => t.reduce((a, v) => a + v * DT, 0);
   ok(ground(hesiTrail) > ground(ctrlTrail), `the hang pays: more ground in the 0.33 s from the push (${ground(hesiTrail).toFixed(2)} vs ${ground(ctrlTrail).toFixed(2)} m)`);
+  // the explode is not a crossover: the hang returns before a direction is recorded, and the pull-back read as reversed by the
+  // explode's own push (a phantom crossover, H2-HESI-SAME-FRAME)
+  ok(hesiCrossed === 0, `the hesi's own push is never read as a crossover (${hesiCrossed} fired)`);
+
+  // hesi into cross, the oldest combo: the real crossover fires on the frame it is thrown — the phantom's cooldown used to eat it
+  const combo = new DribbleController();
+  combo.setFacing(Math.PI);
+  run(combo, Array(60).fill([0, 1]));
+  run(combo, Array(3).fill([0, -1]));
+  run(combo, Array(6).fill([0, 0]));
+  const lead = [...run(combo, Array(10).fill([0, 1])), ...run(combo, Array(4).fill([-1, 0.3]))];   // explode, then lean left
+  const snap = run(combo, Array(8).fill([1, 0.3]));                                                 // snap right
+  ok(!lead.some((r) => r.crossover) && snap[0].crossover && snap.filter((r) => r.crossover).length === 1,
+    `hesi into cross: the crossover fires on the snap and only there (before it: ${lead.filter((r) => r.crossover).length}, on it: ${snap[0].crossover})`);
 
   // and a HELD pullback stick must not explode you toward your own half
   const hold = new DribbleController();
