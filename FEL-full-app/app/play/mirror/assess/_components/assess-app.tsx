@@ -411,7 +411,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
               <span className="flex-1">
                 <span className="block text-[16px]">{COACH_READY}</span>
                 <span role="progressbar" aria-valuetext={COACH_READY} className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10">
-                  <span className="block h-full w-1/3 animate-pulse bg-[#00E5FF]" />
+                  <span className="block h-full w-1/3 motion-safe:animate-pulse bg-[#00E5FF]" />
                 </span>
               </span>
             ) : <span className="text-[16px]">Asking for the camera…</span>}
