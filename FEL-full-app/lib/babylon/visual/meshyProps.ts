@@ -7,9 +7,35 @@
 //   dressBall(ball, kind)        a textured ball mesh rides the mode's physics sphere (the sphere goes invisible)
 //   dressBoard(board, kind)      a textured deck rides the board sport's box (the box goes invisible)
 // Every load is cached per scene as an AssetContainer; a failed load leaves the procedural look in place and warns once.
-import { AssetContainer, Matrix, Mesh, Quaternion, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
+import { AssetContainer, DracoDecoder, Matrix, Mesh, Quaternion, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
+
+/**
+ * SELF-HOSTED DRACO (FDB-2, 2026-10-17). hoop.glb is Draco-compressed now (3D Art: 3,929,424 → 915,584 bytes), and Babylon's
+ * default decoder is fetched from cdn.babylonjs.com. These are the repo's own files (public/loaders/draco, three r169's glTF
+ * decoder build), set at module scope: in place before this module's first load, and before any GLB load on a path that
+ * imports this module (the dunk imports it statically). Never the CDN — meshyProps.draco.test pins all three.
+ *
+ * AT LEAST ONE WORKER. The hoop's normals (int8) and UVs (uint16) are stored as integers that the glTF accessors mark
+ * `normalized`, and Babylon 9.23 applies that accessor flag only on its worker path: decoded in-thread, they reach the GPU
+ * unnormalized (UVs of 0–65535, measured in meshyProps.draco.test). Babylon picks in-thread when its default worker count
+ * comes out 0, i.e. floor(hardwareConcurrency / 2) on a browser that reports one core. Same default otherwise (half the
+ * cores, at most 4).
+ */
+export const DRACO_DECODER_URLS = {
+  wasmUrl: '/loaders/draco/draco_wasm_wrapper.js',
+  wasmBinaryUrl: '/loaders/draco/draco_decoder.wasm',
+  fallbackUrl: '/loaders/draco/draco_decoder.js',
+} as const;
+export function dracoWorkerCount(hardwareConcurrency: number | undefined): number {
+  const cores = Number.isFinite(hardwareConcurrency) ? Math.floor(hardwareConcurrency as number) : 2;
+  return Math.max(1, Math.min(4, Math.floor(cores / 2)));
+}
+DracoDecoder.DefaultConfiguration = {
+  ...DRACO_DECODER_URLS,
+  numWorkers: dracoWorkerCount(typeof navigator === 'object' ? navigator.hardwareConcurrency : undefined),
+};
 
 export type MeshyPropKey = 'hoop' | 'ball-basketball' | 'ball-soccer' | 'ball-tennis' | 'skateboard' | 'snowboard' | 'surfboard' | 'hoopbus' | 'shuttle' | 'goal' | 'stadium' | 'ballpark' | 'sedan' | 'dojo' | 'store' | 'helmet' | 'helmet2' | 'bat' | 'glove';
 export type BallKind = 'basketball' | 'soccer' | 'tennis' | 'volleyball';
