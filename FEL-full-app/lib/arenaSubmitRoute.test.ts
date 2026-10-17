@@ -33,8 +33,14 @@ vi.mock('@/lib/arena', async (orig) => ({
 }));
 
 import { emptyCard, addAttempt, forWire, type DunkAttempt } from './mp/dunkCard';
+import { resetRateLimitMemory } from '@/lib/rate-limit';
 import { houseBeatFor, houseTap, judgeHouseSet, HOUSE_SET_MAX, type HouseTap } from './babylon/music/houseBeat';
 import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from './arena-music';
+
+// RATE-LIMIT-WIRE (PR #289): submit-score now allows 20 a minute per account (lib/rate-limits/policy.ts). This file drives
+// it far more often than that as one user, inside a second; the stand-in database has no raw SQL, so the count is the
+// per-instance window, and each test starts with a fresh one, as a player's next minute would. No assertion changed.
+beforeEach(() => { resetRateLimitMemory(); });
 
 interface Writes { updates: Record<string, unknown>[]; events: { eventType: string; payload: Record<string, unknown> }[] }
 /** MUSIC-SUITE P6: a MatchEvent row already in the database before the request (a music attempt's start / finish). */

@@ -4,7 +4,8 @@ import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
+import { trustedClientIp } from '@/lib/rate-limits/clientIp';
+import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { GUEST_COOKIE } from '@/lib/guest';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
@@ -30,16 +31,6 @@ function randAttr() {
 
 export async function POST(req: Request) {
   try {
-    // Rate limit: 5 signups per IP per 15 min
-    const ip = clientKeyFromHeaders(req.headers);
-    const rl = rateLimit(`signup:${ip}`, 5, 15 * 60 * 1000);
-    if (!rl.ok) {
-      return NextResponse.json(
-        { error: 'Too many signup attempts. Please try again later.' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSec) } }
-      );
-    }
-
     const body = await req.json().catch(() => ({}));
     const parsed = signupSchema.safeParse(body);
     if (!parsed.success) {
@@ -63,6 +54,21 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'age_screen_blocked' },
         { status: 403, headers: { 'Set-Cookie': ageBlockCookieHeader() } },
+      );
+    }
+
+    // RATE-LIMIT-WIRE (PR #289 QA rework): counted per email and per the address the TRUSTED proxy set, in the shared
+    // rate_limits table (lib/rate-limits). The old key was the first X-Forwarded-For entry, which the client writes, so a
+    // new fake address per request was a new allowance. Counted here, after the age screen and before bcrypt or any
+    // write: an under-13 lock stores nothing, not even a counter (AGE-SCREEN D5).
+    const limited = await checkRateLimits(prisma, 'signup', [
+      { kind: 'email', value: email },
+      { kind: 'ip', value: trustedClientIp(req.headers) },
+    ]);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: 'Too many signup attempts. Please try again later.' },
+        { status: 429, headers: retryAfterHeaders(limited) }
       );
     }
 

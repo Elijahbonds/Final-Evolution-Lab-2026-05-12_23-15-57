@@ -9,6 +9,9 @@
  * scales horizontally, replace the Map store with a shared store
  * (Upstash Redis / the platform KV) behind the same `rateLimit()` signature.
  * The call sites (signup, coach) will not need to change.
+ *
+ * RATE-LIMIT-WIRE (2026-10-16): login, signup, run start, season claim and Arena submit now count in the shared
+ * rate_limits table (lib/rate-limits/store.ts); this window is their fallback until that table exists.
  */
 
 interface WindowEntry {
@@ -59,6 +62,11 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
     remaining,
     retryAfterSec: Math.max(1, Math.ceil((entry.resetAt - now) / 1000)),
   };
+}
+
+/** Tests only: forget every window (a test file that drives one limited route many times as one caller). */
+export function resetRateLimitMemory(): void {
+  store.clear();
 }
 
 /** Best-effort client identifier for anonymous endpoints (signup). */

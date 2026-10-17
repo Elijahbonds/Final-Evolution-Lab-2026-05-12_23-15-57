@@ -127,6 +127,11 @@ vi.mock('@/lib/db', () => {
   return {
     prisma: {
       $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx),
+      // RATE-LIMIT-WIRE: the finish gate's count of the user's recorded finishes (GameSession [userId, createdAt])
+      gameSession: {
+        count: async ({ where }: { where: { userId: string; createdAt: { gte: Date } } }) => h.sessions
+          .filter((s) => s.userId === where.userId && new Date(String(s.createdAt ?? new Date())).getTime() >= where.createdAt.gte.getTime()).length,
+      },
       sessionRun: {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
@@ -1213,5 +1218,35 @@ describe('FOLLOW-UP (2026-09-29): the finite pay cap on skateboarding and surfin
     expect(honest.body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
     // another finite mode is capped by C1 per-run ceiling too
     expect((await post({ mode: 'snowboarding', score: 400_000, won: true, duration: 90 })).body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
+  });
+});
+
+// RATE-LIMIT-WIRE (QA top-5 #4, partial): QA's repro looped start+finish and nothing ever returned 429. The finish now
+// counts the user's recorded finishes (GameSession) over the last minute; past RUN_RATE_LIMITS.finish.perUser it is 429.
+describe('the finish rate limit (GameSession count, per user)', () => {
+  it('normal play stays under it: five dunk contests back to back are all paid', async () => {
+    for (let i = 0; i < 5; i++) {
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status, `finish ${i + 1}`).toBe(200);
+    }
+  });
+  it('the next finish past the limit is 429 RATE_LIMITED with Retry-After, and nothing of the run is read or written', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });
+    const writesBefore = h.writes.length;
+    const runId = openRun('dunkContest', 120);
+    const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120, runId });
+    expect(r.status).toBe(429);
+    expect(r.body).toMatchObject({ ok: false, reason: 'RATE_LIMITED', retryAfterSec: 60 });
+    expect(h.writes.length).toBe(writesBefore);
+    expect(h.runs[runId].status).toBe('open');   // the run is still there to finish once the window passes
+  });
+  it('finishes older than the window and other players\' finishes do not count', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) {
+      h.sessions.push({ userId: 'u1', createdAt: new Date(Date.now() - 61_000) });
+      h.sessions.push({ userId: 'someone-else', createdAt: new Date() });
+    }
+    expect((await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 })).status).toBe(200);
   });
 });

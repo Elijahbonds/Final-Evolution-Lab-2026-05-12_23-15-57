@@ -2498,3 +2498,12 @@ model AdventureSave {
   doc       Json
   updatedAt DateTime @default(now())
 }
+
+model RateLimit {
+    bucket  String   @id
+    hits    Int
+    resetAt DateTime @map("reset_at") @db.Timestamp(3)
+
+    @@index([resetAt], map: "rate_limits_reset_at_idx")
+    @@map("rate_limits")
+}

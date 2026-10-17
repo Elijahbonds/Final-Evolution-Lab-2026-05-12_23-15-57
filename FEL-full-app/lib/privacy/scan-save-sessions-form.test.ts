@@ -65,6 +65,8 @@ vi.mock('@/lib/db', () => {
   return {
     prisma: {
       $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx),
+      // RATE-LIMIT-WIRE: the finish gate counts the user's recorded finishes (GameSession [userId, createdAt])
+      gameSession: { count: async ({ where }: { where: { userId: string } }) => h.sessions.filter((s) => s.userId === where.userId).length },
       sessionRun: {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
