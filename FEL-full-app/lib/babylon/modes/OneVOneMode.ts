@@ -2517,7 +2517,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function startDunk(ctx: ModeContext, kind: 'dunk' | 'poster' | 'standing', force?: HoopsDunk): void {   // STICK HANDLE: pausin' forces its 360
     dunking = true; shooting = false; contactLatch = false; finishFoul = false;   // A+ P0: a fresh attempt gets one punch
     box.fga++;   // IMPROVE (2026-10-06) #4
-    meShotWin = 'none'; dunkFlush = null; let resolved = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1
+    meShotWin = 'none'; dunkFlush = null; let resolved = false, released = false; dunkFlight = { k: 0, made: null };   // BIOMECH-HOOPS-WAVE1 (H2 leftovers: `released` — see the resolve)
     let trickThrown = false;                       // one trick per flight: the stick is a commitment, not a masher
     let familyPicked = !!force, trickArmed = true;   // H2e: the family by the stick at the takeoff; the trick stick waits for the stick to come home after it
     turbo.t01 = Math.max(0, turbo.t01 - 0.3);           // dunks spend fuel
@@ -2754,10 +2754,12 @@ export const OneVOneMode: ModeDefinition = (() => {
         if (k < 0.55) ball.position.copyFrom(Vector3.Lerp(from.add(new Vector3(0, 1.2, 0)), glassDunk, g));
         else ball.position.copyFrom(Vector3.Lerp(glassDunk, RIM, Math.min(1, (k - 0.55) / 0.35)));
       }
-      if (!resolved && !swatted && k >= DRIVE_DUNK.resolveK) {
+      // H2 leftovers: on `released`, not `resolved` — a thrown trick sets `resolved` (its make is decided), and this release keyed on it,
+      // so after any trick the ball never left the hand: no flush through the net on a make, no clank and no board on a miss
+      if (!released && !swatted && k >= DRIVE_DUNK.resolveK) {
         // G6: the slam resolves AT THE IRON — the ball leaves the hand at the rim; a make flushes through the net, a miss
         // clanks off the front (it used to let go on the feet-down frame, from a hand at hip height, and float there)
-        resolved = true;
+        resolved = true; released = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
         else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
@@ -2951,7 +2953,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     }
     else if (pumpWindow > 0 && defenderPos && dist < 5.4) plan = planStepThrough(me.root.position, RIM_FLOOR, yaw, defenderPos);   // M8
     else if (euroAvailable(meDribble.vel, me.root.position, RIM_FLOOR, defenderPos)) {                                        // M14
-      const sell = euroSell(mx, -my, yaw);
+      const sell = euroSell(mx, -my, yawTo(me.root.position, RIM_FLOOR));   // H2 leftovers: read across the line to the rim, not the facing (the skip's own fix: the facing follows the stick, so a held sell read forward)
       if (sell) plan = planEuro(me.root.position, RIM_FLOOR, yaw, sell, rimProtected(me.root.position, RIM_FLOOR, defenderPos) ? 'floater' : 'layup');
     }
     // H2e (owner): THE SKIP GATHER — the stick held AWAY from him with no help in the lane (help: the euro above takes the same input)
