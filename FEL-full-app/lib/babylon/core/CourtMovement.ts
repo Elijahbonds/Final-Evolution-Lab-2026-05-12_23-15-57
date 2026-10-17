@@ -182,6 +182,10 @@ export class CourtMovement {
    *  forward/away from camera = -Z on court, matching DribbleController's
    *  convention). Returns the state for animation/HUD. */
   update(dt: number, moveX: number, moveY: number, sprint: boolean): MovementState {
+    // H3a fix: a frame with no time (a hit-stop, a freeze, a feet-down tick) divided the jerk limit's acceleration by zero (0 over 0)
+    // and the NaN stuck in accPrev, then the speed, the velocity and the root (every 3v3 body after it, through the contacts: measured
+    // on a dunk's landing). Such a frame divides by nothing (idt 0) and keeps the acceleration memory as it was.
+    const idt = dt > 1e-9 ? 1 / dt : 0, accKeep = this.accPrev;
     this.plantTimer = Math.max(0, this.plantTimer - dt);
     this.launchLeft = Math.max(0, this.launchLeft - dt);
     this.cutGraceLeft = Math.max(0, this.cutGraceLeft - dt);
@@ -226,9 +230,9 @@ export class CourtMovement {
         // the "studs in the hardwood" beat that sells weight.
         let newSpeed = Math.max(this.plantFloor, speed - (t.gears?.reverseDecel ?? t.decel * 1.4) * dt);   // H3a (gears): the reversal's own brake, not 47.6 m/s²
         if (t.gears?.jerk) {   // H3a: the plant comes on over a few frames too
-          const want = (newSpeed - speed) / dt, j = t.gears.jerk * dt;
+          const want = (newSpeed - speed) * idt, j = t.gears.jerk * dt;
           const a = Math.max(this.accPrev - j, Math.min(this.accPrev + j, want));
-          newSpeed = Math.max(this.plantFloor, Math.max(newSpeed, speed + a * dt)); this.accPrev = (newSpeed - speed) / dt;
+          newSpeed = Math.max(this.plantFloor, Math.max(newSpeed, speed + a * dt)); this.accPrev = (newSpeed - speed) * idt;
         }
         if (speed > 0.001) this.vel.copyFrom(this.vel.normalize().scale(newSpeed)); else this.vel.setAll(0);
       } else {
@@ -280,7 +284,7 @@ export class CourtMovement {
         let newSpeed: number;
         if (t.gears && reversing) {
           newSpeed = Math.max(0, speedT - (t.gears.reverseDecel ?? t.decel) * dt);
-          this.accPrev = (newSpeed - speedT) / dt; this.kickLeft = 0;
+          this.accPrev = (newSpeed - speedT) * idt; this.kickLeft = 0;
         } else if (t.gears) {
           // DRIBBLE PACE: a lag to the gear's target, capped per gear, loaded off the mark; a LOWER target (off the turbo,
           // easing the stick) bleeds at the gear-down rate rather than snapping; the sprint PRESS kicks a moving body.
@@ -297,11 +301,11 @@ export class CourtMovement {
             newSpeed = Math.min(topSpeed, speedT + Math.min(cap * load, err / tau) * dt);
           } else newSpeed = Math.max(topSpeed, speedT - g.gearDownDecel * dt);
           if (g.jerk && this.cutDebt <= 0) {   // H3a: the speed's acceleration changes at most `jerk` m/s³ — never a one-frame flip
-            const want = (newSpeed - speedT) / dt, j = g.jerk * dt;
+            const want = (newSpeed - speedT) * idt, j = g.jerk * dt;
             const a = Math.max(this.accPrev - j, Math.min(this.accPrev + j, want));
             newSpeed = want >= 0 ? Math.min(newSpeed, speedT + a * dt) : Math.max(newSpeed, speedT + a * dt);
-            this.accPrev = (newSpeed - speedT) / dt;
-          } else this.accPrev = (newSpeed - speedT) / dt;
+            this.accPrev = (newSpeed - speedT) * idt;
+          } else this.accPrev = (newSpeed - speedT) * idt;
           if (sprint && !this.sprintWas && speedT >= g.kickAbove) {
             if (g.kickSec) this.kickLeft = g.sprintKick;   // H3a: spread over kickSec
             else newSpeed = Math.min(t.maxSpeed * this.speedScale, newSpeed + g.sprintKick);
@@ -338,15 +342,16 @@ export class CourtMovement {
         const decel = t.gears ? (this.pausedNow ? t.gears.stopDecelLow * 1.5 : hop ? HOP_GLIDE_LOW + (HOP_GLIDE_HIGH - HOP_GLIDE_LOW) * Math.min(1, speed / t.maxSpeed) : t.gears.stopDecelLow + (t.gears.stopDecelHigh - t.gears.stopDecelLow) * Math.min(1, speed / t.maxSpeed)) : t.decel;   // pausin' stops on a dime
         let newSpeed = Math.max(0, speed - decel * dt);
         if (t.gears?.jerk && !this.pausedNow && !hop) {   // H3a: the brake comes on over a few frames, not one (the full push to the stop was a 42 m/s² flip)
-          const want = (newSpeed - speed) / dt, j = t.gears.jerk * dt;
+          const want = (newSpeed - speed) * idt, j = t.gears.jerk * dt;
           const a = Math.max(this.accPrev - j, Math.min(this.accPrev + j, want));
-          newSpeed = Math.max(0, Math.max(newSpeed, speed + a * dt)); this.accPrev = newSpeed > 0 ? (newSpeed - speed) / dt : 0;
+          newSpeed = Math.max(0, Math.max(newSpeed, speed + a * dt)); this.accPrev = newSpeed > 0 ? (newSpeed - speed) * idt : 0;
         }
         this.kickLeft = 0; this.cutDebt = 0;
         this.vel.scaleInPlace(speed > 0.001 ? newSpeed / speed : 0);
       }
     }
 
+    if (!idt) this.accPrev = accKeep;   // (H3a fix: see idt)
     this.sprintWas = sprint && mag > 0.05;
     this.burst01 = Math.max(0, this.burst01 - dt / 0.35);
     const speed01 = Math.min(1, this.vel.length() / t.maxSpeed);
