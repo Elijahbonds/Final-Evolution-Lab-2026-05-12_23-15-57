@@ -134,7 +134,9 @@ import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1: the dunk's Posture Poses, shared
 import { mountMotionLayers, type MotionMount } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the dunk pass's motion layers on both bodies
 import { BodyMotion, dynamicPose } from '../core/DynamicPosture';   // the body answers its MOTION, not just its state
-import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { hoopsPose, hoopsWindow, HOOPS_INPUT_IDLE, RELEASE_SEC, LAND_SEC, CELEBRATE_SEC, PROTECT_SINK_M, DEFENSE_RAISE_M, type HoopsPostureInput, type ShotWindow } from '../core/HoopsPosture';
+import { HandlerLook } from '../core/HoopsLook';   // H3b: the handler reads the defender
+import { mountLandingAbsorb, type LandingAbsorbHandle } from '../anim/LandingAbsorb';   // H3b: the protect's lower stance
 import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biomech';
 // HOOPS KINETIC (owner brief 2026-09-18): the parry-vault, the momentum drift and its ankle-breaker, the footstool board, the drive-by steal.
 import { PARRY, parryVaultRead, vaultAt, DRIFT, driftRead, ankleBreak, FOOTSTOOL, footstoolRead, DRIVE_BY, driveByRead } from '../core/HoopsKinetic';
@@ -198,7 +200,7 @@ import { dunkStingers } from '../audio/mic/names';
 import { HOOPERS } from '../audio/mic/cast';
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
-import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
+import { retreatFor, closeoutFor, defendRunFor, approachFor, DEEP_DEFENSE_STATES } from '../anim/basketballTree';
 /** H2c (dev log): the defender states the stepping pass added or re-routed. */
 const H2C_STEP_STATES: ReadonlySet<string> = new Set(['defend_run', 'defend_run_right', 'run', 'closeout']);   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
@@ -515,6 +517,10 @@ export const OneVOneMode: ModeDefinition = (() => {
   const micCool: Record<string, number> = {};
   // ── BIOMECH-HOOPS-WAVE1 (2026-09-08): the Posture Poses layer per body, and the hoops windows it reads ──
   let mePosture: { layer: PostureLayer; dispose(): void } | null = null, foePosture: { layer: PostureLayer; dispose(): void } | null = null;
+  const meLook = new HandlerLook();                // H3b: my chest and eyes with the ball (HoopsLook)
+  let meSink: LandingAbsorbHandle | null = null;   // H3b: the protect's sink (the hips down, the feet kept); H3c: my D stance raised
+  const foeLook = new HandlerLook(1.1);            // H3c: the rival with the ball reads ME at the gap, the rim on the way
+  let foeSink: LandingAbsorbHandle | null = null;  // H3c: his D stance raised (DEFENSE_RAISE_M)
   let meLayers: MotionMount | null = null, foeLayers: MotionMount | null = null;   // HOOPS MOTION phase 3c
   const meBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE }, foeBio: HoopsPostureInput = { ...HOOPS_INPUT_IDLE };
   let meShotWin: ShotWindow = 'none', meShotSec = 0, foeShotWin: ShotWindow = 'none', foeShotSec = 0;   // load (the meter / the gather) → release → follow (until the arc resolves)
@@ -1070,8 +1076,10 @@ export const OneVOneMode: ModeDefinition = (() => {
       // DEV `?pp=0` (HOOPS-DEPTH S7): no Posture Poses layer on either body — the foot-plant probe's A/B for what the layer does to the feet
       const ppOff = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pp') === '0';
       if (ppOff) console.info('[1V1-DEV] posture layer OFF (?pp=0)');
-      if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking), '1V1-PP');   // DRIBBLE PACE: a sprint LOOKS like work
-      if (!ppOff) foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
+      if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? meLook.aim : foe.root.position, possession === 'mine' ? meLook.eyes : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking), '1V1-PP');   // DRIBBLE PACE: a sprint LOOKS like work
+      if (!ppOff) foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : foeBio.hasBall ? foeLook.aim : RIM, possession === 'mine' ? ballWorld() : foeBio.hasBall ? foeLook.eyes : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
+      meSink?.dispose(); meSink = mountLandingAbsorb(ctx.scene, me.skeleton, me.root, { auto: false, first: true });   // H3b: first — the carry reaches for the ball off the sunk body
+      foeSink?.dispose(); foeSink = mountLandingAbsorb(ctx.scene, foe.skeleton, foe.root, { auto: false, first: true });   // H3c
       // HOOPS MOTION phase 3c: THE MOTION LAYERS (anim/motionLayers — the dunk pass's, lifted out of DunkMode) on both bodies: the limb drag
       // insert-first (the legs only in the air, the ball arm left on its clip around a release), the side lean right after the posture
       // layer (before the carries, whose reach solves against the leaned shoulders), and — after every arm writer below — the hinge
@@ -2353,6 +2361,14 @@ export const OneVOneMode: ModeDefinition = (() => {
         posting, spinning: !!spin,   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
         hesi: meDribble.hanging,     // H2b (plan §4.8): the hitch's posture through the hang
       } satisfies HoopsPostureInput);
+      // H3b: with the ball, my chest and eyes read the rival (HoopsLook); at rest under his press, the protect (the carry's guard, the sink)
+      const meWin = hoopsWindow(meBio);
+      meLook.update({ self: me.root.position, ball: ballWorld(), rim: RIM, defender: foeStunSec > 0 || foeFloored ? null : foe.root.position, window: meWin, speed01: meSpeed01, dt });
+      const protecting = meBio.hasBall && meWin === 'protect';
+      const deep = (st: string | null) => !!st && DEEP_DEFENSE_STATES.has(st as never);   // H3c: the deep defensive captures stand taller
+      meCarry?.setGuard(protecting ? 1 : 0); meSink?.hold(protecting ? PROTECT_SINK_M : deep(meAnimTree.state) ? -DEFENSE_RAISE_M : 0);
+      foeSink?.hold(deep(foeAnimTree.state) ? -DEFENSE_RAISE_M : 0);
+      if (foeBio.hasBall) foeLook.update({ self: foe.root.position, ball: ballWorld(), rim: RIM, defender: meStunSec > 0 || meFloored ? null : me.root.position, window: hoopsWindow(foeBio), speed01: foeSpeed01, dt });   // H3c
       Object.assign(foeBio, {
         role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,
         nearestDefender: possession === 'defense' ? foeDist : Infinity, shot: foeShotWin, flight: foeDunkFlight, landed: false, celebrate: false,
@@ -2370,6 +2386,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       net?.dispose(); net = null;   // IMPROVE (2026-10-06) #8: NETPLAY says bye here, with the rest of teardown (load used to hang up)
       meFootPlant?.dispose(); foeFootPlant?.dispose(); foeFootPlant = null;
       mePosture?.dispose(); foePosture?.dispose(); mePosture = null; foePosture = null;   // BIOMECH-HOOPS-WAVE1
+      meSink?.dispose(); meSink = null; foeSink?.dispose(); foeSink = null;   // H3b/H3c
       meCarry?.dispose(); foeCarry?.dispose(); meCarry = null; foeCarry = null;
       meReach?.dispose(); foeReach?.dispose(); meReach = null; foeReach = null;
       meLayers?.dispose(); foeLayers?.dispose(); meLayers = null; foeLayers = null;   // HOOPS MOTION phase 3c

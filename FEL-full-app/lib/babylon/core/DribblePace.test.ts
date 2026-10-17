@@ -29,11 +29,13 @@ describe('dribble pace: three speeds', () => {
     const v5 = m.update(DT, 0, 1, true).vel.length();
     expect(v1).toBeLessThan(v5 - v3 + 1e-9 + v1 * 0.5);
   });
+  // H3a (owner 2026-10-17, "slides on stops"): the window was 0.35–0.9 s for the sprint stop (its 1.41 m slide); firmer now, still longer
+  // than a jog's (REWRITTEN WINDOW, same intent: a sprint stop is a gather, not a wall, and longer than a jog's)
   it('the stop scales with pace: a sprint slides longer than a jog, both smooth', () => {
     const stopSec = (sprint: boolean) => { const m = geared(); run(m, 1.5, 0, 1, sprint); let t = 0; while (m.update(DT, 0, 0, false).vel.length() > 0.05 && t < 3) t += DT; return t; };
     const fromSprint = stopSec(true), fromJog = stopSec(false);
     expect(fromSprint).toBeGreaterThan(fromJog * 1.4);
-    expect(fromSprint).toBeGreaterThan(0.35); expect(fromSprint).toBeLessThan(0.9);
+    expect(fromSprint).toBeGreaterThan(0.18); expect(fromSprint).toBeLessThan(0.5);
     expect(fromJog).toBeLessThan(0.4);
   });
   it('letting off the turbo with the stick held eases down instead of snapping', () => {
@@ -42,9 +44,15 @@ describe('dribble pace: three speeds', () => {
     let t = 0; while (m.update(DT, 0, 1, false).vel.length() > DEFAULT_MOVEMENT.maxSpeed * DEFAULT_MOVEMENT.jogFactor + 0.05 && t < 2) t += DT;
     expect(t).toBeGreaterThan(0.12); expect(t).toBeLessThan(0.5);
   });
+  // H3a ("too twitchy"): the kick is SPREAD over kickSec, not added in one frame (REWRITTEN: it was `after − before > 0.8 kick` on the
+  // press frame; now the kicked body is ahead of an unkicked one by ≥ 0.8 kick once kickSec has run, and no frame adds a snap)
   it('the sprint PRESS kicks a body already moving, not one standing still', () => {
-    const m = geared(); run(m, 1.5, 0, 1, false); const before = m.vel.length(); const after = m.update(DT, 0, 1, true).vel.length();
-    expect(after - before).toBeGreaterThan(GEARS_HOOPS.sprintKick * 0.8);
+    const plain = () => new CourtMovement({ ...DEFAULT_MOVEMENT, gears: { ...GEARS_HOOPS, sprintKick: 0 } });
+    const m = geared(), c = plain(); run(m, 1.5, 0, 0.3, false); run(c, 1.5, 0, 0.3, false);   // a walk: under every cap, so the kick shows whole
+    let prev = m.vel.length(), maxStep = 0, lead = 0;
+    for (let t = 0; t < (GEARS_HOOPS.kickSec ?? 0) + 2 * DT; t += DT) { const v = m.update(DT, 0, 1, true).vel.length(); const cv = c.update(DT, 0, 1, true).vel.length(); maxStep = Math.max(maxStep, v - prev); lead = Math.max(lead, v - cv); prev = v; }
+    expect(lead).toBeGreaterThan(GEARS_HOOPS.sprintKick * 0.8);   // the kick lands whole (the sprint's own lag then closes the gap near the top)
+    expect(maxStep).toBeLessThan(GEARS_HOOPS.sprintKick * 0.7);   // and no frame is a snap
     const s = geared(); const first = s.update(DT, 0, 1, true).vel.length();
     expect(first).toBeLessThan(GEARS_HOOPS.sprintKick);
   });

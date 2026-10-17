@@ -101,7 +101,7 @@ const hv = (name: string, move: string, jog: number, sprint: boolean): Take => (
 const handleSet = (pfx: string, base: Take, move: string): Take[] => [...rep(base, 2), hv(`${pfx}_${move}_stand`, move, 0, false), hv(`${pfx}_${move}_fast`, move, 0.9, true)];
 const T3 = { close: true, charge: 0.3, spot: [0, -0.1], postMs: 1500 };
 const O = {   // the 1v1 offence takes referenced by name below
-  set: off('o_set', 'jumper'), contest: off('o_contest', 'jumperNow', { luck: 0 }), block: off('o_block', 'contested', { luckShot: 0 }), block2: off('o_block2', 'contested', { luckShot: 0, creep: 0.5, hold: 500 }), strip: off('o_strip', 'idle', { ms: 1800, luck: null }),
+  set: off('o_set', 'jumper'), contest: off('o_contest', 'jumperNow', { luck: 0 }), block: off('o_block', 'contested', { luckShot: 0 }), block2: off('o_block2', 'contested', { luckShot: 0, creep: 0.5, hold: 500 }), hold: off('o_hold', 'idle', { ms: 5000, luck: 0.99 }), strip: off('o_strip', 'idle', { ms: 1800, luck: null }),
   pullup: off('o_pullup', 'pullup'), fade: off('o_fade', 'fade'), stepback: off('o_stepback', 'stepback'),
   layup: off('o_layup', 'layup', { wing: 3.2 }), layup2: off('o_layup2', 'layup', { wing: -3.2 }), layup3: off('o_layup3', 'layup', { wing: 4.5, mag: 0.84, stop: 2.9 }), layup4: off('o_layup4', 'layup', { baseline: true, stop: 2.2 }),
   floater: off('o_floater', 'floater'), dunk: off('o_dunk', 'dunk', { postMs: 3000 }),
@@ -144,7 +144,7 @@ const cont = (name: string, c: number, lo = 1.3, hi = 2.0): Take => ({ name, pla
 const rack = (name: string, extra: Record<string, unknown> = {}): Take => ({ name, play: 'threept', ms: 13000, postMs: 200, canon: false, ...extra });
 const SESSIONS: Session[] = [
   { id: '1v1-off', mode: 'onevone', qs: '&handle=100', takes: [
-    ...canon([O.set, O.contest, O.block, O.block2, O.strip, O.pullup, O.fade, O.stepback, O.layup, O.layup2, O.layup3, O.layup4, O.floater, O.dunk, O.cross, O.between, O.behind, O.spin, O.hesi, O.inout, O.hook, O.dropstep, O.shimmy, O.upunder, O.rebound, O.rebound2, O.rebound3, O.rebound4, O.rebound5]),
+    ...canon([O.set, O.contest, O.block, O.block2, O.hold, O.strip, O.pullup, O.fade, O.stepback, O.layup, O.layup2, O.layup3, O.layup4, O.floater, O.dunk, O.cross, O.between, O.behind, O.spin, O.hesi, O.inout, O.hook, O.dropstep, O.shimmy, O.upunder, O.rebound, O.rebound2, O.rebound3, O.rebound4, O.rebound5]),
     // ── the repeats and variants (phase 1's four runners, folded; each under its own name) ──
     ...rep(O.set, 4), ...rep(O.pullup, 4), ...rep(O.fade, 4), ...rep(O.stepback, 4),
     ...rep(O.contest, 2), off('o_hand1', 'jumperNow', { luck: 0.5, canon: false }), off('o_hand2', 'jumperNow', { luck: 0.5, canon: false }), off('o_hand3', 'contested', { luckShot: 0.5, canon: false }),
@@ -280,6 +280,9 @@ const withReps = (names: string[]): string[] => { const all = SESSIONS.flatMap((
 const CATALOGUE: ActionDef[] = [
   // ── 1v1, my possession: the hero ──
   A('hero_1v1_idle', 'dribble idle at the check', 'idles/reactions', 'idle', '1v1-off', withReps(['o_set']), { body: 'me', start: true }, 0, 450),
+  // H3b (owner 2026-10-17, "idle dribbling felt off"): the dribble AT REST after the check — the stick home, no strip (the at-check
+  // take above is the pre-dribble hold, `idle_stand`)
+  A('hero_1v1_hold', 'idle dribble at rest (the stick home, after the check)', 'idles/reactions', 'idle', '1v1-off', withReps(['o_hold']), { body: 'me', clip: /dribble_idle|protect/ }, 0, 4000),   // H3b: four seconds at rest — the press arrives ~1.2 s in
   A('hero_1v1_jumper_set', 'set jumper (standing)', 'jumpers', 'shot', '1v1-off', withReps(['o_set']), { body: 'me', clip: SHOT_START }, 450, 1700),
   A('hero_1v1_pullup', 'pull-up jumper off the dribble', 'jumpers', 'shot', '1v1-off', withReps(['o_pullup']), { body: 'me', clip: SHOT_START }, 450, 1700),
   A('hero_1v1_fade', 'fadeaway (giving ground)', 'jumpers', 'shot', '1v1-off', withReps(['o_fade']), { body: 'me', clip: /fade|pullup_gather|jumpshot/ }, 450, 1700),

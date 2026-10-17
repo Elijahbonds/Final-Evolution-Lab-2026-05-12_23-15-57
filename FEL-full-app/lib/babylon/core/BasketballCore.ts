@@ -77,7 +77,7 @@ export class DribbleController {
   static readonly EXPLODE_FLOOR = 0.7;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
-    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS });   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS, turnRateDegAtSpeed: 720 });   // H3a: 540 → 720°/s, the handler turns quicker (FEEL NUMBER)   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
     this.crossoverBoost = cfg.crossoverBoost;
   }
   private crossoverBoost: number;
@@ -690,6 +690,16 @@ export class DefenderBrain implements AIBehavior {
   static readonly PRESS_AFTER_SEC = 0.6;
   /** Phase 10: how far off a standing shooter the on-ball man settles (m). Outside the poke's 1.1 m, inside contest range. */
   static readonly ARMS_LENGTH = 1.25;
+  /** H3b (owner 2026-10-16: "idle dribbling felt off"): where the PRESS settles — this far off the standing HANDLER's body (m, root to
+   *  root), between him and the rim. It was a lever of the ball's way to the rim (0.12 of it), lifted toward the rim's height, so the
+   *  steer's dead zone never closed (1.2 m of phantom altitude) and he crept on into the handler: 0.85 m root to root from the arc,
+   *  the torsos interpenetrating on 197 of the hold take's frames. 1.05 m is his reach on the ball's side, chest to chest. */
+  static readonly PRESS_GAP = 1.05;
+  /** H3c (owner 2026-10-16: "situational awareness"): his man HAS the ball within this (m, the root to the ball, flat). It was 1.8, so a
+   *  screener stood beside the handler read as the handler and his defender left him to close out on the ball too: two or more
+   *  defenders on the ball in 11 % of the frames someone had it (_aware-read, h3c-base). A ball in the hands or on the dribble is
+   *  inside ~0.7 m of the root. */
+  static readonly HAS_BALL_M = 1.0;
 
   /**
    * @param markIndex which opponent this defender is assigned to. Null keeps the
@@ -728,7 +738,7 @@ export class DefenderBrain implements AIBehavior {
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
-    const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    const markHasBall = mark ? distXZ(mark, ball) < DefenderBrain.HAS_BALL_M : false;
     // A LIVE BALL outranks everything. Measured in 3v3: after a miss every one of the six bodies sat
     // 8-19 m from the ball holding its seal or its crash lane, and the board fell through to the dice
     // roll — because no job in the system meant "go and get the actual ball".
@@ -820,6 +830,10 @@ export class DefenderBrain implements AIBehavior {
     this.closingOut = closingOut;
     const lever = beaten ? 0.6 : press ? 0.12 : onBall ? 0.35 + Math.min(1, handlerSpeed / 6) * 0.25 : 0.30;
     let denyPoint = Vector3.Lerp(anchor, hoop, lever);
+    if (press && !beaten && handlerPos) {   // H3b: the press sits PRESS_GAP off the handler's body, on the floor (see PRESS_GAP)
+      const tx = hoop.x - handlerPos.x, tz = hoop.z - handlerPos.z, L = Math.hypot(tx, tz);
+      if (L > 1e-3) denyPoint = new Vector3(handlerPos.x + (tx / L) * DefenderBrain.PRESS_GAP, self.y, handlerPos.z + (tz / L) * DefenderBrain.PRESS_GAP);
+    }
     // THE CLOSE-OUT FINISHES AT ARM'S LENGTH (Phase 10). Against a STANDING handler the deny point sat a third of the way
     // to the hoop — 2 m off a shooter at the arc — so a catch-and-shoot held for 1.2 s was released at contest 0.1
     // (measured: 1v1 mean 0.31, 3v3 0.12; contestLevel is 1 - d/2.2). 2K's on-ball man is at arm's length on a set
