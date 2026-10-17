@@ -94,7 +94,7 @@ import {
   DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
-  SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF, SEP_PUSH_MPS, BODY_HARD_GAP, SEP_POP_MAX } from '../core/BasketballCore';
 import { lockTarget, choosePassType, PassFlight, type PassType, type PassTarget, leadPoint, PASS_SPEED } from '../core/BallHandling';
 import { HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A
@@ -112,6 +112,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
   groundContest, aiBlockChance, bumpExposure, aiBumpStrips, jumpSwats, contestedPct, fatiguePct, alteredApex, aiHandsUp, facingCos,
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
   contestTag, aiShotRead,   // HOOPS-DEPTH S5
+  AI_REACH_COOLDOWN_SEC, AI_REACH_GATE, AI_REACH_STUN_SEC, AI_REACH_TELL_SEC, resolveAiReach,   // T-A: the shared reach rules
 } from '../core/HoopsDefense';
 import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE, DUNK_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
@@ -212,6 +213,8 @@ interface Body {
   jumpAge: number;
   /** 2026-09-17: an AI defender's reach is a commitment — this long before he can reach again. */
   reachCooldown: number;
+  /** T-A STEAL-TELL: a reach that is showing (resolves after AI_REACH_TELL_SEC), or null. */
+  reach?: { t: number; exposed: boolean; moveMark: number } | null;
   /** O1–O3: the AI brain (its job / screen / box-out readouts); null for the hero. */
   brain: TeammateBrain | DefenderBrain | null;
   /** O1: the screen clip is held on this body. */
@@ -516,7 +519,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   const DRIVE_MPS = 5.4;            // the rival's sprint drive (suite pass): the clock is distance / this. Past HoopsDunks' WINDUP_SPEED (5.0) on a full-length drive, so the vocabulary opens; a short drive stays a power dunk
   const TEAM_JERSEY = { mine: '#22d3ee', theirs: '#ff2d78' } as const;   // the slot colours the HUD already speaks (cyan = us, pink = them)
   const TEAM_SHORTS = { mine: '#0e7490', theirs: '#9d174d' } as const;   // HOOPS-TO-75 HP-5: shorts tint when the jersey mesh name misses
-  const AI_REACH_COOLDOWN_SEC = 1.2, AI_STEAL_CHANCE = 0.22, AI_STEAL_ON_BUMP = 0.6, AI_REACH_GATE = 0.5;   // measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions — a foul every other trip   // the AI defender's reach: its cadence and its odds (open / on the bump)
+  // T-A: AI_REACH_COOLDOWN_SEC 1.2 / AI_STEAL_CHANCE 0.22 / AI_STEAL_ON_BUMP 0.6 / AI_REACH_GATE 0.5 moved to HoopsDefense, unchanged (measured at 0.6 s: ten reaches and four reach-in fouls in nine possessions)
   const STANDING_GATHER_MS = 220;   // DEFENSE-LOOK: the two-foot squat before a standing dunk's flight
   const DUNK_SHARE = 0.55;          // of the OPEN lanes, the share the rival throws down (the rest are layups); nerve tilts it
   const GATHER_TELL_SEC = 0.35;     // the last stretch of the drive reads as the GATHER — the block's window, on the seam and the hint
@@ -798,6 +801,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function resetPossession(toMe = true): void {
     if (hoopsFx?.deadBall(() => resetPossession(toMe))) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
+    for (const f of foes) f.reach = null;   // T-A: a showing reach ends with the possession
     dropBoard();
     goaltendCalled = false; foeShotScored = false; paintSec = 0; paintWarned = false;   // one goaltend per shot, and the paint clock is per possession
     // every body is about to be teleported; a reset is not an acceleration (nor a run: the movers stand, the pins let go)
@@ -1905,7 +1909,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const key = `${i}|${j}`;
           const cooling = (contactCooldown.get(key) ?? 0) > nowMs;   // one impulse + one event per collision (the Havok solver's 300 ms pair gate)
           const c = resolveBodyContact(A.char.root.position, B.char.root.position, A === me ? me.drib.vel : A.vel, B === me ? me.drib.vel : B.vel, 0.55,
-            { airborneA: A === me && !!finish, airborneB: B === me && !!finish, exchange: !cooling });
+            { airborneA: A === me && !!finish, airborneB: B === me && !!finish, exchange: !cooling,
+              maxPush: SEP_PUSH_MPS * dt, hardGap: BODY_HARD_GAP, popMax: SEP_POP_MAX });   // T-C: a capped push, never a one-frame pop
           if (!c || cooling || c.closing <= 0.8) continue;
           contactCooldown.set(key, nowMs + 300);
           if (c.severity === 'bump') continue;
@@ -2128,15 +2133,23 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // exposure read, no cooldown, no foul risk, while my own reach on their drive has all three. Now theirs is mine
           // mirrored: a reach every AI_REACH_COOLDOWN_SEC at most, it takes the ball on a roll (more on the bump, when the
           // ball is out of the hand), a miss stuns the reacher, and a reach through a moving body is the reach-in foul.
-          if (f.stunSec === 0 && f.reachCooldown === 0 && f.slot.intent.steal && roll() < AI_REACH_GATE && !finish && !gather && !dunking && !sealed && !board && distXZ(f.char.root.position, carrier.char.root.position) < 1.6) {   // `!board`: no reach at a ball still live off the iron / out of the net
-            f.reachCooldown = AI_REACH_COOLDOWN_SEC;
-            f.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
+          // T-A STEAL-TELL (step 4): the reach SHOWS for AI_REACH_TELL_SEC (the beat) and resolves through resolveAiReach —
+          // the handler beats it by moving the ball; the roll, the stun and the foul are unchanged, only later.
+          const reachDist = distXZ(f.char.root.position, carrier.char.root.position);
+          if (f.reach) {
+            f.reach.t += dt;
+            if (f.reach.t < AI_REACH_TELL_SEC) continue;
+            const r = f.reach; f.reach = null;
             const carrierSpeed = carrier === me ? me.drib.vel.length() : carrier.vel.length();
-            const exposed = carrier === me && bumpAge <= BUMP_STRIP_WINDOW_SEC;
-            if (roll() < (exposed ? AI_STEAL_ON_BUMP : AI_STEAL_CHANCE)) { stripBall(ctx, f, 'STOLEN!'); break; }   // D2: the ball goes LOOSE from the hand
-            f.stunSec = 0.35;
-            const onHim = distXZ(f.char.root.position, carrier.char.root.position) <= BODY_STANDOFF + 0.25;
-            if (onHim && carrierSpeed >= REACH_FOUL_SPEED) {
+            const kind = resolveAiReach({
+              tellSec: r.t, eligible: f.stunSec === 0 && !finish && !gather && !dunking && !sealed && !board, inRange: reachDist < 1.6,
+              movedDuringTell: carrier === me && lastStickMoveAt > r.moveMark, exposed: r.exposed,
+              onHim: reachDist <= BODY_STANDOFF + 0.25, carrierSpeed, foulSpeed: REACH_FOUL_SPEED, roll,
+            });
+            console.info(`[3V3-DEF] ai reach resolve ${kind} after ${r.t.toFixed(2)}s`);
+            if (kind === 'strip') { stripBall(ctx, f, 'STOLEN!'); break; }   // D2: the ball goes LOOSE from the hand
+            f.stunSec = AI_REACH_STUN_SEC;
+            if (kind === 'foul') {
               const call = judge('reach_in', { offense: 'me', fouled: 'me' });
               if (call.whistle) SoundKit.play('whistle');
               mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
@@ -2145,6 +2158,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
               console.info(`[3V3-REF] ${call.id} (their reach on ${carrier === me ? 'me' : 'my mate'}) → ${call.ball}`);
               later(700, () => (call.ball === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
             } else console.info('[3V3-DEF] their reach misses');
+            break;
+          }
+          if (f.stunSec === 0 && f.reachCooldown === 0 && f.slot.intent.steal && roll() < AI_REACH_GATE && !finish && !gather && !dunking && !sealed && !board && reachDist < 1.6) {   // `!board`: no reach at a ball still live off the iron / out of the net
+            f.reachCooldown = AI_REACH_COOLDOWN_SEC;
+            f.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
+            f.reach = { t: 0, exposed: carrier === me && bumpAge <= BUMP_STRIP_WINDOW_SEC, moveMark: lastStickMoveAt };
+            console.info(`[3V3-DEF] ai reach tell at ${reachDist.toFixed(2)} m`);
             break;
           }
         }
@@ -3659,6 +3679,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (ended) return;
     if (!cont && hoopsFx?.deadBall(() => opponentPossession(ctx))) return;   // vis-hoops-court: their ball is the other dead ball (a swing's catch, `cont`, is not one)
     possessionToken++;
+    for (const f of foes) f.reach = null;   // T-A: a showing reach ends with the possession
     dropBoard();   // HOTFIX (2026-09-24): their ball ends any board still live (see dropBoard)
     goaltendCalled = false; foeShotScored = false;   // …and again for theirs: the latch is per SHOT, not per game
     carrierId = 'foeTeam';

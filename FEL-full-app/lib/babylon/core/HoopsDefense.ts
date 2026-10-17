@@ -166,3 +166,43 @@ export function facingCos(yaw: number, from: { x: number; z: number }, to: { x: 
   if (d < 1e-4) return 1;
   return (Math.sin(yaw) * dx + Math.cos(yaw) * dz) / d;
 }
+
+// ── T-A STEAL-TELL (step 4): the AI reach is a read with a cost and a visible tell, in 1v1 and 3v3 alike ─────────────
+// The values below moved here from ThreeVThreeMode (unchanged) so both modes reach by the same rules.
+/** No AI defender starts two reaches inside this. */
+export const AI_REACH_COOLDOWN_SEC = 1.2;
+/** A reach that lands strips this often … */
+export const AI_STEAL_CHANCE = 0.22;
+/** … and this often inside the bump window (the ball is out of the hand). */
+export const AI_STEAL_ON_BUMP = 0.6;
+/** A steal intent in range becomes a reach this often. */
+export const AI_REACH_GATE = 0.5;
+/** A missed reach stuns the reacher this long. */
+export const AI_REACH_STUN_SEC = 0.35;
+/** The reach shows (the steal-reach beat) this long before it resolves: the handler's window to move the ball [TUNE]. */
+export const AI_REACH_TELL_SEC = 0.25;
+
+export interface AiReach {
+  /** How long the reach has shown. */
+  tellSec: number;
+  /** Still carrying, not shooting / dunking / finishing / gathering, not sealed. */
+  eligible: boolean;
+  inRange: boolean;
+  /** The handler moved the ball during the tell (a stick move, a spin). */
+  movedDuringTell: boolean;
+  /** Inside the bump window when the tell started. */
+  exposed: boolean;
+  /** Body on body (≤ BODY_STANDOFF + 0.25). */
+  onHim: boolean;
+  carrierSpeed: number;
+  foulSpeed: number;
+  roll: () => number;
+}
+
+/** How a shown reach ends: a strip, a whiff (the reacher is stunned) or the reach-in foul on a moving handler. A reach
+ *  never resolves before AI_REACH_TELL_SEC (throws: a caller bug, never a silent strip). */
+export function resolveAiReach(r: AiReach): 'strip' | 'whiff' | 'foul' {
+  if (!(r.tellSec >= AI_REACH_TELL_SEC)) throw new Error(`resolveAiReach before the tell (${r.tellSec}s < ${AI_REACH_TELL_SEC}s)`);
+  if (r.eligible && r.inRange && !r.movedDuringTell && r.roll() < (r.exposed ? AI_STEAL_ON_BUMP : AI_STEAL_CHANCE)) return 'strip';
+  return r.onHim && r.carrierSpeed >= r.foulSpeed ? 'foul' : 'whiff';
+}
