@@ -475,6 +475,20 @@ function bakeByMaterial(scene: Scene, meshes: AbstractMesh[], into: TransformNod
 export interface VeniceDressingHandle { palms: number; kit: Mesh[]; crowd: Mesh[] }
 
 /**
+ * FDB-3 (PM, 2026-10-17: margin under the dunk-1 budget). palm_hero_lod1.glb ships WITHOUT its frond atlas: it was byte-identical
+ * to palm_hero_lod2.glb's (`palm_frond_atlas_far`, 46,270 B of WebP, the 1.7×-fatter-leaflet atlas the README made for range),
+ * and both files load together in mountVeniceDunkDressing. LOD1's fronds wear LOD2's frond material — the two materials were
+ * identical but for which copy of the atlas they pointed at (MASK 0.5, double-sided, roughness 0.8, specular 0.6, one sampler),
+ * so every pixel is as it was. Its own, texture-less material (the file's `felFrondAtlas` extras say where its atlas is) is freed.
+ */
+export function shareFarFrondMaterial(lod1Frond: Mesh, lod2Frond: Mesh): void {
+  const own = lod1Frond.material;
+  if (!lod2Frond.material || own === lod2Frond.material) return;
+  lod1Frond.material = lod2Frond.material;
+  own?.dispose(false, true);
+}
+
+/**
  * DUNK-VENICE-ENV-2 — the Venice dunk's baked dressing, under the boardwalk holder (it dies with the venue):
  *  · THE PALMS (eye VE-1: a faceted low-poly palm behind the backboard in the slam cam and all three replays): the baked
  *    palm, LOD0 → LOD1 at 25 m → LOD2 at 60 m, the hero behind the backboard and every row on the beach (VENICE_HERO_PALMS,
@@ -503,7 +517,8 @@ export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNod
   const part = (r: (typeof lods)[number], mat: string) => r.meshes.find((m) => m.material?.name === mat) as Mesh | undefined;
   const trunks = lods.map((r) => part(r, 'palm_trunk')), fronds = lods.map((r) => part(r, 'palm_frond'));
   if (trunks.some((m) => !m) || fronds.some((m) => !m)) throw new Error('palm_hero LODs: no palm_trunk / palm_frond mesh');
-  const casters = [...(scene.getLightByName('fel_sun')?.getShadowGenerators()?.values() ?? [])] as Array<{ addShadowCaster?(m: AbstractMesh, d?: boolean): unknown; removeShadowCaster?(m: AbstractMesh, d?: boolean): unknown }>;
+  shareFarFrondMaterial(fronds[1] as Mesh, fronds[2] as Mesh);   // FDB-3: LOD1 ships without its copy of the far atlas
+  const casters =[...(scene.getLightByName('fel_sun')?.getShadowGenerators()?.values() ?? [])] as Array<{ addShadowCaster?(m: AbstractMesh, d?: boolean): unknown; removeShadowCaster?(m: AbstractMesh, d?: boolean): unknown }>;
   for (const masters of [trunks, fronds]) {
     const [m0, m1, m2] = masters as Mesh[];
     m0.addLODLevel(VENICE_PALM_LODS.switchM[0], m1); m0.addLODLevel(VENICE_PALM_LODS.switchM[1], m2);
