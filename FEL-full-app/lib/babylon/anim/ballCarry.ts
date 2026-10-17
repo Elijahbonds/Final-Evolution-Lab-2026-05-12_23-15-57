@@ -175,6 +175,19 @@ export const CLIP_PHI_AT_PEAK = 0, CLIP_LOCK_GAIN = 3, CLIP_LOCK_MAX_MPS = 0.4, 
  * goes to GUARD_BAR (root-local: x toward the ball side × the side sign, y, z) with its elbow out toward the off side (GUARD_BAR_POLE),
  * the forearm across the front between the ball and him. Eased over GUARD_SEC.
  */
+/**
+ * H3d (owner 2026-10-17: the moves "clunky" — the move-entry pops H3a found from the walk loop). A HANDLE MOVE'S HAND-OVERS EASE. At
+ * a move's start the arms go from the loop under them (the walk's arm mid-swing) and the dribble's reach to the move's clip and its
+ * contact schedule in a frame or two; at its end back again. The ball arm's forearm turned 2,600–3,700°/s on the first blend frames
+ * of the cross, the between, the behind and the in-and-out from a walk (h3d-base, three attempts each) — with the move's reach off as
+ * well (h3d-x1), so it is the hand-over, not one layer. Through the first and the last MOVE_EASE_SEC of a move (and a cancel), no
+ * arm bone (the clavicle, the upper arm, the forearm) turns faster than MOVE_EASE_RATE_DEG from where it was last drawn; it runs
+ * last, after every arm writer (the hinge included), just before the camera. TUNED (new).
+ */
+export const MOVE_EASE_SEC = 0.2, MOVE_EASE_RATE_DEG = 1000;
+/** H3d: and through the rest of a move, MOVE_ARM_RATE_DEG — a hand moves fast in a handle, but an arm turning 3,000–9,700°/s in a
+ *  frame is a key flipping (the spin capture's ball arm, the authored behind-the-back's off forearm: h3d-base). TUNED (new). */
+export const MOVE_ARM_RATE_DEG = 1800;
 export const GUARD_BACK_M = 0.22, GUARD_OUT_M = 0.06, GUARD_DROP_M = 0.06, GUARD_SEC = 0.15;
 export const GUARD_BAR: readonly [number, number, number] = [0.15, 1.06, 0.34];   // the hand across the front, ahead of the ball's hip (measured: at x 0.04 the forearm sat 0.37 m off the ball→defender line, a bar on 17 % of pressured frames)
 export const GUARD_BAR_POLE: readonly [number, number, number] = [-0.7, -0.15, 0.3];
@@ -458,6 +471,9 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     return true;
   };
   let guardTarget = 0, guardK = 0;   // H3b: the protect (setGuard)
+  // H3d: the move hand-overs' ease (MOVE_EASE_SEC): both arms' clavicle, upper arm and forearm, as drawn last frame
+  const easeNodes = (['Left', 'Right'] as const).flatMap((sd) => [`${sd}Shoulder`, `${sd}Arm`, `${sd}ForeArm`].map((b) => findBone(opts.skeleton, b)?.getTransformNode() ?? null)).filter((n): n is TransformNode => !!n);
+  const easeLast: Quaternion[] = easeNodes.map(() => new Quaternion()); let easeLastAt = -1, easeLeft = 0;
   const pg: DribbleParams = { ...p };   // the stroke with the protect's palm drop (written each pass; no garbage)
   // HOOPS MOTION phase 4b (U20): the last strike of EACH foot (the athlete's side it is drawn on), so a hand change re-seeds the lock from
   // its new lock foot's own last strike; and when a catch could not be timed to that foot, the clock the lock's gain eases back from
@@ -784,6 +800,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     setSide(rigOf(path.startHand));
     startOff = null; prevArm = null; switchLeft = 0;
+    easeLeft = MOVE_EASE_SEC;   // H3d: the hand-over into the move eases
     pending = true;   // drawn this frame (a held ball let go here is placed by the path, never left where it was)
     o.onEvent?.('start', path.move);
     if (path.segs[0] && !path.segs[0].hand) o.onEvent?.('release', path.move);   // (a falling ball re-aimed: already out of the hand)
@@ -812,7 +829,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** The move is over: the ball is at the end hand's top, at rest — the dribble takes it from phase 0 (the path's catch was timed to the
    *  lock foot; when it could not be, the lock's gain eases back). A queued move starts from here. */
   const endMove = (): void => {
-    const m = mv!; mv = null;
+    const m = mv!; mv = null; easeLeft = MOVE_EASE_SEC;   // H3d: and the hand-over back to the dribble
     setSide(rigOf(m.path.endHand));
     phase = 0; startAcc = 0; startOff = null; prevArm = null; switchLeft = 0;
     if (!m.timed) lockEaseAt = clock;
@@ -1017,7 +1034,21 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   // the held ball's cap runs LAST, just before the camera draws: after the physics step (a Havok-driven root moves AFTER the
   // after-animations pass — measured on the 1v1 spin: the cap there let 0.20 m frames through) and after the modes' own
   // before-render drives (the 3v3 driver). Once per drawn frame.
-  const obsLimit = hoops ? opts.scene.onBeforeCameraRenderObservable.add(() => { if (limitedAt === stamp) return; limitedAt = stamp; followRoot(); limitHeldBall(); }) : null;
+  /** H3d: through a move's hand-over (easeLeft), no arm bone turns faster than MOVE_EASE_RATE_DEG from where it was drawn last frame. */
+  const easeArms = (): void => {
+    if ((easeLeft > 0 || mv) && easeLastAt === stamp - 1 && passDt > 0) {
+      const maxRad = ((easeLeft > 0 ? MOVE_EASE_RATE_DEG : MOVE_ARM_RATE_DEG) * Math.PI / 180) * passDt;
+      easeNodes.forEach((n, i) => {
+        const q = n.rotationQuaternion; if (!q) return;
+        const d = Math.min(1, Math.abs(Quaternion.Dot(easeLast[i], q))), ang = 2 * Math.acos(d);
+        if (ang > maxRad) Quaternion.SlerpToRef(easeLast[i], q, maxRad / ang, q);
+      });
+      easeLeft = Math.max(0, easeLeft - passDt);
+    }
+    easeNodes.forEach((n, i) => { easeLast[i].copyFrom(n.rotationQuaternion ?? Quaternion.Identity()); });
+    easeLastAt = stamp;
+  };
+  const obsLimit = hoops ? opts.scene.onBeforeCameraRenderObservable.add(() => { if (limitedAt === stamp) return; limitedAt = stamp; followRoot(); limitHeldBall(); easeArms(); }) : null;
 
   const api: BallCarry = {
     get active() { return active; },
@@ -1043,7 +1074,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     },
     cancelMove() {
       queued = null; const m = mv; if (!m) return;
-      const h = holdingHand(); mv = null; m.opts.onEvent?.('cancel', m.name);
+      const h = holdingHand(); mv = null; easeLeft = MOVE_EASE_SEC; m.opts.onEvent?.('cancel', m.name);
       if (active) { setSide(rigOf(h)); activating = true; }   // back into the dribble from where the ball is (the activation's own restart)
     },
     switchHand(via?: CrossPoint) {
