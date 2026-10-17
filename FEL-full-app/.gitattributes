@@ -14,3 +14,6 @@
 # Marking it generated keeps the remaining churn out of diffs and reviews. It stays tracked.
 public/_prisma/client/** -diff linguist-generated=true
 public/_prisma/client/*.node binary
+# PRISMA-PUBLIC step 1: the parallel client out of public/ (same artifact, same attributes).
+lib/generated/prisma/** -diff linguist-generated=true
+lib/generated/prisma/*.node binary

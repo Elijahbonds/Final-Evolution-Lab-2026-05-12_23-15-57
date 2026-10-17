@@ -9,10 +9,15 @@ import { SCAN_SAVE_ROUTES } from './scanSaveGate';
 
 const ROOT = join(__dirname, '../..');
 
+/** Generated code is not a write site: the Prisma client under lib/generated/prisma (PRISMA-PUBLIC step 1) is the
+ *  same artifact as public/_prisma/client, which this walk never read; its index.d.ts documents `.create` calls on
+ *  every model. Only that one directory is skipped — every hand-written file under lib/ is still read. */
+const GENERATED = new Set([join(ROOT, 'lib/generated/prisma')]);
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
+    if (GENERATED.has(p)) continue;
     if (statSync(p).isDirectory()) out.push(...walk(p));
     else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name)) out.push(p);
   }
@@ -52,6 +57,13 @@ describe('every movement write site is gated, routed, or named as not movement',
     expect(DETECTORS.some((d) => d.re.test(synthetic))).toBe(true);
     expect(DETECTORS.some((d) => d.re.test('await tx.prqEntry.createMany({ data })'))).toBe(true);
     expect(DETECTORS.some((d) => d.re.test('await prisma.workoutScan.findMany({ where })'))).toBe(false);
+  });
+
+  it('control: only the generated client is skipped — the rest of lib/ is still walked', () => {
+    expect(files.some((f) => f.startsWith('lib/generated/prisma/'))).toBe(false);
+    expect(files).toContain('lib/move/formWrite.ts');
+    expect(files).toContain('lib/prq-entries.ts');
+    expect(GENERATED.size).toBe(1);
   });
 
   it('no write site is uncovered (app/dev and tests excluded)', () => {

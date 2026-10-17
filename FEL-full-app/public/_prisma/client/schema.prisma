@@ -24,6 +24,15 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
+// PRISMA-PUBLIC step 1 (PR A, PRISMA-PUBLIC-PLAN.md): a PARALLEL client out of public/. Nothing imports it yet — prod
+// keeps loading ../public/_prisma/client above. next.config.js copies its debian engine + schema into
+// <distDir>/prisma-engine so step 2 can point lib/db.ts at it (PRISMA_QUERY_ENGINE_LIBRARY). public/_prisma goes in step 4.
+generator clientLib {
+  provider      = "prisma-client-js"
+  output        = "../../lib/generated/prisma"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
 datasource db {
   provider  = "postgresql"
   // The hosted database is Cloud SQL for PostgreSQL, reachable over TLS only (see .env.example).
