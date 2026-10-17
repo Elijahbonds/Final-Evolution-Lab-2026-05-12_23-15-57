@@ -68,15 +68,29 @@ export interface LandingAbsorbOpts {
   auto?: boolean;
   /** 0..1 scale on the sink (mobile can pass less). Default 1. */
   intensity?: number;
+  /** H3b: run FIRST in the after-animations pass, before the layers that place a hand or a ball off the body (the ball carry): a sink
+   *  applied after them carries the reached hand down off its target. Default false (Free Run's order, unchanged). */
+  first?: boolean;
 }
 
 export interface LandingAbsorbHandle {
   /** A touchdown at `vImpact` m/s (the mode knows its own landing). A harder landing during an absorb restarts it deeper. */
   impact(vImpact: number): void;
+  /** H3b: a HELD sink (m) — a lower stance the body sits in (the hoops protect), eased in and out over HOLD_SEC; the drop is the deeper of
+   *  it and a landing's. 0 lets it go. H3c: negative RAISES the hips (a capture that sits too deep: the legs straighten under it, the feet
+   *  stay), down to −HOLD_RAISE_MAX. */
+  hold(m: number): void;
   /** The sink being applied now (m), for probes. */
   readonly drop: number;
   dispose(): void;
 }
+
+/** H3b: how fast a held sink (`hold`) eases in and out (s). */
+export const HOLD_SEC = 0.18;
+/** H3c: the most a held hold may raise the hips (m). */
+export const HOLD_RAISE_MAX = 0.25;
+/** H3c: a raise stops where a leg (hip to ankle) would pass this share of its length — the knee keeps a bend. */
+export const RAISE_REACH = 0.97;
 
 export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: TransformNode, opts: LandingAbsorbOpts = {}): LandingAbsorbHandle {
   const hips = boneNode(skeleton, 'Hips');
@@ -90,7 +104,7 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
   const legTracks = legs.map((l) => ({ hip: new AdditiveQuat(), knee: new AdditiveQuat(), l }));
   const fromClip = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (!q) return; const [x, y, z, w] = t.baseFor(q.x, q.y, q.z, q.w); q.set(x, y, z, w); };
   const wroteLeg = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (q) t.wrote(q.x, q.y, q.z, q.w); };
-  let depth = 0, t = 0, drop = 0, applied = false;
+  let depth = 0, t = 0, drop = 0, applied = false, holdTarget = 0, held = 0;
   const inv = new Matrix(), worldDown = new Vector3(), local = new Vector3();
   const start = (v: number) => { const d = absorbDepth(v) * intensity; if (d > (depth > 0 ? absorbAt(t, depth) : 0)) { depth = d; t = 0; } };
   const obs: Observer<Scene> | null = !hips || legs.length < 2 ? null : scene.onAfterAnimationsObservable.add(() => {
@@ -99,10 +113,12 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     root.computeWorldMatrix(true);
     if (detector) { const v = detector.step(root.getAbsolutePosition().y, dt); if (v > 0) start(v); }
     if (depth > 0) { t += dt; drop = absorbAt(t, depth); if (t >= absorbSec(depth)) { depth = 0; drop = 0; } } else drop = 0;
+    held += (holdTarget - held) * Math.min(1, dt / HOLD_SEC); if (Math.abs(held) < 1e-5 && holdTarget === 0) held = 0;
+    drop = held < 0 ? (drop > 0 ? drop : held) : Math.max(drop, held);   // (a landing's sink wins over a raise)
     const p = hips.position;
     const base = { x: track.x.baseFor(p.x), y: track.y.baseFor(p.y), z: track.z.baseFor(p.z) };
     for (const t of legTracks) { fromClip(t.l.hip, t.hip); fromClip(t.l.knee, t.knee); }
-    if (drop <= 1e-4) {
+    if (Math.abs(drop) <= 1e-4) {
       // nothing to add: a hips position no clip keys goes back to its own value once (held-pose memory), then is left alone
       if (applied) { p.set(base.x, base.y, base.z); track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = false; }
       for (const t of legTracks) { wroteLeg(t.l.hip, t.hip); wroteLeg(t.l.knee, t.knee); }
@@ -112,18 +128,28 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     const feet = legs.map((l) => { l.ankle.computeWorldMatrix(true); return l.ankle.getAbsolutePosition().clone(); });
     const knees = legs.map((l) => { l.knee.computeWorldMatrix(true); return l.knee.getAbsolutePosition().clone(); });
     const hipW = legs.map((l) => { l.hip.computeWorldMatrix(true); return l.hip.getAbsolutePosition().clone(); });
+    // H3c: a RAISE never asks a leg for more than RAISE_REACH of its length (hip to ankle, as the clip has it): a slide's trailing leg
+    // extends on the push, and a raise past its reach snapped it straight and back (thigh pops to 4,800°/s on the 3v3 slides)
+    let d = drop;
+    if (d < 0) legs.forEach((l, i) => {
+      const L = (Vector3.Distance(hipW[i], knees[i]) + Vector3.Distance(knees[i], feet[i])) * RAISE_REACH;
+      const hx = hipW[i].x - feet[i].x, hz = hipW[i].z - feet[i].z, h2 = L * L - hx * hx - hz * hz;
+      const rMax = h2 > 0 ? Math.max(0, Math.sqrt(h2) - (hipW[i].y - feet[i].y)) : 0;
+      d = Math.max(d, -rMax);
+    });
     // a world-down sink in the hips' parent space (the armature may be rotated and scaled)
     const parent = hips.parent as TransformNode | null;
-    worldDown.set(0, -drop, 0);
+    worldDown.set(0, -d, 0);
     if (parent) { parent.computeWorldMatrix(true); parent.getWorldMatrix().invertToRef(inv); Vector3.TransformNormalToRef(worldDown, inv, local); } else local.copyFrom(worldDown);
     p.set(base.x + local.x, base.y + local.y, base.z + local.z);
     track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = true;
     hips.computeWorldMatrix(true);
     legs.forEach((l, i) => solveChainInFrame(l.hip, l.knee, l.ankle, feet[i], bendPole(hipW[i], knees[i], feet[i], root.forward), 1));
     for (const t of legTracks) { wroteLeg(t.l.hip, t.hip); wroteLeg(t.l.knee, t.knee); }
-  });
+  }, undefined, !!opts.first);
   return {
     impact: (v: number) => start(v),
+    hold: (m: number) => { holdTarget = Math.max(-HOLD_RAISE_MAX, Number.isFinite(m) ? m : 0) * intensity; },
     get drop() { return drop; },
     dispose() { if (obs) scene.onAfterAnimationsObservable.remove(obs); },
   };

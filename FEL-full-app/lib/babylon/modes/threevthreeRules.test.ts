@@ -6,6 +6,7 @@ import { rivalShotPct } from '../core/BasketballCore';
 import {
   THREEV_TIER, tierForRun, cutOff, laneClear, openness, kickTarget, catchAndShoot, KICK_OPEN_M, SHOOT_OPEN_M, SHOOT_MIN_RIM_M,
   rivalPoints, goaltendAward, rivalReleasePct, passPreviewLabel, hintFor, lodFor, LOD_FAR_IN_M, LOD_FAR_OUT_M, type HintState,
+  mateCall, MATE_SETTLE_SEC, MATE_READ_SEC, MATE_HOLD_MAX_SEC, MATE_SHOOT_RANGE_M, MATE_FINISH_M, MATE_DRIVE_MAX_SEC,   // H3e
 } from './threevthreeRules';
 import { boxLine, emptyBox } from './threevthreeBox';
 import { hintSwap, HINT_PAINT } from './onevoneRules';
@@ -130,5 +131,31 @@ describe('#14 the level of detail', () => {
     expect(lodFor(1, { offBall: true, onScreen: true, distM: mid })).toBe(1);   // stays far inside the gap
     expect(lodFor(0, { offBall: true, onScreen: true, distM: mid })).toBe(0);   // stays near inside the gap
     expect(lodFor(1, { offBall: true, onScreen: true, distM: LOD_FAR_OUT_M - 0.1 })).toBe(0);
+  });
+});
+
+// H3e (owner 2026-10-17: pace and flow): my teammate with the ball reads and plays — he used to dribble on the spot until I called for it.
+describe('mateCall — my teammate with the ball (H3e)', () => {
+  const base = { sinceCatchSec: 0.5, rimDist: 6, open: 1.0, laneToRim: false, driving: false, driveSec: 0, passOpen: false };
+  it('a beat to catch it first, whatever is open', () => {
+    expect(mateCall({ ...base, sinceCatchSec: MATE_SETTLE_SEC - 0.01, open: 9 })).toBe('hold');
+  });
+  it('open in range: the shot off the catch; out of range or covered: not', () => {
+    expect(mateCall({ ...base, open: SHOOT_OPEN_M })).toBe('shoot');
+    expect(mateCall({ ...base, open: SHOOT_OPEN_M, rimDist: MATE_SHOOT_RANGE_M + 0.5 })).not.toBe('shoot');
+    expect(mateCall({ ...base, open: SHOOT_OPEN_M - 0.2 })).toBe('hold');
+  });
+  it('a clear lane: the drive, finished at the rim or after MATE_DRIVE_MAX_SEC', () => {
+    expect(mateCall({ ...base, laneToRim: true })).toBe('drive');
+    expect(mateCall({ ...base, driving: true, rimDist: 4, driveSec: 0.5 })).toBe('drive');
+    expect(mateCall({ ...base, driving: true, rimDist: MATE_FINISH_M })).toBe('shoot');
+    expect(mateCall({ ...base, driving: true, rimDist: 4, driveSec: MATE_DRIVE_MAX_SEC })).toBe('shoot');
+  });
+  it('nothing on: the swing to the open man after MATE_READ_SEC, and the ball never held past MATE_HOLD_MAX_SEC', () => {
+    expect(mateCall({ ...base, passOpen: true, sinceCatchSec: MATE_READ_SEC - 0.05 })).toBe('hold');
+    expect(mateCall({ ...base, passOpen: true, sinceCatchSec: MATE_READ_SEC })).toBe('pass');
+    expect(mateCall({ ...base, sinceCatchSec: MATE_HOLD_MAX_SEC })).toBe('shoot');                                       // in range: a contested look
+    expect(mateCall({ ...base, sinceCatchSec: MATE_HOLD_MAX_SEC, rimDist: MATE_SHOOT_RANGE_M + 1 })).toBe('pass');       // out of range: move it
+    for (let t = 0; t <= MATE_HOLD_MAX_SEC + 1e-9; t += 0.05) if (t >= MATE_HOLD_MAX_SEC) expect(mateCall({ ...base, sinceCatchSec: t })).not.toBe('hold');
   });
 });
