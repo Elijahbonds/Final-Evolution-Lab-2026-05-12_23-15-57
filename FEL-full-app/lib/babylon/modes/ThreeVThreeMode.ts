@@ -106,7 +106,7 @@ import {   // HOOPS-MOVE-KIT-A
   planSpin, spinYaw, spinPos, spinOffContact, postSpinSide, SPIN_ARM_SEC, SPIN_BEAT_K, SPIN_EXIT_SPEED, SPIN_STUN_SEC, SPIN_TRIGGER_RANGE, SPIN_COOLDOWN_SEC, type SpinPlan,   // M6 the spin
   passFakeBite, passFakeShiftTo, PASS_FAKE_STUN,   // the pass fake (owner, 2026-09-13)
   runningHook, HOOK_ON_ME, isPumpFake, planStepThrough, STEP_THROUGH_SEC, PUMP_BITE_RANGE, PUMP_BITE_CHANCE, PUMP_BITE_STUN,   // wave 2: M7 / M8
-  pivotFrom, planPivot, PIVOT_MAX_SPEED, rimProtected, isReverseFinish, reverseSide,                               // M9 / M10 / M11
+  pivotFrom, planPivot, pivotFreeFoot, PIVOT_MAX_SPEED, rimProtected, isReverseFinish, reverseSide,                               // M9 / M10 / M11
   inBankBand, bankPoint, BANK_PCT_BONUS, planHopStep, HOP_RANGE, planEuro, euroSell, euroAvailable, gatherTravel,  // M12 / M13 / M14
   planGather, gatherWish, gatherLabel, stickBack01, STEPBACK_STICK_BACK_MIN, type GatherPlan,
   pickLayupSide, planFinish, finishHopY, finishStride, FINISH_LABEL, type FinishPlan, type FinishStyle,
@@ -578,6 +578,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     Object.assign(b.bio, {
       role, hasBall, speed01: b.speed01, nearestDefender, shot: b.shotWin, flight: b === me ? dunkFlight : null, landed: b.landSec > 0, celebrate: b.celebrateSec > 0,
       reaching: reaching || (b !== me && (foeHandUp === b || b.jumpAge !== Infinity)), staggered: b === me ? meStunSec > 0 && !meFloored : b.stunSec > 0 && !b.floored, floored: b === me ? meFloored : b.floored,
+      hesi: b === me && me.drib.hanging,   // H2b (plan §4.8): the hitch's posture through the hang
     } satisfies HoopsPostureInput);
   }
 
@@ -1513,16 +1514,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // HOOPS-10PHASE-2 phase 5: replay a buffered gesture the instant the lock clears — see the 1v1 note.
       if (shooting || dunking || finish || gather || spin) stickLockClearAt = null; else if (stickLockClearAt === null) stickLockClearAt = performance.now();   // H1 H-04
       if (iAmCarrier) stickGestures.push(...rStick.tick(performance.now() / 1000));   // H1 H-03: a still thumb still reaches the hold clock
-      if (pausedDribble && (!(iAmCarrier) || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; me.drib.pause(false); me.tree.releaseHold(); console.info("[3V3-STICK] PAUSIN' let go quietly"); }
+      if (pausedDribble && (!(iAmCarrier) || shooting || dunking || performance.now() / 1000 - pausedAt > PAUSE_MAX_SEC)) { pausedDribble = false; me.drib.pause(false); me.tree.releaseHold(); if (iAmCarrier && !shooting && !dunking) carries.get(me)?.runMove('pausin_release'); console.info("[3V3-STICK] PAUSIN' let go quietly"); }
       if (bufferedGesture && !shooting && !dunking && !finish && !gather && !spin && bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) {
         stickGestures.unshift(bufferedGesture); bufferedGesture = null;
       } else if (bufferedGesture && !bufferLive(bufferedGestureAt, stickLockClearAt, performance.now())) bufferedGesture = null;   // H-04: the buffer survives the lock, then 220 ms
       if (stickGestures.length && iAmCarrier && !shooting && !dunking && !finish && !gather && !spin) {
         const nfS = nearestLiveFoe(); const foeDistS = nfS ? distXZ(me.char.root.position, nfS.char.root.position) : Infinity; const foeLiveS = !!nfS;
         for (const g of stickGestures) {
-          if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; me.drib.pause(false); me.tree.releaseHold(); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[3V3-STICK] release — the explode out of the pause'); } continue; }
+          if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; me.drib.pause(false); me.tree.releaseHold(); carries.get(me)?.runMove('pausin_release'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[3V3-STICK] release — the explode out of the pause'); } continue; }
           if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
-            if (!pausedDribble && !me.slot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; me.drib.pause(true); me.tree.hold('bball_hesi', { fadeSec: moveFadeSec(false), speedRatio: 0.25 }); console.info("[3V3-STICK] PAUSIN'"); }
+            if (!pausedDribble && !me.slot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; me.drib.pause(true); me.tree.hold(`bball_pausin_${carries.get(me)?.hand === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); carries.get(me)?.runMove('pausin');   /* H2b (plan §4.18) */ console.info("[3V3-STICK] PAUSIN'"); }
             continue;
           }
           const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: carries.get(me)?.hand ?? 'Right', escape: !!me.slot.intent.sprint, brace: !!me.slot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
@@ -1559,15 +1560,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // man, it can break ankles like anything else at its price. The stepback hop + the cross below is its body.
             // HOOPS MOTION phase 4b: its own read first (custom, as today), then the render — the ball crosses on the snatchback's path in the
             // hop (the switchHand toggle is gone: plan §4.13)
-            requestMove(meHost(), {
-              move: 'snatch_back', clip: 'bball_stepback_gather', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,
+            const snr = requestMove(meHost(), {
+              move: 'snatch_back', fadeSec: moveFadeSec(sprintOk), speedRatio: 1,   // H2b (plan §4.13): its own v2 clip (MOVE_CLIP)
               decide: { kind: 'custom', run: () => {
                 const sno = resolveHandleMove('snatch_back', chain, handle, { present: !!nfS && nfS.stunSec <= 0 && !nfS.floored, closing: false, set: false, within: !!nfS && distXZ(me.char.root.position, nfS.char.root.position) < 2.4 }, roll, MOVES_UNLOCKED_GATE);
                 chain = sno.chain;
-                console.info(`[3V3-HANDLE] move snatch_back → bball_snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
+                console.info(`[3V3-HANDLE] move snatch_back (chain ${chain.length}, handle ${handle}, ${sno.tier})`);
                 reactToBreak(ctx, sno, nfS, 'snatch_back', pick.side ?? 'right');
               } },
             });
+            console.info(`[3V3-HANDLE] snatch_back → ${snr.clip ?? 'no clip'} ball ${snr.startHand}→${snr.endHand}`);   // H2b: the clip that really played (it named bball_snatch_back, a clip the move did not play)
             // THE SNATCHBACK (2K: step-back with R2): the hop off the rim AND the ball to the other hand in the same beat
             const toRimS = RIM_FLOOR.subtract(me.char.root.position); toRimS.y = 0;
             me.drib.stepBack(toRimS.x, toRimS.z, true); stepbackWindow = STEPBACK_WINDOW_SEC;
@@ -1675,7 +1677,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             // HOOPS MOTION phase 4b: the jab through the renderer — its own decision (custom: jabBiteOdds / throwJab / Math.random, unchanged),
             // today's clip (bball_hesi; 4e authors the jab's), the ball a pound in the same hand
             requestMove(meHost(), {
-              move: 'jab', clip: 'bball_hesi', fadeSec: 0.05, speedRatio: 1,
+              move: 'jab', clip: 'bball_jab', fadeSec: 0.05, speedRatio: 1,
               decide: { kind: 'custom', run: () => {
                 odds = nf ? jabBiteOdds({
                   defenderDist: distXZ(me.char.root.position, nf.char.root.position),
@@ -2086,7 +2088,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       // test): a trigger still held past the meter's end restarted a shot with the ball in the air (a second gather on top of
       // the arc, measured)
       if (stickShot && !stickShot.started) {   // POST HOOK: the shimmy beat before the hook; a tap let go before the shot is nothing
-          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_hesi', { fadeSec: 0.05, speedRatio: 1.5 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 }); { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } }); } } }   // THE MIC: the bite
+          if (stickShot.shimmy && !stickShot.shimmied) { stickShot.shimmied = true; me.tree.beat('bball_shimmy_quick', { fadeSec: 0.05, speedRatio: 1 }); SoundKit.play('whoosh', { pitch: 1.1, volume: 0.3 });   /* H2b (plan §4.23) */ { const nfB = nearestLiveFoe(); if (nfB && distXZ(me.char.root.position, nfB.char.root.position) < 2.0 && roll() < 0.45) { nfB.stunSec = 0.4; nfB.tree.beat('bball_contact_react', { fadeSec: 0.06 }); bannerFlash(ctx, 'SHIMMY — HE BIT!', 600); mic?.say({ moment: 'game.bite', crowd: { moment: 'crowd.ooh', n: 1 } }); } } }   // THE MIC: the bite
           shimmyLeft = Math.max(0, shimmyLeft - dt);
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
@@ -2795,7 +2797,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const plan = pivotRead ? planPivot(me.char.root.position, me.char.root.rotation.y, pivotRead.side, pivotRead.reverse)
       : planSpin(me.char.root.position, me.char.root.rotation.y, RIM_FLOOR, defPos, side);
     spin = { plan, t: 0, beat: !!pivotRead };
-    spinClip = pivotRead ? 'bball_pivot' : 'bball_spin';
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : 'bball_spin';   // H2b (plan §4.16): the v2 pivot, named by the free foot
     spinCooldown = SPIN_COOLDOWN_SEC;
     posting = false;
     // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the spin's ball is its PULL (the hand change) on the carry — the carries loop ticks it
@@ -2832,9 +2834,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       console.info(`[3V3-MOVE] spin shoulder clear beaten ${beaten}`);
     }
     if (spin.t < spin.plan.sec) return;
-    const exitYaw = Math.atan2(spin.plan.exit.x, spin.plan.exit.z);
+    const exitYaw = spin.plan.stepOut ? spinYaw(spin.plan, spin.plan.sec) : Math.atan2(spin.plan.exit.x, spin.plan.exit.z);   // H2b (plan §4.14): no end snap — the step-out is the loop's turn
     me.char.root.rotation.y = exitYaw;
     me.drib.setFacing(exitYaw);
+    if (spin.plan.stepOut) me.drib.turnTo(Math.atan2(spin.plan.exit.x, spin.plan.exit.z));   // H2b: the step-out, turned on the way out
     // M6 the spin comes out INTO the drive; M9 a pivot is a turn in place — it hands nothing back
     me.drib.vel.copyFrom(spinClip === 'bball_pivot' ? new Vector3(0, 0, 0) : spin.plan.exit.scale(SPIN_EXIT_SPEED));
     spin = null;

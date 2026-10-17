@@ -38,6 +38,13 @@ export const BASKETBALL_CLIPS = [
   'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',
   'bball_momentum_cross_left', 'bball_momentum_cross_right',   // HOOPS MOTION phase 4c (plan §4.2): the momentum cross on its own (wider) path
   'bball_btb_slide_left', 'bball_btb_slide_right',   // H2 (owner 2026-10-16): the BTB slide — the behind-the-back's wrap with the body skipping sideways
+  'bball_hesi_v2_left', 'bball_hesi_v2_right',   // H2b (plan §4.8): the hesitation on its float path — the rise that sells it, then low for the explode
+  'bball_yoyo_v2_left', 'bball_yoyo_v2_right',   // H2b (plan §4.9): the yoyo on its pound-then-float path
+  'bball_pausin_left', 'bball_pausin_right',     // H2b (plan §4.18): PAUSIN' — the ball held out, the palm on top, low and back
+  'bball_jab',                                   // H2b (plan §4.11): the triple-threat jab step (its own clip; it played the hesi)
+  'bball_pivot_v2_left', 'bball_pivot_v2_right', // H2b (plan §4.16): the pivot at real speed, the root owns the turn
+  'bball_snatch_back_v2_left', 'bball_snatch_back_v2_right',   // H2b (plan §4.13): the snatchback on its own crossing path, timed to the hop
+  'bball_shimmy_quick',                          // H2b (plan §4.23): the post hook's R2 shimmy (it played the hesi at 1.5×)
   'bball_ankle_stumble', 'bball_ankle_slip',
   'bball_stepback_gather',
   'bball_hop_step', 'bball_euro_step',
@@ -167,11 +174,18 @@ export function buildPullupGather(scene: Scene, sk: Skeleton): AnimationGroup | 
  * key squares up: a step-back you cannot shoot out of is just a retreat.
  */
 export function buildStepbackGather(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  // H2b (plan §4.12): v2 — the FEET are keyed (ankle targets). The push-off key used to be a forward stride while the root hopped back:
+  // the right foot jumped 0.29–0.47 m in one frame at +217 ms (5/5 takes). Now: 0.10 the lead (left) foot plants out in front; 0.10–0.28
+  // the body pushes off it and travels back over the trail foot, which leaves the floor and reaches back; 0.28 the trail foot lands;
+  // 0.28–0.42 the lead foot comes back under (the set step); 0.46 set, nearly square. Keyed in the body frame: while the root hops back
+  // the planted lead foot reads further and further IN FRONT (+0.30 → +0.46), which is the floor staying where it was.
   return buildPoseClip(scene, sk, 'bball_stepback_gather', 0.46, [
-    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0],  Neck: [-4, 0, 0], ...STANCE }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06 },
-    { t: 0.12, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0],  Neck: [-8, 0, 0], LeftUpLeg: [-52, 0, 10], RightUpLeg: [-18, 0, -10], LeftLeg: [66, 0, 0], RightLeg: [26, 0, 0] }, hands: { Right: [0.28, 0.82, 0.40] as V3, Left: [0.06, 0.86, 0.38] as V3 }, hipsY: -0.18 },   // THE PLANT: weight forward onto the lead leg, deep — this is the push
-    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-4, 0, 0],  Neck: [-2, 0, 0], LeftUpLeg: [10, 0, 10], RightUpLeg: [-40, 0, -10], LeftLeg: [16, 0, 0], RightLeg: [56, 0, 0] }, hands: { Right: [0.20, 1.06, 0.02] as V3, Left: [-0.06, 1.04, 0.04] as V3 }, hipsY: -0.02 },   // THE PUSH-OFF: the lead leg drives straight, the hips go out BEHIND the feet, the ball swept back with them
-    { t: 0.46, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  Neck: [-6, 0, 0], LeftUpLeg: [-30, 0, 10], RightUpLeg: [-30, 0, -10], LeftLeg: [44, 0, 0], RightLeg: [44, 0, 0] }, hands: { Right: [0.14, 1.28, 0.24] as V3, Left: [-0.10, 1.26, 0.26] as V3 }, hipsY: -0.11 },   // SET: squared and loaded — a step-back you cannot shoot out of is a retreat
+    { t: 0,    bones: { Hips: [0, 0, 0], Spine: [16, 0, 0],  Neck: [-4, 0, 0] }, hands: { Right: BALL_HAND, Left: OFF_HAND }, hipsY: -0.06, feet: feetAt(-0.06, STANCE_FEET), kneesFront: true },
+    { t: 0.10, bones: { Hips: [0, 0, 0], Spine: [30, 0, 0],  Neck: [-8, 0, 0] }, hands: { Right: [0.28, 0.82, 0.40] as V3, Left: [0.06, 0.86, 0.38] as V3 }, hipsY: -0.18, feet: feetAt(-0.18, { Left: [-0.19, ANKLE_Y, 0.30], Right: STANCE_FEET.Right }), kneesFront: true },   // THE PLANT: the lead foot out, the weight onto it, deep — this is the push
+    { t: 0.20, bones: { Hips: [0, 0, 0], Spine: [8, 0, 0],   Neck: [-4, 0, 0] }, hands: { Right: [0.24, 0.96, 0.18] as V3, Left: [0.0, 0.96, 0.20] as V3 }, hipsY: -0.08, feet: feetAt(-0.08, { Left: [-0.18, ANKLE_Y, 0.44], Right: [0.20, ANKLE_Y + 0.08, -0.20] }), kneesFront: true },   // THE PUSH-OFF: the hips go out behind the feet, the trail foot in the air reaching back
+    { t: 0.28, bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0],  Neck: [-2, 0, 0] }, hands: { Right: [0.20, 1.06, 0.02] as V3, Left: [-0.06, 1.04, 0.04] as V3 }, hipsY: -0.05, feet: feetAt(-0.05, { Left: [-0.18, ANKLE_Y + 0.06, 0.36], Right: [0.21, ANKLE_Y, -0.26] }), kneesFront: true },   // the trail foot lands, the lead foot leaves, the ball swept back with them
+    { t: 0.38, bones: { Hips: [0, 0, 0], Spine: [6, 0, 0],   Neck: [-4, 0, 0] }, hands: { Right: [0.16, 1.18, 0.14] as V3, Left: [-0.08, 1.16, 0.16] as V3 }, hipsY: -0.09, feet: feetAt(-0.09, { Left: [-0.19, ANKLE_Y + 0.02, 0.12], Right: [0.21, ANKLE_Y, -0.20] }), kneesFront: true },   // THE SET STEP: the lead foot back under
+    { t: 0.46, bones: { Hips: [0, 0, 0], Spine: [10, 0, 0],  Neck: [-6, 0, 0] }, hands: { Right: [0.14, 1.28, 0.24] as V3, Left: [-0.10, 1.26, 0.26] as V3 }, hipsY: -0.11, feet: feetAt(-0.11, { Left: [-0.19, ANKLE_Y, 0.06], Right: [0.21, ANKLE_Y, -0.10] }), kneesFront: true },   // SET: squared and loaded — a step-back you cannot shoot out of is a retreat
   ]);
 }
 
@@ -217,6 +231,55 @@ export function buildBetweenLegsDribble(scene: Scene, sk: Skeleton, dir: 'left' 
 export function buildBehindBackDribble(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
   return buildHandleV2(scene, sk, `bball_behind_back_${dir}`, 'behind_back', BEHIND_V2, dir === 'right');
 }
+/** THE HESITATION, v2 (H2b, hoops-motion plan §4.8): the hesi's float path (anim/handlePaths: a high, slow bounce over the load and the
+ *  rise, then a pound forward) with the body that sells it (HESI_V2). `dir` is the ball's hand (a hesi keeps it): `_right` the right
+ *  hand's, `_left` its mirror. The capture that played as `bball_hesi` (06_12 2.55–3.10 s) is "a hard low dribble" — the opposite of
+ *  the read (the plan's own words); it stays for the calls that still name it (the jab, the post shimmy, the rival's step-back). */
+export function buildHesiV2(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildHandleV2(scene, sk, `bball_hesi_v2_${dir}`, 'hesi', HESI_V2, dir === 'left');
+}
+/** THE YOYO, v2 (H2b, plan §4.9): on its own path — a low pound, then the ball floated high — square and tall, only the ball, the
+ *  knees and the eyes move. `dir` is the ball's hand. */
+export function buildYoyoV2(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildHandleV2(scene, sk, `bball_yoyo_v2_${dir}`, 'yoyo', YOYO_V2, dir === 'left');
+}
+/** PAUSIN' (H2b, plan §4.18): the stick held — the ball out to the side at hip height with the palm on top, the body low and the
+ *  weight back, for up to PAUSIN_MAX_SEC (0.9 s, the owner's pick). The mode HOLDS this clip; the carry holds the ball on the pausin
+ *  path. `dir` is the ball's hand. (It played the hesi capture at a quarter speed with the carry parked.) */
+export function buildPausin(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
+  return buildHandleV2(scene, sk, `bball_pausin_${dir}`, 'pausin', PAUSIN_V2, dir === 'left');
+}
+/** The ankle targets of a key authored straight into buildPoseClip (handleV2Keys does this for the v2 tables): the target in the
+ *  final pose is raised by the key's hipsY, because the legs are solved with the hips at bind. */
+const feetAt = (hipsY: number, f: { Left: V3; Right: V3 }) => ({ Left: [f.Left[0], f.Left[1] - hipsY, f.Left[2]] as V3, Right: [f.Right[0], f.Right[1] - hipsY, f.Right[2]] as V3 });
+/** THE JAB (H2b, plan §4.11): from triple threat, the right foot jabs 0.30 m out toward the drive and comes back; the pivot (left)
+ *  foot stays; the shoulders and the head sell it, the ball ripped low on the far hip with both hands. 0.35 s — the jab's own
+ *  timing (TripleThreat). It played `bball_hesi` (the hesitation) before. */
+export function buildJab(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const H = (y: number) => y;
+  return buildPoseClip(scene, sk, 'bball_jab', 0.35, accent([
+    { t: 0,    bones: { ...torso(0, 16) }, hands: { Right: [0.20, 0.96, 0.22] as V3, Left: [0.02, 0.98, 0.26] as V3 }, hipsY: H(-0.10), feet: feetAt(-0.10, STANCE_FEET), kneesFront: true },
+    { t: 0.10, bones: { ...torso(-8, 24, 4, [-2, 0, 0]) }, hands: { Right: [0.24, 0.86, 0.16] as V3, Left: [0.04, 0.90, 0.20] as V3 }, hipsY: H(-0.16), feet: feetAt(-0.16, { Left: STANCE_FEET.Left, Right: [0.30, ANKLE_Y + 0.03, 0.28] }), kneesFront: true },
+    { t: 0.18, bones: { ...torso(-9, 26, 5, [-2, 0, 0]) }, hands: { Right: [0.25, 0.85, 0.15] as V3, Left: [0.05, 0.89, 0.19] as V3 }, hipsY: H(-0.17), feet: feetAt(-0.17, { Left: STANCE_FEET.Left, Right: [0.32, ANKLE_Y, 0.30] }), kneesFront: true },
+    { t: 0.28, bones: { ...torso(-3, 20, 1) }, hands: { Right: [0.22, 0.92, 0.20] as V3, Left: [0.03, 0.95, 0.24] as V3 }, hipsY: H(-0.12), feet: feetAt(-0.12, { Left: STANCE_FEET.Left, Right: [0.22, ANKLE_Y + 0.04, 0.14] }), kneesFront: true },
+    { t: 0.35, bones: { ...torso(0, 16) }, hands: { Right: [0.20, 0.96, 0.22] as V3, Left: [0.02, 0.98, 0.26] as V3 }, hipsY: H(-0.10), feet: feetAt(-0.10, STANCE_FEET), kneesFront: true },
+  ], 0.18), { smooth: true });
+}
+/** THE PIVOT, v2 (H2b, plan §4.16): the turn on a planted foot at REAL speed. The capture that stood in for `bball_pivot` (78_31)
+ *  packed 1.1 s of motion into the 0.42 s turn — 2.6× real — with 83° of hip yaw baked in on top of the root's own turn. The root
+ *  owns the turn (planPivot); this keys no yaw: the pivot foot stays where the stance put it (the body turns about it), the free foot
+ *  lifts and comes down, the ball is held across the body, the chest stays tall. `free` names the free foot: `_right` the right
+ *  foot steps (the left is the pivot), `_left` its mirror. */
+export function buildPivotV2(scene: Scene, sk: Skeleton, free: 'left' | 'right' = 'right'): AnimationGroup | null {
+  const keys: PoseKey[] = [
+    { t: 0,    bones: { ...torso(0, 14) }, hands: { Right: [0.14, 1.00, 0.26] as V3, Left: [-0.06, 1.02, 0.28] as V3 }, hipsY: -0.10, feet: feetAt(-0.10, STANCE_FEET), kneesFront: true },
+    { t: 0.12, bones: { ...torso(0, 16) }, hands: { Right: [0.12, 0.98, 0.26] as V3, Left: [-0.08, 1.00, 0.28] as V3 }, hipsY: -0.08, feet: feetAt(-0.08, { Left: STANCE_FEET.Left, Right: [0.18, ANKLE_Y + 0.08, 0.04] }), kneesFront: true },
+    { t: 0.26, bones: { ...torso(0, 14) }, hands: { Right: [0.10, 1.00, 0.27] as V3, Left: [-0.10, 1.02, 0.28] as V3 }, hipsY: -0.08, feet: feetAt(-0.08, { Left: STANCE_FEET.Left, Right: [0.22, ANKLE_Y + 0.07, 0.06] }), kneesFront: true },
+    { t: 0.36, bones: { ...torso(0, 14) }, hands: { Right: [0.13, 1.00, 0.26] as V3, Left: [-0.07, 1.02, 0.28] as V3 }, hipsY: -0.10, feet: feetAt(-0.10, STANCE_FEET), kneesFront: true },
+    { t: 0.42, bones: { ...torso(0, 14) }, hands: { Right: [0.14, 1.00, 0.26] as V3, Left: [-0.06, 1.02, 0.28] as V3 }, hipsY: -0.10, feet: feetAt(-0.10, STANCE_FEET), kneesFront: true },
+  ];
+  return buildPoseClip(scene, sk, `bball_pivot_v2_${free}`, 0.42, free === 'right' ? keys : keys.map(mirrorKey), { smooth: true });
+}
 /** THE BTB SLIDE (H2, owner 2026-10-16): the behind-the-back's wrap and path with the body skipping sideways the ball's way (SLIDE_V2).
  *  `dir` is the side the ball ENDS on, as the behind-the-back's: `_left` is the right hand's, `_right` its mirror. */
 export function buildBtbSlide(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
@@ -239,6 +302,13 @@ export function buildSnatchBack(scene: Scene, sk: Skeleton): AnimationGroup | nu
   ]);
 }
 
+/** THE SNATCHBACK, v2 (H2b, plan §4.13): on its own crossing path, timed to the hop — the ball pushed INTO him (the push 0–0.09), the
+ *  floor at 0.17 in front, caught by the other hand at 0.25 while the body is in the air going back; the chest stays square. `dir` is the
+ *  side the ball ENDS on (as the crossover's): `_left` is the right hand's, `_right` its mirror. It played the step-back's gather, the
+ *  ball toggled to the other hand by switchHand(). The hop itself is the controller's (DribbleController.stepBack). */
+export function buildSnatchBackV2(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'left'): AnimationGroup | null {
+  return buildHandleV2(scene, sk, `bball_snatch_back_v2_${dir}`, 'snatch_back', SNATCH_V2, dir === 'right');
+}
 /** THE SHAMMGOD (phase 4c v2, plan §4.6): pushed out long with one hand, the OTHER hand arrives on it and pulls it across. */
 export function buildShammgod(scene: Scene, sk: Skeleton, dir: 'left' | 'right' = 'right'): AnimationGroup | null {
   return buildHandleV2(scene, sk, `bball_shammgod_${dir}`, 'shammgod', SHAMMGOD_V2, dir === 'right');
@@ -784,6 +854,18 @@ export function buildShimmy(scene: Scene, sk: Skeleton): AnimationGroup | null {
   });
   return buildPoseClip(scene, sk, 'bball_shimmy', 0.38, [key(0, 0, 0, -0.10), key(0.1, 14, 7, -0.11), key(0.2, -14, -7, -0.11), key(0.3, 9, 4, -0.10), key(0.38, 0, 0, -0.10)]);
 }
+/** THE HOOK'S SHIMMY (H2b, plan §4.23 (b)): the R2 shimmy before a post hook gets its own 0.22 s cut — one full sell, +15° then −15° at
+ *  the shoulders, played at rate 1 inside the hook's shimmy window (shimmyLeft 0.22, unchanged). It played the hesitation at 1.5×.
+ *  The shoulders are the hips (±8°) plus the Spine turning WITH them (±7°): the fade's bball_shimmy counter-rotates its Spine at −0.6 ×
+ *  the hips, which by key arithmetic leaves the shoulders ±5.6° — too little to sell in a beat this short. */
+export function buildShimmyQuick(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const base: Record<string, Deg3> = { LeftUpLeg: [-28, 0, 18], RightUpLeg: [-28, 0, -18], LeftLeg: [42, 0, 0], RightLeg: [42, 0, 0] };
+  const key = (t: number, yaw: number, roll: number, hipsY: number): PoseKey => ({
+    t, bones: { Hips: [0, yaw, 0], Spine: [10, yaw * 0.875, roll], Neck: [-6, -yaw * 0.5, 0], ...base },
+    hands: { Right: [0.16 + yaw * 0.004, 1.16, 0.22], Left: [-0.12 + yaw * 0.004, 1.14, 0.24] }, hipsY,
+  });
+  return buildPoseClip(scene, sk, 'bball_shimmy_quick', 0.22, [key(0, 0, 0, -0.10), key(0.07, 8, 6, -0.11), key(0.15, -8, -6, -0.11), key(0.22, 0, 0, -0.10)]);
+}
 /** The DROP STEP, right-side: from the seal (back to the basket, the ball low on the right) the right foot swings AROUND
  *  toward the iron, the ball swept low across the body into both hands at the chest — set for the layup that follows (the
  *  mode walks the step). 0.34 s (DROP_STEP_SEC).
@@ -1081,10 +1163,67 @@ const IN_AND_OUT_V2: readonly V2Key[] = [
   { t: 0.24, bones: { ...torso(6, 26, -3) }, hipsY: -0.17, R: 'on', L: [-0.27, 1.0, 0.12], feet: { Left: [-0.24, ANKLE_Y + 0.04, 0.15], Right: STANCE_FEET.Right } },
   { t: 0.34, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
 ];
+/**
+ * THE HESITATION (H2b, plan §4.8): 0.66 s on the hesi path. The load (0–0.06: the ball pushed into a soft high bounce, the knees
+ * down), THE RISE (0.15–0.32: the hips come up 0.09 to the hitch, the spine goes from 20° over to 4°, the head up — the defender reads "he is
+ * stopping" and stands up; the ball floats at the top of its bounce, P + 0.06, held at 0.32: the hitch), then LOW AND GONE
+ * (0.32–0.66: the hips drop 0.13 under the stance, the chest over 26°, the lead foot steps out 0.22 m on the pound forward). Keyed
+ * as ankles (V2Key.feet); the pivot (right) foot stays put. The controller's hang (DribbleController.HESI_HANG_SEC) holds the body
+ * still through the rise, so the explode leaves from a stop.
+ */
+/** THE SNATCHBACK v2 keys (plan §4.13): into him (0–0.09, the lead foot planted out front), the rip and the hop (0.09–0.25: the trail foot
+ *  in the air reaching back, the ball on the floor in front), the catch low in the left hand (0.25, the body down to it) as the trail
+ *  foot lands, then the set (0.36–0.50). 0.50 s; the path ends at 0.40 (the left hand's top). */
+const SNATCH_V2: readonly V2Key[] = [
+  { t: 0, bones: { ...torso(0, 16) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.06, bones: { ...torso(4, 26, -2) }, hipsY: -0.12, R: 'on', L: { near: 0.25, off: [0.02, 0.14, -0.08] }, feet: { Left: [-0.19, ANKLE_Y, 0.26], Right: STANCE_FEET.Right } },   // INTO him
+  { t: 0.15, bones: { ...torso(8, 12, -4) }, hipsY: -0.10, R: [0.22, 0.88, 0.24], L: { near: 0.25, off: [0.0, 0.06, -0.04] }, feet: { Left: [-0.19, ANKLE_Y + 0.02, 0.28], Right: [0.20, ANKLE_Y + 0.06, -0.08] } },   // the rip: the hop back, the chest square
+  { t: 0.25, bones: { ...torso(6, 22, -3) }, hipsY: -0.16, R: [0.26, 0.96, 0.06], L: 'on', feet: { Left: [-0.19, ANKLE_Y + 0.04, 0.20], Right: [0.21, ANKLE_Y, -0.16] } },   // the low catch (the ball hand ripped back to the hip line), the trail foot down
+  { t: 0.36, bones: { ...torso(0, 16) }, hipsY: -0.08, R: OFF_R, L: 'on', feet: { Left: [-0.19, ANKLE_Y, 0.10], Right: [0.21, ANKLE_Y, -0.12] } },   // the set step
+  { t: 0.50, bones: { ...torso(0, 14) }, hipsY: -0.05, R: OFF_R, L: 'on', feet: STANCE_FEET },
+];
+const HESI_STEP = { Left: [-0.19, ANKLE_Y, 0.30] as V3, Right: STANCE_FEET.Right };
+const HESI_V2: readonly V2Key[] = [
+  { t: 0, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.06, bones: { ...torso(0, 20, 0, [-2, 0, 0]) }, hipsY: -0.11, R: 'on', L: OFF_HAND, feet: STANCE_FEET },   // the load
+  { t: 0.15, bones: { ...torso(0, 13, 0, [-6, 0, 0]) }, hipsY: -0.06, R: { near: 0.24, off: [0.0, 0.08, -0.02] }, L: [-0.26, 1.02, 0.12], feet: STANCE_FEET },
+  { t: 0.24, bones: { ...torso(0, 12, 0, [-8, 0, 0]) }, hipsY: -0.08, R: 'on', L: [-0.26, 1.03, 0.12], feet: STANCE_FEET },   // the rise (the hand meets the ball low on its way up: at −0.02 it could not reach)
+  { t: 0.32, bones: { ...torso(0, 4, 0, [-10, 0, 0]) }, hipsY: -0.02, R: 'on', L: [-0.26, 1.04, 0.12], hold: true, feet: STANCE_FEET },   // the hitch: tall, still, the ball up
+  { t: 0.42, bones: { ...torso(-4, 24, 2, [-4, 0, 0]) }, hipsY: -0.14, R: 'on', L: [-0.24, 0.94, 0.16], feet: { Left: [-0.19, ANKLE_Y + 0.06, 0.20], Right: STANCE_FEET.Right } },   // GONE: low, the lead foot out
+  { t: 0.49, bones: { ...torso(-5, 26, 3, [-4, 0, 0]) }, hipsY: -0.16, R: { near: 0.56, off: [0.02, 0.10, -0.04] }, L: [-0.24, 0.92, 0.18], feet: HESI_STEP },
+  { t: 0.56, bones: { ...torso(-3, 30, 2, [-4, 0, 0]) }, hipsY: -0.20, R: 'on', L: [-0.24, 0.92, 0.16], feet: HESI_STEP },   // the low catch off the pound
+  { t: 0.66, bones: { ...torso(0, 18, 0) }, hipsY: -0.09, R: 'on', L: OFF_HAND, feet: { Left: [-0.19, ANKLE_Y, 0.20], Right: STANCE_FEET.Right } },
+];
+/**
+ * THE YOYO (H2b, plan §4.9): 0.67 s on the yoyo path — the ball pounded low (0–0.30: its top at 0.55 of the stroke) then floated high
+ * (0.48–0.59, the top at P + 0.08, held: the dare). Square and tall: no hip yaw; the knees go down to meet the low ball and come up
+ * with the high one; the feet never move.
+ */
+const YOYO_V2: readonly V2Key[] = [
+  { t: 0, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.06, bones: { ...torso(0, 18) }, hipsY: -0.09, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.15, bones: { ...torso(0, 30) }, hipsY: -0.21, R: { near: 0.21, off: [0.0, 0.07, -0.02] }, L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.21, bones: { ...torso(0, 36, 0, [-2, 0, 0]) }, hipsY: -0.27, R: 'on', L: OFF_HAND, feet: STANCE_FEET },   // down to the low pound (the hand only reaches it this low)
+  { t: 0.30, bones: { ...torso(0, 33, 0, [-3, 0, 0]) }, hipsY: -0.24, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.38, bones: { ...torso(0, 24, 0, [-5, 0, 0]) }, hipsY: -0.15, R: { near: 0.48, off: [0.0, 0.08, -0.02] }, L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.48, bones: { ...torso(0, 12, 0, [-7, 0, 0]) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.59, bones: { ...torso(0, 8, 0, [-9, 0, 0]) }, hipsY: -0.03, R: 'on', L: OFF_HAND, hold: true, feet: STANCE_FEET },   // high: the dare
+  { t: 0.67, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+];
+/**
+ * PAUSIN' (H2b, plan §4.18): 1.02 s on the pausin path — 0.12 s to take the ball out to the side (S + 0.08, P − 0.05, F + 0.12: the
+ * palm on top), then held. The body sits low (−0.14) with the weight back (the spine up to 8°), the off arm out for balance.
+ */
+const PAUSIN_V2: readonly V2Key[] = [
+  { t: 0, bones: { ...torso(0, 14) }, hipsY: -0.05, R: 'on', L: OFF_HAND, feet: STANCE_FEET },
+  { t: 0.12, bones: { ...torso(-6, 8, 3, [-6, 0, 0]) }, hipsY: -0.14, R: 'on', L: [-0.34, 1.02, 0.18], feet: STANCE_FEET },
+  { t: 0.57, bones: { ...torso(-6, 9, 3, [-7, 0, 0]) }, hipsY: -0.15, R: 'on', L: [-0.35, 1.01, 0.18], feet: STANCE_FEET },
+  { t: 1.02, bones: { ...torso(-6, 8, 3, [-6, 0, 0]) }, hipsY: -0.14, R: 'on', L: [-0.34, 1.02, 0.18], feet: STANCE_FEET },
+];
 /** The BTB slide's keys (H2): on the behind-the-back's path, so not in V2_KEYS (one table per path); the tests read it here. */
 export const SLIDE_V2_KEYS: readonly V2Key[] = SLIDE_V2;
 /** The v2 key tables by path (the tests resolve them the way the builders do). */
 export const V2_KEYS: Readonly<Partial<Record<PathMove, readonly V2Key[]>>> = {
   crossover: CROSSOVER_V2, momentum_cross: MOMENTUM_CROSS_V2, between_legs: BETWEEN_V2, behind_back: BEHIND_V2, double_cross: DOUBLE_CROSS_V2,
-  shammgod: SHAMMGOD_V2, in_and_out: IN_AND_OUT_V2,
+  shammgod: SHAMMGOD_V2, in_and_out: IN_AND_OUT_V2, hesi: HESI_V2, yoyo: YOYO_V2, pausin: PAUSIN_V2, snatch_back: SNATCH_V2,
 };

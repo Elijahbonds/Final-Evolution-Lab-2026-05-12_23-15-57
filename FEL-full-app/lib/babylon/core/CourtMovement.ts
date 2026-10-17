@@ -127,6 +127,23 @@ export class CourtMovement {
    *  facing is held: a committed hop is ballistic, not a stick-driven run (released, the stop would bleed a 3 m/s hop in a step).
    *  Nothing calls it but a move that asks; at 0 the update is exactly what it was. */
   holdFor(sec: number): void { this.holdLeft = Math.max(this.holdLeft, sec); }
+  /** H2b (the spin's step-out, plan §4.14): turn the facing to `yaw` at `rateRad` per second, the short way, whatever the stick
+   *  says — the body comes out of a spin on its exit run with the stick at home too. Cleared on arrival or by stop(). */
+  turnTo(yaw: number, rateRad: number): void { this.slew = { yaw, rate: Math.max(0.1, rateRad) }; }
+  private slew: { yaw: number; rate: number } | null = null;
+  private stepSlew(dt: number): void {
+    const s = this.slew; if (!s) return;
+    let d = s.yaw - this.facing; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    const step = s.rate * dt;
+    if (Math.abs(d) <= step) { this.facing = s.yaw; this.slew = null; } else this.facing += Math.sign(d) * step;
+  }
+  /** H2b (the step-back, plan §4.12): for the next `sec` seconds the stick reads as HOME — the hop a move wrote plays out exactly as it
+   *  does with the thumb off the stick (the stop's own decel, the facing kept), whatever the thumb is doing. Without it a step-back
+   *  thrown with the left stick still pushed at the rim never stopped: the stick STEERS the velocity round at the capped turn rate
+   *  instead of braking through zero, so the body backpedalled at 3.7 m/s for over a second and turned its back to the rim (measured:
+   *  180° by 0.4 s). Cleared by stop(). */
+  ignoreStickFor(sec: number): void { this.stickOffLeft = Math.max(this.stickOffLeft, sec); }
+  private stickOffLeft = 0;
   get holding(): boolean { return this.holdLeft > 0; }
   private holdLeft = 0;
   get paused(): boolean { return this.pausedNow; }
@@ -143,8 +160,10 @@ export class CourtMovement {
     this.plantTimer = Math.max(0, this.plantTimer - dt);
     this.launchLeft = Math.max(0, this.launchLeft - dt);
     this.cutGraceLeft = Math.max(0, this.cutGraceLeft - dt);
-    const mag = this.pausedNow ? 0 : Math.min(1, Math.hypot(moveX, moveY));   // pausin': the stick is ignored
+    this.stickOffLeft = Math.max(0, this.stickOffLeft - dt);
+    const mag = this.pausedNow || this.stickOffLeft > 0 ? 0 : Math.min(1, Math.hypot(moveX, moveY));   // pausin' (and a committed step-back, H2b): the stick is ignored
     const t = this.tune;
+    this.stepSlew(dt);   // H2b: a pending step-out turn (turnTo)
     if (this.holdLeft > 0) {   // H2: a committed hop (holdFor) — the velocity and the facing as the move wrote them
       this.holdLeft = Math.max(0, this.holdLeft - dt);
       this.sprintWas = sprint && mag > 0.05;
@@ -269,7 +288,7 @@ export class CourtMovement {
   }
 
   /** Hard stop (possession change, whistle). Keeps facing. */
-  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.holdLeft = 0; }
+  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.holdLeft = 0; this.slew = null; this.stickOffLeft = 0; }
 }
 
 /** Binds a character root to a Havok capsule. KINEMATIC (ANIMATED motion

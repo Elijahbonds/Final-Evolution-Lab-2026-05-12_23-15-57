@@ -15,7 +15,7 @@ import { BALL_ELBOW_POLE } from '../ballCarry';
 import { pathAt } from '../handlePaths';
 import { buildPoseClip } from '../poseClip';
 import {
-  buildCrossover, buildMomentumCross, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildShammgod, buildBtbSlide, SLIDE_V2_KEYS,
+  buildCrossover, buildMomentumCross, buildInAndOut, buildBetweenLegsDribble, buildBehindBackDribble, buildDoubleCross, buildShammgod, buildBtbSlide, SLIDE_V2_KEYS, buildHesiV2, buildYoyoV2, buildPausin, buildSnatchBackV2,
   carryStanceAtBind, handleV2Keys, mirrorKey, buildHesi, BASKETBALL_CLIPS, V2_KEYS as KEYS_OF, V2_BALL_POLE,
 } from './basketball';
 import { pathFor, strokeStretch, type PathMove } from '../handlePaths';
@@ -73,6 +73,15 @@ const CLIPS: { name: string; move: PathMove; build: (s: Scene, k: Skeleton) => A
   // H2 (owner 2026-10-16): the BTB slide — the behind-the-back's path, its own keys; held to every line the crossing clips are
   { name: 'bball_btb_slide_left', move: 'behind_back', build: (s, k) => buildBtbSlide(s, k, 'left'), mirrored: false, keys: SLIDE_V2_KEYS },
   { name: 'bball_btb_slide_right', move: 'behind_back', build: (s, k) => buildBtbSlide(s, k, 'right'), mirrored: true, keys: SLIDE_V2_KEYS },
+  // H2b (plan §4.8): the hesitation v2 on the hesi's float path
+  { name: 'bball_hesi_v2_right', move: 'hesi', build: (s, k) => buildHesiV2(s, k, 'right'), mirrored: false },
+  { name: 'bball_hesi_v2_left', move: 'hesi', build: (s, k) => buildHesiV2(s, k, 'left'), mirrored: true },
+  { name: 'bball_yoyo_v2_right', move: 'yoyo', build: (s, k) => buildYoyoV2(s, k, 'right'), mirrored: false },   // H2b (plan §4.9)
+  { name: 'bball_yoyo_v2_left', move: 'yoyo', build: (s, k) => buildYoyoV2(s, k, 'left'), mirrored: true },
+  { name: 'bball_pausin_right', move: 'pausin', build: (s, k) => buildPausin(s, k, 'right'), mirrored: false },   // H2b (plan §4.18)
+  { name: 'bball_pausin_left', move: 'pausin', build: (s, k) => buildPausin(s, k, 'left'), mirrored: true },
+  { name: 'bball_snatch_back_v2_left', move: 'snatch_back', build: (s, k) => buildSnatchBackV2(s, k, 'left'), mirrored: false },   // H2b (plan §4.13)
+  { name: 'bball_snatch_back_v2_right', move: 'snatch_back', build: (s, k) => buildSnatchBackV2(s, k, 'right'), mirrored: true },
 ];
 
 for (const body of Object.keys(BODIES)) {

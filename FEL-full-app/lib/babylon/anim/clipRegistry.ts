@@ -85,6 +85,8 @@ export const REAL_CLIPS = new Set<string>([
   'bball_double_cross_left', 'bball_double_cross_right', 'bball_snatch_back', 'bball_shammgod_left', 'bball_shammgod_right', 'bball_yoyo',
   'bball_momentum_cross_left', 'bball_momentum_cross_right',   // HOOPS MOTION phase 4c (plan §4.2)
   'bball_btb_slide_left', 'bball_btb_slide_right',   // H2 (owner 2026-10-16): the BTB slide
+  'bball_hesi_v2_left', 'bball_hesi_v2_right',   // H2b (plan §4.8): the hesitation v2
+  'bball_yoyo_v2_left', 'bball_yoyo_v2_right', 'bball_pausin_left', 'bball_pausin_right', 'bball_jab', 'bball_pivot_v2_left', 'bball_pivot_v2_right', 'bball_snatch_back_v2_left', 'bball_snatch_back_v2_right', 'bball_shimmy_quick',   // H2b
   'bball_ankle_stumble', 'bball_ankle_slip', 'bball_stepback_gather', 'bball_mikan', 'bball_mikan_left', 'bball_up_and_under',
   'bball_up_and_under_left', 'bball_finger_roll', 'bball_finger_roll_left', 'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin',
   'bball_layup_spin_left', 'bball_layup_hang', 'bball_layup_hang_left', 'bball_shimmy', 'bball_drop_step', 'bball_drop_step_left', 'bball_floater_left',

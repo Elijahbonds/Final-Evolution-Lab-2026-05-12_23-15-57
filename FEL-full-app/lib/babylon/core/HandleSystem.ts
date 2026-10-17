@@ -95,15 +95,15 @@ export const MOVE_HANDLE: Readonly<Record<HandleMove, number>> = {
  */
 export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => string) | null>> = {
   crossover: (d) => `bball_crossover_${d}`,
-  hesi: () => 'bball_hesi',
+  hesi: (d) => `bball_hesi_v2_${d}`,   // H2b (plan §4.8): the v2 hesitation on its float path, in the ball's hand (`d` = the hand: a hesi keeps it)
   in_and_out: (d) => `bball_in_and_out_${d}`,
-  yoyo: () => 'bball_yoyo',
+  yoyo: (d) => `bball_yoyo_v2_${d}`,   // H2b (plan §4.9): the v2 yoyo on its path, in the ball's hand
   between_legs: (d) => `bball_between_legs_${d}`,
   behind_back: (d) => `bball_behind_back_${d}`,
   spin: null,             // the mode turns the body; there is no hand shape that says "spin" on its own
   slip_slide: (d) => `bball_in_and_out_${d}`,   // the slip IS an in-and-out you took past his hip — same hands, mode moves the feet
   double_cross: (d) => `bball_double_cross_${d}`,
-  snatch_back: () => 'bball_snatch_back',
+  snatch_back: (d) => `bball_snatch_back_v2_${d}`,   // H2b (plan §4.13): the v2 snatchback on its crossing path, named for the ball's END side
   shammgod: (d) => `bball_shammgod_${d}`,
   off_the_head: null,     // the ball leaves your hands; the mode owns that one entirely
   momentum_cross: (d) => `bball_momentum_cross_${d}`,   // HOOPS MOTION phase 4c (plan §4.2): its own clip on its own wider path (it played the crossover's)
