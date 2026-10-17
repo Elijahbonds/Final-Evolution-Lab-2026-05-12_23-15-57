@@ -515,11 +515,12 @@ no legal or policy copy.
   - The face-scan entry ("Scan My Face" and its capture) is hidden in edit mode, whatever `FACE_SCAN_ENABLED` says.
   Tested in `components/closet/closet-studio-edit.test.tsx`: the whole ClosetView runs on the test hook runtime, with fetch and
   storage stubbed and read back.
-  **Follow-ups (left as they are, for the creator lane):**
-  - In edit mode, the Body controls' note in `components/closet/character-controls.tsx` still says height and build stay on
-    this device "unless you allow saving look numbers above". That consent control is hidden there.
-  - The first-visit walkthrough's "save" step can't be completed in edit mode, which has no Save Look. It can only be
-    skipped.
+  **Follow-ups:** ~~left as they are, for the creator lane~~ — done in round 5 (§13.4):
+  - ~~In edit mode, the Body controls' note in `components/closet/character-controls.tsx` still says height and build stay on
+    this device "unless you allow saving look numbers above". That consent control is hidden there.~~ Reworded in edit mode
+    only (the Shape tab's note too, which had the same words).
+  - ~~The first-visit walkthrough's "save" step can't be completed in edit mode, which has no Save Look. It can only be
+    skipped.~~ In edit mode it is the hand-back, and "Back to Nexus Studio" completes it.
 - **The rival — owner call, not built.** Tiebreak's rival is a body the MODE spawns: a tinted spawn → the roster's pick and its
   rotation (`rosterUrlFor`, `rotationFor`), its own name and look. Casting it is not data: the mode and the roster would have to
   hand that choice over (a mode code change, and the roster's say on whose body an opponent wears). Recorded for the owner.
@@ -571,7 +572,8 @@ caught; the 4 that survived the first run were two weak tests (strengthened) and
 - The Closet's half of "Edit in the Closet" was routed from this lane and has since been applied, on `lane/closet-studio`
   (§12.2, §12.5).
 - The replay event is unit-tested on the host; it is live only in a mode that replays (Football Rush, studio-4a's target).
-- Cast fans: desktop / high only (the phone keeps its card crowd); they idle (sit / stand) and do not join the crowd's cheers.
+- Cast fans: desktop / high only (the phone keeps its card crowd); they idle (sit / stand) ~~and do not join the crowd's cheers~~
+  — they cheer with the crowd since round 5 (§13.1).
   Each is a skinned body: the editor's desktop meter read 27 bodies on the demo venue with the player + 3 fans cast (red against
   the phone's 16; the phone column never mounts cast fans). The baseline without them was not measured separately.
 - The explain summary on the rig is a stubbed answer; a real model's wording is the owner's to judge.
@@ -708,3 +710,105 @@ As routed: with no `?studioEdit=` in the URL every changed line is a no-op (the 
  
          {faceScan && scanning && (
 ```
+
+## 13. Round 5 (2026-10-17, lane/studio-5)
+
+Owner 2026-10-17 ("all four chosen"). Four items. Nothing here changes a score, a timing window, a rule or a tuned number; no
+schema, no dependency, no legal or policy copy.
+
+### 13.1 Cast fans cheer with the crowd (`castCheer.ts`, `castLayer.ts`, `runtime.ts`, `stage.ts`)
+
+The project characters seated among the fans (§12.2) sat or stood through every cheer. Now they hear every reaction the crowd
+makes and answer with **the crowd's own vocabulary and timing**, read from `visual/crowd`, never re-tuned here: the plan
+(`crowdReact.planFor` — a seated cheer, a standing jump ×1–2, rise → three jumps → sit down for ON FIRE, the groans, claps under
+reduced motion), the clips (`crowdClips.crowdClipKeys` at `crowdVat.CROWD_CLIPS`' seconds), the stagger and the ripple along the
+row (`crowdReact.delayFor`), and the priority (`crowdReact.PRIORITY`: a groan never cuts a cheer; nothing cuts the finish).
+
+- **Who calls.** `runtime.ts mountCrowdLayer` wraps the crowd handle's `react` once, and `crowd.onReact` hears every caller:
+  `mountModeCrowd`'s momentum, tier and end-of-match listeners, a script's crowd action, and the capture rig's dev handle
+  (`scene.metadata.felCrowd`) — they all call that handle. The crowd's own reaction runs first and unchanged; a listener that
+  throws is caught. The mode (`mountStudioExtras`) and the editor (`stage.ts`; a crowd re-mount re-seats the fans on the new
+  crowd) wire it.
+- **The director** (`castCheer.ts CastFanDirector`, pure) is `CrowdDirector`'s rules with one difference: **every cast fan takes
+  part**. The crowd moves a share of its fans by the play's size (`shareFor`); a cast fan is the creator's own character, put in the
+  stands to be seen. **assumption:** the owner wants their characters in every cheer. `castCheer.test.ts` holds the timeline to
+  `CrowdDirector`'s for every crowd fan the share let into the same reactions (seated and standing, reduced motion or not).
+- **The body.** Each crowd clip is built on the kit body the first time it is needed (`buildPoseClip`, the crowd's keys plus the
+  hands: on the thighs seated, at the sides standing, blended by the hips' drop while up off the seat). Measured on the real
+  `fel-kit-female.glb`: all ten clips build; at every sample both hands hang below the shoulders, in reach; the seated cheer lifts
+  the hips over 15 cm and sets them back.
+- **On the rig** (the real Tiebreak play-test, three cast fans, the crowd made to react through its dev handle): hips +0.26 m at the
+  cheer's peak and back; on the stand, up to standing and jumping; the groan folds. Shots: `round5/studio-5/shots/cheer-*.png`.
+- RIG-ADJACENT. GATE 0 (`scripts/gate0-animation-verification.ts`) ran first: 39 passed, 0 failed.
+- **Not covered.** The perf governor's 'still' level stops the crowd's clock; a cast fan keeps playing its current clip (as it
+  kept idling before). None on the mobile tier, as before.
+
+### 13.2 CELL proposes stamps (`aiEdits.ts`, `stamps.ts`, `ai-venue-panel.tsx`)
+
+One more op in the closed vocabulary: `{"op":"stamp","stamp":<id or name>,"at":[x,z],"yaw":degrees}` — the same review-then-apply
+step, the same ONE command, the same undo stack.
+
+- **Sanitised like the rest** (on the server and again in the browser): a capped name, a clamped spot, degrees to radians, 6 per
+  answer; nothing else in the op is read. **Resolved in the browser** (`resolveStamp`): a built-in by its id, else by name among the
+  built-ins and the project's own stamps (the cast rule: exact, else one unique partial match; ambiguous or unknown is struck out in
+  the review and left out). **Placed whole or not at all**, inside the venue's object cap and the answer's placement cap; fresh ids;
+  every piece through `sanitizeObject`; turned about the stamp's centre with the group gizmo's yaw (`stamps.ts stampCopies`, which
+  `placeStamp` now calls — its own behaviour unchanged).
+- **Privacy, unchanged.** The request is still `{prompt, venue}` (the route is not edited). **assumption:** project stamp NAMES are not
+  venue data — they live on the project (`StudioProject.stamps`), not on the venue, and are free text a creator typed — so the model
+  is told the **built-in** stamps only (app content, like the catalog's ids). A project stamp is reached the way a character is: the
+  creator names it in the typed request, the model repeats the name, the browser resolves it. Tests hold that nothing the model
+  hears names a project stamp or its pieces, even when a body smuggles one into the venue.
+- **On the rig** (the studio bundle, the model stubbed at the network): the review lists four stamps and strikes out a fifth that
+  no shelf has; Apply is one step (1 → 18 objects; Undo "AI: a lamp row down each side…"); the request body carries no project
+  stamp. Shots: `round5/studio-5/shots/t2s-*.png`.
+
+### 13.3 Volleyball and Derby are play-test targets (`targets.ts`, `runtime.ts`, `stage.ts`, `NetSportMode.ts`, `precisionModes.ts`)
+
+Football Rush's pattern (§11.4), for two court modes that open on the walk-in and replay (a winning rally; a home run):
+
+| | Volleyball | Derby |
+|---|---|---|
+| Spec · preset | `volleyball` · `net` | `derby` · `court` (the definition's modeId is `baseball`: the editor's scene is marked with it) |
+| Hero · objective | NetSportMode's spawn (0, 0, 7.65), facing −z · the opponent's spot | the batter (−0.7, 0, 0), facing +x · the mound (z 18) |
+| Crowd look line | `crowdVenues` VOLLEYBALL | `crowdVenues` DERBY |
+| Weather | the coast family; a look only — NetSportMode rolls weather for a one-touch sport only (tennis's wind), so volleyball's WeatherKit is always 'natural' | the court family; a look only — Derby has no weather |
+| Director · replays | steps its own (no Studio intro stepper) · the venue's angles reach `ctx.highlight` | the same |
+| Score keys (scripts) | `score` / `foeScore` | `score` / `rivalHomers` |
+| Budget row | **assumption:** `tennis` (no volleyball row; the same net-sport engine) | **assumption:** `football` (no baseball row; an open field with stands) |
+| Cast frame | standard (no fairness review) | standard (no fairness review) |
+
+- **The opt-ins** (shared files, the dev-only lines only): the mood and intro getters, the look line (`studioLookFor ?? readPlaceLook`;
+  NetSportMode now reads the place pick once and uses that one look for the court fx's place and the weather's keepSky), the extras
+  mounted right after the venue and before the hero spawns (so a cast is seated), their dispose, and `angles: studioReplayAngles(…)`
+  on the replay. Without `?venue=`, and always in production, every value is the shipped one (`courtTargets.test.ts`).
+- **Tennis shares NetSportMode.** `studioVenueFor` now answers null for a mode with no target row, so Tennis never loads a venue —
+  not even an export forged for `'tennis'`.
+- **test changed:** `lib/babylon/court/courtModesWiring.test.ts` pinned `intro: 'walkIn'` in NetSportMode and DerbyMode; the pins
+  now match the getters exactly (as football's did in round 4). Not loosened: `courtTargets.test.ts` holds each getter to 'walkIn'
+  without a venue, in production, and for Tennis whatever the page carries.
+- **On the rig**: both modes load a Studio export through `?venue=` on the real harness — the night mood (sun 2.2 / hemi 0.55, the
+  venue's sky colour as the clear colour), the Studio floods and scans, the cast player on court / at bat, the establish intro.
+  Derby's scene is `baseball`. Shots: `round5/studio-5/shots/{volleyball,derby}-*.png`.
+- **Limits.** The editor does not stand these modes' own furniture in the viewport (Football's gridiron is the only one): the beach
+  plate, the sea and the court dressing (NetSportMode), and the plate, mound and outfield wall (DerbyMode) are the modes' own,
+  built in their `load()`. Volleyball's own beach picks its night sea from the place pick only, so under a Studio night venue the
+  sea stays the day sea. The mood resolver (`scene/moodResolver.ts`) still lets a non-home place pick override a declared mood,
+  for every target, Studio venue or not (dev-only; the rig runs `place=home`).
+
+### 13.4 The Closet's two follow-ups (`components/closet/**`, `components/closet-view.tsx` — the creator lane's files)
+
+- **The notes.** In Studio-edit mode the Body note no longer points at the hidden look-numbers consent: it says the height and
+  build go back to Nexus Studio with the look and nothing is saved to the Closet (a share code always carries them). The Shape tab's
+  note had the same words and gets the same treatment.
+- **The walkthrough.** In Studio-edit mode its last step is "Send it back", and a successful "Back to Nexus Studio" completes it (as
+  Save Look completes the live Closet's). A hand-back that fails (the Studio stopped waiting) completes nothing.
+- **A normal `/closet` is byte-identical:** the controls and the cards are passed exactly the props they always had (no
+  `studioEdit` key at all, held in `closet-studio-edit.test.tsx`), each renders exactly its old markup without the prop
+  (`studio-edit-notes.test.tsx`), and Save Look still completes the walkthrough.
+- **On the rig** (the closet bundle, a guest): the live Closet's last card says "Save it", Studio-edit mode's "Send it back"
+  (`round5/studio-5/shots/closet-{live,studio-edit}.png`). The Body note's new words are held by the render tests only (the
+  capture's tab click landed on the camera's FACE button).
+- **shared file:** `components/closet-view.tsx` changed on `lane/finish-release` 2 hours before this work (the closet-studio merge,
+  PR #304). LANES §3 says route a file changed in the last 24 hours; the round-5 brief assigns these follow-ups to this lane, so they
+  are applied here, additive and edit-mode only, and flagged.
