@@ -151,12 +151,15 @@ export function projectFingerprint(p: StudioProject): string {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-/** What this device last agreed with the server about one project: the server revision and the content at that point. */
+/** What this device last agreed with the server about one project: the server revision and the content at that point.
+ *  The device keeps one set of records PER ACCOUNT. A browser shared by two people has one working project, and a record made
+ *  under one account says nothing about another account. */
 export interface SyncRecord { projectId: string; rev: number; fingerprint: string }
 
 export type SyncAction =
   | { kind: 'none' }
-  /** Never saved to the account: create it (baseRev 0). */
+  /** Never saved to this account from this device: OFFER to save it (baseRev 0). Never automatic: on a shared browser the
+   *  working project may be someone else's, and only an explicit "Save to my account" may put it in this one. */
   | { kind: 'create' }
   /** Only this device changed it: send it, based on the revision both last agreed. */
   | { kind: 'push'; baseRev: number }
