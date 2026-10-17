@@ -235,8 +235,10 @@ with it. Another account's GET is a 404 and its DELETE removes nothing (tested o
 
 The route files are wiring only:
 
+- each reads the session itself with `getServerSession`, so `lib/api/routeContract.test.ts` sees the guard in every
+  route file;
 - the handlers are `lib/nexus-studio/cloudRoute.ts`;
-- the deps are `lib/nexus-studio/cloudDeps.ts`: the session user, `prismaProjectStore(prisma)`, the switch,
+- the deps are `lib/nexus-studio/cloudDeps.ts` `studioSaveDeps(userId)`: `prismaProjectStore(prisma)`, the switch,
   `readDobYear` from the database, `rateLimit` and the PII-free log line;
 - the store is `lib/nexus-studio/cloudStore.ts`.
 
