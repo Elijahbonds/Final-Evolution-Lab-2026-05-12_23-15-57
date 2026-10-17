@@ -11,8 +11,9 @@ describe('opponentMotion — an opponent plays the capture that replaces the aut
   });
 
   it('swaps only when the rig owns the capture', () => {
-    const owned = new Set(['bball_crossover_left', 'bball_mc_crossover_left', 'jumpshot']);
-    expect(variantFor('bball_crossover_left', owned)).toBe('bball_mc_crossover_left');
+    // (HOOPS MOTION phase 4c: the crossover capture no longer stands in for the authored crossover — the dribble idle's does)
+    const owned = new Set(['bball_dribble_idle', 'bball_mc_dribble_idle', 'jumpshot']);
+    expect(variantFor('bball_dribble_idle', owned)).toBe('bball_mc_dribble_idle');
     expect(variantFor('jumpshot', owned)).toBe('jumpshot');            // capture not built on this rig: authored stays
     expect(variantFor('idle_stand', owned)).toBe('idle_stand');
   });

@@ -17,18 +17,18 @@
   },
   {
    "name": "bball_mc_crossover_right",
-   "replaces": "bball_crossover_right",
+   "replaces": "bball_crossover_capture_right",
    "source": "cmu",
    "file": "cmu/06/06_13.bvh",
    "from": 6.2,
    "to": 6.68,
    "duration": 0.45,
    "reRoot": true,
-   "note": "low freestyle: the LEFT hand carries across to the right hip (going right)"
+   "note": "low freestyle: the LEFT hand carries across to the right hip (going right) · HOOPS MOTION phase 4c (2026-09-29): no longer stands in for bball_crossover_right — the v2 authored crossover, keyed on its ball path, is the default; this capture plays by its own name under the dev A/B ?hm4cross=cap (handleMotion.crossClip)"
   },
   {
    "name": "bball_mc_crossover_left",
-   "replaces": "bball_crossover_left",
+   "replaces": "bball_crossover_capture_left",
    "source": "cmu",
    "file": "cmu/06/06_13.bvh",
    "from": 6.2,
@@ -36,7 +36,7 @@
    "duration": 0.45,
    "reRoot": true,
    "mirror": true,
-   "note": "the same capture mirrored"
+   "note": "the same capture mirrored · HOOPS MOTION phase 4c (2026-09-29): no longer stands in for bball_crossover_left — the v2 authored crossover, keyed on its ball path, is the default; this capture plays by its own name under the dev A/B ?hm4cross=cap (handleMotion.crossClip)"
   },
   {
    "name": "bball_mc_hesi",
@@ -583,19 +583,19 @@
    "note": "the hard slide mirrored · REAL TIME (2b, 2026-09-25): was played in 0.6 s; now its cut span at rate 1, paced by StrideMatch"
   },
   {
-   "name": "bball_mc_feint_right",
-   "replaces": "bball_in_and_out_right",
+   "name": "bball_mc_rip_right",
+   "replaces": "bball_rip_right",
    "source": "cmu",
    "file": "cmu/78/78_20.bvh",
    "from": 0.35,
    "to": 1.05,
    "duration": 0.55,
    "reRoot": true,
-   "note": "FeintLeftMoveRight: the body sells left (hips drop to -0.32) and explodes right — the in-and-out's shape, captured (2026-09-17)"
+   "note": "FeintLeftMoveRight: the body sells left (hips drop to -0.32) and explodes right — the in-and-out's shape, captured (2026-09-17) · HOOPS MOTION phase 4c (2026-09-29, plan §4.7): a two-hand RIP, not an in-and-out (MAP gap 8) — renamed from bball_mc_feint_right, no longer the in-and-out (the v2 authored one-hand in-and-out is); kept for phase 9's rip-through"
   },
   {
-   "name": "bball_mc_feint_left",
-   "replaces": "bball_in_and_out_left",
+   "name": "bball_mc_rip_left",
+   "replaces": "bball_rip_left",
    "source": "cmu",
    "file": "cmu/78/78_20.bvh",
    "from": 0.35,
@@ -603,7 +603,7 @@
    "duration": 0.55,
    "reRoot": true,
    "mirror": true,
-   "note": "the feint mirrored"
+   "note": "the feint mirrored · HOOPS MOTION phase 4c (2026-09-29, plan §4.7): a two-hand RIP, not an in-and-out (MAP gap 8) — renamed from bball_mc_feint_left, no longer the in-and-out (the v2 authored one-hand in-and-out is); kept for phase 9's rip-through"
   },
   {
    "name": "bball_mc_dribble_walk",

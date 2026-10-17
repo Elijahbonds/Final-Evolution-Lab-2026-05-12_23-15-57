@@ -71,3 +71,20 @@ describe('F2: down-toward is a move, never a dead stick', () => {
     expect(stickMoveFor(f, { speed01: 0.2, pressured: false, sprint: false, hand: 'Right', escape: true })).toEqual({ move: 'snatchback', side: 'right' });
   });
 });
+
+// ── H2 (owner, 2026-10-16) ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+import { PAUSE_MAX_SEC as PAUSE_MAX_H2 } from './StickHandle';
+import { MOVES_UNLOCKED_GATE } from './HandleSystem';
+describe('H2: the slide is gated as the behind-the-back; PAUSIN\' holds at most 0.9 s', () => {
+  it('the BTB slide needs the behind-the-back\'s rating, and falls back like it (never to itself)', () => {
+    expect(ownedStickMove('btb_slide', 50)).toEqual({ move: 'crossover', locked: true, need: 58 });
+    expect(ownedStickMove('btb_slide', 58)).toEqual({ move: 'btb_slide', locked: false, need: 58 });
+    expect(ownedStickMove('momentum_btb', 40).move).toBe('momentum_cross');   // a refused move never lands on the slide
+  });
+  it('at the H2 gate every stick move is owned (unlock all moves until H9)', () => {
+    for (const m of ['behind_back', 'btb_slide', 'snatchback', 'steezo_roll', 'momentum_btb', 'between_legs', 'in_and_out'] as const) {
+      expect(ownedStickMove(m, MOVES_UNLOCKED_GATE).locked, m).toBe(false);
+    }
+  });
+  it('PAUSIN\' lets go on its own after 0.9 s (owner Q1; was 1.5)', () => expect(PAUSE_MAX_H2).toBe(0.9));
+});

@@ -30,6 +30,9 @@ export interface PlayOpts {
    *  jumper's capture opens with its own dip/load — but the shooter is already HELD in the gather's loaded pose, so
    *  replaying the load read as a second shot; the beat starts at the rise. The clip still runs to its natural end. */
   from01?: number;
+  /** H2 (2026-10-16): a LOOP starts its playhead this fraction in (it still loops over the whole clip — from01 would loop the tail): the
+   *  basketball tree restarts a dribble loop at the stride phase its legs layer (moveLegs) carried through a handle move. */
+  phase01?: number;
 }
 
 export class CharacterAnimator {
@@ -150,6 +153,7 @@ export class CharacterAnimator {
                finalSpeed < 0 ? next.to : from01 > 0 ? next.from + from01 * (next.to - next.from) : next.from,
                finalSpeed < 0 ? next.from : next.to, false);
     next.setWeightForAllAnimatables(0);
+    if (loop && opts.phase01 !== undefined && opts.phase01 > 0 && finalSpeed > 0 && next.to > next.from) next.goToFrame(next.from + Math.min(0.999, opts.phase01) * (next.to - next.from));   // H2: the loop's stride carries on
 
     if (onEnd) {
       this.endObs.get(next)?.remove();
@@ -237,6 +241,9 @@ export class CharacterAnimator {
     const w = (g as unknown as { animatables?: { weight: number }[] }).animatables?.[0]?.weight;
     return w == null || w < 0 ? 1 : Math.max(0, Math.min(1, w));
   }
+
+  /** H2 (moveLegs): the animation group a request for `name` resolves to on this body (no scope fallback, nothing played), or null. */
+  groupFor(name: string): AnimationGroup | null { return this.groups.get(resolveClip(name, this.clipNames).clip) ?? null; }
 
   /** Wall-clock duration of a clip (seconds) at speedRatio 1 — used by
    *  ShotReleaseSync to pace the jumpshot so its contact frame lands on

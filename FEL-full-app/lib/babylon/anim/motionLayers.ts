@@ -13,6 +13,9 @@
 //     and out over LEG_DRAG_EASE_SEC; the foot bones are left out (the posture layer pitches them with a held-pose memory of its own);
 //   · the BALL ARM is skipped around a release: the arm whose hand holds the ball follows its clip exactly, and for RELEASE_SKIP_SEC after
 //     the ball leaves it (the release point and the follow-through are the clip's, on the frame the clip says);
+//   · HOOPS MOTION phase 4b (plan §3.3, U21): …and a handle move's CONTACT HANDS are skipped too (setContactHands: the carry's
+//     move.contactHands, a hand inside CONTACT_FADE_SEC of its contact) — a dribbled ball is not parented, so its arms were dragged, and a
+//     hand fading onto the ball or off it must be the clip's own keys under the carry's reach, not a dragged copy of them;
 //   · a SIDE LEAN: the captures carry none (roll 0 in all 706 keys, V:clips F), so a body turning or cutting stayed bolt upright. The lean
 //     tilts the lumbar spine INTO the root's lateral acceleration (gain LEAN_GAIN × the lean a runner's balance needs, capped at
 //     LEAN_MAX_DEG, eased); it is mounted right after the posture layer (before the carry's reach, which then solves against the leaned
@@ -131,6 +134,9 @@ export interface MotionMount {
   mountHinge(): void;
   /** The ball the release skip watches (a mode that spawns its bodies before its ball hands it over here). */
   setBall(ball: AbstractMesh | null): void;
+  /** HOOPS MOTION phase 4b: the rig arms a handle move has its hands on now (the carry's move.contactHands as rig sides) — skipped by the
+   *  drag like the ball arm. null: none. */
+  setContactHands(read: (() => readonly ('Left' | 'Right')[]) | null): void;
   /** A teleport / a reset: the followers start again from the clips, the lean from upright. */
   reset(): void;
   /**
@@ -168,6 +174,15 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
     const up = low - footFloor;
     airborne = airborne ? up > AIRBORNE_OFF_M : up > AIRBORNE_ON_M;
   };
+  let contactRead: (() => readonly ('Left' | 'Right')[]) | null = null;
+  const both = new Set<TransformNode>([...skipSets.Left, ...skipSets.Right]);
+  /** The drag's skip set this frame: the ball arm's (readSkip) and a handle move's contact hands. */
+  const skipNow = (): Set<TransformNode> | undefined => {
+    const hands = contactRead ? contactRead() : [];
+    const all = new Set<'Left' | 'Right'>(hands); if (skipping) all.add(skipping);
+    if (!all.size) return undefined;
+    return all.size === 2 ? both : skipSets[all.has('Left') ? 'Left' : 'Right'];
+  };
   const readSkip = (dt: number): void => {
     const b = ballRef; if (!b) { skipping = null; return; }
     const L = layers.arms.Left, R = layers.arms.Right;
@@ -186,7 +201,7 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
     if (MOTION_OFF || (gate && !gate())) { layers.drag.reset(); layers.legDrag?.reset(); legW = 0; return; }
     const dt = dtNow();
     readAirborne(dt); readSkip(dt);
-    layers.drag.apply(dt, 1, skipping ? skipSets[skipping] : undefined);
+    layers.drag.apply(dt, 1, skipNow());
     legW = Math.min(1, Math.max(0, legW + (airborne ? dt : -dt) / LEG_DRAG_EASE_SEC));
     if (legW <= 0) layers.legDrag?.reset(); else layers.legDrag?.apply(dt, legW);
   }, undefined, true);
@@ -240,6 +255,7 @@ export function mountMotionLayers(o: MotionMountOpts): MotionMount {
     layers, mountHinge,
     setBall(b) { ballRef = b; heldBy = null; skipping = null; },
     setGate(g) { gate = g; },
+    setContactHands(read) { contactRead = read; },
     reset() { layers.reset(); legW = 0; airborne = false; footFloor = Number.POSITIVE_INFINITY; heldBy = null; skipping = null; sinceRelease = Number.POSITIVE_INFINITY; seen = false; vel.setAll(0); acc.setAll(0); leanDeg = 0; for (const H of layers.hinges) H.stamp = -10; },
     dispose() {
       if (dragObs) scene.onAfterAnimationsObservable.remove(dragObs);

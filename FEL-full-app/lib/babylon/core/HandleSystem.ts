@@ -106,7 +106,7 @@ export const MOVE_CLIP: Readonly<Record<HandleMove, ((dir: 'left' | 'right') => 
   snatch_back: () => 'bball_snatch_back',
   shammgod: (d) => `bball_shammgod_${d}`,
   off_the_head: null,     // the ball leaves your hands; the mode owns that one entirely
-  momentum_cross: (d) => `bball_crossover_${d}`,     // the capture's cross, played FAST and wide by the movement
+  momentum_cross: (d) => `bball_momentum_cross_${d}`,   // HOOPS MOTION phase 4c (plan §4.2): its own clip on its own wider path (it played the crossover's)
   momentum_btb: (d) => `bball_behind_back_${d}`,
   steezo_roll: (d) => `bball_behind_back_${d}`,      // the wrap; the mode's spin follows
   stepback: () => 'bball_stepback_gather',             // the hop off the rim; the mode moves the feet
@@ -164,6 +164,15 @@ export function handleFrom(prq: { agility?: number; flexibility?: number; mental
 
 /** Baseline scan: what a brand-new player's hands are. */
 export const BASELINE_HANDLE = 50;
+
+/**
+ * H2 (owner, 2026-10-16: "unlock all moves until H9"): the handle the two hoops modes GATE moves on. Every move in MOVE_HANDLE is owned
+ * at it, so nothing is refused and nothing falls back — while the player's own handle (BASELINE_HANDLE until H9 wires the rating) still
+ * sets everything else a handle sets: the chain window, the ankle-break odds, the hard break and the dribble's tightness. H9 deletes it
+ * and the modes gate on the rating again. resolveHandleMove / canChain take it as their `gate` argument (default: the handle itself, so
+ * every caller that passes none gates exactly as before).
+ */
+export const MOVES_UNLOCKED_GATE = 100;
 
 /**
  * How long after one move the next can still chain off it.
@@ -232,16 +241,31 @@ export const MAX_CHAIN = 4;
 /** The moves only the RIGHT STICK produces (StickHandle.stickMoveFor) — moveFromContext never names them. */
 export const STICK_ONLY: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross', 'momentum_btb', 'steezo_roll', 'stepback']);
 export const MOMENTUM_REPEATABLE: ReadonlySet<HandleMove> = new Set<HandleMove>(['momentum_cross']);
-export function canChain(next: HandleMove, state: ChainState, handle: number): boolean {
-  if (!hasMove(next, handle)) return false;
+/**
+ * THE DOUBLE MOVES (H2, owner 2026-10-16: "add double moves … like double behind the back or a between the legs behind the back";
+ * generic names, no real names). Two flicks inside the chain window: behind-the-back then behind-the-back is the DOUBLE BEHIND (the ball
+ * wraps back the way it came), between-the-legs then behind-the-back the BETWEEN-BEHIND. They CHAIN — the second is a link, the tier and
+ * the ankle odds are a combo's — so the spam guard (no repeat back to back) lets this one repeat through. The renderer plays the second
+ * on the first's ball (a request while a move runs QUEUES behind it: one continuous path, the second wrap from the first's catch hand).
+ * Keyed "last>next".
+ */
+export const DOUBLE_MOVES: Readonly<Record<string, { id: 'double_behind' | 'between_behind'; label: string }>> = {
+  'behind_back>behind_back': { id: 'double_behind', label: 'DOUBLE BEHIND' },
+  'between_legs>behind_back': { id: 'between_behind', label: 'BETWEEN-BEHIND' },
+};
+export function doubleMoveOf(last: HandleMove | null, next: HandleMove): { id: 'double_behind' | 'between_behind'; label: string } | null {
+  return last ? DOUBLE_MOVES[`${last}>${next}`] ?? null : null;
+}
+export function canChain(next: HandleMove, state: ChainState, handle: number, gate: number = handle): boolean {
+  if (!hasMove(next, gate)) return false;   // H2: `gate` owns the move (MOVES_UNLOCKED_GATE); `handle` still sets the window
   if (state.last === null) return true;                 // opening a chain is always allowed
-  if (state.last === next && !MOMENTUM_REPEATABLE.has(next)) return false;   // no double-tapping one move into a "combo" — except the MOMENTUM SPAM (2K17): the cross chains into itself
+  if (state.last === next && !MOMENTUM_REPEATABLE.has(next) && !doubleMoveOf(state.last, next)) return false;   // no double-tapping one move into a "combo" — except the MOMENTUM SPAM (2K17): the cross chains into itself — and the DOUBLE BEHIND (H2)
   return state.since <= chainWindowSec(handle);
 }
 
 /** Advance the chain. A move outside the window STARTS a new chain rather than extending the old one. */
 export function pushChain(next: HandleMove, state: ChainState, handle: number): ChainState {
-  const continues = state.last !== null && (state.last !== next || MOMENTUM_REPEATABLE.has(next)) && state.since <= chainWindowSec(handle)
+  const continues = state.last !== null && (state.last !== next || MOMENTUM_REPEATABLE.has(next) || !!doubleMoveOf(state.last, next)) && state.since <= chainWindowSec(handle)
     && state.length < MAX_CHAIN;
   return { last: next, since: 0, length: continues ? state.length + 1 : 1 };
 }
@@ -460,11 +484,12 @@ export function resolveHandleMove(
   handle: number,
   def: DefenderRead,
   roll: () => number = Math.random,
+  gate: number = handle,   // H2: the handle the move is OWNED at (MOVES_UNLOCKED_GATE); `handle` still prices it
 ): MoveOutcome {
-  if (!hasMove(move, handle)) {
+  if (!hasMove(move, gate)) {
     return { owned: false, chain, tier: chainTier(chain.length), restarted: false, broke: 'none', odds: 0 };
   }
-  if (!canChain(move, chain, handle)) {
+  if (!canChain(move, chain, handle, gate)) {
     // out of the window, or a repeat: this is a new chain rather than a refusal, so the input is never eaten
     const fresh = pushChain(move, { ...CHAIN_IDLE }, handle);
     return { owned: true, chain: fresh, tier: chainTier(fresh.length), restarted: true, broke: 'none', odds: 0 };
@@ -575,6 +600,18 @@ export function moveImpulse(move: HandleMove): MoveImpulse {
   }
 }
 
+/**
+ * HOOPS MOTION phase 4b (plan §3.1, U18): the move's impulse with its lateral SIGNED BY THE MOVE — + toward the athlete's right — not by
+ * where the defender stands. `dir` is the side the body goes: a crossing move's is the side the ball ENDS on (the body goes with the
+ * ball), a same-hand move's the side the call site names (the left-stick cut's). Both modes signed moveImpulse's lateral "away from him"
+ * (`toFoe · right > 0 ? −1 : 1`, and 3v3's +1 with no man) — so a crossover to the right with the defender on the right sent the body
+ * left and the ball right. THIS CHANGES WHERE THE BODY GOES: gameplay, stated in the 4b commit.
+ */
+export function impulseFor(move: HandleMove, dir: 'left' | 'right'): MoveImpulse {
+  const i = moveImpulse(move);
+  return { forward: i.forward, lateral: i.lateral * (dir === 'right' ? 1 : -1) };
+}
+
 /** Does this move displace the body at all? A fake does not. */
 export function movesTheBody(move: HandleMove): boolean {
   const i = moveImpulse(move);
@@ -582,9 +619,14 @@ export function movesTheBody(move: HandleMove): boolean {
 }
 
 /** MOVE PACE (owner, 2026-09-17: "make the crossover and hesi look faster with the turbo"). The clip's playback rate for a
- *  handle move: on the turbo the cross / hesi / in-and-out snap (1.35×, a shorter fade); off it they play at the capture's
- *  own pace. Pure — the modes hand it to the tree's beat and to the tree's crossover state. */
-export const MOVE_RATE_TURBO = 1.35, MOVE_RATE_BASE = 1.0;
+ *  handle move: on the turbo the cross / hesi / in-and-out snap (a shorter fade); off it they play at the capture's own pace.
+ *  Pure — the modes hand it to the tree's beat and to the tree's crossover state.
+ *  H2 (owner pick 2026-09-26 Q3, re-confirmed 2026-10-14 decision 10): the turbo plays a move at 1.25× REAL speed — 1.35 → 1.25.
+ *  Every clip a handle move beats through the renderer is real-time at rate 1 (the v2 crossing clips are built on their paths at pace 1;
+ *  the hesi's capture is 0.55 s of motion in 0.55 s), so 1.25 here IS MOVE_TURBO_REAL below — and the clip now runs at its ball path's
+ *  pace (handleMotion runs the path at MOVE_TURBO_REAL; at 1.35 the hands left the ball 8 % early on every turbo move). A literal, not
+ *  the constant, because MOVE_TURBO_REAL is declared further down. */
+export const MOVE_RATE_TURBO = 1.25, MOVE_RATE_BASE = 1.0;
 export function moveRate(turbo: boolean): number { return turbo ? MOVE_RATE_TURBO : MOVE_RATE_BASE; }
 export function moveFadeSec(turbo: boolean): number { return turbo ? 0.08 : 0.12; }   // H1 H-05: 0.07/0.045 popped the hand swap on the 30 fps rigs
 
@@ -602,4 +644,30 @@ export function fallbackMove(move: HandleMove, handle: number): HandleMove {
   let m = move;
   for (let i = 0; i < 6 && !hasMove(m, handle) && m !== 'spin'; i++) m = FALLBACK_MOVE[m] ?? 'crossover';
   return m;
+}
+
+// ── HOOPS MOTION phase 4a (plan §3.1): THE SHAPE OF EACH MOVE, AND ITS PACE ─────────────────────────────────────────────────────────
+//
+// Phase 4's renderer (4b's HandleMotion) plays every move the same way: the move's clip, the ball's path (anim/handlePaths), the hand it
+// ends in, the pace and the defender's clip beat. What differs by move is this table. It is DATA ONLY here — nothing reads it yet but
+// handlePaths and the tests; the call sites keep their decisions (plan §3.4) and change in 4b.
+
+export { MOVE_SHAPE, type MovePath, type MoveExposure, type MovePosture, type MoveShape } from './HandleShape';
+import { MOVE_SHAPE } from './HandleShape';
+/** The hand a move ends in (plan §3.1): a move that crosses once ends in the OTHER hand, whatever the defender read says; 0 or 2 crossings
+ *  end in the hand it started in. `dir` in MOVE_CLIP stays "the side the ball ENDS on". */
+export function endHandFor(move: HandleMove, startHand: 'left' | 'right'): 'left' | 'right' {
+  return MOVE_SHAPE[move].crosses === 1 ? (startHand === 'left' ? 'right' : 'left') : startHand;
+}
+/** The turbo's pace against real speed (owner Q3, 2026-09-26: 1.25× real on the turbo, against today's MOVE_RATE_TURBO 1.35× on top of
+ *  captures that already play fast — the feint about 1.74× real on the turbo, the crossover 1.44×). */
+export const MOVE_TURBO_REAL = 1.25;
+/**
+ * A move clip's playback rate that plays it at REAL speed (plan §3.1): `playedSec / realSec` — a clip `playedSec` long holding `realSec`
+ * of real motion (a capture's window, MOCAP_REAL_SEC; an authored clip's own duration) — × MOVE_TURBO_REAL on the turbo. Pure: the anim
+ * side looks the two numbers up and passes them in, so core imports no anim. Not wired yet (4b/4g replace moveRate with it).
+ */
+export function moveRateFor(realSec: number, playedSec: number, turbo: boolean): number {
+  const base = realSec > 1e-6 && playedSec > 1e-6 ? playedSec / realSec : 1;
+  return turbo ? base * MOVE_TURBO_REAL : base;
 }

@@ -123,6 +123,12 @@ export class CourtMovement {
   cutGrace(sec: number): void { this.cutGraceLeft = Math.max(this.cutGraceLeft, sec); }
   /** gears: pausin' — while on, the stick is ignored and the body stops hard; off, movement resumes. */
   pause(on: boolean): void { this.pausedNow = on; }
+  /** H2 (the BTB slide's hop): for the next `sec` seconds the velocity a move wrote is KEPT — no stick, no steering, no stop — and the
+   *  facing is held: a committed hop is ballistic, not a stick-driven run (released, the stop would bleed a 3 m/s hop in a step).
+   *  Nothing calls it but a move that asks; at 0 the update is exactly what it was. */
+  holdFor(sec: number): void { this.holdLeft = Math.max(this.holdLeft, sec); }
+  get holding(): boolean { return this.holdLeft > 0; }
+  private holdLeft = 0;
   get paused(): boolean { return this.pausedNow; }
   /** gears: a burst from outside (a crossover, an explode-out) adds to the intensity read. */
   noteBurst(amount01 = 0.35): void { this.burst01 = Math.min(1, this.burst01 + amount01); }
@@ -139,6 +145,13 @@ export class CourtMovement {
     this.cutGraceLeft = Math.max(0, this.cutGraceLeft - dt);
     const mag = this.pausedNow ? 0 : Math.min(1, Math.hypot(moveX, moveY));   // pausin': the stick is ignored
     const t = this.tune;
+    if (this.holdLeft > 0) {   // H2: a committed hop (holdFor) — the velocity and the facing as the move wrote them
+      this.holdLeft = Math.max(0, this.holdLeft - dt);
+      this.sprintWas = sprint && mag > 0.05;
+      this.burst01 = Math.max(0, this.burst01 - dt / 0.35);
+      const s01 = Math.min(1, this.vel.length() / t.maxSpeed);
+      return { vel: this.vel, speed01: s01, planting: false, facingRad: this.facing, ...(t.gears ? { gear: this.gearNow, intensity01: Math.min(1, s01 * 0.72 + this.burst01 * 0.35) } : {}) };
+    }
 
     if (mag > 0.05) {
       const wantDir = new Vector3(moveX, 0, -moveY).normalize();
@@ -256,7 +269,7 @@ export class CourtMovement {
   }
 
   /** Hard stop (possession change, whistle). Keeps facing. */
-  stop(): void { this.vel.setAll(0); this.plantTimer = 0; }
+  stop(): void { this.vel.setAll(0); this.plantTimer = 0; this.holdLeft = 0; }
 }
 
 /** Binds a character root to a Havok capsule. KINEMATIC (ANIMATED motion
