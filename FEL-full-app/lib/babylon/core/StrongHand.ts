@@ -7,6 +7,14 @@
 // phase 9's). A gather already takes the ball to the right hand (U14). The return is a quiet front crossing on the carry — a path, not a
 // chain move: it reads no defender, rolls nothing and is never counted as a move. Pure: the modes step it and run the crossing.
 
+/**
+ * hoops-handle (owner 2026-10-17: "The model only dribbles right handed, let's fix that. It needs to perform real crossovers"): the
+ * automatic return is OFF. Measured on the rig before this switch (1v1, a crossover at a jog, then away from the rival): the ball went
+ * back to the right hand 1.55 s after the cross with no input (`strong hand back (time)`), and in 3v3 on every stop — so a left-hand
+ * dribble never lasted. The ball now stays in the hand the last move left it in until the player crosses it back (a gather still takes
+ * it to the shooting hand, U14). The rule and its numbers are kept whole: true restores H2d's return (owner Q8, 2026-10-16) exactly.
+ */
+export const STRONG_HAND_RETURNS: boolean = false;
 /** Under this share of top speed the body has stopped (the plan's 0.15). */
 export const STOP_SPEED01 = 0.15;
 /** …for this long (s). */

@@ -1138,7 +1138,9 @@ const torso = (yaw: number, pitch: number, spineYaw = 0, neck: Deg3 = [-4, 0, 0]
 const OFF_R: V3 = [0.25, 1.0, 0.12];   // the right hand relaxed, once the ball has gone to the left (OFF_HAND's mirror)
 /**
  * CROSSOVER (plan §4.1): 0.42 s at pace 1 — the push 0–0.08, the floor at 0.19, the catch 0.30–0.42. The outside (right) foot pushes, the
- * hips swing 24° toward the new side at the crossing and the body is down 0.12 there; the push hand follows through toward the midline,
+ * hips swing 24° toward the new side at the crossing and the body is down 0.12 there — hoops-handle (owner 10-17, "sharpen up the moves"):
+ * the SHOULDERS LEAD, the spine turning on with the hips (+4 → +8°, it counter-turned −5 → −12°: the shoulder line read 9–15° in play) and
+ * the chest further over (spine pitch +3–5°); the push hand follows through toward the midline,
  * the catch hand comes low to meet the ball at (−0.32, 0.60, 0.26) — the body goes down 0.16 to it: standing, the hand cannot reach that
  * low (handleV2.test: every contact key within 0.05 m of the carry's target on the hero and the female kit). Ends square (no hip yaw: the
  * loop's own seam). Every low contact below (the momentum cross's catch, the between's, the behind-the-back's, the double cross's two, the
@@ -1146,18 +1148,18 @@ const OFF_R: V3 = [0.25, 1.0, 0.12];   // the right hand relaxed, once the ball 
  */
 const CROSSOVER_V2: readonly V2Key[] = [
   { t: 0, bones: { ...torso(0, 14), ...LEGS.stance }, hipsY: -0.05, R: 'on', L: OFF_HAND },
-  { t: 0.08, bones: { ...torso(10, 17, -5), ...LEGS.pushR }, hipsY: -0.07, R: 'on', L: { near: 0.30, off: [0.02, 0.16, -0.10] } },
-  { t: 0.19, bones: { ...torso(24, 22, -12), ...LEGS.wide }, hipsY: -0.12, R: { near: 0.08, off: [0.04, 0.10, -0.06] }, L: { near: 0.30, off: [0.0, 0.06, -0.04] } },
-  { t: 0.30, bones: { ...torso(14, 26, -7), ...LEGS.low }, hipsY: -0.16, R: [0.24, 0.94, 0.16], L: 'on' },   // down to the low catch (the hand cannot reach it standing)
+  { t: 0.08, bones: { ...torso(10, 20, 4), ...LEGS.pushR }, hipsY: -0.07, R: 'on', L: { near: 0.30, off: [0.02, 0.16, -0.10] } },
+  { t: 0.19, bones: { ...torso(24, 27, 8), ...LEGS.wide }, hipsY: -0.12, R: { near: 0.08, off: [0.04, 0.10, -0.06] }, L: { near: 0.30, off: [0.0, 0.06, -0.04] } },
+  { t: 0.30, bones: { ...torso(14, 30, 2), ...LEGS.low }, hipsY: -0.16, R: [0.24, 0.94, 0.16], L: 'on' },   // down to the low catch (the hand cannot reach it standing)
   { t: 0.42, bones: { ...torso(0, 14), ...LEGS.stance }, hipsY: -0.05, R: OFF_R, L: 'on' },
 ];
 /** MOMENTUM CROSS (plan §4.2): the crossover at pace — 0.45 s at pace 1 (the turbo's 1.25 plays the plan's 0.36 s), the floor 0.50 ahead,
  *  the catch wide at (−0.40, 0.62, 0.36); the body lower and turned further (it rides DribbleController.momentumCross's wide cut). */
 const MOMENTUM_CROSS_V2: readonly V2Key[] = [
   { t: 0, bones: { ...torso(0, 14), ...LEGS.stance }, hipsY: -0.05, R: 'on', L: OFF_HAND },
-  { t: 0.09, bones: { ...torso(12, 20, -6), ...LEGS.pushR }, hipsY: -0.08, R: 'on', L: { near: 0.32, off: [0.02, 0.16, -0.10] } },
-  { t: 0.20, bones: { ...torso(28, 26, -14), ...LEGS.wide }, hipsY: -0.14, R: { near: 0.09, off: [0.04, 0.10, -0.06] }, L: { near: 0.32, off: [0.0, 0.06, -0.04] } },
-  { t: 0.32, bones: { ...torso(16, 30, -8), ...LEGS.low }, hipsY: -0.19, R: [0.24, 0.94, 0.16], L: 'on' },
+  { t: 0.09, bones: { ...torso(12, 24, 4), ...LEGS.pushR }, hipsY: -0.08, R: 'on', L: { near: 0.32, off: [0.02, 0.16, -0.10] } },
+  { t: 0.20, bones: { ...torso(28, 31, 8), ...LEGS.wide }, hipsY: -0.14, R: { near: 0.09, off: [0.04, 0.10, -0.06] }, L: { near: 0.32, off: [0.0, 0.06, -0.04] } },
+  { t: 0.32, bones: { ...torso(16, 34, 2), ...LEGS.low }, hipsY: -0.19, R: [0.24, 0.94, 0.16], L: 'on' },
   { t: 0.45, bones: { ...torso(0, 15), ...LEGS.stance }, hipsY: -0.05, R: OFF_R, L: 'on' },
 ];
 /**

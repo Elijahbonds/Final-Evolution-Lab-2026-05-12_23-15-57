@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -34,6 +34,18 @@ const playGauntletExempt = new Set([
 ]);
 const devGauntletModes = modesInForLoops(devGauntlet);
 const playGauntletModes = modesInForLoops(playGauntlet);
+const conceptLockNames = new Set(
+  readdirSync(join(ROOT, 'docs/concept-lock'))
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => f.replace(/\.md$/, '')),
+);
+const conceptLockName: Record<string, string> = {
+  karate: 'karate-endless',
+  karate_vs: 'karate-vs',
+  derby: 'baseball',
+  penalty: 'soccer',
+  snowboard_slalom: 'snowboard',
+};
 
 function modesInForLoops(script: string): Set<string> {
   const modes = new Set<string>();
@@ -74,6 +86,7 @@ const missingMenuLinks: string[] = [];
 const missingControllerSchemas: string[] = [];
 const missingDevGauntlet: string[] = [];
 const missingPlayGauntlet: string[] = [];
+const missingConceptLocks: string[] = [];
 for (const key of enabledModes) {
   const route = `/play/${routeMap.get(key) ?? key}`;
   const slug = route.slice('/play/'.length);
@@ -82,6 +95,7 @@ for (const key of enabledModes) {
   if (!(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
   if (!devGauntletModes.has(key)) missingDevGauntlet.push(key);
   if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);
+  if (!conceptLockNames.has(conceptLockName[key] ?? key)) missingConceptLocks.push(key);
 }
 
 assert.deepEqual(missingRoutes, [], 'full-picture must resolve enabled modes to real /play routes');
@@ -89,6 +103,7 @@ assert.deepEqual(missingMenuLinks, [], 'full-picture menu column must match MODE
 assert.deepEqual(missingControllerSchemas, [], 'enabled modes must have Controller Link schemas');
 assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode gauntlet');
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
+assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');
