@@ -48,7 +48,7 @@ export default async function PlayPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-[#00E5FF]/45 bg-[#00E5FF]/[0.1] min-h-12 px-4 py-2.5
                        text-base font-bold text-white transition-colors hover:bg-[#00E5FF]/20"
           >
-            <Users className="h-4 w-4 text-[#00E5FF]" /> Play with friends
+            <Users className="h-4 w-4 text-[#00E5FF]" /> Couch multiplayer
           </Link>
           <Link
             href="/multiplayer"

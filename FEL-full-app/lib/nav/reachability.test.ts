@@ -176,4 +176,14 @@ describe('the doors', () => {
   it('gives every tab some depth', () => {
     for (const t of TABS) expect(DOORS.filter((d) => d.tab === t.id).length, t.id).toBeGreaterThan(2);
   });
+
+  it('distinguishes couch multiplayer from the social party room on Play', () => {
+    const playPage = readFileSync(join(ROOT, 'app/play/page.tsx'), 'utf8');
+    const partyDoor = DOORS.find((d) => d.href === '/party');
+
+    expect(playPage).toContain('href="/play/party"');
+    expect(playPage).toContain('Couch multiplayer');
+    expect(playPage).not.toContain('Play with friends');
+    expect(partyDoor?.label).toBe('Party chat');
+  });
 });
