@@ -48,6 +48,7 @@ describe('renderer flags', () => {
       surfing: 'surf',
       tennis: 'tennis',
       threePoint: 'threePoint',
+      tiebreak: 'tiebreak',
       velocityKart: 'velocityKart',
       volleyball: 'volleyball',
       whoSceneIt: 'whoSceneIt',

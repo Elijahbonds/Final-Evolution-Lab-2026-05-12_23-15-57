@@ -33,6 +33,8 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/admin': 'shown in the rail to an admin only',
   '/game-surface.css': 'not a route',
   '/play': 'a tab',
+  '/play/adventure': 'unlisted Adventure story route; hiddenRoute.test.ts enforces that it is served but linked from nowhere until the owner lists it',
+  '/play/adventure-br': 'unlisted Adventure bot BR route; hiddenRoute.test.ts enforces that it is served but linked from nowhere until the owner lists it',
   '/play/map-preview': 'signed-in 3D map preview harness, opened directly for map/perf QA rather than product navigation',
   '/train': 'a tab',
   '/profile': 'a tab',
