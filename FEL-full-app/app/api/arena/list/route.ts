@@ -10,6 +10,7 @@ import { parseCard } from '@/lib/mp/dunkCard';
 import { isStakingPaused, STAKING_PAUSED } from '@/lib/stakingPause';
 import { expiredOutcomeOf, isExpired, reclaimOnRead, type ExpiredOutcome } from '@/lib/arena-reclaim';
 import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
   if (!userId) return null;
@@ -83,10 +84,9 @@ export async function GET() {
     return { mode: key, name: MODE_INFO[key]?.name ?? key, href: MODE_INFO[key]?.href ?? '#' };
   };
 
-  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a WAITING duel on a paused mode can no
-  // longer be accepted (/api/arena/join refuses it), so it is not advertised as an OPEN CHALLENGE. Its creator still
-  // sees it under MY DUELS, flagged stakingPaused, with the CANCEL that refunds it.
-  const open = openRaw.filter((m) => !isStakingPaused(m.mode) && !isExpired(m.expiresAt, now)).map((m) => ({
+  // MUSIC-SUITE P1 / IRON-PARADISE-OUT: a WAITING duel that cannot accept a NEW stake is not advertised as an OPEN
+  // CHALLENGE. Its creator still sees it under MY DUELS, with the CANCEL that refunds it.
+  const open = openRaw.filter((m) => !isStakingPaused(m.mode) && !isUnlistedMode(arenaModeKey(m.mode)) && !isExpired(m.expiresAt, now)).map((m) => ({
     id: m.id,
     ...modeMeta(m.mode),
     feeLc: m.entryFeeCents,
