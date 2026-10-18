@@ -69,6 +69,10 @@ describe('creator platform boundaries (PR #18 slimmed down, owner 2026-10-13)', 
         /(?:bio|reel links|social links|service description|package description|highlight|photo) placeholder|placeholder until|are placeholders/i,
       );
     }
+    const profile = readFileSync('app/team/[slug]/page.tsx', 'utf8');
+    expect(profile).toContain('lede={publicProfileSpecialty(profile)}');
+    expect(profile).toContain('{publicServiceName(s)}');
+    expect(profile).not.toMatch(/lede=\{profile\.specialty\}|\{s\.name\}/);
   });
 
   it('no creator page creates a Stripe checkout, and none reads a live Instagram, Printful or Connect endpoint', () => {

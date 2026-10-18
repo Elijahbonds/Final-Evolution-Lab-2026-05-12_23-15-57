@@ -5,6 +5,7 @@ import {
   EXAMPLE_AUDIO_CENTS,
   EXAMPLE_BUNDLE_CENTS,
   EXAMPLE_EBOOK_CENTS,
+  EXAMPLE_PRICE_NOTE,
   PARTNERS,
   getBook,
   getOffer,
@@ -63,6 +64,7 @@ describe('the press catalog', () => {
   });
 
   it('keeps unfinished catalog copy out of public Press surfaces', () => {
+    expect(EXAMPLE_PRICE_NOTE).not.toMatch(/placeholder/i);
     for (const book of BOOKS) {
       expect(publicBookDescription(book), book.slug).not.toMatch(/placeholder/i);
       expect(publicChapterInventoryNotice(book) ?? '', book.slug).not.toMatch(/placeholder/i);
@@ -71,6 +73,7 @@ describe('the press catalog', () => {
     for (const file of [
       'app/press/page.tsx',
       'app/press/[slug]/page.tsx',
+      'components/press/press-frame.tsx',
       'components/press/offer-card.tsx',
       'lib/books/bookCheckout.ts',
     ]) {

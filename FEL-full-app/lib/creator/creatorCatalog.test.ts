@@ -13,6 +13,7 @@ import {
   publicProfileBio,
   publicProfileSpecialty,
   publicServiceDescription,
+  publicServiceName,
 } from './creatorCatalog';
 
 describe('creator catalog', () => {
@@ -42,6 +43,8 @@ describe('creator catalog', () => {
     expect(publicCreatorCopy('Bio placeholder.', 'Fallback')).toBe('Fallback');
     expect(publicProfileBio(profile)).not.toMatch(/placeholder/i);
     expect(publicProfileSpecialty(profile)).not.toMatch(/placeholder/i);
+    expect(publicServiceName(service)).toBe('1-on-1 session');
+    expect(publicServiceName(service)).not.toMatch(/example|placeholder/i);
     expect(publicServiceDescription(service)).not.toMatch(/placeholder/i);
     expect(publicMediaKitHighlight(MEDIA_KIT.highlights[0])).not.toMatch(/placeholder/i);
     expect(publicMediaKitPackageDetail(MEDIA_KIT.packages[0])).not.toMatch(/placeholder/i);

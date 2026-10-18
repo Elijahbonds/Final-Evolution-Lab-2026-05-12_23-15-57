@@ -6,6 +6,8 @@ import {
   getApprovedProfile,
   publicProfileBio,
   publicServiceDescription,
+  publicServiceName,
+  publicProfileSpecialty,
 } from '@/lib/creator/creatorCatalog';
 import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
 import { currentViewer } from '@/lib/creator/creatorViewer';
@@ -29,7 +31,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
   const bookHref = bookHrefWhenStoreOpen(coachStoreBookHref(profile));
 
   return (
-    <CreatorFrame signedIn={viewer.signedIn} title={profile.name} lede={profile.specialty}>
+    <CreatorFrame signedIn={viewer.signedIn} title={profile.name} lede={publicProfileSpecialty(profile)}>
       <p className="mt-6 text-xs text-white/40">
         <Link href="/team" className="hover:text-white">Team</Link>
         <span> / {profile.name}</span>
@@ -101,7 +103,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {services.map((s) => (
             <div key={s.id} className="rounded-xl border border-white/10 bg-[#141414] p-4">
-              <p className="text-sm font-semibold text-white">{s.name}</p>
+              <p className="text-sm font-semibold text-white">{publicServiceName(s)}</p>
               <p className="mt-1 text-xs text-white/50">{s.durationMinutes} min · {publicServiceDescription(s)}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {bookHref ? (

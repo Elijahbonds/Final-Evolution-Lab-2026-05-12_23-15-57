@@ -89,11 +89,13 @@ export interface AudienceStats {
 export const EXAMPLE_RATE_NOTE = 'EXAMPLE — draft rate pending Elijah\'s decision. Not a live price.';
 export const PUBLIC_PROFILE_BIO_FALLBACK = 'Profile details are being confirmed with the Final Evolution Lab team.';
 export const PUBLIC_PROFILE_SPECIALTY_FALLBACK = 'Final Evolution Lab sessions and creative collaborations';
+export const PUBLIC_SERVICE_NAME_FALLBACK = 'FEL team session';
 export const PUBLIC_SERVICE_DESCRIPTION_FALLBACK = 'Scope is confirmed before booking or quoting.';
 export const PUBLIC_MEDIA_KIT_HIGHLIGHT_FALLBACK = 'Partner-facing highlights are confirmed during inquiry.';
 export const PUBLIC_MEDIA_KIT_PACKAGE_FALLBACK = 'Deliverables and usage terms are confirmed during inquiry.';
 
 const PLACEHOLDER_COPY = /\bplaceholder\b/i;
+const EXAMPLE_SUFFIX = /\s*\(EXAMPLE\)\s*$/i;
 
 export function publicCreatorCopy(value: string | null | undefined, fallback: string): string {
   const trimmed = (value ?? '').trim();
@@ -228,6 +230,10 @@ export function publicProfileBio(profile: CreatorProfile | undefined): string {
 
 export function publicProfileSpecialty(profile: CreatorProfile): string {
   return publicCreatorCopy(profile.specialty, PUBLIC_PROFILE_SPECIALTY_FALLBACK);
+}
+
+export function publicServiceName(service: CreatorService): string {
+  return publicCreatorCopy(service.name.replace(EXAMPLE_SUFFIX, ''), PUBLIC_SERVICE_NAME_FALLBACK);
 }
 
 export function publicServiceDescription(service: CreatorService): string {

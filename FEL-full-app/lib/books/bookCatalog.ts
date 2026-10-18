@@ -78,7 +78,7 @@ export const EXAMPLE_EBOOK_CENTS = 999;
 export const EXAMPLE_AUDIO_CENTS = 1499;
 export const EXAMPLE_BUNDLE_CENTS = 1999;
 
-export const EXAMPLE_PRICE_NOTE = 'EXAMPLE — placeholder pending Elijah\'s decision. Not a live price.';
+export const EXAMPLE_PRICE_NOTE = 'EXAMPLE — rate awaiting Elijah\'s final approval. Not a live price.';
 export const BOOK_PUBLIC_DESCRIPTION_FALLBACK =
   'Final Evolution Press title. Stream the audiobook in FEL; Kindle availability and purchase options are listed below.';
 export const CHAPTER_INVENTORY_PENDING_COPY =
