@@ -1,9 +1,8 @@
 import Link from 'next/link';
-import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Lock, Clapperboard, ChefHat, Shirt, PenLine } from 'lucide-react';
+import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Clapperboard, ChefHat, Shirt, PenLine } from 'lucide-react';
 
-// Creator Hub — the five disciplines. Each tile routes to a real, playable
-// surface. Art has no painter yet (the M76 card/paint editor is deferred), so
-// it is honestly marked "coming soon" rather than linking to a dead route.
+// Creator Hub — the nine disciplines. Each tile routes to a real play surface
+// or to the guided creator flow for disciplines that are authored before play.
 
 const BG = '#050505';
 
@@ -11,7 +10,7 @@ type Discipline = {
   id: string;
   name: string;
   tagline: string;
-  href: string | null;
+  href: string;
   color: string;
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 };
@@ -21,12 +20,12 @@ const DISCIPLINES: Discipline[] = [
   { id: 'acting', name: 'Acting', tagline: 'Hit the cue, match the intensity. Delivery, scored locally.', href: '/play/acting', color: '#FF3366', icon: Mic },
   { id: 'music', name: 'Music', tagline: 'The FEL Academy — sequence, flip a sample, master and publish your own tracks.', href: '/play/music', color: '#00E5FF', icon: Music },   // the Academy mounts at /play/music (/studio is the code studio, on hold)
   { id: 'sport', name: 'Sport', tagline: 'Time the rise, throw it down. The dunk arena.', href: '/play/dunk', color: '#FFD700', icon: Dumbbell },
-  { id: 'art', name: 'Art', tagline: 'The paint studio is in the workshop — arriving in a future drop.', href: null, color: '#A855F7', icon: Palette },
+  { id: 'art', name: 'Art', tagline: 'Paint a board, court, kit or UI card and submit it for the game.', href: '/create/art', color: '#A855F7', icon: Palette },
   // lane 4 (2026-09-06): the new disciplines author in /create and publish as Creator Cards
-  { id: 'scene', name: 'Scene', tagline: 'Author a Spot the Scene pack from FEL\'s own venues — friends play it as a round.', href: '/create', color: '#8B5CF6', icon: Clapperboard },
-  { id: 'cooking', name: 'Cooking', tagline: 'A recipe card the Fuel floor can serve and a coach can assign.', href: '/create', color: '#F43F5E', icon: ChefHat },
-  { id: 'fashion', name: 'Fashion', tagline: 'A look from your closet — equippable, shareable, sellable.', href: '/create', color: '#EC4899', icon: Shirt },
-  { id: 'writing', name: 'Writing', tagline: 'A story beat, a caption, a verse — reviewed, then read in Story.', href: '/create', color: '#84CC16', icon: PenLine },
+  { id: 'scene', name: 'Scene', tagline: 'Author a Spot the Scene pack from FEL\'s own venues — friends play it as a round.', href: '/create/scene', color: '#8B5CF6', icon: Clapperboard },
+  { id: 'cooking', name: 'Cooking', tagline: 'A recipe card the Fuel floor can serve and a coach can assign.', href: '/create/cooking', color: '#F43F5E', icon: ChefHat },
+  { id: 'fashion', name: 'Fashion', tagline: 'A look from your closet — equippable, shareable, sellable.', href: '/create/fashion', color: '#EC4899', icon: Shirt },
+  { id: 'writing', name: 'Writing', tagline: 'A story beat, a caption, a verse — reviewed, then read in Story.', href: '/create/writing', color: '#84CC16', icon: PenLine },
 ];
 
 export function CreatorHub() {
@@ -41,15 +40,14 @@ export function CreatorHub() {
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {DISCIPLINES.filter((d) => d.href).map((d) => {
+          {DISCIPLINES.map((d) => {
             const Icon = d.icon;
             const inner = (
               <div
                 className="group relative flex h-full flex-col rounded-2xl border p-6 transition"
                 style={{
-                  borderColor: d.href ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)',
+                  borderColor: 'rgba(255,255,255,0.1)',
                   background: 'rgba(255,255,255,0.03)',
-                  opacity: d.href ? 1 : 0.6,
                 }}
               >
                 <div
@@ -60,19 +58,14 @@ export function CreatorHub() {
                 </div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-bold">{d.name}</h2>
-                  {!d.href && <Lock className="h-3.5 w-3.5 text-white/40" />}
                 </div>
                 <p className="mt-2 flex-1 text-sm text-white/50">{d.tagline}</p>
-                <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold" style={{ color: d.href ? d.color : 'rgba(255,255,255,0.35)' }}>
-                  {d.href ? <>Enter <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></> : null}
+                <div className="mt-4 inline-flex items-center gap-1 text-sm font-semibold" style={{ color: d.color }}>
+                  Enter <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                 </div>
               </div>
             );
-            return d.href ? (
-              <Link key={d.id} href={d.href} className="block">{inner}</Link>
-            ) : (
-              <div key={d.id}>{inner}</div>
-            );
+            return <Link key={d.id} href={d.href} className="block">{inner}</Link>;
           })}
         </div>
       </div>

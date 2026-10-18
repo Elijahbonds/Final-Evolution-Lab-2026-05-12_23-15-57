@@ -33,9 +33,15 @@ describe('NP-1 placeholder language', () => {
     });
   }
 
-  it('the creator hub hides unbuilt disciplines instead of labelling them', () => {
+  it('the creator hub renders all nine disciplines and sends authoring tiles to their guided flows', () => {
     const src = readFileSync('app/creator/_components/hub.tsx', 'utf8');
-    expect(src).toContain('DISCIPLINES.filter((d) => d.href).map((d) =>');
+    expect(src).toContain('DISCIPLINES.map((d) =>');
+    for (const id of ['dance', 'acting', 'music', 'sport', 'art', 'scene', 'cooking', 'fashion', 'writing']) {
+      expect(src).toContain(`id: '${id}'`);
+    }
+    for (const href of ['/create/art', '/create/scene', '/create/cooking', '/create/fashion', '/create/writing']) {
+      expect(src).toContain(`href: '${href}'`);
+    }
     expect(src).not.toContain("'Coming soon'");
   });
 
