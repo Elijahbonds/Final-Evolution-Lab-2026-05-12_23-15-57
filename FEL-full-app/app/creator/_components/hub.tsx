@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Lock, Clapperboard, ChefHat, Shirt, PenLine } from 'lucide-react';
 
-// Creator Hub — the five disciplines. Each tile routes to a real, playable
-// surface. Art has no painter yet (the M76 card/paint editor is deferred), so
-// it is honestly marked "coming soon" rather than linking to a dead route.
+// Creator Hub — live disciplines only. Art has no painter yet (the M76
+// card/paint editor is deferred), so it stays out of the grid rather than
+// promising a dead or placeholder route.
 
 const BG = '#050505';
 
@@ -36,7 +36,7 @@ export function CreatorHub() {
         <div className="mb-2 text-xs font-semibold tracking-[0.4em] text-white/40">FEL · CREATOR</div>
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">Creator Hub</h1>
         <p className="mt-3 max-w-2xl text-sm text-white/55">
-          Nine disciplines, one arena. Pick a craft and perform — each one scores what you actually do,
+          Eight live disciplines, one arena. Pick a craft and perform — each one scores what you actually do,
           not a menu you tap through.
         </p>
 
@@ -45,6 +45,7 @@ export function CreatorHub() {
             const Icon = d.icon;
             const inner = (
               <div
+                data-creator-discipline={d.id}
                 className="group relative flex h-full flex-col rounded-2xl border p-6 transition"
                 style={{
                   borderColor: d.href ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)',
