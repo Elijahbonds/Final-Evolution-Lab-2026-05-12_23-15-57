@@ -22,6 +22,8 @@ const STARTERS = [
   'How do I progress to more advanced drills?',
 ];
 
+const NO_COACH_REPLY = "Sorry, I'm having trouble connecting right now. Try again in a moment.";
+
 export function CoachChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -89,11 +91,14 @@ export function CoachChat() {
         return;
       }
 
-      if (!res.body) return;
+      if (!res.body) {
+        replaceLast(NO_COACH_REPLY);
+        return;
+      }
       const fullText = await readReplyStream(res.body, replaceLast);
 
-      // If no text was extracted from SSE, the response might be raw text
-      if (!fullText) replaceLast('Coach Bonds is thinking... try again.');
+      // If no text was extracted, do not leave the player staring at an empty/thinking bubble.
+      if (!fullText) replaceLast(NO_COACH_REPLY);
     } catch {
       replaceLast('Connection error. Please try again.');
     } finally {
