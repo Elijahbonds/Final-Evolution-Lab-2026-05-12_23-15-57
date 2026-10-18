@@ -172,9 +172,9 @@ exists, so nothing is deleted until you do this. `docs/RETENTION-JOB.md` has the
 
 **Same shape, also never scheduled:** `POST /api/arena/reclaim` (`ARENA_RECLAIM_SECRET`, header
 `x-arena-reclaim-secret`; unset = 404) and `POST /api/coach-store/reconcile` (`COACH_STORE_RECONCILE_SECRET`, already
-in `firebase.json`). Both say "no scheduler calls it yet". `ARENA_RECLAIM_SECRET` is in no doc and not in
-`.env.example`. If the arena sweep should run, it needs the same three steps (secret, `firebase.json`, a Scheduler
-job); the arena also reclaims on read, so this is a cleanup, not a fix.
+in `firebase.json`). Both say "no scheduler calls it yet". Follow-up 2026-10-18: `.env.example` now names
+`ARENA_RECLAIM_SECRET`, but if the arena sweep should run, it still needs the same three steps (secret, `firebase.json`,
+a Scheduler job); the arena also reclaims on read, so this is a cleanup, not a fix.
 
 ### 3.2 Pending SQL (`prisma/pending/`, 17 files)
 
@@ -268,18 +268,20 @@ other server value reaches production through the deploy tree's env file, so wha
 
 | Variable | Read in | Unset means |
 |---|---|---|
-| `COACH_STORE_LIVE` | `lib/flags.ts`, `lib/coach-store/stripeMode.ts`, `app/api/stripe/checkout`, `lib/books/bookCheckout.ts` | a **live** Stripe key is refused (test keys only). Set it only on the day real money is meant to flow |
-| `ARENA_RECLAIM_SECRET` | `app/api/arena/reclaim/route.ts` | the reclaim sweep route is a 404 (3.1) |
+| `COACH_STORE_LIVE` | `lib/flags.ts`, `lib/coach-store/stripeMode.ts`, `app/api/stripe/checkout`, `lib/books/bookCheckout.ts` | a **live** Stripe key is refused (test keys only). Set it only on the day real money is meant to flow. Follow-up 2026-10-18: `.env.example` names it. |
+| `ARENA_RECLAIM_SECRET` | `app/api/arena/reclaim/route.ts` | the reclaim sweep route is a 404 (3.1). Follow-up 2026-10-18: `.env.example` names it. |
 | `CREATOR_MEDIA_BUCKET`, `CREATOR_MEDIA_PUBLIC_BUCKET` | `lib/soundtrack/storage.ts`, `app/api/v1/creative-card/upload-url` | creator uploads answer with an unavailable-storage 503. Two distinct GCS buckets: pending (private, 30-day lifecycle on `pending/`) and public-read with CORS; `lib/soundtrack/storage.ts` lines 8–13 describe both. Follow-up 2026-10-18: `.env.example` names both values. |
-| `LIVE_STREAM_SCHEDULE_ENABLED` | `lib/flags.ts`, `app/api/live/schedule` | `/live/schedule` is a 404 |
-| `NEXT_PUBLIC_FEL_BODY_RIDE` | `lib/input/rideProfiles.ts` | build-time, probe-only; leave unset in production |
-| `K_REVISION`, `VERCEL_GIT_COMMIT_SHA` | `app/api/health/route.ts` | set by the platform; nothing to do |
+| `LIVE_STREAM_SCHEDULE_ENABLED` | `lib/flags.ts`, `app/api/live/schedule` | `/live/schedule` is a 404. Follow-up 2026-10-18: `.env.example` names it. |
+| `NEXT_PUBLIC_FEL_BODY_RIDE` | `lib/input/rideProfiles.ts` | build-time, probe-only; leave unset in production. Follow-up 2026-10-18: `.env.example` names it. |
+| `K_REVISION`, `VERCEL_GIT_COMMIT_SHA` | `app/api/health/route.ts` | set by the platform; nothing to do. Follow-up 2026-10-18: `.env.example` names both as platform-provided metadata. |
 
-**Named in a doc but missing from `.env.example`** (a fresh checkout cannot see them): `ABACUS_ENABLED`,
+**Named in a doc but missing from `.env.example`** (a fresh checkout could not see them): `ABACUS_ENABLED`,
 `COACH_STORE_ENABLED`, `COACH_STORE_PAYMENTS_ENABLED`, `COACH_STORE_COACH_USER_IDS`, `COACH_STORE_RECONCILE_SECRET`,
 `COACH_REVIEWS_BUCKET`, `COACH_REVIEW_UPLOADS_ENABLED`, `FACE_SCAN_ENABLED`, `VIRTUAL_PURCHASES_ENABLED`,
-`PAYOUTS_ENABLED`, `STRIPE_BOOKS_SECRET_KEY`, `RETENTION_CRON_SECRET`, `NEXT_PUBLIC_JOIN_LAB_ENABLED`,
-`FEL_TEST_ACCOUNTS`. All default off or closed when unset.
+`PAYOUTS_ENABLED`, `RETENTION_CRON_SECRET`, `NEXT_PUBLIC_JOIN_LAB_ENABLED`, `FEL_TEST_ACCOUNTS`. Follow-up 2026-10-18:
+`.env.example` names each of them, empty/fail-closed, and `lib/env-example.test.ts` pins the list. The separate
+`STRIPE_BOOKS_SECRET_KEY` is intentionally absent because books now use the platform `STRIPE_SECRET_KEY`; the guard
+also pins that it stays retired. All default off or closed when unset.
 
 The rest are test- or probe-only (`SESSIONS_IT`, `DAILY_IT`, `DB_CONNECTOR_IT`, `HM_DEBUG`, `CAM_CAL`,
 `MIRROR_BASELINE_OUT`, `COMPLIANCE_PROOF_OUT`, `FEL_RECORD_BUS_GOLDEN`, `FEL_POKE_DEBUG`, `FEL_HERO_GLB`). The full
@@ -366,8 +368,8 @@ Recommendation first in each.
 5. **The retention cron and the arena reclaim (§3.1).** (a) **Retention: do the five steps** *(recommended: the privacy
    policy promises the 12-month delete)*. Arena reclaim: (a) leave it unscheduled *(recommended: it reclaims on read
    already)*; (b) schedule it the same way.
-6. **`.env.example` (§3.4).** (a) **A lane adds the 20 names it is missing, empty, with one comment line each**
-   *(recommended; documentation only, nothing deploys from it)*; (b) leave it.
+6. **`.env.example` (§3.4).** Follow-up 2026-10-18: done for the active missing names, empty/fail-closed, with
+   `lib/env-example.test.ts` guarding the handoff list. The retired `STRIPE_BOOKS_SECRET_KEY` remains absent.
 
 ---
 
