@@ -77,6 +77,16 @@ function addTarget(hrefs: Set<string>, raw: string) {
   hrefs.add(raw.replace(/\$\{[^}]+\}/g, '[dynamic]'));
 }
 
+interface LinkTarget {
+  href: string;
+  source: string;
+}
+
+function addTargetWithSource(targets: LinkTarget[], source: string, raw: string) {
+  if (!raw.startsWith('/')) return;
+  targets.push({ href: raw.replace(/\$\{[^}]+\}/g, '[dynamic]'), source });
+}
+
 function routeReachedBy(route: string, href: string): boolean {
   const path = href.split('?')[0];
   const routeParts = route.split('/').filter(Boolean);
@@ -90,6 +100,32 @@ function routeReachedBy(route: string, href: string): boolean {
     if (routePart !== hrefPart) return false;
   }
   return true;
+}
+
+function routeTargetExists(href: string, routes: string[]): boolean {
+  const path = href.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+  if (path === '/') return true;
+  const hrefParts = path.split('/').filter(Boolean);
+  return routes.some((route) => {
+    const routeParts = route.split('/').filter(Boolean);
+    if (routeParts.length !== hrefParts.length) return false;
+    for (let i = 0; i < routeParts.length; i += 1) {
+      const routePart = routeParts[i];
+      const hrefPart = hrefParts[i];
+      const routeDynamic = routePart.startsWith('[') && routePart.endsWith(']');
+      const hrefDynamic = hrefPart.startsWith('[') && hrefPart.endsWith(']');
+      if (routeDynamic || hrefDynamic) continue;
+      if (routePart !== hrefPart) return false;
+    }
+    return true;
+  });
+}
+
+function shouldResolveToPage(href: string): boolean {
+  const path = href.split(/[?#]/)[0];
+  if (path.startsWith('/api/')) return false;
+  // Static files, downloads and generated assets are not App Router pages.
+  return !/\.[A-Za-z0-9]+$/.test(path);
 }
 
 function hasExplicitExcuse(route: string): boolean {
@@ -128,6 +164,35 @@ function everyLinkTarget(): Set<string> {
   return hrefs;
 }
 
+function everyLinkTargetWithSource(): LinkTarget[] {
+  const targets: LinkTarget[] = [];
+  const scan = (dir: string) => {
+    for (const e of readdirSync(dir)) {
+      if (e === 'node_modules' || e.startsWith('.')) continue;
+      const p = join(dir, e);
+      if (statSync(p).isDirectory()) { scan(p); continue; }
+      if (!/\.(tsx|ts)$/.test(p) || p.endsWith('.test.ts') || p.endsWith('.test.tsx')) continue;
+      const src = readFileSync(p, 'utf8');
+      const source = p.slice(ROOT.length + 1).replace(/\\/g, '/');
+      for (const m of src.matchAll(/href=["'](\/[A-Za-z0-9/[\]._-]*)/g)) addTargetWithSource(targets, source, m[1]);
+      for (const m of src.matchAll(/href:\s*["'](\/[A-Za-z0-9/[\]._-]*)/g)) addTargetWithSource(targets, source, m[1]);
+      for (const m of src.matchAll(/(?:push|replace|redirect)\(\s*["'](\/[A-Za-z0-9/[\]._-]*)/g)) addTargetWithSource(targets, source, m[1]);
+      for (const m of src.matchAll(/href=\{\s*`([^`]+)`\s*\}/g)) addTargetWithSource(targets, source, m[1]);
+      for (const m of src.matchAll(/(?:push|replace|redirect)\(\s*`([^`]+)`/g)) addTargetWithSource(targets, source, m[1]);
+    }
+  };
+  scan(join(ROOT, 'app'));
+  scan(join(ROOT, 'components'));
+  scan(join(ROOT, 'lib'));
+  for (const t of TABS) targets.push({ href: t.href, source: 'components/shell/tab-bar.tsx' });
+  for (const d of DOORS) targets.push({ href: d.href, source: 'lib/nav/doors.ts' });
+  for (const f of FAMILIES) for (const m of f.modes) {
+    const href = MODE_INFO[m as keyof typeof MODE_INFO]?.href;
+    if (href) targets.push({ href, source: 'lib/nav/families.ts' });
+  }
+  return targets;
+}
+
 describe('nothing in the app is orphaned', () => {
   const routes = appRoutes();
   const hrefs = everyLinkTarget();
@@ -141,6 +206,14 @@ describe('nothing in the app is orphaned', () => {
     const orphans = routes.filter((r) => !reached(r) && !hasExplicitExcuse(r));
     expect(orphans, `nothing links to these — give each a home in lib/nav/doors.ts or a reason in NOT_NAVIGABLE`)
       .toEqual([]);
+  });
+
+  it('every literal in-app navigation target resolves to a page route', () => {
+    const missing = everyLinkTargetWithSource()
+      .filter((target) => shouldResolveToPage(target.href))
+      .filter((target) => !routeTargetExists(target.href, routes))
+      .map((target) => `${target.source}: ${target.href}`);
+    expect(missing, 'links that point at no App Router page').toEqual([]);
   });
 
   it('the athlete creator is linked, not only the /creator hub above it', () => {
