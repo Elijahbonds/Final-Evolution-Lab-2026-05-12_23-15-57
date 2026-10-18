@@ -18,9 +18,9 @@ describe('creator catalog', () => {
     expect(getApprovedProfile('nobody')).toBeUndefined();
   });
 
-  it('invents no bio, marks every stat and media-kit rate as an example', () => {
+  it('keeps unconfirmed bio copy generic, marks every stat and media-kit rate as an example', () => {
     for (const p of PROFILES) {
-      expect(p.bio).toBe('Bio placeholder.');
+      expect(p.bio).toBe('Bio details are pending confirmation.');
       for (const stat of p.stats) expect(stat.isExample).toBe(true);
     }
     for (const pkg of MEDIA_KIT.packages) expect(pkg.priceIsExample, pkg.id).toBe(true);
