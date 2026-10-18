@@ -12,16 +12,18 @@ import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 
 /**
- * SELF-HOSTED DRACO (FDB-2, 2026-10-17). hoop.glb is Draco-compressed now (3D Art: 3,929,424 → 915,584 bytes), and Babylon's
- * default decoder is fetched from cdn.babylonjs.com. These are the repo's own files (public/loaders/draco, three r169's glTF
- * decoder build), set at module scope: in place before this module's first load, and before any GLB load on a path that
- * imports this module (the dunk imports it statically). Never the CDN — meshyProps.draco.test pins all three.
+ * SELF-HOSTED DRACO (FDB-2, 2026-10-17). Three dunk-1 models are Draco-compressed (3D Art): hoop.glb (FDB-4: 893,740 B, float
+ * attributes), ball-basketball.glb and the Venice palm's palm_hero_lod0.glb (FDB-4), and Babylon's default decoder is fetched
+ * from cdn.babylonjs.com. These are the repo's own files (public/loaders/draco, three r169's glTF decoder build), set at module
+ * scope: in place before any GLB load on a path that imports this module (the dunk imports it statically; veniceBoardwalk,
+ * which loads the palm, imports it too). Never the CDN — meshyProps.draco.test pins all three.
  *
- * AT LEAST ONE WORKER. The hoop's normals (int8) and UVs (uint16) are stored as integers that the glTF accessors mark
- * `normalized`, and Babylon 9.23 applies that accessor flag only on its worker path: decoded in-thread, they reach the GPU
- * unnormalized (UVs of 0–65535, measured in meshyProps.draco.test). Babylon picks in-thread when its default worker count
- * comes out 0, i.e. floor(hardwareConcurrency / 2) on a browser that reports one core. Same default otherwise (half the
- * cores, at most 4).
+ * AT LEAST ONE WORKER (kept as a guard). Babylon 9.23 applies a glTF accessor's `normalized` flag to Draco data only on its
+ * worker path: a Draco file whose attributes are normalized integers (FDB-2's hoop: int8 normals, uint16 UVs) decoded in-thread
+ * reaches the GPU unnormalized (UVs of 0–65535). Every Draco file shipped since FDB-4 stores float attributes, which decode the
+ * same on either path (meshyProps.draco.test fails if one stops doing so). Babylon picks in-thread when its default worker count
+ * comes out 0, i.e. floor(hardwareConcurrency / 2) on a browser that reports one core. Same default otherwise (half the cores,
+ * at most 4).
  */
 export const DRACO_DECODER_URLS = {
   wasmUrl: '/loaders/draco/draco_wasm_wrapper.js',
@@ -29,10 +31,12 @@ export const DRACO_DECODER_URLS = {
   fallbackUrl: '/loaders/draco/draco_decoder.js',
 } as const;
 /**
- * How many Draco decode workers: Babylon's own default (half the cores, at most 4), but NEVER 0 (PM call, FDB-2 2026-10-17).
- * Zero workers means Babylon decodes in-thread, and in-thread Babylon 9.23 leaves the hoop's int8 normals and uint16 UVs
- * unnormalized — the glTF accessor's `normalized` flag is only applied on the worker path — so the hoop renders untextured
- * (its UVs read 0–65535). Do not set `numWorkers: 0`, not even as a CSP workaround: allow `blob:` workers instead.
+ * How many Draco decode workers: Babylon's own default (half the cores, at most 4), but NEVER 0 (PM call, FDB-2 2026-10-17;
+ * kept in FDB-4). Zero workers means Babylon decodes in-thread, and in-thread Babylon 9.23 leaves normalized integer attributes
+ * unnormalized — the glTF accessor's `normalized` flag is only applied on the worker path. That made FDB-2's hoop (int8 normals,
+ * uint16 UVs) render untextured in-thread (its UVs read 0–65535). The Draco files shipped since FDB-4 (hoop, ball, palm LOD0)
+ * store float attributes and are not affected; the floor keeps any future quantized one safe. Do not set `numWorkers: 0`, not
+ * even as a CSP workaround: allow `blob:` workers instead.
  */
 export function dracoWorkerCount(hardwareConcurrency: number | undefined): number {
   const cores = Number.isFinite(hardwareConcurrency) ? Math.floor(hardwareConcurrency as number) : 2;

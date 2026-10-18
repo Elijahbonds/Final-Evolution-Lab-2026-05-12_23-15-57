@@ -188,7 +188,10 @@ describe('DUNK-VENICE-ENV-2 — the Venice dunk\'s baked dressing', () => {
 
   it('ships the five GLBs byte for byte — the asset drop, never re-exported', () => {
     const drop: Record<string, string> = {
-      'palm_hero_lod0.glb': '03109df70554bc2e8c730f9c7a5df3cdfe8ff38bf46a3a499f74376204c3f99a',
+      // PIN MOVED (FDB-4, PM 2026-10-17) from the 4beb7e90 drop's 03109df70554bc2e8c730f9c7a5df3cdfe8ff38bf46a3a499f74376204c3f99a
+      // for an intended change: 3D Art's Draco LOD0 (float attributes, 464,320 → 375,460 B), images and material/node JSON
+      // byte-identical to the drop's, decoded geometry within 0.1 mm (meshyProps.draco.test pins all three).
+      'palm_hero_lod0.glb': '70e7e4b78b09d56445fe456080275cc1db732b982c9bc5047a87be944fabd4d8',
       // PIN MOVED (FDB-3, owner decision 2026-10-17) from the 4beb7e90 drop's d9acd04d1261461dbefbbb7ce74eb636480fa48784c056f46af88951115e3299
       // for an intended LOSSLESS change: the duplicate far-frond atlas (byte-identical to LOD2's) was removed and LOD1 now
       // shares LOD2's frond material (veniceBoardwalk.shareFarFrondMaterial); every other byte is the drop's (dunkOneMargin.test).
