@@ -16,6 +16,7 @@ import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, syntheticCalibration 
 import { summarize, type ScreenSummary } from './checks';
 import { BAND_WORDS, GRADED_CHECKS, THRESHOLDS_VERSION } from './PROPOSED-thresholds';
 import { AGE_BANDS, type AgeBand } from './age';
+import { ELIJAH_COACH_STORE_HREF, ELIJAH_DUNK_PROGRAM_HREF } from '@/lib/creator/coachStoreHrefs';
 import {
   DISCLAIMER, DONE_CLEAR, EARLY_VERSION, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOT_SAVED_TITLE, NOTHING_TO_RANK, PARENT_TITLE,
   SCREENSHOT_LINE, SCREEN_TEST_NAMES, STOP_LINE, WIN_LINE,
@@ -187,12 +188,13 @@ describe('item 4 and L5 (retest 1): 18 or older get EXACTLY ONE next step, the K
   });
 
   it('Train with Elijah is absent until the server passes a verified-adult href, and a kid never sees it', () => {
-    const adult = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '18+', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: '/coach/elijah' }));
+    const adult = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '18+', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: ELIJAH_COACH_STORE_HREF }));
     expect(adult).toContain('data-train-with-elijah');
     expect(adult).toContain('Train with Elijah');
+    expect(adult).toContain(`href="${ELIJAH_COACH_STORE_HREF}"`);
     const step = adult.slice(adult.indexOf('data-next-step')).split('</div>')[0];
     expect(step).not.toContain('Train with Elijah');
-    const kid = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '13-17', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: '/coach/elijah' }));
+    const kid = renderToStaticMarkup(createElement(ResultsView, { summary: FLAGGED, age: '13-17', onClear: () => {}, onRunAgain: () => {}, trainWithElijahHref: ELIJAH_COACH_STORE_HREF }));
     expect(kid).not.toContain('Train with Elijah');
   });
 
@@ -202,9 +204,10 @@ describe('item 4 and L5 (retest 1): 18 or older get EXACTLY ONE next step, the K
     // NP-1: no "coming soon" block in its place.
     expect(plain).not.toContain('data-coming-soon');
     expect(text(plain)).not.toMatch(/coming soon/i);
-    const linked = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
+    const linked = renderToStaticMarkup(createElement(LaneBody, { lane: 'dunking', s: FLAGGED, dunkHref: ELIJAH_DUNK_PROGRAM_HREF }));
     expect(linked).toContain('Build my Dunk Program');
-    const other = renderToStaticMarkup(createElement(LaneBody, { lane: 'posture', s: FLAGGED, dunkHref: '/coach/elijah/programs/dunking' }));
+    expect(linked).toContain(`href="${ELIJAH_DUNK_PROGRAM_HREF}"`);
+    const other = renderToStaticMarkup(createElement(LaneBody, { lane: 'posture', s: FLAGGED, dunkHref: ELIJAH_DUNK_PROGRAM_HREF }));
     expect(other).not.toContain('Build my Dunk Program');
   });
 
