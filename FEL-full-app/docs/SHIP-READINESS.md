@@ -172,9 +172,9 @@ exists, so nothing is deleted until you do this. `docs/RETENTION-JOB.md` has the
 
 **Same shape, also never scheduled:** `POST /api/arena/reclaim` (`ARENA_RECLAIM_SECRET`, header
 `x-arena-reclaim-secret`; unset = 404) and `POST /api/coach-store/reconcile` (`COACH_STORE_RECONCILE_SECRET`, already
-in `firebase.json`). Both say "no scheduler calls it yet". `ARENA_RECLAIM_SECRET` is in no doc and not in
-`.env.example`. If the arena sweep should run, it needs the same three steps (secret, `firebase.json`, a Scheduler
-job); the arena also reclaims on read, so this is a cleanup, not a fix.
+in `firebase.json`). Both say "no scheduler calls it yet". `.env.example` now names both secrets; if the arena sweep
+should run, it needs the same three steps (secret, `firebase.json`, a Scheduler job). The arena also reclaims on read,
+so this is a cleanup, not a fix.
 
 ### 3.2 Pending SQL (`prisma/pending/`, 17 files)
 
