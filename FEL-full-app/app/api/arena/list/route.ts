@@ -10,7 +10,7 @@ import { parseCard } from '@/lib/mp/dunkCard';
 import { isStakingPaused, STAKING_PAUSED } from '@/lib/stakingPause';
 import { expiredOutcomeOf, isExpired, reclaimOnRead, type ExpiredOutcome } from '@/lib/arena-reclaim';
 import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
-import { isUnlistedMode } from '@/lib/unlisted-modes';
+import { isUnlistedMode, UNLISTED_MODES } from '@/lib/unlisted-modes';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
   if (!userId) return null;
@@ -37,11 +37,11 @@ export async function GET() {
   const now = new Date();
   const reclaim = await reclaimOnRead(prisma as any, userId, { now });
 
-  // MUSIC-SUITE P1 (2026-09-25): a posted duel on a paused mode can no longer be joined, so its creator's CANCEL is the
-  // only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels. A WAITING duel's
-  // updatedAt is its creation time, so after 25 newer duels it would drop off the list with its CANCEL. The creator's
-  // paused WAITING duels are fetched on their own and always listed.
-  const pausedKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), 'musicAcademy']));
+  // MUSIC-SUITE P1 / IRON-PARADISE-OUT: a posted duel on a paused or parked mode can no longer be joined, so its
+  // creator's CANCEL is the only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels.
+  // A WAITING duel's updatedAt is its creation time, so after 25 newer duels it would drop off the list with its CANCEL.
+  // Fetch those stranded WAITING duels on their own and always list them.
+  const strandedWaitingKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), 'musicAcademy', ...UNLISTED_MODES]));
   const [openRaw, mineRecent, mineStranded] = await Promise.all([
     // MUSIC-SUITE P6: a posted duel past its expiry is not an open challenge — /api/arena/join refuses it (409 EXPIRED)
     // and the next sweep refunds its creator.
@@ -56,7 +56,7 @@ export async function GET() {
       take: 25,
     }),
     prisma.competitionMatch.findMany({
-      where: { currency: 'LC', status: 'WAITING', player1Id: userId, mode: { in: pausedKeys } },
+      where: { currency: 'LC', status: 'WAITING', player1Id: userId, mode: { in: strandedWaitingKeys } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),

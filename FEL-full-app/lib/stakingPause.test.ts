@@ -438,6 +438,15 @@ describe('the Arena lobby', () => {
     const body = await (await listGET()).json();
     expect(body.mine.map((d: Row) => d.id)).toContain('old-paused');
   });
+
+  it('keeps a parked WAITING duel in MY DUELS even behind 30 newer duels, so its CANCEL is always there', async () => {
+    const old = duel({ id: 'old-parked', mode: 'training', status: 'WAITING', matchType: 'SCORE_DUEL', player2Id: null });
+    const newer = Array.from({ length: 30 }, (_, i) => duel({ id: `newer-${i}`, mode: 'threePoint', status: 'SETTLED' }));
+    h.matches = [...newer, old];
+    const body = await (await listGET()).json();
+    const mine = Object.fromEntries(body.mine.map((d: Row) => [d.id, d]));
+    expect(mine['old-parked']).toMatchObject({ id: 'old-parked', unlistedMode: true });
+  });
 });
 
 describe('friend challenges (/multiplayer)', () => {
