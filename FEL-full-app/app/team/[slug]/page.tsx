@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { approvedServices, coachStoreBookHref, getApprovedProfile } from '@/lib/creator/creatorCatalog';
+import {
+  approvedServices,
+  coachStoreBookHref,
+  getApprovedProfile,
+  publicProfileBio,
+  publicServiceDescription,
+} from '@/lib/creator/creatorCatalog';
 import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
@@ -33,7 +39,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
         <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} size="lg" />
         <div>
           <SectionTitle>Bio</SectionTitle>
-          <p className="mt-2 text-sm text-white/70">{profile.bio}</p>
+          <p className="mt-2 text-sm text-white/70">{publicProfileBio(profile)}</p>
           <div className="mt-4 flex flex-wrap gap-3">
             {bookHref ? (
               <Link
@@ -60,7 +66,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
         <div>
           <SectionTitle>Reels</SectionTitle>
           {profile.reels.length === 0 ? (
-            <p className="mt-2 text-sm text-white/45">Reel links placeholder.</p>
+            <p className="mt-2 text-sm text-white/45">No reel links are published yet.</p>
           ) : (
             <ul className="mt-2 space-y-1 text-sm">
               {profile.reels.map((r) => (
@@ -72,7 +78,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
         <div>
           <SectionTitle>Links</SectionTitle>
           {profile.socials.length === 0 ? (
-            <p className="mt-2 text-sm text-white/45">Social links placeholder.</p>
+            <p className="mt-2 text-sm text-white/45">No external social links are published yet.</p>
           ) : (
             <ul className="mt-2 space-y-1 text-sm">
               {profile.socials.map((s) => (
@@ -96,7 +102,7 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
           {services.map((s) => (
             <div key={s.id} className="rounded-xl border border-white/10 bg-[#141414] p-4">
               <p className="text-sm font-semibold text-white">{s.name}</p>
-              <p className="mt-1 text-xs text-white/50">{s.durationMinutes} min · {s.description}</p>
+              <p className="mt-1 text-xs text-white/50">{s.durationMinutes} min · {publicServiceDescription(s)}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {bookHref ? (
                   <Link

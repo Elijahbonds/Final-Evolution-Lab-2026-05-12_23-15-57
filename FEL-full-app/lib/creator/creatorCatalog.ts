@@ -86,7 +86,19 @@ export interface AudienceStats {
   stats: Array<{ label: string; value: string }>;
 }
 
-export const EXAMPLE_RATE_NOTE = 'EXAMPLE — placeholder rate pending Elijah\'s decision. Not a live price.';
+export const EXAMPLE_RATE_NOTE = 'EXAMPLE — draft rate pending Elijah\'s decision. Not a live price.';
+export const PUBLIC_PROFILE_BIO_FALLBACK = 'Profile details are being confirmed with the Final Evolution Lab team.';
+export const PUBLIC_PROFILE_SPECIALTY_FALLBACK = 'Final Evolution Lab sessions and creative collaborations';
+export const PUBLIC_SERVICE_DESCRIPTION_FALLBACK = 'Scope is confirmed before booking or quoting.';
+export const PUBLIC_MEDIA_KIT_HIGHLIGHT_FALLBACK = 'Partner-facing highlights are confirmed during inquiry.';
+export const PUBLIC_MEDIA_KIT_PACKAGE_FALLBACK = 'Deliverables and usage terms are confirmed during inquiry.';
+
+const PLACEHOLDER_COPY = /\bplaceholder\b/i;
+
+export function publicCreatorCopy(value: string | null | undefined, fallback: string): string {
+  const trimmed = (value ?? '').trim();
+  return trimmed && !PLACEHOLDER_COPY.test(trimmed) ? trimmed : fallback;
+}
 
 export const AUDIENCE_STATS: AudienceStats = {
   isExample: true,
@@ -208,6 +220,26 @@ export function getApprovedProfile(slug: string): CreatorProfile | undefined {
 
 export function approvedServices(profile: CreatorProfile): CreatorService[] {
   return profile.approved ? profile.services.filter((s) => s.approved) : [];
+}
+
+export function publicProfileBio(profile: CreatorProfile | undefined): string {
+  return publicCreatorCopy(profile?.bio, PUBLIC_PROFILE_BIO_FALLBACK);
+}
+
+export function publicProfileSpecialty(profile: CreatorProfile): string {
+  return publicCreatorCopy(profile.specialty, PUBLIC_PROFILE_SPECIALTY_FALLBACK);
+}
+
+export function publicServiceDescription(service: CreatorService): string {
+  return publicCreatorCopy(service.description, PUBLIC_SERVICE_DESCRIPTION_FALLBACK);
+}
+
+export function publicMediaKitHighlight(highlight: string): string {
+  return publicCreatorCopy(highlight, PUBLIC_MEDIA_KIT_HIGHLIGHT_FALLBACK);
+}
+
+export function publicMediaKitPackageDetail(pkg: MediaKitPackage): string {
+  return publicCreatorCopy(pkg.detail, PUBLIC_MEDIA_KIT_PACKAGE_FALLBACK);
 }
 
 /**
