@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Clapperboard, ChefHat, Shirt, PenLine } from 'lucide-react';
+import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Clapperboard, ChefHat, Shirt, PenLine, UserRound } from 'lucide-react';
 
 // Creator Hub — every card below opens a shipped play or guided Create flow.
 
@@ -37,6 +37,30 @@ export function CreatorHub() {
           Nine creator disciplines, one arena. Pick a craft and perform or publish — each one scores or showcases
           what you actually do, not a menu you tap through.
         </p>
+
+        <Link
+          href="/creator/athlete"
+          className="mt-8 flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-white/25 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <div
+              className="flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ background: 'rgba(255, 255, 255, 0.08)', border: '1px solid rgba(255,255,255,0.14)' }}
+            >
+              <UserRound className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.32em] text-white/35">Character Creator</div>
+              <h2 className="mt-1 text-2xl font-black">Build your athlete</h2>
+              <p className="mt-2 max-w-2xl text-sm text-white/55">
+                Shape the hero every shipped mode wears — face, body, palette, nameplate, and active look.
+              </p>
+            </div>
+          </div>
+          <div className="inline-flex items-center gap-1 text-sm font-semibold text-white">
+            Open Athlete Creator <ArrowRight className="h-4 w-4" />
+          </div>
+        </Link>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {DISCIPLINES.map((d) => {

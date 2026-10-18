@@ -35,6 +35,7 @@ describe('NP-1 placeholder language', () => {
 
   it('the creator hub links only to built play and create routes', () => {
     const src = readFileSync('app/creator/_components/hub.tsx', 'utf8');
+    expect(src).toContain('href="/creator/athlete"');
     expect(src).toContain("href: '/create/art'");
     expect(src).toContain("href: '/create/scene'");
     expect(src).not.toContain('href: null');

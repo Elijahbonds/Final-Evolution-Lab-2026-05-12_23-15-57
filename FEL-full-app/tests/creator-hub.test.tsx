@@ -11,8 +11,10 @@ describe('CreatorHub', () => {
 
     expect(disciplineMarkers).toHaveLength(9);
     expect(html).toContain('Nine creator disciplines, one arena');
+    expect(html).toContain('Build your athlete');
     expect(html).toContain('data-creator-discipline="art"');
-    expect(hrefs).toEqual([
+    expect(hrefs[0]).toBe('/creator/athlete');
+    expect(hrefs.slice(1)).toEqual([
       '/play/dance',
       '/play/acting',
       '/play/music',
