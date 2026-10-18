@@ -74,7 +74,7 @@ function Beat({ show, instant, children, className = '' }: { show: boolean; inst
     <div
       aria-hidden={show ? undefined : true}
       data-beat={show ? 'shown' : 'waiting'}
-      className={`${className} ${instant ? '' : 'transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.2,1.4,0.4,1)]'} ${show ? 'opacity-100' : 'pointer-events-none translate-y-3 scale-95 opacity-0'}`}
+      className={`${className} ${instant ? '' : 'transition-[opacity,transform] duration-300 [transition-timing-function:cubic-bezier(0.2,1.4,0.4,1)]'} ${show ? 'opacity-100' : 'pointer-events-none translate-y-3 scale-95 opacity-0'}`}
     >
       {children}
     </div>
