@@ -8,6 +8,8 @@ import {
   PARTNERS,
   getBook,
   getOffer,
+  publicBookDescription,
+  publicChapterInventoryNotice,
 } from './bookCatalog';
 
 const TITLES = [
@@ -57,6 +59,23 @@ describe('the press catalog', () => {
       expect(getBook(slug)!.kdpSelect).toBe(false);
       expect(getOffer(`${slug}:ebook`)!.directSale).toBe(true);
       expect(getOffer(`${slug}:bundle`)!.directSale).toBe(true);
+    }
+  });
+
+  it('keeps unfinished catalog copy out of public Press surfaces', () => {
+    for (const book of BOOKS) {
+      expect(publicBookDescription(book), book.slug).not.toMatch(/placeholder/i);
+      expect(publicChapterInventoryNotice(book) ?? '', book.slug).not.toMatch(/placeholder/i);
+    }
+
+    for (const file of [
+      'app/press/page.tsx',
+      'app/press/[slug]/page.tsx',
+      'components/press/offer-card.tsx',
+      'lib/books/bookCheckout.ts',
+    ]) {
+      const src = readFileSync(file, 'utf8');
+      expect(src, file).not.toMatch(/book\.description|featured\.description|placeholder until/i);
     }
   });
 

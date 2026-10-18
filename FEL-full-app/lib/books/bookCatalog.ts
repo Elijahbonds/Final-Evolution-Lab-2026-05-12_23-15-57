@@ -79,6 +79,10 @@ export const EXAMPLE_AUDIO_CENTS = 1499;
 export const EXAMPLE_BUNDLE_CENTS = 1999;
 
 export const EXAMPLE_PRICE_NOTE = 'EXAMPLE — placeholder pending Elijah\'s decision. Not a live price.';
+export const BOOK_PUBLIC_DESCRIPTION_FALLBACK =
+  'Final Evolution Press title. Stream the audiobook in FEL; Kindle availability and purchase options are listed below.';
+export const CHAPTER_INVENTORY_PENDING_COPY =
+  'Audio chapter inventory is being finalized. The player shows the current listening sequence and only enables samples or owned tracks that can be streamed.';
 
 export const AMAZON_AUTHOR_URL = 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B';
 
@@ -336,6 +340,17 @@ export function featuredBook(): BookTitle {
   const book = BOOKS.find((b) => b.featured);
   if (!book) throw new Error('catalog has no featured book');
   return book;
+}
+
+export function publicBookDescription(book: BookTitle): string {
+  const description = book.description.trim();
+  return description && !/^Description placeholder\.$/i.test(description)
+    ? description
+    : BOOK_PUBLIC_DESCRIPTION_FALLBACK;
+}
+
+export function publicChapterInventoryNotice(book: BookTitle): string | null {
+  return book.chaptersArePlaceholder ? CHAPTER_INVENTORY_PENDING_COPY : null;
 }
 
 export function getOffer(offerId: string): BookOffer | undefined {

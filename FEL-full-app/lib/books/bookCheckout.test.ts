@@ -31,6 +31,9 @@ describe('book checkout', () => {
     });
     const item = params.line_items?.[0];
     expect(item && 'price_data' in item && item.price_data?.unit_amount).toBe(999);
+    const productDescription = item && 'price_data' in item ? item.price_data?.product_data?.description : '';
+    expect(productDescription).toContain('Price is marked example pending final approval.');
+    expect(productDescription).not.toMatch(/placeholder/i);
     expect(params.metadata).toMatchObject({ product: 'BOOK', offerId: 'blueprint:ebook', format: 'ebook', terms_version: STORE_TERMS_VERSION });
     expect(params.success_url).toBe('http://localhost:3000/press/receipt?session_id={CHECKOUT_SESSION_ID}');
     expect(params.automatic_tax).toBeUndefined();
