@@ -18,6 +18,8 @@ import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { runMode, InputBus, type FelInput, type HudValue, type ModePhase, type SessionResult } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { BootSplash } from '@/components/games/boot-splash';
+import { surfaceBootError } from '@/components/games/boot-error';
+import { useBabylonBootRetry } from '@/components/games/use-babylon-boot-retry';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import type { ControlEvent } from '@/lib/controller-link/types';
@@ -68,6 +70,18 @@ export function HostStage({ modeId: initialModeId }: { modeId: string }) {
   const linkSink = useRef<{ bus: InputBus; sink: ReturnType<typeof toInputBus> } | null>(null);
   const presenceRef = useRef(new HostPresence());
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({
+    busRef,
+    setPhase,
+    setCountdown,
+    setLoadError,
+    reset: () => {
+      setHud({});
+      setResult(null);
+      setBus(null);
+      linkSink.current = null;
+    },
+  });
 
   useEffect(() => {
     if (!started || !def) return;
@@ -108,12 +122,7 @@ export function HostStage({ modeId: initialModeId }: { modeId: string }) {
       }).then((dispose) => {
         if (disposed) dispose();
         else stop = dispose;
-      }).catch((e) => {
-        if (!disposed) {
-          setPhase('error');
-          setLoadError(String((e as Error)?.message ?? e));
-        }
-      });
+      }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-HOST] boot failed', setPhase, setLoadError }));
     }, 0);
 
     return () => {
@@ -126,7 +135,7 @@ export function HostStage({ modeId: initialModeId }: { modeId: string }) {
       }
       setBus((current) => (current === input ? null : current));
     };
-  }, [started, def]);
+  }, [started, def, bootAttempt]);
 
   // release the wake lock and leave fullscreen when the stage goes away
   useEffect(() => () => { void presenceRef.current.exit(); }, []);
@@ -212,7 +221,7 @@ export function HostStage({ modeId: initialModeId }: { modeId: string }) {
             phase={phase}
             detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
             onStart={tapStart}
-            onRetry={tapStart}
+            onRetry={retryBoot}
           />
 
           <HostLobby
