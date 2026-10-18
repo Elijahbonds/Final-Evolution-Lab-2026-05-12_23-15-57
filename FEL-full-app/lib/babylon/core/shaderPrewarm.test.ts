@@ -151,8 +151,8 @@ describe('the harness runs it where it cannot trip the watchdog', () => {
     expect(block).toContain("if (warm.capHit) reportDiag('load', `shader pre-warm hit its cap");
     expect(block).not.toContain('if (warm.timedOut)');
   });
-  it('the watchdog is still 20 s (it is not raised: the pre-warm runs after it)', () => {
-    expect(src).toMatch(/const LOAD_WATCHDOG_MS = 20_000;/);
+  it('the watchdog gives measured heavy phone loads room before the stuck-load error', () => {
+    expect(src).toMatch(/const LOAD_WATCHDOG_MS = 45_000;/);
   });
   it('a load the watchdog ends is reported to the diag before the error screen, like a load that throws', () => {
     const arm = src.indexOf('const watchdog = setTimeout(() => {');

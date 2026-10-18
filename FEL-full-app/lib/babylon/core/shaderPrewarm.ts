@@ -17,10 +17,10 @@
 // parallel compile can run between them, and then it waits for the ENGINE (`effectsReady`: every program anything has asked for)
 // as well as the scene.
 //
-// THE CLOCK. The load watchdog (ModeHarness LOAD_WATCHDOG_MS, 20 s) is disarmed when the mode's load() returns, BEFORE this runs,
+// THE CLOCK. The load watchdog (ModeHarness LOAD_WATCHDOG_MS, 45 s) is disarmed when the mode's load() returns, BEFORE this runs,
 // so a slow compile cannot make the watchdog report "Load timed out", and a compile that never finishes cannot hold the splash:
 // this has its own cap and the game goes on to READY either way (a shader left uncompiled is just compiled on first use, as it
-// was before). The watchdog is untouched.
+// was before).
 //
 // PHONE ONLY (`prewarmWanted`): desktop and high keep their first-use compiles (their GPUs and drivers compile in a frame or
 // two, and the owner asked for the phone). Development keeps warmAll after READY.

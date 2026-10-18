@@ -266,8 +266,10 @@ export interface HarnessOpts {
 }
 
 /** Max time a mode's load() may take before the anti-infinite-spinner watchdog
- * fires and surfaces the error screen (no player must ever hang forever). */
-const LOAD_WATCHDOG_MS = 20_000;
+ * fires and surfaces the error screen (no player must ever hang forever).
+ * Ship-readiness phone rigs measured heavy def.load() paths at 24-35s, so the guard
+ * gives real devices room to reach READY while still cutting off a true stuck load. */
+const LOAD_WATCHDOG_MS = 45_000;
 
 /** OOM-HYGIENE: the floating-origin resetter lives at MODULE scope on purpose — an arrow written inside runMode captures the
  *  harness closure (heap snapshot: `getScene → context: scene → Scene`), and would retain the scene it exists to release. */
