@@ -275,11 +275,13 @@ other server value reaches production through the deploy tree's env file, so wha
 | `NEXT_PUBLIC_FEL_BODY_RIDE` | `lib/input/rideProfiles.ts` | build-time, probe-only; leave unset in production |
 | `K_REVISION`, `VERCEL_GIT_COMMIT_SHA` | `app/api/health/route.ts` | set by the platform; nothing to do |
 
-**Named in a doc but missing from `.env.example`** (a fresh checkout cannot see them): `ABACUS_ENABLED`,
-`COACH_STORE_ENABLED`, `COACH_STORE_PAYMENTS_ENABLED`, `COACH_STORE_COACH_USER_IDS`, `COACH_STORE_RECONCILE_SECRET`,
+**Follow-up 2026-10-18:** `.env.example` now names the documented operational flags and secrets a fresh deploy needs to
+see before it can intentionally turn them on: `ABACUS_ENABLED`, `COACH_STORE_ENABLED`,
+`COACH_STORE_PAYMENTS_ENABLED`, `COACH_STORE_LIVE`, `COACH_STORE_COACH_USER_IDS`, `COACH_STORE_RECONCILE_SECRET`,
 `COACH_REVIEWS_BUCKET`, `COACH_REVIEW_UPLOADS_ENABLED`, `FACE_SCAN_ENABLED`, `VIRTUAL_PURCHASES_ENABLED`,
-`PAYOUTS_ENABLED`, `STRIPE_BOOKS_SECRET_KEY`, `RETENTION_CRON_SECRET`, `NEXT_PUBLIC_JOIN_LAB_ENABLED`,
-`FEL_TEST_ACCOUNTS`. All default off or closed when unset.
+`PAYOUTS_ENABLED`, `RETENTION_CRON_SECRET`, `ARENA_RECLAIM_SECRET`, `LIVE_STREAM_SCHEDULE_ENABLED`,
+`NEXT_PUBLIC_JOIN_LAB_ENABLED` and `FEL_TEST_ACCOUNTS`. All default off or closed when unset. The old
+`STRIPE_BOOKS_SECRET_KEY` remains intentionally absent; books use the platform `STRIPE_SECRET_KEY`.
 
 The rest are test- or probe-only (`SESSIONS_IT`, `DAILY_IT`, `DB_CONNECTOR_IT`, `HM_DEBUG`, `CAM_CAL`,
 `MIRROR_BASELINE_OUT`, `COMPLIANCE_PROOF_OUT`, `FEL_RECORD_BUS_GOLDEN`, `FEL_POKE_DEBUG`, `FEL_HERO_GLB`). The full
