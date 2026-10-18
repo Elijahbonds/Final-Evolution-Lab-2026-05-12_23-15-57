@@ -124,6 +124,7 @@ import {
 } from '@/lib/mirror/progressReading';
 import { forgetDeviceProgress, recordDeviceProgress } from '@/lib/mirror/deviceProgress';
 import { ProgressLine } from './progress-line';
+import { ScanSaveCard } from '@/components/privacy/scan-save-card';
 
 /** What the screen panel says when a finished screen was not kept (offline, signed out, a server error). */
 const SCREEN_NOT_SAVED = 'Screen finished — it could not be saved, so nothing was paid for it.';
@@ -214,9 +215,20 @@ const BONES: [number, number][] = [
  * youthGateFor) — under 18 or no birth year on file, the screen's written corrective blocks are off (PLAN item 9).
  * Absent → youth rules, the conservative side (decision #20: blank = youth until answered).
  * `canSaveScan` (R-HEALTH-CLIENT, 2026-09-30): page.tsx's canSaveScanNumbers for this user, asked once on the server. False
- * (the default: a missing prop never saves) → no request to /api/mirror/* at all; results stay in this page's memory.
+ * (the default: a missing prop never saves) → no request to /api/mirror/* at all until a verified adult grants the opt-in
+ * from the card below; results otherwise stay in this page's memory.
  */
-export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initialPattern = DEFAULT_MIRROR_TAB }: { youth?: YouthGate; canSaveScan?: boolean; initialPattern?: MirrorTab } = {}) {
+export function MirrorHarness({
+  youth = 'unknownAge',
+  canSaveScan = false,
+  scanSaveEligible = false,
+  initialPattern = DEFAULT_MIRROR_TAB,
+}: {
+  youth?: YouthGate;
+  canSaveScan?: boolean;
+  scanSaveEligible?: boolean;
+  initialPattern?: MirrorTab;
+} = {}) {
   // THE CAMERA (MIRROR-FIRST P1): use-mirror-camera.ts. A hidden tab turns it off and pauses the session (onPause stops the
   // coach mid-sentence: nobody is in front of the phone); Resume brings it back with the books kept (onResume drops the
   // jump tracker's half-read jump, which cannot span the gap).
@@ -273,6 +285,36 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
   // just forgotten from it
   const [progress, setProgress] = useState<ProgressView | null>(null);
   const [progressForgotten, setProgressForgotten] = useState(false);
+  const [scanSaveChecked, setScanSaveChecked] = useState(canSaveScan);
+  const [scanSaveBusy, setScanSaveBusy] = useState(false);
+  const [scanSaveError, setScanSaveError] = useState('');
+  const canSaveMirror = canSaveScan || (scanSaveEligible && scanSaveChecked);
+  useEffect(() => {
+    setScanSaveChecked(canSaveScan);
+  }, [canSaveScan]);
+
+  async function setMirrorScanSave(next: boolean) {
+    setScanSaveChecked(next);
+    setScanSaveBusy(true);
+    setScanSaveError('');
+    try {
+      const res = await fetch('/api/account/scan-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ granted: next }),
+      });
+      if (!res.ok) {
+        setScanSaveChecked(canSaveScan);
+        setScanSaveError("That didn't save. Try again from Account if this keeps happening.");
+        return;
+      }
+    } catch {
+      setScanSaveChecked(canSaveScan);
+      setScanSaveError("That didn't save. Try again when your connection is back.");
+    } finally {
+      setScanSaveBusy(false);
+    }
+  }
   // The skeleton-only view (no camera picture; everything that reads stays). A browser preference, read after mount so
   // the server render and the first client render agree; never a server write.
   const [skeletonOnly, setSkeletonOnly] = useState(false);
@@ -711,7 +753,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     // (it rides on the POST below), this phone for everyone else and for the hinge and push-up (never sent).
     const tab = patternRef.current;
     const movement = progressMovementFor(tab);
-    const source = movement ? progressSource(movement, canSaveScan) : null;
+    const source = movement ? progressSource(movement, canSaveMirror) : null;
     const reading: ProgressReading | null =
       tab === 'squat' ? squatReading(squatSessionRef.current.workReps, squatJudged(kneeRecordRef.current))
         : tab === 'lunge' ? lungeReading(lungeSessionRef.current)
@@ -737,7 +779,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
       // Mirror could never show whether anyone was improving. Saving is best-effort and silent:
       // a failed write must never interrupt the end of a workout.
       // R-HEALTH-CLIENT: null (nothing sent) unless this account's sessions are saved; the summary already showed.
-      void mirrorSave(canSaveScan, fetch, '/api/mirror/sessions', {
+      void mirrorSave(canSaveMirror, fetch, '/api/mirror/sessions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -774,7 +816,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     }
     stop();
     setStatus('idle');
-  }, [stop, setStatus, sessionSummary, canSaveScan]);
+  }, [stop, setStatus, sessionSummary, canSaveMirror]);
 
   const secs = (ms: number) => (ms / 1000).toFixed(1);
 
@@ -789,7 +831,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
   const recordDunk = useCallback(async (m: DunkMetrics) => {
     const attempt = attemptFrom(m);
     try {
-      const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks', {
+      const pending = mirrorSave(canSaveMirror, fetch, '/api/mirror/dunks', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(attempt),
@@ -809,13 +851,13 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
       const local = readProgress([attempt]);
       setDunkSaid(progressLine(local, attempt));
     }
-  }, [speak, canSaveScan]);
+  }, [speak, canSaveMirror]);
 
   // The history, so the screen opens on what there is to beat rather than on nothing.
   // R-HEALTH-CLIENT: only an account whose jumps are saved has a history to read; everyone else starts from this session.
   useEffect(() => {
     if (pattern !== 'jump') return;
-    const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks');
+    const pending = mirrorSave(canSaveMirror, fetch, '/api/mirror/dunks');
     if (!pending) return;
     let live = true;
     pending
@@ -823,7 +865,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
       .then((j) => { if (live && j?.progress) setDunkProgress(j.progress); })
       .catch(() => {});
     return () => { live = false; };
-  }, [pattern, canSaveScan]);
+  }, [pattern, canSaveMirror]);
 
   /**
    * A finished screen goes to the server, which recomputes the score and decides the payout. A screen the
@@ -848,7 +890,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
     // so (NOT_READ_LINE), not "not graded yet" (P3 review)
     setScreenSummary(scoreScreen(ran, results, { attempted: grades.length > 0 }));
     try {
-      const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/screen', {
+      const pending = mirrorSave(canSaveMirror, fetch, '/api/mirror/screen', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -889,7 +931,7 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
       setScreenMessage(SCREEN_NOT_SAVED);
       setSavedScreenId('unsaved');
     }
-  }, [speak, canSaveScan]);
+  }, [speak, canSaveMirror]);
 
   // The screen ends itself. Nothing else in the Mirror does, which is the point of a protocol.
   //
@@ -1059,6 +1101,21 @@ export function MirrorHarness({ youth = 'unknownAge', canSaveScan = false, initi
             </Link>
             {' '}— your jump in about a minute, or the full screen in about five. No account needed.
           </p>
+        )}
+        {!live && !paused && scanSaveEligible && !canSaveScan && (
+          <section data-mirror-scan-save-opt-in className="-mt-1 mb-4 rounded-2xl border border-[#00E5FF]/25 bg-[#00E5FF]/[0.045] p-3">
+            <p className="mb-2 text-[12.5px] leading-relaxed text-white/60">
+              Want Mirror progress saved to your account instead of this page only? You can turn that on here before
+              this set starts.
+            </p>
+            <ScanSaveCard checked={scanSaveChecked} disabled={scanSaveBusy} onChange={(next) => { void setMirrorScanSave(next); }} />
+            {scanSaveChecked && !scanSaveError && (
+              <p data-mirror-scan-save-on className="mt-2 text-[12px] font-semibold text-[#00FF9D]">
+                Mirror saves are on for this session.
+              </p>
+            )}
+            {scanSaveError && <p className="mt-2 text-[12px] text-red-400">{scanSaveError}</p>}
+          </section>
         )}
         <CorrectivesPicker youth={youth} />
 
