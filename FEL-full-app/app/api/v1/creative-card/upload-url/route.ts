@@ -28,7 +28,7 @@ const UPLOAD_RATE = { limit: 24, windowMs: 10 * 60_000 } as const;
  *  - 24 signs per 10 minutes per account (a song, its cover and up to 16 stems fit, with a retry or two).
  *  - uploads are for public creators only (verified 18+). Owner: "teens create but nothing of theirs is public"; a teen's
  *    work stays on the device, as their Closet look does (lib/creator/lookPrivacy.ts).
- *  - no bucket configured → 503 "uploads coming soon" (fail closed).
+ *  - no bucket configured → 503 uploads_coming_soon (fail closed; the client explains which storage env is missing).
  *
  * PIPELINES (owner, 2026-10-06, "teen private uploads YES: owner-only private area, never public; acting/voice stays
  * adults-only"). A creator who is not a verified 18+ (a teen, or no birth year) may now upload music audio and images

@@ -9,7 +9,7 @@ import { CLIP_MIME, GET_TTL_SEC, MAX_CLIP_BYTES, ORIGINALS_PREFIX, PUT_TTL_SEC, 
 
 export class UploadsComingSoon extends Error {
   constructor() {
-    super('Uploads coming soon');
+    super('review upload storage is not configured');
     this.name = 'UploadsComingSoon';
   }
 }

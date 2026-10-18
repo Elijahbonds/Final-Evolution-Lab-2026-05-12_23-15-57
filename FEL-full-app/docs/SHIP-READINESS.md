@@ -270,7 +270,7 @@ other server value reaches production through the deploy tree's env file, so wha
 |---|---|---|
 | `COACH_STORE_LIVE` | `lib/flags.ts`, `lib/coach-store/stripeMode.ts`, `app/api/stripe/checkout`, `lib/books/bookCheckout.ts` | a **live** Stripe key is refused (test keys only). Set it only on the day real money is meant to flow |
 | `ARENA_RECLAIM_SECRET` | `app/api/arena/reclaim/route.ts` | the reclaim sweep route is a 404 (3.1) |
-| `CREATOR_MEDIA_BUCKET`, `CREATOR_MEDIA_PUBLIC_BUCKET` | `lib/soundtrack/storage.ts`, `app/api/v1/creative-card/upload-url` | creator uploads answer "coming soon". Two distinct GCS buckets: pending (private, 30-day lifecycle on `pending/`) and public-read with CORS; `lib/soundtrack/storage.ts` lines 8–13 describe both |
+| `CREATOR_MEDIA_BUCKET`, `CREATOR_MEDIA_PUBLIC_BUCKET` | `lib/soundtrack/storage.ts`, `app/api/v1/creative-card/upload-url` | creator uploads answer with an unavailable-storage 503. Two distinct GCS buckets: pending (private, 30-day lifecycle on `pending/`) and public-read with CORS; `lib/soundtrack/storage.ts` lines 8–13 describe both. Follow-up 2026-10-18: `.env.example` names both values. |
 | `LIVE_STREAM_SCHEDULE_ENABLED` | `lib/flags.ts`, `app/api/live/schedule` | `/live/schedule` is a 404 |
 | `NEXT_PUBLIC_FEL_BODY_RIDE` | `lib/input/rideProfiles.ts` | build-time, probe-only; leave unset in production |
 | `K_REVISION`, `VERCEL_GIT_COMMIT_SHA` | `app/api/health/route.ts` | set by the platform; nothing to do |
