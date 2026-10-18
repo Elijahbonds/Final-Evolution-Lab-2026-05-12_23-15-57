@@ -1,4 +1,4 @@
-// STAKING PAUSED FOR MUSIC AND DANCE — MUSIC-SUITE P1 (2026-09-25).
+// STAKING PAUSED — MUSIC-SUITE P1 (2026-09-25), plus route-specific challenge pauses.
 //
 // Owner decision #9 (outbox/finish-release/musicsuite/DECISIONS.md): "pause staking both now" — music AND dance come
 // out of Arena Quick Match, posted duels and friend challenges; each returns when its fairness phase lands (music with
@@ -165,7 +165,8 @@ const duel = (over: Row = {}): Row => ({
   seed: 'seed-before-the-pause', player1Id: USER, player2Id: HOUSE, player1Score: null, player2Score: null, winnerId: null,
   createdAt: new Date('2026-09-24T00:00:00Z'), updatedAt: new Date('2026-09-24T00:00:00Z'), ...over,
 });
-const PAUSED = ['dance'] as const;   // MUSIC-SUITE P6: music left the list
+const PAUSED = ['dance', 'dunkduel'] as const;   // MUSIC-SUITE P6: music left the list; Prove It is IRL, not GameSession-backed
+const ARENA_PAUSED = ['dance'] as const;
 
 /** MUSIC-SUITE P6: `userId` plays their one attempt in music duel `matchId` (every other note dead on); its rejudged score. */
 function played(matchId: string, userId: string): number {
@@ -181,8 +182,8 @@ beforeEach(() => {
 });
 
 describe('the one list (lib/stakingPause.ts)', () => {
-  it('pauses exactly dance now: music came back with MUSIC-SUITE phase 6 (owner decisions #9 and #12)', () => {
-    expect([...STAKING_PAUSED].sort()).toEqual(['dance']);
+  it('pauses exactly dance and Prove It now: music came back with MUSIC-SUITE phase 6 (owner decisions #9 and #12)', () => {
+    expect([...STAKING_PAUSED].sort()).toEqual([...PAUSED].sort());
     for (const m of PAUSED) expect(isStakingPaused(m), m).toBe(true);
     expect(isStakingPaused('music')).toBe(false);
   });
@@ -194,8 +195,8 @@ describe('the one list (lib/stakingPause.ts)', () => {
     }
   });
 
-  it('a paused mode is still an Arena mode with a ceiling, so a duel opened before the pause can still take a score', () => {
-    for (const m of PAUSED) {
+  it('a paused Arena mode is still an Arena mode with a ceiling, so a duel opened before the pause can still take a score', () => {
+    for (const m of ARENA_PAUSED) {
       expect(isArenaMode(m), m).toBe(true);
       expect(scoreCeilingFor(m), m).not.toBeNull();
       expect(isArenaStakeable(m), m).toBe(false);
@@ -203,17 +204,18 @@ describe('the one list (lib/stakingPause.ts)', () => {
   });
 
   it('every other Arena mode can still be staked', () => {
-    expect(arenaStakeableModes()).toEqual(ARENA_MODES.filter((m) => !PAUSED.includes(m as never)));
-    expect(arenaStakeableModes()).toHaveLength(ARENA_MODES.length - PAUSED.length);
+    expect(arenaStakeableModes()).toEqual(ARENA_MODES.filter((m) => !ARENA_PAUSED.includes(m as never)));
+    expect(arenaStakeableModes()).toHaveLength(ARENA_MODES.length - ARENA_PAUSED.length);
     for (const m of arenaStakeableModes()) expect(isArenaStakeable(m), m).toBe(true);
   });
 
   it('tells the player which mode, why, and that free play and their open duels are fine', () => {
     expect(stakingPausedDetail('dance')).toContain('The Cypher');
+    expect(stakingPausedDetail('dunkduel')).toContain('Prove It');
     expect(stakingPausedDetail('musicAcademy')).toContain('Groove Academy');
     expect(stakingPausedDetail('music')).toMatch(/Free play is open/);
     expect(stakingPausedDetail('music')).toMatch(/still plays and settles/);
-    expect(pausedStakeModes().map((p) => p.name).sort()).toEqual(['The Cypher']);
+    expect(pausedStakeModes().map((p) => p.name).sort()).toEqual(['Prove It', 'The Cypher']);
     expect(STAKING_PAUSED_CODE).toBe('STAKING_PAUSED');
     expect(STAKING_PAUSED_STATUS).toBe(409);
   });
@@ -233,7 +235,7 @@ describe('the one list (lib/stakingPause.ts)', () => {
 });
 
 describe('the Arena refuses a NEW stake on dance, and nothing is written', () => {
-  for (const mode of PAUSED) {
+  for (const mode of ARENA_PAUSED) {
     it(`POST DUEL on "${mode}": 409 STAKING_PAUSED, no row, no event, no Lab Credits locked`, async () => {
       const res = await createPOST(post({ mode, feeLc: 50 }));
       expect(res.status).toBe(409);
@@ -375,7 +377,7 @@ describe('the Arena lobby', () => {
     // below are unchanged.
     expect(keys).toEqual(arenaStakeableModes().filter((k: string) => !isUnlistedMode(k)));
     expect(keys).not.toContain('training');
-    expect(body.pausedModes.map((p: Row) => p.key).sort()).toEqual(['dance']);
+    expect(body.pausedModes.map((p: Row) => p.key).sort()).toEqual([...ARENA_PAUSED].sort());
     expect(keys).toContain('music');   // P6: offered again
   });
 
@@ -406,35 +408,41 @@ describe('the Arena lobby', () => {
 });
 
 describe('friend challenges (/multiplayer)', () => {
-  it('dance is still a challenge key (its label and creator cards read it) but no NEW challenge can be made on it', () => {
+  it('dance and Prove It are still challenge keys (labels and creator cards read them) but no NEW challenge can be made on them', () => {
     expect(isValidMpMode('dance')).toBe(true);
     expect(mpModeLabel('dance')).toBe('The Cypher');
-    expect(isMpChallengeOpen('dance')).toBe(false);
-    expect(MP_PAUSED_MODES.map((m) => m.key)).toEqual(['dance']);
-    expect(MP_CHALLENGE_MODES.map((m) => m.key)).not.toContain('dance');
+    expect(isValidMpMode('dunkduel')).toBe(true);
+    expect(mpModeLabel('dunkduel')).toBe('Prove It');
+    for (const m of PAUSED) expect(isMpChallengeOpen(m), m).toBe(false);
+    expect(MP_PAUSED_MODES.map((m) => m.key).sort()).toEqual([...PAUSED].sort());
+    for (const m of PAUSED) expect(MP_CHALLENGE_MODES.map((mode) => mode.key)).not.toContain(m);
   });
 
   it('every other challenge mode stays open', () => {
-    expect(MP_CHALLENGE_MODES).toHaveLength(MP_MODES.length - 1);
+    expect(MP_CHALLENGE_MODES).toHaveLength(MP_MODES.length - PAUSED.length);
     for (const m of MP_CHALLENGE_MODES) {
       expect(isMpChallengeOpen(m.key), m.key).toBe(true);
       expect(isStakingPaused(sessionModeFor(m.key)), m.key).toBe(false);
     }
   });
 
-  it('CREATE CHALLENGE on dance: 409 STAKING_PAUSED, nothing created; on threepoint it is created', async () => {
-    const res = await mpCreatePOST(post({ mode: 'dance' }));
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ error: 'STAKING_PAUSED' });
+  it('CREATE CHALLENGE on paused modes: 409 STAKING_PAUSED, nothing created; on threepoint it is created', async () => {
+    for (const mode of PAUSED) {
+      const res = await mpCreatePOST(post({ mode }));
+      expect(res.status, mode).toBe(409);
+      expect(await res.json()).toMatchObject({ error: 'STAKING_PAUSED' });
+    }
     expect(h.mpCreated).toEqual([]);
     const ok = await mpCreatePOST(post({ mode: 'threepoint' }));
     expect(ok.status).toBe(200);
     expect(h.mpCreated.map((a) => a.mode)).toEqual(['threepoint']);
   });
 
-  it('pass-and-play on dance: 409, no match recorded and no coins or shards; on soccer it records', async () => {
-    const res = await mpLocalPOST(post({ mode: 'dance', hostScore: 10, guestScore: 5, guestName: 'P2' }));
-    expect(res.status).toBe(409);
+  it('pass-and-play on paused modes: 409, no match recorded and no coins or shards; on soccer it records', async () => {
+    for (const mode of PAUSED) {
+      const res = await mpLocalPOST(post({ mode, hostScore: 10, guestScore: 5, guestName: 'P2' }));
+      expect(res.status, mode).toBe(409);
+    }
     expect(h.mpCreated).toEqual([]);
     const ok = await mpLocalPOST(post({ mode: 'soccer', hostScore: 3, guestScore: 1, guestName: 'P2' }));
     expect(ok.status).toBe(200);
@@ -444,16 +452,20 @@ describe('friend challenges (/multiplayer)', () => {
   // P1 review hole: accepting settles on the guest's ALL-TIME best, which own-song dance free play after the pause can
   // inflate to the 79,680 ceiling — the song-decides duel the pause exists to stop. Accepting is refused; nothing was
   // locked on a friend challenge, so the host's challenge just stays open (no row changes, no grants).
-  it('a dance challenge posted before the pause can no longer be accepted: 409, no settle, no grants; soccer still settles', async () => {
+  it('a challenge posted before the pause can no longer be accepted: 409, no settle, no grants; soccer still settles', async () => {
     h.mpMatches = [
       { id: 'mp-1', code: 'DANCE2', mode: 'dance', kind: 'online', status: 'open', hostId: OTHER, hostName: 'Rival', hostScore: 3000, guestId: null, guestScore: null },
-      { id: 'mp-2', code: 'SOCCR2', mode: 'soccer', kind: 'online', status: 'open', hostId: OTHER, hostName: 'Rival', hostScore: 1, guestId: null, guestScore: null },
+      { id: 'mp-2', code: 'DUNKD2', mode: 'dunkduel', kind: 'online', status: 'open', hostId: OTHER, hostName: 'Rival', hostScore: 0, guestId: null, guestScore: null },
+      { id: 'mp-3', code: 'SOCCR2', mode: 'soccer', kind: 'online', status: 'open', hostId: OTHER, hostName: 'Rival', hostScore: 1, guestId: null, guestScore: null },
     ];
     h.bestScores = { [USER]: 4200 };
-    const res = await mpJoinPOST(post({ code: 'DANCE2' }));
-    expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ error: 'staking_paused' });
+    for (const code of ['DANCE2', 'DUNKD2']) {
+      const res = await mpJoinPOST(post({ code }));
+      expect(res.status, code).toBe(409);
+      expect(await res.json()).toMatchObject({ error: 'staking_paused' });
+    }
     expect(h.mpMatches[0]).toMatchObject({ status: 'open', guestId: null });
+    expect(h.mpMatches[1]).toMatchObject({ status: 'open', guestId: null });
     expect(h.grants).toEqual([]);
     const ok = await mpJoinPOST(post({ code: 'SOCCR2' }));
     expect(ok.status).toBe(200);
@@ -462,7 +474,7 @@ describe('friend challenges (/multiplayer)', () => {
 
 describe('the dark real-money engine reads the same list', () => {
   it('create refuses dance before the eligibility lookup; a bounded unpaused mode gets past the gate', async () => {
-    for (const mode of PAUSED) {
+    for (const mode of ARENA_PAUSED) {
       const res = await compCreatePOST(post({ mode, matchType: 'SCORE_DUEL', entryFeeCents: 500 }));
       expect(res.status, mode).toBe(409);
       expect((await res.json()).error).toBe('STAKING_PAUSED');

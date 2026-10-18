@@ -5,7 +5,7 @@ import { readWallet } from '@/lib/wallet/wallet-service';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { ARENA_RAKE_PERCENT, ARENA_FEE_TIERS, arenaStakeableModes } from '@/lib/arena';
+import { ARENA_RAKE_PERCENT, ARENA_FEE_TIERS, ARENA_MODES, arenaStakeableModes } from '@/lib/arena';
 import { pausedStakeModes } from '@/lib/stakingPause';
 import { MODE_INFO } from '@/lib/game-data';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
@@ -30,7 +30,7 @@ export async function GET() {
   }
 
   // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): the lobby's mode picker offers only modes
-  // a NEW stake can be opened on. The paused ones (lib/stakingPause.ts) are named beside it rather than silently
+  // a NEW stake can be opened on. The paused Arena ones (lib/stakingPause.ts) are named beside it rather than silently
   // dropped, so a player looking for music or dance reads why; their open duels keep their links in /api/arena/list.
   // IRON-PARADISE-OUT (2026-10-03): a parked mode (lib/unlisted-modes.ts) is never offered for a NEW stake — its
   // /play route redirects, and a stake on a redirecting route is a trap. ARENA_MODES keeps the row (lib/arena.ts,
@@ -46,7 +46,7 @@ export async function GET() {
     rakePercent: ARENA_RAKE_PERCENT,
     feeTiers: ARENA_FEE_TIERS,
     modes,
-    pausedModes: pausedStakeModes(),
+    pausedModes: pausedStakeModes().filter((m) => ARENA_MODES.includes(m.key)),
     balance,
     authenticated: Boolean(userId),
   });

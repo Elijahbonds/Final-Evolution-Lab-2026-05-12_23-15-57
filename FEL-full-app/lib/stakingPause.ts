@@ -1,10 +1,10 @@
 /**
- * lib/stakingPause.ts — THE ONE LIST OF MODES THAT CANNOT BE STAKED RIGHT NOW (MUSIC-SUITE P1, 2026-09-25).
+ * lib/stakingPause.ts — THE ONE LIST OF MODES THAT CANNOT BE STAKED RIGHT NOW.
  *
  * Owner decision #9 (outbox/finish-release/musicsuite/DECISIONS.md, 2026-09-25): "pause staking both now". Music and
  * dance come out of the Arena (Quick Match, a posted duel, accepting someone's posted duel) and out of friend challenges
- * (the /multiplayer online challenge and its pass-and-play twin). Each comes back when its own fairness phase lands.
- * Free play is not touched: /play/music and /play/dance without ?arena= never read this file.
+ * (the /multiplayer online challenge and its pass-and-play twin). Later entries use the same guard when their current
+ * player-facing route cannot produce comparable challenge scores. Free play is not touched.
  *
  * WHY (the map's findings, understand-wf_3a55346f-032.json; music came back in phase 6, see the list below):
  *   · dance — the song you pick decides a staked duel, not the dancing. A flawless BATTLE run tops out at 4,355 against a
@@ -43,6 +43,9 @@ export const STAKING_PAUSED: ReadonlySet<string> = new Set<string>([
   // was in #46 (houseSong.ts, arenaDance.ts, ARENA_STAKE_CEILINGS, the music-attempt route) and is NOT in this tree; it was
   // proven on a fake Prisma only. Do not delete this line without that proof.
   'dance',
+  // Prove It is now the IRL camera route (/play/dunkduel), not the legacy GameShell duel. Friend challenges settle from
+  // GameSession best scores, so a Prove It challenge would compare 0 vs 0 until that scoring bridge exists.
+  'dunkduel',
 ]);
 
 /** Is a NEW stake or challenge on this mode refused right now? Takes any spelling a stored row or an old client may use. */
