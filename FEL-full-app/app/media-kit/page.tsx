@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import { formatUsd } from '@/lib/books/bookCatalog';
-import { AUDIENCE_STATS, MEDIA_KIT, mediaKitProfile } from '@/lib/creator/creatorCatalog';
+import {
+  AUDIENCE_STATS,
+  MEDIA_KIT,
+  mediaKitHighlightsForDisplay,
+  mediaKitProfile,
+  packageDetailForDisplay,
+  profileBioForDisplay,
+} from '@/lib/creator/creatorCatalog';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, ExampleBadge, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
 
@@ -11,19 +18,20 @@ export default async function MediaKitPage() {
   const viewer = await currentViewer();
   const profile = mediaKitProfile();
   const audience = AUDIENCE_STATS;
+  const highlights = mediaKitHighlightsForDisplay(MEDIA_KIT);
 
   return (
     <CreatorFrame
       signedIn={viewer.signedIn}
       title={<>Media <span className="text-[#F5C518]">kit</span></>}
-      lede="For brands and partners. Everything marked EXAMPLE is a placeholder until it is confirmed."
+      lede="For brands and partners. Numbers and rates marked EXAMPLE are unconfirmed until Elijah approves them."
     >
       <section className="mt-8 grid gap-6 md:grid-cols-[180px_1fr]">
         {profile ? <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} size="lg" /> : null}
         <div>
           <SectionTitle>Bio</SectionTitle>
           <p className="fel-heading mt-1 text-3xl text-white">{profile?.name ?? 'Final Evolution Lab'}</p>
-          <p className="mt-2 text-sm text-white/70">{profile?.bio ?? 'Bio placeholder.'}</p>
+          <p className="mt-2 text-sm text-white/70">{profileBioForDisplay(profile)}</p>
           <Link href="/work-with-us?source=media-kit" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
             Inquire
           </Link>
@@ -33,7 +41,7 @@ export default async function MediaKitPage() {
       <section className="mt-10">
         <SectionTitle>Highlights</SectionTitle>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-white/70">
-          {MEDIA_KIT.highlights.map((h) => <li key={h}>{h}</li>)}
+          {highlights.map((h) => <li key={h}>{h}</li>)}
         </ul>
       </section>
 
@@ -73,7 +81,7 @@ export default async function MediaKitPage() {
           {MEDIA_KIT.packages.map((p) => (
             <div key={p.id} className="rounded-xl border border-white/10 bg-[#141414] p-4">
               <p className="text-sm font-semibold text-white">{p.name}</p>
-              <p className="mt-1 text-xs text-white/50">{p.detail}</p>
+              <p className="mt-1 text-xs text-white/50">{packageDetailForDisplay(p)}</p>
               <p className="mt-2 text-sm text-white">
                 From {formatUsd(p.priceCents)}
                 {p.priceIsExample ? <ExampleBadge /> : null}

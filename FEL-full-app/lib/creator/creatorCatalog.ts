@@ -86,7 +86,7 @@ export interface AudienceStats {
   stats: Array<{ label: string; value: string }>;
 }
 
-export const EXAMPLE_RATE_NOTE = 'EXAMPLE — placeholder rate pending Elijah\'s decision. Not a live price.';
+export const EXAMPLE_RATE_NOTE = 'EXAMPLE — rate pending Elijah\'s decision. Not a live price.';
 
 export const AUDIENCE_STATS: AudienceStats = {
   isExample: true,
@@ -208,6 +208,36 @@ export function getApprovedProfile(slug: string): CreatorProfile | undefined {
 
 export function approvedServices(profile: CreatorProfile): CreatorService[] {
   return profile.approved ? profile.services.filter((s) => s.approved) : [];
+}
+
+const PLACEHOLDER_COPY_RE = /\b(?:bio|specialty|service description|package description|highlight|stat)\s+placeholder\b/i;
+
+export function isPlaceholderCopy(value: string): boolean {
+  return PLACEHOLDER_COPY_RE.test(value);
+}
+
+export function profileBioForDisplay(profile: CreatorProfile | undefined): string {
+  if (!profile || isPlaceholderCopy(profile.bio)) {
+    return 'Final Evolution Lab profile details are being confirmed. Use the inquiry links below for current booking, brand and collaboration requests.';
+  }
+  return profile.bio;
+}
+
+export function profileSpecialtyForDisplay(profile: CreatorProfile): string {
+  return isPlaceholderCopy(profile.specialty) ? 'Final Evolution Lab team profile' : profile.specialty;
+}
+
+export function serviceDescriptionForDisplay(service: CreatorService): string {
+  return isPlaceholderCopy(service.description) ? 'Details are confirmed in the coach store or through the inquiry form.' : service.description;
+}
+
+export function mediaKitHighlightsForDisplay(kit: MediaKit): string[] {
+  const confirmed = kit.highlights.filter((h) => !isPlaceholderCopy(h));
+  return confirmed.length > 0 ? confirmed : ['Brand, media and collaboration requests are reviewed through the inquiry form.'];
+}
+
+export function packageDetailForDisplay(pkg: MediaKitPackage): string {
+  return isPlaceholderCopy(pkg.detail) ? 'Scope and deliverables are confirmed through the inquiry form.' : pkg.detail;
 }
 
 /**

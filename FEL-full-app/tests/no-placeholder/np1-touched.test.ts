@@ -24,6 +24,9 @@ const FIXED = [
   'components/shell/venue-shelf.tsx',
   'app/coach/_components/coach-chat.tsx',
   'components/studio/studio-shell.tsx',
+  'app/team/[slug]/page.tsx',
+  'app/media-kit/page.tsx',
+  'components/creator-platform/creator-frame.tsx',
 ];
 
 describe('NP-1 placeholder language', () => {

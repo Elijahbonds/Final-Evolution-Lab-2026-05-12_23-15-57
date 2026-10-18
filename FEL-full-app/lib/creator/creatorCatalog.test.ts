@@ -7,6 +7,12 @@ import {
   approvedServices,
   coachStoreBookHref,
   getApprovedProfile,
+  isPlaceholderCopy,
+  mediaKitHighlightsForDisplay,
+  packageDetailForDisplay,
+  profileBioForDisplay,
+  profileSpecialtyForDisplay,
+  serviceDescriptionForDisplay,
 } from './creatorCatalog';
 
 describe('creator catalog', () => {
@@ -26,6 +32,20 @@ describe('creator catalog', () => {
     for (const pkg of MEDIA_KIT.packages) expect(pkg.priceIsExample, pkg.id).toBe(true);
     expect(MEDIA_KIT.partnersConfirmed).toBe(false);
     expect(AUDIENCE_STATS.isExample).toBe(true);
+  });
+
+  it('keeps raw example copy out of public profile and media-kit display strings', () => {
+    const profile = getApprovedProfile('elijah-bonds')!;
+    expect(isPlaceholderCopy(profile.bio)).toBe(true);
+    expect(profileBioForDisplay(profile)).not.toMatch(/placeholder/i);
+    expect(profileSpecialtyForDisplay(profile)).not.toMatch(/placeholder/i);
+    for (const service of approvedServices(profile)) {
+      expect(serviceDescriptionForDisplay(service)).not.toMatch(/placeholder/i);
+    }
+    expect(mediaKitHighlightsForDisplay(MEDIA_KIT).join(' ')).not.toMatch(/placeholder/i);
+    for (const pkg of MEDIA_KIT.packages) {
+      expect(packageDetailForDisplay(pkg)).not.toMatch(/placeholder/i);
+    }
   });
 
   it('lists services as information only: no price, no slot, nothing to buy here', () => {

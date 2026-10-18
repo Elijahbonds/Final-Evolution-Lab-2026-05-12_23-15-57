@@ -40,7 +40,7 @@ export function CreatorFrame({
           <Link href="/terms" className="hover:text-white/70">Terms</Link>
           <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
           <Link href="/support" className="hover:text-white/70">Support</Link>
-          <span>Profiles, rates and stats marked EXAMPLE are placeholders.</span>
+          <span>Profiles, rates and stats marked EXAMPLE are unconfirmed.</span>
         </footer>
       </main>
     </div>
@@ -63,7 +63,7 @@ export function ProfilePhoto({ name, photoUrl, size = 'md' }: { name: string; ph
   }
   const initials = name.split(/\s+/).map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
   return (
-    <div aria-label={`${name} (photo placeholder)`} className={`${box} fel-heading flex items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-[#1b1b1b] to-[#0c0c0c] text-[#F5C518]`}>
+    <div aria-label={`${name} initials`} className={`${box} fel-heading flex items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-[#1b1b1b] to-[#0c0c0c] text-[#F5C518]`}>
       {initials}
     </div>
   );
