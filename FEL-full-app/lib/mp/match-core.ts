@@ -77,7 +77,7 @@ export const MP_MODES: { key: string; label: string }[] = [
   // find nothing to stake it against. Their session keys are taken from what the hosts actually
   // post under, not guessed.
   { key: 'karate', label: 'The Hundred' },
-  { key: 'mixedcombat', label: 'Mixed Rules' },
+  { key: 'mixedcombat', label: "Ring's Edge" },
   { key: 'dunkduel', label: 'Prove It' },
   { key: 'who-scene-it', label: 'Spot the Scene' },
   // REVIVED 2026-09-13 — the four that came back into the nav. The multiplayer contract is that an ENABLED

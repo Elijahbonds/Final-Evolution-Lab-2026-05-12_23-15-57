@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { MP_MODES, MP_SESSION_MODE, sessionModeFor, isValidMpMode } from './match-core';
+import { MODE_INFO } from '../game-data';
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -61,5 +62,12 @@ describe('every challenge can settle', () => {
       expect(m.key).toMatch(/^[a-z0-9_-]+$/);
     }
     expect(new Set(MP_MODES.map((m) => m.key)).size).toBe(MP_MODES.length);
+  });
+
+  it('challenge labels match the catalogue names players see elsewhere', () => {
+    const wrong = MP_MODES
+      .filter((m) => MODE_INFO[sessionModeFor(m.key)]?.name !== m.label)
+      .map((m) => `${m.key}: challenge '${m.label}' vs catalogue '${MODE_INFO[sessionModeFor(m.key)]?.name ?? 'missing'}'`);
+    expect(wrong).toEqual([]);
   });
 });
