@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, Gem, PersonStanding, Shirt, Store, Target } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -10,6 +10,9 @@ import { readWallet } from '@/lib/wallet/wallet-service';
 import { prqScore, prqGrade } from '@/lib/prq';
 import { recoveryAsOf } from '@/lib/prq-recovery';
 import { gameVitals, ownedFromEntitlements } from '@/lib/cards/boosts';
+import { buildStatus, biggestMovers, type AthleteStatus } from '@/lib/profile/dashboard';
+import { loadSharedProfile } from '@/lib/profile/profileServer';
+import { PLATFORM_PROTOCOLS } from '@/lib/profile/protocol';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileView } from '@/components/profile-view';
@@ -31,12 +34,13 @@ export default async function ProfilePage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!session) redirect(loginPath('/profile'));
 
-  const [profile, entitlements, wallet] = await Promise.all([
+  const [profile, entitlements, wallet, sharedProfile] = await Promise.all([
     me ? prisma.playerProfile.findUnique({ where: { userId: me } }).catch(() => null) : null,
     me ? prisma.playerEntitlement.findMany({ where: { playerId: me }, select: { skuId: true } }).catch(() => []) : [],
     // The SHARDS THAT BUY are the wallet's, not PlayerProfile.shards. Two fields carry that name and only this one
     // is what spend() decrements -- showing the other would price the shelf against a balance nobody can spend.
     me ? readWallet(prisma, me).catch(() => null) : null,
+    me ? loadSharedProfile(prisma, me).catch(() => null) : null,
   ]);
 
   // MIRROR-COACH P9 fix (2026-09-30): recovery as of now (its half-life runs only inside a settle; this page reads the
@@ -47,6 +51,7 @@ export default async function ProfilePage() {
   // The grade an athlete IS graded at is the measured one. CARD-SAFE-2: cards are cosmetic, so there is no lift to show.
   const grade = prqGrade(vitals.base);
   const shards = wallet?.shards ?? 0;
+  const athleteStatus = sharedProfile ? buildStatus(sharedProfile, PLATFORM_PROTOCOLS) : null;
 
   const shortcuts = [
     // HOTFIX (2026-09-24): the athlete creator shipped with no link anywhere -- reachable only by typing
@@ -97,6 +102,8 @@ export default async function ProfilePage() {
 
       <ProfileView userName={session.user?.name ?? 'Athlete'} email={session.user?.email ?? ''} />
 
+      {athleteStatus && <AthleteStatusCard status={athleteStatus} />}
+
       <BoostShelf shards={shards} owned={owned} />
 
       <section className="mt-10">
@@ -117,5 +124,92 @@ export default async function ProfilePage() {
       <div className="mt-8"><MotionSetting /></div>
       <DoorsRow tab="profile" hide={isCoachStoreEnabled() ? [] : ['/account/bookings']} />
     </TabPage>
+  );
+}
+
+function AthleteStatusCard({ status }: { status: AthleteStatus }) {
+  const movers = biggestMovers(status);
+  const score = status.composite === null ? 'Scan needed' : Math.round(status.composite).toString();
+  const scanAge = status.scanAgeDays === null ? 'No scan yet' : status.scanAgeDays === 0 ? 'Scanned today' : `${status.scanAgeDays}d since scan`;
+  const nextBody = (
+    <>
+      <span>{status.next.text}</span>
+      {status.next.href && <ArrowRight className="h-4 w-4" />}
+    </>
+  );
+
+  return (
+    <section className="mt-8 rounded-2xl border border-[#00E5FF]/20 bg-[#00E5FF]/[0.04] p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#00E5FF]/70">Athlete status</p>
+          <h2 className="fel-heading mt-1 text-[22px] font-black text-white">What to do next</h2>
+          <p className="mt-1 text-sm text-white/55">A live read of your scan history, Academy progress, and open protocols.</p>
+        </div>
+        <div className="grid min-w-[220px] grid-cols-2 gap-2 text-right">
+          <StatusMetric label="PRQ" value={score} />
+          <StatusMetric label="Scan" value={scanAge} />
+          <StatusMetric label="Academy" value={`${status.modulesCompleted} done`} />
+          <StatusMetric label="Protocols" value={`${status.openProtocols}/${status.totalProtocols} open`} />
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1.35fr_1fr]">
+        <div className="rounded-xl border border-white/10 bg-black/25 p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-white">
+            <Target className="h-4 w-4 text-[#FFD700]" /> Lead action
+          </div>
+          {status.next.href ? (
+            <Link
+              href={status.next.href}
+              className="mt-3 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#FFD700] px-4 py-2 text-sm font-black text-black transition-transform hover:scale-[1.01]"
+            >
+              {nextBody}
+            </Link>
+          ) : (
+            <p className="mt-3 text-sm text-white/70">{status.next.text}</p>
+          )}
+          {status.nextUnlock && (
+            <p className="mt-3 text-xs text-white/45">
+              Closest unlock: <span className="text-white/65">{status.nextUnlock.title}</span> needs {status.nextUnlock.need}.
+            </p>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-white/10 bg-black/25 p-4">
+          <div className="flex items-center gap-2 text-sm font-bold text-white">
+            <Activity className="h-4 w-4 text-[#00FF9D]" /> Movement
+          </div>
+          {movers.length ? (
+            <div className="mt-3 space-y-2">
+              {movers.map((m) => (
+                <div key={m.axis} className="flex items-center justify-between rounded-lg bg-white/[0.03] px-3 py-2 text-sm">
+                  <span className="capitalize text-white/65">{m.axis}</span>
+                  <span className={`font-mono font-bold ${m.delta > 0 ? 'text-[#00FF9D]' : 'text-[#FF7A2F]'}`}>
+                    {m.delta > 0 ? '+' : ''}{m.delta}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-white/55">{status.shift.label}</p>
+          )}
+          {status.gaps.length > 0 && (
+            <p className="mt-3 text-xs text-white/40">
+              Missing measurements: {status.gaps.slice(0, 3).join(', ')}{status.gaps.length > 3 ? '...' : ''}.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function StatusMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
+      <p className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-white/35">{label}</p>
+      <p className="mt-1 text-sm font-black text-white">{value}</p>
+    </div>
   );
 }

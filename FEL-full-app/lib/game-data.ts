@@ -1,5 +1,5 @@
 import { CARD_CATALOG } from './card-catalog';
-import { isUnlistedMode } from './unlisted-modes';
+import { isUnlistedMode } from './unlisted-mode-ids';
 
 export interface Venue {
   key: string;
