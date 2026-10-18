@@ -71,6 +71,11 @@ describe('a win, revealed (reduced motion: instant)', () => {
   it('no confetti under reduced motion', () => {
     expect(h).not.toContain('data-end-confetti');
   });
+  it('keeps the non-reduced beat timing without Tailwind ambiguous arbitrary easing', () => {
+    const animated = html({ reducedMotion: false });
+    expect(animated).toContain('transition-timing-function:cubic-bezier(0.2,1.4,0.4,1)');
+    expect(animated).not.toContain('ease-[cubic-bezier');
+  });
 });
 
 describe('a beaten personal best', () => {
