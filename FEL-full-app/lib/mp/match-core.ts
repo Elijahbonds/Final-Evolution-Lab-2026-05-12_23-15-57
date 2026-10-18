@@ -73,15 +73,16 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'carnival', label: 'Game Night' },
   { key: 'volleyball', label: 'Beach Rally' },
   { key: 'dance', label: 'The Cypher' },
-  // 2026-09-12: four ENABLED modes had no challenge at all, so a player could finish a run and
-  // find nothing to stake it against. Their session keys are taken from what the hosts actually
-  // post under, not guessed.
+  // 2026-09-12: enabled score modes had no challenge at all, so a player could finish a GameShell run
+  // and find nothing to stake it against. Their session keys are taken from what the hosts actually
+  // post under, not guessed; non-GameShell camera flows stay out until they implement the same handoff.
   { key: 'karate', label: 'The Hundred' },
   { key: 'mixedcombat', label: 'Mixed Rules' },
-  { key: 'dunkduel', label: 'Prove It' },
+  // Prove It (/play/dunkduel) is the IRL camera flow and does not mount GameShell or honor ?c= yet.
+  // Keep its Babylon mode in the registry/dev harness, but do not offer it as an async score challenge.
   { key: 'who-scene-it', label: 'Spot the Scene' },
   // REVIVED 2026-09-13 — the four that came back into the nav. The multiplayer contract is that an ENABLED
-  // mode can always be staked against; a mode you can finish with nothing to challenge is a dead end, and
+  // GameShell score mode can be staked against; a mode you can finish with nothing to challenge is a dead end, and
   // the contract test caught these the moment they were re-enabled. Still stakeable, no longer first (QA P1-27), and
   // the sprint carries its mode's name.
   { key: 'sprint', label: 'Beach Sprint' },

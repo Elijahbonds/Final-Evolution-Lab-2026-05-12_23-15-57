@@ -12,6 +12,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { MP_MODES, MP_SESSION_MODE, sessionModeFor, isValidMpMode } from './match-core';
+import { challengePlayHref } from '../social/challenge-routes';
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -61,5 +62,10 @@ describe('every challenge can settle', () => {
       expect(m.key).toMatch(/^[a-z0-9_-]+$/);
     }
     expect(new Set(MP_MODES.map((m) => m.key)).size).toBe(MP_MODES.length);
+  });
+
+  it('Prove It is not advertised as an async challenge until its live route handles challenge handoff', () => {
+    expect(MP_MODES.map((m) => m.key)).not.toContain('dunkduel');
+    expect(challengePlayHref('dunkduel', 'DD-7')).toBeNull();
   });
 });
