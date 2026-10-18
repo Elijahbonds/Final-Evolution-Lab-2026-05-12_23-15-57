@@ -45,6 +45,16 @@ describe('NP-1 placeholder language', () => {
     expect(src).not.toContain("'Coming soon'");
   });
 
+  it('the Create hub and preview do not label unwired consumers as soon', () => {
+    for (const f of [
+      'components/creator/creative-hub.tsx',
+      'components/create/guided-flow.tsx',
+      'lib/create/disciplines.ts',
+    ]) {
+      expect(readFileSync(f, 'utf8')).not.toMatch(/\bsoon\b/i);
+    }
+  });
+
   it('an unbuilt program lane is a 404, not a "coming soon" page', () => {
     expect(readFileSync('app/coach/[slug]/programs/[lane]/page.tsx', 'utf8')).toContain('if (coming) notFound();');
   });

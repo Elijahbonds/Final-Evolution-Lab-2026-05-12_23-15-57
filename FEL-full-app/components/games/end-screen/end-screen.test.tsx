@@ -5,6 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { readFileSync } from 'node:fs';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: () => {} }) }));
 
@@ -70,6 +71,12 @@ describe('a win, revealed (reduced motion: instant)', () => {
   });
   it('no confetti under reduced motion', () => {
     expect(h).not.toContain('data-end-confetti');
+  });
+  it('keeps the beat reveal curve out of Tailwind arbitrary classes', () => {
+    const src = readFileSync('components/games/end-screen/end-screen.tsx', 'utf8');
+    const forbiddenClass = 'ease-' + '[cubic-bezier(0.2,1.4,0.4,1)]';
+    expect(src).not.toContain(forbiddenClass);
+    expect(src).toContain("transitionTimingFunction: 'cubic-bezier(0.2,1.4,0.4,1)'");
   });
 });
 
