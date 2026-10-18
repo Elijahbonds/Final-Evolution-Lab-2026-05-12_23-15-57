@@ -50,6 +50,7 @@ const matchesWhere = (where: Row): Row[] => h.matches.filter((m) => {
   if (where.player1Id?.not && m.player1Id === where.player1Id.not) return false;
   if (typeof where.player1Id === 'string' && m.player1Id !== where.player1Id) return false;
   if (where.mode?.in && !where.mode.in.includes(m.mode)) return false;
+  if (where.mode?.notIn && where.mode.notIn.includes(m.mode)) return false;
   if (where.OR) return where.OR.some((c: Row) => Object.entries(c).every(([k, v]) => m[k] === v));
   return true;
 });
@@ -401,6 +402,31 @@ describe('the Arena lobby', () => {
     ];
     const body = await (await listGET()).json();
     expect(body.open.map((d: Row) => d.id)).toEqual(['open-music']);
+  });
+
+  it('filters parked/paused open rows before the open challenge cap, so joinable duels are not crowded out', async () => {
+    const later = new Date(Date.now() + 60_000);
+    const parked = Array.from({ length: 45 }, (_, i) => duel({
+      id: `parked-${i}`,
+      mode: i % 2 === 0 ? 'training' : 'dance',
+      status: 'WAITING',
+      matchType: 'SCORE_DUEL',
+      player1Id: OTHER,
+      player2Id: null,
+      expiresAt: later,
+    }));
+    const joinable = duel({
+      id: 'joinable-music',
+      mode: 'music',
+      status: 'WAITING',
+      matchType: 'SCORE_DUEL',
+      player1Id: OTHER,
+      player2Id: null,
+      expiresAt: later,
+    });
+    h.matches = [...parked, joinable];
+    const body = await (await listGET()).json();
+    expect(body.open.map((d: Row) => d.id)).toEqual(['joinable-music']);
   });
 
   it('marks my old parked duels so the lobby does not offer a PLAY link into a redirect', async () => {

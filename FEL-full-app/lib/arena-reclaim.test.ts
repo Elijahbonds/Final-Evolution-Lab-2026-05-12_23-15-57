@@ -42,6 +42,7 @@ const h = vi.hoisted(() => {
     if (c instanceof Date) return v instanceof Date && v.getTime() === c.getTime();
     if (c && typeof c === 'object') {
       if ('in' in c) return c.in.includes(v);
+      if ('notIn' in c) return !c.notIn.includes(v);
       if ('contains' in c) return typeof v === 'string' && v.includes(c.contains);
       if ('not' in c) return c.not === null ? v !== null && v !== undefined : v !== c.not;
       const t = v === null || v === undefined ? NaN : new Date(v as string).getTime();

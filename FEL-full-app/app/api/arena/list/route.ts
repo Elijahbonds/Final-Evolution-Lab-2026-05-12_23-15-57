@@ -41,12 +41,19 @@ export async function GET() {
   // creator's CANCEL is the only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels.
   // A WAITING duel's updatedAt is its creation time, so after 25 newer duels it would drop off the list with its CANCEL.
   // Fetch those stranded WAITING duels on their own and always list them.
-  const strandedWaitingKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), 'musicAcademy', ...UNLISTED_MODES]));
+  const blockedOpenKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), ...UNLISTED_MODES]));
+  const strandedWaitingKeys = Array.from(new Set([...blockedOpenKeys, 'musicAcademy']));
   const [openRaw, mineRecent, mineStranded] = await Promise.all([
     // MUSIC-SUITE P6: a posted duel past its expiry is not an open challenge — /api/arena/join refuses it (409 EXPIRED)
     // and the next sweep refunds its creator.
     prisma.competitionMatch.findMany({
-      where: { currency: 'LC', status: 'WAITING', player1Id: { not: userId }, expiresAt: { gt: now } },
+      where: {
+        currency: 'LC',
+        status: 'WAITING',
+        player1Id: { not: userId },
+        expiresAt: { gt: now },
+        mode: { notIn: blockedOpenKeys },
+      },
       orderBy: { createdAt: 'desc' },
       take: 40,
     }),
