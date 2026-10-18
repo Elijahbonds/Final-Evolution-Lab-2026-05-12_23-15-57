@@ -176,4 +176,11 @@ describe('the doors', () => {
   it('gives every tab some depth', () => {
     for (const t of TABS) expect(DOORS.filter((d) => d.tab === t.id).length, t.id).toBeGreaterThan(2);
   });
+
+  it('labels preview or social rooms without overstating shipped gameplay', () => {
+    const labelFor = (href: string) => DOORS.find((d) => d.href === href)?.label;
+    expect(labelFor('/party')).toBe('Party chat');
+    expect(labelFor('/live')).toBe('Program guide');
+    expect(labelFor('/create')).toBe('Create');
+  });
 });

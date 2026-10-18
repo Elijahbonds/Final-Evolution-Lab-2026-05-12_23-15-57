@@ -21,7 +21,7 @@ export const VENUES: Venue[] = [
   { key: 'soccerstadium', name: 'Coastal FC Stadium', image: '/venues/soccerstadium.jpg', modes: ['Twelve Yards'], playable: true, href: '/play/soccer' },
   { key: 'baseballpark', name: 'Catalina Ballpark', image: '/venues/baseballpark.jpg', modes: ['Moonshot Derby'], playable: true, href: '/play/baseball' },
   { key: 'gridiron', name: 'The Gridiron', image: '', modes: ['Breakaway'], playable: true, href: '/play/football' },
-  { key: 'lumaveniceshop', name: 'Luma Venice Shop', image: '/venues/lumaveniceshop.jpg', modes: ['Market Browse'], playable: true, href: '/shop' },
+  { key: 'lumaveniceshop', name: 'Luma Venice Shop', image: '/venues/lumaveniceshop.jpg', modes: ['Market Browse'], playable: false },
   { key: 'courtcarnival', name: 'Court Carnival', image: '/venues/courtcarnival.jpg', modes: ['Slam Rush', 'Strike Storm', 'Trick Gauntlet', 'Hot Shot', 'Coin Storm', 'Counter Strike', '+ mini-game night'], playable: true, href: '/play/carnival' },
   { key: 'octagon', name: 'The Octagon', image: '', modes: ["Ring's Edge"], playable: true, href: '/play/mixedcombat' },
   // 'duelarena' (Weapon Duel) RETIRED from the v1 roster (owner, 2026-09-01:

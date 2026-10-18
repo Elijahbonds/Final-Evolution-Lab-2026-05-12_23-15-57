@@ -92,4 +92,10 @@ describe('creator platform boundaries (PR #18 slimmed down, owner 2026-10-13)', 
     expect(page).toContain('INQUIRIES_UNAVAILABLE_MESSAGE');
     expect(page).not.toMatch(/\{true \? \(/);
   });
+
+  it('public team profiles do not render literal placeholder copy for missing links', () => {
+    const profile = readFileSync('app/team/[slug]/page.tsx', 'utf8');
+    expect(profile).not.toMatch(/placeholder/i);
+    expect(profile).toContain('profile.reels.length > 0 || profile.socials.length > 0');
+  });
 });
