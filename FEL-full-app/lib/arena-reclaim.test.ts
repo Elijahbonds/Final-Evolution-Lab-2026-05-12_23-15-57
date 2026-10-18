@@ -645,6 +645,7 @@ describe('the lobby row (components/arena-view.tsx) — "expired — refunded", 
     expect(duelRowView({ ...base, status: 'SETTLED', expired: 'won_by_forfeit' }, at)).toMatchObject({ meta: { label: 'Won by forfeit' }, playable: false });
     expect(duelRowView({ ...base, status: 'SETTLED', expired: 'lost_by_forfeit' }, at).meta.label).toBe('Expired — forfeited');
     expect(duelRowView({ ...base, expiresAt: past().toISOString(), pastExpiry: true }, at)).toMatchObject({ meta: { label: 'Expired — settling' }, playable: false, left: null });
+    expect(duelRowView({ ...base, unlistedMode: true }, at)).toMatchObject({ meta: { label: 'Mode parked' }, playable: false, left: '5h left' });
     // a cancel or a tie keeps the plain label; a row from an older server (no expiry fields) is exactly what it was
     expect(duelRowView({ ...base, status: 'VOIDED' }, at).meta.label).toBe('Refunded');
     expect(duelRowView({ status: 'ACTIVE', mySubmitted: false }, at)).toMatchObject({ meta: { label: 'Live — play your round' }, playable: true, left: null });

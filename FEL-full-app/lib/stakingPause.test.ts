@@ -403,6 +403,17 @@ describe('the Arena lobby', () => {
     expect(body.open.map((d: Row) => d.id)).toEqual(['open-music']);
   });
 
+  it('marks my old parked duels so the lobby does not offer a PLAY link into a redirect', async () => {
+    h.matches = [
+      duel({ id: 'mine-training', mode: 'training', status: 'ACTIVE', matchType: 'SCORE_DUEL', player1Id: USER, player2Id: OTHER, expiresAt: new Date(Date.now() + 60_000) }),
+      duel({ id: 'mine-music', mode: 'music', status: 'ACTIVE', matchType: 'SCORE_DUEL', player1Id: USER, player2Id: OTHER, expiresAt: new Date(Date.now() + 60_000) }),
+    ];
+    const body = await (await listGET()).json();
+    const mine = Object.fromEntries(body.mine.map((d: Row) => [d.id, d]));
+    expect(mine['mine-training']).toMatchObject({ mode: 'training', href: '/play/training', unlistedMode: true });
+    expect(mine['mine-music']).toMatchObject({ mode: 'music', href: '/play/music', unlistedMode: false });
+  });
+
   it('does not advertise a paused duel nobody can accept, and keeps mine with its PLAY link and a paused flag', async () => {
     h.matches = [
       duel({ id: 'open-dance', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null }),

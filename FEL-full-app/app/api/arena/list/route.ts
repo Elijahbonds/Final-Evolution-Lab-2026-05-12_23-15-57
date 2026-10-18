@@ -169,6 +169,9 @@ export async function GET() {
       // MUSIC-SUITE P1: a duel on a paused mode. An ACTIVE one still plays and settles; a WAITING one can only be
       // cancelled (and refunded), because nobody can join it — the lobby says so on the row.
       stakingPaused: isStakingPaused(m.mode),
+      // IRON-PARADISE-OUT: an old duel on a parked mode remains visible/history-readable, but the UI must not offer a
+      // PLAY link into a route that now redirects away from the game.
+      unlistedMode: isUnlistedMode(arenaModeKey(m.mode)),
       // MUSIC-SUITE P6 (owner decision #30): when the duel lapses, and — once a reclaim closed it — how: 'refunded' (nobody
       // played, every stake back), 'won_by_forfeit' / 'lost_by_forfeit' (one side played). `pastExpiry` is an open duel
       // whose deadline passed and that this read did not get to: it cannot be played (submit-score 409 EXPIRED), and the
