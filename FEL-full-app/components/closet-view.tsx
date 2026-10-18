@@ -1052,6 +1052,7 @@ function Group({ title, soon = false, children }: { title: string; soon?: boolea
       <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-white/80">
         <Palette className="h-3.5 w-3.5 text-cyan-400" /> {title}
       </h3>
+      {soon ? <p className="mb-2 text-[10px] text-white/35">Saved with your look; 3D shape not on body yet.</p> : null}
       {children}
     </div>
   );

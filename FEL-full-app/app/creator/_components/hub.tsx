@@ -1,9 +1,9 @@
 import Link from 'next/link';
 import { Music, Mic, Zap, Palette, Dumbbell, ArrowRight, Lock, Clapperboard, ChefHat, Shirt, PenLine } from 'lucide-react';
 
-// Creator Hub — the five disciplines. Each tile routes to a real, playable
-// surface. Art has no painter yet (the M76 card/paint editor is deferred), so
-// it is honestly marked "coming soon" rather than linking to a dead route.
+// Creator Hub — visible disciplines route to real, playable surfaces. Art has no
+// painter yet (the M76 card/paint editor is deferred), so it stays hidden until
+// the paint studio ships instead of linking to a dead route.
 
 const BG = '#050505';
 
