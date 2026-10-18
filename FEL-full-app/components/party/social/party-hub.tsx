@@ -12,6 +12,22 @@ import { cleanPlayerName, recallPlayerName, rememberPlayerName, PLAYER_NAME_MAX 
 import { useParty } from './use-party';
 import { InviteBlock } from './party-bits';
 
+export function LocalPartyFallback() {
+  return (
+    <section data-testid="party-local-fallback" className="space-y-3 rounded-xl bg-white/[0.06] p-4 text-sm text-white/70">
+      <p role="status">
+        Online parties aren&apos;t switched on here yet. Everything else works as usual.
+      </p>
+      <p>
+        Want to play with friends now? Use the local party room for same-screen games with phones as controllers.
+      </p>
+      <Link href="/play/party" className="inline-flex rounded-xl bg-[#00E5FF] px-4 py-2 font-bold text-black">
+        Open local party room
+      </Link>
+    </section>
+  );
+}
+
 export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
   const s = useParty();
   const [name, setName] = useState('');
@@ -49,7 +65,7 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
       </div>
 
       {s.status === 'unavailable' ? (
-        <p role="status" data-testid="party-unavailable" className="rounded-xl bg-white/[0.06] p-4 text-sm text-white/70">Parties aren&apos;t switched on here yet. Everything else works as usual.</p>
+        <LocalPartyFallback />
       ) : s.status === 'outdated' ? (
         <p role="status" data-testid="party-outdated" className="rounded-xl bg-amber-400/10 p-4 text-sm text-amber-200">Parties need a server update. Everything else works as usual.</p>
       ) : inParty(s) ? (
