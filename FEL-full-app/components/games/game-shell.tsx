@@ -23,6 +23,7 @@ import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
+import { ThreeDErrorBoundary } from '@/lib/babylon/error-boundary';
 import { isPlayedRun } from './played-evidence';
 import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
@@ -774,7 +775,9 @@ function GameShellInner({
         )}
         {profile ? (
           <ReplayInPlaceContext.Provider value={registerReplay}>
-            <Game key={gameKey} grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+            <ThreeDErrorBoundary key={gameKey}>
+              <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+            </ThreeDErrorBoundary>
           </ReplayInPlaceContext.Provider>
         ) : !unreachable ? (
           <div className="flex h-[60vh] items-center justify-center">
