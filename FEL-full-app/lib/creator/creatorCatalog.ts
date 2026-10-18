@@ -86,7 +86,7 @@ export interface AudienceStats {
   stats: Array<{ label: string; value: string }>;
 }
 
-export const EXAMPLE_RATE_NOTE = 'EXAMPLE — placeholder rate pending Elijah\'s decision. Not a live price.';
+export const EXAMPLE_RATE_NOTE = 'EXAMPLE — rate pending Elijah\'s decision. Not a live price.';
 
 export const AUDIENCE_STATS: AudienceStats = {
   isExample: true,

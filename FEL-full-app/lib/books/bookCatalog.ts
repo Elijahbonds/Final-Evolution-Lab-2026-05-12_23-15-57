@@ -78,7 +78,7 @@ export const EXAMPLE_EBOOK_CENTS = 999;
 export const EXAMPLE_AUDIO_CENTS = 1499;
 export const EXAMPLE_BUNDLE_CENTS = 1999;
 
-export const EXAMPLE_PRICE_NOTE = 'EXAMPLE — placeholder pending Elijah\'s decision. Not a live price.';
+export const EXAMPLE_PRICE_NOTE = 'EXAMPLE — price pending Elijah\'s decision. Not a live price.';
 
 export const AMAZON_AUTHOR_URL = 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B';
 

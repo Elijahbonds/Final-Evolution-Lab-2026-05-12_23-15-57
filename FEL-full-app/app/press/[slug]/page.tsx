@@ -10,6 +10,7 @@ import { PressFrame } from '@/components/press/press-frame';
 import { BookCover } from '@/components/press/book-cover';
 import { KindleLink, OfferCard } from '@/components/press/offer-card';
 import { AudioPlayer } from '@/components/press/audio-player';
+import { publicCopy } from '@/lib/publicCopy';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,9 +74,9 @@ export default async function BookPage({
           {book.eyebrow ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.eyebrow}</p> : null}
           {book.track ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.track}</p> : null}
           <h2 className="fel-heading text-4xl text-white">{book.title}</h2>
-          <p className="mt-2 text-sm text-white/60">{book.description}</p>
+          <p className="mt-2 text-sm text-white/60">{publicCopy(book.description, 'Book description is being confirmed.')}</p>
           {book.chaptersArePlaceholder ? (
-            <p className="mt-2 text-[11px] text-white/35">Chapter list is a placeholder until the audio masters are uploaded.</p>
+            <p className="mt-2 text-[11px] text-white/35">Audio chapter titles will update when masters are uploaded.</p>
           ) : null}
         </div>
       </div>
