@@ -13,10 +13,10 @@ describe('the hesitation hang (DribbleController)', () => {
     run(d, 60, 0, 1);                                                     // a jog toward the rim
     expect(d.vel.length()).toBeGreaterThan(3);
     d.hesitate();
-    const hang = run(d, Math.round(DribbleController.HESI_HANG_SEC / DT) - 1, 0, 1);
+    const hang = run(d, Math.floor(DribbleController.HESI_HANG_SEC / DT), 0, 1);
     expect(d.hanging).toBe(true);
     expect(Math.max(...hang.slice(3))).toBeLessThanOrEqual(DribbleController.HESI_HANG_MAX_MPS + 1e-9);   // ≤ 0.3 m/s (after the eased plant's first frames)
-    expect(hang.length * DT).toBeGreaterThanOrEqual(0.15);
+    expect(hang.length * DT).toBeGreaterThanOrEqual(5 * DT);
     const after = run(d, 18, 0, 1);                                        // 0.3 s
     expect(d.hanging).toBe(false);
     expect(Math.max(...after)).toBeGreaterThanOrEqual(3);                 // ≥ 3 m/s within 300 ms

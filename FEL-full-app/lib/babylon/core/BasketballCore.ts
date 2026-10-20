@@ -234,10 +234,10 @@ export class DribbleController {
    * — with the stick still forward, the pause lasted ONE frame; the left-stick tap's pull-then-push wrote the explode on the same
    * frame. Both now enter one hang: for HESI_HANG_SEC the body is held at ≤ HESI_HANG_MAX_MPS and the stick moves nothing; the
    * latest forward push inside it is REMEMBERED and the explode leaves on the hang's last frame. The explode window counts from
-   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.18 s later than it was — that pause IS
+   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.09 s later than it was — that pause IS
    * the hesitation the defender bites on.
    */
-  static readonly HESI_HANG_SEC = 0.18;
+  static readonly HESI_HANG_SEC = 0.09;
   static readonly HESI_HANG_MAX_MPS = 0.3;
   private hangLeft = 0;
   private hangPush: Vector3 | null = null;
