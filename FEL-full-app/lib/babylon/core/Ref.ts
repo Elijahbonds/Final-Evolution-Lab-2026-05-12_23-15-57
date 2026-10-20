@@ -313,20 +313,17 @@ export function possessionAfterScore(format: ScoringFormat, scorer: Side): Side 
 }
 
 /**
- * Free throws are NOT implemented in this build, in either mode.
+ * Free throws ARE implemented (lane/hoops-shot-content, owner 2026-10-20), in 1v1 and 3v3.
  *
- * The handbook carries `shots` because a rulebook should say what a foul is worth, and `judge()` returns
- * it — but nothing has ever read it. Both modes play a pickup format (first to 11 / first to 21,
- * make-it-take-it or alternating) where a foul is answered with the ball rather than with free throws, so
- * that is what they do: an and-one keeps the basket and the possession, a foul on a miss hands the ball
- * back. That is correct for the format and it is the reason nobody noticed `shots` going unread.
- *
- * This flag exists so the gap is stated rather than implied. A mode that starts honouring `Call.shots`
- * should flip it, and the test that pins this should be updated in the same commit.
+ * Until then both modes answered a shooting foul with the ball alone and `Call.shots` was read by nobody. Now a foul on the hero's
+ * shot sends him to the line: `core/FreeThrows.freeThrowsFor` turns this call into the trip (two shots, three on a fouled three,
+ * one on an and-one), `core/FreeThrowLine` runs it as a dead ball, and after the last shot the ball goes where `judge()` already
+ * sent it — the fouled team. `foulAward` below says 'shots' for a shooting foul and an and-one; every other foul is still the ball.
+ * (Was `false` with the test pinning it; flipped with that test in the same commit, as this comment asked.)
  */
-export const FREE_THROWS_IMPLEMENTED = false;
+export const FREE_THROWS_IMPLEMENTED = true;
 
-/** What a foul is actually worth today: possession, not shots. */
+/** What a foul is actually worth today: shots for a shooting foul / an and-one (then the ball), the ball for everything else. */
 export function foulAward(call: Call): 'ball_back' | 'shots' {
   return FREE_THROWS_IMPLEMENTED && call.shots > 0 ? 'shots' : 'ball_back';
 }
