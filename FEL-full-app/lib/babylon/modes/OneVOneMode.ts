@@ -121,7 +121,8 @@ import {
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10PHASE-2 phase 8: the tip-in
-import { attachBallToHand, gatherBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
+import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
+import { dunkMissVelocity, dunkVerdict } from '../core/RimForAll';   // lane/hoops-shot-core: dunks on the rim (clankOffRim retired here)
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
 import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves
 import { findBone } from '../anim/boneLookup';
@@ -2553,7 +2554,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       : null;
     if (glassDunk) { releaseBall(ball); bannerFlash(ctx, 'OFF THE GLASS!', 700); console.info('[1V1-GLASS] off-the-backboard dunk armed'); }
     console.info(`[1V1-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)}`);
-    let made = Math.random() < c.pct;
+    const dunkV = dunkVerdict(RIM, from, c.pct, c.contested ? 1 : 0); let made = dunkV.made;   // lane/hoops-shot-core: the RING decides the dunk (RimForAll), the rate kept — was `Math.random() < pct`
     let swatted = false;
     // DUNK-FANATIC (2026-09-17): the rim hang (a poster / a timed flush holds the body on the iron) and the RIM PROTECTOR —
     // the AI never left the floor against a dunk (a hand up, a roll at the bump); now a defender inside range jumps to MEET
@@ -2769,7 +2770,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         resolved = true; released = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
-        else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
+        else { missClank(ctx); launchLoose(releasePos, dunkMissVelocity(dunkV, from, RIM)); }   // lane/hoops-shot-core: the miss bounces off the iron where the ring's error put it
         hangLeft = hangWanted(made, kind, showtimeJudge, picked.flashy);   // DUNK-FANATIC
         meter3d?.end(made ? 'good' : 'brick');   // (a timed flush / a trick already stamped its own verdict — end() keeps the first)
       }
@@ -3797,7 +3798,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
     const ground = groundContest(distXZ(me.root.position, foe.root.position), facingCos(me.root.rotation.y, me.root.position, foe.root.position), meHandUp);
     const contest = Math.min(1, contestLevel(foe.root.position, me.root.position) * 0.5 + ground + (myJumpAge <= HAND_UP_SEC ? 0.3 : 0));
-    let made = Math.random() < contestedPct(c.pct, contest);
+    const dunkVF = dunkVerdict(RIM, from, contestedPct(c.pct, contest), contest); let made = dunkVF.made;   // lane/hoops-shot-core: the RING decides the dunk (RimForAll), the rate kept — was `Math.random() < pct`
     let swatted = false, bumped = false, resolved = false;
     defContest = contest;
     // ANIM CLEAN-UP (2026-09-18): the rival's dunk goes through the same picker as mine (it played the one power launch
@@ -3857,7 +3858,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: inLane ? 'poster' : 'dunk' };
-        else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
+        else { missClank(ctx); launchLoose(releasePos, dunkMissVelocity(dunkVF, from, RIM)); }   // lane/hoops-shot-core: the miss bounces off the iron where the ring's error put it
       }
       if (k < 1) return;
       foeFlightTick = null;   // IMPROVE (2026-10-06) #5
