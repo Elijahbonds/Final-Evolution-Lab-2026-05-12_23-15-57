@@ -692,37 +692,43 @@ function GameShellInner({
       {/* Sideways on a phone, the header is a fifth of the screen spent on a back link. It goes; the way out
           lives on the stage instead, where a thumb already is. */}
       <header data-game-chrome className={`sticky top-0 z-40 border-b border-white/10 bg-[#050505]/85 backdrop-blur-md ${fullBleed || streamOn ? 'hidden' : ''}`}>
-        <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-2.5">
+        {/* PHONE-FIRST-SCREEN (2026-10-17): the row WRAPS. It needs ~600 px in one line, and a 393 px phone squeezed its
+            items into 3-4 line stacks and still ran 104 px off the right edge (graphics select and full screen cut off).
+            Wrapped, a phone gets two rows: Home · title · BODY, then PRQ · graphics · full screen (measured natural widths
+            75 + 108 + 76 and 166 + 118 + 32). BODY comes before the PRQ badge for that split; nothing is shortened. */}
+        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
           <Link
             href="/"
-            className="flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/60 transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Home
           </Link>
-          <div>
+          <div className="min-w-0">
             <h1 className="fel-heading text-xl font-bold leading-none text-white">{title}</h1>
             <p className="font-mono text-[10px] text-white/40">{venue}</p>
           </div>
+          {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
+              a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
+              so no mode file knows this exists. */}
+          <div className="ml-auto flex items-center gap-3">
+            <BodyControl />
+          </div>
           {profile && (
             <span
-              className="ml-auto rounded-md border px-2.5 py-1 font-mono text-xs"
+              className="whitespace-nowrap rounded-md border px-2.5 py-1 font-mono text-xs"
               style={{ borderColor: `${profile.display.color}55`, color: profile.display.color }}
             >
               {profile.display.badge}
             </span>
           )}
-          {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
-              a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
-              so no mode file knows this exists. */}
-          <BodyControl />
           <GraphicsToggle />   {/* visual-foundation: Auto / Performance / Quality, applied on the next load */}
           {fsAvailable && (
             <button
               type="button"
               onClick={onFullscreen}
               aria-label={fsOn ? 'Leave full screen' : 'Full screen'}
-              className={`grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white/50
-                          transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF] ${profile ? '' : 'ml-auto'}`}
+              className="grid h-8 w-8 place-items-center rounded-md border border-white/10 text-white/50
+                         transition-colors hover:border-[#00E5FF]/50 hover:text-[#00E5FF]"
             >
               {fsOn ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>

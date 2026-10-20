@@ -26,6 +26,7 @@ import { syncHair } from '../creator/hair/renderHair';
 import { hairCover, resolveHair } from '../../creator/look/hair';
 import { eyeParams } from '../creator/eyes/eyeTexture';
 import { RawTexture } from '@babylonjs/core';
+import { signedOutVisitor } from './visitor';
 
 type TintMat = Material & { albedoColor?: Color3; diffuseColor?: Color3; bumpTexture?: { dispose(): void } | null };
 
@@ -95,22 +96,41 @@ export interface EquippedCard { id: string; name: string; accent: string; mode: 
 const FALLBACK_PALETTE = { jersey: '#00E5FF', shorts: '#0b1220', shoes: '#A855F7', accent: '#FFD700' };
 
 let cached: PlayerIdentity | null = null;
+/** FIRST-DUNK-BUDGET (2026-10-17): the read in flight, so two callers share it. The spawn asks twice at once
+ *  (characterPipeline's Promise.all and CharacterLibrary.spawn's own call), and only the RESULT was cached, so every
+ *  spawn sent the closet and hero-body reads twice. */
+let pending: Promise<PlayerIdentity> | null = null;
+/** Whether `cached` was resolved for a visitor the host said is signed out (no closet read went into it). */
+let cachedSignedOut = false;
+/** Bumped by invalidate / prime: a read that was in flight across one does not overwrite what they set. */
+let generation = 0;
 
 /** Fetch + merge the user's identity once per session. Fail soft to defaults. */
 export async function resolveIdentity(force = false): Promise<PlayerIdentity> {
+  const signedOut = signedOutVisitor();
+  // an identity made without the closet is not the one for a mount whose visitor may be signed in (a guest who signed in)
+  if (cached && cachedSignedOut && !signedOut) cached = null;
   if (cached && !force) return cached;
+  if (pending && !force) return pending;
   const dev = devBodyOverride();
-  if (dev) { cached = dev; return dev; }
-  // CREATOR-PLAN phase 4a: `?for=spawn` — the closet answers the ACTIVE slot only (a spawn dresses one body).
-  const [closet, heroBody] = await Promise.all([
-    fetch('/api/v1/closet?for=spawn').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<HeroBodyAnswer | null>,
-  ]);
-  // TEENS (owner decision 2026-10-06, "Every mode, device only"): a lookLocal player's row holds only the catalog
-  // defaults, so their look comes from the device copy — read here, never sent anywhere (lib/creator/look/slots.ts).
-  const local = closet?.lookLocal === true && TEEN_DEVICE_LOOK_EVERYWHERE ? readLocalLook() : null;
-  cached = identityFrom(closet, heroBody, local);
-  return cached;
+  if (dev) { cached = dev; cachedSignedOut = false; return dev; }
+  const gen = generation;
+  const read = (async () => {
+    // CREATOR-PLAN phase 4a: `?for=spawn` — the closet answers the ACTIVE slot only (a spawn dresses one body).
+    // FIRST-DUNK-BUDGET: a visitor the host knows is signed out is not asked (a guest's closet is a 401, and null is what a 401 gave).
+    const [closet, heroBody] = await Promise.all([
+      signedOut ? null : fetch('/api/v1/closet?for=spawn').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch('/api/v1/hero-body').then((r) => (r.ok ? r.json() : null)).catch(() => null) as Promise<HeroBodyAnswer | null>,
+    ]);
+    // TEENS (owner decision 2026-10-06, "Every mode, device only"): a lookLocal player's row holds only the catalog
+    // defaults, so their look comes from the device copy — read here, never sent anywhere (lib/creator/look/slots.ts).
+    const local = closet?.lookLocal === true && TEEN_DEVICE_LOOK_EVERYWHERE ? readLocalLook() : null;
+    const id = identityFrom(closet, heroBody, local);
+    if (gen === generation) { cached = id; cachedSignedOut = signedOut; }
+    return id;
+  })();
+  pending = read;
+  try { return await read; } finally { if (pending === read) pending = null; }
 }
 
 /** What /api/v1/hero-body answers. */
@@ -206,14 +226,14 @@ function devBodyOverride(): PlayerIdentity | null {
 }
 
 /** Call on Closet save / new scan so the next spawn picks up changes. */
-export function invalidateIdentity(): void { cached = null; }
+export function invalidateIdentity(): void { cached = null; pending = null; generation++; }
 
 /**
  * Seat a resolved identity as the session's one (racing/raceLook: the local-look overlay for a minor,
  * computed from what the device holds, so CharacterLibrary's own resolveIdentity picks it up). Nothing
  * here fetches or uploads — it only sets what the next spawn will wear.
  */
-export function primeIdentity(id: PlayerIdentity): void { cached = id; }
+export function primeIdentity(id: PlayerIdentity): void { cached = id; cachedSignedOut = false; pending = null; generation++; }
 
 // ── Application layers ──────────────────────────────────────────────────
 
