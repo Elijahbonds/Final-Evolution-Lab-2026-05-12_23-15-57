@@ -13,6 +13,8 @@
 //
 // Pure: no DOM, no React. The TV page feeds it InputBus.pads() and HostSession.lobby().
 
+import type { FelInput, InputBus } from '@/lib/babylon/core/InputBus';
+
 export const PARTY_CAPACITY = 4;
 
 /** One colour per seat, the same on the TV card and the phone's header. */
@@ -89,4 +91,86 @@ export function captainKey(t: SeatTable): string | null {
 /** What an empty seat says on the TV. */
 export function openSeatHint(hasPads: boolean): string {
   return hasPads ? 'Press any button on a controller · or scan' : 'Scan the code · or press A on a controller';
+}
+
+// ── COUCH (FN-0, 2026-10-19): the host-seat model ───────────────────────────────────────────────────────────────────────
+//
+// A signed-in host starts a couch session from a mode's own /play page; up to three more people sit down beside them by
+// pressing a button on a pad or joining by phone code. The seat rule is the one above (pads first, then phones in join
+// order), capped at four; a fifth joiner waits. Everything about a seat lives in this module's memory and nowhere else:
+// no account, no DB row, no localStorage, no fetch. The session forgets its seats when it ends.
+
+/** Seats on a couch: the host plus up to three. */
+export const COUCH_SEATS = PARTY_CAPACITY;
+/** Phones the couch room lets connect: one past the seats, so a fifth joiner waits on the TV instead of being refused. */
+export const COUCH_ROOM_PHONES = COUCH_SEATS + 1;
+
+/** The couch's seat table: the seat rule, capped at COUCH_SEATS. */
+export function couchSeatTable(pads: readonly PadIn[], phones: readonly PhoneIn[]): SeatTable {
+  return seatTable(pads, phones, COUCH_SEATS);
+}
+
+/** What the mode reads as ctx.seatCount(): the seated players, never below the host's one. */
+export function couchSeatCount(t: SeatTable): number {
+  return Math.max(1, Math.min(COUCH_SEATS, t.seats.length));
+}
+
+/**
+ * One couch session's seats, in memory only. The TV feeds it the pads and the phone lobby; a phone's press is routed to
+ * the seat it holds (null = waiting or gone, and the press reaches nobody).
+ */
+export class CouchSession {
+  private table: SeatTable = { seats: [], waiting: [] };
+
+  seat(pads: readonly PadIn[], phones: readonly PhoneIn[]): SeatTable {
+    this.table = couchSeatTable(pads, phones);
+    return this.table;
+  }
+
+  current(): SeatTable { return this.table; }
+
+  seatCount(): number { return couchSeatCount(this.table); }
+
+  seatOfPhone(peerId: string): number | null { return seatOfPhone(this.table, peerId); }
+
+  /**
+   * A phone's press, to the seat it holds: InputBus.emitSlot (seat 1 = slot 0) for a mode that reads each seat, and seat
+   * 1 also on the merged stream every solo mode reads — as a pad in slot 0 is. A waiting phone reaches nobody. Returns
+   * the seat it went to.
+   */
+  route(peerId: string, e: FelInput, bus: Pick<InputBus, 'emit' | 'emitSlot'>): number | null {
+    const seat = this.seatOfPhone(peerId);
+    if (seat === null) return null;
+    bus.emitSlot(seat, e);
+    if (seat === 0) bus.emit(e);
+    return seat;
+  }
+
+  /** Forget every seat (the room closed). */
+  end(): void { this.table = { seats: [], waiting: [] }; }
+}
+
+// Whether a couch room is open on this device. In memory, read by the party dock (no chat, no voice on a couch) and by
+// the phone controller page once its room says it is a couch.
+let couchRooms = 0;
+const couchListeners = new Set<() => void>();
+
+export function couchActive(): boolean { return couchRooms > 0; }
+
+/** Open a couch on this device; call the returned function to close it (each opener closes only its own). */
+export function enterCouch(): () => void {
+  couchRooms++;
+  couchListeners.forEach((fn) => fn());
+  let open = true;
+  return () => {
+    if (!open) return;
+    open = false;
+    couchRooms = Math.max(0, couchRooms - 1);
+    couchListeners.forEach((fn) => fn());
+  };
+}
+
+export function subscribeCouch(fn: () => void): () => void {
+  couchListeners.add(fn);
+  return () => { couchListeners.delete(fn); };
 }
