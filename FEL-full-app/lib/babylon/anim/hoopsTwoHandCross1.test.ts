@@ -74,8 +74,11 @@ function toHand(s: ReturnType<typeof setup>, want: 'Right' | 'Left'): void {
   for (let i = 0; i < 30; i++) s.frame();
   expect(s.carry.hand).toBe(want);
 }
-/** Play `path` on the carry and assert the hand state against the path's own hand-offs on every frame. */
-function expectHandoffs(path: HandlePath, want: number[], label: string): Frame[] {
+/** HOOPS-HAND-LABEL: frame `n` of a move on this rig (path time n / 60 s, the 60 fps frame clock) — a flip's exact frame boundary. */
+const F = (n: number): number => n / 60;
+/** Play `path` on the carry and assert the hand state against the path's own hand-offs on every frame. HOOPS-HAND-LABEL (Elijah, Oct 20
+ *  1:11 PM PT): the hand flips on the frame the new palm holds the ball (`flipAt`, exact frame boundaries), not at the catch's t0. */
+function expectHandoffs(path: HandlePath, want: number[], label: string, flipAt: number[]): Frame[] {
   const s = setup();
   toHand(s, cap(path.startHand));
   expect(handoffs(path).map((t) => +t.toFixed(4)), `${label}: the path's hand-offs`).toEqual(want.map((t) => +t.toFixed(4)));
@@ -84,12 +87,12 @@ function expectHandoffs(path: HandlePath, want: number[], label: string): Frame[
   const fr = runOut(s.carry, s.frame);
   expect(fr.length, label).toBeGreaterThan(10);
   for (const f of fr) {
-    const k = want.filter((t) => f.t >= t).length;   // hand-offs passed
+    const k = flipAt.filter((t) => f.t >= t - 1e-6).length;   // flips passed
     const h = k % 2 === 0 ? path.startHand : (path.startHand === 'right' ? 'left' : 'right');
     expect(f.hand, `${label} t ${f.t.toFixed(3)}`).toBe(cap(h));
     expect(athleteOfBone(f.bone), `${label} t ${f.t.toFixed(3)}: handBone agrees with hand`).toBe(f.hand);
   }
-  expect(flipsOf(fr.map((f) => f.hand)), label).toBe(want.length);
+  expect(flipsOf(fr.map((f) => f.hand)), label).toBe(flipAt.length);
   expect(s.carry.move, label).toBeNull();
   expect(s.carry.hand, `${label}: after`).toBe(cap(path.endHand));
   return fr;
@@ -102,12 +105,12 @@ describe('TH-1: the ball-hand state follows the crossover', () => {
     for (let t = 0; t < p.duration; t += 0.005) expect(moveHandAt(p, t), `t ${t.toFixed(3)}`).toBe(t < 0.30 ? 'right' : 'left');
     expect(moveHandAt(p, 0.30)).toBe('left');
   });
-  it('on the carry, R → L: `hand` is Right on every frame with path t < 0.30, Left from 0.30 on, and handBone agrees on each frame', () => {
-    const fr = expectHandoffs(pathFor('crossover', 'right')!, [0.30], 'crossover R→L');
-    expect(fr.some((f) => f.t < 0.30) && fr.some((f) => f.t >= 0.30)).toBe(true);
+  it('on the carry, R → L: `hand` is Right on every frame before the left palm holds the ball (frame 19, t 0.317 — the catch t0 is 0.30), Left from it on, and handBone agrees on each frame', () => {
+    const fr = expectHandoffs(pathFor('crossover', 'right')!, [0.30], 'crossover R→L', [F(19)]);
+    expect(fr.some((f) => f.t < F(19) - 1e-6) && fr.some((f) => f.t >= F(19) - 1e-6)).toBe(true);
   });
-  it('mirrored, L → R: Left until 0.30, Right from 0.30 on', () => {
-    expectHandoffs(pathFor('crossover', 'left')!, [0.30], 'crossover L→R');
+  it('mirrored, L → R: Left until the right palm holds it (frame 20, t 0.333), Right from it on', () => {
+    expectHandoffs(pathFor('crossover', 'left')!, [0.30], 'crossover L→R', [F(20)]);
   });
   it('the destination stays readable through handAfterMove: the end hand on every frame of the move (today\'s `hand`)', () => {
     const s = setup();
@@ -163,9 +166,9 @@ describe('TH-2: the modes\' ball-hand feeds follow it', () => {
 });
 
 describe('TH-3: the double cross flips twice; same-hand moves never flip', () => {
-  it('the double cross: Left at 0.25 s, back to Right at 0.51 s (HP:158-160), ending in the start hand — and mirrored', () => {
-    expectHandoffs(pathFor('double_cross', 'right')!, [0.25, 0.51], 'double cross R');
-    expectHandoffs(pathFor('double_cross', 'left')!, [0.25, 0.51], 'double cross L');
+  it('the double cross: catches at 0.25 s and 0.51 s (HP:158-160), but on this rig the other palm never holds the ball (0.41 m off at the first catch) — no flip, the start hand all through and at the end — and mirrored', () => {
+    expectHandoffs(pathFor('double_cross', 'right')!, [0.25, 0.51], 'double cross R', []);
+    expectHandoffs(pathFor('double_cross', 'left')!, [0.25, 0.51], 'double cross L', []);
   });
   it('a crossover QUEUED behind a crossover applies the same rule to its own path: two flips, each with handBone, the start hand at the end', () => {
     const s = setup();
@@ -182,7 +185,7 @@ describe('TH-3: the double cross flips twice; same-hand moves never flip', () =>
     for (const mv of ['hesi', 'in_and_out', 'yoyo', 'jab', 'pausin'] as PathMove[]) {
       for (const h of ['right', 'left'] as const) {
         const p = pathFor(mv, h)!; expect(p, mv).not.toBeNull();
-        expectHandoffs(p, [], `${mv} ${h}`);
+        expectHandoffs(p, [], `${mv} ${h}`, []);
       }
     }
   });
@@ -190,12 +193,18 @@ describe('TH-3: the double cross flips twice; same-hand moves never flip', () =>
 
 describe('TH-4: no flip before the hand-off', () => {
   const T0: [PathMove, number][] = [['between_legs', 0.30], ['behind_back', 0.34], ['shammgod', 0.34], ['spin', 0.49], ['momentum_cross', 0.32]];
-  it(`each at its F4 t0, at pace 1 and at the turbo's pace (MOVE_TURBO_REAL ${MOVE_TURBO_REAL}: t0 / pace), both hands`, () => {
+  /** HOOPS-HAND-LABEL: the frame the new palm holds the ball, measured on this rig — [pace 1 R→L, pace 1 L→R, turbo R→L, turbo L→R]. */
+  const PALM: Record<string, [number, number, number, number]> = {
+    between_legs: [20, 21, 16, 17], behind_back: [21, 22, 17, 17], shammgod: [24, 24, 19, 20], spin: [31, 31, 25, 25], momentum_cross: [21, 22, 17, 17],
+  };
+  it(`each with its F4 catch t0 (t0 / pace at the turbo's MOVE_TURBO_REAL ${MOVE_TURBO_REAL}), flipping on the palm's frame, both hands`, () => {
     expect(MOVE_TURBO_REAL).toBe(1.25);   // read from code (HandleSystem), the value the spec left UNMEASURED
     for (const [mv, t0] of T0) {
-      for (const pace of [1, MOVE_TURBO_REAL]) {
-        for (const h of ['right', 'left'] as const) {
-          expectHandoffs(pathFor(mv, h, pace)!, [t0 / pace], `${mv} ${h} pace ${pace}`);
+      for (const [pi, pace] of [1, MOVE_TURBO_REAL].entries()) {
+        for (const [hi, h] of (['right', 'left'] as const).entries()) {
+          const n = PALM[mv][2 * pi + hi];
+          expect(F(n), `${mv} ${h} pace ${pace}: the palm frame is after the catch t0`).toBeGreaterThan(t0 / pace);
+          expectHandoffs(pathFor(mv, h, pace)!, [t0 / pace], `${mv} ${h} pace ${pace}`, [F(n)]);
         }
       }
     }
