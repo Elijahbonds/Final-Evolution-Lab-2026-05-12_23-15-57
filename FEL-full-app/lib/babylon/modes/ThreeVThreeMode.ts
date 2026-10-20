@@ -55,6 +55,9 @@ import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
+import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
+import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';
@@ -960,6 +963,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // HOOPS MOTION phase 3c: THE MOTION LAYERS, mounted here (plan §3: "3v3 inside spawnBody") — the drag insert-first, the side lean
         // right after this body's posture layer; the ball and the hinge (the arms' last writer) come once the carries are on
         body.layers = mountMotionLayers({ scene: ctx.scene, skeleton: char.skeleton, root: char.root, hinge: false });
+        DrawnFacing.for(ctx.scene, char.root); FootGlide.for(ctx.scene, char.skeleton, char.root);   // hoops-dip movement pass, every body: no one-frame facing snap is DRAWN (core/DrawnFacing: the game keeps the movement's); no foot skates over the floor (anim/footGlide)
         if (ai) body.layers.setGate(() => body.lod === 0);   // IMPROVE (2026-10-06) #14: a far or off-screen off-ball body skips the drag and the lean
         return body;
       };
@@ -976,6 +980,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
       MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
+      LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => me.tree.state);   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so

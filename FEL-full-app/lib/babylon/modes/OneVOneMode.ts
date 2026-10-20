@@ -186,6 +186,9 @@ import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PH
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
+import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
+import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { AiMover } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
@@ -1073,6 +1076,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       const ppOff = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pp') === '0';
       if (ppOff) console.info('[1V1-DEV] posture layer OFF (?pp=0)');
       if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking), '1V1-PP');   // DRIBBLE PACE: a sprint LOOKS like work
+      LocoAccent.for(ctx.scene, me.skeleton, me.root, () => meAnimTree.state);   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carry)
       if (!ppOff) foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
       // HOOPS MOTION phase 3c: THE MOTION LAYERS (anim/motionLayers — the dunk pass's, lifted out of DunkMode) on both bodies: the limb drag
       // insert-first (the legs only in the air, the ball arm left on its clip around a release), the side lean right after the posture
@@ -1089,6 +1093,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meLayers.mountHinge(); foeLayers.mountHinge();   // HOOPS MOTION phase 3c: the hinged arm LAST — after the carries and the rim reaches
       // HOOPS MOTION phase 4b (U21): a handle move's contact hands are the carry's reach over the clip's own keys — the drag skips them
       { const mc = meCarry, fc = foeCarry; meLayers.setContactHands(() => mc?.move?.contactRig ?? []); foeLayers.setContactHands(() => fc?.move?.contactRig ?? []); }
+      for (const b of [me, foe]) { DrawnFacing.for(ctx.scene, b.root); FootGlide.for(ctx.scene, b.skeleton, b.root); }   // hoops-dip movement pass: no one-frame facing snap is DRAWN (core/DrawnFacing: the game keeps the movement's); no foot skates over the floor (anim/footGlide; last on the pass)
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();

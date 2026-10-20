@@ -6,13 +6,13 @@
 //   · the PUSH-OFF: from under START_FROM_MPS, accelerating harder than START_ACCEL_MPS2 — the body loads (sinks) and leans INTO the first
 //     step over ACCENT_SEC.start.
 // Only on a locomotion / dribble loop (the tree's state; never on a shot, a gather, a move beat, a dunk, a reaction). The sink is legSink's
-// (the knees bend, the feet stay); the lean turns the Spine about the athlete's right axis. Mounted after the posture layer (which would pull
+// (the knees bend, the feet stay); the lean turns the Spine about the athlete's right axis; the hands stay where they were (legSink). Mounted after the posture layer (which would pull
 // a spine lean back toward its stance) and before the carry (whose reach reads the shoulders where they are drawn).
 import { Space, Vector3 } from '@babylonjs/core';
 import type { Observer, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { findBone } from './boneLookup';
 import { animDt } from './motionLayers';
-import { sinkRig, sinkRead, sinkHipsKeepFeet, type SinkRig } from './legSink';
+import { sinkRig, sinkRead, sinkHipsKeepFeet, holdHands, restoreHands, type SinkRig } from './legSink';
 import { DIP_MIN_HIPS_OVER_ANKLE } from './moveDip';
 
 export type AccentKind = 'stop' | 'start';
@@ -85,13 +85,14 @@ export class LocoAccent {
   now: { kind: AccentKind; drop: number; leanDeg: number } | null = null;
   constructor(private scene: Scene, skeleton: Skeleton, private root: TransformNode, private stateOf: () => string | null) {
     this.rig = sinkRig(skeleton, root);
-    this.spine = findBone(skeleton, 'Spine')?.getTransformNode() ?? null;
+    this.spine = (findBone(skeleton, 'Spine') ?? findBone(skeleton, 'Spine1') ?? findBone(skeleton, 'Spine2'))?.getTransformNode() ?? null;   // the lowest spine bone the rig has
     this.obs = this.rig ? scene.onAfterAnimationsObservable.add(() => this.apply()) : null;
   }
   dispose(): void { if (this.obs) { this.scene.onAfterAnimationsObservable.remove(this.obs); this.obs = null; } }
 
   private apply(): void {
     const rig = this.rig!;
+    if (this.root.isDisposed()) { this.dispose(); return; }   // the body is gone
     const dt = animDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
     this.root.computeWorldMatrix(true);
     const p = this.root.getAbsolutePosition();
@@ -106,12 +107,14 @@ export class LocoAccent {
     const k = accentShape(a.u);
     const drop = ACCENT_DROP_M[a.kind] * k, leanDeg = ACCENT_LEAN_DEG[a.kind] * k;
     const target = Math.max(this.ankleFloorY + DIP_MIN_HIPS_OVER_ANKLE, hipsY - drop);
+    const hands = holdHands(rig);   // the hands stay where the loop and the dip drew them (the dribble's ball path is the carry's, root-relative)
     if (target < hipsY) sinkHipsKeepFeet(rig, target, 0, this.ankleFloorY);
     if (this.spine && Math.abs(leanDeg) > 1e-3) {
       const yaw = this.root.absoluteRotationQuaternion ? this.root.absoluteRotationQuaternion.toEulerAngles().y : this.root.rotation.y;
       // + pitches the chest toward the body's front: about the athlete's right axis (athleteSide: (cos yaw, 0, −sin yaw))
       this.spine.rotate(new Vector3(Math.cos(yaw), 0, -Math.sin(yaw)), (leanDeg * Math.PI) / 180, Space.WORLD);
       this.spine.computeWorldMatrix(true);
+      restoreHands(rig, hands, false);
     }
     this.now = { kind: a.kind, drop: Math.max(0, hipsY - target), leanDeg };
   }

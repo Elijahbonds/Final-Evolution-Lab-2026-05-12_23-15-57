@@ -8,7 +8,11 @@
 //   · a jump bigger than SNAP_MIN_RAD in one frame is spread over TURN_SMOOTH_SEC at a constant rate (the jump's size / the time), and any
 //     further turn while it runs is folded into the same slew;
 //   · a teleport (the body moved more than TELEPORT_M in a frame: a reset, a new possession) takes the new facing at once.
-// Pure state + one step; the modes keep one per steered body and draw the root at step(...)'s yaw.
+// Pure state + one step, and the hook (DrawnFacing.for) that draws a body's root at it for the render only (see the class).
+
+import { Quaternion, Vector3 } from '@babylonjs/core';
+import type { Observer, Scene, TransformNode } from '@babylonjs/core';
+import { animDt } from '../anim/motionLayers';
 
 /** The smoothing time of a facing snap (s). TUNED (new): the owner's "about 0.12 s". */
 export const TURN_SMOOTH_SEC = 0.12;
@@ -38,12 +42,57 @@ export function stepDrawnFacing(s: DrawnFacingState, target: number, x: number, 
   return s;
 }
 
-/** The modes' one-line hook: the drawn yaw for this body's root this frame, its state kept per node. `target` is the movement's facing.
- *  It starts from the yaw the root is DRAWN at now — other code turns the root too (the spin's path and its exit, the pivots, a reset) and
- *  the slew must go on from there, never from a stale yaw of its own. */
-const PER_NODE = new WeakMap<object, DrawnFacingState>();
-export function drawnYaw(node: { position: { x: number; z: number }; rotation: { y: number } }, target: number, dt: number): number {
-  let s = PER_NODE.get(node); if (!s) { s = drawnFacingIdle(); PER_NODE.set(node, s); }
-  if (s.seeded) { if (Math.abs(wrap(node.rotation.y - s.yaw)) > 1e-6) s.rate = 0; s.yaw = node.rotation.y; }   // turned by someone else: start over from there
-  return stepDrawnFacing(s, target, node.position.x, node.position.z, dt).yaw;
+/**
+ * The modes' one-line hook: this body's root is DRAWN at the smoothed facing and is the movement's again for everything else.
+ *
+ * The game reads the root's yaw all through its update — the crossover's side against the facing before the cut, the stance's stick, the
+ * contest's facing, the spin's contact, the facing a landing hands back to the dribble — so a smoothed root would have leaked into play for
+ * the 0.12 s after a cut. Instead the drawn yaw is put on the root only for the frame's DRAWING: at the start of the scene's render (before
+ * the animations, so the clips, the layers, the carry's root-relative ball and the camera all draw it), and the movement's yaw is put back
+ * after the render, before the game's next update. A root turned by something else during the render is left as that wrote it.
+ */
+const yawOf = (n: TransformNode): number => (n.rotationQuaternion ? n.rotationQuaternion.toEulerAngles().y : n.rotation.y);
+const PER_NODE = new WeakMap<TransformNode, DrawnFacing>();
+export class DrawnFacing {
+  static for(scene: Scene, root: TransformNode): DrawnFacing {
+    const had = PER_NODE.get(root); if (had) return had;
+    const d = new DrawnFacing(scene, root); PER_NODE.set(root, d); return d;
+  }
+  private s = drawnFacingIdle();
+  private before: Observer<Scene> | null;
+  private after: Observer<Scene> | null;
+  private saved: { y: number; q: Quaternion | null; drawn: number } | null = null;
+  /** The drawn yaw's lag behind the movement's on the last frame (rad) — the probe's and the tests' read. */
+  lag = 0;
+  constructor(private scene: Scene, private root: TransformNode) {
+    this.before = scene.onBeforeAnimationsObservable.add(() => this.draw(), undefined, true);
+    this.after = scene.onAfterRenderObservable.add(() => this.restore());
+  }
+  dispose(): void {
+    if (this.before) this.scene.onBeforeAnimationsObservable.remove(this.before);
+    if (this.after) this.scene.onAfterRenderObservable.remove(this.after);
+    this.before = this.after = null;
+  }
+  private draw(): void {
+    if (this.root.isDisposed()) { this.dispose(); return; }
+    this.saved = null;
+    const dt = animDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
+    const yaw = yawOf(this.root);
+    const drawn = stepDrawnFacing(this.s, yaw, this.root.position.x, this.root.position.z, dt).yaw;
+    const d = wrap(drawn - yaw); this.lag = d;
+    if (Math.abs(d) < 1e-6) return;
+    this.saved = { y: this.root.rotation.y, q: this.root.rotationQuaternion?.clone() ?? null, drawn };
+    this.root.rotation.y = this.root.rotation.y + d;
+    // a world turn about the vertical on top of whatever the root holds (Babylon's a.multiply(b): a outer — the world frame for a root)
+    if (this.root.rotationQuaternion) this.root.rotationQuaternion = Quaternion.RotationAxis(Vector3.Up(), d).multiply(this.root.rotationQuaternion);
+    this.root.computeWorldMatrix(true);
+  }
+  private restore(): void {
+    const sv = this.saved; this.saved = null;
+    if (!sv || this.root.isDisposed()) return;
+    if (Math.abs(wrap(yawOf(this.root) - sv.drawn)) > 1e-3) { this.s = drawnFacingIdle(); return; }   // turned by something else in the render: theirs
+    this.root.rotation.y = sv.y;
+    if (sv.q && this.root.rotationQuaternion) this.root.rotationQuaternion.copyFrom(sv.q);
+    this.root.computeWorldMatrix(true);
+  }
 }
