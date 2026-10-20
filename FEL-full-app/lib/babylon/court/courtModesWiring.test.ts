@@ -20,9 +20,12 @@ const pen = prec.slice(idx(prec, 'export const PenaltyMode'));
 
 describe('the broadcast opt-ins', () => {
   it('every court mode opts into the intro and the replay, and names its cast', () => {
-    expect(net).toMatch(/intro: 'walkIn'/); expect(net).toMatch(/replay: true/); expect(net).toMatch(/replayCast:/);
+    // test changed: (studio-5, NEXUS STUDIO §13.3) the net sports' and the derby's intro became getters that answer 'walkIn' unless a
+    // dev-only ?venue= picks one, as football's did in round 4; pinned to the getters exactly (lib/nexus-studio/courtTargets.test.ts
+    // holds that each is 'walkIn' without a venue, in production, and — for Tennis — whatever the page carries)
+    expect(net).toMatch(/get intro\(\) \{ return studioIntroOr\(o\.modeId, 'walkIn'\); \}/); expect(net).toMatch(/replay: true/); expect(net).toMatch(/replayCast:/);
     expect(golf).toMatch(/intro: 'establish'/); expect(golf).toMatch(/replay: true/); expect(golf).toMatch(/replayCast:/);
-    expect(derby).toMatch(/intro: 'walkIn'/); expect(derby).toMatch(/replay: true/); expect(derby).toMatch(/replayCast:/);
+    expect(derby).toMatch(/get intro\(\) \{ return studioIntroOr\('derby', 'walkIn'\); \}/); expect(derby).toMatch(/replay: true/); expect(derby).toMatch(/replayCast:/);
     expect(pen).not.toMatch(/\n\s+intro: '/); expect(pen).toMatch(/replay: true/); expect(pen).toMatch(/replayCast:/);
     // football's own, from the foundation. NEXUS STUDIO 4a: the intro is a getter that answers 'walkIn' unless a dev-only
     // ?venue= picks one (lib/nexus-studio/football.test.ts holds that it is 'walkIn' without a venue and in production)

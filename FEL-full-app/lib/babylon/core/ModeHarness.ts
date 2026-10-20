@@ -42,6 +42,8 @@ import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
+import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
+import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
@@ -263,11 +265,17 @@ export interface HarnessOpts {
   /** M28 art round-trip: called once after the venue loads so a published art
    * card can reskin the court/board/kit mesh. Runs post-liftBlackMaterials. */
   applySkin?: (scene: Scene) => void;
+  /** FIRST-DUNK-BUDGET (2026-10-17): the host KNOWS the visitor is signed out (/try: the server sent everyone else to
+   *  /play/dunk), so the spawn's closet read and the season read are not sent (visitor.ts). Absent is "not known". */
+  guest?: boolean;
 }
 
-/** Max time a mode's load() may take before the anti-infinite-spinner watchdog
- * fires and surfaces the error screen (no player must ever hang forever). */
+/** Max time a mode's load() may go with NOTHING arriving before the anti-infinite-spinner watchdog
+ * fires and surfaces the error screen (no player must ever hang forever). FIRST-DUNK-BUDGET (2026-10-17): it was the
+ * whole load's budget, so a phone still downloading on 4G was failed; it is the stall budget now (loadProgress.ts). */
 const LOAD_WATCHDOG_MS = 20_000;
+/** How often the load watchdog looks for progress. */
+const LOAD_STALL_LOOK_MS = 1_000;
 
 /** OOM-HYGIENE: the floating-origin resetter lives at MODULE scope on purpose — an arrow written inside runMode captures the
  *  harness closure (heap snapshot: `getScene → context: scene → Scene`), and would retain the scene it exists to release. */
@@ -290,6 +298,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // otherwise leave a dead mode's card up until the next mount.
   const seam = bodySeamFor(def);
   const store = sessionStore.mount({ ...seam.card, stance: stanceOnMount(seam.profile) });   // MOVEMENT PLAY P8: a board game asks for its stance from the mount
+  setSignedOutVisitor(opts.guest === true);   // FIRST-DUNK-BUDGET: every mount says, so a host that does not know asks as before
   try {
     return await mountMode(def, opts, seam, store);
   } catch (e) {
@@ -600,17 +609,25 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   engine.onContextRestoredObservable.add(() => reportDiag('context', 'WebGL context restored'));
 
   // ── Load with watchdog + error phase (the anti-infinite-spinner guarantee) ──
-  // load() either resolves (READY), throws (error screen), or the 20s watchdog
+  // load() either resolves (READY), throws (error screen), or the watchdog
   // fires (error screen). A player can never see an eternal spinner again.
+  // FIRST-DUNK-BUDGET (2026-10-17): the watchdog fires after 20 s with NOTHING arriving — no bytes, no finished file, no
+  // loader step (loadProgress.ts) — not 20 s after load() began, so a slow download that is still moving is never failed.
   let renderWatchdog: RenderWatchdog | null = null;
   const attemptLoad = async (): Promise<boolean> => {
     setPhase('loading');
     renderWatchdog?.disarm();
+    installLoadProgress();
     let timedOut = false;
-    const watchdog = setTimeout(() => {
+    const stall = new LoadStallClock(LOAD_WATCHDOG_MS);
+    let watchdog = setTimeout(function look() {
+      if (!stall.stalled()) { watchdog = setTimeout(look, LOAD_STALL_LOOK_MS); return; }
       timedOut = true;
+      // ship-ready (2026-10-17): counted, like a load that throws (below). On the phone rig, def.load() alone ran 24–35 s in
+      // dunk, threepoint and karate; without this line production cannot say how many real phones end on this screen.
+      reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);
       setPhase('error', 'Load timed out — check your connection and retry.');
-    }, LOAD_WATCHDOG_MS);
+    }, LOAD_STALL_LOOK_MS);
     try {
       replayTrack.length = 0;
       await def.load(ctx);
@@ -639,7 +656,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       if (prewarmWanted(tier)) {
         console.info('[FEL-PERF] shader pre-warm start');
         const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });
-        if (warm.timedOut) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames)`);
+        // ship-ready (2026-10-17): capHit, not timedOut — a scene that turned ready but lost its warm frames to the cap was not reported
+        if (warm.capHit) reportDiag('load', `shader pre-warm hit its cap after ${Math.round(warm.ms)} ms (${warm.polls} polls, ${warm.frames} frames, scene ${warm.ready ? 'ready' : 'not ready'})`);
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
       }
       setPhase('ready');

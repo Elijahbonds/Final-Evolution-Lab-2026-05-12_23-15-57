@@ -54,6 +54,7 @@ import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cann
 import { VenueKit } from '../visual/VenueKit';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
 import { readPlaceLook } from '../nexus/placeLooks';
+import { mountStudioFor, studioIntroOr, studioLookFor, studioMood, studioReplayAngles, type StudioExtras } from '@/lib/nexus-studio/runtime';   // NEXUS STUDIO §13.3: a dev-only ?venue= for Derby (null without one, and in production)
 import { EffectsKit } from '../visual/EffectsKit';
 import { Onlookers } from '../visual/Onlookers';
 import { mountModeCrowd, type ModeCrowd } from '../visual/crowd/modeCrowd';
@@ -989,6 +990,7 @@ const BAT_HANDS_PULL = 0.7;
 
 export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
+  let studio: StudioExtras | null = null;   // NEXUS STUDIO §13.3: a dev-only ?venue='s extras (null without one)
   let meAnim: BeatOwner, pitcherAnim: BeatOwner;
   /** The pitch is a beat: the ball leaves the hand on the release key, not at the wind-up. */
   let throwIn = 0; let pendingThrow: (() => void) | null = null;
@@ -1328,14 +1330,15 @@ export const DerbyMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'baseball', mood: 'goldenHour', camPreset: 'court',
-    intro: 'walkIn',   // VIS-COURT: the broadcast intro — a crane over the park, then a shot on the batter; the first pitch waits for it
+    modeId: 'baseball', get mood() { return studioMood('derby', 'goldenHour'); }, camPreset: 'court',   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one
+    get intro() { return studioIntroOr('derby', 'walkIn'); },   // VIS-COURT: the broadcast intro — a crane over the park, then a shot on the batter; the first pitch waits for it. NEXUS STUDIO: 'walkIn' unless a dev-only ?venue= picks one
     replay: true,      // VIS-COURT: a home run, replayed from the broadcast angles, following the ball (a proxy body is the replay's focus)
     replayCast: () => ({ bodies: [focusProxy, me?.root, pitcher?.root].filter((r): r is TransformNode => !!r), loose: ball ? [ball] : [] }),
 
     async load(ctx: ModeContext) {
-      derbyVenue = mountVenue(ctx, 'derby', { keepGameplayCamera: true, look: readPlaceLook('derby') });   // PLACE
+      derbyVenue = mountVenue(ctx, 'derby', { keepGameplayCamera: true, look: studioLookFor('derby') ?? readPlaceLook('derby') });   // PLACE (NEXUS STUDIO: the place pick unless a dev-only ?venue= lays a Studio look)
       if (!derbyVenue) VenueKit.buildField(ctx.scene, 'ballpark');   // spec first, kit fallback
+      studio?.dispose(); studio = mountStudioFor('derby', ctx);   // NEXUS STUDIO: null without a dev-only ?venue=
       EffectsKit.ambient(ctx.scene, 'park');
       furniture = buildPlateAndMound(ctx.scene);
       // Phase 6 — the ballpark was a green plain with a mound: nothing for a
@@ -1665,7 +1668,7 @@ export const DerbyMode: ModeDefinition = (() => {
       if (!flying && !incoming && !pending) {
         if (round >= TOTAL) { endDerby(ctx, TOTAL, 0); return; }
         pending = true; trickDone = false;   // #12: the set — the next pitch's warm-up is open from here
-        if (replayWanted) { replayWanted = false; void ctx.highlight?.({ lastSeconds: 3.8, objective: ball.position.clone() }); }   // VIS-COURT: the home run, replayed (the mode's clock — and so this timer — holds while it plays)
+        if (replayWanted) { replayWanted = false; void ctx.highlight?.({ lastSeconds: 3.8, objective: ball.position.clone(), angles: studioReplayAngles('derby') }); }   // VIS-COURT: the home run, replayed (the mode's clock — and so this timer — holds while it plays)
         timers.later(() => { pending = false; if (!ended) pitch(ctx); }, 800);
       }
       // During the PITCH the fixed swing camera aims at where the pitch is
@@ -1681,7 +1684,7 @@ export const DerbyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
     // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
-    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; studio?.dispose(); studio = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

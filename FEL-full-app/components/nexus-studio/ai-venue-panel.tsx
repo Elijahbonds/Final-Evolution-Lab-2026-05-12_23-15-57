@@ -11,6 +11,10 @@
 // against the project's own characters — the request never carries one), reviewed and applied in the same one step; and
 // "Explain this venue" asks CELL for a read-only, plain-language summary (no edits). What leaves the browser is the typed request
 // and the venue without its cast (venueForAi) — Privacy Policy §1.
+//
+// studio-5: CELL may also place STAMPS (stamps.ts) — a built-in by its id, or one of this project's own stamps by the name the
+// creator typed, matched HERE against the project's shelf (the request never carries the project's stamps). Reviewed and applied in
+// the same one step; a name that matches no stamp is struck out.
 
 import { useState } from 'react';
 import { Sparkles, Check, X, Loader2, BookOpen } from 'lucide-react';
@@ -26,6 +30,7 @@ export const AI_VENUE_EXAMPLES = [
   'a sunny clay court with palms on the left and a half-empty bleacher',
   'an indoor arena, glossy floor, two standing crowds behind the far baseline',
   'when a rally reaches 5, the crowd cheers and a banner says WHAT A RALLY',
+  'a lamp row down each side and a flood corner set round the court',
 ] as const;
 
 const ERRORS: Record<string, string> = {
@@ -35,10 +40,15 @@ const ERRORS: Record<string, string> = {
 };
 
 /** Pure: what the review list says about an answer (a cast that names no character of this project is marked as left out). */
-export function reviewOf(edits: readonly AiEdit[], dropped: number, ctx: AiProjectCtx = { characters: [], scripts: [] }): { lines: string[]; skipped: Array<string | undefined>; note: string | null } {
+export function reviewOf(edits: readonly AiEdit[], dropped: number, ctx: AiProjectCtx = { characters: [], scripts: [], stamps: [] }): { lines: string[]; skipped: Array<string | undefined>; note: string | null } {
   const r = reviewAiEdits(edits, ctx);
   const note = !edits.length ? 'CELL’s answer had nothing the Studio can apply.' : dropped ? `${dropped} part(s) of the answer were not Studio edits and were left out.` : null;
   return { lines: r.map((x) => x.line), skipped: r.map((x) => x.skipped), note };
+}
+
+/** The project around the venue that review and apply read — never sent (studio-5: the project's own stamps too). Pure. */
+export function aiCtxOf(doc: Pick<StudioApi['doc'], 'characters' | 'scripts' | 'stamps'>): AiProjectCtx {
+  return { characters: doc.characters, scripts: doc.scripts, stamps: doc.stamps ?? [] };
 }
 
 /** The body the panel sends: the typed request (or the explain pass) and the venue without its cast. Pure. */
@@ -56,7 +66,7 @@ export function AiVenuePanel({ studio, onApplied }: { studio: StudioApi; onAppli
   const [explaining, setExplaining] = useState(false);
   const venue = studio.venue;
   const available = ai === 'available';
-  const ctx: AiProjectCtx = { characters: studio.doc.characters, scripts: studio.doc.scripts };
+  const ctx = aiCtxOf(studio.doc);
 
   const explain = async () => {
     if (!venue || !available || explaining) return;

@@ -22,7 +22,7 @@ import { mountVenueProps, propSetFor, type VenuePropsHandle } from '../visual/Ve
 import { VENUE_PROP_SETS, surroundSize, surroundColor, surroundDetail } from '../visual/venuePropSets';
 import { Color3, MeshBuilder, PBRMaterial } from '@babylonjs/core';
 import { dressHoop } from '../visual/meshyProps';
-import { decorateVeniceBoardwalk } from '../nexus/veniceBoardwalk';
+import { decorateVeniceBoardwalk, type DressingHooks } from '../nexus/veniceBoardwalk';
 import { NavBounds } from './NavBounds';
 import { MAPS } from '../../map-data';
 import type { Vector3 } from '@babylonjs/core';
@@ -56,6 +56,9 @@ export interface VenueHandle {
   hidePlaceholders(): void;
   /** Reveal the capsule stand-ins. Authoring only — see the note at the mount. */
   showPlaceholders(): void;
+  /** FIRST-DUNK-BUDGET: mount the dressing a `deferDressing` venue held back (the prop set, the onlookers). Idempotent; resolves
+   *  once the prop set has landed or failed. A venue that did not defer has already started it. */
+  mountDressing(): Promise<void>;
   dispose(): void;
 }
 
@@ -111,6 +114,13 @@ export interface MountVenueOptions {
   arena?: CombatArena;
   /** PLACE LOOKS (2026-09-18): a sky / floor colour / horizon / dressing over the spec for the modes that pick a place (nexus/placeLooks.ts). */
   look?: PlaceLook;
+  /**
+   * FIRST-DUNK-BUDGET (2026-10-17): the venue's CC0 prop set and the boardwalk's onlookers wait for `mountDressing()` instead of
+   * loading with the court. The dunk mounts them once dunk 1 is in: on the Venice dunk they were ~12 MB (the parked bus and
+   * sedan, five onlooker bodies, the lamps, tents, flags, pier and boats) of a first download a phone on 4G could not finish.
+   * Off by default: every other venue loads its dressing with the court, as before.
+   */
+  deferDressing?: boolean;
 }
 
 /**
@@ -297,7 +307,10 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
   }
   // owner 2026-09-05: the concept photo rebuilt as scenery. DUNK-VENICE-ENV-RENDER (2026-09-28): the dunk (and the duel, which
   // mounts the same venue) stands in its own Venice — beach, bike path and promenade, no lawn; the other hoops courts keep theirs.
-  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' ? 'venice-dunk' : 'lawn');
+  // FIRST-DUNK-BUDGET: the dressing's jobs — started together by mountDressing(), at once unless the mode deferred them
+  const dressingJobs: Array<() => Promise<void> | void> = [], landedJobs: Array<() => void> = [];
+  const hooks: DressingHooks | undefined = options.deferDressing ? { start: (job) => { dressingJobs.push(job); }, landed: (job) => { landedJobs.push(job); } } : undefined;
+  if (!location && /^basketball_/.test(modeId)) decorateVeniceBoardwalk(ctx.scene, built.root, scanShiftZ, modeId === 'basketball_dunk' ? 'venice-dunk' : 'lawn', hooks);
   void dressHoop(ctx.scene, built.root);   // owner 2026-09-05: the scanned Venice hoop stands in for the procedural one, every court, every location
   let props: VenuePropsHandle | null = null; let propsGone = false;
   // HIDE THE STUBS WHEN THE KIT IS ON (SHARED-PLACE-FLOOR). A spec's 'palm' is a cylinder under a six-sided cone and its
@@ -322,13 +335,18 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
       const shown = setStubs(true);
       if (shown) console.warn(`[NEXUS] ${modeId}: the "${propSet}" kit ${why} — ${shown} stub palms/lamps restored as the fallback`);
     };
-    void mountVenueProps(ctx.scene, propSet, built.root).then((h) => {
+    dressingJobs.push(() => mountVenueProps(ctx.scene, propSet, built.root).then((h) => {
       if (propsGone) { h?.dispose(); return; }
       props = h;
       if (h && h.count > 0) console.info(`[NEXUS] ${modeId}: "${propSet}" kit on — placeholder palms/lamps stay hidden`);
       else fallback('loaded no props');
-    }, () => fallback('failed to load'));
+    }, () => fallback('failed to load')));
   }
+  let dressing: Promise<void> | null = null;
+  const mountDressing = (): Promise<void> => (dressing ??= Promise.all(dressingJobs.map((job) => job())).then(() => {
+    if (!propsGone) for (const job of landedJobs) job();
+  }));
+  if (!options.deferDressing) void mountDressing();
 
   // M104: hand the shot back to the mode's follow-cam. The venue's ArcRotate
   // camera stays in the scene (its scenery is unaffected by which camera
@@ -411,6 +429,7 @@ export function mountVenue(ctx: VenueCtx, modeId: string, options: MountVenueOpt
         a.getChildMeshes().forEach((m) => { m.isVisible = true; });
       }
     },
+    mountDressing,
     dispose() {
       disposed = true;
       ctx.camDirector?.invalidateBounds?.();

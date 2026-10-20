@@ -37,16 +37,29 @@ function writeIndex(v: CacheEntry[]): void { try { localStorage.setItem(INDEX_KE
 
 const hasCache = (): boolean => typeof caches !== 'undefined' && typeof caches.open === 'function';
 const objectUrls = new Map<string, string>();
+/** FIRST-DUNK-BUDGET: the answers being worked out, so two players asking for one track at once share its one download. */
+const resolving = new Map<string, Promise<string>>();
 
 /**
  * The address to play `url` from: a local object URL when the track is cached (no network, and no cross-origin audio for
- * WebAudio to silence), else the URL itself, with the track fetched into the cache in the background for next time.
+ * WebAudio to silence); on a miss the track is fetched ONCE into the cache and played from that copy.
+ *
+ * FIRST-DUNK-BUDGET (2026-10-17): a miss used to hand back the URL for the element to stream AND fetch the same file into the
+ * cache beside it — every new track downloaded twice, and a /try walk-out song three times with the walk-out's own element.
+ * Now the one fetch both fills the cache and plays (a track starts a moment later on a slow line: a preview is ~0.4 MB). A track
+ * over CACHE_MAX_BYTES, or a fetch that fails, still streams from the URL.
  */
 export async function cachedSrc(url: string, opts: { saveData?: boolean } = {}): Promise<string> {
   if (!hasCache() || opts.saveData) return url;
+  const known = objectUrls.get(url);
+  if (known) { touchIndex(url, null); return known; }
+  let p = resolving.get(url);
+  if (!p) { p = resolveSrc(url).finally(() => resolving.delete(url)); resolving.set(url, p); }
+  return p;
+}
+
+async function resolveSrc(url: string): Promise<string> {
   try {
-    const known = objectUrls.get(url);
-    if (known) { touchIndex(url, null); return known; }
     const cache = await caches.open(CACHE_NAME);
     const hit = await cache.match(url);
     if (hit) {
@@ -56,17 +69,20 @@ export async function cachedSrc(url: string, opts: { saveData?: boolean } = {}):
       touchIndex(url, blob.size);
       return obj;
     }
-    void (async () => {
-      try {
-        const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
-        if (!res.ok) return;
-        const bytes = Number(res.headers.get('content-length')) || (await res.clone().blob()).size;
-        if (bytes > CACHE_MAX_BYTES) return;
+    const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+    if (!res.ok) return url;
+    if (Number(res.headers.get('content-length')) > CACHE_MAX_BYTES) { void res.body?.cancel(); return url; }   // too big to keep: stream it
+    const blob = await res.clone().blob();
+    const obj = URL.createObjectURL(blob);
+    objectUrls.set(url, obj);
+    try {
+      if (blob.size <= CACHE_MAX_BYTES) {
         await cache.put(url, res);
-        const evicted = touchIndex(url, bytes);
-        for (const u of evicted) { await cache.delete(u); const o = objectUrls.get(u); if (o) { URL.revokeObjectURL(o); objectUrls.delete(u); } }
-      } catch { /* streaming still works */ }
-    })();
+        const evicted = touchIndex(url, blob.size);
+        for (const u of evicted) { await cache.delete(u); const o = objectUrls.get(u); if (o && u !== url) { URL.revokeObjectURL(o); objectUrls.delete(u); } }
+      }
+    } catch { /* not kept for next time; it still plays from memory now */ }
+    return obj;
   } catch { /* no cache this session */ }
   return url;
 }
