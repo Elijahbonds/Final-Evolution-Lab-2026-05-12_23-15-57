@@ -216,6 +216,7 @@ import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
 import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
+import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
 import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA #259/#262: the OPPONENT pick, PRO on a staked / head-to-head run (every mode reads runTier)
 import type { AmbientHandle } from '../visual/EffectsKit';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
@@ -370,6 +371,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** Bumped on every possession change — every timer that changes possession checks it (a stale watchdog used to force
    *  the NEXT possession's release 1.1 s in). */
   let possessionToken = 0;
+  const shotClock = new PlayerShotClock(() => playerShotClockSec('1v1', runTier()), (v) => hud({ shotClock: v }));   // lane/hoops-shot-core: ELITE's 12 s shot clock (core/ShotClock)
   let carrying = true, shooting = false, dunking = false;
   /** The ball is live on the floor (a miss, a block) — BallSim owns it, whoever's possession it is. */
   let loose = false;
@@ -732,7 +734,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function rimTouches(): void {
     for (const t of arc.takeTouches()) {
       if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[1V1-RIM] glass kiss`); }
-      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
+      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }
   /** The ball leaves a hand for the floor: BallSim owns it until someone picks it up. */
@@ -1195,6 +1197,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (ended) return;
       micTick(ctx);
       if (hoopsFx?.holdIntro(me.root.position, RIM)) return;   // vis-hoops-court: the broadcast intro holds the first possession
+      if (shotClock.tick(dt, { token: possessionToken, ours: possession === 'mine', live: possession === 'mine' && carrying && !loose && !shooting && !dunking && !gather && !finish })) { shotClockViolation(ctx); return; }   // lane/hoops-shot-core: ELITE's shot clock
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
       // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
       // it was extracted FROM here because this is the mode people have actually played
@@ -2413,6 +2416,16 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (now - earlyJumpBannerAt > 1800) { earlyJumpBannerAt = now; bannerFlash(ctx, 'JUMPED EARLY — WAIT FOR THE GATHER', 600); }
     }
     return true;
+  }
+
+  /** lane/hoops-shot-core: ELITE's shot clock ran out on my ball — the Ref's call, and their check (the out-of-bounds path's shape). */
+  function shotClockViolation(ctx: ModeContext): void {
+    const call = judge('shot_clock', { offense: 'me' });
+    if (call.whistle) SoundKit.play('whistle');
+    meCarry?.update(0, 0, false);
+    console.info(`[1V1-REF] ${call.id} → ${call.ball}`);
+    micWhistle();
+    startDefense(ctx, `${call.banner} — DEFEND!`);
   }
 
   /** THEIR possession: the check. The rival checks up beyond the arc, I set inside him, the drive starts after

@@ -172,6 +172,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
+import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
@@ -469,6 +470,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** Bumped on every possession change; every timer that changes possession checks it (the 1v1's rule) — a stale
    *  setTimeout(resetPossession) from the rival's possession fired INTO my next one and teleported me mid-meter (measured). */
   let possessionToken = 0;
+  const shotClock = new PlayerShotClock(() => playerShotClockSec('3v3', runTier()), (v) => { if (ctx0) putHud(ctx0, { shotClock: v }); });   // lane/hoops-shot-core: ELITE's 14 s shot clock (core/ShotClock)
   // ── IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md that need state ──
   /** #4 #10 #17: the MODE's clock (update() does not run while the game is paused) and the beats queued on it — every possession
    *  change, banner clear and follow-up that was a wall-clock setTimeout (they fired behind the pause card, and after dispose into
@@ -1142,6 +1144,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       lodTick(ctx);   // #14
       micTick(ctx);   // THE MIC: its clock, the welcome on the first live frame, an open mate calling for it
       if (hoopsFx?.holdIntro(me.char.root.position, RIM)) return;   // vis-hoops-court: the broadcast intro holds the first possession (and the game clock)
+      if (shotClock.tick(dt, { token: possessionToken, ours: carrierId !== 'foeTeam', live: carrierId !== 'foeTeam' && !board && !arc.active && !mateArc.active && !shooting && !mateShooting && !dunking && !gather && !finish })) { shotClockViolation(ctx); return; }   // lane/hoops-shot-core: ELITE's shot clock
       // HOOPS KINETIC 3v3: the clocks, the vault, the overdrive's infinite turbo, the gauge on the HUD
       synergy.tick(dt); driftCool = Math.max(0, driftCool - dt); meBurstLeft = Math.max(0, meBurstLeft - dt); mateBurst[0] = Math.max(0, mateBurst[0] - dt); mateBurst[1] = Math.max(0, mateBurst[1] - dt);
       if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.char.root.position.set(q.x, q.y, q.z); me.drib.vel.set(0, 0, 0); if (u >= 1) vault = null; }
@@ -3134,7 +3137,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function rimTouches(a: ShotArc): void {
     for (const t of a.takeTouches()) {
       if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3V3-RIM] glass kiss`); }
-      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
+      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }
   /** All six bodies as the loose ball sees them — a floored or stunned body cannot go up for it. */
@@ -3912,6 +3915,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
   /** Their possession. IMPROVE (2026-10-06) #1: `cont` = the same possession carried on by a SWING — the receiver of their kick-out is
    *  the new ball-handler (no check, no chatter); he shoots it off the catch when he is open out there, else he attacks. */
+  /** lane/hoops-shot-core: ELITE's shot clock ran out on my team's ball — the Ref's call, and their ball (the out-of-bounds path's shape). */
+  function shotClockViolation(ctx: ModeContext): void {
+    const call = judge('shot_clock', { offense: 'me' });
+    if (call.whistle) SoundKit.play('whistle');
+    console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
+    putHud(ctx, { banner: `${call.banner} — THEIR BALL` });
+    bannerClearLater(ctx, 900);
+    mic?.say({ moment: 'game.foul' }); micSlump();
+    void opponentPossession(ctx);
+  }
   async function opponentPossession(ctx: ModeContext, cont?: SwingCatch): Promise<void> {
     if (ended) return;
     if (!cont && hoopsFx?.deadBall(() => opponentPossession(ctx))) return;   // vis-hoops-court: their ball is the other dead ball (a swing's catch, `cont`, is not one)
