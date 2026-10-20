@@ -57,7 +57,7 @@ import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running unde
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';
-import { stepAiHand, AI_HAND_IDLE, AI_HAND_RANGE_M, type AiHandState } from '../core/AiBallHand';   // hoops-handle (owner 10-17): the AI handlers' ball hand   // H2d (plan §3.8)
+import { stepAiHand, AI_HAND_IDLE, aiHandRangeM, type AiHandState } from '../core/AiBallHand';   // hoops-handle (owner 10-17): the AI handlers' ball hand   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, putbackDunkOn, PUTBACK_DUNK, oopCut, ALLEY_OOP, CONTEST_TRICK, contestTricksOn, trickPctFor } from '../core/GameDunks';
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';   // H2 leftovers: the in-air trick stick (1v1's)   // H2e: more dunks   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
@@ -1195,7 +1195,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (ab !== aiHandBody) { aiHand = AI_HAND_IDLE; aiHandBody = ab; }
         if (ab && ac) {
           const opp = (isFoe(ab) ? [me, ...mates] : foes).reduce<Body | null>((best, o) => o.stunSec > 0 || o.floored ? best : !best || distXZ(o.char.root.position, ab.char.root.position) < distXZ(best.char.root.position, ab.char.root.position) ? o : best, null);
-          const near = opp && distXZ(opp.char.root.position, ab.char.root.position) < AI_HAND_RANGE_M ? opp : null;
+          const near = opp && distXZ(opp.char.root.position, ab.char.root.position) < aiHandRangeM() ? opp : null;   // feel-panel: AI_HAND_RANGE_M as a feel knob
           const st = stepAiHand(aiHand, dt, { hand: ac.hand === 'Left' ? 'left' : 'right', away: near ? sideAwayFrom(ab.char.root.position, ab.char.root.rotation.y, near.char.root.position) : null, dribbling: ac.active && !ballReleased, moveActive: !!ac.move });
           aiHand = st.state;
           if (st.cross && ac.runMove('crossover', { pace: 1 })) { aiCrosses++; console.info(`[3V3-HANDLE] ai hand ${isFoe(ab) ? `foe${foes.indexOf(ab)}` : `mate${mates.indexOf(ab)}`} crosses → ${ac.hand} #${aiCrosses}`); }

@@ -122,3 +122,12 @@ export function isCoachStoreLive(env: NodeJS.ProcessEnv = process.env): boolean 
 export function isVirtualPurchasesEnabled(): boolean {
   return envOn('VIRTUAL_PURCHASES_ENABLED');
 }
+
+/**
+ * FEEL PANEL (owner, 2026-10-20) — the hidden feel-knob sliders (docs/FEEL-PANEL.md). Default OFF. The panel opens only while this
+ * is on AND the signed-in user passes lib/admin/requireAdmin (role === 'admin'); GET /api/feel-panel answers both. Even then an
+ * override applies only on this device, and only in an unpaid playtest run (lib/feel-panel/sessionGate.ts).
+ */
+export function isFeelPanelEnabled(): boolean {
+  return envOn('FEEL_PANEL_ENABLED');
+}
