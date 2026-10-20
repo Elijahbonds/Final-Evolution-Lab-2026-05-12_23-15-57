@@ -22,13 +22,25 @@ export function shotMeterWindow(green: unknown): { from: number; to: number } | 
   return g && g.length === 2 && g.every((v) => Number.isFinite(v)) ? { from: g[0] - g[1], to: g[0] + g[1] } : null;
 }
 
-export function HoopsShotMeter({ t, green }: { t: number; green: unknown }) {
+/** lane/hoops-shot-core (owner, 2026-10-20): THE PERFECT BAND inside the green. The mode publishes its half-width
+ *  (`shotMeterPerfect`, 0..1 — ShotWindow.perfectHud: the share ShotMeter.release() grades 'perfect' by) beside the green; this
+ *  centres it on the green and clamps it inside. A dunk's bar publishes '' and draws no band. The 3D bar has always drawn it. */
+export function shotMeterPerfect(green: unknown, perfect: unknown): { from: number; to: number } | null {
+  const w = shotMeterWindow(green);
+  const ph = typeof perfect === 'string' && perfect !== '' ? Number(perfect) : typeof perfect === 'number' ? perfect : NaN;
+  if (!w || !Number.isFinite(ph) || ph <= 0) return null;
+  const c = (w.from + w.to) / 2, half = Math.min(ph, (w.to - w.from) / 2);
+  return { from: c - half, to: c + half };
+}
+
+export function HoopsShotMeter({ t, green, perfect: perfectHalf }: { t: number; green: unknown; perfect?: unknown }) {
   const win = shotMeterWindow(green);
+  const perfect = shotMeterPerfect(green, perfectHalf);
   return (
     <HudMeter
       height="thick" width="16rem" framed
       value={t} max={1} tone="you" fillAlpha={SHOT_FILL_ALPHA}
-      segments={win ? [{ from: win.from, to: win.to, tone: 'good', alpha: 0.7 }] : undefined}
+      segments={win ? [{ from: win.from, to: win.to, tone: 'good', alpha: 0.7 }, ...(perfect ? [{ from: perfect.from, to: perfect.to, tone: 'score' as const, alpha: 0.95 }] : [])] : undefined}
       markers={[{ at: t, tone: 'text', width: 3, glow: true }]}
     />
   );

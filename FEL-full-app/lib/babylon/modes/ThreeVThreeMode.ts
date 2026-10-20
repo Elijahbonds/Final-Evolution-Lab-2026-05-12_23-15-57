@@ -171,6 +171,7 @@ import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
+import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
@@ -349,8 +350,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let meter3d: ShotMeter3DHandle | null = null; let hudGreen = '';
   let meReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
-    shotMeter.start(contest, style ?? 'jumper', gather ?? 0);
-    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`;
+    shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.char.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
+    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; if (ctx0) putHud(ctx0, { shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
@@ -2434,6 +2435,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     else if (quality === 'early') putHud(ctx, { banner: `EARLY${tag}` });
     else if (quality === 'late') putHud(ctx, { banner: `LATE${tag}` });
     else if (quality === 'brick') putHud(ctx, { banner: `WAY LATE${tag}` });
+    else { const g = releaseGradeLabel(quality, shotMeter.offsetSec, shotMeter.greenHalfSec); if (g) putHud(ctx, { banner: `${g}${tag}` }); }   // lane/hoops-shot-core: SLIGHTLY EARLY / LATE (ms) — odds unchanged
     // no clear here: the arc's make/miss banner replaces it and owns the timeout
     // the ball flies — score/possession resolve when it lands (update loop)
     arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, v3.play);   // Phase 8: a bank has rim play too   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
@@ -2508,7 +2510,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     else me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, flightTotal / 1000) });
     putHud(ctx, { shotType: picked3.label });
     // THE METER ON A DUNK (owner, 2026-09-18): the bar rides the flight clock — see the 1v1's
-    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`;
+    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`; putHud(ctx, { shotMeterPerfect: '' });   // lane/hoops-shot-core: a dunk's bar has no perfect band
     meter3d?.begin(showtime ? { center: SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K, half: SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K } : { center: DRIVE_DUNK.resolveK, half: 0.05 });
     if (showtime) {
       const dir = RIM_FLOOR.subtract(from); dir.y = 0; if (dir.lengthSquared() < 1e-4) dir.set(0, 0, -1); dir.normalize();

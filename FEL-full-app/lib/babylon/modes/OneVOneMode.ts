@@ -214,6 +214,7 @@ import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/Mo
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
+import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
 import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA #259/#262: the OPPONENT pick, PRO on a staked / head-to-head run (every mode reads runTier)
 import type { AmbientHandle } from '../visual/EffectsKit';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
@@ -489,8 +490,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   // same ShotMeter numbers the release is graded by
   let meter3d: ShotMeter3DHandle | null = null; let hudGreen = '';
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
-    shotMeter.start(contest, style ?? 'jumper', gather ?? 0);
-    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`;
+    shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
+    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; hud({ shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
@@ -2620,7 +2621,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     ctx.setHud({ shotType: picked.label });
     // THE METER ON A DUNK (owner, 2026-09-18: "make it trigger on layups and dunks"): the bar rides the flight clock —
     // showtime's green is the timed flush, a plain drive's green is the iron (the flush resolves there on its own)
-    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`;
+    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`; putHud(ctx, { shotMeterPerfect: '' });   // lane/hoops-shot-core: a dunk's bar has no perfect band
     meter3d?.begin(showtime ? { center: SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K, half: SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K } : { center: DRIVE_DUNK.resolveK, half: 0.05 });
     if (picked.flashy) ctx.camDirector.pulse(0.35, 0.4);
     console.info(`[1V1-DUNK] ${picked.label} (${picked.clip}) speed ${speedNow.toFixed(1)} lateral ${lateral01.toFixed(2)} contest ${(c.contested ? 1 : 0)} momentum ${mbus.score01.toFixed(2)}`);
@@ -3312,7 +3313,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       bannerFlash(ctx, `LATE${tag}`, 700);
     } else if (quality === 'brick') {
       bannerFlash(ctx, `WAY LATE${tag}`, 800);
-    }
+    } else { const g = releaseGradeLabel(quality, shotMeter.offsetSec, shotMeter.greenHalfSec); if (g) bannerFlash(ctx, `${g}${tag}`, 700); }   // lane/hoops-shot-core: SLIGHTLY EARLY / LATE (ms) — the grade's own words, odds unchanged
     if (!made) swing('miss');
     // What this shot earned, handed to the iron when the arc gets there. EARLY is rushed — short, off the
     // front. LATE is long, off the back. A brick sprays laterally. A hand in the face pushes it short on

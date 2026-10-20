@@ -24,6 +24,7 @@ import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: t
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
+import { PERFECT_BAND_SHARE } from './shotBands';   // lane/hoops-shot-core: the perfect band's share, one constant for the grade and both bars
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
   type OffenseJob, type DefenseJob, type ScreenState,
@@ -603,6 +604,16 @@ export class ShotMeter {
     if (!(factor > 1)) return;
     this.greenHalfWidth *= factor;
   }
+  /** lane/hoops-shot-core: NARROW the green after start() — distance (ShotWindow.distanceGreenFactor). The mirror of widenBy:
+   *  `factor` is never allowed to WIDEN (≥ 1 is a no-op) or close the window (floored at 0.5). The rise is untouched. */
+  narrowBy(factor: number): void {
+    if (!(factor < 1)) return;
+    this.greenHalfWidth *= Math.max(0.5, factor);
+  }
+  /** lane/hoops-shot-core: where the last release (or the bar now) sits against the green's centre, in SECONDS (− early, + late),
+   *  and the green's half-width in seconds — the finer banner grade reads both (ShotWindow.releaseGradeLabel). */
+  get offsetSec(): number { return (this.t - this.greenCenter) * this.duration; }
+  get greenHalfSec(): number { return this.greenHalfWidth * this.duration; }
   /** The gather's seconds at the front of the meter, and the rise's own seconds (pace the shot clip to THIS, not durationSec). */
   get gatherSec(): number { return this.gather; }
   get riseSec(): number { return this.rise; }
@@ -613,7 +624,7 @@ export class ShotMeter {
   release(): ShotQuality {
     this.active = false;
     const d = this.t - this.greenCenter;
-    if (Math.abs(d) <= this.greenHalfWidth * 0.35) return 'perfect';
+    if (Math.abs(d) <= this.greenHalfWidth * PERFECT_BAND_SHARE) return 'perfect';
     if (Math.abs(d) <= this.greenHalfWidth) return 'good';
     if (d < 0) return 'early';
     // YOU CANNOT HOLD A LAYUP. A meter that runs all the way out is a shot the player never released, and for a

@@ -144,7 +144,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       {/* shot meter */}
       {meter !== null && phase === 'playing' && (
         <div className="absolute inset-x-0 bottom-24 flex justify-center">
-          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} />
+          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} />
         </div>
       )}
 
