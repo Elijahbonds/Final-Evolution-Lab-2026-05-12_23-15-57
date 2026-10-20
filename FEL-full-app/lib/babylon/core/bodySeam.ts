@@ -19,6 +19,8 @@ import { resolveBodyProfile, cardLines, type BodyClaim, type BodyProfile } from 
 import { BodyFloor } from '@/lib/input/bodyFloor';
 import { BodySession } from './BodySession';
 import { EvidenceCounter, type SessionView } from './sessionStore';
+import { BODY_FIGHT } from '../combat/bodyFightFlags';
+import { isAdultAtLeast18 } from '@/lib/age/ageRules';
 
 export interface BodySeam {
   /** The mode's row, minus its claims. */
@@ -55,4 +57,44 @@ export function bodySeamFor(def: Pick<ModeDefinition, 'modeId' | 'body' | 'onBod
     // MOVEMENT PLAY P7: a mode that reads the body itself says its own lines (a combat mode's strikes, guard, slip, step)
     card: { modeId: def.modeId, key: profile.key, lines: def.body?.lines ? [...def.body.lines] : cardLines(profile), drives, later: profile.later },
   };
+}
+
+// FN-BOX-1 FIGHT-BODY-AGE-GATE (2026-10-19, PM queue: Karate VS is the boxing slot). The kid rule: under 18 plays with a
+// controller or a phone, never the camera. A fight mode's body path (its onBody, its claims, its P3 row's presses) is
+// offered only to a player whose birth year reads 18+ (ageRules.isAdultAtLeast18), and never in couch mode (FN-0, not
+// built: the host says so with `couch`). No birth year on file is refused: the gate fails closed. Refused, the mode runs
+// as a session-only row with no plan phase, so `drives` is false, the floor presses nothing, the card has no lines and
+// READY offers neither body play nor "coming" (bodyPlayChoice.bodyPlayOffer → null). Pad play is untouched.
+
+/** What the host knows when a fight mode mounts. A missing year is unknown, and unknown is refused. */
+export interface BodyAgeGate {
+  dobYear: number | null | undefined;
+  /** Couch mode (FN-0): several players on one screen. Always refused. */
+  couch: boolean;
+}
+
+/** The combat modes the body could play (bodyFightFlags' keys), by their row key. */
+const FIGHT_KEYS: ReadonlySet<string> = new Set(Object.keys(BODY_FIGHT));
+
+/** True when this player may be offered a fight mode's body path. */
+export function bodyFightAllowed(gate: BodyAgeGate, now: Date = new Date()): boolean {
+  return !gate.couch && isAdultAtLeast18(gate.dobYear, now);
+}
+
+/** The mode's row before its claims (its own profile, or the table's). */
+const rowOf = (def: Pick<ModeDefinition, 'modeId' | 'body'>): BodyProfile =>
+  resolveBodyProfile({ modeId: def.modeId, body: def.body?.profile ? { profile: def.body.profile } : undefined });
+
+/** True when `def` is a combat mode the body-fight gate covers. */
+export function isBodyFightMode(def: Pick<ModeDefinition, 'modeId' | 'body'>): boolean {
+  return FIGHT_KEYS.has(rowOf(def).key);
+}
+
+/**
+ * The definition the harness mounts: `def` itself when it is not a fight mode or the player may use the body, otherwise
+ * the same mode with no body path (no onBody, no claims, no presses, no plan phase to promise).
+ */
+export function gateBodyFight<D extends Pick<ModeDefinition, 'modeId' | 'body' | 'onBody'>>(def: D, gate: BodyAgeGate, now: Date = new Date()): D {
+  if (!isBodyFightMode(def) || bodyFightAllowed(gate, now)) return def;
+  return { ...def, body: { profile: { ...rowOf(def), bindings: [], later: 'L' } }, onBody: undefined };
 }
