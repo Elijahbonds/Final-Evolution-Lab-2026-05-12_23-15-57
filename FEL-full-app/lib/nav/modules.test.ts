@@ -124,7 +124,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   'lib/babylon/nutrition/FoodScan.tsx',
   'lib/babylon/platform/GenerationService.ts',
   'lib/babylon/server/subscriptionApi.ts',
-  'lib/locomotion/moves/MoveGraph.ts',
   // Everything else.
   'lib/cache/asset-cache.ts',
   'lib/competition/payoutMethods.ts',

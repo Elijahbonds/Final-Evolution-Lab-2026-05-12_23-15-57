@@ -13,7 +13,7 @@ import {
   SPIN_SEC, SPIN_TRAVEL, SPIN_SWEEP, SPIN_MIN_SPEED, SPIN_TRIGGER_RANGE, POST_SPIN_STICK_MIN,
   // wave 2: M7–M14
   gatherWish as legWish, runningHook, helpInTheWay, isPumpFake, PUMP_MAX_SEC, planStepThrough, STEP_THROUGH_SPEED,
-  pivotFrom, planPivot, PIVOT_FRONT_SWEEP, PIVOT_REVERSE_SWEEP, PIVOT_SEC, PIVOT_STICK_MIN,
+  pivotFrom, planPivot, pivotFreeFoot, PIVOT_FRONT_SWEEP, PIVOT_REVERSE_SWEEP, PIVOT_SEC, PIVOT_STICK_MIN,
   rimProtected, isReverseFinish, reverseSide, REVERSE_RANGE,
   inBankBand, bankPoint, BANK_MIN_DEG, BANK_MAX_DEG, BANK_UP,
   planHopStep, HOP_TRAVEL_MAX, HOP_SEC, planEuro, euroSell, euroAvailable, EURO_A_SEC, EURO_B_SEC,
@@ -303,15 +303,33 @@ describe('M5 — the jump hook', () => {
   });
 });
 
+import { spinSweepFor, SPIN_SWEEP_MIN, SPIN_SWEEP_MAX } from './HoopsMoves';
+describe('H2b: the spin\'s planted sweep and its step-out (plan §4.14 worked cases)', () => {
+  const deg = (r: number) => r * 180 / Math.PI, rad = (d: number) => d * Math.PI / 180;
+  it('a drive straight at the rim (exit 14° on): 270° planted, +104° stepped out, the turn going on the same way', () => {
+    const r = spinSweepFor(0, rad(14), 1); expect(deg(r.sweep)).toBeCloseTo(270, 6); expect(deg(r.stepOut)).toBeCloseTo(104, 6);
+  });
+  it('a post spin (the seal faces away: exit 180°–194° round): the half turn planted, nothing left to snap', () => {
+    for (const d of [180, 194]) { const r = spinSweepFor(0, rad(d), 1); expect(deg(r.sweep)).toBeCloseTo(d, 6); expect(r.stepOut).toBeCloseTo(0, 9); }
+  });
+  it('the worst case (45°) steps out 135°, never more; the mirror turns the other way', () => {
+    const r = spinSweepFor(0, rad(45), 1); expect(Math.abs(deg(r.stepOut))).toBeCloseTo(135, 6);
+    const m = spinSweepFor(0, rad(-14), -1); expect(deg(m.sweep)).toBeCloseTo(-270, 6); expect(deg(m.stepOut)).toBeCloseTo(-104, 6);
+    for (let d = 0; d < 360; d += 7) { const q = spinSweepFor(0.3, 0.3 + rad(d), 1); expect(Math.abs(q.stepOut)).toBeLessThanOrEqual(Math.PI * 0.75 + 1e-9); expect(Math.cos(q.sweep + q.stepOut - rad(d))).toBeCloseTo(1, 9); }
+  });
+});
+
 describe('M6 — the spin move', () => {
   const me = () => V(0, 2.6);
-  it('the foot plants on HIS side and the body turns the other way, a full revolution', () => {
+  // H2b (hoops-motion plan §4.14) rewrote the sweep lines of this case, as the plan names: the sweep is the turn to the exit held to
+  // π…1.5π (a full revolution then a one-frame snap to the exit was the defect); the side and pivot asserts stay
+  it('the foot plants on HIS side and the body turns the other way, a planted sweep of a half to three-quarters of a turn', () => {
     const right = planSpin(me(), PI, RIM, V(-0.9, 2.2));    // he is on my right (−x at yaw π)
     expect(right.side).toBe('left');
-    expect(right.sweep).toBeCloseTo(-SPIN_SWEEP, 5);
+    expect(right.sweep).toBeLessThanOrEqual(-SPIN_SWEEP_MIN + 1e-9); expect(right.sweep).toBeGreaterThanOrEqual(-SPIN_SWEEP_MAX - 1e-9);
     expect(right.pivot.x).toBeLessThan(me().x);             // the pivot foot toward him
     const left = planSpin(me(), PI, RIM, V(0.9, 2.2));
-    expect(left.side).toBe('right'); expect(left.sweep).toBeCloseTo(SPIN_SWEEP, 5);
+    expect(left.side).toBe('right'); expect(left.sweep).toBeGreaterThanOrEqual(SPIN_SWEEP_MIN - 1e-9); expect(left.sweep).toBeLessThanOrEqual(SPIN_SWEEP_MAX + 1e-9);
     expect(left.pivot.x).toBeGreaterThan(me().x);
     expect(planSpin(me(), PI, RIM, null).side).toBe('right');           // nobody there: off the right shoulder
     expect(planSpin(me(), PI, RIM, V(-0.9, 2.2), 'right').side).toBe('right');   // the post's own stick overrides the read
@@ -324,11 +342,15 @@ describe('M6 — the spin move', () => {
     expect(dot).toBeGreaterThan(0.9);                        // at the rim …
     expect(dot).toBeLessThan(0.999);                         // … but leaned off it, past his shoulder
   });
-  it('a readable PIVOT: the turn is eased and monotonic, never a snap, and it lands on the exit facing', () => {
+  // H2b rewrote the landing line (plan §4.14): the planted sweep plus the step-out lands on the exit (mod 2π); the step-out is turned
+  // after the plant by the loop, never written in one frame
+  it('a readable PIVOT: the turn is eased and monotonic, never a snap, and sweep + step-out lands on the exit facing', () => {
     const p = planSpin(me(), PI, RIM, V(-0.9, 2.2));
     expect(spinEase(0)).toBe(0); expect(spinEase(1)).toBe(1); expect(spinEase(0.5)).toBeCloseTo(0.5, 5);
     expect(spinYaw(p, 0)).toBeCloseTo(PI, 5);
-    expect(spinYaw(p, p.sec)).toBeCloseTo(PI - SPIN_SWEEP, 5);           // a full turn: the same facing, gone all the way round
+    const exitYaw = Math.atan2(p.exit.x, p.exit.z), land = spinYaw(p, p.sec) + (p.stepOut ?? 0);
+    expect(Math.cos(land - exitYaw)).toBeCloseTo(1, 9);                   // on the exit, mod 2π
+    expect(Math.abs(p.stepOut ?? 0)).toBeLessThanOrEqual(Math.PI * 0.75 + 1e-9);   // ≤ 135°: the short way is the planned way
     let prev = spinYaw(p, 0), maxStep = 0;
     for (let t = 1 / 60; t <= p.sec + 1e-9; t += 1 / 60) {
       const y = spinYaw(p, t);
@@ -778,5 +800,22 @@ describe('THE 2K PRO STICK: the L2 step-back dribble', () => {
     expect(planGather(new Vector3(0, 0, -1.5), me, rim, 0, 1).kind).toBe('stepback');
     expect(planGather(new Vector3(0, 0, -1.5), me, rim, 0, 0.6).kind).not.toBe('stepback');
     expect(planGather(new Vector3(0, 0, -1.5), me, rim, 0.5, 0.6).kind).toBe('stepback');
+  });
+});
+
+describe('H2b: the pivot clip is named by the FREE foot (pivotFreeFoot)', () => {
+  // the free foot is the one AWAY from planPivot's pivot point: the pivot point sits on the other side of the body
+  for (const [side, reverse] of [['right', false], ['left', false], ['right', true], ['left', true]] as const) {
+    it(`${reverse ? 'reverse' : 'front'} pivot to the ${side}: the free foot is on the far side of the pivot point`, () => {
+      const yaw = 0.7, at = V(1, 4);
+      const plan = planPivot(at, yaw, side, reverse);
+      const lat = (plan.pivot.x - at.x) * Math.cos(yaw) - (plan.pivot.z - at.z) * Math.sin(yaw);   // + = the body's right (athleteRight)
+      const pivotFoot = lat > 0 ? 'right' : 'left';
+      expect(pivotFreeFoot(side, reverse)).toBe(pivotFoot === 'right' ? 'left' : 'right');
+    });
+  }
+  it('a front pivot steps with the turn\'s own foot; a reverse with the other', () => {
+    expect(pivotFreeFoot('right', false)).toBe('right'); expect(pivotFreeFoot('left', false)).toBe('left');
+    expect(pivotFreeFoot('right', true)).toBe('left'); expect(pivotFreeFoot('left', true)).toBe('right');
   });
 });

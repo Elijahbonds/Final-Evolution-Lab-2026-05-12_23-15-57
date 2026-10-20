@@ -82,12 +82,24 @@ export function renameStampCommand(id: string, name: string): Command {
 export function placeStamp(v: StudioVenue, stamp: StudioStamp, at: V3, snap?: SnapSettings): { cmd: Command; ids: string[] } | null {
   if (!stamp.objects.length || v.objects.length + stamp.objects.length > LIMITS.objects) return null;
   const base = snap ? snapTransform({ p: at, ry: 0, s: 1 }, snap).p : at;
-  const seen = new Set(v.objects.map((o) => o.id));
-  const objects: StudioObject[] = [];
-  for (const src of stamp.objects) {
-    const o = sanitizeObject({ ...structuredClone(src), id: newId(src.type), t: { ...src.t, p: [base[0] + src.t.p[0], base[1] + src.t.p[1], base[2] + src.t.p[2]] } }, seen);
-    if (o) objects.push(o);
-  }
+  const objects = stampCopies(stamp, base, 0, new Set(v.objects.map((o) => o.id)));
   if (!objects.length) return null;
   return { cmd: { label: `Place ${stamp.name}`, ops: objects.map((object) => ({ op: 'addObject' as const, venueId: v.id, object })) }, ids: objects.map((o) => o.id) };
+}
+
+/**
+ * studio-5 (§13.2): a stamp's pieces as fresh objects at `at`, turned `yaw` (radians) about the stamp's own origin — Babylon's yaw,
+ * as the group gizmo turns a selection (group.ts applyDelta): (x, z) → (x cos θ + z sin θ, −x sin θ + z cos θ), each piece's own
+ * ry + θ. Fresh ids, each through the import sanitiser (`seen` collects the ids). A yaw of 0 is placeStamp's own placement.
+ */
+export function stampCopies(stamp: StudioStamp, at: V3, yaw: number, seen: Set<string>): StudioObject[] {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const out: StudioObject[] = [];
+  for (const src of stamp.objects) {
+    const [x, y, z] = src.t.p;
+    const p: V3 = yaw ? [at[0] + x * c + z * s, at[1] + y, at[2] - x * s + z * c] : [at[0] + x, at[1] + y, at[2] + z];
+    const o = sanitizeObject({ ...structuredClone(src), id: newId(src.type), t: { ...src.t, p, ...(yaw ? { ry: src.t.ry + yaw } : {}) } }, seen);
+    if (o) out.push(o);
+  }
+  return out;
 }

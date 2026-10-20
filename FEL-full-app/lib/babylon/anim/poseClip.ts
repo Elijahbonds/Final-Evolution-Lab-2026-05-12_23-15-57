@@ -38,6 +38,14 @@ export interface PoseKey {
    * bends it roughly another 10°. Wins over `hands` for the same side when both are given.
    */
   handsRel?: { Left?: [number, number, number]; Right?: [number, number, number] };
+  /**
+   * Wrist targets in THIS BODY's own metres from the root (+x right, +y up, +z forward) — no reference scaling (HOOPS MOTION phase 4c,
+   * 2026-09-29). `hands` is authored for the reference body and re-expressed for each one (its height, its arm), which is right for a pose;
+   * it is wrong for a point a body-specific thing puts there — the handle moves' ball path (anim/handlePaths) is laid on each body's own
+   * dribble stance (its fitted palm), so a v2 handle clip keys its hands where THAT body's path touches the ball. The point is where the hand
+   * is in the FINAL pose (after the key's hipsY). Wins over `hands` for the same side; `handsRel` wins over both.
+   */
+  handsBody?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Elbow pole directions (body-local); default: out to the side and back. */
   poles?: { Left?: [number, number, number]; Right?: [number, number, number] };
   /** Ankle targets, body-local metres. */
@@ -48,6 +56,15 @@ export interface PoseKey {
    * Spider-Man's back leg has to turn its knee out to the side while it is bent and only face the court once it is nearly straight.
    */
   kneePoles?: { Left?: [number, number, number]; Right?: [number, number, number] };
+  /**
+   * HOOPS MOTION phase 4c (2026-09-29): each leg this key poses with `bones` (and no `feet` target) is solved again to the ankle those bones
+   * put there, the knee toward the body's front — the pole the runtime foot planter uses (FootPlanting: `root.forward`). The planter twists
+   * a planted leg's knee to that pole on every frame it holds the foot, and lets the clip's own knee show on a touchdown frame (the pin
+   * starts where the ankle is: no drift, no solve): a clip whose knee faces elsewhere flicks between the two. The v2 handle clips turned the
+   * hips 24–28° with the legs keyed wide, and the knees sat 22–39° off the planter's pole (0.10–0.14 m at the knee; the phase-1 hesi and
+   * the idle 6–7°) — 4c's probe read it as one-frame thigh pops of 1000–2100°/s on every crossing clip. Same ankles, the knee on the pole.
+   */
+  kneesFront?: boolean;
   /** Hips vertical offset (metres) — the only translation a clip carries. */
   hipsY?: number;
   /** A smooth clip eases to a stop on this key (zero velocity in and out): the top of a wind-up, a held accent. */
@@ -180,7 +197,7 @@ export function closesLoop(keys: PoseKey[], duration: number): boolean {
   const a = keys[0], b = keys[keys.length - 1];
   if (Math.abs(a.t) > 1e-6 || Math.abs(b.t - duration) > 1e-3) return false;
   const same = (x: unknown, y: unknown): boolean => JSON.stringify(x ?? null) === JSON.stringify(y ?? null);
-  return same(a.bones, b.bones) && same(a.hands, b.hands) && same(a.handsRel, b.handsRel) && same(a.poles, b.poles) && same(a.feet, b.feet) && same(a.kneePoles, b.kneePoles) && (a.hipsY ?? 0) === (b.hipsY ?? 0);
+  return same(a.bones, b.bones) && same(a.hands, b.hands) && same(a.handsRel, b.handsRel) && same(a.handsBody, b.handsBody) && same(a.poles, b.poles) && same(a.feet, b.feet) && same(a.kneePoles, b.kneePoles) && (a.hipsY ?? 0) === (b.hipsY ?? 0);
 }
 
 export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration: number, keys: PoseKey[], opts: PoseClipOpts = {}): AnimationGroup | null {
@@ -282,15 +299,16 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     refresh();
     // 2) hands
     for (const side of ['Left', 'Right'] as const) {
-      const rel = key.handsRel?.[side]; const tgt = key.hands?.[side]; const arm = arms[side];
-      if (!arm || (!rel && !tgt)) continue;
+      const rel = key.handsRel?.[side]; const body = key.handsBody?.[side]; const tgt = key.hands?.[side]; const arm = arms[side];
+      if (!arm || (!rel && !body && !tgt)) continue;
       const pole = key.poles?.[side] ?? [side === 'Left' ? -0.7 : 0.7, -0.2, -0.5];
       let world: Vector3;
       if (rel) {
         const r = ratios.arm[side];
         arm.shoulder.computeWorldMatrix(true);
         world = arm.shoulder.getAbsolutePosition().add(inBody([rel[0] * r, rel[1] * r, rel[2] * r]));
-      } else world = forLimb(tgt as [number, number, number], arm.shoulder, ratios.arm[side]);
+      } else if (body) world = rootPos.add(inBody(body)).addInPlace(bodyFrame.up.scale(-(key.hipsY ?? 0) * scale));   // (this body's own metres IN THE FINAL POSE — phase 4c's handsBody: the key is solved with the hips at bind and hipsY then lowers the whole body, so the target is raised by it here)
+      else world = forLimb(tgt as [number, number, number], arm.shoulder, ratios.arm[side]);
       // DUNK MOTION phase 9: the dunk family's elbows point where an elbow can (HandIK.anatomicalElbowPole): an authored pole in the
       // forbidden half turned into the allowed one, a missing one the upper arm's natural back plus a flare out to its own side
       let poleW = inBody(pole);
@@ -334,15 +352,20 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     }
     // 3) feet
     for (const side of ['Left', 'Right'] as const) {
-      const tgt = key.feet?.[side]; if (!tgt) continue;
+      const tgt = key.feet?.[side];
       const [h, k, a] = legs[side].map((b) => nodes.get(b)); if (!h || !k || !a) continue;
+      if (!tgt) {
+        // phase 4c kneesFront: the keyed leg, to its own ankle, the knee toward the body's front (the foot planter's pole)
+        if (key.kneesFront) { a.computeWorldMatrix(true); plantLeg(h, k, a, a.getAbsolutePosition().clone(), bodyFrame.front); refresh(); }
+        continue;
+      }
       const kp = key.kneePoles?.[side];
       plantLeg(h, k, a, forLimb(tgt, h, ratios.leg[side]), kp ? inBody(kp).normalize() : bodyFrame.front);   // the knee toward the body's front
       refresh();
     }
     // 4) read back local rotations for every bone the key touched
     const touched = new Set<string>(Object.keys(key.bones ?? {}));
-    for (const side of ['Left', 'Right'] as const) { if (key.hands?.[side] || key.handsRel?.[side]) for (const b of ARM_BONES) if (b.startsWith(side)) touched.add(b); if (key.feet?.[side]) for (const b of LEG_BONES) if (b.startsWith(side)) touched.add(b); }
+    for (const side of ['Left', 'Right'] as const) { if (key.hands?.[side] || key.handsRel?.[side] || key.handsBody?.[side]) for (const b of ARM_BONES) if (b.startsWith(side)) touched.add(b); if (key.feet?.[side] || key.kneesFront) for (const b of LEG_BONES) if (b.startsWith(side)) touched.add(b); }
     for (const bone of touched) { const n = nodes.get(bone); if (n?.rotationQuaternion) push(bone, key.t, n.rotationQuaternion); }
     if (key.hipsY != null) hipsY.push([key.t, key.hipsY * scale]);
   }

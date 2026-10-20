@@ -80,7 +80,8 @@ describe('the seven TEMP speed pins play the duration they did before the fps fi
 
 describe('the hoops captures: loops at real speed, one-shots on their beat', () => {
   const LOOPS = ['bball_mc_run', 'bball_mc_dribble_run', 'bball_mc_drive', 'bball_mc_defend_slide_right', 'bball_mc_defend_slide_left', 'bball_mc_defend_backpedal',
-    'bball_mc_defend_slide_hard_right', 'bball_mc_defend_slide_hard_left', 'bball_mc_dribble_walk', 'bball_mc_dribble_jog', 'bball_mc_dribble_idle', 'bball_mc_defend_stance'];
+    'bball_mc_defend_slide_hard_right', 'bball_mc_defend_slide_hard_left', 'bball_mc_dribble_walk', 'bball_mc_dribble_jog', 'bball_mc_dribble_idle', 'bball_mc_defend_stance',
+    'bball_mc_dribble_side_left', 'bball_mc_dribble_side_right', 'bball_mc_dribble_back'];   // H2d (plan §4.19): the carrier's side and back dribbles
   it.each(LOOPS)('%s: no `duration` in the manifest, played span = cut span (0.9–1.15× real at rate 1)', (name) => {
     const e = entry(name)!, b = built(name)!;
     expect(e.loop).toBe(true);
@@ -107,6 +108,7 @@ describe('HOOPS_STRIDE_CAPTURE: each state paces against the clip it plays (scri
     bball_mc_run: 4.69, bball_mc_dribble_run: 4.57, bball_mc_drive: 4.57, bball_mc_dribble_jog: 3.87, bball_mc_dribble_walk: 0.97,
     bball_mc_defend_slide_left: 2.4, bball_mc_defend_slide_right: 1.7, bball_mc_defend_slide_hard_left: 2.69, bball_mc_defend_slide_hard_right: 2.69,
     bball_mc_defend_backpedal: 3.31,
+    bball_mc_dribble_side_left: 1.42, bball_mc_dribble_side_right: 1.42, bball_mc_dribble_back: 1.17,   // H2d (scripts/mocap/clip-strides.mts)
   };
   // a hoops rig (the 1v1 scope) owns the captures the scope allows and the tree's own clips
   const hoops = scopeForMode('onevone');
@@ -218,5 +220,37 @@ describe('N4: the re-rooted hoops one-shots, and the regeneration leaves every o
   it('the byte-identical list is every non-hoops capture plus the style pins', () => {
     expect(MOCAP_OPPONENT_CLIPS.filter((c) => !c.name.startsWith('bball_mc_')).every((c) => c.name in BEFORE)).toBe(true);
     for (const n of ['football_mc_run', 'karate_mc_uppercut', 'trick_jump_spin_kick', 'trick_cartwheel', 'cap_escape', 'pk_backflip', 'pk_360_jump']) expect(BEFORE).toHaveProperty(n);
+  });
+});
+
+// ── HOOPS MOTION phase 4a (plan §3.1): MOCAP_REAL_SEC — the real seconds in each hoops capture one-shot, for moveRateFor ──────────────
+import { MOCAP_REAL_SEC } from './mocapOpponents';
+import { moveRateFor } from '../../core/HandleSystem';
+describe('MOCAP_REAL_SEC (generated beside the clips; every clip row byte-identical)', () => {
+  const oneShots = MOCAP_OPPONENT_CLIPS.filter((c) => /^bball_mc_/.test(c.name) && !c.loop);
+  it('has exactly the hoops capture one-shots — no loop (StrideMatch paces those), no other family', () => {
+    expect(Object.keys(MOCAP_REAL_SEC).sort()).toEqual(oneShots.map((c) => c.name).sort());
+    expect(Object.keys(MOCAP_REAL_SEC).length).toBe(14);
+  });
+  it('each is its window in true seconds: the manifest\'s to − from, the same as the clip\'s own source line', () => {
+    for (const c of oneShots) {
+      const e = entry(c.name)!; const w = windowOf(c);
+      expect(MOCAP_REAL_SEC[c.name], c.name).toBeCloseTo(e.to - e.from, 9);
+      expect(MOCAP_REAL_SEC[c.name], c.name).toBeCloseTo(w.to - w.from, 9);
+    }
+  });
+  it('played through moveRateFor each one-shot runs its real seconds at rate 1 and 1.25× real on the turbo (today: up to 2.6× on the pivot)', () => {
+    for (const c of oneShots) {
+      const real = MOCAP_REAL_SEC[c.name];
+      expect(c.duration / moveRateFor(real, c.duration, false), c.name).toBeCloseTo(real, 9);
+      expect(real / (c.duration / moveRateFor(real, c.duration, true)), c.name).toBeCloseTo(1.25, 9);
+    }
+    // what the table shows today (the clip played at its own duration): real seconds per played second
+    expect(MOCAP_REAL_SEC.bball_mc_pivot / MOCAP_OPPONENT_CLIPS.find((c) => c.name === 'bball_mc_pivot')!.duration).toBeCloseTo(2, 9);
+  });
+  it('sits AFTER the clips in the module, so a regeneration that adds it moves no clip row', () => {
+    const src = readFileSync('lib/babylon/anim/authored/mocapOpponents.ts', 'utf8');
+    expect(src.indexOf('export const MOCAP_REAL_SEC')).toBeGreaterThan(src.indexOf('export function buildMocapOpponentClip'));
+    expect(src.trimEnd().endsWith('};')).toBe(true);
   });
 });

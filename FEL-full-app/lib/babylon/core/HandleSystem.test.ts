@@ -650,18 +650,20 @@ describe('MOVE_CLIP', () => {
   });
 
   it('the sided moves name a different clip for each side — that was the bug, on the crossover itself', () => {
-    for (const move of ['crossover', 'in_and_out', 'between_legs', 'behind_back', 'double_cross', 'shammgod'] as HandleMove[]) {
+    // (H2b added the snatchback: its v2 crosses the ball on its own path, so it is named for the side the ball ends on — plan §4.13)
+    for (const move of ['crossover', 'in_and_out', 'between_legs', 'behind_back', 'double_cross', 'shammgod', 'snatch_back'] as HandleMove[]) {
       const l = moveClip(move, 'left'), r = moveClip(move, 'right');
       expect(l).toBeTruthy(); expect(r).toBeTruthy();
       expect(l).not.toBe(r);
     }
   });
 
-  it('the sideless ones give the same clip either way, and the mode-owned ones give none', () => {
-    for (const move of ['hesi', 'yoyo', 'snatch_back'] as HandleMove[]) {
-      expect(moveClip(move, 'left')).toBe(moveClip(move, 'right'));
-      expect(moveClip(move, 'left')).toBeTruthy();
-    }
+  // H2b rewrote this case's list (plan §4.8, §4.13): the hesi and the yoyo left it — their v2 clips are played in the ball's hand (a
+  // right-hand clip and its mirror) — and so did its last sideless member, the snatchback (sided now: the case above)
+  it('no handle move is sideless any more, and the mode-owned ones give none; the hesi plays in the ball\'s hand', () => {
+    expect(moveClip('hesi', 'right')).toBe('bball_hesi_v2_right'); expect(moveClip('hesi', 'left')).toBe('bball_hesi_v2_left');
+    expect(moveClip('yoyo', 'right')).toBe('bball_yoyo_v2_right'); expect(moveClip('yoyo', 'left')).toBe('bball_yoyo_v2_left');   // (H2b: the yoyo too)
+    expect(moveClip('snatch_back', 'left')).toBe('bball_snatch_back_v2_left'); expect(moveClip('snatch_back', 'right')).toBe('bball_snatch_back_v2_right');
     // a spin turns the whole body and an off-the-head throws the ball at somebody: the modes render those
     expect(moveClip('spin', 'left')).toBeNull();
     expect(moveClip('off_the_head', 'left')).toBeNull();
@@ -677,7 +679,7 @@ describe('MOVE_CLIP', () => {
   });
 });
 
-import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE, STICK_ONLY, canChain, pushChain, MOMENTUM_REPEATABLE } from './HandleSystem';
+import { moveRate, moveFadeSec, MOVE_RATE_TURBO, MOVE_RATE_BASE, STICK_ONLY, MOMENTUM_REPEATABLE } from './HandleSystem';   // (4b: canChain / pushChain are the top import's — the duplicate was a TS2300)
 describe('move pace on the turbo', () => {
   it('a move on the turbo plays faster with a shorter fade; off it, the capture\'s own pace', () => {
     expect(moveRate(true)).toBe(MOVE_RATE_TURBO); expect(moveRate(false)).toBe(MOVE_RATE_BASE);
@@ -733,5 +735,164 @@ describe('flickClip — every move a left-stick flick can become has a body', ()
     const clipless = new Set<HandleMove>();
     for (const handle of [0, 50, 92, 100]) for (const r of grid()) { const m = moveFromContext(r, handle); if (!moveClip(m, 'left')) clipless.add(m); }
     expect([...clipless]).toEqual(['off_the_head']);
+  });
+});
+
+// ── HOOPS MOTION phase 4a (plan §3.1, §6): the shape of each move, its end hand, its pace ─────────────────────────────────────────
+import { MOVE_SHAPE, endHandFor, moveRateFor, MOVE_TURBO_REAL } from './HandleSystem';
+describe('MOVE_SHAPE — one row per move, the data the phase 4 renderer plays', () => {
+  const MOVES = Object.keys(MOVE_HANDLE) as HandleMove[];
+  it('covers every HandleMove, and nothing else', () => {
+    expect(Object.keys(MOVE_SHAPE).sort()).toEqual([...MOVES].sort());
+  });
+  it('off the head is the mode\'s (the release, the loose ball, the stun stay where they are): no path, no crossing; every other move is the renderer\'s', () => {
+    expect(MOVE_SHAPE.off_the_head).toMatchObject({ owner: 'mode', path: 'none', crosses: 0 });
+    for (const m of MOVES.filter((x) => x !== 'off_the_head')) expect(MOVE_SHAPE[m].owner, m).toBe('motion');
+  });
+  it('a move displaces the body in the shape exactly when moveImpulse moves it today (the call sites keep their impulses)', () => {
+    for (const m of MOVES) expect(MOVE_SHAPE[m].impulse, m).toBe(movesTheBody(m));
+  });
+  it('every move links in the chain today (the spin at its exit), and its read and exposure are fractions of the move', () => {
+    for (const m of MOVES) {
+      const s = MOVE_SHAPE[m];
+      expect(s.chain, m).toBe(true);
+      if (s.readAtK !== null) { expect(s.readAtK).toBeGreaterThan(0); expect(s.readAtK).toBeLessThan(1); }
+      if (s.exposed) { expect(s.exposed.from).toBeGreaterThanOrEqual(0); expect(s.exposed.to).toBeLessThanOrEqual(1); expect(s.exposed.from).toBeLessThan(s.exposed.to); expect(s.exposed.level).toBeGreaterThan(0); expect(s.exposed.level).toBeLessThanOrEqual(1); }
+    }
+  });
+  it('the moves that throw the ball across cross it; the fakes, the step-back and off the head keep it; the double and the roll cross back', () => {
+    for (const m of ['crossover', 'momentum_cross', 'between_legs', 'behind_back', 'momentum_btb', 'shammgod', 'spin', 'snatch_back'] as const) expect(MOVE_SHAPE[m].crosses, m).toBe(1);
+    for (const m of ['in_and_out', 'slip_slide', 'hesi', 'yoyo', 'stepback', 'off_the_head'] as const) expect(MOVE_SHAPE[m].crosses, m).toBe(0);
+    for (const m of ['double_cross', 'steezo_roll'] as const) expect(MOVE_SHAPE[m].crosses, m).toBe(2);
+  });
+  it('the path family names the clip\'s own shape: between for between, behind for the wraps, a feint for the in-and-out and the slip', () => {
+    expect(MOVE_SHAPE.between_legs.path).toBe('between');
+    for (const m of ['behind_back', 'momentum_btb', 'steezo_roll'] as const) expect(MOVE_SHAPE[m].path, m).toBe('behind');
+    for (const m of ['in_and_out', 'slip_slide'] as const) expect(MOVE_SHAPE[m].path, m).toBe('feint');
+    expect(MOVE_SHAPE.spin.path).toBe('pull'); expect(MOVE_SHAPE.shammgod.path).toBe('pushOut'); expect(MOVE_SHAPE.hesi.path).toBe('float');
+  });
+});
+describe('endHandFor — a crossing ends in the OTHER hand, whatever the defender read says (plan §3.1)', () => {
+  it('one crossing flips the hand, none or two keep it', () => {
+    for (const m of Object.keys(MOVE_SHAPE) as HandleMove[]) for (const h of ['left', 'right'] as const) {
+      expect(endHandFor(m, h), `${m} from ${h}`).toBe(MOVE_SHAPE[m].crosses === 1 ? (h === 'left' ? 'right' : 'left') : h);
+    }
+  });
+});
+describe('moveRateFor — a move plays at REAL speed, 1.25× real on the turbo (owner Q3)', () => {
+  it('plays a clip holding realSec of motion in realSec: rate = playedSec / realSec', () => {
+    expect(moveRateFor(0.48, 0.45, false)).toBeCloseTo(0.9375, 12);   // the crossover capture: 0.48 s of motion in a 0.45 s clip
+    expect(0.45 / moveRateFor(0.48, 0.45, false)).toBeCloseTo(0.48, 12);
+    expect(moveRateFor(0.35, 0.35, false)).toBe(1);                     // an authored clip: its realSec is its duration
+  });
+  it('the turbo is 1.25× real — never faster — against today\'s flat 1.35× on top of captures that already play fast', () => {
+    expect(MOVE_TURBO_REAL).toBe(1.25);
+    for (const [real, played] of [[0.48, 0.45], [0.7, 0.55], [0.75, 0.6], [1.1, 0.55], [0.42, 0.42]]) {
+      const r = moveRateFor(real, played, true);
+      expect((real / (played / r)), `${real} in ${played}`).toBeCloseTo(1.25, 12);   // real seconds per played second
+    }
+    // the OLD flat rate (1.35, until H2) on the feint capture (0.70 s in 0.55 s) was 1.72× real on the turbo — moveRateFor holds it to 1.25.
+    // H2 rewrote this line: it read MOVE_RATE_TURBO, which is now 1.25 itself (the owner's pick); the 1.35 it described is pinned as a literal.
+    expect((0.7 / 0.55) * 1.35).toBeGreaterThan(1.7);
+    expect(MOVE_TURBO_REAL).toBeGreaterThan(1.2);   // the intent of the MOVE_RATE_TURBO > 1.2 pin above: the turbo still reads faster
+  });
+  it('H2: the renderer\'s turbo rate IS the real-speed turbo (owner Q3 / decision 10: 1.35 → 1.25) — the clip and its ball path share a pace', () => {
+    expect(MOVE_RATE_TURBO).toBe(MOVE_TURBO_REAL);
+    expect(moveRateFor(0.55, 0.55, true)).toBe(MOVE_RATE_TURBO);   // the hesi's capture: 0.55 s of motion in 0.55 s
+  });
+  it('degenerate inputs play at rate 1 (and the turbo on top): no division by zero reaches the tree', () => {
+    expect(moveRateFor(0, 0.5, false)).toBe(1); expect(moveRateFor(0.5, 0, false)).toBe(1); expect(moveRateFor(0, 0, true)).toBe(1.25);
+  });
+});
+
+// HOOPS MOTION phase 4b (plan §3.1, U18): the impulse signed by the MOVE, not by where the defender stands
+import { impulseFor } from './HandleSystem';
+describe('impulseFor (U18)', () => {
+  it('the lateral goes to the side named (+ right), the forward part unchanged; the fakes still move nothing', () => {
+    for (const m of ['crossover', 'between_legs', 'behind_back', 'double_cross', 'shammgod', 'slip_slide', 'snatch_back'] as const) {
+      const i = moveImpulse(m);
+      expect(impulseFor(m, 'right'), m).toEqual({ forward: i.forward, lateral: i.lateral });
+      expect(impulseFor(m, 'left'), m).toEqual({ forward: i.forward, lateral: -i.lateral });
+    }
+    for (const m of ['hesi', 'yoyo', 'in_and_out', 'spin', 'off_the_head'] as const) { expect(impulseFor(m, 'left').lateral === 0 || Object.is(impulseFor(m, 'left').lateral, -0)).toBe(true); expect(impulseFor(m, 'left').forward).toBe(0); }
+  });
+});
+
+
+// ── H2 (owner, 2026-10-16): every move UNLOCKED until H9 — the gate handle owns them, the player's handle still prices them ──────────
+import { MOVES_UNLOCKED_GATE, BASELINE_HANDLE as BASE_H2, MOVE_HANDLE as MH_H2, resolveHandleMove as rhm, canChain as cc, ankleBreakOdds as abo } from './HandleSystem';
+describe('MOVES_UNLOCKED_GATE (H2: unlock all moves until H9)', () => {
+  const live = { present: true, closing: true, set: false, within: true };
+  it('owns every move in the vocabulary', () => {
+    for (const m of Object.keys(MH_H2) as (keyof typeof MH_H2)[]) expect(MH_H2[m], m).toBeLessThanOrEqual(MOVES_UNLOCKED_GATE);
+  });
+  it('a baseline handle with the gate throws the shammgod — the move is owned, nothing refused', () => {
+    expect(rhm('shammgod', { last: null, since: Infinity, length: 0 }, BASE_H2, live, () => 0.99).owned).toBe(false);   // no gate: refused, as before
+    const o = rhm('shammgod', { last: null, since: Infinity, length: 0 }, BASE_H2, live, () => 0.99, MOVES_UNLOCKED_GATE);
+    expect(o.owned).toBe(true); expect(o.chain.length).toBe(1);
+  });
+  it('the odds are still the PLAYER\'s handle, not the gate\'s: an unlocked move at 50 rolls the 50 odds', () => {
+    const o = rhm('behind_back', { last: null, since: Infinity, length: 0 }, BASE_H2, live, () => 0.0, MOVES_UNLOCKED_GATE);
+    expect(o.odds).toBeCloseTo(abo({ chainLength: 1, handle: BASE_H2, defenderClosing: true, defenderSet: false, move: 'behind_back' }), 12);
+  });
+  it('an unlocked move CHAINS (canChain reads the gate for ownership, the handle for the window)', () => {
+    const st = { last: 'crossover' as const, since: 0.2, length: 1 };
+    expect(cc('double_cross', st, BASE_H2)).toBe(false);                       // 72 > 50: not owned, as before
+    expect(cc('double_cross', st, BASE_H2, MOVES_UNLOCKED_GATE)).toBe(true);   // owned at the gate, inside 50's window (0.44 s)
+    expect(cc('double_cross', { ...st, since: 0.6 }, BASE_H2, MOVES_UNLOCKED_GATE)).toBe(false);   // past 50's window: the gate does not widen it
+  });
+});
+
+// ── H2 (owner, 2026-10-16): the DOUBLE MOVES chain through the spam guard ───────────────────────────────────────────────────────────
+import { doubleMoveOf, DOUBLE_MOVES, pushChain as pc2, canChain as cc2, resolveHandleMove as rhm2, chainWindowSec as cws2 } from './HandleSystem';
+describe('the double moves (H2): behind → behind, between → behind', () => {
+  const after = (m: 'behind_back' | 'between_legs') => pc2(m, { last: null, since: Infinity, length: 0 }, 50);
+  it('behind then behind inside the window CHAINS (the spam guard lets this one repeat), and is named', () => {
+    const st = { ...after('behind_back'), since: 0.3 };
+    expect(cc2('behind_back', st, 50, 100)).toBe(true);
+    expect(pc2('behind_back', st, 50).length).toBe(2);
+    expect(doubleMoveOf('behind_back', 'behind_back')?.id).toBe('double_behind');
+  });
+  it('between then behind is the between-behind; it chained before H2 too, and is named now', () => {
+    expect(doubleMoveOf('between_legs', 'behind_back')?.id).toBe('between_behind');
+    expect(cc2('behind_back', { ...after('between_legs'), since: 0.3 }, 50, 100)).toBe(true);
+  });
+  it('every other repeat is still spam: crossover → crossover, between → between restart the chain', () => {
+    for (const m of ['crossover', 'between_legs', 'in_and_out'] as const) {
+      const st = { ...pc2(m, { last: null, since: Infinity, length: 0 }, 50), since: 0.2 };
+      expect(cc2(m, st, 50, 100), m).toBe(false);
+      expect(doubleMoveOf(m, m), m).toBeNull();
+    }
+    expect(Object.keys(DOUBLE_MOVES).sort()).toEqual(['behind_back>behind_back', 'between_legs>behind_back']);
+  });
+  it('the window is the player\'s handle\'s: a second behind after it is a fresh move, not a double', () => {
+    const st = { ...after('behind_back'), since: cws2(50) + 0.01 };
+    const o = rhm2('behind_back', st, 50, { present: true, closing: false, set: false, within: true }, () => 0.99, 100);
+    expect(o.restarted).toBe(true); expect(o.chain.length).toBe(1);
+  });
+});
+
+import { MOVE_DISPLAY_NAME, moveDisplayName, moveClip as mc4g, MOVE_HANDLE as MH4g, type HandleMove as HM4g } from './HandleSystem';
+import { MOCAP_OPPONENT_CLIPS } from '../anim/authored/mocapOpponents';
+import { readFileSync } from 'node:fs';
+describe('H2d (plan 4g): the names table and the turbo', () => {
+  it('owner Q7: every handle move has a generic on-screen name, and no on-screen name is a real player\'s', () => {
+    for (const m of Object.keys(MH4g) as HM4g[]) expect(MOVE_DISPLAY_NAME[m], m).toBeTruthy();
+    const players = /shammgod|steezo|iverson|crawford|curry|kyrie|jordan|kobe|irving|hardaway/i;
+    for (const n of Object.values(MOVE_DISPLAY_NAME)) expect(n).not.toMatch(players);
+    for (const id of ['shammgod', 'steezo_roll', 'snatchback', 'size_up', 'btb_slide']) expect(moveDisplayName(id)).not.toMatch(players);
+    expect(moveDisplayName('shammgod')).toBe('PUSH-PULL CROSS'); expect(moveDisplayName('steezo_roll')).toBe('WRAP SPIN');
+    // the screen text the modes build goes through the table (the refuse chip built the name from the id before)
+    for (const f of ['lib/babylon/modes/OneVOneMode.ts', 'lib/babylon/modes/ThreeVThreeMode.ts', 'lib/babylon/modes/onevoneRules.ts']) {
+      const src = readFileSync(f, 'utf8');
+      expect(src, f).not.toMatch(/\.move\.replace\(\/_\/g, ' '\)\.toUpperCase\(\)/);
+      expect(src.match(/'[^'\n]*'|`[^`\n]*`/g)?.filter((lit) => /STEEZO|SHAMMGOD|Steezo|Shammgod/.test(lit)) ?? [], f).toEqual([]);
+    }
+  });
+  it('the turbo retune (plan §3.1): no handle move\'s clip is a capture any more, so the flat turbo IS moveRateFor (real × MOVE_TURBO_REAL)', () => {
+    const captured = new Set(MOCAP_OPPONENT_CLIPS.map((c) => c.replaces));
+    for (const m of Object.keys(MH4g) as HM4g[]) for (const d of ['left', 'right'] as const) {
+      const c = mc4g(m, d); if (c) expect(captured.has(c), `${m} ${d} → ${c} is replaced by a capture`).toBe(false);
+    }
   });
 });

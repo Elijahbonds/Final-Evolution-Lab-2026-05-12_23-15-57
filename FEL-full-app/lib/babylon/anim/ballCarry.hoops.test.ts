@@ -3,7 +3,7 @@
 // are (the rig's LEFT arm on the root's +x: the athlete's right).
 import { describe, expect, it } from 'vitest';
 import { Bone, FreeCamera, Matrix, MeshBuilder, NullEngine, Quaternion, Scene, Skeleton, TransformNode, Vector3 } from '@babylonjs/core';
-import { mountBallCarry, dribbleWristDeg, crossLateral, crossHeight, HELD_STEP_M, HELD_MPS, type BallCarry } from './ballCarry';
+import { mountBallCarry, dribbleWristDeg, moveWristDeg, MOVE_WRIST_DEG, WRIST_DEG, HELD_STEP_M, HELD_MPS, type BallCarry } from './ballCarry';
 import { attachBallToHand, releaseBall, ballGathering } from './ballRig';
 import { HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, PUSHED_PEAK_RATE, dribbleAtPushed, pushedBounce01, strideLockHz, STRIDE_LOCK_HZ_MAX } from './Dribble';
 
@@ -97,9 +97,16 @@ describe('the pushed bounce (Dribble.dribbleAtPushed)', () => {
     expect(strideLockHz(0.1, 0, P, 0.92)).toBeLessThan(1 / P);                     // ahead: waits
     expect(strideLockHz(0.5, 0, 0.3, 0.92)).toBeLessThanOrEqual(STRIDE_LOCK_HZ_MAX);
   });
-  it('a crossing is a straight line in plan and goes low; the dribbling wrist pushes at the top and cocks for the catch', () => {
-    expect(crossLateral(-0.26, 0.26, 0.5)).toBeCloseTo(0, 9);
-    expect(crossHeight(0)).toBe(1); expect(crossHeight(1)).toBeCloseTo(1, 9); expect(crossHeight(0.5)).toBeLessThan(0.8);
+  it('the dribbling wrist pushes at the top and cocks for the catch; a move\'s wrist flexes through its push and cocks for its catch (phase 4b)', () => {
+    // (phase 3's crossLateral / crossHeight went with its floor-point crossing: a crossing is a handlePaths path now, whose shape —
+    // low, past the midline, into the other hand — handlePaths.test proves, and the carry's playing of it the tests below)
+    const at = (contact: 'right' | 'left' | null, seg: 'push' | 'catch' | 'flight' | 'hold', reach: { right: number; left: number }) => ({ contact, seg, reach });
+    expect(moveWristDeg(at('right', 'push', { right: 1, left: 0 }), 'right', 0.5)).toBe(MOVE_WRIST_DEG.push);
+    expect(moveWristDeg(at('left', 'catch', { right: 0, left: 1 }), 'left', 0)).toBe(MOVE_WRIST_DEG.cock);
+    expect(moveWristDeg(at('left', 'catch', { right: 0, left: 1 }), 'left', 1)).toBeCloseTo(dribbleWristDeg(0), 9);   // settles into the dribble's catch
+    expect(moveWristDeg(at(null, 'flight', { right: 0, left: 0.5 }), 'left', 0.5)).toBe(MOVE_WRIST_DEG.cock);        // fading on: cocked to take it
+    expect(moveWristDeg(at(null, 'flight', { right: 0, left: 0 }), 'right', 0.5)).toBe(WRIST_DEG.relaxed);           // off the ball: the curl
+    expect(moveWristDeg(at('right', 'hold', { right: 1, left: 0 }), 'right', 0.5)).toBe(WRIST_DEG.support);
     expect(dribbleWristDeg(0.12)).toBeGreaterThan(20);
     expect(dribbleWristDeg(0.96)).toBeLessThan(-10);
     expect(dribbleWristDeg(0)).toBeCloseTo(dribbleWristDeg(1), 6);
@@ -244,7 +251,7 @@ describe('the hoops carry', () => {
     expect(Math.max(...d.path)).toBeLessThanOrEqual(0.15);
     carry.dispose();
   });
-  it('switchHand is a PATH: the ball crosses in front, low, into the other hand — never a jump (it moved 0.52 m in a frame)', () => {
+  it('switchHand is a PATH (phase 4b: the crossover\'s): the ball crosses in front, low, into the other hand — never a jump (it moved 0.52 m in a frame)', () => {
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
     attachBallToHand(r.ball, r.sk, 'LeftHand');
@@ -256,17 +263,19 @@ describe('the hoops carry', () => {
     expect(carry.phase).toBeLessThan(PUSHED_FLOOR_PHASE);
     d.reset();
     carry.switchHand();
-    expect(carry.side).toBe('Right'); expect(carry.hand).toBe('Left'); expect(carry.crossing).toBe(true);
+    // phase 4b: the crossover's path starts now; the rig hand is the one on the ball until the other catches it, the athlete's hand (what the
+    // stick maps read) is the destination at once
+    expect(carry.move?.name).toBe('crossover'); expect(carry.side).toBe('Left'); expect(carry.hand).toBe('Left'); expect(carry.crossing).toBe(true);
     const xs: number[] = [];
     for (let i = 0; i < 60; i++) { const p = d.frame(1 / 60, 0.2, true); xs.push(localX(r.root, p)); }
     expect(Math.max(...d.path)).toBeLessThan(0.15);
     const steps = xs.slice(1).map((x, i) => Math.abs(x - xs[i]));
-    expect(Math.max(...steps)).toBeLessThan(0.06);            // across in steps, not in one
+    expect(Math.max(...steps)).toBeLessThan(0.1);             // across in steps, not in one (the re-aimed fall: ≤ 0.28 m over ≥ 0.05 s)
     expect(xs[xs.length - 1]).toBeLessThan(-0.15);            // ends on the athlete's left
-    expect(carry.crossing).toBe(false);
+    expect(carry.side).toBe('Right'); expect(carry.move).toBeNull(); expect(carry.crossing).toBe(false);
     carry.dispose();
   });
-  it('asked on the way UP, the old hand takes it at the top and the next push crosses', () => {
+  it('asked on the way UP, it starts AT ONCE (phase 4b, U2): the old hand meets the rising ball at the release and it crosses on this bounce', () => {
     const scene = new Scene(new NullEngine());
     const r = rig(scene);
     attachBallToHand(r.ball, r.sk, 'LeftHand');
@@ -274,10 +283,12 @@ describe('the hoops carry', () => {
     const d = driver(scene, carry, r.ball);
     let n = 0; while (carry.phase < 0.6 && n++ < 200) d.frame(1 / 60, 0.2, true);
     carry.switchHand();
-    expect(carry.side).toBe('Left');       // still his until the top…
+    expect(carry.move?.name).toBe('crossover');   // phase 3 held it as pending until the next top (up to 0.9 s of the ball on the old side)
+    expect(carry.side).toBe('Left');       // still his until the other hand catches it…
     expect(carry.hand).toBe('Left');       // …but on its way to the left hand
     n = 0; while (carry.side === 'Left' && n++ < 200) d.frame(1 / 60, 0.2, true);
     expect(carry.side).toBe('Right');
+    expect(n).toBeLessThanOrEqual(Math.ceil(0.75 * 60));   // caught within the path: well inside a bounce and a half at 1.7 Hz
     expect(Math.max(...d.path)).toBeLessThan(0.15);
     carry.dispose();
   });

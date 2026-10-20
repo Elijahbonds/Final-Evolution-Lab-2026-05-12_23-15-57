@@ -70,11 +70,18 @@ const chakraPetch = localFont({
 // what they were about to get.
 const HOOK = '60 seconds to a dunk. No account, no download — drop into Venice Beach and throw down right now.'
 
+// THE FAVICON, ONCE (FDB-2, 2026-10-17). `metadata.icons` rendered two links (icon + shortcut, the same file) inside the
+// metadata Next re-renders on every client navigation, and public/ files are served with max-age=0, so /links → /try
+// fetched /favicon.svg five times (measured: twice on the /links load, three more in the hop to /try). One link in the
+// root layout's own <head> is rendered once per document and is not re-rendered by a client navigation.
+// (Not exported: a layout may only export Next's own names.)
+const FAVICON_HREF = '/favicon.svg'
+
 export const metadata = {
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
   title: 'Final Evolution Lab',
   description: HOOK,
-  icons: { icon: '/favicon.svg', shortcut: '/favicon.svg' },
+  // no `icons`: the favicon is FAVICON_HREF's one <link> in RootLayout's <head>
   openGraph: {
     type: 'website',
     siteName: 'Final Evolution Lab',
@@ -97,6 +104,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`dark ${barlow.variable} ${plexSans.variable} ${jetbrainsMono.variable} ${chakraPetch.variable}`} suppressHydrationWarning>
+      <head>
+        <link rel="icon" href={FAVICON_HREF} type="image/svg+xml" />
+      </head>
       <body className="font-sans min-h-screen bg-[#050505]">
         <Providers>
           {/* THE ONE BAR (2026-09-20). Above the page, not inside it: thirty-three routes each mounted their own

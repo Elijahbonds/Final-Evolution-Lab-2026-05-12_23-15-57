@@ -11,6 +11,7 @@ import type { AbstractMesh, AnimationGroup, Skeleton, TransformNode } from '@bab
 import { mirrorGroupsInPlace } from './groupMirror';
 import { gatherBallToHand, attachBallToHand, trackDrawnBall } from './ballRig';
 import { rigHandOnSide, type AthleteSide, type RigHand } from './athleteSide';
+import { variantFor } from './opponentMotion';
 
 /** The families a hoops body plays mirrored (the dunks are dunkHand's). */
 export const HOOPS_MIRROR = /^bball_/;
@@ -34,4 +35,32 @@ export function hoopsHand(body: { skeleton: Skeleton; root: TransformNode }, sid
 export function ballToAthleteHand(ball: AbstractMesh, body: { skeleton: Skeleton; root: TransformNode }, side: AthleteSide = 'right', gather = true): boolean {
   const hand = hoopsHand(body, side);
   return gather ? gatherBallToHand(ball, body.skeleton, hand) : attachBallToHand(ball, body.skeleton, hand);
+}
+
+/** HOOPS MOTION phase 4b (plan §3.5, U4): the dribble loops the `_left` twins are made of (the tree's CLIP_FOR names — each resolves to
+ *  the capture this rig plays for it, installOpponentMotion's variantFor). */
+export const LEFT_TWIN_LOOPS = ['bball_dribble_idle', 'bball_dribble_walk', 'bball_dribble_jog', 'bball_dribble_run', 'bball_dribble_side_left', 'bball_dribble_side_right', 'bball_dribble_back'] as const;   // (H2d: the carrier's side and back dribbles)
+/**
+ * The dribble loops with the ball in the athlete's LEFT hand, made at spawn as runtime mirrors (the groupMirror path phase 3 uses — no
+ * manifest row, no generated clip): each loop this rig plays (the capture for its name, or the authored clip) is cloned — its animations
+ * and their keys copied — and mirrored across the body again, so the right-handed-on-screen loop plays left-handed, and registered under
+ * the name the tree asks for (`bball_dribble_idle_left` …: basketballTree.leftTwinOf). Call AFTER rightHandHoops (the source must already
+ * be right-handed on screen). Idempotent. Returns the names registered now.
+ */
+export function leftDribbleTwins(animator: unknown, skeleton: Skeleton): string[] {
+  const a = animator as { groups?: Map<string, AnimationGroup>; register?: (g: AnimationGroup) => void; clipNames?: Set<string> };
+  const groups = a.groups; if (!groups || typeof a.register !== 'function') return [];
+  const made: string[] = [];
+  for (const base of LEFT_TWIN_LOOPS) {
+    const name = `${base}_left`;
+    if (groups.has(name)) continue;
+    const src = groups.get(variantFor(base, new Set(groups.keys())));
+    if (!src || !(src.metadata as { felMirrored?: boolean } | null)?.felMirrored) continue;   // not right-handed yet: nothing to twin
+    const twin = src.clone(name, undefined, true, true);
+    twin.metadata = { ...(src.metadata ?? {}), felMirrored: false, felLeftTwinOf: src.name };   // (clone shares the metadata object)
+    mirrorGroupsInPlace([twin], skeleton);
+    a.register(twin);
+    made.push(name);
+  }
+  return made;
 }

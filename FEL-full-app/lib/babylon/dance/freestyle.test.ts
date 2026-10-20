@@ -13,7 +13,7 @@ import { DANCE_LIBRARY, MISS_AFTER, beatDuration } from '../core/DanceCore';
 import { FAMILY_BUTTON, GROOVE_STYLE, GROOVE_WINDOW_SEC, chartForLevel } from './chartPlay';
 import { CAPTURED_MOVES, danceMove } from './moves';
 import {
-  FREESTYLE_PAD, FreestyleDeck, freeButtonOf, freeName, freeSpanAt, freeStyleFor, legendLine, nextFreeSpan, routeFreestyle, type FreeSpan, type PadSlot,
+  FREESTYLE_PAD, FreestyleDeck, freeButtonOf, freeName, freeSpanAt, freeStyleFor, legendLine, nextFreeSpan, routeFreestyle, VARIETY_CAP, type FreeSpan, type PadSlot,
 } from './freestyle';
 import {
   CHART_SONG_IDS, chartFor, chartFreeSpansFor, chartStats, chartStepsFor, chartStyleBeatsFor, expandChart, planChart, stepsFromPresses, styleBeatsFromPresses, validateChart,
@@ -221,8 +221,17 @@ describe('the shipped charts', () => {
       }
     }
   });
-  it('the opt-in sections: each song\'s last hook ends in one (the climax), and nothing else changed', () => {
-    for (const id of CHART_SONG_IDS) expect(chartFreeSpansFor(id)!.length, id).toBe(1);
+  // test changed (lane/dance-options, owner 2026-10-17, Q3 A): one section a song → two. The first hook now ends in a section too (the
+  // song's own marked phrase, played in place of that hook's last free phrase: the same slots). The next test holds that it costs nothing.
+  it('the opt-in sections: each song\'s first hook and last hook end in one, and nothing else changed', () => {
+    for (const id of CHART_SONG_IDS) {
+      const song = songFor(id)!;
+      const spans = chartFreeSpansFor(id)!;
+      expect(spans.length, id).toBe(2);
+      const hooks = song.sections.filter((s) => s.name === 'hook');
+      const endOf = (s: { startBar: number; bars: number }) => (s.startBar - 1 + s.bars) * 4;
+      expect(spans.map((f) => f.end), id).toEqual([endOf(hooks[0]), endOf(hooks[hooks.length - 1])]);
+    }
   });
   it('the sections cost nothing: the song\'s scored steps and STYLE beats are what the same chart without the flags plays', () => {
     for (const id of CHART_SONG_IDS) {
@@ -298,7 +307,10 @@ describe('a whole chart with a mashing thumb in every section scores what it sco
     expect(withSection.moves.length).toBe(40);
     expect(withSection.style).toBeGreaterThan(0);
     expect(withSection.style % GROOVE_STYLE).toBe(0);
-    expect(withSection.style).toBeLessThanOrEqual(styleBeats.length * GROOVE_STYLE);       // at most one payout per slot
+    // test changed (lane/dance-options, owner 2026-10-17, Q2 A): the section's VARIETY (a thumb mashing the pad's buttons in turn uses them
+    // all) is STYLE beside the slots' own, so the per-slot bound reads the slots' share; the variety is held to its own cap here.
+    expect(withSection.style - withSection.variety).toBeLessThanOrEqual(styleBeats.length * GROOVE_STYLE);   // at most one payout per slot
+    expect(withSection.variety).toBeLessThanOrEqual(VARIETY_CAP * spans.length);
   });
   it('the same mash with MATCH off is the same: X and Y dance too, and still nothing reaches the score', () => {
     const inputs = [...flawless.filter((x) => (x.ev as { btn: string }).btn === 'A' || (x.ev as { btn: string }).btn === 'B'), ...mash(40, T(37), T(45))];

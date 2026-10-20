@@ -35,6 +35,8 @@ import { browserKV, decodeInline, readPlaytest, type KV } from './storage';
 import { castFrameFor, targetOf } from './targets';
 import { castIdentity } from './cast';
 import { mountCrowdCastLayer } from './castLayer';
+import type { CrowdReactions } from './castCheer';
+import type { ReactionKind } from '../babylon/visual/crowd/crowdReact';
 import { mountScriptHost, type ScriptHost, type ScriptHostCtx } from './scriptHost';
 import { invalidateIdentity, primeIdentity } from '../babylon/core/playerIdentity';
 
@@ -47,10 +49,14 @@ let cache: { key: string; exp: StudioVenueExport | null } | null = null;
 
 /**
  * The Studio venue this page asks `modeKey` to load, or null (no `?venue=`, a production build, a venue made for another
- * mode, nothing under that id). Read three times per mount (mood, intro, look) and cached on the page's query.
+ * mode, nothing under that id, a mode with no play-test target row). Read three times per mount (mood, intro, look) and cached
+ * on the page's query.
  */
 export function studioVenueFor(modeKey: string, search?: string, kv?: KV | null, env?: string): StudioVenueExport | null {
   if (!studioLoadAllowed(env)) return null;
+  // §13.3: only a play-test target loads a venue (targets.ts). NetSportMode reads its venue by its own modeId and builds Tennis
+  // too; Tennis has no row (its weather is gameplay and it has had no review), so it never loads one, whatever the page carries.
+  if (!targetOf(modeKey)) return null;
   let q = search;
   if (q === undefined) { try { q = typeof window !== 'undefined' ? window.location.search : ''; } catch { q = ''; } }
   const param = new URLSearchParams(q).get('venue');
@@ -206,8 +212,16 @@ export function mountDecalLayer(scene: Scene, tier: QualityTier, items: readonly
   return { stamped, live, dispose() { pool.dispose(); } };
 }
 
-/** The export's stands as a crowd (visual/crowd). `ctx` may carry the mode's momentum and phase: the crowd then reacts. */
-export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?: () => string }, crowd: ExportCrowd | null): Layer & { seats: number; crowd: { react(kind: string, strength?: number): void } | null } {
+/** The crowd layer's handle: the crowd's react, and (studio-5) every reaction it makes, for the cast fans. */
+export interface StudioCrowd extends CrowdReactions { react(kind: string, strength?: number): void }
+
+/**
+ * The export's stands as a crowd (visual/crowd). `ctx` may carry the mode's momentum and phase: the crowd then reacts.
+ * studio-5 (§13.1): `crowd.onReact` hears EVERY reaction the crowd makes, whoever asked — mountModeCrowd's momentum, tier and
+ * end-of-match listeners, a script's crowd action, the dev rig's `felCrowd` — because they all call the handle's `react`, which
+ * is wrapped here once. The crowd's own reaction runs first and unchanged; the listeners (the cast fans) only hear it.
+ */
+export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?: () => string }, crowd: ExportCrowd | null): Layer & { seats: number; crowd: StudioCrowd | null } {
   if (!crowd?.stands.length) return { seats: 0, crowd: null, dispose() {} };
   const venue: CrowdVenue = {
     stands: crowd.stands.map((s) => ({ id: `studio_${s.id}`, front: [...s.front] as [number, number, number], yaw: s.yaw, width: s.width, rows: s.rows, step: [...s.step] as [number, number], posture: s.posture, benches: s.benches, gaps: s.gaps })),
@@ -215,7 +229,18 @@ export function mountCrowdLayer(ctx: { scene: Scene; momentum?: unknown; phase?:
     camera: { at: [...crowd.camera.at] as [number, number, number], into: [...crowd.camera.into] as [number, number], margin: crowd.camera.margin },
   };
   const h = mountModeCrowd(ctx as Parameters<typeof mountModeCrowd>[0], 'tennis', { venue });
-  return { seats: h?.seats ?? 0, crowd: h ? { react: (kind, strength) => h.react(kind as Parameters<typeof h.react>[0], strength) } : null, dispose() { h?.dispose(); } };
+  if (!h) return { seats: 0, crowd: null, dispose() {} };
+  const heard = new Set<(kind: ReactionKind, strength: number) => void>();
+  const own = h.react.bind(h);
+  h.react = (kind, strength) => {
+    own(kind, strength);
+    for (const fn of [...heard]) { try { fn(kind, strength ?? 1); } catch (e) { console.warn('[NEXUS-STUDIO] a crowd listener failed:', e instanceof Error ? e.message : e); } }
+  };
+  const handle: StudioCrowd = {
+    react: (kind, strength) => h.react(kind as ReactionKind, strength),
+    onReact(fn) { heard.add(fn); return () => { heard.delete(fn); }; },
+  };
+  return { seats: h.seats, crowd: handle, dispose() { heard.clear(); h.dispose(); } };
 }
 
 /** The weather's look (never its gameplay: nothing here reads the kit's modifiers). 'natural' mounts nothing. */
@@ -260,9 +285,11 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
     decals: mountDecalLayer(scene, tier, exp.decals),
     crowd: mountCrowdLayer({ scene, momentum: ctx.momentum, phase: ctx.phase }, exp.crowd),
     weather: mountWeatherLayer(scene, ctx.lights ?? null, exp.weather, family, { tier, keepSky: !!exp.look.sky }),
-    // studio-4b: project characters seated among the fans (castLayer.ts), visual only; none on the mobile tier
-    crowdCast: mountCrowdCastLayer(scene, exp.cast?.crowd, exp.crowd, { tier, frame: castFrameFor(exp.target) }),
+    crowdCast: null as Layer | null,
   };
+  // studio-4b: project characters seated among the fans (castLayer.ts), visual only; none on the mobile tier.
+  // studio-5: they hear the crowd's reactions and cheer with it (castCheer.ts)
+  layers.crowdCast = mountCrowdCastLayer(scene, exp.cast?.crowd, exp.crowd, { tier, frame: castFrameFor(exp.target), hears: layers.crowd.crowd });
   // A mode with a fixed camera (Tiebreak snaps once) never steps its director, so the intro it was given would never run.
   // The stepper runs it on the frame the mode set up when play began (that subject, that objective), and when the intro
   // ends puts the mode's own camera back exactly as the mode left it: the play camera is the mode's, not the follow's.
@@ -298,7 +325,7 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
     dispose() {
       scripts.dispose();
       if (stepper) scene.onBeforeRenderObservable.remove(stepper);
-      for (const l of Object.values(layers)) l.dispose();
+      for (const l of Object.values(layers)) l?.dispose();
       delete meta.felStudioGround;
     },
   };

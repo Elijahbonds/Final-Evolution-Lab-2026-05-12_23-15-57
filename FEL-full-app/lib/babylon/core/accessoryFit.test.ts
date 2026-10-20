@@ -2,7 +2,7 @@
 // shoulder, the teal shard on the shin and the "stretched" upper arm were one rigid tube each, sized in metres from a
 // reference body and centred where they overran the joint. These pin the geometry that replaces that.
 import { describe, expect, it } from 'vitest';
-import { ringFit, ringRadius, trimSpan, tubeCoverage, tubeFit, TUBE_EASE, TUBE_MIN_RING, TUBE_SPANS } from './accessoryFit';
+import { ringFit, ringRadius, trimSpan, tubeCoverage, tubeFit, headRing, TUBE_EASE, TUBE_MIN_RING, TUBE_SPANS, BROW_BELOW_CROWN, HEAD_EASE } from './accessoryFit';
 
 /** Skin points of a tapered limb along a→b: `rings` rings of `seg` points, radius r0 at a easing to r1 at b. */
 function limb(a: [number, number, number], b: [number, number, number], r0: number, r1: number, rings = 40, seg = 16): number[] {
@@ -98,5 +98,29 @@ describe('a tube under a shown top', () => {
   });
   it('a cut that leaves less than the shortest drawable tube hides it', () => {
     expect(trimSpan({ from: 0.3, to: 0.6 }, [true, true, true, true, true, true, false, false], 0.28)).toBeNull();   // 75 % covered, 7 cm left less the gap
+  });
+});
+
+describe('the headband and the wristband are measured on the skin (style pass, 2026-10-16)', () => {
+  // a head: an ellipse of skin points 0.075 × 0.095 m round (0.3, y, 0.1), from the chin (1.55) to the crown (1.80)
+  const head = (): number[] => {
+    const P: number[] = [];
+    for (let y = 1.55; y <= 1.8001; y += 0.005) {
+      const k = Math.sqrt(Math.max(0, 1 - ((y - 1.68) / 0.125) ** 2));
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) P.push(0.3 + Math.cos(a) * 0.075 * k, y, 0.1 + Math.sin(a) * 0.095 * k);
+    }
+    for (let i = 0; i < 400; i++) P.push(0.3 + ((i % 20) - 10) * 0.02, 1.2 + Math.floor(i / 20) * 0.01, 0.1);   // the shoulders and chest: never in the ring
+    return P;
+  };
+  it('the band rings the head at the brow, centred on the skin (not the bone), standing HEAD_EASE off it', () => {
+    const r = headRing(head())!;
+    expect(r.c.y).toBeCloseTo(1.8 - BROW_BELOW_CROWN, 3);
+    expect(r.c.x).toBeCloseTo(0.3, 2); expect(r.c.z).toBeCloseTo(0.1, 2);
+    expect(r.r).toBeGreaterThan(0.07); expect(r.r).toBeLessThan(0.095 + HEAD_EASE + 0.005);   // the head's own size: not the 0.135 m hoop
+  });
+  it('no head, no ring: the band keeps its reference size', () => expect(headRing([0, 1, 0, 0.1, 1, 0])).toBeNull());
+  it('the wristband lives in the stretch the shooting sleeve leaves for it', () => {
+    expect(TUBE_SPANS.wristband.from).toBeGreaterThanOrEqual(TUBE_SPANS.armsleeve2.to);
+    expect(TUBE_SPANS.wristband.to).toBeLessThan(1);
   });
 });

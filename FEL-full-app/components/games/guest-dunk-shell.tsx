@@ -267,6 +267,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
             grade={grade}
             prq={50}
             continuous
+            guest
             onEnd={handleEnd}
             onCard={handleCard}
             cardSlot={cards === 1 ? claimLink : null}

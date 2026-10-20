@@ -15,7 +15,7 @@ import { LEGS, type LegPose } from './DunkLegs';
 import type { FlightWindow } from './Biomech';
 
 export type HoopsWindow =
-  | 'idle' | 'run' | 'dribble' | 'drive' | 'protect'
+  | 'idle' | 'run' | 'dribble' | 'drive' | 'protect' | 'hesi'   // H2b (plan §4.8): the hesitation's hitch
   | 'gather' | 'load' | 'release' | 'follow'
   | 'post' | 'fade' | 'hook' | 'spin'   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit's own shapes (M4–M6)
   | 'pump' | 'footwork'   // wave 2: the fake that sells (M8) and the footwork legs — step-through / hop / euro (M8/M13/M14)
@@ -34,7 +34,11 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
   // the ball: a handler sits low, chest tall, eyes up (film: the run loop rounds the chest and drops the eyes)
   dribble:   P({ lean: 5,  spine1: [3, 0, 0],   spine2: [-5, 0, 0],  neck: [-4, 0, 0], head: [-10, 0, 0], shrug: 0,  forward: 2,  eyes: 0.6, chestAim: 0.3,  weight: 0.75 }),
   drive:     P({ lean: 12, spine1: [8, 0, 0],   spine2: [-4, 0, 0],  neck: [-4, 0, 0], head: [-12, 0, 0], shrug: 3,  forward: 4,  eyes: 0.8, chestAim: 0.4,  weight: 0.85 }),
-  protect:   P({ lean: 9,  spine1: [10, 0, 0],  spine2: [-2, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 4,  forward: 6,  eyes: 0.6, chestAim: 0,    weight: 0.85 }),   // the shield: the back to the defender, the chest stays where the hips are
+  protect:   P({ lean: 9,  spine1: [10, 0, 0],  spine2: [-2, 0, 0],  neck: [-4, 0, 0], head: [-8, 0, 0],  shrug: 4,  forward: 6,  eyes: 0.6, chestAim: 0,    weight: 0.85 }),
+  // H2b (plan §4.8): THE HESITATION'S HITCH — through the hang the handler comes UP: no lean, the chest tall and open, the head up, the
+  // eyes on the man (he reads "he is stopping"). The hesi clip's own rise (Spine 14 → 4°) is kept by the layer instead of being pulled
+  // back to the dribble's lean.
+  hesi:      P({ lean: 0,  spine1: [-4, 0, 0],  spine2: [-10, 0, 0], neck: [-4, 0, 0], head: [-14, 0, 0], shrug: 2,  forward: -2, eyes: 1,   chestAim: 0.6,  weight: 1 }),   // the shield: the back to the defender, the chest stays where the hips are
   // the shot: square to the rim, eyes on the iron; tall through the release; the follow-through held
   // HOOPS-MOVE-KIT-A (M1/M3): the GATHER — the plant before the rise (the pull-up, the step-back, the layup's stride): low,
   // the chest forward over the loaded knees, the eyes already on the iron
@@ -75,7 +79,7 @@ export const HOOPS_POSTURE: Record<HoopsWindow, PosturePose> = {
 // gently (0.5: the loops keep their heel-strike), the release points the toes off the floor, the flight is the dunk's.
 const L = (footPitch: number, weight: number, toeCurl = 0): LegPose => ({ footPitch, toeCurl, weight });
 export const HOOPS_LEGS: Record<HoopsWindow, LegPose> = {
-  idle: L(0, 0.5), run: L(0, 0), dribble: L(0, 0.5), drive: L(0, 0), protect: L(0, 0.5),
+  idle: L(0, 0.5), run: L(0, 0), dribble: L(0, 0.5), drive: L(0, 0), protect: L(0, 0.5), hesi: L(0, 0.6),
   gather: L(0, 0.5), load: L(0, 0.6), release: L(-30, 0.7), follow: L(0, 0.8),
   // the post is planted (flat, heavy); the fade and the hook leave the floor off one plant (the toes point); the spin
   // rides its own planted pivot foot and the clip's swing leg — the layer stays out of it
@@ -107,6 +111,8 @@ export interface HoopsPostureInput {
   /** HOOPS-MOVE-KIT-B: backing him down with the back to the basket (M4–M6's path) / mid-pivot (M6). */
   posting?: boolean;
   spinning?: boolean;
+  /** H2b (plan §4.8): the handler is inside a hesitation's hang (DribbleController.hanging). */
+  hesi?: boolean;
 }
 export const HOOPS_INPUT_IDLE: HoopsPostureInput = { role: 'idle', hasBall: false, speed01: 0, nearestDefender: Infinity, shot: 'none', flight: null, landed: false, celebrate: false, reaching: false, staggered: false, floored: false };
 
@@ -141,6 +147,7 @@ export function hoopsWindow(i: HoopsPostureInput): HoopsWindow {
   if (i.posting) return 'post';         // M4–M6's path: the back to the basket, the chest NOT squared to the rim
   if (i.role === 'defense') return i.speed01 > SLIDE_SPEED01 ? 'slide' : 'defend';
   if (i.hasBall) {
+    if (i.hesi) return 'hesi';            // H2b: before protect / dribble — the hitch is tall even with him on top of you
     if (i.speed01 > DRIVE_SPEED01) return 'drive';
     if (i.nearestDefender < PROTECT_RANGE && i.speed01 < 0.15) return 'protect';
     return 'dribble';

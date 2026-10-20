@@ -336,6 +336,48 @@
   align-items: flex-end !important;
 }
 
+/* 4d. The READY card's top-left corner (PHONE-FIRST-SCREEN, 2026-10-17).
+ *    GameShell's capture menu (⋯, GameCaptureHud) sits at the stage's top-left,
+ *    8 px in, 60x47 px, over the card. Measured on the live dunk: it covered the
+ *    MOTION chip (1187 px² at 393x852, 1662 at 1280x800, 1387 at 844x390), the
+ *    MOTION chip covered VENICE BEACH COURT at 1280x800, and on a phone the USB
+ *    pill covered it (on /try too).
+ *    - MOTION sits beside the ⋯, not under it: 76 px from the left edge on the
+ *      screen (the card is zoomed sideways, so the offset is divided back out).
+ *      Only where a shell put the ⋯ there; /try has none and keeps the corner. */
+div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-splash-corner] {
+  left: calc(4.75rem / var(--fel-hud-zoom, 1));
+}
+/*    - Sideways it keeps to the band above the columns: top-aligned with the ⋯
+ *      (8 px) and zoomed like the shell's own corner controls (rule 3: capped
+ *      at 1.25x), so it ends 39 px down, above the brand line (41 px at
+ *      1280x800). The columns keep their height: pushing them down instead cost
+ *      the 1280x800 CONTROLS panel its fit (0.85, 7 px of its lines cut). */
+[data-fel-console]:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-splash-corner] {
+  --fel-splash-corner-zoom: min(var(--fel-hud-zoom, 1), 1.25);
+  zoom: calc(var(--fel-splash-corner-zoom) / var(--fel-hud-zoom, 1));
+  left: calc(4.75rem / var(--fel-splash-corner-zoom));
+  top: calc(0.5rem / var(--fel-splash-corner-zoom));
+}
+/*    - Upright, the column starts below that row (the ⋯ ends 43 px down the
+ *      card) rather than under it. Sideways the console padding wins. */
+div:has(> [data-capture-ui]) > div:has(> canvas) > [data-fel-fullbleed] > [data-splash-column] {
+  padding-top: 3.5rem;
+}
+/*    - ...and below the controller pills (HostLobby at the dunk's left-4
+ *      top-14: in production the USB line alone, ending 75 px down; the room
+ *      chip above it is dev-only). From the top, not centred, and 14 px apart
+ *      rather than 16: an upright stage runs 56 px past the bottom of a 393x852
+ *      phone, and centred, the card's last ball row went below it. Sideways the
+ *      pills move top-right (4c). */
+@media (max-aspect-ratio: 6/5) {
+  div:has(> canvas):has(> div > [data-testid="host-lobby-badge"], > div > [data-testid="usb-connect-hint"]) > [data-fel-fullbleed] > [data-splash-column] {
+    padding-top: 5.25rem;
+    justify-content: flex-start;
+    row-gap: 0.875rem;
+  }
+}
+
 /* 5. The MC's line (MicCaption), sideways: one line across the bottom of the
  *    picture rather than two stacked over the player. At 560 px it wrapped on
  *    every TV shot and, zoomed for the couch, sat across the dunker's legs. */

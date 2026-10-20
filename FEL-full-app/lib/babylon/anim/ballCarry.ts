@@ -22,11 +22,22 @@
 //   · a two-hand chest HOLD (setHold) for a jog with the ball — 3PT's own carryApply, moved here so these fixes reach it;
 //   · the WRISTS (WristLayer) while this body has the ball: the push and the catch on the dribble, the cock under a held ball,
 //     the snap on the release, a loose lag behind the forearm — both hand bones were frozen in 381 of 382 phase-1 windows.
+//
+// HOOPS MOTION phase 4b (2026-09-29, plan §3.3): THE MOVE. A handle move's ball is a PATH (handlePaths) the carry plays — runMove starts
+// it on the frame it is asked, from the ball as it is drawn (mid-bounce: its fall re-aimed at the path's floor contact, or the start hand
+// meeting it); queueMove holds one more to start at the running move's catch (the double cross); cancelMove drops it back into the
+// dribble. The carry owns a hand only while it touches the ball (the path's contact schedule: weight 1 on the ball, faded over
+// CONTACT_FADE_SEC either side, 0 between contacts — the clip's arm); the move's catch is timed to the END hand's lock foot, the lock is
+// re-seeded from that foot's own last strike when the hand changes, and a catch that could not be timed eases the lock back over one
+// stride. switchHand / toSide are a crossover path now (their old floor-point crossing is gone: plan U1/U2).
 import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand, ballGathering, gatherBallToHand, palmOffsetOf } from './ballRig';
-import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
+import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, clearOfBallWeight, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from './HandIK';
+import { pathFor, pathAt, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
+import { MOVE_SHAPE } from '../core/HandleShape';
+import type { HandleMove } from '../core/HandleSystem';
 import { findBone } from './boneLookup';
 import { WristLayer, flexAxisLocal, handFlexAxisFromPoints, handPointsFromMeshes, PALM_LOCAL } from './WristLayer';
 import { rigHandOnSide, sideOfRigHand, type AthleteSide, type RigHand } from './athleteSide';
@@ -54,8 +65,35 @@ export interface BallCarryOpts {
    */
   idleStride?: boolean;
 }
-/** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Default: the centre line, in front. */
+/** Where a crossing's ball meets the floor, in the root's frame (x across, z forward; m). Phase 4b: unused — a crossing is a crossover
+ *  PATH (handlePaths) with its own floor point; kept in the signatures so a caller that names one still compiles. */
 export interface CrossPoint { x?: number; z?: number }
+/** A move's events, in order: it starts, the ball leaves a hand, meets the floor, is caught (the end hand's last segment), the move ends
+ *  (the dribble takes over) — or is cancelled. */
+export type CarryMoveEvent = 'start' | 'release' | 'floor' | 'catch' | 'end' | 'cancel';
+export interface CarryMoveOpts {
+  /** The path's pace (moveRateFor: 1 = real speed); its times scale by it. Default 1. */
+  pace?: number;
+  /** Time the catch to the end hand's lock foot (the stride lock; handlePaths.relockCatch). Default true. */
+  lock?: boolean;
+  onEvent?: (e: CarryMoveEvent, move: string) => void;
+}
+/** The move under way (plan §3.3's `move`). */
+export interface CarryMoveState {
+  name: string; t: number; k: number;
+  /** H2c: the path's length (s) and the defender's read point on it (k, MOVE_SHAPE.readAtK) — the beat that times his clip to the ball. */
+  duration: number; readAtK: number | null;
+  /** How exposed the ball is now (the move's shape; 0 outside its k range). */
+  exposed01: number;
+  /** The athlete's hands inside CONTACT_FADE_SEC of a contact (the motion layers' drag skips them). */
+  contactHands: ('right' | 'left')[];
+  /** The same hands as RIG sides (motionLayers.setContactHands). */
+  contactRig: ('Left' | 'Right')[];
+  /** The hand on the ball now (null in the air), and how hard each hand reaches (the contact schedule: 1 on the ball, 0 = the clip's). */
+  contact: 'right' | 'left' | null;
+  reach: { right: number; left: number };
+  startHand: 'right' | 'left'; endHand: 'right' | 'left';
+}
 
 export interface BallCarry {
   /** Drive the dribble. `active` false = ball in the palm (the clip owns it). `hz` (DUNK MOTION phase 8) overrides the
@@ -79,8 +117,18 @@ export interface BallCarry {
   readonly handBone: RigHand;
   /** The ATHLETE's hand the ball is on (or on its way to), as drawn — what a stick map's "hand" means. */
   readonly hand: 'Left' | 'Right';
-  /** Hoops: a crossing is under way or pending. */
+  /** Hoops: a crossing is under way or pending (a move that crosses). */
   readonly crossing: boolean;
+  /** HOOPS MOTION phase 4b: play a move's ball path NOW (plan §3.3) — from the ball as drawn, the carry active or not (a held ball: the
+   *  path starts in the palm and the carry takes the ball from there). A running move is replaced. false only when this body has no ball
+   *  (or the move has no path: the step-back, off the head). */
+  runMove(move: PathMove | HandlePath, opts?: CarryMoveOpts): boolean;
+  /** Hold one move to start at the running move's catch (a second request replaces the first); with no move running it starts now. */
+  queueMove(move: PathMove, opts?: CarryMoveOpts): boolean;
+  /** Drop the running (and queued) move; the ball goes back into the dribble from where it is. */
+  cancelMove(): void;
+  /** The move under way, or null. */
+  readonly move: CarryMoveState | null;
 }
 
 /** The old arm's let-go on a hand switch. */
@@ -109,8 +157,23 @@ export const OFF_SWING_M = 0.16;
 /** The stride lock: the bounce's phase when the foot OPPOSITE the ball hand strikes (the ball arriving at the palm as that foot
  *  plants — arm and leg in opposition, the way the arms swing), how hard it is pulled on, and from what ground speed (m/s). */
 export const STRIDE_PHI_AT_STRIKE = 0.92, STRIDE_LOCK_GAIN = 3, STRIDE_LOCK_MIN_MPS = 1.4;
-/** A crossing bounce goes low and hard: its height (fraction of the stroke at the floor half) and its rate (× the bounce rate). */
-export const CROSS_LOW = 0.28, CROSS_HZ = 1.2;
+/** HOOPS MOTION phase 4b (plan §3.3, U20): a gap between two strikes of the lock foot shorter than this share of the stride is never
+ *  averaged into it — the half-gap a hand change leaves (the new lock foot's first strike, about half a stride after the old one's). */
+export const LOCK_MIN_GAP_K = 0.7;
+/** The push-ahead's share through a move (k = its progress): 1 at both ends (the dribble's own), eased to 0 over its first and last
+ *  MOVE_PUSH_EASE of it — the move's path places the ball itself. */
+export const MOVE_PUSH_EASE = 0.3;
+export function movePushK(k: number): number {
+  const u = Math.min(1, Math.max(0, k)), e = (x: number) => { const c = Math.min(1, Math.max(0, x)); return c * c * (3 - 2 * c); };
+  return Math.max(1 - e(u / MOVE_PUSH_EASE), e((u - (1 - MOVE_PUSH_EASE)) / MOVE_PUSH_EASE));
+}
+/** During a move's HOLD (the palm holding the ball against the body's turn: the spin's pull, PAUSIN') the ball's frame turns with the
+ *  root's own turn up to this fast (rad/s) — the pull path is written in the turning root's frame (plan §3.2); everywhere else in a move
+ *  it follows at BALL_YAW_RATE, like the dribble, and never snaps with a facing snap. */
+export const MOVE_YAW_RATE = 25;
+/** (4b review F1) A turn of the root larger than this between two drawn frames is a FACING SNAP (a facing written in one frame, not a
+ *  turn): a move's ball goes with the body — the dribble's own threshold (its > 90° lag takes the new facing). */
+export const SNAP_TURN_RAD = Math.PI / 2;
 /** A dribble started with the ball below this share of the stroke starts on the way UP at the ball's height (risingPhaseAt); above it,
  *  at the top. Whatever is left of where the palm had the ball fades out over this much of the bounce. */
 export const START_FROM_TOP_ABOVE = 0.85, START_FADE_PHASE = 0.6;
@@ -152,10 +215,21 @@ export function dribbleWristDeg(phase: number): number {
   }
   return DRIBBLE_WRIST_KEYS[0][1];
 }
-/** The lateral position of a crossing ball (root frame) at progress k ∈ [0, 1]: a straight line in plan, across the bounce. */
-export function crossLateral(from: number, to: number, k: number): number { const u = Math.min(1, Math.max(0, k)); return from + (to - from) * u; }
-/** The stroke's height scale through a crossing: 1 at both palms, lowest mid-crossing. */
-export function crossHeight(k: number): number { const u = Math.min(1, Math.max(0, k)); return 1 - CROSS_LOW * Math.sin(Math.PI * u); }
+/** HOOPS MOTION phase 4b (plan §3.3 "the wrists"): a hand's wrist through a move (degrees, + flexed toward the palm) — a flex through the
+ *  push or the pound, the support under a held or floated ball, cocked back for a catch and easing into the dribble's catch
+ *  (dribbleWristDeg(0)) as it settles, the relaxed curl off the ball. `u` is the progress through the current segment. */
+export const MOVE_WRIST_DEG = { push: 30, cock: -16 } as const;
+export function moveWristDeg(s: Pick<PathSample, 'contact' | 'seg' | 'reach'>, hand: 'right' | 'left', u: number): number {
+  if (s.contact === hand) {
+    if (s.seg === 'push' || s.seg === 'pound') return MOVE_WRIST_DEG.push;
+    if (s.seg === 'catch') return MOVE_WRIST_DEG.cock + (dribbleWristDeg(0) - MOVE_WRIST_DEG.cock) * Math.min(1, Math.max(0, u));
+    return WRIST_DEG.support;
+  }
+  return s.reach[hand] > 0 ? MOVE_WRIST_DEG.cock : WRIST_DEG.relaxed;   // fading on for its catch: cocked to take it
+}
+/** The wrist through a move (degrees, the carry's sign: + flexed): the push and the pound flex through the ball, the hand that holds or
+ *  floats it supports it, a hand coming on for the catch cocks back and settles into the dribble's catch (dribbleWristDeg(0)) through
+ *  it, and a hand off the ball is the relaxed curl (plan §3.3 "the wrists"). `u` = progress through the current segment. */
 
 /**
  * CLOTHING-SOFT-RESIDUAL C4 (2026-09-15): THE DRIBBLE WHIPPED THE ARM AT EVERY CATCH. As the ball comes back up, the hand target
@@ -342,16 +416,16 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const handNodes = { Left: findBone(opts.skeleton, 'LeftHand')?.getTransformNode() ?? null, Right: findBone(opts.skeleton, 'RightHand')?.getTransformNode() ?? null };
   const foreNodes = { Left: findBone(opts.skeleton, 'LeftForeArm')?.getTransformNode() ?? null, Right: findBone(opts.skeleton, 'RightForeArm')?.getTransformNode() ?? null };
   const footNodes = [findBone(opts.skeleton, 'LeftFoot')?.getTransformNode() ?? null, findBone(opts.skeleton, 'RightFoot')?.getTransformNode() ?? null];
-  /** A crossing under way: the ball's lateral start (root frame), where it meets the floor, how much phase it takes, how much has run. */
-  let cross: { from: number; z: number; x: number; span: number; acc: number } | null = null;
-  let pendingCross: CrossPoint | null = null;   // asked for on the way UP: the old hand takes it at the top, then it crosses
-  let lastBallX = 0;                            // the ball's lateral this frame (root frame), a crossing's start
   let startOff: Vector3 | null = null;          // an activation's offset from the palm to the bounce's point it starts at, faded out
   let startAcc = 0;                              // the phase run since the activation (the fade's clock)
   let clock = 0, pendingDt = 0, rootSpeed = 0;  // the carry's own clock (s), the dt recorded since the last pass, planar root speed
   const lastRoot = new Vector3(); let rootSeen = false;
   const feet = footNodes.map(() => ({ down: false, floor: Number.POSITIVE_INFINITY }));
   let lockStrikeAt = Number.NEGATIVE_INFINITY, lockPeriod = 0.6, lockHz = 0;
+  // HOOPS MOTION phase 4b (U20): the last strike of EACH foot (the athlete's side it is drawn on), so a hand change re-seeds the lock from
+  // its new lock foot's own last strike; and when a catch could not be timed to that foot, the clock the lock's gain eases back from
+  const strikeAt: Record<'right' | 'left', number> = { right: Number.NEGATIVE_INFINITY, left: Number.NEGATIVE_INFINITY };
+  let lockEaseAt = Number.NEGATIVE_INFINITY;
   let holdTarget = 0, holdK = 0;
   let floorY = Number.NaN;   // the floor the ball bounces on (see strideTick)
   let ballYaw: number | null = null;   // the dribbled ball's own facing (see BALL_YAW_RATE)
@@ -417,7 +491,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const mine = active || !!inHand;
     for (const sd of ['Left', 'Right'] as const) {
       let deg = 0;
-      if (active) deg = sd === side ? dribbleWristDeg(phase) : WRIST_DEG.relaxed + 5 * Math.sin(2 * Math.PI * phase + Math.PI);
+      if (active && mv && mv.sample) deg = moveWristDeg(mv.sample, athleteOf(sd), mv.segU);   // (phase 4b) the move's wrists, per hand
+      else if (active) deg = sd === side ? dribbleWristDeg(phase) : WRIST_DEG.relaxed + 5 * Math.sin(2 * Math.PI * phase + Math.PI);
       else if (inHand) {
         const up = handUp01(sd);
         const cock = WRIST_DEG.cockLow + (WRIST_DEG.cockHigh - WRIST_DEG.cockLow) * up;
@@ -453,15 +528,20 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (!st.down && y < st.floor + 0.035) {
         st.down = true;
         f.getAbsolutePosition().subtractToRef(rp, _v); _v.applyRotationQuaternionInPlace(_q);
+        if (Math.abs(_v.x) > 0.01) strikeAt[_v.x > 0 ? 'right' : 'left'] = clock;   // (phase 4b: every foot's strike, for the re-seed)
         if (Math.sign(_v.x) === -Math.sign(sx) && Math.abs(_v.x) > 0.01) {   // the lock foot: the side opposite the ball hand
           const gap = clock - lockStrikeAt;
-          if (gap > 0.3 && gap < 1.3) lockPeriod += (gap - lockPeriod) * 0.5;
+          // (phase 4b, U20) a gap under LOCK_MIN_GAP_K of the stride is a hand change's half-gap, never a stride
+          if (gap > Math.max(0.3, LOCK_MIN_GAP_K * lockPeriod) && gap < 1.3) lockPeriod += (gap - lockPeriod) * 0.5;
           if (gap > 0.25) lockStrikeAt = clock;
         }
       } else if (st.down && y > st.floor + 0.07) st.down = false;
     });
     const since = clock - lockStrikeAt;
-    lockHz = active && rootSpeed > STRIDE_LOCK_MIN_MPS && since < 2 * lockPeriod ? strideLockHz(phase, since, lockPeriod, STRIDE_PHI_AT_STRIKE, STRIDE_LOCK_GAIN) : 0;
+    // (phase 4b, plan §3.3) after a catch the path could not time to the lock foot, the gain eases from 0 back to STRIDE_LOCK_GAIN over one
+    // stride — at gain 0 the bounce runs at the stride's own rate, so the miss is walked in, not snapped
+    const gain = STRIDE_LOCK_GAIN * Math.min(1, Math.max(0, (clock - lockEaseAt) / Math.max(0.3, lockPeriod)));
+    lockHz = active && rootSpeed > STRIDE_LOCK_MIN_MPS && since < 2 * lockPeriod ? strideLockHz(phase, since, lockPeriod, STRIDE_PHI_AT_STRIKE, gain) : 0;
   };
   /** The two-hand chest carry (3PT's jog): each palm on its side of the ball, solved off this frame's shoulders. */
   const applyHold = (dt: number): void => {
@@ -577,6 +657,178 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   };
   /** The drawn frame's animation dt (s) for a pass the mode recorded nothing for; 1/60 when the engine has no frame time yet. */
   const drawnDt = (): number => { const d = animDt(opts.scene.getEngine().getDeltaTime() / 1000, opts.scene.animationTimeScale); return d > 0 ? d : 1 / 60; };
+  // ── HOOPS MOTION phase 4b: THE MOVE (plan §3.3) ───────────────────────────────────────────────────────────────────────────────
+  type MoveHand = 'right' | 'left';
+  interface RunningMove { name: string; path: HandlePath; t: number; opts: CarryMoveOpts; catchT: number; timed: boolean; crosses: number; sample: PathSample | null; sampleT: number; segU: number }
+  let mv: RunningMove | null = null;
+  let moveRootYaw: number | null = null;   // the root's yaw on the move's last drawn frame (a held ball turns with it)
+  let queued: { move: PathMove; opts: CarryMoveOpts } | null = null;
+  /** The ball as the last pass drew it — in the ball's frame, less the push-ahead — and its velocity there: a move's mid-bounce start. */
+  const lastLocal = new Vector3(), lastVel = new Vector3(); let lastLocalAt = -1;
+  const athleteOf = (sd: 'Left' | 'Right'): MoveHand => sideOfRigHand(opts.skeleton, opts.root, `${sd}Hand`);
+  const rigOf = (h: MoveHand): 'Left' | 'Right' => (rigHandOnSide(opts.skeleton, opts.root, h) === 'LeftHand' ? 'Left' : 'Right');
+  const moveArms: Record<'Left' | 'Right', ArmChain | null> = { Left: armChain(opts.skeleton, 'Left'), Right: armChain(opts.skeleton, 'Right') };
+  const moveHandT = { right: new Vector3(), left: new Vector3() }, movePole = { right: new Vector3(), left: new Vector3() };
+  const crossesOf = (m: string): number => (m in MOVE_SHAPE ? MOVE_SHAPE[m as HandleMove].crosses : 0);
+  /** The ball hand changed (a move's contact, its end): the arms follow, and the stride lock is re-seeded from the NEW lock foot's own last
+   *  strike (U20: it stayed on the old foot until the new one struck — about half a stride — the lock half a bounce off meanwhile). */
+  const setSide = (sd: 'Left' | 'Right'): void => {
+    if (sd === side) return;
+    side = sd; arm = armChain(opts.skeleton, side); offArm = armChain(opts.skeleton, otherSideOf(side));
+    const foot: MoveHand = athleteOf(side) === 'right' ? 'left' : 'right';
+    if (Number.isFinite(strikeAt[foot])) lockStrikeAt = strikeAt[foot];
+  };
+  /** The END hand's lock foot for the catch's timing (handlePaths.relockCatch): where it is in its stride now, while the stride clock runs. */
+  const lockFor = (endHand: MoveHand): PathLock | undefined => {
+    const since = clock - strikeAt[endHand === 'right' ? 'left' : 'right'];
+    if (!(rootSpeed > STRIDE_LOCK_MIN_MPS) || !(since >= 0 && since < 2 * lockPeriod)) return undefined;
+    return { strikePhase: (since / lockPeriod) % 1, period: lockPeriod, phiAtStrike: STRIDE_PHI_AT_STRIKE };
+  };
+  const _mv = new Vector3();
+  /** A world point in the ball's frame (ballToWorld inverted: its yaw, the floor), less the push-ahead `push`. */
+  const ballLocalOf = (w: Vector3, push: number, out: Vector3, frameYaw?: number): Vector3 => {
+    const rp = opts.root.getAbsolutePosition(), yaw = frameYaw ?? ballYaw ?? rootYaw(), c = Math.cos(yaw), sn = Math.sin(yaw);
+    const dx = w.x - rp.x, dz = w.z - rp.z, fl = Number.isFinite(floorY) ? floorY : rp.y;
+    return out.set(dx * c - dz * sn, w.y - fl, dx * sn + dz * c - push);
+  };
+  /** The ball where it is now (the ball frame, less the push-ahead) and its velocity — or undefined at the stroke's top at rest (the path's
+   *  own start). A ball in the palm (a held move: the spin, a gather) is at rest where the palm has it. */
+  const drawnFrom = (): PathFrom | undefined => {
+    if (active && !opts.ball.parent && lastLocalAt === stamp) {
+      if (lastVel.length() < 0.05 && Math.abs(lastLocal.y - p.palmY) < 0.02) return undefined;
+      return { p: { x: lastLocal.x, y: lastLocal.y, z: lastLocal.z }, v: { x: lastVel.x, y: lastVel.y, z: lastVel.z } };
+    }
+    opts.ball.computeWorldMatrix(true); opts.root.computeWorldMatrix(true);
+    const held = !active || activating || !!opts.ball.parent;   // (startMove's own test: a held ball's frame is the root's facing — it takes it)
+    const q = ballLocalOf(opts.ball.getAbsolutePosition(), PUSH_AHEAD_M * pushK, _mv, held ? rootYaw() : undefined);
+    return { p: { x: q.x, y: q.y, z: q.z }, v: { x: 0, y: 0, z: 0 } };
+  };
+  /** The hand the ball is with now: in a move, the one touching it, else the next to touch it; otherwise the carry's own. */
+  const holdingHand = (): MoveHand => {
+    const m = mv;
+    if (m) { const smp = pathAt(m.path, m.t); if (smp.contact) return smp.contact; const next = m.path.segs.find((sg) => sg.t0 >= m.t && sg.hand); return next?.hand ?? m.path.endHand; }
+    const held = ballHandNow(); return athleteOf(active || !held ? side : held);
+  };
+  const buildMove = (move: PathMove, o: CarryMoveOpts, startHand: MoveHand, from: PathFrom | undefined): HandlePath | null => {
+    const pace = o.pace ?? 1, st = { P: p.palmY, r: p.ballR, S: p.side, F: p.forward };
+    const path = pathFor(move, startHand, pace, st, undefined, from); if (!path) return null;
+    const lock = o.lock === false ? undefined : lockFor(path.endHand);
+    return lock ? pathFor(move, startHand, pace, st, lock, from) ?? path : path;
+  };
+  const startMove = (path: HandlePath, o: CarryMoveOpts): void => {
+    if (mv) mv.opts.onEvent?.('cancel', mv.name);   // replaced
+    moveRootYaw = null;
+    const last = path.segs[path.segs.length - 1];
+    // the path starts at the ball as the LAST pass drew it: asked after this frame's update (the modes read their sticks after they tick the
+    // carry), its first drawn frame is this frame's dt into it — started at 0 the ball stood still for a frame (a false top, 4b's probe)
+    const t0 = pending && active ? frameDt : 0;
+    mv = { name: path.move, path, t: t0, opts: o, catchT: last && last.kind === 'catch' ? last.t0 : path.duration, timed: path.lockMiss != null && Math.abs(path.lockMiss) < 0.02, crosses: crossesOf(path.move), sample: null, sampleT: -1, segU: 0 };
+    if (!active || activating || opts.ball.parent) {
+      // a held ball (or a dribble that has not let go yet): the carry takes it from the palm, where the path starts
+      active = true; activating = false; releaseLeft = 0; startOff = null;
+      if (opts.ball.parent) opts.ball.setParent(null);
+      ballYaw = rootYaw();   // (a held ball's frame is the body's: drawnFrom read it there — a dribble's old facing left over from before the hold is not)
+    }
+    setSide(rigOf(path.startHand));
+    startOff = null; prevArm = null; switchLeft = 0;
+    pending = true;   // drawn this frame (a held ball let go here is placed by the path, never left where it was)
+    o.onEvent?.('start', path.move);
+    if (path.segs[0] && !path.segs[0].hand) o.onEvent?.('release', path.move);   // (a falling ball re-aimed: already out of the hand)
+  };
+  const runMoveImpl = (spec: PathMove | HandlePath, o: CarryMoveOpts = {}): boolean => {
+    if (!hoops) return false;
+    if (!active && !ballHandNow()) return false;   // this body has no ball
+    const startHand = holdingHand(), from = drawnFrom();
+    const path = typeof spec === 'string' ? buildMove(spec, o, startHand, from) : spec;
+    if (!path) return false;
+    queued = null;
+    startMove(path, o);
+    return true;
+  };
+  /** The events between two clock readings of the running move (segment boundaries crossed). */
+  const fireEvents = (m: RunningMove, a: number, b: number): void => {
+    const cb = m.opts.onEvent; if (!cb) return;
+    const sg = m.path.segs;
+    for (let i = 1; i < sg.length; i++) {
+      const tb = sg[i].t0; if (!(tb > a && tb <= b)) continue;
+      if (sg[i - 1].mode === 'fall') cb('floor', m.name);
+      if (sg[i - 1].hand && !sg[i].hand) cb('release', m.name);
+      if (i === sg.length - 1 && sg[i].kind === 'catch') cb('catch', m.name);
+    }
+  };
+  /** The move is over: the ball is at the end hand's top, at rest — the dribble takes it from phase 0 (the path's catch was timed to the
+   *  lock foot; when it could not be, the lock's gain eases back). A queued move starts from here. */
+  const endMove = (): void => {
+    const m = mv!; mv = null;
+    setSide(rigOf(m.path.endHand));
+    phase = 0; startAcc = 0; startOff = null; prevArm = null; switchLeft = 0;
+    if (!m.timed) lockEaseAt = clock;
+    m.opts.onEvent?.('end', m.name);
+    if (queued) { const q = queued; queued = null; const path = buildMove(q.move, q.opts, m.path.endHand, undefined); if (path) startMove(path, q.opts); }
+  };
+  /** A queued move starts at the running one's catch, from the ball as it is caught (plan §3.3: the double cross's second crossing). */
+  const startQueued = (): void => {
+    const m = mv!, q = queued!; queued = null;
+    const smp = pathAt(m.path, m.t);
+    setSide(rigOf(m.path.endHand));
+    m.opts.onEvent?.('end', m.name); mv = null;
+    const path = buildMove(q.move, q.opts, m.path.endHand, { p: smp.ball, v: smp.vel });
+    if (path) startMove(path, q.opts); else { phase = 0; startAcc = 0; activating = true; }
+  };
+  const tickMove = (dt: number): void => {
+    const m = mv!; const a = m.t; m.t += dt;
+    fireEvents(m, a, m.t);
+    if (queued && a < m.catchT && m.t >= m.catchT) startQueued();
+    else if (m.t >= m.path.duration) endMove();
+  };
+  /** The move's frame (the after-animations pass): the ball on its path, each hand by the contact schedule. */
+  const applyMove = (dt: number): void => {
+    const m = mv!; const smp = pathAt(m.path, m.t); m.sample = smp; m.sampleT = m.t;
+    const sg = m.path.segs.find((x) => m.t <= x.t1) ?? m.path.segs[m.path.segs.length - 1]; m.segU = sg.t1 > sg.t0 ? (m.t - sg.t0) / (sg.t1 - sg.t0) : 1;
+    // the ball's frame follows the root's turn at a ball's pace (BALL_YAW_RATE, the dribble's) — and never snaps with it: the facing snaps
+    // at a cut (the left-stick reversal's −129°, the momentum cross's −55° in one frame; measured, the probe's first 4b run) swung a ball
+    // in the hand round the hips 0.2–0.8 m in a frame. A ball the palm HOLDS (the spin's pull, PAUSIN') turns WITH the body — this frame's
+    // turn of the root, capped at MOVE_YAW_RATE — and a lag it brought in from the air closes at BALL_YAW_RATE (closing it at the hold's
+    // rate swung the steezo roll's ball 0.21 m in a frame: the probe's second 4b run)
+    // (4b review F1) …EXCEPT A FACING SNAP: the body turned more than a quarter turn since it was last drawn (the left-stick reversal's cut
+    // writes the facing in one frame, −118° to −129°) takes the ball with it, by exactly the snap — the dribble's own rule (a snap takes the
+    // new facing). Left behind at BALL_YAW_RATE, the ball was drawn on the OTHER side of the body for 0.2–0.3 s, the contact hand reaching
+    // across the chest for it: a crossing pick read as its twin and a twin as a crossing (the review's 1v1 o_lcross_cam a3 / a4: +0.26 m
+    // → −0.33 m of the body on the turn frame). The world step on that frame is the body's snap, not the ball's (FacingSnap: SNAP_TURN_RAD)
+    { const ry = rootYaw(); if (ballYaw == null) ballYaw = ry;
+      if (placedAt === stamp - 1) { let snap = ry - placedYaw; snap -= 2 * Math.PI * Math.round(snap / (2 * Math.PI)); if (Math.abs(snap) > SNAP_TURN_RAD) { ballYaw += snap; if (moveRootYaw != null) moveRootYaw = ry; } }
+      let d = ry - ballYaw; d -= 2 * Math.PI * Math.round(d / (2 * Math.PI));
+      const hold = (m.path.segs.find((x) => m.t <= x.t1) ?? m.path.segs[m.path.segs.length - 1]).kind === 'hold';
+      let turn = 0; if (hold && moveRootYaw != null) { turn = ry - moveRootYaw; turn -= 2 * Math.PI * Math.round(turn / (2 * Math.PI)); turn = Math.max(-MOVE_YAW_RATE * dt, Math.min(MOVE_YAW_RATE * dt, turn)); }
+      const rest = d - turn;
+      ballYaw += turn + Math.max(-BALL_YAW_RATE * dt, Math.min(BALL_YAW_RATE * dt, rest));
+      moveRootYaw = ry; }
+    pushK += (Math.min(1, Math.max(0, lastSpeed01)) - pushK) * Math.min(1, dt / 0.25);
+    // the dribble's push-ahead (up to PUSH_AHEAD_M at a sprint) eases OUT through the move and back in for its catch: the path places the
+    // ball itself (a behind-the-back's wrap behind the hips) — carried on top, it moved the wrap 0.14–0.16 m forward at pace and the
+    // crossing read in front of the hip line (4b's probe: the fast behind-the-back and every momentum behind-the-back)
+    const push = PUSH_AHEAD_M * pushK * movePushK(m.t / Math.max(1e-6, m.path.duration));
+    ballToWorld(smp.ball.x, smp.ball.y, smp.ball.z + push, world);
+    opts.ball.position.copyFrom(world);
+    placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
+    lastVel.set(smp.vel.x, smp.vel.y, smp.vel.z); lastLocal.set(smp.ball.x, smp.ball.y, smp.ball.z); lastLocalAt = stamp;
+    if (smp.contact) setSide(rigOf(smp.contact));
+    if (!(armW > 0)) return;
+    // the off arm's pace reach lets go (the move's contact schedule owns both hands now, plan §3.3)
+    if (offArm && offW > 0) { offW = Math.max(0, offW - dt / 0.08); toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, offW, dt, stamp); }
+    const rp = opts.root.getAbsolutePosition(), fl = Number.isFinite(floorY) ? floorY : rp.y;
+    let best = 0;
+    for (const h of ['right', 'left'] as const) {
+      const ch = moveArms[rigOf(h)]; if (!ch) continue;
+      const w = smp.reach[h] * armW, tg = smp.handTarget[h];
+      if (!(w > 1e-3) || !tg) { forgetElbowSwing(ch); continue; }   // between contacts the arm is the clip's
+      ballToWorld(tg.x, tg.y, tg.z + push, moveHandT[h]);
+      toWorld((h === 'right' ? 1 : -1) * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], movePole[h]).subtractInPlace(rp);
+      reachShaped(ch, moveHandT[h], movePole[h], w, dt, stamp);
+      // the let-go (a shot or a pass mid-move) fades the hand that reached hardest, from where it reached
+      if (w > best) { best = w; arm = ch; handLocal.set(tg.x, tg.y + fl - rp.y, tg.z + push); pole.copyFrom(movePole[h]); }
+    }
+  };
   const applyHoops = () => {
     stamp++;
     // the dt the mode recorded since the last pass — or, on a frame it did not update() the carry (a defender's, a held move's), the drawn
@@ -642,19 +894,11 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         if (startOff.length() > 1.3) startOff = null;   // a ball that was nowhere near (a reset) just starts
       }
     }
-    const k = cross ? Math.min(1, cross.acc / Math.max(1e-6, cross.span)) : 0;
-    const s = dribbleAtPushed(phase, p, cross ? crossHeight(k) : 1);
+    if (mv) { applyMove(dt); applyWrists(dt); return; }   // HOOPS MOTION phase 4b: a move's path owns the ball and the hands
+    const s = dribbleAtPushed(phase, p);
     pushK += (Math.min(1, Math.max(0, lastSpeed01)) - pushK) * Math.min(1, dt / 0.25);
     const push = PUSH_AHEAD_M * pushK;
-    let bx = s.ball.x * sx, bz = s.ball.z;
-    if (cross) {
-      bx = crossLateral(cross.from, s.ball.x * sx, k);
-      const u = 4 * k * (1 - k);   // 1 at mid-crossing (the floor, on a crossing from the top), 0 at both palms
-      bx += (cross.x - (cross.from + s.ball.x * sx) / 2) * u * (Math.abs(cross.from - s.ball.x * sx) > 1e-3 ? 1 : 0);
-      bz = p.forward + (cross.z - p.forward) * u;
-      if (cross.acc >= cross.span) cross = null;
-    }
-    lastBallX = bx;
+    const bx = s.ball.x * sx, bz = s.ball.z;
     // the ball's facing follows the body's at a ball's pace (BALL_YAW_RATE); a snap or a reset (> 90°) just takes the new one
     { const ry = rootYaw(); if (ballYaw == null) ballYaw = ry; let d = ry - ballYaw; d -= 2 * Math.PI * Math.round(d / (2 * Math.PI)); ballYaw = Math.abs(d) > Math.PI / 2 ? ry : ballYaw + Math.max(-BALL_YAW_RATE * dt, Math.min(BALL_YAW_RATE * dt, d)); }
     // THE BALL BOUNCES ON THE FLOOR, NOT ON THE ROOT (ballToWorld): a hop mid-dribble (the step-back) carried the ball up with the body and
@@ -666,12 +910,17 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     opts.ball.position.copyFrom(world);
     placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
+    // (phase 4b) the ball as drawn — the activation's fade included — in the ball frame less the push, and its velocity: where a move asked
+    // mid-bounce starts from
+    { const was = _mv.copyFrom(lastLocal); ballLocalOf(world, push, lastLocal); if (lastLocalAt === stamp - 1 && dt > 0) lastVel.copyFrom(lastLocal).subtractInPlace(was).scaleInPlace(1 / dt); else lastVel.setAll(0); lastLocalAt = stamp; }
     if (arm && armW > 0) {
       handLocal.set(s.hand.x * sx, s.hand.y, s.hand.z + push);
       toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
-      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6));
+      // hoops-handle: never under the rising ball — the clip's hand (a stance with no ball arm) is lifted clear of the ball's top
+      arm.hand.computeWorldMatrix(true);
+      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6), clearOfBallWeight(arm.hand.getAbsolutePosition().y, handT.y, world.y + p.ballR));
       reachShaped(arm, handT, pole, w * armW * ks, frameDt, stamp);
       if (prevArm && ks < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - ks), frameDt, stamp);
       if (!(offArm && lastSpeed01 > 0.35)) offW = 0;
@@ -688,24 +937,18 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     }
     applyWrists(dt);
   };
-  /** Start a crossing now: the ball runs from where it is to the other hand over what is left of this bounce (or a whole one). */
-  const beginCross = (via: CrossPoint | undefined, span: number): void => {
-    if (arm) { prevArm = arm; prevHandT.copyFrom(handT); prevPole.copyFrom(pole); switchLeft = SWITCH_FADE_SEC; }
-    side = otherSideOf(side);
-    arm = armChain(opts.skeleton, side);
-    offArm = armChain(opts.skeleton, otherSideOf(side));
-    cross = { from: lastBallX, x: via?.x ?? 0, z: via?.z ?? p.forward, span: Math.max(0.2, span), acc: 0 };
-  };
-  const switchHoops = (via?: CrossPoint): void => {
+  /** HOOPS MOTION phase 4b: a hand switch on a live dribble is the crossover's PATH, started now (plan §3.3: "switchHand and toSide stay;
+   *  they build a default front path") — phase 3's floor-point crossing waited for the next top when asked on the way up (up to 0.9 s
+   *  of the hand named and the ball still drawn on the old side, 4a preflight). Asked while a move runs, it queues behind it. */
+  const switchHoops = (_via?: CrossPoint): void => {
     if (!active) {
       // no bounce to cross on: a held hand change is a hand-off — the ball eased palm to palm, never a snap
       side = otherSideOf(side); arm = armChain(opts.skeleton, side); offArm = armChain(opts.skeleton, otherSideOf(side));
       if (ballHandNow()) gatherBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
       return;
     }
-    if (pendingCross) { pendingCross = null; return; }   // asked twice before it crossed: it stays in this hand
-    if (phase < PUSHED_FLOOR_PHASE) beginCross(via, 1 - phase);   // on its way down: this bounce crosses
-    else pendingCross = via ?? {};                                 // on its way up: the old hand takes it, the next push crosses
+    if (mv) queued = { move: 'crossover', opts: {} };
+    else runMoveImpl('crossover');
   };
   const obs = opts.scene.onAfterAnimationsObservable.add(hoops ? applyHoops : apply);
   const obsDrawn = hoops ? opts.scene.onAfterRenderObservable.add(sampleDrawn) : null;
@@ -720,10 +963,27 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get side() { return side; },
     get handBone() { return `${side}Hand` as RigHand; },
     get hand() {
-      const toward = pendingCross ? otherSideOf(side) : side;
-      return sideOfRigHand(opts.skeleton, opts.root, `${toward}Hand`) === 'right' ? 'Right' : 'Left';
+      // the destination while a move runs (and the queued move's after it): what the stick maps mirror by
+      if (mv) { let h = mv.path.endHand; if (queued && crossesOf(queued.move) % 2 === 1) h = h === 'right' ? 'left' : 'right'; return h === 'right' ? 'Right' : 'Left'; }
+      return sideOfRigHand(opts.skeleton, opts.root, `${side}Hand`) === 'right' ? 'Right' : 'Left';
     },
-    get crossing() { return !!cross || !!pendingCross; },
+    get crossing() { return (!!mv && mv.crosses > 0) || (!!queued && crossesOf(queued.move) > 0); },
+    get move() {
+      const m = mv; if (!m) return null;
+      const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t);
+      return { name: m.name, t: m.t, duration: m.path.duration, readAtK: m.path.readAtK, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand };
+    },
+    runMove(spec: PathMove | HandlePath, o?: CarryMoveOpts) { return runMoveImpl(spec, o); },
+    queueMove(move: PathMove, o: CarryMoveOpts = {}) {
+      if (!hoops) return false;
+      if (!mv) return runMoveImpl(move, o);
+      queued = { move, opts: o }; return true;
+    },
+    cancelMove() {
+      queued = null; const m = mv; if (!m) return;
+      const h = holdingHand(); mv = null; m.opts.onEvent?.('cancel', m.name);
+      if (active) { setSide(rigOf(h)); activating = true; }   // back into the dribble from where the ball is (the activation's own restart)
+    },
     switchHand(via?: CrossPoint) {
       if (hoops) { switchHoops(via); return; }
       if (arm) { prevArm = arm; prevHandT.copyFrom(handT); prevPole.copyFrom(pole); switchLeft = SWITCH_FADE_SEC; }
@@ -742,7 +1002,8 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       if (!hoops) return;
       const s0 = strongSide();
       if (s0 !== side) { side = s0; arm = armChain(opts.skeleton, side); offArm = armChain(opts.skeleton, otherSideOf(side)); }
-      cross = null; pendingCross = null; prevArm = null; switchLeft = 0; startOff = null;
+      if (mv) { const m = mv; mv = null; m.opts.onEvent?.('cancel', m.name); } queued = null;
+      prevArm = null; switchLeft = 0; startOff = null;
     },
     setHold(k: number) { holdTarget = Math.min(1, Math.max(0, k)); },
     update(dt, speed01, wantActive, hz, releaseSec) {
@@ -756,31 +1017,30 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
             // drawn frame, from where that palm is drawn then (applyHoops lets it go)
             const inHand = ballHandNow();
             if (inHand && inHand !== side) { side = inHand; arm = armChain(opts.skeleton, side); offArm = armChain(opts.skeleton, otherSideOf(side)); prevArm = null; switchLeft = 0; }
-            phase = 0; releaseLeft = 0; cross = null; pendingCross = null; startOff = null; ballYaw = null; activating = true;
+            phase = 0; releaseLeft = 0; startOff = null; ballYaw = null; activating = true; lastLocalAt = -1;
             pushK = Math.min(1, Math.max(0, speed01));
-            lastBallX = dribbleAtPushed(0, p).ball.x * sideSign(side);
           } else { opts.ball.setParent(null); phase = 0; releaseLeft = 0; }
         } else {
+          if (mv) { const m = mv; mv = null; m.opts.onEvent?.('cancel', m.name); }   // (phase 4b) a shot, a pass, a pick-up mid-move
+          queued = null; lastLocalAt = -1;
           releaseLeft = releaseTotal = Math.max(1e-3, releaseSec ?? RELEASE_FADE_SEC);
           // Hand the ball back ONLY if it is still ours to hand back: a steal
           // re-parents it to another hand and a release sets it flying, and
           // either may land in the same frame as our deactivation.
           if (opts.ball.parent === null && !opts.ball.metadata?.felReleased) {
-            if (hoops) { cross = null; pendingCross = null; gatherBallToHand(opts.ball, opts.skeleton, `${side}Hand`); }   // THE GATHER
+            if (hoops) gatherBallToHand(opts.ball, opts.skeleton, `${side}Hand`);   // THE GATHER
             else attachBallToHand(opts.ball, opts.skeleton, `${side}Hand`);
           }
         }
       }
       switchLeft = Math.max(0, switchLeft - dt);
       if (!active) { releaseDt = dt; return; }
-      if (hoops) {
+      if (hoops && mv) tickMove(dt);   // (phase 4b) a move's clock: the dribble's phase waits for it
+      else if (hoops) {
         const base = hz != null && hz > 0 ? hz : lockHz > 0 ? lockHz : p.hzIdle + (p.hzFast - p.hzIdle) * Math.min(1, Math.max(0, speed01));
-        const rate = base * (cross ? CROSS_HZ : 1);
-        const next = phase + dt * rate;
-        if (cross) cross.acc += dt * rate;
-        startAcc += dt * rate;
-        if (next >= 1 && pendingCross) { const via = pendingCross; pendingCross = null; phase = next - Math.floor(next); beginCross(via, 1); cross!.acc = phase; }
-        else phase = next - Math.floor(next);
+        const next = phase + dt * base;
+        startAcc += dt * base;
+        phase = next - Math.floor(next);
       } else phase = hz != null && hz > 0 ? (phase + dt * hz) - Math.floor(phase + dt * hz) : advancePhase(phase, dt, speed01, p);
       frameDt = dt; lastSpeed01 = speed01;
       pending = true;
