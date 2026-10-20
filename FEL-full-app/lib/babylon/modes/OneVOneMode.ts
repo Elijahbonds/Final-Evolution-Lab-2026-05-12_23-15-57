@@ -2203,7 +2203,10 @@ export const OneVOneMode: ModeDefinition = (() => {
             // the ball cross 6/10 at finish-release and 0/10 on the rebased p4. Through the renderer now: no decision, no impulse, no chain
             // (his move is AttackerBrain's), the crossover's path on his carry, his capture's clip; a crossover to the hand the ball is
             // already in moves no ball (toSide's old rule).
-            const crosses = !!foeCarry && (foeCarry.hand === 'Left' ? 'left' : 'right') !== dec.crossover;
+            // HOOPS-CROSS-FIXUP-2 (owner 2026-10-20): "the hand the ball is in" is its DESTINATION — handAfterMove. Since TWO-HAND-CROSS-1
+            // `hand` is the start hand until the catch, so a crossover decided mid-move, toward the hand the ball is already heading to,
+            // read as a crossing and queued a second one behind it (the ball crossed back: a phantom double cross).
+            const crosses = !!foeCarry && (foeCarry.handAfterMove === 'Left' ? 'left' : 'right') !== dec.crossover;
             requestMove(foeHost(), { move: 'crossover', hint: dec.crossover, decide: { kind: 'none' }, clip: foe.animator.clipNames.has(cap) ? cap : dec.crossover === 'left' ? 'bball_crossover_left' : 'bball_crossover_right', fadeSec: 0.12, speedRatio: 1, path: crosses ? undefined : false });
             // (4b review F4) HIS BALL STAYS IN HIS HAND UNTIL 4f routes him through HandleMotion (plan §4.20: a path timed inside his poke
             // window). 4b ran the hero's crossover path here (toSide → runMove): the ledger's L1 (his crossover's foot slide p90, the mean of
