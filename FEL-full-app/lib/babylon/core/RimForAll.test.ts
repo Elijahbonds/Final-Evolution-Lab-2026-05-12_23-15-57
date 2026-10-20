@@ -30,7 +30,7 @@ const FROM = new Vector3(1.2, 0, 4.5);
 const toShooter = (): Vector3 => { const v = FROM.subtract(RIM); v.y = 0; return v; };
 
 // ── each path's REAL pct over a spread of its real inputs ─────────────────────────────────────────────────────────────
-interface Shot { pct: number; quality: number; short: number; lateral: number }
+interface Shot { pct: number; quality: number; short: number; lateral: number; dunk?: number }
 
 /** 3v3 teammate (teammateShoots): matePct over the finish, the distance, the contest on him; his miss shape as the mode builds it. */
 function mateShots(): Shot[] {
@@ -64,7 +64,7 @@ function rivalShots(): Shot[] {
 function dunkShots(): Shot[] {
   const out: Shot[] = [];
   for (const base of [DUNK_PCT.dunk, DUNK_PCT.standing, DUNK_PCT.poster, DUNK_PCT.poster - DRIVE_CONTEST_PENALTY * 0.5, DUNK_PCT.poster - DRIVE_CONTEST_PENALTY])
-    for (const c of [0, 0.3, 0.6, 1]) out.push({ pct: contestedPct(base, c), quality: DUNK_RING_QUALITY, short: c * 0.7, lateral: 0 });
+    for (const c of [0, 0.3, 0.6, 1]) out.push({ pct: contestedPct(base, c), quality: DUNK_RING_QUALITY, short: c * 0.7, lateral: 0, dunk: c });
   return out;
 }
 
@@ -90,7 +90,9 @@ describe('statistical: N seeded shots per path, the dice (before) vs the ring (a
       const s = ctx[i % ctx.length];
       expected += diceRate(s.pct);
       if (before() < s.pct) mb++;                                                                  // the dice this path rolled
-      if (rimDecidesExact(RIM, toShooter(), s.pct, s.quality, { short: s.short, lateral: s.lateral }, after).made) ma++;   // the ring
+      const v = s.dunk !== undefined ? dunkVerdict(RIM, FROM, s.pct, s.dunk, after)                                   // a dunk: the modes' own call
+        : rimDecidesExact(RIM, toShooter(), s.pct, s.quality, { short: s.short, lateral: s.lateral }, after);       // the ring, as rimVerdictFor asks it
+      if (v.made) ma++;
     }
     const e = expected / N, rb = mb / N, ra = ma / N;
     const sigma = Math.sqrt(Math.max(1e-6, e * (1 - e)) / N);
