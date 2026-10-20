@@ -74,7 +74,7 @@ export class ChallengeLinkCore {
   static mint({ modeKey, score, display, keyMoments = [], athleteTag = 'ATHLETE' }: MintInput): MintResult {
     if (!modeKey || score == null) throw new Error('mode+score required');
     const payload: ChallengePayload = {
-      v: 1,
+      v: 2, // CHALLENGE-SIGN-V2: signPayload signs the full payload as v2 (v1 rows verify until the sunset)
       modeKey,
       score,
       display,
