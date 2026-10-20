@@ -26,6 +26,7 @@ const TEXT_BY_VERSION: Record<string, string> = {
   '2026-10-14': 'd0dd0d8daf1d3367',  // LANE-SYNC: CREATOR-PLATFORM §1 Work-with-us bullet + BUSINESS-ADDRESS #2012 mailbox together
   '2026-10-14b': '6d4d960aced45bf7',  // PARTY-PRIVACY: §2 gains the Parties bullet (party name, nothing recorded, voice 18+, block on the device, reports kept 12 months)
   '2026-10-16': 'f5be67c85745dff0',   // STUDIO-AI-DISCLOSURE: §1 and §2 name the Studio AI builder's requests (venue request + settings only, signed-in 13+, rate-limited)
+  '2026-10-17': '65a6d38721c3f5ac',   // STUDIO-SAVE: §1 Studio projects, §2 how saved projects are used, §4 delete and download
 };
 
 describe('the policy version', () => {
@@ -57,8 +58,11 @@ describe('the policy version', () => {
   // the text; 2026-10-13 is now an earlier version and keeps its fingerprint above.
   // test changed (2026-10-16, owner-approved Studio AI builder disclosure, lane/owner-1016): was toBe('2026-10-14b'). The
   // version moves with the text; 2026-10-14b is now an earlier version and keeps its fingerprint above.
+  // test changed (2026-10-20, owner-approved Studio save text, lane/studio-save): was toBe('2026-10-16'). The version moves with
+  // the text; 2026-10-16 is now an earlier version and keeps its fingerprint above.
   it('is the final, non-draft label', () => {
-    expect(CURRENT_POLICY_VERSION).toBe('2026-10-16');
+    expect(CURRENT_POLICY_VERSION).toBe('2026-10-17');
+    expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-16');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14b');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-14');
     expect(CURRENT_POLICY_VERSION).not.toBe('2026-10-13');
