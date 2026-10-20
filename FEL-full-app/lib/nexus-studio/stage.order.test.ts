@@ -77,7 +77,9 @@ describe('one look stack, two callers', () => {
   it('the Studio\'s stage mounts it once and makes none of its calls itself', () => {
     expect(count(stageBody, 'await mountLookStack(')).toBe(1);
     for (const c of CALLS) expect(count(stageBody, c), `${c} in stage.mountStage`).toBe(0);
-    expect(stageBody).toMatch(/modeId: exp\.target/);
+    // test changed: (studio-5, §13.3) the scene is marked with the target's own modeId where the definition's is not the registry
+    // key (Derby plays as 'baseball'), else the key as before; pinned exactly (courtTargets.test.ts mounts both and reads the mark)
+    expect(stageBody).toMatch(/modeId: target\?\.modeId \?\? exp\.target,/);
     expect(stageBody).toMatch(/mood: \(\) => exp\.mood/);
   });
 

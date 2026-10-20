@@ -31,17 +31,25 @@ export interface WalkOutDeps {
 async function defaultFetchCatalogue(): Promise<SoundtrackTrack[]> {
   if (typeof fetch !== 'function') return [];
   try {
-    const res = await fetch('/api/v1/soundtrack');
-    if (!res.ok) return [];
-    const body = (await res.json()) as { tracks?: SoundtrackTrack[] };
-    return Array.isArray(body?.tracks) ? body.tracks : [];
+    // FIRST-DUNK-BUDGET (2026-10-17): the page's one catalogue read, shared with the soundtrack dock (each fetched it on every /try run)
+    const { fetchSoundtrackTracks } = await import('@/lib/soundtrack/client');
+    return (await fetchSoundtrackTracks()) ?? [];
   } catch { return []; }
 }
 
 async function defaultPlayOnBus(url: string, opts: { gainDb?: number; loop?: boolean; who?: string }): Promise<MusicBusClip | null> {
   try {
     const { playOnMusicBus } = await import('@/lib/soundtrack/musicBusPlayer');
-    return await playOnMusicBus(url, opts);
+    // FIRST-DUNK-BUDGET: a catalogue track comes through the soundtrack's device cache, so the walk-out and the soundtrack's deck
+    // share one download of it (a local song is a data URL already: it plays as it is)
+    let src = url;
+    if (/^(\/|https?:)/.test(url)) {
+      const { SoundKit } = await import('@/lib/babylon/audio/SoundKit');
+      if (!SoundKit.graph()) return null;   // nothing could play it: fetch nothing (playOnMusicBus answers null here too)
+      const [{ cachedSrc }, { saveDataOn }] = await Promise.all([import('@/lib/soundtrack/cache'), import('@/lib/soundtrack/client')]);
+      src = await cachedSrc(url, { saveData: saveDataOn() });
+    }
+    return await playOnMusicBus(src, opts);
   } catch { return null; }
 }
 

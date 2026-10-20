@@ -87,3 +87,25 @@ export const HOSTILE_SCRIPT_ANSWER = JSON.stringify({
 
 /** A model's summary for the explain pass, with the things a summary must not carry through. */
 export const EXPLAIN_ANSWER = '## Night Court\n\nA **night** court under four floods.\u0007 The far stand is packed.<img src=x onerror=alert(1)>\n```json\n{"edits":[]}\n```\nAdd palms on the left.';
+
+// studio-5 (§13.2): CELL proposes STAMPS — two built-ins (by id and by name), one of the project's own named as the creator typed
+// it, a name nobody has, and the hostile shapes (no spot, a stamp that is not text, past the per-answer cap).
+export const STAMP_PROMPT = 'a lamp row down each side, a flood corner set, and my Bench Gang behind the far line';
+export const STAMP_ANSWER = JSON.stringify({
+  edits: [
+    { op: 'stamp', stamp: 'stamp:lampRow', at: [-9, 0], yaw: 90 },
+    { op: 'stamp', stamp: 'Lamp row', at: [9, 0], yaw: 90 },
+    { op: 'stamp', stamp: 'stamp:floodCorners', at: [0, 0] },
+    { op: 'stamp', stamp: 'Bench Gang', at: [0, -22], yaw: 0 },
+    { op: 'stamp', stamp: 'Disco Ball Tower', at: [0, -30] },
+  ],
+});
+export const HOSTILE_STAMP_ANSWER = JSON.stringify({
+  edits: [
+    { op: 'stamp', stamp: 'stamp:lampRow' },                                   // no spot
+    { op: 'stamp', stamp: { id: 'stamp:lampRow', objects: [{ type: 'hoop' }] }, at: [0, 0] },   // a stamp that is not a name
+    { op: 'stamp', stamp: '', at: [0, 0] },
+    { op: 'stamp', stamp: 'stamp:lampRow', at: [500, -500], yaw: 'x', objects: [{ type: 'specProp', kind: 'hoop' }], id: 'evil' },   // clamped; the extras ignored
+    ...Array.from({ length: 8 }, (_, i) => ({ op: 'stamp', stamp: 'stamp:lanternString', at: [i, 5] })),   // past the cap of 6
+  ],
+});

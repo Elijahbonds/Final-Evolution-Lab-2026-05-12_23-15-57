@@ -185,8 +185,12 @@ import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { MoveDip } from '../anim/moveDip';   // hoops-dip
+import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
+import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { AiMover } from '../core/AiMovement';
-import { stepStrongHand, STRONG_HAND_IDLE, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
+import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, CONTEST_TRICK, contestTricksOn, trickPctFor, putbackDunkOn, PUTBACK_DUNK } from '../core/GameDunks';   // H2e: more dunks
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
@@ -1056,6 +1060,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meDribbleSM = new DribbleStateMachine();
       void meDribbleSM;
       meAnimTree = new BasketballAnimTree(me.animator);
+      MoveDip.for(ctx.scene, me.skeleton, me.root, (n) => me.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
@@ -1071,6 +1076,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       const ppOff = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pp') === '0';
       if (ppOff) console.info('[1V1-DEV] posture layer OFF (?pp=0)');
       if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking), '1V1-PP');   // DRIBBLE PACE: a sprint LOOKS like work
+      LocoAccent.for(ctx.scene, me.skeleton, me.root, () => meAnimTree.state);   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carry)
       if (!ppOff) foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
       // HOOPS MOTION phase 3c: THE MOTION LAYERS (anim/motionLayers — the dunk pass's, lifted out of DunkMode) on both bodies: the limb drag
       // insert-first (the legs only in the air, the ball arm left on its clip around a release), the side lean right after the posture
@@ -1087,6 +1093,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meLayers.mountHinge(); foeLayers.mountHinge();   // HOOPS MOTION phase 3c: the hinged arm LAST — after the carries and the rim reaches
       // HOOPS MOTION phase 4b (U21): a handle move's contact hands are the carry's reach over the clip's own keys — the drag skips them
       { const mc = meCarry, fc = foeCarry; meLayers.setContactHands(() => mc?.move?.contactRig ?? []); foeLayers.setContactHands(() => fc?.move?.contactRig ?? []); }
+      for (const b of [me, foe]) { DrawnFacing.for(ctx.scene, b.root); FootGlide.for(ctx.scene, b.skeleton, b.root); }   // hoops-dip movement pass: no one-frame facing snap is DRAWN (core/DrawnFacing: the game keeps the movement's); no foot skates over the floor (anim/footGlide; last on the pass)
       shotMeter = new ShotMeter();
       turbo = new TurboMeter();
       arc = new ShotArc();
@@ -1588,7 +1595,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // the ball leaves the palm while I carry; a crossover swaps hands
           // STICK HANDLE: pausin' holds the ball out. HOOPS MOTION phase 4b (U19): …unless a move's path has it (PAUSIN's `hold` segment)
           meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move));
-          { // H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
+          if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
             const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.handAfterMove === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
               dribbling: !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble,
               defenderDist: foeStunSec === 0 && !foeFloored ? distXZ(me.root.position, foe.root.position) : Infinity });

@@ -11,6 +11,11 @@ reaches `lane/finish-release` through a PR that the owner merges. Nobody commits
 `mode-lanes/wt-finish-release`. The lane rules, the registry of who owns which files and ports, and the deploy and
 capacity limits are in **`FEL-full-app/docs/LANES.md`**. Read it before you start or land lane work.
 
+**What the owner has decided (owner, 2026-10-20).** Every product decision, dated, is in
+**`FEL-full-app/docs/OWNER-DECISIONS.md`**: read it before planning work, so you build what was chosen and do not re-ask
+what was answered. Its standing rule: for reversible choices take the recommended option and flag it; ask only on the
+irreversible ones listed below.
+
 ---
 
 ## When to ask, and when to just go (owner, 2026-09-28)
@@ -24,6 +29,11 @@ to write code, change a number, add a test, or refactor. Make the call, do it we
 
 - **Pushing to `main`.** `main` is the deploy branch (Firebase web-frameworks; a push ships). Agents push to their
   **own lane branch only**. Merging a lane to `main` is the owner's call, every time, even with a green gate.
+  *Standing exception (owner, 2026-10-20):* the **coordinator** may fast-forward `main` to `lane/finish-release` when
+  release CI, the E2E tests and the preview checks are all green, and the change touches none of: deploy config
+  (`firebase.json`, the `build` script, CI deploy steps), the database schema or `public/_prisma/**`, payments going
+  live, or policy text outside the disclosure-only rule in `docs/OWNER-DECISIONS.md`. Those still wait for the owner.
+  Lane agents still never push `main`.
 - **Any history rewrite on a shared branch** — force-push, rebase, amend, `push --force-with-lease`.
 - **Deleting anything that isn't yours** — a branch, a ref, a file you didn't create, a database row or table.
 - **Triggering a deploy**, or changing what deploys (`firebase.json`, the `build` script, `public/_prisma/**`).

@@ -42,6 +42,10 @@ export const DUNK_BOARDWALK = { bikeX: [13.5, 17] as const, walkX: [17, 31] as c
 /** Which Venice: 'lawn' is the shared hoops boardwalk (1v1, 3v3, three-point, carnival); 'venice-dunk' is the dunk's own. */
 export type BoardwalkEnv = 'lawn' | 'venice-dunk';
 
+/** FIRST-DUNK-BUDGET (2026-10-17): handed in by a venue whose dressing mounts later (NexusVenue `deferDressing`). `start` runs a job
+ *  when the dressing mounts; `landed` runs one once the venue's prop set (the lamps the flags hang on) has landed. */
+export interface DressingHooks { start(job: () => void): void; landed(job: () => void): void }
+
 function flat(scene: Scene, name: string, w: number, d: number, x: number, z: number, y: number, hex: string, holder: TransformNode, rough = 1, kind?: GroundKind, mul?: string): Mesh {
   const g = MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
   g.position.set(x, y, z); g.parent = holder; g.isPickable = false; g.receiveShadows = true;
@@ -64,7 +68,7 @@ function flat(scene: Scene, name: string, w: number, d: number, x: number, z: nu
  * aprons, far hoop, centre logo and gate sign slide with it — the owner's Luma reference (2026-09-06) shows both hoops on
  * the concrete right behind each baseline.
  */
-export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn'): TransformNode {
+export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanShiftZ = 0, env: BoardwalkEnv = 'lawn', dressing?: DressingHooks): TransformNode {
   const holder = new TransformNode('venice_boardwalk', scene); holder.parent = root;
   const { apron, grass, walkW, sandW } = BOARDWALK;
   // concrete apron around the slab (a hair above the scan's painted ground), then the boardwalk strip to the east
@@ -201,7 +205,9 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
     sign('vb_scoreboard', 4.8, 1.3, [ax + grass + walkW / 2 + 1.5, 3.0, SCAN_MID], -Math.PI / 2, flightNight);
   }
   const flagTex = signTexture(scene, ['FEL'], { bg: '#B03A2E', fg: '#FFF4E0', accent: '#F2B84B', w: 256, h: 640 });
-  for (let i = 0; i < 4; i++) { const z = -36 + i * 24; sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); }
+  const flags = Array.from({ length: 4 }, (_, i) => { const z = -36 + i * 24; return sign(`vb_flag_${i}`, 0.5, 1.25, [19.55, 4.0, z + 0.5], Math.PI / 2, flagTex); });
+  // FIRST-DUNK-BUDGET: the lamps come with the prop set, so on a deferred dressing the flags wait for them rather than float
+  if (dressing) { for (const f of flags) f.setEnabled(false); dressing.landed(() => { for (const f of flags) if (!f.isDisposed()) f.setEnabled(true); }); }
   // Pass 7 phase 5 — air: six gulls (three on a phone) wheel over the northern water on slow ellipses (billboards on a painted chevron).
   // Cheap: six unlit planes and one observer.
   const gullTex = new DynamicTexture('vb_gull_tex', 64, scene, false);
@@ -233,9 +239,15 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // Pass 7 phase 6 — life: a rail of onlookers on the boardwalk's inner edge, facing the court (roster bodies, cap 8, the
   // same people every session). They idle and bob; the modes' cheer hooks are not wired here — this is scenery.
   const railX = COURT.hx + apron - 0.7;   // on the east apron, inside the scan's baked fence — on the walk they stood behind it, unseen from the court
-  const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID));
-  const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
-  holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });
+  // FIRST-DUNK-BUDGET: on a deferred dressing the rail fills when the dressing mounts (five roster bodies, ~3.9 MB, were the
+  // biggest thing on the dunk's first download after the bus)
+  const fillRail = (): void => {
+    if (holder.isDisposed()) return;
+    const rail = new Onlookers(scene, Array.from({ length: 9 }, (_, i) => new Vector3(railX + (i % 2) * 0.7, 0, SCAN_N + 1.5 + i * 3.0)), '#2b3550', new Vector3(0, 0, SCAN_MID));
+    const life = scene.onBeforeRenderObservable.add(() => rail.update(scene.getEngine().getDeltaTime() / 1000));
+    holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(life); rail.dispose(); });
+  };
+  if (dressing) dressing.start(fillRail); else fillRail();
   // DUNK-VISUAL-POLISH: a DynamicTexture on a Ground lands MIRRORED along u for a camera looking down −z (every
   // basketball camera here) — the centre logo read "HƆA38 3ƆIИ3V" backwards. It was unreadable mush on the old scan,
   // so nobody could see it was wrong. Flip u on this copy (measured both ways, 2026-09-09: u alone reads "FEL").
@@ -463,6 +475,20 @@ function bakeByMaterial(scene: Scene, meshes: AbstractMesh[], into: TransformNod
 export interface VeniceDressingHandle { palms: number; kit: Mesh[]; crowd: Mesh[] }
 
 /**
+ * FDB-3 (PM, 2026-10-17: margin under the dunk-1 budget). palm_hero_lod1.glb ships WITHOUT its frond atlas: it was byte-identical
+ * to palm_hero_lod2.glb's (`palm_frond_atlas_far`, 46,270 B of WebP, the 1.7×-fatter-leaflet atlas the README made for range),
+ * and both files load together in mountVeniceDunkDressing. LOD1's fronds wear LOD2's frond material — the two materials were
+ * identical but for which copy of the atlas they pointed at (MASK 0.5, double-sided, roughness 0.8, specular 0.6, one sampler),
+ * so every pixel is as it was. Its own, texture-less material (the file's `felFrondAtlas` extras say where its atlas is) is freed.
+ */
+export function shareFarFrondMaterial(lod1Frond: Mesh, lod2Frond: Mesh): void {
+  const own = lod1Frond.material;
+  if (!lod2Frond.material || own === lod2Frond.material) return;
+  lod1Frond.material = lod2Frond.material;
+  own?.dispose(false, true);
+}
+
+/**
  * DUNK-VENICE-ENV-2 — the Venice dunk's baked dressing, under the boardwalk holder (it dies with the venue):
  *  · THE PALMS (eye VE-1: a faceted low-poly palm behind the backboard in the slam cam and all three replays): the baked
  *    palm, LOD0 → LOD1 at 25 m → LOD2 at 60 m, the hero behind the backboard and every row on the beach (VENICE_HERO_PALMS,
@@ -491,7 +517,8 @@ export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNod
   const part = (r: (typeof lods)[number], mat: string) => r.meshes.find((m) => m.material?.name === mat) as Mesh | undefined;
   const trunks = lods.map((r) => part(r, 'palm_trunk')), fronds = lods.map((r) => part(r, 'palm_frond'));
   if (trunks.some((m) => !m) || fronds.some((m) => !m)) throw new Error('palm_hero LODs: no palm_trunk / palm_frond mesh');
-  const casters = [...(scene.getLightByName('fel_sun')?.getShadowGenerators()?.values() ?? [])] as Array<{ addShadowCaster?(m: AbstractMesh, d?: boolean): unknown; removeShadowCaster?(m: AbstractMesh, d?: boolean): unknown }>;
+  shareFarFrondMaterial(fronds[1] as Mesh, fronds[2] as Mesh);   // FDB-3: LOD1 ships without its copy of the far atlas
+  const casters =[...(scene.getLightByName('fel_sun')?.getShadowGenerators()?.values() ?? [])] as Array<{ addShadowCaster?(m: AbstractMesh, d?: boolean): unknown; removeShadowCaster?(m: AbstractMesh, d?: boolean): unknown }>;
   for (const masters of [trunks, fronds]) {
     const [m0, m1, m2] = masters as Mesh[];
     m0.addLODLevel(VENICE_PALM_LODS.switchM[0], m1); m0.addLODLevel(VENICE_PALM_LODS.switchM[1], m2);

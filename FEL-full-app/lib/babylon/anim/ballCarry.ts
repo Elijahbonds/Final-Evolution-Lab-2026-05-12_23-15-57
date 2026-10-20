@@ -33,7 +33,7 @@
 import { Quaternion, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import { attachBallToHand, ballGathering, gatherBallToHand, palmOffsetOf } from './ballRig';
-import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
+import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, clearOfBallWeight, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from './HandIK';
 import { pathFor, pathAt, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
 import { MOVE_SHAPE } from '../core/HandleShape';
@@ -948,7 +948,9 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       toWorld(handLocal.x, handLocal.y, handLocal.z, handT);
       toWorld(sx * BALL_ELBOW_POLE[0], BALL_ELBOW_POLE[1], BALL_ELBOW_POLE[2], pole).subtractInPlace(opts.root.getAbsolutePosition());
       const ks = switchLeft > 0 ? 1 - switchLeft / SWITCH_FADE_SEC : 1;
-      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6));
+      // hoops-handle: never under the rising ball — the clip's hand (a stance with no ball arm) is lifted clear of the ball's top
+      arm.hand.computeWorldMatrix(true);
+      const w = Math.max(s.handWeight, Math.min(1, lastSpeed01 * 1.6), clearOfBallWeight(arm.hand.getAbsolutePosition().y, handT.y, world.y + p.ballR));
       reachShaped(arm, handT, pole, w * armW * ks, frameDt, stamp);
       if (prevArm && ks < 1) reachShaped(prevArm, prevHandT, prevPole, w * armW * (1 - ks), frameDt, stamp);
       if (!(offArm && lastSpeed01 > 0.35)) offW = 0;
