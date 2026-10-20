@@ -155,7 +155,9 @@ describe('the harness runs it where it cannot trip the watchdog', () => {
     expect(src).toMatch(/const LOAD_WATCHDOG_MS = 20_000;/);
   });
   it('a load the watchdog ends is reported to the diag before the error screen, like a load that throws', () => {
-    const arm = src.indexOf('const watchdog = setTimeout(() => {');
+    // test changed (2026-10-20): FIRST-DUNK-BUDGET (#316) re-armed the watchdog as a stall clock that looks again until nothing
+    // has arrived for 20 s (`let watchdog = setTimeout(function look() {`); the anchor follows it. The assertion is unchanged.
+    const arm = src.indexOf('let watchdog = setTimeout(function look() {');
     const fire = src.indexOf("setPhase('error', 'Load timed out", arm);
     expect(arm).toBeGreaterThan(0);
     expect(src.slice(arm, fire)).toContain("reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);");
