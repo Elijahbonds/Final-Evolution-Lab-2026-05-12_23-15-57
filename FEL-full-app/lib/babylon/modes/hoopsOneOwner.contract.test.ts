@@ -18,7 +18,9 @@ describe('3PT: every clip the shooter and the sideline bodies play goes through 
     expect(mode).toMatch(/owners\.push\(new BeatOwner\(b\.animator\)\)/);
   });
   it('the set holds, the shot holds, the follow-through chains to its absorb, the jog cuts a beat in flight', () => {
-    expect(mode).toMatch(/beats\?\.beat\('bball_pullup_gather', \{ fadeSec: 0\.1, holdEnd: true \}\)/);
+    // test changed (hoops-shot-content, 2026-10-20): the set is the CATCH HOP now (anim/authored/shotKit — the pull-up gather's set key in the
+    // same 0.3 s, pinned by shotKit.test.ts); it is still one held beat on the BeatOwner, which is what this pins
+    expect(mode).toMatch(/beats\?\.beat\(CATCH_HOP_CLIP, \{ fadeSec: 0\.1, holdEnd: true \}\)/);
     expect(mode).toMatch(/beats\?\.beat\('jumpshot', \{ speedRatio: SHOT_CLIP_SPEED, fadeSec: 0\.08, holdEnd: true, from01: rise01 \}\)/);
     expect(mode).toMatch(/beats\?\.beat\(ftClip, \{ fadeSec: 0\.08, onSettle: \(\) => beats\?\.beat\('bball_land_absorb', \{ fadeSec: 0\.1 \}\) \}\)/);
     expect(mode).toMatch(/beats\?\.loop\(k < 1 \? 'run' : WATCH_IDLE\); beats\?\.settle\(\);/);
@@ -38,7 +40,7 @@ describe('3PT on the real animator: a make\'s celebrate, the next ball\'s set, t
       const n = Math.round(sec * 60); a.setKeys([{ frame: 0, value: 0 }, { frame: n, value: 10 }]);
       const g = new AnimationGroup(name, scene); g.addTargetedAnimation(a, node); g.normalize(0, n); return g;
     };
-    const groups = [clip('bball_idle_stand', 0.5), clip('run', 0.6), clip('bball_pullup_gather', 0.35), clip('jumpshot', 0.9), clip('bball_follow_through', 0.65), clip('bball_land_absorb', 0.4), clip('dunk_celebrate_big', 0.9)];
+    const groups = [clip('bball_idle_stand', 0.5), clip('run', 0.6), clip('bball_catch_hop', 0.35), clip('jumpshot', 0.9), clip('bball_follow_through', 0.65), clip('bball_land_absorb', 0.4), clip('dunk_celebrate_big', 0.9)];
     const animator = new CharacterAnimator(scene, groups);
     const beats = new BeatOwner(animator);
     let stacked = 0, frames = 0;
@@ -48,7 +50,7 @@ describe('3PT on the real animator: a make\'s celebrate, the next ball\'s set, t
     for (let i = 0; i < 20; i++) { beats.loop('run'); beats.settle(); run(1); }
     beats.loop(WATCH_IDLE); beats.settle(); run(1);
     for (let shot = 0; shot < 3; shot++) {
-      beats.beat('bball_pullup_gather', { fadeSec: 0.1, holdEnd: true }); beats.loop(WATCH_IDLE, { fadeSec: 0.2 });   // setFeet
+      beats.beat('bball_catch_hop', { fadeSec: 0.1, holdEnd: true }); beats.loop(WATCH_IDLE, { fadeSec: 0.2 });   // setFeet
       run(40);                                                                                                           // the bar sweeps: the set holds
       beats.beat('jumpshot', { speedRatio: 1.5, fadeSec: 0.08, holdEnd: true, from01: 0.13 }); run(27);                   // fire → the release (the rise — the held set is the load)
       beats.beat('bball_follow_through', { fadeSec: 0.08, onSettle: () => beats.beat('bball_land_absorb', { fadeSec: 0.1 }) });
