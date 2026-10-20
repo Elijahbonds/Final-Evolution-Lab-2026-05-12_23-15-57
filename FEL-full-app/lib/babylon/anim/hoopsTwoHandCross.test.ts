@@ -11,7 +11,7 @@ import { requestMove, type HandleHost } from './handleMotion';
 import { attachBallToHand } from './ballRig';
 import { pathFor } from './handlePaths';
 import { chooseBasketballClip, LEFT_TWIN_STATES, leftTwinOf, type AnimTreeInput } from './basketballTree';
-import { DribbleController, redirectFor, REDIRECT_TOP_K } from '../core/BasketballCore';
+import { DribbleController, redirectFor, REDIRECT_TOP_K, REDIRECT_TIGHT_MAX_RAD } from '../core/BasketballCore';
 import { DEFAULT_MOVEMENT } from '../core/CourtMovement';
 import { impulseFor, moveImpulse, type HandleMove } from '../core/HandleSystem';
 
@@ -116,20 +116,27 @@ function atSpeed(sprint = true) {
   return d;
 }
 const heading = (v: Vector3): number => Math.atan2(v.x, v.z);
+/** HOOPS-CROSS-ANGLE (owner 2026-10-20): the 2K-style bar — a plain crossover (stick released) turns the travel 14–19°, never over 25°;
+ *  with the stick held or pointed toward the side, 60° or more. */
+const DEG = Math.PI / 180;
+const PLAIN_MIN = 14 * DEG, PLAIN_MAX = 19 * DEG, HELD_MIN = 60 * DEG;
 
 describe('TH-6: a move redirects the travel — rotate, don\'t add (DR-3)', () => {
-  it('redirectFor (pure): the travel turned toward the move\'s side by atan2(lateral, forward), the speed max(current, |impulse|) capped at top × 1.15 — never braked', () => {
+  it('redirectFor (pure): the travel turned toward the move\'s side — 14–19° with the stick released (never over 25°), ≥ 60° held — the speed max(current, |impulse|) capped at top × 1.15 — never braked', () => {
     const top = DEFAULT_MOVEMENT.maxSpeed;
     const cross = impulseFor('crossover', 'right');
     const r = redirectFor(0, 5, 0, cross.forward, cross.lateral)!;
-    expect(r.turnRad).toBeCloseTo(Math.atan2(1.6, 0.4), 6);
-    expect(Math.atan2(r.x, r.z)).toBeCloseTo(Math.atan2(1.6, 0.4), 6);   // +: toward the athlete's right (yaw + π/2)
+    expect(r.turnRad).toBeGreaterThanOrEqual(PLAIN_MIN);   // +: toward the athlete's right
+    expect(r.turnRad).toBeLessThanOrEqual(PLAIN_MAX);
+    expect(r.turnRad).toBeLessThanOrEqual(REDIRECT_TIGHT_MAX_RAD);
+    expect(Math.atan2(r.x, r.z)).toBeCloseTo(r.turnRad, 6);
+    expect(redirectFor(0, 5, 0, cross.forward, cross.lateral, true)!.turnRad).toBeGreaterThanOrEqual(HELD_MIN);
     expect(r.speed).toBe(5);
     const l = redirectFor(0, 5, 0, impulseFor('crossover', 'left').forward, impulseFor('crossover', 'left').lateral)!;
-    expect(Math.atan2(l.x, l.z)).toBeCloseTo(-Math.atan2(1.6, 0.4), 6);
+    expect(Math.atan2(l.x, l.z)).toBeCloseTo(-r.turnRad, 6);
     // from a standstill: the facing turned, at the impulse's own magnitude
     const s = redirectFor(0, 0, Math.PI / 2, cross.forward, cross.lateral)!;
-    expect(Math.atan2(s.x, s.z)).toBeCloseTo(Math.PI / 2 + Math.atan2(1.6, 0.4), 6);
+    expect(Math.atan2(s.x, s.z)).toBeCloseTo(Math.PI / 2 + r.turnRad, 6);
     expect(s.speed).toBeCloseTo(Math.hypot(0.4, 1.6), 6);
     // the cap holds an impulse over it; a run already over the cap is not braked
     expect(redirectFor(0, 0, 0, 9, 0)!.speed).toBeCloseTo(top * REDIRECT_TOP_K, 6);
@@ -146,9 +153,25 @@ describe('TH-6: a move redirects the travel — rotate, don\'t add (DR-3)', () =
       for (let i = 0; i < 5; i++) d.update(1 / 60, 0, 0, true);   // the blend (CUT_BLEND_SEC 0.07 s), the stick let go
       const turned = heading(d.vel) - h0;
       const sgn = side === 'right' ? 1 : -1;
-      expect(turned * sgn, side).toBeGreaterThan(0.5);   // over ~29°: a heading change, not a sideways slide
+      expect(turned * sgn, side).toBeGreaterThanOrEqual(PLAIN_MIN);   // the tight 2K cross: 14–19°, never over 25°
+      expect(turned * sgn, side).toBeLessThanOrEqual(PLAIN_MAX);
+      expect(turned * sgn, side).toBeLessThanOrEqual(REDIRECT_TIGHT_MAX_RAD);
       expect(d.vel.length(), side).toBeGreaterThanOrEqual(s0 * 0.85);   // (the stick let go: CourtMovement's own decel over 5 frames)
-      expect((d.facing - h0) * sgn, side).toBeGreaterThan(0.5);
+      expect((d.facing - h0) * sgn, side).toBeGreaterThanOrEqual(PLAIN_MIN);
+      expect((d.facing - h0) * sgn, side).toBeLessThanOrEqual(PLAIN_MAX);
+    }
+  });
+  it('…with the stick held (forward, or pointed toward the move\'s side) the same crossover turns the travel 60° or more, 5 frames on', () => {
+    for (const side of ['right', 'left'] as const) {
+      const sgn = side === 'right' ? 1 : -1;
+      for (const [label, sx, sy] of [['forward', 0, -1], ['toward the side', sgn, 0]] as const) {
+        const d = atSpeed();
+        const h0 = heading(d.vel);
+        const imp = impulseFor('crossover', side);
+        expect(d.redirect(imp.forward, imp.lateral, d.facing)).toBe(true);
+        for (let i = 0; i < 5; i++) d.update(1 / 60, sx, sy, true);
+        expect((heading(d.vel) - h0) * sgn, `${side} ${label}`).toBeGreaterThanOrEqual(HELD_MIN);
+      }
     }
   });
   it('…and the redirect\'s target speed is not below the pre-move speed (the cut it writes: speed ≥ |v0|), its heading the rotated one', () => {
@@ -156,9 +179,11 @@ describe('TH-6: a move redirects the travel — rotate, don\'t add (DR-3)', () =
     const s0 = d.vel.length(), h0 = heading(d.vel);
     const imp = impulseFor('crossover', 'right');
     d.redirect(imp.forward, imp.lateral, d.facing);
+    d.update(1 / 60, 0, 0, true);   // HOOPS-CROSS-ANGLE: the move is resolved on the next update, with that frame's stick (released)
     const cut = (d as unknown as { pendingCut: { x: number; z: number; speed: number } | null }).pendingCut!;
     expect(cut.speed).toBeGreaterThanOrEqual(s0);
-    expect(Math.atan2(cut.x, cut.z) - h0).toBeCloseTo(Math.atan2(1.6, 0.4), 4);
+    expect(Math.atan2(cut.x, cut.z) - h0).toBeGreaterThanOrEqual(PLAIN_MIN);
+    expect(Math.atan2(cut.x, cut.z) - h0).toBeLessThanOrEqual(PLAIN_MAX);
   });
   it('a zero-impulse move (the hesi) changes nothing: no cut, the velocity and the facing as they were', () => {
     const d = atSpeed();

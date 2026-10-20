@@ -36,20 +36,37 @@ export interface DribbleResult { crossover: boolean; hesitation: boolean; speed0
 export const REDIRECT_MIN_TRAVEL_MPS = 0.5;
 /** The redirect's speed cap, × top speed: the left-stick crossover's own cap (DribbleController.update's cut). */
 export const REDIRECT_TOP_K = 1.15;
+/** HOOPS-CROSS-ANGLE (owner 2026-10-20): the left stick past this magnitude on the move's frame is HELD — the move takes the wide turn. */
+export const REDIRECT_HELD_STICK = 0.5;
+/** The tight (stick released) turn: a move's atan2 angle passes unchanged up to the knee, and only REDIRECT_TIGHT_SLOPE of it past the
+ *  knee — so the Shammgod's 13° (under the knee) keeps its line and the crossover's 76° lands at 16.5°. ESTIMATE [TUNE]. */
+export const REDIRECT_TIGHT_KNEE_RAD = (14 * Math.PI) / 180;
+export const REDIRECT_TIGHT_SLOPE = 0.04;
+/** The tight turn's hard cap: a plain move never turns the travel more than 25° (owner bar). */
+export const REDIRECT_TIGHT_MAX_RAD = (25 * Math.PI) / 180;
+/** The turn a move's push maps to. Held stick: atan2(lateral, forward), the full angle (a crossover's 0.4 / 1.6 is 76°). Released: the
+ *  2K-style tight crossover — the hand changes, the line barely does (14–19°, never over 25°). A move that comes BACK (past 90°, the
+ *  snatchback's push) keeps its own angle either way. */
+export function redirectTurn(forward: number, lateral: number, stickHeld: boolean): number {
+  const full = Math.atan2(lateral, forward);
+  const a = Math.abs(full);
+  if (stickHeld || a <= REDIRECT_TIGHT_KNEE_RAD || a >= Math.PI / 2) return full;
+  return Math.sign(full) * Math.min(REDIRECT_TIGHT_MAX_RAD, REDIRECT_TIGHT_KNEE_RAD + (a - REDIRECT_TIGHT_KNEE_RAD) * REDIRECT_TIGHT_SLOPE);
+}
 /**
  * HOOPS-TWO-HAND-CROSS (DR-3, pure): a handle move's impulse (forward, lateral: the body's frame, lateral + toward the athlete's right)
  * as a REDIRECT — ROTATE the travel, don't add to it. The direction is the current travel turned toward the move's side by
- * atan2(lateral, forward) (a crossover's 0.4 / 1.6 is 76°) — or the facing turned, with no travel (or travel backwards against the
- * facing) to turn. The speed is max(current, |(forward, lateral)|), capped at top × REDIRECT_TOP_K — but never below the current
+ * redirectTurn (HOOPS-CROSS-ANGLE: the stick held, atan2(lateral, forward) — a crossover's 0.4 / 1.6 is 76°; released, the tight 2K
+ * cross, 16.5°) — or the facing turned, with no travel (or travel backwards against the facing) to turn. The speed is max(current, |(forward, lateral)|), capped at top × REDIRECT_TOP_K — but never below the current
  * speed (a momentum streak over the cap is not braked by a move). Null for a fake (zero impulse: the hesi, the yoyo, the in-and-out).
  * ESTIMATE [TUNE]: the angle mapping is the spec's; the eye judges it.
  */
-export function redirectFor(vx: number, vz: number, yaw: number, forward: number, lateral: number, top = DEFAULT_MOVEMENT.maxSpeed): { x: number; z: number; speed: number; turnRad: number } | null {
+export function redirectFor(vx: number, vz: number, yaw: number, forward: number, lateral: number, stickHeld = false, top = DEFAULT_MOVEMENT.maxSpeed): { x: number; z: number; speed: number; turnRad: number } | null {
   if (forward === 0 && lateral === 0) return null;
   const cur = Math.hypot(vx, vz);
   const along = vx * Math.sin(yaw) + vz * Math.cos(yaw);
   const base = cur > REDIRECT_MIN_TRAVEL_MPS && along > 0 ? Math.atan2(vx, vz) : yaw;
-  const turnRad = Math.atan2(lateral, forward);
+  const turnRad = redirectTurn(forward, lateral, stickHeld);
   const head = base + turnRad;
   const mag = Math.hypot(forward, lateral);
   // HOOPS-CROSS-FIXUP (QA PR #384 item 3): a move that pushes the ball out AHEAD (forward-dominant — of the movers only the Shammgod,
@@ -123,6 +140,8 @@ export class DribbleController {
   private momentumStreak = 0; private momentumAt = -Infinity; private clock = 0;
   /** THE SMOOTH CUT: a redirect is eased over CUT_BLEND_SEC rather than written into the velocity in one frame. */
   private pendingCut: { x: number; z: number; speed: number; left: number } | null = null;
+  /** HOOPS-CROSS-ANGLE: a handle move's push waiting for the next update, which reads the left stick to pick the tight or wide turn. */
+  private pendingMove: { forward: number; lateral: number; yaw: number } | null = null;
   static readonly CUT_BLEND_SEC = 0.07;
   static readonly MOMENTUM_STREAK_SEC = 0.55;
   static readonly MOMENTUM_TOP = 1.2;          // × top speed a momentum streak can reach
@@ -151,13 +170,24 @@ export class DribbleController {
   /** HOOPS-TWO-HAND-CROSS (DR-3): a handle move's impulse REDIRECTS the travel (redirectFor), eased through cutTo — it used to be added
    *  to the velocity in one frame (the body slid sideways, its heading barely turned). `yaw` is the body's facing (the impulse's frame).
    *  A cut already blending (the left stick's own reversal, the momentum cross, the step-back: an authored redirect this beat) keeps
-   *  its line: the addition it used to get was eased out inside CUT_BLEND_SEC anyway. False when nothing changed (a fake, a cut pending). */
+   *  its line: the addition it used to get was eased out inside CUT_BLEND_SEC anyway. False when nothing changed (a fake, a cut pending).
+   *  HOOPS-CROSS-ANGLE (owner 2026-10-20): the move is resolved on the next update, which reads the left stick — released, the tight
+   *  turn; held (past REDIRECT_HELD_STICK), the wide one. The cut starts blending on that same update, as it did when written here. */
   redirect(forward: number, lateral: number, yaw: number): boolean {
-    if (this.pendingCut) return false;
-    const r = redirectFor(this.movement.vel.x, this.movement.vel.z, yaw, forward, lateral);
-    if (!r) return false;
-    this.cutTo(r.x, r.z, r.speed, Math.abs(r.turnRad) < Math.PI / 2);   // a move that comes BACK keeps the chest where it is (the step-back's rule)
+    if (this.pendingCut || this.pendingMove) return false;
+    if (forward === 0 && lateral === 0) return false;
+    this.pendingMove = { forward, lateral, yaw };
     return true;
+  }
+  /** The queued move, resolved with this frame's stick. An authored cut (or the slide) written since the move keeps its line — it
+   *  overwrote the move's cut when the redirect was written at once. */
+  private resolveMove(moveX: number, moveY: number): void {
+    const m = this.pendingMove; if (!m) return;
+    this.pendingMove = null;
+    if (this.pendingCut || this.pendingSlide) return;
+    const r = redirectFor(this.movement.vel.x, this.movement.vel.z, m.yaw, m.forward, m.lateral, Math.hypot(moveX, moveY) > REDIRECT_HELD_STICK);
+    if (!r) return;
+    this.cutTo(r.x, r.z, r.speed, Math.abs(r.turnRad) < Math.PI / 2);   // a move that comes BACK keeps the chest where it is (the step-back's rule)
   }
   /** HOOPS KINETIC (2026-09-18): the MOMENTUM DRIFT — a slide-cut onto a new line with the dribble speed kept. */
   drift(dx: number, dz: number): void { this.cutTo(dx, dz, Math.max(this.movement.vel.length(), 0.1)); }
@@ -301,6 +331,7 @@ export class DribbleController {
   }
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
     this.clock += dt;
+    this.resolveMove(moveX, moveY);   // HOOPS-CROSS-ANGLE: a move's push, turned by this frame's stick
     this.stepCut(dt);
     this.stepSlide(dt);   // H2: the BTB slide's committed hop
     this.crossoverCooldown = Math.max(0, this.crossoverCooldown - dt);
