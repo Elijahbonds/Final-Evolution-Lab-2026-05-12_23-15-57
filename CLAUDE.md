@@ -11,6 +11,11 @@ reaches `lane/finish-release` through a PR that the owner merges. Nobody commits
 `mode-lanes/wt-finish-release`. The lane rules, the registry of who owns which files and ports, and the deploy and
 capacity limits are in **`FEL-full-app/docs/LANES.md`**. Read it before you start or land lane work.
 
+**What the owner has decided (owner, 2026-10-20).** Every product decision, dated, is in
+**`FEL-full-app/docs/OWNER-DECISIONS.md`**: read it before planning work, so you build what was chosen and do not re-ask
+what was answered. Its standing rule: for reversible choices take the recommended option and flag it; ask only on the
+irreversible ones listed below.
+
 ---
 
 ## When to ask, and when to just go (owner, 2026-09-28)
