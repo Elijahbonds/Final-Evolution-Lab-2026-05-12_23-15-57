@@ -36,6 +36,8 @@ import { buildTrophy, trophyRise, TROPHY_AT, TROPHY_RISE_SEC, type TrophyHandle 
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
 import { SPEED_VIGNETTE_ON } from '../core/ImpactFrame';
+// lane/tiebreak-cam (2026-10-20): upright, the load's camera slides sideways with the player (tiebreakCam.ts says why)
+import { SPOT_X, isPortrait, portraitCamX } from './tiebreakCam';
 
 export interface TiebreakModeOpts {
   reactBase: number;
@@ -130,6 +132,10 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   let hitAt = -1;
   // #18: the HUD's last numbers — compared, not stringified, every frame
   let hudMy = -1, hudAi = -1, hudRally = -1, hudAwait = false, hudWarm = -1;
+  // lane/tiebreak-cam: the camera as load() snapped it, and whether the portrait truck has moved it off that
+  let camBase: { pos: Vector3; tgt: Vector3 } | null = null;
+  let trucked = false;
+  const camTgt = new Vector3();
 
   function placeBall(s: BlitzState): void {
     if (!ball || !ring || !shadow) return;
@@ -166,7 +172,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   /** #5: a body slides to its spot, shuffling while the gap is large and settling into the ready bounce when it is there. */
   function slide(root: TransformNode | undefined, body: BeatOwner | null, yaw: number, side: Side, z: number, dt: number): void {
     if (!root) return;
-    const x = side === 'left' ? -1.7 : 1.7;
+    const x = side === 'left' ? -SPOT_X : SPOT_X;
     const gap = x - root.position.x;
     root.position.x += gap * Math.min(1, dt * 6);
     root.position.z = z;
@@ -206,6 +212,23 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
     const from: Side = towards === 'left' ? 'right' : 'left';
     rivalBody?.beat(swingClip(RIVAL_YAW, from, rivalFore, rivalMirror), { fadeSec: 0.08 });
   };
+
+  /** lane/tiebreak-cam: on a screen held upright, the load's camera trucks with the player (tiebreakCam.ts). On a wide screen it
+   *  is never written: the camera stays exactly where load() snapped it, as shipped. The Studio's intro owns the frame while it
+   *  runs, and hands back the load's camera. */
+  function framePortrait(ctx: ModeContext): void {
+    if (!camBase || !player || ctx.camDirector.inIntro) return;
+    const engine = ctx.scene.getEngine();
+    if (!isPortrait(engine.getRenderWidth() / Math.max(1, engine.getRenderHeight()))) {
+      // turned sideways: one cut back to the load's camera, then hands off (a wide screen is never written)
+      if (trucked) { trucked = false; ctx.camera.position.copyFrom(camBase.pos); ctx.camera.setTarget(camBase.tgt); }
+      return;
+    }
+    trucked = true;
+    const x = portraitCamX(player.root.position.x);
+    ctx.camera.position.set(x, camBase.pos.y, camBase.pos.z);
+    ctx.camera.setTarget(camTgt.set(x, camBase.tgt.y, camBase.tgt.z));
+  }
 
   function say(text: string): void {
     banner = text;
@@ -425,6 +448,9 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       ctx.objectiveRef.current = rival.root.position;
       ctx.camDirector.setPreset('court');
       ctx.camDirector.snapTo(player.root.position, rival.root.position);
+      // lane/tiebreak-cam: keep the snapped camera; upright, READY already shows the trucked one (no cut on START)
+      camBase = { pos: ctx.camera.position.clone(), tgt: ctx.camera.getTarget().clone() }; trucked = false;
+      framePortrait(ctx);
       if (state.warmup > 0) say(`WARM-UP · ${state.warmup} BALL${state.warmup > 1 ? 'S' : ''}`);
       hud(ctx);
     },
@@ -471,6 +497,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       slide(player?.root, playerBody, PLAYER_YAW, state.incoming, NEAR_Z, dt);
       slide(rival?.root, rivalBody, RIVAL_YAW, state.incoming === 'left' ? 'right' : 'left', FAR_Z, dt);
       placeBall(state);
+      framePortrait(ctx);   // lane/tiebreak-cam
       if (player) ctx.heroRef.current = player.root;
       if (ball && state.awaiting) ctx.objectiveRef.current = ball.position;
       else if (rival) ctx.objectiveRef.current = rival.root.position;
@@ -492,6 +519,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       studio?.dispose(); studio = null;   // NEXUS STUDIO
       ball = null; ring = null; shadow = null; player = null; rival = null; venue = null;
       playerBody = null; rivalBody = null;
+      camBase = null; trucked = false;   // lane/tiebreak-cam
     },
   };
 }
