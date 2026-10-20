@@ -14,6 +14,16 @@ work) and `docs/LANES.md` (who owns what): this file is *what was decided*.
 - **Fewer, bigger merges.** Batch related lanes into fewer PRs and deploys.
 - **Game feel first, then Nexus**; platform lanes (coach, education, money) may run beside them, at most two at a time.
 - **No ads ever** inside the app. Real-money competition stays OFF until a legal review.
+- **Things that no longer wait on the owner (2026-10-20):**
+  - *Deploys:* the coordinator fast-forwards `main` when release CI, E2E and preview checks are green, unless the change
+    touches deploy config, the schema / `public/_prisma`, payments going live, or non-disclosure policy text (CLAUDE.md).
+  - *SQL:* a guarded CI job (one-time GitHub secret) previews, applies only an exact reviewed pending file, and verifies;
+    anything unexpected stops and pings the owner.
+  - *Self-approved, owner reviews after in the Owner Inbox (all reversible):* new feel numbers from measurements;
+    content drafted from the owner's own books after automated fact checks; disclosure-only privacy text (describes only
+    what the code already does) landing after 48 h unless the owner objects.
+  - *Still the owner's:* existing tuned numbers, new data uses and other policy text, accounts and money (Stripe, mail,
+    R2), legal documents, and anything else on CLAUDE.md's stop list. They wait in the **Owner Inbox**, one tap each.
 
 ## The log (oldest first)
 
@@ -233,3 +243,8 @@ The entries below are the coordinator's log, copied as written. Later entries ov
 - QUALITY (owner 2026-10-20), PLATFORM: pick-your-path onboarding (play/train/learn/teach/create -> one start + 60 s guided first win); full WCAG 2.2 AA audit + fixes (games: colour-blind-safe cues, remappable controls); "Report a problem" button with auto context (no personal data) -> admin inbox; exercise library = 3D demos from the owner's books in owner-approved batches; safety ALL (community guidelines for approval + report flow + admin queue warn/mute/ban; teen-safe defaults audit; word filter; appeals); English now, i18n-ready (all text in translation files); graceful offline (single-player + downloaded lessons offline via PWA, sync later, clear offline messages); design system pass over every page (tokens exist: TV HUD palette + --fel-*), screenshot proof; uptime check + error-spike alerts via Google Cloud monitoring (no new service); backups: verify + one restore drill in the ops session.
 - QUALITY, PROJECT: E2E (Playwright) on key flows in CI per PR, blocking; visual regression screenshot diffs on key screens + a frame per mode; phone-profile perf budget gate in CI (over budget fails unless owner approves a raised row); preview channel per release before main (deploy-config change: show the owner the exact change first); commit decisions log as docs/OWNER-DECISIONS.md + CLAUDE.md pointer; giant files: split when touched + size guard; full security review + fixes before launch; upgrades: security patches always (with owner OK, dependency change), majors as planned lanes after launch; releases: version tags + plain-language notes + in-app "What's new" + documented one-command rollback.
 - PROCESS (owner 2026-10-20): weekly status page (shareable, phone-readable); fewer, bigger merges; a written quality bar per lane; **ASK LESS, DECIDE MORE: use the recommended option for reversible choices; only ask on irreversible ones.**
+- DELEGATION (owner 2026-10-20: "find a way for the things that are waiting on me to not need me, and make it better"):
+  - DEPLOYS: auto-deploy (fast-forward main) when release CI + E2E + preview checks are green — no per-batch ask. STILL ASK for: deploy config (firebase.json, build script, CI deploy steps), database schema/`public/_prisma`, payments going live, policy text outside the disclosure-only rule.
+  - SQL: guarded CI job with a one-time GitHub secret (production DIRECT url): preview -> apply ONLY if the diff equals a reviewed pending SQL file -> verify; anything unexpected (DROP, extra statements) stops and pings the owner.
+  - OWNER INBOX: one private phone page listing everything waiting (policy text, content drafts, feel numbers, account steps) with Approve / Change / Reject; agents act on the taps.
+  - SELF-APPROVE, owner reviews after (each lands in the Inbox; reversible): (1) NEW feel numbers from measurements (existing tuned numbers still need the owner; owner can change any on the feel panel); (2) content drafts from the owner's own books after automated fact checks (quiz cards, lessons, exercise demos); (3) DISCLOSURE-ONLY privacy text (describes only what the code already does; no new data use) — lands after 48 h in the Inbox unless the owner objects.

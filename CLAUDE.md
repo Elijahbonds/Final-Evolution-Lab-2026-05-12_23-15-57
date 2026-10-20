@@ -29,6 +29,11 @@ to write code, change a number, add a test, or refactor. Make the call, do it we
 
 - **Pushing to `main`.** `main` is the deploy branch (Firebase web-frameworks; a push ships). Agents push to their
   **own lane branch only**. Merging a lane to `main` is the owner's call, every time, even with a green gate.
+  *Standing exception (owner, 2026-10-20):* the **coordinator** may fast-forward `main` to `lane/finish-release` when
+  release CI, the E2E tests and the preview checks are all green, and the change touches none of: deploy config
+  (`firebase.json`, the `build` script, CI deploy steps), the database schema or `public/_prisma/**`, payments going
+  live, or policy text outside the disclosure-only rule in `docs/OWNER-DECISIONS.md`. Those still wait for the owner.
+  Lane agents still never push `main`.
 - **Any history rewrite on a shared branch** — force-push, rebase, amend, `push --force-with-lease`.
 - **Deleting anything that isn't yours** — a branch, a ref, a file you didn't create, a database row or table.
 - **Triggering a deploy**, or changing what deploys (`firebase.json`, the `build` script, `public/_prisma/**`).
