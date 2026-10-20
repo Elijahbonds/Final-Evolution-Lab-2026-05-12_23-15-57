@@ -20,6 +20,7 @@
 import { MOVE_SHAPE, MOVE_TURBO_REAL, flickClip, impulseFor, moveClip, moveFadeSec, moveRate, type HandleMove, type MoveImpulse, type MoveOutcome } from '../core/HandleSystem';
 import type { BallCarry } from './ballCarry';
 import type { PathMove } from './handlePaths';
+import type { ComboFlow } from './comboFlow';
 
 export type Side = 'left' | 'right';
 /** What a call site decides (plan §3.4): the render is shared, the decision is the call site's own. */
@@ -64,6 +65,9 @@ export interface HandleHost {
   carry: Pick<BallCarry, 'runMove' | 'queueMove' | 'move' | 'hand'> | null;
   beat(clip: string, opts: { fadeSec: number; speedRatio: number }): void;
   impulse?(forward: number, lateral: number): void;
+  /** hoops-moves (owner 2026-10-20, the combo window — anim/comboFlow): this body's flow. Each request presses it (the count, the label)
+   *  and a queued move cuts in at the running path's float top (the hesi); absent, requests render exactly as before. */
+  flow?: ComboFlow;
 }
 export interface HandleResult {
   owned: boolean; restarted: boolean; outcome: MoveOutcome | null;
@@ -136,6 +140,9 @@ export function requestMove(host: HandleHost, req: HandleRequest): HandleResult 
   if (req.decide.kind === 'resolve') { outcome = req.decide.run(); owned = outcome.owned; restarted = outcome.restarted; }
   else if (req.decide.kind !== 'none') req.decide.run();
   if (!owned) return { owned, restarted, outcome, clipAt: 'none', rendered: req.move, twin: false, startHand, endHand: startHand, clipDir: startHand, clip: null, ball: 'none', impulse: null };
+  const flow = host.flow;
+  const cutIn = !!flow && !!running?.cutIn && running.t <= running.cutIn.to;   // the combo window's cut-in is still ahead or open (comboFlow)
+  const onEnd = (e: string): void => { if (e === 'end') flow?.ended(); };
   const sides = resolveSides(req.move, startHand, { hint: req.hint, cutSide: req.cutSide, path: req.path });
   const { rendered, twin, endHand, clipDir } = sides;
   const turbo = !!req.turbo;
@@ -146,13 +153,14 @@ export function requestMove(host: HandleHost, req: HandleRequest): HandleResult 
   const pm: PathMove | null = req.path === false ? null : twin ? rendered : (req.path ?? (shapeOf(rendered).path === 'none' ? null : rendered));
   if (pm && carry && running) {
     let beaten = false;
-    const queued = carry.queueMove(pm, { pace: turbo ? MOVE_TURBO_REAL : 1, onEvent: (e) => { if (e === 'start' && !beaten) { beaten = true; beat(); } } });
+    const queued = carry.queueMove(pm, { pace: turbo ? MOVE_TURBO_REAL : 1, cutIn, onEvent: (e) => { onEnd(e); if (e === 'start' && !beaten) { beaten = true; beat(); } } });
     ball = queued ? 'queued' : 'none';
     if (queued) clipAt = clip ? 'start' : 'none'; else beat();
   } else {
     beat();
-    if (pm && carry) ball = carry.runMove(pm, { pace: turbo ? MOVE_TURBO_REAL : 1 }) ? 'started' : 'none';
+    if (pm && carry) ball = carry.runMove(pm, { pace: turbo ? MOVE_TURBO_REAL : 1, onEvent: flow ? onEnd : undefined }) ? 'started' : 'none';
   }
+  if (flow && req.move !== 'jab') flow.press({ move: req.move, runningK: running ? running.k : null, runningName: running?.name ?? null, cutIn: cutIn && ball === 'queued' });
   // the impulse where the call site applied one today: owned, not restarted, not a move the mode resolves itself (off the head)
   let impulse: MoveImpulse | null = null;
   if (req.impulse && !restarted && req.move !== 'jab' && MOVE_SHAPE[req.move].owner === 'motion') {

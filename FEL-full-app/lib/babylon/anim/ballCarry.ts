@@ -35,7 +35,7 @@ import type { AbstractMesh, Scene, Skeleton, TransformNode } from '@babylonjs/co
 import { attachBallToHand, ballGathering, gatherBallToHand, palmOffsetOf } from './ballRig';
 import { DEFAULT_DRIBBLE, DRIBBLE_ELBOW_HEADROOM, HOOPS_DRIBBLE, PUSHED_FLOOR_PHASE, advancePhase, clearOfBallWeight, dribbleAt, dribbleAtPushed, fitDribbleToReach, pushedBounce01, strideLockHz, type DribbleParams } from './Dribble';
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, type ArmChain } from './HandIK';
-import { pathFor, pathAt, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
+import { pathFor, pathAt, cutInWindow, type HandlePath, type PathFrom, type PathLock, type PathMove, type PathSample } from './handlePaths';
 import { MOVE_SHAPE } from '../core/HandleShape';
 import type { HandleMove } from '../core/HandleSystem';
 import { findBone } from './boneLookup';
@@ -77,6 +77,9 @@ export interface CarryMoveOpts {
   /** Time the catch to the end hand's lock foot (the stride lock; handlePaths.relockCatch). Default true. */
   lock?: boolean;
   onEvent?: (e: CarryMoveEvent, move: string) => void;
+  /** queueMove (hoops-moves, the combo window — anim/comboFlow): start at the running path's cut-in (cutInWindow: the hesi's float top)
+   *  instead of its catch, when that window has not passed — at once when the running move is inside it. Default false. */
+  cutIn?: boolean;
 }
 /** The move under way (plan §3.3's `move`). */
 export interface CarryMoveState {
@@ -93,6 +96,8 @@ export interface CarryMoveState {
   contact: 'right' | 'left' | null;
   reach: { right: number; left: number };
   startHand: 'right' | 'left'; endHand: 'right' | 'left';
+  /** hoops-moves: the path's cut-in window (anim/comboFlow.cutInWindow, s on its own clock), or null. */
+  cutIn: { from: number; to: number } | null;
 }
 
 export interface BallCarry {
@@ -662,7 +667,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   interface RunningMove { name: string; path: HandlePath; t: number; opts: CarryMoveOpts; catchT: number; timed: boolean; crosses: number; sample: PathSample | null; sampleT: number; segU: number }
   let mv: RunningMove | null = null;
   let moveRootYaw: number | null = null;   // the root's yaw on the move's last drawn frame (a held ball turns with it)
-  let queued: { move: PathMove; opts: CarryMoveOpts } | null = null;
+  let queued: { move: PathMove; opts: CarryMoveOpts; at?: number } | null = null;   // `at`: the cut-in (comboFlow), else the catch
   /** The ball as the last pass drew it — in the ball's frame, less the push-ahead — and its velocity there: a move's mid-bounce start. */
   const lastLocal = new Vector3(), lastVel = new Vector3(); let lastLocalAt = -1;
   const athleteOf = (sd: 'Left' | 'Right'): MoveHand => sideOfRigHand(opts.skeleton, opts.root, `${sd}Hand`);
@@ -772,13 +777,14 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const smp = pathAt(m.path, m.t);
     setSide(rigOf(m.path.endHand));
     m.opts.onEvent?.('end', m.name); mv = null;
-    const path = buildMove(q.move, q.opts, m.path.endHand, { p: smp.ball, v: smp.vel });
+    const path = buildMove(q.move, q.opts, m.path.endHand, { p: smp.ball, v: smp.vel, held: q.at !== undefined });   // a cut-in: the ball in the palm
     if (path) startMove(path, q.opts); else { phase = 0; startAcc = 0; activating = true; }
   };
   const tickMove = (dt: number): void => {
     const m = mv!; const a = m.t; m.t += dt;
     fireEvents(m, a, m.t);
-    if (queued && a < m.catchT && m.t >= m.catchT) startQueued();
+    const at = queued?.at ?? m.catchT;   // hoops-moves: a cut-in starts the queued move at the float's top (comboFlow), else at the catch
+    if (queued && a < at && m.t >= at) startQueued();
     else if (m.t >= m.path.duration) endMove();
   };
   /** The move's frame (the after-animations pass): the ball on its path, each hand by the contact schedule. */
@@ -971,13 +977,16 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get move() {
       const m = mv; if (!m) return null;
       const smp = m.sampleT === m.t && m.sample ? m.sample : pathAt(m.path, m.t);
-      return { name: m.name, t: m.t, duration: m.path.duration, readAtK: m.path.readAtK, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand };
+      return { name: m.name, t: m.t, duration: m.path.duration, readAtK: m.path.readAtK, k: m.path.duration > 0 ? Math.min(1, m.t / m.path.duration) : 1, exposed01: smp.exposed, contactHands: smp.contactHands.slice(), contactRig: smp.contactHands.map(rigOf), contact: smp.contact, reach: { ...smp.reach }, startHand: m.path.startHand, endHand: m.path.endHand, cutIn: cutInWindow(m.path) };
     },
     runMove(spec: PathMove | HandlePath, o?: CarryMoveOpts) { return runMoveImpl(spec, o); },
     queueMove(move: PathMove, o: CarryMoveOpts = {}) {
       if (!hoops) return false;
       if (!mv) return runMoveImpl(move, o);
-      queued = { move, opts: o }; return true;
+      const w = o.cutIn ? cutInWindow(mv.path) : null;   // hoops-moves: the combo window's cut-in (the hesi's float top), while it is still ahead or open
+      queued = { move, opts: o, at: w && mv.t <= w.to ? w.from : undefined };
+      if (queued.at !== undefined && mv.t >= queued.at) startQueued();
+      return true;
     },
     cancelMove() {
       queued = null; const m = mv; if (!m) return;
