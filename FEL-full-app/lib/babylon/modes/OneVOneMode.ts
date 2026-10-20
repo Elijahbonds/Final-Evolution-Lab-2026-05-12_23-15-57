@@ -1022,7 +1022,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       // HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): the body's reads merged into the pad's (lib/move/bodyControlSource) —
       // with no body in frame the merge IS the pad's Intent, field for field, so button play is unchanged
-      bodyCtl = new BodyControlSource({ role: () => (possession === 'mine' ? 'offense' : 'defense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => meCarry?.hand ?? 'Right', emit: (e) => OneVOneMode.onInput(ctx, e) });
+      bodyCtl = new BodyControlSource({ role: () => (possession === 'mine' ? 'offense' : 'defense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => meCarry?.handAfterMove ?? 'Right', emit: (e) => OneVOneMode.onInput(ctx, e) });
       meSlot = new PlayerSlot('me', agentCtl ?? new MergedControlSource(localSource, bodyCtl), true);
       // NETPLAY (2026-09-12): with ?net=<room> the opponent is driven by a remote player instead
       // of the DefenderBrain. Exactly the ?agent=1 precedent above — one source swap, and with no
@@ -1589,7 +1589,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           // STICK HANDLE: pausin' holds the ball out. HOOPS MOTION phase 4b (U19): …unless a move's path has it (PAUSIN's `hold` segment)
           meCarry?.update(dt, drib.speed01, carrying && !shooting && !dunking && !finish && !(pausedDribble && !meCarry?.move));
           { // H2d (plan §3.8, Q8): the ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
-            const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.hand === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
+            const sh = stepStrongHand(strongHand, dt, { hand: meCarry?.handAfterMove === 'Left' ? 'left' : 'right', speed01: drib.speed01, moveActive: !!meCarry?.move,
               dribbling: !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble,
               defenderDist: foeStunSec === 0 && !foeFloored ? distXZ(me.root.position, foe.root.position) : Infinity });
             strongHand = sh.state;
@@ -1613,10 +1613,10 @@ export const OneVOneMode: ModeDefinition = (() => {
           for (const g of stickGestures) {
             if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; meDribble.pause(false); meAnimTree.releaseHold(); meCarry?.runMove('pausin_release'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[1V1-STICK] release — the explode out of the pause'); } continue; }
             if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
-              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold(`bball_pausin_${meCarry?.hand === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); meCarry?.runMove('pausin');   /* H2b (plan §4.18): its own hold, the ball held out on its path */ console.info("[1V1-STICK] PAUSIN'"); }
+              if (!pausedDribble && !meSlot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; meDribble.pause(true); meAnimTree.hold(`bball_pausin_${meCarry?.handAfterMove === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); meCarry?.runMove('pausin');   /* H2b (plan §4.18): its own hold, the ball held out on its path */ console.info("[1V1-STICK] PAUSIN'"); }
               continue;
             }
-            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: meCarry?.hand ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+            const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: meCarry?.handAfterMove ?? 'Right', escape: !!meSlot.intent.sprint, brace: !!meSlot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
             // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
             // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
             // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
@@ -1626,7 +1626,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
             if (!pick) continue;
             if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;   // a size-up is rhythm, not the move the aggressive BTB chains off
-            console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(meCarry?.hand ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
+            console.info(`[1V1-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(meCarry?.handAfterMove ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${meDribble.vel.length().toFixed(1)} m/s`);
             // THE 2K PRO STICK (2026-09-18): the size-up (a package animation in place, no travel), the L2 step-back dribble
             // (a hop off the rim that arms the step-back jumper), the L2 spin — none of them a chain move
             if (pick.move === 'size_up') {
