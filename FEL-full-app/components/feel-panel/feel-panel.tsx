@@ -1,9 +1,9 @@
 'use client';
 // THE FEEL PANEL (feel-panel lane, owner 2026-10-20; docs/FEEL-PANEL.md). Mounted once for every /play route by app/play/layout.tsx.
 //
-// For everyone but an admin on a deploy with FEEL_PANEL_ENABLED on, this renders NOTHING and changes nothing: it asks
-// GET /api/feel-panel once (the layout stays mounted across client navigations, so once per visit to /play), the server says no
-// (404 flag off / 403 not an admin), and lib/feel-panel/feel.ts never even reads localStorage. When the server says yes, the panel tells
+// For everyone but a user on FEEL_PANEL_USERS (or an admin) on a deploy with FEEL_PANEL_ENABLED on, this renders NOTHING and changes
+// nothing: it asks GET /api/feel-panel once (the layout stays mounted across client navigations, so once per visit to /play), the
+// server says { enabled: false }, and lib/feel-panel/feel.ts never even reads localStorage. When the server says yes, the panel tells
 // the store where we are on every route or query change (sessionGate.feelSessionBlock) — overrides apply only in a playtest run
 // with no staked, ranked, head-to-head, online or party session — and draws the sheet (feel-sheet.tsx).
 import { useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';

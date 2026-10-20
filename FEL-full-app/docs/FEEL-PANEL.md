@@ -10,7 +10,10 @@ player is affected.
   all three of these hold:
   1. this device's `localStorage` holds an override (key `fel.feel.overrides.v1`; it is never sent anywhere);
   2. the server opened the panel for this user. `GET /api/feel-panel` answers `{ enabled: true }` only when
-     `FEEL_PANEL_ENABLED` is on **and** `requireAdmin()` passes (`lib/admin/requireAdmin.ts`, `role === 'admin'`);
+     `FEEL_PANEL_ENABLED` is on **and** the user's id is on `FEEL_PANEL_USERS`, or the user is an admin
+     (`lib/admin/requireAdmin.ts`, `role === 'admin'`). `FEEL_PANEL_USERS` is a narrow permission: it opens the feel
+     panel and nothing else. The `admin` role also opens the CRM and the admin dashboards (owner decision,
+     2026-10-20). No email or id is written in code; the list lives only in the server env;
   3. the run may carry overrides (`lib/feel-panel/sessionGate.ts`).
 - **Overrides apply only in a playtest run.** The run must be a `/play/<mode>?playtest=1` run. The server already
   records that run as unpaid with no `GameSession` row (`lib/sessions/runEligibility.ts`, `PLAYTEST`). It pays no XP,
@@ -43,11 +46,15 @@ player is affected.
 
 ## Turning it on (the owner)
 
-1. Check that your account's `User.role` is exactly `admin`. No API route writes that column. `/coach/admin` loads
-   only for an admin (it is a 404 otherwise). An account whose role is `owner` does **not** pass `requireAdmin()`.
-2. Set the server env var **`FEEL_PANEL_ENABLED=1`** in the production server environment, then deploy. It is read
-   per request (`lib/flags.ts` `isFeelPanelEnabled()`). `1`, `true`, `on` and `yes` turn it on; anything else, or
-   unset, leaves it off. Deploying is the owner's step.
+1. Find your user id. Sign in on the live site, open `/api/auth/session`, and copy the `"id"` value from `"user"`.
+   This only reads; nothing is written.
+2. Set two server env vars in the production server environment, then deploy. Deploying is the owner's step.
+   - **`FEEL_PANEL_ENABLED=1`**. `1`, `true`, `on` and `yes` turn it on; anything else, or unset, leaves it off.
+   - **`FEEL_PANEL_USERS=<your user id>`**. This is a comma list of exact user ids, matched case-sensitively, so
+     add more people with `id1,id2`.
+
+   Both are read per request (`lib/flags.ts` `isFeelPanelEnabled()`, `isFeelPanelUser()`). No role change, no schema
+   change and no database write are needed. An account with role `admin` also opens the panel without being listed.
 3. On your phone, sign in and open a mode as a playtest run, for example
    `/play/threevthree?playtest=1` or `/play/onevone?playtest=1`. A slim **FEEL** tab sits on the left edge, at
    mid-height.
@@ -59,8 +66,8 @@ player is affected.
    Paste that to us and we commit it.
 
 On a normal (paying) run the sheet still opens, but it says "Saved on this device, NOT applied here" and offers
-**Restart as a playtest run**. To turn the panel off, unset the env var. Your saved values stay on your phone and do
-nothing.
+**Restart as a playtest run**. To turn the panel off, unset `FEEL_PANEL_ENABLED` or remove your id from
+`FEEL_PANEL_USERS`. Your saved values stay on your phone and do nothing.
 
 ## Registering a knob (other lanes)
 
@@ -103,7 +110,7 @@ not tuned. Widen a bound only with a reason.
 | `lib/feel-panel/feel.ts` | `feel()`, the store (three conditions, storage, set/reset, copy JSON, the challenge-link latch) |
 | `lib/feel-panel/sessionGate.ts` | `feelSessionBlock(pathname, search)`, the allow-list and the blocked keys |
 | `lib/feel-panel/knobs.ts` | `FEEL_KNOBS`, the catalogue |
-| `lib/flags.ts` | `isFeelPanelEnabled()`, `FEEL_PANEL_ENABLED` |
+| `lib/flags.ts` | `isFeelPanelEnabled()` (`FEEL_PANEL_ENABLED`), `isFeelPanelUser()` (`FEEL_PANEL_USERS`) |
 | `app/api/feel-panel/route.ts` | the server's yes or no. It always answers 200, so players get no console noise. With the flag off it reads no session |
 | `components/feel-panel/feel-panel.tsx` | the client container. It is mounted once in `app/play/layout.tsx` and renders nothing until the server says yes |
 | `components/feel-panel/feel-sheet.tsx` | the sheet itself (pure view) |

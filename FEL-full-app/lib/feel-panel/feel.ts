@@ -5,7 +5,8 @@
  *
  * returns the default (the shipped constant) for everyone. It returns an override only when ALL of these hold:
  *   1. this device holds one (localStorage, FEEL_STORAGE_KEY — never sent anywhere);
- *   2. the server said the panel is open for this user (GET /api/feel-panel: the FEEL_PANEL_ENABLED flag AND requireAdmin());
+ *   2. the server said the panel is open for this user (GET /api/feel-panel: the FEEL_PANEL_ENABLED flag AND the user on
+ *      FEEL_PANEL_USERS or an admin);
  *   3. this page is a run where overrides may apply (sessionGate.feelSessionBlock: an unpaid playtest, no staked/ranked/
  *      head-to-head/online/party session).
  * Every one of them starts CLOSED, so a module that reads a knob before the panel has mounted — or on the server, or in a test, or
