@@ -12,6 +12,7 @@ import { FIGHT_CARD_LINES, FIGHT_CLAIMS } from '../combat/bodyFight';
 import { bodyButtonAction, bodyPlayOffer, kicksOptInOffer } from '@/lib/move/bodyPlayChoice';
 import { bodyPlayDobYear, setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import type { ModeDefinition } from './ModeHarness';
+import { bodyPlayDob, setBodyPlayDob } from '@/lib/move/bodyPlayGrownUp';
 
 const NOW = new Date('2026-10-19T12:00:00Z');
 const TEEN: BodyAgeGate = { dobYear: 2011, couch: false };          // 15
@@ -192,5 +193,107 @@ describe('the wiring', () => {
       const loader = read(`app/play/${d}/_components/loader.tsx`);
       expect(loader, d).toMatch(/useHeldDobYear\(dobYear\);/);
     }
+  });
+});
+
+// FN-BOX-1b (2026-10-19): a full date of birth makes the gate exact — allowed from the 18th birthday on (ageRules.isAdult18).
+// Without one, the strict year rule above still decides, so born 2008 with only a year is refused (fail closed).
+describe('FN-BOX-1b: the full birth date', () => {
+  afterEach(() => { setBodyPlayDob(undefined); setBodyPlayDobYear(undefined); });
+  // NOW is 2026-10-19 12:00 UTC — 2026-10-19 on the local calendar of any machine from UTC−11 to UTC+11.
+  const ALREADY_18: BodyAgeGate = { dobYear: 2008, dob: '2008-03-14', couch: false };   // birthday before today
+  const STILL_17: BodyAgeGate = { dobYear: 2008, dob: '2008-12-02', couch: false };     // birthday after today
+  const TURNS_18_TODAY: BodyAgeGate = { dobYear: 2008, dob: '2008-10-19', couch: false };
+  const TURNS_18_TOMORROW: BodyAgeGate = { dobYear: 2008, dob: '2008-10-20', couch: false };
+  const YEAR_ONLY_2008: BodyAgeGate = { dobYear: 2008, dob: null, couch: false };
+
+  it('born 2008, birthday already passed this year: allowed', () => {
+    expect(bodyFightAllowed(ALREADY_18, NOW)).toBe(true);
+  });
+
+  it('born 2008, birthday still to come this year: refused', () => {
+    expect(bodyFightAllowed(STILL_17, NOW)).toBe(false);
+    expect(bodyFightAllowed(TURNS_18_TOMORROW, NOW)).toBe(false);
+  });
+
+  it('born 2008, birthday exactly today: allowed', () => {
+    expect(bodyFightAllowed(TURNS_18_TODAY, NOW)).toBe(true);
+    expect(bodyFightAllowed(TURNS_18_TODAY, new Date(2026, 9, 19, 0, 0, 0, 0))).toBe(true);
+    expect(bodyFightAllowed(TURNS_18_TODAY, new Date(2026, 9, 18, 23, 59, 59, 999))).toBe(false);
+  });
+
+  it('no full date and dobYear 2008: refused (the strict year rule, fail closed), for null and absent alike', () => {
+    expect(bodyFightAllowed(YEAR_ONLY_2008, NOW)).toBe(false);
+    expect(bodyFightAllowed({ dobYear: 2008, couch: false }, NOW)).toBe(false);
+    for (const now of ALL_OF_2026) expect(bodyFightAllowed(YEAR_ONLY_2008, now), now.toString()).toBe(false);
+    expect(bodyFightAllowed(YEAR_ONLY_2008, NEW_YEAR_2027)).toBe(true);
+    // no date and no year at all is still refused
+    expect(bodyFightAllowed({ dobYear: null, dob: null, couch: false }, NOW)).toBe(false);
+  });
+
+  it('couch mode refuses every full date, the adult ones included', () => {
+    for (const g of [ALREADY_18, TURNS_18_TODAY, { dobYear: 1990, dob: '1990-01-01', couch: false }]) {
+      expect(bodyFightAllowed({ ...g, couch: true }, NOW), g.dob ?? '').toBe(false);
+    }
+  });
+
+  it('an invalid, future or mismatched full date is refused, never waved through on the year', () => {
+    expect(bodyFightAllowed({ dobYear: 1990, dob: '1990-02-30', couch: false }, NOW)).toBe(false);
+    expect(bodyFightAllowed({ dobYear: 1990, dob: 'garbage', couch: false }, NOW)).toBe(false);
+    expect(bodyFightAllowed({ dobYear: 2027, dob: '2027-01-01', couch: false }, NOW)).toBe(false);
+    expect(bodyFightAllowed({ dobYear: 1990, dob: '2008-03-14', couch: false }, NOW)).toBe(false);   // year says adult, date does not agree
+    expect(bodyFightAllowed({ dobYear: 2011, dob: '1990-03-14', couch: false }, NOW)).toBe(false);   // and the other way round
+  });
+
+  it('a full date that agrees with the year can only open, never close, what the year rule opened', () => {
+    expect(bodyFightAllowed({ dobYear: 1990, dob: '1990-12-31', couch: false }, NOW)).toBe(true);
+    expect(bodyFightAllowed({ dobYear: 2007, dob: '2007-12-31', couch: false }, FIRST_OF_2026)).toBe(true);
+    // a teen's date is refused just as the year was
+    expect(bodyFightAllowed({ dobYear: 2011, dob: '2011-01-01', couch: false }, NOW)).toBe(false);
+  });
+
+  for (const modeId of FIGHTS) {
+    it(`${modeId} at mount: already 18 keeps the body path; still 17 and year-only 2008 lose it; couch loses it`, () => {
+      const def = fightDef(modeId);
+      expect(gateBodyFight(def, ALREADY_18, NOW)).toBe(def);
+      expect(gateBodyFight(def, TURNS_18_TODAY, NOW)).toBe(def);
+      expect(prompts(gateBodyFight(def, ALREADY_18, NOW)).offer).toBe('play');
+      for (const gate of [STILL_17, YEAR_ONLY_2008, { ...ALREADY_18, couch: true }]) {
+        const gated = gateBodyFight(def, gate, NOW);
+        expect(gated, String(gate.dob)).not.toBe(def);
+        expect(gated.onBody).toBeUndefined();
+        const p = prompts(gated);
+        expect(p.offer).toBeNull();
+        expect(p.button).toBe('unavailable');
+        expect(p.drives).toBe(false);
+        expect(gated.update).toBe(def.update);
+      }
+    });
+  }
+
+  it('gateBodyFight reads the page\'s held full date when the host passes none (as runMode does)', () => {
+    const def = fightDef('karate-vs');
+    const yearOnly: BodyAgeGate = { dobYear: 2008, couch: false };
+    expect(gateBodyFight(def, yearOnly, NOW)).not.toBe(def);           // nothing held: the year rule refuses
+    setBodyPlayDob('2008-03-14');
+    expect(gateBodyFight(def, yearOnly, NOW)).toBe(def);               // held date, birthday passed: allowed
+    setBodyPlayDob('2008-12-02');
+    expect(gateBodyFight(def, yearOnly, NOW)).not.toBe(def);           // held date, birthday to come: refused
+    setBodyPlayDob('2008-03-14');
+    expect(gateBodyFight(def, { ...yearOnly, couch: true }, NOW)).not.toBe(def);
+    expect(gateBodyFight(def, { ...yearOnly, dob: null }, NOW)).not.toBe(def);   // the host's explicit "none" wins
+    expect(gateBodyFight(def, { dobYear: 1990, couch: false }, NOW)).not.toBe(def);   // held date disagrees with the year
+  });
+
+  it('the page slot for the full date starts unknown, and the fight pages hand it to the harness', () => {
+    expect(bodyPlayDob()).toBeUndefined();
+    const ROOT = join(__dirname, '../../..');
+    const read = (rel: string): string => stripComments(readFileSync(join(ROOT, rel), 'utf8'));
+    for (const d of ['karate-vs', 'mixedcombat', 'showdown']) {
+      expect(read(`app/play/${d}/page.tsx`), d).toMatch(/const dob = userId \? await readUserDob\(prisma as unknown as RawDb, userId\) : null;/);
+      expect(read(`app/play/${d}/page.tsx`), d).toMatch(/dob=\{dob\}/);
+      expect(read(`app/play/${d}/_components/loader.tsx`), d).toMatch(/useHeldDob\(dob\);/);
+    }
+    expect(read('lib/babylon/core/bodySeam.ts')).toMatch(/gate\.dob === undefined \? \{ \.\.\.gate, dob: bodyPlayDob\(\) \} : gate/);
   });
 });

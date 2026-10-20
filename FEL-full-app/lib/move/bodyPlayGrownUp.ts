@@ -30,6 +30,17 @@ export function bodyPlayDobYear(): number | null | undefined {
   return heldYear;
 }
 
+/** FN-BOX-1b: the account's full birth date ('YYYY-MM-DD'), held beside the year. Unset stays unknown. */
+let heldDob: string | null | undefined;
+
+export function setBodyPlayDob(dob: string | null | undefined): void {
+  heldDob = dob;
+}
+
+export function bodyPlayDob(): string | null | undefined {
+  return heldDob;
+}
+
 /**
  * True when the camera has to wait for "A grown-up is with me".
  * Unknown age waits. A known adult (screen band 18+, and no birth year that still reads as under 18) does not.

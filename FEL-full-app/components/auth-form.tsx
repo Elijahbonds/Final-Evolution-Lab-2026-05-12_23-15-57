@@ -51,6 +51,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [host, setHost] = useState<{ name: string; mode: string | null; accent: string | null } | null>(null);
   // AGE-SCREEN: the year is locked in page memory before any credential field renders. A block replaces the form.
   const [birthYear, setBirthYear] = useState<number | null>(null);
+  // FN-BOX-1b: the full date the age step locked with the year ('YYYY-MM-DD'); the server stores it as User.dob.
+  const [birthDate, setBirthDate] = useState<string | null>(null);
   const [turnedAway, setTurnedAway] = useState(false);
 
   useEffect(() => {
@@ -115,7 +117,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(refCode ? { ref: refCode } : {}) }),
+          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(birthDate ? { birthDate } : {}), ...(refCode ? { ref: refCode } : {}) }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -230,7 +232,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
 
         {mode === 'signup' && (
           <div className="mb-6">
-            <AgeStep mode="signup" onLocked={setBirthYear} onBlocked={() => setTurnedAway(true)} />
+            <AgeStep mode="signup" onLocked={(y, d) => { setBirthYear(y); setBirthDate(d); }} onBlocked={() => setTurnedAway(true)} />
           </div>
         )}
 

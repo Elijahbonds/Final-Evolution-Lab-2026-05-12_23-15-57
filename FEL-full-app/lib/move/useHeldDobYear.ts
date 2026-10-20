@@ -6,11 +6,19 @@
 'use client';
 
 import { useLayoutEffect } from 'react';
-import { setBodyPlayDobYear } from './bodyPlayGrownUp';
+import { setBodyPlayDob, setBodyPlayDobYear } from './bodyPlayGrownUp';
 
 export function useHeldDobYear(dobYear: number | null | undefined): void {
   useLayoutEffect(() => {
     setBodyPlayDobYear(dobYear);
     return () => setBodyPlayDobYear(undefined);
   }, [dobYear]);
+}
+
+/** FN-BOX-1b: the same for the account's full birth date ('YYYY-MM-DD'); null is "no full date on file". */
+export function useHeldDob(dob: string | null | undefined): void {
+  useLayoutEffect(() => {
+    setBodyPlayDob(dob);
+    return () => setBodyPlayDob(undefined);
+  }, [dob]);
 }

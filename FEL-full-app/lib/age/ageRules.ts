@@ -82,3 +82,75 @@ export function isAdultAtLeast18(dobYear: number | null | undefined, now: Date =
   if (!dobYear) return false;
   return gapAtLeastEighteenYears(dobYear, now);
 }
+
+// ── FULL-DATE RULE (FN-BOX-1b, 2026-10-19) ─────────────────────────────────────────────────────────────────────────────
+//
+// A birth year alone cannot tell a 17-year-old from an 18-year-old in the year they turn 18, so the strict year rule
+// refuses that whole year. With a full date of birth (User.dob, prisma/pending/2026-10-19-user-dob.sql) the answer is
+// exact: `isAdult18` is true from the 18th birthday on. Dates are calendar dates, 'YYYY-MM-DD' — no time, no zone. The
+// birth date is read as written (a Date is read in UTC, which is how Postgres DATE comes back through Prisma); `now` is
+// read on the local calendar, the same clock `now.getFullYear()` reads for the year rules above.
+
+/** A calendar date. month is 1–12. */
+export interface CalendarDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+const isLeapYear = (y: number): boolean => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+
+const daysInMonth = (y: number, m: number): number => (m === 2 ? (isLeapYear(y) ? 29 : 28) : [4, 6, 9, 11].includes(m) ? 30 : 31);
+
+const compareDates = (a: CalendarDate, b: CalendarDate): number => a.year - b.year || a.month - b.month || a.day - b.day;
+
+/** The local calendar date of `now`. */
+function todayOf(now: Date): CalendarDate {
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
+
+/**
+ * A real calendar date from integer parts, year >= 1900, or null (Feb 30, month 13, a fraction, NaN …). No "is it in
+ * the future" check: that is the caller's (it depends on `now`).
+ */
+export function calendarDate(year: unknown, month: unknown, day: unknown): CalendarDate | null {
+  if (![year, month, day].every((n) => typeof n === 'number' && Number.isInteger(n))) return null;
+  const [y, m, d] = [year, month, day] as number[];
+  if (y < EARLIEST_BIRTH_YEAR || y > 9999 || m < 1 || m > 12 || d < 1 || d > daysInMonth(y, m)) return null;
+  return { year: y, month: m, day: d };
+}
+
+/** 'YYYY-MM-DD' (or a Date, read in UTC) as a real calendar date, else null. Anything else is null. */
+export function parseBirthDate(dob: unknown): CalendarDate | null {
+  if (dob instanceof Date) {
+    if (!Number.isFinite(dob.getTime())) return null;
+    return calendarDate(dob.getUTCFullYear(), dob.getUTCMonth() + 1, dob.getUTCDate());
+  }
+  if (typeof dob !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob);
+  return m ? calendarDate(Number(m[1]), Number(m[2]), Number(m[3])) : null;
+}
+
+/** The date as 'YYYY-MM-DD'. */
+export function formatBirthDate(d: CalendarDate): string {
+  return `${String(d.year).padStart(4, '0')}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+}
+
+/** True when the date is after `now`'s local calendar date (born tomorrow is not a birth date). */
+export function isFutureBirthDate(d: CalendarDate, now: Date = new Date()): boolean {
+  return compareDates(d, todayOf(now)) > 0;
+}
+
+/**
+ * FULL-DATE adult rule: true ONLY when the person has had their 18th birthday on or before `now`'s calendar date. A
+ * Feb 29 birth has its birthday on Mar 1 in a year with no Feb 29 (so is still refused on Feb 28). An invalid date, a
+ * year before 1900, or a date after today → false.
+ */
+export function isAdult18(dob: string | Date | null | undefined, now: Date = new Date()): boolean {
+  const birth = parseBirthDate(dob);
+  if (!birth || isFutureBirthDate(birth, now)) return false;
+  const year = birth.year + 18;
+  const leapDayInPlainYear = birth.month === 2 && birth.day === 29 && !isLeapYear(year);
+  const eighteenth: CalendarDate = leapDayInPlainYear ? { year, month: 3, day: 1 } : { year, month: birth.month, day: birth.day };
+  return compareDates(todayOf(now), eighteenth) >= 0;
+}

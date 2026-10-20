@@ -20,7 +20,8 @@ import { BodyFloor } from '@/lib/input/bodyFloor';
 import { BodySession } from './BodySession';
 import { EvidenceCounter, type SessionView } from './sessionStore';
 import { BODY_FIGHT } from '../combat/bodyFightFlags';
-import { isVerifiedAdultStrict } from '@/lib/age/ageRules';
+import { isAdult18, isVerifiedAdultStrict, parseBirthDate } from '@/lib/age/ageRules';
+import { bodyPlayDob } from '@/lib/move/bodyPlayGrownUp';
 
 export interface BodySeam {
   /** The mode's row, minus its claims. */
@@ -67,10 +68,16 @@ export function bodySeamFor(def: Pick<ModeDefinition, 'modeId' | 'body' | 'onBod
 // and first plays on 2027-01-01. No birth year on file is refused: the gate fails closed. Refused, the mode runs
 // as a session-only row with no plan phase, so `drives` is false, the floor presses nothing, the card has no lines and
 // READY offers neither body play nor "coming" (bodyPlayChoice.bodyPlayOffer → null). Pad play is untouched.
+// FN-BOX-1b (2026-10-19): with a full date of birth on file the gate is exact — ageRules.isAdult18, allowed from the 18th
+// birthday on — so born 2008 plays from their birthday in 2026, not from 2027-01-01. Without one it is the strict year
+// rule above, unchanged. A full date that does not match the year on file is refused (fail closed: one of them is wrong).
 
 /** What the host knows when a fight mode mounts. A missing year is unknown, and unknown is refused. */
 export interface BodyAgeGate {
   dobYear: number | null | undefined;
+  /** FN-BOX-1b: the full birth date, 'YYYY-MM-DD'. null is "none on file"; absent reads the page's held date
+   *  (bodyPlayGrownUp.setBodyPlayDob) in gateBodyFight. */
+  dob?: string | null;
   /** Couch mode (FN-0): several players on one screen. Always refused. */
   couch: boolean;
 }
@@ -80,7 +87,10 @@ const FIGHT_KEYS: ReadonlySet<string> = new Set(Object.keys(BODY_FIGHT));
 
 /** True when this player may be offered a fight mode's body path. */
 export function bodyFightAllowed(gate: BodyAgeGate, now: Date = new Date()): boolean {
-  return !gate.couch && isVerifiedAdultStrict(gate.dobYear, now);
+  if (gate.couch) return false;
+  if (gate.dob == null) return isVerifiedAdultStrict(gate.dobYear, now);
+  if (gate.dobYear != null && parseBirthDate(gate.dob)?.year !== gate.dobYear) return false;
+  return isAdult18(gate.dob, now);
 }
 
 /** The mode's row before its claims (its own profile, or the table's). */
@@ -97,6 +107,7 @@ export function isBodyFightMode(def: Pick<ModeDefinition, 'modeId' | 'body'>): b
  * the same mode with no body path (no onBody, no claims, no presses, no plan phase to promise).
  */
 export function gateBodyFight<D extends Pick<ModeDefinition, 'modeId' | 'body' | 'onBody'>>(def: D, gate: BodyAgeGate, now: Date = new Date()): D {
-  if (!isBodyFightMode(def) || bodyFightAllowed(gate, now)) return def;
+  const withDob = gate.dob === undefined ? { ...gate, dob: bodyPlayDob() } : gate;
+  if (!isBodyFightMode(def) || bodyFightAllowed(withDob, now)) return def;
   return { ...def, body: { profile: { ...rowOf(def), bindings: [], later: 'L' } }, onBody: undefined };
 }
