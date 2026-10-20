@@ -51,7 +51,13 @@ export function redirectFor(vx: number, vz: number, yaw: number, forward: number
   const base = cur > REDIRECT_MIN_TRAVEL_MPS && along > 0 ? Math.atan2(vx, vz) : yaw;
   const turnRad = Math.atan2(lateral, forward);
   const head = base + turnRad;
-  const speed = Math.max(cur, Math.min(top * REDIRECT_TOP_K, Math.hypot(forward, lateral)));
+  const mag = Math.hypot(forward, lateral);
+  // HOOPS-CROSS-FIXUP (QA PR #384 item 3): a move that pushes the ball out AHEAD (forward-dominant — of the movers only the Shammgod,
+  // 3.4 / 0.8) keeps the burst the old addition gave it: current + |impulse|, under the same cap. The max(current, |impulse|) rule
+  // left its 3.49 below a 4.34 m/s jog, so it exited at 4.35 — a plain crossover's speed (it peaked 7.63 before 8faaa228). The turn is
+  // unchanged. FEEL CHANGE (flagged): from a 4.34 jog the Shammgod's target is 7.36 m/s (the cap), from a 6.40 sprint 7.36 too.
+  const burst = forward > Math.abs(lateral);
+  const speed = Math.max(cur, Math.min(top * REDIRECT_TOP_K, burst ? cur + mag : mag));
   return { x: Math.sin(head), z: Math.cos(head), speed, turnRad };
 }
 
@@ -365,6 +371,11 @@ export class DribbleController {
         // A flick straight back OUT (pull then push in one motion) is the explode — remembered, and it leaves on the hang's last
         // frame (H2b; it used to be written on this same frame, a hesitation with no pause in it).
         if (dir && fwd > 0.3) this.hangPush = dir.clone();
+      } else if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC) {
+        // HOOPS-CROSS-FIXUP (as H2-HESI-COOLDOWN-CONSUME 40bdf1e8): a tap the cooldown refuses is still a tap, not a run — it is
+        // consumed. Its pull-back stayed the last direction, so the push out of it read as a reversal: a phantom crossover on
+        // every refused tap (QA: 3 of 6 cycles at 3f back / 6f neutral / 30f forward).
+        this.lastDirAge = Infinity;
       }
       this.pullbackSec = -1;
     }

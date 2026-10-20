@@ -37,4 +37,26 @@ describe('the hesitation hang (DribbleController)', () => {
     const r = run(d, 6, 1, 0);                                            // hard sideways inside the hang
     expect(Math.max(...r.slice(3))).toBeLessThanOrEqual(DribbleController.HESI_HANG_MAX_MPS + 1e-9);
   });
+  // HOOPS-CROSS-FIXUP (QA PR #384): pull back 3f, neutral 6f, forward 30f, cycled — every second tap falls inside HESI_COOLDOWN_SEC.
+  // The refused tap's pull-back used to stay the last direction and the first forward frame fired a crossover (3 of 6 cycles).
+  it('repeated hesi taps (3f back, 6f neutral, 30f forward) inside the cooldown: no phantom crossover, every second tap refused', () => {
+    const d = new DribbleController(); d.setFacing(Math.PI);
+    run(d, 60, 0, 1);
+    let hesis = 0, crosses = 0;
+    for (let k = 0; k < 6; k++) {
+      for (const [x, y, n] of [[0, -1, 3], [0, 0, 6], [0, 1, 30]] as const) for (let i = 0; i < n; i++) { const r = d.update(DT, x, y, false); if (r.hesitation) hesis++; if (r.crossover) crosses++; }
+    }
+    expect(hesis).toBe(3);
+    expect(crosses).toBe(0);
+  });
+  it('a real reversal after a refused tap still crosses', () => {
+    const d = new DribbleController(); d.setFacing(Math.PI);
+    run(d, 60, 0, 1);
+    run(d, 3, 0, -1); run(d, 6, 0, 0); run(d, 30, 0, 1);                  // hesi #1
+    run(d, 3, 0, -1); run(d, 6, 0, 0);                                    // refused inside the cooldown
+    run(d, 20, -1, 0.3);                                                  // drive left…
+    let crossed = 0;
+    for (let i = 0; i < 4; i++) if (d.update(DT, 1, 0.3, false).crossover) crossed++;   // …and snap right
+    expect(crossed).toBe(1);
+  });
 });
