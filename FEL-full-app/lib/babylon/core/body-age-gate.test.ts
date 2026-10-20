@@ -1,6 +1,7 @@
 // FN-BOX-1 FIGHT-BODY-AGE-GATE (2026-10-19): under 18 plays a fight with a controller or a phone, never the camera.
-// The body path of Karate VS (the boxing slot), Mixed Combat and Showdown is offered only to a birth year that reads 18+
-// (ageRules.isAdultAtLeast18), never in couch mode (FN-0, modelled as a flag), and an unknown year is refused.
+// The body path of Karate VS (the boxing slot), Mixed Combat and Showdown is offered only to a birth year that is
+// certainly 18+ (ageRules.isVerifiedAdultStrict since FN-BOX-1-STRICT: born 2008 waits for 2027), never in couch mode
+// (FN-0, modelled as a flag), and an unknown year is refused.
 // Held here on the definitions the harness mounts, the card READY reads, and the header's Body button.
 import { describe, it, expect, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -18,6 +19,14 @@ const UNKNOWN: BodyAgeGate = { dobYear: null, couch: false };
 const NO_YEAR: BodyAgeGate = { dobYear: undefined, couch: false };
 const ADULT: BodyAgeGate = { dobYear: 1990, couch: false };
 const ADULT_COUCH: BodyAgeGate = { dobYear: 1990, couch: true };
+const BORN_2008: BodyAgeGate = { dobYear: 2008, couch: false };     // an 18 gap in 2026: may still be 17
+const BORN_2007: BodyAgeGate = { dobYear: 2007, couch: false };     // a 19 gap in 2026: certainly 18
+// Local-clock instants: the rule reads now.getFullYear(), the local year, so a UTC string at midnight would still be
+// 2026 on a Pacific machine.
+const FIRST_OF_2026 = new Date(2026, 0, 1);
+const LAST_OF_2026 = new Date(2026, 11, 31, 23, 59, 59, 999);
+const NEW_YEAR_2027 = new Date(2027, 0, 1);
+const ALL_OF_2026 = [FIRST_OF_2026, NOW, LAST_OF_2026];
 
 type Def = Pick<ModeDefinition, 'modeId' | 'body' | 'onBody'> & { update: () => void; load: () => Promise<void> };
 
@@ -57,7 +66,16 @@ describe('the gate itself', () => {
     expect(bodyFightAllowed({ dobYear: 2009, couch: false }, NOW)).toBe(false);   // 17 by year gap
     expect(bodyFightAllowed(ADULT_COUCH, NOW)).toBe(false);
     expect(bodyFightAllowed(ADULT, NOW)).toBe(true);
-    expect(bodyFightAllowed({ dobYear: 2008, couch: false }, NOW)).toBe(true);    // isAdultAtLeast18: an 18 gap is adult
+    expect(bodyFightAllowed({ dobYear: 2008, couch: false }, NOW)).toBe(false);   // STRICT: an 18 gap may be 17
+  });
+
+  it('FN-BOX-1-STRICT: born 2008 is refused all of 2026 and plays from 2027-01-01; born 2007 plays', () => {
+    for (const now of ALL_OF_2026) expect(bodyFightAllowed(BORN_2008, now), now.toString()).toBe(false);
+    expect(bodyFightAllowed(BORN_2008, NEW_YEAR_2027)).toBe(true);
+    for (const now of ALL_OF_2026) expect(bodyFightAllowed(BORN_2007, now), now.toString()).toBe(true);
+    // the couch still refuses everyone
+    expect(bodyFightAllowed({ ...BORN_2007, couch: true }, NOW)).toBe(false);
+    expect(bodyFightAllowed({ ...BORN_2008, couch: true }, NEW_YEAR_2027)).toBe(false);
   });
 
   it('covers the five combat rows (registry key or modeId), and nothing else', () => {
@@ -105,6 +123,31 @@ describe('Karate VS, Mixed Combat and Showdown at mount', () => {
         expect(p.kicks).toBe(true);
         expect(p.drives).toBe(true);
         expect(p.claimed).toBe(FIGHT_CLAIMS.length);
+      });
+
+      it('born 2008, any day of 2026: refused (strict year rule) — no body path, no camera or "coming" prompt', () => {
+        const def = fightDef(modeId);
+        for (const now of ALL_OF_2026) {
+          const gated = gateBodyFight(def, BORN_2008, now);
+          expect(gated, now.toString()).not.toBe(def);
+          expect(gated.onBody).toBeUndefined();
+          expect(gated.body?.claims).toBeUndefined();
+          const p = prompts(gated);
+          expect(p.offer).toBeNull();
+          expect(p.button).toBe('unavailable');
+          expect(p.kicks).toBe(false);
+          expect(p.drives).toBe(false);
+          expect(p.bindings).toBe(0);
+          expect(p.lines).toBe(0);
+          expect(gated.update).toBe(def.update);
+        }
+      });
+
+      it('born 2007 in 2026, and born 2008 from 2027-01-01: the definition is handed back as is', () => {
+        const def = fightDef(modeId);
+        for (const now of ALL_OF_2026) expect(gateBodyFight(def, BORN_2007, now), now.toString()).toBe(def);
+        expect(gateBodyFight(def, BORN_2008, NEW_YEAR_2027)).toBe(def);
+        expect(prompts(gateBodyFight(def, BORN_2008, NEW_YEAR_2027)).offer).toBe('play');
       });
     });
   }

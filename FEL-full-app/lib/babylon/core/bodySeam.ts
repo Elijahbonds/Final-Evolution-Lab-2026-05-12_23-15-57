@@ -20,7 +20,7 @@ import { BodyFloor } from '@/lib/input/bodyFloor';
 import { BodySession } from './BodySession';
 import { EvidenceCounter, type SessionView } from './sessionStore';
 import { BODY_FIGHT } from '../combat/bodyFightFlags';
-import { isAdultAtLeast18 } from '@/lib/age/ageRules';
+import { isVerifiedAdultStrict } from '@/lib/age/ageRules';
 
 export interface BodySeam {
   /** The mode's row, minus its claims. */
@@ -61,8 +61,10 @@ export function bodySeamFor(def: Pick<ModeDefinition, 'modeId' | 'body' | 'onBod
 
 // FN-BOX-1 FIGHT-BODY-AGE-GATE (2026-10-19, PM queue: Karate VS is the boxing slot). The kid rule: under 18 plays with a
 // controller or a phone, never the camera. A fight mode's body path (its onBody, its claims, its P3 row's presses) is
-// offered only to a player whose birth year reads 18+ (ageRules.isAdultAtLeast18), and never in couch mode (FN-0, not
-// built: the host says so with `couch`). No birth year on file is refused: the gate fails closed. Refused, the mode runs
+// offered only to a player whose birth year is certainly 18+, and never in couch mode (FN-0, not built: the host says
+// so with `couch`). FN-BOX-1-STRICT (owner, 2026-10-19): the year rule is the strict one, isVerifiedAdultStrict —
+// more than 18 years since the birth year, so anyone born in 2008 is refused for all of 2026 (they may still be 17)
+// and first plays on 2027-01-01. No birth year on file is refused: the gate fails closed. Refused, the mode runs
 // as a session-only row with no plan phase, so `drives` is false, the floor presses nothing, the card has no lines and
 // READY offers neither body play nor "coming" (bodyPlayChoice.bodyPlayOffer → null). Pad play is untouched.
 
@@ -78,7 +80,7 @@ const FIGHT_KEYS: ReadonlySet<string> = new Set(Object.keys(BODY_FIGHT));
 
 /** True when this player may be offered a fight mode's body path. */
 export function bodyFightAllowed(gate: BodyAgeGate, now: Date = new Date()): boolean {
-  return !gate.couch && isAdultAtLeast18(gate.dobYear, now);
+  return !gate.couch && isVerifiedAdultStrict(gate.dobYear, now);
 }
 
 /** The mode's row before its claims (its own profile, or the table's). */
