@@ -13,7 +13,7 @@ import { DancePerformance, beatDuration, type DanceStep, type Judgement } from '
 import { danceTap, type TriggerLatch } from '../../lib/babylon/audio/SongClock';
 import { buttonForStep, matchPress, pressTarget, styleTapAt, GROOVE_STYLE, GROOVE_WINDOW_SEC } from '../../lib/babylon/dance/chartPlay';
 import { STOOP_LOOKAHEAD } from '../../lib/babylon/dance/stoopWindows';
-import { FreestyleDeck, freeSpanAt, freeStyleFor, routeFreestyle, type FreeSpan } from '../../lib/babylon/dance/freestyle';
+import { FreestyleDeck, exitGraceForgives, freeSpanAt, freeStyleFor, routeFreestyle, varietyBonus, type FreeSpan, type PadSlot } from '../../lib/babylon/dance/freestyle';
 
 export interface TimedInput { at: number; ev: FelInput }
 export interface ChainResult {
@@ -33,6 +33,9 @@ export interface ChainResult {
   freestyle: number;
   /** The moves those presses danced, in order (clip ids). */
   moves: string[];
+  /** lane/dance-options: the VARIETY STYLE the sections paid (part of `style`), and the would-be wild taps the EXIT GRACE absorbed. */
+  variety: number;
+  graced: number;
 }
 
 export function runChain(o: {
@@ -46,6 +49,11 @@ export function runChain(o: {
   freeSpans?: FreeSpan[];
   /** Run to this heard second after the last input (so unanswered steps expire as MISS). */
   endAt?: number;
+  /** The exit grace (s); the room's EXIT_GRACE_SEC when absent, and a negative value turns it off (to measure the window). */
+  graceSec?: number;
+  /** false = the section's edge as it was before lane/dance-options (no MATCH pass-through in a section, no exit grace), so a measurement
+   *  can put the old room beside the new one. Default true: the room as it is. */
+  edgeFix?: boolean;
 }): ChainResult {
   const perf = new DancePerformance(o.bpm);
   perf.setRoutine(o.steps);
@@ -61,6 +69,12 @@ export function runChain(o: {
   const moves: string[] = [];
   const deck = new FreestyleDeck();
   let freeCur: FreeSpan | null = null;
+  // lane/dance-options: the buttons that took a slot in the section being danced (DanceMode freeButtons), and the song beat of the last
+  // press made inside a section (DanceMode freeLastPress)
+  let freeButtons = new Set<PadSlot>();
+  let lastSectionPress: number | null = null;
+  let variety = 0, graced = 0;
+  const closeSection = (): void => { const v = varietyBonus(freeButtons); style += v; variety += v; freeButtons = new Set(); };
 
   for (const { at, ev } of [...o.inputs].sort((a, b) => a.at - b.at)) {
     perf.update(at);
@@ -69,12 +83,13 @@ export function runChain(o: {
     const btn = o.match ? matchPress(ev, t.tap) : null;
     // ── DanceMode.update's trackFreestyle, then onInput's freestylePress (before the tap guard) ──
     const span = o.freeSpans?.length ? freeSpanAt(o.freeSpans, at / bd) : null;
-    if (span !== freeCur) { freeCur = span; if (span) deck.reset(); }
+    if (span !== freeCur) { if (freeCur) closeSection(); freeCur = span; if (span) deck.reset(); }
     if (freeCur) {
-      const route = routeFreestyle({ e: ev, tap: t.tap, upcoming: perf.upcoming(at, STOOP_LOOKAHEAD), heardNow: at, beatPos: at / bd, beatSec: bd, styleBeats: grooves, taken });
+      if (matchPress(ev, t.tap)) lastSectionPress = at / bd;
+      const route = routeFreestyle({ e: ev, tap: t.tap, upcoming: perf.upcoming(at, STOOP_LOOKAHEAD), heardNow: at, beatPos: at / bd, beatSec: bd, styleBeats: grooves, taken, matchOn: o.match && o.edgeFix !== false });
       if (route) {
         moves.push(deck.press(route.slot).clipId);
-        if (route.slotBeat !== null) taken.add(route.slotBeat);
+        if (route.slotBeat !== null) { taken.add(route.slotBeat); freeButtons.add(route.slot); }
         style += freeStyleFor(route);
         freestyle++;
         continue;
@@ -94,11 +109,15 @@ export function runChain(o: {
         if (buttonForStep(target.step) !== btn) { fumbled.add(target.step); wrongButton++; continue; }
       }
     }
+    // lane/dance-options: the EXIT GRACE — a would-be wild tap just after a section the player was still dancing at its end is absorbed
+    if (o.freeSpans?.length && o.edgeFix !== false && (o.graceSec ?? 0) >= 0 && !pressTarget(perf.upcoming(at, STOOP_LOOKAHEAD), at)
+      && exitGraceForgives({ spans: o.freeSpans, beatPos: at / bd, beatSec: bd, lastSectionPressBeat: lastSectionPress, graceSec: o.graceSec })) { graced++; continue; }
     void perf.hit(at);
   }
+  if (freeCur) closeSection();
   perf.update(o.endAt ?? (o.inputs.length ? Math.max(...o.inputs.map((i) => i.at)) + 2 : 2));
   const r = perf.result();
-  return { labels, score: r.score, combo: perf.combo, maxCombo: r.maxCombo, counts: r.counts, style, wrongButton, ignored, freestyle, moves };
+  return { labels, score: r.score, combo: perf.combo, maxCombo: r.maxCombo, counts: r.counts, style, wrongButton, ignored, freestyle, moves, variety, graced };
 }
 
 /** A hand-made routine: the families the MATCH buttons carry, one step a bar at 120 BPM (a beat is 0.5 s). */
