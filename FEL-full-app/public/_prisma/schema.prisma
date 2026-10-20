@@ -154,6 +154,8 @@ model User {
   adventureSave AdventureSave?
   // STUDIO SAVE (owner-approved 2026-10-17): Nexus Studio projects saved to the account. See StudioProjectSave below.
   studioProjectSaves StudioProjectSave[]
+  // FINAL EVOLUTION PRESS (PR #17; model added owner 2026-10-20): ebook / audiobook entitlements. See BookEntitlement below.
+  bookEntitlements BookEntitlement[]
 }
 
 model PlayerProfile {
@@ -2525,4 +2527,90 @@ model StudioProjectSave {
   updatedAt DateTime @default(now())
 
   @@id([userId, projectId])
+}
+
+// ── PENDING-SQL TABLES, MODELLED (owner, 2026-10-20: "Add the 3 models") ────────────────────────────────────────────
+// Each table below was shipped as hand-written pending SQL with no model. Once applied, every `prisma migrate diff` from
+// the database proposed DROPPING it, so the models now sit here, each matching its SQL file column for column. The
+// code that uses PartyReport and CreatorInquiry still goes through raw SQL behind an information_schema probe
+// (lib/coach/pendingSchema.ts); these models only keep the schema and the database in agreement. The book store reads
+// its two tables through these delegates (lib/books/bookStore.ts bookTablesReady()).
+
+/// PARTY-CHAT (2026-10-13): one report of one party member by another. Matches prisma/pending/2026-10-13-party-report.sql.
+/// Written only by lib/party/social/reports.ts (raw SQL; ids from netd's sealed report slip). No message content.
+/// reporterId / reportedId are null for a guest and carry no foreign key. Deleted after 365 days (the same file's purge).
+model PartyReport {
+  id           String   @id
+  reporterId   String?
+  reportedId   String?
+  reportedName String
+  partyCode    String
+  reason       String
+  reportedAt   DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([reportedId])
+  @@index([createdAt])
+}
+
+/// CREATOR PLATFORM (2026-10-13): one "Work with us" / media-kit / team-profile inquiry. Matches
+/// prisma/pending/2026-10-13-creator-inquiry.sql. Written only by lib/creator/inquiryStore.ts (raw SQL). No IP, no
+/// account link. Deleted after 365 days (INQUIRY_RETENTION_DAYS).
+model CreatorInquiry {
+  id           String   @id
+  brand        String
+  contactName  String
+  email        String
+  budgetRange  String
+  dates        String   @default("")
+  deliverables String
+  message      String   @default("")
+  profileSlug  String?
+  /// 'work-with-us' | 'media-kit' | 'team-profile'
+  source       String
+  status       String   @default("NEW")
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// FINAL EVOLUTION PRESS (PR #17): one processed Stripe event, so a purchase or refund is applied once. Matches
+/// prisma/pending/2026-10-09-book-shop.sql.
+model BookFulfillmentEvent {
+  id              String   @id @default(cuid())
+  /// A Stripe event id (refunds) or stripe-session:<cs_id> (purchases)
+  eventId         String   @unique
+  type            String
+  paymentIntentId String?
+  createdAt       DateTime @default(now())
+
+  @@index([paymentIntentId])
+}
+
+/// FINAL EVOLUTION PRESS (PR #17): one book offer owned by one buyer email, claimed by the account with that email.
+/// Matches prisma/pending/2026-10-09-book-shop.sql (ON DELETE SET NULL, ON UPDATE CASCADE).
+model BookEntitlement {
+  id                    String    @id @default(cuid())
+  email                 String
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  offerId               String
+  /// ebook | audiobook | bundle
+  format                String
+  bookSlug              String
+  stripeSessionId       String
+  stripePaymentIntentId String?
+  stripeEventId         String
+  amountCents           Int
+  currency              String    @default("usd")
+  /// ACTIVE | REVOKED
+  status                String    @default("ACTIVE")
+  revokedAt             DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([email, offerId])
+  @@index([userId])
+  @@index([stripeSessionId])
+  @@index([stripePaymentIntentId])
 }

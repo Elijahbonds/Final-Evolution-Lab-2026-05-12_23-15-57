@@ -7,6 +7,13 @@
  * be merged, and agents do not regenerate it). So the two delegates are typed here by hand, and until the owner
  * applies the SQL and adds the models, the generated client has neither: bookTablesReady() is false and every
  * store call throws BookTablesNotReady, which the pages and routes already treat as "library unavailable".
+ *
+ * MODELS ADDED (owner, 2026-10-20, lane/studio-save): prisma/schema.prisma now carries both models and the committed
+ * client has both delegates, so with that client bookTablesReady() is TRUE and these calls reach the tables. The SQL
+ * must therefore be applied before (or in the same session as) the deploy that ships that client: without the tables
+ * a call fails with P2021 instead of BookTablesNotReady (the /press pages log it and degrade; the download and stream
+ * routes answer 503; the refund webhook logs P2021). The hand-typed BookDelegates slice and the guard stay as they
+ * were (no code in this file changed); they are kept so a client without the models still fails closed.
  */
 
 import 'server-only';

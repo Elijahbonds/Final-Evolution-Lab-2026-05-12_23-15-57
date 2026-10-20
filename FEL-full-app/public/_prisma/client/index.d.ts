@@ -618,6 +618,32 @@ export type AdventureSave = $Result.DefaultSelection<Prisma.$AdventureSavePayloa
  * saw, then rev + 1).
  */
 export type StudioProjectSave = $Result.DefaultSelection<Prisma.$StudioProjectSavePayload>
+/**
+ * Model PartyReport
+ * PARTY-CHAT (2026-10-13): one report of one party member by another. Matches prisma/pending/2026-10-13-party-report.sql.
+ * Written only by lib/party/social/reports.ts (raw SQL; ids from netd's sealed report slip). No message content.
+ * reporterId / reportedId are null for a guest and carry no foreign key. Deleted after 365 days (the same file's purge).
+ */
+export type PartyReport = $Result.DefaultSelection<Prisma.$PartyReportPayload>
+/**
+ * Model CreatorInquiry
+ * CREATOR PLATFORM (2026-10-13): one "Work with us" / media-kit / team-profile inquiry. Matches
+ * prisma/pending/2026-10-13-creator-inquiry.sql. Written only by lib/creator/inquiryStore.ts (raw SQL). No IP, no
+ * account link. Deleted after 365 days (INQUIRY_RETENTION_DAYS).
+ */
+export type CreatorInquiry = $Result.DefaultSelection<Prisma.$CreatorInquiryPayload>
+/**
+ * Model BookFulfillmentEvent
+ * FINAL EVOLUTION PRESS (PR #17): one processed Stripe event, so a purchase or refund is applied once. Matches
+ * prisma/pending/2026-10-09-book-shop.sql.
+ */
+export type BookFulfillmentEvent = $Result.DefaultSelection<Prisma.$BookFulfillmentEventPayload>
+/**
+ * Model BookEntitlement
+ * FINAL EVOLUTION PRESS (PR #17): one book offer owned by one buyer email, claimed by the account with that email.
+ * Matches prisma/pending/2026-10-09-book-shop.sql (ON DELETE SET NULL, ON UPDATE CASCADE).
+ */
+export type BookEntitlement = $Result.DefaultSelection<Prisma.$BookEntitlementPayload>
 
 /**
  * Enums
@@ -2074,6 +2100,46 @@ export class PrismaClient<
     * ```
     */
   get studioProjectSave(): Prisma.StudioProjectSaveDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.partyReport`: Exposes CRUD operations for the **PartyReport** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more PartyReports
+    * const partyReports = await prisma.partyReport.findMany()
+    * ```
+    */
+  get partyReport(): Prisma.PartyReportDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.creatorInquiry`: Exposes CRUD operations for the **CreatorInquiry** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CreatorInquiries
+    * const creatorInquiries = await prisma.creatorInquiry.findMany()
+    * ```
+    */
+  get creatorInquiry(): Prisma.CreatorInquiryDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.bookFulfillmentEvent`: Exposes CRUD operations for the **BookFulfillmentEvent** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BookFulfillmentEvents
+    * const bookFulfillmentEvents = await prisma.bookFulfillmentEvent.findMany()
+    * ```
+    */
+  get bookFulfillmentEvent(): Prisma.BookFulfillmentEventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.bookEntitlement`: Exposes CRUD operations for the **BookEntitlement** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more BookEntitlements
+    * const bookEntitlements = await prisma.bookEntitlement.findMany()
+    * ```
+    */
+  get bookEntitlement(): Prisma.BookEntitlementDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2614,7 +2680,11 @@ export namespace Prisma {
     CallSignal: 'CallSignal',
     CoachStoreReferral: 'CoachStoreReferral',
     AdventureSave: 'AdventureSave',
-    StudioProjectSave: 'StudioProjectSave'
+    StudioProjectSave: 'StudioProjectSave',
+    PartyReport: 'PartyReport',
+    CreatorInquiry: 'CreatorInquiry',
+    BookFulfillmentEvent: 'BookFulfillmentEvent',
+    BookEntitlement: 'BookEntitlement'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2633,7 +2703,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "coachAvailability" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral" | "adventureSave" | "studioProjectSave"
+      modelProps: "user" | "playerProfile" | "gameSession" | "sessionRun" | "sessionGrant" | "creditLedger" | "cardOwnership" | "storyNodeProgress" | "lessonProgress" | "cellProject" | "cellApiKey" | "cellSettings" | "cellUsage" | "projectFile" | "cellMessage" | "cellWisdom" | "exerciseCategory" | "exercise" | "ledgerAccount" | "ledgerTransaction" | "ledgerPosting" | "stripeCustomer" | "subscription" | "order" | "payoutRequest" | "marketplaceListing" | "studioPartnerKey" | "partnerUsage" | "marketplacePurchase" | "ladderSeason" | "ladderEntry" | "competitionMatch" | "matchEvent" | "mirrorTriumph" | "prqEntry" | "guestSession" | "season" | "passProgress" | "passGrant" | "modeMastery" | "signatureAttempt" | "challengeLink" | "analyticsEvent" | "metricRollup" | "wallet" | "walletLedgerEntry" | "rewardRule" | "perfEarnEvent" | "playerEntitlement" | "marketingLead" | "referralCode" | "referralConversion" | "mpMatch" | "creativeCard" | "cardSlot" | "creatorCard" | "workoutScan" | "workoutPlan" | "athleteBuild" | "avatarLook" | "ownedWearable" | "sessionBooking" | "sessionJoinLink" | "crmCompany" | "crmContact" | "crmDeal" | "crmActivity" | "crmNote" | "programExercise" | "coachingProgram" | "block" | "session" | "sessionExercise" | "clientSession" | "exerciseLog" | "setLog" | "programMessage" | "facilitatorProfile" | "credential" | "guardianConsent" | "goalPlan" | "campSession" | "campTemplate" | "mirrorSession" | "healthIntake" | "painCheckIn" | "healthConsent" | "scanSaveOptIn" | "readinessCheckIn" | "breathLog" | "shareLink" | "coachInvite" | "coachClient" | "coachAvailability" | "instructor" | "programAccess" | "booking" | "callSignal" | "coachStoreReferral" | "adventureSave" | "studioProjectSave" | "partyReport" | "creatorInquiry" | "bookFulfillmentEvent" | "bookEntitlement"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -10111,6 +10181,302 @@ export namespace Prisma {
           }
         }
       }
+      PartyReport: {
+        payload: Prisma.$PartyReportPayload<ExtArgs>
+        fields: Prisma.PartyReportFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.PartyReportFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.PartyReportFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>
+          }
+          findFirst: {
+            args: Prisma.PartyReportFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.PartyReportFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>
+          }
+          findMany: {
+            args: Prisma.PartyReportFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>[]
+          }
+          create: {
+            args: Prisma.PartyReportCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>
+          }
+          createMany: {
+            args: Prisma.PartyReportCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.PartyReportCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>[]
+          }
+          delete: {
+            args: Prisma.PartyReportDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>
+          }
+          update: {
+            args: Prisma.PartyReportUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>
+          }
+          deleteMany: {
+            args: Prisma.PartyReportDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.PartyReportUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.PartyReportUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>[]
+          }
+          upsert: {
+            args: Prisma.PartyReportUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$PartyReportPayload>
+          }
+          aggregate: {
+            args: Prisma.PartyReportAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregatePartyReport>
+          }
+          groupBy: {
+            args: Prisma.PartyReportGroupByArgs<ExtArgs>
+            result: $Utils.Optional<PartyReportGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.PartyReportCountArgs<ExtArgs>
+            result: $Utils.Optional<PartyReportCountAggregateOutputType> | number
+          }
+        }
+      }
+      CreatorInquiry: {
+        payload: Prisma.$CreatorInquiryPayload<ExtArgs>
+        fields: Prisma.CreatorInquiryFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CreatorInquiryFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CreatorInquiryFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>
+          }
+          findFirst: {
+            args: Prisma.CreatorInquiryFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CreatorInquiryFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>
+          }
+          findMany: {
+            args: Prisma.CreatorInquiryFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>[]
+          }
+          create: {
+            args: Prisma.CreatorInquiryCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>
+          }
+          createMany: {
+            args: Prisma.CreatorInquiryCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CreatorInquiryCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>[]
+          }
+          delete: {
+            args: Prisma.CreatorInquiryDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>
+          }
+          update: {
+            args: Prisma.CreatorInquiryUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>
+          }
+          deleteMany: {
+            args: Prisma.CreatorInquiryDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CreatorInquiryUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CreatorInquiryUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>[]
+          }
+          upsert: {
+            args: Prisma.CreatorInquiryUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreatorInquiryPayload>
+          }
+          aggregate: {
+            args: Prisma.CreatorInquiryAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCreatorInquiry>
+          }
+          groupBy: {
+            args: Prisma.CreatorInquiryGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CreatorInquiryGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CreatorInquiryCountArgs<ExtArgs>
+            result: $Utils.Optional<CreatorInquiryCountAggregateOutputType> | number
+          }
+        }
+      }
+      BookFulfillmentEvent: {
+        payload: Prisma.$BookFulfillmentEventPayload<ExtArgs>
+        fields: Prisma.BookFulfillmentEventFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BookFulfillmentEventFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BookFulfillmentEventFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          findFirst: {
+            args: Prisma.BookFulfillmentEventFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BookFulfillmentEventFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          findMany: {
+            args: Prisma.BookFulfillmentEventFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>[]
+          }
+          create: {
+            args: Prisma.BookFulfillmentEventCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          createMany: {
+            args: Prisma.BookFulfillmentEventCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BookFulfillmentEventCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>[]
+          }
+          delete: {
+            args: Prisma.BookFulfillmentEventDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          update: {
+            args: Prisma.BookFulfillmentEventUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          deleteMany: {
+            args: Prisma.BookFulfillmentEventDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BookFulfillmentEventUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BookFulfillmentEventUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>[]
+          }
+          upsert: {
+            args: Prisma.BookFulfillmentEventUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookFulfillmentEventPayload>
+          }
+          aggregate: {
+            args: Prisma.BookFulfillmentEventAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBookFulfillmentEvent>
+          }
+          groupBy: {
+            args: Prisma.BookFulfillmentEventGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BookFulfillmentEventGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BookFulfillmentEventCountArgs<ExtArgs>
+            result: $Utils.Optional<BookFulfillmentEventCountAggregateOutputType> | number
+          }
+        }
+      }
+      BookEntitlement: {
+        payload: Prisma.$BookEntitlementPayload<ExtArgs>
+        fields: Prisma.BookEntitlementFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.BookEntitlementFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.BookEntitlementFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          findFirst: {
+            args: Prisma.BookEntitlementFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.BookEntitlementFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          findMany: {
+            args: Prisma.BookEntitlementFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>[]
+          }
+          create: {
+            args: Prisma.BookEntitlementCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          createMany: {
+            args: Prisma.BookEntitlementCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.BookEntitlementCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>[]
+          }
+          delete: {
+            args: Prisma.BookEntitlementDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          update: {
+            args: Prisma.BookEntitlementUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          deleteMany: {
+            args: Prisma.BookEntitlementDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.BookEntitlementUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.BookEntitlementUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>[]
+          }
+          upsert: {
+            args: Prisma.BookEntitlementUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$BookEntitlementPayload>
+          }
+          aggregate: {
+            args: Prisma.BookEntitlementAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateBookEntitlement>
+          }
+          groupBy: {
+            args: Prisma.BookEntitlementGroupByArgs<ExtArgs>
+            result: $Utils.Optional<BookEntitlementGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.BookEntitlementCountArgs<ExtArgs>
+            result: $Utils.Optional<BookEntitlementCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -10296,6 +10662,10 @@ export namespace Prisma {
     coachStoreReferral?: CoachStoreReferralOmit
     adventureSave?: AdventureSaveOmit
     studioProjectSave?: StudioProjectSaveOmit
+    partyReport?: PartyReportOmit
+    creatorInquiry?: CreatorInquiryOmit
+    bookFulfillmentEvent?: BookFulfillmentEventOmit
+    bookEntitlement?: BookEntitlementOmit
   }
 
   /* Types for Logging */
@@ -10442,6 +10812,7 @@ export namespace Prisma {
     crmActivities: number
     crmNotes: number
     studioProjectSaves: number
+    bookEntitlements: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -10497,6 +10868,7 @@ export namespace Prisma {
     crmActivities?: boolean | UserCountOutputTypeCountCrmActivitiesArgs
     crmNotes?: boolean | UserCountOutputTypeCountCrmNotesArgs
     studioProjectSaves?: boolean | UserCountOutputTypeCountStudioProjectSavesArgs
+    bookEntitlements?: boolean | UserCountOutputTypeCountBookEntitlementsArgs
   }
 
   // Custom InputTypes
@@ -10872,6 +11244,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountStudioProjectSavesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: StudioProjectSaveWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountBookEntitlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookEntitlementWhereInput
   }
 
 
@@ -12176,6 +12555,7 @@ export namespace Prisma {
     crmNotes?: boolean | User$crmNotesArgs<ExtArgs>
     adventureSave?: boolean | User$adventureSaveArgs<ExtArgs>
     studioProjectSaves?: boolean | User$studioProjectSavesArgs<ExtArgs>
+    bookEntitlements?: boolean | User$bookEntitlementsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -12296,6 +12676,7 @@ export namespace Prisma {
     crmNotes?: boolean | User$crmNotesArgs<ExtArgs>
     adventureSave?: boolean | User$adventureSaveArgs<ExtArgs>
     studioProjectSaves?: boolean | User$studioProjectSavesArgs<ExtArgs>
+    bookEntitlements?: boolean | User$bookEntitlementsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
@@ -12371,6 +12752,7 @@ export namespace Prisma {
       crmNotes: Prisma.$CrmNotePayload<ExtArgs>[]
       adventureSave: Prisma.$AdventureSavePayload<ExtArgs> | null
       studioProjectSaves: Prisma.$StudioProjectSavePayload<ExtArgs>[]
+      bookEntitlements: Prisma.$BookEntitlementPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -12845,6 +13227,7 @@ export namespace Prisma {
     crmNotes<T extends User$crmNotesArgs<ExtArgs> = {}>(args?: Subset<T, User$crmNotesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CrmNotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     adventureSave<T extends User$adventureSaveArgs<ExtArgs> = {}>(args?: Subset<T, User$adventureSaveArgs<ExtArgs>>): Prisma__AdventureSaveClient<$Result.GetResult<Prisma.$AdventureSavePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     studioProjectSaves<T extends User$studioProjectSavesArgs<ExtArgs> = {}>(args?: Subset<T, User$studioProjectSavesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioProjectSavePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    bookEntitlements<T extends User$bookEntitlementsArgs<ExtArgs> = {}>(args?: Subset<T, User$bookEntitlementsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -14749,6 +15132,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: StudioProjectSaveScalarFieldEnum | StudioProjectSaveScalarFieldEnum[]
+  }
+
+  /**
+   * User.bookEntitlements
+   */
+  export type User$bookEntitlementsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    where?: BookEntitlementWhereInput
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    cursor?: BookEntitlementWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
   }
 
   /**
@@ -130913,6 +131320,4374 @@ export namespace Prisma {
 
 
   /**
+   * Model PartyReport
+   */
+
+  export type AggregatePartyReport = {
+    _count: PartyReportCountAggregateOutputType | null
+    _min: PartyReportMinAggregateOutputType | null
+    _max: PartyReportMaxAggregateOutputType | null
+  }
+
+  export type PartyReportMinAggregateOutputType = {
+    id: string | null
+    reporterId: string | null
+    reportedId: string | null
+    reportedName: string | null
+    partyCode: string | null
+    reason: string | null
+    reportedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type PartyReportMaxAggregateOutputType = {
+    id: string | null
+    reporterId: string | null
+    reportedId: string | null
+    reportedName: string | null
+    partyCode: string | null
+    reason: string | null
+    reportedAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type PartyReportCountAggregateOutputType = {
+    id: number
+    reporterId: number
+    reportedId: number
+    reportedName: number
+    partyCode: number
+    reason: number
+    reportedAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type PartyReportMinAggregateInputType = {
+    id?: true
+    reporterId?: true
+    reportedId?: true
+    reportedName?: true
+    partyCode?: true
+    reason?: true
+    reportedAt?: true
+    createdAt?: true
+  }
+
+  export type PartyReportMaxAggregateInputType = {
+    id?: true
+    reporterId?: true
+    reportedId?: true
+    reportedName?: true
+    partyCode?: true
+    reason?: true
+    reportedAt?: true
+    createdAt?: true
+  }
+
+  export type PartyReportCountAggregateInputType = {
+    id?: true
+    reporterId?: true
+    reportedId?: true
+    reportedName?: true
+    partyCode?: true
+    reason?: true
+    reportedAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type PartyReportAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PartyReport to aggregate.
+     */
+    where?: PartyReportWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PartyReports to fetch.
+     */
+    orderBy?: PartyReportOrderByWithRelationInput | PartyReportOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: PartyReportWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PartyReports from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PartyReports.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned PartyReports
+    **/
+    _count?: true | PartyReportCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: PartyReportMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: PartyReportMaxAggregateInputType
+  }
+
+  export type GetPartyReportAggregateType<T extends PartyReportAggregateArgs> = {
+        [P in keyof T & keyof AggregatePartyReport]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregatePartyReport[P]>
+      : GetScalarType<T[P], AggregatePartyReport[P]>
+  }
+
+
+
+
+  export type PartyReportGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: PartyReportWhereInput
+    orderBy?: PartyReportOrderByWithAggregationInput | PartyReportOrderByWithAggregationInput[]
+    by: PartyReportScalarFieldEnum[] | PartyReportScalarFieldEnum
+    having?: PartyReportScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: PartyReportCountAggregateInputType | true
+    _min?: PartyReportMinAggregateInputType
+    _max?: PartyReportMaxAggregateInputType
+  }
+
+  export type PartyReportGroupByOutputType = {
+    id: string
+    reporterId: string | null
+    reportedId: string | null
+    reportedName: string
+    partyCode: string
+    reason: string
+    reportedAt: Date
+    createdAt: Date
+    _count: PartyReportCountAggregateOutputType | null
+    _min: PartyReportMinAggregateOutputType | null
+    _max: PartyReportMaxAggregateOutputType | null
+  }
+
+  type GetPartyReportGroupByPayload<T extends PartyReportGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<PartyReportGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof PartyReportGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], PartyReportGroupByOutputType[P]>
+            : GetScalarType<T[P], PartyReportGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type PartyReportSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    reporterId?: boolean
+    reportedId?: boolean
+    reportedName?: boolean
+    partyCode?: boolean
+    reason?: boolean
+    reportedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["partyReport"]>
+
+  export type PartyReportSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    reporterId?: boolean
+    reportedId?: boolean
+    reportedName?: boolean
+    partyCode?: boolean
+    reason?: boolean
+    reportedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["partyReport"]>
+
+  export type PartyReportSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    reporterId?: boolean
+    reportedId?: boolean
+    reportedName?: boolean
+    partyCode?: boolean
+    reason?: boolean
+    reportedAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["partyReport"]>
+
+  export type PartyReportSelectScalar = {
+    id?: boolean
+    reporterId?: boolean
+    reportedId?: boolean
+    reportedName?: boolean
+    partyCode?: boolean
+    reason?: boolean
+    reportedAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type PartyReportOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "reporterId" | "reportedId" | "reportedName" | "partyCode" | "reason" | "reportedAt" | "createdAt", ExtArgs["result"]["partyReport"]>
+
+  export type $PartyReportPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "PartyReport"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      reporterId: string | null
+      reportedId: string | null
+      reportedName: string
+      partyCode: string
+      reason: string
+      reportedAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["partyReport"]>
+    composites: {}
+  }
+
+  type PartyReportGetPayload<S extends boolean | null | undefined | PartyReportDefaultArgs> = $Result.GetResult<Prisma.$PartyReportPayload, S>
+
+  type PartyReportCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<PartyReportFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: PartyReportCountAggregateInputType | true
+    }
+
+  export interface PartyReportDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['PartyReport'], meta: { name: 'PartyReport' } }
+    /**
+     * Find zero or one PartyReport that matches the filter.
+     * @param {PartyReportFindUniqueArgs} args - Arguments to find a PartyReport
+     * @example
+     * // Get one PartyReport
+     * const partyReport = await prisma.partyReport.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends PartyReportFindUniqueArgs>(args: SelectSubset<T, PartyReportFindUniqueArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one PartyReport that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {PartyReportFindUniqueOrThrowArgs} args - Arguments to find a PartyReport
+     * @example
+     * // Get one PartyReport
+     * const partyReport = await prisma.partyReport.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends PartyReportFindUniqueOrThrowArgs>(args: SelectSubset<T, PartyReportFindUniqueOrThrowArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PartyReport that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportFindFirstArgs} args - Arguments to find a PartyReport
+     * @example
+     * // Get one PartyReport
+     * const partyReport = await prisma.partyReport.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends PartyReportFindFirstArgs>(args?: SelectSubset<T, PartyReportFindFirstArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first PartyReport that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportFindFirstOrThrowArgs} args - Arguments to find a PartyReport
+     * @example
+     * // Get one PartyReport
+     * const partyReport = await prisma.partyReport.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends PartyReportFindFirstOrThrowArgs>(args?: SelectSubset<T, PartyReportFindFirstOrThrowArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more PartyReports that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all PartyReports
+     * const partyReports = await prisma.partyReport.findMany()
+     * 
+     * // Get first 10 PartyReports
+     * const partyReports = await prisma.partyReport.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const partyReportWithIdOnly = await prisma.partyReport.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends PartyReportFindManyArgs>(args?: SelectSubset<T, PartyReportFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a PartyReport.
+     * @param {PartyReportCreateArgs} args - Arguments to create a PartyReport.
+     * @example
+     * // Create one PartyReport
+     * const PartyReport = await prisma.partyReport.create({
+     *   data: {
+     *     // ... data to create a PartyReport
+     *   }
+     * })
+     * 
+     */
+    create<T extends PartyReportCreateArgs>(args: SelectSubset<T, PartyReportCreateArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many PartyReports.
+     * @param {PartyReportCreateManyArgs} args - Arguments to create many PartyReports.
+     * @example
+     * // Create many PartyReports
+     * const partyReport = await prisma.partyReport.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends PartyReportCreateManyArgs>(args?: SelectSubset<T, PartyReportCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many PartyReports and returns the data saved in the database.
+     * @param {PartyReportCreateManyAndReturnArgs} args - Arguments to create many PartyReports.
+     * @example
+     * // Create many PartyReports
+     * const partyReport = await prisma.partyReport.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many PartyReports and only return the `id`
+     * const partyReportWithIdOnly = await prisma.partyReport.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends PartyReportCreateManyAndReturnArgs>(args?: SelectSubset<T, PartyReportCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a PartyReport.
+     * @param {PartyReportDeleteArgs} args - Arguments to delete one PartyReport.
+     * @example
+     * // Delete one PartyReport
+     * const PartyReport = await prisma.partyReport.delete({
+     *   where: {
+     *     // ... filter to delete one PartyReport
+     *   }
+     * })
+     * 
+     */
+    delete<T extends PartyReportDeleteArgs>(args: SelectSubset<T, PartyReportDeleteArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one PartyReport.
+     * @param {PartyReportUpdateArgs} args - Arguments to update one PartyReport.
+     * @example
+     * // Update one PartyReport
+     * const partyReport = await prisma.partyReport.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends PartyReportUpdateArgs>(args: SelectSubset<T, PartyReportUpdateArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more PartyReports.
+     * @param {PartyReportDeleteManyArgs} args - Arguments to filter PartyReports to delete.
+     * @example
+     * // Delete a few PartyReports
+     * const { count } = await prisma.partyReport.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends PartyReportDeleteManyArgs>(args?: SelectSubset<T, PartyReportDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PartyReports.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many PartyReports
+     * const partyReport = await prisma.partyReport.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends PartyReportUpdateManyArgs>(args: SelectSubset<T, PartyReportUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more PartyReports and returns the data updated in the database.
+     * @param {PartyReportUpdateManyAndReturnArgs} args - Arguments to update many PartyReports.
+     * @example
+     * // Update many PartyReports
+     * const partyReport = await prisma.partyReport.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more PartyReports and only return the `id`
+     * const partyReportWithIdOnly = await prisma.partyReport.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends PartyReportUpdateManyAndReturnArgs>(args: SelectSubset<T, PartyReportUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one PartyReport.
+     * @param {PartyReportUpsertArgs} args - Arguments to update or create a PartyReport.
+     * @example
+     * // Update or create a PartyReport
+     * const partyReport = await prisma.partyReport.upsert({
+     *   create: {
+     *     // ... data to create a PartyReport
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the PartyReport we want to update
+     *   }
+     * })
+     */
+    upsert<T extends PartyReportUpsertArgs>(args: SelectSubset<T, PartyReportUpsertArgs<ExtArgs>>): Prisma__PartyReportClient<$Result.GetResult<Prisma.$PartyReportPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of PartyReports.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportCountArgs} args - Arguments to filter PartyReports to count.
+     * @example
+     * // Count the number of PartyReports
+     * const count = await prisma.partyReport.count({
+     *   where: {
+     *     // ... the filter for the PartyReports we want to count
+     *   }
+     * })
+    **/
+    count<T extends PartyReportCountArgs>(
+      args?: Subset<T, PartyReportCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], PartyReportCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a PartyReport.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends PartyReportAggregateArgs>(args: Subset<T, PartyReportAggregateArgs>): Prisma.PrismaPromise<GetPartyReportAggregateType<T>>
+
+    /**
+     * Group by PartyReport.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {PartyReportGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends PartyReportGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: PartyReportGroupByArgs['orderBy'] }
+        : { orderBy?: PartyReportGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, PartyReportGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetPartyReportGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the PartyReport model
+   */
+  readonly fields: PartyReportFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for PartyReport.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__PartyReportClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the PartyReport model
+   */
+  interface PartyReportFieldRefs {
+    readonly id: FieldRef<"PartyReport", 'String'>
+    readonly reporterId: FieldRef<"PartyReport", 'String'>
+    readonly reportedId: FieldRef<"PartyReport", 'String'>
+    readonly reportedName: FieldRef<"PartyReport", 'String'>
+    readonly partyCode: FieldRef<"PartyReport", 'String'>
+    readonly reason: FieldRef<"PartyReport", 'String'>
+    readonly reportedAt: FieldRef<"PartyReport", 'DateTime'>
+    readonly createdAt: FieldRef<"PartyReport", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * PartyReport findUnique
+   */
+  export type PartyReportFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * Filter, which PartyReport to fetch.
+     */
+    where: PartyReportWhereUniqueInput
+  }
+
+  /**
+   * PartyReport findUniqueOrThrow
+   */
+  export type PartyReportFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * Filter, which PartyReport to fetch.
+     */
+    where: PartyReportWhereUniqueInput
+  }
+
+  /**
+   * PartyReport findFirst
+   */
+  export type PartyReportFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * Filter, which PartyReport to fetch.
+     */
+    where?: PartyReportWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PartyReports to fetch.
+     */
+    orderBy?: PartyReportOrderByWithRelationInput | PartyReportOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PartyReports.
+     */
+    cursor?: PartyReportWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PartyReports from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PartyReports.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PartyReports.
+     */
+    distinct?: PartyReportScalarFieldEnum | PartyReportScalarFieldEnum[]
+  }
+
+  /**
+   * PartyReport findFirstOrThrow
+   */
+  export type PartyReportFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * Filter, which PartyReport to fetch.
+     */
+    where?: PartyReportWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PartyReports to fetch.
+     */
+    orderBy?: PartyReportOrderByWithRelationInput | PartyReportOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for PartyReports.
+     */
+    cursor?: PartyReportWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PartyReports from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PartyReports.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of PartyReports.
+     */
+    distinct?: PartyReportScalarFieldEnum | PartyReportScalarFieldEnum[]
+  }
+
+  /**
+   * PartyReport findMany
+   */
+  export type PartyReportFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * Filter, which PartyReports to fetch.
+     */
+    where?: PartyReportWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of PartyReports to fetch.
+     */
+    orderBy?: PartyReportOrderByWithRelationInput | PartyReportOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing PartyReports.
+     */
+    cursor?: PartyReportWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` PartyReports from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` PartyReports.
+     */
+    skip?: number
+    distinct?: PartyReportScalarFieldEnum | PartyReportScalarFieldEnum[]
+  }
+
+  /**
+   * PartyReport create
+   */
+  export type PartyReportCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * The data needed to create a PartyReport.
+     */
+    data: XOR<PartyReportCreateInput, PartyReportUncheckedCreateInput>
+  }
+
+  /**
+   * PartyReport createMany
+   */
+  export type PartyReportCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many PartyReports.
+     */
+    data: PartyReportCreateManyInput | PartyReportCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PartyReport createManyAndReturn
+   */
+  export type PartyReportCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * The data used to create many PartyReports.
+     */
+    data: PartyReportCreateManyInput | PartyReportCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * PartyReport update
+   */
+  export type PartyReportUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * The data needed to update a PartyReport.
+     */
+    data: XOR<PartyReportUpdateInput, PartyReportUncheckedUpdateInput>
+    /**
+     * Choose, which PartyReport to update.
+     */
+    where: PartyReportWhereUniqueInput
+  }
+
+  /**
+   * PartyReport updateMany
+   */
+  export type PartyReportUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update PartyReports.
+     */
+    data: XOR<PartyReportUpdateManyMutationInput, PartyReportUncheckedUpdateManyInput>
+    /**
+     * Filter which PartyReports to update
+     */
+    where?: PartyReportWhereInput
+    /**
+     * Limit how many PartyReports to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * PartyReport updateManyAndReturn
+   */
+  export type PartyReportUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * The data used to update PartyReports.
+     */
+    data: XOR<PartyReportUpdateManyMutationInput, PartyReportUncheckedUpdateManyInput>
+    /**
+     * Filter which PartyReports to update
+     */
+    where?: PartyReportWhereInput
+    /**
+     * Limit how many PartyReports to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * PartyReport upsert
+   */
+  export type PartyReportUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * The filter to search for the PartyReport to update in case it exists.
+     */
+    where: PartyReportWhereUniqueInput
+    /**
+     * In case the PartyReport found by the `where` argument doesn't exist, create a new PartyReport with this data.
+     */
+    create: XOR<PartyReportCreateInput, PartyReportUncheckedCreateInput>
+    /**
+     * In case the PartyReport was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<PartyReportUpdateInput, PartyReportUncheckedUpdateInput>
+  }
+
+  /**
+   * PartyReport delete
+   */
+  export type PartyReportDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+    /**
+     * Filter which PartyReport to delete.
+     */
+    where: PartyReportWhereUniqueInput
+  }
+
+  /**
+   * PartyReport deleteMany
+   */
+  export type PartyReportDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which PartyReports to delete
+     */
+    where?: PartyReportWhereInput
+    /**
+     * Limit how many PartyReports to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * PartyReport without action
+   */
+  export type PartyReportDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the PartyReport
+     */
+    select?: PartyReportSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the PartyReport
+     */
+    omit?: PartyReportOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CreatorInquiry
+   */
+
+  export type AggregateCreatorInquiry = {
+    _count: CreatorInquiryCountAggregateOutputType | null
+    _min: CreatorInquiryMinAggregateOutputType | null
+    _max: CreatorInquiryMaxAggregateOutputType | null
+  }
+
+  export type CreatorInquiryMinAggregateOutputType = {
+    id: string | null
+    brand: string | null
+    contactName: string | null
+    email: string | null
+    budgetRange: string | null
+    dates: string | null
+    deliverables: string | null
+    message: string | null
+    profileSlug: string | null
+    source: string | null
+    status: string | null
+    createdAt: Date | null
+  }
+
+  export type CreatorInquiryMaxAggregateOutputType = {
+    id: string | null
+    brand: string | null
+    contactName: string | null
+    email: string | null
+    budgetRange: string | null
+    dates: string | null
+    deliverables: string | null
+    message: string | null
+    profileSlug: string | null
+    source: string | null
+    status: string | null
+    createdAt: Date | null
+  }
+
+  export type CreatorInquiryCountAggregateOutputType = {
+    id: number
+    brand: number
+    contactName: number
+    email: number
+    budgetRange: number
+    dates: number
+    deliverables: number
+    message: number
+    profileSlug: number
+    source: number
+    status: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type CreatorInquiryMinAggregateInputType = {
+    id?: true
+    brand?: true
+    contactName?: true
+    email?: true
+    budgetRange?: true
+    dates?: true
+    deliverables?: true
+    message?: true
+    profileSlug?: true
+    source?: true
+    status?: true
+    createdAt?: true
+  }
+
+  export type CreatorInquiryMaxAggregateInputType = {
+    id?: true
+    brand?: true
+    contactName?: true
+    email?: true
+    budgetRange?: true
+    dates?: true
+    deliverables?: true
+    message?: true
+    profileSlug?: true
+    source?: true
+    status?: true
+    createdAt?: true
+  }
+
+  export type CreatorInquiryCountAggregateInputType = {
+    id?: true
+    brand?: true
+    contactName?: true
+    email?: true
+    budgetRange?: true
+    dates?: true
+    deliverables?: true
+    message?: true
+    profileSlug?: true
+    source?: true
+    status?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type CreatorInquiryAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CreatorInquiry to aggregate.
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreatorInquiries to fetch.
+     */
+    orderBy?: CreatorInquiryOrderByWithRelationInput | CreatorInquiryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CreatorInquiryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreatorInquiries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreatorInquiries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CreatorInquiries
+    **/
+    _count?: true | CreatorInquiryCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CreatorInquiryMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CreatorInquiryMaxAggregateInputType
+  }
+
+  export type GetCreatorInquiryAggregateType<T extends CreatorInquiryAggregateArgs> = {
+        [P in keyof T & keyof AggregateCreatorInquiry]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCreatorInquiry[P]>
+      : GetScalarType<T[P], AggregateCreatorInquiry[P]>
+  }
+
+
+
+
+  export type CreatorInquiryGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CreatorInquiryWhereInput
+    orderBy?: CreatorInquiryOrderByWithAggregationInput | CreatorInquiryOrderByWithAggregationInput[]
+    by: CreatorInquiryScalarFieldEnum[] | CreatorInquiryScalarFieldEnum
+    having?: CreatorInquiryScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CreatorInquiryCountAggregateInputType | true
+    _min?: CreatorInquiryMinAggregateInputType
+    _max?: CreatorInquiryMaxAggregateInputType
+  }
+
+  export type CreatorInquiryGroupByOutputType = {
+    id: string
+    brand: string
+    contactName: string
+    email: string
+    budgetRange: string
+    dates: string
+    deliverables: string
+    message: string
+    profileSlug: string | null
+    source: string
+    status: string
+    createdAt: Date
+    _count: CreatorInquiryCountAggregateOutputType | null
+    _min: CreatorInquiryMinAggregateOutputType | null
+    _max: CreatorInquiryMaxAggregateOutputType | null
+  }
+
+  type GetCreatorInquiryGroupByPayload<T extends CreatorInquiryGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CreatorInquiryGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CreatorInquiryGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CreatorInquiryGroupByOutputType[P]>
+            : GetScalarType<T[P], CreatorInquiryGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CreatorInquirySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    brand?: boolean
+    contactName?: boolean
+    email?: boolean
+    budgetRange?: boolean
+    dates?: boolean
+    deliverables?: boolean
+    message?: boolean
+    profileSlug?: boolean
+    source?: boolean
+    status?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["creatorInquiry"]>
+
+  export type CreatorInquirySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    brand?: boolean
+    contactName?: boolean
+    email?: boolean
+    budgetRange?: boolean
+    dates?: boolean
+    deliverables?: boolean
+    message?: boolean
+    profileSlug?: boolean
+    source?: boolean
+    status?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["creatorInquiry"]>
+
+  export type CreatorInquirySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    brand?: boolean
+    contactName?: boolean
+    email?: boolean
+    budgetRange?: boolean
+    dates?: boolean
+    deliverables?: boolean
+    message?: boolean
+    profileSlug?: boolean
+    source?: boolean
+    status?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["creatorInquiry"]>
+
+  export type CreatorInquirySelectScalar = {
+    id?: boolean
+    brand?: boolean
+    contactName?: boolean
+    email?: boolean
+    budgetRange?: boolean
+    dates?: boolean
+    deliverables?: boolean
+    message?: boolean
+    profileSlug?: boolean
+    source?: boolean
+    status?: boolean
+    createdAt?: boolean
+  }
+
+  export type CreatorInquiryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "brand" | "contactName" | "email" | "budgetRange" | "dates" | "deliverables" | "message" | "profileSlug" | "source" | "status" | "createdAt", ExtArgs["result"]["creatorInquiry"]>
+
+  export type $CreatorInquiryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CreatorInquiry"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      brand: string
+      contactName: string
+      email: string
+      budgetRange: string
+      dates: string
+      deliverables: string
+      message: string
+      profileSlug: string | null
+      /**
+       * 'work-with-us' | 'media-kit' | 'team-profile'
+       */
+      source: string
+      status: string
+      createdAt: Date
+    }, ExtArgs["result"]["creatorInquiry"]>
+    composites: {}
+  }
+
+  type CreatorInquiryGetPayload<S extends boolean | null | undefined | CreatorInquiryDefaultArgs> = $Result.GetResult<Prisma.$CreatorInquiryPayload, S>
+
+  type CreatorInquiryCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CreatorInquiryFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CreatorInquiryCountAggregateInputType | true
+    }
+
+  export interface CreatorInquiryDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CreatorInquiry'], meta: { name: 'CreatorInquiry' } }
+    /**
+     * Find zero or one CreatorInquiry that matches the filter.
+     * @param {CreatorInquiryFindUniqueArgs} args - Arguments to find a CreatorInquiry
+     * @example
+     * // Get one CreatorInquiry
+     * const creatorInquiry = await prisma.creatorInquiry.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CreatorInquiryFindUniqueArgs>(args: SelectSubset<T, CreatorInquiryFindUniqueArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CreatorInquiry that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CreatorInquiryFindUniqueOrThrowArgs} args - Arguments to find a CreatorInquiry
+     * @example
+     * // Get one CreatorInquiry
+     * const creatorInquiry = await prisma.creatorInquiry.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CreatorInquiryFindUniqueOrThrowArgs>(args: SelectSubset<T, CreatorInquiryFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CreatorInquiry that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryFindFirstArgs} args - Arguments to find a CreatorInquiry
+     * @example
+     * // Get one CreatorInquiry
+     * const creatorInquiry = await prisma.creatorInquiry.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CreatorInquiryFindFirstArgs>(args?: SelectSubset<T, CreatorInquiryFindFirstArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CreatorInquiry that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryFindFirstOrThrowArgs} args - Arguments to find a CreatorInquiry
+     * @example
+     * // Get one CreatorInquiry
+     * const creatorInquiry = await prisma.creatorInquiry.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CreatorInquiryFindFirstOrThrowArgs>(args?: SelectSubset<T, CreatorInquiryFindFirstOrThrowArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CreatorInquiries that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CreatorInquiries
+     * const creatorInquiries = await prisma.creatorInquiry.findMany()
+     * 
+     * // Get first 10 CreatorInquiries
+     * const creatorInquiries = await prisma.creatorInquiry.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const creatorInquiryWithIdOnly = await prisma.creatorInquiry.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CreatorInquiryFindManyArgs>(args?: SelectSubset<T, CreatorInquiryFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CreatorInquiry.
+     * @param {CreatorInquiryCreateArgs} args - Arguments to create a CreatorInquiry.
+     * @example
+     * // Create one CreatorInquiry
+     * const CreatorInquiry = await prisma.creatorInquiry.create({
+     *   data: {
+     *     // ... data to create a CreatorInquiry
+     *   }
+     * })
+     * 
+     */
+    create<T extends CreatorInquiryCreateArgs>(args: SelectSubset<T, CreatorInquiryCreateArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CreatorInquiries.
+     * @param {CreatorInquiryCreateManyArgs} args - Arguments to create many CreatorInquiries.
+     * @example
+     * // Create many CreatorInquiries
+     * const creatorInquiry = await prisma.creatorInquiry.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CreatorInquiryCreateManyArgs>(args?: SelectSubset<T, CreatorInquiryCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CreatorInquiries and returns the data saved in the database.
+     * @param {CreatorInquiryCreateManyAndReturnArgs} args - Arguments to create many CreatorInquiries.
+     * @example
+     * // Create many CreatorInquiries
+     * const creatorInquiry = await prisma.creatorInquiry.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CreatorInquiries and only return the `id`
+     * const creatorInquiryWithIdOnly = await prisma.creatorInquiry.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CreatorInquiryCreateManyAndReturnArgs>(args?: SelectSubset<T, CreatorInquiryCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CreatorInquiry.
+     * @param {CreatorInquiryDeleteArgs} args - Arguments to delete one CreatorInquiry.
+     * @example
+     * // Delete one CreatorInquiry
+     * const CreatorInquiry = await prisma.creatorInquiry.delete({
+     *   where: {
+     *     // ... filter to delete one CreatorInquiry
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CreatorInquiryDeleteArgs>(args: SelectSubset<T, CreatorInquiryDeleteArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CreatorInquiry.
+     * @param {CreatorInquiryUpdateArgs} args - Arguments to update one CreatorInquiry.
+     * @example
+     * // Update one CreatorInquiry
+     * const creatorInquiry = await prisma.creatorInquiry.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CreatorInquiryUpdateArgs>(args: SelectSubset<T, CreatorInquiryUpdateArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CreatorInquiries.
+     * @param {CreatorInquiryDeleteManyArgs} args - Arguments to filter CreatorInquiries to delete.
+     * @example
+     * // Delete a few CreatorInquiries
+     * const { count } = await prisma.creatorInquiry.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CreatorInquiryDeleteManyArgs>(args?: SelectSubset<T, CreatorInquiryDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CreatorInquiries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CreatorInquiries
+     * const creatorInquiry = await prisma.creatorInquiry.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CreatorInquiryUpdateManyArgs>(args: SelectSubset<T, CreatorInquiryUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CreatorInquiries and returns the data updated in the database.
+     * @param {CreatorInquiryUpdateManyAndReturnArgs} args - Arguments to update many CreatorInquiries.
+     * @example
+     * // Update many CreatorInquiries
+     * const creatorInquiry = await prisma.creatorInquiry.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CreatorInquiries and only return the `id`
+     * const creatorInquiryWithIdOnly = await prisma.creatorInquiry.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CreatorInquiryUpdateManyAndReturnArgs>(args: SelectSubset<T, CreatorInquiryUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CreatorInquiry.
+     * @param {CreatorInquiryUpsertArgs} args - Arguments to update or create a CreatorInquiry.
+     * @example
+     * // Update or create a CreatorInquiry
+     * const creatorInquiry = await prisma.creatorInquiry.upsert({
+     *   create: {
+     *     // ... data to create a CreatorInquiry
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CreatorInquiry we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CreatorInquiryUpsertArgs>(args: SelectSubset<T, CreatorInquiryUpsertArgs<ExtArgs>>): Prisma__CreatorInquiryClient<$Result.GetResult<Prisma.$CreatorInquiryPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CreatorInquiries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryCountArgs} args - Arguments to filter CreatorInquiries to count.
+     * @example
+     * // Count the number of CreatorInquiries
+     * const count = await prisma.creatorInquiry.count({
+     *   where: {
+     *     // ... the filter for the CreatorInquiries we want to count
+     *   }
+     * })
+    **/
+    count<T extends CreatorInquiryCountArgs>(
+      args?: Subset<T, CreatorInquiryCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CreatorInquiryCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CreatorInquiry.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CreatorInquiryAggregateArgs>(args: Subset<T, CreatorInquiryAggregateArgs>): Prisma.PrismaPromise<GetCreatorInquiryAggregateType<T>>
+
+    /**
+     * Group by CreatorInquiry.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreatorInquiryGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CreatorInquiryGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CreatorInquiryGroupByArgs['orderBy'] }
+        : { orderBy?: CreatorInquiryGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CreatorInquiryGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCreatorInquiryGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CreatorInquiry model
+   */
+  readonly fields: CreatorInquiryFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CreatorInquiry.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CreatorInquiryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CreatorInquiry model
+   */
+  interface CreatorInquiryFieldRefs {
+    readonly id: FieldRef<"CreatorInquiry", 'String'>
+    readonly brand: FieldRef<"CreatorInquiry", 'String'>
+    readonly contactName: FieldRef<"CreatorInquiry", 'String'>
+    readonly email: FieldRef<"CreatorInquiry", 'String'>
+    readonly budgetRange: FieldRef<"CreatorInquiry", 'String'>
+    readonly dates: FieldRef<"CreatorInquiry", 'String'>
+    readonly deliverables: FieldRef<"CreatorInquiry", 'String'>
+    readonly message: FieldRef<"CreatorInquiry", 'String'>
+    readonly profileSlug: FieldRef<"CreatorInquiry", 'String'>
+    readonly source: FieldRef<"CreatorInquiry", 'String'>
+    readonly status: FieldRef<"CreatorInquiry", 'String'>
+    readonly createdAt: FieldRef<"CreatorInquiry", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CreatorInquiry findUnique
+   */
+  export type CreatorInquiryFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * Filter, which CreatorInquiry to fetch.
+     */
+    where: CreatorInquiryWhereUniqueInput
+  }
+
+  /**
+   * CreatorInquiry findUniqueOrThrow
+   */
+  export type CreatorInquiryFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * Filter, which CreatorInquiry to fetch.
+     */
+    where: CreatorInquiryWhereUniqueInput
+  }
+
+  /**
+   * CreatorInquiry findFirst
+   */
+  export type CreatorInquiryFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * Filter, which CreatorInquiry to fetch.
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreatorInquiries to fetch.
+     */
+    orderBy?: CreatorInquiryOrderByWithRelationInput | CreatorInquiryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CreatorInquiries.
+     */
+    cursor?: CreatorInquiryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreatorInquiries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreatorInquiries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CreatorInquiries.
+     */
+    distinct?: CreatorInquiryScalarFieldEnum | CreatorInquiryScalarFieldEnum[]
+  }
+
+  /**
+   * CreatorInquiry findFirstOrThrow
+   */
+  export type CreatorInquiryFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * Filter, which CreatorInquiry to fetch.
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreatorInquiries to fetch.
+     */
+    orderBy?: CreatorInquiryOrderByWithRelationInput | CreatorInquiryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CreatorInquiries.
+     */
+    cursor?: CreatorInquiryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreatorInquiries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreatorInquiries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CreatorInquiries.
+     */
+    distinct?: CreatorInquiryScalarFieldEnum | CreatorInquiryScalarFieldEnum[]
+  }
+
+  /**
+   * CreatorInquiry findMany
+   */
+  export type CreatorInquiryFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * Filter, which CreatorInquiries to fetch.
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreatorInquiries to fetch.
+     */
+    orderBy?: CreatorInquiryOrderByWithRelationInput | CreatorInquiryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CreatorInquiries.
+     */
+    cursor?: CreatorInquiryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreatorInquiries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreatorInquiries.
+     */
+    skip?: number
+    distinct?: CreatorInquiryScalarFieldEnum | CreatorInquiryScalarFieldEnum[]
+  }
+
+  /**
+   * CreatorInquiry create
+   */
+  export type CreatorInquiryCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * The data needed to create a CreatorInquiry.
+     */
+    data: XOR<CreatorInquiryCreateInput, CreatorInquiryUncheckedCreateInput>
+  }
+
+  /**
+   * CreatorInquiry createMany
+   */
+  export type CreatorInquiryCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CreatorInquiries.
+     */
+    data: CreatorInquiryCreateManyInput | CreatorInquiryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CreatorInquiry createManyAndReturn
+   */
+  export type CreatorInquiryCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * The data used to create many CreatorInquiries.
+     */
+    data: CreatorInquiryCreateManyInput | CreatorInquiryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CreatorInquiry update
+   */
+  export type CreatorInquiryUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * The data needed to update a CreatorInquiry.
+     */
+    data: XOR<CreatorInquiryUpdateInput, CreatorInquiryUncheckedUpdateInput>
+    /**
+     * Choose, which CreatorInquiry to update.
+     */
+    where: CreatorInquiryWhereUniqueInput
+  }
+
+  /**
+   * CreatorInquiry updateMany
+   */
+  export type CreatorInquiryUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CreatorInquiries.
+     */
+    data: XOR<CreatorInquiryUpdateManyMutationInput, CreatorInquiryUncheckedUpdateManyInput>
+    /**
+     * Filter which CreatorInquiries to update
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * Limit how many CreatorInquiries to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CreatorInquiry updateManyAndReturn
+   */
+  export type CreatorInquiryUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * The data used to update CreatorInquiries.
+     */
+    data: XOR<CreatorInquiryUpdateManyMutationInput, CreatorInquiryUncheckedUpdateManyInput>
+    /**
+     * Filter which CreatorInquiries to update
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * Limit how many CreatorInquiries to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CreatorInquiry upsert
+   */
+  export type CreatorInquiryUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * The filter to search for the CreatorInquiry to update in case it exists.
+     */
+    where: CreatorInquiryWhereUniqueInput
+    /**
+     * In case the CreatorInquiry found by the `where` argument doesn't exist, create a new CreatorInquiry with this data.
+     */
+    create: XOR<CreatorInquiryCreateInput, CreatorInquiryUncheckedCreateInput>
+    /**
+     * In case the CreatorInquiry was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CreatorInquiryUpdateInput, CreatorInquiryUncheckedUpdateInput>
+  }
+
+  /**
+   * CreatorInquiry delete
+   */
+  export type CreatorInquiryDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+    /**
+     * Filter which CreatorInquiry to delete.
+     */
+    where: CreatorInquiryWhereUniqueInput
+  }
+
+  /**
+   * CreatorInquiry deleteMany
+   */
+  export type CreatorInquiryDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CreatorInquiries to delete
+     */
+    where?: CreatorInquiryWhereInput
+    /**
+     * Limit how many CreatorInquiries to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CreatorInquiry without action
+   */
+  export type CreatorInquiryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreatorInquiry
+     */
+    select?: CreatorInquirySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreatorInquiry
+     */
+    omit?: CreatorInquiryOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model BookFulfillmentEvent
+   */
+
+  export type AggregateBookFulfillmentEvent = {
+    _count: BookFulfillmentEventCountAggregateOutputType | null
+    _min: BookFulfillmentEventMinAggregateOutputType | null
+    _max: BookFulfillmentEventMaxAggregateOutputType | null
+  }
+
+  export type BookFulfillmentEventMinAggregateOutputType = {
+    id: string | null
+    eventId: string | null
+    type: string | null
+    paymentIntentId: string | null
+    createdAt: Date | null
+  }
+
+  export type BookFulfillmentEventMaxAggregateOutputType = {
+    id: string | null
+    eventId: string | null
+    type: string | null
+    paymentIntentId: string | null
+    createdAt: Date | null
+  }
+
+  export type BookFulfillmentEventCountAggregateOutputType = {
+    id: number
+    eventId: number
+    type: number
+    paymentIntentId: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type BookFulfillmentEventMinAggregateInputType = {
+    id?: true
+    eventId?: true
+    type?: true
+    paymentIntentId?: true
+    createdAt?: true
+  }
+
+  export type BookFulfillmentEventMaxAggregateInputType = {
+    id?: true
+    eventId?: true
+    type?: true
+    paymentIntentId?: true
+    createdAt?: true
+  }
+
+  export type BookFulfillmentEventCountAggregateInputType = {
+    id?: true
+    eventId?: true
+    type?: true
+    paymentIntentId?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type BookFulfillmentEventAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookFulfillmentEvent to aggregate.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BookFulfillmentEvents
+    **/
+    _count?: true | BookFulfillmentEventCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BookFulfillmentEventMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BookFulfillmentEventMaxAggregateInputType
+  }
+
+  export type GetBookFulfillmentEventAggregateType<T extends BookFulfillmentEventAggregateArgs> = {
+        [P in keyof T & keyof AggregateBookFulfillmentEvent]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBookFulfillmentEvent[P]>
+      : GetScalarType<T[P], AggregateBookFulfillmentEvent[P]>
+  }
+
+
+
+
+  export type BookFulfillmentEventGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookFulfillmentEventWhereInput
+    orderBy?: BookFulfillmentEventOrderByWithAggregationInput | BookFulfillmentEventOrderByWithAggregationInput[]
+    by: BookFulfillmentEventScalarFieldEnum[] | BookFulfillmentEventScalarFieldEnum
+    having?: BookFulfillmentEventScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BookFulfillmentEventCountAggregateInputType | true
+    _min?: BookFulfillmentEventMinAggregateInputType
+    _max?: BookFulfillmentEventMaxAggregateInputType
+  }
+
+  export type BookFulfillmentEventGroupByOutputType = {
+    id: string
+    eventId: string
+    type: string
+    paymentIntentId: string | null
+    createdAt: Date
+    _count: BookFulfillmentEventCountAggregateOutputType | null
+    _min: BookFulfillmentEventMinAggregateOutputType | null
+    _max: BookFulfillmentEventMaxAggregateOutputType | null
+  }
+
+  type GetBookFulfillmentEventGroupByPayload<T extends BookFulfillmentEventGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BookFulfillmentEventGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BookFulfillmentEventGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BookFulfillmentEventGroupByOutputType[P]>
+            : GetScalarType<T[P], BookFulfillmentEventGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BookFulfillmentEventSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type BookFulfillmentEventSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type BookFulfillmentEventSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type BookFulfillmentEventSelectScalar = {
+    id?: boolean
+    eventId?: boolean
+    type?: boolean
+    paymentIntentId?: boolean
+    createdAt?: boolean
+  }
+
+  export type BookFulfillmentEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "eventId" | "type" | "paymentIntentId" | "createdAt", ExtArgs["result"]["bookFulfillmentEvent"]>
+
+  export type $BookFulfillmentEventPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BookFulfillmentEvent"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      /**
+       * A Stripe event id (refunds) or stripe-session:<cs_id> (purchases)
+       */
+      eventId: string
+      type: string
+      paymentIntentId: string | null
+      createdAt: Date
+    }, ExtArgs["result"]["bookFulfillmentEvent"]>
+    composites: {}
+  }
+
+  type BookFulfillmentEventGetPayload<S extends boolean | null | undefined | BookFulfillmentEventDefaultArgs> = $Result.GetResult<Prisma.$BookFulfillmentEventPayload, S>
+
+  type BookFulfillmentEventCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BookFulfillmentEventFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BookFulfillmentEventCountAggregateInputType | true
+    }
+
+  export interface BookFulfillmentEventDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BookFulfillmentEvent'], meta: { name: 'BookFulfillmentEvent' } }
+    /**
+     * Find zero or one BookFulfillmentEvent that matches the filter.
+     * @param {BookFulfillmentEventFindUniqueArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BookFulfillmentEventFindUniqueArgs>(args: SelectSubset<T, BookFulfillmentEventFindUniqueArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BookFulfillmentEvent that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BookFulfillmentEventFindUniqueOrThrowArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BookFulfillmentEventFindUniqueOrThrowArgs>(args: SelectSubset<T, BookFulfillmentEventFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookFulfillmentEvent that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventFindFirstArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BookFulfillmentEventFindFirstArgs>(args?: SelectSubset<T, BookFulfillmentEventFindFirstArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookFulfillmentEvent that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventFindFirstOrThrowArgs} args - Arguments to find a BookFulfillmentEvent
+     * @example
+     * // Get one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BookFulfillmentEventFindFirstOrThrowArgs>(args?: SelectSubset<T, BookFulfillmentEventFindFirstOrThrowArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BookFulfillmentEvents that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BookFulfillmentEvents
+     * const bookFulfillmentEvents = await prisma.bookFulfillmentEvent.findMany()
+     * 
+     * // Get first 10 BookFulfillmentEvents
+     * const bookFulfillmentEvents = await prisma.bookFulfillmentEvent.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const bookFulfillmentEventWithIdOnly = await prisma.bookFulfillmentEvent.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BookFulfillmentEventFindManyArgs>(args?: SelectSubset<T, BookFulfillmentEventFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BookFulfillmentEvent.
+     * @param {BookFulfillmentEventCreateArgs} args - Arguments to create a BookFulfillmentEvent.
+     * @example
+     * // Create one BookFulfillmentEvent
+     * const BookFulfillmentEvent = await prisma.bookFulfillmentEvent.create({
+     *   data: {
+     *     // ... data to create a BookFulfillmentEvent
+     *   }
+     * })
+     * 
+     */
+    create<T extends BookFulfillmentEventCreateArgs>(args: SelectSubset<T, BookFulfillmentEventCreateArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BookFulfillmentEvents.
+     * @param {BookFulfillmentEventCreateManyArgs} args - Arguments to create many BookFulfillmentEvents.
+     * @example
+     * // Create many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BookFulfillmentEventCreateManyArgs>(args?: SelectSubset<T, BookFulfillmentEventCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BookFulfillmentEvents and returns the data saved in the database.
+     * @param {BookFulfillmentEventCreateManyAndReturnArgs} args - Arguments to create many BookFulfillmentEvents.
+     * @example
+     * // Create many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BookFulfillmentEvents and only return the `id`
+     * const bookFulfillmentEventWithIdOnly = await prisma.bookFulfillmentEvent.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BookFulfillmentEventCreateManyAndReturnArgs>(args?: SelectSubset<T, BookFulfillmentEventCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BookFulfillmentEvent.
+     * @param {BookFulfillmentEventDeleteArgs} args - Arguments to delete one BookFulfillmentEvent.
+     * @example
+     * // Delete one BookFulfillmentEvent
+     * const BookFulfillmentEvent = await prisma.bookFulfillmentEvent.delete({
+     *   where: {
+     *     // ... filter to delete one BookFulfillmentEvent
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BookFulfillmentEventDeleteArgs>(args: SelectSubset<T, BookFulfillmentEventDeleteArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BookFulfillmentEvent.
+     * @param {BookFulfillmentEventUpdateArgs} args - Arguments to update one BookFulfillmentEvent.
+     * @example
+     * // Update one BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BookFulfillmentEventUpdateArgs>(args: SelectSubset<T, BookFulfillmentEventUpdateArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BookFulfillmentEvents.
+     * @param {BookFulfillmentEventDeleteManyArgs} args - Arguments to filter BookFulfillmentEvents to delete.
+     * @example
+     * // Delete a few BookFulfillmentEvents
+     * const { count } = await prisma.bookFulfillmentEvent.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BookFulfillmentEventDeleteManyArgs>(args?: SelectSubset<T, BookFulfillmentEventDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookFulfillmentEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BookFulfillmentEventUpdateManyArgs>(args: SelectSubset<T, BookFulfillmentEventUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookFulfillmentEvents and returns the data updated in the database.
+     * @param {BookFulfillmentEventUpdateManyAndReturnArgs} args - Arguments to update many BookFulfillmentEvents.
+     * @example
+     * // Update many BookFulfillmentEvents
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BookFulfillmentEvents and only return the `id`
+     * const bookFulfillmentEventWithIdOnly = await prisma.bookFulfillmentEvent.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BookFulfillmentEventUpdateManyAndReturnArgs>(args: SelectSubset<T, BookFulfillmentEventUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BookFulfillmentEvent.
+     * @param {BookFulfillmentEventUpsertArgs} args - Arguments to update or create a BookFulfillmentEvent.
+     * @example
+     * // Update or create a BookFulfillmentEvent
+     * const bookFulfillmentEvent = await prisma.bookFulfillmentEvent.upsert({
+     *   create: {
+     *     // ... data to create a BookFulfillmentEvent
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BookFulfillmentEvent we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BookFulfillmentEventUpsertArgs>(args: SelectSubset<T, BookFulfillmentEventUpsertArgs<ExtArgs>>): Prisma__BookFulfillmentEventClient<$Result.GetResult<Prisma.$BookFulfillmentEventPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BookFulfillmentEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventCountArgs} args - Arguments to filter BookFulfillmentEvents to count.
+     * @example
+     * // Count the number of BookFulfillmentEvents
+     * const count = await prisma.bookFulfillmentEvent.count({
+     *   where: {
+     *     // ... the filter for the BookFulfillmentEvents we want to count
+     *   }
+     * })
+    **/
+    count<T extends BookFulfillmentEventCountArgs>(
+      args?: Subset<T, BookFulfillmentEventCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BookFulfillmentEventCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BookFulfillmentEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BookFulfillmentEventAggregateArgs>(args: Subset<T, BookFulfillmentEventAggregateArgs>): Prisma.PrismaPromise<GetBookFulfillmentEventAggregateType<T>>
+
+    /**
+     * Group by BookFulfillmentEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookFulfillmentEventGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BookFulfillmentEventGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BookFulfillmentEventGroupByArgs['orderBy'] }
+        : { orderBy?: BookFulfillmentEventGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BookFulfillmentEventGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBookFulfillmentEventGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BookFulfillmentEvent model
+   */
+  readonly fields: BookFulfillmentEventFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BookFulfillmentEvent.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BookFulfillmentEventClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BookFulfillmentEvent model
+   */
+  interface BookFulfillmentEventFieldRefs {
+    readonly id: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly eventId: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly type: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly paymentIntentId: FieldRef<"BookFulfillmentEvent", 'String'>
+    readonly createdAt: FieldRef<"BookFulfillmentEvent", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BookFulfillmentEvent findUnique
+   */
+  export type BookFulfillmentEventFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent findUniqueOrThrow
+   */
+  export type BookFulfillmentEventFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent findFirst
+   */
+  export type BookFulfillmentEventFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookFulfillmentEvents.
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookFulfillmentEvents.
+     */
+    distinct?: BookFulfillmentEventScalarFieldEnum | BookFulfillmentEventScalarFieldEnum[]
+  }
+
+  /**
+   * BookFulfillmentEvent findFirstOrThrow
+   */
+  export type BookFulfillmentEventFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvent to fetch.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookFulfillmentEvents.
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookFulfillmentEvents.
+     */
+    distinct?: BookFulfillmentEventScalarFieldEnum | BookFulfillmentEventScalarFieldEnum[]
+  }
+
+  /**
+   * BookFulfillmentEvent findMany
+   */
+  export type BookFulfillmentEventFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter, which BookFulfillmentEvents to fetch.
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookFulfillmentEvents to fetch.
+     */
+    orderBy?: BookFulfillmentEventOrderByWithRelationInput | BookFulfillmentEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BookFulfillmentEvents.
+     */
+    cursor?: BookFulfillmentEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookFulfillmentEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookFulfillmentEvents.
+     */
+    skip?: number
+    distinct?: BookFulfillmentEventScalarFieldEnum | BookFulfillmentEventScalarFieldEnum[]
+  }
+
+  /**
+   * BookFulfillmentEvent create
+   */
+  export type BookFulfillmentEventCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data needed to create a BookFulfillmentEvent.
+     */
+    data: XOR<BookFulfillmentEventCreateInput, BookFulfillmentEventUncheckedCreateInput>
+  }
+
+  /**
+   * BookFulfillmentEvent createMany
+   */
+  export type BookFulfillmentEventCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BookFulfillmentEvents.
+     */
+    data: BookFulfillmentEventCreateManyInput | BookFulfillmentEventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BookFulfillmentEvent createManyAndReturn
+   */
+  export type BookFulfillmentEventCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data used to create many BookFulfillmentEvents.
+     */
+    data: BookFulfillmentEventCreateManyInput | BookFulfillmentEventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BookFulfillmentEvent update
+   */
+  export type BookFulfillmentEventUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data needed to update a BookFulfillmentEvent.
+     */
+    data: XOR<BookFulfillmentEventUpdateInput, BookFulfillmentEventUncheckedUpdateInput>
+    /**
+     * Choose, which BookFulfillmentEvent to update.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent updateMany
+   */
+  export type BookFulfillmentEventUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BookFulfillmentEvents.
+     */
+    data: XOR<BookFulfillmentEventUpdateManyMutationInput, BookFulfillmentEventUncheckedUpdateManyInput>
+    /**
+     * Filter which BookFulfillmentEvents to update
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * Limit how many BookFulfillmentEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookFulfillmentEvent updateManyAndReturn
+   */
+  export type BookFulfillmentEventUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The data used to update BookFulfillmentEvents.
+     */
+    data: XOR<BookFulfillmentEventUpdateManyMutationInput, BookFulfillmentEventUncheckedUpdateManyInput>
+    /**
+     * Filter which BookFulfillmentEvents to update
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * Limit how many BookFulfillmentEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookFulfillmentEvent upsert
+   */
+  export type BookFulfillmentEventUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * The filter to search for the BookFulfillmentEvent to update in case it exists.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+    /**
+     * In case the BookFulfillmentEvent found by the `where` argument doesn't exist, create a new BookFulfillmentEvent with this data.
+     */
+    create: XOR<BookFulfillmentEventCreateInput, BookFulfillmentEventUncheckedCreateInput>
+    /**
+     * In case the BookFulfillmentEvent was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BookFulfillmentEventUpdateInput, BookFulfillmentEventUncheckedUpdateInput>
+  }
+
+  /**
+   * BookFulfillmentEvent delete
+   */
+  export type BookFulfillmentEventDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+    /**
+     * Filter which BookFulfillmentEvent to delete.
+     */
+    where: BookFulfillmentEventWhereUniqueInput
+  }
+
+  /**
+   * BookFulfillmentEvent deleteMany
+   */
+  export type BookFulfillmentEventDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookFulfillmentEvents to delete
+     */
+    where?: BookFulfillmentEventWhereInput
+    /**
+     * Limit how many BookFulfillmentEvents to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookFulfillmentEvent without action
+   */
+  export type BookFulfillmentEventDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookFulfillmentEvent
+     */
+    select?: BookFulfillmentEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookFulfillmentEvent
+     */
+    omit?: BookFulfillmentEventOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model BookEntitlement
+   */
+
+  export type AggregateBookEntitlement = {
+    _count: BookEntitlementCountAggregateOutputType | null
+    _avg: BookEntitlementAvgAggregateOutputType | null
+    _sum: BookEntitlementSumAggregateOutputType | null
+    _min: BookEntitlementMinAggregateOutputType | null
+    _max: BookEntitlementMaxAggregateOutputType | null
+  }
+
+  export type BookEntitlementAvgAggregateOutputType = {
+    amountCents: number | null
+  }
+
+  export type BookEntitlementSumAggregateOutputType = {
+    amountCents: number | null
+  }
+
+  export type BookEntitlementMinAggregateOutputType = {
+    id: string | null
+    email: string | null
+    userId: string | null
+    offerId: string | null
+    format: string | null
+    bookSlug: string | null
+    stripeSessionId: string | null
+    stripePaymentIntentId: string | null
+    stripeEventId: string | null
+    amountCents: number | null
+    currency: string | null
+    status: string | null
+    revokedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BookEntitlementMaxAggregateOutputType = {
+    id: string | null
+    email: string | null
+    userId: string | null
+    offerId: string | null
+    format: string | null
+    bookSlug: string | null
+    stripeSessionId: string | null
+    stripePaymentIntentId: string | null
+    stripeEventId: string | null
+    amountCents: number | null
+    currency: string | null
+    status: string | null
+    revokedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type BookEntitlementCountAggregateOutputType = {
+    id: number
+    email: number
+    userId: number
+    offerId: number
+    format: number
+    bookSlug: number
+    stripeSessionId: number
+    stripePaymentIntentId: number
+    stripeEventId: number
+    amountCents: number
+    currency: number
+    status: number
+    revokedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type BookEntitlementAvgAggregateInputType = {
+    amountCents?: true
+  }
+
+  export type BookEntitlementSumAggregateInputType = {
+    amountCents?: true
+  }
+
+  export type BookEntitlementMinAggregateInputType = {
+    id?: true
+    email?: true
+    userId?: true
+    offerId?: true
+    format?: true
+    bookSlug?: true
+    stripeSessionId?: true
+    stripePaymentIntentId?: true
+    stripeEventId?: true
+    amountCents?: true
+    currency?: true
+    status?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BookEntitlementMaxAggregateInputType = {
+    id?: true
+    email?: true
+    userId?: true
+    offerId?: true
+    format?: true
+    bookSlug?: true
+    stripeSessionId?: true
+    stripePaymentIntentId?: true
+    stripeEventId?: true
+    amountCents?: true
+    currency?: true
+    status?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type BookEntitlementCountAggregateInputType = {
+    id?: true
+    email?: true
+    userId?: true
+    offerId?: true
+    format?: true
+    bookSlug?: true
+    stripeSessionId?: true
+    stripePaymentIntentId?: true
+    stripeEventId?: true
+    amountCents?: true
+    currency?: true
+    status?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type BookEntitlementAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookEntitlement to aggregate.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned BookEntitlements
+    **/
+    _count?: true | BookEntitlementCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: BookEntitlementAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: BookEntitlementSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: BookEntitlementMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: BookEntitlementMaxAggregateInputType
+  }
+
+  export type GetBookEntitlementAggregateType<T extends BookEntitlementAggregateArgs> = {
+        [P in keyof T & keyof AggregateBookEntitlement]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateBookEntitlement[P]>
+      : GetScalarType<T[P], AggregateBookEntitlement[P]>
+  }
+
+
+
+
+  export type BookEntitlementGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: BookEntitlementWhereInput
+    orderBy?: BookEntitlementOrderByWithAggregationInput | BookEntitlementOrderByWithAggregationInput[]
+    by: BookEntitlementScalarFieldEnum[] | BookEntitlementScalarFieldEnum
+    having?: BookEntitlementScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: BookEntitlementCountAggregateInputType | true
+    _avg?: BookEntitlementAvgAggregateInputType
+    _sum?: BookEntitlementSumAggregateInputType
+    _min?: BookEntitlementMinAggregateInputType
+    _max?: BookEntitlementMaxAggregateInputType
+  }
+
+  export type BookEntitlementGroupByOutputType = {
+    id: string
+    email: string
+    userId: string | null
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId: string | null
+    stripeEventId: string
+    amountCents: number
+    currency: string
+    status: string
+    revokedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: BookEntitlementCountAggregateOutputType | null
+    _avg: BookEntitlementAvgAggregateOutputType | null
+    _sum: BookEntitlementSumAggregateOutputType | null
+    _min: BookEntitlementMinAggregateOutputType | null
+    _max: BookEntitlementMaxAggregateOutputType | null
+  }
+
+  type GetBookEntitlementGroupByPayload<T extends BookEntitlementGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<BookEntitlementGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof BookEntitlementGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], BookEntitlementGroupByOutputType[P]>
+            : GetScalarType<T[P], BookEntitlementGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type BookEntitlementSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }, ExtArgs["result"]["bookEntitlement"]>
+
+  export type BookEntitlementSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }, ExtArgs["result"]["bookEntitlement"]>
+
+  export type BookEntitlementSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }, ExtArgs["result"]["bookEntitlement"]>
+
+  export type BookEntitlementSelectScalar = {
+    id?: boolean
+    email?: boolean
+    userId?: boolean
+    offerId?: boolean
+    format?: boolean
+    bookSlug?: boolean
+    stripeSessionId?: boolean
+    stripePaymentIntentId?: boolean
+    stripeEventId?: boolean
+    amountCents?: boolean
+    currency?: boolean
+    status?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type BookEntitlementOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "userId" | "offerId" | "format" | "bookSlug" | "stripeSessionId" | "stripePaymentIntentId" | "stripeEventId" | "amountCents" | "currency" | "status" | "revokedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["bookEntitlement"]>
+  export type BookEntitlementInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }
+  export type BookEntitlementIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }
+  export type BookEntitlementIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | BookEntitlement$userArgs<ExtArgs>
+  }
+
+  export type $BookEntitlementPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "BookEntitlement"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs> | null
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      email: string
+      userId: string | null
+      offerId: string
+      /**
+       * ebook | audiobook | bundle
+       */
+      format: string
+      bookSlug: string
+      stripeSessionId: string
+      stripePaymentIntentId: string | null
+      stripeEventId: string
+      amountCents: number
+      currency: string
+      /**
+       * ACTIVE | REVOKED
+       */
+      status: string
+      revokedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["bookEntitlement"]>
+    composites: {}
+  }
+
+  type BookEntitlementGetPayload<S extends boolean | null | undefined | BookEntitlementDefaultArgs> = $Result.GetResult<Prisma.$BookEntitlementPayload, S>
+
+  type BookEntitlementCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<BookEntitlementFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: BookEntitlementCountAggregateInputType | true
+    }
+
+  export interface BookEntitlementDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BookEntitlement'], meta: { name: 'BookEntitlement' } }
+    /**
+     * Find zero or one BookEntitlement that matches the filter.
+     * @param {BookEntitlementFindUniqueArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends BookEntitlementFindUniqueArgs>(args: SelectSubset<T, BookEntitlementFindUniqueArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one BookEntitlement that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {BookEntitlementFindUniqueOrThrowArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends BookEntitlementFindUniqueOrThrowArgs>(args: SelectSubset<T, BookEntitlementFindUniqueOrThrowArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookEntitlement that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementFindFirstArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends BookEntitlementFindFirstArgs>(args?: SelectSubset<T, BookEntitlementFindFirstArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first BookEntitlement that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementFindFirstOrThrowArgs} args - Arguments to find a BookEntitlement
+     * @example
+     * // Get one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends BookEntitlementFindFirstOrThrowArgs>(args?: SelectSubset<T, BookEntitlementFindFirstOrThrowArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more BookEntitlements that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all BookEntitlements
+     * const bookEntitlements = await prisma.bookEntitlement.findMany()
+     * 
+     * // Get first 10 BookEntitlements
+     * const bookEntitlements = await prisma.bookEntitlement.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const bookEntitlementWithIdOnly = await prisma.bookEntitlement.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends BookEntitlementFindManyArgs>(args?: SelectSubset<T, BookEntitlementFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a BookEntitlement.
+     * @param {BookEntitlementCreateArgs} args - Arguments to create a BookEntitlement.
+     * @example
+     * // Create one BookEntitlement
+     * const BookEntitlement = await prisma.bookEntitlement.create({
+     *   data: {
+     *     // ... data to create a BookEntitlement
+     *   }
+     * })
+     * 
+     */
+    create<T extends BookEntitlementCreateArgs>(args: SelectSubset<T, BookEntitlementCreateArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many BookEntitlements.
+     * @param {BookEntitlementCreateManyArgs} args - Arguments to create many BookEntitlements.
+     * @example
+     * // Create many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends BookEntitlementCreateManyArgs>(args?: SelectSubset<T, BookEntitlementCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many BookEntitlements and returns the data saved in the database.
+     * @param {BookEntitlementCreateManyAndReturnArgs} args - Arguments to create many BookEntitlements.
+     * @example
+     * // Create many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many BookEntitlements and only return the `id`
+     * const bookEntitlementWithIdOnly = await prisma.bookEntitlement.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends BookEntitlementCreateManyAndReturnArgs>(args?: SelectSubset<T, BookEntitlementCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a BookEntitlement.
+     * @param {BookEntitlementDeleteArgs} args - Arguments to delete one BookEntitlement.
+     * @example
+     * // Delete one BookEntitlement
+     * const BookEntitlement = await prisma.bookEntitlement.delete({
+     *   where: {
+     *     // ... filter to delete one BookEntitlement
+     *   }
+     * })
+     * 
+     */
+    delete<T extends BookEntitlementDeleteArgs>(args: SelectSubset<T, BookEntitlementDeleteArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one BookEntitlement.
+     * @param {BookEntitlementUpdateArgs} args - Arguments to update one BookEntitlement.
+     * @example
+     * // Update one BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends BookEntitlementUpdateArgs>(args: SelectSubset<T, BookEntitlementUpdateArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more BookEntitlements.
+     * @param {BookEntitlementDeleteManyArgs} args - Arguments to filter BookEntitlements to delete.
+     * @example
+     * // Delete a few BookEntitlements
+     * const { count } = await prisma.bookEntitlement.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends BookEntitlementDeleteManyArgs>(args?: SelectSubset<T, BookEntitlementDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookEntitlements.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends BookEntitlementUpdateManyArgs>(args: SelectSubset<T, BookEntitlementUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more BookEntitlements and returns the data updated in the database.
+     * @param {BookEntitlementUpdateManyAndReturnArgs} args - Arguments to update many BookEntitlements.
+     * @example
+     * // Update many BookEntitlements
+     * const bookEntitlement = await prisma.bookEntitlement.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more BookEntitlements and only return the `id`
+     * const bookEntitlementWithIdOnly = await prisma.bookEntitlement.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends BookEntitlementUpdateManyAndReturnArgs>(args: SelectSubset<T, BookEntitlementUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one BookEntitlement.
+     * @param {BookEntitlementUpsertArgs} args - Arguments to update or create a BookEntitlement.
+     * @example
+     * // Update or create a BookEntitlement
+     * const bookEntitlement = await prisma.bookEntitlement.upsert({
+     *   create: {
+     *     // ... data to create a BookEntitlement
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the BookEntitlement we want to update
+     *   }
+     * })
+     */
+    upsert<T extends BookEntitlementUpsertArgs>(args: SelectSubset<T, BookEntitlementUpsertArgs<ExtArgs>>): Prisma__BookEntitlementClient<$Result.GetResult<Prisma.$BookEntitlementPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of BookEntitlements.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementCountArgs} args - Arguments to filter BookEntitlements to count.
+     * @example
+     * // Count the number of BookEntitlements
+     * const count = await prisma.bookEntitlement.count({
+     *   where: {
+     *     // ... the filter for the BookEntitlements we want to count
+     *   }
+     * })
+    **/
+    count<T extends BookEntitlementCountArgs>(
+      args?: Subset<T, BookEntitlementCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], BookEntitlementCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a BookEntitlement.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends BookEntitlementAggregateArgs>(args: Subset<T, BookEntitlementAggregateArgs>): Prisma.PrismaPromise<GetBookEntitlementAggregateType<T>>
+
+    /**
+     * Group by BookEntitlement.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {BookEntitlementGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends BookEntitlementGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: BookEntitlementGroupByArgs['orderBy'] }
+        : { orderBy?: BookEntitlementGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, BookEntitlementGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBookEntitlementGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the BookEntitlement model
+   */
+  readonly fields: BookEntitlementFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for BookEntitlement.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__BookEntitlementClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends BookEntitlement$userArgs<ExtArgs> = {}>(args?: Subset<T, BookEntitlement$userArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the BookEntitlement model
+   */
+  interface BookEntitlementFieldRefs {
+    readonly id: FieldRef<"BookEntitlement", 'String'>
+    readonly email: FieldRef<"BookEntitlement", 'String'>
+    readonly userId: FieldRef<"BookEntitlement", 'String'>
+    readonly offerId: FieldRef<"BookEntitlement", 'String'>
+    readonly format: FieldRef<"BookEntitlement", 'String'>
+    readonly bookSlug: FieldRef<"BookEntitlement", 'String'>
+    readonly stripeSessionId: FieldRef<"BookEntitlement", 'String'>
+    readonly stripePaymentIntentId: FieldRef<"BookEntitlement", 'String'>
+    readonly stripeEventId: FieldRef<"BookEntitlement", 'String'>
+    readonly amountCents: FieldRef<"BookEntitlement", 'Int'>
+    readonly currency: FieldRef<"BookEntitlement", 'String'>
+    readonly status: FieldRef<"BookEntitlement", 'String'>
+    readonly revokedAt: FieldRef<"BookEntitlement", 'DateTime'>
+    readonly createdAt: FieldRef<"BookEntitlement", 'DateTime'>
+    readonly updatedAt: FieldRef<"BookEntitlement", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * BookEntitlement findUnique
+   */
+  export type BookEntitlementFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement findUniqueOrThrow
+   */
+  export type BookEntitlementFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement findFirst
+   */
+  export type BookEntitlementFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookEntitlements.
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookEntitlements.
+     */
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * BookEntitlement findFirstOrThrow
+   */
+  export type BookEntitlementFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlement to fetch.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for BookEntitlements.
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of BookEntitlements.
+     */
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * BookEntitlement findMany
+   */
+  export type BookEntitlementFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter, which BookEntitlements to fetch.
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of BookEntitlements to fetch.
+     */
+    orderBy?: BookEntitlementOrderByWithRelationInput | BookEntitlementOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing BookEntitlements.
+     */
+    cursor?: BookEntitlementWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` BookEntitlements from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` BookEntitlements.
+     */
+    skip?: number
+    distinct?: BookEntitlementScalarFieldEnum | BookEntitlementScalarFieldEnum[]
+  }
+
+  /**
+   * BookEntitlement create
+   */
+  export type BookEntitlementCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * The data needed to create a BookEntitlement.
+     */
+    data: XOR<BookEntitlementCreateInput, BookEntitlementUncheckedCreateInput>
+  }
+
+  /**
+   * BookEntitlement createMany
+   */
+  export type BookEntitlementCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many BookEntitlements.
+     */
+    data: BookEntitlementCreateManyInput | BookEntitlementCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * BookEntitlement createManyAndReturn
+   */
+  export type BookEntitlementCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * The data used to create many BookEntitlements.
+     */
+    data: BookEntitlementCreateManyInput | BookEntitlementCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BookEntitlement update
+   */
+  export type BookEntitlementUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * The data needed to update a BookEntitlement.
+     */
+    data: XOR<BookEntitlementUpdateInput, BookEntitlementUncheckedUpdateInput>
+    /**
+     * Choose, which BookEntitlement to update.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement updateMany
+   */
+  export type BookEntitlementUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update BookEntitlements.
+     */
+    data: XOR<BookEntitlementUpdateManyMutationInput, BookEntitlementUncheckedUpdateManyInput>
+    /**
+     * Filter which BookEntitlements to update
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * Limit how many BookEntitlements to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookEntitlement updateManyAndReturn
+   */
+  export type BookEntitlementUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * The data used to update BookEntitlements.
+     */
+    data: XOR<BookEntitlementUpdateManyMutationInput, BookEntitlementUncheckedUpdateManyInput>
+    /**
+     * Filter which BookEntitlements to update
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * Limit how many BookEntitlements to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * BookEntitlement upsert
+   */
+  export type BookEntitlementUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * The filter to search for the BookEntitlement to update in case it exists.
+     */
+    where: BookEntitlementWhereUniqueInput
+    /**
+     * In case the BookEntitlement found by the `where` argument doesn't exist, create a new BookEntitlement with this data.
+     */
+    create: XOR<BookEntitlementCreateInput, BookEntitlementUncheckedCreateInput>
+    /**
+     * In case the BookEntitlement was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<BookEntitlementUpdateInput, BookEntitlementUncheckedUpdateInput>
+  }
+
+  /**
+   * BookEntitlement delete
+   */
+  export type BookEntitlementDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+    /**
+     * Filter which BookEntitlement to delete.
+     */
+    where: BookEntitlementWhereUniqueInput
+  }
+
+  /**
+   * BookEntitlement deleteMany
+   */
+  export type BookEntitlementDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which BookEntitlements to delete
+     */
+    where?: BookEntitlementWhereInput
+    /**
+     * Limit how many BookEntitlements to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * BookEntitlement.user
+   */
+  export type BookEntitlement$userArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * BookEntitlement without action
+   */
+  export type BookEntitlementDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the BookEntitlement
+     */
+    select?: BookEntitlementSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the BookEntitlement
+     */
+    omit?: BookEntitlementOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: BookEntitlementInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -132560,6 +137335,70 @@ export namespace Prisma {
   export type StudioProjectSaveScalarFieldEnum = (typeof StudioProjectSaveScalarFieldEnum)[keyof typeof StudioProjectSaveScalarFieldEnum]
 
 
+  export const PartyReportScalarFieldEnum: {
+    id: 'id',
+    reporterId: 'reporterId',
+    reportedId: 'reportedId',
+    reportedName: 'reportedName',
+    partyCode: 'partyCode',
+    reason: 'reason',
+    reportedAt: 'reportedAt',
+    createdAt: 'createdAt'
+  };
+
+  export type PartyReportScalarFieldEnum = (typeof PartyReportScalarFieldEnum)[keyof typeof PartyReportScalarFieldEnum]
+
+
+  export const CreatorInquiryScalarFieldEnum: {
+    id: 'id',
+    brand: 'brand',
+    contactName: 'contactName',
+    email: 'email',
+    budgetRange: 'budgetRange',
+    dates: 'dates',
+    deliverables: 'deliverables',
+    message: 'message',
+    profileSlug: 'profileSlug',
+    source: 'source',
+    status: 'status',
+    createdAt: 'createdAt'
+  };
+
+  export type CreatorInquiryScalarFieldEnum = (typeof CreatorInquiryScalarFieldEnum)[keyof typeof CreatorInquiryScalarFieldEnum]
+
+
+  export const BookFulfillmentEventScalarFieldEnum: {
+    id: 'id',
+    eventId: 'eventId',
+    type: 'type',
+    paymentIntentId: 'paymentIntentId',
+    createdAt: 'createdAt'
+  };
+
+  export type BookFulfillmentEventScalarFieldEnum = (typeof BookFulfillmentEventScalarFieldEnum)[keyof typeof BookFulfillmentEventScalarFieldEnum]
+
+
+  export const BookEntitlementScalarFieldEnum: {
+    id: 'id',
+    email: 'email',
+    userId: 'userId',
+    offerId: 'offerId',
+    format: 'format',
+    bookSlug: 'bookSlug',
+    stripeSessionId: 'stripeSessionId',
+    stripePaymentIntentId: 'stripePaymentIntentId',
+    stripeEventId: 'stripeEventId',
+    amountCents: 'amountCents',
+    currency: 'currency',
+    status: 'status',
+    revokedAt: 'revokedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type BookEntitlementScalarFieldEnum = (typeof BookEntitlementScalarFieldEnum)[keyof typeof BookEntitlementScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -133097,6 +137936,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteListRelationFilter
     adventureSave?: XOR<AdventureSaveNullableScalarRelationFilter, AdventureSaveWhereInput> | null
     studioProjectSaves?: StudioProjectSaveListRelationFilter
+    bookEntitlements?: BookEntitlementListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -133178,6 +138018,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteOrderByRelationAggregateInput
     adventureSave?: AdventureSaveOrderByWithRelationInput
     studioProjectSaves?: StudioProjectSaveOrderByRelationAggregateInput
+    bookEntitlements?: BookEntitlementOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -133262,6 +138103,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteListRelationFilter
     adventureSave?: XOR<AdventureSaveNullableScalarRelationFilter, AdventureSaveWhereInput> | null
     studioProjectSaves?: StudioProjectSaveListRelationFilter
+    bookEntitlements?: BookEntitlementListRelationFilter
   }, "id" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -141678,6 +146520,320 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"StudioProjectSave"> | Date | string
   }
 
+  export type PartyReportWhereInput = {
+    AND?: PartyReportWhereInput | PartyReportWhereInput[]
+    OR?: PartyReportWhereInput[]
+    NOT?: PartyReportWhereInput | PartyReportWhereInput[]
+    id?: StringFilter<"PartyReport"> | string
+    reporterId?: StringNullableFilter<"PartyReport"> | string | null
+    reportedId?: StringNullableFilter<"PartyReport"> | string | null
+    reportedName?: StringFilter<"PartyReport"> | string
+    partyCode?: StringFilter<"PartyReport"> | string
+    reason?: StringFilter<"PartyReport"> | string
+    reportedAt?: DateTimeFilter<"PartyReport"> | Date | string
+    createdAt?: DateTimeFilter<"PartyReport"> | Date | string
+  }
+
+  export type PartyReportOrderByWithRelationInput = {
+    id?: SortOrder
+    reporterId?: SortOrderInput | SortOrder
+    reportedId?: SortOrderInput | SortOrder
+    reportedName?: SortOrder
+    partyCode?: SortOrder
+    reason?: SortOrder
+    reportedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type PartyReportWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: PartyReportWhereInput | PartyReportWhereInput[]
+    OR?: PartyReportWhereInput[]
+    NOT?: PartyReportWhereInput | PartyReportWhereInput[]
+    reporterId?: StringNullableFilter<"PartyReport"> | string | null
+    reportedId?: StringNullableFilter<"PartyReport"> | string | null
+    reportedName?: StringFilter<"PartyReport"> | string
+    partyCode?: StringFilter<"PartyReport"> | string
+    reason?: StringFilter<"PartyReport"> | string
+    reportedAt?: DateTimeFilter<"PartyReport"> | Date | string
+    createdAt?: DateTimeFilter<"PartyReport"> | Date | string
+  }, "id">
+
+  export type PartyReportOrderByWithAggregationInput = {
+    id?: SortOrder
+    reporterId?: SortOrderInput | SortOrder
+    reportedId?: SortOrderInput | SortOrder
+    reportedName?: SortOrder
+    partyCode?: SortOrder
+    reason?: SortOrder
+    reportedAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: PartyReportCountOrderByAggregateInput
+    _max?: PartyReportMaxOrderByAggregateInput
+    _min?: PartyReportMinOrderByAggregateInput
+  }
+
+  export type PartyReportScalarWhereWithAggregatesInput = {
+    AND?: PartyReportScalarWhereWithAggregatesInput | PartyReportScalarWhereWithAggregatesInput[]
+    OR?: PartyReportScalarWhereWithAggregatesInput[]
+    NOT?: PartyReportScalarWhereWithAggregatesInput | PartyReportScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"PartyReport"> | string
+    reporterId?: StringNullableWithAggregatesFilter<"PartyReport"> | string | null
+    reportedId?: StringNullableWithAggregatesFilter<"PartyReport"> | string | null
+    reportedName?: StringWithAggregatesFilter<"PartyReport"> | string
+    partyCode?: StringWithAggregatesFilter<"PartyReport"> | string
+    reason?: StringWithAggregatesFilter<"PartyReport"> | string
+    reportedAt?: DateTimeWithAggregatesFilter<"PartyReport"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"PartyReport"> | Date | string
+  }
+
+  export type CreatorInquiryWhereInput = {
+    AND?: CreatorInquiryWhereInput | CreatorInquiryWhereInput[]
+    OR?: CreatorInquiryWhereInput[]
+    NOT?: CreatorInquiryWhereInput | CreatorInquiryWhereInput[]
+    id?: StringFilter<"CreatorInquiry"> | string
+    brand?: StringFilter<"CreatorInquiry"> | string
+    contactName?: StringFilter<"CreatorInquiry"> | string
+    email?: StringFilter<"CreatorInquiry"> | string
+    budgetRange?: StringFilter<"CreatorInquiry"> | string
+    dates?: StringFilter<"CreatorInquiry"> | string
+    deliverables?: StringFilter<"CreatorInquiry"> | string
+    message?: StringFilter<"CreatorInquiry"> | string
+    profileSlug?: StringNullableFilter<"CreatorInquiry"> | string | null
+    source?: StringFilter<"CreatorInquiry"> | string
+    status?: StringFilter<"CreatorInquiry"> | string
+    createdAt?: DateTimeFilter<"CreatorInquiry"> | Date | string
+  }
+
+  export type CreatorInquiryOrderByWithRelationInput = {
+    id?: SortOrder
+    brand?: SortOrder
+    contactName?: SortOrder
+    email?: SortOrder
+    budgetRange?: SortOrder
+    dates?: SortOrder
+    deliverables?: SortOrder
+    message?: SortOrder
+    profileSlug?: SortOrderInput | SortOrder
+    source?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreatorInquiryWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: CreatorInquiryWhereInput | CreatorInquiryWhereInput[]
+    OR?: CreatorInquiryWhereInput[]
+    NOT?: CreatorInquiryWhereInput | CreatorInquiryWhereInput[]
+    brand?: StringFilter<"CreatorInquiry"> | string
+    contactName?: StringFilter<"CreatorInquiry"> | string
+    email?: StringFilter<"CreatorInquiry"> | string
+    budgetRange?: StringFilter<"CreatorInquiry"> | string
+    dates?: StringFilter<"CreatorInquiry"> | string
+    deliverables?: StringFilter<"CreatorInquiry"> | string
+    message?: StringFilter<"CreatorInquiry"> | string
+    profileSlug?: StringNullableFilter<"CreatorInquiry"> | string | null
+    source?: StringFilter<"CreatorInquiry"> | string
+    status?: StringFilter<"CreatorInquiry"> | string
+    createdAt?: DateTimeFilter<"CreatorInquiry"> | Date | string
+  }, "id">
+
+  export type CreatorInquiryOrderByWithAggregationInput = {
+    id?: SortOrder
+    brand?: SortOrder
+    contactName?: SortOrder
+    email?: SortOrder
+    budgetRange?: SortOrder
+    dates?: SortOrder
+    deliverables?: SortOrder
+    message?: SortOrder
+    profileSlug?: SortOrderInput | SortOrder
+    source?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+    _count?: CreatorInquiryCountOrderByAggregateInput
+    _max?: CreatorInquiryMaxOrderByAggregateInput
+    _min?: CreatorInquiryMinOrderByAggregateInput
+  }
+
+  export type CreatorInquiryScalarWhereWithAggregatesInput = {
+    AND?: CreatorInquiryScalarWhereWithAggregatesInput | CreatorInquiryScalarWhereWithAggregatesInput[]
+    OR?: CreatorInquiryScalarWhereWithAggregatesInput[]
+    NOT?: CreatorInquiryScalarWhereWithAggregatesInput | CreatorInquiryScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    brand?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    contactName?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    email?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    budgetRange?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    dates?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    deliverables?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    message?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    profileSlug?: StringNullableWithAggregatesFilter<"CreatorInquiry"> | string | null
+    source?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    status?: StringWithAggregatesFilter<"CreatorInquiry"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"CreatorInquiry"> | Date | string
+  }
+
+  export type BookFulfillmentEventWhereInput = {
+    AND?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    OR?: BookFulfillmentEventWhereInput[]
+    NOT?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    id?: StringFilter<"BookFulfillmentEvent"> | string
+    eventId?: StringFilter<"BookFulfillmentEvent"> | string
+    type?: StringFilter<"BookFulfillmentEvent"> | string
+    paymentIntentId?: StringNullableFilter<"BookFulfillmentEvent"> | string | null
+    createdAt?: DateTimeFilter<"BookFulfillmentEvent"> | Date | string
+  }
+
+  export type BookFulfillmentEventOrderByWithRelationInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    eventId?: string
+    AND?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    OR?: BookFulfillmentEventWhereInput[]
+    NOT?: BookFulfillmentEventWhereInput | BookFulfillmentEventWhereInput[]
+    type?: StringFilter<"BookFulfillmentEvent"> | string
+    paymentIntentId?: StringNullableFilter<"BookFulfillmentEvent"> | string | null
+    createdAt?: DateTimeFilter<"BookFulfillmentEvent"> | Date | string
+  }, "id" | "eventId">
+
+  export type BookFulfillmentEventOrderByWithAggregationInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: BookFulfillmentEventCountOrderByAggregateInput
+    _max?: BookFulfillmentEventMaxOrderByAggregateInput
+    _min?: BookFulfillmentEventMinOrderByAggregateInput
+  }
+
+  export type BookFulfillmentEventScalarWhereWithAggregatesInput = {
+    AND?: BookFulfillmentEventScalarWhereWithAggregatesInput | BookFulfillmentEventScalarWhereWithAggregatesInput[]
+    OR?: BookFulfillmentEventScalarWhereWithAggregatesInput[]
+    NOT?: BookFulfillmentEventScalarWhereWithAggregatesInput | BookFulfillmentEventScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BookFulfillmentEvent"> | string
+    eventId?: StringWithAggregatesFilter<"BookFulfillmentEvent"> | string
+    type?: StringWithAggregatesFilter<"BookFulfillmentEvent"> | string
+    paymentIntentId?: StringNullableWithAggregatesFilter<"BookFulfillmentEvent"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"BookFulfillmentEvent"> | Date | string
+  }
+
+  export type BookEntitlementWhereInput = {
+    AND?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    OR?: BookEntitlementWhereInput[]
+    NOT?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    id?: StringFilter<"BookEntitlement"> | string
+    email?: StringFilter<"BookEntitlement"> | string
+    userId?: StringNullableFilter<"BookEntitlement"> | string | null
+    offerId?: StringFilter<"BookEntitlement"> | string
+    format?: StringFilter<"BookEntitlement"> | string
+    bookSlug?: StringFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringFilter<"BookEntitlement"> | string
+    amountCents?: IntFilter<"BookEntitlement"> | number
+    currency?: StringFilter<"BookEntitlement"> | string
+    status?: StringFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }
+
+  export type BookEntitlementOrderByWithRelationInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type BookEntitlementWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    email_offerId?: BookEntitlementEmailOfferIdCompoundUniqueInput
+    AND?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    OR?: BookEntitlementWhereInput[]
+    NOT?: BookEntitlementWhereInput | BookEntitlementWhereInput[]
+    email?: StringFilter<"BookEntitlement"> | string
+    userId?: StringNullableFilter<"BookEntitlement"> | string | null
+    offerId?: StringFilter<"BookEntitlement"> | string
+    format?: StringFilter<"BookEntitlement"> | string
+    bookSlug?: StringFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringFilter<"BookEntitlement"> | string
+    amountCents?: IntFilter<"BookEntitlement"> | number
+    currency?: StringFilter<"BookEntitlement"> | string
+    status?: StringFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    user?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+  }, "id" | "email_offerId">
+
+  export type BookEntitlementOrderByWithAggregationInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrderInput | SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrderInput | SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: BookEntitlementCountOrderByAggregateInput
+    _avg?: BookEntitlementAvgOrderByAggregateInput
+    _max?: BookEntitlementMaxOrderByAggregateInput
+    _min?: BookEntitlementMinOrderByAggregateInput
+    _sum?: BookEntitlementSumOrderByAggregateInput
+  }
+
+  export type BookEntitlementScalarWhereWithAggregatesInput = {
+    AND?: BookEntitlementScalarWhereWithAggregatesInput | BookEntitlementScalarWhereWithAggregatesInput[]
+    OR?: BookEntitlementScalarWhereWithAggregatesInput[]
+    NOT?: BookEntitlementScalarWhereWithAggregatesInput | BookEntitlementScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    email?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    userId?: StringNullableWithAggregatesFilter<"BookEntitlement"> | string | null
+    offerId?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    format?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    bookSlug?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableWithAggregatesFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    amountCents?: IntWithAggregatesFilter<"BookEntitlement"> | number
+    currency?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    status?: StringWithAggregatesFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableWithAggregatesFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"BookEntitlement"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
@@ -141757,6 +146913,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -141838,6 +146995,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserUpdateInput = {
@@ -141919,6 +147077,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -142000,6 +147159,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -151310,6 +156470,369 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type PartyReportCreateInput = {
+    id: string
+    reporterId?: string | null
+    reportedId?: string | null
+    reportedName: string
+    partyCode: string
+    reason: string
+    reportedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type PartyReportUncheckedCreateInput = {
+    id: string
+    reporterId?: string | null
+    reportedId?: string | null
+    reportedName: string
+    partyCode: string
+    reason: string
+    reportedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type PartyReportUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    reporterId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedName?: StringFieldUpdateOperationsInput | string
+    partyCode?: StringFieldUpdateOperationsInput | string
+    reason?: StringFieldUpdateOperationsInput | string
+    reportedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PartyReportUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    reporterId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedName?: StringFieldUpdateOperationsInput | string
+    partyCode?: StringFieldUpdateOperationsInput | string
+    reason?: StringFieldUpdateOperationsInput | string
+    reportedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PartyReportCreateManyInput = {
+    id: string
+    reporterId?: string | null
+    reportedId?: string | null
+    reportedName: string
+    partyCode: string
+    reason: string
+    reportedAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type PartyReportUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    reporterId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedName?: StringFieldUpdateOperationsInput | string
+    partyCode?: StringFieldUpdateOperationsInput | string
+    reason?: StringFieldUpdateOperationsInput | string
+    reportedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type PartyReportUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    reporterId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedId?: NullableStringFieldUpdateOperationsInput | string | null
+    reportedName?: StringFieldUpdateOperationsInput | string
+    partyCode?: StringFieldUpdateOperationsInput | string
+    reason?: StringFieldUpdateOperationsInput | string
+    reportedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CreatorInquiryCreateInput = {
+    id: string
+    brand: string
+    contactName: string
+    email: string
+    budgetRange: string
+    dates?: string
+    deliverables: string
+    message?: string
+    profileSlug?: string | null
+    source: string
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type CreatorInquiryUncheckedCreateInput = {
+    id: string
+    brand: string
+    contactName: string
+    email: string
+    budgetRange: string
+    dates?: string
+    deliverables: string
+    message?: string
+    profileSlug?: string | null
+    source: string
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type CreatorInquiryUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    brand?: StringFieldUpdateOperationsInput | string
+    contactName?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    budgetRange?: StringFieldUpdateOperationsInput | string
+    dates?: StringFieldUpdateOperationsInput | string
+    deliverables?: StringFieldUpdateOperationsInput | string
+    message?: StringFieldUpdateOperationsInput | string
+    profileSlug?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CreatorInquiryUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    brand?: StringFieldUpdateOperationsInput | string
+    contactName?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    budgetRange?: StringFieldUpdateOperationsInput | string
+    dates?: StringFieldUpdateOperationsInput | string
+    deliverables?: StringFieldUpdateOperationsInput | string
+    message?: StringFieldUpdateOperationsInput | string
+    profileSlug?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CreatorInquiryCreateManyInput = {
+    id: string
+    brand: string
+    contactName: string
+    email: string
+    budgetRange: string
+    dates?: string
+    deliverables: string
+    message?: string
+    profileSlug?: string | null
+    source: string
+    status?: string
+    createdAt?: Date | string
+  }
+
+  export type CreatorInquiryUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    brand?: StringFieldUpdateOperationsInput | string
+    contactName?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    budgetRange?: StringFieldUpdateOperationsInput | string
+    dates?: StringFieldUpdateOperationsInput | string
+    deliverables?: StringFieldUpdateOperationsInput | string
+    message?: StringFieldUpdateOperationsInput | string
+    profileSlug?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CreatorInquiryUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    brand?: StringFieldUpdateOperationsInput | string
+    contactName?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    budgetRange?: StringFieldUpdateOperationsInput | string
+    dates?: StringFieldUpdateOperationsInput | string
+    deliverables?: StringFieldUpdateOperationsInput | string
+    message?: StringFieldUpdateOperationsInput | string
+    profileSlug?: NullableStringFieldUpdateOperationsInput | string | null
+    source?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventCreateInput = {
+    id?: string
+    eventId: string
+    type: string
+    paymentIntentId?: string | null
+    createdAt?: Date | string
+  }
+
+  export type BookFulfillmentEventUncheckedCreateInput = {
+    id?: string
+    eventId: string
+    type: string
+    paymentIntentId?: string | null
+    createdAt?: Date | string
+  }
+
+  export type BookFulfillmentEventUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventCreateManyInput = {
+    id?: string
+    eventId: string
+    type: string
+    paymentIntentId?: string | null
+    createdAt?: Date | string
+  }
+
+  export type BookFulfillmentEventUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookFulfillmentEventUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    eventId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    paymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementCreateInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user?: UserCreateNestedOneWithoutBookEntitlementsInput
+  }
+
+  export type BookEntitlementUncheckedCreateInput = {
+    id?: string
+    email: string
+    userId?: string | null
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneWithoutBookEntitlementsNestedInput
+  }
+
+  export type BookEntitlementUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementCreateManyInput = {
+    id?: string
+    email: string
+    userId?: string | null
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    userId?: NullableStringFieldUpdateOperationsInput | string | null
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -151709,6 +157232,12 @@ export namespace Prisma {
     none?: StudioProjectSaveWhereInput
   }
 
+  export type BookEntitlementListRelationFilter = {
+    every?: BookEntitlementWhereInput
+    some?: BookEntitlementWhereInput
+    none?: BookEntitlementWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -151895,6 +157424,10 @@ export namespace Prisma {
   }
 
   export type StudioProjectSaveOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type BookEntitlementOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -157708,6 +163241,175 @@ export namespace Prisma {
     bytes?: SortOrder
   }
 
+  export type PartyReportCountOrderByAggregateInput = {
+    id?: SortOrder
+    reporterId?: SortOrder
+    reportedId?: SortOrder
+    reportedName?: SortOrder
+    partyCode?: SortOrder
+    reason?: SortOrder
+    reportedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type PartyReportMaxOrderByAggregateInput = {
+    id?: SortOrder
+    reporterId?: SortOrder
+    reportedId?: SortOrder
+    reportedName?: SortOrder
+    partyCode?: SortOrder
+    reason?: SortOrder
+    reportedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type PartyReportMinOrderByAggregateInput = {
+    id?: SortOrder
+    reporterId?: SortOrder
+    reportedId?: SortOrder
+    reportedName?: SortOrder
+    partyCode?: SortOrder
+    reason?: SortOrder
+    reportedAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreatorInquiryCountOrderByAggregateInput = {
+    id?: SortOrder
+    brand?: SortOrder
+    contactName?: SortOrder
+    email?: SortOrder
+    budgetRange?: SortOrder
+    dates?: SortOrder
+    deliverables?: SortOrder
+    message?: SortOrder
+    profileSlug?: SortOrder
+    source?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreatorInquiryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    brand?: SortOrder
+    contactName?: SortOrder
+    email?: SortOrder
+    budgetRange?: SortOrder
+    dates?: SortOrder
+    deliverables?: SortOrder
+    message?: SortOrder
+    profileSlug?: SortOrder
+    source?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreatorInquiryMinOrderByAggregateInput = {
+    id?: SortOrder
+    brand?: SortOrder
+    contactName?: SortOrder
+    email?: SortOrder
+    budgetRange?: SortOrder
+    dates?: SortOrder
+    deliverables?: SortOrder
+    message?: SortOrder
+    profileSlug?: SortOrder
+    source?: SortOrder
+    status?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventCountOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventMaxOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookFulfillmentEventMinOrderByAggregateInput = {
+    id?: SortOrder
+    eventId?: SortOrder
+    type?: SortOrder
+    paymentIntentId?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type BookEntitlementEmailOfferIdCompoundUniqueInput = {
+    email: string
+    offerId: string
+  }
+
+  export type BookEntitlementCountOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookEntitlementAvgOrderByAggregateInput = {
+    amountCents?: SortOrder
+  }
+
+  export type BookEntitlementMaxOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookEntitlementMinOrderByAggregateInput = {
+    id?: SortOrder
+    email?: SortOrder
+    userId?: SortOrder
+    offerId?: SortOrder
+    format?: SortOrder
+    bookSlug?: SortOrder
+    stripeSessionId?: SortOrder
+    stripePaymentIntentId?: SortOrder
+    stripeEventId?: SortOrder
+    amountCents?: SortOrder
+    currency?: SortOrder
+    status?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type BookEntitlementSumOrderByAggregateInput = {
+    amountCents?: SortOrder
+  }
+
   export type PlayerProfileCreateNestedOneWithoutUserInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -158144,6 +163846,13 @@ export namespace Prisma {
     connect?: StudioProjectSaveWhereUniqueInput | StudioProjectSaveWhereUniqueInput[]
   }
 
+  export type BookEntitlementCreateNestedManyWithoutUserInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+  }
+
   export type PlayerProfileUncheckedCreateNestedOneWithoutUserInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -158578,6 +164287,13 @@ export namespace Prisma {
     connectOrCreate?: StudioProjectSaveCreateOrConnectWithoutUserInput | StudioProjectSaveCreateOrConnectWithoutUserInput[]
     createMany?: StudioProjectSaveCreateManyUserInputEnvelope
     connect?: StudioProjectSaveWhereUniqueInput | StudioProjectSaveWhereUniqueInput[]
+  }
+
+  export type BookEntitlementUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -159452,6 +165168,20 @@ export namespace Prisma {
     deleteMany?: StudioProjectSaveScalarWhereInput | StudioProjectSaveScalarWhereInput[]
   }
 
+  export type BookEntitlementUpdateManyWithoutUserNestedInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    upsert?: BookEntitlementUpsertWithWhereUniqueWithoutUserInput | BookEntitlementUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    set?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    disconnect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    delete?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    update?: BookEntitlementUpdateWithWhereUniqueWithoutUserInput | BookEntitlementUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: BookEntitlementUpdateManyWithWhereWithoutUserInput | BookEntitlementUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
+  }
+
   export type PlayerProfileUncheckedUpdateOneWithoutUserNestedInput = {
     create?: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
     connectOrCreate?: PlayerProfileCreateOrConnectWithoutUserInput
@@ -160298,6 +166028,20 @@ export namespace Prisma {
     update?: StudioProjectSaveUpdateWithWhereUniqueWithoutUserInput | StudioProjectSaveUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: StudioProjectSaveUpdateManyWithWhereWithoutUserInput | StudioProjectSaveUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: StudioProjectSaveScalarWhereInput | StudioProjectSaveScalarWhereInput[]
+  }
+
+  export type BookEntitlementUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput> | BookEntitlementCreateWithoutUserInput[] | BookEntitlementUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: BookEntitlementCreateOrConnectWithoutUserInput | BookEntitlementCreateOrConnectWithoutUserInput[]
+    upsert?: BookEntitlementUpsertWithWhereUniqueWithoutUserInput | BookEntitlementUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: BookEntitlementCreateManyUserInputEnvelope
+    set?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    disconnect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    delete?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    connect?: BookEntitlementWhereUniqueInput | BookEntitlementWhereUniqueInput[]
+    update?: BookEntitlementUpdateWithWhereUniqueWithoutUserInput | BookEntitlementUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: BookEntitlementUpdateManyWithWhereWithoutUserInput | BookEntitlementUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutProfileInput = {
@@ -163858,6 +169602,22 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutStudioProjectSavesInput, UserUpdateWithoutStudioProjectSavesInput>, UserUncheckedUpdateWithoutStudioProjectSavesInput>
   }
 
+  export type UserCreateNestedOneWithoutBookEntitlementsInput = {
+    create?: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutBookEntitlementsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneWithoutBookEntitlementsNestedInput = {
+    create?: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutBookEntitlementsInput
+    upsert?: UserUpsertWithoutBookEntitlementsInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutBookEntitlementsInput, UserUpdateWithoutBookEntitlementsInput>, UserUncheckedUpdateWithoutBookEntitlementsInput>
+  }
+
   export type NestedStringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -166763,6 +172523,50 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type BookEntitlementCreateWithoutUserInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementUncheckedCreateWithoutUserInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementCreateOrConnectWithoutUserInput = {
+    where: BookEntitlementWhereUniqueInput
+    create: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput>
+  }
+
+  export type BookEntitlementCreateManyUserInputEnvelope = {
+    data: BookEntitlementCreateManyUserInput | BookEntitlementCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
   export type PlayerProfileUpsertWithoutUserInput = {
     update: XOR<PlayerProfileUpdateWithoutUserInput, PlayerProfileUncheckedUpdateWithoutUserInput>
     create: XOR<PlayerProfileCreateWithoutUserInput, PlayerProfileUncheckedCreateWithoutUserInput>
@@ -168719,6 +174523,43 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"StudioProjectSave"> | Date | string
   }
 
+  export type BookEntitlementUpsertWithWhereUniqueWithoutUserInput = {
+    where: BookEntitlementWhereUniqueInput
+    update: XOR<BookEntitlementUpdateWithoutUserInput, BookEntitlementUncheckedUpdateWithoutUserInput>
+    create: XOR<BookEntitlementCreateWithoutUserInput, BookEntitlementUncheckedCreateWithoutUserInput>
+  }
+
+  export type BookEntitlementUpdateWithWhereUniqueWithoutUserInput = {
+    where: BookEntitlementWhereUniqueInput
+    data: XOR<BookEntitlementUpdateWithoutUserInput, BookEntitlementUncheckedUpdateWithoutUserInput>
+  }
+
+  export type BookEntitlementUpdateManyWithWhereWithoutUserInput = {
+    where: BookEntitlementScalarWhereInput
+    data: XOR<BookEntitlementUpdateManyMutationInput, BookEntitlementUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type BookEntitlementScalarWhereInput = {
+    AND?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
+    OR?: BookEntitlementScalarWhereInput[]
+    NOT?: BookEntitlementScalarWhereInput | BookEntitlementScalarWhereInput[]
+    id?: StringFilter<"BookEntitlement"> | string
+    email?: StringFilter<"BookEntitlement"> | string
+    userId?: StringNullableFilter<"BookEntitlement"> | string | null
+    offerId?: StringFilter<"BookEntitlement"> | string
+    format?: StringFilter<"BookEntitlement"> | string
+    bookSlug?: StringFilter<"BookEntitlement"> | string
+    stripeSessionId?: StringFilter<"BookEntitlement"> | string
+    stripePaymentIntentId?: StringNullableFilter<"BookEntitlement"> | string | null
+    stripeEventId?: StringFilter<"BookEntitlement"> | string
+    amountCents?: IntFilter<"BookEntitlement"> | number
+    currency?: StringFilter<"BookEntitlement"> | string
+    status?: StringFilter<"BookEntitlement"> | string
+    revokedAt?: DateTimeNullableFilter<"BookEntitlement"> | Date | string | null
+    createdAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+    updatedAt?: DateTimeFilter<"BookEntitlement"> | Date | string
+  }
+
   export type UserCreateWithoutProfileInput = {
     id?: string
     email: string
@@ -168797,6 +174638,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutProfileInput = {
@@ -168877,6 +174719,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutProfileInput = {
@@ -168973,6 +174816,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutProfileInput = {
@@ -169053,6 +174897,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionsInput = {
@@ -169133,6 +174978,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -169213,6 +175059,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -169352,6 +175199,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -169432,6 +175280,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type SessionRunUpsertWithoutGameSessionInput = {
@@ -169561,6 +175410,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionRunsInput = {
@@ -169641,6 +175491,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionRunsInput = {
@@ -169810,6 +175661,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionRunsInput = {
@@ -169890,6 +175742,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type SessionGrantUpsertWithWhereUniqueWithoutRunInput = {
@@ -170037,6 +175890,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionGrantsInput = {
@@ -170117,6 +175971,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionGrantsInput = {
@@ -170256,6 +176111,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionGrantsInput = {
@@ -170336,6 +176192,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type SessionRunUpsertWithoutGrantsInput = {
@@ -170465,6 +176322,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLedgerInput = {
@@ -170545,6 +176403,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLedgerInput = {
@@ -170641,6 +176500,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLedgerInput = {
@@ -170721,6 +176581,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCardsInput = {
@@ -170801,6 +176662,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCardsInput = {
@@ -170881,6 +176743,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCardsInput = {
@@ -170977,6 +176840,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCardsInput = {
@@ -171057,6 +176921,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutStoryProgressInput = {
@@ -171137,6 +177002,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStoryProgressInput = {
@@ -171217,6 +177083,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStoryProgressInput = {
@@ -171313,6 +177180,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStoryProgressInput = {
@@ -171393,6 +177261,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutLessonsInput = {
@@ -171473,6 +177342,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLessonsInput = {
@@ -171553,6 +177423,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLessonsInput = {
@@ -171649,6 +177520,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLessonsInput = {
@@ -171729,6 +177601,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCellProjectsInput = {
@@ -171809,6 +177682,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellProjectsInput = {
@@ -171889,6 +177763,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellProjectsInput = {
@@ -172111,6 +177986,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellProjectsInput = {
@@ -172191,6 +178067,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CellWisdomUpsertWithWhereUniqueWithoutProjectInput = {
@@ -172394,6 +178271,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellApiKeysInput = {
@@ -172474,6 +178352,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellApiKeysInput = {
@@ -172570,6 +178449,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellApiKeysInput = {
@@ -172650,6 +178530,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCellSettingsInput = {
@@ -172730,6 +178611,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCellSettingsInput = {
@@ -172810,6 +178692,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCellSettingsInput = {
@@ -172906,6 +178789,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCellSettingsInput = {
@@ -172986,6 +178870,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CellProjectCreateWithoutUsagesInput = {
@@ -173733,6 +179618,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStripeCustomerInput = {
@@ -173813,6 +179699,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStripeCustomerInput = {
@@ -173909,6 +179796,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStripeCustomerInput = {
@@ -173989,6 +179877,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSubscriptionsInput = {
@@ -174069,6 +179958,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSubscriptionsInput = {
@@ -174149,6 +180039,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSubscriptionsInput = {
@@ -174245,6 +180136,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSubscriptionsInput = {
@@ -174325,6 +180217,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutOrdersInput = {
@@ -174405,6 +180298,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutOrdersInput = {
@@ -174485,6 +180379,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutOrdersInput = {
@@ -174581,6 +180476,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOrdersInput = {
@@ -174661,6 +180557,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPayoutRequestsInput = {
@@ -174741,6 +180638,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPayoutRequestsInput = {
@@ -174821,6 +180719,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPayoutRequestsInput = {
@@ -174917,6 +180816,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPayoutRequestsInput = {
@@ -174997,6 +180897,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreatorListingsInput = {
@@ -175077,6 +180978,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreatorListingsInput = {
@@ -175157,6 +181059,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreatorListingsInput = {
@@ -175279,6 +181182,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreatorListingsInput = {
@@ -175359,6 +181263,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type MarketplacePurchaseUpsertWithWhereUniqueWithoutListingInput = {
@@ -175455,6 +181360,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPartnerKeysInput = {
@@ -175535,6 +181441,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPartnerKeysInput = {
@@ -175661,6 +181568,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPartnerKeysInput = {
@@ -175741,6 +181649,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type PartnerUsageUpsertWithWhereUniqueWithoutPartnerKeyInput = {
@@ -175923,6 +181832,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutBuyerPurchasesInput = {
@@ -176003,6 +181913,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutBuyerPurchasesInput = {
@@ -176136,6 +182047,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBuyerPurchasesInput = {
@@ -176216,6 +182128,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type MarketplaceListingUpsertWithoutPurchasesInput = {
@@ -176410,6 +182323,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLadderEntriesInput = {
@@ -176490,6 +182404,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLadderEntriesInput = {
@@ -176617,6 +182532,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLadderEntriesInput = {
@@ -176697,6 +182613,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCompetitionMatchesP1Input = {
@@ -176777,6 +182694,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesP1Input = {
@@ -176857,6 +182775,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesP1Input = {
@@ -176942,6 +182861,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesP2Input = {
@@ -177022,6 +182942,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesP2Input = {
@@ -177107,6 +183028,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCompetitionMatchesWinnerInput = {
@@ -177187,6 +183109,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCompetitionMatchesWinnerInput = {
@@ -177311,6 +183234,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesP1Input = {
@@ -177391,6 +183315,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCompetitionMatchesP2Input = {
@@ -177482,6 +183407,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesP2Input = {
@@ -177562,6 +183488,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCompetitionMatchesWinnerInput = {
@@ -177653,6 +183580,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCompetitionMatchesWinnerInput = {
@@ -177733,6 +183661,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type MatchEventUpsertWithWhereUniqueWithoutMatchInput = {
@@ -177888,6 +183817,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMatchEventsInput = {
@@ -177968,6 +183898,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMatchEventsInput = {
@@ -178129,6 +184060,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMatchEventsInput = {
@@ -178209,6 +184141,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutMirrorTriumphsInput = {
@@ -178289,6 +184222,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMirrorTriumphsInput = {
@@ -178369,6 +184303,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMirrorTriumphsInput = {
@@ -178465,6 +184400,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMirrorTriumphsInput = {
@@ -178545,6 +184481,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPrqEntriesInput = {
@@ -178625,6 +184562,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPrqEntriesInput = {
@@ -178705,6 +184643,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPrqEntriesInput = {
@@ -178801,6 +184740,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPrqEntriesInput = {
@@ -178881,6 +184821,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type PassProgressCreateWithoutSeasonInput = {
@@ -179228,6 +185169,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWalletInput = {
@@ -179308,6 +185250,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWalletInput = {
@@ -179438,6 +185381,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWalletInput = {
@@ -179518,6 +185462,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type WalletLedgerEntryUpsertWithWhereUniqueWithoutWalletInput = {
@@ -179690,6 +185635,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPerfEarnEventsInput = {
@@ -179770,6 +185716,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPerfEarnEventsInput = {
@@ -179866,6 +185813,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPerfEarnEventsInput = {
@@ -179946,6 +185894,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutEntitlementsInput = {
@@ -180026,6 +185975,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutEntitlementsInput = {
@@ -180106,6 +186056,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutEntitlementsInput = {
@@ -180202,6 +186153,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutEntitlementsInput = {
@@ -180282,6 +186234,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutLeadRecordInput = {
@@ -180362,6 +186315,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutLeadRecordInput = {
@@ -180442,6 +186396,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutLeadRecordInput = {
@@ -180538,6 +186493,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutLeadRecordInput = {
@@ -180618,6 +186574,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutReferralCodeInput = {
@@ -180698,6 +186655,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutReferralCodeInput = {
@@ -180778,6 +186736,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutReferralCodeInput = {
@@ -180900,6 +186859,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReferralCodeInput = {
@@ -180980,6 +186940,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type ReferralConversionUpsertWithWhereUniqueWithoutCodeInput = {
@@ -181140,6 +187101,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMpMatchesHostInput = {
@@ -181220,6 +187182,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMpMatchesHostInput = {
@@ -181305,6 +187268,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMpMatchesGuestInput = {
@@ -181385,6 +187349,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMpMatchesGuestInput = {
@@ -181481,6 +187446,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMpMatchesHostInput = {
@@ -181561,6 +187527,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutMpMatchesGuestInput = {
@@ -181652,6 +187619,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMpMatchesGuestInput = {
@@ -181732,6 +187700,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreativeCardsInput = {
@@ -181812,6 +187781,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreativeCardsInput = {
@@ -181892,6 +187862,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreativeCardsInput = {
@@ -181988,6 +187959,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreativeCardsInput = {
@@ -182068,6 +188040,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCardSlotInput = {
@@ -182148,6 +188121,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCardSlotInput = {
@@ -182228,6 +188202,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCardSlotInput = {
@@ -182324,6 +188299,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCardSlotInput = {
@@ -182404,6 +188380,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCreatorCardsInput = {
@@ -182484,6 +188461,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCreatorCardsInput = {
@@ -182564,6 +188542,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCreatorCardsInput = {
@@ -182660,6 +188639,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreatorCardsInput = {
@@ -182740,6 +188720,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutWorkoutScansInput = {
@@ -182820,6 +188801,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWorkoutScansInput = {
@@ -182900,6 +188882,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWorkoutScansInput = {
@@ -183024,6 +189007,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWorkoutScansInput = {
@@ -183104,6 +189088,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type WorkoutPlanUpsertWithWhereUniqueWithoutScanInput = {
@@ -183200,6 +189185,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutWorkoutPlansInput = {
@@ -183280,6 +189266,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutWorkoutPlansInput = {
@@ -183399,6 +189386,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWorkoutPlansInput = {
@@ -183479,6 +189467,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type WorkoutScanUpsertWithoutPlansInput = {
@@ -183588,6 +189577,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAthleteBuildInput = {
@@ -183668,6 +189658,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAthleteBuildInput = {
@@ -183764,6 +189755,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAthleteBuildInput = {
@@ -183844,6 +189836,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutAvatarLookInput = {
@@ -183924,6 +189917,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAvatarLookInput = {
@@ -184004,6 +189998,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAvatarLookInput = {
@@ -184100,6 +190095,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAvatarLookInput = {
@@ -184180,6 +190176,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutOwnedWearablesInput = {
@@ -184260,6 +190257,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutOwnedWearablesInput = {
@@ -184340,6 +190338,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutOwnedWearablesInput = {
@@ -184436,6 +190435,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOwnedWearablesInput = {
@@ -184516,6 +190516,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutSessionBookingsInput = {
@@ -184596,6 +190597,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutSessionBookingsInput = {
@@ -184676,6 +190678,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutSessionBookingsInput = {
@@ -184772,6 +190775,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionBookingsInput = {
@@ -184852,6 +190856,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CrmContactCreateWithoutCompanyInput = {
@@ -185054,6 +191059,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmContactLinksInput = {
@@ -185134,6 +191140,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmContactLinksInput = {
@@ -185252,6 +191259,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmContactsInput = {
@@ -185332,6 +191340,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmContactsInput = {
@@ -185534,6 +191543,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmContactLinksInput = {
@@ -185614,6 +191624,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CrmCompanyUpsertWithoutContactsInput = {
@@ -185744,6 +191755,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmContactsInput = {
@@ -185824,6 +191836,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CrmDealUpsertWithWhereUniqueWithoutContactInput = {
@@ -186028,6 +192041,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmDealsInput = {
@@ -186108,6 +192122,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmDealsInput = {
@@ -186356,6 +192371,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmDealsInput = {
@@ -186436,6 +192452,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CrmActivityUpsertWithWhereUniqueWithoutDealInput = {
@@ -186628,6 +192645,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmActivitiesInput = {
@@ -186708,6 +192726,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmActivitiesInput = {
@@ -186896,6 +192915,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmActivitiesInput = {
@@ -186976,6 +192996,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CrmContactCreateWithoutCrmNotesInput = {
@@ -187136,6 +193157,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCrmNotesInput = {
@@ -187216,6 +193238,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCrmNotesInput = {
@@ -187404,6 +193427,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCrmNotesInput = {
@@ -187484,6 +193508,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type SessionExerciseCreateWithoutExerciseInput = {
@@ -188972,6 +194997,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutFacilitatorProfileInput = {
@@ -189052,6 +195078,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutFacilitatorProfileInput = {
@@ -189272,6 +195299,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutFacilitatorProfileInput = {
@@ -189352,6 +195380,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type GoalPlanUpsertWithWhereUniqueWithoutFacilitatorProfileInput = {
@@ -189517,6 +195546,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCredentialsInput = {
@@ -189597,6 +195627,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCredentialsInput = {
@@ -189693,6 +195724,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCredentialsInput = {
@@ -189773,6 +195805,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGuardianConsentsInput = {
@@ -189853,6 +195886,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGuardianConsentsInput = {
@@ -189933,6 +195967,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGuardianConsentsInput = {
@@ -190029,6 +196064,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGuardianConsentsInput = {
@@ -190109,6 +196145,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutGoalPlansAsMenteeInput = {
@@ -190189,6 +196226,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoalPlansAsMenteeInput = {
@@ -190269,6 +196307,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoalPlansAsMenteeInput = {
@@ -190354,6 +196393,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutGoalPlansAsFacilitatorInput = {
@@ -190434,6 +196474,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutGoalPlansAsFacilitatorInput = {
@@ -190607,6 +196648,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoalPlansAsMenteeInput = {
@@ -190687,6 +196729,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutGoalPlansAsFacilitatorInput = {
@@ -190778,6 +196821,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGoalPlansAsFacilitatorInput = {
@@ -190858,6 +196902,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type FacilitatorProfileUpsertWithoutGoalPlansInput = {
@@ -191245,6 +197290,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutMirrorSessionsInput = {
@@ -191325,6 +197371,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutMirrorSessionsInput = {
@@ -191421,6 +197468,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutMirrorSessionsInput = {
@@ -191501,6 +197549,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutHealthIntakesInput = {
@@ -191581,6 +197630,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutHealthIntakesInput = {
@@ -191661,6 +197711,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutHealthIntakesInput = {
@@ -191757,6 +197808,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutHealthIntakesInput = {
@@ -191837,6 +197889,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutPainCheckInsInput = {
@@ -191917,6 +197970,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutPainCheckInsInput = {
@@ -191997,6 +198051,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutPainCheckInsInput = {
@@ -192093,6 +198148,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPainCheckInsInput = {
@@ -192173,6 +198229,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutHealthConsentsInput = {
@@ -192253,6 +198310,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutHealthConsentsInput = {
@@ -192333,6 +198391,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutHealthConsentsInput = {
@@ -192429,6 +198488,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutHealthConsentsInput = {
@@ -192509,6 +198569,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutScanSaveOptInInput = {
@@ -192589,6 +198650,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutScanSaveOptInInput = {
@@ -192669,6 +198731,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutScanSaveOptInInput = {
@@ -192765,6 +198828,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutScanSaveOptInInput = {
@@ -192845,6 +198909,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutReadinessCheckInsInput = {
@@ -192925,6 +198990,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutReadinessCheckInsInput = {
@@ -193005,6 +199071,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutReadinessCheckInsInput = {
@@ -193101,6 +199168,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReadinessCheckInsInput = {
@@ -193181,6 +199249,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutBreathLogsInput = {
@@ -193261,6 +199330,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutBreathLogsInput = {
@@ -193341,6 +199411,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutBreathLogsInput = {
@@ -193437,6 +199508,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBreathLogsInput = {
@@ -193517,6 +199589,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCoachSharesInput = {
@@ -193597,6 +199670,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachSharesInput = {
@@ -193677,6 +199751,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachSharesInput = {
@@ -193773,6 +199848,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachSharesInput = {
@@ -193853,6 +199929,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutCoachInvitesInput = {
@@ -193933,6 +200010,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachInvitesInput = {
@@ -194013,6 +200091,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachInvitesInput = {
@@ -194109,6 +200188,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachInvitesInput = {
@@ -194189,6 +200269,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutClientsCoachedInput = {
@@ -194269,6 +200350,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutClientsCoachedInput = {
@@ -194349,6 +200431,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutClientsCoachedInput = {
@@ -194434,6 +200517,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutCoachesInput = {
@@ -194514,6 +200598,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutCoachesInput = {
@@ -194627,6 +200712,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutClientsCoachedInput = {
@@ -194707,6 +200793,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserUpsertWithoutCoachesInput = {
@@ -194798,6 +200885,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCoachesInput = {
@@ -194878,6 +200966,7 @@ export namespace Prisma {
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type CoachAvailabilityUpsertWithoutLinkInput = {
@@ -195823,6 +201912,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutAdventureSaveInput = {
@@ -195903,6 +201993,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutAdventureSaveInput = {
@@ -195999,6 +202090,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAdventureSaveInput = {
@@ -196079,6 +202171,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type UserCreateWithoutStudioProjectSavesInput = {
@@ -196159,6 +202252,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
+    bookEntitlements?: BookEntitlementCreateNestedManyWithoutUserInput
   }
 
   export type UserUncheckedCreateWithoutStudioProjectSavesInput = {
@@ -196239,6 +202333,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
     crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
     adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
+    bookEntitlements?: BookEntitlementUncheckedCreateNestedManyWithoutUserInput
   }
 
   export type UserCreateOrConnectWithoutStudioProjectSavesInput = {
@@ -196335,6 +202430,7 @@ export namespace Prisma {
     crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUpdateManyWithoutUserNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStudioProjectSavesInput = {
@@ -196415,6 +202511,347 @@ export namespace Prisma {
     crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
     crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
     adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
+    bookEntitlements?: BookEntitlementUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserCreateWithoutBookEntitlementsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileCreateNestedOneWithoutUserInput
+    sessions?: GameSessionCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionCreateNestedManyWithoutUserInput
+    orders?: OrderCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphCreateNestedManyWithoutUserInput
+    wallet?: WalletCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveCreateNestedOneWithoutUserInput
+    studioProjectSaves?: StudioProjectSaveCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutBookEntitlementsInput = {
+    id?: string
+    email: string
+    name?: string | null
+    password: string
+    role?: string
+    createdAt?: Date | string
+    dobYear?: number | null
+    kycStatus?: string
+    kycProvider?: string | null
+    kycVerifiedAt?: Date | string | null
+    selfExcludedAt?: Date | string | null
+    declaredState?: string | null
+    policyVersion?: string | null
+    policyAcceptedAt?: Date | string | null
+    profile?: PlayerProfileUncheckedCreateNestedOneWithoutUserInput
+    sessions?: GameSessionUncheckedCreateNestedManyWithoutUserInput
+    sessionRuns?: SessionRunUncheckedCreateNestedManyWithoutUserInput
+    sessionGrants?: SessionGrantUncheckedCreateNestedManyWithoutUserInput
+    ledger?: CreditLedgerUncheckedCreateNestedManyWithoutUserInput
+    cards?: CardOwnershipUncheckedCreateNestedManyWithoutUserInput
+    prqEntries?: PrqEntryUncheckedCreateNestedManyWithoutUserInput
+    lessons?: LessonProgressUncheckedCreateNestedManyWithoutUserInput
+    storyProgress?: StoryNodeProgressUncheckedCreateNestedManyWithoutUserInput
+    cellProjects?: CellProjectUncheckedCreateNestedManyWithoutUserInput
+    cellApiKeys?: CellApiKeyUncheckedCreateNestedManyWithoutUserInput
+    cellSettings?: CellSettingsUncheckedCreateNestedOneWithoutUserInput
+    athleteBuild?: AthleteBuildUncheckedCreateNestedOneWithoutUserInput
+    stripeCustomer?: StripeCustomerUncheckedCreateNestedOneWithoutUserInput
+    subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
+    mirrorSessions?: MirrorSessionUncheckedCreateNestedManyWithoutUserInput
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    payoutRequests?: PayoutRequestUncheckedCreateNestedManyWithoutUserInput
+    creatorListings?: MarketplaceListingUncheckedCreateNestedManyWithoutCreatorInput
+    buyerPurchases?: MarketplacePurchaseUncheckedCreateNestedManyWithoutBuyerInput
+    coachShares?: ShareLinkUncheckedCreateNestedManyWithoutCoachInput
+    coachInvites?: CoachInviteUncheckedCreateNestedManyWithoutCoachInput
+    clientsCoached?: CoachClientUncheckedCreateNestedManyWithoutCoachInput
+    coaches?: CoachClientUncheckedCreateNestedManyWithoutClientInput
+    ladderEntries?: LadderEntryUncheckedCreateNestedManyWithoutUserInput
+    partnerKeys?: StudioPartnerKeyUncheckedCreateNestedManyWithoutUserInput
+    competitionMatchesP1?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer1Input
+    competitionMatchesP2?: CompetitionMatchUncheckedCreateNestedManyWithoutPlayer2Input
+    competitionMatchesWinner?: CompetitionMatchUncheckedCreateNestedManyWithoutWinnerInput
+    matchEvents?: MatchEventUncheckedCreateNestedManyWithoutUserInput
+    mirrorTriumphs?: MirrorTriumphUncheckedCreateNestedManyWithoutUserInput
+    wallet?: WalletUncheckedCreateNestedOneWithoutPlayerInput
+    perfEarnEvents?: PerfEarnEventUncheckedCreateNestedManyWithoutPlayerInput
+    entitlements?: PlayerEntitlementUncheckedCreateNestedManyWithoutPlayerInput
+    leadRecord?: MarketingLeadUncheckedCreateNestedOneWithoutConvertedUserInput
+    referralCode?: ReferralCodeUncheckedCreateNestedOneWithoutUserInput
+    mpMatchesHost?: MpMatchUncheckedCreateNestedManyWithoutHostInput
+    mpMatchesGuest?: MpMatchUncheckedCreateNestedManyWithoutGuestInput
+    creatorCards?: CreatorCardUncheckedCreateNestedManyWithoutOwnerInput
+    creativeCards?: CreativeCardUncheckedCreateNestedManyWithoutOwnerInput
+    cardSlot?: CardSlotUncheckedCreateNestedOneWithoutUserInput
+    workoutScans?: WorkoutScanUncheckedCreateNestedManyWithoutUserInput
+    workoutPlans?: WorkoutPlanUncheckedCreateNestedManyWithoutUserInput
+    avatarLook?: AvatarLookUncheckedCreateNestedOneWithoutUserInput
+    ownedWearables?: OwnedWearableUncheckedCreateNestedManyWithoutUserInput
+    sessionBookings?: SessionBookingUncheckedCreateNestedManyWithoutUserInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedCreateNestedOneWithoutUserInput
+    facilitatorProfile?: FacilitatorProfileUncheckedCreateNestedOneWithoutUserInput
+    goalPlansAsMentee?: GoalPlanUncheckedCreateNestedManyWithoutMenteeInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedCreateNestedManyWithoutFacilitatorInput
+    credentials?: CredentialUncheckedCreateNestedManyWithoutUserInput
+    guardianConsents?: GuardianConsentUncheckedCreateNestedManyWithoutMenteeInput
+    healthIntakes?: HealthIntakeUncheckedCreateNestedManyWithoutUserInput
+    painCheckIns?: PainCheckInUncheckedCreateNestedManyWithoutUserInput
+    healthConsents?: HealthConsentUncheckedCreateNestedManyWithoutUserInput
+    readinessCheckIns?: ReadinessCheckInUncheckedCreateNestedManyWithoutUserInput
+    breathLogs?: BreathLogUncheckedCreateNestedManyWithoutUserInput
+    crmContacts?: CrmContactUncheckedCreateNestedManyWithoutOwnerInput
+    crmContactLinks?: CrmContactUncheckedCreateNestedManyWithoutLinkedUserInput
+    crmDeals?: CrmDealUncheckedCreateNestedManyWithoutOwnerInput
+    crmActivities?: CrmActivityUncheckedCreateNestedManyWithoutOwnerInput
+    crmNotes?: CrmNoteUncheckedCreateNestedManyWithoutAuthorInput
+    adventureSave?: AdventureSaveUncheckedCreateNestedOneWithoutUserInput
+    studioProjectSaves?: StudioProjectSaveUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutBookEntitlementsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+  }
+
+  export type UserUpsertWithoutBookEntitlementsInput = {
+    update: XOR<UserUpdateWithoutBookEntitlementsInput, UserUncheckedUpdateWithoutBookEntitlementsInput>
+    create: XOR<UserCreateWithoutBookEntitlementsInput, UserUncheckedCreateWithoutBookEntitlementsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutBookEntitlementsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutBookEntitlementsInput, UserUncheckedUpdateWithoutBookEntitlementsInput>
+  }
+
+  export type UserUpdateWithoutBookEntitlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUpdateManyWithoutUserNestedInput
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUpdateManyWithoutUserNestedInput
+    wallet?: WalletUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUpdateOneWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUpdateOneWithoutUserNestedInput
+    studioProjectSaves?: StudioProjectSaveUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutBookEntitlementsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: NullableStringFieldUpdateOperationsInput | string | null
+    password?: StringFieldUpdateOperationsInput | string
+    role?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    dobYear?: NullableIntFieldUpdateOperationsInput | number | null
+    kycStatus?: StringFieldUpdateOperationsInput | string
+    kycProvider?: NullableStringFieldUpdateOperationsInput | string | null
+    kycVerifiedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    selfExcludedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    declaredState?: NullableStringFieldUpdateOperationsInput | string | null
+    policyVersion?: NullableStringFieldUpdateOperationsInput | string | null
+    policyAcceptedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    profile?: PlayerProfileUncheckedUpdateOneWithoutUserNestedInput
+    sessions?: GameSessionUncheckedUpdateManyWithoutUserNestedInput
+    sessionRuns?: SessionRunUncheckedUpdateManyWithoutUserNestedInput
+    sessionGrants?: SessionGrantUncheckedUpdateManyWithoutUserNestedInput
+    ledger?: CreditLedgerUncheckedUpdateManyWithoutUserNestedInput
+    cards?: CardOwnershipUncheckedUpdateManyWithoutUserNestedInput
+    prqEntries?: PrqEntryUncheckedUpdateManyWithoutUserNestedInput
+    lessons?: LessonProgressUncheckedUpdateManyWithoutUserNestedInput
+    storyProgress?: StoryNodeProgressUncheckedUpdateManyWithoutUserNestedInput
+    cellProjects?: CellProjectUncheckedUpdateManyWithoutUserNestedInput
+    cellApiKeys?: CellApiKeyUncheckedUpdateManyWithoutUserNestedInput
+    cellSettings?: CellSettingsUncheckedUpdateOneWithoutUserNestedInput
+    athleteBuild?: AthleteBuildUncheckedUpdateOneWithoutUserNestedInput
+    stripeCustomer?: StripeCustomerUncheckedUpdateOneWithoutUserNestedInput
+    subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
+    mirrorSessions?: MirrorSessionUncheckedUpdateManyWithoutUserNestedInput
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    payoutRequests?: PayoutRequestUncheckedUpdateManyWithoutUserNestedInput
+    creatorListings?: MarketplaceListingUncheckedUpdateManyWithoutCreatorNestedInput
+    buyerPurchases?: MarketplacePurchaseUncheckedUpdateManyWithoutBuyerNestedInput
+    coachShares?: ShareLinkUncheckedUpdateManyWithoutCoachNestedInput
+    coachInvites?: CoachInviteUncheckedUpdateManyWithoutCoachNestedInput
+    clientsCoached?: CoachClientUncheckedUpdateManyWithoutCoachNestedInput
+    coaches?: CoachClientUncheckedUpdateManyWithoutClientNestedInput
+    ladderEntries?: LadderEntryUncheckedUpdateManyWithoutUserNestedInput
+    partnerKeys?: StudioPartnerKeyUncheckedUpdateManyWithoutUserNestedInput
+    competitionMatchesP1?: CompetitionMatchUncheckedUpdateManyWithoutPlayer1NestedInput
+    competitionMatchesP2?: CompetitionMatchUncheckedUpdateManyWithoutPlayer2NestedInput
+    competitionMatchesWinner?: CompetitionMatchUncheckedUpdateManyWithoutWinnerNestedInput
+    matchEvents?: MatchEventUncheckedUpdateManyWithoutUserNestedInput
+    mirrorTriumphs?: MirrorTriumphUncheckedUpdateManyWithoutUserNestedInput
+    wallet?: WalletUncheckedUpdateOneWithoutPlayerNestedInput
+    perfEarnEvents?: PerfEarnEventUncheckedUpdateManyWithoutPlayerNestedInput
+    entitlements?: PlayerEntitlementUncheckedUpdateManyWithoutPlayerNestedInput
+    leadRecord?: MarketingLeadUncheckedUpdateOneWithoutConvertedUserNestedInput
+    referralCode?: ReferralCodeUncheckedUpdateOneWithoutUserNestedInput
+    mpMatchesHost?: MpMatchUncheckedUpdateManyWithoutHostNestedInput
+    mpMatchesGuest?: MpMatchUncheckedUpdateManyWithoutGuestNestedInput
+    creatorCards?: CreatorCardUncheckedUpdateManyWithoutOwnerNestedInput
+    creativeCards?: CreativeCardUncheckedUpdateManyWithoutOwnerNestedInput
+    cardSlot?: CardSlotUncheckedUpdateOneWithoutUserNestedInput
+    workoutScans?: WorkoutScanUncheckedUpdateManyWithoutUserNestedInput
+    workoutPlans?: WorkoutPlanUncheckedUpdateManyWithoutUserNestedInput
+    avatarLook?: AvatarLookUncheckedUpdateOneWithoutUserNestedInput
+    ownedWearables?: OwnedWearableUncheckedUpdateManyWithoutUserNestedInput
+    sessionBookings?: SessionBookingUncheckedUpdateManyWithoutUserNestedInput
+    scanSaveOptIn?: ScanSaveOptInUncheckedUpdateOneWithoutUserNestedInput
+    facilitatorProfile?: FacilitatorProfileUncheckedUpdateOneWithoutUserNestedInput
+    goalPlansAsMentee?: GoalPlanUncheckedUpdateManyWithoutMenteeNestedInput
+    goalPlansAsFacilitator?: GoalPlanUncheckedUpdateManyWithoutFacilitatorNestedInput
+    credentials?: CredentialUncheckedUpdateManyWithoutUserNestedInput
+    guardianConsents?: GuardianConsentUncheckedUpdateManyWithoutMenteeNestedInput
+    healthIntakes?: HealthIntakeUncheckedUpdateManyWithoutUserNestedInput
+    painCheckIns?: PainCheckInUncheckedUpdateManyWithoutUserNestedInput
+    healthConsents?: HealthConsentUncheckedUpdateManyWithoutUserNestedInput
+    readinessCheckIns?: ReadinessCheckInUncheckedUpdateManyWithoutUserNestedInput
+    breathLogs?: BreathLogUncheckedUpdateManyWithoutUserNestedInput
+    crmContacts?: CrmContactUncheckedUpdateManyWithoutOwnerNestedInput
+    crmContactLinks?: CrmContactUncheckedUpdateManyWithoutLinkedUserNestedInput
+    crmDeals?: CrmDealUncheckedUpdateManyWithoutOwnerNestedInput
+    crmActivities?: CrmActivityUncheckedUpdateManyWithoutOwnerNestedInput
+    crmNotes?: CrmNoteUncheckedUpdateManyWithoutAuthorNestedInput
+    adventureSave?: AdventureSaveUncheckedUpdateOneWithoutUserNestedInput
+    studioProjectSaves?: StudioProjectSaveUncheckedUpdateManyWithoutUserNestedInput
   }
 
   export type GameSessionCreateManyUserInput = {
@@ -197076,6 +203513,23 @@ export namespace Prisma {
     rev: number
     bytes: number
     doc: JsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type BookEntitlementCreateManyUserInput = {
+    id?: string
+    email: string
+    offerId: string
+    format: string
+    bookSlug: string
+    stripeSessionId: string
+    stripePaymentIntentId?: string | null
+    stripeEventId: string
+    amountCents: number
+    currency?: string
+    status?: string
+    revokedAt?: Date | string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -199113,6 +205567,57 @@ export namespace Prisma {
     rev?: IntFieldUpdateOperationsInput | number
     bytes?: IntFieldUpdateOperationsInput | number
     doc?: JsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type BookEntitlementUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    offerId?: StringFieldUpdateOperationsInput | string
+    format?: StringFieldUpdateOperationsInput | string
+    bookSlug?: StringFieldUpdateOperationsInput | string
+    stripeSessionId?: StringFieldUpdateOperationsInput | string
+    stripePaymentIntentId?: NullableStringFieldUpdateOperationsInput | string | null
+    stripeEventId?: StringFieldUpdateOperationsInput | string
+    amountCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
