@@ -2405,7 +2405,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // HOOPS-10PHASE-2 phase 3: fatigue reads the same "how gassed" signal the posture layer already does (the turbo tank
     // run down) — not a new stat, just the make chance now listening to it too.
     const meFatigue01 = Math.max(0, 1 - turbo.t01);
-    const pct = fatiguePct(contestedPct(SHOT_QUALITY_PCT[quality] * pctMod, shotContest), meFatigue01) + (banked ? BANK_PCT_BONUS : 0);
+    const pct = fatiguePct(contestedPct(SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier(), shotContest), meFatigue01) + (banked ? BANK_PCT_BONUS : 0);   // lane/hoops-shot-core: the 1v1's momentum multiplier (0.94–1.10, MomentumBus) on the 3v3 hero too
     const dist = Vector3.Distance(me.char.root.position, RIM);
     arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
