@@ -116,14 +116,15 @@ describe('HOOPS-HAND-LABEL: the hand label and the hand holding the ball agree o
       expect(fr.filter((f, i) => i > 0 && f.hand !== fr[i - 1].hand).length).toBe(1);
     }
   });
-  it('the double cross on this rig: the other palm never holds the ball (≥ 0.3 m through its catch), so no flip — the start hand on every frame and at the end', () => {
+  it('the double cross on this rig: it flips twice, at the palm\'s frames (out to the other hand, then back), the new palm on the ball on each flip frame — the start hand at the end', () => {
     for (const pace of [1, MOVE_TURBO_REAL]) for (const h of ['right', 'left'] as const) {
       const path = pathFor('double_cross', h, pace)!; const s = setup(); toHand(s, h); s.carry.runMove(path);
       const fr = runOut(s);
-      for (const f of fr) {
-        expect(f.hand, `pace ${pace} ${h} t ${f.t.toFixed(4)}`).toBe(h);
-        if (moveHandAt(path, f.t) !== h) expect(f.palm[other(h)], `pace ${pace} ${h} t ${f.t.toFixed(4)}`).toBeGreaterThanOrEqual(0.3);
-      }
+      const flips = fr.map((f, i) => i).filter((i) => i > 0 && fr[i].hand !== fr[i - 1].hand);
+      const want = pace === 1 ? (h === 'right' ? [17, 33] : [18, 33]) : (h === 'right' ? [13, 26] : [14, 26]);
+      expect(flips.map((i) => Math.round(fr[i].t * 60)), `pace ${pace} ${h}: the flip frames`).toEqual(want);
+      expect(flips.map((i) => fr[i].hand), `pace ${pace} ${h}: out, then back`).toEqual([other(h), h]);
+      for (const i of flips) expect(fr[i].palm[fr[i].hand], `pace ${pace} ${h} t ${fr[i].t.toFixed(4)}: the new palm on its flip frame`).toBeLessThan(0.3);
       expect(s.carry.hand).toBe(cap(h));
     }
   });

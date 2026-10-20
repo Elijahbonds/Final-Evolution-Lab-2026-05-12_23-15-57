@@ -120,7 +120,7 @@ export interface BallCarry {
    *  never flips; moveHandAt). HOOPS-TWO-HAND-CROSS-1: it read the move's END hand from the move's first frame. */
   readonly hand: 'Left' | 'Right';
   /* HOOPS-HAND-LABEL: …and the flip is on the frame the new hand's palm HOLDS the ball (palmOnBall, on the drawn frame) once its catch span
-   * has begun — not at the span's t0. A palm that never reaches it never takes it (this rig's double cross: the right hand all through). */
+   * has begun — not at the span's t0. A palm that never reaches it never takes it (HOOPS-DOUBLE-CROSS-PALM: the double cross's catches now reach it). */
   /** The athlete's hand the ball is on its way to: a running move's end hand (and the queued move's after it), else `hand` — today's
    *  stick maps, the strong-hand return and toSide read this (the destination), so the hand-off timing above changes none of them. */
   readonly handAfterMove: 'Left' | 'Right';
@@ -804,7 +804,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   /** HOOPS-HAND-LABEL: the hand-off, on the drawn frame (ball placed, arms reached, wrists bent: the last pass to move the hand): the catch span under way (moveHandAt) is by the other
    *  hand and that hand's palm is on the ball (palmOnBall, the carry's own < 0.3 m rule) — the ball is in it now: `hand` and the rig side
    *  flip together. It was the span's t0 (HOOPS-TWO-HAND-CROSS-1), a frame or more before the palm got there (the crossover's 0.30 s catch:
-   *  the left palm reaches it at 0.317 s; the double cross's first catch is never reached on the node rig — no hand-off, no flip). */
+   *  the left palm reaches it at 0.317 s; the double cross's catches, up at the crossover's height, are reached on the node rig at 0.283 s (0.300 s from the left) and 0.550 s). */
   const settleHeld = (m: RunningMove): void => {
     const want = moveHandAt(m.path, m.t);
     if (want !== m.held && palmOnBall(rigOf(want))) m.held = want;

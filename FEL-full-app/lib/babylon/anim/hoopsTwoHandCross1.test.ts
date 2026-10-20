@@ -166,9 +166,9 @@ describe('TH-2: the modes\' ball-hand feeds follow it', () => {
 });
 
 describe('TH-3: the double cross flips twice; same-hand moves never flip', () => {
-  it('the double cross: catches at 0.25 s and 0.51 s (HP:158-160), but on this rig the other palm never holds the ball (0.41 m off at the first catch) — no flip, the start hand all through and at the end — and mirrored', () => {
-    expectHandoffs(pathFor('double_cross', 'right')!, [0.25, 0.51], 'double cross R', []);
-    expectHandoffs(pathFor('double_cross', 'left')!, [0.25, 0.51], 'double cross L', []);
+  it('the double cross: catches at 0.26 s and 0.52 s (HP:158-160), and on this rig it flips twice, at the palm\'s frames, back to the start hand — and mirrored', () => {
+    expectHandoffs(pathFor('double_cross', 'right')!, [0.26, 0.52], 'double cross R', [F(17), F(33)]);
+    expectHandoffs(pathFor('double_cross', 'left')!, [0.26, 0.52], 'double cross L', [F(18), F(33)]);
   });
   it('a crossover QUEUED behind a crossover applies the same rule to its own path: two flips, each with handBone, the start hand at the end', () => {
     const s = setup();
