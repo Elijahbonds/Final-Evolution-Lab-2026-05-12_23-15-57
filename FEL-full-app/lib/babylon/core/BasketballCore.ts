@@ -331,6 +331,11 @@ export class DribbleController {
         // A flick straight back OUT (pull then push in one motion) is the explode — remembered, and it leaves on the hang's last
         // frame (H2b; it used to be written on this same frame, a hesitation with no pause in it).
         if (dir && fwd > 0.3) this.hangPush = dir.clone();
+      } else if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC) {
+        // H2-HESI-COOLDOWN-CONSUME: a tap the cooldown refuses is still a tap, not a run — it is consumed. Its pull-back stayed the
+        // last direction, so the push out of it read as a reversal: a phantom crossover on every refused tap (3 of 6 at 0.5 s),
+        // whose own cooldown ate the real one.
+        this.lastDirAge = Infinity;
       }
       this.pullbackSec = -1;
     }
