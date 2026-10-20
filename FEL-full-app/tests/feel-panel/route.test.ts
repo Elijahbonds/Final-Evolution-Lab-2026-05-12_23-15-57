@@ -26,18 +26,25 @@ describe('FEEL_PANEL_ENABLED (lib/flags.ts)', () => {
 });
 
 describe('GET /api/feel-panel', () => {
-  it('flag OFF: closed for everyone — an admin too — and no session is read (404)', async () => {
+  it('answers 200 every time (no red console line for every player on every /play visit)', async () => {
+    for (const flag of [undefined, '1']) for (const role of [undefined, 'player', 'admin']) {
+      if (flag) process.env.FEEL_PANEL_ENABLED = flag; else delete process.env.FEEL_PANEL_ENABLED;
+      as(role);
+      expect((await call()).status, `${flag} ${role}`).toBe(200);
+    }
+  });
+  it('flag OFF: closed for everyone — an admin too — and no session is read', async () => {
     for (const role of [undefined, 'player', 'coach', 'owner', 'admin']) {
       as(role);
-      expect(await call(), String(role)).toEqual({ status: 404, body: { enabled: false }, cache: 'no-store' });
+      expect(await call(), String(role)).toEqual({ status: 200, body: { enabled: false }, cache: 'no-store' });
     }
     expect(h.sessionReads).toBe(0);
   });
-  it('flag ON: closed for signed out, players, coaches and owners (requireAdmin is role === "admin" only) — 403', async () => {
+  it('flag ON: closed for signed out, players, coaches and owners (requireAdmin is role === "admin" only)', async () => {
     process.env.FEEL_PANEL_ENABLED = '1';
     for (const role of [undefined, 'player', 'coach', 'owner', 'test', 'Admin', '']) {
       as(role);
-      expect(await call(), String(role)).toEqual({ status: 403, body: { enabled: false }, cache: 'no-store' });
+      expect(await call(), String(role)).toEqual({ status: 200, body: { enabled: false }, cache: 'no-store' });
     }
   });
   it('flag ON + an admin: open', async () => {

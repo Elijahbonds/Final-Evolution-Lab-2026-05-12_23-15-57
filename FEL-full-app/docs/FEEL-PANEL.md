@@ -104,7 +104,7 @@ not tuned. Widen a bound only with a reason.
 | `lib/feel-panel/sessionGate.ts` | `feelSessionBlock(pathname, search)`, the allow-list and the blocked keys |
 | `lib/feel-panel/knobs.ts` | `FEEL_KNOBS`, the catalogue |
 | `lib/flags.ts` | `isFeelPanelEnabled()`, `FEEL_PANEL_ENABLED` |
-| `app/api/feel-panel/route.ts` | the server's yes/no: 404 when the flag is off (no session is read), 403 when the user is not an admin |
+| `app/api/feel-panel/route.ts` | the server's yes or no. It always answers 200, so players get no console noise. With the flag off it reads no session |
 | `components/feel-panel/feel-panel.tsx` | the client container. It is mounted once in `app/play/layout.tsx` and renders nothing until the server says yes |
 | `components/feel-panel/feel-sheet.tsx` | the sheet itself (pure view) |
 

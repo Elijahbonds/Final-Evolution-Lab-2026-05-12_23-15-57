@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
 export async function GET() {
-  if (!isFeelPanelEnabled()) return NextResponse.json({ enabled: false }, { status: 404, headers: NO_STORE });
-  if (!(await requireAdmin())) return NextResponse.json({ enabled: false }, { status: 403, headers: NO_STORE });
+  if (!isFeelPanelEnabled()) return NextResponse.json({ enabled: false }, { headers: NO_STORE });
+  if (!(await requireAdmin())) return NextResponse.json({ enabled: false }, { headers: NO_STORE });
   return NextResponse.json({ enabled: true }, { headers: NO_STORE });
 }
