@@ -185,6 +185,7 @@ import { MomentumBus } from '../core/MomentumBus';
 import { PlayerStateMachine } from '../core/PlayerStateMachine';   // HOOPS-10PHASE-2 phase 4: the explicit idle/dribble/gather/shoot/pass/dunk/land state, published read-only
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { MoveDip } from '../anim/moveDip';   // hoops-dip
 import { AiMover } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
@@ -1056,6 +1057,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       meDribbleSM = new DribbleStateMachine();
       void meDribbleSM;
       meAnimTree = new BasketballAnimTree(me.animator);
+      MoveDip.for(ctx.scene, me.skeleton, me.root, (n) => me.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
       meAnimTree.attachLegs(MoveLegs.for(ctx.scene, me.skeleton, (n) => me.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       foeAnimTree = new BasketballAnimTree(foe.animator);
       meFootPlant = new FootPlant(me.skeleton, me.meshes[0] as never);
