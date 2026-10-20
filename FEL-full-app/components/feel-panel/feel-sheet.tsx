@@ -33,7 +33,7 @@ export function FeelSheet(p: FeelSheetProps) {
   const count = Object.keys(state.values).length;
   const chip = state.active ? (
     <div data-testid="feel-on-chip" role="status" aria-live="polite"
-      className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top)+6px)] z-[95] -translate-x-1/2 rounded-full border border-amber-300/70 bg-amber-400/90 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-black shadow-lg">
+      className="pointer-events-none fixed left-1/2 top-[calc(env(safe-area-inset-top)+40px)] z-[95] -translate-x-1/2 whitespace-nowrap rounded-full border border-amber-300/70 bg-amber-400/90 px-3 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-black shadow-lg">
       FEEL OVERRIDES ON · {count}
     </div>
   ) : null;
@@ -98,7 +98,7 @@ export function FeelSheet(p: FeelSheetProps) {
                       <input type="range" aria-label={k.label} data-testid={`feel-slider-${k.id}`}
                         min={k.min} max={k.max} step={k.step} value={cur}
                         onChange={(e) => p.onSet(k.id, Number(e.currentTarget.value))}
-                        className="h-8 flex-1 accent-amber-400" />
+                        className={`h-8 flex-1 ${has ? 'accent-amber-400' : 'accent-slate-400'}`} />
                       <span className="w-10 font-mono text-[10px] text-white/40">{k.max}</span>
                       <button type="button" data-testid={`feel-reset-${k.id}`} onClick={() => p.onReset(k.id)} disabled={!has}
                         className="rounded-md border border-white/20 px-2 py-1 text-[11px] text-white/80 disabled:opacity-30">Reset</button>
