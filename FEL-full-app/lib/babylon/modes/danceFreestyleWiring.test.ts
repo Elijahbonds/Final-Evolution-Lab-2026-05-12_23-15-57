@@ -41,7 +41,9 @@ describe('a freestyle press never reaches the judge and writes only STYLE', () =
     expect(mode).not.toMatch(/ctx\.(end|card)\([^)]*\+ style/);
     // the only writers of `style` in the room: groove taps, held freezes, and the freestyle section
     const writers = [...mode.matchAll(/\bstyle\s*(\+=|=)\s*([^;]+);/g)].map((m) => `${m[1]} ${m[2].trim()}`);
-    expect(new Set(writers)).toEqual(new Set(['+= GROOVE_STYLE', '+= r.style', '+= freeStyleFor(route)', '= 0']));
+    // test changed (lane/dance-options, owner 2026-10-17, Q2 A): two more writers, both the section's VARIETY (dance/freestyle.ts
+    // varietyBonus) — at the section's end, and at a finish that lands inside one. Still STYLE: the next assertions hold it out of the score.
+    expect(new Set(writers)).toEqual(new Set(['+= GROOVE_STYLE', '+= r.style', '+= freeStyleFor(route)', '= 0', '+= variety', '+= varietyBonus(freeButtons)']));
   });
 });
 
@@ -94,5 +96,39 @@ describe('the chart is built around the sections', () => {
     expect(lvl).toBeGreaterThan(secs);
     expect(begin).toContain('level, freeSecs);');
     expect(begin).toContain('freeSpans = freeSecs;');
+  });
+});
+
+// lane/dance-options (owner 2026-10-17): the room's half of the VARIETY bonus (Q2) and the section's EDGE (Q6). The pure rules are run over
+// every shipped chart in dance/danceOptions.test.ts through tests/helpers/dancePressChain.ts; these hold the room to the same lines.
+describe('the VARIETY bonus and the EDGE, in the room', () => {
+  const free = bodyOf(mode, 'function freestylePress(', '\n  }\n');
+  it('a press that takes a slot adds its button to the section\'s VARIETY; the section\'s last press is noted for the EXIT GRACE', () => {
+    expect(free).toContain('if (route.slotBeat !== null) { grooveTaken.add(route.slotBeat); freeButtons.add(route.slot); }');
+    expect(free).toContain('if (matchPress(e, anyTap)) freeLastPress = (heardNow - startAt) / bd;');
+    expect(free.indexOf('freeLastPress =')).toBeLessThan(free.indexOf('routeFreestyle({'));   // before the router can hand the press on
+  });
+  it('MATCH is never asked in a section: the router is told MATCH is on, so a wrong button there dances instead of fumbling', () => {
+    expect(free).toContain('matchOn: matchMode,');
+  });
+  it('the section pays its VARIETY once, when it ends (or when a finish lands inside it), and the banner says so', () => {
+    const x = bodyOf(mode, 'function exitFreestyle(', '\n  }\n');
+    expect(x).toContain('const variety = varietyBonus(freeButtons);');
+    expect(x).toContain('style += variety;');
+    expect(x.indexOf('style += variety;')).toBeLessThan(x.indexOf('const gained = style - freeStyleAt;'));
+    expect(x).toContain('(VARIETY +${variety})');
+    expect(bodyOf(mode, 'function enterFreestyle(', '\n  }\n')).toContain('freeButtons = new Set();');
+    expect(bodyOf(mode, 'function finish(', '\n  }\n')).toContain('if (freeCur) style += varietyBonus(freeButtons);');
+    expect(bodyOf(mode, 'function resetImproveRun(', '\n  }\n')).toContain('freeButtons = new Set(); freeLastPress = null;');
+  });
+  it('the EXIT GRACE sits in pressAt after the STYLE tap and the MATCH fumble and before perf.hit, and only for a would-be wild tap', () => {
+    const p = bodyOf(mode, 'function pressAt(', '\n  }\n');
+    const fumble = p.indexOf('if (fumbled.has(target.step)) return;');
+    const grace = p.indexOf('exitGraceForgives({ spans: freeSpans, beatPos: (heardNow - startAt) / bd, beatSec: bd, lastSectionPressBeat: freeLastPress })');
+    const hit = p.indexOf('perf.hit(heardNow)');
+    expect(fumble).toBeGreaterThan(-1);
+    expect(grace).toBeGreaterThan(fumble);
+    expect(hit).toBeGreaterThan(grace);
+    expect(p).toContain("if (freeSpans.length && phase === 'playing' && !pressTarget(near ?? perf.upcoming(heardNow, STOOP_LOOKAHEAD), heardNow)) {");
   });
 });
