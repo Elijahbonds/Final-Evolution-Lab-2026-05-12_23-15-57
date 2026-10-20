@@ -51,20 +51,24 @@ function setup() {
   const r = hoopsNodeRig('right', (n) => { n.Hips.position.y += rise; for (const sd of ['Left', 'Right']) n[`${sd}Leg`].rotationQuaternion = Quaternion.RotationAxis(Vector3.Right(), -0.15); });
   (r.scene.getEngine() as unknown as { getDeltaTime: () => number }).getDeltaTime = () => 1000 / 60;
   // what the layers before the dip left (read first, inserted ahead of it)
-  const pre: { ankles: Vector3[]; turns: Quaternion[] } = { ankles: [], turns: [] };
-  const ank = ['LeftFoot', 'RightFoot'].map((n) => r.nodes[n]);
+  const pre: { ankles: Vector3[]; turns: Quaternion[]; hands: Vector3[]; handTurns: Quaternion[] } = { ankles: [], turns: [], hands: [], handTurns: [] };
+  const ank = ['LeftFoot', 'RightFoot'].map((n) => r.nodes[n]), hnd = ['LeftHand', 'RightHand'].map((n) => r.nodes[n]);
+  // the hands just after the dip (inserted first BEFORE it, so it runs right behind it — ahead of the carry, whose wrist layer turns the hand)
+  const post: { hands: Vector3[]; handTurns: Quaternion[] } = { hands: [], handTurns: [] };
+  r.scene.onAfterAnimationsObservable.add(() => { post.hands = hnd.map((h) => { h.computeWorldMatrix(true); return h.getAbsolutePosition().clone(); }); post.handTurns = hnd.map((h) => h.absoluteRotationQuaternion.clone()); }, undefined, true);
   const dip = MoveDip.for(r.scene, r.sk, r.root, (name) => (name === 'bball_crossover_left' ? stub.g : null));   // (it inserts itself first)
   // …so the read of what the layers before it left is inserted first AFTER it, to run ahead of it
-  r.scene.onAfterAnimationsObservable.add(() => { pre.ankles = ank.map((a) => { a.computeWorldMatrix(true); return a.getAbsolutePosition().clone(); }); pre.turns = ank.map((a) => a.absoluteRotationQuaternion.clone()); }, undefined, true);
+  r.scene.onAfterAnimationsObservable.add(() => { pre.ankles = ank.map((a) => { a.computeWorldMatrix(true); return a.getAbsolutePosition().clone(); }); pre.turns = ank.map((a) => a.absoluteRotationQuaternion.clone());
+    pre.hands = hnd.map((h) => { h.computeWorldMatrix(true); return h.getAbsolutePosition().clone(); }); pre.handTurns = hnd.map((h) => h.absoluteRotationQuaternion.clone()); }, undefined, true);
   const frame = () => { r.scene.onBeforeAnimationsObservable.notifyObservers(r.scene); r.scene.onAfterAnimationsObservable.notifyObservers(r.scene); for (const n of Object.values(r.nodes)) n.computeWorldMatrix(true); };
   const hipsY = () => r.nodes.Hips.getAbsolutePosition().y;
   const knee = (sd: string) => { const u = r.nodes[`${sd}UpLeg`].getAbsolutePosition(), k = r.nodes[`${sd}Leg`].getAbsolutePosition(), a = r.nodes[`${sd}Foot`].getAbsolutePosition();
     return 180 - Math.acos(Vector3.Dot(u.subtract(k).normalize(), a.subtract(k).normalize())) * 180 / Math.PI; };
-  return { r, stub, dip, frame, hipsY, knee, pre, ank, setRise: (v: number) => { rise = v; } };
+  return { r, stub, dip, frame, hipsY, knee, pre, post, ank, hnd, setRise: (v: number) => { rise = v; } };
 }
 
 describe('the dip layer on the node rig (a beat whose clip raises the hips 0.15 m)', () => {
-  it('the hips go DOWN from where the body was by the profile — never up — the ankles stay on the floor, the knees bend, the feet keep their turn', () => {
+  it('the hips go DOWN from where the body was by the profile — never up — the ankles stay on the floor, the knees bend, the feet and the hands stay', () => {
     const s = setup();
     for (let i = 0; i < 20; i++) s.frame();                       // idle: the base
     const base = s.hipsY(); const floorA = Math.min(...s.ank.map((a) => a.getAbsolutePosition().y)); const knee0 = s.knee('Left');
@@ -81,6 +85,13 @@ describe('the dip layer on the node rig (a beat whose clip raises the hips 0.15 
         expect(Math.hypot(p.x - was.x, p.z - was.z), `ankle ${i} not moved across the floor`).toBeLessThan(0.003);
         const dq = Quaternion.Inverse(s.pre.turns[i]).multiply(a.absoluteRotationQuaternion); const ang = 2 * Math.acos(Math.min(1, Math.abs(dq.w))) * 180 / Math.PI;
         expect(ang, `foot ${i} turn kept`).toBeLessThan(0.5);
+      });
+      // the hands stay where the layers before put them (the ball's path is the carry's, root-relative: a hand drawn lower with the body
+      // sat in the rising ball's way — the rig's wrist-in-ball frames)
+      s.hnd.forEach((_, i) => {
+        expect(Vector3.Distance(s.post.hands[i], s.pre.hands[i]), `hand ${i} kept, k ${k.toFixed(2)}`).toBeLessThan(0.003);
+        const dq = Quaternion.Inverse(s.pre.handTurns[i]).multiply(s.post.handTurns[i]); const ang = 2 * Math.acos(Math.min(1, Math.abs(dq.w))) * 180 / Math.PI;
+        expect(ang, `hand ${i} turn kept`).toBeLessThan(0.5);
       });
       kneeMax = Math.max(kneeMax, s.knee('Left'));
     }

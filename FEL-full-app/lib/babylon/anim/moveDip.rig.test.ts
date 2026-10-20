@@ -33,12 +33,12 @@ afterAll(() => { scene?.dispose(); engine?.dispose(); });
 const IDLE: AnimTreeInput = { speed01: 0, speedMps: 0, crossover: false, hasBall: true, shooting: false, dunking: false, driving: false, defending: false, bracing: false, staggered: false, nearestDefender: 9 };
 const at = (b: string) => { const n = boneNode(sk, b)!; n.computeWorldMatrix(true); return n.getAbsolutePosition().clone(); };
 const knee = (sd: string) => { const u = at(`${sd}UpLeg`), k = at(`${sd}Leg`), a = at(`${sd}Foot`); return 180 - Math.acos(Vector3.Dot(u.subtract(k).normalize(), a.subtract(k).normalize())) * 180 / Math.PI; };
-interface F { hips: number; ankleLow: number; knee: number; playing: boolean }
+interface F { hips: number; ankleLow: number; knee: number; playing: boolean; hands: Vector3[] }
 function run(withDip: boolean): { idle: F[]; beat: F[] } {
   tree.reset(); for (const g of scene.animationGroups) g.stop();
   const dip = withDip ? MoveDip.for(scene, sk, root, (n) => animator.groupFor(n)) : null;
   const frame = (): F => { tree.update(IDLE); scene.render(); const ry = root.getAbsolutePosition().y;
-    return { hips: at('Hips').y - ry, ankleLow: Math.min(at('LeftFoot').y, at('RightFoot').y) - ry, knee: Math.max(knee('Left'), knee('Right')), playing: cross.isPlaying }; };
+    return { hips: at('Hips').y - ry, ankleLow: Math.min(at('LeftFoot').y, at('RightFoot').y) - ry, knee: Math.max(knee('Left'), knee('Right')), playing: cross.isPlaying, hands: [at('LeftHand'), at('RightHand')] }; };
   const idle: F[] = []; for (let i = 0; i < 60; i++) idle.push(frame());
   tree.beat('bball_crossover_left', { fadeSec: 0.08 });
   const beat: F[] = []; for (let i = 0; i < 60; i++) beat.push(frame());
@@ -64,5 +64,8 @@ describe('the dip on the real tree (the forge hero, the v2 crossover)', () => {
     expect(kneeDip, `never straighter than the clip alone (${kneeBare.toFixed(0)}°)`).toBeGreaterThanOrEqual(kneeBare - 1);
     // the beat runs the same frames with and without the layer (it reads the clip's clock, it never sets it)
     expect(dipped.beat.map((f) => f.playing)).toEqual(bare.beat.map((f) => f.playing));
+    // …and both hands are where the clip alone put them: only the body sinks around the ball's path
+    const handOff = Math.max(...dipped.beat.flatMap((f, i) => f.hands.map((h, j) => Vector3.Distance(h, bare.beat[i].hands[j]))));
+    expect(handOff, 'the hands stay where the clip drew them').toBeLessThan(0.01);
   });
 });

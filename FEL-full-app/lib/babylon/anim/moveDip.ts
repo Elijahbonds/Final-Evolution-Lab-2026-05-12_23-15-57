@@ -13,11 +13,13 @@
 // lateral / forward hip motion (its x, z) is kept. Then each leg is re-solved (the two-bone IK the foot planter uses) so its ankle stays
 // where every layer before this one put it — the clip's step, the loop's stride under moveLegs, the planter's pin — less the clip's rise
 // over the base (the loop's own feet were drawn under the base, not under the clip's raised hips), never under the ankle's floor height;
-// the foot keeps its world rotation. The knees bend; the feet do not move. After the beat the override fades out over DIP_RELEASE_SEC
+// the foot keeps its world rotation. The knees bend; the feet do not move. The hands do not move either (legSink re-solves each arm from
+// its lowered shoulder): the ball's path is the carry's and root-relative, and a hand drawn lower with the body sat in the rising ball's
+// way before the carry's reach took it (the rig, without this: 1–3 frames of wrist in the ball, −6.4 / −10.5 cm; #375 had none). After the beat the override fades out over DIP_RELEASE_SEC
 // (the loop fades in from the beat's parked last frame, whose hips are the clip's).
 //
 // Visual only: nothing here reads or writes a speed, a timer, a window, a roll, the root, the ball or its path. The ball path is the
-// carry's (root-relative), so the catch is where and when it was; only the body draws lower around it.
+// carry's (root-relative), so the catch is where and when it was; the hands stay on it; only the body draws lower around it.
 //
 // Ordered on the after-animations pass: moveLegs (the loop's legs at a jog), then this, then the foot planter (CharacterLibrary mounts it at
 // spawn) — so the planter pins the feet where this layer put them — then the posture layer, the motion layers and the carry, which read the
@@ -105,6 +107,7 @@ export class MoveDip {
 
   private apply(): void {
     const rig = this.rig!;
+    if (rig.root.isDisposed()) { this.dispose(); return; }   // the body is gone (a new game spawns new ones)
     const dt = animDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);   // the drawn frame's animation clock
     const { hipsY, lowAnkleY } = sinkRead(rig);
     // the floor: the lowest the ankles go, drifting up slowly — learnt only outside a dip (inside one the clip's raised feet are not the floor)
