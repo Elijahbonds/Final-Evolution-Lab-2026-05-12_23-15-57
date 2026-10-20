@@ -32,6 +32,29 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
 
+/** HOOPS-TWO-HAND-CROSS (DR-3): below this the body has no travel to turn — the redirect turns the FACING instead (m/s). assumption: 0.5. */
+export const REDIRECT_MIN_TRAVEL_MPS = 0.5;
+/** The redirect's speed cap, × top speed: the left-stick crossover's own cap (DribbleController.update's cut). */
+export const REDIRECT_TOP_K = 1.15;
+/**
+ * HOOPS-TWO-HAND-CROSS (DR-3, pure): a handle move's impulse (forward, lateral: the body's frame, lateral + toward the athlete's right)
+ * as a REDIRECT — ROTATE the travel, don't add to it. The direction is the current travel turned toward the move's side by
+ * atan2(lateral, forward) (a crossover's 0.4 / 1.6 is 76°) — or the facing turned, with no travel (or travel backwards against the
+ * facing) to turn. The speed is max(current, |(forward, lateral)|), capped at top × REDIRECT_TOP_K — but never below the current
+ * speed (a momentum streak over the cap is not braked by a move). Null for a fake (zero impulse: the hesi, the yoyo, the in-and-out).
+ * ESTIMATE [TUNE]: the angle mapping is the spec's; the eye judges it.
+ */
+export function redirectFor(vx: number, vz: number, yaw: number, forward: number, lateral: number, top = DEFAULT_MOVEMENT.maxSpeed): { x: number; z: number; speed: number; turnRad: number } | null {
+  if (forward === 0 && lateral === 0) return null;
+  const cur = Math.hypot(vx, vz);
+  const along = vx * Math.sin(yaw) + vz * Math.cos(yaw);
+  const base = cur > REDIRECT_MIN_TRAVEL_MPS && along > 0 ? Math.atan2(vx, vz) : yaw;
+  const turnRad = Math.atan2(lateral, forward);
+  const head = base + turnRad;
+  const speed = Math.max(cur, Math.min(top * REDIRECT_TOP_K, Math.hypot(forward, lateral)));
+  return { x: Math.sin(head), z: Math.cos(head), speed, turnRad };
+}
+
 /** Planar movement now runs on CourtMovement (Phase 2 weight model):
  *  ramped accel, stronger decel, speed-scaled plant-and-cut, turn-rate cap.
  *  This class keeps its API (and its crossover detection) so every mode's
@@ -118,6 +141,17 @@ export class DribbleController {
     const v = this.movement.vel;
     v.x += (c.x * c.speed - v.x) * k; v.z += (c.z * c.speed - v.z) * k;
     c.left -= dt; if (c.left <= 1e-4) { v.x = c.x * c.speed; v.z = c.z * c.speed; this.pendingCut = null; }
+  }
+  /** HOOPS-TWO-HAND-CROSS (DR-3): a handle move's impulse REDIRECTS the travel (redirectFor), eased through cutTo — it used to be added
+   *  to the velocity in one frame (the body slid sideways, its heading barely turned). `yaw` is the body's facing (the impulse's frame).
+   *  A cut already blending (the left stick's own reversal, the momentum cross, the step-back: an authored redirect this beat) keeps
+   *  its line: the addition it used to get was eased out inside CUT_BLEND_SEC anyway. False when nothing changed (a fake, a cut pending). */
+  redirect(forward: number, lateral: number, yaw: number): boolean {
+    if (this.pendingCut) return false;
+    const r = redirectFor(this.movement.vel.x, this.movement.vel.z, yaw, forward, lateral);
+    if (!r) return false;
+    this.cutTo(r.x, r.z, r.speed, Math.abs(r.turnRad) < Math.PI / 2);   // a move that comes BACK keeps the chest where it is (the step-back's rule)
+    return true;
   }
   /** HOOPS KINETIC (2026-09-18): the MOMENTUM DRIFT — a slide-cut onto a new line with the dribble speed kept. */
   drift(dx: number, dz: number): void { this.cutTo(dx, dz, Math.max(this.movement.vel.length(), 0.1)); }

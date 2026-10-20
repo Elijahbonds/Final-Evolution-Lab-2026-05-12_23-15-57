@@ -926,7 +926,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         rightHandHoops(char.animator, char.skeleton);   // HOOPS MOTION phase 3: the whole bball_* family too (captures included) — all six
-        if (!ai) leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the hero's dribble loops in the left hand too
+        leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — HOOPS-TWO-HAND-CROSS: all six (the AI's were the hero's only, 1v1 twins both bodies)
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
         // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
@@ -1901,6 +1901,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         body.tree.update({
           speedMps: Math.hypot(vel.x, vel.z),
           speed01: body.speed01, crossover: false, nearestDefender: Infinity, hasBall: carrierId === mateId && !passFlight.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased, shooting: false, dunking: false, driving: false,   // HOOPS MOTION phase 3b: his released shot is not his ball (the tree settled him into a dribble idle under a flying ball)
+          ballHand: carries.get(body)?.hand === 'Left' ? 'left' : 'right',   // HOOPS-TWO-HAND-CROSS: his loops in his ball hand (1v1's rival feed)
           defending: carrierId === 'foeTeam', bracing: !!mb?.boxing, staggered: false, slideDir: slideDirFor(body.char.root.rotation.y, vel),
           retreat: retreatFor(body.char.root.position, vel, driver?.char.root.position ?? null),   // DEFENSE-LOOK
           defendRun: carrierId === 'foeTeam' && defendRunFor(body.char.root.rotation.y, vel, body.tree.state), approach: carrierId === 'foeTeam' && approachFor(body.char.root.position, vel, driver?.char.root.position ?? null, body.tree.state),   // H2c
@@ -1937,7 +1938,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const driveMpsNow = Math.hypot(driverVelEst.x, driverVelEst.z);
           f.char.root.rotation.y = slewYaw(f.char.root.rotation.y, yawTo(f.char.root.position, RIM), FACE_RIM_RATE, dt);
           f.speed01 = driveK < 1 && driveMps > 0 ? 0.9 : 0;   // IMPROVE (2026-10-06) #1: a catch-and-shoot (driveMps 0) stands, it does not run in place
-          if (!foeDunkFlight) f.tree.update({ speedMps: driveMpsNow, speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: driverHasBall(), shooting: false, dunking: false, driving: driveK < 1 && driveMps > 0, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
+          if (!foeDunkFlight) f.tree.update({ speedMps: driveMpsNow, speed01: f.speed01, crossover: false, nearestDefender: Infinity, hasBall: driverHasBall(), ballHand: carries.get(f)?.hand === 'Left' ? 'left' : 'right', shooting: false, dunking: false, driving: driveK < 1 && driveMps > 0, defending: false, bracing: false, staggered: false });   // the dunk's launch / land are mode-owned beats
           bioTick(f, dt, 'offense', driverHasBall(), Infinity, false);
           if (foeDunkFlight) f.bio.flight = foeDunkFlight;
           chokeClamp(f.char.root.position);   // CHOKEPOINT: the scripted drive skips the clamp line below — 2 of 546 samples inside a rail, measured
@@ -3342,10 +3343,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     return {
       carry: carries.get(me) ?? null,
       beat: (clip, o) => me.tree.beat(clip, o),
-      impulse: (forward, lateral) => {
-        const yaw = me.char.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), rx = fz, rz = -fx;
-        me.drib.vel.addInPlace(new Vector3(fx * forward + rx * lateral, 0, fz * forward + rz * lateral));
-      },
+      // HOOPS-TWO-HAND-CROSS (DR-3): the move REDIRECTS the travel (rotated toward its side, eased over CUT_BLEND_SEC) — it was added
+      impulse: (forward, lateral) => { me.drib.redirect(forward, lateral, me.char.root.rotation.y); },
     };
   }
   /** HOOPS MOTION phase 4b (U14, S6): a shot's or a footwork's gather takes the ball to the RIGHT hand as drawn (1v1's gatherToShootingHand). */

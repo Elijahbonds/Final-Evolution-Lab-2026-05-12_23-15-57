@@ -3400,10 +3400,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     return {
       carry: meCarry,
       beat: (clip, o) => meAnimTree.beat(clip, o),
-      impulse: (forward, lateral) => {
-        const yaw = me.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), rx = fz, rz = -fx;
-        meDribble.vel.addInPlace(new Vector3(fx * forward + rx * lateral, 0, fz * forward + rz * lateral));
-      },
+      // HOOPS-TWO-HAND-CROSS (DR-3): the move REDIRECTS the travel (rotated toward its side, eased over CUT_BLEND_SEC) — it was added
+      impulse: (forward, lateral) => { meDribble.redirect(forward, lateral, me.root.rotation.y); },
     };
   }
   /**
