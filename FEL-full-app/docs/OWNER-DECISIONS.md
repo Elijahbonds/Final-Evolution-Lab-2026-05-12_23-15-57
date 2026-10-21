@@ -280,3 +280,6 @@ hoopsHandLabel.test.ts are new on this lane; the edits below to them are edits t
 
 Relay (not a direct quote):
 - 4:47 PM PT Oct 20: QA reports Elijah told QA 'Yes, I approved those' (relayed by PM; not said in Autopilot's 1:1, so it's logged as a relay, not as a direct quote).
+
+## #372 HESI owner trail (relay log, Oct 20, 2026)
+- 4:57 PM PT Oct 20: QA reports Elijah told QA 'Yes, I approved both' for the 5-frame hang minimum and HESI_EXPLODE_FLOOR 0.95 (relay via PM). Direct: 7:33 AM PT Oct 20, in Autopilot's 1:1, yes to HESI v2, count 5 held frames, min 5*DT ~83 ms.

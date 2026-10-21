@@ -309,10 +309,10 @@ export class DribbleController {
    * — with the stick still forward, the pause lasted ONE frame; the left-stick tap's pull-then-push wrote the explode on the same
    * frame. Both now enter one hang: for HESI_HANG_SEC the body is held at ≤ HESI_HANG_MAX_MPS and the stick moves nothing; the
    * latest forward push inside it is REMEMBERED and the explode leaves on the hang's last frame. The explode window counts from
-   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.18 s later than it was — that pause IS
+   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.09 s later than it was — that pause IS
    * the hesitation the defender bites on.
    */
-  static readonly HESI_HANG_SEC = 0.18;
+  static readonly HESI_HANG_SEC = 0.09;
   static readonly HESI_HANG_MAX_MPS = 0.3;
   private hangLeft = 0;
   private hangPush: Vector3 | null = null;
@@ -408,9 +408,9 @@ export class DribbleController {
         // frame (H2b; it used to be written on this same frame, a hesitation with no pause in it).
         if (dir && fwd > 0.3) this.hangPush = dir.clone();
       } else if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC) {
-        // HOOPS-CROSS-FIXUP (as H2-HESI-COOLDOWN-CONSUME 40bdf1e8): a tap the cooldown refuses is still a tap, not a run — it is
-        // consumed. Its pull-back stayed the last direction, so the push out of it read as a reversal: a phantom crossover on
-        // every refused tap (QA: 3 of 6 cycles at 3f back / 6f neutral / 30f forward).
+        // H2-HESI-COOLDOWN-CONSUME (also HOOPS-CROSS-FIXUP): a tap the cooldown refuses is still a tap, not a run — it is consumed.
+        // Its pull-back stayed the last direction, so the push out of it read as a reversal: a phantom crossover on every refused
+        // tap (3 of 6 at 0.5 s; QA: 3 of 6 cycles at 3f back / 6f neutral / 30f forward), whose own cooldown ate the real one.
         this.lastDirAge = Infinity;
       }
       this.pullbackSec = -1;
