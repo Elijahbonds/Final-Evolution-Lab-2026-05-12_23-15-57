@@ -36,6 +36,10 @@ export interface DribbleResult { crossover: boolean; hesitation: boolean; speed0
 export const REDIRECT_MIN_TRAVEL_MPS = 0.5;
 /** The redirect's speed cap, × top speed: the left-stick crossover's own cap (DribbleController.update's cut). */
 export const REDIRECT_TOP_K = 1.15;
+/** SHAMMGOD-PEAK (tuned, flagged): the forward-dominant burst's cap (of the movers only the Shammgod), × top speed. The 1.15 cap
+ *  (7.36 target) peaked 7.21 m/s from a 4.34 jog once the cut's blend paid its decel; this target lands the jog peak at ~7.6 m/s, the
+ *  pre-8faaa228 7.63. DribbleController's move redirect passes it to redirectFor; redirectFor's default stays REDIRECT_TOP_K. */
+export const REDIRECT_BURST_TOP_K = 1.21;
 /** HOOPS-CROSS-ANGLE (owner 2026-10-20): the left stick past this magnitude on the move's frame is HELD — the move takes the wide turn. */
 export const REDIRECT_HELD_STICK = 0.5;
 /** The tight (stick released) turn: a move's atan2 angle passes unchanged up to the knee, and only REDIRECT_TIGHT_SLOPE of it past the
@@ -61,7 +65,7 @@ export function redirectTurn(forward: number, lateral: number, stickHeld: boolea
  * speed (a momentum streak over the cap is not braked by a move). Null for a fake (zero impulse: the hesi, the yoyo, the in-and-out).
  * ESTIMATE [TUNE]: the angle mapping is the spec's; the eye judges it.
  */
-export function redirectFor(vx: number, vz: number, yaw: number, forward: number, lateral: number, stickHeld = false, top = DEFAULT_MOVEMENT.maxSpeed): { x: number; z: number; speed: number; turnRad: number } | null {
+export function redirectFor(vx: number, vz: number, yaw: number, forward: number, lateral: number, stickHeld = false, top = DEFAULT_MOVEMENT.maxSpeed, burstTopK = REDIRECT_TOP_K): { x: number; z: number; speed: number; turnRad: number } | null {
   if (forward === 0 && lateral === 0) return null;
   const cur = Math.hypot(vx, vz);
   const along = vx * Math.sin(yaw) + vz * Math.cos(yaw);
@@ -73,8 +77,9 @@ export function redirectFor(vx: number, vz: number, yaw: number, forward: number
   // 3.4 / 0.8) keeps the burst the old addition gave it: current + |impulse|, under the same cap. The max(current, |impulse|) rule
   // left its 3.49 below a 4.34 m/s jog, so it exited at 4.35 — a plain crossover's speed (it peaked 7.63 before 8faaa228). The turn is
   // unchanged. FEEL CHANGE (flagged): from a 4.34 jog the Shammgod's target is 7.36 m/s (the cap), from a 6.40 sprint 7.36 too.
+  // SHAMMGOD-PEAK: the burst has its own cap (burstTopK; the controller passes REDIRECT_BURST_TOP_K) — every other move keeps top × REDIRECT_TOP_K.
   const burst = forward > Math.abs(lateral);
-  const speed = Math.max(cur, Math.min(top * REDIRECT_TOP_K, burst ? cur + mag : mag));
+  const speed = Math.max(cur, burst ? Math.min(top * burstTopK, cur + mag) : Math.min(top * REDIRECT_TOP_K, mag));
   return { x: Math.sin(head), z: Math.cos(head), speed, turnRad };
 }
 
@@ -185,7 +190,7 @@ export class DribbleController {
     const m = this.pendingMove; if (!m) return;
     this.pendingMove = null;
     if (this.pendingCut || this.pendingSlide) return;
-    const r = redirectFor(this.movement.vel.x, this.movement.vel.z, m.yaw, m.forward, m.lateral, Math.hypot(moveX, moveY) > REDIRECT_HELD_STICK);
+    const r = redirectFor(this.movement.vel.x, this.movement.vel.z, m.yaw, m.forward, m.lateral, Math.hypot(moveX, moveY) > REDIRECT_HELD_STICK, DEFAULT_MOVEMENT.maxSpeed, REDIRECT_BURST_TOP_K);
     if (!r) return;
     this.cutTo(r.x, r.z, r.speed, Math.abs(r.turnRad) < Math.PI / 2);   // a move that comes BACK keeps the chest where it is (the step-back's rule)
   }
