@@ -75,6 +75,13 @@ export class DribbleController {
   /** The explode-out leaves at no less than this share of top speed: the plant took the run down to ~0.3 m/s, and
    *  "0.3 + the boost" was 2.3 m/s — a jog, not the separation the move exists to buy (measured, onevone-depth). */
   static readonly EXPLODE_FLOOR = 0.7;
+  /** H2-HESI-SAME-FRAME (2026-10-17): the HESITATION's explode floor. The hang (HESI_HANG_SEC) holds the body while a plain stop-and-go
+   *  is already pushing, so the explode is read against a control that has had the hang's frames to build: at 0.7 it left at 4.48 m/s,
+   *  1.58× the control on that same frame (2.84). FEEL CHANGE (flagged): 0.95 → 6.08 m/s, 2.14× — about the crossover's own burst out
+   *  of a jog (6.22). PAUSIN's explode keeps EXPLODE_FLOOR. */
+  static readonly HESI_EXPLODE_FLOOR = 0.95;
+  /** The floor of the explode window that is armed now: the hang's (HESI_EXPLODE_FLOOR) or PAUSIN's (EXPLODE_FLOOR). */
+  private explodeFloor = DribbleController.EXPLODE_FLOOR;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
     this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS });   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
@@ -211,7 +218,7 @@ export class DribbleController {
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
     this.movement.pause(on);
-    if (!on) { this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC; this.movement.launchFor(0.5); }
+    if (!on) { this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC; this.explodeFloor = DribbleController.EXPLODE_FLOOR; this.movement.launchFor(0.5); }
   }
   get paused(): boolean { return this.movement.paused; }
   /** A hesitation thrown from the stick (the L-stick pull-back tap does this on its own): the plant, eased, and the window. */
@@ -227,23 +234,28 @@ export class DribbleController {
    * — with the stick still forward, the pause lasted ONE frame; the left-stick tap's pull-then-push wrote the explode on the same
    * frame. Both now enter one hang: for HESI_HANG_SEC the body is held at ≤ HESI_HANG_MAX_MPS and the stick moves nothing; the
    * latest forward push inside it is REMEMBERED and the explode leaves on the hang's last frame. The explode window counts from
-   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.18 s later than it was — that pause IS
+   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.09 s later than it was — that pause IS
    * the hesitation the defender bites on.
    */
-  static readonly HESI_HANG_SEC = 0.18;
+  static readonly HESI_HANG_SEC = 0.09;
   static readonly HESI_HANG_MAX_MPS = 0.3;
   private hangLeft = 0;
   private hangPush: Vector3 | null = null;
   private enterHang(): void {
     this.hangLeft = DribbleController.HESI_HANG_SEC; this.hangPush = null;
     this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC + DribbleController.HESI_HANG_SEC;
+    this.explodeFloor = DribbleController.HESI_EXPLODE_FLOOR;
+    // the hesitation spends the run's direction: the hang returns before a direction is recorded, so the pull-back stayed the last
+    // one (0.22 s old after the hang) and the explode's own push read as a reversal of it — a phantom crossover whose cooldown ate
+    // the real one (H2-HESI-SAME-FRAME, measured)
+    this.lastDirAge = Infinity;
   }
   /** Is the body inside a hesitation's hang? */
   get hanging(): boolean { return this.hangLeft > 0; }
   private explodeAlong(dir: Vector3): void {
     const top = DEFAULT_MOVEMENT.maxSpeed;
     this.pendingCut = null;
-    this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.movement.vel.length() + this.crossoverBoost))));
+    this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * this.explodeFloor, this.movement.vel.length() + this.crossoverBoost))));
     this.movement.facing = Math.atan2(dir.x, dir.z);
     this.hesiBoostLeft = 0;
   }
@@ -319,6 +331,11 @@ export class DribbleController {
         // A flick straight back OUT (pull then push in one motion) is the explode — remembered, and it leaves on the hang's last
         // frame (H2b; it used to be written on this same frame, a hesitation with no pause in it).
         if (dir && fwd > 0.3) this.hangPush = dir.clone();
+      } else if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC) {
+        // H2-HESI-COOLDOWN-CONSUME: a tap the cooldown refuses is still a tap, not a run — it is consumed. Its pull-back stayed the
+        // last direction, so the push out of it read as a reversal: a phantom crossover on every refused tap (3 of 6 at 0.5 s),
+        // whose own cooldown ate the real one.
+        this.lastDirAge = Infinity;
       }
       this.pullbackSec = -1;
     }
@@ -343,13 +360,7 @@ export class DribbleController {
     if (!hesitation && this.hesiBoostLeft > 0 && mag > 0.5) {
       const dir = new Vector3(moveX, 0, -moveY).normalize();
       const fwd = dir.x * Math.sin(this.movement.facing) + dir.z * Math.cos(this.movement.facing);
-      if (fwd > 0.3) {
-        const top = DEFAULT_MOVEMENT.maxSpeed;
-        this.pendingCut = null;   // see above
-        this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.movement.vel.length() + this.crossoverBoost))));
-        this.movement.facing = Math.atan2(dir.x, dir.z);
-        this.hesiBoostLeft = 0;
-      }
+      if (fwd > 0.3) this.explodeAlong(dir);   // the same explode as the hang's (its floor is the window's: the hesi's or PAUSIN's)
     }
 
     // CHANGE OF PACE — the R2 press inside the gear-down window: the explode-out's burst along the stick (the hesi's
