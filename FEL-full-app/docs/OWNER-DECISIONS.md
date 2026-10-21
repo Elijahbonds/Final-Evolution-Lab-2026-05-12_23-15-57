@@ -248,3 +248,6 @@ The entries below are the coordinator's log, copied as written. Later entries ov
   - SQL: guarded CI job with a one-time GitHub secret (production DIRECT url): preview -> apply ONLY if the diff equals a reviewed pending SQL file -> verify; anything unexpected (DROP, extra statements) stops and pings the owner.
   - OWNER INBOX: one private phone page listing everything waiting (policy text, content drafts, feel numbers, account steps) with Approve / Change / Reject; agents act on the taps.
   - SELF-APPROVE, owner reviews after (each lands in the Inbox; reversible): (1) NEW feel numbers from measurements (existing tuned numbers still need the owner; owner can change any on the feel panel); (2) content drafts from the owner's own books after automated fact checks (quiz cards, lessons, exercise demos); (3) DISCLOSURE-ONLY privacy text (describes only what the code already does; no new data use) — lands after 48 h in the Inbox unless the owner objects.
+
+## #372 HESI owner trail (relay log, Oct 20, 2026)
+- 4:57 PM PT Oct 20: QA reports Elijah told QA 'Yes, I approved both' for the 5-frame hang minimum and HESI_EXPLODE_FLOOR 0.95 (relay via PM). Direct: 7:33 AM PT Oct 20, in Autopilot's 1:1, yes to HESI v2, count 5 held frames, min 5*DT ~83 ms.
