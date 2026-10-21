@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { DUNK_WEEKS } from '@/lib/coach-store/dunkProgram';
+import { PAIN_LINE } from '@/lib/coach-store/constants';
 
 const MAX_BYTES = 209715200;
 const DRILLS = DUNK_WEEKS.flatMap((week) => week.days.flatMap((day) => day.drills)).filter((drill, index, all) => all.findIndex((row) => row.id === drill.id) === index);
@@ -73,9 +74,11 @@ export function ReviewStudio({ bookingId, coach }: { bookingId: string; coach?: 
   };
 
   const submit = async () => {
+    // STORE-HURT-OPTIN: the pain answer is still required here, but it stays in this page's memory — never sent or stored.
+    if (pain === null) { setMessage('Check the goal and the pain question.'); return; }
     const res = await fetch(`/api/coach-store/reviews/${bookingId}/submit`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clips, goal, painYes: pain, note }),
+      body: JSON.stringify({ clips, goal, note }),
     });
     setMessage(res.ok ? 'Sent.' : 'Check the goal and the pain question.');
   };
@@ -201,6 +204,7 @@ export function ReviewStudio({ bookingId, coach }: { bookingId: string; coach?: 
           <p className="text-sm">Does anything hurt?</p>
           <label className="mr-3 text-sm"><input type="radio" name="pain" onChange={() => setPain(true)} /> Yes</label>
           <label className="text-sm"><input type="radio" name="pain" onChange={() => setPain(false)} /> No</label>
+          {pain === true ? <p className="text-sm">{PAIN_LINE}</p> : null}
           <label className="block text-sm">Note ({note.length}/300)
             <textarea maxLength={300} className="mt-1 w-full bg-black p-2" value={note} onChange={(e) => setNote(e.target.value)} />
           </label>

@@ -25,6 +25,7 @@ export interface CheckoutBody {
   startsAt?: unknown;
   referralCode?: unknown;
   goal?: unknown;
+  /** STORE-HURT-OPTIN: ignored. The answer stays in the buyer's browser for the session; it is never stored. */
   painYes?: unknown;
   note?: unknown;
   shareWithCoach?: unknown;
@@ -256,7 +257,8 @@ async function bookTime(
       slotLock,
       shareWithCoach: share,
       goal: typeof body.goal === 'string' ? body.goal.slice(0, 80) : null,
-      painYes: typeof body.painYes === 'boolean' ? body.painYes : null,
+      // STORE-HURT-OPTIN: the "Does anything hurt?" answer is never stored (no opt-in copy exists); any value sent is dropped.
+      painYes: null,
       reviewNote: typeof body.note === 'string' ? body.note.slice(0, 300) : null,
     },
   });
