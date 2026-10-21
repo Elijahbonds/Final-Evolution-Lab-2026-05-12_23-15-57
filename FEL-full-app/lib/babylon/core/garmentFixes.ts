@@ -297,6 +297,49 @@ function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world:
 }
 
 /**
+ * KIT-NO-HIGH-BOOTS (2026-10-20): the pass-2 tee, shorts and low sock are a flat colour with NO UVs (only the shoe kept a
+ * map), and Creator paint (creator/paint/renderPaint) draws a garment into a texture through its UVs — without them a
+ * garment layer never showed. So a shown garment without UVs gets an atlas here, before any other fix reads its
+ * geometry: each triangle its own cell, which unwelds the mesh (3 vertices a triangle, every attribute copied, so it
+ * renders and skins exactly as before; the edge flare welds by position). A cell's triangle sits GARMENT_UV_PAD texels
+ * in at the smallest garment paint size, inside what the paint's dilation fills, so filtering never reads a neighbour.
+ * Only this clone's geometry changes; a mesh with morph targets (none ship) is left alone.
+ */
+const GARMENT_UV_PAD = 3 / 512;
+export function ensureGarmentUVs(mesh: AbstractMesh): boolean {
+  if (!(mesh instanceof Mesh) || mesh.isVerticesDataPresent(VertexBuffer.UVKind) || mesh.morphTargetManager) return false;
+  const ind = mesh.getIndices();
+  if (!ind || ind.length < 3 || !mesh.isVerticesDataPresent(VertexBuffer.PositionKind)) return false;
+  try {
+    const tris = Math.floor(ind.length / 3), corners = tris * 3;
+    // read every attribute before writing any: the position write resets the vertex count the others are read with
+    const src = mesh.getVerticesDataKinds().map((kind) => ({ kind, size: mesh.getVertexBuffer(kind)!.getSize(), data: mesh.getVerticesData(kind)! }));
+    mesh.makeGeometryUnique();
+    src.sort((a, b) => Number(b.kind === VertexBuffer.PositionKind) - Number(a.kind === VertexBuffer.PositionKind));
+    for (const { kind, size, data } of src) {
+      const out = new Float32Array(corners * size);
+      for (let i = 0; i < corners; i++) for (let k = 0; k < size; k++) out[i * size + k] = data[ind[i] * size + k];
+      mesh.setVerticesData(kind, out, false, size);
+    }
+    const n = Math.ceil(Math.sqrt(tris)), cell = 1 / n, pad = Math.min(GARMENT_UV_PAD, cell / 4);
+    const uv = new Float32Array(corners * 2);
+    for (let t = 0; t < tris; t++) {
+      const u0 = (t % n) * cell, v0 = Math.floor(t / n) * cell;
+      uv.set([u0 + pad, v0 + pad, u0 + cell - pad, v0 + pad, u0 + pad, v0 + cell - pad], t * 6);
+    }
+    mesh.setVerticesData(VertexBuffer.UVKind, uv, false, 2);
+    const seq = new Uint32Array(corners);
+    for (let i = 0; i < corners; i++) seq[i] = i;
+    mesh.setIndices(seq, corners, false);
+    mesh.refreshBoundingInfo();
+    return true;
+  } catch (e) {
+    console.warn(`[FEL-KIT] garment UVs skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+    return false;
+  }
+}
+
+/**
  * Tops and shorts sit a few millimetres over the skin, and where the two surfaces coincide the body wins the depth
  * test in patches — the "torn / stained" read on the tee and the court short (karate and tennis frames, 2026-09-05).
  * A polygon offset on the garment's material pulls it in front of the skin at the same depth; the geometry is untouched.
