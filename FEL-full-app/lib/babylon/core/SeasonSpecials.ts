@@ -4,6 +4,7 @@
 // off the top of the backboard, the backboard run — are the PRO lane's. The lane comes from the season API (`hasPro` on
 // /api/season); a guest or a free-lane player sees the specials named and locked, never silently missing.
 // Dev only: `?pass=1` / `?pass=0` on the url overrides the read (the lab measures the specials without a login).
+import { signedOutVisitor } from './visitor';
 
 export type SeasonLane = 'guest' | 'free' | 'pro';
 export type DunkSpecial = 'kangaroo' | 'skyTap' | 'boardTopFlip' | 'boardRun';
@@ -34,6 +35,9 @@ let laneCache: SeasonLane | null = null;
 export async function readSeasonLane(): Promise<SeasonLane> {
   if (laneCache) return laneCache;
   if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') { const o = devPassOverride(window.location.search); if (o) return (laneCache = o); }
+  // FIRST-DUNK-BUDGET (2026-10-17): a visitor the host knows is signed out is the guest lane without asking (the read was a 401 on
+  // every /try run, and a 401 IS 'guest'). Not cached: a later mount that may be signed in still reads it.
+  if (signedOutVisitor()) return 'guest';
   try {
     const r = await fetch('/api/season');
     const body = r.ok ? await r.json().catch(() => null) : null;

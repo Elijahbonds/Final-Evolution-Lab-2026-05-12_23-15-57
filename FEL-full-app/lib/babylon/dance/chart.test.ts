@@ -82,6 +82,8 @@ describe('DENSITY PAYS AS STYLE: a chart\'s steps are its moves, every other pre
       // row, or — only where the chart opts in by naming its id (dance/moves.ts; lane/dance-extras, 2026-10-14) — a captured move.
       // test changed (lane/dance-extras): this said "DANCE_LIBRARY row" and read the clip's beats off DANCE_LIBRARY; the two opt-in
       // phrases (evolution ehBc, canals kvDc) make a step's clip a captured move, which is a 4-beat press step of its own family.
+      // (lane/dance-options, owner 2026-10-17: the charts now spell the five captures' ids wherever they meant them — no opt-in phrase is
+      // left; the assertions are unchanged.)
       expect([...style].sort((a, b) => a - b)).toEqual(style);
       const stepBeats = new Set(steps.map((x) => x.beat));
       for (const b of style) expect(stepBeats.has(b), `style beat ${b} is also a step`).toBe(false);

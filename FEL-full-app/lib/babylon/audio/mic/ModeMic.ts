@@ -29,6 +29,9 @@ export interface ModeMicOpts {
   /** Load the coach (movement play: the form read after an attempt, spoken as who: 'coach'). */
   coach?: boolean;
   seed?: number;
+  /** FIRST-DUNK-BUDGET (2026-10-17): load only the banks' indexes (the words) now, and their AUDIO when the mode calls
+   *  `loadAudio()` — the dunk's first download carried ~6 MB of voices. Until then every line is its caption. */
+  deferAudio?: boolean;
 }
 
 /** The last cues, for probes (`window.__FEL_MIC__`). */
@@ -57,12 +60,14 @@ export class ModeMic {
   private seq: { ev: MicEvent; at: number }[] = [];
   private crowdIdle: string | null = null;
   private disposed = false;
+  private audioAsked = false;   // FIRST-DUNK-BUDGET: a deferAudio mic's loadAudio() has run
   private readonly crowdMic = new CrowdMicPicker();
   private crowdPending: { pick: NonNullable<ReturnType<CrowdMicPicker['hear']>>; at: number } | null = null;
 
   constructor(private readonly ctx: ModeContext, private readonly o: ModeMicOpts) {
     this.court = o.court ?? ctx.location ?? 'venice';
     this.mc = mcFor(this.court);
+    if (o.deferAudio) VoiceKit.holdAudio(true);
     void this.load();
     void fetchCommunity('mc-lines').then((l) => this.crowdMic.setLines(l)).catch(() => { /* no community lines */ });
   }
@@ -128,25 +133,39 @@ export class ModeMic {
   hush(): void { this.seq = []; this.director?.hush(now()); VoiceKit.stop('booth', 0.08); this.clearCaption(); }
   dispose(): void {
     this.disposed = true;
+    if (this.o.deferAudio) VoiceKit.holdAudio(false);   // the hold is this mic's, not the next mode's
     saveLineMemory();   // VOICEOVER: the next run picks up the rounds where this one left off
     VoiceKit.stopAll(0.12);
     this.clearCaption();
+  }
+  /** FIRST-DUNK-BUDGET: a `deferAudio` mic's voices — the banks' audio, held back until now. Idempotent. */
+  loadAudio(): void {
+    if (!this.o.deferAudio || this.audioAsked || this.disposed) return;
+    this.audioAsked = true;
+    VoiceKit.holdAudio(false);
+    void VoiceKit.load(this.needs());
   }
   get booth(): { mc: string; side: string } { return { mc: this.mc, side: SIDEKICK }; }
   /** The voices are in (a call can be spoken). */
   get ready(): boolean { return !!this.director; }
 
   // ── internals ─────────────────────────────────────────────────────────────────────────────────────────────────────
-  private async load(): Promise<void> {
+  /** The banks this mic speaks from: the MC and the sidekick in each group, the crowd, the players' chatter, the coach. */
+  private needs(): { cast: string; group: string }[] {
     const groups = [...new Set<string>(['shared', ...this.o.groups])];
     const needs: { cast: string; group: string }[] = [];
     for (const g of groups) { needs.push({ cast: this.mc, group: g }); if (g !== 'names') needs.push({ cast: SIDEKICK, group: g }); }
-    const crowd = this.o.crowd !== false ? CROWD : [];
-    for (const c of crowd) needs.push({ cast: c, group: 'crowd' });
+    for (const c of this.crowdCast()) needs.push({ cast: c, group: 'crowd' });
     const players = [...new Set(Object.values(this.o.players ?? {}))];
     for (const p of players) needs.push({ cast: p, group: 'chatter' });
     if (this.o.coach) needs.push({ cast: 'coach', group: 'coach' });
-    const idx = await VoiceKit.load(needs);
+    return needs;
+  }
+  private crowdCast(): readonly string[] { return this.o.crowd !== false ? CROWD : []; }
+  private async load(): Promise<void> {
+    const needs = this.needs(), crowd = this.crowdCast();
+    // FIRST-DUNK-BUDGET: a deferAudio mic reads the words now (the director and the captions need them) and the audio on loadAudio()
+    const idx = await (this.o.deferAudio && !this.audioAsked ? VoiceKit.loadIndex(needs) : VoiceKit.load(needs));
     if (this.disposed) return;
     this.director = new MicDirector({
       scripts: toScripts(idx),

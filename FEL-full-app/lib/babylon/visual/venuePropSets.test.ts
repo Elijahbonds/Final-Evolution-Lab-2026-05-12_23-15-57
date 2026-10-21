@@ -188,8 +188,14 @@ describe('DUNK-VENICE-ENV-2 — the Venice dunk\'s baked dressing', () => {
 
   it('ships the five GLBs byte for byte — the asset drop, never re-exported', () => {
     const drop: Record<string, string> = {
-      'palm_hero_lod0.glb': '03109df70554bc2e8c730f9c7a5df3cdfe8ff38bf46a3a499f74376204c3f99a',
-      'palm_hero_lod1.glb': 'd9acd04d1261461dbefbbb7ce74eb636480fa48784c056f46af88951115e3299',
+      // PIN MOVED (FDB-4, PM 2026-10-17) from the 4beb7e90 drop's 03109df70554bc2e8c730f9c7a5df3cdfe8ff38bf46a3a499f74376204c3f99a
+      // for an intended change: 3D Art's Draco LOD0 (float attributes, 464,320 → 375,460 B), images and material/node JSON
+      // byte-identical to the drop's, decoded geometry within 0.1 mm (meshyProps.draco.test pins all three).
+      'palm_hero_lod0.glb': '70e7e4b78b09d56445fe456080275cc1db732b982c9bc5047a87be944fabd4d8',
+      // PIN MOVED (FDB-3, owner decision 2026-10-17) from the 4beb7e90 drop's d9acd04d1261461dbefbbb7ce74eb636480fa48784c056f46af88951115e3299
+      // for an intended LOSSLESS change: the duplicate far-frond atlas (byte-identical to LOD2's) was removed and LOD1 now
+      // shares LOD2's frond material (veniceBoardwalk.shareFarFrondMaterial); every other byte is the drop's (dunkOneMargin.test).
+      'palm_hero_lod1.glb': '4868821bbb2cb2af6665d5cb4e80f775b03fbf37b1e7ce17c850a99fe002dfae',
       'palm_hero_lod2.glb': '8df995989a580b7a60d27ea0f8baa38c3e62949ac152e7f996855695da00f3d6',
       'venice_boardwalk_kit.glb': '534acabd6d0d973bbcffe60fe46c08aa8d62946851caeb53bf7bbd98debdc96f',
       'venice_crowd_cards.glb': 'de1569f028d459b79cf0cb6d78ceab727a87bf0d087b774e12a2073b0c7a88bc',

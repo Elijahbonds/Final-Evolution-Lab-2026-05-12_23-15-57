@@ -82,6 +82,11 @@ class VoiceKitImpl {
   private readonly waiting = new Map<number, Waiting>();
   private seq = 0;
   private wake: ReturnType<typeof setTimeout> | null = null;
+  /** FIRST-DUNK-BUDGET (2026-10-17): while held, no voice AUDIO is downloaded — a line whose bank is not in is its caption only. */
+  private audioHeld = false;
+
+  /** FIRST-DUNK-BUDGET: hold the voice audio back (the dunk's first download), or let it come. ModeMic `deferAudio` holds it. */
+  holdAudio(on: boolean): void { this.audioHeld = on; }
 
   /** Fetch the banks a mode needs (e.g. the court's MC in 'shared' + 'dunk'). Resolves to the indexes that arrived. */
   async load(needs: { cast: string; group: string }[]): Promise<BankIndex[]> {
@@ -104,7 +109,7 @@ class VoiceKitImpl {
    * cached. False (and silent) on any failure: no Web Audio, no CORS on the bucket, a decode error.
    */
   async playUrl(url: string, court: string, onStart?: () => void): Promise<boolean> {
-    if (!/^https:\/\//.test(url) || typeof window === 'undefined') return false;
+    if (!/^https:\/\//.test(url) || typeof window === 'undefined' || this.audioHeld) return false;
     try {
       const g = SoundKit.graph();
       if (!g) return false;
@@ -293,6 +298,7 @@ class VoiceKitImpl {
   private bin(key: string): Promise<ArrayBuffer | null> {
     let p = this.bins.get(key);
     if (!p) {
+      if (this.audioHeld) return Promise.resolve(null);   // not cached: asked again once the hold lifts
       const name = this.binName.get(key);
       if (!name) return Promise.resolve(null);
       p = (async () => {

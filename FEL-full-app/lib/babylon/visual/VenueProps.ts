@@ -7,9 +7,10 @@
 // scenery only — not pickable, no collisions, outside every playing area.
 // Assets: public/models/props/<kit>/<model>.glb (Kenney, CC0; see manifest.json).
 import { Color3, Matrix, PBRMaterial, Quaternion, Ray, SceneLoader, TransformNode, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, Mesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, ISceneLoaderAsyncResult, Mesh, Scene } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { VENUE_PROP_SETS, type PropPlacement } from './venuePropSets';
+import { MESHY_DIR } from './meshyProps';
 
 export interface VenuePropsHandle { root: TransformNode; count: number; dispose(): void }
 
@@ -30,13 +31,88 @@ function normaliseKitMaterial(mat: PBRMaterial): void {
   const hex = KIT_PALETTE[mat.name]; if (hex && !mat.albedoTexture) mat.albedoColor = Color3.FromHexString(hex);
 }
 
+/** The folder a kit's files are served from. The owner's Meshy props have ONE, meshyProps' /models/meshy/ (FIRST-DUNK-BUDGET,
+ *  2026-10-17: this read them again as /models/props/meshy/, a symlink to the same files, so the dunk downloaded its parked bus
+ *  and its corner bus — one 4.7 MB file — twice). */
+const kitDir = (kit: string): string => (kit === 'meshy' ? MESHY_DIR : `/models/props/${kit}/`);
+
+/**
+ * One import of a kit file per scene. `owner` is who has the imported meshes themselves: the venue's set (they become its hidden
+ * thin-instance masters) or one mode copy (parented under its root, as the dunk's corner tent always was). Everyone else asking
+ * while it is in flight gets a clone made the moment it lands, before the venue hides and re-parks its masters.
+ */
+interface KitImport {
+  result: Promise<ISceneLoaderAsyncResult>;
+  copies: Array<(r: ISceneLoaderAsyncResult, adopt: boolean) => void> | null;   // null once landed
+  owner: 'venue' | 'copy' | null;
+}
+const imports = new WeakMap<Scene, Map<string, KitImport>>();
+function importOf(scene: Scene, kit: string, model: string): KitImport {
+  let map = imports.get(scene);
+  if (!map) { map = new Map(); imports.set(scene, map); const m = map; scene.onDisposeObservable.addOnce(() => { m.clear(); imports.delete(scene); }); }   // OOM-HYGIENE
+  const key = `${kit}/${model}`;
+  let e = map.get(key);
+  if (!e) {
+    const entry: KitImport = {
+      copies: [],
+      owner: null,
+      result: SceneLoader.ImportMeshAsync('', kitDir(kit), `${model}.glb`, scene).then((r) => {
+        const waiting = entry.copies ?? [];
+        entry.copies = null;
+        waiting.forEach((serve, i) => serve(r, i === 0 && entry.owner === null));
+        return r;
+      }),
+    };
+    entry.result.catch(() => { /* each asker handles the failure */ });
+    map.set(key, entry);
+    e = entry;
+  }
+  return e;
+}
+
+/** A mode's copy under a fresh root: the import's own root nodes when `adopt` (nobody else has them), else clones of them
+ *  (their children with them; geometry and materials shared). */
+function copyUnder(scene: Scene, r: ISceneLoaderAsyncResult, name: string, adopt: boolean): TransformNode {
+  const root = new TransformNode(name, scene);
+  for (const m of r.meshes) if (!m.parent) { if (adopt) m.parent = root; else m.clone(`${name}_${m.name}`, root); }
+  for (const m of root.getChildMeshes()) { m.isPickable = false; m.receiveShadows = true; }
+  return root;
+}
+
+/**
+ * FIRST-DUNK-BUDGET (2026-10-17): a kit model of a mode's own (the dunk's corner tent and corner bus) from the SAME import the venue's
+ * set uses, so the file comes down once. It was a second ImportMeshAsync of /models/props/racing/tent.glb beside the venue's tents.
+ * Ask in the same breath as the venue's set mounts and the copy is cloned as the import lands; with no venue set wanting the file,
+ * the copy takes the import itself. Asked after the venue's import landed (those meshes are its masters now), it imports its own.
+ */
+export function copyKitModel(scene: Scene, kit: string, model: string, name: string): Promise<TransformNode> {
+  const e = importOf(scene, kit, model);
+  const copies = e.copies;
+  if (!copies) {
+    console.info(`[FEL-PROPS] ${kit}/${model}: asked after the shared import landed — an import of its own`);
+    return SceneLoader.ImportMeshAsync('', kitDir(kit), `${model}.glb`, scene).then((r) => copyUnder(scene, r, name, true));
+  }
+  return new Promise<TransformNode>((resolve, reject) => {
+    copies.push((r, adopt) => { if (adopt) e.owner = 'copy'; resolve(copyUnder(scene, r, name, adopt)); });
+    e.result.catch(reject);
+  });
+}
+
+/** The venue set's import of a model: the shared one, unless a mode's copy already took its meshes (then one of its own). */
+function venueImport(scene: Scene, kit: string, model: string): Promise<ISceneLoaderAsyncResult> {
+  const e = importOf(scene, kit, model);
+  if (e.owner === 'copy') return SceneLoader.ImportMeshAsync('', kitDir(kit), `${model}.glb`, scene);
+  e.owner = 'venue';
+  return e.result;
+}
+
 async function loadModel(scene: Scene, kit: string, model: string): Promise<Mesh[]> {
   let cache = modelCache.get(scene);
   if (!cache) { cache = new Map(); modelCache.set(scene, cache); const c = cache; scene.onDisposeObservable.addOnce(() => { c.clear(); modelCache.delete(scene); }); }   // OOM-HYGIENE: nothing outlives the scene
   const key = `${kit}/${model}`;
   let p = cache.get(key);
   if (!p) {
-    p = SceneLoader.ImportMeshAsync('', `/models/props/${kit}/`, `${model}.glb`, scene).then((r) => {
+    p = venueImport(scene, kit, model).then((r) => {
       const meshes = r.meshes.filter((m): m is Mesh => (m as Mesh).getTotalVertices?.() > 0) as Mesh[];
       for (const m of r.meshes) {
         m.isPickable = false; m.setEnabled(false);   // the source stays hidden; instances show

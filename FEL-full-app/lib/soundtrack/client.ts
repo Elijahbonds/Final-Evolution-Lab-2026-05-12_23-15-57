@@ -14,7 +14,7 @@ import { musicFocus, claimMusicFocus } from './focus';
 import { stageForPhase } from './policy';
 import { cachedSrc } from './cache';
 import { readRunTrack } from './runTrack';
-import type { SoundtrackStage } from './types';
+import type { SoundtrackCatalogue, SoundtrackStage, SoundtrackTrack } from './types';
 
 export { claimMusicFocus };
 /** The Dunk walk-out's catalogue source (routed: the Dunk lane mounts it). */
@@ -85,12 +85,28 @@ export function getSoundtrackPlayer(): SoundtrackPlayer | null {
   return player;
 }
 
-/** The first tap: unlock SoundKit's context and the decks inside the gesture, then let the soundtrack start. */
-export function unlockSoundtrackFromGesture(): void {
+/** How long a tapped link's destination holds the soundtrack if the page never gets there (a drag that started on the link). */
+export const HEADING_TIMEOUT_MS = 15_000;
+
+/**
+ * The first tap: unlock SoundKit's context and the decks inside the gesture, then let the soundtrack start.
+ * FDB-2: `headingTo` is where that tap is navigating (the dock reads the tapped link). It is set BEFORE the unlock, so the tap
+ * on /links' "Play FEL" — the way into /try — never starts a song on the way out; /try's own hold takes over once it lands.
+ */
+export function unlockSoundtrackFromGesture(headingTo: string | null = null): void {
   const p = getSoundtrackPlayer();
   if (!p) return;
   try { kit?.unlock(); } catch { /* the harness unlocks it on a game's first input anyway */ }
+  if (headingTo) {
+    p.headTo(headingTo);
+    setTimeout(() => { if (p.conditions.headingTo === headingTo) p.headTo(null); }, HEADING_TIMEOUT_MS);
+  }
   p.primeFromGesture(silentWavDataUri());
+}
+
+/** FDB-2: the guest's first dunk is in — DunkMode's contest set calls this at its `fel:dunk1-in` mark; /try's soundtrack starts. */
+export function soundtrackFirstDunkIn(): void {
+  getSoundtrackPlayer()?.setFirstDunkIn(true);
 }
 
 /** A host's phase ('loading' | 'ready' | 'playing' | 'ended' | …) or a stage; null hands the stage back to the page. */
@@ -106,3 +122,20 @@ export function setSoundtrackStage(phaseOrStage: string | null): void {
 export const enterBed = (): void => setSoundtrackStage('bed');
 /** …and this on teardown. */
 export const exitBed = (): void => setSoundtrackStage(null);
+
+/** How long one read of the catalogue answers every asker on the page (the route itself is CDN-cached 5 min). */
+const CATALOGUE_TTL_MS = 5 * 60_000;
+let catalogueRead: { at: number; p: Promise<SoundtrackTrack[] | null> } | null = null;
+/**
+ * FIRST-DUNK-BUDGET (2026-10-17): the soundtrack catalogue, read ONCE for the page (and again after CATALOGUE_TTL_MS). The dock and
+ * the Dunk walk-out each fetched /api/v1/soundtrack on every /try run. Null when the read failed (a failure is not remembered).
+ */
+export function fetchSoundtrackTracks(): Promise<SoundtrackTrack[] | null> {
+  const t = Date.now();
+  if (catalogueRead && t - catalogueRead.at < CATALOGUE_TTL_MS) return catalogueRead.p;
+  const p = fetch('/api/v1/soundtrack').then((r) => (r.ok ? r.json() : null)).then((c: SoundtrackCatalogue | null) => (Array.isArray(c?.tracks) ? c!.tracks : null)).catch(() => null);
+  const read = { at: t, p };
+  catalogueRead = read;
+  void p.then((tracks) => { if (!tracks && catalogueRead === read) catalogueRead = null; });
+  return p;
+}

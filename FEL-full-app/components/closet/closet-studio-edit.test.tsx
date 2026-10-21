@@ -23,6 +23,8 @@ import { CLOSET_EDIT_KEY, CLOSET_EDIT_TTL_MS, CLOSET_RETURN_KEY, startClosetEdit
 import { LOCAL_CONSENT_KEY, LOCAL_LOOK_KEY } from '@/lib/creator/localLook';
 import { WALK_KEY } from '@/lib/creator/look/studio/walkthrough';
 import { faceMorphList } from '@/lib/creator/look/faceMorphList';
+import { BodyControls } from '@/components/closet/character-controls';
+import { WalkthroughCard } from '@/components/closet/studio/walkthrough-card';
 import { decodeSlotCode, encodeSlotCode } from '@/lib/creator/look/shareCode';
 
 const SESSION = 'ce_session0001';
@@ -32,8 +34,8 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 const until = async (ok: () => boolean) => { for (let i = 0; i < 200 && !ok(); i++) await flush(); expect(ok()).toBe(true); };
 
 type Call = { url: string; method: string };
-function rig(search: string, kv: MemoryKV = memoryKV()) {
-  kv.data.set(WALK_KEY, 'done');   // the first-visit walkthrough would move the tab; it is not what these tests are about
+function rig(search: string, kv: MemoryKV = memoryKV(), o: { walkSeen?: boolean } = {}) {
+  if (o.walkSeen !== false) kv.data.set(WALK_KEY, 'done');   // the first-visit walkthrough would move the tab; it is not what these tests are about (studio-5's are)
   const writes: string[] = [];
   const setItem = kv.setItem.bind(kv);
   kv.setItem = (k, v) => { writes.push(k); setItem(k, v); };
@@ -251,5 +253,69 @@ describe('a session the Closet rejects: the normal Closet', () => {
     const r2 = rig('?studioEdit=../../x');
     await handOff(r2.kv);
     await normal(r2);
+  });
+});
+
+// studio-5 (docs/NEXUS-STUDIO.md §13.4): the two follow-ups §12.2 left for the creator lane. In Studio-edit mode the Body note (and
+// the Shape tab's, which had the same words) stop pointing at the hidden look-numbers consent, and the walkthrough's last step is
+// the hand-back. A normal /closet passes the very same props as before (no `studioEdit` key at all) and still completes the
+// walkthrough with Save Look.
+describe('studio-5: the Body and Shape notes, and the walkthrough, in edit mode only', () => {
+  const walkCards = (m: Mounted) => of(m, WalkthroughCard);
+  const toShape = async (m: Mounted) => { chip(m, 'Shape').props.onClick(); await flush(); };
+  /** The Shape tab (a dynamic import in the Closet, so found by its props). */
+  const shapeTab = (m: Mounted) => { const t = findAll(tree(m), (el) => 'onShape' in el.props && 'numbersSaved' in el.props); expect(t).toHaveLength(1); return t[0]; };
+
+  it('a normal /closet: the controls and the walkthrough get exactly the props they always had; Save Look still completes it', async () => {
+    const r = rig('', memoryKV(), { walkSeen: false });
+    const m = await open();
+    await until(() => walkCards(m).length === 2);   // the stage's card and the phone's
+    for (const c of walkCards(m)) expect(Object.keys(c.props).sort()).toEqual(['onNext', 'onSkip', 'state']);
+    await toShape(m);
+    expect(Object.keys(shapeTab(m).props)).not.toContain('studioEdit');
+    chip(m, 'Face').props.onClick(); await flush();
+    expect(Object.keys(of(m, BodyControls)[0].props).sort()).toEqual(['body', 'frame', 'numbersSaved', 'onBody', 'onFrame', 'scanOwned']);
+    // part → paint → save, the save step completed by Save Look, as it always was
+    walkCards(m)[0].props.onNext(); await flush();
+    walkCards(m)[0].props.onNext(); await flush();
+    expect(walkCards(m)[0].props.state.step).toBe(2);
+    button(tree(m), /Save Look/).props.onClick();
+    await until(() => r.kv.data.get(WALK_KEY) === 'done');
+    expect(walkCards(m)[0].props.state.over).toBe(true);
+    m.unmount();
+  });
+
+  it('edit mode: the Body and Shape controls are told, the walkthrough\'s last step is the hand-back, and Back to Nexus Studio completes it', async () => {
+    const r = rig(`?studioEdit=${SESSION}`, memoryKV(), { walkSeen: false });
+    await handOff(r.kv);
+    const m = await open();
+    await until(() => walkCards(m).length === 2);
+    for (const c of walkCards(m)) expect(c.props.studioEdit).toBe(true);
+    chip(m, 'Face').props.onClick(); await flush();
+    expect(of(m, BodyControls)[0].props.studioEdit).toBe(true);
+    await toShape(m);
+    expect(shapeTab(m).props.studioEdit).toBe(true);
+    walkCards(m)[0].props.onNext(); await flush();
+    walkCards(m)[0].props.onNext(); await flush();
+    expect(walkCards(m)[0].props.state.step).toBe(2);   // the save step, which this mode's Back to Nexus Studio completes
+    button(tree(m), /Back to Nexus Studio/).props.onClick();
+    await until(() => r.close.mock.calls.length === 1);
+    expect(r.kv.data.get(WALK_KEY)).toBe('done');
+    m.unmount();
+  });
+
+  it('edit mode, the Studio no longer waiting: the hand-back failed, so the step is not completed', async () => {
+    const r = rig(`?studioEdit=${SESSION}`, memoryKV(), { walkSeen: false });
+    await handOff(r.kv);
+    const m = await open();
+    await until(() => walkCards(m).length === 2);
+    walkCards(m)[0].props.onNext(); await flush();
+    walkCards(m)[0].props.onNext(); await flush();
+    r.kv.data.delete(CLOSET_EDIT_KEY);
+    button(tree(m), /Back to Nexus Studio/).props.onClick();
+    await until(() => vi.mocked(toast.error).mock.calls.length === 1);
+    expect(walkCards(m)[0].props.state).toMatchObject({ step: 2, over: false });
+    expect(r.kv.data.has(WALK_KEY)).toBe(false);
+    m.unmount();
   });
 });

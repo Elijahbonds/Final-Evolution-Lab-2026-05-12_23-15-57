@@ -10,7 +10,8 @@
 // only to a signed-in player with two or more characters; a guest, a failed read or one character renders nothing.
 // No Babylon here: the mode reloads, so the next spawn resolves the identity afresh.
 
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
+import { SessionContext } from 'next-auth/react';
 import { readLocalLook, writeLocalLook } from '@/lib/creator/localLook';
 import { activeSlotId, slotSummaries, switchActive, type SlotSummary } from '@/lib/creator/look/slots';
 
@@ -29,15 +30,18 @@ export function switcherSlots(answer: SlotsAnswer | null, deviceFace: unknown): 
 export function PlayAsSwitcher({ tint = '#00E5FF', reload = () => window.location.reload() }: { tint?: string; reload?: () => void }) {
   const [state, setState] = useState<ReturnType<typeof switcherSlots>>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  // FIRST-DUNK-BUDGET (2026-10-17): a guest renders nothing, so a guest is not asked either — the read was a 401 on every /try run.
+  const signedIn = useContext(SessionContext)?.status === 'authenticated';
 
   useEffect(() => {
+    if (!signedIn) return;
     let live = true;
     fetch('/api/v1/closet?for=slots')
       .then((r) => (r.ok ? r.json() : null))
       .then((j: SlotsAnswer | null) => { if (live) setState(switcherSlots(j, readLocalLook()?.face)); })
       .catch(() => {});
     return () => { live = false; };
-  }, []);
+  }, [signedIn]);
 
   if (!state || state.slots.length < 2) return null;
 
