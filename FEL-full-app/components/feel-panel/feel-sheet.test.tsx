@@ -120,6 +120,11 @@ describe('the wiring (source pins: these files cannot render here)', () => {
     expect(src).toContain('setFeelSession(feelSessionBlock(pathname, search))');
     expect(src).toMatch(/return \(\) => \{ dead = true; setFeelUser\(false\); \};/);
   });
+  it('leaving /play closes BOTH conditions: the user and the session (a page outside /play, e.g. /story or /arena, has no panel)', () => {
+    const src = readFileSync('components/feel-panel/feel-panel.tsx', 'utf8');
+    expect(src).toContain("useBeforeFrame(() => () => setFeelSession('UNKNOWN'), []);");
+    expect(src).toMatch(/return \(\) => \{ dead = true; setFeelUser\(false\); \};/);
+  });
   it('GameShell never mints a challenge link from a page that used overrides', () => {
     const src = readFileSync('components/games/game-shell.tsx', 'utf8');
     expect(src).toContain('if (!result || feelOverridesUsed()) return;');

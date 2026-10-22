@@ -1,7 +1,7 @@
 // feel-panel lane (owner 2026-10-20). feel(id, default) returns the DEFAULT for everyone: an override applies only when this device holds
 // one AND the server opened the panel for this user AND the run is an unpaid playtest with no staked / ranked / head-to-head / online /
 // party session. Proved here on the store itself and on the four #375 numbers as their modules read them.
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   FEEL_STORAGE_KEY, feel, feelOverridesUsed, feelValuesJson, getFeelState, parseFeelOverrides, resetAllFeelOverrides, resetFeelForTests,
   resetFeelOverride, setFeelOverride, setFeelSession, setFeelUser, subscribeFeel,
@@ -56,6 +56,19 @@ describe('feel(): the default for everyone', () => {
     seed(); setFeelUser(true); setFeelSession(PLAYTEST);
     expect(feel('hoops.aiHandRangeM', 2.4)).toBe(3.1);
     expect(getFeelState().active).toBe(true);
+  });
+  it('a FRESH page (the module as first loaded, no reset helper): closed on every condition, even for an allowed user with an override', async () => {
+    // resetFeelForTests() writes the closed state itself, so it cannot prove the module STARTS closed. A page that never mounts the
+    // panel (/story/*, /arena/*, /dev/*) relies on exactly this start state.
+    vi.resetModules();
+    const fresh = await import('./feel');
+    expect(fresh.getFeelState()).toMatchObject({ userAllowed: false, block: 'UNKNOWN', active: false });
+    seed();
+    fresh.setFeelUser(true);   // the server said yes, but nothing has told the gate where we are
+    expect(fresh.getFeelState().block).toBe('UNKNOWN');
+    for (const k of FEEL_KNOBS) expect(fresh.feel(k.id, k.def), k.id).toBe(k.def);
+    expect(fresh.getFeelState().active).toBe(false);
+    fresh.resetFeelForTests();
   });
   it('the panel closing (unmount: user false, session UNKNOWN) closes it again', () => {
     seed(); setFeelUser(true); setFeelSession(PLAYTEST);
