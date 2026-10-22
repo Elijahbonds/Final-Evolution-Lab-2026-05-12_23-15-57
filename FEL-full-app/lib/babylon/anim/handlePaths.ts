@@ -116,7 +116,7 @@ const bounce = (t: [number, number, number, number, number], rel: P3, floor: P3,
  *  - the hesi, the yoyo, the jab and PAUSIN's release are authored here (the plan gives their shapes, not their keys); their releases sit
  *    lower than a dribble's top so each drop stays under 9 m/s;
  *  - the double cross is one path with two crossings, the second lower (the plan's two queued front paths, joined at the left hand's
- *    low catch instead of its top);
+ *    catch up at the crossover's height instead of its top);
  *  - the spin's hold ends at 0.28 s (plan 0.34): released at 0.34 its drop to the floor by 0.44 s reads 0.154 m a frame;
  *  - the behind-the-back's wrap is lower (0.74–0.76 m; plan 0.80) and its catch starts at 0.56 m, the double cross is 0.60 s (plan 0.56),
  *    the hesi's path 0.66 s (its clip, plan §4.8: 0.62) and the yoyo's 0.67 s (0.66) — each to stay inside 0.15 m a frame at the turbo's
@@ -154,9 +154,9 @@ const AUTHORED: Partial<Record<PathMove, Authored>> = {
     spans: [{ kind: 'hold', hand: 'start' }, { kind: 'hold', hand: 'start' }, fall, rise, catchEnd], crossings: 1,
   },
   snatch_back: bounce([0, 0.09, 0.17, 0.25, 0.40], [0.12, 0.62, 0.34], [0.00, R0, 0.42], [-0.24, 0.58, 0.30], TOP_L),
-  double_cross: {   // two front crossings, the second lower: R → L, the left hand's low catch pushes it straight back, L → R
-    knots: [{ t: 0, p: TOP_R, rest: true }, { t: 0.08, p: [0.14, 0.62, 0.26] }, { t: 0.17, p: [-0.02, R0, 0.34] }, { t: 0.25, p: [-0.28, 0.50, 0.24] }, { t: 0.29, p: [-0.30, 0.54, 0.22] },
-      { t: 0.35, p: [-0.14, 0.50, 0.28] }, { t: 0.43, p: [0.02, R0, 0.34] }, { t: 0.51, p: [0.26, 0.52, 0.24] }, { t: 0.60, p: TOP_R, rest: true }],
+  double_cross: {   // two front crossings, the second lower: R → L, the left hand's catch up at the crossover's height pushes it straight back, L → R
+    knots: [{ t: 0, p: TOP_R, rest: true }, { t: 0.08, p: [0.14, 0.62, 0.26] }, { t: 0.17, p: [-0.02, R0, 0.34] }, { t: 0.26, p: [-0.32, 0.60, 0.26] }, { t: 0.32, p: [-0.30, 0.66, 0.22] },
+      { t: 0.36, p: [-0.14, 0.54, 0.28] }, { t: 0.44, p: [0.02, R0, 0.34] }, { t: 0.52, p: [0.28, 0.58, 0.26] }, { t: 0.60, p: TOP_R, rest: true }],
     spans: [push, fall, rise, catchEnd, { kind: 'push', hand: 'end' }, fall, rise, catchStart], crossings: 2,
   },
   pausin: {   // the ball held out to the side at hip height, the palm on top (plan §4.18), for up to PAUSIN_MAX_SEC
