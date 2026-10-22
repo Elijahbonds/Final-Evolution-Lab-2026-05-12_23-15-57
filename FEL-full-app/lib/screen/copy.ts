@@ -227,3 +227,6 @@ export const REPLAY_WORST = 'Worst rep';
 export const REPLAY_BEST = 'Best rep';
 /** Framing helper: the "you're in the shot" badge, so the state is never shown by colour alone (UX advice §2). */
 export const FRAMING_IN_FRAME = 'In frame';
+/** Reading-quality badge (UX advice §3): two states only, never a percentage — there is no validated accuracy number. */
+export const READ_CLEAR = 'Clear read';
+export const READ_PARTIAL = 'Partial read';
