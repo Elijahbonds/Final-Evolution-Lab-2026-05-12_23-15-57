@@ -16,17 +16,19 @@ describe('the prisma schema that ships', () => {
   const source = () => readFileSync('prisma/schema.prisma', 'utf8');
   const shipped = () => readFileSync('public/_prisma/schema.prisma', 'utf8');
 
-  it('the shipped copy differs from the source in EXACTLY one line: the generator output path', () => {
+  it('the shipped copy differs from the source ONLY in the generator output paths (PRISMA-PUBLIC step 1: two generators)', () => {
     const a = source().split('\n');
     const b = shipped().split('\n');
     expect(b.length).toBe(a.length);
     const differing = a.map((line, i) => (line === b[i] ? null : i)).filter((i): i is number => i !== null);
     // The copy sits one directory deeper, so its relative `output` needs one more hop — see copy-prisma-schema.mjs.
     // Everything else being byte-identical is the property that matters: a model added to one must reach the other.
-    expect(differing).toHaveLength(1);
-    expect(a[differing[0]]).toContain('output');
+    expect(differing).toHaveLength(2);
+    for (const i of differing) { expect(a[i]).toContain('output'); expect(b[i]).toContain('output'); }
     expect(a[differing[0]]).toContain('../public/_prisma/client');
     expect(b[differing[0]]).toContain('./client');
+    expect(a[differing[1]]).toContain('"../lib/generated/prisma"');
+    expect(b[differing[1]]).toContain('"../../lib/generated/prisma"');
   });
 
   it('every model in the source schema reaches the shipped one', () => {

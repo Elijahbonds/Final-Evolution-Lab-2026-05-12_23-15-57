@@ -25,6 +25,7 @@ mkdirSync(destDir, { recursive: true });
 // same directory; copied verbatim they would not.
 writeFileSync(
   join(destDir, 'schema.prisma'),
-  readFileSync(src, 'utf8').replace('output   = "../public/_prisma/client"', 'output   = "./client"'),
+  readFileSync(src, 'utf8').replace('output   = "../public/_prisma/client"', 'output   = "./client"')
+    .replace('output        = "../lib/generated/prisma"', 'output        = "../../lib/generated/prisma"'),   // PRISMA-PUBLIC step 1: same target, relative to public/_prisma
 );
 console.log(`[prisma-schema] copied ${src} -> ${join(destDir, 'schema.prisma')}`);
