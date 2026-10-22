@@ -19,6 +19,8 @@ import { AVAILABILITY_API, AvailabilityPicker } from '@/components/coach/availab
 import { availabilityLine, type AvailabilityView } from '@/lib/coach/availability';
 // COACH-LOOP P1 (2026-10-20): assign the selected program to a group (the duplicate route's first button)
 import { AssignProgram } from '@/components/coach/assign-program';
+// COACH-LOOP P1: the guardian's training report, for teens with an accepted consent only (the server decides who)
+import { GUARDIAN_REPORT_API, GuardianReportButton } from '@/components/coach/guardian-report-button';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -40,6 +42,7 @@ export function ClientsView() {
   // null until the server says the feature is on (the pending SQL applied); then every roster row gets the picker
   const [availability, setAvailability] = useState<Record<string, AvailabilityView> | null>(null);
   const [linked, setLinked] = useState<string[]>([]);
+  const [guardian, setGuardian] = useState<{ eligible: string[]; email: boolean }>({ eligible: [], email: false });
 
   const load = useCallback(async () => {
     const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
@@ -50,6 +53,7 @@ export function ClientsView() {
   }, [selected]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { fetch('/api/coach/messages/unread').then((r) => (r.ok ? r.json() : null)).then((j) => setUnread(j)).catch(() => {}); }, []);
+  useEffect(() => { fetch(GUARDIAN_REPORT_API).then((r) => (r.ok ? r.json() : null)).then((j) => { if (Array.isArray(j?.eligible)) setGuardian({ eligible: j.eligible, email: !!j.email }); }).catch(() => {}); }, []);
   useEffect(() => { fetch(AVAILABILITY_API).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.available) { setAvailability(j.byClient ?? {}); setLinked(Array.isArray(j.linked) ? j.linked : []); } }).catch(() => {}); }, []);
   useEffect(() => {
     if (!selected) return;
@@ -106,6 +110,7 @@ export function ClientsView() {
               <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
               {/* the six-pattern strip, last 7 days; absent when this coach has no active program for them */}
               {r.coverage && <CoverageStrip strip={r.coverage} />}
+              {guardian.eligible.includes(r.clientId) && <GuardianReportButton clientId={r.clientId} name={r.name} emailOn={guardian.email} />}
               {availability && linked.includes(r.clientId) && (
                 <AvailabilityPicker
                   clientId={r.clientId}
