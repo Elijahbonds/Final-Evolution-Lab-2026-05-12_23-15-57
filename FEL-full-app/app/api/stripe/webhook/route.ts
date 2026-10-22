@@ -17,6 +17,7 @@ import {
   subscriptionEnded,
   subscriptionPeriodEnd,
 } from '@/lib/stripe/basil-shapes';
+import { isWalletSession, walletCheckoutCompleted } from '@/lib/wallet/stripe-wallet-events';
 import type Stripe from 'stripe';
 
 /**
@@ -104,9 +105,16 @@ export async function POST(req: NextRequest) {
       // Coach-store fulfilment ignores event.livemode. Other products keep the switch below.
       await fulfilCoachStore(event, eventIdempotencyKey);
     } else switch (event.type) {
-      case 'checkout.session.completed':
+      case 'checkout.session.completed': {
+        // LAUNCH-SALES: coin packs, shard packs and the season pass PRO lane fulfil here too, through the wallet
+        // webhook's own code (one endpoint can be subscribed per signing secret; see stripe-wallet-events.ts).
+        const session = event.data.object as Stripe.Checkout.Session;
+        if (isWalletSession(session)) {
+          return NextResponse.json(await walletCheckoutCompleted(stripe, session));
+        }
         await handleCheckoutCompleted(event, eventIdempotencyKey);
         break;
+      }
       case 'invoice.paid':
         await handleInvoicePaid(event);
         break;
