@@ -448,7 +448,10 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       ctx.objectiveRef.current = rival.root.position;
       ctx.camDirector.setPreset('court');
       ctx.camDirector.snapTo(player.root.position, rival.root.position);
-      // lane/tiebreak-cam: keep the snapped camera; upright, READY already shows the trucked one (no cut on START)
+      // lane/tiebreak-cam: keep the snapped camera; upright, READY already shows the trucked one (no cut on START).
+      // getTarget() is refreshed only by a view-matrix compute: read before one, it is a never-rendered camera's (0, 0, 0),
+      // which aimed the truck at the court's centre spot (rig, 2026-10-22: rendered target (±2.1, 0, 0), not z 8.5 at chest height)
+      ctx.camera.getViewMatrix(true);
       camBase = { pos: ctx.camera.position.clone(), tgt: ctx.camera.getTarget().clone() }; trucked = false;
       framePortrait(ctx);
       if (state.warmup > 0) say(`WARM-UP · ${state.warmup} BALL${state.warmup > 1 ? 'S' : ''}`);

@@ -2,6 +2,7 @@
 // (390×844 DPR 3, the real harness): CameraDirector.snapTo on the 'court' preset, clamped by the tennis venue's bounds. The
 // projection is checked against the same rig's own projections first (a control), so the framing claims rest on it.
 import { describe, expect, it } from 'vitest';
+import { NullEngine, Scene, TargetCamera, Vector3 } from '@babylonjs/core';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONTACT_Y, CONTACT_Z, FAR_Z, NEAR_Z, incomingPoint, type Pt } from '../core/TiebreakFlight';
@@ -112,7 +113,8 @@ describe('the portrait truck', () => {
 describe('TiebreakMode wiring (source)', () => {
   const src = readFileSync(join(__dirname, 'TiebreakMode.ts'), 'utf8');
   it('captures the load\'s camera right after its one snap, and writes the camera only from framePortrait', () => {
-    expect(src).toMatch(/ctx\.camDirector\.snapTo\(player\.root\.position, rival\.root\.position\);\n(\s+\/\/.*\n)?\s+camBase = \{ pos: ctx\.camera\.position\.clone\(\), tgt: ctx\.camera\.getTarget\(\)\.clone\(\) \}; trucked = false;\n\s+framePortrait\(ctx\);/);
+    // the view matrix is computed before the target is read: getTarget() is stale (a fresh camera's 0, 0, 0) until one is
+    expect(src).toMatch(/ctx\.camDirector\.snapTo\(player\.root\.position, rival\.root\.position\);\n(\s+\/\/.*\n)*\s+ctx\.camera\.getViewMatrix\(true\);\n\s+camBase = \{ pos: ctx\.camera\.position\.clone\(\), tgt: ctx\.camera\.getTarget\(\)\.clone\(\) \}; trucked = false;\n\s+framePortrait\(ctx\);/);
     const fn = src.slice(src.indexOf('function framePortrait'), src.indexOf('function say('));
     const outside = src.replace(fn, '');
     expect(outside).not.toMatch(/ctx\.camera\.(position\.(set|copyFrom|addInPlace|x|y|z)\b|position =|setTarget)/);
@@ -131,5 +133,24 @@ describe('TiebreakMode wiring (source)', () => {
   });
   it('the shared \'court\' preset is not this lane\'s to change', () => {
     expect(FOLLOW_PRESETS.court).toEqual({ distance: 8.0, height: 2.6, minHeight: 1.5, pitchFloorDeg: 6, pitchCapDeg: 16, targetHeight: 1.35, lag: 0.10, lookAhead: 1.0, fitTwo: true, fovGain: 0.10, fovAtSpeed: 6.4 });
+  });
+});
+
+describe('reading the load\'s aim (Babylon, NullEngine)', () => {
+  // The first fix read getTarget() straight after snapTo's setTarget: on the rig the truck then aimed at (±2.1, 0, 0), the court's
+  // centre spot, not the snapped (x, 1.32, 8.5). getTarget() is only refreshed by a view-matrix compute.
+  const aimed = () => {
+    const cam = new TargetCamera('c', new Vector3(CAM[0], CAM[1], CAM[2]), new Scene(new NullEngine()));
+    cam.setTarget(new Vector3(TGT[0], TGT[1], TGT[2]));
+    return cam;
+  };
+  it('control: before a view-matrix compute, a fresh camera\'s getTarget() is (0, 0, 0), whatever it was aimed at', () => {
+    const t = aimed().getTarget();
+    expect([t.x, t.y, t.z]).toEqual([0, 0, 0]);
+  });
+  it('after getViewMatrix(true), getTarget() is the snapped aim point', () => {
+    const cam = aimed(); cam.getViewMatrix(true);
+    const t = cam.getTarget();
+    for (let i = 0; i < 3; i++) expect([t.x, t.y, t.z][i]).toBeCloseTo(TGT[i], 3);
   });
 });
