@@ -52,7 +52,6 @@ import { claimLines } from './claim';
 import { ClaimBar } from './claim-bar';
 
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
-const BEAT_EASE = 'cubic-bezier(0.2,1.4,0.4,1)';
 
 /** The figures under the headline: the Arena's settled pair when the run was staked, else the mode's own. */
 export function scoreFigures(p: Pick<EndScreenProps, 'run' | 'arenaVerdict' | 'arenaResult'>): { mine: number; vs: number | null; vsLabel: string | null } {
@@ -76,7 +75,7 @@ function Beat({ show, instant, children, className = '' }: { show: boolean; inst
       aria-hidden={show ? undefined : true}
       data-beat={show ? 'shown' : 'waiting'}
       className={`${className} ${instant ? '' : 'transition-[opacity,transform] duration-300'} ${show ? 'opacity-100' : 'pointer-events-none translate-y-3 scale-95 opacity-0'}`}
-      style={instant ? undefined : { transitionTimingFunction: BEAT_EASE }}
+      style={instant ? undefined : { transitionTimingFunction: 'cubic-bezier(0.2,1.4,0.4,1)' }}
     >
       {children}
     </div>

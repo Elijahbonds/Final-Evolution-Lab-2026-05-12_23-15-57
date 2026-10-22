@@ -43,6 +43,28 @@ describe('NP-1 placeholder language', () => {
     expect(src).not.toContain("'Coming soon'");
   });
 
+  it('the creator hub renders all nine disciplines and sends authoring tiles to their guided flows', () => {
+    const src = readFileSync('app/creator/_components/hub.tsx', 'utf8');
+    expect(src).toContain('DISCIPLINES.map((d) =>');
+    for (const id of ['dance', 'acting', 'music', 'sport', 'art', 'scene', 'cooking', 'fashion', 'writing']) {
+      expect(src).toContain(`id: '${id}'`);
+    }
+    for (const href of ['/create/art', '/create/scene', '/create/cooking', '/create/fashion', '/create/writing']) {
+      expect(src).toContain(`href: '${href}'`);
+    }
+    expect(src).not.toContain("'Coming soon'");
+  });
+
+  it('the Create hub and preview do not label unwired consumers as soon', () => {
+    for (const f of [
+      'components/creator/creative-hub.tsx',
+      'components/create/guided-flow.tsx',
+      'lib/create/disciplines.ts',
+    ]) {
+      expect(readFileSync(f, 'utf8')).not.toMatch(/\bsoon\b/i);
+    }
+  });
+
   it('an unbuilt program lane is a 404, not a "coming soon" page', () => {
     expect(readFileSync('app/coach/[slug]/programs/[lane]/page.tsx', 'utf8')).toContain('if (coming) notFound();');
   });
