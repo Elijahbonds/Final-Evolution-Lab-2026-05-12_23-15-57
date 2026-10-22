@@ -10,6 +10,7 @@ import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App 
 import { stripeTestGate } from '@/lib/coach-store/stripeMode';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
+import { adultBuyerGate } from '@/lib/stripe/adult-gate';
 import { ensureStripeCustomer, createStudioCreditsCheckout } from '@/lib/stripe/product-checkout';
 import { previewPurchase } from '@/lib/store/coachListing';
 import { loadSharedProfile } from '@/lib/profile/profileServer';
@@ -45,6 +46,10 @@ export async function POST(req: NextRequest) {
   const site = siteOrigin();
   if (!site) return storeClosed('site_url_not_set');
   const origin: string = site;
+  // LAUNCH-SALES (B10's "18+ check"): every product this route sells is real money. A buyer who is not a verified
+  // adult (DB dobYear, strict rule; unknown age is not an adult) is 403 adults_only before any Stripe call.
+  const refused = await adultBuyerGate(prisma, userId);
+  if (refused) return refused;
   const stripe = getStripe();
 
   try {
