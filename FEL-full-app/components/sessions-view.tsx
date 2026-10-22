@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { CalendarDays, Loader2, Users, Lock, Check, Sparkles, Dumbbell } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
+import { ELIJAH_COACH_STORE_HREF } from '@/lib/creator/coachStoreHrefs';
 import { BookingRow, HostingPanel, type BookingWithLink, type HostingSlot } from '@/components/sessions/join-links';
 
 type GroupSlot = { sessionKey: string; host: string; startsAtIso: string; label: string; shards: number; capacity: number };
@@ -195,7 +196,7 @@ export function SessionsView() {
       {coachStore ? (
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-white/70">Private 1-on-1</h2>
-          <Link href="/coach/elijah" className="text-sm text-cyan-300 underline">Book with Elijah on the coach store</Link>
+          <Link href={ELIJAH_COACH_STORE_HREF} className="text-sm text-cyan-300 underline">Book with Elijah on the coach store</Link>
         </section>
       ) : <section className="mb-8">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-white/70"><Lock className="h-4 w-4 text-purple-300" /> Private 1-on-1 (18+)</h2>

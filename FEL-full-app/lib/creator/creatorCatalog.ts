@@ -16,6 +16,9 @@
  */
 
 import { PARTNERS } from '@/lib/books/bookCatalog';
+import { ELIJAH_COACH_STORE_SLUG, ELIJAH_PROFILE_SLUG } from './coachStoreHrefs';
+
+export { ELIJAH_COACH_STORE_HREF, ELIJAH_DUNK_PROGRAM_HREF, ELIJAH_PROFILE_SLUG } from './coachStoreHrefs';
 
 export interface CreatorLink {
   label: string;
@@ -118,7 +121,7 @@ function service(input: Omit<CreatorService, 'approved'> & { approved?: boolean 
 
 export const PROFILES: readonly CreatorProfile[] = [
   {
-    slug: 'elijah-bonds',
+    slug: ELIJAH_PROFILE_SLUG,
     name: 'Elijah Bonds',
     approved: true,
     photoUrl: null,
@@ -130,7 +133,7 @@ export const PROFILES: readonly CreatorProfile[] = [
       { label: 'Amazon author page', href: 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B' },
     ],
     // The coach-store page /coach/elijahbonds (the store terms name it). Book buttons go there.
-    coachStoreSlug: 'elijahbonds',
+    coachStoreSlug: ELIJAH_COACH_STORE_SLUG,
     services: [
       service({
         id: 'elijah-bonds:session-60',
@@ -199,6 +202,9 @@ function assertCatalog(profiles: readonly CreatorProfile[]): void {
     slugs.add(p.slug);
     if (p.bio.trim() === '') throw new Error(`${p.slug} needs a bio line`);
     if (p.coachStoreSlug != null && !/^[a-z0-9][a-z0-9-]*$/.test(p.coachStoreSlug)) throw new Error(`bad coach-store slug on ${p.slug}`);
+    if (p.slug === ELIJAH_PROFILE_SLUG && p.coachStoreSlug !== ELIJAH_COACH_STORE_SLUG) {
+      throw new Error(`Elijah's coach-store slug must stay ${ELIJAH_COACH_STORE_SLUG}`);
+    }
     for (const s of p.services) {
       if (s.profileSlug !== p.slug || !s.id.startsWith(`${p.slug}:`)) throw new Error(`service ${s.id} is on the wrong profile`);
       if (serviceIds.has(s.id)) throw new Error(`duplicate service ${s.id}`);
@@ -256,6 +262,13 @@ export function publicMediaKitPackageDetail(pkg: MediaKitPackage): string {
 export function coachStoreBookHref(profile: CreatorProfile): string | null {
   if (!profile.approved || !profile.coachStoreSlug) return null;
   return `/coach/${profile.coachStoreSlug}`;
+}
+
+export function requiredCoachStoreBookHref(profileSlug: string): string {
+  const profile = getApprovedProfile(profileSlug);
+  const href = profile ? coachStoreBookHref(profile) : null;
+  if (!href) throw new Error(`${profileSlug} needs an approved coach-store slug`);
+  return href;
 }
 
 export function mediaKitProfile(): CreatorProfile | undefined {
