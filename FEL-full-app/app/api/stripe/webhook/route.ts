@@ -9,6 +9,14 @@ import {
 import { fulfilCheckoutSession } from '@/lib/stripe/checkout-fulfil';
 import { verifyIdempotencyKey } from '@/lib/stripe/verify-checkout';
 import { coachStoreMeta, fulfilCoachStore } from '@/lib/coach-store/webhook';
+import {
+  invoicePeriodEnd,
+  invoiceSubscriptionId,
+  invoiceSubscriptionMetadata,
+  isSubscriptionProduct,
+  subscriptionEnded,
+  subscriptionPeriodEnd,
+} from '@/lib/stripe/basil-shapes';
 import type Stripe from 'stripe';
 
 /**
@@ -100,7 +108,7 @@ export async function POST(req: NextRequest) {
         await handleCheckoutCompleted(event, eventIdempotencyKey);
         break;
       case 'invoice.paid':
-        await handleInvoicePaid(event, eventIdempotencyKey);
+        await handleInvoicePaid(event);
         break;
       case 'invoice.payment_failed':
         await handleInvoiceFailed(event);
@@ -139,46 +147,83 @@ async function handleCheckoutCompleted(event: Stripe.Event, _eventIdempotencyKey
   await fulfilCheckoutSession(session, verifyIdempotencyKey(session.id));
 }
 
-async function handleInvoicePaid(event: Stripe.Event, idempotencyKey: string) {
-  const invoice = event.data.object as any;
-  const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
-  if (!subId) return;
+// LAUNCH-SALES B-W3. The pinned API version (2025-04-30.basil) removed invoice.subscription and
+// subscription.current_period_end; these handlers read the basil fields through lib/stripe/basil-shapes.ts (which
+// still accepts the old shape). Before: every renewal and failed payment returned early on a missing subscription
+// id (no ledger row, no period moved, never PAST_DUE), and every period write was `new Date(NaN)`, which Prisma
+// refuses, so customer.subscription.updated 500'd on every retry.
 
-  const sub = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: subId } });
-  if (!sub) { console.warn(`[webhook] invoice.paid for unknown sub ${subId}`); return; }
+/** The Subscription row for a Stripe subscription id, written from the invoice's metadata when it is missing. */
+async function subscriptionRowFor(
+  subId: string,
+  invoice: Stripe.Invoice,
+  stripeSub: Stripe.Subscription,
+): Promise<{ userId: string; product: string; status: string } | null> {
+  const row = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: subId } });
+  if (row) return row;
+  // invoice.paid may land BEFORE checkout.session.completed (Stripe does not order events). The subscription's own
+  // metadata (written at checkout, snapshotted onto every invoice) is enough to create the row the checkout would.
+  const meta = { ...(stripeSub.metadata ?? {}), ...invoiceSubscriptionMetadata(invoice) } as Record<string, string>;
+  if (!meta.userId || !isSubscriptionProduct(meta.product)) return null;
+  const periodEnd = subscriptionPeriodEnd(stripeSub) ?? invoicePeriodEnd(invoice);
+  return prisma.subscription.upsert({
+    where: { stripeSubscriptionId: subId },
+    update: {},
+    create: {
+      userId: meta.userId,
+      stripeSubscriptionId: subId,
+      stripePriceId: stripeSub.items?.data?.[0]?.price?.id ?? '',
+      product: meta.product,
+      status: 'ACTIVE',
+      currentPeriodEnd: periodEnd,
+    },
+  });
+}
+
+async function handleInvoicePaid(event: Stripe.Event) {
+  const invoice = event.data.object as Stripe.Invoice;
+  const subId = invoiceSubscriptionId(invoice);
+  if (!subId) return;
 
   const amountCents = invoice.amount_paid ?? 0;
   if (amountCents <= 0) return; // trial or free
 
+  // The Stripe read happens OUTSIDE the database transaction.
+  const stripeSub = await getStripe().subscriptions.retrieve(subId);
+  const sub = await subscriptionRowFor(subId, invoice, stripeSub);
+  if (!sub) { console.warn(`[webhook] invoice.paid for unknown sub ${subId}`); return; }
+  const periodEnd = subscriptionPeriodEnd(stripeSub) ?? invoicePeriodEnd(invoice);
+
   await prisma.$transaction(async (tx: any) => {
-    // Update subscription period
-    const stripe = getStripe();
-    const stripeSub: any = await stripe.subscriptions.retrieve(subId);
+    // Update subscription period. A paid invoice re-opens the row (an unpaid subscription that was paid comes
+    // back) unless Stripe has ended the subscription: a refund cancels it (lib/stripe/refund-revoke.ts), and an
+    // invoice paid after that is recorded, never a re-grant.
     await tx.subscription.update({
       where: { stripeSubscriptionId: subId },
       data: {
-        status: 'ACTIVE',
-        currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+        ...(subscriptionEnded(stripeSub) ? {} : { status: 'ACTIVE' }),
+        ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
       },
     });
-    // Ledger: EXTERNAL → PLATFORM_REVENUE
+    // Ledger: EXTERNAL → PLATFORM_REVENUE. Keyed on the INVOICE, so a redelivered or replayed event (or both
+    // events of a retry) books one payment once.
     await ledgerSubscriptionPayment(tx, {
       userId: sub.userId,
       amountCents,
-      idempotencyKey,
+      idempotencyKey: `stripe-invoice:${invoice.id}`,
       kind: `SUBSCRIPTION_PAYMENT_${sub.product}`,
-      metadata: { invoiceId: invoice.id, subscriptionId: subId, product: sub.product },
+      metadata: { invoiceId: invoice.id ?? null, subscriptionId: subId, product: sub.product },
     });
   });
 }
 
 async function handleInvoiceFailed(event: Stripe.Event) {
-  const invoice = event.data.object as any;
-  const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id;
+  const invoice = event.data.object as Stripe.Invoice;
+  const subId = invoiceSubscriptionId(invoice);
   if (!subId) return;
 
   await prisma.subscription.updateMany({
-    where: { stripeSubscriptionId: subId },
+    where: { stripeSubscriptionId: subId, status: { not: 'CANCELED' } },
     data: { status: 'PAST_DUE' },
   });
   console.log(`[webhook] Subscription ${subId} marked PAST_DUE`);
@@ -190,12 +235,17 @@ async function handleSubscriptionUpdated(event: Stripe.Event) {
   if (!sub) return;
 
   const status = mapStripeStatus(stripeSub.status);
+  const periodEnd = subscriptionPeriodEnd(stripeSub);
+  // Stripe does not order events. An 'active' update delivered after a refund cancelled the subscription is stale:
+  // before re-opening a CANCELED row, ask Stripe for the subscription as it is now.
+  const stale = sub.status === 'CANCELED' && status === 'ACTIVE'
+    && subscriptionEnded(await getStripe().subscriptions.retrieve(stripeSub.id));
   await prisma.subscription.update({
     where: { stripeSubscriptionId: stripeSub.id },
     data: {
-      status,
+      ...(stale ? {} : { status }),
       cancelAtPeriodEnd: stripeSub.cancel_at_period_end,
-      currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000),
+      ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
     },
   });
 }

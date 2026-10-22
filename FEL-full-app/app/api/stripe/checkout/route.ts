@@ -94,6 +94,10 @@ export async function POST(req: NextRequest) {
       }],
       // `plan` keeps the cadence for reporting; `product` stays the entitlement the webhook writes
       metadata: { userId, product: entitlementProduct, plan: String(product) },
+      // LAUNCH-SALES (B-W3): the same metadata on the SUBSCRIPTION, so every invoice carries it
+      // (basil: invoice.parent.subscription_details.metadata). invoice.paid can then write the
+      // Subscription row itself when it lands before checkout.session.completed.
+      subscription_data: { metadata: { userId, product: entitlementProduct, plan: String(product) } },
       success_url: `${origin}/account?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/account?stripe=cancel`,
     });
