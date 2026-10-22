@@ -87,6 +87,13 @@ ok(files.length > 0, `A1 found game-mounting files (got ${files.length})`);
 ok(enabledModes.length > 0, `A2 found enabled Babylon registry modes (got ${enabledModes.length})`);
 ok(babylonFlags.size > 0, `A3 found renderer flags (got ${babylonFlags.size})`);
 
+// Enabled registry modes whose LIVE route never asks the renderer flag, each with its reason. integ/backlog
+// (2026-10-22): #335 took `dunkduel` out of BABYLON_MODES because /play/dunkduel is the IRL Prove It camera route,
+// while #346 added A6 here; the exemption is held from both sides (A7), so it cannot go stale silently.
+const NOT_RENDERER_FLAGGED: Record<string, string> = {
+  dunkduel: '/play/dunkduel is the IRL Prove It camera route; DunkDuelMode is dev-harness only and its route never asks isBabylon',
+};
+
 const mappedModes = Object.keys(rendererFlagByRegistryMode);
 const missingModeMappings = enabledModes.filter((mode) => rendererFlagByRegistryMode[mode] == null);
 const staleModeMappings = mappedModes.filter((mode) => !enabledModes.includes(mode));
@@ -94,11 +101,15 @@ const missingRendererFlags = enabledModes
   .map((mode) => `${mode} -> ${rendererFlagByRegistryMode[mode] ?? '(missing map)'}`)
   .filter((pair) => {
     const flag = pair.split(' -> ')[1];
-    return flag !== '(missing map)' && !babylonFlags.has(flag);
+    return flag !== '(missing map)' && !babylonFlags.has(flag) && !(pair.split(' -> ')[0] in NOT_RENDERER_FLAGGED);
   });
+const staleRendererExemptions = Object.keys(NOT_RENDERER_FLAGGED).filter((mode) => (
+  !enabledModes.includes(mode) || babylonFlags.has(rendererFlagByRegistryMode[mode] ?? mode)
+));
 ok(missingModeMappings.length === 0, `A4 enabled modes missing renderer flag map: ${missingModeMappings.join(', ')}`);
 ok(staleModeMappings.length === 0, `A5 renderer flag map contains stale disabled modes: ${staleModeMappings.join(', ')}`);
 ok(missingRendererFlags.length === 0, `A6 enabled modes missing true BABYLON_MODES flags: ${missingRendererFlags.join(', ')}`);
+ok(staleRendererExemptions.length === 0, `A7 renderer-flag exemptions must be enabled modes whose flag is really off: ${staleRendererExemptions.join(', ')}`);
 
 for (const path of files) {
   const src = readFileSync(path, 'utf8');
