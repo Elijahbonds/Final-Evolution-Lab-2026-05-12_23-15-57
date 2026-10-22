@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, Copy, Link2, Loader2, QrCode, Users, X } from 'lucide-react';
 import { inviteUrl } from '@/lib/coach/invite';
+// COACH-LOOP P1 (2026-10-20): the typed code each new invite carries
+import { JOIN_BY_CODE_PATH, codeOfToken, formatCode } from '@/lib/coach/inviteCode';
 
 interface Invite { token: string; use: 'once' | 'many'; expiresAt: string; joined: number }
 
@@ -70,7 +72,8 @@ export function InvitePanel() {
         <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">Add an athlete</h2>
       </header>
       <p className="mt-2 text-xs leading-relaxed text-white/50">
-        Send a link or show the QR. They sign up, land on your roster, and you can program for them straight away.
+        Send a link, show the QR, or write the code on the board. They sign up, land on your roster, and you can program
+        for them straight away.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -89,12 +92,15 @@ export function InvitePanel() {
       {invites?.length === 0 && <p className="mt-4 text-xs text-white/35">No open invites.</p>}
 
       <ul className="mt-4 space-y-2">
-        {invites?.map((i) => (
+        {invites?.map((i) => {
+          const code = codeOfToken(i.token);
+          return (
           <li key={i.token} className="rounded-xl border border-white/10 bg-black/30 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
                 {i.use === 'once' ? 'One athlete' : 'Reusable'} · {i.joined} joined
               </span>
+              {code && <span className="font-mono text-sm font-bold tracking-[0.15em] text-[#00E5FF]" title={`Type it at ${JOIN_BY_CODE_PATH}`} data-invite-code>{formatCode(code)}</span>}
               <span className="ml-auto flex gap-1">
                 <button onClick={() => copy(i.token)} title="Copy the link"
                   className="rounded-md border border-white/15 p-1.5 text-white/70 hover:text-white">
@@ -117,8 +123,12 @@ export function InvitePanel() {
               </div>
             )}
           </li>
-        ))}
+          );
+        })}
       </ul>
+      {invites?.some((i) => codeOfToken(i.token)) && (
+        <p className="mt-2 text-[11px] text-white/40">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
+      )}
     </section>
   );
 }
