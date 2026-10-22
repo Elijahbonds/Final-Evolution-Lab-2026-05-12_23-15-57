@@ -8,7 +8,7 @@
 
 import 'server-only';
 import Stripe from 'stripe';
-import { formatLabel, getBook, getOffer, type BookOffer, type BookTitle } from './bookCatalog';
+import { formatLabel, getBook, getOffer, publicBookDescription, type BookOffer, type BookTitle } from './bookCatalog';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import type { StoreClosedReason } from '@/lib/coach-store/stripeMode';
@@ -169,8 +169,8 @@ export function checkoutParamsForOffer(input: CheckoutBuildInput): Stripe.Checko
           product_data: {
             name: `${input.book.title} — ${formatLabel(input.offer.format)}`,
             description: input.offer.priceIsExample
-              ? 'EXAMPLE price — placeholder, not a final price.'
-              : input.book.description,
+              ? `${publicBookDescription(input.book)} Price is marked example pending final approval.`
+              : publicBookDescription(input.book),
           },
         },
       };

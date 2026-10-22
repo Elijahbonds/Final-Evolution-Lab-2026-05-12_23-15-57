@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { approvedProfiles, coachStoreBookHref } from '@/lib/creator/creatorCatalog';
+import { approvedProfiles, coachStoreBookHref, publicProfileSpecialty } from '@/lib/creator/creatorCatalog';
 import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
 import { teamPageLede } from '@/lib/creator/teamCopy';
 import { CreatorFrame, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
@@ -34,7 +34,7 @@ export default async function TeamPage() {
                   <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} />
                   <div className="min-w-0">
                     <p className="fel-heading text-2xl text-white">{profile.name}</p>
-                    <p className="text-xs text-white/50">{profile.specialty}</p>
+                    <p className="text-xs text-white/50">{publicProfileSpecialty(profile)}</p>
                   </div>
                 </Link>
                 {bookHref ? (

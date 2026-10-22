@@ -262,6 +262,22 @@ describe('streaming (plan item #11, server half)', () => {
     expect(text).toContain('Dunk ✓ é');
     expect(text).not.toContain('�');
   });
+
+  it('provider network failure is temporary unavailability, not a generic app crash', async () => {
+    fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    const res = await POST(ask());
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: 'Coach is temporarily unavailable' });
+  });
+
+  it('provider aborts are reported as a timeout', async () => {
+    const abort = new Error('aborted');
+    abort.name = 'AbortError';
+    fetchSpy.mockRejectedValueOnce(abort);
+    const res = await POST(ask());
+    expect(res.status).toBe(504);
+    expect(await res.json()).toEqual({ error: 'Coach is temporarily unavailable' });
+  });
 });
 
 describe('the consent route', () => {

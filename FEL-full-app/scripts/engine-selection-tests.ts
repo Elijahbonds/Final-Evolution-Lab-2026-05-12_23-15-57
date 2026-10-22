@@ -20,6 +20,47 @@ const fail: string[] = [];
 const ok = (c: boolean, label: string): void => { checks++; if (!c) fail.push(label); };
 
 const ROOT = process.cwd();
+const registry = readFileSync(join(ROOT, 'lib', 'babylon', 'modes', 'registry.ts'), 'utf8');
+const rendererFlags = readFileSync(join(ROOT, 'components', 'three', 'flags.ts'), 'utf8');
+
+const enabledBody = registry.match(/ENABLED_BABYLON_MODES = new Set<string>\(\[([\s\S]*?)\]\)/)?.[1] ?? '';
+const enabledModes = [...enabledBody.matchAll(/'([a-zA-Z0-9_]+)'/g)].map((m) => m[1]);
+const babylonFlagsBody = rendererFlags.match(/const BABYLON_MODES:[^{]+{([\s\S]*?)^};/m)?.[1] ?? '';
+const babylonFlags = new Set([...babylonFlagsBody.matchAll(/([A-Za-z0-9_]+):\s*true/g)].map((m) => m[1]));
+
+// Registry mode IDs, route session keys, and renderer flag keys do not share one vocabulary.
+// Make the translation explicit so enabling a mode cannot silently leave it on a fallback renderer.
+const rendererFlagByRegistryMode: Record<string, string> = {
+  aeroaces: 'aeroAces',
+  bigair: 'bigAir',
+  brainbrawl: 'brainBrawl',
+  carnival: 'carnival',
+  dance: 'dance',
+  derby: 'baseball',
+  duel: 'duel',
+  dunk: 'dunkContest',
+  dunkduel: 'dunkduel',
+  football: 'football',
+  freerun: 'freerun',
+  golf: 'golf',
+  karate: 'karateEndless',
+  karate_vs: 'karateVersus',
+  mixedcombat: 'mixedcombat',
+  onevone: 'hoops1v1',
+  penalty: 'soccer',
+  showdown: 'showdown',
+  skateboard: 'skateboard',
+  snowboard_slalom: 'snowboard_slalom',
+  sprint: 'sprint',
+  surf: 'surf',
+  tennis: 'tennis',
+  threepoint: 'threePoint',
+  threevthree: 'hoops3v3',
+  tiebreak: 'tiebreak',
+  velocitykart: 'velocityKart',
+  volleyball: 'volleyball',
+  who_scene_it: 'whoSceneIt',
+};
 
 /** Every file that chooses which game component to mount. */
 function mountingFiles(): string[] {
@@ -43,6 +84,21 @@ function mountingFiles(): string[] {
 
 const files = mountingFiles();
 ok(files.length > 0, `A1 found game-mounting files (got ${files.length})`);
+ok(enabledModes.length > 0, `A2 found enabled Babylon registry modes (got ${enabledModes.length})`);
+ok(babylonFlags.size > 0, `A3 found renderer flags (got ${babylonFlags.size})`);
+
+const mappedModes = Object.keys(rendererFlagByRegistryMode);
+const missingModeMappings = enabledModes.filter((mode) => rendererFlagByRegistryMode[mode] == null);
+const staleModeMappings = mappedModes.filter((mode) => !enabledModes.includes(mode));
+const missingRendererFlags = enabledModes
+  .map((mode) => `${mode} -> ${rendererFlagByRegistryMode[mode] ?? '(missing map)'}`)
+  .filter((pair) => {
+    const flag = pair.split(' -> ')[1];
+    return flag !== '(missing map)' && !babylonFlags.has(flag);
+  });
+ok(missingModeMappings.length === 0, `A4 enabled modes missing renderer flag map: ${missingModeMappings.join(', ')}`);
+ok(staleModeMappings.length === 0, `A5 renderer flag map contains stale disabled modes: ${staleModeMappings.join(', ')}`);
+ok(missingRendererFlags.length === 0, `A6 enabled modes missing true BABYLON_MODES flags: ${missingRendererFlags.join(', ')}`);
 
 for (const path of files) {
   const src = readFileSync(path, 'utf8');

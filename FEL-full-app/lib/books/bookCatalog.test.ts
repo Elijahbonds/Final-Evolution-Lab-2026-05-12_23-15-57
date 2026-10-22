@@ -5,9 +5,12 @@ import {
   EXAMPLE_AUDIO_CENTS,
   EXAMPLE_BUNDLE_CENTS,
   EXAMPLE_EBOOK_CENTS,
+  EXAMPLE_PRICE_NOTE,
   PARTNERS,
   getBook,
   getOffer,
+  publicBookDescription,
+  publicChapterInventoryNotice,
 } from './bookCatalog';
 
 const TITLES = [
@@ -59,6 +62,25 @@ describe('the press catalog', () => {
       expect(getOffer(`${slug}:ebook`)!.directSale).toBe(true);
       expect(getOffer(`${slug}:audiobook`)!.directSale).toBe(!book.chaptersArePlaceholder);
       expect(getOffer(`${slug}:bundle`)!.directSale).toBe(!book.chaptersArePlaceholder);
+    }
+  });
+
+  it('keeps unfinished catalog copy out of public Press surfaces', () => {
+    expect(EXAMPLE_PRICE_NOTE).not.toMatch(/placeholder/i);
+    for (const book of BOOKS) {
+      expect(publicBookDescription(book), book.slug).not.toMatch(/placeholder/i);
+      expect(publicChapterInventoryNotice(book) ?? '', book.slug).not.toMatch(/placeholder/i);
+    }
+
+    for (const file of [
+      'app/press/page.tsx',
+      'app/press/[slug]/page.tsx',
+      'components/press/press-frame.tsx',
+      'components/press/offer-card.tsx',
+      'lib/books/bookCheckout.ts',
+    ]) {
+      const src = readFileSync(file, 'utf8');
+      expect(src, file).not.toMatch(/book\.description|featured\.description|placeholder until/i);
     }
   });
 
