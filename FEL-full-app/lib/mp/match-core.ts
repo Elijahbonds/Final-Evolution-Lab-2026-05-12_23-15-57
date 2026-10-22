@@ -77,7 +77,7 @@ export const MP_MODES: { key: string; label: string }[] = [
   // and find nothing to stake it against. Their session keys are taken from what the hosts actually
   // post under, not guessed; non-GameShell camera flows stay out until they implement the same handoff.
   { key: 'karate', label: 'The Hundred' },
-  { key: 'mixedcombat', label: 'Mixed Rules' },
+  { key: 'mixedcombat', label: "Ring's Edge" },
   // Prove It (/play/dunkduel) is the IRL camera flow and does not mount GameShell or honor ?c= yet.
   // Keep its Babylon mode in the registry/dev harness, but do not offer it as an async score challenge.
   { key: 'who-scene-it', label: 'Spot the Scene' },

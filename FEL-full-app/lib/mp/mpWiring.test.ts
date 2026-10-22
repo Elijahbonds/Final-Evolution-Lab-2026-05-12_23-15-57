@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { MP_MODES, MP_SESSION_MODE, sessionModeFor, isValidMpMode } from './match-core';
 import { challengePlayHref } from '../social/challenge-routes';
+import { MODE_INFO } from '../game-data';
 
 const ROOT = path.resolve(__dirname, '../..');
 
@@ -67,5 +68,12 @@ describe('every challenge can settle', () => {
   it('Prove It is not advertised as an async challenge until its live route handles challenge handoff', () => {
     expect(MP_MODES.map((m) => m.key)).not.toContain('dunkduel');
     expect(challengePlayHref('dunkduel', 'DD-7')).toBeNull();
+  });
+
+  it('challenge labels match the catalogue names players see elsewhere', () => {
+    const wrong = MP_MODES
+      .filter((m) => MODE_INFO[sessionModeFor(m.key)]?.name !== m.label)
+      .map((m) => `${m.key}: challenge '${m.label}' vs catalogue '${MODE_INFO[sessionModeFor(m.key)]?.name ?? 'missing'}'`);
+    expect(wrong).toEqual([]);
   });
 });
