@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { MODE_INFO, VENUES } from './game-data';
-import { modesAtVenue, shelfModeKeys, venueCardModes } from './venueModes';
+import { isPlayableGameVenue, modesAtVenue, playableGameVenues, shelfModeKeys, venueCardModes } from './venueModes';
 
 const live = shelfModeKeys();
 
@@ -27,6 +27,14 @@ describe('venue cards list their live modes', () => {
   it('a mode off the shelf is not listed, and the Duel is not in the dojo', () => {
     expect(modesAtVenue('Venice Beach Court', new Set(['dunkContest']))).toEqual(['Flight Night']);
     expect(modesAtVenue('Shimogamo Dojo')).not.toContain('Duel');
+  });
+
+  it('only game-route venues appear in the Play venue browser', () => {
+    expect(isPlayableGameVenue(VENUES.find((v) => v.key === 'lumaveniceshop')!)).toBe(false);
+    expect(playableGameVenues(VENUES).map((v) => v.href)).toEqual(
+      expect.arrayContaining(['/play/dunk', '/play/karate', '/play/tennis']),
+    );
+    expect(playableGameVenues(VENUES).map((v) => v.href)).not.toContain('/shop');
   });
 
   it('every card has art: a photo, or the branded placeholder tile', () => {

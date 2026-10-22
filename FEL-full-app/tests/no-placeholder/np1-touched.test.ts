@@ -62,8 +62,10 @@ describe('NP-1 placeholder language', () => {
     expect(readFileSync('components/season-pass-track.tsx', 'utf8')).toContain('!state.hasPro && state.proPurchasable && (');
   });
 
-  it('the venue shelf only lists playable venues', () => {
-    expect(readFileSync('components/shell/venue-shelf.tsx', 'utf8')).toContain('VENUES.filter((v) => v.playable).map(');
+  it('the venue shelf only lists playable game venues', () => {
+    const src = readFileSync('components/shell/venue-shelf.tsx', 'utf8');
+    expect(src).toContain('playableGameVenues(VENUES)');
+    expect(src).toContain('{venues.map((venue, i) =>');
   });
 
   it('the Nova announcer line no longer says "opens soon"', () => {

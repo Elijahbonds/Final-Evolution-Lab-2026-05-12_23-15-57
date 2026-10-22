@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
@@ -43,6 +44,17 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({
+    busRef,
+    endedRef,
+    setPhase,
+    setCountdown,
+    setLoadError,
+    reset: () => {
+      setHud({});
+      replayAtRef.current = null;
+    },
+  });
   useBabylonPlaytestBridge('who_scene_it', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
@@ -72,8 +84,8 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-WSI] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: callbacks are refs; bootAttempt is the retry remount key after a rejected runMode().
+  }, [bootAttempt]);
 
   // IMPROVE (#16): REPLAY on the shell's end card — a new set of rounds on this stage, same players, no reboot
   const restart = useCallback((): boolean => {
@@ -251,7 +263,7 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
             <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
             <button
               type="button"
-              onClick={tapStart}
+              onClick={retryBoot}
               className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
             >
               RETRY
