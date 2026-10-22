@@ -68,6 +68,7 @@ import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore'
 import { formReadStore } from '@/lib/move/formRead';   // HOOPS BODY (2026-10-07): the end card's FORM block
 import { renderDue } from './pausedRender';   // IMPROVE (2026-10-06, 3PT #18): the pause renders at ~10 fps
 import { stripStaticControls } from '../ui/staticControls';   // controls-screen (2026-10-06): button maps leave the play screen
+import { WEBGL_CONTEXT_RESET_MESSAGE } from './bootErrors';
 // declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
 export type { BodyClaim, BodyChannelName, ModeBodySpec } from '@/lib/input/bodyProfiles';
 
@@ -603,8 +604,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     reportDiag('context', 'WebGL context lost');
     // Measured (fault capture, 2026-09-03): the canvas went black and the HUD
     // kept streaming with no word to the player. Name it; the host's error UI
-    // offers the reload.
-    setPhase('error', 'Graphics were reset by the device. Reload to keep playing.');
+    // offers the reload, not a same-canvas retry.
+    setPhase('error', WEBGL_CONTEXT_RESET_MESSAGE);
   });
   engine.onContextRestoredObservable.add(() => reportDiag('context', 'WebGL context restored'));
 
@@ -1007,6 +1008,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     lights.dispose();
     scene.dispose();
     engine.dispose();
+    setSignedOutVisitor(false);   // /try's known-guest flag is mount-scoped; leaving the mode must not guest-lock the app.
     // OOM-HYGIENE (2026-09-07): Babylon 9's floating-origin helper keeps a module-level `getScene` closure over the LAST
     // RENDERED scene (Materials/floatingOriginMatrixOverrides — every scene.render rebinds it, nothing ever clears it). It
     // was the one strong root left on a disposed dojo after an in-page exit (heap snapshot, karate_vs: 339 MB retained

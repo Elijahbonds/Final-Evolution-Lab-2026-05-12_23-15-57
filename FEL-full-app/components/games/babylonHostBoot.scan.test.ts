@@ -51,8 +51,19 @@ describe('Babylon hosts own their boot effect for the mount', () => {
     expect(src).toContain('retryBoot');
     expect(src).toMatch(/\},\s*\[[^\]]*bootAttempt[^\]]*\]\);/);
     expect(src).not.toContain('onRetry={tapStart}');
-    if (file === 'who-scene-it-babylon.tsx') expect(src).toContain('onClick={retryBoot}');
+    if (file === 'who-scene-it-babylon.tsx') {
+      expect(src).toContain('onClick={recoverFromError}');
+      expect(src).toContain('retryBoot();');
+    }
     else expect(src).toContain('onRetry={retryBoot}');
+  });
+
+  it('who-scene-it offers a page reload after context-reset boot errors', () => {
+    const src = read('who-scene-it-babylon.tsx');
+
+    expect(src).toContain('bootErrorRequiresPageReload');
+    expect(src).toContain('window.location.reload()');
+    expect(src).toContain("{reloadRequired ? 'RELOAD' : 'RETRY'}");
   });
 });
 

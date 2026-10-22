@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
-import { surfaceBootError } from './boot-error';
+import { bootErrorRequiresPageReload, surfaceBootError } from './boot-error';
 import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -97,6 +97,14 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
+  const reloadRequired = bootErrorRequiresPageReload(loadError);
+  const recoverFromError = useCallback(() => {
+    if (reloadRequired) {
+      window.location.reload();
+      return;
+    }
+    retryBoot();
+  }, [reloadRequired, retryBoot]);
   const revealing = typeof hud.reveal === 'string' && hud.reveal.length > 0;
   // #2: once the question resolves, the right card and each seat's pick (-1 = none)
   const answerIdx = typeof hud.answerIdx === 'number' ? hud.answerIdx : -1;
@@ -263,10 +271,10 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
             <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
             <button
               type="button"
-              onClick={retryBoot}
+              onClick={recoverFromError}
               className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
             >
-              RETRY
+              {reloadRequired ? 'RELOAD' : 'RETRY'}
             </button>
           </div>
         </div>

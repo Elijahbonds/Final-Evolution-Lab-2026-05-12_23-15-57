@@ -119,6 +119,7 @@ export function BookForm({
         if (res.status === 409 && json.error === 'terms_required') { setTermsNotice(termsNoticeFor(json)); return; }
         const outcome = authOrMessage(res, json);
         if (outcome === 'sign_in' || outcome === 'adults_only') setPartAuth((prev) => ({ ...prev, [part.key]: outcome }));
+        else if (outcome === 'store_closed') setPartErrors((prev) => ({ ...prev, [part.key]: 'Booking is not available right now.' }));
         else setPartErrors((prev) => ({ ...prev, [part.key]: outcome }));
         return;
       }
