@@ -153,62 +153,9 @@ describe('existing charts are unchanged unless they opt in', () => {
   });
 });
 
-// ── the opt-in phrases: the captures change the clip a step dances, and nothing else ─────────────────────────────────────────────
-import { planChart, stepsFromPresses, styleBeatsFromPresses, type DanceChart } from './chart';
-import { DancePerformance, beatDuration } from '../core/DanceCore';
-
-const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
-/** The shipped opt-in phrases and the stand-in phrase each one replaces (same notes, the short names the chart always used). */
-const OPT_IN: { song: string; phrase: string; base: string; section: number; captured: string[] }[] = [
-  { song: 'evolution', phrase: 'ehBc', base: 'ehB', section: 7, captured: ['dance_toprock_kick', 'dance_power_helicopter'] },
-  { song: 'canals', phrase: 'kvDc', base: 'kvD', section: 5, captured: ['dance_pop_moonwalk'] },
-];
-const flawless = (steps: ReturnType<typeof stepsFromPresses>, bpm: number) => {
-  const perf = new DancePerformance(bpm);
-  perf.setRoutine(steps);
-  perf.start(0);
-  const bd = beatDuration(bpm);
-  for (const x of steps) { perf.update(x.beat * bd); perf.hit(x.beat * bd); }
-  return perf.result();
-};
-
-describe('the opt-in phrases: only the clip a step dances changes', () => {
-  for (const o of OPT_IN) {
-    const song = songFor(o.song)!;
-    const actual = chartFor(o.song)!;
-    // the same chart with this phrase's section playing the stand-in phrase again
-    const baseline: DanceChart = clone(actual);
-    baseline.sections[o.section].play = baseline.sections[o.section].play.map((p) => (p === o.phrase ? o.base : p));
-
-    it(`${o.song}: ${o.phrase} is ${o.base} with its short names spelled as the captures' ids — same beats, accents, doubles and mirrors`, () => {
-      const a = actual.phrases[o.phrase], b = actual.phrases[o.base];
-      expect(a.bars).toBe(b.bars);
-      expect(a.notes!.length).toBe(b.notes!.length);
-      a.notes!.forEach((n, i) => {
-        const { m: ma, ...ra } = n, { m: mb, ...rb } = b.notes![i];
-        expect(ra, `note ${i}`).toEqual(rb);                                                  // every beat, double and mirror
-        expect(ma === undefined, `note ${i} is a move in both`).toBe(mb === undefined);
-        if (ma !== undefined && ma !== mb) {                                                   // a spelled-out id where the base has a short name…
-          expect(isCapturedMove(ma), `${ma} is a captured id`).toBe(true);
-          expect(danceMove(ma)!.category, `note ${i} family`).toBe(moveClip(mb)!.category);   // …of the same family: the MATCH button and the instrument
-        }
-      });
-    });
-    it(`${o.song}: the chart still validates, calls exactly ${o.captured.join(' + ')}, and plays the same scored steps, STYLE taps and flawless score as before`, () => {
-      expect(validateChart(actual, song)).toEqual([]);
-      const planA = planChart(actual, song), planB = planChart(baseline, song);
-      expect(planA.problems).toEqual([]);
-      const calls = (p: typeof planA) => p.presses.filter((x) => x.kind === 'move' && isCapturedMove(x.clipId)).map((x) => x.clipId).sort();
-      expect(calls(planA)).toEqual([...o.captured].sort());
-      expect(calls(planB)).toHaveLength(0);
-      const shape = (p: typeof planA) => p.scored.map((x) => ({ at: x.swungBeat, fam: danceMove(x.clipId)!.category, mir: x.mirrored, kind: x.kind }));
-      expect(shape(planA)).toEqual(shape(planB));                                              // the scored steps: when, which family, mirrored
-      expect(styleBeatsFromPresses(planA.style)).toEqual(styleBeatsFromPresses(planB.style));  // the STYLE taps
-      expect(planA.demoted.map((x) => x.swungBeat)).toEqual(planB.demoted.map((x) => x.swungBeat));   // the cap demotes the same moves
-      const stepsA = stepsFromPresses(planA.scored), stepsB = stepsFromPresses(planB.scored);
-      expect(flawless(stepsA, song.bpm)).toEqual(flawless(stepsB, song.bpm));                   // pay: a flawless run scores what it did
-      // a step's hold is a freeze's only; no scored captured move here is one, so no hold changed
-      expect(planA.scored.filter((x) => isCapturedMove(x.clipId) && danceMove(x.clipId)!.category === 'freeze')).toHaveLength(0);
-    });
-  }
-});
+// ── the opt-in phrases ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// test changed (lane/dance-options, owner 2026-10-17, Q1 A + Q5 A): the two opt-in phrases this block compared with their stand-ins are
+// gone. Every chart now spells the five captures' ids itself (evolution's ehBc IS ehB; canals' kvDc is kvD again, and canals' moonwalk moved
+// to the first hook's arm wave, khAm), so there is no stand-in phrase left to compare with. The same promise — only the clip a step dances
+// changes: the same scored steps, STYLE taps, demotions and flawless NORMAL / EASY / HARD — is held on ALL SIX charts, against each chart
+// with the short names spelled back, in danceOptions.test.ts ("Q1 the five short names as the captures").
