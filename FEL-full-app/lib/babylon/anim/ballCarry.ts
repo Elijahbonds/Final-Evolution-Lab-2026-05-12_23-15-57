@@ -120,8 +120,15 @@ export interface BallCarry {
   readonly side: 'Left' | 'Right';
   /** The rig bone of the ball hand. */
   readonly handBone: RigHand;
-  /** The ATHLETE's hand the ball is on (or on its way to), as drawn — what a stick map's "hand" means. */
+  /** The ATHLETE's hand the ball is IN, as drawn. Through a move: the start hand until the path reaches the first catch span by the
+   *  other hand (its t0), then that hand — every later catch span by a hand hands it on (the double cross flips twice; a same-hand move
+   *  never flips; moveHandAt). HOOPS-TWO-HAND-CROSS-1: it read the move's END hand from the move's first frame. */
   readonly hand: 'Left' | 'Right';
+  /* HOOPS-HAND-LABEL: …and the flip is on the frame the new hand's palm HOLDS the ball (palmOnBall, on the drawn frame) once its catch span
+   * has begun — not at the span's t0. A palm that never reaches it never takes it (HOOPS-DOUBLE-CROSS-PALM: the double cross's catches now reach it). */
+  /** The athlete's hand the ball is on its way to: a running move's end hand (and the queued move's after it), else `hand` — today's
+   *  stick maps, the strong-hand return and toSide read this (the destination), so the hand-off timing above changes none of them. */
+  readonly handAfterMove: 'Left' | 'Right';
   /** Hoops: a crossing is under way or pending (a move that crosses). */
   readonly crossing: boolean;
   /** HOOPS MOTION phase 4b: play a move's ball path NOW (plan §3.3) — from the ball as drawn, the carry active or not (a held ball: the
@@ -269,6 +276,16 @@ function lowestHandY(chain: ArmChain | null, root: TransformNode): number {
   const sh = chain.shoulder.getAbsolutePosition(), el = chain.elbow.getAbsolutePosition(), ha = chain.hand.getAbsolutePosition();
   const armLen = Vector3.Distance(sh, el) + Vector3.Distance(el, ha);
   return sh.y - root.getAbsolutePosition().y - armLen;
+}
+
+/** HOOPS-TWO-HAND-CROSS-1 (spec §3.1 item 1): the athlete's hand a move's ball is in at path time `t` (s) — the start hand until the first
+ *  `catch` span by the other hand begins (its t0, inclusive), then that hand; each later catch span by a hand hands it on (the double
+ *  cross: twice, back to the start hand). A same-hand move's catches are all the start hand's: it never flips. The path's own segments,
+ *  so a path started mid-bounce (blendFrom), re-timed onto the lock foot or played at the turbo's pace carries its own hand-off. */
+export function moveHandAt(path: Pick<HandlePath, 'startHand' | 'segs'>, t: number): 'right' | 'left' {
+  let h = path.startHand;
+  for (const sg of path.segs) { if (sg.t0 > t) break; if (sg.kind === 'catch' && sg.hand) h = sg.hand; }
+  return h;
 }
 
 export function mountBallCarry(opts: BallCarryOpts): BallCarry {
@@ -664,7 +681,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const drawnDt = (): number => { const d = animDt(opts.scene.getEngine().getDeltaTime() / 1000, opts.scene.animationTimeScale); return d > 0 ? d : 1 / 60; };
   // ── HOOPS MOTION phase 4b: THE MOVE (plan §3.3) ───────────────────────────────────────────────────────────────────────────────
   type MoveHand = 'right' | 'left';
-  interface RunningMove { name: string; path: HandlePath; t: number; opts: CarryMoveOpts; catchT: number; timed: boolean; crosses: number; sample: PathSample | null; sampleT: number; segU: number }
+  interface RunningMove { name: string; path: HandlePath; t: number; opts: CarryMoveOpts; catchT: number; timed: boolean; crosses: number; sample: PathSample | null; sampleT: number; segU: number; held: MoveHand }
   let mv: RunningMove | null = null;
   let moveRootYaw: number | null = null;   // the root's yaw on the move's last drawn frame (a held ball turns with it)
   let queued: { move: PathMove; opts: CarryMoveOpts; at?: number } | null = null;   // `at`: the cut-in (comboFlow), else the catch
@@ -720,21 +737,21 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const lock = o.lock === false ? undefined : lockFor(path.endHand);
     return lock ? pathFor(move, startHand, pace, st, lock, from) ?? path : path;
   };
-  const startMove = (path: HandlePath, o: CarryMoveOpts): void => {
+  const startMove = (path: HandlePath, o: CarryMoveOpts, heldIn?: MoveHand): void => {
     if (mv) mv.opts.onEvent?.('cancel', mv.name);   // replaced
     moveRootYaw = null;
     const last = path.segs[path.segs.length - 1];
     // the path starts at the ball as the LAST pass drew it: asked after this frame's update (the modes read their sticks after they tick the
     // carry), its first drawn frame is this frame's dt into it — started at 0 the ball stood still for a frame (a false top, 4b's probe)
     const t0 = pending && active ? frameDt : 0;
-    mv = { name: path.move, path, t: t0, opts: o, catchT: last && last.kind === 'catch' ? last.t0 : path.duration, timed: path.lockMiss != null && Math.abs(path.lockMiss) < 0.02, crosses: crossesOf(path.move), sample: null, sampleT: -1, segU: 0 };
+    mv = { name: path.move, path, t: t0, opts: o, catchT: last && last.kind === 'catch' ? last.t0 : path.duration, timed: path.lockMiss != null && Math.abs(path.lockMiss) < 0.02, crosses: crossesOf(path.move), sample: null, sampleT: -1, segU: 0, held: heldIn ?? path.startHand };
     if (!active || activating || opts.ball.parent) {
       // a held ball (or a dribble that has not let go yet): the carry takes it from the palm, where the path starts
       active = true; activating = false; releaseLeft = 0; startOff = null;
       if (opts.ball.parent) opts.ball.setParent(null);
       ballYaw = rootYaw();   // (a held ball's frame is the body's: drawnFrom read it there — a dribble's old facing left over from before the hold is not)
     }
-    setSide(rigOf(path.startHand));
+    setSide(rigOf(mv.held));
     startOff = null; prevArm = null; switchLeft = 0;
     pending = true;   // drawn this frame (a held ball let go here is placed by the path, never left where it was)
     o.onEvent?.('start', path.move);
@@ -775,10 +792,12 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
   const startQueued = (): void => {
     const m = mv!, q = queued!; queued = null;
     const smp = pathAt(m.path, m.t);
-    setSide(rigOf(m.path.endHand));
+    // HOOPS-HAND-LABEL: the ball is still in flight to the end hand at this catch — the hand that HOLDS it carries into the queued move,
+    // whose own catch hands it on when that palm has it (it flipped here, at the catch's t0, a frame or two before the palm reached it)
+    setSide(rigOf(m.held));
     m.opts.onEvent?.('end', m.name); mv = null;
-    const path = buildMove(q.move, q.opts, m.path.endHand, { p: smp.ball, v: smp.vel, held: q.at !== undefined });   // a cut-in: the ball in the palm
-    if (path) startMove(path, q.opts); else { phase = 0; startAcc = 0; activating = true; }
+    const path = buildMove(q.move, q.opts, m.path.endHand, { p: smp.ball, v: smp.vel, held: q.at !== undefined });   // hoops-moves: a cut-in — the ball in the palm
+    if (path) startMove(path, q.opts, m.held); else { setSide(rigOf(m.path.endHand)); phase = 0; startAcc = 0; activating = true; }
   };
   const tickMove = (dt: number): void => {
     const m = mv!; const a = m.t; m.t += dt;
@@ -786,6 +805,16 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     const at = queued?.at ?? m.catchT;   // hoops-moves: a cut-in starts the queued move at the float's top (comboFlow), else at the catch
     if (queued && a < at && m.t >= at) startQueued();
     else if (m.t >= m.path.duration) endMove();
+  };
+  let moveReached = false;   // (applyMove: an arm reached for the ball this frame — the let-go's `arm`)
+  /** HOOPS-HAND-LABEL: the hand-off, on the drawn frame (ball placed, arms reached, wrists bent: the last pass to move the hand): the catch span under way (moveHandAt) is by the other
+   *  hand and that hand's palm is on the ball (palmOnBall, the carry's own < 0.3 m rule) — the ball is in it now: `hand` and the rig side
+   *  flip together. It was the span's t0 (HOOPS-TWO-HAND-CROSS-1), a frame or more before the palm got there (the crossover's 0.30 s catch:
+   *  the left palm reaches it at 0.317 s; the double cross's catches, up at the crossover's height, are reached on the node rig at 0.283 s (0.300 s from the left) and 0.550 s). */
+  const settleHeld = (m: RunningMove): void => {
+    const want = moveHandAt(m.path, m.t);
+    if (want !== m.held && palmOnBall(rigOf(want))) m.held = want;
+    const reached = arm; setSide(rigOf(m.held)); if (moveReached) arm = reached;   // (the let-go's arm stays the one that reached hardest)
   };
   /** The move's frame (the after-animations pass): the ball on its path, each hand by the contact schedule. */
   const applyMove = (dt: number): void => {
@@ -818,7 +847,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     opts.ball.position.copyFrom(world);
     placedRoot.copyFrom(opts.root.getAbsolutePosition()); placedYaw = rootYaw(); placedAt = stamp;
     lastVel.set(smp.vel.x, smp.vel.y, smp.vel.z); lastLocal.set(smp.ball.x, smp.ball.y, smp.ball.z); lastLocalAt = stamp;
-    if (smp.contact) setSide(rigOf(smp.contact));
+    moveReached = false;
     if (!(armW > 0)) return;
     // the off arm's pace reach lets go (the move's contact schedule owns both hands now, plan §3.3)
     if (offArm && offW > 0) { offW = Math.max(0, offW - dt / 0.08); toWorld(offLocal.x, offLocal.y, offLocal.z, offT); reachShaped(offArm, offT, offPole, offW, dt, stamp); }
@@ -834,6 +863,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
       // the let-go (a shot or a pass mid-move) fades the hand that reached hardest, from where it reached
       if (w > best) { best = w; arm = ch; handLocal.set(tg.x, tg.y + fl - rp.y, tg.z + push); pole.copyFrom(movePole[h]); }
     }
+    moveReached = best > 0;
   };
   const applyHoops = () => {
     stamp++;
@@ -900,7 +930,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
         if (startOff.length() > 1.3) startOff = null;   // a ball that was nowhere near (a reset) just starts
       }
     }
-    if (mv) { applyMove(dt); applyWrists(dt); return; }   // HOOPS MOTION phase 4b: a move's path owns the ball and the hands
+    if (mv) { applyMove(dt); applyWrists(dt); settleHeld(mv); return; }   // HOOPS MOTION phase 4b: a move's path owns the ball and the hands
     const s = dribbleAtPushed(phase, p);
     pushK += (Math.min(1, Math.max(0, lastSpeed01)) - pushK) * Math.min(1, dt / 0.25);
     const push = PUSH_AHEAD_M * pushK;
@@ -969,6 +999,11 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     get side() { return side; },
     get handBone() { return `${side}Hand` as RigHand; },
     get hand() {
+      // HOOPS-TWO-HAND-CROSS-1: the hand the ball is in through a move — the start hand until the end hand's catch (moveHandAt)
+      if (mv) return mv.held === 'right' ? 'Right' : 'Left';   // (HOOPS-HAND-LABEL: the hand whose palm has it — settleHeld)
+      return sideOfRigHand(opts.skeleton, opts.root, `${side}Hand`) === 'right' ? 'Right' : 'Left';
+    },
+    get handAfterMove() {
       // the destination while a move runs (and the queued move's after it): what the stick maps mirror by
       if (mv) { let h = mv.path.endHand; if (queued && crossesOf(queued.move) % 2 === 1) h = h === 'right' ? 'left' : 'right'; return h === 'right' ? 'Right' : 'Left'; }
       return sideOfRigHand(opts.skeleton, opts.root, `${side}Hand`) === 'right' ? 'Right' : 'Left';
@@ -1004,7 +1039,7 @@ export function mountBallCarry(opts: BallCarryOpts): BallCarry {
     },
     toSide(want: AthleteSide, via?: CrossPoint) {
       if (!hoops) return;
-      const cur = api.hand === 'Right' ? 'right' : 'left';
+      const cur = api.handAfterMove === 'Right' ? 'right' : 'left';   // (HOOPS-TWO-HAND-CROSS-1) the destination, as before
       if (cur !== want) api.switchHand(via);
     },
     reset() {

@@ -14,16 +14,19 @@
 //     MATCH off X and Y work too — inside the section they are not "taps", they are moves;
 //   · it pays STYLE ONLY, and only the STYLE values that already exist: a press on one of the chart's own freestyle slots (the beats
 //     its `free.every` lays down) banks chartPlay.GROOVE_STYLE into the run's STYLE tally, exactly as a groove tap does, and nothing
-//     else does. No new value, no variety multiplier (a new STYLE number is a tuned number — assumption: the owner can add one);
+//     else does — plus, since lane/dance-options (owner 2026-10-17), the section's VARIETY when it ends (varietyBonus, below: +50 a
+//     different button past the first, at most +150; one button earns none);
 //   · it never touches the judge: a freestyle press does not reach DancePerformance.hit, so it cannot cost a wild tap (−20), break the
 //     combo or move the score; inside the section there is nothing to miss. A press that would belong to a step (one within the judge's
 //     reach of a scored move — the edges of the section) is that step's, exactly as before.
 // The score, the combo, the stars, the scored-step cap and the Arena ceiling are therefore the same with the section as without it
 // (freestyleWiring.test.ts runs a whole chart both ways), and a chart with no freestyle section plays exactly as it did.
+// lane/dance-options (owner 2026-10-17, Q6) closes the section's EDGE: inside a section MATCH never fumbles the next step (routeFreestyle
+// matchOn), and a would-be wild tap just after a section the player was still dancing is its follow-through (exitGraceForgives, below).
 
 import type { FelInput } from '../core/InputBus';
 import { MISS_AFTER, type DanceStep } from '../core/DanceCore';
-import { FAMILY_BUTTON, GROOVE_STYLE, GROOVE_WINDOW_SEC, matchPress, pressTarget, styleTapAt } from './chartPlay';
+import { FAMILY_BUTTON, GROOVE_STYLE, GROOVE_WINDOW_SEC, buttonForStep, matchPress, pressTarget, styleTapAt } from './chartPlay';
 import { danceMove } from './moves';
 
 /** The gold the lane draws a freestyle slot and the section's own marker in (the HUD's score tone, a step cue's colours stay the families'). */
@@ -127,10 +130,19 @@ export function routeFreestyle(o: {
   /** The chart's STYLE beats (accents, doubles, freestyle slots) and the ones already taken this run. */
   styleBeats: readonly number[];
   taken: ReadonlySet<number>;
+  /** MATCH is on (lane/dance-options, Q6): a press in the section that the judge would take for a step with the WRONG button is still the
+   *  section's — a move danced, never a fumble — because MATCH is never asked inside a section. Absent / false: exactly as before. */
+  matchOn?: boolean;
 }): FreeRoute | null {
   const slot = matchPress(o.e, o.tap);
   if (!slot) return null;
-  if (pressTarget(o.upcoming, o.heardNow, MISS_AFTER)) return null;                                       // a step's press: the judge's
+  const target = pressTarget(o.upcoming, o.heardNow, MISS_AFTER);
+  // lane/dance-options (owner 2026-10-17, Q6): in a section's last moment the next step is already within the judge's reach. A press with
+  // that step's button is the step's (an early hit, exactly as before); with MATCH on, a press with ANOTHER button used to reach the room's
+  // MATCH check and fumble the step — a MISS and the combo gone, for a press made where MATCH is never asked. It dances its move instead,
+  // pays nothing, and leaves the step to the player's next press (a step nobody presses still expires a MISS).
+  if (target && o.matchOn && buttonForStep(target.step) !== slot) return { slot, slotBeat: null };
+  if (target) return null;                                                                                 // a step's press: the judge's
   const g = o.styleBeats.length ? styleTapAt(o.styleBeats, o.upcoming, o.heardNow, o.beatPos, GROOVE_WINDOW_SEC / o.beatSec, o.taken) : null;
   return { slot, slotBeat: g };
 }
@@ -143,3 +155,55 @@ export const freeButtonOf = (clipId: string): PadSlot | null => {
   const m = danceMove(clipId);
   return m ? FAMILY_BUTTON[m.category] : null;
 };
+
+// ── the VARIETY bonus (owner 2026-10-17, lane/dance-options, Q2 A) ──────────────────────────────────────────────────────────
+//
+// A section pays a little more STYLE for dancing it with more of the pad: +VARIETY_STYLE for every DIFFERENT button that took one of the
+// section's slots, past the first, at most VARIETY_CAP (all four buttons). Counted once, when the section ends. One button — however often
+// it is pressed, mashed or not — earns nothing: the deck already cycles a button's moves, so "a new move" would pay the deck, not the
+// player (docs/DANCE-EXTRAS-OPTIONS.md (b), measured). Only a press that TOOK a slot counts (FreeRoute.slotBeat): a press off the beat
+// dances its move and adds no button. STYLE only, like everything else here: never the score, the combo, the pay or a compared number.
+
+/** TUNED (new, owner 2026-10-17): STYLE for each different button that took a slot in a section, past the first. */
+export const VARIETY_STYLE = 50;
+/** TUNED (new, owner 2026-10-17): the most a section's variety pays (= all four buttons: 3 × VARIETY_STYLE). */
+export const VARIETY_CAP = 150;
+
+/** The variety STYLE a section pays for the buttons that took its slots (any order, repeats allowed). Pure. */
+export function varietyBonus(slotButtons: Iterable<PadSlot>): number {
+  const n = new Set(slotButtons).size;
+  return Math.min(VARIETY_CAP, VARIETY_STYLE * Math.max(0, n - 1));
+}
+
+// ── the EXIT GRACE (owner 2026-10-17, lane/dance-options, Q6) ──────────────────────────────────────────────────────────────
+//
+// WHAT WAS WRONG (measured on the shipped charts, docs/DANCE-EXTRAS-OPTIONS.md (c)): on four of the six songs the next scored step lands
+// ON a section's last beat line. A press in the section's last MISS_AFTER is that step's (routeFreestyle hands it to the judge, as it
+// should), so a player still dancing the section up to its last instant catches the step EARLY — and then their press ON the beat finds
+// no step and is a WILD TAP: −WILD_TAP_COST, the combo gone, the spam lock on the next hit. The same when a last-moment press takes the
+// first STYLE tap after the section. Measured cost: 460–1,000 points a run.
+//
+// THE FIX, as small as it needs to be: a press that the judge would call a WILD tap (no step within its reach — pressTarget null), made
+// within EXIT_GRACE_SEC after a section ends, by a player who pressed inside that section within MISS_AFTER of its end, is the section's
+// follow-through: it is absorbed (no move, no STYLE, no cost). It only ever removes a wild tap's penalty: a press that would catch a step
+// still catches it, a step that nobody hit still expires a MISS and still breaks the combo (DancePerformance.update, untouched), and a
+// flawless run has no wild taps to forgive, so no flawless score moves.
+
+/** TUNED (new, owner 2026-10-17): how long after a freestyle section ends a would-be wild tap is the section's follow-through (s). */
+export const EXIT_GRACE_SEC = 0.1;
+
+/**
+ * Is a press at `beatPos` (song beats) — one the judge would call a wild tap — the forgiven follow-through of a section the player was
+ * still dancing at its end? `lastSectionPressBeat` = the song beat of the last press made inside a section (null: none this run). Pure.
+ */
+export function exitGraceForgives(o: { spans: readonly FreeSpan[]; beatPos: number; beatSec: number; lastSectionPressBeat: number | null; graceSec?: number }): boolean {
+  const { spans, beatPos, beatSec, lastSectionPressBeat: last } = o;
+  const grace = o.graceSec ?? EXIT_GRACE_SEC;
+  if (last === null || !Number.isFinite(beatPos) || !(beatSec > 0)) return false;
+  for (const f of spans) {
+    const after = (beatPos - f.end) * beatSec;
+    if (after < 0 || after > grace) continue;
+    if (last >= f.start && last < f.end && (f.end - last) * beatSec <= MISS_AFTER) return true;
+  }
+  return false;
+}
