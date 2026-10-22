@@ -162,7 +162,7 @@ describe('A2-5: hidden and TODO checks leave nothing behind', () => {
   it('the jump is a personal best for an adult, never a band word', () => {
     const h = html(CLEAN);
     const pb = h.slice(h.indexOf('data-personal-best')).split('</section>')[0];
-    expect(text(pb)).toMatch(/Your best jump: \d+(\.\d)? in A personal best to beat next time\./);
+    expect(text(pb)).toMatch(/Your best jump: about \d+ in A personal best to beat next time\./);
     expect(pb).not.toMatch(/data-band|Good to go|Worth working on|Priority to work on/);
   });
 });

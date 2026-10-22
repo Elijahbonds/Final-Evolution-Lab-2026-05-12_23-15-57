@@ -76,7 +76,7 @@ import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
 type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError' | 'noCamera';
-interface JumpView { heightCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
+interface JumpView { heightCm: number | null; plusMinusCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'takeoff', 'cameraInfo', 'starting', 'device', 'running'];
 /** SCREEN A: while a rep is up, nobody reads — the caption bar hides on these steps (voice off keeps it). */
@@ -221,6 +221,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       carryRef.current = t5;
       const view: JumpView = {
         heightCm: t5?.t5?.bestHeightCm ?? null,
+        plusMinusCm: t5?.t5?.heightPlusMinusCm ?? null,
         attempts: t5?.t5?.jumps.length ?? 0,
         jumpIn: summary.jumpBestIn,
         lastIn: lastJumpRef.current,
@@ -446,7 +447,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       ) : null}
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
       {phase === 'jumpResult' && jumpView ? (
-        <JumpResult heightCm={jumpView.heightCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
+        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
       ) : null}
 
       {live ? (

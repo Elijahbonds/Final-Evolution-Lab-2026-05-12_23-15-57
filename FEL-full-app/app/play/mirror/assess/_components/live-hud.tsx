@@ -12,7 +12,7 @@ import { Check, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { RunnerView } from '@/lib/assess/runner';
 import { testDef, type Side } from '@/lib/assess/protocol';
-import { FRAMING_IN_FRAME, READ_CLEAR, READ_PARTIAL, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
+import { FRAMING_IN_FRAME, JUMP_LAND_TALL, READ_CLEAR, READ_PARTIAL, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
 import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { cuesDue, cueFlash, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
 
@@ -107,6 +107,10 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
             </p>
           </div>
         </>
+      ) : null}
+      {/* MIRROR flight-time (PM): written only, under the jump setup — the flight time reads truest on straight legs */}
+      {v.test === 'T5' && !noReading ? (
+        <p data-jump-land-tall className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{JUMP_LAND_TALL}</p>
       ) : null}
       {v.dimWarning && !noReading ? (
         <p className="absolute inset-x-3 top-[7.5rem] z-[6] text-center text-[16px] font-bold text-[#FFB020]">Low light — move closer to a window if you can</p>
