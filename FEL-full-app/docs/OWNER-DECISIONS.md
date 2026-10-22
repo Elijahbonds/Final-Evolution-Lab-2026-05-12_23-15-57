@@ -249,5 +249,37 @@ The entries below are the coordinator's log, copied as written. Later entries ov
   - OWNER INBOX: one private phone page listing everything waiting (policy text, content drafts, feel numbers, account steps) with Approve / Change / Reject; agents act on the taps.
   - SELF-APPROVE, owner reviews after (each lands in the Inbox; reversible): (1) NEW feel numbers from measurements (existing tuned numbers still need the owner; owner can change any on the feel panel); (2) content drafts from the owner's own books after automated fact checks (quiz cards, lessons, exercise demos); (3) DISCLOSURE-ONLY privacy text (describes only what the code already does; no new data use) — lands after 48 h in the Inbox unless the owner objects.
 
+## #384 test-edit trail (PR #384, lane/hoops-two-hand-cross @ 4f4d13f1; audited Oct 20, 2026, ~4:55 PM PT)
+
+Elijah's words (1:1, Oct 20, 2026, PT), verbatim:
+- **10:47 AM** — "Yes, change the 4 ball-carry test lines to read handAfterMove" (ballCarry.hoops.test.ts 268/288/303, ballCarry.moves.test.ts 150)
+- **12:33 PM** — "Yes, change contract line 48 to handAfterMove and use option (a) for the hand label" (hoopsHandles.contract.test.ts:48; TH-1's 0.30 s flip moves to the palm-hold frame)
+- **12:34 PM** — "Yes, use the tighter 2K-style crossover and replace the 76° tests with the 14–19° / 60°+ bar"
+- **1:11 PM** — "Approve the flip-timing edit to TH-3 and TH-4"
+- **2:09 PM** — "the double-cross test edits (TH-3 lines 170-171 and hoopsHandLabel.test.ts 124-125)"
+- **4:54 PM** — "Approve removing the no-flip double-cross test in hoopsHandLabel and the same-frame hesi-vs-stop change in onevone-depth-tests section C"
+
+Scope note: against the finish-release base (0a5ed265), the only PRE-EXISTING test files edited are ballCarry.hoops.test.ts,
+ballCarry.moves.test.ts, hoopsHandles.contract.test.ts and scripts/onevone-depth-tests.ts. hoopsTwoHandCross(1).test.ts and
+hoopsHandLabel.test.ts are new on this lane; the edits below to them are edits to assertions the lane itself added earlier.
+
+| Edit | Commit | Covered by |
+|---|---|---|
+| ballCarry.hoops.test.ts:268, 288, 303 and ballCarry.moves.test.ts:150 `carry.hand` → `carry.handAfterMove` (expected 'Left' unchanged) | 70ada9af | 10:47 AM |
+| hoopsHandles.contract.test.ts:48 `foeCarry\.hand ===` → `foeCarry\.handAfterMove ===` | 98998ea1 | 12:33 PM |
+| TH-1 (hoopsTwoHandCross1:108-113): flip at 0.30 s → palm frames F(19) R→L / F(20) L→R; `expectHandoffs` gains `flipAt` | 510cdea5 | 12:33 PM (option a) |
+| TH-4 (hoopsTwoHandCross1:196-207): flip at t0/pace → measured PALM frames table, plus a "palm frame is after t0" check | 510cdea5 | 1:11 PM |
+| TH-6 (hoopsTwoHandCross.test.ts tests 1–3): `atan2(1.6, 0.4)` (76°) and `> 0.5` rad assertions → 14–19° / ≤ 25° released bar; new held ≥ 60° test; test 3 gains one `d.update(1/60, 0, 0, true)` setup line | d54a22bf | 12:34 PM |
+| TH-3 double cross (hoopsTwoHandCross1:170-171): hand-offs [0.25, 0.51] → [0.26, 0.52], flipAt → R [F(17), F(33)] / L [F(18), F(33)] | 66c8217b | 2:09 PM |
+| hoopsHandLabel.test.ts:124-125 (loop body): "never flips" per-frame check → exactly 2 flips on the measured frames, palm < 0.3 m | 66c8217b | 2:09 PM |
+| **TH-3 double cross, 510cdea5:** the 2-flip expectation [0.25, 0.51] → **0 flips** (`flipAt []`, "no flip, the start hand all through"). That is a flip-COUNT change, not flip timing. It is superseded by 66c8217b (2 flips again), so it is not in the final tree | 510cdea5 | **MISSING ELIJAH WORDS** (1:11 PM says "flip-timing"; the count change in between isn't named) |
+| **TH-3 title line :169** reworded twice (2 flips → no flip → 2 flips at palm frames) | 510cdea5, 66c8217b | **MISSING ELIJAH WORDS** (2:09 PM names 170-171 only; title text only, no assertion) |
+| **hoopsHandLabel.test.ts: the no-flip double-cross test removed as written.** Title :119 reworded, and lines :123 and :126 (the `for (const f of fr) {…}` wrapper and its `toBe(h)` / `palm ≥ 0.3` checks) replaced, alongside the named 124-125 | 66c8217b | **Covered (4:54 PM)**: 124-125 by 2:09 PM; the whole test removal incl. title :119 and wrapper :123/:126 by 4:54 PM. The test itself (added in 510cdea5) was the lane's own |
+| **scripts/onevone-depth-tests.ts section C** (pre-existing at base): the hesi-vs-control read moved from "each on the frame it leaves" (base f69e9194) to "both on the SAME frame, the hang's last" (`push()` loop); both `ok(...)` messages changed; the comment block rewritten | 4937c484 | **Covered (4:54 PM)** (the commit itself cited "Owner's rule: the bar does not move" without a quote; Elijah approved it at 4:54 PM) |
+| onevone-depth-tests C additions (no phantom crossover, hesi into cross), C2 repeated-hesi + mirrored; HesiHang.test.ts +2; new files hoopsCrossFixup, hoopsCrossFixup2, hoopsCrossAngle, hoopsHandLabel, hoopsTwoHandCross(1) | 337b7fa6, 22bc79b9, 8faaa228, 70ada9af, 98998ea1, d54a22bf, 510cdea5 | Additions only; no approval needed |
+
+Relay (not a direct quote):
+- 4:47 PM PT Oct 20: QA reports Elijah told QA 'Yes, I approved those' (relayed by PM; not said in Autopilot's 1:1, so it's logged as a relay, not as a direct quote).
+
 ## #372 HESI owner trail (relay log, Oct 20, 2026)
 - 4:57 PM PT Oct 20: QA reports Elijah told QA 'Yes, I approved both' for the 5-frame hang minimum and HESI_EXPLODE_FLOOR 0.95 (relay via PM). Direct: 7:33 AM PT Oct 20, in Autopilot's 1:1, yes to HESI v2, count 5 held frames, min 5*DT ~83 ms.

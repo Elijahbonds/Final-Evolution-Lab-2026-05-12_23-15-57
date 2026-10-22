@@ -163,6 +163,33 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
   ok(hold.vel.z <= 0.01, 'a held pull-back (retreat) never fires the boost');
 }
 
+// ── C2. repeated hesitations inside the cooldown (HOOPS-CROSS-FIXUP) ───────
+// QA (PR #372/#384): forward 60f, then six cycles of pull back 3f / neutral 6f / forward 30f. Every second tap lands inside
+// HESI_COOLDOWN_SEC, fires no hesi, and its pull-back used to stay the last direction — the push out of it read as a reversal and
+// a crossover fired with no sideways input (3 of 6). A refused tap is now consumed.
+{
+  const rep = new DribbleController();
+  rep.setFacing(Math.PI);
+  run(rep, Array(60).fill([0, 1]));
+  let hesis = 0, crosses = 0;
+  for (let k = 0; k < 6; k++) {
+    for (const r of run(rep, [...Array(3).fill([0, -1]), ...Array(6).fill([0, 0]), ...Array(30).fill([0, 1])])) { if (r.hesitation) hesis++; if (r.crossover) crosses++; }
+  }
+  ok(crosses === 0, `repeated hesi taps inside the cooldown fire no phantom crossover (${crosses} in 6 cycles)`);
+  ok(hesis === 3, `the cooldown still refuses every second tap (${hesis} hesitations in 6 cycles)`);
+
+  // the mirrored hesi into cross: lean right, snap left — one crossover, on the snap
+  const mirror = new DribbleController();
+  mirror.setFacing(Math.PI);
+  run(mirror, Array(60).fill([0, 1]));
+  run(mirror, Array(3).fill([0, -1]));
+  run(mirror, Array(6).fill([0, 0]));
+  const lead = [...run(mirror, Array(10).fill([0, 1])), ...run(mirror, Array(4).fill([1, 0.3]))];
+  const snap = run(mirror, Array(8).fill([-1, 0.3]));
+  ok(!lead.some((r) => r.crossover) && snap[0].crossover && snap.filter((r) => r.crossover).length === 1,
+    `hesi into cross, mirrored: the crossover fires on the snap and only there (before it: ${lead.filter((r) => r.crossover).length}, on it: ${snap[0].crossover})`);
+}
+
 // ── D. the steal window is real ────────────────────────────────────────────
 // An open drive weaves; exposure must peak mid-weave and vanish at the gather.
 {
