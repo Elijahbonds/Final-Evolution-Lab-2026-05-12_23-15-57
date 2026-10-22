@@ -113,11 +113,13 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     X: { label: 'DROP', emit: A('X') },
     Y: { label: 'LOB', emit: A('Y') },
   }),
-  // Tiebreak's route draws its own two large swing buttons; the dev harness and
-  // creator-card readout still need honest verbs for the registry entry.
+  // TENNIS-TIEBREAK-FOLD (2026-10-22): `tiebreak` is the Tennis tiebreak variant on NetSportMode now, so it plays Tennis's
+  // four shots (the old Blitz's two swing buttons went with TiebreakMode's unregistering).
   tiebreak: verbs({
-    B: { label: 'SWING R', emit: A('B') },
-    X: { label: 'SWING L', emit: A('X') },
+    A: { label: 'DRIVE', emit: A('A') },
+    B: { label: 'SLICE', emit: A('B') },
+    X: { label: 'DROP', emit: A('X') },
+    Y: { label: 'LOB', emit: A('Y') },
   }),
   // PARKOUR DERBY (2026-09-18): B is the BAT-FLIP VAULT, the wind-up trick that fills flow for a KINETIC swing. It
   // shipped with no touch slot, so on a tablet or the on-screen pad the derby's whole trick economy was unreachable —

@@ -406,16 +406,19 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       ] },
     ],
   },
+  // TENNIS-TIEBREAK-FOLD (2026-10-22): the Tennis tiebreak variant (NetSportMode) — Tennis's pad: move, and four shots
   tiebreak: {
     modeId: 'tiebreak',
     title: 'Tiebreak Blitz',
     maxPlayers: 1,
     askName: true,
     schemas: [
-      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'dpad', dpad: { action: 'move' } },
       { kind: 'button', buttons: [
-        { action: 'X', label: 'SWING L' },
-        { action: 'B', label: 'SWING R' },
+        { action: 'A', label: 'DRIVE' },
+        { action: 'B', label: 'SLICE' },
+        { action: 'X', label: 'DROP' },
+        { action: 'Y', label: 'LOB' },
       ] },
     ],
   },
