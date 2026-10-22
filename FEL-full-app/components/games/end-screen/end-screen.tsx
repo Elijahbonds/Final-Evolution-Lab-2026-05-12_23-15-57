@@ -336,7 +336,9 @@ export function EndScreen(props: EndScreenProps) {
 
   // ── WHAT IS SHOWN ──
   const fig = scoreFigures(props);
-  const score = useCountUp(fig.mine, { active: true, instant: fast, ms: Math.max(250, durs[1] ?? 500) });
+  // QA-H5 (hoops grade 0d16f5dd): the card's score is the board's number from its first frame — it counted up from 0, so a
+  // screenshot or share in the first second read "2 SCORE" against a 4–12 board. The reward tiles still count up.
+  const score = fig.mine;
   const confettiWin = !instant && won;
   const confettiGold = !instant && newBest && shown('callouts');
   const longHead = headline.length > 16;
