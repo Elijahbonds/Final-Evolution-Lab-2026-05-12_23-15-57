@@ -201,6 +201,9 @@ export async function POST(req: NextRequest) {
         quantity: 1,
       }],
       metadata: { userId, product: 'COSMETIC', itemKey },
+      // LAUNCH-SALES: the payment intent carries the same metadata, so a refund (charge.refunded) can be mapped
+      // back to this purchase (lib/stripe/refund-revoke.ts), the way the coach store and the season pass do.
+      payment_intent_data: { metadata: { userId, product: 'COSMETIC', itemKey } },
       success_url: `${origin}/shop?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shop?stripe=cancel`,
     });

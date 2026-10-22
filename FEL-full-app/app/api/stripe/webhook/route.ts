@@ -17,6 +17,7 @@ import {
   subscriptionEnded,
   subscriptionPeriodEnd,
 } from '@/lib/stripe/basil-shapes';
+import { revokeForRefundedCharge } from '@/lib/stripe/refund-revoke';
 import { isWalletSession, walletCheckoutCompleted } from '@/lib/wallet/stripe-wallet-events';
 import type Stripe from 'stripe';
 
@@ -127,6 +128,12 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.deleted':
         await handleSubscriptionDeleted(event);
         break;
+      case 'charge.refunded': {
+        // LAUNCH-SALES: a refund revokes what it paid for (lib/stripe/refund-revoke.ts). Books and coach-store rows
+        // with metadata were handled above; this covers subscriptions, wallet products, cosmetics and memberships.
+        const outcome = await revokeForRefundedCharge(stripe, event);
+        return NextResponse.json({ received: true, refund: outcome.kind });
+      }
       default:
         console.log(`[stripe-webhook] Unhandled event type: ${event.type}`);
     }

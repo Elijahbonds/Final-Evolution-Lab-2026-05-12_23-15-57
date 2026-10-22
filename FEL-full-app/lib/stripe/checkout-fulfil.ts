@@ -72,7 +72,7 @@ export async function fulfilCheckoutSession(
     // Here we just create the Order record.
     await prisma.order.upsert({
       where: { stripeSessionId: session.id },
-      update: { status: 'PAID' },
+      update: await paidUnlessRefunded(prisma, session.id),
       create: {
         userId,
         stripeSessionId: session.id,
@@ -120,7 +120,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -149,7 +149,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -208,7 +208,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       const order = await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -247,7 +247,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       const order = await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -283,4 +283,14 @@ export async function fulfilCheckoutSession(
   }
 
   return { kind: 'none' };
+}
+
+/**
+ * LAUNCH-SALES: a replayed fulfilment (a redelivered webhook, a reloaded success page running verify-session) must
+ * never turn a REFUNDED Order back into PAID. The refund path (lib/stripe/refund-revoke.ts) is the only writer of
+ * REFUNDED; every other status moves to PAID as before.
+ */
+async function paidUnlessRefunded(db: any, stripeSessionId: string): Promise<{ status?: 'PAID' }> {
+  const row = await db.order.findUnique({ where: { stripeSessionId }, select: { status: true } });
+  return row?.status === 'REFUNDED' ? {} : { status: 'PAID' };
 }
