@@ -54,6 +54,10 @@ import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, TransformNode, Mesh } from '@babylonjs/core';
 import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
+import { MoveDip } from '../anim/moveDip';   // hoops-dip
+import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
+import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';
@@ -928,7 +932,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         rightHandHoops(char.animator, char.skeleton);   // HOOPS MOTION phase 3: the whole bball_* family too (captures included) — all six
-        leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand)
+        leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand); HOOPS-TWO-HAND-CROSS: all six loop in the left hand
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
         // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
@@ -959,6 +963,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // HOOPS MOTION phase 3c: THE MOTION LAYERS, mounted here (plan §3: "3v3 inside spawnBody") — the drag insert-first, the side lean
         // right after this body's posture layer; the ball and the hinge (the arms' last writer) come once the carries are on
         body.layers = mountMotionLayers({ scene: ctx.scene, skeleton: char.skeleton, root: char.root, hinge: false });
+        DrawnFacing.for(ctx.scene, char.root); FootGlide.for(ctx.scene, char.skeleton, char.root);   // hoops-dip movement pass, every body: no one-frame facing snap is DRAWN (core/DrawnFacing: the game keeps the movement's); no foot skates over the floor (anim/footGlide)
         if (ai) body.layers.setGate(() => body.lod === 0);   // IMPROVE (2026-10-06) #14: a far or off-screen off-ball body skips the drag and the lean
         return body;
       };
@@ -966,7 +971,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       localSource = new LocalInputSource();
       // HOOPS BODY (2026-10-07, Mirror & coaching Phase 7): the body's reads merged into the pad's for MY body only (lib/move/bodyControlSource);
       // with no body in frame the merge IS the pad's Intent, so button play is unchanged
-      bodyCtl = new BodyControlSource({ role: () => (carrierId === 'foeTeam' ? 'defense' : 'offense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => carries.get(me)?.hand ?? 'Right', emit: (e) => ThreeVThreeMode.onInput(ctx, e) });
+      bodyCtl = new BodyControlSource({ role: () => (carrierId === 'foeTeam' ? 'defense' : 'offense'), view: () => ctx.body?.() ?? null, meter: () => shotMeter ?? null, hand: () => carries.get(me)?.handAfterMove ?? 'Right', emit: (e) => ThreeVThreeMode.onInput(ctx, e) });
 
       net = attachNetplay('threevthree'); netSeatTaken = false;   // no-op without ?net=
       // M69 (mirrors 1v1): when driven by an agent (?agent=1), the hero slot reads from the AgentControlSource
@@ -974,6 +979,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       agentCtl = agentBridge() ? new AgentControlSource() : null;
       if (agentCtl) { ctx.agent.control = agentCtl; ctx.agent.getScore = () => myScore; }
       me = await spawnBody(new Vector3(0, 0, 6), undefined, false, 'teammate');
+      MoveDip.for(ctx.scene, me.char.skeleton, me.char.root, (n) => me.char.animator.groupFor(n));   // hoops-dip (owner 10-20; BEFORE MoveLegs: both insert first, so the pass runs moveLegs → the dip → the foot planter): the body sinks into the crossover / momentum cross / behind-the-back (anim/moveDip)
+      LocoAccent.for(ctx.scene, me.char.skeleton, me.char.root, () => me.tree.state);   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carries)
       me.tree.attachLegs(MoveLegs.for(ctx.scene, me.char.skeleton, (n) => me.char.animator.groupFor(n)));   // H2: the legs keep running under a handle move
       ring?.dispose(); ring = mountPlayerRing(ctx.scene, me.char.root, { color: TEAM_JERSEY.mine, icon: readPlayerIcon() });   // PLAYER RING: the one you steer, in your team's colour
       // Each defender MARKS A MAN: allyPositions() is [me, mate0, mate1], so
@@ -1182,7 +1189,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       for (const [b, c] of carries) c.update(dt, b === me ? meSpeed01 : Math.max(b.speed01, Math.min(1, Math.hypot(b.vel.x, b.vel.z) / 4.2)), cbNow === b && !(b === me && pausedDribble && !c.move) && !shooting && !mateShooting && !dunking && !passFlight.active && !arc.active && !finish && !gather && !ballReleased && !(b === me && !!spin && !c.move));   // HOOPS MOTION phase 4b (U19): …the hero's carry is ticked through a move's path (the spin's pull, PAUSIN's hold)
       if (STRONG_HAND_RETURNS) { // hoops-handle (owner 10-17): off — the ball stays in the hand a move left it in. H2d (plan §3.8, Q8): my ball goes back to the strong hand on a stop / after 1.2 s in the left — a quiet crossing, not a move
         const myC = carries.get(me); const nfH = nearestLiveFoe();
-        const sh = stepStrongHand(strongHand, dt, { hand: myC?.hand === 'Left' ? 'left' : 'right', speed01: meSpeed01, moveActive: !!myC?.move,
+        const sh = stepStrongHand(strongHand, dt, { hand: myC?.handAfterMove === 'Left' ? 'left' : 'right', speed01: meSpeed01, moveActive: !!myC?.move,
           dribbling: !!myC?.active && cbNow === me && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble && !passFlight.active && !arc.active,
           defenderDist: nfH ? distXZ(me.char.root.position, nfH.char.root.position) : Infinity });
         strongHand = sh.state;
@@ -1580,10 +1587,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         for (const g of stickGestures) {
           if (g.kind === 'release') { if (pausedDribble) { pausedDribble = false; me.drib.pause(false); me.tree.releaseHold(); carries.get(me)?.runMove('pausin_release'); SoundKit.play('whoosh', { pitch: 1.3, volume: 0.4 }); console.info('[3V3-STICK] release — the explode out of the pause'); } continue; }
           if (g.kind === 'hold') {   // H1 H-03: PAUSIN' — frozen, the ball out; R2 held means you are going, not pausing
-            if (!pausedDribble && !me.slot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; me.drib.pause(true); me.tree.hold(`bball_pausin_${carries.get(me)?.hand === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); carries.get(me)?.runMove('pausin');   /* H2b (plan §4.18) */ console.info("[3V3-STICK] PAUSIN'"); }
+            if (!pausedDribble && !me.slot.intent.sprint) { pausedDribble = true; pausedAt = performance.now() / 1000; me.drib.pause(true); me.tree.hold(`bball_pausin_${carries.get(me)?.handAfterMove === 'Left' ? 'left' : 'right'}`, { fadeSec: moveFadeSec(false) }); carries.get(me)?.runMove('pausin');   /* H2b (plan §4.18) */ console.info("[3V3-STICK] PAUSIN'"); }
             continue;
           }
-          const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: carries.get(me)?.hand ?? 'Right', escape: !!me.slot.intent.sprint, brace: !!me.slot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
+          const pick0 = stickMoveFor(g, { speed01: drib.speed01, pressured: foeDistS < 2.0 && foeLiveS, crowded: foeDistS < SLIDE_MIN_SPACE_M && foeLiveS, sprint: sprintOk, hand: carries.get(me)?.handAfterMove ?? 'Right', escape: !!me.slot.intent.sprint, brace: !!me.slot.intent.brace, sinceMoveSec: performance.now() / 1000 - lastStickMoveAt });
           // THE GATE IS THE UPGRADE. The snatchback is a rating-{MOVE_HANDLE.snatch_back} move in HandleSystem and the stick must not
           // hand it to a baseline handle for free — that would undo the one reason a PRQ upgrade is worth paying for. Refused by
           // NAME (locked moves are named, never hidden) and the plain step-back plays instead, which is what the flick is without R2.
@@ -1593,7 +1600,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const pick = locked ? { move: own0!.move, side: pick0!.side } : pick0;
           if (!pick) continue;
           if (pick.move !== 'size_up') lastStickMoveAt = performance.now() / 1000;
-          console.info(`[3V3-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(carries.get(me)?.hand ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${me.drib.vel.length().toFixed(1)} m/s`);
+          console.info(`[3V3-STICK] ${g.kind}${'dir8' in g ? ' ' + g.dir8 : ''} (ball ${(carries.get(me)?.handAfterMove ?? 'Right')[0]}) → ${pick.move}${pick.side ? ' ' + pick.side : ''} at ${me.drib.vel.length().toFixed(1)} m/s`);
           // THE 2K PRO STICK (remapped 2026-09-22, relative to the ball hand — docs/SPEC-STICK-2K-DECODE.md): the size-up, the step-back on DOWN, the spin on a ROTATION, the snatchback with R2
           if (pick.move === 'size_up') {
             // HOOPS MOTION phase 4b: its move's clip AND ball in place — no decision, no impulse, no link (1v1's)
@@ -3357,10 +3364,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     return {
       carry: carries.get(me) ?? null,
       beat: (clip, o) => me.tree.beat(clip, o),
-      impulse: (forward, lateral) => {
-        const yaw = me.char.root.rotation.y, fx = Math.sin(yaw), fz = Math.cos(yaw), rx = fz, rz = -fx;
-        me.drib.vel.addInPlace(new Vector3(fx * forward + rx * lateral, 0, fz * forward + rz * lateral));
-      },
+      // HOOPS-TWO-HAND-CROSS (DR-3): the move REDIRECTS the travel (rotated toward its side, eased over CUT_BLEND_SEC) — it was added
+      impulse: (forward, lateral) => { me.drib.redirect(forward, lateral, me.char.root.rotation.y); },
     };
   }
   /** HOOPS MOTION phase 4b (U14, S6): a shot's or a footwork's gather takes the ball to the RIGHT hand as drawn (1v1's gatherToShootingHand). */
