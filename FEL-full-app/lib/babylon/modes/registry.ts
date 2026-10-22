@@ -45,7 +45,10 @@ export const MODES: Record<string, ModeDefinition> = {
   snowboard_slalom: SnowboardSlalomMode,
   surf: SurfBreakMode,
   // Rollout wave 3 — precision family (M40 full rebuilds on aimSwingCore).
-  // Route flag keys map to these registry keys: baseball→derby, soccer→penalty.
+  // Route flag keys map to these registry keys: soccer→penalty. Baseball and derby are separate modes (BASEBALL-3INN,
+  // 2026-10-22): derby is the home-run derby at /play/derby; /play/baseball mounts BaseballInningsMode, three innings,
+  // straight from its route and not from this map yet — a `baseball` key would need its own body row, which
+  // bodySeam.test.ts (modeId 'baseball' → the derby row) and the body-profile checks in registry.drift.test.ts pin out.
   tennis: TennisMode,
   derby: DerbyMode,
   penalty: PenaltyMode,

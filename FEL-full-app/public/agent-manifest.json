@@ -28,7 +28,7 @@
     { "id": "brainbrawl",       "route": "/play/brain-brawl",   "label": "Brain Brawl",    "venue": "NeuroArena",           "actions": ["move", "shoot", "idle"] },
     { "id": "carnival",         "route": "/play/carnival",      "label": "Carnival",       "venue": "Venice Beach Court",   "actions": ["move", "shoot", "idle"] },
     { "id": "dance",            "route": "/play/dance",         "label": "The Cypher",     "venue": "The Cypher",           "actions": ["move", "idle"] },
-    { "id": "derby",            "route": "/play/baseball",      "label": "Moonshot Derby", "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
+    { "id": "derby",            "route": "/play/derby",         "label": "Moonshot Derby", "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
     { "id": "duel",             "route": "/play/duel",          "label": "Duel",           "venue": "Shimogamo Dojo",       "actions": ["move", "guard", "strike", "idle"] },
     { "id": "dunk",             "route": "/play/dunk",          "label": "Dunk Contest",   "venue": "Venice Beach Court",   "actions": ["move", "sprint", "dunk", "shoot", "idle"] },
     { "id": "dunkduel",         "route": "/play/dunkduel",      "label": "Prove It",       "venue": "Venice Beach Court",   "actions": ["move", "sprint", "dunk", "shoot", "idle"] },

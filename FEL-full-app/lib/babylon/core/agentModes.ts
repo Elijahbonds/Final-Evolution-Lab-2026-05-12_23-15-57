@@ -17,7 +17,7 @@ export const AGENT_MODES: AgentModeDescriptor[] = [
   { id: 'brainbrawl',        route: '/play/brain-brawl',   label: 'Brain Brawl',    actions: ['move', 'shoot', 'idle'] },
   { id: 'carnival',          route: '/play/carnival',      label: 'Carnival',       actions: ['move', 'shoot', 'idle'] },
   { id: 'dance',             route: '/play/dance',         label: 'The Cypher',     actions: ['move', 'idle'] },
-  { id: 'derby',             route: '/play/baseball',      label: 'Moonshot Derby', actions: ['move', 'shoot', 'idle'] },
+  { id: 'derby',             route: '/play/derby',         label: 'Moonshot Derby', actions: ['move', 'shoot', 'idle'] },
   { id: 'duel',              route: '/play/duel',          label: 'Duel',           actions: ['move', 'guard', 'strike', 'idle'] },
   { id: 'dunk',              route: '/play/dunk',          label: 'Dunk Contest',   actions: ['move', 'sprint', 'dunk', 'shoot', 'idle'] },
   { id: 'dunkduel',          route: '/play/dunkduel',      label: 'Prove It',       actions: ['move', 'sprint', 'dunk', 'shoot', 'idle'] },

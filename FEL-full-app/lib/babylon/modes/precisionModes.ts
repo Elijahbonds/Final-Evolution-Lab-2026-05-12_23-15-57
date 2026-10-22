@@ -118,7 +118,7 @@ const CLUTCH_MULT = 1.5;
 /** Seconds into soccer_kick_shoot where the boot meets the ball (the strike-through key). */
 const KICK_CONTACT_SEC = 0.45;
 /** Seconds into baseball_pitch_over / _side where the ball leaves the hand (between the over-the-top key and the release). */
-const PITCH_RELEASE_SEC = 0.52;
+export const PITCH_RELEASE_SEC = 0.52;
 
 // ── GOLF: the three pillars the benchmark's own lock names ──────────────────
 // "Club selection + shot timing + course reading". Shot timing was here and
