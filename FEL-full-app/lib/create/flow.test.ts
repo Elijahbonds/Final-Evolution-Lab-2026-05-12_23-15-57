@@ -1,7 +1,7 @@
 // CREATE HUB: the guided flow's step logic, teen privacy, the rights tick, pending uploads and the publish links.
 import { describe, expect, it } from 'vitest';
 import {
-  PENDING_MEDIA, STEPS, blockers, buildCreateBody, canLeave, clampStep, effectivePublic, newDraft, nextStep, pendingFields,
+  PENDING_MEDIA, STEPS, blockers, buildCreateBody, canLeave, clampStep, createFlowHref, effectivePublic, newDraft, nextStep, pendingFields,
   pendingUrl, prevStep, publishHref, readEntry, resolvePending, visibilityNote, type FlowDraft,
 } from './flow';
 import { DISCIPLINES, RIGHTS_VERSIONS, validateArtPayload, type ArtPayloadBody } from '@/lib/creator/creative-card-types';
@@ -121,5 +121,13 @@ describe('publish-as-card links', () => {
     expect(readEntry({ from: ['library', 'x'], title: 'x'.repeat(80) })).toEqual({ from: 'library', title: 'x'.repeat(60) });
     const round = readEntry(new URL(`https://fel${publishHref('music', { from: 'song-render', song: 'a_b-1', title: 'My Song', chart: true })}`).searchParams);
     expect(round).toEqual({ from: 'song-render', song: 'a_b-1', title: 'My Song', chart: true });
+  });
+  it('keeps only safe publish context when a signed-out creator is sent through login', () => {
+    expect(createFlowHref('music', { from: 'song-render', song: 'mix_7', title: 'My Mix', chart: '1', remix: 'ccard_u1_2' })).toBe(
+      '/create/music?from=song-render&song=mix_7&title=My+Mix&chart=1&remix=ccard_u1_2',
+    );
+    expect(createFlowHref('music', { from: 'evil', song: '../../etc', title: '<script>', chart: 'yes', remix: 'bad id' })).toBe(
+      '/create/music?title=%3Cscript%3E',
+    );
   });
 });

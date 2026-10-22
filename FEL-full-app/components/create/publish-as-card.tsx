@@ -19,21 +19,34 @@ export function PublishAsCardLink({ discipline, entry, style, className, qa = 'p
   );
 }
 
+export function publishFileBlocker(blob: Blob | null, entry: PublishEntry): string | null {
+  if (!entry.from) return 'Open this from a creator tool first.';
+  if (!blob) return 'Render or choose a file before opening Create.';
+  return null;
+}
+
 /** For a file the flow needs (a rendered song, an uploaded file): kept on this device first, then the flow opens. */
 export function PublishFileAsCard({ discipline, entry, file, meta, style, className, qa = 'publish-file-as-card', children }: {
   discipline: Discipline; entry: PublishEntry; file: () => Blob | null; meta: Omit<HandoffMeta, 'at' | 'from'>;
   style?: React.CSSProperties; className?: string; qa?: string; children?: React.ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const id = `${qa}-error`;
   return (
-    <button data-qa={qa} style={style} className={className} disabled={busy} onClick={async () => {
-      const blob = file();
-      if (!blob || !entry.from) return;
-      setBusy(true);
-      await putHandoff(blob, { ...meta, from: entry.from });   // false (no file store): the flow asks for the file instead
-      window.location.assign(publishHref(discipline, entry));
-    }}>
-      {busy ? 'OPENING CREATE…' : children ?? 'PUBLISH AS CARD'}
-    </button>
+    <>
+      <button data-qa={qa} style={style} className={className} disabled={busy} aria-describedby={error ? id : undefined} onClick={async () => {
+        const blob = file();
+        const blocker = publishFileBlocker(blob, entry);
+        if (blocker) { setError(blocker); return; }
+        setError(null);
+        setBusy(true);
+        await putHandoff(blob!, { ...meta, from: entry.from! });   // false (no file store): the flow asks for the file instead
+        window.location.assign(publishHref(discipline, entry));
+      }}>
+        {busy ? 'OPENING CREATE…' : children ?? 'PUBLISH AS CARD'}
+      </button>
+      {error && <p id={id} role="alert" className="mt-2 text-xs text-amber-300">{error}</p>}
+    </>
   );
 }
