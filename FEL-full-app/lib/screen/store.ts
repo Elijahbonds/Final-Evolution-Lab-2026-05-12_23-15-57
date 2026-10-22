@@ -33,6 +33,8 @@ export const KEYS = {
   gate: `${SCREEN_PREFIX}gate`,
   takeoff: `${SCREEN_PREFIX}takeoffLeg`,
   summary: `${SCREEN_PREFIX}summary`,
+  /** SCREEN-MINOR-LOCK: the strictest age answered in this tab, for the whole session (lockSessionAge). */
+  sessionAge: `${SCREEN_PREFIX}sessionAge`,
 } as const;
 /** PR #20's old localStorage keys (a preview build wrote them): removed on clear, never written again. */
 export const LEGACY_LOCAL_KEYS = ['fel.assess.takeoffLeg', 'fel.assess.voice'] as const;
@@ -129,7 +131,44 @@ export function resetAge(s: StorageLike | null): void {
 }
 
 /** Tests only: a new tab (a fresh page's memory). */
-export function forgetAgeForTests(): void { ageMemory = null; }
+export function forgetAgeForTests(): void { ageMemory = null; sessionAgeMemory = null; }
+
+// ── the session lock (SCREEN-MINOR-LOCK, PM 2026-10-21) ──
+//
+// The age answer above is per RUN: every new Start resets it (AGE-RESET), so the next person on a shared phone answers
+// for themselves. This lock is per SESSION, beside it, and only ever tightens: it holds the strictest answer this tab
+// has given, resetAge never clears it, clearScreen keeps it, and closing the tab ends it. An answer under 18 or "rather
+// not say" therefore holds for the rest of the session: the page re-locks the run's answer from it on every new Start
+// (the question is not asked again), and a later "18 or older" cannot loosen it. An adult answer is still asked again
+// on a new Start (AGE-RESET), and a kid answer then tightens the lock. sessionStorage only: no cookie, no localStorage.
+
+// The page's memory of the lock, for a browser that refuses sessionStorage.
+let sessionAgeMemory: AgeBand | null = null;
+
+/** The strictest age this tab has answered this session, or null when none has been given. */
+export function readSessionAge(s: StorageLike | null): AgeBand | null {
+  let stored: AgeBand | null = null;
+  try {
+    const v = s?.getItem(KEYS.sessionAge) ?? null;
+    if (isAgeBand(v)) stored = v;
+  } catch { /* no storage: the page's memory below */ }
+  return strictestAge(stored, sessionAgeMemory);
+}
+
+/** Add an answer to the session lock and return the band that holds: the strictest of every answer this session. */
+export function lockSessionAge(s: StorageLike | null, band: AgeBand): AgeBand {
+  const had = readSessionAge(s);
+  const holds = strictestAge(had, band)!;
+  sessionAgeMemory = holds;
+  if (holds === had) return holds;
+  try { s?.setItem(KEYS.sessionAge, holds); } catch { /* refused: the page's memory holds it */ }
+  return holds;
+}
+
+/** The camera, for this run: only when every age the page holds (the run's, the tab's, the session's) is 18 or older. */
+export function cameraAllowed(...ages: (AgeBand | null | undefined)[]): boolean {
+  return ages.every((a) => a === '18+');
+}
 
 // ── the result ──
 
@@ -184,14 +223,14 @@ export function recall(s: StorageLike | null): { gate: GateRecord; summary: Scre
 
 /**
  * Every screen key in this tab (and PR #20's old localStorage keys), gone, and the page's memory of them: all but the
- * age answer, which stays locked until the tab closes (clearing is not a way to answer again).
+ * age answer and the session lock, which stay until the tab closes (clearing is not a way to answer again).
  */
 export function clearScreen(s: StorageLike | null, local?: Pick<Storage, 'getItem' | 'removeItem'> | null): void {
   memory = null;
   try {
     if (s) {
       const keys: string[] = [];
-      for (let i = 0; i < s.length; i++) { const k = s.key(i); if (k && k.startsWith(SCREEN_PREFIX) && k !== KEYS.age) keys.push(k); }
+      for (let i = 0; i < s.length; i++) { const k = s.key(i); if (k && k.startsWith(SCREEN_PREFIX) && k !== KEYS.age && k !== KEYS.sessionAge) keys.push(k); }
       for (const k of keys) s.removeItem(k);
     }
   } catch { /* no storage: nothing to clear */ }
