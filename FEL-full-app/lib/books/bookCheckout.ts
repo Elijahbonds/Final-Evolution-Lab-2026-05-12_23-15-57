@@ -112,15 +112,21 @@ export class BookCheckoutError extends Error {
 export const FORMAT_NOT_OFFERED_MESSAGE = 'This format is not for sale here yet. Audiobooks are stream only.';
 
 /**
- * The terms rule for checkout (lib/books/bookTerms.ts): an offer whose format the current store terms do not cover
- * (ebook, bundle) is refused with a 409 `format_not_offered`. Fail closed: an unknown offer is refused too. The route
- * calls this BEFORE it creates a Stripe customer, and checkoutParamsForOffer calls it again.
+ * The terms/catalog rule for checkout: refuse an unknown offer, a format the current store terms do not cover, or a
+ * catalog offer that is not ready for direct sale BEFORE the route creates or looks up a Stripe customer.
  */
 export function assertOfferSellable(offerId: string, policy: BookTermsPolicy = currentBookPolicy()): void {
   const offer = getOffer(offerId);
   if (!offer) throw new BookCheckoutError('Unknown book.', 404, 'unknown_offer');
   if (!bookFormatAllowed(offer.format, policy)) {
     throw new BookCheckoutError(FORMAT_NOT_OFFERED_MESSAGE, 409, 'format_not_offered');
+  }
+  if (!bookOfferAllowed(offer, policy)) {
+    throw new BookCheckoutError(
+      offer.directSaleNote || 'This format is not for sale here.',
+      409,
+      'not_for_sale',
+    );
   }
 }
 

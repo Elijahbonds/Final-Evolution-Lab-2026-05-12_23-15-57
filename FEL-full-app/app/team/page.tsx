@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { approvedProfiles, coachStoreBookHref } from '@/lib/creator/creatorCatalog';
 import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
+import { teamPageLede } from '@/lib/creator/teamCopy';
 import { CreatorFrame, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
 import { currentViewer } from '@/lib/creator/creatorViewer';
+import { isCoachStoreEnabled } from '@/lib/flags';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Team — Final Evolution Lab' };
@@ -10,18 +12,19 @@ export const metadata = { title: 'Team — Final Evolution Lab' };
 export default async function TeamPage() {
   const viewer = await currentViewer();
   const profiles = approvedProfiles();
+  const coachStoreOpen = isCoachStoreEnabled();
 
   return (
     <CreatorFrame
       signedIn={viewer.signedIn}
       title={<>Final Evolution <span className="text-[#F5C518]">Team</span></>}
-      lede="Meet the people behind FEL. Book a session through the coach store, or request a quote."
+      lede={teamPageLede(coachStoreOpen)}
     >
       <section className="mt-8">
         <SectionTitle>Profiles</SectionTitle>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {profiles.map((profile) => {
-            const bookHref = bookHrefWhenStoreOpen(coachStoreBookHref(profile));
+            const bookHref = bookHrefWhenStoreOpen(coachStoreBookHref(profile), coachStoreOpen);
             return (
               <div
                 key={profile.slug}

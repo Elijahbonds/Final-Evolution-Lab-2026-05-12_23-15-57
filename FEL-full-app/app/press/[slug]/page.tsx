@@ -75,7 +75,7 @@ export default async function BookPage({
           <h2 className="fel-heading text-4xl text-white">{book.title}</h2>
           <p className="mt-2 text-sm text-white/60">{book.description}</p>
           {book.chaptersArePlaceholder ? (
-            <p className="mt-2 text-[11px] text-white/35">Chapter list is a placeholder until the audio masters are uploaded.</p>
+            <p className="mt-2 text-[11px] text-white/35">Audio masters are pending inventory, so audiobook checkout is disabled for this title.</p>
           ) : null}
         </div>
       </div>

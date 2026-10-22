@@ -26,9 +26,13 @@ describe('Book links only while the coach store is open', () => {
   });
 
   it('both /team pages send the href through it (the live /team linked a 404)', () => {
-    for (const f of ['app/team/page.tsx', 'app/team/[slug]/page.tsx']) {
+    const calls: Record<string, RegExp> = {
+      'app/team/page.tsx': /bookHrefWhenStoreOpen\(coachStoreBookHref\(profile\), coachStoreOpen\)/,
+      'app/team/[slug]/page.tsx': /bookHrefWhenStoreOpen\(coachStoreBookHref\(profile\)\)/,
+    };
+    for (const [f, call] of Object.entries(calls)) {
       const src = readFileSync(f, 'utf8');
-      expect(src, f).toContain('bookHrefWhenStoreOpen(coachStoreBookHref(profile))');
+      expect(src, f).toMatch(call);
     }
   });
 });

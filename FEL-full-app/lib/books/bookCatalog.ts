@@ -45,7 +45,7 @@ export interface BookOffer {
 export interface BookTitle {
   slug: string;
   title: string;
-  /** Placeholder copy. Elijah replaces this. */
+  /** Public copy. Keep generic until Elijah replaces this. */
   description: string;
   track: string | null;
   /** Shown on the featured card. Omitted when there is nothing honest to say. */
@@ -84,6 +84,8 @@ export const AMAZON_AUTHOR_URL = 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q
 
 const KU_EBOOK = 'This ebook is in Kindle Unlimited, so it is not sold here until that term ends.';
 const KU_BUNDLE = 'The bundle includes the ebook, so it stays off while the ebook is in Kindle Unlimited.';
+const AUDIO_PENDING = 'Audio masters are pending inventory, so this audiobook is not for sale here yet.';
+const BUNDLE_AUDIO_PENDING = 'The bundle includes audiobook access, so it stays off until the audio masters are inventoried.';
 
 export const PARTNERS: readonly PartnerLink[] = [
   {
@@ -153,7 +155,7 @@ function numberedChapters(count: number): string[] {
   return ['Opening', ...Array.from({ length: count }, (_, i) => `Chapter ${i + 1}`), 'Close'];
 }
 
-function offersFor(slug: string, kdpSelect: boolean): BookOffer[] {
+function offersFor(slug: string, kdpSelect: boolean, audioMastersReady: boolean): BookOffer[] {
   return [
     {
       id: `${slug}:ebook`,
@@ -170,7 +172,8 @@ function offersFor(slug: string, kdpSelect: boolean): BookOffer[] {
       format: 'audiobook',
       priceCents: EXAMPLE_AUDIO_CENTS,
       priceIsExample: true,
-      directSale: true,
+      directSale: audioMastersReady,
+      directSaleNote: audioMastersReady ? undefined : AUDIO_PENDING,
     },
     {
       id: `${slug}:bundle`,
@@ -178,8 +181,8 @@ function offersFor(slug: string, kdpSelect: boolean): BookOffer[] {
       format: 'bundle',
       priceCents: EXAMPLE_BUNDLE_CENTS,
       priceIsExample: true,
-      directSale: !kdpSelect,
-      directSaleNote: kdpSelect ? KU_BUNDLE : undefined,
+      directSale: !kdpSelect && audioMastersReady,
+      directSaleNote: kdpSelect ? KU_BUNDLE : audioMastersReady ? undefined : BUNDLE_AUDIO_PENDING,
     },
   ];
 }
@@ -199,7 +202,7 @@ function title(input: {
   return {
     slug: input.slug,
     title: input.title,
-    description: 'Description placeholder.',
+    description: 'Description pending confirmation.',
     track: input.track,
     eyebrow: input.eyebrow ?? null,
     featured: input.featured ?? false,
@@ -207,7 +210,7 @@ function title(input: {
     kdpSelect: input.kdpSelect,
     chaptersArePlaceholder: input.chaptersArePlaceholder,
     files: [...ebookFiles(input.slug), ...audioFiles(input.slug, input.chapterLabels, input.sampleLabel ?? null)],
-    offers: offersFor(input.slug, input.kdpSelect),
+    offers: offersFor(input.slug, input.kdpSelect, !input.chaptersArePlaceholder),
   };
 }
 
@@ -312,6 +315,9 @@ function assertCatalog(books: readonly BookTitle[]): void {
       if (!Number.isInteger(offer.priceCents) || offer.priceCents <= 0) throw new Error(`bad price on ${offer.id}`);
       if (book.kdpSelect && (offer.format === 'ebook' || offer.format === 'bundle') && offer.directSale) {
         throw new Error(`${offer.id} is marked for direct sale while the ebook is in KDP Select`);
+      }
+      if (book.chaptersArePlaceholder && (offer.format === 'audiobook' || offer.format === 'bundle') && offer.directSale) {
+        throw new Error(`${offer.id} is marked for direct sale before audio masters are inventoried`);
       }
     }
   }

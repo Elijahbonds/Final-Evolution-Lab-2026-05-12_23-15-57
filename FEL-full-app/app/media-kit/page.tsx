@@ -16,14 +16,14 @@ export default async function MediaKitPage() {
     <CreatorFrame
       signedIn={viewer.signedIn}
       title={<>Media <span className="text-[#F5C518]">kit</span></>}
-      lede="For brands and partners. Everything marked EXAMPLE is a placeholder until it is confirmed."
+      lede="For brands and partners. Everything marked EXAMPLE is sample data until it is confirmed."
     >
       <section className="mt-8 grid gap-6 md:grid-cols-[180px_1fr]">
         {profile ? <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} size="lg" /> : null}
         <div>
           <SectionTitle>Bio</SectionTitle>
           <p className="fel-heading mt-1 text-3xl text-white">{profile?.name ?? 'Final Evolution Lab'}</p>
-          <p className="mt-2 text-sm text-white/70">{profile?.bio ?? 'Bio placeholder.'}</p>
+          <p className="mt-2 text-sm text-white/70">{profile?.bio ?? 'Bio details are pending confirmation.'}</p>
           <Link href="/work-with-us?source=media-kit" className="mt-4 inline-block rounded-md bg-[#F5C518] px-4 py-2 text-sm font-semibold text-black hover:bg-[#ffd84a]">
             Inquire
           </Link>

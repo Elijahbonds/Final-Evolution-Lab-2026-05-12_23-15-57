@@ -56,38 +56,36 @@ export default async function TeamProfilePage({ params }: { params: { slug: stri
         </div>
       </section>
 
-      <section className="mt-10 grid gap-6 md:grid-cols-2">
-        <div>
-          <SectionTitle>Reels</SectionTitle>
-          {profile.reels.length === 0 ? (
-            <p className="mt-2 text-sm text-white/45">Reel links placeholder.</p>
-          ) : (
-            <ul className="mt-2 space-y-1 text-sm">
-              {profile.reels.map((r) => (
-                <li key={r.href}><a className="text-[#F5C518] hover:underline" href={r.href} target="_blank" rel="noopener noreferrer">{r.label}</a></li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div>
-          <SectionTitle>Links</SectionTitle>
-          {profile.socials.length === 0 ? (
-            <p className="mt-2 text-sm text-white/45">Social links placeholder.</p>
-          ) : (
-            <ul className="mt-2 space-y-1 text-sm">
-              {profile.socials.map((s) => (
-                <li key={s.href}>
-                  {s.href.startsWith('/') ? (
-                    <Link className="text-[#F5C518] hover:underline" href={s.href}>{s.label}</Link>
-                  ) : (
-                    <a className="text-[#F5C518] hover:underline" href={s.href} target="_blank" rel="noopener noreferrer">{s.label}</a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
+      {profile.reels.length > 0 || profile.socials.length > 0 ? (
+        <section className="mt-10 grid gap-6 md:grid-cols-2">
+          {profile.reels.length > 0 ? (
+            <div>
+              <SectionTitle>Reels</SectionTitle>
+              <ul className="mt-2 space-y-1 text-sm">
+                {profile.reels.map((r) => (
+                  <li key={r.href}><a className="text-[#F5C518] hover:underline" href={r.href} target="_blank" rel="noopener noreferrer">{r.label}</a></li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {profile.socials.length > 0 ? (
+            <div>
+              <SectionTitle>Links</SectionTitle>
+              <ul className="mt-2 space-y-1 text-sm">
+                {profile.socials.map((s) => (
+                  <li key={s.href}>
+                    {s.href.startsWith('/') ? (
+                      <Link className="text-[#F5C518] hover:underline" href={s.href}>{s.label}</Link>
+                    ) : (
+                      <a className="text-[#F5C518] hover:underline" href={s.href} target="_blank" rel="noopener noreferrer">{s.label}</a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="mt-10">
         <SectionTitle>Services</SectionTitle>

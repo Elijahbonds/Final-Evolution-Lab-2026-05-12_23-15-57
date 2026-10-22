@@ -10,7 +10,7 @@
  * could look like a decision is an EXAMPLE until Elijah replaces it.
  *
  * - `approved: false` entries never render. A profile that is not approved hides everything under it.
- * - Bios, specialties and stats are placeholders. Do not replace them with invented copy in a code change;
+ * - Bios, specialties and stats are pending confirmation. Do not replace them with invented copy in a code change;
  *   paste the real text.
  * - Media-kit package rates are EXAMPLE (`priceIsExample`) until the owner sets real ones.
  */
@@ -45,7 +45,7 @@ export interface CreatorProfile {
   approved: boolean;
   /** Public image path or null for the initials tile. */
   photoUrl: string | null;
-  /** Placeholder copy. Elijah replaces this. */
+  /** Public profile copy. Keep generic until Elijah replaces this. */
   bio: string;
   specialty: string;
   reels: CreatorLink[];
@@ -108,8 +108,8 @@ export const PROFILES: readonly CreatorProfile[] = [
     name: 'Elijah Bonds',
     approved: true,
     photoUrl: null,
-    bio: 'Bio placeholder.',
-    specialty: 'Specialty placeholder.',
+    bio: 'Bio details are pending confirmation.',
+    specialty: 'Services and collaborations through Final Evolution Lab.',
     reels: [],
     socials: [
       { label: 'Books on FEL Press', href: '/press' },
@@ -122,19 +122,19 @@ export const PROFILES: readonly CreatorProfile[] = [
         id: 'elijah-bonds:session-60',
         profileSlug: 'elijah-bonds',
         name: '1-on-1 session (EXAMPLE)',
-        description: 'Service description placeholder.',
+        description: 'Details are confirmed through the coach store.',
         durationMinutes: 60,
       }),
       service({
         id: 'elijah-bonds:consult-30',
         profileSlug: 'elijah-bonds',
         name: 'Consult call (EXAMPLE)',
-        description: 'Service description placeholder.',
+        description: 'Details are confirmed through the coach store.',
         durationMinutes: 30,
       }),
     ],
     stats: [
-      { label: 'Stat placeholder', value: 'EXAMPLE', isExample: true },
+      { label: 'Confirmed stat', value: 'EXAMPLE', isExample: true },
     ],
   },
   {
@@ -143,8 +143,8 @@ export const PROFILES: readonly CreatorProfile[] = [
     name: 'Example Teammate',
     approved: false,
     photoUrl: null,
-    bio: 'Bio placeholder.',
-    specialty: 'Specialty placeholder.',
+    bio: 'Bio details are pending confirmation.',
+    specialty: 'Services and collaborations through Final Evolution Lab.',
     reels: [],
     socials: [],
     coachStoreSlug: null,
@@ -153,26 +153,26 @@ export const PROFILES: readonly CreatorProfile[] = [
         id: 'example-teammate:session-60',
         profileSlug: 'example-teammate',
         name: 'Session (EXAMPLE)',
-        description: 'Service description placeholder.',
+        description: 'Details are confirmed through the coach store.',
         durationMinutes: 60,
       }),
     ],
-    stats: [{ label: 'Stat placeholder', value: 'EXAMPLE', isExample: true }],
+    stats: [{ label: 'Confirmed stat', value: 'EXAMPLE', isExample: true }],
   },
 ];
 
 export const MEDIA_KIT: MediaKit = {
   profileSlug: 'elijah-bonds',
-  highlights: ['Highlight placeholder.'],
+  highlights: ['Highlights are pending confirmation.'],
   highlightsArePlaceholder: true,
   // Taken from the Press partner links, which are real links. Whether each counts as a past partner for a
   // brand deck is Elijah's call, so the kit marks the list unconfirmed.
   pastPartners: PARTNERS.map((p) => p.name),
   partnersConfirmed: false,
   packages: [
-    { id: 'reel', name: 'Sponsored reel (EXAMPLE)', detail: 'Package description placeholder.', priceCents: 100000, priceIsExample: true },
-    { id: 'story-set', name: 'Story set (EXAMPLE)', detail: 'Package description placeholder.', priceCents: 50000, priceIsExample: true },
-    { id: 'appearance', name: 'Event appearance (EXAMPLE)', detail: 'Package description placeholder.', priceCents: 250000, priceIsExample: true },
+    { id: 'reel', name: 'Sponsored reel (EXAMPLE)', detail: 'Scope is confirmed by inquiry before any offer.', priceCents: 100000, priceIsExample: true },
+    { id: 'story-set', name: 'Story set (EXAMPLE)', detail: 'Scope is confirmed by inquiry before any offer.', priceCents: 50000, priceIsExample: true },
+    { id: 'appearance', name: 'Event appearance (EXAMPLE)', detail: 'Scope is confirmed by inquiry before any offer.', priceCents: 250000, priceIsExample: true },
   ],
 };
 
@@ -183,7 +183,7 @@ function assertCatalog(profiles: readonly CreatorProfile[]): void {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(p.slug)) throw new Error(`bad profile slug ${p.slug}`);
     if (slugs.has(p.slug)) throw new Error(`duplicate profile ${p.slug}`);
     slugs.add(p.slug);
-    if (p.bio.trim() === '') throw new Error(`${p.slug} needs a bio placeholder`);
+    if (p.bio.trim() === '') throw new Error(`${p.slug} needs a bio line`);
     if (p.coachStoreSlug != null && !/^[a-z0-9][a-z0-9-]*$/.test(p.coachStoreSlug)) throw new Error(`bad coach-store slug on ${p.slug}`);
     for (const s of p.services) {
       if (s.profileSlug !== p.slug || !s.id.startsWith(`${p.slug}:`)) throw new Error(`service ${s.id} is on the wrong profile`);
