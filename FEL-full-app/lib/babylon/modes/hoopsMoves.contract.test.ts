@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PlayerGuardHand, comboBanner, ComboFlow, spinClipFor } from './hoopsFlow';
 import { AI_HAND_DWELL_SEC } from '../core/AiBallHand';
 import { GUARD_RANGE_M } from '../core/GuardHand';
+import { stickMoveFor, type StickGesture } from '../core/StickHandle';
 
 const one = readFileSync('lib/babylon/modes/OneVOneMode.ts', 'utf8');
 const three = readFileSync('lib/babylon/modes/ThreeVThreeMode.ts', 'utf8');
@@ -92,4 +93,24 @@ describe('comboBanner / spinClipFor', () => {
     expect(spinClipFor('Left', without)).toBe('bball_spin');
     expect(spinClipFor(undefined, has)).toBe('bball_spin');
   });
+});
+
+// THE FOUR NEW MOVES (owner 2026-10-20: "in-and-out, snatch-back, hesi-cross, and the spin from the left hand"). No new binding: each is
+// reached from the #240 Pro Stick map as it stands (InputBus / StickHandle / HandleSystem / modeVerbs untouched) — pinned here from BOTH
+// ball hands, so a later remap that drops one fails by name.
+describe('the round-2 moves reach the stick from either hand (no new binding)', () => {
+  const flick = (x: number, y: number): StickGesture => ({ kind: 'flick', dir: 'up', dir8: 'up', x, y });
+  const read = (hand: 'Left' | 'Right', escape = false) => ({ speed01: 0.4, pressured: true, sprint: escape, hand, escape });
+  for (const hand of ['Right', 'Left'] as const) {
+    const toward = hand === 'Right' ? 1 : -1, s = hand === 'Right' ? 'right' : 'left', o = hand === 'Right' ? 'left' : 'right';
+    it(`ball in the ${hand} hand`, () => {
+      expect(stickMoveFor(flick(0, -1), read(hand))).toEqual({ move: 'in_and_out', side: s });   // UP: the in-and-out, on the ball's side
+      expect(stickMoveFor(flick(0, 1), read(hand, true))).toEqual({ move: 'snatchback', side: o });   // R2 + DOWN: the snatch-back, it crosses
+      expect(stickMoveFor(flick(0, 1), read(hand))?.move).toBe('stepback');   // DOWN without R2 stays the step-back (#240)
+      // the hesi-cross: TOWARD (the hesi), then UP-AWAY (the crossover) in the hesi's float — the combo window flows it (anim/comboFlow)
+      expect(stickMoveFor(flick(toward, 0), read(hand))?.move).toBe('hesi');
+      expect(stickMoveFor(flick(-toward * 0.7, -0.7), read(hand))).toEqual({ move: 'crossover', side: o });
+      expect(stickMoveFor({ kind: 'sweep', sign: 1 }, read(hand))?.move).toBe('spin');   // ROTATE: the spin, its body by the hand (spinClipFor)
+    });
+  }
 });
