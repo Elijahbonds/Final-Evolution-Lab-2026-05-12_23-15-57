@@ -45,7 +45,7 @@ describe('the rival\'s crossover (4f §4.20, H2a): through the renderer — his 
     const at = one.indexOf("if (dec.crossover) {");
     const block = one.slice(at, at + 2400);
     expect(block).toMatch(/const cap = `bball_mc_crossover_\$\{dec\.crossover === 'left' \? 'left' : 'right'\}`;/);
-    expect(block).toMatch(/const crosses = !!foeCarry && \(foeCarry\.hand === 'Left' \? 'left' : 'right'\) !== dec\.crossover;/);
+    expect(block).toMatch(/const crosses = !!foeCarry && \(foeCarry\.handAfterMove === 'Left' \? 'left' : 'right'\) !== dec\.crossover;/);
     expect(block).toMatch(/requestMove\(foeHost\(\), \{ move: 'crossover', hint: dec\.crossover, decide: \{ kind: 'none' \}, clip: foe\.animator\.clipNames\.has\(cap\) \? cap : [^}]*fadeSec: 0\.12, speedRatio: 1, path: crosses \? undefined : false \}\);/);
     expect(one).toMatch(/function foeHost\(\): HandleHost \{ return \{ carry: foeCarry, beat: \(clip, o\) => foeAnimTree\.beat\(clip, o\) \}; \}/);   // no impulse: AttackerBrain moves him
     expect(one).not.toMatch(/^\s*foeCarry\?\.toSide\(/m);
