@@ -49,7 +49,6 @@ const NOT_NAVIGABLE: Record<string, string> = {
   // 2026-10-13 linked it from /coach/dashboard and the buyer's thanks page through lib/coach-store/reviewLink.ts.) Each is named with the reason found in the code.
   '/press/receipt': 'Stripe Checkout success_url for a book purchase (lib/books/bookCheckout.ts), where Stripe sends the buyer back; BOOK_STORE_ENABLED keeps checkout closed, so nothing opens it yet',
   '/coach/thanks': 'Stripe Checkout success_url (lib/coach-store/checkout.ts), flag-gated by COACH_STORE_ENABLED, noindex',
-  '/live/schedule': 'LIVE-PAGE-FLAGOFF: 404s while isLiveStreamScheduleEnabled() is off; it needs a link the day the owner turns it on',
   '/story/rail': 'Story is parked (drafts-keep-7, #153): the standalone Nexus rail is deliberately unlinked from /story',
   '/story/boss': 'Story is parked (drafts-keep-7, #153): the standalone Vertigo boss is deliberately unlinked from /story',
 };
