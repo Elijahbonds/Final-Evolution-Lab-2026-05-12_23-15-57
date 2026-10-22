@@ -5,7 +5,7 @@
 //     getUserMedia), no camera component in the tree; the one way on is the camera-free card's single button.
 //   · 18 or older: unchanged, the camera card and then the camera.
 //   · the age answer: sessionStorage only (no cookie, no localStorage), and an answer under 18 or "rather not say" is
-//     locked for the rest of the session — a new Start, "Back to the start" or a later "18 or older" cannot loosen it.
+//     locked for the rest of the session — a new Start, the card's restart button or a later "18 or older" cannot loosen it.
 //
 // THE REAL PAGE IS DRIVEN, NOT A COPY OF IT. assess-app.tsx is called as a function under a tiny hook runtime (React's
 // hooks swapped for a per-component store while the page renders; effects run after each render as React would), its
@@ -197,7 +197,8 @@ describe('under 13, 13–17 and "rather not say": no camera ask, no camera, one 
     // the card's markup: its one button, and no camera ask in it
     const html = renderToStaticMarkup(<KidNoCamera onRestart={card.onRestart} />);
     expect(html.match(/<button/g)).toHaveLength(1);
-    expect(html).toContain('Back to the start');
+    expect(html).toContain('Continue without the camera');
+    expect(html).not.toContain('Back to the start');
     expect(html).toContain(KID_NO_CAMERA_TITLE);
     expect(html).toContain(KID_NO_CAMERA_BODY);
     for (const s of [CAMERA_INFO_BUTTON, CAMERA_INFO_TITLE, GROWN_UP_CHECKBOX, 'Allow']) expect(html).not.toContain(s);

@@ -59,10 +59,10 @@ export const GROWN_UP_CHECKBOX = 'A grown-up is with me';
 /**
  * SCREEN-MINOR-LOCK (2026-10-21): the camera-free card for under 18, "rather not say" or no age, right after the age
  * answer. No camera is asked for or opened, so it shows no number. Verbatim from SCREEN-18PLUS-GATE (6eeb4ec0), whose
- * WORDING still needs Elijah's look; the card's button is the existing "Back to the start" (the brief's
- * "Continue without the camera" is not in the repo's copy yet).
+ * WORDING still needs Elijah's look. The card's one button reads "Continue without the camera" (it returns to the start).
  */
 export const KID_NO_CAMERA_TITLE = 'The camera check is for 18 or older';
+export const KID_NO_CAMERA_BUTTON = 'Continue without the camera';
 export const KID_NO_CAMERA_BODY = 'The camera was not turned on, so there are no numbers to show. Nothing was sent anywhere.';
 
 /** The camera card (S-3): after "no" to pain and before the browser asks for the camera, for every age. */
