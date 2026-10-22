@@ -48,6 +48,9 @@ const writes = () => ({ cs: h.store.cs.length, log: h.store.log.length, setLog: 
 function seed(dobYear: number | null) {
   h.store = newTodayStore();
   h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test', dobYear });
+  // COACH-LOOP P1 (2026-10-20): a minor's coached log exists only with a guardian's yes (lib/coach/teenGate.ts), so the
+  // coached minor below has one; an adult's row is never read by the gate past the birth year
+  if (dobYear != null && new Date().getFullYear() - dobYear <= 18) h.store.guardianConsent!.push({ id: 'gc-1', menteeId: 'client-1', menteeBirthYear: dobYear, requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: null });
   h.store.pe.push(
     catalogueRow({ id: 'pe-goblet', coachId: 'coach-1', name: 'Goblet Squat' }),
     catalogueRow({ id: 'pe-row', coachId: 'coach-1', name: 'Half-kneeling Row' }),
