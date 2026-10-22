@@ -13,8 +13,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, Copy, Link2, Loader2, QrCode, Users, X } from 'lucide-react';
 import { inviteUrl } from '@/lib/coach/invite';
-// COACH-LOOP P1 (2026-10-20): the typed code each new invite carries
+// COACH-LOOP P1 (2026-10-20): the typed code each new invite carries, and the bulk / email panel
 import { JOIN_BY_CODE_PATH, codeOfToken, formatCode } from '@/lib/coach/inviteCode';
+import { BulkInvite } from './bulk-invite';
 
 interface Invite { token: string; use: 'once' | 'many'; expiresAt: string; joined: number }
 
@@ -129,6 +130,7 @@ export function InvitePanel() {
       {invites?.some((i) => codeOfToken(i.token)) && (
         <p className="mt-2 text-[11px] text-white/40">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
       )}
+      <BulkInvite onDone={() => void load()} />
     </section>
   );
 }
