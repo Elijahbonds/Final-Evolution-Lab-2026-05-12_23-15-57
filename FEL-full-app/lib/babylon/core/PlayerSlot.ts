@@ -189,6 +189,11 @@ export class LocalInputSource implements ControlSource {
     // Circle: a screen is a CALL (an edge, once), taking a charge is a COMMITMENT (held — you are standing there
     // hoping he runs into you, and you are not going anywhere while you do it).
     if (e.t === 'button' && e.btn === 'B') { if (e.pressed) this.screenEdge = true; this.chargeHeld = e.pressed; }
+    // CO-2 (2026-10-20): SPACE IS NOT A PASS. The bus makes up an A when Space comes back up (`src: 'space'`, the dunk's
+    // run key — InputBus.onKey) and never a matching release, so a keyboard player who held Space to run threw the ball
+    // away on letting go, and the unreleased press latched `passDownAt` into a pass fake 180 ms later. That A belongs to
+    // the dunk modes (core/slamPress), which read the bus directly; the hoops slot drops it. J — a plain A — still passes.
+    if (e.t === 'button' && e.btn === 'A' && e.src === 'space') return;
     if (e.t === 'button' && e.pressed && e.btn === 'A') { this.passEdge = true; this.passDownAt = performance.now(); }
     if (e.t === 'button' && !e.pressed && e.btn === 'A') this.passDownAt = -1;
   }

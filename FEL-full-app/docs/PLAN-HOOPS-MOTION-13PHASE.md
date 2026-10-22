@@ -507,6 +507,7 @@ better, on top of its own gate. 42 cells over 29 actions:
 - **Ball path:** ≤ 0.15 m per frame through every move, hero and rival (base 0.52 m switch; rival hand 0.22–0.29 m in one frame).
 - **Spin:** body turn 180–270° with a hand change (base 312 ± 89°, no change). Pivot-foot slide ≤ 3 cm (base 8.8–12.3 cm, 20–30 skates).
 - **Hesi:** Spine2 rises ≥ 4 cm and the stride pauses ≥ 150 ms, then speed rises (decode targets; base: no hitch).
+  - 5-frame hold (83 ms) replaces the 150 ms guideline. Elijah approved counting 5 held frames, minimum 5 frames, at 7:33 AM PT Oct 18 2026.
 - **Pops:** ≤ 4 per handle and 0 severe (base: hero 8.7 / 0.24; rival cross 19 / 1.4).
 - **Feet:** slide p90 ≤ 3 cm at the handle jog and at speed (base 3.0–3.7 / 10–14 cm).
 - **Names:** the clip name matches the probe's visual verdict on 100% of the handles catalogue.

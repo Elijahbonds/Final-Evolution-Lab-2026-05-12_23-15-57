@@ -200,9 +200,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[#00E5FF]/10 blur-[120px]" />
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#A855F7]/10 blur-[120px]" />
       </div>
+      {/* LOGIN-NO-PAINT (2026-10-20): no `opacity: 0` in `initial`. framer-motion writes `initial` into the server
+          HTML, so the whole card (title, email, password, ENTER THE LAB) shipped as style="opacity:0" and stayed
+          invisible until the client bundle hydrated and ran the fade. On a phone that is a blank page for as long as
+          the JS takes, and for good if it never runs. The slide-in stays; the card paints from the first byte. */}
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ y: 24 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
         className={`fel-panel relative w-full rounded-2xl p-5 sm:p-8 ${mode === 'signup' ? 'max-w-2xl' : 'max-w-md'}`}
       >
