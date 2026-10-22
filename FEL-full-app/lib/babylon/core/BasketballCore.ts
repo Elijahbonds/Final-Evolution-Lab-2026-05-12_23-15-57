@@ -28,6 +28,7 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
   type OffenseJob, type DefenseJob, type ScreenState,
 } from './HoopsOffball';
+import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -771,6 +772,8 @@ export class DefenderBrain implements AIBehavior {
   private stillSec = 0;
   /** Handler body position last frame (press clock + slide lever). */
   private prevHandler: Vector3 | null = null;
+  /** hoops-defense-fx: the side of the handler he has read the ball on (core/BallSideShade — the on-ball anchor). */
+  private readonly shade = new BallSideShade();
 
   /** Ball still this long → the on-ball defender steps UP into the handler
    *  instead of holding the cushion. */
@@ -893,7 +896,7 @@ export class DefenderBrain implements AIBehavior {
     // never adjusted at all: measured live, the 1v1 defender moved < 1m in
     // an entire possession and could never be caught closing (which the hesi
     // bite needs). A statue can't bite on a fake; a sliding defender can.
-    const anchor = onBall ? ball : mark!;
+    const anchor = onBall ? (handlerPos ? this.shade.anchor(dt, handlerPos, ball, hoop, self) : ball) : mark!;   // hoops-defense-fx: on the ball, the side he has READ (core/BallSideShade)
     // DEFENSE-LOOK (2026-09-17). Two reads a real defender makes that this one never did:
     //   BEATEN — the handler is nearer the rim than I am: stop guarding the spot he left, RECOVER toward the rim at a run
     //            (the deny point drops to the rim side of him) with the chest still on him — the backpedal.
