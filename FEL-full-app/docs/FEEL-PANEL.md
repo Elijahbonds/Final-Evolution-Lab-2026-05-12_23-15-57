@@ -125,3 +125,9 @@ lane/hoops-shot-core (group "Hoops · shooting"), defaults unchanged: `hoops.dis
 `hoops.dunkClankSpanMps` 1.6 m/s (`RimForAll.ts`). **assumption:** the bounds are safe, not tuned. The dunk knobs move
 only where a missed dunk hits the iron and how it bounces off, never the make rate (the ring's scale keeps P(made) = pct
 at every quality).
+
+lane/hoops-moves (group "Hoops · handle"), defaults unchanged: `hoops.comboOpenK` 0.5 and `hoops.comboGraceSec` 0.15 s
+(`comboFlow.ts` `COMBO_OPEN_K`, `COMBO_GRACE_SEC`: when a press flows into the running move and counts toward the on-screen
+combo; flow only, no odds), and `hoops.guardRangeM` 2.0 m (`GuardHand.ts` `GUARD_RANGE_M`: a live defender inside it moves the
+player's ball to the outside hand; the dwell and gap are the AI hand's `hoops.aiHandDwellSec` / `hoops.aiHandGapSec`).
+**assumption:** the bounds are safe, not tuned.

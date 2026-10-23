@@ -15,6 +15,7 @@
 //     roll, link and tier exactly as before; this count reads nothing it writes and is read by nothing that rolls.
 //
 // Pure (no scene): the state machine and the window are unit-tested; handleMotion.requestMove drives it through the HandleHost's `flow`.
+import { feel } from '../../feel-panel/feel';   // feel-panel: COMBO_OPEN_K / COMBO_GRACE_SEC are feel knobs (lib/feel-panel/knobs.ts, group "Hoops · handle")
 export { cutInWindow } from './handlePaths';   // (the window lives with the paths: the carry — and so the dunk's import closure — reads it)
 
 /** The last part of a running move: a press at or past this share of it flows (new — a feel number: register as `hoops.comboOpenK`). */
@@ -62,7 +63,7 @@ const HESI_CROSS_FROM = new Set(['crossover', 'momentum_cross']);
 /** One press. */
 export function pressCombo(st: ComboState, p: ComboPress): ComboStep {
   const running = p.runningK !== null && !p.runningQuiet;
-  const flowed = running ? (p.cutIn || p.runningK! >= COMBO_OPEN_K) : p.nowSec - st.endedAt <= COMBO_GRACE_SEC;
+  const flowed = running ? (p.cutIn || p.runningK! >= feel('hoops.comboOpenK', COMBO_OPEN_K)) : p.nowSec - st.endedAt <= feel('hoops.comboGraceSec', COMBO_GRACE_SEC);
   const count = flowed ? st.count + 1 : 1;
   const hesiCross = flowed && HESI_CROSS_FROM.has(p.move) && (running ? p.runningName : st.last) === 'hesi';
   const label = count >= COMBO_SHOW_AT ? `${count}-MOVE COMBO` : hesiCross ? 'HESI CROSS' : null;

@@ -11,6 +11,7 @@
 // clip of its own, no chain link, no roll, no stun, no impulse. Nothing here reads or writes a steal, a strip or an odds number.
 // Pure: the mode reads the defender, steps it, and runs the crossing (modes/hoopsFlow.PlayerGuardHand).
 import { stepAiHand, AI_HAND_IDLE, type AiHandState } from './AiBallHand';
+import { feel } from '../../feel-panel/feel';   // feel-panel: GUARD_RANGE_M is a feel knob (lib/feel-panel/knobs.ts, group "Hoops · handle")
 import type { AthleteSide } from '../anim/athleteSide';
 
 /** A live defender inside this is GUARDING the player (m; new — a feel number, register as `hoops.guardRangeM`). The modes' own
@@ -32,7 +33,7 @@ export interface GuardHandRead {
 }
 
 /** Is this defender guarding me? */
-export function guarded(d: GuardHandRead['defender']): boolean { return !!d && d.dist < GUARD_RANGE_M; }
+export function guarded(d: GuardHandRead['defender']): boolean { return !!d && d.dist < feel('hoops.guardRangeM', GUARD_RANGE_M); }
 
 /** One frame. `cross` true = cross the ball to the other hand now (the caller's carry.runMove('crossover')). */
 export function stepGuardHand(st: GuardHandState, dt: number, r: GuardHandRead): { state: GuardHandState; cross: boolean } {
