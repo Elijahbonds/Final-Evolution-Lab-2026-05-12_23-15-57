@@ -78,6 +78,13 @@ export const PLACE_LOOKS: Record<string, PlaceLook[]> = {
     { id: 'sandlot', name: 'Sandlot', sub: 'DRY TURF · A CITY BLOCK BEHIND THE PLATE', tint: '#c9a56b', sky: DESERT, backdrop: 'city', ground: { color: '#7a8a3a', line: '#d9c39a' }, propSet: null },
     { id: 'night-dome', name: 'Night Game', sub: 'UNDER THE LIGHTS', tint: '#9ad7ff', sky: NIGHT, backdrop: 'stadium', ground: { color: '#2a6b3a', line: '#e8d5a8' }, props: [lamp(-30, -40, '#e8f0ff'), lamp(30, -40, '#e8f0ff'), lamp(-30, 40, '#e8f0ff'), lamp(30, 40, '#e8f0ff')] },
   ],
+  // BASEBALL-3INN (2026-10-22): three innings on the derby's ballpark spec (BaseballInningsMode mounts venue 'derby' with
+  // this pick) — the same three places as the derby, picked and remembered under baseball's own key.
+  baseball: [
+    home('Catalina Ballpark', 'THE BALLPARK IN DAYLIGHT', '#E8D5A8'),
+    { id: 'sandlot', name: 'Sandlot', sub: 'DRY TURF · A CITY BLOCK BEHIND THE PLATE', tint: '#c9a56b', sky: DESERT, backdrop: 'city', ground: { color: '#7a8a3a', line: '#d9c39a' }, propSet: null },
+    { id: 'night-dome', name: 'Night Game', sub: 'UNDER THE LIGHTS', tint: '#9ad7ff', sky: NIGHT, backdrop: 'stadium', ground: { color: '#2a6b3a', line: '#e8d5a8' }, props: [lamp(-30, -40, '#e8f0ff'), lamp(30, -40, '#e8f0ff'), lamp(-30, 40, '#e8f0ff'), lamp(30, 40, '#e8f0ff')] },
+  ],
   golf: [
     home('Coastal Links', 'THE LOOP BY THE SEA', '#3B8A4E'),
     { id: 'desert', name: 'Desert Course', sub: 'DRY AIR · THE BALL FLIES', tint: '#f7c77f', sky: DESERT, backdrop: 'mountains', ground: { color: '#6f9a45', line: '#FFFFFF' }, propSet: null },
