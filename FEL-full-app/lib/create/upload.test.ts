@@ -30,7 +30,7 @@ describe('uploadMedia', () => {
   });
   it.each([
     [403, { error: 'device_only', message: 'Uploads are for creators 18 and over. Your work stays on this device.' }, 'device_only', /18 and over/],
-    [503, { error: 'uploads_coming_soon' }, 'coming_soon', /coming soon/],
+    [503, { error: 'uploads_coming_soon' }, 'coming_soon', /not available right now/],
     [429, { error: 'too many' }, 'rate_limited', /Too many/],
     [422, { error: 'Audio files can be up to 8 MB.' }, 'refused', /8 MB/],
   ] as const)('%s → %s', async (status, body, code, text) => {

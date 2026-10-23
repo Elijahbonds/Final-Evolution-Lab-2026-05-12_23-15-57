@@ -19,7 +19,8 @@ const WhoSceneItBabylon = dynamicImport(() => import('@/components/games/who-sce
 ) });
 
 export function WhoSceneItLoader() {
-  // lane 3 W1: the live venue quiz on Babylon; the 2D deck stays as the fallback behind the flag
+  // lane 3 W1: the live venue quiz on Babylon; the 2D deck stays as the fallback behind the flag.
+  // The shell names the mode's home room; individual questions still mount the FEL venues being guessed.
   const babylon = isBabylon('whoSceneIt');
-  return <GameShell mode="whoSceneIt" title="SPOT THE SCENE" venue={babylon ? 'Scene Vault' : 'NeuroArena'} Game={babylon ? WhoSceneItBabylon : WhoSceneItGame} ownControls={babylon} />;
+  return <GameShell mode="whoSceneIt" title="SPOT THE SCENE" venue="Scene Vault" Game={babylon ? WhoSceneItBabylon : WhoSceneItGame} ownControls={babylon} />;
 }

@@ -60,7 +60,7 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   storyMode: { icon: BookOpen, color: '#A855F7', desc: 'The Nexus Initiative. Train in the Sanctum, grind the rails, face the Glitch Boss.' },
   football: { icon: Footprints, color: '#FFD700', desc: 'Breakaway football. Read the lane, chain cuts and trucks, then finish through contact.' },
   mixedcombat: { icon: Swords, color: '#FF3366', desc: "Ring's Edge combat. Manage guard, spacing, stamina and finishers in a scored fight." },
-  dunkduel: { icon: Trophy, color: '#00E5FF', desc: 'Prove It with a camera-judged IRL dunk duel: measure jump metrics and settle the challenge.' },
+  dunkduel: { icon: Trophy, color: '#00E5FF', desc: 'Prove It with a camera-judged IRL dunk duel: measure jump metrics on-device.' },
   volleyball: { icon: CircleDot, color: '#00FF9D', desc: 'Beach Rally. Serve, dig and spike through rally windows against a reactive opponent.' },
   showdown: { icon: Shield, color: '#FF3366', desc: 'Storm-style showdown. Spend support assists and substitutions to swing a duel in your favor.' },
   duel: { icon: Swords, color: '#A855F7', desc: 'Weapon duel fundamentals: reach, footwork and clean-hit windows decide the score.' },

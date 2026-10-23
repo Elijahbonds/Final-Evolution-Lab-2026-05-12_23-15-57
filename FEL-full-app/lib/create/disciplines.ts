@@ -1,8 +1,8 @@
 // lib/create/disciplines.ts — CREATE HUB (owner, 2026-10-06: "make it easier for people to access and set up").
 //
-// What each Create tile promises: where the work shows up in the game. The owner reads these tiles, so they say only
-// what is TRUE today (`live`) and mark what a routed lane still has to wire (`live: false`, shown as "soon"). When a
-// consumer lands, flip its line here and the tile and the step-3 preview follow. Pure; one list every surface reads.
+// What each Create tile promises: where the work shows up in the game. The owner reads these tiles, so user-facing
+// rows say only what is TRUE today (`live`). Future routed consumers stay in the metadata as `live: false`, but surfaces
+// hide them until the lane wires the consumer and flips the row live. Pure; one list every surface reads.
 
 import { DISCIPLINES, DISCIPLINE_META, type Discipline } from '@/lib/creator/creative-card-types';
 
@@ -24,6 +24,8 @@ export interface DisciplineGuide {
   /** Where the approved work appears, most visible first. */
   showsUp: Showcase[];
 }
+
+const MY_CREATIONS_FALLBACK: Showcase = { where: 'Saved in My Creations for review, remixing and reuse', live: true };
 
 const GUIDE: Record<Discipline, Omit<DisciplineGuide, 'id' | 'label' | 'blurb' | 'color'>> = {
   music: {
@@ -88,3 +90,8 @@ export function guideFor(d: Discipline): DisciplineGuide {
 }
 
 export const ALL_GUIDES: readonly DisciplineGuide[] = HUB_ORDER.map(guideFor);
+
+export function visibleShowcases(guide: DisciplineGuide): readonly Showcase[] {
+  const live = guide.showsUp.filter((s) => s.live);
+  return live.length > 0 ? live : [MY_CREATIONS_FALLBACK];
+}

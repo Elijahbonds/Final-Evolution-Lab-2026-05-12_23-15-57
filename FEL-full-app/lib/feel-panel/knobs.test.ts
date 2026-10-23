@@ -8,6 +8,8 @@ import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
 import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotClock';
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
+import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
+import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 
 function tsFiles(dir: string): string[] {
@@ -38,6 +40,11 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.dunkShortBias')).toBe(DUNK_SHORT_BIAS);
     expect(def('hoops.dunkClankMinMps')).toBe(DUNK_CLANK_MIN_MPS);
     expect(def('hoops.dunkClankSpanMps')).toBe(DUNK_CLANK_SPAN_MPS);
+    // hoops-moves (group "Hoops · handle")
+    expect(def('hoops.comboOpenK')).toBe(COMBO_OPEN_K);
+    expect(def('hoops.comboGraceSec')).toBe(COMBO_GRACE_SEC);
+    expect(def('hoops.guardRangeM')).toBe(GUARD_RANGE_M);
+    expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
     // hoops-defense-fx
     expect(def('hoops.ballSideShadeOn')).toBe(BALL_SIDE_SHADE_ON ? 1 : 0);
     expect(def('hoops.shadeOffsetM')).toBe(SHADE_OFFSET_M);

@@ -10,7 +10,9 @@ vi.mock('next/link', () => ({ default: (p: any) => createElement('a', { href: p.
 import { CoachView } from '@/app/coach/_components/coach-view';
 import { CellOrb } from '@/components/cell-orb';
 
-const coachTab = (html: string) => />Coach<\/button>/.test(html);
+// COACH-LOOP P1 (2026-10-20), test changed: the tab label is wrapped in a <span> so it can truncate at 390 px
+// (app/coach/_components/coach-view.tsx); the tab is still a button whose whole label is "Coach"
+const coachTab = (html: string) => />Coach(?:<\/span>)?<\/button>/.test(html);
 
 describe('NP-1 AI entry points', () => {
   for (const s of ['coming_soon', 'loading'] as const) {

@@ -37,8 +37,8 @@ import {
  */
 const FACE_DEFAULT = defaultFace() as unknown as Record<string, string>;
 
-/** The honest line for a face option with no 3D shape yet (faceMorphs.faceOptionRenders). */
-const SOON_3D = 'Coming soon in 3D: saved with your look, not yet shaped on the body.';
+/** The honest line for a face option saved in the look but not mapped to a current body morph. */
+const SAVED_ONLY_3D = 'Saved with your look. The current 3D body uses Face Shape and Fine Tune for shape changes.';
 
 const face = (id: string, label: string, options: readonly string[], glossary: string): SlotRow => ({
   kind: 'slot', id, label, section: 'appearance', tab: 'Face',
@@ -65,14 +65,14 @@ export const APPEARANCE: SectionTable<AnyRow> = {
     face('faceShape', 'Face Shape', FACE_SHAPES, 'The base skull shape the fine-tune morphs blend on top of.'),
     face('hairStyle', 'Hair', HAIR_STYLES, 'Four packs — textured & protective, fades & cuts, long & tied, game flair — every style its own shape, built to fit your head. Textured, protective and cultural styles are first-class here, not an afterthought list. Beards, a second colour and accessories are on the Closet\'s Hair tab.'),
     face('hairColor', 'Hair Colour', HAIR_COLORS, 'Natural shades plus the three the Nexus palette uses.'),
-    // IMPROVE (2026-10-06), research item 3: these glossaries promised 3D geometry the body does not have (seven morphs, no
-    // iris material — faceMorphs.faceOptionRenders). They say what is true now; the Closet labels the same options.
-    face('eyeShape', 'Eye Shape', EYE_SHAPES, `Lid and corner shape. ${SOON_3D}`),
+    // IMPROVE (2026-10-06), research item 3: these glossaries promised 3D geometry the body does not have. They say
+    // what is true now; the Closet labels the same options.
+    face('eyeShape', 'Eye Shape', EYE_SHAPES, `Lid and corner shape. ${SAVED_ONLY_3D}`),
     // CREATOR-PLAN phase 4a: eye colour renders now (the procedural eye texture), any colour in the Closet
     face('eyeColor', 'Eye Colour', EYE_COLORS, 'Iris colour, drawn into the 3D eyes. The cyan one is a Nexus look rather than a natural one.'),
-    face('brows', 'Brows', BROWS, 'Brow weight and arch. Arched lifts the brow on the 3D body; the other weights are coming soon in 3D.'),
-    face('mouth', 'Mouth', MOUTHS, `Lip shape and fullness. ${SOON_3D}`),
-    face('nose', 'Nose', NOSES, `Bridge and tip shape. ${SOON_3D}`),
+    face('brows', 'Brows', BROWS, 'Brow weight and arch. Arched lifts the brow on the 3D body; the other brow weights save with your look.'),
+    face('mouth', 'Mouth', MOUTHS, `Lip shape and fullness. ${SAVED_ONLY_3D}`),
+    face('nose', 'Nose', NOSES, `Bridge and tip shape. ${SAVED_ONLY_3D}`),
     ...FACE_SLIDER_KEYS.map(slider),
   ],
 };

@@ -10,7 +10,7 @@
 
 import { VenueKit } from '../visual/VenueKit';
 import { Color3, DynamicTexture, Matrix, MeshBuilder, StandardMaterial, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, PBRMaterial, Scene } from '@babylonjs/core';
+import type { AbstractMesh, PBRMaterial, Scene, TransformNode } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { spawnMeshyProp } from '../visual/meshyProps';
 import { CharacterPipeline } from '../core/characterPipeline';
@@ -279,8 +279,10 @@ const GOAL_FIT = { width: 7.42, height: 2.44, depth: 2.0, z: 11 } as const;
 
 /** `alive` (IMPROVE 2026-10-06): asked when the Meshy goal lands. A caller that tears its goal down before the async load
  *  finishes (Carnival Hot Shot ends after 15 s) says so, and the late model is dropped instead of appearing in the next
- *  event. Omitted, only a disposed scene drops it (the old behaviour). */
-export function buildGoal(scene: Scene, alive: () => boolean = () => true): AbstractMesh[] {
+ *  event. Omitted, only a disposed scene drops it (the old behaviour).
+ *  `parent` (S1 HITCH, 2026-10-22): the node the late Meshy goal lands under (its fit is in world metres, so the parent sits at
+ *  the origin). Carnival Hot Shot is built behind the board and parked: a goal landing at the scene root would stand on the hub. */
+export function buildGoal(scene: Scene, alive: () => boolean = () => true, parent: TransformNode | null = null): AbstractMesh[] {
   const parts: AbstractMesh[] = [];
   const white = mat(scene, '#f4f6f8');
   const bars: AbstractMesh[] = [];
@@ -297,7 +299,7 @@ export function buildGoal(scene: Scene, alive: () => boolean = () => true): Abst
   // ASSET UPGRADE (owner, 2026-09-18: "do asset upgrade, asset swaps with the models"): a real goal with real netting rides
   // the frame above — the boxes stay as the instant look and are hidden the moment the mesh lands (a failed load keeps them).
   // The model's own proportions are not regulation, so it is fitted per axis to GOAL_FIT; a net does not show the stretch.
-  void spawnMeshyProp(scene, 'goal', null, 'goal_meshy').then((root) => {
+  void spawnMeshyProp(scene, 'goal', parent, 'goal_meshy').then((root) => {
     if (!root || scene.isDisposed) return;
     if (!alive()) { root.dispose(); return; }   // the materials are the cached container's: left alone
     const { min, max } = root.getHierarchyBoundingVectors(true);

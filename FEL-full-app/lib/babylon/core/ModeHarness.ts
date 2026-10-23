@@ -45,7 +45,8 @@ import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
 import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
-import { mountPerfGuard } from './perfGuard';                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
+import { mountPerfGuard } from './perfGuard';
+import { mountHitchProbe } from './hitchProbe';                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
@@ -68,6 +69,7 @@ import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore'
 import { formReadStore } from '@/lib/move/formRead';   // HOOPS BODY (2026-10-07): the end card's FORM block
 import { renderDue } from './pausedRender';   // IMPROVE (2026-10-06, 3PT #18): the pause renders at ~10 fps
 import { stripStaticControls } from '../ui/staticControls';   // controls-screen (2026-10-06): button maps leave the play screen
+import { WEBGL_CONTEXT_RESET_MESSAGE } from './bootErrors';
 // declared beside the profiles they subtract from (step 2); the harness is where a mode meets them
 export type { BodyClaim, BodyChannelName, ModeBodySpec } from '@/lib/input/bodyProfiles';
 
@@ -342,6 +344,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // total backing pixels (no-op on a 1x desktop). Ship pass (2026-09-02): desktop 60 fps / mobile 30 fps, the tier decided
   // once from the same fill-rate signal (visual-foundation: + the GPU, the high tier and the Graphics menu).
   let guard!: ReturnType<typeof mountPerfGuard>;
+  let hitch!: ReturnType<typeof mountHitchProbe>;
   let declaredMood!: VenueMood;
   const look = await mountLookStack({
     canvas: opts.canvas,
@@ -356,6 +359,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
         engine, scene, tier, fit: fit!, publish: devOrAgentHooks(),
         onHidden: () => { if (phase === 'playing') { releaseBody(); setPhase('paused'); store.setPause('input'); } },
       });
+      // S1 HITCH (ALL-MODES-TO-75 §1, 2026-10-22): the guard handles sustained load, not a hitch. Beside it, the frame-time probe
+      // (worst frame, p5 fps over live play) and the per-scene counters a mode keeps at 0 after its intro: mid-play build(),
+      // clone() and first-use shader compiles. Published as window.__FEL_HITCH__ under dev / agent runs (hitchProbe.ts).
+      hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
       // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
       // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
@@ -630,8 +637,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     reportDiag('context', 'WebGL context lost');
     // Measured (fault capture, 2026-09-03): the canvas went black and the HUD
     // kept streaming with no word to the player. Name it; the host's error UI
-    // offers the reload.
-    setPhase('error', 'Graphics were reset by the device. Reload to keep playing.');
+    // offers the reload, not a same-canvas retry.
+    setPhase('error', WEBGL_CONTEXT_RESET_MESSAGE);
   });
   engine.onContextRestoredObservable.add(() => reportDiag('context', 'WebGL context restored'));
 
@@ -948,6 +955,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let lastPausedRender = Number.NEGATIVE_INFINITY;   // IMPROVE (2026-10-06, 3PT #18): see core/pausedRender
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
+    hitch.frame(phase === 'playing', camDirector.inIntro, engine.getDeltaTime());   // S1 HITCH: the frame that ended here, and the intro's end
     ringFollow();
     ring?.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
     // MOVEMENT PLAY P3 (2026-09-24): the body's clock between camera frames, in every phase — the lost deadline, the
@@ -1024,6 +1032,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     def.dispose?.();
     perf.dispose();       // M67
     guard.dispose();      // PERF-GUARD
+    hitch.dispose();      // S1 HITCH
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
@@ -1035,6 +1044,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     lights.dispose();
     scene.dispose();
     engine.dispose();
+    setSignedOutVisitor(false);   // /try's known-guest flag is mount-scoped; leaving the mode must not guest-lock the app.
     // OOM-HYGIENE (2026-09-07): Babylon 9's floating-origin helper keeps a module-level `getScene` closure over the LAST
     // RENDERED scene (Materials/floatingOriginMatrixOverrides — every scene.render rebinds it, nothing ever clears it). It
     // was the one strong root left on a disposed dojo after an in-page exit (heap snapshot, karate_vs: 339 MB retained

@@ -180,8 +180,14 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ programId: data.program.id, sessionId: data.today.session.id, logs, complete }) });
     setBusy(false);
     if (!r.ok) {
-      const j = await r.json().catch(() => ({})) as { error?: string; sessionExerciseId?: string; set?: number };
+      const j = await r.json().catch(() => ({})) as { error?: string; sessionExerciseId?: string; set?: number; message?: string; href?: string | null };
       const copy = j.error && j.error in SET_LOG_ERROR_COPY ? SET_LOG_ERROR_COPY[j.error as SetLogError] : null;
+      // COACH-LOOP P1 (2026-10-20): the teen gate's refusal says what is needed and where (lib/coach/teenGate.ts)
+      if (!copy && j.message) {
+        const href = j.href;
+        toast.error(j.message, href ? { action: { label: 'Open', onClick: () => { window.location.href = href; } } } : undefined);
+        return;
+      }
       if (copy && j.sessionExerciseId) setErrors({ [j.sessionExerciseId]: `${j.set ? `Set ${j.set}: ` : ''}${copy}` });
       toast.error(copy ? `Not saved. ${j.set ? `Set ${j.set}: ` : ''}${copy}` : `Could not save (${j.error ?? r.status})`);
       return;

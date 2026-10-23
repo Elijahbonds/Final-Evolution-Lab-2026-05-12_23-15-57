@@ -16,6 +16,23 @@ const enabled = new Set([...(registry.match(/ENABLED_BABYLON_MODES = new Set<str
 const importOf = (cls: string): string | null => { const m = registry.match(new RegExp(`import \\{[^}]*\\b${cls}\\b[^}]*\\} from '\\./([A-Za-z0-9]+)'`)) ?? registry.match(new RegExp(`\\b${cls}\\b[^\\n]*from '\\./([A-Za-z0-9]+)'`)); return m ? `lib/babylon/modes/${m[1]}.ts` : null; };
 const aliasOf = (cls: string): string | null => { const m = registry.match(new RegExp(`\\b${cls}\\b\\s*=\\s*([A-Za-z0-9]+)`)); return m ? m[1] : null; };
 const modeFile = (cls: string): string | null => importOf(cls) ?? (aliasOf(cls) ? importOf(aliasOf(cls)!) : null) ?? (existsSync(`lib/babylon/modes/${cls}.ts`) ? `lib/babylon/modes/${cls}.ts` : null);
+const nextExport = (src: string, start: number): number => {
+  const rest = src.slice(start + 1);
+  const next = rest.match(/\nexport (?:const|function|class|interface|type) /);
+  return next?.index === undefined ? src.length : start + 1 + next.index;
+};
+const exportSlice = (src: string, marker: string): string | null => {
+  const at = src.indexOf(marker);
+  return at >= 0 ? src.slice(at, nextExport(src, at)) : null;
+};
+function implementationSlice(src: string, cls: string): string {
+  const own = exportSlice(src, `export const ${cls}`) ?? exportSlice(src, `export function ${cls}`) ?? src;
+  const factory = own.match(/=\s*(make[A-Za-z0-9_]+)\(/)?.[1];
+  const factoryBody = factory ? exportSlice(src, `export function ${factory}`) : null;
+  if (factoryBody) return `${factoryBody}\n${own}`;
+  const exportConstCount = (src.match(/(?:^|\n)export const /g) ?? []).length;
+  return exportConstCount > 1 ? own : src;
+}
 
 // venue: two mounting paths. (a) a venue SPEC (lib/babylon/nexus/venueSpecs) via
 // mountVenue(ctx, venueId) — the route table in NexusVenue or a literal in the mode —
@@ -42,7 +59,6 @@ const gauntlet = read('scripts/gauntlet.sh');
 const gauntletPlay = read('scripts/gauntlet-play.sh');
 const gameData = read('lib/game-data.ts');
 const locks = new Set(readdirSync('docs/concept-lock').map((f) => f.replace(/\.md$/, '')));
-const testScripts = readdirSync('scripts').filter((f) => /-tests\.ts$/.test(f));
 const routeMap: Record<string, string> = {
   karate_vs: 'karate-vs',
   penalty: 'soccer',
@@ -56,14 +72,49 @@ const routeMap: Record<string, string> = {
 };
 const lockName: Record<string, string> = { karate: 'karate-endless', karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
 const camName: Record<string, string> = { karate_vs: 'karate-vs', derby: 'baseball', penalty: 'soccer', snowboard_slalom: 'snowboard' };
+const testName: Record<string, string[]> = {
+  aeroaces: ['aeroaces', 'aero-aces', 'aeroAces'],
+  bigair: ['bigair', 'big-air', 'BigAir'],
+  brainbrawl: ['brainbrawl', 'brain-brawl', 'brainBrawl'],
+  derby: ['derby', 'baseball'],
+  dunkduel: ['dunkduel', 'dunk-duel', 'DunkDuel'],
+  freerun: ['freerun', 'free-run', 'FreeRun'],
+  karate_vs: ['karate_vs', 'karate-vs', 'KarateVS', 'karateVersus'],
+  mixedcombat: ['mixedcombat', 'mixed-combat', 'MixedCombat'],
+  onevone: ['onevone', 'one-v-one', 'OneVOne'],
+  penalty: ['penalty', 'soccer'],
+  skateboard: ['skateboard', 'skate-run', 'skate'],
+  snowboard_slalom: ['snowboard_slalom', 'snowboard', 'snowboarding'],
+  tiebreak: ['tiebreak', 'Tiebreak'],
+  threepoint: ['threepoint', 'three-point', 'threePoint'],
+  threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
+  velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
+  who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
+};
+const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
+function walkTestFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!skipTestDirs.has(entry.name)) out.push(...walkTestFiles(`${dir}/${entry.name}`));
+    } else if (/(?:^|[./-])(?:test|tests)\.(?:ts|tsx)$|-tests\.ts$/.test(entry.name)) {
+      out.push(`${dir}/${entry.name}`.replace(/^\.\//, ''));
+    }
+  }
+  return out;
+}
+const testFiles = walkTestFiles('.');
+function testCountFor(key: string): number {
+  const tokens = testName[key] ?? [key, routeMap[key] ?? key];
+  return testFiles.filter((file) => tokens.some((token) => file.toLowerCase().includes(token.toLowerCase()))).length;
+}
 
 interface Row { navFirst: boolean; key: string; enabled: boolean; file: string | null; route: string; menu: boolean; venue: string | null; map: string | null; kit: string | null; baked: boolean; cores: string[]; camera: boolean; clamps: number; bridge: boolean; gauntlet: boolean; play: boolean; lock: boolean; tests: number; lines: number }
 const rows: Row[] = modeEntries.map(({ key, cls }) => {
   const file = modeFile(cls); const whole = file ? read(file) : '';
   // A file may export several modes (precisionModes.ts: Tennis, Golf, Derby, Penalty). Judge each mode by ITS
   // slice — from its `export const <Cls>` to the next export — or derby reads golf's venue mount.
-  const sliceAt = whole.indexOf(`export const ${cls}`); const nextAt = sliceAt >= 0 ? whole.indexOf('\nexport const ', sliceAt + 1) : -1;
-  const src = sliceAt >= 0 && whole.split('\nexport const ').length > 2 ? whole.slice(sliceAt, nextAt > 0 ? nextAt : undefined) : whole;
+  const src = file ? implementationSlice(whole, cls) : '';
   const route = `/play/${routeMap[key] ?? key}`;
   const { venue, map, kit } = venueOfMode(key, src);
   const cores = CORES.filter((c) => new RegExp(`from '\\.\\./core/${c}'|from '\\./${c}'|\\b${c}\\b`).test(src) && src.includes(`${c}`));
@@ -79,7 +130,7 @@ const rows: Row[] = modeEntries.map(({ key, cls }) => {
     gauntlet: new RegExp(`\\b${key}\\b`).test(gauntlet.split('for m in')[1] ?? ''),
     play: gauntletPlay.includes(key),
     lock: locks.has(lockName[key] ?? key),
-    tests: testScripts.filter((t) => t.includes(key.split('_')[0])).length,
+    tests: testCountFor(key),
     lines: src ? src.split('\n').length : 0,
   };
 });

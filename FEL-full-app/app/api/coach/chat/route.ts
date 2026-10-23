@@ -1,4 +1,4 @@
-import { abacusEnabled, aiComingSoonResponse } from '@/lib/abacus/killSwitch';
+import { abacusAvailable, aiComingSoonResponse, requireAbacusApiKey } from '@/lib/abacus/killSwitch';
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -15,6 +15,8 @@ import {
 } from '@/lib/coach/aiChatGuard';
 
 export const dynamic = 'force-dynamic';
+
+const COACH_PROVIDER_TIMEOUT_MS = 30_000;
 
 // MIRROR-COACH P5 (2026-09-29): this is the LIVE AI coach — lib/coach-service.ts's buildSystemPrompt has no real
 // caller anywhere in the app (see lib/coach/aiSystemPrompt.ts's own header) and is not what this route uses. The
@@ -43,7 +45,7 @@ BLUEPRINT PHILOSOPHY:
 - The breath is the foundation of everything`;
 
 // COACH-AI Phase 8 (2026-10-07): the hardening the owner asked for before this route is switched back on (owner
-// decision 8: abacusEnabled() stays as it is, off by default, and still runs FIRST). In order, before anything leaves:
+// decision 8: the Abacus switch stays off by default, and readiness still runs FIRST). In order, before anything leaves:
 //   1. the kill switch (unchanged);  2. signed in;  3. rateLimit() per account (a minute and a day window,
 //   lib/coach/aiChatGuard.ts AI_CHAT_RATE);  4. ADULTS ONLY from the DB's User.dobYear and 5. a live AI-sharing consent
 //   (lib/coach/aiChatAccess.ts) — both 403, nothing read from the body;  6. the body: role allowlist and count/length
@@ -53,7 +55,7 @@ BLUEPRINT PHILOSOPHY:
 // passed through as bytes (lib/coach/chatStream.ts has the client half of plan item #11).
 export async function POST(req: Request) {
   try {
-    if (!abacusEnabled()) return aiComingSoonResponse('coach');
+    if (!abacusAvailable()) return aiComingSoonResponse('coach');
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -97,23 +99,35 @@ export async function POST(req: Request) {
     const systemBase = SYSTEM_PROMPT + learnerContext(attrs, relevant, weakest) + catalogueHeading(exercises.length) + catalogueText(exercises);
     const fullSystem = withPainSafety(systemBase, { isMinor });
 
-    // Call LLM with streaming
-    const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-5.4-mini',
-        messages: [
-          { role: 'system', content: fullSystem },
-          ...userMessages,
-        ],
-        stream: true,
-        max_tokens: 2000,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), COACH_PROVIDER_TIMEOUT_MS);
+    let response: Response;
+    try {
+      // Call LLM with streaming. Provider/network adversity is handled here so it does not look like an app crash.
+      response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${requireAbacusApiKey('coach/chat')}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-5.4-mini',
+          messages: [
+            { role: 'system', content: fullSystem },
+            ...userMessages,
+          ],
+          stream: true,
+          max_tokens: 2000,
+        }),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      const timedOut = err instanceof Error && err.name === 'AbortError';
+      console.error('LLM API error:', timedOut ? 'timeout' : 'fetch_failed');
+      return NextResponse.json({ error: 'Coach is temporarily unavailable' }, { status: timedOut ? 504 : 502 });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok || !response.body) {
       // the status only: a provider's error text can quote the request, which is the user's own words

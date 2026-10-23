@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { abacusEnabled } from '@/lib/abacus/killSwitch';
+import { abacusAvailable } from '@/lib/abacus/killSwitch';
 import type { AiStatus } from '@/lib/abacus/aiStatus';
 
 // Reads a session, and the answer has to come from the env at request time, never from a build-time render.
@@ -18,7 +18,7 @@ export async function GET() {
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const availability = abacusEnabled() ? 'available' : 'coming_soon';
+  const availability = abacusAvailable() ? 'available' : 'coming_soon';
   const status: AiStatus = { coach: availability, studio: availability };
   return NextResponse.json(status, { headers: { 'Cache-Control': 'no-store' } });
 }

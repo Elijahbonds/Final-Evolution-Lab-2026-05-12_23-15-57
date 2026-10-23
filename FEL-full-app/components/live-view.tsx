@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Radio, Loader2, Play, Sparkles, Ticket, Calendar, ShieldQuestion } from 'lucide-react';
 import { newIdempotencyKey } from '@/lib/wallet/client';
 import { skuOnSale } from '@/lib/wallet/catalog';
@@ -14,7 +15,7 @@ const CAT_ACCENT: Record<string, string> = {
   Corrective: '#A855F7', Education: '#FFD700', Pilates: '#00FF9D', Dance: '#FF3366',
 };
 
-export function LiveView() {
+export function LiveView({ scheduleEnabled = false }: { scheduleEnabled?: boolean } = {}) {
   const router = useRouter();
   const [buying, setBuying] = useState<string | null>(null);
   // Deterministic per-day house ad so SSR/CSR agree within a session.
@@ -55,6 +56,23 @@ export function LiveView() {
         <h1 className="flex items-center gap-2 text-2xl font-bold text-white"><Radio className="h-6 w-6 text-red-400" /> Live</h1>
         <p className="text-sm text-white/50">Classes, creator highlights, and live training with Elijah Bonds and the FEL studio.</p>
       </div>
+
+      {scheduleEnabled && (
+        <Link
+          href="/live/schedule"
+          className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-red-400/35 bg-red-400/[0.08] px-5 py-4 text-left transition hover:border-red-300/70 hover:bg-red-400/[0.12]"
+        >
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-red-200">
+              <Calendar className="h-4 w-4" /> Weekly stream schedule
+            </span>
+            <span className="mt-1 block text-sm text-white/55">
+              See the Pacific-time Twitch and FEL live slots before a class goes on air.
+            </span>
+          </span>
+          <span className="shrink-0 rounded-xl bg-red-300 px-4 py-2 text-sm font-bold text-black">Open schedule</span>
+        </Link>
+      )}
 
       {/* House ad banner */}
       {ad && (

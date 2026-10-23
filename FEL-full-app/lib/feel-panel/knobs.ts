@@ -105,6 +105,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/RimForAll.ts DUNK_CLANK_SPAN_MPS',
     hint: 'Added to the slowest bounce for a dunk that catches the far edge of the iron.',
   },
+  // ── hoops-moves (hoops round 2): the combo window and the player's outside hand when guarded ──
+  {
+    id: 'hoops.comboOpenK', label: 'Combo: window opens at', def: 0.5, min: 0.2, max: 0.9, step: 0.05, unit: '', group: 'Hoops · handle',
+    source: 'lib/babylon/anim/comboFlow.ts COMBO_OPEN_K',
+    hint: 'A move pressed past this share of the running one flows into it and counts toward the on-screen combo (flow only, no odds).',
+  },
+  {
+    id: 'hoops.comboGraceSec', label: 'Combo: grace after a move', def: 0.15, min: 0, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle',
+    source: 'lib/babylon/anim/comboFlow.ts COMBO_GRACE_SEC',
+    hint: 'A move pressed this soon after the last one ended still counts as the same combo.',
+  },
+  {
+    id: 'hoops.guardRangeM', label: 'Outside hand: guarded inside', def: 2.0, min: 0.8, max: 3.5, step: 0.05, unit: 'm', group: 'Hoops · handle',
+    source: 'lib/babylon/core/GuardHand.ts GUARD_RANGE_M',
+    hint: 'A live defender inside this moves your ball to the hand away from him (after the AI hand\'s dwell); outside it the hand stays put.',
+    },
   // ── hoops-defense-fx: the on-ball defender shades the ball side; a cross thrown at him buys a beat (core/BallSideShade) ──
   {
     id: 'hoops.ballSideShadeOn', label: 'Ball-side shade on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
