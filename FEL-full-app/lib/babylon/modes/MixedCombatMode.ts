@@ -88,6 +88,7 @@ import { readBodyKicks } from '@/lib/move/bodyPlayChoice';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyView } from '../core/ModeHarness';
 import { boneNode } from '../anim/boneLookup';
+import { rampFighterVel } from '../core/fighterRamp';
 
 type Phase = 'loadout' | 'fighting' | 'roundOver' | 'matchOver';
 type Loadout = 'fists' | 'staff';
@@ -314,6 +315,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
   let ctx0!: ModeContext;   // STORM: the context the stick read needs (set every update)
   let lastMyVel: Vector3 | null = null, lastFoeVel: Vector3 | null = null;   // FREE RUN: last frame's travel, for the facing
   // IMPROVE (2026-10-06): the per-frame velocities and the fall camera's target live in scratch vectors (#19)
+  const myWalkVelS = new Vector3();   // MC75-2: the walk's ramped velocity (fighterRamp, T7) — never the stick in one frame
   const moveVelS = new Vector3(), myDashVelS = new Vector3(), foeVelS = new Vector3(), fallCamS = new Vector3();
   const FREE_RUN_M = 3.4;
   // STORM (2026-09-17): the string book (every press is its own link), the X reader, the dash and the launched body
@@ -1116,6 +1118,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
       meCounter = tickCounter(meCounter, sdtHero);
       let mySpeed01 = rollVel ? 0 : moveVel.length() / MOVE_SPEED;   // the INTENT, striking or not: a strike that runs out under a held stick settles straight into the guard step
       const pp = player.root.position;
+      if (wallRun || wallKick || meDash || rollVel || !meState.controllable || striking || meState.blockHeld) myWalkVelS.setAll(0);   // MC75-2: a walk resumes from rest
       if (wallRun || wallKick) { /* MATRIX: the wall owns the body */ }
       else if (meDash) {   // STORM: the dash owns the body (and takes the ring check — a dash off the edge is a ring-out)
         if (meDash.homing) { const tx = rival.root.position.x - pp.x, tz = rival.root.position.z - pp.z, d = Math.hypot(tx, tz); if (d <= DASH.homingStopM) meDash.left = 0; else meDash.dir.set(tx / d, 0, tz / d); }
@@ -1129,7 +1132,8 @@ export const MixedCombatMode: ModeDefinition = (() => {
         pp.addInPlaceFromFloats(rollVel.x * sdtHero, rollVel.y * sdtHero, rollVel.z * sdtHero); arenaClamp(pp, arena);
         if (offRing(pp)) { ringOut(ctx, true); animate(dt, 0, 0); return; }
       } else if (meState.controllable && !striking && !meState.blockHeld) {
-        pp.addInPlaceFromFloats(moveVel.x * sdtHero, 0, moveVel.z * sdtHero); arenaClamp(pp, arena);
+        rampFighterVel(myWalkVelS, moveVel, sdtHero);   // MC75-2: T7 start ramp / stop bleed in place of the one-frame write
+        pp.addInPlaceFromFloats(myWalkVelS.x * sdtHero, 0, myWalkVelS.z * sdtHero); arenaClamp(pp, arena);
         if (offRing(pp)) { ringOut(ctx, true); animate(dt, 0, 0); return; }
       }
       // P7 AUTO-SPACING: a body player has no stick — a strike out of range closes a little, a step in / out / across moves
