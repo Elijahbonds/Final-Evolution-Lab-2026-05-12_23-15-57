@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { getChallenge } from '@/lib/social/challenge-service';
+import { challengeVersionLive } from '@/lib/social/challenge-sign';
 import { ChallengeLanding } from '@/components/challenge-landing';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function ChallengePage({ params }: { params: { code: string } }) {
   const session = await getServerSession(authOptions);
-  const link = await getChallenge(params.code);
+  const found = await getChallenge(params.code);
+  // CHALLENGE-SIGN-V2: the page renders from the columns without verifying, so a v1 row past the sunset (or an unknown
+  // version) gets the same invalid-or-expired copy the attempt route's 404 implies.
+  const link = found && challengeVersionLive(found.payload) ? found : null;
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
