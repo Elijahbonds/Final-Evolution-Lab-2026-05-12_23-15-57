@@ -18,9 +18,10 @@ import type { DriftRow } from './compliance';
 const DAY = 86_400_000;
 
 /**
- * Missed sessions worth an alert: two. One missed session in a week is a busy week; two is a pattern a coach would
- * want to hear about before it becomes "stalled". assumption: the number is this lane's, not the owner's; it is the
- * one named constant to change.
+ * Missed sessions worth an alert: two in the last seven days. One missed session in a week is a busy week; two is a
+ * pattern a coach would want to hear about before it becomes "stalled". OWNER-CONFIRMED 2026-10-23 ("2 in 7 days").
+ * A plain constant, not a feel-panel knob: the feel panel tunes game feel, and wiring a coach setting into it was not
+ * cheap; this is the one line to change.
  */
 export const MISSED_ALERT_MIN = 2;
 /** A program younger than a week has no "this week" to have missed. */
