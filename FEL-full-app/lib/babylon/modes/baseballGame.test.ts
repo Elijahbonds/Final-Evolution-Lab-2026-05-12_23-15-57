@@ -207,7 +207,9 @@ describe('BB-5 /play/baseball mounts baseball, /play/derby mounts derby', () => 
     const src = stripComments(read('app/play/derby/_components/loader.tsx'));
     expect(src).toMatch(/makeTimingHost\(\{ modeKey: 'derby'/);
     expect(src).toMatch(/title="MOONSHOT DERBY"/);
-    expect(src).toMatch(/<GameShell mode="baseball"/);   // the derby's sessions keep their catalogue key
+    // DERBY-KEY (owner, 2026-10-23): the derby saves under its own key now; baseball keeps 'baseball'
+    expect(src).toMatch(/<GameShell mode="derby"/);
+    expect(stripComments(read('app/play/baseball/_components/loader.tsx'))).toMatch(/<GameShell mode="baseball"/);
   });
 
   it('the host mounts the definition it is handed before the registry\'s', () => {

@@ -61,6 +61,7 @@ export const MODE_WEIGHTS: Record<string, number> = {
   skateboarding: 1.0,
   soccer: 1.1,
   baseball: 1.0,
+  derby: 1.0,   // DERBY-KEY (2026-10-23): the derby's own session key, the weight it had under 'baseball'
   snowboarding: 1.0,
   surfing: 1.0,
   golf: 0.9,
@@ -86,6 +87,7 @@ export const MODE_ATTRS: Record<string, PrqAttr[]> = {
   skateboarding: ['agility', 'flexibility', 'mental'],
   soccer: ['power', 'agility', 'mental'],
   baseball: ['strength', 'power', 'speed'],
+  derby: ['strength', 'power', 'speed'],   // DERBY-KEY: as it trained under 'baseball'
   snowboarding: ['agility', 'speed', 'mental'],
   surfing: ['flexibility', 'endurance', 'mental'],
   golf: ['mental', 'flexibility', 'power'],

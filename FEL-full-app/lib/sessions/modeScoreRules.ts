@@ -185,7 +185,12 @@ export const MEASURED_RUNS: Readonly<Record<string, readonly MeasuredRun[]>> = {
   bigAir: [{ score: 319, sec: 60, secIs: 'upper', source: `${AP}:130` }],
   soccer: [{ score: null, sec: 60, secIs: 'upper', source: `${AP}:131 (kick 3/5, "6–2 you": the posted score is not in the capture)` }],
   whoSceneIt: [{ score: 479, sec: 60, secIs: 'upper', source: `${AP}:102` }],
+  // DERBY-KEY (owner, 2026-10-23): this run was the home-run derby, which saved under 'baseball' until it took its own key.
+  // The derby's row is a copy of it, so the derby's rules do not move. Baseball (three innings) keeps the copy it had: its
+  // maxScore is its own rules ceiling (27, arena-score-integrity baseballCeiling), and a 60 s upper bound sets no length,
+  // so every other number in its row is a floor. No three-inning run has been measured yet.
   baseball: [{ score: 0, sec: 60, secIs: 'upper', source: `${AP}:105` }],
+  derby: [{ score: 0, sec: 60, secIs: 'upper', source: `${AP}:105 (the derby, measured under 'baseball')` }],
   // ECONOMY-CAPS (a): measured TRUE :3000 runs from eye-a1a1c5f9/MEASURED_RUNS.md
   tiebreak: [{ score: 1020, sec: 29.8, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md tiebreak 1020/29.8 s' }],
   training: [{ score: 4200, sec: 61.7, secIs: 'posted', source: 'eye-a1a1c5f9/MEASURED_RUNS.md training 4200/61.7 s' }],

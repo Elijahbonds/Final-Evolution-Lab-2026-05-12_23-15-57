@@ -52,7 +52,7 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'freerun': { const t = n(s, 'timeSec'), tricks = n(s, 'tricks'), combo = n(s, 'bestCombo'), high = n(s, 'highLine'); return `${r.score} PTS${t !== null ? ` · ${t}s` : ''}${tricks !== null ? ` · ${tricks} TRICK` : ''}${combo ? ` · ×${combo}` : ''}${high ? ' · HIGH LINE' : ''}`; }
     case 'sprint': { const st = n(s, 'stumbles'); return `${r.score} PTS${st !== null ? ` · ${st} STUMBLE${st === 1 ? '' : 'S'}` : ''} · ${wl(r)}`; }
     case 'golf': { const strokes = n(s, 'strokes'), holes = n(s, 'holes'); return strokes !== null ? `${strokes} STROKES${holes !== null ? ` · ${holes} HOLES` : ''}` : `${r.score} PTS`; }
-    case 'baseball': {
+    case 'baseball': case 'derby': {   // DERBY-KEY (2026-10-23): the derby's own key reads the same line it did under 'baseball'
       const hr = n(s, 'homers'), outs = n(s, 'outs'), longest = n(s, 'longestFt'), rival = n(s, 'rivalHomers');
       if (hr !== null) return `${hr} HR${rival !== null ? ` vs ${rival}` : ''}${outs !== null ? ` · ${outs} OUTS` : ''}${longest ? ` · LONGEST ${longest} FT` : ''}`;
       const hits = n(s, 'hits'), misses = n(s, 'misses'); return hits !== null ? `${hits}/${hits + (misses ?? 0)} CONTACT · ${r.score} PTS` : null;

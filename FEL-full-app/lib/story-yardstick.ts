@@ -97,7 +97,8 @@ export const STORY_YARDSTICKS: Readonly<Record<string, StoryYardstick>> = {
     basis: 'GolfMode: par 3-4-4-3-5, a hole pays max(20, 120 − 40 × strokes over par), the last ×1.5 (CLUTCH_MULT) — a '
       + 'par card posts 660 before rings and banks; the round is won at par or better',
   },
-  baseball: {
+  // DERBY-KEY (2026-10-23): the derby's own session key (it was 'baseball' until the three-inning game took that key)
+  derby: {
     unit: POINTS, verb: 'Score', postsWin: true, winGoal: 'Win the derby — 3 homers',
     winEvidence: 'solo against the wall (three homers), no rival to out-balance — and NETPREC-10PHASE (2026-09-22): the '
       + 'intent driver\'s derby ended on 4 homers (DERBY_END 302), over the host\'s line',
