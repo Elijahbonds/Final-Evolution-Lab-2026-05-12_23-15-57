@@ -21,7 +21,8 @@ describe('the Blueprint curriculum', () => {
     }
   });
   it('every drill link resolves to a real play route', () => {
-    expect(drillPlayHref('derby')).toBe('/play/baseball');
+    expect(drillPlayHref('derby')).toBe('/play/derby');   // DERBY-KEY (2026-10-23): the derby's own route; /play/baseball is three innings
+    expect(drillPlayHref('baseball')).toBe('/play/baseball');
     for (const l of allLessons()) {
       const href = drillPlayHref(l.drill.modeKey);
       expect(href, l.ref).toMatch(/^\/play\/[a-z0-9-]+$/);

@@ -82,6 +82,7 @@ export const ARENA_MODES: readonly string[] = [
   'bigAir',
   'golf',
   'baseball',
+  'derby',   // DERBY-KEY (owner, 2026-10-23): the home-run derby on its own session key, ceiling and baseline
   'soccer',
   'tennis',
   'tiebreak',

@@ -12,7 +12,7 @@ const BASE = process.env.BASE ?? 'http://127.0.0.1:3096';
 const OUT = `${process.env.HOME}/Claude/outbox/finish-release/phone`; fs.mkdirSync(OUT, { recursive: true });
 const ROUTES: [string, string][] = [
   ['dunk', '/play/dunk'], ['karate', '/play/karate'], ['football', '/play/football'], ['skateboard', '/play/skateboard'],
-  ['snowboard_slalom', '/play/snowboard'], ['surf', '/play/surf'], ['tennis', '/play/tennis'], ['derby', '/play/baseball'],
+  ['snowboard_slalom', '/play/snowboard'], ['surf', '/play/surf'], ['tennis', '/play/tennis'], ['derby', '/play/derby'],
   ['penalty', '/play/soccer'], ['golf', '/play/golf'], ['onevone', '/play/onevone'], ['threevthree', '/play/threevthree'],
   ['karate_vs', '/play/karate-vs'], ['mixedcombat', '/play/mixedcombat'], ['sprint', '/play/sprint'], ['showdown', '/play/showdown'],
   ['duel', '/play/duel'], ['volleyball', '/play/volleyball'], ['dance', '/play/dance'], ['who_scene_it', '/play/who-scene-it'],
