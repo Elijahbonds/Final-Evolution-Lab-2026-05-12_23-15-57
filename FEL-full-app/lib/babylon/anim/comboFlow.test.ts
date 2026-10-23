@@ -39,12 +39,47 @@ describe('the combo count (pure)', () => {
   });
   it('ComboFlow: the label is taken once; the clock is the flow\'s own', () => {
     let now = 5; const f = new ComboFlow(() => now);
-    f.press({ move: 'hesi', runningK: null, runningName: null, cutIn: false });
+    f.press({ move: 'hesi', runningK: null, runningName: null, cutIn: false }); f.event('start');   // (the hesi's path is on the carry)
     f.press({ move: 'crossover', runningK: 0.3, runningName: 'hesi', cutIn: true });
     expect(f.takeLabel()).toBe('HESI CROSS'); expect(f.takeLabel()).toBeNull();
     f.ended(); now += COMBO_GRACE_SEC / 2;
     expect(f.press({ move: 'behind_back', runningK: null, runningName: null, cutIn: false }).state.count).toBe(3);
     expect(f.takeLabel()).toBe('3-MOVE COMBO');
+  });
+});
+
+describe('a quiet carry move (the guard hand) is not a move to flow out of', () => {
+  it('pressed during a crossing the flow did not press: a new count, no label; pressed during its own move: it flows', () => {
+    let now = 5; const f = new ComboFlow(() => now);
+    f.press({ move: 'crossover', runningK: null, runningName: null, cutIn: false }); f.event('start'); f.event('end');
+    now += 2;   // long after: the guard hand crosses (runMove, no events), and the hesi is pressed late in that crossing
+    const h = f.press({ move: 'hesi', runningK: 0.8, runningName: 'crossover', cutIn: false });
+    expect(h.flowed).toBe(false); expect(h.state.count).toBe(1);
+    f.event('start');   // the hesi's own path starts
+    const c = f.press({ move: 'crossover', runningK: 0.2, runningName: 'hesi', cutIn: true });
+    expect(c.state.count).toBe(2); expect(f.takeLabel()).toBe('HESI CROSS');   // was "3-MOVE COMBO" on the 3v3 rig
+    // pure: the same press with runningQuiet unset flows as before (the count's own tests above)
+    expect(pressCombo({ ...COMBO_IDLE, count: 1 }, { move: 'hesi', runningK: 0.8, runningName: 'crossover', cutIn: false, nowSec: 0 }).flowed).toBe(true);
+    expect(pressCombo({ ...COMBO_IDLE, count: 1 }, { move: 'hesi', runningK: 0.8, runningName: 'crossover', cutIn: false, runningQuiet: true, nowSec: 0 }).flowed).toBe(false);
+  });
+  it('on the real carry: a hesi requested during a quiet runMove crossing counts 1; the cross out of its float reads HESI CROSS', () => {
+    const r: HoopsNodeRig = hoopsNodeRig('right');
+    for (let i = 0; i < 60; i++) r.frame(1 / 60, 0.3);
+    let t = 0; const flow = new ComboFlow(() => t);
+    const host: HandleHost = { carry: r.carry, beat: () => {}, flow };
+    flow.press({ move: 'crossover', runningK: null, runningName: null, cutIn: false });   // a stale count from an earlier move
+    expect(r.carry.runMove('crossover', { pace: 1 })).toBe(true);   // the guard hand's quiet crossing (hoopsFlow.PlayerGuardHand)
+    for (let i = 0; i < 24; i++) { t += 1 / 60; r.frame(1 / 60, 0.3); }   // late in it (k > COMBO_OPEN_K)
+    expect(r.carry.move!.k).toBeGreaterThan(COMBO_OPEN_K);
+    requestMove(host, { move: 'hesi', decide: { kind: 'none' } });
+    expect(flow.state.count).toBe(1);
+    let crossed = false;
+    for (let i = 0; i < 90 && !crossed; i++) {
+      t += 1 / 60; r.frame(1 / 60, 0.3);
+      const m = r.carry.move; if (m?.name === 'hesi' && m.cutIn && m.t >= m.cutIn.from - 0.05) { requestMove(host, { move: 'crossover', decide: { kind: 'none' } }); crossed = true; }
+    }
+    expect(crossed).toBe(true); expect(flow.state.count).toBe(2); expect(flow.takeLabel()).toBe('HESI CROSS');
+    r.dispose();
   });
 });
 

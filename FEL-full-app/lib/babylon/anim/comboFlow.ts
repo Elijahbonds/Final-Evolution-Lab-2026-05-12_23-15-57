@@ -43,6 +43,9 @@ export interface ComboPress {
   runningName: string | null;
   /** The press cut in at the running path's float (cutInWindow): it flows whatever its k. */
   cutIn: boolean;
+  /** The running move is not one this flow pressed — a quiet carry crossing (the outside hand when guarded, core/GuardHand): nothing
+   *  flows out of it; the press reads as if nothing ran (the grace after the last pressed move, else a new count). */
+  runningQuiet?: boolean;
   nowSec: number;
 }
 export interface ComboStep {
@@ -58,11 +61,12 @@ const HESI_CROSS_FROM = new Set(['crossover', 'momentum_cross']);
 
 /** One press. */
 export function pressCombo(st: ComboState, p: ComboPress): ComboStep {
-  const flowed = p.runningK !== null ? (p.cutIn || p.runningK >= COMBO_OPEN_K) : p.nowSec - st.endedAt <= COMBO_GRACE_SEC;
+  const running = p.runningK !== null && !p.runningQuiet;
+  const flowed = running ? (p.cutIn || p.runningK! >= COMBO_OPEN_K) : p.nowSec - st.endedAt <= COMBO_GRACE_SEC;
   const count = flowed ? st.count + 1 : 1;
-  const hesiCross = flowed && HESI_CROSS_FROM.has(p.move) && (p.runningName ?? st.last) === 'hesi';
+  const hesiCross = flowed && HESI_CROSS_FROM.has(p.move) && (running ? p.runningName : st.last) === 'hesi';
   const label = count >= COMBO_SHOW_AT ? `${count}-MOVE COMBO` : hesiCross ? 'HESI CROSS' : null;
-  return { state: { count, endedAt: p.runningK !== null ? -Infinity : st.endedAt, last: p.move }, flowed, label };
+  return { state: { count, endedAt: running ? -Infinity : st.endedAt, last: p.move }, flowed, label };
 }
 /** A move ended (the carry's 'end'): the grace starts now. */
 export function endCombo(st: ComboState, nowSec: number): ComboState {
@@ -76,14 +80,24 @@ export function endCombo(st: ComboState, nowSec: number): ComboState {
 export class ComboFlow {
   state: ComboState = COMBO_IDLE;
   private label: string | null = null;
+  /** A move this flow pressed is on the carry now (its path's 'start' seen, not yet its 'end' / 'cancel'). */
+  private own = false;
   constructor(private readonly clock: () => number = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000) {}
   press(p: Omit<ComboPress, 'nowSec'>): ComboStep {
-    const s = pressCombo(this.state, { ...p, nowSec: this.clock() });
+    const s = pressCombo(this.state, { ...p, runningQuiet: p.runningQuiet ?? (p.runningK !== null && !this.own), nowSec: this.clock() });
     this.state = s.state; if (s.label) this.label = s.label;
     return s;
   }
   ended(): void { this.state = endCombo(this.state, this.clock()); }
+  /** A pressed move's carry event (handleMotion.requestMove feeds them): 'start' — it is on the carry; 'end' — it ended (the grace starts);
+   *  'cancel' — replaced or dropped. Only a running move this flow saw start can be flowed out of: a quiet crossing the carry ran on its
+   *  own (the guard hand) never is — the resume capture's 3v3 hesi cross read "3-MOVE COMBO" off a hesi pressed during one. */
+  event(e: string): void {
+    if (e === 'start') this.own = true;
+    else if (e === 'end') { this.own = false; this.ended(); }
+    else if (e === 'cancel') this.own = false;
+  }
   /** The label to show, once (null when there is none). */
   takeLabel(): string | null { const l = this.label; this.label = null; return l; }
-  reset(): void { this.state = COMBO_IDLE; this.label = null; }
+  reset(): void { this.state = COMBO_IDLE; this.label = null; this.own = false; }
 }

@@ -142,7 +142,7 @@ export function requestMove(host: HandleHost, req: HandleRequest): HandleResult 
   if (!owned) return { owned, restarted, outcome, clipAt: 'none', rendered: req.move, twin: false, startHand, endHand: startHand, clipDir: startHand, clip: null, ball: 'none', impulse: null };
   const flow = host.flow;
   const cutIn = !!flow && !!running?.cutIn && running.t <= running.cutIn.to;   // the combo window's cut-in is still ahead or open (comboFlow)
-  const onEnd = (e: string): void => { if (e === 'end') flow?.ended(); };
+  const onEnd = (e: string): void => { flow?.event(e); };   // (hoops-moves: start / end / cancel — the flow knows its own move on the carry)
   const sides = resolveSides(req.move, startHand, { hint: req.hint, cutSide: req.cutSide, path: req.path });
   const { rendered, twin, endHand, clipDir } = sides;
   const turbo = !!req.turbo;

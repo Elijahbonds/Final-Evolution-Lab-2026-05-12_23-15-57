@@ -83,7 +83,7 @@ describe('comboBanner / spinClipFor', () => {
   it('shows the flow\'s label once', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
     const f = new ComboFlow(() => 0); const shown: string[] = [];
-    f.press({ move: 'hesi', runningK: null, runningName: null, cutIn: false });
+    f.press({ move: 'hesi', runningK: null, runningName: null, cutIn: false }); f.event('start');   // (the hesi's path is on the carry)
     f.press({ move: 'crossover', runningK: 0.2, runningName: 'hesi', cutIn: true });
     comboBanner(f, (t) => shown.push(t), 'T'); comboBanner(f, (t) => shown.push(t), 'T');
     expect(shown).toEqual(['HESI CROSS']);
