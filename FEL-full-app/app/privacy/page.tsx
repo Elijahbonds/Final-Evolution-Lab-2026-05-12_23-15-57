@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { PRIVACY_CONTENT, CURRENT_POLICY_VERSION } from '@/lib/policies';
+import { LEGAL_PROSE, LEGAL_QUOTE_VIOLET } from '@/lib/legal/legalProse';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +14,8 @@ export default async function PrivacyPage() {
       {session ? null : <PublicTopBar />}
       <main className="mx-auto max-w-[700px] px-4 py-8">
         <div className="fel-panel rounded-xl p-6">
-          <div className="prose prose-invert prose-sm max-w-none
-            prose-headings:fel-heading prose-headings:text-white
-            prose-p:text-white/70 prose-li:text-white/70
-            prose-blockquote:border-[#A855F7]/40 prose-blockquote:text-[#A855F7]/80
-            prose-strong:text-white prose-em:text-white/50">
+          {/* TW-DEAD-CLASSES: the prose-* classes compiled to nothing (no typography plugin); lib/legal/legalProse.ts */}
+          <div className={`${LEGAL_PROSE} ${LEGAL_QUOTE_VIOLET}`}>
             <div dangerouslySetInnerHTML={{ __html: simpleMarkdown(PRIVACY_CONTENT) }} />
           </div>
           <div className="mt-4 text-center text-[10px] text-white/30">

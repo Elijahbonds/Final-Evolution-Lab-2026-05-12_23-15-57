@@ -9,8 +9,28 @@ import { partyClient } from '@/lib/party/social/client';
 import { inParty } from '@/lib/party/social/state';
 import { parsePartyCode, PARTY_CODE_LEN, PARTY_MAX } from '@/server/netd/src/partyRules';
 import { cleanPlayerName, recallPlayerName, rememberPlayerName, PLAYER_NAME_MAX } from '@/lib/party/playerName';
+import { loginPath } from '@/lib/auth/safeNext';
 import { useParty } from './use-party';
 import { InviteBlock } from './party-bits';
+
+export function LocalPartyFallback({ outdated = false }: { outdated?: boolean }) {
+  const href = loginPath('/play/party');
+  return (
+    <section data-testid="party-local-fallback" className="space-y-3 rounded-xl bg-white/[0.06] p-4 text-sm text-white/70">
+      <p role="status" data-testid={outdated ? 'party-outdated' : undefined}>
+        {outdated
+          ? 'Parties need a server update. Everything else works as usual.'
+          : "Online parties aren't switched on here yet. Everything else works as usual."}
+      </p>
+      <p>
+        Want to play with friends now? Sign in as the host and use the local party room for same-screen games with phones as controllers.
+      </p>
+      <Link href={href} className="inline-flex rounded-xl bg-[#00E5FF] px-4 py-2 font-bold text-black">
+        Open local party room
+      </Link>
+    </section>
+  );
+}
 
 export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
   const s = useParty();
@@ -49,9 +69,9 @@ export function PartyHub({ initialCode = '' }: { initialCode?: string }) {
       </div>
 
       {s.status === 'unavailable' ? (
-        <p role="status" data-testid="party-unavailable" className="rounded-xl bg-white/[0.06] p-4 text-sm text-white/70">Parties aren&apos;t switched on here yet. Everything else works as usual.</p>
+        <LocalPartyFallback />
       ) : s.status === 'outdated' ? (
-        <p role="status" data-testid="party-outdated" className="rounded-xl bg-amber-400/10 p-4 text-sm text-amber-200">Parties need a server update. Everything else works as usual.</p>
+        <LocalPartyFallback outdated />
       ) : inParty(s) ? (
         <section className="space-y-3" aria-label="Your party">
           {s.status === 'waiting' ? (

@@ -272,7 +272,7 @@ export default function AthleteCreator({ axes, profileId, adult = false }: Props
               ))}
             </ul>
             {serverIssues.length > 0 && (
-              <ul className="mt-3 space-y-1 rounded-xl bg-[var(--fel-red)]/10 p-3">
+              <ul className="mt-3 space-y-1 rounded-xl [background-color:color-mix(in_srgb,var(--fel-red)_10%,transparent)] p-3">
                 {serverIssues.map((i, n) => (
                   <li key={`s${n}`} className="font-mono text-[11px] text-[var(--fel-red)]">
                     <button onClick={() => setOpenKey(i.section)} className="underline">{i.section}</button> · {i.message}

@@ -1,5 +1,5 @@
 // STORE-READY B2 (buy button): a 409 store_closed from /api/coach-store/checkout becomes a friendly
-// "Checkout opens soon." notice in neutral styling — not the red error text, never "payments not set up"
+// "Booking is not available right now." notice in neutral styling — not the red error text, never "payments not set up"
 // or "error", and no redirect. Every other non-ok answer behaves as today (a 500 still shows the error).
 //
 // book-form's closed/error branch is client-side and fetch-driven; jsdom is not configured here, so the
@@ -17,16 +17,17 @@ function render(props: Record<string, unknown>) {
   return renderToStaticMarkup(createElement(BookForm as never, { slug: 'elijah', listingId: 'listing-1', ...props } as never));
 }
 
-describe('B2 book-form: 409 store_closed is a friendly "Checkout opens soon." notice', () => {
+describe('B2 book-form: 409 store_closed is a friendly unavailable notice', () => {
   it('authOrMessage maps 409 { error: store_closed } to the closed branch (source)', () => {
     expect(src).toContain("res.status === 409 && json.error === 'store_closed'");
     expect(src).toContain("return 'store_closed'");
   });
 
-  // NP-1 (Elijah rule): was "Checkout opens soon." — no "soon" text; the notice says plainly that booking is unavailable.
+  // NP-1 (Elijah rule): the notice says plainly that booking is unavailable, with no launch-teaser wording.
   it('the closed branch sets the neutral "Booking is not available right now." notice, not the red error (source)', () => {
     expect(src).toContain("else if (outcome === 'store_closed') setClosedNotice('Booking is not available right now.')");
-    expect(src).not.toMatch(/opens soon|coming soon/i);
+    expect(src).toContain("else if (outcome === 'store_closed') setPartErrors((prev) => ({ ...prev, [part.key]: 'Booking is not available right now.' }))");
+    expect(src).not.toMatch(/opens\s+soon|coming\s+soon/i);
     // The notice renders in a neutral <p role="status">, NOT the red error class and NOT the error state.
     expect(src).toMatch(/closedNotice \? \([\s\S]*?role="status"[\s\S]*?\{closedNotice\}/);
     expect(src).toContain('Booking is not available right now.');
@@ -42,7 +43,8 @@ describe('B2 book-form: 409 store_closed is a friendly "Checkout opens soon." no
 
   it('the static first paint shows no closed notice, no error, and the buy button is intact', () => {
     const html = render({ kind: 'video_review' });
-    expect(html).not.toContain('Checkout opens soon');
+    expect(html).not.toMatch(/Checkout opens\s+soon/);
+    expect(html).not.toContain('Booking is not available right now');
     expect(html).not.toContain('payments not set up');
     expect(html).toContain('<button');
   });

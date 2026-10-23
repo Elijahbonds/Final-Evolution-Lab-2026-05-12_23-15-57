@@ -202,6 +202,15 @@ describe('book checkout: the store terms allow-list (lib/books/bookTerms.ts), au
     expect(h.sessionsCreate).toEqual([]);
   });
 
+  it('a pending-inventory audiobook is 409 not_for_sale before any Stripe customer or session', async () => {
+    h.stripeCustomer = null;
+    const r = await call({ ...GOOD_BODY, offerId: 'unfair-advantages:audiobook' });
+    expect(r.status).toBe(409);
+    expect(r.json).toMatchObject({ code: 'not_for_sale' });
+    expect(h.customersCreate).toEqual([]);
+    expect(h.sessionsCreate).toEqual([]);
+  });
+
   it('the audiobook is still sold', async () => {
     const r = await call(GOOD_BODY);
     expect(r.status).toBe(200);

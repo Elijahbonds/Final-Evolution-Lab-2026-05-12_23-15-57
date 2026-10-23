@@ -27,8 +27,8 @@ import { STORE_TERMS_VERSION } from '@/lib/store-terms';
  *   2. not signed in     -> 401 unauthorized. There is no guest checkout.
  *   3. no terms tick, or not the current STORE_TERMS_VERSION -> 409 terms_required { version }, before any Stripe call.
  *   4. not a verified adult (isVerifiedAdult, unknown age counts as not adult) -> 403 adults_only.
- *   5. an offer whose format the store terms do not cover (ebook, bundle: lib/books/bookTerms.ts) -> 409
- *      format_not_offered, fail closed, before any Stripe customer exists. Audiobooks only until EBOOK-1.
+ *   5. an offer whose format the store terms do not cover (ebook, bundle: lib/books/bookTerms.ts), or whose catalog
+ *      entry is not ready for direct sale, is refused before any Stripe customer exists.
  * Only then is a customer attached and a Checkout Session created. Stripe's success/cancel URLs come from
  * siteOrigin() (B3), never the request's Origin header. See bookCheckoutGate.
  */
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     ? `book:${offerId}:${body.idempotencyKey}`
     : undefined;
 
-  // The terms rule (lib/books/bookTerms.ts): refuse an ebook or a bundle BEFORE any Stripe customer is created.
+  // The terms/catalog rule: refuse hidden or not-ready offers BEFORE any Stripe customer is created.
   try {
     assertOfferSellable(offerId);
   } catch (err) {
