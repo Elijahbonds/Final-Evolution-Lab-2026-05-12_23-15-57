@@ -13,6 +13,7 @@ export interface AgentModeDescriptor {
 
 export const AGENT_MODES: AgentModeDescriptor[] = [
   { id: 'aeroaces',          route: '/play/aero-aces',     label: 'Aero Aces',      actions: ['move', 'sprint', 'idle'] },
+  { id: 'baseball',          route: '/play/baseball',      label: 'Baseball',       actions: ['move', 'shoot', 'idle'] },
   { id: 'bigair',            route: '/play/big-air',       label: 'Stomp',          actions: ['move', 'sprint', 'idle'] },
   { id: 'brainbrawl',        route: '/play/brain-brawl',   label: 'Brain Brawl',    actions: ['move', 'shoot', 'idle'] },
   { id: 'carnival',          route: '/play/carnival',      label: 'Carnival',       actions: ['move', 'shoot', 'idle'] },

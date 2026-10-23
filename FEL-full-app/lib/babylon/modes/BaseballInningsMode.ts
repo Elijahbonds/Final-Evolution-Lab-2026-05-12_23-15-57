@@ -7,10 +7,9 @@
 // so a pause holds all of it. No setTimeout, no Math.random().
 //
 // Why not BaseballMode.ts: that stub is excluded from tsc (tsconfig.json) and pinned dead by controlsScreen.scan.test.ts
-// (DEAD_FILES; "nothing registered imports them"), so it stays as it was. Why not the registry: a `baseball` key with its
-// own body row cannot pass bodySeam.test.ts:92 (modeId 'baseball' → the derby row) together with registry.drift.test.ts's
-// body-profile checks, so /play/baseball hands this definition straight to the timing host (TimingHostOpts.def), the way
-// Tiebreak's live route builds its own. Both are named in the BASEBALL-3INN report as the test edits that would let it in.
+// (DEAD_FILES; "nothing registered imports them"), so it stays as it was. The registry: BASEBALL-REGISTER (2026-10-22) put
+// this definition in MODES.baseball and ENABLED_BABYLON_MODES with its own body row, and moved Derby to modeId 'derby'.
+// /play/baseball still hands it straight to the timing host (TimingHostOpts.def), the same definition.
 //
 // Bodies and clips: the batter and the pitcher run anim/baseballTree.ts — the bat stance and swing, the over-the-top pitch
 // (whose first PITCH_RELEASE_SEC is the leg lift: the wind-up), the jump on a home run. Every clip already exists.
@@ -26,7 +25,7 @@ import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
 import { EffectsKit, type AmbientHandle } from '../visual/EffectsKit';
 import { spawnAthlete, spawnFoe, buildPlateAndMound, buildBallparkOutfield, Flight } from './aimSwingCore';
-import { pitchSpec, PITCH_RELEASE_SEC } from './precisionModes';
+import { pitchSpec, PITCH_RELEASE_SEC } from './baseballPitch';   // BASEBALL-PITCH-MOD: its own copy, so Derby/golf/shootout clips stay out of baseball's closure
 import { derbySeed } from '../core/DerbyLoop';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
 import { BaseballGame, RELEASE_Z, SWING_WINDOW_SEC, type SwingGrade } from './baseballGame';

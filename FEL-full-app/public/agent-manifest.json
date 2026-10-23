@@ -24,6 +24,7 @@
   },
   "modes": [
     { "id": "aeroaces",         "route": "/play/aero-aces",     "label": "Aero Aces",      "venue": "The Flyway",           "actions": ["move", "sprint", "idle"] },
+    { "id": "baseball",         "route": "/play/baseball",      "label": "Baseball",       "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
     { "id": "bigair",           "route": "/play/big-air",       "label": "Stomp",          "venue": "Mountain Slope",       "actions": ["move", "sprint", "idle"] },
     { "id": "brainbrawl",       "route": "/play/brain-brawl",   "label": "Brain Brawl",    "venue": "NeuroArena",           "actions": ["move", "shoot", "idle"] },
     { "id": "carnival",         "route": "/play/carnival",      "label": "Carnival",       "venue": "Venice Beach Court",   "actions": ["move", "shoot", "idle"] },

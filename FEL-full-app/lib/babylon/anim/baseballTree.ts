@@ -30,15 +30,15 @@ const CLIP_FOR: Record<BaseballAnimState, { clip: string; loop: boolean; fadeSec
   swing_contact: { clip: 'baseball_swing_full', loop: false, fadeSec: 0.05 },
   swing_power:   { clip: 'baseball_contact_drive', loop: false, fadeSec: 0.04 },
   field_routine: { clip: 'idle_stand', loop: true, fadeSec: 0.15 },
-  field_dive:    { clip: 'keeper_dive_left', loop: false, fadeSec: 0.05 },
+  field_dive:    { clip: 'jump_land', loop: false, fadeSec: 0.05 },
   // BASEBALL-3INN (2026-10-22, ALL-MODES §6B / ANIM-ALL-1): the throw played the karate jab and the celebration the
   // uppercut — borrowed combat clips, which the baseball clip scope does not even build. The throw is the over-the-top
   // pitch (an arm that throws a ball) and the celebration the core jump; both clips already exist, no new asset.
   throw:         { clip: 'derby_pitch', loop: false, fadeSec: 0.07 },
   run:           { clip: 'baseball_homer_trot', loop: true, fadeSec: 0.12 },
-  slide:         { clip: 'soccer_tackle_slide', loop: false, fadeSec: 0.05 },
+  slide:         { clip: 'jump_land', loop: false, fadeSec: 0.05 },
   celebrate:     { clip: 'jump_up', loop: false, fadeSec: 0.12 },
-  dejected:      { clip: 'football_tackled_fall', loop: false, fadeSec: 0.2 },
+  dejected:      { clip: 'idle_stand', loop: false, fadeSec: 0.2 },
 };
 
 export function chooseBaseballClip(i: BaseballAnimInput): { state: BaseballAnimState; clip: string; loop: boolean; fadeSec: number } {
