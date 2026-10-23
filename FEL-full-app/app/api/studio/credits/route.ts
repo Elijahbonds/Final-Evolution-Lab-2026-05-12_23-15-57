@@ -11,6 +11,7 @@ import { getStripe } from '@/lib/stripe';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import { createStudioCreditsCheckout } from '@/lib/stripe/product-checkout';
+import { adultBuyerGate } from '@/lib/stripe/adult-gate';
 
 /**
  * GET /api/studio/credits
@@ -76,6 +77,10 @@ export async function POST(req: NextRequest) {
   if (!STUDIO_CREDIT_PACKS[itemKey]) {
     return NextResponse.json({ error: 'Invalid credit pack' }, { status: 400 });
   }
+  // LAUNCH-SALES: real money — verified adults only (403 adults_only with a reason), the same gate as
+  // /api/stripe/checkout's STUDIO_CREDITS, before any Stripe call.
+  const refused = await adultBuyerGate(prisma, userId);
+  if (refused) return refused;
 
   try {
     const result = await createStudioCreditsCheckout({ stripe: getStripe(), userId, itemKey, origin });
