@@ -22,9 +22,11 @@ export interface BaseballAnimInput {
   dejected?: boolean;
 }
 
-const CLIP_FOR: Record<BaseballAnimState, { clip: string; loop: boolean; fadeSec: number }> = {
+export const BASEBALL_CLIP_FOR: Readonly<Record<BaseballAnimState, { clip: string; loop: boolean; fadeSec: number }>> = {
   idle:          { clip: 'idle_stand', loop: true, fadeSec: 0.2 },
-  windup:        { clip: 'baseball_bat_stance', loop: true, fadeSec: 0.2 },
+  // BASEBALL-FEEL (2026-10-23): the wind-up is the first PITCH_RELEASE_SEC of the pitch clip (its leg lift), not the
+  // batter's stance on the pitcher. Same clip and same opts as pitch_release, so windup → release plays on, no restart.
+  windup:        { clip: 'derby_pitch', loop: false, fadeSec: 0.08 },
   pitch_release: { clip: 'derby_pitch', loop: false, fadeSec: 0.08 },
   stance:        { clip: 'baseball_bat_stance', loop: true, fadeSec: 0.18 },
   swing_contact: { clip: 'baseball_swing_full', loop: false, fadeSec: 0.05 },
@@ -34,7 +36,8 @@ const CLIP_FOR: Record<BaseballAnimState, { clip: string; loop: boolean; fadeSec
   // BASEBALL-3INN (2026-10-22, ALL-MODES §6B / ANIM-ALL-1): the throw played the karate jab and the celebration the
   // uppercut — borrowed combat clips, which the baseball clip scope does not even build. The throw is the over-the-top
   // pitch (an arm that throws a ball) and the celebration the core jump; both clips already exist, no new asset.
-  throw:         { clip: 'derby_pitch', loop: false, fadeSec: 0.07 },
+  // BASEBALL-FEEL (2026-10-23, PM): a fielder's throw is the side-arm, not the pitcher's over-the-top delivery.
+  throw:         { clip: 'baseball_pitch_side', loop: false, fadeSec: 0.07 },
   run:           { clip: 'baseball_homer_trot', loop: true, fadeSec: 0.12 },
   slide:         { clip: 'jump_land', loop: false, fadeSec: 0.05 },
   celebrate:     { clip: 'jump_up', loop: false, fadeSec: 0.12 },
@@ -56,7 +59,7 @@ export function chooseBaseballClip(i: BaseballAnimInput): { state: BaseballAnimS
   else if (i.batting) state = 'stance';
   else if (i.pitching) state = 'windup';
   else state = 'idle';
-  return { state, ...CLIP_FOR[state] };
+  return { state, ...BASEBALL_CLIP_FOR[state] };
 }
 
 export class BaseballAnimTree {

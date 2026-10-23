@@ -49,6 +49,7 @@ import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
 import { batLineAt, batRightSign, BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
+import { dressBatGlb } from './baseballBat';   // BASEBALL-FEEL: the Meshy bat drawn over the placed cylinder
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
@@ -997,6 +998,8 @@ export const DerbyMode: ModeDefinition = (() => {
   let bat: AbstractMesh | null = null;
   /** VIS-COURT: the bat's streak, the home run's tracer / card / board / fireworks, the replay's focus and its pacing. */
   let batTip: TransformNode | null = null, batTrail: SwingTrailHandle | null = null;
+  /** BASEBALL-FEEL (2026-10-23): bat.glb, copying the cylinder's computed transform every frame (not a RightHand child). */
+  let batGlb: { dispose(): void } | null = null;
   let hrTracer: ShotTracer | null = null, hrReadout: ReadoutHandle | null = null, jumbo: JumbotronHandle | null = null, shells: FireworkShow | null = null;
   let focusProxy: TransformNode | null = null, launchVel: { x: number; y: number; z: number } | null = null, cardPending = false, replayWanted = false;
   const derbyPacer = new HighlightPacer();
@@ -1382,6 +1385,7 @@ export const DerbyMode: ModeDefinition = (() => {
           // VIS-COURT: the barrel's end (the cylinder's +y is the barrel along the swing's line) carries the streak
           batTip = new TransformNode('derby_bat_tip', ctx.scene); batTip.parent = bat; batTip.position.set(0, BAT_LEN / 2, 0);
           batTrail?.dispose(); batTrail = mountSwingTrail(ctx.scene, batTip, { color: '#fff4d0', width: 0.14, length: 20, alpha: 0.7, name: 'bat' });
+          batGlb?.dispose(); batGlb = dressBatGlb(ctx.scene, bat, BAT_LEN);
           const batRef = bat, meRef = me;
           // IMPROVE (2026-10-06, Derby #13): the placement runs every frame, so it writes into these — it allocated ~8
           // Vector3s a frame (clone, subtract, add, new Vector3, toEulerAngles, Vector3.Up()).
@@ -1684,7 +1688,7 @@ export const DerbyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
     // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
-    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; studio?.dispose(); studio = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; studio?.dispose(); studio = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; batGlb?.dispose(); batGlb = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

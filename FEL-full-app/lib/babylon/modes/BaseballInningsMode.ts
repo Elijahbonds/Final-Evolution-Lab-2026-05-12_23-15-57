@@ -13,6 +13,10 @@
 //
 // Bodies and clips: the batter and the pitcher run anim/baseballTree.ts — the bat stance and swing, the over-the-top pitch
 // (whose first PITCH_RELEASE_SEC is the leg lift: the wind-up), the jump on a home run. Every clip already exists.
+//
+// BASEBALL-FEEL (2026-10-23): every slot runs off a game event through baseballSlots.ts (pure, played headless by
+// baseballFeel.test.ts); contact and power stop at their own points on the swing clip; each contact holds a hit-stop
+// (contact < power ≤ homer, ≤ 120 ms); the batter holds Derby's two-hand bat, drawn as bat.glb.
 
 import { MeshBuilder, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh } from '@babylonjs/core';
@@ -31,14 +35,12 @@ import { pitchSpec, PITCH_RELEASE_SEC } from './baseballPitch';   // BASEBALL-PI
 import { derbySeed } from '../core/DerbyLoop';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
 import { BaseballGame, RELEASE_Z, SWING_WINDOW_SEC, type SwingGrade } from './baseballGame';
+import { mountTwoHandBat, type BatHandle } from './baseballBat';
+import { BaseballSlots, SlotDriver, hitStopFor, SWING_STOP_T, swingWeightFor, type SwingWeight } from './baseballSlots';
 
 /** Derby's batting frame (precisionModes.ts battingCam): behind and left of the batter, the pitcher mid-frame. */
 const BATTING_CAM = new Vector3(-1.75, 1.85, -3.4);
 const PITCHER_VIEW = new Vector3(0, 1.45, 18);
-/** How long the swing and the pitch own their bodies before the stance / the idle comes back (s). */
-const SWING_HOLD_SEC = 0.9;
-const PITCH_HOLD_SEC = 1.3;
-const CELEBRATE_SEC = 1.6;
 /** Where the ball leaves the hand and where it crosses (Derby: released at 1.5 m over the mound, in the zone at ~1.05 m). */
 const RELEASE_Y = 1.5, PLATE_Y = 1.05;
 
@@ -65,8 +67,10 @@ export const BaseballInningsMode: ModeDefinition = (() => {
   let ambient: AmbientHandle | null = null;
   let venue: VenueHandle | null = null;
   let game: BaseballGame | null = null;
-  /** Seconds since each beat started (−1 = not running). */
-  let swingT = -1, pitchT = -1, celebrateT = -1;
+  /** The slot each body is in, off the game's events (baseballSlots). */
+  let slots: BaseballSlots | null = null;
+  let bat: BatHandle | null = null, batSec: number | null = null;
+  let driver: SlotDriver | null = null, swingW: SwingWeight = 'contact', swingHeld = false;
   /** The pitch on its way in: seconds since the release and its speed (null: nothing inbound). */
   let inbound: { t: number; speed: number } | null = null;
 
@@ -89,6 +93,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
       pitcherTree = new BaseballAnimTree(pitcher.animator);
       batterTree.update({ ...REST, batting: true });
       pitcherTree.update(REST);
+      bat?.dispose(); bat = mountTwoHandBat(ctx.scene, batter, () => batSec);   // Derby's two-hand bat, drawn as bat.glb
 
       ball = MeshBuilder.CreateSphere('baseball_ball', { diameter: 0.12 }, ctx.scene);
       ball.material = VenueKit.paint(ctx.scene, 'baseball_ball_m', '#f7f7f2', 0.45, 0.35);
@@ -102,12 +107,12 @@ export const BaseballInningsMode: ModeDefinition = (() => {
       ctx.camera.setTarget(Vector3.Lerp(batter.root.position.add(new Vector3(0, 1.25, 0)), PITCHER_VIEW, 0.4));
       assertSpawned(ctx.scene, { hero: batter.root, minWorldMeshes: 5, modeId: 'baseball' });
 
-      swingT = -1; pitchT = -1; celebrateT = -1; inbound = null;
+      slots = new BaseballSlots(PITCH_RELEASE_SEC); driver = new SlotDriver(batterTree, pitcherTree); batSec = null; swingHeld = false; inbound = null;
       const seed = derbySeed();
       game?.dispose();
       game = new BaseballGame({
         windup: () => {
-          pitchT = 0; pitcherTree?.clearBeat('pitch_release');
+          slots?.windup();
           ball?.setEnabled(false);
           if (flight) flight.active = false;
         },
@@ -115,15 +120,17 @@ export const BaseballInningsMode: ModeDefinition = (() => {
           inbound = { t: 0, speed: p.speed };
           ball?.position.set(0, RELEASE_Y, RELEASE_Z); ball?.setEnabled(true);
         },
-        swing: () => {
-          swingT = 0; batterTree?.clearBeat('swing_contact');
+        swing: (g) => {
+          slots?.swing(g); swingW = swingWeightFor(g.kind); swingHeld = false;
           SoundKit.play('whoosh');
         },
         contact: (g) => {
           // the crack on the contact frame: the press that connected, with the ball at the plate (±0.15 s)
           SoundKit.play('impact', { pitch: g.kind === 'homer' ? 1.5 : 1.25, volume: 0.9 });
-          ctx.feel?.impact?.(g.kind === 'homer' ? 0.3 : 0.15);
-          if (g.kind === 'homer') { celebrateT = 0; SoundKit.play('crowdCheer'); }
+          ctx.juice.hitStop(hitStopFor(g.kind));   // contact < power ≤ homer, all ≤ HIT_STOP_CAP_MS
+          ctx.juice.shake(g.kind === 'homer' ? 0.12 : 0.06, 120);
+          slots?.contact(g);
+          if (g.kind === 'homer') SoundKit.play('crowdCheer');
           inbound = null;
           if (ball && flight) {
             ball.setEnabled(true);
@@ -131,6 +138,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
             flight.launch(new Vector3(ball.position.x, ball.position.y, Math.max(ball.position.z, 0.3)), new Vector3(v.x, v.y, v.z));
           }
         },
+        strikeout: () => slots?.strikeout(),
         banner: (text) => ctx.setHud({ banner: text }),
         hud: (patch) => ctx.setHud(patch),
         end: (r) => ctx.end(r.outcome, r.score, r.stats),
@@ -155,15 +163,20 @@ export const BaseballInningsMode: ModeDefinition = (() => {
       }
       if (flight?.active) flight.step(dt);
 
-      if (swingT >= 0) { swingT += dt; if (swingT > SWING_HOLD_SEC) swingT = -1; }
-      if (pitchT >= 0) { pitchT += dt; if (pitchT > PITCH_HOLD_SEC) pitchT = -1; }
-      if (celebrateT >= 0) { celebrateT += dt; if (celebrateT > CELEBRATE_SEC) celebrateT = -1; }
-      batterTree?.update({ ...REST, batting: true, swinging: swingT >= 0 ? 'contact' : null, celebrating: celebrateT >= 0 && swingT < 0 });
-      pitcherTree?.update({ ...REST, releasing: pitchT >= 0 });
+      if (!slots) return;
+      const f = slots.tick(dt);
+      driver?.apply(f);   // a new beat re-fires even when it is the same slot as the last (two strikeouts in a row)
+      batSec = f.batSec;
+      // the swing's stop point: contact checks at t 0.42, power drives to 0.55 — the clip holds there
+      if (f.batter.swinging && !swingHeld && batSec != null && batSec >= SWING_STOP_T[swingW]) {
+        swingHeld = true;
+        batter?.animator.setSpeed(swingW === 'power' ? 'baseball_contact_drive' : 'baseball_swing_full', 0);
+      }
     },
 
     dispose() {
-      game?.dispose(); game = null;
+      game?.dispose(); game = null; slots = null; driver = null;
+      bat?.dispose(); bat = null; batSec = null;
       ambient?.dispose(); ambient = null;
       venue?.dispose(); venue = null;
       batter?.dispose(); pitcher?.dispose(); batter = null; pitcher = null;

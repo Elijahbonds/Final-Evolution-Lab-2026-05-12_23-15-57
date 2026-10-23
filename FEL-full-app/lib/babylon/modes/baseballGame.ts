@@ -112,6 +112,8 @@ export interface BaseballView {
   swing(grade: SwingGrade): void;
   /** Bat on ball: the contact frame (the crack, the flight). Fires on the press that connected. */
   contact(grade: SwingGrade): void;
+  /** Strike three (BASEBALL-FEEL: the batter's dejected beat). */
+  strikeout?(): void;
   banner(text: string): void;
   hud(patch: Record<string, string | number>): void;
   end(result: BaseballResult): void;
@@ -182,7 +184,7 @@ export class BaseballGame {
 
   private strike(line: string): void {
     this.strikes++;
-    if (this.strikes >= STRIKES_PER_OUT) { this.strikeouts++; this.out('STRIKE THREE — YOU\'RE OUT'); return; }
+    if (this.strikes >= STRIKES_PER_OUT) { this.strikeouts++; this.view.strikeout?.(); this.out('STRIKE THREE — YOU\'RE OUT'); return; }
     this.banners.flash(`${line} · ${this.strikes} STRIKE${this.strikes === 1 ? '' : 'S'}`, BANNER_MS);
     this.settle();
   }
