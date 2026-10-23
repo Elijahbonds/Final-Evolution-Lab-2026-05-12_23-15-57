@@ -15,14 +15,18 @@
 // (`shotClock`: '' hidden, whole seconds from 5 up, tenths under 5 — the broadcast read) only when the shown value changes.
 
 import type { Tier } from './Difficulty';
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.shotClock1v1Sec / hoops.shotClock3v3Sec
 
-/** The owner's seconds (2026-10-20), per mode, on ELITE. Knob candidates: hoops.shotClock1v1Sec, hoops.shotClock3v3Sec. */
-export const PLAYER_SHOT_CLOCK_SEC = { '1v1': 12, '3v3': 14 } as const;
+/** The owner's seconds (2026-10-20), per mode, on ELITE — feel knobs hoops.shotClock1v1Sec / hoops.shotClock3v3Sec. */
+export const SHOT_CLOCK_1V1_SEC = 12;
+export const SHOT_CLOCK_3V3_SEC = 14;
+export const PLAYER_SHOT_CLOCK_SEC = { '1v1': SHOT_CLOCK_1V1_SEC, '3v3': SHOT_CLOCK_3V3_SEC } as const;
 export type ShotClockMode = keyof typeof PLAYER_SHOT_CLOCK_SEC;
 
 /** The clock this run plays: ELITE only (0 = no clock). */
 export function playerShotClockSec(mode: ShotClockMode, tier: Tier): number {
-  return tier === 'elite' ? PLAYER_SHOT_CLOCK_SEC[mode] : 0;
+  if (tier !== 'elite') return 0;
+  return mode === '1v1' ? feel('hoops.shotClock1v1Sec', SHOT_CLOCK_1V1_SEC) : feel('hoops.shotClock3v3Sec', SHOT_CLOCK_3V3_SEC);
 }
 
 /** Under this many seconds the clock shows tenths (the broadcast's last-five read). */

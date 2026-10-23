@@ -21,16 +21,17 @@
 
 import type { ShotQuality, ShotStyle } from './BasketballCore';
 import { PERFECT_BAND_SHARE } from './shotBands';
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.distGreen* (lib/feel-panel/knobs.ts)
 
-/** TUNED (new): the distance narrowing. Knob candidates: hoops.distGreenNearM, hoops.distGreenFarM, hoops.distGreenMaxNarrow. */
-export const DIST_GREEN = {
-  /** At or inside this rim distance (m) the green is untouched. */
-  nearM: 2.0,
-  /** At or beyond this rim distance (m) the green is at its narrowest (a deep three). */
-  farM: 7.5,
-  /** The most the green narrows: 0.22 = the shootout's own deepest-rack narrowing (0.4 × 0.05 of its 0.09 half-width). */
-  maxNarrow: 0.22,
-} as const;
+/** TUNED (new): the distance narrowing — feel knobs hoops.distGreenNearM / hoops.distGreenFarM / hoops.distGreenMaxNarrow. */
+/** At or inside this rim distance (m) the green is untouched. */
+export const DIST_GREEN_NEAR_M = 2.0;
+/** At or beyond this rim distance (m) the green is at its narrowest (a deep three). */
+export const DIST_GREEN_FAR_M = 7.5;
+/** The most the green narrows: 0.22 = the shootout's own deepest-rack narrowing (0.4 × 0.05 of its 0.09 half-width). */
+export const DIST_GREEN_MAX_NARROW = 0.22;
+/** The shipped defaults, together (the constants above). */
+export const DIST_GREEN = { nearM: DIST_GREEN_NEAR_M, farM: DIST_GREEN_FAR_M, maxNarrow: DIST_GREEN_MAX_NARROW } as const;
 
 /** The styles distance narrows: the jump shots. Every finish keeps the bar it was tuned with. */
 const JUMP_SHOTS: ReadonlySet<ShotStyle> = new Set<ShotStyle>(['jumper', 'fadeaway']);
@@ -38,8 +39,9 @@ const JUMP_SHOTS: ReadonlySet<ShotStyle> = new Set<ShotStyle>(['jumper', 'fadeaw
 /** The factor (≤ 1) the green half-width is multiplied by for a shot from `distM` metres off the rim. */
 export function distanceGreenFactor(distM: number, style: ShotStyle = 'jumper'): number {
   if (!JUMP_SHOTS.has(style) || !Number.isFinite(distM)) return 1;
-  const k = Math.max(0, Math.min(1, (distM - DIST_GREEN.nearM) / (DIST_GREEN.farM - DIST_GREEN.nearM)));
-  return 1 - DIST_GREEN.maxNarrow * k;
+  const near = feel('hoops.distGreenNearM', DIST_GREEN_NEAR_M), far = Math.max(near + 0.1, feel('hoops.distGreenFarM', DIST_GREEN_FAR_M));
+  const k = Math.max(0, Math.min(1, (distM - near) / (far - near)));
+  return 1 - feel('hoops.distGreenMaxNarrow', DIST_GREEN_MAX_NARROW) * k;
 }
 
 /** Below this offset the finer grade is not shown (a release that is "slightly" off by 0 ms is a rounding artefact). */

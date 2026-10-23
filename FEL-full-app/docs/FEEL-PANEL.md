@@ -118,3 +118,10 @@ not tuned. Widen a bound only with a reason.
 Knobs registered today, with their defaults unchanged: `hoops.aiHandRangeM` 2.4 m, `hoops.aiHandDwellSec` 0.35 s,
 `hoops.aiHandGapSec` 0.9 s and `hoops.handClearM` 0.01 m (PR #375's `AI_HAND_RANGE_M`, `AI_HAND_DWELL_SEC`,
 `AI_HAND_GAP_SEC` and `HAND_CLEAR_M`).
+
+lane/hoops-shot-core (group "Hoops · shooting"), defaults unchanged: `hoops.distGreenNearM` 2.0 m, `hoops.distGreenFarM`
+7.5 m, `hoops.distGreenMaxNarrow` 0.22 (`ShotWindow.ts`), `hoops.shotClock1v1Sec` 12 s, `hoops.shotClock3v3Sec` 14 s
+(`ShotClock.ts`), `hoops.dunkRingQuality` 0.7, `hoops.dunkShortBias` 0.7, `hoops.dunkClankMinMps` 2.4 m/s and
+`hoops.dunkClankSpanMps` 1.6 m/s (`RimForAll.ts`). **assumption:** the bounds are safe, not tuned. The dunk knobs move
+only where a missed dunk hits the iron and how it bounces off, never the make rate (the ring's scale keeps P(made) = pct
+at every quality).

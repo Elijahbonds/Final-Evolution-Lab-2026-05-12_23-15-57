@@ -59,6 +59,52 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/Dribble.ts HAND_CLEAR_M',
     hint: 'How far above the rising ball the dribble hand is held (no hand through the ball).',
   },
+  // ── hoops-shot-core: the distance-narrowed green, ELITE's shot clock, a missed dunk off the iron ──
+  {
+    id: 'hoops.distGreenNearM', label: 'Green: full width inside', def: 2.0, min: 0.5, max: 5.0, step: 0.1, unit: 'm', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/ShotWindow.ts DIST_GREEN_NEAR_M',
+    hint: 'A 1v1 / 3v3 jump shot from inside this keeps the whole green.',
+  },
+  {
+    id: 'hoops.distGreenFarM', label: 'Green: narrowest from', def: 7.5, min: 4.0, max: 10.0, step: 0.1, unit: 'm', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/ShotWindow.ts DIST_GREEN_FAR_M',
+    hint: 'From this far out the jump shot\'s green is at its narrowest.',
+  },
+  {
+    id: 'hoops.distGreenMaxNarrow', label: 'Green: most it narrows', def: 0.22, min: 0, max: 0.5, step: 0.01, unit: '', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/ShotWindow.ts DIST_GREEN_MAX_NARROW',
+    hint: 'Share of the green taken away at the far distance (0.22 = 22 % narrower, the shootout\'s deepest rack).',
+  },
+  {
+    id: 'hoops.shotClock1v1Sec', label: 'Shot clock 1v1 (ELITE)', def: 12, min: 6, max: 24, step: 1, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/ShotClock.ts SHOT_CLOCK_1V1_SEC',
+    hint: 'The player\'s shot clock in 1v1 on ELITE (ROOKIE and PRO are untimed).',
+  },
+  {
+    id: 'hoops.shotClock3v3Sec', label: 'Shot clock 3v3 (ELITE)', def: 14, min: 6, max: 24, step: 1, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/ShotClock.ts SHOT_CLOCK_3V3_SEC',
+    hint: 'The player\'s shot clock in 3v3 on ELITE (ROOKIE and PRO are untimed).',
+  },
+  {
+    id: 'hoops.dunkRingQuality', label: 'Dunk miss: spread', def: 0.7, min: 0.3, max: 1.0, step: 0.05, unit: '', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/RimForAll.ts DUNK_RING_QUALITY',
+    hint: 'Where a missed dunk catches the iron (higher = misses closer to the rim\'s edge). The make rate does not change.',
+  },
+  {
+    id: 'hoops.dunkShortBias', label: 'Dunk miss: out the front when contested', def: 0.7, min: 0, max: 1.0, step: 0.05, unit: '', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/RimForAll.ts DUNK_SHORT_BIAS',
+    hint: 'How much a contest pushes a missed dunk off the front iron, back at the dunker.',
+  },
+  {
+    id: 'hoops.dunkClankMinMps', label: 'Dunk miss: slowest bounce', def: 2.4, min: 1.0, max: 4.0, step: 0.1, unit: 'm/s', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/RimForAll.ts DUNK_CLANK_MIN_MPS',
+    hint: 'A missed dunk caught near the middle leaves the iron at this speed.',
+  },
+  {
+    id: 'hoops.dunkClankSpanMps', label: 'Dunk miss: extra bounce at the edge', def: 1.6, min: 0, max: 3.0, step: 0.1, unit: 'm/s', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/RimForAll.ts DUNK_CLANK_SPAN_MPS',
+    hint: 'Added to the slowest bounce for a dunk that catches the far edge of the iron.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

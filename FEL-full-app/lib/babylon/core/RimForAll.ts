@@ -33,6 +33,7 @@ import { rivalShotPct } from './BasketballCore';
 import { rimDecides, type RimBias, type RimVerdict } from './RimDecides';
 import { rimFrame } from './RimPlay';
 import { RIM_RADIUS, type MissProfile } from './RimPhysics';
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.dunk* (lib/feel-panel/knobs.ts)
 
 /** rimDecides' own pct clamp (RimDecides.PCT_MIN / PCT_MAX, not exported there). */
 export const RING_PCT_MIN = 0.005, RING_PCT_MAX = 0.995;
@@ -68,8 +69,13 @@ export function matePct(finish: 'shot' | 'alleyoop' | 'putback', dist: number, m
 /** A dunk at the ring: quality is high (it is placed, not thrown), and a body in the flight's path pushes the miss back out the
  *  front (the iron comes back at the dunker). */
 export const DUNK_RING_QUALITY = 0.7;
+/** How hard a contest pushes a missed dunk out the front iron (bias.short = contest × this). */
+export const DUNK_SHORT_BIAS = 0.7;
+/** A missed dunk's outward speed off the iron: MIN at the centre, + SPAN at the miss radius (m/s). */
+export const DUNK_CLANK_MIN_MPS = 2.4;
+export const DUNK_CLANK_SPAN_MPS = 1.6;
 export function dunkRimBias(contest01: number): RimBias {
-  return { short: Math.max(0, Math.min(1, contest01)) * 0.7 };
+  return { short: Math.max(0, Math.min(1, contest01)) * feel('hoops.dunkShortBias', DUNK_SHORT_BIAS) };
 }
 
 /**
@@ -85,14 +91,14 @@ export function dunkClankVelocity(profile: MissProfile, toShooter: Vector3): Vec
   const n = Math.hypot(ex, ez);
   if (n < 1e-6) { ex = back.x; ez = back.z; } else { ex /= n; ez /= n; }
   const out = Math.max(0, Math.min(1, n / (RIM_RADIUS * 1.9)));   // 0 at the centre … 1 at MISS_RADIAL_MAX
-  const speed = 2.4 + 1.6 * out;                                    // 2.4–4.0 m/s (the old clank: 3.2 always)
+  const speed = feel('hoops.dunkClankMinMps', DUNK_CLANK_MIN_MPS) + feel('hoops.dunkClankSpanMps', DUNK_CLANK_SPAN_MPS) * out;   // 2.4–4.0 m/s (the old clank: 3.2 always)
   return new Vector3(ex * speed, 2.6, ez * speed);
 }
 
 /** A dunk's verdict: the ring at the dunk's pct, from where he took off. `contest01` pushes a miss out the front. */
 export function dunkVerdict(rim: Vector3, from: Vector3, pct: number, contest01: number, rand: () => number = Math.random): RimVerdict {
   const toShooter = from.subtract(rim); toShooter.y = 0;
-  return rimDecidesExact(rim, toShooter, pct, DUNK_RING_QUALITY, dunkRimBias(contest01), rand);
+  return rimDecidesExact(rim, toShooter, pct, feel('hoops.dunkRingQuality', DUNK_RING_QUALITY), dunkRimBias(contest01), rand);
 }
 /** The missed dunk's ball off the iron (dunkClankVelocity on the verdict's error). */
 export function dunkMissVelocity(v: RimVerdict, from: Vector3, rim: Vector3): Vector3 {
