@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BookCheckoutError,
+  assertOfferSellable,
   assertStripeTestKey,
   bookCheckoutGate,
   bookStoreEnabled,
@@ -31,6 +32,9 @@ describe('book checkout', () => {
     });
     const item = params.line_items?.[0];
     expect(item && 'price_data' in item && item.price_data?.unit_amount).toBe(999);
+    const productDescription = item && 'price_data' in item ? item.price_data?.product_data?.description : '';
+    expect(productDescription).toContain('Price is marked example pending final approval.');
+    expect(productDescription).not.toMatch(/placeholder/i);
     expect(params.metadata).toMatchObject({ product: 'BOOK', offerId: 'blueprint:ebook', format: 'ebook', terms_version: STORE_TERMS_VERSION });
     expect(params.success_url).toBe('http://localhost:3000/press/receipt?session_id={CHECKOUT_SESSION_ID}');
     expect(params.automatic_tax).toBeUndefined();
@@ -89,7 +93,7 @@ describe('book checkout', () => {
     expect(params.payment_method_types).toBeUndefined();
   });
 
-  it('the terms rule: audiobook sells, ebook and bundle are refused with format_not_offered, a closed policy sells nothing', () => {
+  it('the terms and catalog rule: ready audiobook sells, ebook/bundle are refused, pending audio is not for sale', () => {
     const args = { origin: 'http://localhost:3000', taxEnabled: false, paymentMethodTypes: ['card'] };
     expect(buildBookCheckoutParams({ ...args, offerId: 'blueprint:audiobook' }).metadata?.format).toBe('audiobook');
     for (const offerId of ['blueprint:ebook', 'blueprint:bundle']) {
@@ -105,6 +109,15 @@ describe('book checkout', () => {
     // switching it on later is one row in bookTerms.ts: an ebook-enabled policy sells them (KDP Select still applies)
     expect(buildBookCheckoutParams({ ...args, offerId: 'blueprint:bundle', policy: EBOOK_ENABLED_POLICY }).metadata?.format).toBe('bundle');
     expect(() => buildBookCheckoutParams({ ...args, offerId: 'blueprint:audiobook', policy: CLOSED_POLICY })).toThrow(/stream only/);
+    expect(() => assertOfferSellable('unfair-advantages:audiobook')).toThrow(BookCheckoutError);
+    try {
+      assertOfferSellable('unfair-advantages:audiobook');
+      throw new Error('pending audiobook should have been refused');
+    } catch (err) {
+      expect(err).toBeInstanceOf(BookCheckoutError);
+      expect((err as BookCheckoutError).code).toBe('not_for_sale');
+      expect((err as BookCheckoutError).message).toContain('Audio masters are pending inventory');
+    }
   });
 
   it('the checkout route runs the gate before it can create a session', () => {

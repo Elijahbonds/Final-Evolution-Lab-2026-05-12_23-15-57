@@ -58,6 +58,23 @@ describe('creator platform boundaries (PR #18 slimmed down, owner 2026-10-13)', 
     }
   });
 
+  it('public creator pages do not render literal fixture-placeholder copy', () => {
+    for (const f of [
+      'app/team/page.tsx',
+      'app/team/[slug]/page.tsx',
+      'app/media-kit/page.tsx',
+      'components/creator-platform/creator-frame.tsx',
+    ]) {
+      expect(readFileSync(f, 'utf8'), f).not.toMatch(
+        /(?:bio|reel links|social links|service description|package description|highlight|photo) placeholder|placeholder until|are placeholders/i,
+      );
+    }
+    const profile = readFileSync('app/team/[slug]/page.tsx', 'utf8');
+    expect(profile).toContain('lede={publicProfileSpecialty(profile)}');
+    expect(profile).toContain('{publicServiceName(s)}');
+    expect(profile).not.toMatch(/lede=\{profile\.specialty\}|\{s\.name\}/);
+  });
+
   it('no creator page creates a Stripe checkout, and none reads a live Instagram, Printful or Connect endpoint', () => {
     const creator = [...files('app/team'), ...files('app/media-kit'), ...files('app/work-with-us'), ...files('app/api/creator'),
       ...files('components/creator-platform'), 'lib/creator/creatorCatalog.ts', 'lib/creator/inquiry.ts', 'lib/creator/inquiryStore.ts',
@@ -91,5 +108,11 @@ describe('creator platform boundaries (PR #18 slimmed down, owner 2026-10-13)', 
     expect(formAt).toBeGreaterThan(gateAt);
     expect(page).toContain('INQUIRIES_UNAVAILABLE_MESSAGE');
     expect(page).not.toMatch(/\{true \? \(/);
+  });
+
+  it('public team profiles do not render literal placeholder copy for missing links', () => {
+    const profile = readFileSync('app/team/[slug]/page.tsx', 'utf8');
+    expect(profile).not.toMatch(/placeholder/i);
+    expect(profile).toContain('profile.reels.length > 0 || profile.socials.length > 0');
   });
 });

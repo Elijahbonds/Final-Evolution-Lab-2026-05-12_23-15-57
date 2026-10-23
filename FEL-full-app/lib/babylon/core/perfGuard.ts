@@ -200,6 +200,7 @@ export function mountPerfGuard(o: PerfGuardOpts): PerfGuardHandle {
     if (next === hwLevel) return;
     hwLevel = next;
     engine.setHardwareScalingLevel(next);   // Babylon resizes its targets here; no shader is compiled
+    redraw();   // the resize cleared the canvas: draw it again now, not on the paced loop's next frame
   };
   const scalable: ScalableEngine = {
     setHardwareScalingLevel(l: number) {
@@ -278,6 +279,7 @@ export function mountPerfGuard(o: PerfGuardOpts): PerfGuardHandle {
   let rafId = 0;
   let timer = 0;
   let physicsHeld: boolean | null = null;
+  let inFrame = false, redrawDue = false, redrawing = false;
   const resetFrameClock = () => {
     // Babylon's frame clock (engine.getDeltaTime: the harness's dt, the particles, the physics) would read the whole
     // idle as one frame; disable/enable drops the last timestamp and keeps the last real frame time as the step
@@ -292,7 +294,9 @@ export function mountPerfGuard(o: PerfGuardOpts): PerfGuardHandle {
       const cb = pending;
       pending = null;
       if (pacer.takeResumed()) resetFrameClock();
-      cb(t);
+      inFrame = true;
+      try { cb(t); } finally { inFrame = false; }
+      if (redrawDue) { redrawDue = false; redraw(); }
       return;
     }
     schedule();
@@ -302,6 +306,20 @@ export function mountPerfGuard(o: PerfGuardOpts): PerfGuardHandle {
     if (pacer.mode === 'stop') return;   // woken by refreshMode
     if (pacer.mode === 'low') { timer = host.setTimeout(() => { timer = 0; if (!rafId && pending) rafId = host.requestAnimationFrame(loop); }, IDLE_FRAME_MS); return; }
     rafId = host.requestAnimationFrame(loop);
+  };
+  // One frame at once, synchronously, before the browser composites the cleared canvas (issue #352). Babylon's
+  // re-request lands back in `pending` and the tick already queued (rafId / timer) paces it, so nothing new is queued.
+  // Inside a frame (the governor scales from onEndFrame) the frame in flight finishes first; the redraw follows it in
+  // the same task. A hidden page ('stop') draws nothing.
+  const redraw = () => {
+    if (!host || disposed || pacer.mode === 'stop') return;
+    if (inFrame) { redrawDue = true; return; }
+    const cb = pending;
+    if (!cb) return;
+    pending = null;
+    if (pacer.mode === 'low') resetFrameClock();   // an idle frame is its own small step, as in the loop
+    redrawing = true;
+    try { cb(host.now()); } finally { redrawing = false; }
   };
   const cancel = () => {
     pending = null;
@@ -346,6 +364,7 @@ export function mountPerfGuard(o: PerfGuardOpts): PerfGuardHandle {
     tBegin = host?.now() ?? 0;
   });
   const endObs = engine.onEndFrameObservable.add(() => {
+    if (redrawing) return;   // the redraw is not a paced frame: the governor measures paced intervals only
     const now = host?.now() ?? 0;
     const work = now - tBegin;
     const live = pacer.mode === 'run' && prevMode === 'run';

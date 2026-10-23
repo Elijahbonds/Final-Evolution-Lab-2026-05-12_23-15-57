@@ -18,6 +18,10 @@ interface ManifestAction {
   name: string;
 }
 
+const AGENT_MODE_EXEMPTIONS: Record<string, string> = {
+  dunkduel: '/play/dunkduel is the IRL Prove It camera route; Babylon DunkDuelMode is dev-harness only',
+};
+
 function manifest() {
   return JSON.parse(readFileSync(join(process.cwd(), 'public', 'agent-manifest.json'), 'utf8'));
 }
@@ -34,9 +38,15 @@ describe('NEXUS agent manifest', () => {
     expect(modes).toEqual(AGENT_MODES);
   });
 
-  it('advertises every enabled Babylon registry mode', () => {
+  it('advertises every enabled Babylon registry mode with a shipping GameShell play route', () => {
     const advertised = AGENT_MODES.map((mode) => mode.id).sort();
-    expect(advertised).toEqual([...ENABLED_BABYLON_MODES].sort());
+    const expected = [...ENABLED_BABYLON_MODES].filter((id) => !(id in AGENT_MODE_EXEMPTIONS)).sort();
+    expect(advertised).toEqual(expected);
+    for (const [id, reason] of Object.entries(AGENT_MODE_EXEMPTIONS)) {
+      expect(ENABLED_BABYLON_MODES.has(id), `agent-mode exemption is stale; registry no longer enables ${id}`).toBe(true);
+      expect(reason.length, `agent-mode exemption needs a real reason: ${id}`).toBeGreaterThan(40);
+      expect(advertised).not.toContain(id);
+    }
   });
 
   it('only advertises actions that the manifest defines', () => {

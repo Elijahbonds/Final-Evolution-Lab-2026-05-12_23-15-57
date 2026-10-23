@@ -10,6 +10,7 @@ import { parseCard } from '@/lib/mp/dunkCard';
 import { isStakingPaused, STAKING_PAUSED } from '@/lib/stakingPause';
 import { expiredOutcomeOf, isExpired, reclaimOnRead, type ExpiredOutcome } from '@/lib/arena-reclaim';
 import { MUSIC_ATTEMPT_START, MUSIC_ATTEMPT_FINISH } from '@/lib/arena-music';
+import { isUnlistedMode, UNLISTED_MODES } from '@/lib/unlisted-modes';
 
 function label(userId: string | null | undefined, users: Record<string, string>) {
   if (!userId) return null;
@@ -36,16 +37,23 @@ export async function GET() {
   const now = new Date();
   const reclaim = await reclaimOnRead(prisma as any, userId, { now });
 
-  // MUSIC-SUITE P1 (2026-09-25): a posted duel on a paused mode can no longer be joined, so its creator's CANCEL is the
-  // only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels. A WAITING duel's
-  // updatedAt is its creation time, so after 25 newer duels it would drop off the list with its CANCEL. The creator's
-  // paused WAITING duels are fetched on their own and always listed.
-  const pausedKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), 'musicAcademy']));
+  // MUSIC-SUITE P1 / IRON-PARADISE-OUT: a posted duel on a paused or parked mode can no longer be joined, so its
+  // creator's CANCEL is the only way its stake comes back — and MY DUELS shows only the 25 most recently updated duels.
+  // A WAITING duel's updatedAt is its creation time, so after 25 newer duels it would drop off the list with its CANCEL.
+  // Fetch those stranded WAITING duels on their own and always list them.
+  const blockedOpenKeys = Array.from(new Set([...Array.from(STAKING_PAUSED), ...UNLISTED_MODES]));
+  const strandedWaitingKeys = Array.from(new Set([...blockedOpenKeys, 'musicAcademy']));
   const [openRaw, mineRecent, mineStranded] = await Promise.all([
     // MUSIC-SUITE P6: a posted duel past its expiry is not an open challenge — /api/arena/join refuses it (409 EXPIRED)
     // and the next sweep refunds its creator.
     prisma.competitionMatch.findMany({
-      where: { currency: 'LC', status: 'WAITING', player1Id: { not: userId }, expiresAt: { gt: now } },
+      where: {
+        currency: 'LC',
+        status: 'WAITING',
+        player1Id: { not: userId },
+        expiresAt: { gt: now },
+        mode: { notIn: blockedOpenKeys },
+      },
       orderBy: { createdAt: 'desc' },
       take: 40,
     }),
@@ -55,7 +63,7 @@ export async function GET() {
       take: 25,
     }),
     prisma.competitionMatch.findMany({
-      where: { currency: 'LC', status: 'WAITING', player1Id: userId, mode: { in: pausedKeys } },
+      where: { currency: 'LC', status: 'WAITING', player1Id: userId, mode: { in: strandedWaitingKeys } },
       orderBy: { createdAt: 'desc' },
       take: 50,
     }),
@@ -83,10 +91,9 @@ export async function GET() {
     return { mode: key, name: MODE_INFO[key]?.name ?? key, href: MODE_INFO[key]?.href ?? '#' };
   };
 
-  // MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"): a WAITING duel on a paused mode can no
-  // longer be accepted (/api/arena/join refuses it), so it is not advertised as an OPEN CHALLENGE. Its creator still
-  // sees it under MY DUELS, flagged stakingPaused, with the CANCEL that refunds it.
-  const open = openRaw.filter((m) => !isStakingPaused(m.mode) && !isExpired(m.expiresAt, now)).map((m) => ({
+  // MUSIC-SUITE P1 / IRON-PARADISE-OUT: a WAITING duel that cannot accept a NEW stake is not advertised as an OPEN
+  // CHALLENGE. Its creator still sees it under MY DUELS, with the CANCEL that refunds it.
+  const open = openRaw.filter((m) => !isStakingPaused(m.mode) && !isUnlistedMode(arenaModeKey(m.mode)) && !isExpired(m.expiresAt, now)).map((m) => ({
     id: m.id,
     ...modeMeta(m.mode),
     feeLc: m.entryFeeCents,
@@ -169,6 +176,9 @@ export async function GET() {
       // MUSIC-SUITE P1: a duel on a paused mode. An ACTIVE one still plays and settles; a WAITING one can only be
       // cancelled (and refunded), because nobody can join it — the lobby says so on the row.
       stakingPaused: isStakingPaused(m.mode),
+      // IRON-PARADISE-OUT: an old duel on a parked mode remains visible/history-readable, but the UI must not offer a
+      // PLAY link into a route that now redirects away from the game.
+      unlistedMode: isUnlistedMode(arenaModeKey(m.mode)),
       // MUSIC-SUITE P6 (owner decision #30): when the duel lapses, and — once a reclaim closed it — how: 'refunded' (nobody
       // played, every stake back), 'won_by_forfeit' / 'lost_by_forfeit' (one side played). `pastExpiry` is an open duel
       // whose deadline passed and that this read did not get to: it cannot be played (submit-score 409 EXPIRED), and the

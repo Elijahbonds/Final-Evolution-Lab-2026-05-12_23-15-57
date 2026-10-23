@@ -1,4 +1,5 @@
 import type { ModePhase } from '@/lib/babylon';
+export { bootErrorRequiresPageReload, WEBGL_CONTEXT_RESET_MESSAGE } from '@/lib/babylon/core/bootErrors';
 
 type BootErrorOptions = {
   disposed?: boolean;

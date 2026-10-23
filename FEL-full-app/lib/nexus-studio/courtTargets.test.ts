@@ -203,7 +203,7 @@ describe('the opt-ins are minimal (shared files)', () => {
     expect(net.match(/readPlaceLook\(/g)).toHaveLength(1);   // the place pick is read once, as the fallback of the one look
   });
   it('DerbyMode reads the venue in exactly the dev-only lines, keyed "derby"', () => {
-    expect(derbySrc).toMatch(/modeId: 'baseball', get mood\(\) \{ return studioMood\('derby', 'goldenHour'\); \}, camPreset: 'court',/);
+    expect(derbySrc).toMatch(/modeId: 'derby', get mood\(\) \{ return studioMood\('derby', 'goldenHour'\); \}, camPreset: 'court',/);
     expect(derbySrc).toMatch(/get intro\(\) \{ return studioIntroOr\('derby', 'walkIn'\); \}/);
     expect(derbySrc).toMatch(/derbyVenue = mountVenue\(ctx, 'derby', \{ keepGameplayCamera: true, look: studioLookFor\('derby'\) \?\? readPlaceLook\('derby'\) \}\);/);
     expect(derbySrc).toMatch(/studio\?\.dispose\(\); studio = mountStudioFor\('derby', ctx\);/);

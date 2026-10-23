@@ -24,6 +24,21 @@ export function formatJumpCm(heightCm: number, unit: JumpUnit): string {
   return `${inches(heightCm).toFixed(1)} in`;
 }
 
+/**
+ * MIRROR flight-time step (Research): the jump as a rounded estimate with its ± range, never an exact number.
+ * `plusMinusCm` is the grader's one-frame timing band (lib/assess/graders/t5-cmj.ts heightPlusMinusCm: dh = g·t·dt/4,
+ * dt = one frame at the pose rate), so a slower camera shows a wider range. Never under ±1 of the unit shown.
+ */
+export function formatJumpEstimate(heightCm: number, plusMinusCm: number | null, unit: JumpUnit): string {
+  const v = unit === 'cm' ? heightCm : inches(heightCm);
+  const pm = plusMinusCm === null || !Number.isFinite(plusMinusCm) ? null : unit === 'cm' ? plusMinusCm : inches(plusMinusCm);
+  const u = unit === 'cm' ? 'cm' : 'in';
+  return pm === null ? `about ${Math.round(v)} ${u}` : `about ${Math.round(v)} ±${Math.max(1, Math.round(pm))} ${u}`;
+}
+
+/** A jump in whole inches, for the lines that only carry inches: "about 17 in". */
+export const aboutInches = (jumpIn: number): string => `about ${Math.round(jumpIn)} in`;
+
 export function readJumpUnit(s: StorageLike | null): JumpUnit {
   try {
     return s?.getItem(JUMP_UNIT_KEY) === 'cm' ? 'cm' : 'in';

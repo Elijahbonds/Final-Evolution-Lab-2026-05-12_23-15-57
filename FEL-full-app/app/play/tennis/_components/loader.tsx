@@ -39,5 +39,5 @@ export function TennisLoader({ variant = 'match' }: { variant?: TennisVariant })
   // the 2D fallback (NEXT_PUBLIC_DISABLE_3D) has no tiebreak: either variant plays the 2D match
   const babylon = isBabylon('tennis');
   const Game = babylon ? TennisBabylon : TennisGame2D;
-  return <GameShell mode="tennis" title="MATCH POINT" venue="Nexus Tennis Court" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="tennis" title="MATCH POINT" venue="Venice Tennis Court" Game={Game} ownControls={babylon} />;
 }

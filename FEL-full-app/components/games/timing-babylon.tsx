@@ -13,6 +13,7 @@ import { BootSplash } from './boot-splash';
 import { TimingPrompt } from './timing-prompt';
 import { LANE_PLATE_ALPHA, PASSED_CUE_OPACITY, hitRingStyle } from './cue-lane-style';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import type { ModeDefinition } from '@/lib/babylon/core/ModeHarness';
 import { MODES } from '@/lib/babylon/modes/registry';
@@ -84,6 +85,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
     useBabylonPlaytestBridge(modeKey, () => ({ phase, countdown, loadError, hud }), busRef.current);
 
     useEffect(() => {
@@ -160,7 +162,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         busRef.current = null;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-    }, []);
+    }, [bootAttempt]);
 
     const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
       busRef.current?.emit(e);
@@ -547,7 +549,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
           onStart={tapStart}
-          onRetry={tapStart}
+          onRetry={retryBoot}
         />
 
         {/* MUSIC-SUITE P7 (2026-09-29), room-mix-ux: "reachable from the dance room's pause menu" — boot-splash.tsx

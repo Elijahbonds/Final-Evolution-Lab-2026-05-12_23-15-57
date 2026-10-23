@@ -1,12 +1,12 @@
 # Coach store — notes that are not this lane's to fix
 
-## B-W2
+## B-W2 (fixed by lane/launch-sales, 2026-10-20)
 
-`FEL_COACH` and `FEL_FACILITY` checkout writes an Order and does not write a Subscription row. The coach store writes `ProgramAccess` for its own memberships and does not patch those handlers. `lib/coach-store/out-of-lane.test.ts` keeps a skipped test so the gap stays visible.
+`FEL_COACH` and `FEL_FACILITY` checkout wrote no Subscription row. `lib/stripe/checkout-fulfil.ts` now writes it for every subscription product. `lib/coach-store/out-of-lane.test.ts` holds the real test (it was skipped). See `docs/LAUNCH-SALES.md`.
 
-## B-W3
+## B-W3 (fixed by lane/launch-sales, 2026-10-20)
 
-Stripe's basil API removed `invoice.subscription` and `subscription.current_period_end`. They now live at `invoice.parent.subscription_details.subscription` and `subscription.items.data[].current_period_end`. The existing webhook handlers were not changed. Coach-store reads both shapes in `lib/coach-store/stripeShapes.ts`.
+Stripe's basil API removed `invoice.subscription` and `subscription.current_period_end`. They now live at `invoice.parent.subscription_details.subscription` and `subscription.items.data[].current_period_end`. The FEL handlers in `app/api/stripe/webhook/route.ts` and `lib/stripe/checkout-fulfil.ts` now read them through `lib/stripe/basil-shapes.ts`, which reuses the coach store's readers in `lib/coach-store/stripeShapes.ts`. Tests: `lib/stripe/webhook-basil.test.ts`.
 
 ## Bucket lifecycle
 

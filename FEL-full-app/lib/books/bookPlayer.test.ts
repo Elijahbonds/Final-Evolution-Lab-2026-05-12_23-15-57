@@ -53,7 +53,7 @@ describe('requestStreamUrl: the only place the player gets a URL', () => {
   it.each([
     [401, { error: 'unauthorized' }, /sign in/i],
     [403, { error: 'adults_only' }, /18\+/],
-    [409, { error: 'store_closed', message: 'Checkout opens soon.' }, /unavailable/i],
+    [409, { error: 'store_closed', message: 'Checkout is not available right now.' }, /unavailable/i],
     [503, { error: 'Library is unavailable right now.' }, /unavailable/i],
     [403, { error: 'You do not own this file.' }, /do not own/i],
   ])('status %s is explained, never a URL', async (status, body, text) => {

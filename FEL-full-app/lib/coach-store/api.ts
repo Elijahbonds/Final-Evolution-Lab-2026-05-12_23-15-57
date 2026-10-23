@@ -30,7 +30,7 @@ function unavailable(err: unknown): NextResponse | null {
     logStoreUnavailable();
     return NextResponse.json({ error: 'coach_store_not_set_up', message: 'coach store not set up yet' }, { status: 503 });
   }
-  if (err instanceof UploadsComingSoon) return NextResponse.json({ error: 'uploads_coming_soon', message: 'Uploads coming soon' }, { status: 503 });
+  if (err instanceof UploadsComingSoon) return NextResponse.json({ error: 'uploads_coming_soon', message: 'Uploads are not available right now.' }, { status: 503 });
   return null;
 }
 
@@ -186,7 +186,7 @@ function pathsOf(value: unknown): string[] {
 
 export async function uploadUrl(userId: string, bookingId: string, body: { bytes?: unknown; mime?: unknown; seconds?: unknown; role?: unknown }): Promise<NextResponse> {
   try {
-    if (!reviewsCanBeSold()) return NextResponse.json({ error: 'uploads_coming_soon', message: 'Uploads coming soon' }, { status: 503 });
+    if (!reviewsCanBeSold()) return NextResponse.json({ error: 'uploads_coming_soon', message: 'Uploads are not available right now.' }, { status: 503 });
     const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
     const reply = body.role === 'reply';
     const allowed = booking && booking.kind === 'video_review' && booking.status === 'PAID'

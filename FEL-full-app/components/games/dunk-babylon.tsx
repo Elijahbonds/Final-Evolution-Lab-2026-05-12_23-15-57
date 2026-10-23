@@ -78,8 +78,19 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const [bootAttempt, setBootAttempt] = useState(0);
   // CONTROLLER-UNIVERSAL-MULTI: the chips and the phone link need the bus in RENDER, and busRef alone never re-renders
   const [bus, setBus] = useState<InputBus | null>(null);
+
+  const retryBoot = useCallback(() => {
+    endedRef.current = false;
+    setLoadError(null);
+    setCountdown(null);
+    setHud({});
+    setPhase('loading');
+    setBus(null);
+    setBootAttempt((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -166,8 +177,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       stop?.();
       busRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: callbacks are refs; bootAttempt is the RETRY remount key after a rejected runMode().
+  }, [bootAttempt]);
 
   // The mode is deaf for a beat when the card lands, so that a SLAM already in flight
   // cannot skip the one screen that says how the night went (DunkMode CARD_SETTLE_SEC).
@@ -508,7 +519,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
-        onRetry={tapStart}
+        onRetry={retryBoot}
       />
 
       {/* CONTROLLER-UNIVERSAL-MULTI: phones join as pads (lazy — no room until the badge is tapped), TV MODE lives in its

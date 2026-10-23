@@ -32,6 +32,7 @@ import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { gameResultFromSession, opponentScoreFromStats } from '@/lib/sessions/gameResultFromSession';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { replayBrainBrawl } from '@/lib/babylon/modes/BrainBrawlMode';
@@ -187,6 +188,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
   useBabylonPlaytestBridge('brainbrawl', () => ({ phase, countdown, loadError, hud }), busRef.current);
   const [hostLive, setHostLive] = useState(false);
 
@@ -217,7 +219,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-BRAINBRAWL] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-  }, []);
+  }, [bootAttempt]);
 
   // REPLAY on the shell's end card: a new match on this stage, same players, straight into round one's spin
   const restart = useCallback((): boolean => {
@@ -424,7 +426,7 @@ export default function BrainBrawlBabylon({ onEnd }: GameProps) {
         </div>
       )}
 
-      <BootSplash modeId="brainbrawl" title="BRAIN BRAWL" phase={phase} detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)} onStart={tapStart} onRetry={tapStart} />
+      <BootSplash modeId="brainbrawl" title="BRAIN BRAWL" phase={phase} detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)} onStart={tapStart} onRetry={retryBoot} />
       {(phase === 'playing' || phase === 'countdown') && busRef.current && <TouchOverlay bus={busRef.current} modeId="brainbrawl" visible />}
     </div>
   );

@@ -8,7 +8,7 @@
  */
 import type { Provider } from '@/lib/cell-models';
 import { assertProviderAllowed, type CompliancePolicy } from '@/lib/cell-compliance';
-import { abacusEnabled, AiDisabledError } from '@/lib/abacus/killSwitch';
+import { abacusEnabled, AiDisabledError, requireAbacusApiKey } from '@/lib/abacus/killSwitch';
 
 export interface PMessage {
   role: 'system' | 'user' | 'assistant';
@@ -69,13 +69,14 @@ async function callAbacus(
   maxTokens: number,
   jsonMode?: boolean
 ): Promise<ModelCallResult> {
+  const apiKey = requireAbacusApiKey('callAbacus');
   const body: Record<string, any> = { model, messages, stream: false, max_tokens: maxTokens };
   if (jsonMode) body.response_format = { type: 'json_object' };
   const res = await fetch('https://apps.abacus.ai/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.ABACUSAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });

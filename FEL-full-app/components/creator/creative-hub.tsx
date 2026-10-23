@@ -7,7 +7,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ALL_GUIDES } from '@/lib/create/disciplines';
+import { ALL_GUIDES, visibleShowcases } from '@/lib/create/disciplines';
 import { useMyCards } from '@/lib/create/use-my-cards';
 import MyCreations from './my-creations';
 
@@ -30,23 +30,22 @@ export default function CreativeHub({ publicCreator }: { publicCreator: boolean 
       </div>
 
       <div className="grid grid-cols-1 gap-3 px-5 pb-8 sm:grid-cols-2 lg:grid-cols-3" data-qa="discipline-grid">
-        {ALL_GUIDES.map((g, i) => (
-          <Link key={g.id} href={`/create/${g.id}`} data-qa={`tile-${g.id}`}
-            className={`group relative flex flex-col rounded-2xl bg-neutral-900 p-4 transition hover:bg-neutral-800 ${i === 0 ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
-            <span className={`absolute left-0 top-4 h-8 w-1 rounded-r ${g.color}`} aria-hidden />
-            <span className="text-lg font-black">{g.label}</span>
-            <span className="text-sm text-neutral-400">{g.blurb}</span>
-            <span className="mt-3 text-[10px] uppercase tracking-widest text-neutral-500">Shows up in</span>
-            <ul className="mt-1 space-y-0.5 text-xs">
-              {g.showsUp.map((s) => (
-                <li key={s.where} className={s.live ? 'text-neutral-200' : 'text-neutral-500'}>
-                  {s.live ? '●' : '○'} {s.where}{s.live ? '' : ' · soon'}
-                </li>
-              ))}
-            </ul>
-            <span className="mt-auto pt-4 text-sm font-bold text-amber-300 group-hover:underline">Start →</span>
-          </Link>
-        ))}
+        {ALL_GUIDES.map((g, i) => {
+          const rows = visibleShowcases(g);
+          return (
+            <Link key={g.id} href={`/create/${g.id}`} data-qa={`tile-${g.id}`}
+              className={`group relative flex flex-col rounded-2xl bg-neutral-900 p-4 transition hover:bg-neutral-800 ${i === 0 ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
+              <span className={`absolute left-0 top-4 h-8 w-1 rounded-r ${g.color}`} aria-hidden />
+              <span className="text-lg font-black">{g.label}</span>
+              <span className="text-sm text-neutral-400">{g.blurb}</span>
+              <span className="mt-3 text-[10px] uppercase tracking-widest text-neutral-500">Shows up in</span>
+              <ul className="mt-1 space-y-0.5 text-xs">
+                {rows.map((s) => <li key={s.where} className="text-neutral-200">● {s.where}</li>)}
+              </ul>
+              <span className="mt-auto pt-4 text-sm font-bold text-amber-300 group-hover:underline">Start →</span>
+            </Link>
+          );
+        })}
       </div>
 
       <MyCreations cards={cards} loading={loading} publicCreator={publicCreator} />

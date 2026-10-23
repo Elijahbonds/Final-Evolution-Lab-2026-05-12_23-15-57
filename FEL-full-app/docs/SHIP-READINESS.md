@@ -172,9 +172,9 @@ exists, so nothing is deleted until you do this. `docs/RETENTION-JOB.md` has the
 
 **Same shape, also never scheduled:** `POST /api/arena/reclaim` (`ARENA_RECLAIM_SECRET`, header
 `x-arena-reclaim-secret`; unset = 404) and `POST /api/coach-store/reconcile` (`COACH_STORE_RECONCILE_SECRET`, already
-in `firebase.json`). Both say "no scheduler calls it yet". `ARENA_RECLAIM_SECRET` is in no doc and not in
-`.env.example`. If the arena sweep should run, it needs the same three steps (secret, `firebase.json`, a Scheduler
-job); the arena also reclaims on read, so this is a cleanup, not a fix.
+in `firebase.json`). Both say "no scheduler calls it yet". `.env.example` now names both secrets; if the arena sweep
+should run, it needs the same three steps (secret, `firebase.json`, a Scheduler job). The arena also reclaims on read,
+so this is a cleanup, not a fix.
 
 ### 3.2 Pending SQL (`prisma/pending/`, 17 files)
 
@@ -270,16 +270,18 @@ other server value reaches production through the deploy tree's env file, so wha
 |---|---|---|
 | `COACH_STORE_LIVE` | `lib/flags.ts`, `lib/coach-store/stripeMode.ts`, `app/api/stripe/checkout`, `lib/books/bookCheckout.ts` | a **live** Stripe key is refused (test keys only). Set it only on the day real money is meant to flow |
 | `ARENA_RECLAIM_SECRET` | `app/api/arena/reclaim/route.ts` | the reclaim sweep route is a 404 (3.1) |
-| `CREATOR_MEDIA_BUCKET`, `CREATOR_MEDIA_PUBLIC_BUCKET` | `lib/soundtrack/storage.ts`, `app/api/v1/creative-card/upload-url` | creator uploads answer "coming soon". Two distinct GCS buckets: pending (private, 30-day lifecycle on `pending/`) and public-read with CORS; `lib/soundtrack/storage.ts` lines 8–13 describe both |
+| `CREATOR_MEDIA_BUCKET`, `CREATOR_MEDIA_PUBLIC_BUCKET` | `lib/soundtrack/storage.ts`, `app/api/v1/creative-card/upload-url` | creator uploads answer with an unavailable-storage 503. Two distinct GCS buckets: pending (private, 30-day lifecycle on `pending/`) and public-read with CORS; `lib/soundtrack/storage.ts` lines 8–13 describe both. Follow-up 2026-10-18: `.env.example` names both values. |
 | `LIVE_STREAM_SCHEDULE_ENABLED` | `lib/flags.ts`, `app/api/live/schedule` | `/live/schedule` is a 404 |
 | `NEXT_PUBLIC_FEL_BODY_RIDE` | `lib/input/rideProfiles.ts` | build-time, probe-only; leave unset in production |
 | `K_REVISION`, `VERCEL_GIT_COMMIT_SHA` | `app/api/health/route.ts` | set by the platform; nothing to do |
 
-**Named in a doc but missing from `.env.example`** (a fresh checkout cannot see them): `ABACUS_ENABLED`,
-`COACH_STORE_ENABLED`, `COACH_STORE_PAYMENTS_ENABLED`, `COACH_STORE_COACH_USER_IDS`, `COACH_STORE_RECONCILE_SECRET`,
+**Follow-up 2026-10-18:** `.env.example` now names the documented operational flags and secrets a fresh deploy needs to
+see before it can intentionally turn them on: `ABACUS_ENABLED`, `COACH_STORE_ENABLED`,
+`COACH_STORE_PAYMENTS_ENABLED`, `COACH_STORE_LIVE`, `COACH_STORE_COACH_USER_IDS`, `COACH_STORE_RECONCILE_SECRET`,
 `COACH_REVIEWS_BUCKET`, `COACH_REVIEW_UPLOADS_ENABLED`, `FACE_SCAN_ENABLED`, `VIRTUAL_PURCHASES_ENABLED`,
-`PAYOUTS_ENABLED`, `STRIPE_BOOKS_SECRET_KEY`, `RETENTION_CRON_SECRET`, `NEXT_PUBLIC_JOIN_LAB_ENABLED`,
-`FEL_TEST_ACCOUNTS`. All default off or closed when unset.
+`PAYOUTS_ENABLED`, `RETENTION_CRON_SECRET`, `ARENA_RECLAIM_SECRET`, `LIVE_STREAM_SCHEDULE_ENABLED`,
+`NEXT_PUBLIC_JOIN_LAB_ENABLED` and `FEL_TEST_ACCOUNTS`. All default off or closed when unset. The old
+`STRIPE_BOOKS_SECRET_KEY` remains intentionally absent; books use the platform `STRIPE_SECRET_KEY`.
 
 The rest are test- or probe-only (`SESSIONS_IT`, `DAILY_IT`, `DB_CONNECTOR_IT`, `HM_DEBUG`, `CAM_CAL`,
 `MIRROR_BASELINE_OUT`, `COMPLIANCE_PROOF_OUT`, `FEL_RECORD_BUS_GOLDEN`, `FEL_POKE_DEBUG`, `FEL_HERO_GLB`). The full

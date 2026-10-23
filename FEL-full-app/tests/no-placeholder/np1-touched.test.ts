@@ -33,10 +33,36 @@ describe('NP-1 placeholder language', () => {
     });
   }
 
-  it('the creator hub hides unbuilt disciplines instead of labelling them', () => {
+  it('the creator hub links only to built play and create routes', () => {
     const src = readFileSync('app/creator/_components/hub.tsx', 'utf8');
-    expect(src).toContain('DISCIPLINES.filter((d) => d.href).map((d) =>');
+    expect(src).toContain('href="/creator/athlete"');
+    expect(src).toContain("href: '/create/art'");
+    expect(src).toContain("href: '/create/scene'");
+    expect(src).not.toContain('href: null');
+    expect(src).not.toContain('DISCIPLINES.filter((d) => d.href)');
     expect(src).not.toContain("'Coming soon'");
+  });
+
+  it('the creator hub renders all nine disciplines and sends authoring tiles to their guided flows', () => {
+    const src = readFileSync('app/creator/_components/hub.tsx', 'utf8');
+    expect(src).toContain('DISCIPLINES.map((d) =>');
+    for (const id of ['dance', 'acting', 'music', 'sport', 'art', 'scene', 'cooking', 'fashion', 'writing']) {
+      expect(src).toContain(`id: '${id}'`);
+    }
+    for (const href of ['/create/art', '/create/scene', '/create/cooking', '/create/fashion', '/create/writing']) {
+      expect(src).toContain(`href: '${href}'`);
+    }
+    expect(src).not.toContain("'Coming soon'");
+  });
+
+  it('the Create hub and preview do not label unwired consumers as soon', () => {
+    for (const f of [
+      'components/creator/creative-hub.tsx',
+      'components/create/guided-flow.tsx',
+      'lib/create/disciplines.ts',
+    ]) {
+      expect(readFileSync(f, 'utf8')).not.toMatch(/\bsoon\b/i);
+    }
   });
 
   it('an unbuilt program lane is a 404, not a "coming soon" page', () => {
@@ -58,8 +84,10 @@ describe('NP-1 placeholder language', () => {
     expect(readFileSync('components/season-pass-track.tsx', 'utf8')).toContain('!state.hasPro && state.proPurchasable && (');
   });
 
-  it('the venue shelf only lists playable venues', () => {
-    expect(readFileSync('components/shell/venue-shelf.tsx', 'utf8')).toContain('VENUES.filter((v) => v.playable).map(');
+  it('the venue shelf only lists playable game venues', () => {
+    const src = readFileSync('components/shell/venue-shelf.tsx', 'utf8');
+    expect(src).toContain('playableGameVenues(VENUES)');
+    expect(src).toContain('{venues.map((venue, i) =>');
   });
 
   it('the Nova announcer line no longer says "opens soon"', () => {
