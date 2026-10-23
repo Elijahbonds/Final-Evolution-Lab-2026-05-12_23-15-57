@@ -11,7 +11,7 @@ import { REASON } from '@/lib/wallet/reward-rules';
 import {
   NEEDS_REVIEW, FREE_CARD_SLOTS,
   defaultStats, defaultRarity,
-  type CreativeCard, type Discipline, type ArtPayload, isDiscipline, validateArtPayload, stampRights,
+  type CreativeCard, type Discipline, type ArtPayload, isDiscipline, validateArtPayload, stampRights, cardMediaOf,
   type CardStats, type CardRarity, type ReviewState, type SportDesignation,
 } from './creative-card-types';
 // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06): approval, privacy and the slim list live in one additive module.
@@ -28,6 +28,7 @@ const PUBLISH_FAUCET_COINS = 50; // mirrors reward rule CREATIVE_CARD_PUBLISH
 const firstApprovalKey = (ownerId: string, discipline: string) => `first_${ownerId}_${discipline}`;
 // CREATE HUB (owner, 2026-10-06, "remix pay is capped"): the remix royalty pays once per parent card, on its first remix.
 const firstRemixKey = (parentId: string) => `remix_first_${parentId}`;
+const PENDING_MEDIA_PREFIX = 'https://upload.pending/';
 
 export class CardError extends Error {
   status: number;
@@ -101,6 +102,9 @@ export async function createCard(
   if (!isDiscipline(input.primary) || !input.secondary.every(isDiscipline)) throw new CardError(422, 'unknown discipline');
   const shape = validateArtPayload(input.art);   // lane 4: every payload's fields, urls and list bounds
   if (!shape.ok) throw new CardError(422, shape.error);
+  if (cardMediaOf(input.art).some((url) => url.startsWith(PENDING_MEDIA_PREFIX))) {
+    throw new CardError(422, 'upload still pending');
+  }
   // CREATE HUB phase 1 (owner 2026-10-06): the rights record keeps the server's time of agreement, not the device's.
   input = { ...input, art: stampRights(input.art) };
   if (input.art.kind === 'fashion') {   // a look may only carry wearables the owner actually holds

@@ -121,7 +121,8 @@ import {
 } from '../core/ContactDunk';   // dunked ON, not dunked beside
 import { ballVsBodies, resolvePickup, bobbleVelocity, boardOutcome, ballOutOfPlay, HOOPS_BALL_BOUNDS, type BodyRef } from '../core/LooseBall';   // and somebody has to go and get it
 import { isTipInEligible, tipInMakeChance } from '../core/TipIn';   // HOOPS-10PHASE-2 phase 8: the tip-in
-import { attachBallToHand, gatherBallToHand, releaseBall, clankOffRim } from '../anim/ballRig';
+import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
+import { dunkMissVelocity, dunkVerdict } from '../core/RimForAll';   // lane/hoops-shot-core: dunks on the rim (clankOffRim retired here)
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
 import { requestMove, sizeUpMoveOf, type HandleHost } from '../anim/handleMotion';   // HOOPS MOTION phase 4b: one renderer for the handle moves
 import { findBone } from '../anim/boneLookup';
@@ -218,6 +219,8 @@ import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/Mo
 import type { BodyEvent } from '@/lib/pose/BodyReader';
 import type { FelInput } from '../core/InputBus';
 import { DUNK_CONFIG as SHARED_CFG } from './modeConfigs';
+import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
+import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
 import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA #259/#262: the OPPONENT pick, PRO on a staked / head-to-head run (every mode reads runTier)
 import type { AmbientHandle } from '../visual/EffectsKit';
 import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules.test)
@@ -372,6 +375,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** Bumped on every possession change — every timer that changes possession checks it (a stale watchdog used to force
    *  the NEXT possession's release 1.1 s in). */
   let possessionToken = 0;
+  const shotClock = new PlayerShotClock(() => playerShotClockSec('1v1', runTier()), (v) => hud({ shotClock: v }));   // lane/hoops-shot-core: ELITE's 12 s shot clock (core/ShotClock)
   let carrying = true, shooting = false, dunking = false;
   /** The ball is live on the floor (a miss, a block) — BallSim owns it, whoever's possession it is. */
   let loose = false;
@@ -493,8 +497,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   // same ShotMeter numbers the release is graded by
   let meter3d: ShotMeter3DHandle | null = null; let hudGreen = '';
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
-    shotMeter.start(contest, style ?? 'jumper', gather ?? 0);
-    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`;
+    shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
+    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; hud({ shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
@@ -734,7 +738,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   function rimTouches(): void {
     for (const t of arc.takeTouches()) {
       if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[1V1-RIM] glass kiss`); }
-      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
+      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }
   /** The ball leaves a hand for the floor: BallSim owns it until someone picks it up. */
@@ -1200,6 +1204,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       if (ended) return;
       micTick(ctx);
       if (hoopsFx?.holdIntro(me.root.position, RIM)) return;   // vis-hoops-court: the broadcast intro holds the first possession
+      if (shotClock.tick(dt, { token: possessionToken, ours: possession === 'mine', live: possession === 'mine' && carrying && !loose && !shooting && !dunking && !gather && !finish })) { shotClockViolation(ctx); return; }   // lane/hoops-shot-core: ELITE's shot clock
       // the harness cools the shared meter on real time now -- a second update() here decayed it twice as fast
       // this exact curve is now MomentumFx.crowdLevel, applied by the harness for every mode --
       // it was extracted FROM here because this is the mode people have actually played
@@ -2423,6 +2428,16 @@ export const OneVOneMode: ModeDefinition = (() => {
     return true;
   }
 
+  /** lane/hoops-shot-core: ELITE's shot clock ran out on my ball — the Ref's call, and their check (the out-of-bounds path's shape). */
+  function shotClockViolation(ctx: ModeContext): void {
+    const call = judge('shot_clock', { offense: 'me' });
+    if (call.whistle) SoundKit.play('whistle');
+    meCarry?.update(0, 0, false);
+    console.info(`[1V1-REF] ${call.id} → ${call.ball}`);
+    micWhistle();
+    startDefense(ctx, `${call.banner} — DEFEND!`);
+  }
+
   /** THEIR possession: the check. The rival checks up beyond the arc, I set inside him, the drive starts after
    *  CHECK_HOLD_SEC. No timer decides the release — the AttackerBrain reads my body. */
   function startDefense(ctx: ModeContext, banner: string): void {
@@ -2562,7 +2577,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       : null;
     if (glassDunk) { releaseBall(ball); bannerFlash(ctx, 'OFF THE GLASS!', 700); console.info('[1V1-GLASS] off-the-backboard dunk armed'); }
     console.info(`[1V1-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)}`);
-    let made = Math.random() < c.pct;
+    const dunkV = dunkVerdict(RIM, from, c.pct, c.contested ? 1 : 0); let made = dunkV.made;   // lane/hoops-shot-core: the RING decides the dunk (RimForAll), the rate kept — was `Math.random() < pct`
     let swatted = false;
     // DUNK-FANATIC (2026-09-17): the rim hang (a poster / a timed flush holds the body on the iron) and the RIM PROTECTOR —
     // the AI never left the floor against a dunk (a hand up, a roll at the bump); now a defender inside range jumps to MEET
@@ -2630,7 +2645,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     ctx.setHud({ shotType: picked.label });
     // THE METER ON A DUNK (owner, 2026-09-18: "make it trigger on layups and dunks"): the bar rides the flight clock —
     // showtime's green is the timed flush, a plain drive's green is the iron (the flush resolves there on its own)
-    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`;
+    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`; putHud(ctx, { shotMeterPerfect: '' });   // lane/hoops-shot-core: a dunk's bar has no perfect band
     meter3d?.begin(showtime ? { center: SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K, half: SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K } : { center: DRIVE_DUNK.resolveK, half: 0.05 });
     if (picked.flashy) ctx.camDirector.pulse(0.35, 0.4);
     console.info(`[1V1-DUNK] ${picked.label} (${picked.clip}) speed ${speedNow.toFixed(1)} lateral ${lateral01.toFixed(2)} contest ${(c.contested ? 1 : 0)} momentum ${mbus.score01.toFixed(2)}`);
@@ -2778,7 +2793,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         resolved = true; released = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
-        else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
+        else { missClank(ctx); launchLoose(releasePos, dunkMissVelocity(dunkV, from, RIM)); }   // lane/hoops-shot-core: the miss bounces off the iron where the ring's error put it
         hangLeft = hangWanted(made, kind, showtimeJudge, picked.flashy);   // DUNK-FANATIC
         meter3d?.end(made ? 'good' : 'brick');   // (a timed flush / a trick already stamped its own verdict — end() keeps the first)
       }
@@ -3322,7 +3337,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       bannerFlash(ctx, `LATE${tag}`, 700);
     } else if (quality === 'brick') {
       bannerFlash(ctx, `WAY LATE${tag}`, 800);
-    }
+    } else { const g = releaseGradeLabel(quality, shotMeter.offsetSec, shotMeter.greenHalfSec); if (g) bannerFlash(ctx, `${g}${tag}`, 700); }   // lane/hoops-shot-core: SLIGHTLY EARLY / LATE (ms) — the grade's own words, odds unchanged
     if (!made) swing('miss');
     // What this shot earned, handed to the iron when the arc gets there. EARLY is rushed — short, off the
     // front. LATE is long, off the back. A brick sprays laterally. A hand in the face pushes it short on
@@ -3804,7 +3819,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
     const ground = groundContest(distXZ(me.root.position, foe.root.position), facingCos(me.root.rotation.y, me.root.position, foe.root.position), meHandUp);
     const contest = Math.min(1, contestLevel(foe.root.position, me.root.position) * 0.5 + ground + (myJumpAge <= HAND_UP_SEC ? 0.3 : 0));
-    let made = Math.random() < contestedPct(c.pct, contest);
+    const dunkVF = dunkVerdict(RIM, from, contestedPct(c.pct, contest), contest); let made = dunkVF.made;   // lane/hoops-shot-core: the RING decides the dunk (RimForAll), the rate kept — was `Math.random() < pct`
     let swatted = false, bumped = false, resolved = false;
     defContest = contest;
     // ANIM CLEAN-UP (2026-09-18): the rival's dunk goes through the same picker as mine (it played the one power launch
@@ -3864,7 +3879,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         resolved = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: inLane ? 'poster' : 'dunk' };
-        else { missClank(ctx); launchLoose(releasePos, clankOffRim(ball, RIM)); }
+        else { missClank(ctx); launchLoose(releasePos, dunkMissVelocity(dunkVF, from, RIM)); }   // lane/hoops-shot-core: the miss bounces off the iron where the ring's error put it
       }
       if (k < 1) return;
       foeFlightTick = null;   // IMPROVE (2026-10-06) #5

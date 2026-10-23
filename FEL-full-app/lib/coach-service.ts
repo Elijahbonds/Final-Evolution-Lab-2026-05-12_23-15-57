@@ -19,7 +19,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { abacusEnabled } from '@/lib/abacus/killSwitch';
+import { abacusEnabled, abacusApiKey } from '@/lib/abacus/killSwitch';
 import { AI_COMING_SOON_MESSAGE } from '@/lib/abacus/aiStatus';
 
 // ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ export async function callCoachLLM(
 ): Promise<string> {
   // ABACUS-KILL: no request leaves while the switch is off (lib/abacus/killSwitch.ts).
   if (!abacusEnabled()) throw new CoachServiceError(AI_COMING_SOON_MESSAGE.coach, 503);
-  const apiKey = process.env.ABACUSAI_API_KEY;
+  const apiKey = abacusApiKey();
   if (!apiKey) {
     throw new CoachServiceError('Coach is not configured (missing ABACUSAI_API_KEY).', 503);
   }

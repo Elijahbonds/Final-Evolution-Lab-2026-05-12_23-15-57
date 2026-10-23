@@ -64,6 +64,30 @@ describe('no injected client error reporter', () => {
   });
 });
 
+describe('vendor build warnings', () => {
+  it('suppresses only MediaPipe vision bundle dynamic-request noise', () => {
+    const existingWarning = /keep-this-warning/;
+    const config = nextConfig.webpack({ output: {}, ignoreWarnings: [existingWarning] }, { isServer: true });
+    expect(config.ignoreWarnings).toContain(existingWarning);
+
+    const rule = config.ignoreWarnings.find((warning: unknown) => {
+      return Boolean(
+        warning &&
+        typeof warning === 'object' &&
+        'module' in warning &&
+        'message' in warning &&
+        warning.module instanceof RegExp &&
+        warning.message instanceof RegExp &&
+        warning.module.test('node_modules/@mediapipe/tasks-vision/vision_bundle.mjs') &&
+        warning.message.test('Critical dependency: the request of a dependency is an expression'),
+      );
+    });
+
+    expect(rule).toBeTruthy();
+    expect(rule.module.test('node_modules/@mediapipe/tasks-vision/other_bundle.mjs')).toBe(false);
+  });
+});
+
 describe('the retired Abacus hosts', () => {
   it('routes nothing by an abacusai.app hostname', () => {
     // middleware.ts existed only to send nexusllm.abacusai.app to /studio; it was deleted with the host.

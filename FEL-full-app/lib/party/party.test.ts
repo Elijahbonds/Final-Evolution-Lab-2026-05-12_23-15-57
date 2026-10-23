@@ -76,9 +76,16 @@ describe('catalog: only games that really seat more than one person', () => {
   it('lookups, badges and links', () => {
     expect(partyModeFor('brainBrawl')?.id).toBe('brainbrawl');
     expect(partyModeFor('brainbrawl')?.id).toBe('brainbrawl');
+    expect(partyModeFor('brain-brawl')?.id).toBe('brainbrawl');
+    expect(partyModeFor('/play/brain-brawl')?.id).toBe('brainbrawl');
+    expect(partyModeFor('https://fel.example/play/who-scene-it?utm=party')?.id).toBe('who_scene_it');
+    expect(partyModeFor('dunkContest')?.id).toBe('dunk');
+    expect(partyModeFor('/play/dunk?from=shelf')?.id).toBe('dunk');
     expect(partyModeFor('dance')).toBeNull();
+    expect(partyModeFor('hoops1v1')).toBeNull();
     expect(playersBadge({ minPlayers: 1, maxPlayers: 4 })).toBe('1–4 PLAYERS');
     expect(playersBadge({ minPlayers: 2, maxPlayers: 2 })).toBe('2 PLAYERS');
+    expect(partyHref('brain-brawl')).toBe('/play/party?mode=brainbrawl');
     expect(partyHref('threePoint')).toBe('/play/party?mode=threepoint');
     expect(partyHref('nope')).toBe('/play/party');
   });

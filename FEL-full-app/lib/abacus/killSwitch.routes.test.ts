@@ -53,7 +53,9 @@ let bodyReads: number;
 function req(body: unknown): Request {
   const r = new Request('http://localhost/api/x', { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } });
   const json = r.json.bind(r);
+  const text = r.text.bind(r);
   (r as any).json = () => { bodyReads++; return json(); };
+  (r as any).text = () => { bodyReads++; return text(); };
   return r;
 }
 
@@ -116,6 +118,23 @@ describe('flag UNSET: every AI route answers 503 coming_soon and does nothing el
     expect(prisma.models.cellProject.create).not.toHaveBeenCalled();
     expect(prisma.models.cellProject.findFirst).not.toHaveBeenCalled();
     expect(prisma.models.cellMessage.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("flag ON but ABACUSAI_API_KEY missing: every AI route still answers coming_soon and does nothing else", () => {
+  beforeEach(() => {
+    process.env.ABACUS_ENABLED = 'true';
+    delete process.env.ABACUSAI_API_KEY;
+  });
+
+  it.each(ROUTES)('%s', async (_name, feature, run) => {
+    const res = await run();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ status: 'coming_soon', feature, message: AI_COMING_SOON_MESSAGE[feature] });
+    expect(getServerSession.spy).not.toHaveBeenCalled();
+    expect(bodyReads).toBe(0);
+    for (const s of allPrismaSpies()) expect(s).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
 

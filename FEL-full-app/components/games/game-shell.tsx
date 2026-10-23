@@ -23,12 +23,14 @@ import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
 import { sessionStore, markRun, countedSince } from '@/lib/babylon/core/sessionStore';
 import { agentPlayEvidence } from '@/lib/babylon/core/AgentBridge';
+import { ThreeDErrorBoundary } from '@/lib/babylon/error-boundary';
 import { isPlayedRun } from './played-evidence';
 import { arenaRefusal, storyRefusal, type Refusal } from './end-card-refusal';
 import { EndScreen } from './end-screen/end-screen';
 import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
 import { sendFinish, flushFinishes, settled, type FinishDeps } from '@/lib/sessions/finishOutbox';   // QA-H2: a finish survives a reload
+import { feelOverridesUsed } from '@/lib/feel-panel/feel';   // feel-panel lane (owner 10-20)
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
@@ -565,7 +567,7 @@ function GameShellInner({
   // Mint a shareable challenge link from this finished run (M13.4 K-factor loop).
   // PACK THE FIVE #3: `display` may be overridden — the dunk proof card mints the same link with the make/miss line.
   const shareChallenge = useCallback(async (displayOverride?: string) => {
-    if (!result) return;
+    if (!result || feelOverridesUsed()) return;   // feel-panel: a run played with the owner's feel overrides is never minted as a challenge
     setShareState('minting');
     try {
       const j = await fetch('/api/challenge/mint', {
@@ -780,7 +782,9 @@ function GameShellInner({
         )}
         {profile ? (
           <ReplayInPlaceContext.Provider value={registerReplay}>
-            <Game key={gameKey} grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+            <ThreeDErrorBoundary key={gameKey}>
+              <Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />
+            </ThreeDErrorBoundary>
           </ReplayInPlaceContext.Provider>
         ) : !unreachable ? (
           <div className="flex h-[60vh] items-center justify-center">

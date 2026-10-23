@@ -54,6 +54,22 @@ export function normalizeRigNames(container: AssetContainer): RigNormalization {
   return { renamedBones: renamed, hadPrefix };
 }
 
+/** Store rig matrices in a texture for every loaded GLB skeleton.
+ *
+ * Procedural bodies already do this at skin-build time. Imported GLB bodies
+ * need the same low-end-safe path at the import gate; otherwise Babylon falls
+ * back to vertex uniforms and some mobile/WebGL contexts can render the body
+ * invisible without a catchable spawn error. */
+export function storeBoneMatricesInTexture(container: AssetContainer): number {
+  let updated = 0;
+  for (const skeleton of container.skeletons) {
+    if (skeleton.useTextureToStoreBoneMatrices) continue;
+    skeleton.useTextureToStoreBoneMatrices = true;
+    updated++;
+  }
+  return updated;
+}
+
 /** Full gate: normalize, then audit. Throws (never ships a silent T-pose)
  *  when required bones are missing after normalization. Returns the audit
  *  report's conformance flag for tests. */
@@ -69,5 +85,6 @@ export function gateContainerRig(container: AssetContainer, sourceId: string): b
       `[FEL-RIG] ${sourceId} REJECTED at import: ${report.notes.join(' | ') || 'non-conformant rig'}`,
     );
   }
+  storeBoneMatricesInTexture(container);
   return true;
 }

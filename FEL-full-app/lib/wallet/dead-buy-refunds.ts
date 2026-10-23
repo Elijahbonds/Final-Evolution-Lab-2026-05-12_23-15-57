@@ -100,7 +100,7 @@ export async function refundDeadBuysOnRead(
   db: unknown, playerId: string, walletId: string | undefined, credit: CreditDeadBuy, now: Date = new Date(),
 ): Promise<boolean> {
   // A transaction client has no $transaction: that read belongs to someone else's transaction, not ours to write in.
-  if (!db || typeof db !== 'object' || typeof (db as { $transaction?: unknown }).$transaction !== 'function') return false;
+  if (!canRunSweep(db)) return false;
   if (!playerId || !walletId) return false;
   const prisma = db as PrismaClient;
   const swept = sweptFor(db);
@@ -208,6 +208,19 @@ export async function refundDeadBuysOnRead(
   } finally {
     running.delete(playerId);
   }
+}
+
+function canRunSweep(db: unknown): db is PrismaClient {
+  if (!db || typeof db !== 'object') return false;
+  const prisma = db as {
+    $transaction?: unknown;
+    walletLedgerEntry?: { findMany?: unknown };
+    sessionBooking?: { findMany?: unknown; findFirst?: unknown };
+  };
+  return typeof prisma.$transaction === 'function'
+    && typeof prisma.walletLedgerEntry?.findMany === 'function'
+    && typeof prisma.sessionBooking?.findMany === 'function'
+    && typeof prisma.sessionBooking?.findFirst === 'function';
 }
 
 /**

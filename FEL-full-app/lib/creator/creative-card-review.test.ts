@@ -256,7 +256,7 @@ describe('POST /api/v1/creative-card/upload-url', () => {
     h.users.set('noage', { role: 'player', dobYear: null });
     as('noage'); expect((await post(ok)).status).toBe(403);
   });
-  it('no bucket configured → 503 uploads coming soon (fail closed)', async () => {
+  it('no bucket configured → 503 uploads unavailable (fail closed)', async () => {
     as('owner');
     const res = await post(ok);
     expect(res.status).toBe(503);

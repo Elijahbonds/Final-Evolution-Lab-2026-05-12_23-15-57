@@ -150,7 +150,7 @@ describe('B2 no key -> 409 store_closed, no Stripe call, nothing thrown', () => 
     expect(r.status).toBe(409);
     expect(r.json.error).toBe('store_closed');
     expect(r.json.reason).toBe('payments_not_set_up');
-    expect(r.json.message).toBe('Checkout opens soon.');
+    expect(r.json.message).toBe('Checkout is not available right now.');
     expect(h.sessionsCreate).toHaveLength(0);
   });
 
