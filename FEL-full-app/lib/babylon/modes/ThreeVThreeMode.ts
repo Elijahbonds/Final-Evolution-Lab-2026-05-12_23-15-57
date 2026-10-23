@@ -61,6 +61,7 @@ import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';
+import { PlayerGuardHand, ComboFlow, comboBanner, leftMoveTwins, spinClipFor } from './hoopsFlow';   // hoops-moves (owner 10-20): the outside hand when guarded, the combo window, the left-hand spin
 import { stepAiHand, AI_HAND_IDLE, aiHandRangeM, type AiHandState } from '../core/AiBallHand';   // hoops-handle (owner 10-17): the AI handlers' ball hand   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, putbackDunkOn, PUTBACK_DUNK, oopCut, ALLEY_OOP, CONTEST_TRICK, contestTricksOn, trickPctFor } from '../core/GameDunks';
@@ -393,6 +394,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.char.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
   let aiHand: AiHandState = AI_HAND_IDLE, aiHandBody: Body | null = null, aiCrosses = 0;   // hoops-handle (owner 10-17): the AI handler's hand clock, whose it is, and his crossings (logged)
+  const guardHand = new PlayerGuardHand(), meFlow = new ComboFlow();   // hoops-moves (owner 10-20): my outside hand when guarded (core/GuardHand), my combo window (anim/comboFlow)
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)   // H2c (dev log): each defender's last tree state, for the stepping states' lines
   let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
@@ -935,7 +937,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         rightHandHoops(char.animator, char.skeleton);   // HOOPS MOTION phase 3: the whole bball_* family too (captures included) — all six
-        leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand); HOOPS-TWO-HAND-CROSS: all six loop in the left hand
+        leftDribbleTwins(char.animator, char.skeleton); leftMoveTwins(char.animator, char.skeleton);   // hoops-moves (owner 10-20): + the spin's left-hand body (anim/leftMoveTwins)   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand); HOOPS-TWO-HAND-CROSS: all six loop in the left hand
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
         // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
@@ -1199,6 +1201,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         strongHand = sh.state;
         if (sh.back && myC?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[3V3-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
       }
+      { const myG = carries.get(me), nfG = nearestLiveFoe(); guardHand.step(dt, myG, me.char.root, nfG ? nfG.char.root.position : null, !!myG?.active && cbNow === me && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble && !posting && !passFlight.active && !arc.active && !ballReleased, '3V3'); comboBanner(meFlow, (t, ms) => bannerFlash(ctx, t, ms), '3V3'); }   // hoops-moves (owner 10-20): the outside hand when guarded; the combo window's label
       { // hoops-handle (owner 10-17: "only dribbles right handed"): THE AI HANDLER'S HAND — my mate with the ball, or their driver, keeps it in
         // the hand away from the man on him and crosses it over when he comes round (core/AiBallHand): a front crossing on his carry, no roll,
         // no odds, no move — what is drawn, never what happens
@@ -2949,7 +2952,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const plan = pivotRead ? planPivot(me.char.root.position, me.char.root.rotation.y, pivotRead.side, pivotRead.reverse)
       : planSpin(me.char.root.position, me.char.root.rotation.y, RIM_FLOOR, defPos, side);
     spin = { plan, t: 0, beat: !!pivotRead };
-    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : 'bball_spin';   // H2b (plan §4.16): the v2 pivot, named by the free foot
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : spinClipFor(carries.get(me), me.char.animator);   // H2b (plan §4.16): the v2 pivot, named by the free foot
     spinCooldown = SPIN_COOLDOWN_SEC;
     posting = false;
     // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the spin's ball is its PULL (the hand change) on the carry — the carries loop ticks it
@@ -3368,7 +3371,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  along the facing, lateral + toward the athlete's right). */
   function meHost(): HandleHost {
     return {
-      carry: carries.get(me) ?? null,
+      carry: carries.get(me) ?? null, flow: meFlow,   // hoops-moves: the combo window (anim/comboFlow)
       beat: (clip, o) => me.tree.beat(clip, o),
       // HOOPS-TWO-HAND-CROSS (DR-3): the move REDIRECTS the travel (rotated toward its side, eased over CUT_BLEND_SEC) — it was added
       impulse: (forward, lateral) => { me.drib.redirect(forward, lateral, me.char.root.rotation.y); },

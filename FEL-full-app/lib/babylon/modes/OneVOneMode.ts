@@ -192,6 +192,7 @@ import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
 import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { AiMover } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';   // H2d (plan §3.8)
+import { PlayerGuardHand, ComboFlow, comboBanner, leftMoveTwins, spinClipFor } from './hoopsFlow';   // hoops-moves (owner 10-20): the outside hand when guarded, the combo window, the left-hand spin
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, CONTEST_TRICK, contestTricksOn, trickPctFor, putbackDunkOn, PUTBACK_DUNK } from '../core/GameDunks';   // H2e: more dunks
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the rival reads the fakes   // HOOPS MOTION phase 3b: the rival moves with the hero's weight (accel 26 / decel 34), sprint honoured
@@ -578,6 +579,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hopRelease: HopRelease = null;   // the double-tapped hop's finish: 'armed' from the second press, 'auto' once that press came up during the hop (decisions 17-19)
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
+  const guardHand = new PlayerGuardHand(), meFlow = new ComboFlow();   // hoops-moves (owner 10-20): my outside hand when guarded (core/GuardHand), my combo window (anim/comboFlow)
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)
   let foeReact: DefReaction | null = null;   // H2c: the rival's read of a fake — his mover takes the step (core/DefenderReact)
   let lastFoeStepState = '';   // H2c (dev log): the rival's last tree state, for the stepping states' lines
@@ -985,6 +987,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       console.info(`[HOOPS-HAND] 1v1 right-handed hoops: ${rightHandHoops(me.animator, me.skeleton)} / ${rightHandHoops(foe.animator, foe.skeleton)} clips mirrored`);
       // HOOPS MOTION phase 4b (U4): the dribble loops in the LEFT hand — runtime mirrors of the right-handed loops, for the tree's ballHand
       console.info(`[HOOPS-HAND] 1v1 left-hand dribble loops: ${leftDribbleTwins(me.animator, me.skeleton).length} / ${leftDribbleTwins(foe.animator, foe.skeleton).length}`);
+      leftMoveTwins(me.animator, me.skeleton);   // hoops-moves (owner 10-20): the spin's left-hand body (anim/leftMoveTwins)
       onevoneVenue?.hidePlaceholders();  // M74
 
       ball = MeshBuilder.CreateSphere('ball', { diameter: 0.24 }, ctx.scene);
@@ -1607,6 +1610,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             strongHand = sh.state;
             if (sh.back && meCarry?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[1V1-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
           }
+          guardHand.step(dt, meCarry, me.root, foeStunSec === 0 && !foeFloored ? foe.root.position : null, !!meCarry?.active && carrying && possession === 'mine' && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble && !posting, '1V1'); comboBanner(meFlow, (t, ms) => bannerFlash(ctx, t, ms), '1V1');   // hoops-moves (owner 10-20): the outside hand when guarded; the combo window's label
           // (the left-stick crossover's ball goes with its move now: doMove below, the cut's side as the reversal's end side — plan §3.4)
         // STICK HANDLE (2K17, owner 2026-09-17): the right stick's gestures become moves while the ball is on the floor — a
         // side flick at pace is the MOMENTUM CROSS (a wide cut that keeps the run; chained, the spam escalates), a down
@@ -3119,7 +3123,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // H2b (plan §4.16): the pivot plays its v2 at real speed, named by the FREE foot — planPivot keeps the pivot foot opposite the turn
     // on a front pivot (the turn's side steps) and on the turn's side on a reverse (the other foot steps). The capture that stood in for
     // bball_pivot ran 2.6× real with its own hip yaw on top of the root's turn.
-    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : 'bball_spin';
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : spinClipFor(meCarry, me.animator);   // hoops-moves: the left-hand spin's own body
     spinCooldown = SPIN_COOLDOWN_SEC;
     if (posting) { posting = false; }
     // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the SPIN's ball is its pull — the start hand palms it at the hips, lets it go on the exit
@@ -3423,7 +3427,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
   function meHost(): HandleHost {
     return {
-      carry: meCarry,
+      carry: meCarry, flow: meFlow,   // hoops-moves: the combo window (anim/comboFlow)
       beat: (clip, o) => meAnimTree.beat(clip, o),
       // HOOPS-TWO-HAND-CROSS (DR-3): the move REDIRECTS the travel (rotated toward its side, eased over CUT_BLEND_SEC) — it was added
       impulse: (forward, lateral) => { meDribble.redirect(forward, lateral, me.root.rotation.y); },
