@@ -17,6 +17,10 @@ const h = vi.hoisted(() => ({
   useStore: 'spy' as 'spy' | 'today',
 }));
 
+// COACH-LOOP P1 (owner 2026-10-23): a teen's consent counts only if it was asked under the coach-training wording, which
+// is not live yet (lib/coach/coachConsent.ts, null = every teen fails closed). This suite stands after go-live.
+const cc = vi.hoisted(() => ({ since: new Date('2026-01-01') as Date | null }));
+vi.mock('@/lib/coach/coachConsent', async (orig) => (await import('@/tests/helpers/coachConsent')).coachConsentAt(await orig(), () => cc.since));
 vi.mock('next-auth', () => ({ getServerSession: async () => (h.user ? { user: { id: h.user } } : null) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/camp/server', () => ({
@@ -59,7 +63,24 @@ async function join(as: string) {
 }
 
 describe('joining a roster (POST /api/coach/invite/[token])', () => {
-  beforeEach(() => { h.useStore = 'spy'; h.spy = newSpyDb(); seedInvite(); });
+  beforeEach(() => { h.useStore = 'spy'; h.spy = newSpyDb(); seedInvite(); cc.since = new Date('2026-01-01'); });
+
+  it('TODAY (owner 2026-10-23): the coach-training wording is not live, so an accepted old consent does not let a teen join', async () => {
+    cc.since = null;
+    seedUser(h.spy, 'teen', THIS_YEAR - 15);
+    seedAcceptedGuardian(h.spy, 'teen', THIS_YEAR - 15);
+    const r = await join('teen');
+    expect(r.status).toBe(403);
+    expect(r.json).toMatchObject({ error: 'guardian_consent_required', href: null });
+    expect(writesOf(h.spy)).toEqual([]);
+  });
+
+  it('after go-live, a consent requested before that day (the camp-plan wording) does not count', async () => {
+    seedUser(h.spy, 'teen', THIS_YEAR - 15);
+    seedAcceptedGuardian(h.spy, 'teen', THIS_YEAR - 15);
+    cc.since = new Date(Date.now() + 86_400_000);
+    expect((await join('teen')).json.error).toBe('guardian_consent_required');
+  });
 
   it('a 15-year-old with no guardian consent is refused, and nothing is written', async () => {
     seedUser(h.spy, 'teen', THIS_YEAR - 15);
@@ -120,6 +141,7 @@ describe('joining a roster (POST /api/coach/invite/[token])', () => {
 describe('saving training (POST /api/coach/me/log, POST /api/coach/me/cooldown)', () => {
   let PID = '', S1 = '', SE = '';
   beforeEach(() => {
+    cc.since = new Date('2026-01-01');
     h.useStore = 'today';
     h.store = newTodayStore();
     h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test', dobYear: 1985 });
@@ -159,6 +181,16 @@ describe('saving training (POST /api/coach/me/log, POST /api/coach/me/cooldown)'
     accept('teen', THIS_YEAR - 15);
     expect((await log('teen')).status).toBe(200);
     expect(h.store.log.length).toBe(1);
+  });
+
+  it('TODAY (owner 2026-10-23): with the coach-training wording not live, an accepted old consent saves nothing', async () => {
+    cc.since = null;
+    seedFor('teen', THIS_YEAR - 15);
+    accept('teen', THIS_YEAR - 15);
+    const r = await log('teen');
+    expect(r.status).toBe(403);
+    expect(r.json.error).toBe('guardian_consent_required');
+    expect(h.store.log).toEqual([]);
   });
 
   it('an under-13 never saves, consent or not', async () => {

@@ -50,7 +50,7 @@ export function JoinButton({ token, coachName, already }: { token: string; coach
       {error && <p className="mt-3 max-w-xs text-xs text-[#FF3366]">{error}</p>}
       {next && (
         <a href={next.startsWith('/age') ? `/age?next=${encodeURIComponent(`/coach/join/${token}`)}` : next} className="mt-2 inline-block text-xs font-bold text-[#00E5FF] underline" data-teen-gate-next>
-          {next.startsWith('/age') ? 'Add your birth year' : 'Ask a parent or guardian'}
+          {next.startsWith('/age') ? 'Add your birth year' : 'Ask your guardian to approve coach training'}
         </a>
       )}
     </>

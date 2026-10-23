@@ -4,6 +4,10 @@
 // schema does not have (lib/coach/todayMemoryDb.ts); the view mounted with Phase 1's hooks rig.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// COACH-LOOP P1 (owner 2026-10-23): a teen's consent counts only if it was asked under the coach-training wording, which
+// is not live yet (lib/coach/coachConsent.ts, null = every teen fails closed). This suite stands after go-live.
+const cc = vi.hoisted(() => ({ since: new Date('2026-01-01') as Date | null }));
+vi.mock('@/lib/coach/coachConsent', async (orig) => (await import('@/tests/helpers/coachConsent')).coachConsentAt(await orig(), () => cc.since));
 vi.mock('react', async (importOriginal) => (await import('@/tests/helpers/hookRuntime')).hookedReact(await importOriginal()));
 
 const h = vi.hoisted(() => ({ user: 'client-1' as string | null, store: null as unknown as import('@/lib/coach/todayMemoryDb').TodayStore }));

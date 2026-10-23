@@ -59,6 +59,10 @@ describe('the report: training only', () => {
 
 // ── the server half, over the write-spy database ──────────────────────────────────────────────────────────────────
 const h = vi.hoisted(() => ({ user: 'coach-1' as string | null, spy: null as any, sent: [] as any[], mailOn: true }));
+// COACH-LOOP P1 (owner 2026-10-23): a teen's consent counts only if it was asked under the coach-training wording, which
+// is not live yet (lib/coach/coachConsent.ts, null = every teen fails closed). This suite stands after go-live.
+const cc = vi.hoisted(() => ({ since: new Date('2026-01-01') as Date | null }));
+vi.mock('@/lib/coach/coachConsent', async (orig) => (await import('@/tests/helpers/coachConsent')).coachConsentAt(await orig(), () => cc.since));
 vi.mock('@/lib/camp/server', () => ({ currentUserId: async () => h.user, bad: (error: string, status = 400) => Response.json({ error }, { status }) }));
 vi.mock('@/lib/db', async () => {
   const { spyPrisma } = await import('@/tests/helpers/writeSpyDb');
@@ -72,7 +76,7 @@ vi.mock('@/lib/mail', async (orig) => {
 describe('the coach route and the guardian page', () => {
   beforeEach(() => {
     process.env.NEXTAUTH_SECRET = SECRET;
-    h.sent = []; h.mailOn = true; h.user = 'coach-1';
+    h.sent = []; h.mailOn = true; h.user = 'coach-1'; cc.since = new Date('2026-01-01');
     const consent = (id: string, menteeId: string, year: number, extra: Record<string, unknown> = {}) => ({
       id, menteeId, guardianName: 'A Parent', guardianEmail: `${menteeId}-parent@fel.test`, menteeBirthYear: year,
       token: `tok-${id}`, requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: null, ...extra,
@@ -136,6 +140,16 @@ describe('the coach route and the guardian page', () => {
       const res = await POST(new NextRequest('http://fel.test/api/coach/guardian-report', { method: 'POST', body: JSON.stringify({ clientId }) }));
       expect([res.status, await res.json()]).toEqual([404, { status: 'not_eligible' }]);
     }
+    expect(h.sent).toEqual([]);
+  });
+
+  it('TODAY (owner 2026-10-23): no consent covers coach training yet, so no teen is eligible and nothing is sent', async () => {
+    cc.since = null;
+    const { GET, POST } = await import('@/app/api/coach/guardian-report/route');
+    const { NextRequest } = await import('next/server');
+    expect(await (await GET()).json()).toEqual({ eligible: [], email: true });
+    const res = await POST(new NextRequest('http://fel.test/api/coach/guardian-report', { method: 'POST', body: JSON.stringify({ clientId: 'teen' }) }));
+    expect([res.status, await res.json()]).toEqual([404, { status: 'not_eligible' }]);
     expect(h.sent).toEqual([]);
   });
 

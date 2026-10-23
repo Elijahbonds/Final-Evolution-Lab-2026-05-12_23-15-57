@@ -18,12 +18,15 @@
 //   · blank = a minor until answered (decision #20), so it is asked for before anything is written. A blank account
 //     year with an accepted GuardianConsent reads the consent's menteeBirthYear, as app/api/v1/camp/plans does.
 // The consent is lib/consent/guardianGate.ts guardianStatus: the most recently requested row decides, so a revoked
-// consent is not an accepted one.
+// consent is not an accepted one. AND it must cover coach training (owner, 2026-10-23: "ask guardians again"): a
+// consent asked under the old camp-plan wording does not (lib/coach/coachConsent.ts). Today no consent does, so every
+// teen fails closed until the new wording is approved and live (docs/COACH-LOOP.md §1).
 //
 // Pure: plain rows in, a decision out. lib/coach/teenGateServer.ts reads the rows.
 
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import { guardianStatus, type GuardianConsentLike } from '@/lib/consent/guardianGate';
+import { coachConsentAskHref, coversCoachTraining } from './coachConsent';
 
 export interface TeenGateConsent extends GuardianConsentLike {
   menteeBirthYear?: number | null;
@@ -40,11 +43,20 @@ export type TeenGateRefusal = 'under_13' | 'age_required' | 'guardian_consent_re
 export type TeenGateResult = { ok: true; band: 'adult' | 'teen' } | { ok: false; error: TeenGateRefusal };
 
 /** The birth year to judge by: the account's own, else the year an accepted guardian consent recorded. */
+const latestOf = (consents: readonly TeenGateConsent[]) => [...consents].sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())[0];
+
 function yearFor(input: TeenGateInput): number | null {
   if (typeof input.dobYear === 'number') return input.dobYear;
   if (guardianStatus(input.consents) !== 'accepted') return null;
-  const latest = [...input.consents].sort((a, b) => b.requestedAt.getTime() - a.requestedAt.getTime())[0];
+  const latest = latestOf(input.consents);
   return typeof latest?.menteeBirthYear === 'number' ? latest.menteeBirthYear : null;
+}
+
+/** The current consent is accepted AND was asked under the coach-training wording. */
+export function coachTrainingConsented(consents: readonly TeenGateConsent[]): boolean {
+  if (guardianStatus(consents) !== 'accepted') return false;
+  const latest = latestOf(consents);
+  return !!latest && coversCoachTraining(latest);
 }
 
 /** May this account join a coach's roster, or save coached training, right now? */
@@ -55,7 +67,7 @@ export function teenGate(input: TeenGateInput, now: Date = new Date()): TeenGate
   if (outcome === 'invalid') return { ok: false, error: 'age_required' };
   if (outcome === 'blocked') return { ok: false, error: 'under_13' };
   if (outcome === 'adult') return { ok: true, band: 'adult' };
-  return guardianStatus(input.consents) === 'accepted' ? { ok: true, band: 'teen' } : { ok: false, error: 'guardian_consent_required' };
+  return coachTrainingConsented(input.consents) ? { ok: true, band: 'teen' } : { ok: false, error: 'guardian_consent_required' };
 }
 
 /**
@@ -66,14 +78,15 @@ export function teenGate(input: TeenGateInput, now: Date = new Date()): TeenGate
 export const TEEN_GATE_COPY: Record<TeenGateRefusal, { message: string; href: string | null; action: string | null }> = {
   under_13: { message: 'Coaching on FEL is for players 13 and up.', href: null, action: null },
   age_required: { message: 'Tell us the year you were born first.', href: '/age?next=%2Fcoach', action: 'Add your birth year' },
+  // href is filled in by teenGateBody: there is somewhere to ask only once the coach-training wording is live
   guardian_consent_required: {
-    message: 'A parent or guardian needs to say yes before you can train with a coach here.',
-    href: '/consent/guardian', action: 'Ask a parent or guardian',
+    message: 'A parent or guardian needs to approve coach training before you can train with a coach here.',
+    href: null, action: 'Ask your guardian to approve coach training',
   },
 };
 
 /** The JSON a route answers with when the gate refuses (always 403). */
 export function teenGateBody(error: TeenGateRefusal): { error: TeenGateRefusal; message: string; href: string | null } {
   const c = TEEN_GATE_COPY[error];
-  return { error, message: c.message, href: c.href };
+  return { error, message: c.message, href: error === 'guardian_consent_required' ? coachConsentAskHref() : c.href };
 }
