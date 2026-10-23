@@ -50,8 +50,8 @@ describe('the spin from the left hand: bball_spin_left, the right-handed spin mi
   it('is made once, at spawn, and only from a right-handed source (idempotent)', () => {
     expect(made).toEqual(['bball_spin_left']);
     expect(leftMoveTwins(animator, sk)).toEqual([]);
-    expect(spinClipFor('Left', animator)).toBe('bball_spin_left');
-    expect(spinClipFor('Right', animator)).toBe('bball_spin');
+    expect(spinClipFor({ hand: 'Left', move: null }, animator)).toBe('bball_spin_left');
+    expect(spinClipFor({ hand: 'Right', move: null }, animator)).toBe('bball_spin');
   });
   it('the exit: the ball hand out front is the right on bball_spin and the LEFT on the twin — the hands\' laterals mirror', () => {
     const r = pose('bball_spin', 1), l = pose('bball_spin_left', 1);

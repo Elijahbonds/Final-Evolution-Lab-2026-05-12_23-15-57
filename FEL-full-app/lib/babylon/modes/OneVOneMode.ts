@@ -3108,7 +3108,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // H2b (plan §4.16): the pivot plays its v2 at real speed, named by the FREE foot — planPivot keeps the pivot foot opposite the turn
     // on a front pivot (the turn's side steps) and on the turn's side on a reverse (the other foot steps). The capture that stood in for
     // bball_pivot ran 2.6× real with its own hip yaw on top of the root's turn.
-    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : spinClipFor(meCarry?.hand, me.animator);   // hoops-moves: the left-hand spin's own body
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : spinClipFor(meCarry, me.animator);   // hoops-moves: the left-hand spin's own body
     spinCooldown = SPIN_COOLDOWN_SEC;
     if (posting) { posting = false; }
     // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the SPIN's ball is its pull — the start hand palms it at the hips, lets it go on the exit

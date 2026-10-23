@@ -6,7 +6,7 @@
 // right-handed body: the carry pulled the ball round on the LEFT (the spin's path, mirrored — handlePaths.mirrorPath) under an arm that
 // was reaching for a ball on the other side. The left-hand spin is the same clip mirrored once more (the path hoopsHand.leftDribbleTwins
 // makes the left-hand dribble loops by): the ball arm, the swing leg and the wind all on the other side, registered as `bball_spin_left`
-// at spawn. The mode picks it when the ball is in the left hand as the spin starts (spinClipFor).
+// at spawn. The mode picks it when the spin's ball starts in the left hand (spinClipFor / spinStartHand).
 import type { AnimationGroup, Skeleton } from '@babylonjs/core';
 import { mirrorGroupsInPlace } from './groupMirror';
 import { variantFor } from './opponentMotion';
@@ -34,8 +34,20 @@ export function leftMoveTwins(animator: unknown, skeleton: Skeleton): string[] {
   return made;
 }
 
-/** The spin's body for the hand the ball is in as it starts: the left twin when there is one and the ball is in the left hand. */
-export function spinClipFor(hand: 'Left' | 'Right' | undefined | null, animator: { groups?: Map<string, unknown> } | unknown): string {
+/** The hand the spin's ball path starts in — what handleMotion.requestMove starts it from: the running move's END hand when a move is
+ *  still running (the spin queues behind it — the rotation's entry flick is usually a between-the-legs still in flight), else the hand
+ *  that holds the ball. (Read off `hand` alone, a spin thrown out of a running crossing picked the body for the hand the ball was
+ *  LEAVING: the ball pulled round on one side under the other side's arm — the rig's resume capture, 2026-10-22.) */
+export function spinStartHand(carry: SpinCarry | null | undefined): 'Left' | 'Right' {
+  if (!carry) return 'Right';
+  const m = carry.move;
+  if (m) return m.endHand === 'left' ? 'Left' : 'Right';
+  return carry.hand === 'Left' ? 'Left' : 'Right';
+}
+export interface SpinCarry { hand: 'Left' | 'Right'; move: { endHand: 'left' | 'right' } | null }
+
+/** The spin's body for the hand its ball starts in (spinStartHand): the left twin when there is one and that hand is the left. */
+export function spinClipFor(carry: SpinCarry | null | undefined, animator: { groups?: Map<string, unknown> } | unknown): string {
   const groups = (animator as { groups?: Map<string, unknown> } | null)?.groups;
-  return hand === 'Left' && !!groups?.has('bball_spin_left') ? 'bball_spin_left' : 'bball_spin';
+  return spinStartHand(carry) === 'Left' && !!groups?.has('bball_spin_left') ? 'bball_spin_left' : 'bball_spin';
 }

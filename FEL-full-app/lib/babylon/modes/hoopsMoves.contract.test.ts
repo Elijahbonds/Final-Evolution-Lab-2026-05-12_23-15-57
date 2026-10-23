@@ -9,6 +9,8 @@ import { PlayerGuardHand, comboBanner, ComboFlow, spinClipFor } from './hoopsFlo
 import { AI_HAND_DWELL_SEC } from '../core/AiBallHand';
 import { GUARD_RANGE_M } from '../core/GuardHand';
 import { stickMoveFor, type StickGesture } from '../core/StickHandle';
+import { requestMove } from '../anim/handleMotion';
+import { spinStartHand } from '../anim/leftMoveTwins';
 
 const one = readFileSync('lib/babylon/modes/OneVOneMode.ts', 'utf8');
 const three = readFileSync('lib/babylon/modes/ThreeVThreeMode.ts', 'utf8');
@@ -28,7 +30,7 @@ describe('the modes\' hooks', () => {
     });
     it(`${name}: my HandleHost carries the flow; the spin's body follows the ball's hand; the left spin twin is made at spawn`, () => {
       expect(src).toMatch(/flow: meFlow,/);
-      expect(src).toMatch(/: spinClipFor\((meCarry\?\.hand, me\.animator|carries\.get\(me\)\?\.hand, me\.char\.animator)\)/);
+      expect(src).toMatch(/: spinClipFor\((meCarry, me\.animator|carries\.get\(me\), me\.char\.animator)\)/);   // the carry, not its hand: spinStartHand
       expect(src).toMatch(/leftMoveTwins\((me\.animator, me\.skeleton|char\.animator, char\.skeleton)\);/);
     });
   }
@@ -86,12 +88,24 @@ describe('comboBanner / spinClipFor', () => {
     comboBanner(f, (t) => shown.push(t), 'T'); comboBanner(f, (t) => shown.push(t), 'T');
     expect(shown).toEqual(['HESI CROSS']);
   });
-  it('the left twin when the ball is in the left hand and the body has it; the plain spin otherwise', () => {
+  it('the left twin when the spin\'s ball starts in the left hand and the body has it; the plain spin otherwise', () => {
     const has = { groups: new Map([['bball_spin', 1], ['bball_spin_left', 1]]) }, without = { groups: new Map([['bball_spin', 1]]) };
-    expect(spinClipFor('Left', has)).toBe('bball_spin_left');
-    expect(spinClipFor('Right', has)).toBe('bball_spin');
-    expect(spinClipFor('Left', without)).toBe('bball_spin');
+    const held = (hand: 'Left' | 'Right') => ({ hand, move: null });
+    expect(spinClipFor(held('Left'), has)).toBe('bball_spin_left');
+    expect(spinClipFor(held('Right'), has)).toBe('bball_spin');
+    expect(spinClipFor(held('Left'), without)).toBe('bball_spin');
     expect(spinClipFor(undefined, has)).toBe('bball_spin');
+    // thrown out of a running move (the rotation's entry flick, a between still in flight): the body of the hand the ball is GOING to
+    expect(spinClipFor({ hand: 'Right', move: { endHand: 'left' } }, has)).toBe('bball_spin_left');
+    expect(spinClipFor({ hand: 'Left', move: { endHand: 'right' } }, has)).toBe('bball_spin');
+  });
+  it('the spin\'s body names the hand requestMove starts its ball path from — every case, against the renderer itself', () => {
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+    for (const hand of ['Left', 'Right'] as const) for (const running of [null, 'left', 'right'] as const) {
+      const carry = { hand, move: running ? { name: 'between_legs', endHand: running, k: 0.3, t: 0.1, cutIn: null } : null, runMove: () => true, queueMove: () => true };
+      const r = requestMove({ carry: carry as never, beat: () => {} }, { move: 'spin', decide: { kind: 'none' }, clip: null, path: 'spin' });
+      expect(spinStartHand(carry as never), `${hand} ${running}`).toBe(r.startHand === 'left' ? 'Left' : 'Right');
+    }
   });
 });
 
