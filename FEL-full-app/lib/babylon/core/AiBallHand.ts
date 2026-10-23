@@ -6,6 +6,7 @@
 // stays in that hand. No gameplay effect: nothing here reads or writes a roll, a steal, a stun or a speed (3v3's strip odds read the bump,
 // not the hand), so an AI crossing changes what is drawn, never what happens. Pure: the mode steps it and runs the crossing.
 import type { AthleteSide } from '../anim/athleteSide';
+import { feel } from '../../feel-panel/feel';   // feel-panel (owner 10-20): the three numbers below are feel knobs (lib/feel-panel/knobs.ts) — the constant unless the owner's playtest override
 
 /** An opponent inside this decides the hand (m). Outside it the hand stays where it is. assumption: a defender's reach-and-step (1.4 m
  *  protect range + a step); not felt yet. */
@@ -17,7 +18,11 @@ export const AI_HAND_DWELL_SEC = 0.35;
 export const AI_HAND_GAP_SEC = 0.9;
 
 export interface AiHandState { wrongSec: number; sinceSec: number }
-export const AI_HAND_IDLE: AiHandState = { wrongSec: 0, sinceSec: AI_HAND_GAP_SEC };
+/** No crossing yet: the gap is already served (Infinity, so a tuned gap above the default does not hold back the first crossing; at the
+ *  default it behaves as the old `sinceSec: AI_HAND_GAP_SEC` did). */
+export const AI_HAND_IDLE: AiHandState = { wrongSec: 0, sinceSec: Infinity };
+/** The range as played: AI_HAND_RANGE_M, or the owner's feel-panel override in a playtest run. */
+export function aiHandRangeM(): number { return feel('hoops.aiHandRangeM', AI_HAND_RANGE_M); }
 
 export interface AiHandRead {
   /** The athlete's hand the ball is in (the carry's: its destination while a crossing runs). */
@@ -37,6 +42,6 @@ export function stepAiHand(st: AiHandState, dt: number, r: AiHandRead): { state:
   const sinceSec = st.sinceSec + dt;
   if (!r.away || r.away === r.hand) return { state: { wrongSec: 0, sinceSec }, cross: false };
   const wrongSec = st.wrongSec + dt;
-  if (wrongSec >= AI_HAND_DWELL_SEC && sinceSec >= AI_HAND_GAP_SEC) return { state: { wrongSec: 0, sinceSec: 0 }, cross: true };
+  if (wrongSec >= feel('hoops.aiHandDwellSec', AI_HAND_DWELL_SEC) && sinceSec >= feel('hoops.aiHandGapSec', AI_HAND_GAP_SEC)) return { state: { wrongSec: 0, sinceSec: 0 }, cross: true };
   return { state: { wrongSec, sinceSec }, cross: false };
 }
