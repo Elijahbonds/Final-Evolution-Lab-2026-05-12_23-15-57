@@ -122,3 +122,25 @@ export function isCoachStoreLive(env: NodeJS.ProcessEnv = process.env): boolean 
 export function isVirtualPurchasesEnabled(): boolean {
   return envOn('VIRTUAL_PURCHASES_ENABLED');
 }
+
+/**
+ * FEEL PANEL (owner, 2026-10-20) — the hidden feel-knob sliders (docs/FEEL-PANEL.md). Default OFF. The panel opens only while this
+ * is on AND the signed-in user is on FEEL_PANEL_USERS (below) or is an admin; GET /api/feel-panel answers both. Even then an
+ * override applies only on this device, and only in an unpaid playtest run (lib/feel-panel/sessionGate.ts).
+ */
+export function isFeelPanelEnabled(): boolean {
+  return envOn('FEEL_PANEL_ENABLED');
+}
+
+/**
+ * FEEL_PANEL_USERS (owner decision 2026-10-20): a comma list of User ids that may open the feel panel — a NARROW permission that
+ * opens the panel and nothing else (role 'admin' would also open the CRM and the admin dashboards). The shape of the coach store's
+ * COACH_STORE_COACH_USER_IDS (lib/coach-store/coaches.ts). Ids only, never an email in code: the value lives in the env.
+ */
+export function feelPanelUserIds(env: NodeJS.ProcessEnv = process.env): Set<string> {
+  return new Set((env.FEEL_PANEL_USERS ?? '').split(',').map((s) => s.trim()).filter(Boolean));
+}
+
+export function isFeelPanelUser(userId: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
+  return !!userId && feelPanelUserIds(env).has(userId);
+}
