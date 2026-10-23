@@ -188,6 +188,17 @@ describe('the profile failure state is a stop, not a spinner plus a stop', () =>
   });
 });
 
+describe('the live game mount survives a 3D render failure', () => {
+  it('wraps each mounted game in the shared 3D error boundary, reset per replay/remount', () => {
+    const profileMount = between(shell, '{profile ? (', ') : !unreachable ? (');
+    expect(shell).toMatch(/import \{ ThreeDErrorBoundary \} from '@\/lib\/babylon\/error-boundary';/);
+    expect(profileMount).toContain('<ReplayInPlaceContext.Provider value={registerReplay}>');
+    expect(profileMount).toContain('<ThreeDErrorBoundary key={gameKey}>');
+    expect(profileMount).toContain('<Game grade={profile.grade} prq={profile.prq} prqDisplay={profile.display} onEnd={handleEnd} {...(gameProps ?? {})} />');
+    expect(profileMount).toContain('</ThreeDErrorBoundary>');
+  });
+});
+
 // HOOPS BODY (P10, form-send 2026-10-07): the run's FORM read goes to /api/sessions only through formForPost (null for a
 // minor or an unknown age), read once at the end from the run the shell is ending — never a raw view, never on a refusal path.
 describe('the FORM read rides the session POST, adults only (hoops body P10)', () => {

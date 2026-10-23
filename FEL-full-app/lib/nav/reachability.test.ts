@@ -33,6 +33,8 @@ const NOT_NAVIGABLE: Record<string, string> = {
   '/admin': 'shown in the rail to an admin only',
   '/game-surface.css': 'not a route',
   '/play': 'a tab',
+  '/play/adventure': 'unlisted Adventure story route; hiddenRoute.test.ts enforces that it is served but linked from nowhere until the owner lists it',
+  '/play/adventure-br': 'unlisted Adventure bot BR route; hiddenRoute.test.ts enforces that it is served but linked from nowhere until the owner lists it',
   '/play/map-preview': 'signed-in 3D map preview harness, opened directly for map/perf QA rather than product navigation',
   '/train': 'a tab',
   '/profile': 'a tab',
@@ -49,7 +51,6 @@ const NOT_NAVIGABLE: Record<string, string> = {
   // 2026-10-13 linked it from /coach/dashboard and the buyer's thanks page through lib/coach-store/reviewLink.ts.) Each is named with the reason found in the code.
   '/press/receipt': 'Stripe Checkout success_url for a book purchase (lib/books/bookCheckout.ts), where Stripe sends the buyer back; BOOK_STORE_ENABLED keeps checkout closed, so nothing opens it yet',
   '/coach/thanks': 'Stripe Checkout success_url (lib/coach-store/checkout.ts), flag-gated by COACH_STORE_ENABLED, noindex',
-  '/live/schedule': 'LIVE-PAGE-FLAGOFF: 404s while isLiveStreamScheduleEnabled() is off; it needs a link the day the owner turns it on',
   '/story/rail': 'Story is parked (drafts-keep-7, #153): the standalone Nexus rail is deliberately unlinked from /story',
   '/story/boss': 'Story is parked (drafts-keep-7, #153): the standalone Vertigo boss is deliberately unlinked from /story',
 };
@@ -175,5 +176,12 @@ describe('the doors', () => {
 
   it('gives every tab some depth', () => {
     for (const t of TABS) expect(DOORS.filter((d) => d.tab === t.id).length, t.id).toBeGreaterThan(2);
+  });
+
+  it('labels preview or social rooms without overstating shipped gameplay', () => {
+    const labelFor = (href: string) => DOORS.find((d) => d.href === href)?.label;
+    expect(labelFor('/party')).toBe('Party chat');
+    expect(labelFor('/live')).toBe('Program guide');
+    expect(labelFor('/create')).toBe('Create');
   });
 });

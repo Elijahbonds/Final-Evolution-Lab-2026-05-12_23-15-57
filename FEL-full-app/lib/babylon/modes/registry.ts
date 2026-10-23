@@ -88,7 +88,7 @@ export const MODES: Record<string, ModeDefinition> = {
   // This once read "deliberately NOT in ENABLED_BABYLON_MODES" — registering made it reachable from /dev/mode
   // while whether players got the Babylon version stayed an owner call. That call was made: brainbrawl is in the
   // enabled set now (see the note beside it there), and the comment outlived the decision by long enough to say
-  // the opposite of the code. Every registered mode is enabled today.
+  // the opposite of the code. Adventure sandbox modes below stay registered but unlisted until their public pass.
   brainbrawl: BrainBrawlMode,
   // Tiebreak's live route builds a grade-specific definition, but the mode still
   // belongs in the central roster so /dev/mode and drift checks can exercise it.

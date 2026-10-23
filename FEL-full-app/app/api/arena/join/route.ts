@@ -8,6 +8,7 @@ import { arenaLockEntry, appendMatchEvent, ArenaError, arenaModeKey, arenaExpiry
 import { recordServerEvent } from '@/lib/analytics-server';
 import { isStakingPaused, stakingPausedDetail, STAKING_PAUSED_CODE, STAKING_PAUSED_STATUS } from '@/lib/stakingPause';
 import { isExpired } from '@/lib/arena-reclaim';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 
 /**
  * POST /api/arena/join
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
       // longer be joined. Refused before the lock: nothing is written and the joiner's Lab Credits never move. The
       // creator's stake is not stranded — /api/arena/cancel refunds a WAITING duel with no mode check, and the lobby
       // tells them so (components/arena-view.tsx).
+      if (isUnlistedMode(arenaModeKey(match.mode))) throw new ArenaError('invalid_mode', 'That mode is not available in the Arena.', 400);
       if (isStakingPaused(match.mode)) throw new ArenaError(STAKING_PAUSED_CODE, stakingPausedDetail(match.mode), STAKING_PAUSED_STATUS);
       // MUSIC-SUITE P6 (2026-09-26, owner decision #30): a posted duel past its expiresAt is the reclaim sweep's to refund
       // (lib/arena-reclaim.ts), not a challenge — accepting it would lock the joiner's stake on a duel that is refunded at

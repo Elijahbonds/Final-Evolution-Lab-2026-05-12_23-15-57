@@ -1,0 +1,220 @@
+# db-guard — applies reviewed, additive pending SQL to the PRODUCTION database, and nothing else.
+# Owner decision 2026-10-20 ("guarded CI job, one-time secret"). Full story: FEL-full-app/docs/DB-GUARD.md.
+#
+#   1. preview (read-only): prisma migrate diff --from-url <prod> --to-schema-datamodel prisma/schema.prisma --script
+#   2. match:  scripts/sql-guard/cli.ts decides empty | exact match of whole reviewed files in prisma/pending/ |
+#              unexpected. Only additive statements are ever applied; any DROP / ALTER ... DROP / extra statement stops.
+#   3. apply:  each matched file, in dependency order, with prisma db execute --file (never the diff itself).
+#   4. verify: the same diff must now be empty.
+# Anything unexpected fails the run and opens (or comments on) an issue assigned to the owner.
+#
+# Kept SEPARATE from ci.yml on purpose: ci.yml runs on every push of every branch and must never hold a production
+# credential. This file holds the only reference to secrets.PROD_DIRECT_URL. With no secret it reads and writes
+# nothing, and says so.
+#
+# THE REPO IS PUBLIC: run logs and issues are public. Every Prisma error passes through `cli.ts redact` before it is
+# printed, so a host, user, password or database name never reaches a log or an issue. The diffs themselves are DDL
+# for tables already described in the public prisma/schema.prisma.
+name: db-guard
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'apply = preview, apply an exact match of reviewed pending SQL, verify. preview = read-only (diff + decision, writes nothing).'
+        type: choice
+        options: [apply, preview]
+        default: apply
+  push:
+    branches: [main]
+    paths: ['FEL-full-app/prisma/**']
+
+permissions: {}
+
+# One production schema writer at a time; a queued run waits rather than cancelling one mid-apply.
+concurrency:
+  group: db-guard-production
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: guard the production schema
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # The secret lives in this GitHub Environment, whose deployment-branch rule admits only main and
+    # lane/finish-release (docs/DB-GUARD.md §1.1). That rule is the real lock: a workflow edited on any other branch
+    # cannot read an environment secret, whereas any branch's workflow could read a repository secret.
+    environment: production-db
+    permissions:
+      contents: read   # check out the schema and the pending files
+      issues: write    # open or comment on the "db-guard stopped" issue
+    defaults:
+      run:
+        working-directory: FEL-full-app
+        shell: bash
+    env:
+      PROD_DIRECT_URL: ${{ secrets.PROD_DIRECT_URL }}
+      MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'apply' }}
+      NEXT_TELEMETRY_DISABLED: '1'
+      CHECKPOINT_DISABLE: '1'   # no Prisma update check
+    steps:
+      - name: check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      # Defence in depth behind the environment's branch rule: stop before the secret is looked at on any other ref.
+      - name: secret present?
+        id: secret
+        run: |
+          case "${GITHUB_REF}" in
+            refs/heads/main|refs/heads/lane/finish-release) ;;
+            *) echo "::error title=db-guard::refusing ${GITHUB_REF}: db-guard runs only on main or lane/finish-release. Nothing was read or written."; exit 1;;
+          esac
+          if [ -z "${PROD_DIRECT_URL}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The coordinator (scripts/sql-guard/await-db-guard.ts) reads this step's name. Keep it in sync.
+      - name: 'no secret: nothing was read or written'
+        if: steps.secret.outputs.configured != 'true'
+        run: |
+          msg="db-guard did nothing: the repository secret PROD_DIRECT_URL is not set, so production was neither read nor written. The owner's one-time step is in FEL-full-app/docs/DB-GUARD.md. Until then pending SQL is applied by hand (docs/OWNER-RUNBOOK.md §4-5)."
+          echo "::notice title=db-guard: no secret::${msg}"
+          echo "${msg}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: set up node
+        if: steps.secret.outputs.configured == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FEL-full-app/package-lock.json
+
+      - name: install (prisma CLI and tsx from the lockfile)
+        if: steps.secret.outputs.configured == 'true'
+        run: npm ci --no-audit --no-fund
+
+      - name: preview (read-only)
+        id: preview
+        if: steps.secret.outputs.configured == 'true'
+        run: |
+          out="$RUNNER_TEMP/db-guard"; mkdir -p "$out"
+          set +e
+          npx --no-install prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script \
+            > "$out/before.sql" 2> "$out/before.raw.err"
+          rc=$?
+          set -e
+          npx --no-install tsx scripts/sql-guard/cli.ts redact < "$out/before.raw.err" > "$out/before.err"; rm -f "$out/before.raw.err"
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=db-guard::the read-only preview could not read production (exit $rc). Nothing was written."
+            cat "$out/before.err"
+            exit 1
+          fi
+          { echo '### Preview: production -> prisma/schema.prisma'; echo '```sql'; cat "$out/before.sql"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cat "$out/before.sql"
+
+      - name: match against reviewed pending SQL
+        id: match
+        if: steps.secret.outputs.configured == 'true'
+        run: |
+          set +e
+          npx --no-install tsx scripts/sql-guard/cli.ts decide --diff "$RUNNER_TEMP/db-guard/before.sql" --report "$RUNNER_TEMP/db-guard/decision.md"
+          rc=$?
+          set -e
+          cat "$RUNNER_TEMP/db-guard/decision.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit "$rc"
+
+      - name: apply each matched file
+        id: apply
+        if: steps.secret.outputs.configured == 'true' && env.MODE == 'apply' && steps.match.outputs.decision == 'match'
+        env:
+          FILES: ${{ steps.match.outputs.files }}
+        run: |
+          out="$RUNNER_TEMP/db-guard"
+          for f in $FILES; do
+            case "$f" in *[!A-Za-z0-9._-]*|'') echo "::error::refusing file name '$f'"; exit 1;; esac
+            echo "applying prisma/pending/$f"
+            set +e
+            npx --no-install prisma db execute --url "$PROD_DIRECT_URL" --file "prisma/pending/$f" > "$out/apply.raw.log" 2>&1
+            rc=$?
+            set -e
+            npx --no-install tsx scripts/sql-guard/cli.ts redact < "$out/apply.raw.log" | tee -a "$out/apply.log"; rm -f "$out/apply.raw.log"
+            if [ "$rc" -ne 0 ]; then
+              echo "::error title=db-guard::applying $f failed (exit $rc). Files after it were not applied."
+              exit 1
+            fi
+            echo "- applied \`prisma/pending/$f\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: verify (read-only; the diff must now be empty)
+        id: verify
+        if: steps.apply.outcome == 'success'
+        run: |
+          out="$RUNNER_TEMP/db-guard"
+          set +e
+          npx --no-install prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script \
+            > "$out/after.sql" 2> "$out/after.raw.err"
+          rc=$?
+          set -e
+          npx --no-install tsx scripts/sql-guard/cli.ts redact < "$out/after.raw.err" > "$out/after.err"; rm -f "$out/after.raw.err"
+          if [ "$rc" -ne 0 ]; then cat "$out/after.err"; exit 1; fi
+          cat "$out/after.sql"
+          npx --no-install tsx scripts/sql-guard/cli.ts decide --diff "$out/after.sql" --expect-empty
+
+      # The coordinator reads this step's name: it runs only when production now equals this commit's schema.
+      - name: 'verified: production matches the schema'
+        if: steps.match.outputs.decision == 'empty' || steps.verify.outcome == 'success'
+        run: |
+          echo "production schema = prisma/schema.prisma at ${GITHUB_SHA}"
+          echo "**Verified:** production's schema equals \`prisma/schema.prisma\` at \`${GITHUB_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 'preview only: nothing applied'
+        if: env.MODE == 'preview' && steps.match.outputs.decision == 'match'
+        run: echo "::notice title=db-guard preview::an exact match was found; preview mode applies nothing. Run again with mode=apply."
+
+      - name: open an issue for the owner
+        if: failure() && steps.secret.outputs.configured == 'true' && env.MODE == 'apply'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
+        run: |
+          out="$RUNNER_TEMP/db-guard"; mkdir -p "$out"
+          # A fresh read-only diff, so the issue shows production as it is NOW (after a partial apply, too).
+          set +e
+          npx --no-install prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script \
+            > "$out/now.sql" 2> "$out/now.raw.err"
+          set -e
+          npx --no-install tsx scripts/sql-guard/cli.ts redact < "$out/now.raw.err" > "$out/now.err" 2>/dev/null || echo "(redaction unavailable; error output withheld)" > "$out/now.err"
+          rm -f "$out/now.raw.err"
+          block() { echo "<details><summary>$1</summary>"; echo; echo '```'; head -c 15000 "$2" 2>/dev/null || echo "(none)"; echo; echo '```'; echo '</details>'; echo; }
+          {
+            echo "@${OWNER} db-guard stopped and needs you. **Nothing unexpected was applied.**"
+            echo
+            echo "- run: ${RUN_URL}"
+            echo "- event: \`${GITHUB_EVENT_NAME}\` on \`${GITHUB_REF_NAME}\` at \`${GITHUB_SHA}\`"
+            echo "- apply step: \`${APPLY_OUTCOME:-not reached}\` (\`failure\` = a matched file failed partway; see the diff now)"
+            echo
+            if [ -s "$out/decision.md" ]; then cat "$out/decision.md"; else echo "**The run stopped before a decision** (preview could not read production, or a step failed)."; fi
+            echo
+            block "Preview diff (before)" "$out/before.sql"
+            block "Preview errors (redacted)" "$out/before.err"
+            block "Apply log (redacted)" "$out/apply.log"
+            block "Diff after apply" "$out/after.sql"
+            block "Diff now" "$out/now.sql"
+            block "Errors now (redacted)" "$out/now.err"
+            echo "What to do: FEL-full-app/docs/DB-GUARD.md, \"When it stops\". Never run the diff itself; never apply a DROP from it."
+          } > "$out/issue.md"
+          title="db-guard stopped: production schema needs the owner"
+          existing="$(gh issue list --state open --search "\"${title}\" in:title" --json number --jq '.[0].number // empty' || true)"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file "$out/issue.md"
+          else
+            gh issue create --title "$title" --body-file "$out/issue.md" --assignee "$OWNER" \
+              || gh issue create --title "$title" --body-file "$out/issue.md"
+          fi

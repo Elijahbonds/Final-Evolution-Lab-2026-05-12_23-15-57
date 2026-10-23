@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db';
 import { completeText, FILE_BUILDER_SYSTEM, type BuildPlan } from '@/lib/cell-engine';
 import { parseFileOps, bundleFiles } from '@/lib/cell-files';
 import { applyOps, loadFiles, summarizeFiles } from '@/lib/cell-build';
-import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
+import { abacusAvailable, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -36,7 +36,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   // ABACUS-KILL: before the session, the body or any database read or write (lib/abacus/killSwitch.ts).
-  if (!abacusEnabled()) return aiComingSoonResponse('studio');
+  if (!abacusAvailable()) return aiComingSoonResponse('studio');
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

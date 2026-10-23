@@ -14,6 +14,8 @@
 // `?net=` co-op needs the netd server (NEXT_PUBLIC_NETD_URL), which is not deployed. The Babylon pass-and-play dunk duel
 // was replaced on /play/dunkduel by the camera Prove It, by owner decision, so it is not resurfaced here.
 
+import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
+
 export type PartyStyle = 'buzz' | 'turns';
 
 export interface PartyMode {
@@ -56,10 +58,37 @@ export function partyModeById(id: string | null | undefined): PartyMode | null {
   return PARTY_MODES.find((m) => m.id === id) ?? null;
 }
 
+function routePathFromValue(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  const first = raw.split(/[?#]/)[0] ?? '';
+  if (first.startsWith('/')) return first.replace(/\/+$/, '') || '/';
+  try {
+    const url = new URL(raw);
+    return url.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return null;
+  }
+}
+
+function routeSlug(path: string | null): string | null {
+  if (!path || path === '/') return null;
+  const parts = path.split('/').filter(Boolean);
+  return parts[parts.length - 1] ?? null;
+}
+
 /** By MODE_INFO key (the shelf and the shell speak that), or by mode id. */
 export function partyModeFor(key: string | null | undefined): PartyMode | null {
-  if (!key) return null;
-  return PARTY_MODES.find((m) => m.infoKey === key || m.id === key) ?? null;
+  const raw = String(key ?? '').trim();
+  if (!raw) return null;
+  const canonical = canonicalModeKey(raw);
+  const inputPath = routePathFromValue(raw);
+  const inputSlug = routeSlug(inputPath) ?? raw;
+  return PARTY_MODES.find((m) => {
+    if (m.infoKey === raw || m.id === raw || m.infoKey === canonical || m.id === canonical) return true;
+    const hrefPath = routePathFromValue(MODE_INFO[m.infoKey]?.href ?? '');
+    return (inputPath !== null && hrefPath === inputPath) || routeSlug(hrefPath) === inputSlug;
+  }) ?? null;
 }
 
 /** The badge a tile wears: "2 PLAYERS", "1–4 PLAYERS". */
@@ -76,4 +105,43 @@ export function styleLine(m: Pick<PartyMode, 'style'>): string {
 export function partyHref(key?: string | null): string {
   const m = partyModeFor(key ?? null);
   return m ? `/play/party?mode=${encodeURIComponent(m.id)}` : '/play/party';
+}
+
+// ── COUCH (FN-0, 2026-10-19) ──────────────────────────────────────────────────────────────────────────────────────────
+// The /play pages that offer "Couch (2–4)": a signed-in host opens the host-seat room on the TV for this mode, and up to
+// three more sit down by pad or phone code (lib/party/seats.ts couchSeatTable). Each mode reads ctx.seatCount() and the
+// per-seat stream (InputBus.onSlot) when its own tip lands; until then seat 1 drives the game as it does solo.
+
+export interface CouchMode {
+  /** The Babylon / controller-link mode id the host stage runs. */
+  id: string;
+  /** The mode's /play page. */
+  href: string;
+}
+
+export const COUCH_MODES: readonly CouchMode[] = [
+  { id: 'tennis', href: '/play/tennis' },
+  { id: 'volleyball', href: '/play/volleyball' },
+  { id: 'threepoint', href: '/play/threepoint' },
+  { id: 'golf', href: '/play/golf' },
+  { id: 'skateboard', href: '/play/skateboard' },
+  { id: 'karate_vs', href: '/play/karate-vs' },
+];
+
+export function couchModeById(id: string | null | undefined): CouchMode | null {
+  return COUCH_MODES.find((m) => m.id === id) ?? null;
+}
+
+/** The search param a /play page reads to open its couch room. */
+export const COUCH_PARAM = 'couch';
+
+/** Where a mode's "Couch (2–4)" start goes: its own page, couch on (the page keeps its sign-in gate). */
+export function couchHref(m: CouchMode): string {
+  return `${m.href}?${COUCH_PARAM}=1`;
+}
+
+/** Whether a /play page's search params ask for the couch room. */
+export function couchRequested(searchParams: { [k: string]: string | string[] | undefined } | undefined): boolean {
+  const v = searchParams?.[COUCH_PARAM];
+  return (Array.isArray(v) ? v[0] : v) === '1';
 }

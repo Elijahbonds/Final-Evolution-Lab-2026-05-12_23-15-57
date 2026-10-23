@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { MODE_CONTROLLERS } from '../lib/controller-link/schemas/registry';
 
@@ -34,6 +34,59 @@ const playGauntletExempt = new Set([
 ]);
 const devGauntletModes = modesInForLoops(devGauntlet);
 const playGauntletModes = modesInForLoops(playGauntlet);
+const conceptLockNames = new Set(
+  readdirSync(join(ROOT, 'docs/concept-lock'))
+    .filter((f) => f.endsWith('.md'))
+    .map((f) => f.replace(/\.md$/, '')),
+);
+const conceptLockName: Record<string, string> = {
+  karate: 'karate-endless',
+  karate_vs: 'karate-vs',
+  derby: 'baseball',
+  penalty: 'soccer',
+  snowboard_slalom: 'snowboard',
+};
+const testName: Record<string, string[]> = {
+  aeroaces: ['aeroaces', 'aero-aces', 'aeroAces'],
+  bigair: ['bigair', 'big-air', 'BigAir'],
+  brainbrawl: ['brainbrawl', 'brain-brawl', 'brainBrawl'],
+  derby: ['derby', 'baseball'],
+  dunkduel: ['dunkduel', 'dunk-duel', 'DunkDuel'],
+  freerun: ['freerun', 'free-run', 'FreeRun'],
+  karate_vs: ['karate_vs', 'karate-vs', 'KarateVS', 'karateVersus'],
+  mixedcombat: ['mixedcombat', 'mixed-combat', 'MixedCombat'],
+  onevone: ['onevone', 'one-v-one', 'OneVOne'],
+  penalty: ['penalty', 'soccer'],
+  skateboard: ['skateboard', 'skate-run', 'skate'],
+  snowboard_slalom: ['snowboard_slalom', 'snowboard', 'snowboarding'],
+  tiebreak: ['tiebreak', 'Tiebreak'],
+  threepoint: ['threepoint', 'three-point', 'threePoint'],
+  threevthree: ['threevthree', 'three-v-three', 'ThreeVThree'],
+  velocitykart: ['velocitykart', 'velocity-kart', 'velocityKart'],
+  who_scene_it: ['who_scene_it', 'who-scene-it', 'whoSceneIt'],
+};
+const skipTestDirs = new Set(['.git', '.next', 'coverage', 'node_modules', 'public']);
+const testFilePattern = /(?:^|[./-])(?:test|tests)\.(?:ts|tsx)$|-tests\.ts$/;
+
+function walkTestFiles(dir: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!skipTestDirs.has(entry.name)) files.push(...walkTestFiles(path));
+    } else if (testFilePattern.test(entry.name)) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+const testFiles = walkTestFiles(ROOT);
+
+function testCountFor(mode: string): number {
+  const tokens = testName[mode] ?? [mode, routeMap.get(mode) ?? mode];
+  return testFiles.filter((file) => tokens.some((token) => file.toLowerCase().includes(token.toLowerCase()))).length;
+}
 
 function modesInForLoops(script: string): Set<string> {
   const modes = new Set<string>();
@@ -74,6 +127,8 @@ const missingMenuLinks: string[] = [];
 const missingControllerSchemas: string[] = [];
 const missingDevGauntlet: string[] = [];
 const missingPlayGauntlet: string[] = [];
+const missingConceptLocks: string[] = [];
+const missingModeTests: string[] = [];
 for (const key of enabledModes) {
   const route = `/play/${routeMap.get(key) ?? key}`;
   const slug = route.slice('/play/'.length);
@@ -82,6 +137,8 @@ for (const key of enabledModes) {
   if (!(key in MODE_CONTROLLERS)) missingControllerSchemas.push(key);
   if (!devGauntletModes.has(key)) missingDevGauntlet.push(key);
   if (!playGauntletExempt.has(key) && !playGauntletModes.has(key)) missingPlayGauntlet.push(key);
+  if (!conceptLockNames.has(conceptLockName[key] ?? key)) missingConceptLocks.push(key);
+  if (testCountFor(key) === 0) missingModeTests.push(key);
 }
 
 assert.deepEqual(missingRoutes, [], 'full-picture must resolve enabled modes to real /play routes');
@@ -89,6 +146,8 @@ assert.deepEqual(missingMenuLinks, [], 'full-picture menu column must match MODE
 assert.deepEqual(missingControllerSchemas, [], 'enabled modes must have Controller Link schemas');
 assert.deepEqual(missingDevGauntlet, [], 'enabled modes must be in the dev-mode gauntlet');
 assert.deepEqual(missingPlayGauntlet, [], 'enabled modes must be in the shipping-route gauntlet');
+assert.deepEqual(missingConceptLocks, [], 'enabled modes must have concept locks');
+assert.deepEqual(missingModeTests, [], 'enabled modes must have named regression coverage');
 assert.ok(hasDpadAction('freerun', 'move'), 'freerun phone d-pad must steer with LEFT STICK movement');
 assert.ok(hasHeldButton('freerun', 'charge'), 'freerun phone schema must expose held RT sprint');
 assert.ok(hasHeldButton('freerun', 'brake'), 'freerun phone schema must expose held LT slide');

@@ -17,11 +17,14 @@
 
 import { GlobalErrorBoundary, PLAY_CRASH_COPY } from '@/components/reliability/global-error-boundary';
 import { CaptionRegion } from '@/lib/babylon/ui/CaptionRegion';
+import { Suspense } from 'react';
+import { FeelPanel } from '@/components/feel-panel/feel-panel';   // feel-panel lane (owner 10-20): renders nothing unless FEEL_PANEL_ENABLED + admin
 
 export default function PlayLayout({ children }: { children: React.ReactNode }) {
   return (
     <GlobalErrorBoundary copy={PLAY_CRASH_COPY}>
       <CaptionRegion visible={false} />
+      <Suspense fallback={null}><FeelPanel /></Suspense>
       {children}
     </GlobalErrorBoundary>
   );

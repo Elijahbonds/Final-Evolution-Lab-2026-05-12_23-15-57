@@ -66,6 +66,12 @@ describe('the hosts say so', () => {
     expect(read('components/games/dunk-babylon.tsx')).toContain('guest: guestRef.current,');
     expect(read('lib/babylon/core/ModeHarness.ts')).toContain('setSignedOutVisitor(opts.guest === true);');
   });
+  it('the harness clears the known-guest flag when the mode unmounts', () => {
+    const src = read('lib/babylon/core/ModeHarness.ts');
+    const disposer = src.slice(src.indexOf('return () => {'));
+    expect(disposer).toContain('setSignedOutVisitor(false);');
+    expect(disposer.indexOf('setSignedOutVisitor(false);')).toBeLessThan(disposer.indexOf('FloatingOriginCurrentScene.getScene = NO_SCENE;'));
+  });
   it('the start screen asks for the card slot and the saved characters only for a signed-in player', () => {
     for (const f of ['components/games/card-slot.tsx', 'components/closet/play-as-switcher.tsx']) {
       const src = read(f);

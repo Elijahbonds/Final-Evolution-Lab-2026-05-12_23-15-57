@@ -233,12 +233,12 @@ describe('the wiring (source pins)', () => {
   const seam = code('components/games/replay-in-place.ts');
   const dev = code('app/dev/music/loader.tsx');
 
-  it('GameShell (held, unedited): the registered restart first; the key bump only when there is none or it said false', () => {
+  it('GameShell: the registered restart first; the key bump only when there is none or it said false', () => {
     // MERGE WITH ECONOMY-SESSIONS-HARDEN (2026-09-28): an in-place replay starts the rematch's own server run too (every
     // session finishes a run POST /api/sessions/start opened; the first set's run is closed, so reusing it would pay the
     // rematch nothing). A remount starts one from the gameKey effect; the in-place branch must start it itself.
     expect(shell).toMatch(/if \(inPlace\.current\?\.\(\)\) \{ inputCount\.current = 0; serverRun\.current = startServerRun\(\); return; \}\s*setGameKey\(\(k\) => k \+ 1\);/);
-    expect(shell).toMatch(/<ReplayInPlaceContext\.Provider value=\{registerReplay\}>\s*<Game key=\{gameKey\}/);
+    expect(shell).toMatch(/<ReplayInPlaceContext\.Provider value=\{registerReplay\}>\s*<ThreeDErrorBoundary key=\{gameKey\}>\s*<Game grade=\{profile\.grade\}/);
     expect(seam).toContain('export function useReplayInPlace(restart: () => boolean): void {');
     expect(code('app/play/music/_components/loader.tsx')).toMatch(/<GameShell[\s\S]*?Game=\{StudioMode\}/);
   });

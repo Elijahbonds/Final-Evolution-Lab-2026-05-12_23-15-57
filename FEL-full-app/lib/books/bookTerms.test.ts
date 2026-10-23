@@ -42,10 +42,9 @@ describe('the book terms allow-list (one rule, one place)', () => {
     expect(bookPolicyFor('constructor').formats).toEqual([]);
   });
 
-  it('across the whole catalog only audiobook offers are sellable today', () => {
+  it('across the whole catalog only inventoried audiobook offers are sellable today', () => {
     const sellable = BOOKS.flatMap((b) => b.offers.filter((o) => bookOfferAllowed(o)));
-    expect(sellable.length).toBe(BOOKS.length);
-    expect(sellable.every((o) => o.format === 'audiobook')).toBe(true);
+    expect(sellable.map((o) => o.id)).toEqual(['blueprint:audiobook', 'art-of-dunking:audiobook']);
   });
 
   it('file kinds: the mp3 streams; EPUB and PDF are refused until a terms version covers ebooks AND downloads', () => {

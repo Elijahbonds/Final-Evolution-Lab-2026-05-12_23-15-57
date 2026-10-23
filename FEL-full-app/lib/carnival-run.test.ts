@@ -24,6 +24,13 @@ describe('Game Night\'s lineup', () => {
     for (const e of ['Slam Rush', 'Strike Storm', 'Trick Gauntlet', 'Hot Shot', 'Coin Storm', 'Counter Strike']) expect(card.modes).toContain(e);
   });
 
+  it('does not mark the off-sale Luma shop as a live playable venue', () => {
+    const card = VENUES.find((v) => v.key === 'lumaveniceshop')!;
+    expect(card.modes).toContain('Market Browse');
+    expect(card.playable).toBe(false);
+    expect(card.href).toBeUndefined();
+  });
+
   it('external stops keep their own mode names', () => {
     expect(carnivalStopLabel('threePoint')).toBe(MODE_INFO.threePoint.name);
   });

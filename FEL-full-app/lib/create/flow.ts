@@ -195,6 +195,11 @@ export function publishHref(d: Discipline, entry: PublishEntry = { from: null })
   return `/create/${d}${qs ? `?${qs}` : ''}`;
 }
 
+/** The sanitized Create flow path to keep through login redirects. */
+export function createFlowHref(d: Discipline, params: URLSearchParams | Record<string, string | string[] | undefined>): string {
+  return publishHref(d, readEntry(params));
+}
+
 /** The inverse, defensive: anything malformed reads as absent. */
 export function readEntry(params: URLSearchParams | Record<string, string | string[] | undefined>): PublishEntry {
   const get = (k: string): string | undefined => {

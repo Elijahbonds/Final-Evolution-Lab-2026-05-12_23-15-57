@@ -78,6 +78,8 @@ export interface MyDuel {
   updatedAt: string;
   /** MUSIC-SUITE P1 (2026-09-25): the duel's mode is paused for NEW stakes. ACTIVE still plays; WAITING can only be cancelled. */
   stakingPaused?: boolean;
+  /** The duel's mode is parked/unlisted now; history stays visible, but the play route redirects away from the game. */
+  unlistedMode?: boolean;
   /** MUSIC-SUITE P6 (2026-09-26, owner decision #30): when an open duel lapses (null on a row from an older server). */
   expiresAt?: string | null;
   /** How a reclaim closed it: nobody played (every stake back), or one side played and took the pot by forfeit. */
@@ -111,6 +113,8 @@ const EXPIRED_META: Record<'refunded' | 'won_by_forfeit' | 'lost_by_forfeit' | '
 };
 /** MUSIC-SUITE P6 FIX PASS: a music duel whose one attempt is used but not posted — PLAY posts it (the room submits it). */
 const ATTEMPT_USED_META = { label: 'Attempt used — PLAY posts it', color: '#FFD700' };
+/** IRON-PARADISE-OUT: an old duel can outlive the mode's shelf listing; don't send PLAY to a redirect. */
+const UNLISTED_META = { label: 'Mode parked', color: '#FFD700' };
 
 /** "2d 4h left" / "5h left" / "40m left" for an open duel's deadline; null once it has passed (or on an older row). */
 export function timeLeft(expiresAt: string | null | undefined, now = Date.now()): string | null {
@@ -125,17 +129,18 @@ export function timeLeft(expiresAt: string | null | undefined, now = Date.now())
 
 /** A MY DUELS row's badge, whether it offers PLAY, and its deadline hint (MUSIC-SUITE P6; pure, tested in node). */
 export function duelRowView(
-  d: Pick<MyDuel, 'status' | 'mySubmitted' | 'expiresAt' | 'expired' | 'pastExpiry' | 'musicAttempt'>,
+  d: Pick<MyDuel, 'status' | 'mySubmitted' | 'expiresAt' | 'expired' | 'pastExpiry' | 'musicAttempt' | 'unlistedMode'>,
   now = Date.now(),
 ): { meta: { label: string; color: string }; playable: boolean; left: string | null } {
   const meta = d.expired ? EXPIRED_META[d.expired]
     : d.pastExpiry ? EXPIRED_META.past
+      : d.unlistedMode && (d.status === 'ACTIVE' || d.status === 'WAITING') ? UNLISTED_META
       : d.status === 'ACTIVE' && !d.mySubmitted && d.musicAttempt ? ATTEMPT_USED_META
         : STATUS_META[d.status] ?? { label: d.status, color: '#888' };
   const open = d.status === 'ACTIVE' || d.status === 'WAITING';
   return {
     meta,
-    playable: d.status === 'ACTIVE' && !d.mySubmitted && !d.pastExpiry,
+    playable: d.status === 'ACTIVE' && !d.mySubmitted && !d.pastExpiry && !d.unlistedMode,
     left: open && !d.pastExpiry ? timeLeft(d.expiresAt, now) : null,
   };
 }
@@ -627,6 +632,11 @@ export function ArenaView() {
                       {d.pastExpiry && !d.expired && (
                         <div className="mt-1 font-mono text-[11px] text-white/45">
                           This duel passed its deadline and can&rsquo;t be played. Unplayed stakes are refunded; a side that played wins by forfeit.
+                        </div>
+                      )}
+                      {d.unlistedMode && (d.status === 'ACTIVE' || d.status === 'WAITING') && !d.pastExpiry && (
+                        <div className="mt-1 font-mono text-[11px] text-[#FFD700]/80">
+                          {d.name} is parked right now, so PLAY is hidden instead of sending you to a redirect. Waiting duels can still be cancelled; live duels settle when the Arena deadline runs.
                         </div>
                       )}
                       {(d.myScore !== null || d.oppScore !== null || d.oppSubmitted) && (
