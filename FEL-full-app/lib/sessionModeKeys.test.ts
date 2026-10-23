@@ -39,6 +39,7 @@ const DOCUMENTED_SHELL_COPY: Record<string, { venue?: string; title?: string; ro
   carnival: { venue: 'Venice Beach Carnival', reason: 'the shell names the event overlay; MODE_INFO keeps the shelf grouped at Venice Beach Court' },
   irl: { title: 'VERT', venue: 'Anywhere', reason: 'the camera tool labels the measured activity, not the Hang Time catalogue wrapper' },
   music: { title: 'FEL GROOVE ACADEMY', venue: 'The Academy', reason: 'the shell brands the lesson space inside the Studio catalogue venue' },
+  tiebreak: { route: '/play/tennis', title: 'TIEBREAK', reason: 'the Tennis tiebreak variant (/play/tennis?variant=tiebreak) names the variant; the catalogue row keeps the Tiebreak Blitz name the shelf, venue card and challenges list' },
 };
 
 /** Every `<GameShell mode="…">` under app/, with the route it is mounted on: the keys sessions are saved under. */
