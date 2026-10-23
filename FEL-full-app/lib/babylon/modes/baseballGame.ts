@@ -88,11 +88,22 @@ export function advance(bases: readonly boolean[], n: number): { bases: boolean[
 }
 
 export interface BaseballStats { runs: number; hits: number; homers: number; strikeouts: number; outs: number; pitches: number; innings: number }
-export interface BaseballResult { outcome: 'FINAL'; score: number; stats: Record<string, number> }
+export type BaseballOutcome = 'win' | 'loss';
+export interface BaseballResult { outcome: BaseballOutcome; score: number; stats: Record<string, number> }
 
-/** What ctx.end receives: the score IS the runs, and the stats carry the same runs (the card reads either). */
-export function baseballResult(s: BaseballStats): BaseballResult {
-  return { outcome: 'FINAL', score: s.runs, stats: { runs: s.runs, hits: s.hits, homers: s.homers, strikeouts: s.strikeouts, outs: s.outs, pitches: s.pitches, innings: s.innings } };
+/** BASEBALL-FEEL win/loss (Gameplay, 2026-10-23; PM call, Elijah can overrule): the target is the player's best run
+ *  total for this mode (local save). WIN at runs ≥ the target (a new or matched best), LOSS below it. TUNE: with no best
+ *  saved yet (the first game) the target is this ghost line; ≥ 1, so a 0-run game is a loss. */
+export const GHOST_RUNS = 2;   // TUNE
+
+export function baseballOutcome(runs: number, best: number | null): BaseballOutcome {
+  return runs >= (best ?? GHOST_RUNS) ? 'win' : 'loss';
+}
+
+/** What ctx.end receives: the score IS the runs, and the stats carry the same runs (the card reads either). The outcome is
+ *  win/loss against `best` (null: the first game, against GHOST_RUNS). Nothing else changes the score. */
+export function baseballResult(s: BaseballStats, best: number | null = null): BaseballResult {
+  return { outcome: baseballOutcome(s.runs, best), score: s.runs, stats: { runs: s.runs, hits: s.hits, homers: s.homers, strikeouts: s.strikeouts, outs: s.outs, pitches: s.pitches, innings: s.innings } };
 }
 
 /** The end card's line, built from the posted score — the number on the card and the saved number are one. */
@@ -100,6 +111,24 @@ export function baseballHeadline(r: { score: number; stats?: Record<string, numb
   const st = r.stats ?? {};
   const n = (k: string) => Number(st[k] ?? 0);
   return `FINAL · ${r.score} ${r.score === 1 ? 'RUN' : 'RUNS'} · ${n('hits')} H · ${n('homers')} HR · ${n('innings') || INNINGS} INNINGS`;
+}
+
+/** The best run total, saved on this device only (localStorage, the football best's pattern; no DB, no API). */
+export const BASEBALL_BEST_KEY = 'fel-baseball-best-v1';
+export interface BestStore { getItem(k: string): string | null; setItem(k: string, v: string): void }
+function bestStore(): BestStore | null {
+  try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
+}
+export function loadBaseballBest(store: BestStore | null = bestStore()): number | null {
+  if (!store) return null;
+  try { const raw = store.getItem(BASEBALL_BEST_KEY); if (raw == null) return null; const v = Number(raw); return Number.isFinite(v) && v >= 0 ? Math.floor(v) : null; } catch { return null; }
+}
+/** Keep the runs if they beat (or first set) the best. */
+export function saveBaseballBestIfHigher(runs: number, store: BestStore | null = bestStore()): boolean {
+  const prev = loadBaseballBest(store);
+  if (prev !== null && prev >= runs) return false;
+  if (store) { try { store.setItem(BASEBALL_BEST_KEY, String(Math.floor(runs))); } catch { /* full or blocked */ } }
+  return true;
 }
 
 /** The view's side of the game: what to draw and play, called on the game clock. */
@@ -114,6 +143,8 @@ export interface BaseballView {
   contact(grade: SwingGrade): void;
   /** Strike three (BASEBALL-FEEL: the batter's dejected beat). */
   strikeout?(): void;
+  /** The last out: the game's win/loss, as the FINAL board goes up (BASEBALL-FEEL: the batter's last beat). */
+  result?(result: BaseballResult): void;
   /** Runs crossed the plate on this hit (BASEBALL-FEEL §2: the celebrate beat). */
   scored?(runs: number): void;
   banner(text: string): void;
@@ -136,7 +167,8 @@ export class BaseballGame {
   readonly timers = new TimerBag({ gameClock: true });
   private readonly banners: BannerChannel;
 
-  constructor(private readonly view: BaseballView, private readonly pitchFor: (n: number) => BaseballPitch, readonly releaseSec: number) {
+  /** `best`: the saved best run total the game is played against (null: none yet, the ghost line). */
+  constructor(private readonly view: BaseballView, private readonly pitchFor: (n: number) => BaseballPitch, readonly releaseSec: number, readonly best: number | null = null) {
     this.banners = new BannerChannel(this.timers, (t) => view.banner(t));
   }
 
@@ -215,7 +247,9 @@ export class BaseballGame {
         this.phase = 'over';
         this.pushHud();
         this.banners.flash(`FINAL — ${this.runs} ${this.runs === 1 ? 'RUN' : 'RUNS'}`, FINAL_HOLD_MS);
-        this.timers.later(() => this.view.end(baseballResult(this.stats())), FINAL_HOLD_MS);
+        const result = baseballResult(this.stats(), this.best);
+        this.view.result?.(result);
+        this.timers.later(() => this.view.end(result), FINAL_HOLD_MS);
         return;
       }
       this.inning++; this.outs = 0; this.strikes = 0; this.batters = 0; this.bases = [false, false, false];

@@ -34,7 +34,7 @@ import { spawnAthlete, spawnFoe, buildPlateAndMound, buildBallparkOutfield, Flig
 import { pitchSpec, PITCH_RELEASE_SEC } from './baseballPitch';   // BASEBALL-PITCH-MOD: its own copy, so Derby/golf/shootout clips stay out of baseball's closure
 import { derbySeed } from '../core/DerbyLoop';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
-import { BaseballGame, RELEASE_Z, SWING_WINDOW_SEC, type SwingGrade } from './baseballGame';
+import { BaseballGame, RELEASE_Z, SWING_WINDOW_SEC, loadBaseballBest, saveBaseballBestIfHigher, type SwingGrade } from './baseballGame';
 import { mountTwoHandBat, type BatHandle } from './baseballBat';
 import { BaseballSlots, SlotDriver, hitStopFor } from './baseballSlots';
 
@@ -138,10 +138,11 @@ export const BaseballInningsMode: ModeDefinition = (() => {
         },
         strikeout: () => slots?.strikeout(),
         scored: (runs) => slots?.scored(runs),
+        result: (r) => { slots?.gameOver(r.outcome); saveBaseballBestIfHigher(r.score); },   // win/loss beat; the best on this device
         banner: (text) => ctx.setHud({ banner: text }),
         hud: (patch) => ctx.setHud(patch),
         end: (r) => ctx.end(r.outcome, r.score, r.stats),
-      }, (n) => pitchSpec(n, seed), PITCH_RELEASE_SEC);
+      }, (n) => pitchSpec(n, seed), PITCH_RELEASE_SEC, loadBaseballBest());
       game.start();
     },
 

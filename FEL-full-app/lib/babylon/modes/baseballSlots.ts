@@ -83,6 +83,8 @@ class BodyBeats {
   seq = 0;
   set(...beats: Beat[]): void { this.queue = beats; this.t = 0; this.seq++; }
   then(...beats: Beat[]): void { if (this.queue.length === 0) this.seq++; this.queue.push(...beats); }
+  /** The last queued beat (null: nothing queued). */
+  last(): Beat | null { return this.queue.length ? this.queue[this.queue.length - 1] : null; }
   /** Seconds until the queue runs out. */
   remaining(): number { return this.queue.reduce((a, b) => a + b.sec, 0) - this.t; }
   tick(dt: number): void {
@@ -176,6 +178,15 @@ export class BaseballSlots {
   }
 
   strikeout(): void { this.batter.then({ input: { dejected: true }, sec: BEAT_SEC.dejected }); }
+
+  /** The game's win/loss (Gameplay 2026-10-23): WIN queues celebrate, LOSS dejected, AFTER the beat in flight — and not
+   *  again when that beat is already the same one (a last-out strikeout on a loss plays dejected once). */
+  gameOver(outcome: 'win' | 'loss'): void {
+    const input: Partial<BaseballAnimInput> = outcome === 'win' ? { celebrating: true } : { dejected: true };
+    const last = this.batter.last();
+    if (last && (outcome === 'win' ? last.input.celebrating : last.input.dejected)) return;
+    this.batter.then({ input, sec: outcome === 'win' ? BEAT_SEC.celebrate : BEAT_SEC.dejected });
+  }
 
   /** The game is over: everyone back to rest. */
   end(): void { this.pitcherOn = false; this.pitcher.set(); }
