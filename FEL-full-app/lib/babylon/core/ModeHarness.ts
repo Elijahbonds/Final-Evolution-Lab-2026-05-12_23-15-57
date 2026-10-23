@@ -177,6 +177,12 @@ export interface ModeContext {
    *  An absent read (present: false) = the source is live and nobody is in frame. Optional like stamina?, so a fake
    *  context in a test need not know about the body. */
   body?(): BodyView | null;
+  /** COUCH (FN-0, 2026-10-19): how many people are seated on the couch right now (1 outside a couch room). Each seat's
+   *  own input arrives on ctx.input.onSlot, seat 1 = slot 0. Live: read it when it matters, not once at load. Optional
+   *  like stamina?, so a fake context in a test need not know about seats. */
+  seatCount?(): number;
+  /** COUCH: true in a couch room. No seat has a body there: no camera frame reaches the harness, and onBody never runs. */
+  couch?: boolean;
 }
 
 export interface ModeDefinition {
@@ -269,6 +275,22 @@ export interface HarnessOpts {
   /** FIRST-DUNK-BUDGET (2026-10-17): the host KNOWS the visitor is signed out (/try: the server sent everyone else to
    *  /play/dunk), so the spawn's closet read and the season read are not sent (visitor.ts). Absent is "not known". */
   guest?: boolean;
+  /** COUCH (FN-0, 2026-10-19): the host-seat room. The harness takes no body at all — every seat, the host's included and
+   *  whatever anyone's age — so def.onBody is never called, the floor presses nothing and the Body card offers nothing. */
+  couch?: boolean;
+  /** COUCH: the seats right now (lib/party/seats.ts couchSeatCount), read live through ctx.seatCount(). Ignored outside a
+   *  couch room. */
+  seatCount?: () => number;
+}
+
+/** COUCH (FN-0): what runMode holds in place of a body subscription in a couch room — it never listens at all. */
+export const NO_BODY_LISTENER = (): void => undefined;
+
+/** COUCH (FN-0): ctx.seatCount() — the couch's live seats, 1..4; 1 outside a couch room. */
+export function seatCountOf(opts: Pick<HarnessOpts, 'couch' | 'seatCount'>): number {
+  if (opts.couch !== true) return 1;
+  const n = Math.floor(Number(opts.seatCount?.() ?? 1));
+  return Number.isFinite(n) ? Math.max(1, Math.min(4, n)) : 1;
 }
 
 /** Max time a mode's load() may go with NOTHING arriving before the anti-infinite-spinner watchdog
@@ -311,6 +333,7 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
 /** runMode's mount itself: everything from the engine to the disposer, with the body seam and the card already up. */
 async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam, store: SessionWriter): Promise<() => void> {
   const { claimed, floor, session, evidence } = seam;
+  const couch = opts.couch === true;   // COUCH (FN-0): no body, no camera frame, for any seat
   // THE LOOK STACK (lib/babylon/core/lookStack.ts; NEXUS STUDIO §4.1, 2026-10-14): engine → canvas fit → tier → scene →
   // camera → rig → SSAO → backdrop → ink → director → letterbox, the same calls in the same order as they always ran here,
   // extracted so the Nexus Studio's editor viewport mounts exactly this. The harness's own work runs in the hooks at the
@@ -561,7 +584,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     },
     stamina(v01) { ring?.set(v01); },
     body() { const p = input.body(); return p ? viewOf(p) : null; },
+    seatCount: () => seatCountOf(opts),
+    couch,
   };
+  // COUCH (FN-0): no seat has a body, so a mode that asks for one is told there is no body source
+  if (couch) ctx.body = () => null;
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
@@ -789,7 +816,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // the floor turn it into this mode's FelInput — through the arbiter and back into the handler above, where the wake
   // latch, the input buffer, QA and the evidence see it like any other input — and a mode that claims a move gets the
   // event itself. The raw events go to QA's bodyLog, never its graded timeline (Z9).
-  const unBody = input.onBody((p) => {
+  // COUCH (FN-0): in a couch room the harness takes no camera frame — the session, the floor and def.onBody never see one
+  const unBody = couch ? NO_BODY_LISTENER : input.onBody((p) => {
     const now = performance.now();
     const s = session.step(phase, p, now);
     applyBody(s);

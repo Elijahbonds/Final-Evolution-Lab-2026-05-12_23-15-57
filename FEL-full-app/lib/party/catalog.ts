@@ -106,3 +106,42 @@ export function partyHref(key?: string | null): string {
   const m = partyModeFor(key ?? null);
   return m ? `/play/party?mode=${encodeURIComponent(m.id)}` : '/play/party';
 }
+
+// ── COUCH (FN-0, 2026-10-19) ──────────────────────────────────────────────────────────────────────────────────────────
+// The /play pages that offer "Couch (2–4)": a signed-in host opens the host-seat room on the TV for this mode, and up to
+// three more sit down by pad or phone code (lib/party/seats.ts couchSeatTable). Each mode reads ctx.seatCount() and the
+// per-seat stream (InputBus.onSlot) when its own tip lands; until then seat 1 drives the game as it does solo.
+
+export interface CouchMode {
+  /** The Babylon / controller-link mode id the host stage runs. */
+  id: string;
+  /** The mode's /play page. */
+  href: string;
+}
+
+export const COUCH_MODES: readonly CouchMode[] = [
+  { id: 'tennis', href: '/play/tennis' },
+  { id: 'volleyball', href: '/play/volleyball' },
+  { id: 'threepoint', href: '/play/threepoint' },
+  { id: 'golf', href: '/play/golf' },
+  { id: 'skateboard', href: '/play/skateboard' },
+  { id: 'karate_vs', href: '/play/karate-vs' },
+];
+
+export function couchModeById(id: string | null | undefined): CouchMode | null {
+  return COUCH_MODES.find((m) => m.id === id) ?? null;
+}
+
+/** The search param a /play page reads to open its couch room. */
+export const COUCH_PARAM = 'couch';
+
+/** Where a mode's "Couch (2–4)" start goes: its own page, couch on (the page keeps its sign-in gate). */
+export function couchHref(m: CouchMode): string {
+  return `${m.href}?${COUCH_PARAM}=1`;
+}
+
+/** Whether a /play page's search params ask for the couch room. */
+export function couchRequested(searchParams: { [k: string]: string | string[] | undefined } | undefined): boolean {
+  const v = searchParams?.[COUCH_PARAM];
+  return (Array.isArray(v) ? v[0] : v) === '1';
+}
