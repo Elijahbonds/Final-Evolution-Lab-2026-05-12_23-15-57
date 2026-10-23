@@ -131,3 +131,8 @@ lane/hoops-moves (group "Hoops · handle"), defaults unchanged: `hoops.comboOpen
 combo; flow only, no odds), and `hoops.guardRangeM` 2.0 m (`GuardHand.ts` `GUARD_RANGE_M`: a live defender inside it moves the
 player's ball to the outside hand; the dwell and gap are the AI hand's `hoops.aiHandDwellSec` / `hoops.aiHandGapSec`).
 **assumption:** the bounds are safe, not tuned.
+
+lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by that lane: `tennis.portraitHeroMargin` 0.15
+(`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
+only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
+**assumption:** the bounds (0.05 to 0.35) are safe, not tuned.

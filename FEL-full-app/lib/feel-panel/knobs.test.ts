@@ -10,6 +10,7 @@ import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotC
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
+import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -43,6 +44,8 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.comboOpenK')).toBe(COMBO_OPEN_K);
     expect(def('hoops.comboGraceSec')).toBe(COMBO_GRACE_SEC);
     expect(def('hoops.guardRangeM')).toBe(GUARD_RANGE_M);
+    // tiebreak-cam (group "Tennis · camera")
+    expect(def('tennis.portraitHeroMargin')).toBe(PORTRAIT_HERO_MARGIN);
     expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
   });
 

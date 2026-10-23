@@ -120,6 +120,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.guardRangeM', label: 'Outside hand: guarded inside', def: 2.0, min: 0.8, max: 3.5, step: 0.05, unit: 'm', group: 'Hoops · handle',
     source: 'lib/babylon/core/GuardHand.ts GUARD_RANGE_M',
     hint: 'A live defender inside this moves your ball to the hand away from him (after the AI hand\'s dwell); outside it the hand stays put.',
+  },  // ── tiebreak-cam (2026-10-23): Tennis and its tiebreak variant, a phone held upright only ──
+  {
+    id: 'tennis.portraitHeroMargin', label: 'Upright: keep the player this far in', def: 0.15, min: 0.05, max: 0.35, step: 0.01, unit: '', group: 'Tennis · camera',
+    source: 'lib/babylon/modes/netPortraitCam.ts PORTRAIT_HERO_MARGIN',
+    hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
   },
 ];
 
