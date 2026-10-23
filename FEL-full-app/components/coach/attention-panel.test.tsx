@@ -110,7 +110,9 @@ describe('panel source: readiness check-ins', () => {
 
   it('a check-in is not a flag: the empty-state line does not count it', () => {
     const src = readSource();
-    const empty = /\{flags\.length === 0 && waiting\.length === 0 && drifting\.length === 0 && painFlags\.length === 0 && \(/;
+    // COACH-LOOP P1 (2026-10-20), test changed: a compliance alert (a missed-sessions row) IS something to read, so it
+    // joins the empty-state condition; a readiness check-in still does not (the assertion below is unchanged)
+    const empty = /\{flags\.length === 0 && waiting\.length === 0 && drifting\.length === 0 && painFlags\.length === 0 && !\(board\.alerts\?\.length\) && \(/;
     expect(src).toMatch(empty);
     expect(src).not.toMatch(/readiness\.length === 0/);
   });

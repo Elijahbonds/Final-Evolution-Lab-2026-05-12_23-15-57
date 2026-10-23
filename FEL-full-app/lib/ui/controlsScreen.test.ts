@@ -27,7 +27,7 @@ describe('stripStaticControls — what the harness hands the host', () => {
   it('a mode\'s lines for the screen: the pad words, the body\'s while the body plays, never a repeat', () => {
     expect(staticControlsFor('velocitykart')).toEqual([KART_PAD_HINT]);
     expect(staticControlsFor('velocitykart', true)[0]).toMatch(/^Grip the wheel/);
-    expect(staticControlsFor('dunk', true)).toEqual(['HOLD to run · tap JUMP at the line — then SLAM on NOW!']);   // no body words: the pad's
+    expect(staticControlsFor('dunk', true)).toEqual(['HOLD to run · tap JUMP at the line · press to flush']);   // no body words: the pad's
     // integration-2: the hoops modes write no static map (one live line per state, owner picks 1v1 #1 / 3v3 #7; their panel is
     // the curated list), and no mode writes a repeat any more (the 3v3's "Work the court" and the duel's short runway line are gone)
     expect(staticControlsFor('threevthree')).toEqual([]);
@@ -114,7 +114,7 @@ describe('controlRows — the list for the device in use', () => {
 
 describe('controlLines / controlsSheet — the mode\'s own words', () => {
   it('its static hint, split; else the host\'s line; repeats across lines drop', () => {
-    expect(controlLines('dunk')).toEqual(['HOLD to run', 'tap JUMP at the line — then SLAM on NOW!']);
+    expect(controlLines('dunk')).toEqual(['HOLD to run', 'tap JUMP at the line', 'press to flush']);
     expect(controlLines('tennis', { fallback: 'Aim with stick · A to swing as the ball arrives' })).toEqual(['Aim with stick', 'A to swing as the ball arrives']);
     expect(controlLines('golf', { fallback: 'ignored' })[0]).toMatch(/^L-STICK turns the ARROW/);   // the mode's own words win
     // test changed (controls-screen-2): who-scene-it's lines are now its curated list (its split hint came apart into

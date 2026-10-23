@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getOrCreateProfile } from '@/lib/profile-service';
-import { computePrqDelta, MODE_ATTRS, PRQ_CAMERA_SOURCE, prqScore, prqGrade } from '@/lib/prq';
+import { computePrqDelta, MODE_ATTRS, PRQ_ATTRS, PRQ_CAMERA_SOURCE, prqScore, prqGrade } from '@/lib/prq';
 import { sanitizeTallies } from '@/lib/game-systems';
 import { createPrqEntry } from '@/lib/prq-entries';
 import { addSeasonXp, bookSeasonTierUps } from '@/lib/season/season-service';
@@ -19,7 +19,9 @@ import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGat
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
   ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
+  type StreakProfile, type StreakStep,
 } from '@/lib/session-payout';
+import type { Prisma } from '@/public/_prisma/client';
 import { canonicalModeKey } from '@/lib/game-data';
 import { isExpired } from '@/lib/arena-reclaim';
 import { readMusicAttempt, musicAttemptScore, claimMusicSessionPay, MUSIC_SESSION_PAID } from '@/lib/arena-music';
@@ -121,6 +123,54 @@ async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise
     return null;
   }
 }
+
+/**
+ * STREAK-CLAIM-RACE (merge review 2026-09-28; owner sign-off 2026-10-14): a play session's streak step, CLAIMED inside the
+ * run's paying transaction and conditional on the profile this request read. The step was decided from a read taken
+ * before the transaction and written back unconditionally, and the ledger's key is per run, so N runs finishing at once
+ * each paid the day's streak Lab Credits (measured: due, two finishes paid 20 + 20; owed, three finishes after one
+ * creation paid 35 LC each). Returns whether this run won the claim; a run that did not pays no streak share.
+ *   due    conditional on the lastStreakAt it read: every writer that opens a streak day (a play here, a creation session
+ *          above) moves lastStreakAt, so one claim per day wins. Not on lastActiveAt — a lesson writes that
+ *          (lib/knowledge/server/learnRoutes.ts, app/api/education/complete/route.ts), and it must not cost a run the day.
+ *          Writes streakDays, and lastStreakAt and lastActiveAt from one stamp.
+ *   owed   conditional on both: the creation-opened day (lastActiveAt < lastStreakAt) is still unpaid. Writes only
+ *          lastActiveAt, which closes the debt.
+ *   lost   writes nothing — not even lastActiveAt: a run that lost to a creation opening the day would erase the
+ *          creation's owed LC, which the next run pays.
+ *   neither  no streakDays or lastStreakAt (writing back what it read was itself a lost update — it could undo another
+ *          run's claim and open the day again), and lastActiveAt only moves forward: an older stamp written under a
+ *          newer due claim's lastStreakAt would read as a creation-opened day and pay its LC again.
+ */
+async function claimPlayStreak(tx: Prisma.TransactionClient, userId: string, seen: StreakProfile | null | undefined, step: StreakStep, stamp: Date): Promise<boolean> {
+  const lastStreakAt = seen?.lastStreakAt == null ? null : new Date(seen.lastStreakAt);
+  const lastActiveAt = seen?.lastActiveAt == null ? null : new Date(seen.lastActiveAt);
+  if (step.due || step.owed) {
+    // both columns are NOT NULL (@default(now())): a read without them is no row state to claim against
+    if (!lastStreakAt || (step.owed && !lastActiveAt)) return false;
+    const r = step.due
+      ? await tx.playerProfile.updateMany({ where: { userId, lastStreakAt }, data: { streakDays: step.streakDays, lastStreakAt: stamp, lastActiveAt: stamp } })
+      : await tx.playerProfile.updateMany({ where: { userId, lastStreakAt, lastActiveAt: lastActiveAt as Date }, data: { lastActiveAt: stamp } });
+    return r.count > 0;
+  }
+  await tx.playerProfile.updateMany({ where: { userId, lastActiveAt: { lt: stamp } }, data: { lastActiveAt: stamp } });
+  return false;
+}
+
+/**
+ * PRQ-ATTR-RACE (found 2026-10-14; owner sign-off 2026-10-16): a run's trained attributes, each the row's own value + the
+ * run's PRQ delta, capped at 100 and kept to 2 dp — today's rule, unchanged. `row` must be the profile as it is NOW, read
+ * under its row lock inside the paying transaction: computed from the read taken before the transaction and written as a
+ * literal, two runs finishing at once each wrote stale + their own delta and one run's gain was lost (measured: two
+ * dunkContest finishes left power 51.2, not 52.4), while both runs' answers and prq ledger rows claimed theirs.
+ */
+function trainedAttrValues(row: Record<string, unknown> | null | undefined, attrs: readonly string[], prqDelta: number): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const a of attrs) out[a] = Math.min(100, Math.round((Number(row?.[a] ?? 0) + prqDelta) * 100) / 100);
+  return out;
+}
+/** The eight PRQ attributes, as a Prisma select (prqScore reads all of them). */
+const PRQ_SELECT = Object.fromEntries(PRQ_ATTRS.map((a) => [a, true])) as Record<(typeof PRQ_ATTRS)[number], true>;
 
 export async function POST(req: Request) {
   try {
@@ -321,11 +371,12 @@ export async function POST(req: Request) {
     // Credits: hero-mode win +15 LC, daily streak +5*day (cap day 7).
     // MUSIC-SUITE P3 (2026-09-25): the streak rule moved to lib/session-payout.ts streakStep, unchanged — plus `owed`: the
     // first play inside a streak day a creation session opened pays that day's streak LC (the creation paid none), so
-    // making music first never costs a player the day's streak Lab Credits. lastStreakAt and lastActiveAt are written
-    // from ONE stamp below — streakStep's debt test (lastActiveAt < lastStreakAt) relies on a play never leaving them apart.
+    // making music first never costs a player the day's streak Lab Credits. A due play writes lastStreakAt and lastActiveAt
+    // from ONE stamp — streakStep's debt test (lastActiveAt < lastStreakAt) relies on a play never leaving them apart.
+    // STREAK-CLAIM-RACE: this is the step as this request read the row; the paying transaction CLAIMS it (claimPlayStreak)
+    // and pays the streak share only if the claim wins.
     const stamp = new Date();
     const streak = streakStep(profile as any, stamp.getTime(), 'play');
-    const { streakDays, streakBonus } = streak;
     const attrs = MODE_ATTRS?.[rulesMode] ?? ['mental'];
 
     // MUSIC-SUITE P6 FIX PASS: the payout is planned both ways — as a verified Arena set and as free play — and the session
@@ -350,13 +401,9 @@ export async function POST(req: Request) {
       // (FOLLOW-UP 2026-09-29: skateboarding and surfing are paid at most what 4 × their best run seen would pay —
       // session-payout finitePayCapScore; the score itself is recorded as sent)
       const payout = sessionPayout({ score: payScore, won, endless, durationSec: duration, payCapScore: finitePayCapScore(rulesMode) });
-      // Distribute PRQ delta to mode-relevant attributes
-      const attrData: Record<string, any> = {};
-      for (const a of attrs) {
-        const cur = Number((profile as any)?.[a] ?? 0);
-        attrData[a] = Math.min(100, Math.round((cur + prqDelta) * 100) / 100);
-      }
-      return { prqDelta, payout, xp: payout.xp, shards: payout.shards, credits: payout.winCredits + streakBonus, attrData };
+      // (the PRQ delta goes to the mode's attributes inside the transaction, on the row as it is then — trainedAttrValues)
+      // (the win's credits only: the streak's share is added in the transaction, once its claim is won)
+      return { prqDelta, payout, xp: payout.xp, shards: payout.shards, credits: payout.winCredits };
     };
     type Plan = ReturnType<typeof planFor>;
     const freePlan: Plan = planFor(false);
@@ -382,14 +429,16 @@ export async function POST(req: Request) {
         //    After the run's claim and before the ledger, so the ledger files what this run is actually paid, and inside
         //    the run's transaction, so a run that rolls back (a replay, a ledger conflict) releases the duel's claim with it.
         const plan: Plan = arena && arenaPlan && (await claimMusicSessionPay(tx as never, arena.matchId, userId)) ? arenaPlan : freePlan;
-        let { payout, xp, shards, credits, attrData } = plan;
+        let { payout, xp, shards, credits } = plan;
         let economyCapNote: string | null = null;
+        let profileLocked = false;
         try {
           // SECURITY (ECONOMY-CAPS review, daily-cap TOCTOU): lock the user's PlayerProfile row before summing
           // today's earnings, so two concurrent finishes of the same user on different runs cannot both read the
           // same stale sum and each collect the full remaining headroom. The second finish's sum now waits on the
           // first's commit. The lock is released with the transaction.
           await lockPlayerForDailyCap(tx, userId);
+          profileLocked = true;
           const earnedToday = await sumEarnedToday(tx, userId, now);
           const caps = applyEconomyCaps({ xp, shards }, earnedToday);
           xp = caps.xp;
@@ -402,6 +451,13 @@ export async function POST(req: Request) {
           xp = 0;
           shards = 0;
         }
+        // 1c. STREAK-CLAIM-RACE: the day's streak, claimed against the row this request read (claimPlayStreak). Before the
+        //    ledger, so wallet_lc files only what this run is paid; inside the run's transaction, so a run that rolls back
+        //    releases the claim with it. A run that loses pays the win's credits alone.
+        const streakClaimed = await claimPlayStreak(tx, userId, profile as StreakProfile, streak, stamp);
+        const streakBonus = streakClaimed ? streak.streakBonus : 0;
+        const streakOwed = streakClaimed && streak.owed;
+        credits += streakBonus;
         // 2. The ledger, before any balance moves (FIX 2): one row per payout, unique on (user, run, grant). The wallet
         //    and season amounts are decided further down (their caps, the first-of-day bonus) and settled into their rows.
         // PRQ delta filed after profile attrs are known (below); placeholder 0 here.
@@ -421,21 +477,31 @@ export async function POST(req: Request) {
           await settleGrant(tx, { userId, runId: run.id, grantType: 'xp', amount: xp, metadata: { arenaSet: true, arenaMatchId: arena.matchId, rejudged: arena.rejudged } });
         }
 
+        // 3. PRQ-ATTR-RACE: the trained attributes and the PRQ this run starts from, from the row as it is NOW — read under
+        //    the profile row lock, so a run that finished a moment ago is in it and no other writer moves it until this
+        //    commits (trainedAttrValues). The daily-cap check above normally holds the lock already; it is taken here if
+        //    that check could not take it, so this read never depends on it.
+        if (!profileLocked) await lockPlayerForDailyCap(tx, userId);
+        const row = (await tx.playerProfile.findUnique({ where: { userId }, select: PRQ_SELECT })) ?? profile;
+        const prqBefore = prqScore(row as any);
+        const attrData = trainedAttrValues(row as Record<string, unknown>, attrs, plan.prqDelta);
+
         // labCredits/xp/shards are pure counters — atomic increments so two
         // concurrent session submissions can't both read the same stale value
         // and drop one grant (the lost-update race a literal computed write allows).
+        // (PRQ-ATTR-RACE: the attributes are literals, computed from the locked read just above.)
+        // (STREAK-CLAIM-RACE: the streak fields and lastActiveAt are written by claimPlayStreak above, never here.)
         const updated = await tx.playerProfile.update({
           where: { userId },
           data: {
             ...attrData,
             xp: { increment: xp },
             shards: { increment: shards },
-            streakDays,
-            lastStreakAt: streak.due ? stamp : profile?.lastStreakAt,
-            lastActiveAt: stamp,
           },
         });
-        const prqDeltaRounded = Math.round((prqScore(updated as any) - before) * 100) / 100;
+        // the streak day as the row has it now (this run's claim, or the one that beat it)
+        const streakDays = Number.isFinite(Number((updated as any)?.streakDays)) ? Number((updated as any).streakDays) : streak.streakDays;
+        const prqDeltaRounded = Math.round((prqScore(updated as any) - prqBefore) * 100) / 100;
         await settleGrant(tx, { userId, runId: run.id, grantType: 'prq', amount: prqDeltaRounded });
         const createdSession = await tx.gameSession.create({
           data: { userId, mode, score: paidScore, opponentScore, won, xp, shards, prqDelta: prqDeltaRounded, credits, duration, hits, misses, dodges, combos, maxCombo, runId: run.id },
@@ -443,7 +509,7 @@ export async function POST(req: Request) {
         // LC lives in the wallet (2026-09-04): the session's credits move through the one mover, keyed by the RUN.
         let newBalance = Number(updated.labCredits ?? 0);
         if (credits > 0) {
-          const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: sessionLcKey(run.id), metadata: { mode, won, runId: run.id, streakDays, streakBonus: !!streakBonus, ...(streak.owed ? { streakOwed: true } : {}) } });
+          const r = await applyLc(tx, { playerId: userId, delta: credits, reasonCode: 'SESSION_CREDITS', source: 'gameplay', idempotencyKey: sessionLcKey(run.id), metadata: { mode, won, runId: run.id, streakDays, streakBonus: !!streakBonus, ...(streakOwed ? { streakOwed: true } : {}) } });
           newBalance = r.balanceAfter;
         }
         // the wallet's session earns, keyed by the run (see walletCoins above)
@@ -529,7 +595,7 @@ export async function POST(req: Request) {
           streakDays,
           streakBonus,
           prqDelta: prqDeltaRounded,
-          prqBefore: before,
+          prqBefore,
           prqAfter: after,
           grade: prqGrade(after),
           labCredits: (updated as any).labCredits,

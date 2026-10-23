@@ -127,6 +127,19 @@ New PROPOSED numbers from Phase 3, outside this register (both in `lib/pose`), w
 - **The lite confidence floor:** a 1 s median visibility of 0.5, clearing at 0.6. Measured silent on every good
   fixture (lowest 0.928).
 
+## Parked: bent knee at touchdown (T5), 2026-10-13
+
+The rule that would reject a jump when the knee lands more bent than it took off is **parked**. It is not in the register and has no threshold. It must be rebuilt from Elijah's own captures, not from a fixed number.
+
+**Unpark trigger:** Elijah's pending owner capture of the Mirror tests. That capture should include a few deliberate straight-leg landings and a few normal landings, so the cutoff can be set where the two groups separate.
+
+For reference only (not a calibration set): the 8 existing fixture jumps in lib/pose/__fixtures__ are normal landings with nothing to compare them against. Their extra knee bend at the first landing frame, compared with take-off:
+
+- jump_two_foot_low: 33°, 24°, 3°, 21°, 24°
+- jump_two_foot_high: 7°, 40°, 23°
+
+Research's note: landings with 20–40° of extra knee bend likely make the flight-time estimate read a bit high (the time in the air runs long when the feet touch down lower).
+
 ## Questions for Elijah (from the research draft, verbatim)
 
 1. Are these cutoffs right for how you screen clients, or do you want them stricter or looser?

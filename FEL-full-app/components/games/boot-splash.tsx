@@ -18,6 +18,7 @@ import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';   /
 import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
+import { bootErrorRequiresPageReload } from './boot-error';
 import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -260,6 +261,15 @@ export function SplashCard(props: BootSplashProps) {
   const pickSchool = (id: string) => {
     if (id === style.primary) { setBlend({ primary: id, secondary: id, mix: 0 }); return; }
     setBlend({ primary: id, secondary: style.secondary === style.primary ? id : style.secondary, mix: style.mix });
+  };
+  const errorDetail = typeof props.detail === 'string' ? props.detail : null;
+  const reloadRequired = bootErrorRequiresPageReload(errorDetail);
+  const recoverFromError = () => {
+    if (reloadRequired) {
+      window.location.reload();
+      return;
+    }
+    props.onRetry();
   };
 
   // THE ARENA (2026-09-18, owner: "an arena/map that has walls to run off of", "3 per mode minimum"). Picked here like the
@@ -789,10 +799,10 @@ export function SplashCard(props: BootSplashProps) {
         {props.phase === 'error' && (
           <div className="max-w-sm space-y-3">
             <p className="text-sm text-rose-300">
-              {typeof props.detail === 'string' ? props.detail : 'The arena failed to load.'}
+              {errorDetail ?? 'The arena failed to load.'}
             </p>
-            <button onClick={(e) => { e.currentTarget.blur(); props.onRetry(); }}
-              className="rounded-2xl bg-white px-8 py-3 font-black text-black">RETRY</button>
+            <button onClick={(e) => { e.currentTarget.blur(); recoverFromError(); }}
+              className="rounded-2xl bg-white px-8 py-3 font-black text-black">{reloadRequired ? 'RELOAD' : 'RETRY'}</button>
           </div>
         )}
       </div>

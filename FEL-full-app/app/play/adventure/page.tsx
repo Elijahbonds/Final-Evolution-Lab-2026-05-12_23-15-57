@@ -6,7 +6,7 @@ import { AdventureLoader } from './loader';
 export const dynamic = 'force-dynamic';
 
 /**
- * ADVENTURE PHASE B (2026-10-07): the story — the hub and Chapter 1 (placeholder story until the owner's chapters).
+ * ADVENTURE PHASE B (2026-10-07): the story — the hub and Chapter 1 draft until the owner's chapters.
  *
  * UNLISTED (owner decision, 2026-10-06: new routes are reachable by URL, noindex, linked from no menu, picker or sitemap
  * until the owner says otherwise): /dev/adventure's pattern. No sign-in wall: a guest plays on the device save; a
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  * Query: ?demo=1 (the headless Chapter 1 script plays it live), ?seed=N.
  */
 export const metadata: Metadata = {
-  title: 'The Adventure [PLACEHOLDER]',
+  title: 'The Adventure',
   robots: { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } },
 };
 

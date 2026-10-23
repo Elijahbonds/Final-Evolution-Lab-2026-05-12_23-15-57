@@ -7,6 +7,7 @@ import type { GameProps, GameResult } from '@/components/games/game-shell';
 import { useStartWake } from '@/components/games/use-start-wake';
 import { BootSplash } from '@/components/games/boot-splash';
 import { surfaceBootError } from '@/components/games/boot-error';
+import { useBabylonBootRetry } from '@/components/games/use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { gradeReactBase } from '@/lib/babylon/core/TiebreakBlitz';
 import { makeTiebreakMode } from '@/lib/babylon/modes/TiebreakMode';
@@ -31,6 +32,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
   const [phase, setPhase] = useState<ModePhase>('loading');
   const [hud, setHud] = useState<Hud>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setLoadError, reset: () => setHud({}) });
 
   useEffect(() => {
     if (!started) return;
@@ -64,32 +66,36 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
       onEndRef.current(result);
     };
 
-    runMode(makeTiebreakMode({
-      reactBase: gradeReactBase(gradeRef.current.key),
-      // Live miss check. The arena ceiling reads this exact rate off this file.
-      aiNets: (rally) => Math.random() < 0.16 + rally * 0.05,
-    }), {
-      canvas,
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-        // The card already woke the player. The harness has its own ready gate; open it so play starts.
-        if (p === 'ready') bus.emit({ t: 'button', btn: 'A', pressed: true });
-      },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-      resultSink,
-    }).then((s) => {
-      if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
-      stop = s;
-    }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-TIEBREAK] boot failed', setPhase, setLoadError }));
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(makeTiebreakMode({
+        reactBase: gradeReactBase(gradeRef.current.key),
+        // Live miss check. The arena ceiling reads this exact rate off this file.
+        aiNets: (rally) => Math.random() < 0.16 + rally * 0.05,
+      }), {
+        canvas,
+        input: bus,
+        onPhase: (p, cd) => {
+          setPhase(p);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+          // The card already woke the player. The harness has its own ready gate; open it so play starts.
+          if (p === 'ready') bus.emit({ t: 'button', btn: 'A', pressed: true });
+        },
+        onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+        resultSink,
+      }).then((s) => {
+        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+        stop = s;
+      }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-TIEBREAK] boot failed', setPhase, setLoadError }));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-  }, [started]);
+  }, [started, bootAttempt]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -149,7 +155,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : undefined}
           onStart={tapStart}
-          onRetry={tapStart}
+          onRetry={retryBoot}
         />
         {!started && (
           <div onPointerDown={wake.onPointerDown} className="absolute inset-0 z-10 flex cursor-pointer flex-col items-center justify-center gap-4 bg-black/80 p-6 text-center">

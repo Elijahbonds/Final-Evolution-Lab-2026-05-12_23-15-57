@@ -26,6 +26,7 @@ export type RuleId =
   | 'loose_ball_foul'
   | 'reach_in'
   | 'three_seconds'
+  | 'shot_clock'
   | 'goaltending'
   | 'make_it_take_it'
   | 'backcourt';
@@ -142,6 +143,16 @@ export const HANDBOOK: readonly RuleEntry[] = [
     whistle: true,
     says: 'An offensive body may not camp in the paint. Stand in there long enough and the ball goes '
       + 'the other way.',
+  },
+  {
+    id: 'shot_clock',
+    call: 'SHOT CLOCK',
+    award: 'defense',
+    deadBall: true,
+    shots: 0,
+    whistle: true,
+    says: 'On ELITE the offence has a shot clock (12 s one-on-one, 14 s three-on-three). Run it out without a shot that '
+      + 'touches the rim and the ball goes the other way. A rim touch or a new possession starts it again.',
   },
   {
     id: 'goaltending',

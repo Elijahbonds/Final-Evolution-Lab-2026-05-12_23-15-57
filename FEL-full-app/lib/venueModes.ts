@@ -24,3 +24,13 @@ export function venueCardModes(venue: Pick<Venue, 'name' | 'modes'>, live?: Read
   const derived = modesAtVenue(venue.name, live);
   return derived.length ? derived : [...(venue.modes ?? [])];
 }
+
+/** A venue card on the Play/venues surface must open a game route, not a support storefront. */
+export function isPlayableGameVenue(venue: Pick<Venue, 'playable' | 'href'>): boolean {
+  return venue.playable === true && typeof venue.href === 'string' && venue.href.startsWith('/play/');
+}
+
+/** The places shown by the Play venue strip and /venues page. */
+export function playableGameVenues(venues: readonly Venue[]): Venue[] {
+  return venues.filter(isPlayableGameVenue);
+}

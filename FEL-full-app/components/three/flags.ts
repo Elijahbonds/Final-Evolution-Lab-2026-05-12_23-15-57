@@ -74,7 +74,8 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // Rollout wave 6 — combat/duel modes (M53/M56)
   karateVersus: true,
   mixedcombat: true,
-  dunkduel: true,
+  // dunkduel's Babylon mode stays in the registry/dev harness, but /play/dunkduel is the IRL Prove It camera route.
+  // The live route does not ask this renderer flag.
   // These four mount Babylon unconditionally from their own loaders (all pass `ownControls`), so the flag was simply
   // untrue for them — and anything that asks "is this a Babylon mode?" (the shell's input owner, above) read the wrong
   // answer. Ported from elijahbonds-fel-upgrade-pass, 2026-09-12.

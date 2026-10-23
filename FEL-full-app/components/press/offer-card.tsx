@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { formatLabel, formatUsd, kindleUrl, type BookOffer, type BookTitle } from '@/lib/books/bookCatalog';
+import { formatLabel, formatUsd, kindleUrl, publicBookDescription, type BookOffer, type BookTitle } from '@/lib/books/bookCatalog';
 import { bookFormatAllowed, bookOfferAllowed } from '@/lib/books/bookTerms';
 import { BuyButton } from './buy-button';
 
@@ -66,7 +66,7 @@ export function CatalogCard({ book }: { book: BookTitle }) {
         </div>
         <h3 className="mt-3 text-sm font-semibold text-white">{book.title}</h3>
       </Link>
-      <p className="mt-1 text-[11px] text-white/40">{book.description}</p>
+      <p className="mt-1 text-[11px] text-white/40">{publicBookDescription(book)}</p>
       {primary ? (
         <p className="mt-2 text-sm text-white">
           {formatUsd(primary.priceCents)}{' '}

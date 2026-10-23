@@ -2,6 +2,7 @@
 // to the palm in every basketball mode, so a drive read as carrying. This is
 // the pure cycle: where the ball is between palm and floor at time t, and
 // where the hand should be to meet it (the hand IK target). No scene.
+import { feel } from '../../feel-panel/feel';   // feel-panel (owner 10-20): HAND_CLEAR_M is a feel knob (lib/feel-panel/knobs.ts)
 export interface DribbleParams {
   /** Palm height above the character root when the ball is in hand (m). */
   palmY: number;
@@ -145,7 +146,7 @@ export function dribbleAtPushed(phase: number, p: DribbleParams = HOOPS_DRIBBLE,
  * top. 0 when the clip's hand is already clear of the ball (the weight stays the dribble's own).
  */
 export const HAND_CLEAR_M = 0.01;
-export function clearOfBallWeight(clipY: number, targetY: number, ballTopY: number, clear = HAND_CLEAR_M): number {
+export function clearOfBallWeight(clipY: number, targetY: number, ballTopY: number, clear = feel('hoops.handClearM', HAND_CLEAR_M)): number {   // feel-panel: a feel knob
   const need = ballTopY + clear - clipY;
   if (!(need > 0) || !(targetY - clipY > 1e-4)) return 0;
   return Math.min(1, need / (targetY - clipY));

@@ -11,12 +11,14 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
+import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
 
 type Hud = Record<string, HudValue>;
@@ -31,6 +33,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -96,7 +99,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       busRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+  }, [bootAttempt]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -120,6 +123,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
           <ScoreValue value={hnode(hud.score, 0)} size="stat" />
           <HudText size="stat" alpha={HUD_TEXT_ALPHA.faint}>–</HudText>
           <ScoreValue value={hnode(hud.foeScore, 0)} size="stat" />
+          {phase === 'playing' && <HoopsShotClock value={hud.shotClock} />}
         </Scorebug>
         <HudChip tone="you" size="body">AST {hnode(hud.ast, 0)}</HudChip>
         {/* CHOKEPOINT COURT (?choke=1): the rails are on */}
@@ -144,7 +148,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       {/* shot meter */}
       {meter !== null && phase === 'playing' && (
         <div className="absolute inset-x-0 bottom-24 flex justify-center">
-          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} />
+          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} />
         </div>
       )}
 
@@ -171,7 +175,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
-        onRetry={tapStart}
+        onRetry={retryBoot}
       />
 
       {/* HOOPS PAUSE (2026-10-06). Owner: "Hoops pause: Controls panel only" — the full OFFENSE / DEFENSE list that sat along the

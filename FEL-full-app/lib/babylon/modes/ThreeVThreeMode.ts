@@ -61,7 +61,8 @@ import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { retreatFrom, shadeToward, lungeFor, lungesOn, standUpOn, reactionWish, stepReaction, reactClip, readBeatMs, type DefReaction, type DefReadGeometry } from '../core/DefenderReact';   // H2c: the defenders read the fakes
 import { AiMover, AccelFollower, driveFraction, driveSecFor } from '../core/AiMovement';
 import { stepStrongHand, STRONG_HAND_IDLE, STRONG_HAND_RETURNS, type StrongHandState } from '../core/StrongHand';
-import { stepAiHand, AI_HAND_IDLE, AI_HAND_RANGE_M, type AiHandState } from '../core/AiBallHand';   // hoops-handle (owner 10-17): the AI handlers' ball hand   // H2d (plan §3.8)
+import { PlayerGuardHand, ComboFlow, comboBanner, leftMoveTwins, spinClipFor } from './hoopsFlow';   // hoops-moves (owner 10-20): the outside hand when guarded, the combo window, the left-hand spin
+import { stepAiHand, AI_HAND_IDLE, aiHandRangeM, type AiHandState } from '../core/AiBallHand';   // hoops-handle (owner 10-17): the AI handlers' ball hand   // H2d (plan §3.8)
 import { hopOnDoubleTap, tapReleaseHeld, skipAvailable, skipAwaySide, planSkipGather, hopThen, hopReleaseOnButtonUp, hopAutoReleaseNow, HOP_AUTO_QUALITY, type DoubleTapRead, type HopRelease } from '../core/FinishFootwork';   // H2e: the double-tap hop, the skip gather
 import { familyFromStick, FAMILY_PICK_K, putbackDunkOn, PUTBACK_DUNK, oopCut, ALLEY_OOP, CONTEST_TRICK, contestTricksOn, trickPctFor } from '../core/GameDunks';
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';   // H2 leftovers: the in-air trick stick (1v1's)   // H2e: more dunks   // HOOPS MOTION phase 3b: the AI bodies move with the hero's weight (accel 26 / decel 34), sprint honoured; the scripted drive too
@@ -73,7 +74,7 @@ import { slewYaw, yawTo, playFacing, DRIVE_DUNK, driveDunkY } from '../core/Biom
 import { FLICK_RETRACT_SEC, StickHandleReader, stickMoveFor, ownedStickMove, bufferLive, PAUSE_MAX_SEC, SLIDE_MIN_SPACE_M, pausinWanted, sizeUpClip, sizeUpClipFor, STEPBACK_WINDOW_SEC, type StickGesture } from '../core/StickHandle';
 import type { HoopsDunk } from '../core/HoopsDunks';   // STICK HANDLE (2026-09-17)
 import { driveDunkKFor, handForward, handShiftTarget, stepShift, driveDunkPos, hangWanted, RIM_HANG, rimProtectorJump, rimProtectorSwats, RIM_PROTECT, chestRide, VICTIM_SLIDE, slideStep, type ShowtimeJudge } from '../core/DriveFlight';   // DUNK-FANATIC (2026-09-17): at the iron by the resolve, the rim hang, the rim protector, the chest ride
-import { clankOffRim } from '../anim/ballRig';
+import { dunkMissVelocity, dunkVerdict, matePct, rimDecidesExact } from '../core/RimForAll';   // lane/hoops-shot-core: everyone on the rim (clankOffRim retired here)
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush on the game's dunks
 import { RIM_RADIUS } from '../core/RimPhysics';
 import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
@@ -128,10 +129,10 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package 
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE, BUMP_STRIP_WINDOW_SEC,
   contestTag, aiShotRead,   // HOOPS-DEPTH S5
 } from '../core/HoopsDefense';
-import { HAND_UP_SEC, handUpContest, distXZ, rivalShotPct, proximityContest01, LAYUP_RANGE, DUNK_RANGE } from '../core/BasketballCore';
+import { HAND_UP_SEC, handUpContest, distXZ, proximityContest01, LAYUP_RANGE, DUNK_RANGE } from '../core/BasketballCore';
 import { boardWinner, BOX_OUT_RANGE, jobObjective, type BoardBody } from '../core/HoopsOffball';   // HOOPS-MOVE-KIT-A O1–O3
 import { resolveRim, forcedMissProfile } from '../core/RimPhysics';                               // the miss meets the iron it earned
-import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
+import { type RimVerdict } from '../core/RimDecides';   // THE RIM DECIDES (Phase 7): the ring's geometry answers the shot
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { judge, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, foulAward, type ScoringFormat } from '../core/Ref';         // the rules live in the handbook, not in here
 import {
@@ -177,6 +178,8 @@ import { driveIntent, driveLateral, bodiesMet } from '../core/DriveLine';
 import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition, HudValue, BodyView } from '../core/ModeHarness';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
+import { distanceGreenFactor, perfectHud, releaseGradeLabel } from '../core/ShotWindow';   // lane/hoops-shot-core
+import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // lane/hoops-shot-core
 import { readTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
@@ -358,8 +361,8 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const ftAfter = (...a: Parameters<FreeThrowLine['after']>): void => { if (ftLine) ftLine.after(...a); else a[2](); };
   let meReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
-    shotMeter.start(contest, style ?? 'jumper', gather ?? 0);
-    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`;
+    shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.char.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
+    hudGreen = `${shotMeter.greenCenter01.toFixed(3)},${shotMeter.greenHalfWidth01.toFixed(3)}`; if (ctx0) putHud(ctx0, { shotMeterPerfect: perfectHud(shotMeter.greenHalfWidth01) });   // lane/hoops-shot-core: the PERFECT band on the HUD bar
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
@@ -396,6 +399,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.char.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
   let aiHand: AiHandState = AI_HAND_IDLE, aiHandBody: Body | null = null, aiCrosses = 0;   // hoops-handle (owner 10-17): the AI handler's hand clock, whose it is, and his crossings (logged)
+  const guardHand = new PlayerGuardHand(), meFlow = new ComboFlow();   // hoops-moves (owner 10-20): my outside hand when guarded (core/GuardHand), my combo window (anim/comboFlow)
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)   // H2c (dev log): each defender's last tree state, for the stepping states' lines
   let foeShotScored = false;                     // the rival's release already banked its two (a goaltend on it whistles, it does not score again)
   let prevBallY = 0;                             // for the ball's vertical rate (goaltending reads it falling)
@@ -477,6 +481,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   /** Bumped on every possession change; every timer that changes possession checks it (the 1v1's rule) — a stale
    *  setTimeout(resetPossession) from the rival's possession fired INTO my next one and teleported me mid-meter (measured). */
   let possessionToken = 0;
+  const shotClock = new PlayerShotClock(() => playerShotClockSec('3v3', runTier()), (v) => { if (ctx0) putHud(ctx0, { shotClock: v }); });   // lane/hoops-shot-core: ELITE's 14 s shot clock (core/ShotClock)
   // ── IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md that need state ──
   /** #4 #10 #17: the MODE's clock (update() does not run while the game is paused) and the beats queued on it — every possession
    *  change, banner clear and follow-up that was a wall-clock setTimeout (they fired behind the pause card, and after dispose into
@@ -937,7 +942,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         rightHandHoops(char.animator, char.skeleton);   // HOOPS MOTION phase 3: the whole bball_* family too (captures included) — all six
-        leftDribbleTwins(char.animator, char.skeleton);   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand); HOOPS-TWO-HAND-CROSS: all six loop in the left hand
+        leftDribbleTwins(char.animator, char.skeleton); leftMoveTwins(char.animator, char.skeleton);   // hoops-moves (owner 10-20): + the spin's left-hand body (anim/leftMoveTwins)   // HOOPS MOTION phase 4b (U4): the dribble loops in the left hand too — hoops-handle (owner 10-17): on all six, the AI handlers cross as well (core/AiBallHand); HOOPS-TWO-HAND-CROSS: all six loop in the left hand
         installSafePlay(char.animator, 'threevthree');
         ctx.groundLock?.track(char.root, char.skeleton);
         // PERSPECTIVE. `allies` and `foes` used to be the same two functions for
@@ -1160,6 +1165,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       lodTick(ctx);   // #14
       micTick(ctx);   // THE MIC: its clock, the welcome on the first live frame, an open mate calling for it
       if (hoopsFx?.holdIntro(me.char.root.position, RIM)) return;   // vis-hoops-court: the broadcast intro holds the first possession (and the game clock)
+      if (shotClock.tick(dt, { token: possessionToken, ours: carrierId !== 'foeTeam', live: carrierId !== 'foeTeam' && !board && !arc.active && !mateArc.active && !shooting && !mateShooting && !dunking && !gather && !finish })) { shotClockViolation(ctx); return; }   // lane/hoops-shot-core: ELITE's shot clock
       // HOOPS KINETIC 3v3: the clocks, the vault, the overdrive's infinite turbo, the gauge on the HUD
       synergy.tick(dt); driftCool = Math.max(0, driftCool - dt); meBurstLeft = Math.max(0, meBurstLeft - dt); mateBurst[0] = Math.max(0, mateBurst[0] - dt); mateBurst[1] = Math.max(0, mateBurst[1] - dt);
       if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.char.root.position.set(q.x, q.y, q.z); me.drib.vel.set(0, 0, 0); if (u >= 1) vault = null; }
@@ -1208,6 +1214,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         strongHand = sh.state;
         if (sh.back && myC?.runMove('crossover', { pace: 1 })) { strongBacks++; console.info(`[3V3-HANDLE] strong hand back (${sh.back}) #${strongBacks}`); }
       }
+      { const myG = carries.get(me), nfG = nearestLiveFoe(); guardHand.step(dt, myG, me.char.root, nfG ? nfG.char.root.position : null, !!myG?.active && cbNow === me && !shooting && !dunking && !finish && !gather && !spin && !pausedDribble && !posting && !passFlight.active && !arc.active && !ballReleased, '3V3'); comboBanner(meFlow, (t, ms) => bannerFlash(ctx, t, ms), '3V3'); }   // hoops-moves (owner 10-20): the outside hand when guarded; the combo window's label
       { // hoops-handle (owner 10-17: "only dribbles right handed"): THE AI HANDLER'S HAND — my mate with the ball, or their driver, keeps it in
         // the hand away from the man on him and crosses it over when he comes round (core/AiBallHand): a front crossing on his carry, no roll,
         // no odds, no move — what is drawn, never what happens
@@ -1215,7 +1222,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (ab !== aiHandBody) { aiHand = AI_HAND_IDLE; aiHandBody = ab; }
         if (ab && ac) {
           const opp = (isFoe(ab) ? [me, ...mates] : foes).reduce<Body | null>((best, o) => o.stunSec > 0 || o.floored ? best : !best || distXZ(o.char.root.position, ab.char.root.position) < distXZ(best.char.root.position, ab.char.root.position) ? o : best, null);
-          const near = opp && distXZ(opp.char.root.position, ab.char.root.position) < AI_HAND_RANGE_M ? opp : null;
+          const near = opp && distXZ(opp.char.root.position, ab.char.root.position) < aiHandRangeM() ? opp : null;   // feel-panel: AI_HAND_RANGE_M as a feel knob
           const st = stepAiHand(aiHand, dt, { hand: ac.hand === 'Left' ? 'left' : 'right', away: near ? sideAwayFrom(ab.char.root.position, ab.char.root.rotation.y, near.char.root.position) : null, dribbling: ac.active && !ballReleased, moveActive: !!ac.move });
           aiHand = st.state;
           if (st.cross && ac.runMove('crossover', { pace: 1 })) { aiCrosses++; console.info(`[3V3-HANDLE] ai hand ${isFoe(ab) ? `foe${foes.indexOf(ab)}` : `mate${mates.indexOf(ab)}`} crosses → ${ac.hand} #${aiCrosses}`); }
@@ -2348,9 +2355,9 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const mateStyle: 'layup' | 'jumper' = dist < LAYUP_RANGE ? 'layup' : 'jumper';
     // a lob caught at the rim is a high-percentage finish — the read was made on the pass, so a contest
     // on the catch matters much less than it does on a jumper
-    const made = finish !== 'shot'   // (a putback slam at the iron reads the same as the oop's catch: H2 leftovers)
-      ? Math.random() < Math.max(0.55, 0.82 - mateContest * 0.2)
-      : Math.random() < rivalShotPct(dist, mateContest, mateStyle);
+    // (a putback slam at the iron reads the same as the oop's catch: H2 leftovers) — lane/hoops-shot-core: the pct moved verbatim
+    // (RimForAll.matePct) and the RING decides it below, once the miss's shape is known; the dice were `Math.random() < pct`
+    const mPct = matePct(finish, dist, mateContest, mateStyle);
     releaseBall(ball);
     // BIOMECH-HOOPS-WAVE1: the tree owns the beat; a jumper flows into the held follow-through (G5); the ball FLIES (G6)
     // H2 leftovers: HIS oop (and his putback) is a DUNK that leaves the floor — the catch-and-flush clip on the bodies' own jump arc
@@ -2369,7 +2376,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       short: mateContest * 0.8 + Math.max(0, dist - 7) * 0.12,
       lateral: (Math.random() - 0.5) * 0.9,
     };
-    mateArc.start(ball.getAbsolutePosition(), RIM, made, finish !== 'shot' ? 'layup' : 'jumper', 0, null, rimPlayFor(mateMiss.from, made, mateMiss.quality01, mateMiss.short, mateMiss.lateral));   // RIM PLAY
+    const mv = rimVerdictFor(mateMiss.from, mPct, mateMiss.quality01, mateMiss.short, mateMiss.lateral); const made = mv.made;   // lane/hoops-shot-core: on the ring, the rate kept
+    mateArc.start(ball.getAbsolutePosition(), RIM, made, finish !== 'shot' ? 'layup' : 'jumper', 0, null, mv.play);   // RIM PLAY
     if (finish !== 'shot') { ctx.juice.shake(0.12, 120); ctx.feel?.impact?.(0.5); }
     if (made) {
       myScore += points;
@@ -2421,7 +2429,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // HOOPS-10PHASE-2 phase 3: fatigue reads the same "how gassed" signal the posture layer already does (the turbo tank
     // run down) — not a new stat, just the make chance now listening to it too.
     const meFatigue01 = Math.max(0, 1 - turbo.t01);
-    const pct = fatiguePct(contestedPct(SHOT_QUALITY_PCT[quality] * pctMod, shotContest), meFatigue01) + (banked ? BANK_PCT_BONUS : 0);
+    const pct = fatiguePct(contestedPct(SHOT_QUALITY_PCT[quality] * pctMod * mbus.multiplier(), shotContest), meFatigue01) + (banked ? BANK_PCT_BONUS : 0);   // lane/hoops-shot-core: the 1v1's momentum multiplier (0.94–1.10, MomentumBus) on the 3v3 hero too
     const dist = Vector3.Distance(me.char.root.position, RIM);
     arcPoints = isThree(me.char.root.position, RIM) ? 3 : 2;
     arcLabel = currentShot?.label ?? 'SHOT';
@@ -2455,6 +2463,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     else if (quality === 'early') putHud(ctx, { banner: `EARLY${tag}` });
     else if (quality === 'late') putHud(ctx, { banner: `LATE${tag}` });
     else if (quality === 'brick') putHud(ctx, { banner: `WAY LATE${tag}` });
+    else { const g = releaseGradeLabel(quality, shotMeter.offsetSec, shotMeter.greenHalfSec); if (g) putHud(ctx, { banner: `${g}${tag}` }); }   // lane/hoops-shot-core: SLIGHTLY EARLY / LATE (ms) — odds unchanged
     // no clear here: the arc's make/miss banner replaces it and owns the timeout
     // the ball flies — score/possession resolve when it lands (update loop)
     arc.start(ball.getAbsolutePosition(), RIM, arcMade, currentShot?.style ?? 'jumper', alteredApex(shotContest), banked, v3.play);   // Phase 8: a bank has rim play too   // D3: a strong contest ALTERS the release; M12: the glass; RIM PLAY (a bank keeps its glass leg)
@@ -2484,7 +2493,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const flightTotal = showtime ? SHOWTIME_FLIGHT_MS : DRIVE_DUNK.flightMs;
     let showtimeK: number | null = null; showtimePress = false;
     console.info(`[3V3-CONTACT] drive contest ${kind} contested ${c.contested} t ${c.t.toFixed(2)} lateral ${c.lateral.toFixed(2)} set ${c.set} pct ${c.pct.toFixed(2)} wall ${wall ? (wall.stunSec > 0 ? 'stunned' : 'live') : 'none'}`);
-    let made = Math.random() < c.pct;
+    const dunkV = dunkVerdict(RIM, from, c.pct, c.contested ? 1 : 0); let made = dunkV.made;   // lane/hoops-shot-core: the RING decides the dunk (RimForAll), the rate kept — was `Math.random() < pct`
     let swatted = false;
     let swatBy: Body | null = null;   // THE MIC: who stuffed it (his word after the call)
     // DUNK-FANATIC (2026-09-17): the rim hang and the RIM PROTECTOR — the nearest live defender to the ring may leave the
@@ -2529,7 +2538,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     else me.tree.beat(picked3.clip, { holdEnd: true, speedRatio: dunkSpeedRatio(picked3, flightTotal / 1000) });
     putHud(ctx, { shotType: picked3.label });
     // THE METER ON A DUNK (owner, 2026-09-18): the bar rides the flight clock — see the 1v1's
-    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`;
+    hudGreen = showtime ? `${(SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K).toFixed(3)},${(SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K).toFixed(3)}` : `${DRIVE_DUNK.resolveK.toFixed(3)},0.050`; putHud(ctx, { shotMeterPerfect: '' });   // lane/hoops-shot-core: a dunk's bar has no perfect band
     meter3d?.begin(showtime ? { center: SHOWTIME_FLUSH_K / SHOWTIME_DEADLINE_K, half: SHOWTIME_GOOD_K / SHOWTIME_DEADLINE_K } : { center: DRIVE_DUNK.resolveK, half: 0.05 });
     if (showtime) {
       const dir = RIM_FLOOR.subtract(from); dir.y = 0; if (dir.lengthSquared() < 1e-4) dir.set(0, 0, -1); dir.normalize();
@@ -2666,7 +2675,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         resolved = true; released = true;
         const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
         if (made) dunkFlush = { releasePos, since: 0, kind: kind === 'poster' ? 'poster' : showtime ? 'showtime' : 'dunk' };
-        else { missClank(ctx); ballSim.launch(releasePos, clankOffRim(ball, RIM)); }
+        else { missClank(ctx); ballSim.launch(releasePos, dunkMissVelocity(dunkV, from, RIM)); }   // lane/hoops-shot-core: the miss bounces off the iron where the ring's error put it
         meter3d?.end(made ? 'good' : 'brick');   // (a timed flush already stamped its verdict — end() keeps the first)
         hangLeft = hangWanted(made, kind, showtimeJudge, picked3.flashy);   // DUNK-FANATIC
       }
@@ -2959,7 +2968,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const plan = pivotRead ? planPivot(me.char.root.position, me.char.root.rotation.y, pivotRead.side, pivotRead.reverse)
       : planSpin(me.char.root.position, me.char.root.rotation.y, RIM_FLOOR, defPos, side);
     spin = { plan, t: 0, beat: !!pivotRead };
-    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : 'bball_spin';   // H2b (plan §4.16): the v2 pivot, named by the free foot
+    spinClip = pivotRead ? `bball_pivot_v2_${pivotFreeFoot(pivotRead.side, pivotRead.reverse)}` : spinClipFor(carries.get(me), me.char.animator);   // H2b (plan §4.16): the v2 pivot, named by the free foot
     spinCooldown = SPIN_COOLDOWN_SEC;
     posting = false;
     // HOOPS MOTION phase 4b (plan §4.14, U7/U19): the spin's ball is its PULL (the hand change) on the carry — the carries loop ticks it
@@ -3138,7 +3147,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  not a shot at the ring. */
   function rimVerdictFor(shooterPos: Vector3, pct: number, q01: number, short: number, lateral: number): RimVerdict {
     const toShooter = shooterPos.subtract(RIM); toShooter.y = 0;
-    const v = rimDecides(RIM, toShooter, pct, q01, { short, lateral });
+    const v = rimDecidesExact(RIM, toShooter, pct, q01, { short, lateral });   // lane/hoops-shot-core: exact at every pct (RimForAll) — identical inside [0.005, 0.995]
     console.info(`[3V3-RIM] ring ${v.made ? 'YES' : 'no'} radial ${v.radial.toFixed(3)} m at pct ${pct.toFixed(2)}`);
     console.info(`[3V3-RIM] plan ${v.play.kind}${v.play.duration ? ` ${v.play.duration.toFixed(2)} s` : ''}`);
     return v;
@@ -3154,7 +3163,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   function rimTouches(a: ShotArc): void {
     for (const t of a.takeTouches()) {
       if (t.on === 'glass') { SoundKit.play('thud', { pitch: 1.5, volume: 0.35 }); console.info(`[3V3-RIM] glass kiss`); }
-      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); }
+      else { SoundKit.play('rattle', { volume: 0.18 + t.strength01 * 0.22 }); hoopJuice?.graze(); shotClock.rimTouch(); }   // lane/hoops-shot-core: a rim touch resets the shot clock
     }
   }
   /** All six bodies as the loose ball sees them — a floored or stunned body cannot go up for it. */
@@ -3378,7 +3387,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  along the facing, lateral + toward the athlete's right). */
   function meHost(): HandleHost {
     return {
-      carry: carries.get(me) ?? null,
+      carry: carries.get(me) ?? null, flow: meFlow,   // hoops-moves: the combo window (anim/comboFlow)
       beat: (clip, o) => me.tree.beat(clip, o),
       // HOOPS-TWO-HAND-CROSS (DR-3): the move REDIRECTS the travel (rotated toward its side, eased over CUT_BLEND_SEC) — it was added
       impulse: (forward, lateral) => { me.drib.redirect(forward, lateral, me.char.root.rotation.y); },
@@ -3622,7 +3631,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       if (c.bumpK !== null) c.bumpK = driveDunkKFor(c.bumpK, from, RIM, landing, DRIVE_DUNK.resolveK);   // DUNK-FANATIC: the bump on the flight's clock (the eased approach reaches his spot early)
       const ground = groundContest(meDist, facingCos(me.char.root.rotation.y, me.char.root.position, shooter.char.root.position), meHandUp);
       const contest = Math.min(1, contestLevel(shooter.char.root.position, me.char.root.position) * 0.5 + ground + (myJumpAge <= HAND_UP_SEC ? 0.3 : 0));
-      let made = Math.random() < contestedPct(c.pct, contest);
+      const dunkVF = dunkVerdict(RIM, from, contestedPct(c.pct, contest), contest); let made = dunkVF.made;   // lane/hoops-shot-core: the RING decides the dunk (RimForAll), the rate kept — was `Math.random() < pct`
       let swatted = false, bumped = false, resolved = false;
       // the rival dunks out of the same book. His showtime gate is the INVERSE of my momentum: when the game is
       // getting away from me is exactly when he starts throwing 360s, which is what a run feels like from the
@@ -3690,7 +3699,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           resolved = true;
           const releasePos = ball.getAbsolutePosition().clone(); releaseBall(ball);
           if (made) dunkFlush = { releasePos, since: 0, kind: inLane ? 'poster' : 'dunk' };
-          else { missClank(ctx); ballSim.launch(releasePos, clankOffRim(ball, RIM)); }
+          else { missClank(ctx); ballSim.launch(releasePos, dunkMissVelocity(dunkVF, from, RIM)); }   // lane/hoops-shot-core: the miss bounces off the iron where the ring's error put it
         }
         if (k < 1) return;
         foeFlightTick = null;   // IMPROVE (2026-10-06) #4
@@ -3930,6 +3939,16 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   }
   /** Their possession. IMPROVE (2026-10-06) #1: `cont` = the same possession carried on by a SWING — the receiver of their kick-out is
    *  the new ball-handler (no check, no chatter); he shoots it off the catch when he is open out there, else he attacks. */
+  /** lane/hoops-shot-core: ELITE's shot clock ran out on my team's ball — the Ref's call, and their ball (the out-of-bounds path's shape). */
+  function shotClockViolation(ctx: ModeContext): void {
+    const call = judge('shot_clock', { offense: 'me' });
+    if (call.whistle) SoundKit.play('whistle');
+    console.info(`[3V3-REF] ${call.id} → ${call.ball}`);
+    putHud(ctx, { banner: `${call.banner} — THEIR BALL` });
+    bannerClearLater(ctx, 900);
+    mic?.say({ moment: 'game.foul' }); micSlump();
+    void opponentPossession(ctx);
+  }
   async function opponentPossession(ctx: ModeContext, cont?: SwingCatch): Promise<void> {
     if (ended) return;
     if (!cont && hoopsFx?.deadBall(() => opponentPossession(ctx))) return;   // vis-hoops-court: their ball is the other dead ball (a swing's catch, `cont`, is not one)
@@ -4144,7 +4163,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const defenseFactor = Math.min(1, proximityContest01(nearestD) + ground);
     // IMPROVE (2026-10-06) #3: the base is the tier's (PRO: the shipped 0.62 layup / 0.5 jumper — a layup at the rim goes in more often
     // than a pull-up, contested the same way); #1 a catch-and-shoot reads its distance (threevthreeRules.rivalReleasePct)
-    const made = Math.random() < rivalReleasePct({ style: finishStyle, pullUp, distToRim: distXZ(shooter.char.root.position, RIM_FLOOR), defenseFactor, ground, mistake: foeNrv.mistake }, knobs);
+    const rPct = rivalReleasePct({ style: finishStyle, pullUp, distToRim: distXZ(shooter.char.root.position, RIM_FLOOR), defenseFactor, ground, mistake: foeNrv.mistake }, knobs);   // lane/hoops-shot-core: the ring decides it below (was `Math.random() < rPct`)
     // #2: A THREE IS THREE. Their makes (and a goaltend on their shot) always added 2, wherever he let it go
     const points = rivalPoints(finishStyle, isThree(shooter.char.root.position, RIM));
     foeShotPoints = points;
@@ -4163,7 +4182,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       quality01: Math.max(0.15, 0.85 - defenseFactor * 0.5),
       short: defenseFactor * 0.8, lateral: (Math.random() - 0.5) * 0.9,
     };
-    mateArc.start(ball.getAbsolutePosition(), RIM, made, finishStyle, alteredApex(defenseFactor), null, rimPlayFor(mateMiss.from, made, mateMiss.quality01, mateMiss.short, mateMiss.lateral));   // RIM PLAY
+    const rv = rimVerdictFor(mateMiss.from, rPct, mateMiss.quality01, mateMiss.short, mateMiss.lateral); const made = rv.made;   // lane/hoops-shot-core: on the ring, the rate kept
+    mateArc.start(ball.getAbsolutePosition(), RIM, made, finishStyle, alteredApex(defenseFactor), null, rv.play);   // RIM PLAY
     startBoxOut('theirs');   // O2: my team seals their bodies while the ball is up
     if (made) {
       foeScore += points; foeShotScored = true;   // IMPROVE (2026-10-06) #2

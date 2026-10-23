@@ -50,7 +50,7 @@ Why this order:
 | 10 | Edit the production env file: party, feel panel, and a check of the 20 undocumented vars | local, ships with step 11 | §10 |
 | 11 | **Deploy the app**: one deploy carries all of the above | DEPLOY | §11 |
 | 12 | Verify live: health, Studio-save reads, the coach thread, parties, the feel-panel endpoint | read-only | §11.3 |
-| 13 | Give your account the `admin` role (the feel panel and the diagnostics reader need it) | PROD WRITE | §12 |
+| 13 | Put your user id on `FEEL_PANEL_USERS` (feel panel); `admin` role only if you want the diagnostics reader | env (ships with step 11); role is PROD WRITE | §12 |
 | 14 | Create the retention Scheduler job and run it once | **IRREVERSIBLE** (it deletes rows) | §7.3 |
 | 15 | Device checks: the party on two phones, the feel panel on your phone | read-only | §13 |
 | 16 | **Later, its own deploy:** the Studio-save switch | DEPLOY | §9 |
@@ -460,7 +460,7 @@ the deploy runs.
 
 ```sh
 for v in DATABASE_URL DIRECT_URL NEXTAUTH_URL NEXTAUTH_SECRET PARTY_TICKET_SECRET NEXT_PUBLIC_NETD_URL \
-         CONTROLLER_LINK_KV_URL CONTROLLER_LINK_KV_TOKEN FEEL_PANEL_ENABLED NEXUS_STUDIO_ENABLED STUDIO_CLOUD_SAVE_ENABLED \
+         CONTROLLER_LINK_KV_URL CONTROLLER_LINK_KV_TOKEN FEEL_PANEL_ENABLED FEEL_PANEL_USERS NEXUS_STUDIO_ENABLED STUDIO_CLOUD_SAVE_ENABLED \
          COACH_STORE_LIVE ARENA_RECLAIM_SECRET CREATOR_MEDIA_BUCKET CREATOR_MEDIA_PUBLIC_BUCKET LIVE_STREAM_SCHEDULE_ENABLED \
          NEXT_PUBLIC_FEL_BODY_RIDE ABACUS_ENABLED COACH_STORE_ENABLED COACH_STORE_PAYMENTS_ENABLED COACH_STORE_COACH_USER_IDS \
          COACH_STORE_RECONCILE_SECRET COACH_REVIEWS_BUCKET COACH_REVIEW_UPLOADS_ENABLED FACE_SCAN_ENABLED \
@@ -477,7 +477,8 @@ done
 | `PARTY_TICKET_SECRET` | the §8.1 secret (from your password manager) | the app seals party tickets that netd opens |
 | `NEXT_PUBLIC_NETD_URL` | `wss://<netd url>` | build-time. If it is already set to the same netd, leave it |
 | `CONTROLLER_LINK_KV_URL`, `CONTROLLER_LINK_KV_TOKEN` | from the Upstash console | only if unset. The party room across 1–4 instances (§8.3) |
-| `FEEL_PANEL_ENABLED` | `1` | the feel panel (§12). It does nothing until your account is `admin` |
+| `FEEL_PANEL_ENABLED` | `1` | the feel panel (§12). It does nothing until your user id is on `FEEL_PANEL_USERS` |
+| `FEEL_PANEL_USERS` | `<your user id>` | comma list of exact user ids that may open the feel panel (§12). Opens nothing else |
 | `PARTY_TURN_URLS`, `PARTY_TURN_SECRET` | optional | a TURN relay for voice across strict NATs. Leave unset unless the two-phone test (§13) fails on mobile data |
 
 **Leave unset:** `STUDIO_CLOUD_SAVE_ENABLED` (§9.1).
@@ -584,40 +585,34 @@ gcloud logging read 'textPayload:"[FEL-CRASH]" OR jsonPayload.message:"[FEL-CRAS
 From `docs/FEEL-PANEL.md` (branch `lane/feel-panel`). What it requires, read from the code:
 
 1. **The flag:** `FEEL_PANEL_ENABLED=1` (§10.2). `1`, `true`, `on` and `yes` count. It is read per request.
-2. **Your account's `User.role` must be exactly `admin`.** `requireAdmin()` (`lib/admin/requireAdmin.ts`) passes only
-   `admin`. `owner` and `coach` do **not** pass. No API route writes this column, so it is a database update.
+2. **Your user id on `FEEL_PANEL_USERS`** (owner decision 2026-10-20). A comma list of exact user ids, matched
+   case-sensitively. It opens the feel panel and nothing else — no role change and no database write. (An account whose
+   `User.role` is `admin` also passes, but you do not need that for the panel.)
 3. **A playtest run:** overrides apply only on `/play/<mode>?playtest=1`, and never on an arena, challenge, ladder,
    story, carnival, online, party or agent run (`lib/feel-panel/sessionGate.ts`). A playtest run pays nothing and
    records no `GameSession`.
 
-The same `admin` role also opens the diagnostics reader `/api/admin/diag`, which the device checklist uses, plus
-`/admin/metrics`, `/admin/funnel` and `/coach/admin`. **Flag:** `admin` also unlocks the CRM, the coach knowledge-base
-drafts and `POST /api/competition/void`. Those are powers you have as the owner, now reachable from your phone's
-session.
-
 ### 12.1 Run
 
-Write these statements to files, then run them with `prisma db execute`. Use `psql` if you have it, to see the output.
+1. Signed in on the live site, open `https://<SITE_HOST>/api/auth/session` and copy `user.id`.
+2. Add `FEEL_PANEL_ENABLED=1` and `FEEL_PANEL_USERS=<that id>` to the production env (§10.2). They ship with the deploy
+   in step 11.
 
-```sql
--- 1. read first: note your id and current role (this is your undo value)
-SELECT id, email, role FROM "User" WHERE email = '<your sign-in email>';
--- 2. the write
-UPDATE "User" SET role = 'admin' WHERE id = '<your id>';
-```
-
-**You should see:** one row updated. Within 5 minutes your session picks up the new role (`lib/auth.ts` re-reads the
-role every 5 minutes). Signing out and in makes it immediate. Then `/api/feel-panel` answers `{"enabled":true}`. On
-`/play/threevthree?playtest=1` a slim **FEEL** tab sits on the left edge.
+**You should see:** `/api/feel-panel` answers `{"enabled":true}` for you (and `{"enabled":false}` for everyone else).
+On `/play/threevthree?playtest=1` a slim **FEEL** tab sits on the left edge.
 
 **If not:**
 
-- Still `{"enabled":false}`: check the flag line is in the env file that shipped (§10.1), and that the role is exactly
-  `admin` (lower case).
+- Still `{"enabled":false}`: check both lines are in the env file that shipped (§10.1), and that the id matches exactly.
 - No FEEL tab on a normal run: that is correct. The sheet opens but says "NOT applied here". Use `?playtest=1`.
 
-**Undo:** `UPDATE "User" SET role = '<the old role>' WHERE id = '<your id>';`, and/or remove `FEEL_PANEL_ENABLED` and
-redeploy. Values saved on your phone stay there and do nothing.
+**The diagnostics reader** (`/api/admin/diag`, used by the device checklist) still needs `User.role = 'admin'`. That is
+a separate, optional PROD WRITE: `SELECT id, email, role FROM "User" WHERE email = '<your sign-in email>';` (note the
+old role), then `UPDATE "User" SET role = 'admin' WHERE id = '<your id>';`. **Flag:** `admin` also unlocks the CRM, the
+coach knowledge-base drafts and `POST /api/competition/void`.
+
+**Undo:** remove `FEEL_PANEL_ENABLED` / `FEEL_PANEL_USERS` and redeploy (and, if you set it, `UPDATE "User" SET role =
+'<the old role>' WHERE id = '<your id>';`). Values saved on your phone stay there and do nothing.
 
 ---
 
