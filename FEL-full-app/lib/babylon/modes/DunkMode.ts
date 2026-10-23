@@ -60,9 +60,10 @@ import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, anat
 import type { LimbDrag } from '../anim/LimbDrag';      // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
 import { MotionLayers } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the drag, the wrists and the hinged arm are built there (lifted from here, unchanged)
 import { WristLayer, wristFor, pronateToward } from '../anim/WristLayer';   // DUNK MOTION phase 3: the wrists cock, snap and relax   // A+ P8 H1: the hang wrist reach
-import { lagToward, jamWeight, ironContact, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
+import { lagToward, jamWeight, hangHold, jamRootStep, jamFollowExtra, WRIST_LAG_TAU, HANG_MAX_SEC } from '../core/DunkHands';
+import { jamIronStep, dunkHooks, type DunkHookWho } from '../core/DunkContact';   // CONTACT-RIM-SOUND: contact by geometry only; onContact / onMiss
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS } from '../core/CourtMovement';
-import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, ringClearance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
+import { startFlush, stepFlush, sweptTouch, clearOfIron, ringDistance, type FlushState } from '../core/RimFlush';   // DUNK-BALL-ARMS-RIM: the made ball over the lip, down the ring, out of the net   // DUNK-HANDS-RIM: the wrist lag, the jam, the iron contact, the hang
 import { hitStop as feelHitStop } from '../core/gameFeel';   // DUNK-HANDS-RIM H3: the mode's own clock stops on the iron too (the harness scales dt by it)
 import { frameAbove } from '../anim/TwoBoneIK';
 import { chainDeltaToRef, localDeltaToRef, forwardByToRef, rotateInFrame as rotateInFrameOf, computeWorldMatricesDown } from '../core/DunkFrameSpace';   // DUNK-GARBAGE: the posture copy's frame-space math, no per-call allocation
@@ -729,7 +730,7 @@ export const DunkMode: ModeDefinition = (() => {
   // there and LERPED the last 0.45 m on its own (24–27 floating frames), and CONTACT (the hit-stop, the thud, the hoop) fired
   // when the ball was through the NET, 470 ms after the press (1150 ms with the windmill's sweep). Now the ball rides the
   // palm into the iron: the wrist target LAGS in (τ WRIST_LAG_TAU), the jam weight eases up (jamWeight), the root follows
-  // through JAM_FOLLOW_M, the ball lets go on the frame it meets the ring (ironContact, or the short timeout) and THAT is the
+  // through JAM_FOLLOW_M, the ball lets go on the frame it meets the ring (by geometry, CONTACT-RIM-SOUND — never on a timeout) and THAT is the
   // contact beat — the punch, the ring's dip, the net. SLAM held through the contact is a real rim hang (hangHold).
   const lagTarget = new Vector3(), _reachT = new Vector3(), _reachFwd = new Vector3(), _reachWant = new Vector3(); let lagLive = false;   // H1: the reach point the wrist trails — seeded from the clip's own hand when the reach comes on
   let jamSec = -1;                            // seconds into the JAM (the press, or the windmill's release) — −1 outside it
@@ -740,7 +741,6 @@ export const DunkMode: ModeDefinition = (() => {
   // ring for 74–171 frames; a miss froze mid-bounce 0.4–0.9 m off the floor the moment the attempt ended.
   let flush: FlushState | null = null, looseBall = false;
   const jamPrevBall = new Vector3(); let jamPrevLive = false;   // last jam frame's ball (the swept touch)
-  let punchPending = false;                   // a jam that timed out lets go short of the iron: the CONTACT beat waits for the ball to meet it
   const FLUSH_BEAT_SEC = 0.47;                // the verdict's beat after the contact (the old flush's length — the replay and the card keep their timing)
   let hangOn = false, hangHeldSec = 0;        // the rim hang: SLAM held through the contact — the body stays on the rim, the ring stays pulled
   // The follow-through + the pull-up: measured after the first pass (JAM_FOLLOW 0.2, no lift) the hand still stopped 0.33 m off
@@ -1448,6 +1448,7 @@ export const DunkMode: ModeDefinition = (() => {
       dunkOff = 0; dunkOffPlayer = 0; dunkOffRival = 0; dunkOffCards = { player: null, rival: null }; nightBest = { player: 0, rival: 0 }; dunkOffBy = '';   // dunk-next phase 3 (+ endless dunk-offs)
       hype = 0; chain = 0; finishing = false; ended = false; rivalClipToken = 0; card = emptyCard();
       style = 'power'; prop = DEV_PROP && (PROPS as readonly string[]).includes(DEV_PROP) ? (DEV_PROP as Prop) : 'none'; rimCamCut = false;   // (dev ?prop=: the probe's Dubble Up runs) hangSlowMoLatch = false; contactLatch = false;
+      dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false; gatherHeld = false; gatherTold = '';
       dunkBody.reset(); bodySlamClip = null;
@@ -2230,7 +2231,7 @@ export const DunkMode: ModeDefinition = (() => {
           finishT += dt;
           // DUNK-HANDS-RIM: the top of the sweep starts the JAM — the ball stays in the palm and the reach carries it the rest of the
           // way to the iron (it used to let go here, 0.45 m short, and float in)
-          if (finishT * finishRate >= finishRelease) { finishRelease = -1; jamSec = 0; jamContact = false; jamPrevLive = false; punchPending = false; console.info(`[HANDS] windmill top at ${finishT.toFixed(2)} s (${ball.getAbsolutePosition().y.toFixed(2)} m) — the jam carries it in`); }
+          if (finishT * finishRate >= finishRelease) { finishRelease = -1; jamSec = 0; jamContact = false; jamPrevLive = false; console.info(`[HANDS] windmill top at ${finishT.toFixed(2)} s (${ball.getAbsolutePosition().y.toFixed(2)} m) — the jam carries it in`); }
         }
         // a clipped dunk drops the dunker where the prop caught him, and the
         // prop goes over — the failure has to READ as contact, not a teleport
@@ -2263,29 +2264,41 @@ export const DunkMode: ModeDefinition = (() => {
             }
             ball.computeWorldMatrix(true);
             const bp = ball.getAbsolutePosition();
-            if (ironContact({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec, centred: true })) {
+            // CONTACT-RIM-SOUND: the contact is GEOMETRIC — the 0.28 s timeout no longer lets the ball go wherever it is; a jam that
+            // has not met the iron by JAM_SHORT_SEC is SHORT OF THE IRON (a miss, no contact, no punch)
+            const ironStep = jamIronStep({ ball: bp, rim, rimRadius: RIM_RADIUS, ballRadius: ballSim.radius, sincePress: jamSec, centred: true });
+            if (ironStep?.kind === 'contact') {
               // DUNK-BALL-ARMS-RIM: let go where the ball TOUCHED the iron on this frame's travel, not where the frame left it (in the metal)
               // …and out of the metal when it was already in it a frame ago (a low catch under the front rim: no clear frame to rewind to)
               const touch = clearOfIron(jamPrevLive ? sweptTouch(jamPrevBall, bp, rim, RIM_RADIUS, ballSim.radius) : bp, rim, RIM_RADIUS, ballSim.radius);
               releaseBall(ball); ball.position.set(touch.x, touch.y, touch.z);
               jamContact = true; flushRealSec = performance.now() / 1000; releasePos.copyFrom(ball.position); sinceRelease = 0; flush = startFlush(ball.position, rim, RIM_RADIUS, ballSim.radius, NET_THROW_MIN + (NET_THROW_MAX - NET_THROW_MIN) * Math.max(0, Math.min(1, qteAccuracy)));   // NET EXIT: a clean slam spits it out
               console.info(`[HANDS] iron contact ${(jamSec * 1000).toFixed(0)} ms into the jam: ball ${Vector3.Distance(bp, rim).toFixed(2)} m from the rim centre (${bp.y.toFixed(2)} m) · iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m (last frame ${jamPrevLive ? ringDistance(jamPrevBall, rim, RIM_RADIUS).toFixed(3) : '—'}) → let go at ${ringDistance(touch, rim, RIM_RADIUS).toFixed(3)}`);
-              // DUNK-BALL-ARMS-RIM: the CONTACT is the ball ON the iron — a jam that timed out with the ball short of it (a late slam:
-              // 9 cm of daylight measured) punches on the flush frame the ball meets the ring, not on the release
-              if (ringDistance(ball.position, rim, RIM_RADIUS) <= ringClearance(ballSim.radius) + 0.02) { setWin('contact'); contactPunch(ctx); } else punchPending = true;
+              // CONTACT-RIM-SOUND: the CONTACT is this frame — the hand with the ball at the iron by geometry — and only this frame. (A jam
+              // that timed out used to let go short of it, 9 cm of daylight on a late slam, and punch later from the flush step.)
+              setWin('contact'); contactPunch(ctx); dunkHooks.contact(aerialClip, ironStep.quality, tierFromAccuracy(qteAccuracy, aHeld), hookWho());
               // THE HANG'S CAP COUNTS FROM THE CONTACT, not the press (2026-09-18): the jam takes ~1.0 s from the slam to the iron, so a
               // slam held from the beat arrived at the ring with hangSec already at the 1 s cap and the hang never engaged (measured:
               // 'slam up 0.95 s after the press' on an ON TIME slam). Held on the contact = a hang; the tick caps it from here.
               console.info(`[HANDS] contact: slam ${aHeld ? 'held' : 'up'} ${hangSec.toFixed(2)} s after the press`);
               if (hangPrompt) { hangPrompt = false; ctx.setHud({ hint: '' }); }   // IMPROVE (2026-10-06): the prompt's job ends on the iron
               if (aHeld || skyTapped) { hangOn = true; hangHeldSec = 0; hoopJuice?.hold(true); console.info(`[HANDS] rim hang${skyTapped && !aHeld ? ' (the drop hangs)' : ''}`); }   // THE SKY TIER: the drop-in flip hangs on its own   // SLAM still held on the contact = a hang (a tap that overlaps it is a 20 ms pull, released with the tap)
+            } else if (ironStep?.kind === 'short') {
+              // CONTACT-RIM-SOUND: SHORT OF THE IRON — the jam never reached the rim. The ball drops off the hand, the body falls, and the
+              // attempt resolves as a miss on the clank path below; no contact, no punch, no flush
+              const away = new Vector3(bp.x - rim.x, 0, bp.z - rim.z); if (away.lengthSquared() > 1e-6) away.normalize(); else away.set(0, 0, 1);
+              const shortAt = jamSec;
+              releaseBall(ball); ball.position.copyFrom(bp); releasePos.copyFrom(bp); ballSim.launch(bp.clone(), new Vector3(away.x * 1.2, 0.4, away.z * 1.2)); looseBall = true;
+              qteHit = false; jamSec = -1; sinceRelease = 0; dropToFloor = true; dropVy = 0; setTrail('off'); armSettle();
+              console.info(`[HANDS] short of the iron ${shortAt.toFixed(2)} s after the press: iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m — a miss, no contact`);
+              dunkHooks.miss('short', hookWho());
+              flash(ctx, 'SHORT OF THE IRON', 900);
             } else { jamPrevBall.copyFrom(bp); jamPrevLive = true; }
           }
           if (jamContact) {
             if (flush && flush.phase !== 'free') {
               const st = stepFlush(flush, rim, RIM_RADIUS, ballSim.radius, dt);
               ball.position.set(st.pos.x, st.pos.y, st.pos.z);
-              if (punchPending && (ringDistance(st.pos, rim, RIM_RADIUS) <= ringClearance(ballSim.radius) + 0.02 || st.phase !== 'lip')) { punchPending = false; setWin('contact'); contactPunch(ctx); console.info(`[HANDS] contact on the iron ${(sinceRelease * 1000).toFixed(0)} ms after the let-go`); }
               if (st.phase === 'free') { ballSim.launch(ball.position.clone(), new Vector3(st.vel.x, st.vel.y, st.vel.z)); looseBall = true; netRealSec = performance.now() / 1000; console.info(`[HANDS] through the net ${(sinceRelease * 1000).toFixed(0)} ms after the contact`); }
             }
             const through = sinceRelease > FLUSH_BEAT_SEC;
@@ -2941,6 +2954,7 @@ export const DunkMode: ModeDefinition = (() => {
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
     rimCamCut = false; verdictCamSet = false; rivalCamCut = false; hangSlowMoLatch = false; contactLatch = false; styleTaps = 0; hangSec = 0; trickLabels = []; obstacleClipped = false;
+    dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
     slamLatch.clear(); slamSeen = false; slamCueOn = false; beatCalled = false;   // DUNK-BODY-MID: the slam buffer is per attempt
     settleLatch = false; settleArmed = false; setTrail('soft');   // A+ P5/P6: no gather at takeoff, the runway trail stays soft through it
     airHeld = false; dropToFloor = false; dropVy = 0; liveLandAt = -1; replaying = false; replayAir = false; launchRealMs = performance.now();   // A+ P8
@@ -3066,8 +3080,8 @@ export const DunkMode: ModeDefinition = (() => {
     // the finish is paced so it ends with the flush (release + the 0.47 s flush), never a held clip-less pose before CONTACT
     finishRate = finishRelease >= 0 ? Math.min(1, (player.animator.durationOf(aerialClip) ?? 0.85) / (finishRelease + 0.5)) : 1;
     if (lob.live) { setTrail('off'); armSettle(); }   // the lost lob is already bouncing — no clank, the miss is the ball on the floor
-    else if (!qteHit) { releaseBall(ball); ballSim.launch(releasePos, clankOffRim(ball, rim)); looseBall = true; missClank(ctx); setTrail('off'); armSettle(); }   // juice soft #2, #5; A+ P4
-    else if (finishRelease < 0) { jamSec = 0; jamContact = false; jamPrevLive = false; punchPending = false; }   // DUNK-HANDS-RIM: a make keeps the ball IN THE PALM — the jam carries it to the iron and lets go there (the windmill's sweep starts its jam at the top)
+    else if (!qteHit) { releaseBall(ball); ballSim.launch(releasePos, clankOffRim(ball, rim)); looseBall = true; missClank(ctx); setTrail('off'); armSettle(); dunkHooks.miss('rim', hookWho()); }   // juice soft #2, #5; A+ P4
+    else if (finishRelease < 0) { jamSec = 0; jamContact = false; jamPrevLive = false; }   // DUNK-HANDS-RIM: a make keeps the ball IN THE PALM — the jam carries it to the iron and lets go there (the windmill's sweep starts its jam at the top)
     armedAir = null; armedGrade = null;
     if (spin.active) console.info(`[DUNK-CUE] contact latch: turn still ${spin.yaw.toFixed(2)} rad at the resolve — settling`);
     if (!qteHit) dropToFloor = true;   // A+ P8 H5: a miss falls from the release height — feet-down is where the stumble lands
@@ -4075,6 +4089,9 @@ export const DunkMode: ModeDefinition = (() => {
     later(() => setTrail('off'), 130);
   }
 
+  /** CONTACT-RIM-SOUND: who the dunk hooks speak for — the rival's dunks are tagged with his actor id (DUNK-MODE-PLAN §11.9). */
+  function hookWho(): DunkHookWho { return turn === 'rival' ? { source: 'rival', actorId: foe.id } : { source: 'player' }; }
+
   function contactPunch(ctx: ModeContext): void {
     if (contactLatch) return;
     contactLatch = true;
@@ -4629,6 +4646,7 @@ export const DunkMode: ModeDefinition = (() => {
     armedAir = null; spin.reset(); replaySpinYaw = 0; clearBeats(ctx);   // dunk-next: the strip goes with the attempt
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
     dunkBody.reset(); bodySlamClip = null;
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
@@ -4637,7 +4655,7 @@ export const DunkMode: ModeDefinition = (() => {
     // THE FLIGHT'S ONCE-A-FLIGHT FLAGS ARE PER ATTEMPT (2026-09-18, measured: the bus wall run refused attempt 2 of a night — busRan, like
     // doubleLaunched / skyTapped / boardRan, was reset at the mode's start only, so every second flight of a night found its board / sky / bus 'spent')
     vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
-    resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; punchPending = false; dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherRun = null; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = hs('Right') === 'Left'; setWin('run');
+    resetLob(); resetRunway(); ballSim.stop(); looseBall = false; flush = null; jamPrevLive = false; dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherRun = null; finishRelease = -1; attachBallToHand(ball, player.skeleton, 'RightHand'); ebState.inLeftHand = hs('Right') === 'Left'; setWin('run');
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     void setupProp(ctx);
     // P7 (2026-09-16): THE RUNWAY GETS ITS CAMERA BACK. `snapTo` places and aims the camera but never touches the

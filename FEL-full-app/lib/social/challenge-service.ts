@@ -16,7 +16,7 @@
 import { prisma } from '@/lib/db';
 import { recordServerEvent } from '@/lib/analytics-server';
 import { ChallengeLinkCore, type ChallengeKeyMoment, type ChallengePayload } from './challenge-link-core';
-import { signPayload, verifyPayload } from './challenge-sign';
+import { signPayload, verifyChallenge } from './challenge-sign';
 
 export interface MintChallengeInput {
   ownerUserId?: string | null;
@@ -111,8 +111,16 @@ export async function resolveAttempt(input: ResolveAttemptInput): Promise<Resolv
   const link = await prisma.challengeLink.findUnique({ where: { code: input.code } });
   if (!link) return null;
 
-  const payload = link.payload as unknown as ChallengePayload;
-  if (!verifyPayload(payload, link.sig)) return null; // forged / corrupt
+  // CHALLENGE-SIGN-V2: `payload` is only what the signature covers (a v1 row's ghost is reduced to {t}), and the
+  // columns the pages show must match it, else the row is treated as forged.
+  const payload = verifyChallenge(link.payload as unknown as ChallengePayload, link.sig);
+  if (!payload) return null; // forged / corrupt / v1 past the sunset
+  if (
+    link.score !== payload.score ||
+    link.modeKey !== payload.modeKey ||
+    link.tag !== payload.tag ||
+    (link.display ?? undefined) !== payload.display
+  ) return null;
 
   await prisma.challengeLink.update({ where: { code: input.code }, data: { attempted: { increment: 1 } } });
   await recordServerEvent({
@@ -145,7 +153,7 @@ export async function resolveAttempt(input: ResolveAttemptInput): Promise<Resolv
   return {
     beat: res.beat,
     margin: res.margin,
-    targetScore: link.score,
+    targetScore: payload.score,
     vs: payload.tag,
     rematch,
     convertToSignup: res.funnel.convertToSignup,
