@@ -34,7 +34,8 @@ const TiebreakBabylon = dynamicImport(
 
 export function TennisLoader({ variant = 'match' }: { variant?: TennisVariant }) {
   if (variant === 'tiebreak' && isBabylon('tiebreak')) {
-    return <GameShell mode="tiebreak" title="TIEBREAK" venue="Nexus Tennis Court" Game={TiebreakBabylon} ownControls />;
+    // the venue is the catalogue's: the variant plays on Tennis's own court (venueId 'tennis'), Venice Tennis Court
+    return <GameShell mode="tiebreak" title="TIEBREAK" venue="Venice Tennis Court" Game={TiebreakBabylon} ownControls />;
   }
   // the 2D fallback (NEXT_PUBLIC_DISABLE_3D) has no tiebreak: either variant plays the 2D match
   const babylon = isBabylon('tennis');
