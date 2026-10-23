@@ -54,7 +54,7 @@ import {
 import { KnockSlides, makeChestOf } from '../core/FightKit';   // IMPROVE (2026-10-06): the shared knock slide + scratch chest points
 import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06): the OPPONENT pick — PRO on a staked / head-to-head run (QA #259)
 import { GameTimers, BannerSlot } from '../core/ModeClock';   // IMPROVE (2026-10-06): hit beats, the round-over beat and banners on the game clock
-import { dragonLicensed, fallStep, neutralRollDir, onlookerSpots, RIVAL_POWER_BY_LOADOUT } from './mixedRules';   // IMPROVE (2026-10-06)
+import { rivalTierCap, dragonLicensed, fallStep, neutralRollDir, onlookerSpots, RIVAL_POWER_BY_LOADOUT } from './mixedRules';   // IMPROVE (2026-10-06)
 import { mixedScore } from '../core/MixedScore';   // IMPROVE (2026-10-06): the result, with its ring-out bonus
 import type { VenueHandle } from '../core/NexusVenue';
 import { threatLandsIn } from '../core/RivalCombatBrain';
@@ -407,6 +407,7 @@ export const MixedCombatMode: ModeDefinition = (() => {
     const shift = brain.setStanding(foeWins, myWins, ROUNDS_TO_WIN);
     if (shift.label) console.info(`[MIX-NERVE] ${shift.label} (rounds ${foeWins}-${myWins})`);
     brain.setDifficulty(rivalDifficulty(BASE_RIVAL_DIFFICULTY, runTier()));
+    brain.setSkillCap(rivalTierCap(runTier()));   // MC75-1: the per-tier cap, every round, after the standing and the ramp
     brain.setCanSpecial(dragonLicensed(foeRatings));   // IMPROVE (2026-10-06): the pit licenses the DRAGON at full chi (#5/#6)
     brain.setEdge((x, z) => insideBy({ x, z }, arena.shape));
     knock.clear();
