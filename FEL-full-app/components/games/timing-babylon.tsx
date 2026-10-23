@@ -24,6 +24,7 @@ import {
   HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType, HudLowerThird } from './tv-hud';
 import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
+import { volleyballHeadline } from './volleyCard';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (2026-10-06, Penalty #12)
@@ -108,7 +109,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           // TENNIS-TIEBREAK-FOLD: the Tennis tiebreak variant — points, both sides
           : modeKey === 'tiebreak' ? `${won ? 'TIEBREAK WON' : 'TIEBREAK LOST'} · ${r.score}–${n('theirs')} · ${n('style')} STYLE`
-          : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
+          : modeKey === 'volleyball' ? volleyballHeadline(base)   // VB75-2: both scores, off the same result the shell saves
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
           // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
           // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
