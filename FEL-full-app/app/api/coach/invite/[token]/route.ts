@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { inviteState, joinWithInvite, type CoachInvite } from '@/lib/coach/invite';
+import { teenGateRefusal } from '@/lib/coach/teenGateServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,11 @@ export async function POST(_req: Request, { params }: { params: { token: string 
   }
 
   if (outcome.result === 'joined') {
+    // COACH-LOOP P1 (2026-10-20): joining a roster is the moment a coach starts holding a teen's training, so the teen
+    // gate runs here (lib/coach/teenGate.ts): guardian consent for 13–17, never under 13, a blank year asked first.
+    // Only on a NEW join — a dead invite still answers 400 as before, and someone already on the roster writes nothing.
+    const refused = await teenGateRefusal(prisma, clientId);
+    if (refused) return refused;
     await prisma.coachClient.create({ data: { coachId: invite!.coachId, clientId, via: 'invite' } });
     await prisma.coachInvite.update({
       where: { token },
