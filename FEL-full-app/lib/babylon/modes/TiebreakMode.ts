@@ -7,7 +7,7 @@
 // flies out before his comes back (#8), the ball bounces and casts a blob (#14 #15), the crowd builds with the rally
 // (#16), warm-up balls come before 0-0 (#17), and the ball, ring and blob are unlit, frozen and disposed with their
 // materials (#18–#20). The flight is drawn by TiebreakFlight (pure); the rules never read it.
-import { Color3, Mesh, MeshBuilder, StandardMaterial, type AnimationGroup, type Observer, type ParticleSystem, type Scene, type TransformNode, Vector3 } from '@babylonjs/core';
+import { Color3, Mesh, MeshBuilder, StandardMaterial, type AnimationGroup, type Observer, type ParticleSystem, type Scene, type Skeleton, type TransformNode, Vector3 } from '@babylonjs/core';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';
@@ -36,6 +36,7 @@ import { buildTrophy, trophyRise, TROPHY_AT, TROPHY_RISE_SEC, type TrophyHandle 
 import { motionPolicy } from '@/lib/a11y/reducedMotion';
 import { tensionLevel, tensionPulse, tensionRest, trailFor, type RestGrade } from './tiebreakFx';
 import { SPEED_VIGNETTE_ON } from '../core/ImpactFrame';
+import { countHitch, prewarmMeshes } from '../core/hitchProbe';   // S1 HITCH (2026-10-22): no mid-play clone or first-use compile
 
 export interface TiebreakModeOpts {
   reactBase: number;
@@ -66,6 +67,12 @@ const SHUFFLE_GAP = 0.3;
 const CHEER_RALLY = 4;
 const PLAYER_YAW = Math.PI;
 const RIVAL_YAW = 0;
+
+/** S1 HITCH (ALL-MODES-TO-75, 2026-10-22): the mirrored forehand, per skeleton. It is cloned once, at load, and a second ask for
+ *  the same body is answered from here — a clone is never made on a swing (a mid-play clone is a hitch; TN-5's counter). */
+const mirrorBySkeleton = new WeakMap<Skeleton, string | null>();
+/** S1 HITCH: the longest the load waits for the Meshy ball's skin before the pre-warm (a later skin compiles on first use). */
+const BALL_SKIN_WAIT_MS = 1500;
 
 /** #19: one unlit, frozen marker material — the ball, ring and blob only ever showed their emissive colour, so lighting
  *  them was cost with no look. StandardMaterial with lighting off is the unlit marker the ratchet allows. */
@@ -100,6 +107,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   let trail: ParticleSystem | null = null;
   let trailLevel: TrailLevel = 'off';
   let trophy: TrophyHandle | null = null;
+  let trophyRaised = false;                          // S1 HITCH: the cup is built (sunk, off) at load; a win raises it
   let trophyObs: Observer<Scene> | null = null;
   let trophyScene: Scene | null = null;
   let tNow = 0;                                      // seconds into the match (the heart's clock)
@@ -178,6 +186,12 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   /** #6: a mirrored copy of the forehand, so a ball on the body's other side is met with the other arm. Null when the rig
    *  has no swing to copy (the body then plays the forehand both ways, as before). */
   function buildMirrorSwing(c: SpawnedCharacter): string | null {
+    if (mirrorBySkeleton.has(c.skeleton)) return mirrorBySkeleton.get(c.skeleton) ?? null;
+    const name = mirrorSwingOf(c);
+    mirrorBySkeleton.set(c.skeleton, name);
+    return name;
+  }
+  function mirrorSwingOf(c: SpawnedCharacter): string | null {
     try {
       const groups = (c.animator as unknown as { groups?: Map<string, AnimationGroup> }).groups;
       if (!groups) return null;
@@ -186,6 +200,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       const name = `${SPORT_CLIP.tennisForehand}.M`;
       if (groups.has(name)) return name;
       const copy = src.clone(name, (t) => t, true, true);
+      countHitch(c.root.getScene(), 'clone');
       if (mirrorGroupsInPlace([copy], c.skeleton).length !== 1) { copy.dispose(); return null; }
       c.animator.register(copy);
       return name;
@@ -253,8 +268,10 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
   /** vis-party: a won match raises a cup on the court, with a burst of sparks and confetti over it. Runs on the render loop (the
    *  mode's own update has stopped), for a few seconds, then stands. */
   function raiseTrophy(ctx: ModeContext): void {
-    if (trophy) return;
-    trophy = buildTrophy(ctx.scene);
+    if (trophyRaised) return;
+    trophyRaised = true;
+    trophy ??= buildTrophy(ctx.scene);
+    trophy.root.setEnabled(true);
     let age = 0;
     const scene = ctx.scene;
     trophyScene = scene;
@@ -394,7 +411,7 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       ball.isPickable = false;
       // vis-party: the Meshy tennis ball rides the sphere (the sphere itself goes invisible); a missing scan leaves the marker.
       // The trail rides the ball and is off until the ball is in play (placeBall) — a trail at a resting ball would be a blob.
-      void dressBall(ball, 'tennis').catch(() => false);
+      const dressed = dressBall(ball, 'tennis').catch(() => false);   // S1 HITCH: awaited (capped) below, so the skin is pre-warmed too
       trail = EffectsKit.ballTrail(ctx.scene, ball, '#D4FF00');
       applyTrail(trail, 'off', '#D4FF00');
       trailLevel = 'off';
@@ -420,6 +437,14 @@ export function makeTiebreakMode(opts: TiebreakModeOpts): ModeDefinition {
       shadow.material = unlitMarker(ctx.scene, 'tb_ball_shadow_m', '#000000', 0.35);
       shadow.isVisible = false;
       shadow.isPickable = false;
+
+      // S1 HITCH (ALL-MODES-TO-75 §2, TN-5, 2026-10-22): everything the match will draw is compiled HERE, behind the intro — the
+      // ring and the blob (hidden until the first ball), the trail, the venue's cage glass and crowd tiers, and the cup a won match
+      // raises (built now, sunk and off; it compiled on the end card's first frame). mesh.isReady(true) compiles a hidden mesh's
+      // variant as well as a shown one's. Capped: a shader left over compiles on first use, as before.
+      trophy = buildTrophy(ctx.scene); trophy.root.setEnabled(false); trophyRaised = false;
+      await Promise.race([dressed, new Promise((r) => setTimeout(r, BALL_SKIN_WAIT_MS))]);
+      await prewarmMeshes(ctx.scene, ctx.scene.meshes.slice(), [trail]);
 
       ctx.heroRef.current = player.root;
       ctx.objectiveRef.current = rival.root.position;
