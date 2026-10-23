@@ -122,6 +122,44 @@ describe('flag UNSET: zero Abacus requests on every covered path', () => {
   });
 });
 
+describe("flag ON but ABACUSAI_API_KEY missing: Abacus-backed paths still send nothing", () => {
+  beforeEach(() => {
+    process.env.ABACUS_ENABLED = 'true';
+    delete process.env.ABACUSAI_API_KEY;
+  });
+
+  it.each(SENDERS)('marketing email: %s returns false before sending recipient data', async (_kind, run) => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    await expect(run()).resolves.toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(String(info.mock.calls[0]?.[0] ?? '')).toContain('ABACUSAI_API_KEY missing');
+    expect(String(info.mock.calls[0]?.[0] ?? '')).not.toContain('@');
+  });
+
+  it('CELL callLLM throws AiDisabledError before any fetch', async () => {
+    await expect(callLLM({ role: 'architect', messages: [{ role: 'user', content: 'hi' }] })).rejects.toBeInstanceOf(AiDisabledError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('CELL completeText throws AiDisabledError before any fetch', async () => {
+    await expect(completeText({ role: 'builder', messages: [{ role: 'user', content: 'hi' }] })).rejects.toBeInstanceOf(AiDisabledError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('CELL callModel(abacus) throws AiDisabledError before any fetch', async () => {
+    await expect(callProvider('abacus')).rejects.toBeInstanceOf(AiDisabledError);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('coach-service callCoachLLM returns a configured 503 before any fetch', async () => {
+    const err = await callCoachLLM('system', [{ role: 'user', content: 'hi' }]).catch((e) => e);
+    expect(err).toBeInstanceOf(CoachServiceError);
+    expect(err.status).toBe(503);
+    expect(err.message).toMatch(/not configured/i);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
 describe("ABACUS_ENABLED='true': every covered path still reaches its (mocked) endpoint once", () => {
   beforeEach(() => {
     process.env.ABACUS_ENABLED = 'true';

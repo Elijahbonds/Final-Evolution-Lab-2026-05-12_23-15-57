@@ -51,6 +51,14 @@ const nextConfig = {
   // Crashes are reported to our own /api/telemetry/crash. lib/build-config.test.ts fails if an injection like it
   // comes back.
   webpack: (config, { isServer }) => {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /node_modules[\\/]@mediapipe[\\/]tasks-vision[\\/]vision_bundle\.mjs$/,
+        message: /Critical dependency: the request of a dependency is an expression/,
+      },
+    ];
+
     if (!isServer) {
       config.output.filename = 'static/chunks/[name]-[contenthash:8].js';
       config.output.chunkFilename = 'static/chunks/[contenthash:16].js';

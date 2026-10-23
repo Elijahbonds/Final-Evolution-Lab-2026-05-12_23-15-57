@@ -93,6 +93,10 @@ export const JUMP_BUILD_PROGRAM = 'Build my Dunk Program';
 export const JUMP_PLAY_FREE = 'Play free (Brain Brawl)';
 /** Adults only. Height has no band in the register: this is the existing personal-best sentence. */
 export const JUMP_MEANING = 'A personal best to beat next time.';
+/** MIRROR flight-time step: what the number is (an estimate from video) and what it measures. No outside comparisons. */
+/** MIRROR flight-time (PM): on-screen only, under the jump setup; the recorded voice line is unchanged. */
+export const JUMP_LAND_TALL = 'Land tall, legs straight';
+export const JUMP_ESTIMATE_LINE = 'An estimate from video: your time in the air, turned into jump height. A slower camera gives a wider range.';
 /** Shown while the pose model and its runtime load, which starts only after Start. */
 export const COACH_READY = 'Getting the camera coach ready…';
 
@@ -225,3 +229,8 @@ export const REPLAY_PAUSE = 'Pause';
 export const REPLAY_SCRUB = 'Move through the rep';
 export const REPLAY_WORST = 'Worst rep';
 export const REPLAY_BEST = 'Best rep';
+/** Framing helper: the "you're in the shot" badge, so the state is never shown by colour alone (UX advice §2). */
+export const FRAMING_IN_FRAME = 'In frame';
+/** Reading-quality badge (UX advice §3): two states only, never a percentage — there is no validated accuracy number. */
+export const READ_CLEAR = 'Clear read';
+export const READ_PARTIAL = 'Partial read';

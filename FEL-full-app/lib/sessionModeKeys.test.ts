@@ -20,9 +20,31 @@ import { MP_MODES, sessionModeFor } from './mp/match-core';
 
 const APP = join(process.cwd(), 'app');
 
+const staticAttr = (attrs: string, name: string): string | null => {
+  const match = attrs.match(new RegExp(`\\b${name}="([^"]+)"`));
+  return match?.[1] ?? null;
+};
+
+/**
+ * Static in-game labels that deliberately differ from MODE_INFO. A route that wants
+ * different shell copy has to name why, so accidental venue/card drift stays visible.
+ * `route` scopes an exception to one shell when two routes save under the same key (BASEBALL-3INN: /play/derby saves
+ * 'baseball' like /play/baseball); without it the exception covers the mode's one /play shell.
+ */
+const DOCUMENTED_SHELL_COPY: Record<string, { venue?: string; title?: string; route?: string; reason: string }> = {
+  acting: { venue: 'Soundstage', reason: 'the mode plays on a stage while the catalogue groups the discipline as Acting Stage' },
+  aeroAces: { venue: 'Gate Run', reason: 'the race instance names the current course; MODE_INFO names the broader Flyway venue' },
+  baseball: { route: '/play/derby', title: 'MOONSHOT DERBY', reason: 'the home-run derby moved to /play/derby but still saves under baseball (its stake ceiling and history); the catalogue row names the three-inning game' },
+  bigAir: { venue: 'Alpine Ridge', reason: 'the run starts at the ridge inside the Mountain Slope venue family' },
+  carnival: { venue: 'Venice Beach Carnival', reason: 'the shell names the event overlay; MODE_INFO keeps the shelf grouped at Venice Beach Court' },
+  irl: { title: 'VERT', venue: 'Anywhere', reason: 'the camera tool labels the measured activity, not the Hang Time catalogue wrapper' },
+  music: { title: 'FEL GROOVE ACADEMY', venue: 'The Academy', reason: 'the shell brands the lesson space inside the Studio catalogue venue' },
+  tiebreak: { route: '/play/tennis', title: 'TIEBREAK', reason: 'the Tennis tiebreak variant (/play/tennis?variant=tiebreak) names the variant; the catalogue row keeps the Tiebreak Blitz name the shelf, venue card and challenges list' },
+};
+
 /** Every `<GameShell mode="…">` under app/, with the route it is mounted on: the keys sessions are saved under. */
-function shells(): Array<{ mode: string; route: string }> {
-  const out: Array<{ mode: string; route: string }> = [];
+function shells(): Array<{ mode: string; route: string; title: string | null; venue: string | null }> {
+  const out: Array<{ mode: string; route: string; title: string | null; venue: string | null }> = [];
   const walk = (dir: string): void => {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
@@ -33,7 +55,10 @@ function shells(): Array<{ mode: string; route: string }> {
       const parts = relative(APP, p).split(sep);
       const cut = parts.findIndex((s) => s.startsWith('_') || s.endsWith('.tsx'));
       const route = '/' + parts.slice(0, cut).join('/');
-      for (const m of src.matchAll(/<GameShell\b[^>]*?\bmode="([^"]+)"/g)) out.push({ mode: m[1], route });
+      for (const m of src.matchAll(/<GameShell\b([^>]*?)\/>/g)) {
+        const mode = staticAttr(m[1], 'mode');
+        if (mode) out.push({ mode, route, title: staticAttr(m[1], 'title'), venue: staticAttr(m[1], 'venue') });
+      }
     }
   };
   walk(APP);
@@ -60,6 +85,40 @@ describe('mode keys are session keys', () => {
     expect(byRoute.get('/play/music')).toBe('music');
     expect(byRoute.get('/play/velocity-kart')).toBe('velocityKart');
     expect(byRoute.get('/play/aero-aces')).toBe('aeroAces');
+  });
+
+  it('keeps static /play GameShell copy aligned with the catalogue, unless the alternate is documented', () => {
+    const undocumented: string[] = [];
+    const staleDocs: string[] = [];
+
+    const playShells = all.filter((shell) => shell.route.startsWith('/play/'));
+
+    for (const shell of playShells) {
+      const info = MODE_INFO[shell.mode];
+      if (!info) continue;
+      const entry = DOCUMENTED_SHELL_COPY[shell.mode];
+      const doc = entry && (!entry.route || entry.route === shell.route) ? entry : undefined;
+      if (shell.title && shell.title.toLowerCase() !== info.name.toLowerCase() && shell.title !== doc?.title) {
+        undocumented.push(`${shell.route} title '${shell.title}' (catalogue '${info.name}')`);
+      }
+      if (shell.venue && shell.venue !== info.venue && shell.venue !== doc?.venue) {
+        undocumented.push(`${shell.route} venue '${shell.venue}' (catalogue '${info.venue}')`);
+      }
+    }
+
+    for (const [mode, doc] of Object.entries(DOCUMENTED_SHELL_COPY)) {
+      const shell = playShells.find((s) => s.mode === mode && (!doc.route || s.route === doc.route));
+      if (!shell) {
+        staleDocs.push(`${mode}: no shell`);
+        continue;
+      }
+      if (doc.title && shell.title !== doc.title) staleDocs.push(`${mode}: documented title '${doc.title}' is stale`);
+      if (doc.venue && shell.venue !== doc.venue) staleDocs.push(`${mode}: documented venue '${doc.venue}' is stale`);
+      expect(doc.reason.length, `${mode} copy exception explains why`).toBeGreaterThan(40);
+    }
+
+    expect(staleDocs).toEqual([]);
+    expect(undocumented).toEqual([]);
   });
 
   it('every Arena mode is a key some GameShell saves its sessions under', () => {

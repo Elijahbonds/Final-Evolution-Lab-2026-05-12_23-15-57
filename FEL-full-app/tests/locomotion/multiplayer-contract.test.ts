@@ -5,7 +5,7 @@
 // lib/babylon/network/NetworkManager.ts is unreferenced scaffolding — no live mode imports it.)
 //
 // Two drifts are possible and both have happened:
-//   · an ENABLED mode with no challenge — you finish a run with nothing to stake it against
+//   · an ENABLED GameShell score mode with no challenge — you finish a run with nothing to stake it against
 //   · a challenge for a RETIRED mode — sprint was offered while /play/sprint redirects to /modes,
 //     so the challenge could be created and never played
 import { describe, it, expect } from 'vitest';
@@ -17,14 +17,25 @@ const MP_KEY: Readonly<Record<string, string>> = {
   snowboard_slalom: 'snowboard', karate_vs: 'karate-vs', bigair: 'big-air',
   derby: 'baseball', penalty: 'soccer', who_scene_it: 'who-scene-it',
 };
+const NON_GAMESHELL_CHALLENGE_EXEMPT = new Set(['dunkduel']);
 const mpKeyFor = (registryKey: string) => MP_KEY[registryKey] ?? registryKey;
 
 describe('multiplayer covers the game that actually ships', () => {
   const keys = new Set(MP_MODES.map((m) => m.key));
 
-  it('every enabled mode can be challenged', () => {
-    const missing = [...ENABLED_BABYLON_MODES].filter((m) => !keys.has(mpKeyFor(m)));
+  it('every enabled GameShell score mode can be challenged', () => {
+    const missing = [...ENABLED_BABYLON_MODES].filter((m) => (
+      !NON_GAMESHELL_CHALLENGE_EXEMPT.has(m) && !keys.has(mpKeyFor(m))
+    ));
     expect(missing, `enabled but not challengeable: ${JSON.stringify(missing)}`).toEqual([]);
+  });
+
+  it('documents enabled modes that are not async challenges because their live route is not GameShell', () => {
+    expect([...NON_GAMESHELL_CHALLENGE_EXEMPT]).toEqual(['dunkduel']);
+    for (const mode of NON_GAMESHELL_CHALLENGE_EXEMPT) {
+      expect(ENABLED_BABYLON_MODES.has(mode), mode).toBe(true);
+      expect(keys.has(mpKeyFor(mode)), mode).toBe(false);
+    }
   });
 
   it('no challenge exists for a mode you cannot play', () => {

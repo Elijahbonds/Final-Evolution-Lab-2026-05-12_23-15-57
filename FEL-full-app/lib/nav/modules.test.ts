@@ -119,7 +119,6 @@ const KNOWN_ORPHANS: readonly string[] = [
   // the checker just could not see the .mts scripts importing them. sourceScan.ts moved to NOT_IMPORTED.
   'lib/babylon/anim/mocapClip.ts',
   'lib/babylon/avatar/AvatarBuilder.ts',
-  'lib/babylon/error-boundary.tsx',
   'lib/babylon/network/NetworkInputSource.ts',
   'lib/babylon/nutrition/FoodScan.tsx',
   'lib/babylon/platform/GenerationService.ts',

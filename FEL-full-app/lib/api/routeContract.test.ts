@@ -62,6 +62,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'v1/soundtrack/route.ts': 'the soundtrack catalogue: house songs and approved, public, in-rotation tracks by adult creators, as slim CDN-cached entries the menus already play to anyone',
   // PIPELINES (2026-10-06): the community shelves and pickers in the game read this, signed in or not.
   'v1/pipelines/community/route.ts': 'approved, public cards by adult creators as slim credited entries (Dance songs and routines, scene packs, recipes, reads, MC lines) that every player is shown in the game anyway',
+  'coach/invite/code/[code]/route.ts': 'a typed coach-invite code is looked up before sign-in (the /coach/join page welcomes signed-out athletes); answers only the landing path, never a name or account, rate limited per address, and unknown, expired, closed or malformed codes all answer the same 404; joining itself still requires a session and the teen gate',
   'onboarding/host/route.ts': 'a visitor who scanned a card has no session yet; returns only a published card\'s display name, signature mode and accent',
 };
 

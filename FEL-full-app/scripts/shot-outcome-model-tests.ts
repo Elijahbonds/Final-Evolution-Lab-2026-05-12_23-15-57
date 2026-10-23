@@ -111,7 +111,9 @@ function modelPct(quality: ShotQuality, pctMod: number, contest01: number, fatig
   const threevthree = readFileSync(new URL('../lib/babylon/modes/ThreeVThreeMode.ts', import.meta.url), 'utf8');
   ok(/fatiguePct\(contestedPct\(SHOT_QUALITY_PCT\[quality\] \* pctMod \* mbus\.multiplier\(\), shotContest\), meFatigue01\)/.test(onevone),
     "1v1's releaseJumper runs the shot through fatiguePct, not just contestedPct");
-  ok(/fatiguePct\(contestedPct\(SHOT_QUALITY_PCT\[quality\] \* pctMod, shotContest\), meFatigue01\)/.test(threevthree),
+  // test changed (lane/hoops-shot-core item 5): 3v3's hero now carries the 1v1's momentum multiplier (owner 2026-10-20), so the
+  // pinned line is the 1v1's own shape; fatigue still wraps it exactly as before.
+  ok(/fatiguePct\(contestedPct\(SHOT_QUALITY_PCT\[quality\] \* pctMod \* mbus\.multiplier\(\), shotContest\), meFatigue01\)/.test(threevthree),
     "3v3's resolveMyShot runs the shot through fatiguePct, not just contestedPct");
   ok(/const meFatigue01 = Math\.max\(0, 1 - turbo\.t01\)/.test(onevone) && /const meFatigue01 = Math\.max\(0, 1 - turbo\.t01\)/.test(threevthree),
     "fatigue reads the turbo tank run down in both modes — the same 'how gassed' signal the posture layer already uses, not a new stat");

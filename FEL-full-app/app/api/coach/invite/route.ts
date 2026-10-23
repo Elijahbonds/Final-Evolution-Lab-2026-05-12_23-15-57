@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { randomBytes } from 'node:crypto';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { INVITE_TTL_MS, MAX_LIVE_INVITES_PER_COACH, type InviteUse } from '@/lib/coach/invite';
+import { MAX_LIVE_INVITES_PER_COACH, type InviteUse } from '@/lib/coach/invite';
+import { createCodedInvite } from '@/lib/coach/inviteServer';
 
 export const dynamic = 'force-dynamic';
 
-/** 192 bits, the same as a share token, because the URL is the whole access control. */
-const newInviteToken = () => randomBytes(24).toString('base64url');
+// COACH-LOOP P1 (2026-10-20): every new invite carries a short typed code at the front of its token (lib/coach/
+// inviteCode.ts) — `CODE~` + the same 192 random bits the link always had. The panel reads the code off the token.
 
 /** GET /api/coach/invite — my live invites, newest first. */
 export async function GET() {
@@ -40,12 +40,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'too_many_invites' }, { status: 429 });
   }
 
-  const invite = await prisma.coachInvite.create({
-    data: {
-      token: newInviteToken(), coachId, use,
-      expiresAt: new Date(Date.now() + INVITE_TTL_MS[use]),
-    },
-    select: { token: true, use: true, expiresAt: true, joined: true, createdAt: true },
-  });
+  const invite = await createCodedInvite(prisma, coachId, use);
   return NextResponse.json({ invite }, { status: 201 });
 }

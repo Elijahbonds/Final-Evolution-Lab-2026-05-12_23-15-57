@@ -233,7 +233,9 @@ function concatPaths(a: HandlePath, b: HandlePath, move: PathMove): HandlePath {
  *  now, → 1 at its next strike), `period` = the stride (s). `phiAtStrike` defaults to PATH_PHI_AT_STRIKE. */
 export interface PathLock { strikePhase: number; period: number; phiAtStrike?: number }
 /** The drawn ball at a mid-bounce start (root frame): the path starts from it (blendFrom). */
-export interface PathFrom { p: V3; v: V3 }
+/** `held` (hoops-moves, the combo window's cut-in — anim/comboFlow): the ball is at rest IN the palm (the hesi's float top), so the start
+ *  hand pushes it on (the meet below) rather than letting it fall to the path's floor point. */
+export interface PathFrom { p: V3; v: V3; held?: boolean }
 
 /**
  * The path of a move. `startHand` is the hand the ball is in (the athlete's); `pace` the move's playback rate (moveRateFor: 1 = real
@@ -259,6 +261,18 @@ export function pathFor(move: PathMove, startHand: Hand, pace = 1, stance: Parti
   if (from) path = blendFrom(path, from);
   if (lock) path = relockCatch(path, lock);
   return path;
+}
+
+/**
+ * hoops-moves (the combo window, anim/comboFlow): where a following move may take the ball out of a running path EARLY — a path that
+ * FLOATS the ball and then POUNDS it (the hesitation) hands it on at the float's top, the start of the pound, until the pound lets go:
+ * [from, to] in the path's own seconds, or null (the move hands on at its catch, as before). Read off the segments, so a mid-bounce
+ * blend and the pace carry through.
+ */
+export function cutInWindow(path: Pick<HandlePath, 'segs'>): { from: number; to: number } | null {
+  const s = path.segs;
+  for (let i = 1; i < s.length; i++) if (s[i].kind === 'pound' && s[i - 1].kind === 'float' && s[i].hand) return { from: s[i].t0, to: s[i].t1 };
+  return null;
 }
 
 /** The mirror of a path: x → −x, the hands swapped. */
@@ -355,7 +369,7 @@ function blendFrom(p: HandlePath, from: PathFrom): HandlePath {
   const r = fi >= 0 ? p.segs[fi].p1.y : DEFAULT_STANCE.r;   // the floor contact's height (the stance's ball radius)
   const meetY = r + (MEET_Y - R0) * ((s0.p0.y - r) / (P0 - R0));   // (s0.p0 is the start hand's top: the stance's P)
   // a FALLING ball, re-aimed at the path's floor contact
-  if (!handFirst && from.v.y <= 0) {
+  if (!handFirst && from.v.y <= 0 && !from.held) {
     const F = p.segs[fi].p1, tf = fallTime(from.p.y, from.v.y, F.y);
     const v0 = v3((F.x - from.p.x) / tf, from.v.y, (F.z - from.p.z) / tf);
     const vEnd = Math.hypot(v0.x, from.v.y - PATH_G * tf, v0.z);
@@ -367,7 +381,7 @@ function blendFrom(p: HandlePath, from: PathFrom): HandlePath {
   if (handFirst) { const m = meetSeg(from.p, from.v, s0.p1, s0.v1, meetY, p.startHand, meetKind); if (m) return spliced(p, [m], 1); }
   // the start hand meets it: after its own bounce (a falling ball) and its free rise to where a hand takes it
   const pre: PathSeg[] = []; let pos = from.p, vel = from.v, t = 0;
-  if (vel.y <= 0) {
+  if (vel.y <= 0 && !from.held) {
     const f = flightSeg(pos, vel, 0, fallTime(pos.y, vel.y, r), 'fall'); f.p1 = { ...f.p1, y: r }; pre.push(f);
     pos = f.p1; vel = v3(f.v1.x, -RESTITUTION * f.v1.y, f.v1.z); t = f.t1;
   }

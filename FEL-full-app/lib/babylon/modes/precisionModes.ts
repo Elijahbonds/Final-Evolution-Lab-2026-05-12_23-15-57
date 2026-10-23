@@ -118,7 +118,7 @@ const CLUTCH_MULT = 1.5;
 /** Seconds into soccer_kick_shoot where the boot meets the ball (the strike-through key). */
 const KICK_CONTACT_SEC = 0.45;
 /** Seconds into baseball_pitch_over / _side where the ball leaves the hand (between the over-the-top key and the release). */
-const PITCH_RELEASE_SEC = 0.52;
+export const PITCH_RELEASE_SEC = 0.52;
 
 // ── GOLF: the three pillars the benchmark's own lock names ──────────────────
 // "Club selection + shot timing + course reading". Shot timing was here and
@@ -1330,7 +1330,7 @@ export const DerbyMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'baseball', get mood() { return studioMood('derby', 'goldenHour'); }, camPreset: 'court',   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one
+    modeId: 'derby', get mood() { return studioMood('derby', 'goldenHour'); }, camPreset: 'court',   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one
     get intro() { return studioIntroOr('derby', 'walkIn'); },   // VIS-COURT: the broadcast intro — a crane over the park, then a shot on the batter; the first pitch waits for it. NEXUS STUDIO: 'walkIn' unless a dev-only ?venue= picks one
     replay: true,      // VIS-COURT: a home run, replayed from the broadcast angles, following the ball (a proxy body is the replay's focus)
     replayCast: () => ({ bodies: [focusProxy, me?.root, pitcher?.root].filter((r): r is TransformNode => !!r), loose: ball ? [ball] : [] }),
@@ -1487,7 +1487,7 @@ export const DerbyMode: ModeDefinition = (() => {
       flight = new Flight(ball, -6);
       ctx.objectiveRef.current = ball.position;
       battingCam(ctx, true);
-      assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'baseball' });
+      assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'derby' });
 
       // THE BODY (2026-09-13). Derby mounted no posture layer at all, so a batter waited on a 14 m/s pitch
       // with his chest wherever the idle left it and his eyes on nothing. FieldPosture's batting chain is

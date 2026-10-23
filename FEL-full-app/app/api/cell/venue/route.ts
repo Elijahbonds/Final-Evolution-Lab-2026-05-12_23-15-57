@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { completeText } from '@/lib/cell-engine';
-import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
+import { abacusAvailable, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
 import { rateLimit } from '@/lib/rate-limit';
 import { readDobYear, type GateDb } from '@/lib/privacy/scanSaveGate';
 import { AI_BUILDER_AGE_REFUSED, aiBuilderAllowed } from '@/lib/nexus-studio/aiAccess';
@@ -36,7 +36,7 @@ const VENUE_AI_MAX_BODY = 400_000;
  * No new environment variable or secret: it runs on CELL's existing key, behind CELL's existing switch.
  */
 export async function POST(req: Request) {
-  if (!abacusEnabled()) return aiComingSoonResponse('studio');
+  if (!abacusAvailable()) return aiComingSoonResponse('studio');
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as { id?: string } | undefined)?.id;

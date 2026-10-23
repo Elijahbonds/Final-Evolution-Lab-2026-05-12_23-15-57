@@ -16,7 +16,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Play } from 'lucide-react';
 import { VENUES } from '@/lib/game-data';
-import { venueCardModes } from '@/lib/venueModes';
+import { playableGameVenues, venueCardModes } from '@/lib/venueModes';
 import { modeKeyForHref } from '@/lib/mode-routes';
 import { MasteryBadge } from '@/components/mastery-badge';
 
@@ -32,8 +32,9 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
     return () => { live = false; };
   }, []);
 
-  // NP-1: only playable venues are shown; unbuilt ones are hidden, never labelled.
-  const live = VENUES.filter((v) => v.playable).length;
+  // NP-1: only playable game venues are shown here; support storefronts stay under Profile.
+  const venues = playableGameVenues(VENUES);
+  const live = venues.length;
 
   return (
     <section className={heading ? 'mt-12' : ''}>
@@ -51,7 +52,7 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
       )}
 
       <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {VENUES.filter((v) => v.playable).map((venue, i) => {
+        {venues.map((venue, i) => {
           const key = modeKeyForHref(venue.href);
           const tier = key ? mastery[key]?.tierIndex ?? 0 : 0;
           const card = (

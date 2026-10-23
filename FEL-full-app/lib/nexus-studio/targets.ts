@@ -22,7 +22,7 @@ export interface PlaytestTarget {
   /** The hero's facing on that spot (radians; the cast preview stands it so). */
   subjectYaw: number;
   objective: V3;
-  /** The mode definition's own `modeId` where it is not the registry key (Derby plays as 'baseball'): the editor's scene is marked
+  /** The mode definition's own `modeId` where it is not the registry key (none today: Derby played as 'baseball' until BASEBALL-REGISTER): the editor's scene is marked
    *  with it (scene.metadata.felModeId — lookPolicy, the kit defaults and the fixture / sky / decal gates read it), as the mode's is. */
   modeId?: string;
   /** CameraDirector preset the mode plays on. */
@@ -127,13 +127,13 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     // read where the body is — none of it measured against a scaled body.
     castFrame: { frame: 'standard', why: 'No scoring-fairness review yet (docs/NEXUS-STUDIO.md §10.5): the standard frame.' },
   },
-  // §13.3: Derby (registry key 'derby', the definition's modeId 'baseball'). precisionModes.ts DerbyMode reads the venue through
+  // §13.3: Derby (registry key 'derby', modeId 'derby' since BASEBALL-REGISTER; it was 'baseball'). precisionModes.ts DerbyMode reads the venue through
   // the same dev-only lines and passes the angles to the home run's replay.
   derby: {
     key: 'derby',
     label: 'Derby',
     spec: 'derby',
-    modeId: 'baseball',
+    modeId: 'derby',
     subject: [-0.7, 0, 0],     // DerbyMode: the batter at the plate, facing +x (yaw π/2)
     subjectYaw: Math.PI / 2,
     objective: [0, 0, 18],     // the pitcher's mound (DerbyMode: pitcher at z 18; PITCHER_VIEW)

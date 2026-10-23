@@ -96,10 +96,11 @@ describe('the example price file', () => {
     }
   });
 
-  it('lists every direct-sale offer once and leaves out the KDP-blocked ebooks and bundles', () => {
+  it('lists every direct-sale offer once and leaves out KDP-blocked or pending-audio offers', () => {
     const directSale = BOOKS.flatMap((b) => b.offers).filter((o) => o.directSale).map((o) => o.id);
     expect(priceFile.rows.map((r) => r.offerId)).toEqual(directSale);
     expect(priceFile.rows.some((r) => r.offerId === 'art-of-dunking:ebook' || r.offerId === 'art-of-dunking:bundle')).toBe(false);
+    expect(priceFile.rows.some((r) => r.offerId === 'unfair-advantages:audiobook' || r.offerId === 'unfair-advantages:bundle')).toBe(false);
   });
 });
 

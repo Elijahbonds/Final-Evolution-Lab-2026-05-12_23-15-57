@@ -18,7 +18,7 @@ export const DOORS: Door[] = [
   { href: '/story', label: 'Story', tab: 'play' },
   { href: '/host', label: 'Big screen', tab: 'play' },
   { href: '/join', label: 'Join a game', tab: 'play' },   // MULTIPLAYER (2026-10-06): type the code on a friend's TV
-  { href: '/party', label: 'Party', tab: 'play' },   // PARTY-CHAT (2026-10-13): the PSN-style party — chat, voice, play together
+  { href: '/party', label: 'Party chat', tab: 'play' },   // PARTY-CHAT (2026-10-13): the PSN-style party — chat, voice, play together
   { href: '/modes', label: 'All modes', tab: 'play' },
 
   // TRAIN — the coaching business, the credentials, the classes, the gym.
@@ -26,7 +26,7 @@ export const DOORS: Door[] = [
   { href: '/camp', label: 'Camp', tab: 'train' },
   { href: '/education', label: 'Education', tab: 'train' },
   { href: '/learn', label: 'Learn feed', tab: 'train' },
-  { href: '/live', label: 'Live classes', tab: 'train' },
+  { href: '/live', label: 'Program guide', tab: 'train' },
   { href: '/coach', label: 'Coaching', tab: 'train' },
 
   // PROFILE — what you own, what you have done, what you make.
@@ -36,7 +36,7 @@ export const DOORS: Door[] = [
   { href: '/cards', label: 'Card collection', tab: 'profile' },
   { href: '/account', label: 'Account', tab: 'profile' },
   { href: '/market', label: 'Marketplace', tab: 'profile' },
-  { href: '/create', label: 'Studio', tab: 'profile' },
+  { href: '/create', label: 'Create', tab: 'profile' },
   { href: '/guidance', label: 'Pathways', tab: 'profile' },
   { href: '/signature', label: 'Signature', tab: 'profile' },
   { href: '/support', label: 'Support', tab: 'profile' },

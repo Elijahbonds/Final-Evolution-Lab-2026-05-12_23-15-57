@@ -48,3 +48,18 @@ describe('/live, the live classes section', () => {
     expect(m).toMatch(/>Program guide</);
   });
 });
+
+describe('/live, schedule door', () => {
+  it('stays hidden while the live schedule flag is off', () => {
+    const m = renderToStaticMarkup(createElement(LiveView));
+    expect(m).not.toContain('href="/live/schedule"');
+    expect(m).not.toMatch(/Weekly stream schedule/);
+  });
+
+  it('links the working schedule page when the flag is on', () => {
+    const m = renderToStaticMarkup(createElement(LiveView, { scheduleEnabled: true }));
+    expect(m).toContain('href="/live/schedule"');
+    expect(m).toMatch(/Weekly stream schedule/);
+    expect(m).toMatch(/Twitch and FEL live slots/);
+  });
+});

@@ -48,7 +48,7 @@ export async function uploadMedia(input: UploadInput, fetchImpl: FetchLike = (u,
   const data = (await res.json().catch(() => ({}))) as { uploadUrl?: string; headers?: Record<string, string>; publicUrl?: string; error?: string; message?: string };
   if (!res.ok) {
     if (res.status === 403) throw new UploadError('device_only', data.message ?? 'Uploads are for creators 18 and over. Your work stays on this device.');
-    if (res.status === 503) throw new UploadError('coming_soon', 'Uploads are coming soon: FEL has not switched creator storage on yet.');
+    if (res.status === 503) throw new UploadError('coming_soon', 'Uploads are not available right now.');
     if (res.status === 429) throw new UploadError('rate_limited', 'Too many uploads in a row. Try again in a few minutes.');
     throw new UploadError('refused', data.error ?? `Upload refused (${res.status}).`);
   }

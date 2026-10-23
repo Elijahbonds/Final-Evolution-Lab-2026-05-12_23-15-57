@@ -44,7 +44,7 @@ export const STATIC_CONTROLS: readonly StaticControlsLine[] = [
   // the hoops lane (1v1 #1, 3v3 #7: "show one line keyed to the current state … and put the full list in pause") replaced
   // them with ONE line for the state you are in (onevoneRules / threevthreeRules hintFor): live prompts by this file's own
   // rule, listed on the scan's LIVE side. The panel shows the curated hoops lists (panelLines.ts), which never read these.
-  { mode: 'dunk', file: 'DunkMode.ts', text: 'HOLD to run · tap JUMP at the line — then SLAM on NOW!' },
+  { mode: 'dunk', file: 'DunkMode.ts', text: 'HOLD to run · tap JUMP at the line · press to flush' },   // DUNK-NO-PRESS-MISS (c)
   { mode: 'dunkduel', file: 'DunkDuelMode.ts', text: 'STYLE to cycle · X / D-PAD down picks the CAR, BARRIER or CRATE · LOOK stick orbits the camera · HOLD to run — then tap jump' },
   // ── combat ──
   { mode: 'karate', file: 'KarateEndlessMode.ts', text: 'Strings: A A A · A A B WHIRLWIND · A B Y HAMMER · B B Y TYPHOON · stick AT a body + Y = RUSH · pull back + B = SPIN BACK KICK · L1 on a staggered body = GRAB (A swing · Y throw) · tap BLOCK late on a wind-up = COUNTER · land 8 = TAKEDOWN (L1) · a miss or a hit taken breaks the flow · R1 = CHI BURST' },

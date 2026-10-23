@@ -37,7 +37,7 @@ export const ARENA_MOOD: Readonly<Record<string, VenueMood>> = {
  *  arena wins in mountVenue (`options.arena` is applied before `options.look`), so its arena decides. */
 export const PLACE_KEY_OF: Readonly<Record<string, string>> = {
   football: 'football', carnival: 'carnival', tennis: 'tennis', tiebreak: 'tiebreak', volleyball: 'volleyball',
-  baseball: 'derby', derby: 'derby', golf: 'golf', soccer: 'penalty', penalty: 'penalty', dance: 'dance', brainbrawl: 'brainbrawl',
+  baseball: 'baseball', derby: 'derby', golf: 'golf', soccer: 'penalty', penalty: 'penalty', dance: 'dance', brainbrawl: 'brainbrawl',
 };
 
 /** The light each non-home place look asks for, read off its sky (placeLooks.ts NIGHT / NEON / DAWN / EMBER / DESERT /
@@ -49,6 +49,7 @@ export const PLACE_MOOD: Readonly<Record<string, Readonly<Record<string, VenueMo
   tiebreak:   { clay: 'daylight', grass: 'overcast' },
   volleyball: { 'night-beach': 'nightGame', gym: 'indoorArena' },
   derby:      { sandlot: 'daylight', 'night-dome': 'nightGame' },
+  baseball:   { sandlot: 'daylight', 'night-dome': 'nightGame' },
   golf:       { desert: 'daylight', 'alpine-dawn': 'goldenHour' },
   penalty:    { 'street-cage': 'nightGame', 'beach-pitch': 'goldenHour' },
   dance:      { 'neon-club': 'nightGame', 'rooftop-dusk': 'dusk' },

@@ -9,16 +9,18 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { jumpChange, jumpChangeLine } from '@/lib/screen/kid';
 import {
-  DISCLAIMER, JUMP_BUILD_PROGRAM, JUMP_DO_FULL, JUMP_MEANING, JUMP_PLAY_FREE, KID_JUMP, KID_NO_JUMP, KID_SAVE_LINE,
+  DISCLAIMER, JUMP_BUILD_PROGRAM, JUMP_ESTIMATE_LINE, JUMP_DO_FULL, JUMP_MEANING, JUMP_PLAY_FREE, KID_JUMP, KID_NO_JUMP, KID_SAVE_LINE,
   PRIVACY_LINK, RUN_IT_AGAIN, STOP_LINE,
 } from '@/lib/screen/copy';
-import { formatJumpCm, readJumpUnit, writeJumpUnit, type JumpUnit } from '@/lib/screen/jump';
+import { formatJumpEstimate, readJumpUnit, writeJumpUnit, type JumpUnit } from '@/lib/screen/jump';
 import { PRIVACY_PATH, programPath } from '@/lib/screen/routes';
 import { tabStorage } from '@/lib/screen/store';
 import { primaryBtn, quietBtn } from './screen-ui';
 
-export function JumpResult({ heightCm, attempts, kid, jumpIn, lastIn, onFull, onAgain }: {
+export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn, lastIn, onFull, onAgain }: {
   heightCm: number | null;
+  /** The grader's one-frame timing band (cm): shown as the ± range, never an exact number. */
+  plusMinusCm?: number | null;
   attempts: number;
   kid: boolean;
   jumpIn: number | null;
@@ -36,10 +38,11 @@ export function JumpResult({ heightCm, attempts, kid, jumpIn, lastIn, onFull, on
       <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
         <p className="text-[16px] text-white/80">{KID_JUMP}</p>
         {heightCm !== null ? (
-          <p data-jump-number className="mt-1 text-[40px] font-black leading-none text-white">{formatJumpCm(heightCm, unit)}</p>
+          <p data-jump-number className="mt-1 text-[40px] font-black leading-none text-white">{formatJumpEstimate(heightCm, plusMinusCm, unit)}</p>
         ) : (
           <p data-jump-missing className="mt-2 text-[18px] font-bold leading-snug">{KID_NO_JUMP}</p>
         )}
+        {heightCm !== null ? <p data-jump-estimate className="mt-2 text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE}</p> : null}
         <p data-jump-attempts className="mt-2 text-[16px] text-white/75">{attempts} attempts, best kept</p>
         <div className="mt-3 flex justify-center gap-2">
           <button type="button" data-unit="in" aria-pressed={unit === 'in'} onClick={() => pick('in')} className={`${unit === 'in' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Inches</button>
