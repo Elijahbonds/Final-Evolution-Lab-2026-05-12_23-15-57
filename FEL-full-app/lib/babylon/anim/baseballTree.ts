@@ -20,13 +20,20 @@ export interface BaseballAnimInput {
   sliding: boolean;
   celebrating?: boolean;
   dejected?: boolean;
+  /** BASEBALL-FEEL §2: a hit's run to the base plays baseball_run (run ×1.0); a homer keeps the trot. */
+  sprint?: boolean;
+  /** §2: the release on a slider is the side-arm (baseball_pitch_side, as Derby). */
+  sideArm?: boolean;
+  /** §2: a fielder closing in on the ball strafes (strafe_left / strafe_right) under the routine slot. */
+  strafe?: 'left' | 'right' | null;
+  /** §3: the swing's requested speedRatio (contact starts at Derby's 1.7; power ≥ contact). */
+  swingSpeed?: number;
 }
 
 export const BASEBALL_CLIP_FOR: Readonly<Record<BaseballAnimState, { clip: string; loop: boolean; fadeSec: number }>> = {
   idle:          { clip: 'idle_stand', loop: true, fadeSec: 0.2 },
-  // BASEBALL-FEEL (2026-10-23): the wind-up is the first PITCH_RELEASE_SEC of the pitch clip (its leg lift), not the
-  // batter's stance on the pitcher. Same clip and same opts as pitch_release, so windup → release plays on, no restart.
-  windup:        { clip: 'derby_pitch', loop: false, fadeSec: 0.08 },
+  // BASEBALL-FEEL §2: the pitcher's wind-up HOLDS idle_stand (baseball_stance is a batter's), then the release clip plays.
+  windup:        { clip: 'idle_stand', loop: true, fadeSec: 0.2 },
   pitch_release: { clip: 'derby_pitch', loop: false, fadeSec: 0.08 },
   stance:        { clip: 'baseball_bat_stance', loop: true, fadeSec: 0.18 },
   swing_contact: { clip: 'baseball_swing_full', loop: false, fadeSec: 0.05 },
@@ -44,7 +51,7 @@ export const BASEBALL_CLIP_FOR: Readonly<Record<BaseballAnimState, { clip: strin
   dejected:      { clip: 'idle_stand', loop: false, fadeSec: 0.2 },
 };
 
-export function chooseBaseballClip(i: BaseballAnimInput): { state: BaseballAnimState; clip: string; loop: boolean; fadeSec: number } {
+export function chooseBaseballClip(i: BaseballAnimInput): { state: BaseballAnimState; clip: string; loop: boolean; fadeSec: number; speedRatio: number } {
   let state: BaseballAnimState;
   if (i.celebrating) state = 'celebrate';
   else if (i.dejected) state = 'dejected';
@@ -59,22 +66,29 @@ export function chooseBaseballClip(i: BaseballAnimInput): { state: BaseballAnimS
   else if (i.batting) state = 'stance';
   else if (i.pitching) state = 'windup';
   else state = 'idle';
-  return { state, ...BASEBALL_CLIP_FOR[state] };
+  const c = { state, ...BASEBALL_CLIP_FOR[state], speedRatio: 1 };
+  // §2 / §3: the same slot, a different existing clip or speed
+  if (state === 'run' && i.sprint) c.clip = 'baseball_run';
+  else if (state === 'pitch_release' && i.sideArm) c.clip = 'baseball_pitch_side';
+  else if (state === 'field_routine' && i.strafe) { c.clip = i.strafe === 'left' ? 'strafe_left' : 'strafe_right'; c.loop = true; }
+  else if ((state === 'swing_contact' || state === 'swing_power') && i.swingSpeed) c.speedRatio = i.swingSpeed;
+  return c;
 }
 
 export class BaseballAnimTree {
   private current: BaseballAnimState | null = null;
+  private currentClip: string | null = null;
   constructor(private animator: CharacterAnimator) {}
   update(input: BaseballAnimInput): BaseballAnimState {
     const c = chooseBaseballClip(input);
-    if (c.state !== this.current) {
-      this.animator.play(c.clip, { loop: c.loop, fadeSec: c.fadeSec });
-      this.current = c.state;
+    if (c.state !== this.current || c.clip !== this.currentClip) {
+      this.animator.play(c.clip, c.speedRatio !== 1 ? { loop: c.loop, fadeSec: c.fadeSec, speedRatio: c.speedRatio } : { loop: c.loop, fadeSec: c.fadeSec });
+      this.current = c.state; this.currentClip = c.clip;
     }
     return c.state;
   }
   clearBeat(...states: BaseballAnimState[]): void {
-    if (this.current && states.includes(this.current)) this.current = null;
+    if (this.current && states.includes(this.current)) { this.current = null; this.currentClip = null; }
   }
-  reset(): void { this.current = null; }
+  reset(): void { this.current = null; this.currentClip = null; }
 }

@@ -114,6 +114,8 @@ export interface BaseballView {
   contact(grade: SwingGrade): void;
   /** Strike three (BASEBALL-FEEL: the batter's dejected beat). */
   strikeout?(): void;
+  /** Runs crossed the plate on this hit (BASEBALL-FEEL §2: the celebrate beat). */
+  scored?(runs: number): void;
   banner(text: string): void;
   hud(patch: Record<string, string | number>): void;
   end(result: BaseballResult): void;
@@ -199,6 +201,7 @@ export class BaseballGame {
     const r = advance(this.bases, n);
     this.bases = r.bases; this.runs += r.runs; this.hits++; this.strikes = 0; this.batters++;
     if (n === 4) this.homers++;
+    if (r.runs > 0) this.view.scored?.(r.runs);
     const name = n === 4 ? 'HOME RUN' : n === 2 ? 'DOUBLE' : 'SINGLE';
     this.banners.flash(r.runs > 0 ? `${name}! +${r.runs} RUN${r.runs === 1 ? '' : 'S'}` : `${name}!`, BANNER_MS);
     this.settle();

@@ -36,7 +36,7 @@ import { derbySeed } from '../core/DerbyLoop';
 import { PRECISION_CONFIG as CFG } from './modeConfigs';
 import { BaseballGame, RELEASE_Z, SWING_WINDOW_SEC, type SwingGrade } from './baseballGame';
 import { mountTwoHandBat, type BatHandle } from './baseballBat';
-import { BaseballSlots, SlotDriver, hitStopFor, SWING_STOP_T, swingWeightFor, type SwingWeight } from './baseballSlots';
+import { BaseballSlots, SlotDriver, hitStopFor } from './baseballSlots';
 
 /** Derby's batting frame (precisionModes.ts battingCam): behind and left of the batter, the pitcher mid-frame. */
 const BATTING_CAM = new Vector3(-1.75, 1.85, -3.4);
@@ -70,7 +70,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
   /** The slot each body is in, off the game's events (baseballSlots). */
   let slots: BaseballSlots | null = null;
   let bat: BatHandle | null = null, batSec: number | null = null;
-  let driver: SlotDriver | null = null, swingW: SwingWeight = 'contact', swingHeld = false;
+  let driver: SlotDriver | null = null, swingHeld = false;
   /** The pitch on its way in: seconds since the release and its speed (null: nothing inbound). */
   let inbound: { t: number; speed: number } | null = null;
 
@@ -111,8 +111,8 @@ export const BaseballInningsMode: ModeDefinition = (() => {
       const seed = derbySeed();
       game?.dispose();
       game = new BaseballGame({
-        windup: () => {
-          slots?.windup();
+        windup: (p) => {
+          slots?.windup(p);
           ball?.setEnabled(false);
           if (flight) flight.active = false;
         },
@@ -121,15 +121,13 @@ export const BaseballInningsMode: ModeDefinition = (() => {
           ball?.position.set(0, RELEASE_Y, RELEASE_Z); ball?.setEnabled(true);
         },
         swing: (g) => {
-          slots?.swing(g); swingW = swingWeightFor(g.kind); swingHeld = false;
+          slots?.swing(g); swingHeld = false;
           SoundKit.play('whoosh');
         },
         contact: (g) => {
           // the crack on the contact frame: the press that connected, with the ball at the plate (±0.15 s)
           SoundKit.play('impact', { pitch: g.kind === 'homer' ? 1.5 : 1.25, volume: 0.9 });
-          ctx.juice.hitStop(hitStopFor(g.kind));   // contact < power ≤ homer, all ≤ HIT_STOP_CAP_MS
-          ctx.juice.shake(g.kind === 'homer' ? 0.12 : 0.06, 120);
-          slots?.contact(g);
+          slots?.contact(g);   // the hit-stop waits for the swing clip's contact key (t 0.3): see update
           if (g.kind === 'homer') SoundKit.play('crowdCheer');
           inbound = null;
           if (ball && flight) {
@@ -139,6 +137,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
           }
         },
         strikeout: () => slots?.strikeout(),
+        scored: (runs) => slots?.scored(runs),
         banner: (text) => ctx.setHud({ banner: text }),
         hud: (patch) => ctx.setHud(patch),
         end: (r) => ctx.end(r.outcome, r.score, r.stats),
@@ -151,7 +150,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
       if (e.t === 'button' && e.btn === 'A' && e.pressed) game?.press();
     },
 
-    update(_ctx: ModeContext, dt: number) {
+    update(ctx: ModeContext, dt: number) {
       game?.tick(dt);   // the only clock: pitches, banners and the end all run off it, so a pause holds them
 
       if (inbound && ball) {
@@ -167,11 +166,14 @@ export const BaseballInningsMode: ModeDefinition = (() => {
       const f = slots.tick(dt);
       driver?.apply(f);   // a new beat re-fires even when it is the same slot as the last (two strikeouts in a row)
       batSec = f.batSec;
-      // the swing's stop point: contact checks at t 0.42, power drives to 0.55 — the clip holds there
-      if (f.batter.swinging && !swingHeld && batSec != null && batSec >= SWING_STOP_T[swingW]) {
-        swingHeld = true;
-        batter?.animator.setSpeed(swingW === 'power' ? 'baseball_contact_drive' : 'baseball_swing_full', 0);
+      bat?.setVisible(f.batVisible);   // §4: stance, the swings and the recovery only
+      // §3: the hit-stop starts on the swing clip's contact key; contact < power ≤ homer, all ≤ HIT_STOP_CAP_MS
+      if (f.hitStop) {
+        ctx.juice.hitStop(hitStopFor(f.hitStop));
+        ctx.juice.shake(f.hitStop === 'homer' ? 0.12 : 0.06, 120);
       }
+      // §3: power parks on its last frame for the hold (contact has already blended back to the stance)
+      if (f.powerHold && !swingHeld) { swingHeld = true; batter?.animator.setSpeed('baseball_contact_drive', 0); }
     },
 
     dispose() {
