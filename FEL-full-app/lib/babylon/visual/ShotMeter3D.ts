@@ -4,6 +4,7 @@
 // early or late, red for a brick — then a fade. The HUD's own bar at the bottom of the screen stays; this one is where
 // the player is looking. Pure numbers come from the mode's ShotMeter (greenCenter01 / greenHalfWidth01): this only draws.
 import { Color3, MeshBuilder, ShaderMaterial, TransformNode, Vector3, Vector4, type Camera, type Scene } from '@babylonjs/core';
+import { PERFECT_BAND_SHARE } from '../core/shotBands';
 
 export type MeterVerdict = 'perfect' | 'good' | 'early' | 'late' | 'brick' | 'held' | null;
 
@@ -99,7 +100,7 @@ export function mountShotMeter3D(scene: Scene): ShotMeter3DHandle {
   const setGreen = (g: { center: number; half: number; perfectHalf?: number }) => {
     const half = Math.max(0.012, g.half), c = Math.max(half, Math.min(1 - half, g.center));
     greenHalf = half * H; greenY = yOf(c);
-    perfectHalf = Math.min(half, g.perfectHalf ?? half * 0.35) * H;   // HOOPS-DEPTH S6: the band drawn IS the band graded
+    perfectHalf = Math.min(half, g.perfectHalf ?? half * PERFECT_BAND_SHARE) * H;   // HOOPS-DEPTH S6: the band drawn IS the band graded
     upload();
   };
   show(false); upload();
