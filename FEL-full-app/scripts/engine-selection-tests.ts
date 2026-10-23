@@ -35,6 +35,7 @@ const rendererFlagByRegistryMode: Record<string, string> = {
   bigair: 'bigAir',
   brainbrawl: 'brainBrawl',
   carnival: 'carnival',
+  baseball: 'baseball', // BASEBALL-3INN: /play/baseball asks isBabylon('baseball')
   dance: 'dance',
   derby: 'baseball',
   duel: 'duel',

@@ -87,7 +87,7 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
 ];
 
 /** MODELS PASS phase 7: which roster bodies a mode's rivals and crowd draw from (the whole roster when a mode has none). The
- *  modeId is the registry's modeId (`baseball`, `soccer`, `snowboard_slalom`, …), read off `scene.metadata.felModeId`.
+ *  modeId is the registry's modeId (`derby`, `soccer`, `snowboard_slalom`, …), read off `scene.metadata.felModeId`.
  *
  * ASSET-POLISH (2026-10-05): the rival now rotates every match, so a one- or two-body cast meant the same face every
  * time or a flip-flop between two. Every rival cast is at least four now (freerun and sprint keep their three runners).
@@ -97,6 +97,7 @@ export const ATHLETE_ROSTER: RosterAthlete[] = [
  */
 export const MODE_CAST: Record<string, readonly string[]> = {
   baseball: ['blaze', 'rook', 'orbit', 'sol', 'zeal', 'fable'],
+  derby: ['blaze', 'rook', 'orbit', 'sol', 'zeal', 'fable'],   // BASEBALL-REGISTER: the derby's modeId is 'derby' now; same cast as before
   bigair: ['colt', 'jinx', 'wisp', 'volt', 'kite'],
   brainbrawl: ['halo', 'sol', 'quill', 'fable', 'yara', 'rook', 'kite', 'zeal'],
   carnival: ['lux', 'halo', 'jinx', 'umber', 'wisp', 'bolt'],

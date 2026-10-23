@@ -46,7 +46,8 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   surf: true,
   // Rollout wave 3 — timing family (tennis / home-run derby / penalty shootout /
   // golf) on the shared makeTimingSportMode core with swept-hit contact. The
-  // route flag keys map to registry modes: baseball→derby, soccer→penalty.
+  // route flag keys map to registry modes: soccer→penalty. `baseball` flips both ballpark routes (BASEBALL-3INN):
+  // /play/baseball (three innings, BaseballInningsMode) and /play/derby (the home-run derby, registry `derby`).
   tennis: true,
   golf: true,
   baseball: true,

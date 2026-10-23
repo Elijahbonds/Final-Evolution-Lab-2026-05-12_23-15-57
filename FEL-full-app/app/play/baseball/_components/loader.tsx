@@ -14,10 +14,12 @@ const spinner = () => (
 const BaseballGame2D = dynamicImport(() => import('@/components/games/baseball-game'), { ssr: false, loading: spinner });
 const Baseball3D = dynamicImport(() => import('@/components/games/baseball-3d'), { ssr: false, loading: spinner });
 
-// Registry maps the home-run derby to the 'derby' timing mode.
+// BASEBALL-3INN (2026-10-22, PM call per ALL-MODES-TO-75 §6): /play/baseball is three innings of baseball, its own mode
+// (BaseballInningsMode, handed to the timing host directly — see that file's header). The home-run derby that used to
+// answer here moved to /play/derby, unchanged.
 const BaseballBabylon = dynamicImport(
-  () => import('@/components/games/timing-babylon').then((m) => ({
-    default: m.makeTimingHost({ modeKey: 'derby', tag: 'FEL-DERBY', swingLabel: 'STRIKE', hint: 'Move the PCI onto the pitch with the stick · STRIKE as it crosses the plate' }),
+  () => Promise.all([import('@/components/games/timing-babylon'), import('@/lib/babylon/modes/BaseballInningsMode')]).then(([m, b]) => ({
+    default: m.makeTimingHost({ modeKey: 'baseball', def: b.BaseballInningsMode, tag: 'FEL-BASEBALL', swingLabel: 'SWING', hint: 'SWING as the pitch crosses the plate' }),
   })),
   { ssr: false, loading: spinner },
 );
@@ -25,5 +27,5 @@ const BaseballBabylon = dynamicImport(
 export function BaseballLoader() {
   const babylon = isBabylon('baseball');
   const Game = babylon ? BaseballBabylon : is3D('baseball') ? Baseball3D : BaseballGame2D;
-  return <GameShell mode="baseball" title="MOONSHOT DERBY" venue="Catalina Ballpark" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="baseball" title="BASEBALL" venue="Catalina Ballpark" Game={Game} ownControls={babylon} />;
 }

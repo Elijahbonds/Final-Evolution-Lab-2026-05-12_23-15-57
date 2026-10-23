@@ -169,7 +169,8 @@ const ROWS: readonly BodyProfile[] = [
   none('tennis', 'tennis', 'later', 'L', false),
   none('tiebreak', 'tiebreak', 'later', 'L', false),
   none('golf', 'golf', 'later', 'L', false),
-  none('derby', 'baseball', 'later', 'L', false),
+  none('derby', 'derby', 'later', 'L', false),
+  none('baseball', 'baseball', 'later', 'L', false),   // BASEBALL-REGISTER: three innings; the swing is timing only
   none('penalty', 'soccer', 'later', 'L', false),
   none('carnival', 'carnival', 'later', 'L', false),
   none('volleyball', 'volleyball', 'later', 'L', true),
@@ -186,7 +187,7 @@ const ROWS: readonly BodyProfile[] = [
 export const P3_RIDE_ROWS: readonly BodyProfile[] = ROWS.filter((p) => p.later === 'P8');
 const TABLE: readonly BodyProfile[] = ROWS.map((p) => RIDE_ROWS.find((r) => r.key === p.key) ?? p);
 
-/** Every mode's row, by def.modeId (four differ from their registry key: karate-vs, snowboard, baseball, soccer). */
+/** Every mode's row, by def.modeId (three differ from their registry key: karate-vs, snowboard, soccer). */
 export const BODY_PROFILES: Readonly<Record<string /* modeId */, BodyProfile>> = Object.freeze(
   Object.fromEntries(TABLE.map((p) => [p.modeId, p])),
 );

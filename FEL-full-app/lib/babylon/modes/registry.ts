@@ -31,6 +31,7 @@ import { SprintMode } from './SprintMode';
 import { WhoSceneItMode } from './WhoSceneItMode';   // lane 3 W1 — the live venue quiz
 import { BrainBrawlMode } from './BrainBrawlMode';   // A+ mission #11 — the trivia deck as a party mode
 import { TiebreakMode } from './TiebreakMode';
+import { BaseballInningsMode } from './BaseballInningsMode';   // BASEBALL-3INN: three innings at /play/baseball (BaseballMode.ts stays dead)
 import { AdventureMode } from './AdventureMode';   // ADVENTURE A4 (2026-10-06): the dev test yard — registered, NOT enabled
 import { AdventureBRMode } from './AdventureBRMode';   // ADVENTURE C (2026-10-07): the bot BR — registered, NOT enabled (/play/adventure-br, unlisted)
 
@@ -45,9 +46,12 @@ export const MODES: Record<string, ModeDefinition> = {
   snowboard_slalom: SnowboardSlalomMode,
   surf: SurfBreakMode,
   // Rollout wave 3 — precision family (M40 full rebuilds on aimSwingCore).
-  // Route flag keys map to these registry keys: baseball→derby, soccer→penalty.
+  // Route flag keys map to these registry keys: soccer→penalty. Baseball and derby are separate modes (BASEBALL-3INN,
+  // 2026-10-22): derby is the home-run derby at /play/derby (modeId 'derby' since BASEBALL-REGISTER — it played as
+  // 'baseball' before); baseball is BaseballInningsMode, three innings at /play/baseball, each on its own body row.
   tennis: TennisMode,
   derby: DerbyMode,
+  baseball: BaseballInningsMode,
   penalty: PenaltyMode,
   golf: GolfMode,
   // Rollout wave 4 — basketball simulator family (M48) on PlayerSlot +
@@ -107,6 +111,7 @@ export const ENABLED_BABYLON_MODES = new Set<string>([
   'skateboard', 'snowboard_slalom', 'surf',
   // rollout wave 3 — timing family (registry keys)
   'tennis', 'derby', 'penalty', 'golf',
+  'baseball',   // BASEBALL-REGISTER (2026-10-22): three innings, BB-1..BB-4 pass
   // rollout wave 4 — basketball simulator family (M48)
   'onevone', 'threevthree',
   // rollout wave 5 — Court Carnival hub (M49)
