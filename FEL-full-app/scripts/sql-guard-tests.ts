@@ -5,7 +5,8 @@
  *
  * The fixtures are the REAL files in prisma/pending/, plus diffs built the way Prisma prints them (statements grouped
  * by kind across files). scripts/sql-guard-prisma-tests.ts adds diffs printed by the Prisma CLI itself, offline.
- * Mutation-checked when written (2026-10-20): each rule's mutation in sqlGuard.ts turns at least one check here red.
+ * Mutation-checked 2026-10-23: 30 mutants (20 in sqlGuard.ts, one per rule; 4 in the coordinator's verdict; 6 in
+ * db-guard.yml: environment, ref allowlist, concurrency, permissions, pinning, no pull_request), all turn a check here red.
  *
  * Run: npx tsx scripts/sql-guard-tests.ts
  */
@@ -140,6 +141,8 @@ ok('DROP of the raw-SQL tables stops, and names the pending file that made each'
   for (const [table, f] of [['PartyReport', party], ['CreatorInquiry', creator], ['BookEntitlement', books], ['BookFulfillmentEvent', books]] as const) {
     const d = decide(`-- DropTable\nDROP TABLE "${table}";\n`, pending);
     isUnexpected(d, new RegExp(`DESTRUCTIVE: DROP TABLE "${table}".*created by prisma/pending/${f.name.replace(/\./g, '\\.')}`));
+    // It stops AT the destructive statement: the report is that reason alone, not a cover search's noise after it.
+    assert.deepStrictEqual((d as { reasons: string[] }).reasons.map(r => r.split(':')[0]), ['DESTRUCTIVE']);
   }
 });
 
