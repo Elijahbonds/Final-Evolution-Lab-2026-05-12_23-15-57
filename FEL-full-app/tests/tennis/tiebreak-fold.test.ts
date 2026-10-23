@@ -22,6 +22,15 @@ const ROOT = path.resolve(__dirname, '../..');
 
 beforeEach(() => { redirect.mockClear(); session = { user: { id: 'u1' } }; });
 
+// FN-0 COUCH (#383) wraps the page as <><TennisLoader/><CouchStart/></>, so find the loader inside the fragment.
+function loaderOf(el: ReactElement): ReactElement {
+  if (el.type === TennisLoader) return el;
+  const kids = ([] as unknown[]).concat((el.props as { children?: unknown }).children ?? []);
+  const hit = kids.find((k) => isValidElement(k) && k.type === TennisLoader);
+  if (!hit) throw new Error('no TennisLoader in the page');
+  return hit as ReactElement;
+}
+
 describe('TN-4 /play/tiebreak lands in the Tennis tiebreak variant', () => {
   it('/play/tiebreak redirects to /play/tennis?variant=tiebreak', () => {
     expect(TIEBREAK_VARIANT_PATH).toBe('/play/tennis?variant=tiebreak');
@@ -30,8 +39,9 @@ describe('TN-4 /play/tiebreak lands in the Tennis tiebreak variant', () => {
   });
 
   it('/play/tennis?variant=tiebreak renders the Tennis loader in its tiebreak variant', async () => {
-    const el = await TennisPage({ searchParams: { variant: 'tiebreak' } }) as ReactElement;
-    expect(isValidElement(el)).toBe(true);
+    const page = await TennisPage({ searchParams: { variant: 'tiebreak' } }) as ReactElement;
+    expect(isValidElement(page)).toBe(true);
+    const el = loaderOf(page);
     expect(el.type).toBe(TennisLoader);
     expect((el.props as { variant: string }).variant).toBe('tiebreak');
   });
@@ -45,7 +55,7 @@ describe('TN-4 /play/tiebreak lands in the Tennis tiebreak variant', () => {
   });
 
   it('plain /play/tennis is still the match; a signed-out tiebreak visit comes back to the variant after login', async () => {
-    const el = await TennisPage({}) as ReactElement;
+    const el = loaderOf(await TennisPage({}) as ReactElement);
     expect((el.props as { variant: string }).variant).toBe('match');
     session = null;
     await expect(TennisPage({ searchParams: { variant: 'tiebreak' } })).rejects.toThrow(`REDIRECT /login?next=${encodeURIComponent('/play/tennis?variant=tiebreak')}`);
