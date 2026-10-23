@@ -60,7 +60,7 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'skateboard', label: 'Venice Lines' },
   { key: 'surf', label: 'The Break' },
   { key: 'golf', label: 'The Loop' },
-  { key: 'baseball', label: 'Moonshot Derby' },
+  { key: 'baseball', label: 'Baseball' },   // BASEBALL-3INN: a 'baseball' challenge lands on /play/baseball, three innings
   { key: 'soccer', label: 'Twelve Yards' },
   { key: 'football', label: 'Breakaway' },
   { key: 'freerun', label: 'Free Run' },

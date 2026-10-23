@@ -23,6 +23,8 @@ import { assertSpawned } from '../core/FrameGuard';
 import { BaseballAnimTree, type BaseballAnimInput } from '../anim/baseballTree';
 import { SoundKit } from '../audio/SoundKit';
 import { VenueKit } from '../visual/VenueKit';
+import { mountVenue, type VenueHandle } from '../core/NexusVenue';
+import { readPlaceLook } from '../nexus/placeLooks';
 import { EffectsKit, type AmbientHandle } from '../visual/EffectsKit';
 import { spawnAthlete, spawnFoe, buildPlateAndMound, buildBallparkOutfield, Flight } from './aimSwingCore';
 import { pitchSpec, PITCH_RELEASE_SEC } from './baseballPitch';   // BASEBALL-PITCH-MOD: its own copy, so Derby/golf/shootout clips stay out of baseball's closure
@@ -61,6 +63,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
   let batterTree: BaseballAnimTree | null = null, pitcherTree: BaseballAnimTree | null = null;
   let ball: AbstractMesh | null = null, flight: Flight | null = null;
   let ambient: AmbientHandle | null = null;
+  let venue: VenueHandle | null = null;
   let game: BaseballGame | null = null;
   /** Seconds since each beat started (−1 = not running). */
   let swingT = -1, pitchT = -1, celebrateT = -1;
@@ -71,7 +74,10 @@ export const BaseballInningsMode: ModeDefinition = (() => {
     modeId: 'baseball', mood: 'goldenHour', camPreset: 'court',
 
     async load(ctx: ModeContext) {
-      VenueKit.buildField(ctx.scene, 'ballpark');
+      // PLACE (BASEBALL-3INN, environmentCoverage): the derby's ballpark spec under baseball's own place pick (Catalina
+      // Ballpark / Sandlot / Night Game), the way DerbyMode mounts it; the kit field only if the spec is missing.
+      venue = mountVenue(ctx, 'derby', { keepGameplayCamera: true, look: readPlaceLook('baseball') });
+      if (!venue) VenueKit.buildField(ctx.scene, 'ballpark');
       buildPlateAndMound(ctx.scene);
       buildBallparkOutfield(ctx.scene);
       ambient = EffectsKit.ambient(ctx.scene, 'park');
@@ -159,6 +165,7 @@ export const BaseballInningsMode: ModeDefinition = (() => {
     dispose() {
       game?.dispose(); game = null;
       ambient?.dispose(); ambient = null;
+      venue?.dispose(); venue = null;
       batter?.dispose(); pitcher?.dispose(); batter = null; pitcher = null;
       batterTree = null; pitcherTree = null;
       ball = null; flight = null; inbound = null;
