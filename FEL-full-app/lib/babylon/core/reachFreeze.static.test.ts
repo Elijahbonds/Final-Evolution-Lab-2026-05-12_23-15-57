@@ -99,6 +99,12 @@ const ALLOWED: Record<string, Allowed> = {
     kind: 'draw-only', why: 'the derby bat is drawn through the fists; contact = swingQuality(ball z) × PCI coverage',
     proof: [/const timing = swingQuality\(ball\.position\.z,/, /const off = Math\.hypot\(pci\.pos\.x - ball\.position\.x, pci\.pos\.y - ball\.position\.y\)/],
   },
+  // hoops-shot-content: the free throw's ball is gathered to the shooter's hand and flies from where the hand lets it go (drawing);
+  // the make is decided before the flight by RimDecides from the ROOT's offset and the release grade, and the arc lands that verdict
+  'lib/babylon/core/FreeThrowLine.ts': {
+    kind: 'draw-only', why: 'the release point is the hand (drawing); made = rimDecides(rim, root offset, pct of the grade), carried by the arc',
+    proof: [/const toShooter = s\.root\.position\.subtract\(h\.rim\)/, /const v = rimDecides\(h\.rim, toShooter, pct, q01,/, /this\.arc\.start\(from, h\.rim, v\.made,/],
+  },
   // VIS-COURT: the racket arm's swing streak is bound to the right hand and forearm bones (drawing only); a swing's grade is the
   // press's timing against the flight (gradeSwing(dt)) and the AI's is a roll against its skill — neither reads a hand
   'lib/babylon/modes/NetSportMode.ts': {
