@@ -28,7 +28,8 @@ export function jamIronStep(i: IronContactInput, shortSec = JAM_SHORT_SEC): JamI
 }
 
 // ── the hook surface (DUNK-MODE-PLAN §11.1 onContact / onMiss; §11.2 H1, H2, H5; §11.9 rival tag) ──────────────────────────
-export type DunkMissKind = 'rim' | 'glass' | 'short';
+/** DUNK-NO-PRESS-MISS: 'noSlam' — no slam press before the window closed (an air miss: no iron, no punch, no contact). */
+export type DunkMissKind = 'rim' | 'glass' | 'short' | 'noSlam';
 export interface DunkHookWho { source: 'player' | 'rival'; actorId?: string }
 export interface DunkHooks {
   /** the frame the dunking hand with the ball meets the iron — once per attempt */
