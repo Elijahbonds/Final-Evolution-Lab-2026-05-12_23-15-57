@@ -79,6 +79,11 @@ export interface ModeControllerConfig {
    * wire and page are exactly what they were. roomState.ts has the rules.
    */
   roomState?: boolean;
+  /**
+   * COUCH (FN-0, 2026-10-19): this room is a couch session (the host-seat model). The phone's page keeps party chat and
+   * voice off for as long as it holds this layout. Absent on every other room.
+   */
+  couch?: boolean;
 }
 
 /** One status chip on the phone ('BANK B · Pocket Bass', '▶ PLAYING', '● REC ARMED'). The page never learns what it means. */

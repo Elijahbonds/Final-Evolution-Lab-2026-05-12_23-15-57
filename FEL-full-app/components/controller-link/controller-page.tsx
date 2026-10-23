@@ -37,6 +37,7 @@ import type { PartyView } from '@/lib/party/protocol';
 import { cleanPlayerName, PLAYER_NAME_MAX, recallPlayerName, rememberPlayerName } from '@/lib/party/playerName';
 import { partyModeById } from '@/lib/party/catalog';
 import { JOIN_PATH } from '@/lib/party/joinCode';
+import { enterCouch } from '@/lib/party/seats';
 import { PhonePartyPanel } from '@/components/party/phone-party-panel';
 
 const STATE_LABEL: Record<LinkState, string> = {
@@ -88,6 +89,10 @@ export default function ControllerPage({ code }: { code: string }) {
   }, [code, name]);
 
   useEffect(() => () => clientRef.current?.dispose(), []);
+
+  // COUCH (FN-0): a couch room's phone has no party chat or voice while it holds the couch layout (the dock reads it)
+  const couch = config?.couch === true;
+  useEffect(() => (couch ? enterCouch() : undefined), [couch]);
 
   // MULTIPLAYER: leaving is a real goodbye (the TV frees the seat at once), and rejoining is the same one tap
   const leave = useCallback(() => {

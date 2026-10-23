@@ -10,6 +10,7 @@ import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App 
 import { stripeTestGate } from '@/lib/coach-store/stripeMode';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
+import { adultBuyerGate } from '@/lib/stripe/adult-gate';
 import { ensureStripeCustomer, createStudioCreditsCheckout } from '@/lib/stripe/product-checkout';
 import { previewPurchase } from '@/lib/store/coachListing';
 import { loadSharedProfile } from '@/lib/profile/profileServer';
@@ -45,6 +46,10 @@ export async function POST(req: NextRequest) {
   const site = siteOrigin();
   if (!site) return storeClosed('site_url_not_set');
   const origin: string = site;
+  // LAUNCH-SALES (B10's "18+ check"): every product this route sells is real money. A buyer who is not a verified
+  // adult (DB dobYear, strict rule; unknown age is not an adult) is 403 adults_only before any Stripe call.
+  const refused = await adultBuyerGate(prisma, userId);
+  if (refused) return refused;
   const stripe = getStripe();
 
   try {
@@ -89,6 +94,10 @@ export async function POST(req: NextRequest) {
       }],
       // `plan` keeps the cadence for reporting; `product` stays the entitlement the webhook writes
       metadata: { userId, product: entitlementProduct, plan: String(product) },
+      // LAUNCH-SALES (B-W3): the same metadata on the SUBSCRIPTION, so every invoice carries it
+      // (basil: invoice.parent.subscription_details.metadata). invoice.paid can then write the
+      // Subscription row itself when it lands before checkout.session.completed.
+      subscription_data: { metadata: { userId, product: entitlementProduct, plan: String(product) } },
       success_url: `${origin}/account?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/account?stripe=cancel`,
     });
@@ -192,6 +201,9 @@ export async function POST(req: NextRequest) {
         quantity: 1,
       }],
       metadata: { userId, product: 'COSMETIC', itemKey },
+      // LAUNCH-SALES: the payment intent carries the same metadata, so a refund (charge.refunded) can be mapped
+      // back to this purchase (lib/stripe/refund-revoke.ts), the way the coach store and the season pass do.
+      payment_intent_data: { metadata: { userId, product: 'COSMETIC', itemKey } },
       success_url: `${origin}/shop?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/shop?stripe=cancel`,
     });

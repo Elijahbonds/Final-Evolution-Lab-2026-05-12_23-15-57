@@ -17,6 +17,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
+import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
 
 type Hud = Record<string, HudValue>;
@@ -120,6 +121,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
           <ScoreValue value={hnode(hud.score, 0)} size="stat" />
           <HudText size="stat" alpha={HUD_TEXT_ALPHA.faint}>–</HudText>
           <ScoreValue value={hnode(hud.foeScore, 0)} size="stat" />
+          {phase === 'playing' && <HoopsShotClock value={hud.shotClock} />}
         </Scorebug>
         <HudChip tone="you" size="body">AST {hnode(hud.ast, 0)}</HudChip>
         {/* CHOKEPOINT COURT (?choke=1): the rails are on */}
@@ -144,7 +146,7 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
       {/* shot meter */}
       {meter !== null && phase === 'playing' && (
         <div className="absolute inset-x-0 bottom-24 flex justify-center">
-          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} />
+          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} />
         </div>
       )}
 

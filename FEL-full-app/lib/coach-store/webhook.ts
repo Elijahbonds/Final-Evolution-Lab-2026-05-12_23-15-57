@@ -378,6 +378,16 @@ async function onSubscription(event: Stripe.Event, meta: Meta): Promise<void> {
   });
 }
 
+/**
+ * LAUNCH-SALES: the refund/dispute reversal for a row found WITHOUT the charge's metadata — a membership invoice's
+ * charge carries none (subscription_data metadata stays on the subscription), so the shared webhook maps it through
+ * the invoice's subscription (lib/stripe/refund-revoke.ts) and reverses the row here, with the same writes as a
+ * metadata-carrying refund.
+ */
+export async function reverseCoachStoreRow(rowId: string, dispute = false): Promise<void> {
+  await onReverse({ rowId }, dispute);
+}
+
 async function onReverse(meta: Meta, dispute: boolean): Promise<void> {
   if (meta.rowId) {
     await prisma.booking.updateMany({ where: { id: meta.rowId, status: 'PAID' }, data: { status: dispute ? 'DISPUTED' : 'REFUNDED', slotLock: null } });
