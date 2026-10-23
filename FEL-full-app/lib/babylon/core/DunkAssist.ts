@@ -74,7 +74,7 @@ export const RUNWAY_TIPS: readonly string[] = [
   'Y — SELF-LOB standing: toss it up, then run and catch it in the air',
   'R1 — PRACTICE RUNWAY: free dunks, no judges, no rival',
   // dunk-next phase 1 (core/DunkBeats): the flight is a four-beat bar, and nothing on the runway said so
-  'IN THE AIR — hit your tricks ON THE BEAT: tick · tick · tick · NOW! — all of them and the slam is a PERFECT FLIGHT',
+  'IN THE AIR — hit your tricks ON THE BEAT: tick · tick · tick · SLAM — all of them and the slam is a PERFECT FLIGHT',   // DUNK-NO-PRESS-MISS (c): the NOW! call is gone
 ];
 /** Standing still this long before the first tip, then a new tip every IDLE_TIP_EVERY_SEC. */
 export const IDLE_TIP_AFTER_SEC = 3, IDLE_TIP_EVERY_SEC = 3.5;
