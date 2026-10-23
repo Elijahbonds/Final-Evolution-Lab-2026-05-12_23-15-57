@@ -26,6 +26,7 @@ import {
   ledgerMarketplaceSale,
 } from '@/lib/stripe-helpers';
 import { ledgerStudioCreditsGrant } from '@/lib/studio-credits';
+import { isSubscriptionProduct, subscriptionEnded, subscriptionPeriodEnd } from '@/lib/stripe/basil-shapes';
 
 /**
  * The grants a fulfilled checkout can produce. Mirrors the product branches below;
@@ -63,13 +64,15 @@ export async function fulfilCheckoutSession(
 
   const product = meta.product;
 
-  if (product === 'FEL_PRO' || product === 'STUDIO_CREATOR') {
+  // LAUNCH-SALES B-W2: FEL_COACH and FEL_FACILITY are subscriptions too. They used to fall through this branch, so
+  // their checkout wrote no Order and no Subscription row, and isCoachUser/isFacilityUser never saw the purchase.
+  if (isSubscriptionProduct(product)) {
     // Subscription — the subscription object is created by Stripe.
     // We'll get details from invoice.paid for the ledger entry.
     // Here we just create the Order record.
     await prisma.order.upsert({
       where: { stripeSessionId: session.id },
-      update: { status: 'PAID' },
+      update: await paidUnlessRefunded(prisma, session.id),
       create: {
         userId,
         stripeSessionId: session.id,
@@ -85,20 +88,27 @@ export async function fulfilCheckoutSession(
       const subId = typeof session.subscription === 'string' ? session.subscription : session.subscription.id;
       const stripe = getStripe();
       const stripeSub = await stripe.subscriptions.retrieve(subId);
+      // LAUNCH-SALES B-W3: basil moved current_period_end onto the subscription ITEMS. The old top-level read gave
+      // `new Date(NaN)`, which Prisma refuses ("Provided Date object is invalid"), so the upsert threw after the
+      // Order was written: the webhook 500'd on every retry and the buyer never got FEL Pro. Unknown -> not written.
+      const periodEnd = subscriptionPeriodEnd(stripeSub);
+      // Stripe's own status decides: a subscription Stripe has ended (a refund cancels it, lib/stripe/refund-revoke.ts)
+      // is never re-opened by a replayed checkout event or a reloaded success page.
+      const status = subscriptionEnded(stripeSub) ? 'CANCELED' as const : 'ACTIVE' as const;
       await prisma.subscription.upsert({
         where: { stripeSubscriptionId: subId },
         update: {
-          status: 'ACTIVE',
+          status,
           stripePriceId: stripeSub.items.data[0]?.price?.id ?? '',
-          currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000),
+          ...(periodEnd ? { currentPeriodEnd: periodEnd } : {}),
         },
         create: {
           userId,
           stripeSubscriptionId: subId,
           stripePriceId: stripeSub.items.data[0]?.price?.id ?? '',
-          product: product as any,
-          status: 'ACTIVE',
-          currentPeriodEnd: new Date((stripeSub as any).current_period_end * 1000),
+          product,
+          status,
+          currentPeriodEnd: periodEnd,
         },
       });
     }
@@ -110,7 +120,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -139,7 +149,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -198,7 +208,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       const order = await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -237,7 +247,7 @@ export async function fulfilCheckoutSession(
     await prisma.$transaction(async (tx: any) => {
       const order = await tx.order.upsert({
         where: { stripeSessionId: session.id },
-        update: { status: 'PAID' },
+        update: await paidUnlessRefunded(tx, session.id),
         create: {
           userId,
           stripeSessionId: session.id,
@@ -273,4 +283,14 @@ export async function fulfilCheckoutSession(
   }
 
   return { kind: 'none' };
+}
+
+/**
+ * LAUNCH-SALES: a replayed fulfilment (a redelivered webhook, a reloaded success page running verify-session) must
+ * never turn a REFUNDED Order back into PAID. The refund path (lib/stripe/refund-revoke.ts) is the only writer of
+ * REFUNDED; every other status moves to PAID as before.
+ */
+async function paidUnlessRefunded(db: any, stripeSessionId: string): Promise<{ status?: 'PAID' }> {
+  const row = await db.order.findUnique({ where: { stripeSessionId }, select: { status: true } });
+  return row?.status === 'REFUNDED' ? {} : { status: 'PAID' };
 }
