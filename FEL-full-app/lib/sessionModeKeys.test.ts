@@ -28,14 +28,18 @@ const staticAttr = (attrs: string, name: string): string | null => {
 /**
  * Static in-game labels that deliberately differ from MODE_INFO. A route that wants
  * different shell copy has to name why, so accidental venue/card drift stays visible.
+ * `route` scopes an exception to one shell when two routes save under the same key (BASEBALL-3INN: /play/derby saves
+ * 'baseball' like /play/baseball); without it the exception covers the mode's one /play shell.
  */
-const DOCUMENTED_SHELL_COPY: Record<string, { venue?: string; title?: string; reason: string }> = {
+const DOCUMENTED_SHELL_COPY: Record<string, { venue?: string; title?: string; route?: string; reason: string }> = {
   acting: { venue: 'Soundstage', reason: 'the mode plays on a stage while the catalogue groups the discipline as Acting Stage' },
   aeroAces: { venue: 'Gate Run', reason: 'the race instance names the current course; MODE_INFO names the broader Flyway venue' },
+  baseball: { route: '/play/derby', title: 'MOONSHOT DERBY', reason: 'the home-run derby moved to /play/derby but still saves under baseball (its stake ceiling and history); the catalogue row names the three-inning game' },
   bigAir: { venue: 'Alpine Ridge', reason: 'the run starts at the ridge inside the Mountain Slope venue family' },
   carnival: { venue: 'Venice Beach Carnival', reason: 'the shell names the event overlay; MODE_INFO keeps the shelf grouped at Venice Beach Court' },
   irl: { title: 'VERT', venue: 'Anywhere', reason: 'the camera tool labels the measured activity, not the Hang Time catalogue wrapper' },
   music: { title: 'FEL GROOVE ACADEMY', venue: 'The Academy', reason: 'the shell brands the lesson space inside the Studio catalogue venue' },
+  tiebreak: { route: '/play/tennis', title: 'TIEBREAK', reason: 'the Tennis tiebreak variant (/play/tennis?variant=tiebreak) names the variant; the catalogue row keeps the Tiebreak Blitz name the shelf, venue card and challenges list' },
 };
 
 /** Every `<GameShell mode="…">` under app/, with the route it is mounted on: the keys sessions are saved under. */
@@ -92,7 +96,8 @@ describe('mode keys are session keys', () => {
     for (const shell of playShells) {
       const info = MODE_INFO[shell.mode];
       if (!info) continue;
-      const doc = DOCUMENTED_SHELL_COPY[shell.mode];
+      const entry = DOCUMENTED_SHELL_COPY[shell.mode];
+      const doc = entry && (!entry.route || entry.route === shell.route) ? entry : undefined;
       if (shell.title && shell.title.toLowerCase() !== info.name.toLowerCase() && shell.title !== doc?.title) {
         undocumented.push(`${shell.route} title '${shell.title}' (catalogue '${info.name}')`);
       }
@@ -102,7 +107,7 @@ describe('mode keys are session keys', () => {
     }
 
     for (const [mode, doc] of Object.entries(DOCUMENTED_SHELL_COPY)) {
-      const shell = playShells.find((s) => s.mode === mode);
+      const shell = playShells.find((s) => s.mode === mode && (!doc.route || s.route === doc.route));
       if (!shell) {
         staleDocs.push(`${mode}: no shell`);
         continue;

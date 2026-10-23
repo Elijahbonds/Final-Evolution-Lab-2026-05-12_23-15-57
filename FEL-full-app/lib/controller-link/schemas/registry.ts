@@ -184,6 +184,18 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
+  // BASEBALL-3INN (2026-10-22): three innings at /play/baseball (BaseballInningsMode). One verb, the swing on A —
+  // the same as modeVerbs; no stick and no bat flip, so the phone plays the same game as the pad.
+  baseball: {
+    modeId: 'baseball',
+    title: 'Baseball',
+    maxPlayers: 1,
+    askName: true,
+    schemas: [
+      { kind: 'button', buttons: [{ action: 'A', label: 'SWING' }] },
+    ],
+  },
+
   // Baseball (Home Run Derby). The d-pad is 'move' so it forwards as a LEFT
   // STICK event, which is what drives the PCI — a phone that could swing but not
   // COVER the pitch would be playing a different, easier game.
@@ -406,16 +418,19 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
       ] },
     ],
   },
+  // TENNIS-TIEBREAK-FOLD (2026-10-22): the Tennis tiebreak variant (NetSportMode) — Tennis's pad: move, and four shots
   tiebreak: {
     modeId: 'tiebreak',
     title: 'Tiebreak Blitz',
     maxPlayers: 1,
     askName: true,
     schemas: [
-      { kind: 'dpad', dpad: { action: 'dpad' } },
+      { kind: 'dpad', dpad: { action: 'move' } },
       { kind: 'button', buttons: [
-        { action: 'X', label: 'SWING L' },
-        { action: 'B', label: 'SWING R' },
+        { action: 'A', label: 'DRIVE' },
+        { action: 'B', label: 'SLICE' },
+        { action: 'X', label: 'DROP' },
+        { action: 'Y', label: 'LOB' },
       ] },
     ],
   },

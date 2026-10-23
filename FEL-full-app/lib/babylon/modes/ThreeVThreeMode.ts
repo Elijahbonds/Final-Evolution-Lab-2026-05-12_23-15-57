@@ -165,6 +165,7 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { netExitVelocity, netExitKindOf, netExitMph, type NetExitKind } from '../core/NetExit';   // NET EXIT (2026-09-17)
 import { SHOWTIME_FLUSH_K, SHOWTIME_GOOD_K, showtimeAsked, pickShowtime, judgeShowtime, showtimeMeterT, posterRide, SHOWTIME_FLIGHT_MS, SHOWTIME_HANG_FROM, SHOWTIME_HANG_TO, SHOWTIME_HANG_SCALE, SHOWTIME_DEADLINE_K, SHOWTIME_PCT } from '../core/ShowtimeDunk';   // SHOWTIME (2026-09-17)
 import type { ParticleSystem } from '@babylonjs/core';   // suite pass: the hot hand's shot trails (the dunk contest's ball trail, on the game)
+import { mountHandleFx, type HandleFx } from '../court/mount/handleFx';   // hoops-defense-fx (2026-10-20): the handle's squeak, slap, rumble, punch and ooh
 import { mountHoopsCourt, type HoopsCourt } from '../court/mount/hoopsCourt';   // vis-hoops-court (2026-10-14): the broadcast, the scuffs, the dusk and the streetball arena
 import { HoopJuice } from '../visual/HoopJuice';   // A+ P0: the hoop answers the make (shared with Dunk / 1v1; Meshy never scaled)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SHOT METER (owner, 2026-09-18): the 2K bar beside the shooter's head
@@ -361,6 +362,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
     meter3d?.begin({ center: shotMeter.greenCenter01, half: shotMeter.greenHalfWidth01 });
   };
   const meterRelease = (): ReturnType<ShotMeter['release']> => { const q = shotMeter.release(); meter3d?.end(q); return q; };
+  let handleFx: HandleFx | null = null;          // hoops-defense-fx: listens to my carry and the meter (hoops/handleFx)
   let hoopsFx: HoopsCourt | null = null;         // vis-hoops-court: the intro hold, the dead-ball replay, the scuffs, the dusk and the arena (court/hoopsCourt)
   let hoopJuice: HoopJuice | null = null;        // A+ P0 CONTACT-lite: rim spring / net squash / hoop flash on a make
   let contactLatch = false;                      // A+ P0: the dunk's ONE punch per attempt — never re-fired by the banner or the stun
@@ -1035,6 +1037,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       mark.material = markMat; mark.isPickable = false; mark.setEnabled(false);
       hoopsFx?.dispose(); hoopsFx = mountHoopsCourt(ctx, { kind: 'threevthree', rim: RIM, bodies: () => bodiesAll.map((b) => b.char.root), final: () => ended || buzzer, progress: () => Math.max(myScore / TARGET_SCORE, foeScore / TARGET_SCORE, 1 - timeLeft / POSSESSION_SEC),
         teams: { mine: () => mates.map((b) => b.char.root), theirs: () => foes.map((b) => b.char.root), mineColor: TEAM_JERSEY.mine, theirsColor: TEAM_JERSEY.theirs } });
+      handleFx?.dispose(); handleFx = mountHandleFx(ctx, { carry: () => carries.get(me) ?? null });   // hoops-defense-fx
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
       // THE MIC: one per run (the banks load in the background; the welcome waits for the first live frame, in micTick)
@@ -2312,6 +2315,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ring?.dispose(); ring = null;
       ball?.dispose(); SoundKit.stopAmbient();
       hoopsFx?.dispose(); hoopsFx = null;
+      handleFx?.dispose(); handleFx = null;   // hoops-defense-fx
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
       meter3d?.dispose(); meter3d = null;
       mic?.dispose(); mic = null; micParked?.dispose(); micParked = null; micTierOff?.(); micTierOff = null;   // THE MIC stops with the mode

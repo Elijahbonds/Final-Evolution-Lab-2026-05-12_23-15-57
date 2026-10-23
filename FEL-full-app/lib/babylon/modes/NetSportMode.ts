@@ -83,7 +83,7 @@ import { assertSpawned } from '../core/FrameGuard';
 import type { ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import {
-  gradeSwing, planShot, shotAt, judgeShot, TennisScore, VolleyScore, RallyState,
+  gradeSwing, planShot, shotAt, judgeShot, TennisScore, TiebreakScore, VolleyScore, RallyState,
   volleyTouchFor, volleyCrosses, BLOCK_STUFF_WINDOW,
   type TennisShot,
   type RallyConfig, type Shot, type SwingQuality, type RallyFault, type VolleyTouch,
@@ -94,8 +94,9 @@ export interface NetSportOptions {
   venueId: string;
   heroUrl: string;
   cfg: RallyConfig;
-  /** 'tennis' uses games/deuce; 'volley' uses rally scoring to a target. */
-  scoring: 'tennis' | 'volley';
+  /** 'tennis' uses games/deuce; 'volley' uses rally scoring to a target; 'tiebreak' is Tennis's tiebreak variant — points
+   *  to 7, win by 2 (RallyCore.TiebreakScore; TENNIS-TIEBREAK-FOLD). */
+  scoring: 'tennis' | 'volley' | 'tiebreak';
   ballDiameter: number;
   ballTint: string;
   ambient: Parameters<typeof SoundKit.startAmbient>[0];
@@ -227,6 +228,10 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   let rally: RallyState;
   let tennisScore: TennisScore | null = null;
   let volleyScore: VolleyScore | null = null;
+  /** TENNIS-TIEBREAK-FOLD: the Tennis tiebreak variant's scorer. It IS a VolleyScore (rally scoring, first to 7, win by 2,
+   *  no cap), so it also sits in `volleyScore` and every points read below serves it; only the call, the round line and
+   *  the serve rotation ask for it by name. */
+  let tiebreakScore: TiebreakScore | null = null;
 
   // flight state
   let shot: Shot | null = null;
@@ -395,6 +400,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
 
   function label(): string {
     if (tennisScore) return tennisScore.callFor(0);
+    if (tiebreakScore) return tiebreakScore.callFor(0);
     if (volleyScore) return `${volleyScore.points[0]} – ${volleyScore.points[1]}`;
     return '';
   }
@@ -402,6 +408,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   function pushHud(ctx: ModeContext): void {
     if (volleyScore) ctx.setHud({ round: `SET TO ${volleyScore.target}` });   // IMPROVE #10: which set this is
     if (tennisScore) ctx.setHud({ round: `FIRST TO ${tennisScore.gamesToWin}` });   // Tennis #5: which match this is (quick or full)
+    if (tiebreakScore) ctx.setHud({ round: `TIEBREAK · FIRST TO ${tiebreakScore.target} · WIN BY 2` });   // TENNIS-TIEBREAK-FOLD: replaces SET TO 7
     if (o.energy) {
       ctx.setHud({
         energy: Math.round(energy[0]),
@@ -414,7 +421,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       foeScore: tennisScore ? tennisScore.games[1] : volleyScore!.points[1],
       callout: label(),
       // A+ mission #6 (Wii readability): the scoreboard chip — both sides' games, the umpire call, the streak
-      call: tennisScore ? label() : '', streak: heroStreak, you: 'YOU', them: 'THEM',   // hudLabels are the point-flash strings, not side names
+      call: tennisScore || tiebreakScore ? label() : '', streak: heroStreak, you: 'YOU', them: 'THEM',   // hudLabels are the point-flash strings, not side names
       weather: weather.describe(),
     });
   }
@@ -477,6 +484,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
     }
     const result = tennisScore ? tennisScore.award(side) : volleyScore!.award(side);
     if (tennisScore) server = serverAfter(server, result as 'point' | 'game' | 'match');   // Tennis #2: the serve changes ends with the game
+    if (tiebreakScore) server = tiebreakScore.serverFor(0);   // TENNIS-TIEBREAK-FOLD: the player serves point one, then two each
     pushHud(ctx);
     SoundKit.play(side === 0 ? 'score' : 'miss');
     // L4: they react to the point, or they are set dressing. Louder for the
@@ -719,7 +727,7 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
   /**
    * Where the opponent stands, for Nerve.
    *
-   * Both scorers expose what it takes to win -- `gamesToWin` for tennis, `target` for volleyball -- so the
+   * Both scorers expose what it takes to win -- `gamesToWin` for tennis, `target` for volleyball and the tiebreak -- so the
    * margin normalises without this file knowing which sport it is running. Lateness is how close the
    * LEADER is to closing it out, which is the honest reading of "how much time is left": at 3-0 in a
    * first-to-4 the match is nearly over whoever you ask.
@@ -1281,6 +1289,9 @@ export function createNetSportMode(o: NetSportOptions): ModeDefinition {
       const setLen = setLengthOf(readSetLength(o.modeId), o.modeId);
       tennisScore = o.scoring === 'tennis' ? new TennisScore(setLen.target) : null;
       volleyScore = o.scoring === 'volley' ? new VolleyScore(setLen.target, setLen.cap) : null;
+      // TENNIS-TIEBREAK-FOLD: the tiebreak takes no set-length pick — always to TIEBREAK_TARGET, win by 2
+      tiebreakScore = o.scoring === 'tiebreak' ? new TiebreakScore() : null;
+      if (tiebreakScore) volleyScore = tiebreakScore;
       ended = false; restSec = 0.8; shot = null; aimX = 0; heroStreak = 0; gameLatch = false;
 
       ctx.heroRef.current = me.root;

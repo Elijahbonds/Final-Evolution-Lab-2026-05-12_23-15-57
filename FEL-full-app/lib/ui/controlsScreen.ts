@@ -56,7 +56,7 @@ export interface ControlsSheet {
 /** InputBus KEYMAP, read the other way: the key that sends each pad button. */
 const KEY_OF: Record<string, string> = { A: 'J', B: 'K', X: 'L', Y: 'I', L1: 'Q', R1: 'E', SELECT: 'C', START: 'ESC', LS: 'V', RS: 'R' };
 /** Modes the left stick does nothing in (a quiz answers on the face buttons; the sprint mashes the d-pad). */
-const NO_STICK = new Set(['who_scene_it', 'brainbrawl', 'sprint', 'dance', 'bigair']);
+const NO_STICK = new Set(['who_scene_it', 'brainbrawl', 'sprint', 'dance', 'bigair', 'baseball']);   // baseball (BASEBALL-3INN): the swing is timing only
 const STICK_ACTION: Record<string, string> = {
   velocitykart: 'STEER', aeroaces: 'STEER', skateboard: 'STEER', snowboard_slalom: 'STEER', surf: 'STEER',
   golf: 'AIM', derby: 'AIM', penalty: 'AIM', threepoint: 'AIM', duel: 'ORBIT',
