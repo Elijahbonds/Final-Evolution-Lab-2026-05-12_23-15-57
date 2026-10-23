@@ -14,6 +14,7 @@ import { lateralOf } from '../anim/athleteSide';
 import { releaseFrameOf } from '../anim/opponentMotion';
 import type { CharacterAnimator } from '../anim/CharacterAnimator';
 import { STEPBACK_RELEASE_CLIP, STEPBACK_RELEASE_01, BANK_FOLLOW_CLIP } from '../anim/authored/shotKit';
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.bankSetDeg / hoops.bankGlanceMs (lib/feel-panel/knobs.ts)
 
 type Anim = Pick<CharacterAnimator, 'clipNames'> & Partial<CharacterAnimator>;
 
@@ -30,9 +31,11 @@ export function riseClipFor(kind: GatherKind | undefined, animator: Anim): { cli
   return { clip: 'jumpshot', release01: releaseFrameOf(animator as CharacterAnimator, 'jumpshot', RELEASE_FRAME_01) };
 }
 
-/** The angled set: how far the shooter turns off the rim toward the glass side while glass is called (deg; `(new)`, presentation). */
+/** The angled set: how far the shooter turns off the rim toward the glass side while glass is called (deg; `(new)`, presentation;
+ *  feel knob hoops.bankSetDeg). */
 export const BANK_SET_DEG = 12;
-/** How long the eyes stay on the square after the set / the release (ms) — the ball's flight to the glass and off it. */
+/** How long the eyes stay on the square after the set / the release (ms) — the ball's flight to the glass and off it (feel knob
+ *  hoops.bankGlanceMs). */
 export const BANK_GLANCE_MS = 1100;
 
 /**
@@ -48,10 +51,10 @@ export class BankLook {
   setYaw(shooter: Vector3, rim: Vector3, rimFloor: Vector3, boardNormal: Vector3, glass: boolean | undefined): number {
     if (!glass || !inBankBand(shooter, rimFloor, boardNormal)) return 0;
     const aim = bankPoint(shooter, rim, boardNormal);
-    this.aim = aim; this.until = this.now() + BANK_GLANCE_MS;
+    this.aim = aim; this.until = this.now() + feel('hoops.bankGlanceMs', BANK_GLANCE_MS);
     const toRim = yawTo(shooter, rim), toGlass = yawTo(shooter, aim);
     const d = Math.atan2(Math.sin(toGlass - toRim), Math.cos(toGlass - toRim));
-    return Math.sign(d || 1) * BANK_SET_DEG * Math.PI / 180;
+    return Math.sign(d || 1) * feel('hoops.bankSetDeg', BANK_SET_DEG) * Math.PI / 180;
   }
 
   /** The follow-through for this release: a GREEN (perfect / good) release off the glass reads as a bank — the chest and the wrist to the
@@ -59,7 +62,7 @@ export class BankLook {
    *  before the rim, HOOPS-DEPTH S6). Not banked: followThroughFor, unchanged. */
   followThrough(quality: ShotQuality, banked: Vector3 | null, shooter: Vector3, yaw: number): string {
     if (!banked || (quality !== 'perfect' && quality !== 'good')) return followThroughFor(quality);
-    this.aim = banked; this.until = this.now() + BANK_GLANCE_MS;
+    this.aim = banked; this.until = this.now() + feel('hoops.bankGlanceMs', BANK_GLANCE_MS);
     return BANK_FOLLOW_CLIP[lateralOf(shooter, yaw, banked) >= 0 ? 'right' : 'left'];
   }
 

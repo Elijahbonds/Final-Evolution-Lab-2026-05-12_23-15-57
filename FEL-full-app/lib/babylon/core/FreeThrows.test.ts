@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { judge, rule } from './Ref';
 import { SHOT_QUALITY_PCT, ShotMeter } from './BasketballCore';
+import { distanceGreenFactor } from './ShotWindow';
 import { FREE_THROW_M, FREE_THROW_POINTS, FT_TIMING, FreeThrowSequence, freeThrowLabel, freeThrowPct, freeThrowsFor, startLineMeter, type FtEvent } from './FreeThrows';
 
 const me = { offense: 'me', shooter: 'me', fouled: 'me' } as const;
@@ -32,16 +33,20 @@ describe('how many free throws a call is worth', () => {
 });
 
 describe("the line's meter and make chance (no new numbers)", () => {
-  it('is the uncontested jumper window exactly', () => {
+  it("is the uncontested jumper window from the stripe exactly (the live hero's distance narrowing at 4.19 m)", () => {
     const line = new ShotMeter(); startLineMeter(line);
-    const jumper = new ShotMeter(); jumper.start(0, 'jumper', 0);
+    // the hero's own jumper from the stripe, as 1v1 / 3v3 meterStart builds it (lane/hoops-shot-core)
+    const jumper = new ShotMeter(); jumper.start(0, 'jumper', 0); jumper.narrowBy(distanceGreenFactor(FREE_THROW_M, 'jumper'));
     expect(line.durationSec).toBe(jumper.durationSec);
     expect(line.greenCenter01).toBe(jumper.greenCenter01);
     expect(line.greenHalfWidth01).toBe(jumper.greenHalfWidth01);
-    // the numbers the survey measured: 0.72 s, green at 0.62 ± 0.09 (≈ ±65 ms)
+    // the survey's numbers: 0.72 s, green at 0.62 ± 0.09 (≈ ±65 ms) — narrowed ×(1 − 0.22·(4.19 − 2)/5.5) ≈ ×0.912 at the stripe
+    const open = new ShotMeter(); open.start(0, 'jumper', 0);
     expect(line.durationSec).toBeCloseTo(0.72, 6);
     expect(line.greenCenter01).toBeCloseTo(0.62, 6);
-    expect(line.greenHalfWidth01 * line.durationSec * 1000).toBeCloseTo(64.8, 1);
+    expect(open.greenHalfWidth01 * open.durationSec * 1000).toBeCloseTo(64.8, 1);
+    expect(line.greenHalfWidth01 * line.durationSec * 1000).toBeCloseTo(59.1, 1);
+    expect(line.greenHalfWidth01).toBeLessThan(open.greenHalfWidth01);
   });
   it("a release's make chance is the meter's own grade, nothing on top", () => {
     for (const q of ['perfect', 'good', 'early', 'late', 'brick', 'held'] as const) expect(freeThrowPct(q)).toBe(SHOT_QUALITY_PCT[q]);

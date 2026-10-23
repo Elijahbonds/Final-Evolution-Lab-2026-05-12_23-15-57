@@ -10,6 +10,8 @@ import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotC
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
+import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC } from '@/lib/babylon/core/FreeThrows';
+import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -44,6 +46,14 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.comboGraceSec')).toBe(COMBO_GRACE_SEC);
     expect(def('hoops.guardRangeM')).toBe(GUARD_RANGE_M);
     expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
+    // hoops-shot-content
+    expect(def('hoops.ftSetupSec')).toBe(FT_SETUP_SEC);
+    expect(def('hoops.ftRoutineSec')).toBe(FT_ROUTINE_SEC);
+    expect(def('hoops.ftSetSec')).toBe(FT_SET_SEC);
+    expect(def('hoops.ftResultSec')).toBe(FT_RESULT_SEC);
+    expect(def('hoops.bankSetDeg')).toBe(BANK_SET_DEG);
+    expect(def('hoops.bankGlanceMs')).toBe(BANK_GLANCE_MS);
+    expect([FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, BANK_SET_DEG, BANK_GLANCE_MS]).toEqual([0.9, 1.2, 0.3, 1.1, 12, 1100]);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

@@ -121,6 +121,37 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/GuardHand.ts GUARD_RANGE_M',
     hint: 'A live defender inside this moves your ball to the hand away from him (after the AI hand\'s dwell); outside it the hand stays put.',
   },
+  // ── hoops-shot-content (hoops round 2): the free-throw trip's beats and the bank's look (presentation; no window, no odds) ──
+  {
+    id: 'hoops.ftSetupSec', label: 'Free throw: whistle to the line', def: 0.9, min: 0.3, max: 2.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_SETUP_SEC',
+    hint: 'The dead-ball setup: the cut to the shooter on the stripe before the routine starts.',
+  },
+  {
+    id: 'hoops.ftRoutineSec', label: 'Free throw: routine', def: 1.2, min: 0.4, max: 3.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_ROUTINE_SEC',
+    hint: 'The dribbles at the stripe before the ball comes up to the set.',
+  },
+  {
+    id: 'hoops.ftSetSec', label: 'Free throw: the set', def: 0.3, min: 0.1, max: 1.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_SET_SEC',
+    hint: 'The ball up to the set before the line meter can start (a press during it waits).',
+  },
+  {
+    id: 'hoops.ftResultSec', label: 'Free throw: result shown', def: 1.1, min: 0.4, max: 2.5, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_RESULT_SEC',
+    hint: 'How long a free throw\'s make or miss is shown before the next one (or the end of the trip).',
+  },
+  {
+    id: 'hoops.bankSetDeg', label: 'Bank: angled set', def: 12, min: 0, max: 25, step: 1, unit: '°', group: 'Hoops · shooting',
+    source: 'lib/babylon/hoops/shotLooks.ts BANK_SET_DEG',
+    hint: 'How far the shooter turns toward the glass while R1 "called glass" is held in the bank band (look only; the ball\'s route is unchanged).',
+  },
+  {
+    id: 'hoops.bankGlanceMs', label: 'Bank: glance at the glass', def: 1100, min: 300, max: 2500, step: 50, unit: 'ms', group: 'Hoops · shooting',
+    source: 'lib/babylon/hoops/shotLooks.ts BANK_GLANCE_MS',
+    hint: 'How long the eyes stay on the square after the set and the release of a called bank.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

@@ -18,6 +18,7 @@ import { RELEASE_FRAME_01, syncedShotSpeed } from './BallHandling';
 import { yawTo } from './Biomech';
 import { FREE_THROW_M, FREE_THROW_POINTS, FreeThrowSequence, freeThrowLabel, freeThrowPct, freeThrowsFor, type FtEvent } from './FreeThrows';
 import { rule, type Call, type RuleId } from './Ref';
+import { perfectHud, releaseGradeLabel } from './ShotWindow';
 import type { AnimTreeInput } from '../anim/basketballTree';
 import { hoopsHand } from '../anim/hoopsHand';
 import { gatherBallToHand, releaseBall } from '../anim/ballRig';
@@ -216,7 +217,7 @@ export class FreeThrowLine {
     const speedRatio = syncedShotSpeed(clipSec, m.riseSec, greenInRise01, releaseFrameOf(s.animator as CharacterAnimator, 'jumpshot', RELEASE_FRAME_01));
     s.tree.hold('jumpshot', { speedRatio, fadeSec: 0.08 });
     this.host.meter3d()?.begin({ center: m.greenCenter01, half: m.greenHalfWidth01 });
-    this.host.hud({ shotMeterGreen: `${m.greenCenter01.toFixed(3)},${m.greenHalfWidth01.toFixed(3)}` });
+    this.host.hud({ shotMeterGreen: `${m.greenCenter01.toFixed(3)},${m.greenHalfWidth01.toFixed(3)}`, shotMeterPerfect: perfectHud(m.greenHalfWidth01) });   // the PERFECT band (lane/hoops-shot-core), as the live meter draws it
     SoundKit.play('whoosh', { pitch: 1.0, volume: 0.15 });
   }
 
@@ -237,7 +238,8 @@ export class FreeThrowLine {
     h.ball.position.copyFrom(from);
     this.arc.start(from, h.rim, v.made, 'jumper', 0, null, v.play);
     s.tree.beat(followThroughFor(q), { fadeSec: 0.2, holdEnd: true });
-    const word = q === 'perfect' ? 'GREEN!' : q === 'good' ? 'GOOD RELEASE' : q === 'early' ? 'EARLY' : q === 'late' ? 'LATE' : 'WAY LATE';
+    // the live release's words (lane/hoops-shot-core): a good release reads SLIGHTLY EARLY / LATE with its ms
+    const word = q === 'perfect' ? 'GREEN!' : q === 'good' ? (releaseGradeLabel(q, m.offsetSec, m.greenHalfSec) ?? 'GOOD RELEASE') : q === 'early' ? 'EARLY' : q === 'late' ? 'LATE' : 'WAY LATE';
     h.banner(word, 600);
     this.say(`release ${q} at t=${m.t.toFixed(3)} (green ${m.greenCenter01.toFixed(3)} ± ${m.greenHalfWidth01.toFixed(3)}) pct ${pct.toFixed(2)} → ${v.made ? 'YES' : 'no'} (${v.play.kind})`);
   }

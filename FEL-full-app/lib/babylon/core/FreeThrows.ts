@@ -12,13 +12,18 @@
 //   3. Every free throw is a DEAD BALL: make or miss, nobody rebounds it — no lane players (the brief made them optional).
 //   4. After the last shot the ball goes where the ref's call ALREADY sends it (the fouled side, then the mode's format), exactly as
 //      before free throws existed. The trip adds points; it does not change who has the ball next.
-//   5. The line's meter is the uncontested jumper's window (ShotMeter.start(0, 'jumper', 0): 0.72 s, green at 0.62 ± 0.09) and its
-//      make chance is the release's own SHOT_QUALITY_PCT — no contest, no momentum, no fatigue, no new odds table.
+//   5. The line's meter is the uncontested jumper's window (ShotMeter.start(0, 'jumper', 0): 0.72 s, green at 0.62 ± 0.09) narrowed
+//      for the stripe's distance exactly as lane/hoops-shot-core narrows any hero jumper (ShotWindow.distanceGreenFactor at
+//      FREE_THROW_M 4.19 m: ×0.912, ≈ ±59 ms), and its make chance is the release's own SHOT_QUALITY_PCT — no contest, no
+//      momentum, no fatigue, no new odds table.
 //   6. No clock at the line: the shooter takes it when he presses (the AI's internal timers are untouched; the player has none).
 //   7. Only a fouled HERO shoots them — the modes only ever detect a foul on the hero's shot (the rival is never fouled shooting).
 
 import { FREE_THROWS_IMPLEMENTED, type Call } from './Ref';
 import { SHOT_QUALITY_PCT, ShotMeter, type ShotQuality } from './BasketballCore';
+import { distanceGreenFactor } from './ShotWindow';
+import { FREE_THROW_M } from './DunkApproach';
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.ft*Sec (lib/feel-panel/knobs.ts)
 
 /** One point a make (assumption 2). */
 export const FREE_THROW_POINTS = 1;
@@ -39,20 +44,21 @@ export function freeThrowsFor(call: Pick<Call, 'id' | 'shots'> | null | undefine
 /** The make chance of a release at the line (assumption 5): the meter's grade, nothing else. */
 export function freeThrowPct(q: ShotQuality): number { return SHOT_QUALITY_PCT[q]; }
 
-/** Start the line's meter (assumption 5): the uncontested jumper's window, no gather. */
-export function startLineMeter(m: ShotMeter): void { m.start(0, 'jumper', 0); }
+/** Start the line's meter (assumption 5): the uncontested jumper's window, no gather, narrowed for the stripe's distance the way
+ *  every hero jumper is (lane/hoops-shot-core's ShotWindow; its hoops.distGreen* knobs move this one too). */
+export function startLineMeter(m: ShotMeter): void { m.start(0, 'jumper', 0); m.narrowBy(distanceGreenFactor(FREE_THROW_M, 'jumper')); }
 
 /** The trip's beats, in game seconds (all `(new)` numbers — presentation only: none of them is a timing window). */
-export const FT_TIMING = {
-  /** The whistle to the shooter at the line: the bodies walk off, the camera cuts. */
-  setupSec: 0.9,
-  /** The routine: two dribbles at the stripe before the set. */
-  routineSec: 1.2,
-  /** The ball up to the set (the pull-up gather's 0.3 s clip). */
-  setSec: 0.3,
-  /** The ball's result shown before the next shot (or the end of the trip). */
-  resultSec: 1.1,
-} as const;
+/** The whistle to the shooter at the line: the bodies walk off, the camera cuts. Feel knob hoops.ftSetupSec. */
+export const FT_SETUP_SEC = 0.9;
+/** The routine: two dribbles at the stripe before the set. Feel knob hoops.ftRoutineSec. */
+export const FT_ROUTINE_SEC = 1.2;
+/** The ball up to the set (the pull-up gather's 0.3 s clip, held on its loaded frame). Feel knob hoops.ftSetSec. */
+export const FT_SET_SEC = 0.3;
+/** The ball's result shown before the next shot (or the end of the trip). Feel knob hoops.ftResultSec. */
+export const FT_RESULT_SEC = 1.1;
+/** The shipped beats together (the defaults; the sequence reads each through feel()). */
+export const FT_TIMING = { setupSec: FT_SETUP_SEC, routineSec: FT_ROUTINE_SEC, setSec: FT_SET_SEC, resultSec: FT_RESULT_SEC } as const;
 
 export type FtPhase = 'idle' | 'setup' | 'routine' | 'set' | 'ready' | 'rising' | 'flight' | 'result' | 'done';
 export type FtEvent =
@@ -113,13 +119,13 @@ export class FreeThrowSequence {
     if (!held) this.armed = true;
     switch (this.phase) {
       case 'setup':
-        if (this.t >= FT_TIMING.setupSec) this.enter('routine', out);
+        if (this.t >= feel('hoops.ftSetupSec', FT_SETUP_SEC)) this.enter('routine', out);
         break;
       case 'routine':
-        if (this.t >= FT_TIMING.routineSec) this.enter('set', out);
+        if (this.t >= feel('hoops.ftRoutineSec', FT_ROUTINE_SEC)) this.enter('set', out);
         break;
       case 'set':
-        if (this.t >= FT_TIMING.setSec) this.enter('ready', out);
+        if (this.t >= feel('hoops.ftSetSec', FT_SET_SEC)) this.enter('ready', out);
         break;
       case 'ready':
         if (this.armed && held) {
@@ -139,7 +145,7 @@ export class FreeThrowSequence {
       case 'flight':
         break;   // landed() moves it on
       case 'result':
-        if (this.t >= FT_TIMING.resultSec) {
+        if (this.t >= feel('hoops.ftResultSec', FT_RESULT_SEC)) {
           if (this.shot + 1 < this.total) {
             this.shot++; this.armed = false;
             out.push({ kind: 'next', shot: this.shot });
