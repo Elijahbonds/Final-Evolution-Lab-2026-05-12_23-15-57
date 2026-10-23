@@ -17,6 +17,7 @@ import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudPlate, HudText, ScoreValue, Scorebug, hudColor, type HudTone } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
+import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the switch for the voice
 import { pipBias } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06) #10
 
@@ -120,6 +121,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
           <ScoreValue value={hnode(hud.score, 0)} size="stat" />
           <HudText size="stat" alpha={HUD_TEXT_ALPHA.faint}>–</HudText>
           <ScoreValue value={hnode(hud.foeScore, 0)} size="stat" />
+          {phase === 'playing' && <HoopsShotClock value={hud.shotClock} />}
         </Scorebug>
         <span className="flex flex-col items-end gap-1">
           <HudChip tone="score" size="body">{hud.winBy2 === true ? 'TO 11 · WIN BY 2' : 'TO 11'}</HudChip>
@@ -139,7 +141,7 @@ export default function BasketballBabylon({ onEnd }: GameProps) {
       {/* shot meter */}
       {meter !== null && phase === 'playing' && (
         <div className="absolute inset-x-0 bottom-24 flex justify-center">
-          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} />
+          <HoopsShotMeter t={meter} green={hud.shotMeterGreen} perfect={hud.shotMeterPerfect} />
         </div>
       )}
 
