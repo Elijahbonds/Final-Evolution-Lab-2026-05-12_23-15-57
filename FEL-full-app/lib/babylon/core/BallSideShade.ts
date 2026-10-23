@@ -14,27 +14,55 @@
 // back before he has gone cancels the read.
 //
 // Positioning only. Nothing here reads or rolls a steal, a strip, a block or a contest, and nothing changes his speed, his
-// aggression or a timing window: those stay where DefenderBrain and the modes keep them. Pure: no Babylon import, no clock but `dt`.
+// aggression or a timing window: those stay where DefenderBrain and the modes keep them. Pure: no Babylon import, no clock but `dt`;
+// its one import is the feel panel's `feel()` (the shipped constant unless a playtest override is live).
 
-/** The owner's switch: false restores the old anchor (the ball itself) exactly. */
+import { feel } from '../../feel-panel/feel';   // feel-panel knobs hoops.shade* / hoops.ballSideShadeOn (lib/feel-panel/knobs.ts)
+
+/** The owner's switch: false restores the old anchor (the ball itself) exactly. Feel knob `hoops.ballSideShadeOn` (1 / 0) for A/B. */
 export const BALL_SIDE_SHADE_ON = true;
 
-/** TUNED (new, 2026-10-20 — first guesses for the owner's feel test; register as feel knobs once the feel panel lands). */
+// TUNED (new, 2026-10-20 — first guesses for the owner's feel test). Each is a feel knob (group "Hoops · defense"), read per frame below.
+/** How far across the handler→rim line his anchor sits toward the ball's side (m, at the handler). Knob `hoops.shadeOffsetM`. */
+export const SHADE_OFFSET_M = 0.5;
+/** The beat: how long he holds his side after the ball crosses in front of him (s). Knob `hoops.shadeHoldSec`. */
+export const SHADE_REACT_SEC = 0.22;
+/** How fast the anchor slides across once he goes (m/s). Knob `hoops.shadeSlideMps`. */
+export const SHADE_SHIFT_MPS = 2.4;
+/** The ball must be this far over the line before he reads the other side (m): the dribble's own sway never flips him. Knob `hoops.shadeDeadBandM`. */
+export const SHADE_FLIP_M = 0.08;
+/** Only a cross thrown inside this of him earns the beat (m) — DefenderReact's DEF_REACT_RANGE. Knob `hoops.shadeRangeM`. */
+export const SHADE_RANGE_M = 2.4;
+/** A handler who moved further than this between two reads is a new look (a check, a switch): no beat, he is simply there (m). Knob `hoops.shadeReseedM`. */
+export const SHADE_RESEED_M = 1.0;
+
+/** The shipped numbers, together. */
 export const SHADE = {
-  /** How far across the handler→rim line his anchor sits toward the ball's side (m, at the handler). */
-  offsetM: 0.5,
-  /** The beat: how long he holds his side after the ball crosses in front of him (s). */
-  reactSec: 0.22,
-  /** How fast the anchor slides across once he goes (m/s). */
-  shiftMps: 2.4,
-  /** The ball must be this far over the line before he reads the other side (m): the dribble's own sway never flips him. */
-  flipM: 0.08,
-  /** Only a cross thrown inside this of him earns the beat (m) — DefenderReact's DEF_REACT_RANGE. */
-  rangeM: 2.4,
-  /** A handler who moved further than this between two reads is a new look (a check, a switch): no beat, he is simply there (m). */
-  reseedM: 1.0,
+  offsetM: SHADE_OFFSET_M,
+  reactSec: SHADE_REACT_SEC,
+  shiftMps: SHADE_SHIFT_MPS,
+  flipM: SHADE_FLIP_M,
+  rangeM: SHADE_RANGE_M,
+  reseedM: SHADE_RESEED_M,
 } as const;
 export type ShadeTune = { readonly [K in keyof typeof SHADE]: number };
+
+/** The numbers this frame: the shipped ones, unless the feel panel holds a playtest override (lib/feel-panel/feel.ts). */
+export function liveShade(): ShadeTune {
+  return {
+    offsetM: feel('hoops.shadeOffsetM', SHADE_OFFSET_M),
+    reactSec: feel('hoops.shadeHoldSec', SHADE_REACT_SEC),
+    shiftMps: feel('hoops.shadeSlideMps', SHADE_SHIFT_MPS),
+    flipM: feel('hoops.shadeDeadBandM', SHADE_FLIP_M),
+    rangeM: feel('hoops.shadeRangeM', SHADE_RANGE_M),
+    reseedM: feel('hoops.shadeReseedM', SHADE_RESEED_M),
+  };
+}
+
+/** Is the shade on this frame (the constant, or the panel's A/B override)? */
+export function shadeOn(): boolean {
+  return feel('hoops.ballSideShadeOn', BALL_SIDE_SHADE_ON ? 1 : 0) >= 0.5;
+}
 
 export interface Planar { x: number; z: number }
 
@@ -61,7 +89,8 @@ export class BallSideShade {
   private wait = 0;
   private prev: Planar | null = null;
 
-  constructor(private readonly tune: ShadeTune = SHADE) {}
+  /** `tune` pins the numbers (tests); left out, every step reads them live (liveShade: the constants or the panel's override). */
+  constructor(private readonly tune: ShadeTune | null = null) {}
 
   /** The lateral of his anchor now (m). */
   get lateral(): number { return this.sigma; }
@@ -75,7 +104,7 @@ export class BallSideShade {
    * One frame's read. `defender` is where he stands (the beat needs him inside `rangeM`). Returns the anchor's lateral (m along `p`).
    */
   step(dt: number, handler: Planar, ball: Planar, hoop: Planar, defender: Planar): number {
-    const t = this.tune;
+    const t = this.tune ?? liveShade();
     const lat = lateralOf(ball, handler, hoop);
     const read: -1 | 0 | 1 = lat > t.flipM ? 1 : lat < -t.flipM ? -1 : 0;
     const jumped = !this.prev || Math.hypot(handler.x - this.prev.x, handler.z - this.prev.z) > t.reseedM;
@@ -107,10 +136,10 @@ export class BallSideShade {
 
   /**
    * The on-ball anchor (DefenderBrain's hook): the ball's distance along the handler→rim line, and across it the side he has read.
-   * `ball` keeps its own height (the brain's distances are planar). With BALL_SIDE_SHADE_ON false this is the ball, unchanged.
+   * `ball` keeps its own height (the brain's distances are planar). With the shade off (BALL_SIDE_SHADE_ON, or the panel's A/B) this is the ball, unchanged.
    */
   anchor<T extends { x: number; y: number; z: number; clone(): T }>(dt: number, handler: Planar, ball: T, hoop: Planar, defender: Planar): T {
-    if (!BALL_SIDE_SHADE_ON) return ball;
+    if (!shadeOn()) { this.reset(); return ball; }
     const sigma = this.step(dt, handler, ball, hoop, defender);
     const { u, p } = rimFrame(handler, hoop);
     const along = (ball.x - handler.x) * u.x + (ball.z - handler.z) * u.z;

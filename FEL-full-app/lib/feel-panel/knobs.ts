@@ -105,6 +105,42 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/RimForAll.ts DUNK_CLANK_SPAN_MPS',
     hint: 'Added to the slowest bounce for a dunk that catches the far edge of the iron.',
   },
+  // ── hoops-defense-fx: the on-ball defender shades the ball side; a cross thrown at him buys a beat (core/BallSideShade) ──
+  {
+    id: 'hoops.ballSideShadeOn', label: 'Ball-side shade on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts BALL_SIDE_SHADE_ON',
+    hint: 'A/B: 0 puts the on-ball defender back on the old anchor (the ball itself), exactly as before the shade.',
+  },
+  {
+    id: 'hoops.shadeOffsetM', label: 'Shade: how far to the ball side', def: 0.5, min: 0, max: 1.2, step: 0.05, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts SHADE_OFFSET_M',
+    hint: 'How far across the handler-to-rim line the on-ball defender sits toward the ball\'s side.',
+  },
+  {
+    id: 'hoops.shadeHoldSec', label: 'Shade: hold after a cross', def: 0.22, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts SHADE_REACT_SEC',
+    hint: 'The beat: how long he stays on the old side after a cross thrown at him (the lane is open meanwhile).',
+  },
+  {
+    id: 'hoops.shadeSlideMps', label: 'Shade: re-shift rate', def: 2.4, min: 0.5, max: 6.0, step: 0.1, unit: 'm/s', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts SHADE_SHIFT_MPS',
+    hint: 'How fast his spot slides across to the new ball side once he goes (his feet keep their own accel and brake).',
+  },
+  {
+    id: 'hoops.shadeDeadBandM', label: 'Shade: dead band', def: 0.08, min: 0, max: 0.3, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts SHADE_FLIP_M',
+    hint: 'The ball must be this far over the line before he reads the other side (the dribble\'s sway never flips him).',
+  },
+  {
+    id: 'hoops.shadeRangeM', label: 'Shade: cross range for the beat', def: 2.4, min: 0.5, max: 4.0, step: 0.05, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts SHADE_RANGE_M',
+    hint: 'Only a cross thrown inside this of him buys the hold; from further out he just goes.',
+  },
+  {
+    id: 'hoops.shadeReseedM', label: 'Shade: fresh look after a jump of', def: 1.0, min: 0.3, max: 3.0, step: 0.05, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/core/BallSideShade.ts SHADE_RESEED_M',
+    hint: 'A handler who moved this far between two reads (a check, a switch) is a new look: no beat, he is simply on the ball side.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

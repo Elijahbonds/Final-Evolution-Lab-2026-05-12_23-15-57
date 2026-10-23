@@ -125,3 +125,9 @@ lane/hoops-shot-core (group "Hoops · shooting"), defaults unchanged: `hoops.dis
 `hoops.dunkClankSpanMps` 1.6 m/s (`RimForAll.ts`). **assumption:** the bounds are safe, not tuned. The dunk knobs move
 only where a missed dunk hits the iron and how it bounces off, never the make rate (the ring's scale keeps P(made) = pct
 at every quality).
+
+lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `BallSideShade.ts`: `hoops.ballSideShadeOn` 1
+(`BALL_SIDE_SHADE_ON`; 0 = the old anchor exactly, for an A/B on the phone), `hoops.shadeOffsetM` 0.5 m, `hoops.shadeHoldSec`
+0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
+**assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
+speed or timing window reads a knob here.

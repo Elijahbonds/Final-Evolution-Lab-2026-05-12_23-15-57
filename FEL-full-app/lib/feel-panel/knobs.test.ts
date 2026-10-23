@@ -8,6 +8,7 @@ import { HAND_CLEAR_M } from '@/lib/babylon/anim/Dribble';
 import { DIST_GREEN_NEAR_M, DIST_GREEN_FAR_M, DIST_GREEN_MAX_NARROW } from '@/lib/babylon/core/ShotWindow';
 import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotClock';
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
+import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -37,6 +38,15 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.dunkShortBias')).toBe(DUNK_SHORT_BIAS);
     expect(def('hoops.dunkClankMinMps')).toBe(DUNK_CLANK_MIN_MPS);
     expect(def('hoops.dunkClankSpanMps')).toBe(DUNK_CLANK_SPAN_MPS);
+    // hoops-defense-fx
+    expect(def('hoops.ballSideShadeOn')).toBe(BALL_SIDE_SHADE_ON ? 1 : 0);
+    expect(def('hoops.shadeOffsetM')).toBe(SHADE_OFFSET_M);
+    expect(def('hoops.shadeHoldSec')).toBe(SHADE_REACT_SEC);
+    expect(def('hoops.shadeSlideMps')).toBe(SHADE_SHIFT_MPS);
+    expect(def('hoops.shadeDeadBandM')).toBe(SHADE_FLIP_M);
+    expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
+    expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
+    expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

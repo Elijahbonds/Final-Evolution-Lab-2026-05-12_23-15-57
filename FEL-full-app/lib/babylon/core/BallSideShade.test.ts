@@ -1,10 +1,12 @@
 // hoops-defense-fx: the on-ball man shades the ball side, and a cross thrown at him buys a beat (core/BallSideShade), wired into
 // DefenderBrain's on-ball anchor. Positioning only: the poke's roll and its gate are the brain's, unchanged.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Vector3 } from '@babylonjs/core';
-import { BallSideShade, SHADE, lateralOf, rimFrame } from './BallSideShade';
+import { BallSideShade, SHADE, lateralOf, liveShade, rimFrame, shadeOn } from './BallSideShade';
+import { FEEL_STORAGE_KEY, resetFeelForTests, setFeelSession, setFeelUser } from '../../feel-panel/feel';
+import { feelSessionBlock } from '../../feel-panel/sessionGate';
 import { DefenderBrain } from './BasketballCore';
 
 const HOOP = { x: 0, z: -0.6 };
@@ -153,9 +155,41 @@ describe('the wiring: one anchor line in DefenderBrain, and a module that reache
     expect(core.split('\n').filter((l) => /BallSideShade|this\.shade/.test(l))).toHaveLength(4);   // the import, the field's doc line, the field, the anchor
     expect(core).toMatch(/const anchor = onBall \? \(handlerPos \? this\.shade\.anchor\(dt, handlerPos, ball, hoop, self\) : ball\) : mark!;/);
   });
-  it('BallSideShade imports nothing at all (pure), and its code names no odds, speed or window', () => {
-    expect([...shade.matchAll(/^import[^;]*from '([^']+)'/gm)]).toHaveLength(0);
+  it('BallSideShade imports only the feel panel\'s feel() (pure otherwise), and its code names no odds, speed or window', () => {
+    expect([...shade.matchAll(/^import[^;]*from '([^']+)'/gm)].map((m) => m[1])).toEqual(['../../feel-panel/feel']);
     const code = shade.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');   // the code, not its comments
     expect(code).not.toMatch(/steal|strip|odds|aggression|speed|window|difficulty/i);
+  });
+});
+
+describe('the feel panel (group "Hoops · defense"): a playtest override moves the shade, and nothing else does', () => {
+  const g = globalThis as { window?: unknown };
+  const open = (o: Record<string, number>) => {
+    resetFeelForTests();
+    const m = new Map<string, string>([[FEEL_STORAGE_KEY, JSON.stringify(o)]]);
+    g.window = { localStorage: { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, removeItem: (k: string) => { m.delete(k); } } };
+    setFeelUser(true); setFeelSession(feelSessionBlock('/play/onevone', '?playtest=1'));
+  };
+  afterEach(() => { resetFeelForTests(); delete g.window; });
+  it('closed panel: the shipped numbers', () => {
+    expect(liveShade()).toEqual(SHADE);
+    expect(shadeOn()).toBe(true);
+  });
+  it('the A/B: hoops.ballSideShadeOn 0 puts the anchor back on the ball itself', () => {
+    open({ 'hoops.ballSideShadeOn': 0 });
+    expect(shadeOn()).toBe(false);
+    const b = new Vector3(ballAt(0.25).x, 1.1, ballAt(0.25).z);
+    expect(new BallSideShade().anchor(DT, H, b, HOOP, DEF_CLOSE)).toBe(b);
+  });
+  it('the numbers are read live: offset 0.8 and a hold of 0 (he goes at once on a cross)', () => {
+    open({ 'hoops.shadeOffsetM': 0.8, 'hoops.shadeHoldSec': 0 });
+    const s = new BallSideShade();
+    expect(run(s, 0.3, 0.25).at(-1)).toBeCloseTo(0.8, 6);
+    expect(run(s, DT, -0.25)[0]).toBeLessThan(0.8);
+  });
+  it('a ranked / paid run ignores the device\'s overrides', () => {
+    open({ 'hoops.shadeOffsetM': 0.8 });
+    setFeelSession(feelSessionBlock('/play/onevone', '?ranked=1'));
+    expect(liveShade().offsetM).toBe(SHADE.offsetM);
   });
 });
