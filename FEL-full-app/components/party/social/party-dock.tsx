@@ -20,6 +20,7 @@ import { activityLine } from '@/lib/party/social/activity';
 import { recallPlayerName } from '@/lib/party/playerName';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { isQuickScreenPath } from '@/lib/screen/routes';
+import { couchActive, subscribeCouch } from '@/lib/party/seats';
 import { useParty } from './use-party';
 import { Avatar } from './party-bits';
 import { PartyPanel } from './party-panel';
@@ -33,6 +34,8 @@ export function PartyDock() {
   const phase = view.phase;
   const modeId = view.modeId;
   const quick = isQuickScreenPath(pathname);
+  // COUCH (FN-0, 2026-10-19): a couch room on this device — the TV's or a seated phone's — has no party chat and no voice
+  const couch = useSyncExternalStore(subscribeCouch, couchActive, couchActive);
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
 
@@ -68,6 +71,13 @@ export function PartyDock() {
       .catch(() => c.patch({ notice: "Couldn't send the report — they are still blocked for you." }));
   }, [s.reportSlip]);
 
+  // a couch opening leaves voice (the mic closes) and shuts the panel
+  useEffect(() => {
+    if (!couch) return;
+    setOpen(false);
+    voiceMesh(partyClient()).leave();
+  }, [couch]);
+
   // the /party hub opens the panel by event (it lives in the page, the panel lives here)
   useEffect(() => {
     const onOpen = () => setOpen(true);
@@ -75,6 +85,7 @@ export function PartyDock() {
     return () => window.removeEventListener('fel:party-open', onOpen);
   }, []);
 
+  if (couch) return null;
   return (
     <>
       {place !== 'hidden' ? <PartyBar s={s} place={place} onOpen={() => setOpen(true)} /> : null}
