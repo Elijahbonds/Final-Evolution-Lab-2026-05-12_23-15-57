@@ -21,10 +21,25 @@ export function abacusEnabled(env: Readonly<Record<string, string | undefined>> 
   return env.ABACUS_ENABLED === 'true';
 }
 
+export function abacusApiKey(env: Readonly<Record<string, string | undefined>> = process.env): string | null {
+  const key = env.ABACUSAI_API_KEY?.trim();
+  return key ? key : null;
+}
+
+export function abacusAvailable(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  return abacusEnabled(env) && abacusApiKey(env) !== null;
+}
+
+export function requireAbacusApiKey(where: string, env: Readonly<Record<string, string | undefined>> = process.env): string {
+  const key = abacusApiKey(env);
+  if (!abacusEnabled(env) || !key) throw new AiDisabledError(where);
+  return key;
+}
+
 /** Thrown by the AI libraries before any fetch while the switch is off. The routes answer it with the coming-soon 503. */
 export class AiDisabledError extends Error {
   constructor(where: string) {
-    super(`${where}: AI calls are off (ABACUS_ENABLED is not 'true')`);
+    super(`${where}: AI calls are not ready (ABACUS_ENABLED is not 'true' or ABACUSAI_API_KEY is missing)`);
     this.name = 'AiDisabledError';
   }
 }

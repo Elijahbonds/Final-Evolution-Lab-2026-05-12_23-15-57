@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { BOOKS, featuredBook, PARTNERS } from '@/lib/books/bookCatalog';
+import { BOOKS, featuredBook, PARTNERS, publicBookDescription } from '@/lib/books/bookCatalog';
 import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { PressFrame } from '@/components/press/press-frame';
 import { BookCover } from '@/components/press/book-cover';
@@ -40,7 +40,7 @@ export default async function PressPage() {
             <h3 className="fel-heading mt-1 text-3xl text-white">
               <Link href={`/press/${featured.slug}`}>{featured.title}</Link>
             </h3>
-            <p className="mt-2 text-sm text-white/55">{featured.description}</p>
+            <p className="mt-2 text-sm text-white/55">{publicBookDescription(featured)}</p>
             <div className="mt-4 grid max-w-xs gap-3">
               {featuredOffers.map((offer) => (
                 <OfferCard key={offer.id} book={featured} offer={offer} prominent />

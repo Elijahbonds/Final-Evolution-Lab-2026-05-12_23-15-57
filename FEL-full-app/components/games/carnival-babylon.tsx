@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -44,6 +45,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -65,32 +67,36 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
       }));
     };
 
-    runMode(MODES.carnival, {
-      canvas,
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-      },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-      resultSink,
-    })
-      .then((s) => {
-        // A newer mount owns the canvas: do NOT run our teardown — it would
-        // dispose the engine holding the shared WebGL context.
-        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
-        stop = s;
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.carnival, {
+        canvas,
+        input: bus,
+        onPhase: (p, cd) => {
+          setPhase(p);
+          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        },
+        onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+        resultSink,
       })
-      .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-CARNIVAL] boot failed', setPhase, setLoadError }));
+        .then((s) => {
+          // A newer mount owns the canvas: do NOT run our teardown — it would
+          // dispose the engine holding the shared WebGL context.
+          if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+          stop = s;
+        })
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-CARNIVAL] boot failed', setPhase, setLoadError }));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+  }, [bootAttempt]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -189,7 +195,7 @@ export default function CarnivalBabylon({ onEnd }: GameProps) {
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
-        onRetry={tapStart}
+        onRetry={retryBoot}
       />
 
       {busRef.current && <PadChips bus={busRef.current} className="left-4 bottom-4" />}

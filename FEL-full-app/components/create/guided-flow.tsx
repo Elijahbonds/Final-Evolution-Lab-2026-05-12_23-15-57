@@ -14,7 +14,7 @@ import {
   STEPS, STEP_LABEL, SOURCE_LABEL, blockers, buildCreateBody, canLeave, clampStep, newDraft, nextStep, pendingFields, pendingUrl, prevStep,
   resolvePending, type FlowDraft, type PublishEntry, type StepId,
 } from '@/lib/create/flow';
-import { guideFor } from '@/lib/create/disciplines';
+import { guideFor, visibleShowcases } from '@/lib/create/disciplines';
 import { statusOf } from '@/lib/create/status';
 import { uploadMedia, UploadError } from '@/lib/create/upload';
 import { uploadMime } from '@/lib/create/media';
@@ -71,6 +71,7 @@ function MakeStep({ discipline, entry, props, onMade }: { discipline: Discipline
 export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & { discipline: Discipline; entry: PublishEntry }) {
   const ctx = useMemo(() => ({ publicCreator: props.publicCreator }), [props.publicCreator]);
   const guide = guideFor(discipline);
+  const showcaseRows = useMemo(() => visibleShowcases(guide), [guide]);
   const [step, setStep] = useState<StepId>('make');
   const [draft, setDraft] = useState<FlowDraft>(() => newDraft(discipline, { title: entry.title ?? '', wantsPublic: props.publicCreator, ...(entry.remix ? { remixOf: entry.remix } : {}) }));
   const [media, setMedia] = useState<Record<string, PendingMedia>>({});
@@ -183,7 +184,7 @@ export default function GuidedFlow({ discipline, entry, ...props }: FlowProps & 
             <div className="rounded-xl bg-neutral-900 p-4 text-sm">
               <div className="mb-1 text-xs uppercase tracking-wide text-neutral-400">Where it shows up</div>
               <ul className="space-y-1">
-                {guide.showsUp.map((s) => <li key={s.where} className={s.live ? 'text-neutral-100' : 'text-neutral-500'}>{s.live ? '●' : '○'} {s.where}{s.live ? '' : ' (soon)'}</li>)}
+                {showcaseRows.map((s) => <li key={s.where} className="text-neutral-100">● {s.where}</li>)}
               </ul>
             </div>
           </div>

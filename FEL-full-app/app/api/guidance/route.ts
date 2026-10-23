@@ -7,6 +7,9 @@ import { prisma } from '@/lib/db';
 import { evidenceFrom } from '@/lib/guidance/evidence';
 import { adjacentPathways, counsellorNote, suggestPathways } from '@/lib/guidance/pathways';
 
+type SessionEvidenceRow = { mode: string; createdAt: Date };
+type CardEvidenceRow = { primary: string };
+
 /**
  * What this person keeps coming back to, and one next step in that direction.
  *
@@ -22,18 +25,24 @@ export async function GET() {
   // A wide window on purpose: a counsellor looks at a year, not at this week's form.
   const since = new Date(Date.now() - 365 * 24 * 3600 * 1000);
 
-  const [sessions, cards] = await Promise.all([
-    prisma.gameSession.findMany({
-      where: { userId, createdAt: { gte: since } },
-      select: { mode: true, createdAt: true },
-      take: 2000,
-    }).catch(() => []),
-    prisma.creativeCard.findMany({
-      where: { ownerId: userId },
-      select: { primary: true },
-      take: 500,
-    }).catch(() => []),
-  ]);
+  let sessions: SessionEvidenceRow[];
+  let cards: CardEvidenceRow[];
+  try {
+    [sessions, cards] = await Promise.all([
+      prisma.gameSession.findMany({
+        where: { userId, createdAt: { gte: since } },
+        select: { mode: true, createdAt: true },
+        take: 2000,
+      }),
+      prisma.creativeCard.findMany({
+        where: { ownerId: userId },
+        select: { primary: true },
+        take: 500,
+      }),
+    ]);
+  } catch {
+    return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  }
 
   const evidence = evidenceFrom(sessions, cards);
   const suggestions = suggestPathways(evidence);

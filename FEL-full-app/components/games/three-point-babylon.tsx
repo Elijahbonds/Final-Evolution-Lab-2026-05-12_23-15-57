@@ -17,6 +17,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { rackPips, SHOT_TARGET, GOOD_BAND } from '@/lib/babylon/core/shootoutHud';
@@ -81,6 +82,18 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   // only the keys that changed now, and this host MERGES them into the hud (it replaced the whole hud every frame)
   const [micLine, setMicLine] = useState<{ text: HudValue; who: HudValue }>({ text: '', who: '' });
   const [busReady, setBusReady] = useState(false);
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({
+    busRef,
+    endedRef,
+    setPhase,
+    setCountdown,
+    setLoadError,
+    reset: () => {
+      setHud({});
+      setMicLine({ text: '', who: '' });
+      setBusReady(false);
+    },
+  });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -149,8 +162,8 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
       .catch((e) => surfaceBootError(e, { disposed, setPhase, setLoadError }));
     }, 0);
 
-    return () => { disposed = true; clearTimeout(startTimer); stop?.(); };
-  }, []);   // mount once — see onEndRef above
+    return () => { disposed = true; clearTimeout(startTimer); stop?.(); setBusReady(false); busRef.current = null; linkSink.current = null; };
+  }, [bootAttempt]);   // callbacks are refs; bootAttempt remounts after a rejected runMode().
 
   const emit = useCallback((i: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(i);
@@ -308,7 +321,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
-        onRetry={tapStart}
+        onRetry={retryBoot}
       />
 
       {/* Lobby is expanded until the whistle, then collapses to a status badge

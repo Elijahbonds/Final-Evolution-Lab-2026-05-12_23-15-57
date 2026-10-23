@@ -16,6 +16,13 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Every whole-percent opacity step, so a colour modifier like `text-white/45` or `border-white/8` compiles.
+      // Tailwind 3.3's stock scale is 0, 5, 10, 20, 25, 30, 40 … 100, and a modifier off it emits NO CSS at all:
+      // measured 2026-10-14, 70 class names / 912 uses in 222 files compiled to nothing, so that text rendered in
+      // its inherited full colour and those tints, borders, scrims and disabled fades were absent. (3.4 adds only
+      // the 15/35/… steps; Tailwind 4 takes any integer.) Only classes found in content are emitted, so the unused
+      // steps cost nothing, and the stock steps keep their values. tests/tailwind/opacity-scale.test.ts holds it.
+      opacity: Object.fromEntries(Array.from({ length: 101 }, (_, i) => [String(i), String(i / 100)])),
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         display: ['var(--font-display)', 'var(--font-sans)', 'sans-serif'],
@@ -110,6 +117,12 @@ const config: Config = {
         'fade-in': 'fade-in 0.4s ease-out',
         'fade-out': 'fade-out 0.2s ease-out',
       },
+      // The spacing scale on min-height / min-width, as Tailwind 3.4 has it, so `min-h-12` (48 px touch targets) compiles.
+      // 3.3's stock min-h/min-w only know 0, full, screen, min, max, fit, and the rest compiled to NO CSS: measured
+      // 2026-10-16, min-h-12 ×57, min-w-12 ×8, min-h-14 ×6 … 79 uses. Extended, so min-h-full / min-h-screen are unchanged.
+      // tests/tailwind/dead-classes.test.ts holds it.
+      minHeight: ({ theme }) => theme('spacing'),
+      minWidth: ({ theme }) => theme('spacing'),
     },
   },
   plugins: [require('tailwindcss-animate')],

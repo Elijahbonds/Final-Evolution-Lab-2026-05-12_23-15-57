@@ -16,7 +16,7 @@ PR #18 first shipped a whole storefront. The owner chose **SLIM DOWN**. What is 
 
 `package.json`, `package-lock.json` and `yarn.lock` are back to `lane/finish-release`'s exact versions.
 
-Nothing here is live. Every rate, stat and bio is a placeholder or an **EXAMPLE**. Nothing on these pages is priced or sold.
+Nothing here is live. Every rate and stat is an **EXAMPLE**, and unconfirmed bios/services use generic pending-confirmation copy. Nothing on these pages is priced or sold.
 
 ## Book buttons go to the coach store
 
@@ -26,9 +26,9 @@ The services on a profile are information only (name, length, description): no p
 
 ## What Elijah has to decide
 
-1. **Services.** Two placeholder services are listed on `elijah-bonds` (`1-on-1 session (EXAMPLE)`, `Consult call (EXAMPLE)`). Replace the names, descriptions and lengths in `lib/creator/creatorCatalog.ts`, or remove them.
+1. **Services.** Two example services are listed on `elijah-bonds` (`1-on-1 session (EXAMPLE)`, `Consult call (EXAMPLE)`). Replace the names, descriptions and lengths in `lib/creator/creatorCatalog.ts`, or remove them.
 2. **Media-kit rates** (`priceCents` on each package) stay EXAMPLE until set; flip `priceIsExample` only when a number is real. The audience numbers (`AUDIENCE_STATS`) are a fixture with an "Example data" badge until real ones are pasted.
-3. **Content.** The bio (`Bio placeholder.`), specialty, reels, highlights and past partners are placeholders. The past-partner list is taken from the Press partner links and is marked unconfirmed.
+3. **Content.** The bio, specialty, reels, highlights and past partners are pending confirmation. The past-partner list is taken from the Press partner links and is marked unconfirmed.
 4. **Teammates.** `example-teammate` is `approved: false` and never renders. Add real people only with their real copy, set `approved: true` when they sign off, and give them a `coachStoreSlug` if they sell in the coach store.
 5. **Apply the pending SQL** (below) so the inquiry form turns on.
 

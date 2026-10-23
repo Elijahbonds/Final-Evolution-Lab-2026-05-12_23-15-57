@@ -619,6 +619,22 @@ describe('GET /api/v1/wallet refunds what delivered nothing', () => {
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it('a partial client without the sweep delegates reads cleanly and does not warn', async () => {
+    const partial = {
+      wallet: {
+        findUnique: vi.fn(async () => ({ id: 'w_partial', playerId: 'p1', coins: 12n, shards: 34n, lc: 5n, version: 1n, updatedAt: NOW })),
+        create: vi.fn(),
+      },
+      $transaction: vi.fn(async () => { throw new Error('the dead-buy sweep should not run'); }),
+      walletLedgerEntry: { findUnique: vi.fn() },
+    };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await expect(readWallet(partial as never, 'p1')).resolves.toMatchObject({ coins: 12, shards: 34, lc: 5, version: 1 });
+    expect(partial.$transaction).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 const post = (handler: (req: never) => Promise<Response>, body: unknown) => handler(new Request('http://fel.test/api', {

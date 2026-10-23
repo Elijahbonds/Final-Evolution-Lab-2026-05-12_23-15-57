@@ -7,7 +7,7 @@ Flag `COACH_STORE_ENABLED` defaults off. Payments, review uploads, and payouts a
 | `COACH_STORE_ENABLED` | Store pages and routes. Off = 404. |
 | `COACH_STORE_PAYMENTS_ENABLED` | Checkout. Still test keys only (`sk_test_` / `rk_test_`). |
 | `COACH_REVIEW_UPLOADS_ENABLED` | Signed upload URLs and selling video review. |
-| `COACH_REVIEWS_BUCKET` | Private GCS bucket. Unset = uploads fail closed ("Uploads coming soon"). |
+| `COACH_REVIEWS_BUCKET` | Private GCS bucket. Unset = uploads fail closed with an unavailable-storage message. |
 | `COACH_STORE_COACH_USER_IDS` | Comma-separated user ids. Empty = nobody is a coach. |
 | `COACH_STORE_REFERRAL_SHARE_OF_FEE` | Share of FEL's 15% fee. Unset = 0.20. Clamped 0–0.5. |
 | `COACH_STORE_BLOCKED_ADDRESS_TERMS` | Extra substrings refused as a mailing address. |

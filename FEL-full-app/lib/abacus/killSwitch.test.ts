@@ -6,7 +6,7 @@ const m = vi.hoisted(() => ({ session: { user: { id: 'athlete-1' } } as unknown 
 vi.mock('next-auth', () => ({ getServerSession: vi.fn(async () => m.session) }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 
-import { abacusEnabled, aiComingSoonResponse, AiDisabledError, AI_COMING_SOON } from '@/lib/abacus/killSwitch';
+import { abacusApiKey, abacusAvailable, abacusEnabled, aiComingSoonResponse, AiDisabledError, AI_COMING_SOON } from '@/lib/abacus/killSwitch';
 import {
   AI_COMING_SOON_MESSAGE,
   AI_STATUS_PATH,
@@ -16,18 +16,21 @@ import {
 } from '@/lib/abacus/aiStatus';
 import { GET as statusGET } from '@/app/api/ai/status/route';
 
-const saved = process.env.ABACUS_ENABLED;
+const saved = { flag: process.env.ABACUS_ENABLED, key: process.env.ABACUSAI_API_KEY };
 let fetchSpy: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   delete process.env.ABACUS_ENABLED;
+  delete process.env.ABACUSAI_API_KEY;
   m.session = { user: { id: 'athlete-1' } };
   fetchSpy = vi.fn(async () => new Response('{}', { status: 200 }));
   vi.stubGlobal('fetch', fetchSpy);
 });
 afterEach(() => {
-  if (saved === undefined) delete process.env.ABACUS_ENABLED;
-  else process.env.ABACUS_ENABLED = saved;
+  if (saved.flag === undefined) delete process.env.ABACUS_ENABLED;
+  else process.env.ABACUS_ENABLED = saved.flag;
+  if (saved.key === undefined) delete process.env.ABACUSAI_API_KEY;
+  else process.env.ABACUSAI_API_KEY = saved.key;
   vi.unstubAllGlobals();
 });
 
@@ -66,6 +69,22 @@ describe('abacusEnabled(): on only for the exact string "true"', () => {
   });
 });
 
+describe('abacusAvailable(): on only when the switch and server key are both present', () => {
+  it('trims and returns a configured key', () => {
+    expect(abacusApiKey({ ABACUSAI_API_KEY: '  test-key  ' })).toBe('test-key');
+  });
+
+  it('treats an unset or blank key as unavailable even when ABACUS_ENABLED is true', () => {
+    expect(abacusAvailable({ ABACUS_ENABLED: 'true' })).toBe(false);
+    expect(abacusAvailable({ ABACUS_ENABLED: 'true', ABACUSAI_API_KEY: '   ' })).toBe(false);
+  });
+
+  it('is available only with the exact switch and a non-empty key', () => {
+    expect(abacusAvailable({ ABACUS_ENABLED: '1', ABACUSAI_API_KEY: 'key' })).toBe(false);
+    expect(abacusAvailable({ ABACUS_ENABLED: 'true', ABACUSAI_API_KEY: 'key' })).toBe(true);
+  });
+});
+
 describe('the coming-soon answer', () => {
   it.each(['coach', 'studio'] as const)('aiComingSoonResponse(%s) is a 503 {status, feature, message}', async (feature) => {
     const res = aiComingSoonResponse(feature);
@@ -100,8 +119,14 @@ describe('GET /api/ai/status', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("ABACUS_ENABLED='true': available for both", async () => {
+  it("ABACUS_ENABLED='true' but no server key: coming_soon for both", async () => {
     process.env.ABACUS_ENABLED = 'true';
+    expect(await (await statusGET()).json()).toEqual({ coach: 'coming_soon', studio: 'coming_soon' });
+  });
+
+  it("ABACUS_ENABLED='true' with ABACUSAI_API_KEY: available for both", async () => {
+    process.env.ABACUS_ENABLED = 'true';
+    process.env.ABACUSAI_API_KEY = 'test-key-not-real';
     expect(await (await statusGET()).json()).toEqual({ coach: 'available', studio: 'available' });
   });
 

@@ -4,6 +4,7 @@ import {
   resolveFirstGame,
 } from './firstRun';
 import { MODE_INFO } from '../game-data';
+import { shelvedModes } from '../nav/families';
 
 describe('the path', () => {
   it('knows the two it offers and nothing else', () => {
@@ -28,6 +29,14 @@ describe('a mode key is only usable if something opens with it', () => {
 
   it('rejects the rest rather than trusting them', () => {
     for (const v of ['', null, undefined, 'nope', 'DUNKCONTEST', '../../etc']) expect(isPlayableMode(v)).toBe(false);
+  });
+
+  it('rejects catalogue rows that are not first-game shelf entries', () => {
+    for (const key of ['marketplace', 'kitchens', 'mirror', 'training']) {
+      expect(isPlayableMode(key)).toBe(false);
+      expect(resolveFirstGame({ chosen: key })).toBe(DEFAULT_FIRST_GAME);
+      expect(hostFrom({ displayName: 'Host', mode: key })?.mode).toBeNull();
+    }
   });
 });
 
@@ -146,5 +155,10 @@ describe('the carousel', () => {
 
   it('never returns a mode without a route — every card has somewhere to go', () => {
     for (const k of carouselOrder()) expect(MODE_INFO[k]?.href).toBeTruthy();
+  });
+
+  it('offers the Play shelf, not every catalogue row with an href', () => {
+    expect([...carouselOrder()].sort()).toEqual([...shelvedModes()].sort());
+    expect(carouselOrder()).not.toEqual(expect.arrayContaining(['marketplace', 'kitchens', 'mirror', 'training']));
   });
 });

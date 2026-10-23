@@ -6,7 +6,7 @@ import { notFound, redirect } from 'next/navigation';
 import { loginPath } from '@/lib/auth/safeNext';
 import { isDiscipline } from '@/lib/creator/creative-card-types';
 import { creatorContext } from '@/lib/create/creator-context';
-import { readEntry } from '@/lib/create/flow';
+import { createFlowHref, readEntry } from '@/lib/create/flow';
 import GuidedFlow from '@/components/create/guided-flow';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,6 @@ export default async function CreateDisciplinePage({ params, searchParams }: {
   const d = params.discipline;
   if (!isDiscipline(d)) notFound();
   const ctx = await creatorContext();
-  if (!ctx) redirect(loginPath(`/create/${d}`));
+  if (!ctx) redirect(loginPath(createFlowHref(d, searchParams)));
   return <GuidedFlow discipline={d} entry={readEntry(searchParams)} {...ctx} />;
 }

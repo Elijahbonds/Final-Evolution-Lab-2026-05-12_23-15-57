@@ -80,7 +80,7 @@ describe('panel lines — a curated list per long mode', () => {
     // test changed (HOOPS PAUSE): the 3v3 has no curated list any more (its groups, above); karate's holds this instead
     expect(panelLinesFor('karate')).toEqual([...PANEL_LINES.karate.lines]);
     expect(panelLinesFor('dunk')).toBeNull();
-    expect(controlLines('dunk')).toEqual(['HOLD to run', 'tap JUMP at the line — then SLAM on NOW!']);
+    expect(controlLines('dunk')).toEqual(['HOLD to run', 'tap JUMP at the line', 'press to flush']);
   });
 
   it('a curated mode\'s static hint still leaves the play screen word for word (the list replaces only the panel\'s copy)', () => {

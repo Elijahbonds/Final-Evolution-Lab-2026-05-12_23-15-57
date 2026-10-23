@@ -14,6 +14,8 @@
 // `?net=` co-op needs the netd server (NEXT_PUBLIC_NETD_URL), which is not deployed. The Babylon pass-and-play dunk duel
 // was replaced on /play/dunkduel by the camera Prove It, by owner decision, so it is not resurfaced here.
 
+import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
+
 export type PartyStyle = 'buzz' | 'turns';
 
 export interface PartyMode {
@@ -56,10 +58,37 @@ export function partyModeById(id: string | null | undefined): PartyMode | null {
   return PARTY_MODES.find((m) => m.id === id) ?? null;
 }
 
+function routePathFromValue(value: string): string | null {
+  const raw = value.trim();
+  if (!raw) return null;
+  const first = raw.split(/[?#]/)[0] ?? '';
+  if (first.startsWith('/')) return first.replace(/\/+$/, '') || '/';
+  try {
+    const url = new URL(raw);
+    return url.pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return null;
+  }
+}
+
+function routeSlug(path: string | null): string | null {
+  if (!path || path === '/') return null;
+  const parts = path.split('/').filter(Boolean);
+  return parts[parts.length - 1] ?? null;
+}
+
 /** By MODE_INFO key (the shelf and the shell speak that), or by mode id. */
 export function partyModeFor(key: string | null | undefined): PartyMode | null {
-  if (!key) return null;
-  return PARTY_MODES.find((m) => m.infoKey === key || m.id === key) ?? null;
+  const raw = String(key ?? '').trim();
+  if (!raw) return null;
+  const canonical = canonicalModeKey(raw);
+  const inputPath = routePathFromValue(raw);
+  const inputSlug = routeSlug(inputPath) ?? raw;
+  return PARTY_MODES.find((m) => {
+    if (m.infoKey === raw || m.id === raw || m.infoKey === canonical || m.id === canonical) return true;
+    const hrefPath = routePathFromValue(MODE_INFO[m.infoKey]?.href ?? '');
+    return (inputPath !== null && hrefPath === inputPath) || routeSlug(hrefPath) === inputSlug;
+  }) ?? null;
 }
 
 /** The badge a tile wears: "2 PLAYERS", "1–4 PLAYERS". */

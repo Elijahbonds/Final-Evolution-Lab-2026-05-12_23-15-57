@@ -54,14 +54,16 @@ export function CoachView() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition-all ${
+              // COACH-LOOP P1 (2026-10-20): on a phone the icon sits over the label, so five tabs fit 390 px without
+              // squeezing "Form Check" onto two lines beside a crushed icon (measured: scripts/probes/_coach-phone-probe.mts)
+              className={`min-w-0 flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-lg py-2 sm:py-2.5 text-[11px] leading-tight sm:text-sm font-medium transition-all ${
                 active
                   ? 'bg-[#00E5FF]/15 text-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.2)]'
                   : 'text-white/40 hover:text-white/70'
               }`}
             >
-              <Icon className="h-4 w-4" />
-              {t.label}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="max-w-full truncate">{t.label}</span>
             </button>
           );
         })}

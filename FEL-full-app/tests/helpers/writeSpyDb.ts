@@ -51,13 +51,15 @@ function matches(row: Row, where: Row | undefined): boolean {
     if (cond instanceof Date || typeof cond !== 'object' || Array.isArray(cond)) return same(v, cond);
     const c = cond as Row;
     // a compound unique key (e.g. userId_date: { userId, date }) holds plain fields, not operators
-    if (!Object.keys(c).some((op) => ['not', 'gte', 'gt', 'lte', 'lt', 'in'].includes(op))) return matches(row, c);
+    if (!Object.keys(c).some((op) => ['not', 'gte', 'gt', 'lte', 'lt', 'in', 'startsWith'].includes(op))) return matches(row, c);
     if ('not' in c && (c.not === null ? v == null : same(v, c.not))) return false;
     if ('gte' in c && !(v != null && v >= c.gte)) return false;
     if ('gt' in c && !(v != null && v > c.gt)) return false;
     if ('lte' in c && !(v != null && v <= c.lte)) return false;
     if ('lt' in c && !(v != null && v < c.lt)) return false;
     if ('in' in c && !(c.in as unknown[]).some((x) => same(v, x))) return false;
+    // COACH-LOOP P1 (2026-10-20): the typed invite code's lookup (token startsWith `CODE~`)
+    if ('startsWith' in c && !(typeof v === 'string' && v.startsWith(String(c.startsWith)))) return false;
     return true;
   });
 }

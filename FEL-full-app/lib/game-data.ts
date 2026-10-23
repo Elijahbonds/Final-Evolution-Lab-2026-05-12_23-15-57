@@ -21,7 +21,7 @@ export const VENUES: Venue[] = [
   { key: 'soccerstadium', name: 'Coastal FC Stadium', image: '/venues/soccerstadium.jpg', modes: ['Twelve Yards'], playable: true, href: '/play/soccer' },
   { key: 'baseballpark', name: 'Catalina Ballpark', image: '/venues/baseballpark.jpg', modes: ['Moonshot Derby'], playable: true, href: '/play/baseball' },
   { key: 'gridiron', name: 'The Gridiron', image: '', modes: ['Breakaway'], playable: true, href: '/play/football' },
-  { key: 'lumaveniceshop', name: 'Luma Venice Shop', image: '/venues/lumaveniceshop.jpg', modes: ['Market Browse'], playable: true, href: '/shop' },
+  { key: 'lumaveniceshop', name: 'Luma Venice Shop', image: '/venues/lumaveniceshop.jpg', modes: ['Market Browse'], playable: false },
   { key: 'courtcarnival', name: 'Court Carnival', image: '/venues/courtcarnival.jpg', modes: ['Slam Rush', 'Strike Storm', 'Trick Gauntlet', 'Hot Shot', 'Coin Storm', 'Counter Strike', '+ mini-game night'], playable: true, href: '/play/carnival' },
   { key: 'octagon', name: 'The Octagon', image: '', modes: ["Ring's Edge"], playable: true, href: '/play/mixedcombat' },
   // 'duelarena' (Weapon Duel) RETIRED from the v1 roster (owner, 2026-09-01:
@@ -192,7 +192,7 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   carnival: { name: 'Game Night', venue: 'Venice Beach Court', href: '/play/carnival' },
   threePoint: { name: 'Downtown', venue: 'Venice Beach Court', href: '/play/threepoint' },
   karateVersus: { name: 'Storm Duel', venue: 'Shimogamo Dojo', href: '/play/karate-vs' },
-  whoSceneIt: { name: 'Spot the Scene', venue: 'NeuroArena', href: '/play/who-scene-it' },
+  whoSceneIt: { name: 'Spot the Scene', venue: 'Scene Vault', href: '/play/who-scene-it' },
   bigAir: { name: 'Stomp', venue: 'Mountain Slope', href: '/play/big-air' },
   tiebreak: { name: 'Tiebreak Blitz', venue: 'Venice Tennis Court', href: '/play/tiebreak' },
   // sprint / duel / showdown were retired from the v1 roster on 2026-09-01, then revived when the owner asked

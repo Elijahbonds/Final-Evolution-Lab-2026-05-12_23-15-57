@@ -4,6 +4,10 @@
 // schema does not have (lib/coach/todayMemoryDb.ts); the view mounted with Phase 1's hooks rig.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// COACH-LOOP P1 (owner 2026-10-23): a teen's consent counts only if it was asked under the coach-training wording, which
+// is not live yet (lib/coach/coachConsent.ts, null = every teen fails closed). This suite stands after go-live.
+const cc = vi.hoisted(() => ({ since: new Date('2026-01-01') as Date | null }));
+vi.mock('@/lib/coach/coachConsent', async (orig) => (await import('@/tests/helpers/coachConsent')).coachConsentAt(await orig(), () => cc.since));
 vi.mock('react', async (importOriginal) => (await import('@/tests/helpers/hookRuntime')).hookedReact(await importOriginal()));
 
 const h = vi.hoisted(() => ({ user: 'client-1' as string | null, store: null as unknown as import('@/lib/coach/todayMemoryDb').TodayStore }));
@@ -48,6 +52,9 @@ const writes = () => ({ cs: h.store.cs.length, log: h.store.log.length, setLog: 
 function seed(dobYear: number | null) {
   h.store = newTodayStore();
   h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test', dobYear });
+  // COACH-LOOP P1 (2026-10-20): a minor's coached log exists only with a guardian's yes (lib/coach/teenGate.ts), so the
+  // coached minor below has one; an adult's row is never read by the gate past the birth year
+  if (dobYear != null && new Date().getFullYear() - dobYear <= 18) h.store.guardianConsent!.push({ id: 'gc-1', menteeId: 'client-1', menteeBirthYear: dobYear, requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: null });
   h.store.pe.push(
     catalogueRow({ id: 'pe-goblet', coachId: 'coach-1', name: 'Goblet Squat' }),
     catalogueRow({ id: 'pe-row', coachId: 'coach-1', name: 'Half-kneeling Row' }),
