@@ -20,6 +20,7 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { recordServerEvents } from '@/lib/analytics-server';
+import { isAnonymousEvent } from '@/lib/analyticsAnon';   // perf-lag: the fps / ttfp perf stats carry no user or guest id
 import { guestIdFrom } from '@/lib/guestSession';
 import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 
@@ -54,10 +55,10 @@ export async function POST(req: Request) {
       parsed.data.events.map((e) => ({
         name: e.name,
         props: e.props ?? null,
-        sessionKey: e.sessionKey ?? null,
         ts: e.ts,
-        userId,
-        guestId,
+        // perf-lag: an anonymous row keeps no user, no guest and no page key (the page's sessionKey would join it back to that
+        // page's signed-in rows)
+        ...(isAnonymousEvent(e.name, e.props) ? { userId: null, guestId: null, sessionKey: null } : { userId, guestId, sessionKey: e.sessionKey ?? null }),
       })),
     );
     return new NextResponse(null, { status: 204 });
