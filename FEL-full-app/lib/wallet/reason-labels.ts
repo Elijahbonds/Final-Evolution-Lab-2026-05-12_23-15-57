@@ -49,6 +49,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   DEAD_BUY_REFUND: { label: 'Refund: it delivered nothing', kind: 'refund' },
   // MUSIC-SUITE P6 (owner decision #23): a zero-shard row; its metadata.note names the kit.
   KIT_GRANDFATHER_2026_09: { label: 'Music kit kept: unlocked before Sep 20, 2026', kind: 'admin' },
+  DAILY_DRILL_COMPLETE: { label: "Today's drill done", kind: 'earn' },   // DAILY-DRILL (2026-10-24)
 };
 
 export function reasonLabel(code: string): ReasonLabel {

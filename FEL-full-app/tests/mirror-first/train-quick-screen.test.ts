@@ -25,6 +25,13 @@ vi.mock('@/components/shell/tab-page', () => ({
   TabPage: (p: { children?: ReactNode }) => createElement('div', null, p.children),
 }));
 vi.mock('@/components/shell/doors-row', () => ({ DoorsRow: () => null }));
+// DAILY-DRILL (2026-10-24; test changed): /train now also draws today's drill, which reads the account's age on purpose
+// (the drills page's youth gate and profile v2's opt-in gate decide what it may pick; tests/daily-drill tests those
+// reads). It is stood in for here, so "reads no age" below still measures the Quick Screen card and nothing else.
+vi.mock('@/lib/daily-drill/load', async (orig) => ({
+  ...(await orig<typeof import('@/lib/daily-drill/load')>()),
+  loadDailyDrill: async () => { h.reads.push('loadDailyDrill'); return null; },
+}));
 
 import TrainPage from '@/app/train/page';
 import { SCREEN_HOME, isQuickScreenPath } from '@/lib/screen/routes';
