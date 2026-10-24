@@ -42,6 +42,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
         </div>
       </div>
     ),
-    { ...size },
+    // CARD-SAFE-1: next/og defaults to `public, immutable, max-age=31536000` in production; the lower-case key overrides it.
+    { ...size, headers: { 'cache-control': 'no-store' } },
   );
 }
