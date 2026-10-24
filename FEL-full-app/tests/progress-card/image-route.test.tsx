@@ -20,7 +20,8 @@ vi.mock('@/lib/progress-card/image', async (orig) => {
   return { ...real, ProgressCardImage: (p: { card: any; opts: any }) => { h.drawn.push(p); return real.ProgressCardImage(p); } };
 });
 
-import { GET, IMAGE_LIMIT } from '@/app/api/v1/progress-card/image/route';
+import { GET } from '@/app/api/v1/progress-card/image/route';
+import { IMAGE_LIMIT } from '@/lib/progress-card/image';
 import { nameOnImage } from '@/lib/progress-card/image';
 import { resetRateLimitMemory } from '@/lib/rate-limit';
 

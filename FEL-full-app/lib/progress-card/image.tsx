@@ -15,6 +15,8 @@ import { weekLabel, type CardMode, type ProgressCard } from './summary';
 
 /** 4:5 portrait, the size the dunk poster shares at (components/games/dunk-poster.tsx) (new). */
 export const CARD_IMAGE = { width: 1080, height: 1350 } as const;
+/** Images one account may draw per window: a draw is real CPU, and a person shares a week a few times at most (new). */
+export const IMAGE_LIMIT = { count: 20, windowMs: 10 * 60_000 } as const;
 
 const INK = '#050505';
 const PANEL = '#0f0f15';

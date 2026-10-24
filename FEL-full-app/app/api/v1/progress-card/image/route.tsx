@@ -16,15 +16,14 @@ import { prisma } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { readProfileRows, READ_CAP, type ProfileDb } from '@/lib/profile-v2/load';
 import { buildProgressCard } from '@/lib/progress-card/card';
-import { CARD_IMAGE, ProgressCardImage } from '@/lib/progress-card/image';
+// IMAGE_LIMIT lives in the lib: a route file may export only Next's route fields (next build's type check refuses others)
+import { CARD_IMAGE, IMAGE_LIMIT, ProgressCardImage } from '@/lib/progress-card/image';
 
 export const runtime = 'nodejs';
 // a person's own numbers: drawn per request, never cached anywhere
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/** Images one account may draw per window: a draw is real CPU, and a person shares a week a few times at most (new). */
-export const IMAGE_LIMIT = { count: 20, windowMs: 10 * 60_000 } as const;
 
 // LOWER CASE ON PURPOSE: next/og's ImageResponse sets `cache-control: public, immutable, max-age=31536000` in production
 // and spreads ours over it by key. 'Cache-Control' is a different key, so both survived and joined into one header that
