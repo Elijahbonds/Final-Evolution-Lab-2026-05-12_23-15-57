@@ -22,9 +22,10 @@ import { isKid, type AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import {
   DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
-  SCREEN_TEST_NAMES, WIN_LINE,
+  SCREEN_TEST_NAMES, TRUST_INFO_LINE, TRUST_WORDS, WIN_LINE,
 } from '@/lib/screen/copy';
-import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR } from './screen-ui';
+import { BandChip, EarlyTag, PreviewLabel, StopLine, TrustChip, TrustReasonLine, primaryBtn, quietBtn, BAND_COLOUR } from './screen-ui';
+import { worstTrust } from '@/lib/screen/trust-rows';
 import { KidResults } from './kid-results';
 import { DrillDemo } from './drill-demo';
 import { FaultReplay } from './fault-replay';
@@ -67,6 +68,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
 }) {
   const s = summary;
   if (isKid(age)) return <KidResults jumpIn={s.jumpBestIn} lastIn={null} onRunAgain={onRunAgain} />;
+  const jumpTrust = s.trust?.find((r) => r.id === 'jump.height') ?? null;
   return (
     <div data-screen-results className="space-y-3">
       <div className="space-y-2">
@@ -87,18 +89,28 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
       ) : null}
 
       <section>
+        {s.trust?.length ? <p data-trust-info className="px-1 pb-1 text-[16px] leading-snug text-white/70">{TRUST_INFO_LINE}</p> : null}
         <h2 className="px-1 text-[16px] font-bold uppercase tracking-[0.14em] text-white/60">Your checks</h2>
         <ul data-check-cards className="mt-2 space-y-2">
           {checkCards(s).map(({ test, band, row, top }, idx) => {
             const word = band ?? 'unread';
             const pad = top ? 'p-3.5' : 'px-3.5 py-2.5';
             const cueText = top ? 'text-[16px] text-white/85' : 'text-[16px] text-white/75';
+            // MIRROR-TRUST-RATING: the card's trust is its worst row's (a sided row: its worse side); the jump height has its own block
+            const trust = s.trust ? worstTrust(s.trust.filter((r) => r.id !== 'jump.height' && checkById(r.id).test === test)) : null;
+            const label = `${SCREEN_TEST_NAMES[test]}: ${word === 'unread' ? 'not read' : word}${trust ? `, ${TRUST_WORDS[trust.level]}` : ''}`;
             return (
-              <li key={test} data-check-card={test} data-priority={top ? test : undefined} aria-label={`${SCREEN_TEST_NAMES[test]}: ${word === 'unread' ? 'not read' : word}`}
+              <li key={test} data-check-card={test} data-priority={top ? test : undefined} aria-label={label}
                 className={`rounded-2xl border border-white/10 bg-white/[0.03] ${pad}`} style={{ borderLeft: `4px solid ${BAND_COLOUR[word]}` }}>
                 {top ? <p data-top-priority className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Top priority</p> : null}
                 <p className={top ? 'text-[16px] font-black leading-snug' : 'text-[16px] font-bold leading-snug'}>{SCREEN_TEST_NAMES[test]}</p>
                 <div className="mt-0.5"><BandChip band={band} /></div>
+                {trust ? (
+                  <div data-trust-row className="mt-0.5">
+                    <TrustChip level={trust.level} reasons={trust.reasons} />
+                    <TrustReasonLine level={trust.level} reasons={trust.reasons} />
+                  </div>
+                ) : null}
                 {row ? (
                   <>
                     <p data-check-row={row.id} className="mt-1 text-[16px] font-bold leading-snug text-white/90">
@@ -125,8 +137,24 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
 
       {s.jumpBestIn !== null ? (
         <section data-personal-best className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{aboutInches(s.jumpBestIn)}</b></p>
-          <p className="text-[16px] text-white/55">A personal best to beat next time.</p>
+          {jumpTrust?.level === 'low' ? (
+            // a Low jump hides the inches and shows only the reason (MIRROR-TRUST-RATING §5)
+            <div data-jump-trust-hidden>
+              <TrustChip level="low" reasons={jumpTrust.reasons} />
+              <TrustReasonLine level="low" reasons={jumpTrust.reasons} />
+            </div>
+          ) : (
+            <>
+              <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{aboutInches(s.jumpBestIn)}</b></p>
+              {jumpTrust ? (
+                <div data-trust-row className="mt-0.5">
+                  <TrustChip level={jumpTrust.level} reasons={jumpTrust.reasons} />
+                  <TrustReasonLine level={jumpTrust.level} reasons={jumpTrust.reasons} />
+                </div>
+              ) : null}
+              <p className="text-[16px] text-white/55">A personal best to beat next time.</p>
+            </>
+          )}
         </section>
       ) : null}
 

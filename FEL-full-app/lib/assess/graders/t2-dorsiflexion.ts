@@ -28,7 +28,7 @@ export const T2_THRESHOLDS: ThresholdId[] = [
   't2.repRise', 't2.heelFloorPercentile', 't2.reps', 't2.tibia', 't2.lrDiff', 'score.bands03', 'score.asymmetryPoints',
 ];
 
-const points = (s: Side) => [SIDE[s].hip, SIDE[s].knee, SIDE[s].ankle, SIDE[s].heel, SIDE[s].footIndex];
+export const points = (s: Side) => [SIDE[s].hip, SIDE[s].knee, SIDE[s].ankle, SIDE[s].heel, SIDE[s].footIndex];
 
 /** A rock that did not count, and why. */
 export interface T2Rejected { side: Side; rep: number; heelLiftPct: number }

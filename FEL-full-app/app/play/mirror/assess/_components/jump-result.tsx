@@ -15,9 +15,10 @@ import {
 import { formatJumpEstimate, readJumpUnit, writeJumpUnit, type JumpUnit } from '@/lib/screen/jump';
 import { PRIVACY_PATH, programPath } from '@/lib/screen/routes';
 import { tabStorage } from '@/lib/screen/store';
-import { primaryBtn, quietBtn } from './screen-ui';
+import { primaryBtn, quietBtn, TrustChip, TrustReasonLine } from './screen-ui';
+import type { TrustLevel, TrustReason } from '@/lib/screen/trust-rows';
 
-export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn, lastIn, onFull, onAgain }: {
+export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn, lastIn, onFull, onAgain, trust = null }: {
   heightCm: number | null;
   /** The grader's one-frame timing band (cm): shown as the ± range, never an exact number. */
   plusMinusCm?: number | null;
@@ -27,28 +28,44 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn
   lastIn: number | null;
   onFull: () => void;
   onAgain: () => void;
+  /** MIRROR-TRUST-RATING: the jump height's trust, adults only (a kid's view never shows it). */
+  trust?: { level: TrustLevel; reasons: readonly TrustReason[] } | null;
 }) {
   const [unit, setUnit] = useState<JumpUnit>(() => readJumpUnit(tabStorage()));
   const pick = (u: JumpUnit) => { setUnit(u); writeJumpUnit(tabStorage(), u); };
   const change = kid ? jumpChange(jumpIn, lastIn) : null;
+  const t = kid ? null : trust;
+  // a Low jump hides the number and shows only the reason; Medium shows the number with the reason as a caution
+  const hidden = t?.level === 'low';
   return (
     <div data-jump-result={kid ? 'kid' : 'adult'} className="space-y-3">
       <p data-disclaimer className="text-[16px] font-bold leading-snug">{DISCLAIMER}</p>
       <p data-stop-line className="text-[16px] text-white/70">{STOP_LINE}</p>
       <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
         <p className="text-[16px] text-white/80">{KID_JUMP}</p>
-        {heightCm !== null ? (
+        {heightCm !== null && hidden ? (
+          <div data-jump-trust-hidden className="mt-2">
+            <TrustChip level="low" reasons={t!.reasons} />
+            <TrustReasonLine level="low" reasons={t!.reasons} />
+          </div>
+        ) : heightCm !== null ? (
           <p data-jump-number className="mt-1 text-[40px] font-black leading-none text-white">{formatJumpEstimate(heightCm, plusMinusCm, unit)}</p>
         ) : (
           <p data-jump-missing className="mt-2 text-[18px] font-bold leading-snug">{KID_NO_JUMP}</p>
         )}
-        {heightCm !== null ? <p data-jump-estimate className="mt-2 text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE}</p> : null}
+        {heightCm !== null && t && !hidden ? (
+          <div data-trust-row className="mt-1">
+            <TrustChip level={t.level} reasons={t.reasons} />
+            <TrustReasonLine level={t.level} reasons={t.reasons} />
+          </div>
+        ) : null}
+        {heightCm !== null && !hidden ? <p data-jump-estimate className="mt-2 text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE}</p> : null}
         <p data-jump-attempts className="mt-2 text-[16px] text-white/75">{attempts} attempts, best kept</p>
         <div className="mt-3 flex justify-center gap-2">
           <button type="button" data-unit="in" aria-pressed={unit === 'in'} onClick={() => pick('in')} className={`${unit === 'in' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Inches</button>
           <button type="button" data-unit="cm" aria-pressed={unit === 'cm'} onClick={() => pick('cm')} className={`${unit === 'cm' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Centimetres</button>
         </div>
-        {!kid && heightCm !== null ? <p data-jump-meaning className="mt-3 text-[16px] text-white/80">{JUMP_MEANING}</p> : null}
+        {!kid && heightCm !== null && !hidden ? <p data-jump-meaning className="mt-3 text-[16px] text-white/80">{JUMP_MEANING}</p> : null}
         {change ? <p data-kid-change className="mt-2 text-[16px] font-bold text-white/85">{jumpChangeLine(change)}</p> : null}
         {kid && heightCm !== null ? <p data-kid-save-line className="mt-3 text-[16px] leading-snug text-white/75">{KID_SAVE_LINE}</p> : null}
       </section>
