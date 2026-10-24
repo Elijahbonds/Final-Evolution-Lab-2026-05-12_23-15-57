@@ -16,6 +16,7 @@
 import { Color3, Mesh, MeshBuilder, PBRMaterial, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
 import { rimSpring, netSway, RIM_SPRING_SEC, NET_SWAY_SEC, RIM_HOLD_DIP_M } from '../core/DunkHands';
+import { DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY: the juice ring outlines the hoop prop's (non-regulation) dunk ring
 
 const FLASH_S = 0.06;   // flash: peak at ~30 ms (1–2 frames), exact restore after
 const BEAT_S = Math.max(RIM_SPRING_SEC, NET_SWAY_SEC, FLASH_S);
@@ -37,7 +38,7 @@ export class HoopJuice {
 
   constructor(private readonly scene: Scene, private readonly rim: Vector3) {
     // #1 the rim ring — regulation 0.45 m rim as the procedural 'rim' torus draws it (0.90 × 0.055 at scale 1)
-    this.rimRing = MeshBuilder.CreateTorus('juice_rim', { diameter: 0.90, thickness: 0.06, tessellation: 24 }, scene);
+    this.rimRing = MeshBuilder.CreateTorus('juice_rim', { diameter: DUNK_RIM_RADIUS * 2, thickness: 0.06, tessellation: 24 }, scene);
     this.rimRing.position.copyFrom(rim); this.rimRing.isPickable = false; this.rimRing.isVisible = false;
     const rm = new StandardMaterial('juice_rim_m', scene);
     rm.emissiveColor = Color3.FromHexString('#FFB35C'); rm.disableLighting = true; rm.alpha = 0.7; rm.diffuseColor = Color3.Black();

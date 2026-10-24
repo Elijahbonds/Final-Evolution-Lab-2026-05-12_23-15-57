@@ -137,6 +137,7 @@ import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the c
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
 import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
+import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -402,8 +403,8 @@ export const DunkMode: ModeDefinition = (() => {
   const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, runCueAt: -1, runCued: false };
   // DUNK-GLASS-BOUNCE: the backboard's front face (read off the venue's board mesh at load; the regulation fallback) and the
   // iron as twelve small colliders — the lob is swept against both every step
-  const glass = { z: CFG.rimZ - 0.39, xMin: -0.9, xMax: 0.9, yMin: CFG.rimHeight - 0.075, yMax: CFG.rimHeight + 0.975, found: false };
-  const RIM_RING = rimRing({ x: 0, y: CFG.rimHeight, z: CFG.rimZ }, 0.45).map((p) => new Vector3(p.x, p.y, p.z));
+  const glass = { z: CFG.rimZ - HOOP.BOARD_FACE_TO_RIM_CENTRE_M, xMin: -HOOP.BOARD_W / 2, xMax: HOOP.BOARD_W / 2, yMin: CFG.rimHeight - HOOP.BOARD_BOTTOM_BELOW_RIM_M, yMax: CFG.rimHeight + HOOP.BOARD_TOP_ABOVE_RIM_M, found: false };
+  const RIM_RING = rimRing({ x: 0, y: CFG.rimHeight, z: CFG.rimZ }, DUNK_RIM_RADIUS).map((p) => new Vector3(p.x, p.y, p.z));
   const RIM_IRON_R = 0.03;
   // ── runway tricks (thrown during the hold-run) ──
   let runwayBeat: RunwayTrick | null = null, runwayT = 0, runwayReleased = false, runwayToken = 0;
