@@ -164,3 +164,16 @@ canvas {
   overscroll-behavior-x: contain;
 }
 .fel-rail::-webkit-scrollbar { display: none; }
+
+/* PERF-LAG (2026-10-24; the owner's lag report: an iPhone, every mode, the menus and loading). On a touch device the
+   always-on-screen chrome drops its backdrop blur: everything fixed or sticky that wears a Tailwind backdrop-blur (the
+   status rail, the tab bar and its soundtrack strip, the game shell's header, the docks, the overlays' sheets) and what
+   sits inside it, plus the elements marked `fel-chrome-glass` (the touch sticks and the game's corner buttons, which sit
+   over the live 3D canvas). A backdrop-filter is an offscreen render of the area behind it on every composited frame that
+   area changes: every scrolled frame of a menu, every frame of play. On iOS Safari that is a well-known jank source. The
+   bars are 85-90 % opaque, so what showed through as a faint smear now shows through as a faint image. Mouse pointers
+   (desktops, laptops) keep the glass. */
+@media (pointer: coarse) {
+  .fixed[class*="backdrop-blur"], .sticky[class*="backdrop-blur"], .fixed [class*="backdrop-blur"], .sticky [class*="backdrop-blur"],
+  .fel-chrome-glass { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+}
