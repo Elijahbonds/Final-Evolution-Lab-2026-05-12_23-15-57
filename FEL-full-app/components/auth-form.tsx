@@ -14,7 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
-import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
+import { AUTH_RATE_LIMITED, AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 import { loginPath, safeLoginNext, safePostSignInDestination } from '@/lib/auth/safeNext';
 import {
   challengeCodeFromReturnPath,
@@ -51,6 +51,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [host, setHost] = useState<{ name: string; mode: string | null; accent: string | null } | null>(null);
   // AGE-SCREEN: the year is locked in page memory before any credential field renders. A block replaces the form.
   const [birthYear, setBirthYear] = useState<number | null>(null);
+  // FN-BOX-1b: the full date the age step locked with the year ('YYYY-MM-DD'); the server stores it as User.dob.
+  const [birthDate, setBirthDate] = useState<string | null>(null);
   const [turnedAway, setTurnedAway] = useState(false);
 
   useEffect(() => {
@@ -115,7 +117,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(refCode ? { ref: refCode } : {}) }),
+          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(birthDate ? { birthDate } : {}), ...(refCode ? { ref: refCode } : {}) }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -137,10 +139,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         // backend that cannot reach its database also fails sign-in, and
         // telling the athlete to check their password sends them chasing a
         // problem they cannot fix.
+        // RATE-LIMIT-WIRE: too many tries for this email (or address) is its own answer, not a wrong password.
         toast.error(
           result.error.includes(AUTH_SERVICE_UNAVAILABLE)
             ? "Sign-in is temporarily unavailable — the server can't reach its database. This is on our end, not your password."
-            : 'Invalid email or password'
+            : result.error.includes(AUTH_RATE_LIMITED)
+              ? 'Too many sign-in attempts. Please wait a few minutes, then try again.'
+              : 'Invalid email or password'
         );
         setLoading(false);
         return;
@@ -234,7 +239,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
 
         {mode === 'signup' && (
           <div className="mb-6">
-            <AgeStep mode="signup" onLocked={setBirthYear} onBlocked={() => setTurnedAway(true)} />
+            <AgeStep mode="signup" onLocked={(y, d) => { setBirthYear(y); setBirthDate(d); }} onBlocked={() => setTurnedAway(true)} />
           </div>
         )}
 

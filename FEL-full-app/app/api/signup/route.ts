@@ -5,12 +5,16 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
+import { trustedClientIp } from '@/lib/rate-limits/clientIp';
+import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
 import { recordServerEvent } from '@/lib/analytics-server';
-import { GUEST_COOKIE } from '@/lib/guest';
+import { findGuestSession, guestIdFrom } from '@/lib/guestSession';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
 import { sendWelcomeEmail } from '@/lib/marketing/email';
 import { isUnreachable } from '@/lib/db/errors';
-import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome, postedBirthDate } from '@/lib/privacy/ageScreen';
+import { writeUserDob } from '@/lib/age/userDob';
+import type { RawDb } from '@/lib/coach/pendingSchema';
 import { logU13Lock } from '@/lib/privacy/u13LockLog';
 
 export const dynamic = 'force-dynamic';
@@ -22,6 +26,9 @@ const signupSchema = z.object({
   policyVersion: z.string().max(60).optional(),
   ref: z.string().trim().max(16).optional(),
   birthYear: z.number({ required_error: AGE_INVALID, invalid_type_error: AGE_INVALID }).int(AGE_INVALID),
+  // FN-BOX-1b: the full date beside the year, 'YYYY-MM-DD'. Optional (an older client sends the year alone); when sent it
+  // must be a real, past date in birthYear's year.
+  birthDate: z.string({ invalid_type_error: AGE_INVALID }).max(10, AGE_INVALID).optional(),
 });
 
 function randAttr() {
@@ -31,6 +38,9 @@ function randAttr() {
 export async function POST(req: Request) {
   try {
     // Rate limit: 5 signups per IP per 15 min
+    // (RATE-LIMIT-WIRE keeps this per-instance window as it was: the shared-table limit below fails open until its SQL
+    // is applied, so this stays the floor it has always been. Its key is the first X-Forwarded-For entry, which the
+    // client writes; the shared limit below never keys on it.)
     const ip = clientKeyFromHeaders(req.headers);
     const rl = rateLimit(`signup:${ip}`, 5, 15 * 60 * 1000);
     if (!rl.ok) {
@@ -48,7 +58,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { email, password, name, policyVersion, ref, birthYear } = parsed.data;
+    const { email, password, name, policyVersion, ref, birthYear, birthDate } = parsed.data;
 
     // AGE-SCREEN, before bcrypt or any prisma call. assumption: (FE PM can reverse) a cookie-present retry logs nothing.
     if (cookies().get(AGE_BLOCK_COOKIE)) {
@@ -63,6 +73,26 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'age_screen_blocked' },
         { status: 403, headers: { 'Set-Cookie': ageBlockCookieHeader() } },
+      );
+    }
+    // FN-BOX-1b: checked after the block, so an under-13 year is turned away whatever date came with it.
+    const dob = birthDate === undefined ? null : postedBirthDate(birthYear, birthDate);
+    if (birthDate !== undefined && dob === null) {
+      return NextResponse.json({ error: AGE_INVALID }, { status: 400 });
+    }
+
+    // RATE-LIMIT-WIRE (PR #289 QA rework): counted per email and per the address the TRUSTED proxy set, in the shared
+    // rate_limits table (lib/rate-limits). The window above keys on the first X-Forwarded-For entry, which the client
+    // writes, so a new fake address per request is a new allowance there; this one never keys on it. Counted here, after the age screen and before bcrypt or any
+    // write: an under-13 lock stores nothing, not even a counter (AGE-SCREEN D5).
+    const limited = await checkRateLimits(prisma, 'signup', [
+      { kind: 'email', value: email },
+      { kind: 'ip', value: trustedClientIp(req.headers) },
+    ]);
+    if (!limited.ok) {
+      return NextResponse.json(
+        { error: 'Too many signup attempts. Please try again later.' },
+        { status: 429, headers: retryAfterHeaders(limited) }
       );
     }
 
@@ -86,6 +116,10 @@ export async function POST(req: Request) {
       throw e;
     }
 
+    // FN-BOX-1b: User.dob, beside dobYear. Raw SQL behind a column probe (lib/age/userDob.ts): skipped until the owner
+    // applies prisma/pending/2026-10-19-user-dob.sql, and never a reason to fail the signup.
+    if (dob) await writeUserDob(prisma as unknown as RawDb, user.id, dob);
+
     await prisma.playerProfile.create({
       data: {
         userId: user.id,
@@ -105,20 +139,21 @@ export async function POST(req: Request) {
 
     // M13 Step 1 — migrate any anonymous guest state into the new account and
     // close out the growth funnel (guest_claim + signup_complete). Best-effort:
-    // a telemetry hiccup must never fail a signup.
-    const guestToken = cookies().get(GUEST_COOKIE)?.value ?? null;
+    // a telemetry hiccup must never fail a signup. TIP-GUEST-TOKEN-HASH: the
+    // session is found by the token's hash and the events carry the hash.
+    const guestHash = guestIdFrom(cookies());
     try {
-      if (guestToken) {
-        const guest = await prisma.guestSession.findUnique({ where: { token: guestToken } });
+      if (guestHash) {
+        const guest = await findGuestSession(prisma, guestHash);
         if (guest && !guest.migratedUserId) {
           await prisma.guestSession.update({
-            where: { token: guestToken },
+            where: { id: guest.id },
             data: { migratedUserId: user.id },
           });
           await recordServerEvent({
             name: 'guest_claim',
             userId: user.id,
-            guestId: guestToken,
+            guestId: guestHash,
             props: { migrated: true },
           });
         }
@@ -126,8 +161,8 @@ export async function POST(req: Request) {
       await recordServerEvent({
         name: 'signup_complete',
         userId: user.id,
-        guestId: guestToken,
-        props: { fromGuest: Boolean(guestToken) },
+        guestId: guestHash,
+        props: { fromGuest: Boolean(guestHash) },
       });
     } catch (err) {
       console.error('signup funnel telemetry failed', err);

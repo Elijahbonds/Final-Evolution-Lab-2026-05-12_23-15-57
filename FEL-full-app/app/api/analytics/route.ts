@@ -8,6 +8,10 @@
  * when present, otherwise the guest token cookie, and store rows in our own
  * table. No third-party trackers; telemetry only. Always returns 204 so the
  * fire-and-forget client never re-queues on a soft failure.
+ *
+ * TIP-GUEST-TOKEN-HASH (2026-10-19): a guest row's guestId is the HASH of the
+ * guest token (lib/guestSession.ts guestIdFrom), never the cookie itself, and a
+ * signed-out browser carrying the AGE-SCREEN block flag has its batch dropped.
  */
 
 import { NextResponse } from 'next/server';
@@ -16,8 +20,9 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { recordServerEvents } from '@/lib/analytics-server';
-import { GUEST_COOKIE } from '@/lib/guest';
 import { isAnonymousEvent } from '@/lib/analyticsAnon';   // perf-lag: the fps / ttfp perf stats carry no user or guest id
+import { guestIdFrom } from '@/lib/guestSession';
+import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +47,9 @@ export async function POST(req: Request) {
 
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id ?? null;
-    const guestId = userId ? null : cookies().get(GUEST_COOKIE)?.value ?? null;
+    const jar = cookies();
+    if (!userId && jar.get(AGE_BLOCK_COOKIE)) return new NextResponse(null, { status: 204 });
+    const guestId = userId ? null : guestIdFrom(jar);
 
     await recordServerEvents(
       parsed.data.events.map((e) => ({

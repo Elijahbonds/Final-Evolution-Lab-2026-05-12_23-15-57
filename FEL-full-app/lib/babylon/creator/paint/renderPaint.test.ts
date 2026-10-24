@@ -189,7 +189,7 @@ describe('paint through the identity pipe', () => {
     const shown = () => s.meshes.filter((m) => /^Kit_/.test(m.name) && m.isVisible).map((m) => m.name.replace(/_c\d+$/, '')).sort();
     applyIdentity(s, ID(null));
     const kitShown = shown();
-    expect(kitShown.length).toBe(3);
+    expect(kitShown.length).toBe(4);
     const suit = sanitizeCreatorDoc({ ...doc([{ surface: 'garments' }], true), parts: [{ id: 'p1', shape: 'spike', bone: 'Head', colour: '#FF0000' }] })!;
     applyIdentity(s, ID(suit)); flushPaint(s.root);
     expect(shown()).toEqual([]);

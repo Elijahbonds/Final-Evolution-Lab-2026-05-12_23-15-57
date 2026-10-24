@@ -102,6 +102,8 @@ export interface SlotRow extends SchemaRow {
    * from there rather than inferred from array order.
    */
   defaultOption?: string;
+  /** What an option is shown as when that differs from the stored option (a renamed wearable keeps its stored name). */
+  optionLabels?: Readonly<Record<string, string>>;
   /** Gate: this slot only offers its options when the attribute clears the minimum. */
   requires: { attribute: string; min: number } | null;
 }

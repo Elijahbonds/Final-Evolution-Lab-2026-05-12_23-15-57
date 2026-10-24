@@ -24,6 +24,7 @@ import {
   HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType, HudLowerThird } from './tv-hud';
 import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
+import { volleyballHeadline } from './volleyCard';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (2026-10-06, Penalty #12)
@@ -31,6 +32,7 @@ import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (202
 // screen MIX sliders. Dance-only — gated below on hud.instruments / modeKey==='dance', so every other timing sport
 // this host also drives (tennis, derby, penalty, golf, volleyball) renders exactly as before.
 import { decodeInstrumentChips } from '@/lib/babylon/dance/ui/InstrumentChips';
+import { freeDanceHeadline, isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
 import { VolumeMixer } from '@/lib/audio/ui/VolumeMixer';
 // MUSIC-SUITE P8 (2026-09-25): Stoop's caption — the same shared caption layer THE MIC's hoops modes already draw
 // with (mic-caption.tsx's <MicCaption>, reading hud.mic/hud.micWho); DanceMode.ts is the only mode this host also
@@ -108,7 +110,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
           // TENNIS-TIEBREAK-FOLD: the Tennis tiebreak variant — points, both sides
           : modeKey === 'tiebreak' ? `${won ? 'TIEBREAK WON' : 'TIEBREAK LOST'} · ${r.score}–${n('theirs')} · ${n('style')} STYLE`
-          : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
+          : modeKey === 'volleyball' ? volleyballHeadline(base)   // VB75-2: both scores, off the same result the shell saves
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
           // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
           // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
@@ -118,6 +120,8 @@ export function makeTimingHost(opts: TimingHostOpts) {
           // IMPROVE (2026-10-06, Penalty #12): and the breakaway's tricks, when there were any (penaltyHud.breakawayLine)
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE${breakawayLine(st) ? ` · ${breakawayLine(st)}` : ''}`
           // IMPROVE (2026-10-06): the Cypher's card names a full combo (#6) and the run's STYLE (#10 / #13)
+          // lane/dance-extras-2: a FREE DANCE run is judged by nobody — the card says so, and how many moves were danced
+          : modeKey === 'dance' && isFreeDanceResult(r) ? freeDanceHeadline(n('moves'))
           : modeKey === 'dance' && n('rounds') ? `${n('fullCombo') ? 'FULL COMBO · ' : ''}${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS${n('style') ? ` · ${n('style')} STYLE` : ''}`
           : (n('rounds') ? `${n('hits')}/${n('rounds')} CLEAN · ${r.score} PTS` : `${r.score} PTS`);
         onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });

@@ -86,6 +86,7 @@ export const CLIP_ALIASES: Record<string, [string, number]> = {
   baseball_swing_full: ['baseball_swing', 1.0],
   baseball_contact_drive: ['baseball_swing', 1.1],
   baseball_homer_trot: ['run', 0.7],
+  baseball_run: ['run', 1.0],   // BASEBALL-FEEL §2: a hit's run to the base at full speed (a name, no art); a homer keeps the trot
   // board sports
   skate_idle_cruise: ['guard', 0.5],
   skate_kickflip: ['high_kick', 1.2],

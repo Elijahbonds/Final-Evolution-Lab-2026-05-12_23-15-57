@@ -8,6 +8,10 @@ vi.mock('next/headers', () => ({ cookies: () => ({ get: (n: string) => (n === 'f
 vi.mock('@/lib/analytics-server', () => ({ recordServerEvents: async (rows: any[]) => { h.rows.push(...rows); } }));
 
 import { POST } from '@/app/api/analytics/route';
+import { hashGuestToken } from '@/lib/guest';
+
+// A token in the minted format (32 base64url chars): the route stores its hash as the guest id, never the token.
+const TOKEN = 'G'.repeat(32);
 
 const post = (events: unknown[]) => POST(new Request('http://x/api/analytics', { method: 'POST', body: JSON.stringify({ events }) }));
 
@@ -31,14 +35,14 @@ describe('POST /api/analytics: anonymous perf stats', () => {
   });
 
   it('a guest page: the guest cookie never reaches a perf row', async () => {
-    h.session = null; h.guest = 'g-7';
+    h.session = null; h.guest = TOKEN;
     await post([
       { name: 'game_diag', props: { kind: 'fps', mode: 'onevone', detail: 'w=1' }, ts: 1, sessionKey: 'page-2' },
       { name: 'game_diag', props: { kind: 'frame', mode: 'onevone', detail: 'x' }, ts: 2, sessionKey: 'page-2' },
     ]);
     expect(h.rows.map((r) => [r.props.kind, r.userId, r.guestId, r.sessionKey])).toEqual([
       ['fps', null, null, null],
-      ['frame', null, 'g-7', 'page-2'],
+      ['frame', null, hashGuestToken(TOKEN), 'page-2'],
     ]);
   });
 });

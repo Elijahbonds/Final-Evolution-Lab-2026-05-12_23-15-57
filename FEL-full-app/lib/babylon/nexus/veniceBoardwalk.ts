@@ -25,6 +25,7 @@ import { HOOP_SCAN, spawnMeshyProp } from '../visual/meshyProps';
 import { Onlookers } from '../visual/Onlookers';
 import { heroPalmScale, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS } from '../visual/venuePropSets';
 import { veniceSunPosition } from '../visual/veniceSurroundVisibility';
+import { RIM_HEIGHT_M } from '../core/courtDims';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
 import { setPbrRoughnessUniform } from '../scene/pbrUniform';   // perf-lag: the sea's shimmer without a shader re-prepare a frame
 
@@ -179,7 +180,7 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   // Owner 2026-09-05: the far baseline carries the scanned hoop as well, mirrored — the court reads as a full court
   void spawnMeshyProp(scene, 'hoop', holder, 'vb_far_hoop').then((root) => {
     if (!root) return;
-    const s = 3.05 / HOOP_SCAN.rimY; root.scaling.setAll(s); root.rotation.y = Math.PI;
+    const s = RIM_HEIGHT_M / HOOP_SCAN.rimY; root.scaling.setAll(s); root.rotation.y = Math.PI;
     root.position.set(0, 0, SCAN_S - 0.6 + HOOP_SCAN.rimZ * s);   // owner: on the south key's baseline, where the paint ends
   });
   // Pass 7 phase 4 — signage with real names: an entrance sign at the south gate, a scoreboard plate behind the far hoop,

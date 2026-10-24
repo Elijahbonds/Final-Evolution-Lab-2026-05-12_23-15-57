@@ -2,6 +2,7 @@
 // records; a teen, an unknown age or a failed age read stays on the device — and not one session row is read for them.
 import { describe, expect, it } from 'vitest';
 import { cleanMode, cleanSessionId, readAccountBest, type BestsDb } from './account-bests';
+import { BASEBALL_INNINGS_SINCE } from '@/lib/rival-history';
 
 const NOW = new Date(Date.UTC(2026, 9, 6, 12));
 
@@ -30,6 +31,14 @@ describe('readAccountBest', () => {
     const { db, reads } = fakeDb(1990);
     await readAccountBest(db, 'u1', 'golf', null, NOW);
     expect(reads).toEqual([{ where: { userId: 'u1', mode: 'golf' }, _max: { score: true }, _count: { _all: true } }]);
+  });
+
+  it('baseball compares only against 3-inning runs (old Derby runs under `baseball` are left out); derby reads all', async () => {
+    const { db, reads } = fakeDb(1990);
+    await readAccountBest(db, 'u1', 'baseball', null, NOW);
+    await readAccountBest(db, 'u1', 'derby', null, NOW);
+    expect(reads[0].where).toEqual({ userId: 'u1', mode: 'baseball', createdAt: { gte: new Date(BASEBALL_INNINGS_SINCE) } });
+    expect(reads[1].where).toEqual({ userId: 'u1', mode: 'derby' });
   });
 
   it('a teen stays on the device, and none of their session rows is read', async () => {

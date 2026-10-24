@@ -66,7 +66,8 @@ import type { BodyRead, BodyEvent } from '@/lib/pose/BodyReader';
 import type { BodyChannels } from '@/lib/pose/bodyChannels';
 import type { ModeBodySpec } from '@/lib/input/bodyProfiles';
 import type { SessionStep } from './BodySession';
-import { bodySeamFor, type BodySeam } from './bodySeam';
+import { bodySeamFor, gateBodyFight, type BodySeam } from './bodySeam';
+import { bodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { sessionStore, stanceOnMount, type SessionWriter } from './sessionStore';   // (stanceOnMount: MOVEMENT PLAY P8)
 import { formReadStore } from '@/lib/move/formRead';   // HOOPS BODY (2026-10-07): the end card's FORM block
 import { renderDue } from './pausedRender';   // IMPROVE (2026-10-06, 3PT #18): the pause renders at ~10 fps
@@ -278,8 +279,12 @@ export interface HarnessOpts {
   /** FIRST-DUNK-BUDGET (2026-10-17): the host KNOWS the visitor is signed out (/try: the server sent everyone else to
    *  /play/dunk), so the spawn's closet read and the season read are not sent (visitor.ts). Absent is "not known". */
   guest?: boolean;
+  /** FN-BOX-1: the account's birth year, when the host has it. Absent reads the page's held year
+   *  (lib/move/bodyPlayGrownUp.setBodyPlayDobYear); null and a missing year are unknown, and unknown gets no fight body. */
+  dobYear?: number | null;
   /** COUCH (FN-0, 2026-10-19): the host-seat room. The harness takes no body at all — every seat, the host's included and
-   *  whatever anyone's age — so def.onBody is never called, the floor presses nothing and the Body card offers nothing. */
+   *  whatever anyone's age — so def.onBody is never called, the floor presses nothing and the Body card offers nothing.
+   *  FN-BOX-1 reads it too: gateBodyFight refuses every fight mode's body path in a couch room. */
   couch?: boolean;
   /** COUCH: the seats right now (lib/party/seats.ts couchSeatCount), read live through ctx.seatCount(). Ignored outside a
    *  couch room. */
@@ -322,6 +327,9 @@ export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<(
   // the one that replaced it (sessionStore, the step-2 review). And it comes down again if the mount never finishes
   // (the step-3 review): a throw anywhere before the disposer is handed back — the engine, the scene, a rig — would
   // otherwise leave a dead mode's card up until the next mount.
+  // FN-BOX-1 FIGHT-BODY-AGE-GATE (2026-10-19): a fight mode offers the body only to an 18+ birth year, never in couch
+  // mode; unknown is refused (bodySeam.gateBodyFight). Applied before the seam, so the card, `drives` and onBody agree.
+  def = gateBodyFight(def, { dobYear: opts.dobYear !== undefined ? opts.dobYear : bodyPlayDobYear(), couch: opts.couch === true });
   const seam = bodySeamFor(def);
   const store = sessionStore.mount({ ...seam.card, stance: stanceOnMount(seam.profile) });   // MOVEMENT PLAY P8: a board game asks for its stance from the mount
   setSignedOutVisitor(opts.guest === true);   // FIRST-DUNK-BUDGET: every mount says, so a host that does not know asks as before

@@ -169,6 +169,11 @@ vi.mock('@/lib/db', () => {
   return {
     prisma: {
       $transaction: transaction,
+      // RATE-LIMIT-WIRE: the finish gate's count of the user's recorded finishes (GameSession [userId, createdAt])
+      gameSession: {
+        count: async ({ where }: { where: { userId: string; createdAt: { gte: Date } } }) => h.sessions
+          .filter((s) => s.userId === where.userId && new Date(String(s.createdAt ?? new Date())).getTime() >= where.createdAt.gte.getTime()).length,
+      },
       sessionRun: {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
@@ -877,6 +882,29 @@ describe('ECONOMY-SESSIONS-HARDEN: a session must finish a run the server starte
     expect(h.wallet.filter((w) => w.reasonCode === 'MODE_SESSION_COMPLETED')).toHaveLength(1);
   });
 
+  // NB-3 (lane/hoops-overtime): a 3v3 level at the horn goes to sudden-death overtime and ends ONCE, on the first bucket. Its
+  // finish is an ordinary one: inside the 3v3's rules ceiling (20–20 + a three = 23), judged a win off the posted pair, paid once.
+  it('NB-3: a 3v3 decided in overtime posts once — 23–20 (the ceiling) pays one win; its retry is the first answer; 24 is refused', async () => {
+    const ot = { mode: 'hoops3v3', score: 23, opponentScore: 20, won: true, duration: 160, stats: { foeScore: 20, assists: 3, overtimes: 1 } };
+    const first = await post(ot);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ ok: true, paid: true, replayed: false, runId: first.runId });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]).toMatchObject({ mode: 'hoops3v3', score: 23, opponentScore: 20, won: true });
+    const again = await post({ ...ot, runId: first.runId });
+    expect(again.body).toEqual({ ...first.body, replayed: true });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.updates).toHaveLength(1);
+    expect(h.wallet.filter((w) => w.reasonCode === 'MODE_SESSION_COMPLETED')).toHaveLength(1);
+    // the overtime LOSS posts the other side of the pair: a claimed win the score does not support is no win
+    const lost = await post({ ...ot, score: 20, opponentScore: 23, stats: { foeScore: 23, assists: 0, overtimes: 1 } });
+    expect(lost.body).toMatchObject({ ok: true, won: false });
+    // no overtime can post above the rules ceiling (a tie is under 21, and overtime adds one bucket)
+    const forged = await post({ ...ot, score: 24 });
+    expect(forged.status).toBe(422);
+    expect(forged.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 23 });
+  });
+
   it('a run of another mode: RUN_MODE_MISMATCH, and the run is closed (a corrected retry is refused the same way)', async () => {
     const runId = openRun('tennis', 60);
     const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 60, runId });
@@ -1418,5 +1446,122 @@ describe('PRQ-ATTR-RACE: every run\'s PRQ gain lands, however many finish at onc
     // the two prq ledger rows add up to what the row gained — each says what IT added, not the other run's gain too
     expect(h.grants.filter((g) => g.grantType === 'prq')).toHaveLength(2);
     expect(Math.abs(filedPrq() - (prqScore(h.profile as never) - start))).toBeLessThan(0.11);
+  });
+});
+
+// RATE-LIMIT-WIRE (QA top-5 #4, partial): QA's repro looped start+finish and nothing ever returned 429. The finish now
+// counts the user's recorded finishes (GameSession) over the last minute; past RUN_RATE_LIMITS.finish.perUser it is 429.
+describe('the finish rate limit (GameSession count, per user)', () => {
+  it('normal play stays under it: five dunk contests back to back are all paid', async () => {
+    for (let i = 0; i < 5; i++) {
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status, `finish ${i + 1}`).toBe(200);
+    }
+  });
+  it('the next finish past the limit is 429 RATE_LIMITED with Retry-After, and nothing of the run is read or written', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });
+    const writesBefore = h.writes.length;
+    const runId = openRun('dunkContest', 120);
+    const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120, runId });
+    expect(r.status).toBe(429);
+    expect(r.body).toMatchObject({ ok: false, reason: 'RATE_LIMITED', retryAfterSec: 60 });
+    expect(h.writes.length).toBe(writesBefore);
+    expect(h.runs[runId].status).toBe('open');   // the run is still there to finish once the window passes
+  });
+  it('finishes older than the window and other players\' finishes do not count', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) {
+      h.sessions.push({ userId: 'u1', createdAt: new Date(Date.now() - 61_000) });
+      h.sessions.push({ userId: 'someone-else', createdAt: new Date() });
+    }
+    expect((await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 })).status).toBe(200);
+  });
+  it('FAIL OPEN (lane/rate-limits): when the count cannot be read, the finish is paid as before and one line is logged', async () => {
+    const { prisma } = (await import('@/lib/db')) as unknown as { prisma: { gameSession: { count: unknown } } };
+    const real = prisma.gameSession.count;
+    prisma.gameSession.count = async () => { throw Object.assign(new Error("Can't reach database server at 10.0.0.1:5432"), { name: 'PrismaClientInitializationError' }); };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');
+      for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });   // over it
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status).toBe(200);
+      expect(warn.mock.calls.map((c) => String(c[0]))).toContain('[rate-limits] finish_count_failed_failing_open PrismaClientInitializationError');
+    } finally {
+      prisma.gameSession.count = real;
+      warn.mockRestore();
+    }
+  });
+});
+
+// lane/dance-extras-2 (owner 2026-10-24): FREE DANCE — the Cypher with its judge off (lib/babylon/dance/freeDance.ts). "It must pay
+// nothing beyond whatever the existing no-score / free-play floor rule allows; never stakeable; never feeds rivals or leaderboards;
+// can't be posted as a scored run." The route records it on its run, unpaid (FREE_DANCE), with no GameSession row.
+describe('FREE DANCE: recorded unpaid, never a scored run (lane/dance-extras-2)', () => {
+  const freeStats = (o: Record<string, unknown> = {}) => ({ freeDance: 1, endless: 1, moves: 37, bpm: 96, difficulty: 2, ...o });
+
+  it('a free-dance run pays nothing — no XP, shards, Lab Credits, coins, PRQ, streak, season XP or mastery — and writes no GameSession row', async () => {
+    const r = await post({ mode: 'dance', score: 0, won: false, duration: 150, played: true, stats: freeStats() });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: false, reason: 'FREE_DANCE', sessionId: null, score: 0, won: false, xp: 0, shards: 0, credits: 0, coins: 0, prqDelta: 0, streakBonus: 0, season: null, mastery: null });
+    expect(h.runs[r.runId!]).toMatchObject({ status: 'recorded', score: 0 });
+    expectNothingPaid('free dance');
+    expect(h.streakWrites).toEqual([]);
+    expect(h.events).toContainEqual(expect.objectContaining({ name: 'session_unpaid', props: expect.objectContaining({ mode: 'dance', reason: 'FREE_DANCE' }) }));
+  });
+
+  it('…which is nothing beyond the no-score / free-play floor: under a played no-score run\'s floor (Prove It, the endless ceiling\'s) of 10 XP / 1 shard', async () => {
+    const r = await post({ mode: 'dance', score: 0, won: false, duration: 150, played: true, stats: freeStats() });
+    const floor = { xp: sessionXp(0, false), shards: sessionShards(0, false) };
+    expect(floor).toEqual({ xp: 10, shards: 1 });
+    expect(r.body.xp).toBeLessThanOrEqual(floor.xp);
+    expect(r.body.shards).toBeLessThanOrEqual(floor.shards);
+    expect(r.body.xp).toBeLessThanOrEqual(endlessCeilingFor(150, false).xp);
+    expect(r.body.credits).toBe(0);
+  });
+
+  it('a free-dance run on a streak day that is due still opens no streak day and pays no streak Lab Credits', async () => {
+    h.profile.lastStreakAt = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const r = await post({ mode: 'dance', score: 0, duration: 150, played: true, stats: freeStats() });
+    expect(r.body).toMatchObject({ paid: false, reason: 'FREE_DANCE', streakBonus: 0, credits: 0 });
+    expect(h.streakWrites).toEqual([]);
+    expect(h.lc).toEqual([]);
+  });
+
+  it('CAN\'T BE POSTED AS A SCORED RUN: a free-dance post with a score is SCORE_INVALID (free_dance_scored) — rejected, never recorded as scored, nothing paid', async () => {
+    for (const score of [1, 250, 4355]) {
+      const r = await post({ mode: 'dance', score, won: true, duration: 150, played: true, stats: freeStats() });
+      expect(r.status, String(score)).toBe(422);
+      expect(r.body, String(score)).toMatchObject({ ok: false, paid: false, reason: 'SCORE_INVALID', detail: 'free_dance_scored', limit: 0 });
+      expect(h.runs[r.runId!], String(score)).toMatchObject({ status: 'rejected' });
+    }
+    expectNothingPaid('scored free dance');
+  });
+
+  it('the header\'s reserved `endless` alone marks a dance run free (a dance song has an end; only a run with no judge has none)', async () => {
+    const r = await post({ mode: 'dance', score: 0, duration: 150, played: true, stats: { endless: 1, moves: 3 } });
+    expect(r.body).toMatchObject({ paid: false, reason: 'FREE_DANCE' });
+    const scored = await post({ mode: 'dance', score: 900, duration: 150, played: true, stats: { endless: true, perfect: 9 } });
+    expect(scored.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'free_dance_scored' });
+    expectNothingPaid('endless dance');
+  });
+
+  it('a claimed win on a free-dance run is no win', async () => {
+    const r = await post({ mode: 'dance', score: 0, won: true, duration: 150, played: true, stats: freeStats() });
+    expect(r.body).toMatchObject({ won: false, paid: false, reason: 'FREE_DANCE' });
+  });
+
+  it('a JUDGED dance run is paid exactly as before (no flag: a GameSession row, XP for its score)', async () => {
+    const stats = { hits: 40, rounds: 48, stars: 3, accuracy: 80, maxCombo: 22, perfect: 20, great: 12, good: 8, miss: 8 };
+    const r = await post({ mode: 'dance', score: 1200, won: true, duration: 150, played: true, stats });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ ok: true, paid: true, won: true, xp: sessionXp(1200, true), shards: sessionShards(1200, true) });
+    expect(h.sessions[0]).toMatchObject({ mode: 'dance', score: 1200, won: true });
+  });
+
+  it('the flag means free dance in the dance room only: a music set carrying it is not a free-dance run', async () => {
+    const r = await post({ mode: 'music', score: 0, duration: 60, played: true, stats: { ...musicSet({ bars: 8, notes: 128, perfects: 0, goods: 0 }), freeDance: 1 } });
+    expect(r.body.reason).not.toBe('FREE_DANCE');
   });
 });

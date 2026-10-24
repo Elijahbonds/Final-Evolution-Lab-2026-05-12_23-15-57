@@ -659,7 +659,7 @@ describe('the kit interplay', () => {
     wear(s, dressed([{ id: 't', kind: 'top', style: 'hoodie', colour: '#111111' }, { id: 'g', kind: 'gloves', style: 'gloves', colour: '#111111' }]), { equipped: { tops: 'top_bonds', shorts: 'shorts_glitch', shoes: 'shoes_evo' } });
     expect(shown(s, 'tops')).toEqual([]);
     expect(shown(s, 'shorts')).toEqual(['shorts_glitch']);
-    expect(shown(s, 'shoes')).toEqual(['shoes_evo']);
+    expect(shown(s, 'shoes')).toEqual(['shoes_evo', 'shoes_evo']);   // the low shoe's two parts: shoe + sock
     expect(s.root.metadata.felClothes.covered).toEqual(['tops']);
     // take the clothes off: the bought top shows again
     wear(s, null, { equipped: { tops: 'top_bonds', shorts: 'shorts_glitch', shoes: 'shoes_evo' } });
@@ -674,7 +674,7 @@ describe('the kit interplay', () => {
       wear(s, dressed([{ id: 'p', kind: 'bottom', style: 'pants', colour: '#111111' }]), { equipped: {} });
       expect(shown(s, 'shorts')).toEqual([]);
       expect(shown(s, 'tops')).toEqual(['top_lab']);    // karate's default top
-      expect(shown(s, 'shoes')).toEqual(['shoes_evo']);  // karate's default shoe
+      expect(shown(s, 'shoes')).toEqual(['shoes_evo', 'shoes_evo']);  // karate's default shoe (shoe + sock)
       s.root.dispose();
     } finally { scene.metadata = { felTier: 'desktop' }; }
   });

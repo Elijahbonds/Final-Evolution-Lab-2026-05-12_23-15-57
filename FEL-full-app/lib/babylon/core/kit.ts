@@ -10,7 +10,7 @@ import { SceneLoader, VertexBuffer } from '@babylonjs/core';
 import type { AbstractMesh, AssetContainer, Mesh, Scene, Skeleton } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { sportKitDefault } from './sportKitDefaults';
-import { fixGarment, syncGarmentVisibility } from './garmentFixes';
+import { ensureGarmentUVs, fixGarment, syncGarmentVisibility } from './garmentFixes';
 import { scheduleBodyMask, shareBodyBounds, isBodyMesh } from './bodyMask';
 
 export type KitSlot = 'tops' | 'shorts' | 'shoes';
@@ -22,10 +22,19 @@ export type Wardrobe = Partial<Record<KitSlot, string | null>>;
 // tinted in the starters' colours, while top_lab and shoes_flight stayed hidden). The suffix is optional here.
 const KIT_RE = /^Kit_(tops|shorts|shoes)_([A-Za-z0-9_-]+)/;
 const CLONE_SUFFIX = /_(?:c|pk)\d+(?![A-Za-z0-9])/;   // `Kit_tops_top_lab_c31` → `Kit_tops_top_lab`; kit-pack instances carry `_pk<n>`
+// KIT-NO-HIGH-BOOTS (2026-10-20): the low shoe is two primitives (shoe + low sock), and Babylon's glTF loader names each
+// `<node>_primitive<i>` under a TransformNode `<node>` — unparsed, the item read `shoes_evo_primitive0` and matched nothing
+const PRIMITIVE_SUFFIX = /_primitive\d+(?![0-9])/;   // `Kit_shoes_shoes_evo_primitive1_c4` → `Kit_shoes_shoes_evo`
 
-/** Parse a kit mesh name; null for anything else. */
+/** Parse a kit mesh name; null for anything else. Every primitive of a garment parses to the same item. */
 export function kitOf(meshName: string): { slot: KitSlot; itemId: string } | null {
-  const m = KIT_RE.exec(meshName.replace(CLONE_SUFFIX, '')); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
+  const m = KIT_RE.exec(meshName.replace(CLONE_SUFFIX, '').replace(PRIMITIVE_SUFFIX, '')); return m ? { slot: m[1] as KitSlot, itemId: m[2] } : null;
+}
+
+/** The node a garment hangs from on its body: a multi-primitive garment's parts sit one level down, under the
+ *  garment's own TransformNode, so their body is that node's parent. */
+function bodyNodeOf(m: AbstractMesh): object | null {
+  return PRIMITIVE_SUFFIX.test(m.name) && m.parent?.parent ? m.parent.parent : m.parent;
 }
 
 /** The mode the harness stamped on the scene these meshes live in (ModeHarness: `scene.metadata.felModeId`). */
@@ -54,14 +63,19 @@ export function applyKit(meshes: AbstractMesh[], wardrobe: Wardrobe | null | und
   const covered = opts.covered ?? new Set<KitSlot>();
   const owner = kitOwner(meshes);
   if (owner) coveredSlots.set(owner, covered);
+  // every garment on the body, shown or not, gets its UVs at the first apply, before the shape, paint and mask layers
+  // cache anything per garment geometry (a top swapped in later must not change vertex count under a cached prep)
+  for (const list of bySlot.values()) for (const m of list) ensureGarmentUVs(m);
   let found = 0;
   for (const [slot, list] of bySlot) {
     if (covered.has(slot)) { for (const m of list) { m.isVisible = false; found++; syncGarmentVisibility(m); } continue; }
     const byId = (id: string | null | undefined) => (id ? list.find((m) => kitOf(m.name)!.itemId === id) : undefined);
     const want = wardrobe?.[slot] ?? sport[slot] ?? null;
     const show = byId(wardrobe?.[slot]) ?? byId(sport[slot]) ?? list[0];
-    for (const m of list) { m.isVisible = m === show; found++; syncGarmentVisibility(m); }
-    fixGarment(show, slot, kitOf(show.name)!.itemId);
+    const showId = kitOf(show.name)!.itemId;   // every part of the chosen garment shows (the low shoe's sock too)
+    for (const m of list) { m.isVisible = kitOf(m.name)!.itemId === showId; found++; syncGarmentVisibility(m); }
+    // the read fixes go on the garment's first primitive (the shoe, not its sock)
+    fixGarment(list.find((m) => m.isVisible && !/_primitive[1-9]/.test(m.name)) ?? show, slot, showId);
     // a garment the body does not carry but a kit PACK does (owner 2026-09-05: Meshy garments skinned to the rig):
     // fetch it, bind it to this body's skeleton, and swap it in when it lands
     if (want && !byId(want) && KIT_PACKS[want]) void attachKitPack(list[0], slot, want, list);
@@ -79,13 +93,13 @@ export interface KitOptions {
 }
 /** The node a body's garments hang under (the kit's `Human.rig`), which the covered slots are remembered on. */
 function kitOwner(meshes: readonly AbstractMesh[]): object | null {
-  for (const m of meshes) if (kitOf(m.name)) return m.parent ?? m;
+  for (const m of meshes) if (kitOf(m.name)) return bodyNodeOf(m) ?? m;
   return null;
 }
 const coveredSlots = new WeakMap<object, ReadonlySet<KitSlot>>();
 /** Is this kit slot covered by code-built clothes on the body `sibling` belongs to (as applyKit last decided)? */
 export function kitSlotCovered(sibling: AbstractMesh, slot: KitSlot): boolean {
-  return coveredSlots.get(sibling.parent ?? sibling)?.has(slot) ?? false;
+  return coveredSlots.get(bodyNodeOf(sibling) ?? sibling)?.has(slot) ?? false;
 }
 
 /**

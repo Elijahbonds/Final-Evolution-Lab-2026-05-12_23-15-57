@@ -17,7 +17,7 @@
 import { useMemo, useState, useCallback } from 'react';
 import type { AnyRow, SectionTable } from '@/lib/creator/schema/types';
 import { tabsOf, rowsOfTab } from '@/lib/creator/schema/types';
-import { step, canStep, displayValue, rowCeiling, commitRated, type RowValue, type Axes } from '@/lib/creator/editor/rowState';
+import { step, canStep, displayValue, displayLabel, rowCeiling, commitRated, type RowValue, type Axes } from '@/lib/creator/editor/rowState';
 import { ceilingNote } from '@/lib/creator/schema/ceilings';
 import type { Issue } from '@/lib/creator/schema/resolve';
 
@@ -152,7 +152,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                         style={{ backgroundColor: displayValue(row, val) }} />
                     )}
                     <span className={`min-w-[7ch] text-right fel-stat font-mono text-sm ${bad ? 'text-[var(--fel-red)]' : ''}`}>
-                      {displayValue(row, val)}
+                      {displayLabel(row, val)}
                     </span>
                     {focused && (
                       <button onClick={(e) => { e.stopPropagation(); bump(row, 1); }}

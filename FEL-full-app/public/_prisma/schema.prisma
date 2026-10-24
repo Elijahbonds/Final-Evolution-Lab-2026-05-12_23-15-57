@@ -2498,3 +2498,16 @@ model AdventureSave {
   doc       Json
   updatedAt DateTime @default(now())
 }
+
+/// RATE-LIMIT-WIRE (PR #289 rebuilt on release, 2026-10-23): one counting window of one rate-limit bucket, shared by every
+/// server instance. "bucket" is "<route>:<kind>:<HMAC>" (lib/rate-limits/store.ts), so no email, address or account id is
+/// stored in the clear. The table arrives with prisma/pending/2026-10-16-rate-limits.sql; the code writes it with raw SQL
+/// and fails open (logs, lets the request through) while the table is missing.
+model RateLimit {
+  bucket  String   @id
+  hits    Int
+  resetAt DateTime @map("reset_at") @db.Timestamp(3)
+
+  @@index([resetAt], map: "rate_limits_reset_at_idx")
+  @@map("rate_limits")
+}

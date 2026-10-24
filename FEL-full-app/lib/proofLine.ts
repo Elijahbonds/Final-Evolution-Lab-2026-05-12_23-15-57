@@ -3,6 +3,7 @@
 import { gradeFor } from '@/lib/babylon/core/danceTracks';
 import { boxLine } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06): the 1v1's box score line (pure)
 import { boxLine as boxLine3 } from '@/lib/babylon/modes/threevthreeBox';   // IMPROVE (2026-10-06, 3v3 #9): the 3v3's (import-free)
+import { periodLabel } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): 'OT', 'OT2' …
 /** ARENA-10PHASE (2026-09-07): an outside verdict overrides the mode's own W/L — a Triumph Arena run is settled against the
  *  house rival, not the mode's in-game rival, and the card must say ONE thing. TIE = both entries refunded; PENDING = the
  *  opponent has not posted yet. */
@@ -34,7 +35,8 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
       return fga === null ? line : `${line} · ${boxLine({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, ankles: n(s, 'ankles') ?? 0 })}`;
     }
     case 'hoops3v3': {
-      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
+      const ot = periodLabel(n(s, 'overtimes') ?? 0);   // NB-3: a game decided in overtime says so
+      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}${ot ? ` · ${ot}` : ''}`;
       // IMPROVE (2026-10-06, 3v3 #9): the box score the mode now ends with (FG, threes, assists, steals, blocks, overdrives)
       const fga = n(s, 'fga');
       return fga === null ? line : `${line} · ${boxLine3({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, assists: n(s, 'assists') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, overdrives: n(s, 'overdrives') ?? 0 })}`;
@@ -68,6 +70,7 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
     case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.verdict ?? (r.won ? 'CHAMPION' : 'RUNNER-UP')}`; }
     case 'dance': {
+      if (n(s, 'freeDance') === 1) return null;   // lane/dance-extras-2: a free-dance run proves no score, so it has no proof line to share
       const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');
       const grade = acc !== null ? gradeFor(acc / 100) : null;
       return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}${acc !== null ? ` · ${acc}%` : ''}${grade ? ` · GRADE ${grade}` : ''}${combo !== null ? ` · ×${combo} COMBO` : ''}`;

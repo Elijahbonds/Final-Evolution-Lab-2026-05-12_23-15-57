@@ -27,6 +27,7 @@ import { Vector3 } from '@babylonjs/core';
 import { classifyContact, type ContactSeverity } from './ContactSystem';
 import { DUNK_PCT, STEPBACK_SEC, STEPBACK_SPEED, LAYUP_STRIDE_SPEED, type ShotStyle, type ShotDrift } from './BasketballCore';
 import { athleteRight, lateralOf, sideAwayFrom, sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the ONE visual-side helper
+import { separateBodies } from './BodySeparation';   // lane/hoops-def-tell (#273 T-C): the capped push, when a mode asks for it
 
 // ── M1: the gather ──────────────────────────────────────────────────────────
 export type GatherKind = 'set' | 'pullup' | 'stepback'
@@ -306,6 +307,9 @@ export interface BodyContactOpts {
    *  per collision (a 300 ms pair cooldown) — applied every frame while two bodies overlap it stopped a sprinter dead
    *  (measured 6.1 → 0.5 m/s). Default true; the mode gates it. */
   exchange?: boolean;
+  /** lane/hoops-def-tell (#273 T-C): cap the positional half — at most this far per body this call (SEP_PUSH_MPS · dt), back to
+   *  `hardGap` capped at `popMax` below it (core/BodySeparation separateBodies). Omitted: the instant full correction, unchanged. */
+  maxPush?: number; hardGap?: number; popMax?: number; deadband?: number;
 }
 
 /** Push two bodies apart on XZ if they overlap (resolveBodyCollision's separation) AND exchange momentum along the normal
@@ -318,10 +322,15 @@ export function resolveBodyContact(a: Vector3, b: Vector3, va: Vector3, vb: Vect
   const minDist = radius * 2;
   if (distSq >= minDist * minDist || distSq < 1e-6) return null;
   const dist = Math.sqrt(distSq);
-  const push = (minDist - dist) / 2;
   const nx = dx / dist, nz = dz / dist;
-  a.x -= nx * push; a.z -= nz * push;
-  b.x += nx * push; b.z += nz * push;
+  if (opts.maxPush === undefined) {
+    const push = (minDist - dist) / 2;
+    a.x -= nx * push; a.z -= nz * push;
+    b.x += nx * push; b.z += nz * push;
+  } else {   // #273 T-C: a capped push, never a one-frame pop
+    const sep = separateBodies(a, b, 1, { gap: minDist, pushMps: opts.maxPush, hardGap: opts.hardGap, popMax: opts.popMax, deadband: opts.deadband });
+    a.addInPlace(sep.pushA); b.addInPlace(sep.pushB);
+  }
   const aAlong = va.x * nx + va.z * nz;          // a's speed toward b
   const bAlong = -(vb.x * nx + vb.z * nz);       // b's speed toward a
   const closing = Math.max(0, aAlong + bAlong);
