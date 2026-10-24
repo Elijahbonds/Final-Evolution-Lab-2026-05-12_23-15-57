@@ -1,0 +1,2495 @@
+generator client {
+  provider      = "prisma-client-js"
+  // DERIVED by scripts/prisma-generate.mjs from prisma/schema.prisma; this block is the only difference.
+  // The parallel client of PRISMA-PUBLIC step 1 (docs/PRISMA-PUBLIC-PLAN.md): the Cloud Run engine only.
+  output        = "./prisma"
+  binaryTargets = ["debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  // The hosted database is Cloud SQL for PostgreSQL, reachable over TLS only (see .env.example).
+  // DATABASE_URL is what the app connects with: keep ?sslmode=require and a small
+  // connection_limit, because every server instance opens its own client. It is a direct
+  // Postgres connection, not a transaction pooler, so the old Supabase ?pgbouncer=true flag
+  // does not belong on it (all it would do is turn off prepared statements).
+  // DIRECT_URL is the same database without the pool cap, used only by `prisma db push` /
+  // `migrate`. Local dev points both at one local Postgres (scripts/dev-setup.sh).
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  role      String   @default("player")
+  createdAt DateTime @default(now())
+
+  profile       PlayerProfile?
+  sessions      GameSession[]
+  sessionRuns   SessionRun[]
+  sessionGrants SessionGrant[]
+  ledger        CreditLedger[]
+  cards         CardOwnership[]
+  prqEntries    PrqEntry[]
+  lessons       LessonProgress[]
+  storyProgress StoryNodeProgress[]
+  cellProjects  CellProject[]
+  cellApiKeys   CellApiKey[]
+  cellSettings  CellSettings?
+  athleteBuild  AthleteBuild?
+
+  // M2 relations
+  stripeCustomer  StripeCustomer?
+  subscriptions   Subscription[]
+  mirrorSessions  MirrorSession[]
+  orders          Order[]
+  payoutRequests  PayoutRequest[]
+  creatorListings MarketplaceListing[]  @relation("CreatorListings")
+  buyerPurchases  MarketplacePurchase[] @relation("BuyerPurchases")
+  coachShares     ShareLink[]           @relation("CoachShares")
+  coachInvites    CoachInvite[]         @relation("CoachInvites")
+  clientsCoached  CoachClient[]         @relation("CoachOf")
+  coaches         CoachClient[]         @relation("ClientOf")
+  ladderEntries   LadderEntry[]         @relation("LadderEntries")
+
+  // M3 relations (Track C — Studio Creator)
+  partnerKeys StudioPartnerKey[] @relation("PartnerKeys")
+
+  // M4 relations (Track B — Real-money competition)
+  competitionMatchesP1     CompetitionMatch[] @relation("MatchPlayer1")
+  competitionMatchesP2     CompetitionMatch[] @relation("MatchPlayer2")
+  competitionMatchesWinner CompetitionMatch[] @relation("MatchWinner")
+  matchEvents              MatchEvent[]
+  mirrorTriumphs           MirrorTriumph[]
+
+  // FEL dual-currency wallet (coins/shards) — server-authoritative, distinct from LC
+  wallet         Wallet?
+  perfEarnEvents PerfEarnEvent[]
+  entitlements   PlayerEntitlement[]
+
+  // Marketing funnel + referral loop
+  leadRecord   MarketingLead? @relation("LeadConversion")
+  referralCode ReferralCode?  @relation("UserReferralCode")
+
+  // Async multiplayer (challenge/PvP)
+  mpMatchesHost  MpMatch[] @relation("MpHost")
+  mpMatchesGuest MpMatch[] @relation("MpGuest")
+
+  // Creator cards
+  creatorCards CreatorCard[] @relation("CreatorCards")
+
+  // M28: five-discipline creative cards (UGC)
+  creativeCards CreativeCard[] @relation("UserCreativeCards")
+  cardSlot      CardSlot?      @relation("UserCardSlot")
+
+  // M17-M21: workout avatar, closet, sessions
+  workoutScans    WorkoutScan[]
+  workoutPlans    WorkoutPlan[]
+  avatarLook      AvatarLook?
+  ownedWearables  OwnedWearable[]
+  sessionBookings SessionBooking[]
+  /// AB-04: one opt-in row for saving movement numbers (jump, Prove It, re-screen).
+  scanSaveOptIn   ScanSaveOptIn?
+
+  // Camp Blueprint (Education pillar: Mentorship), 2026-09-03
+  facilitatorProfile     FacilitatorProfile?
+  goalPlansAsMentee      GoalPlan[]          @relation("GoalPlanMentee")
+  goalPlansAsFacilitator GoalPlan[]          @relation("GoalPlanFacilitator")
+  credentials            Credential[]
+  guardianConsents       GuardianConsent[]   @relation("ConsentMentee")
+
+  // MIRROR-COACH P5 (2026-09-29): health intake + pain check-in loop (lib/health/). Additive only — see the
+  // HealthIntake/PainCheckIn/HealthConsent models below for the story.
+  healthIntakes     HealthIntake[]
+  painCheckIns      PainCheckIn[]
+  healthConsents    HealthConsent[]
+  // MIRROR-COACH P6 (2026-09-29): the daily readiness check-in (lib/health/readiness.ts). Additive only — see the
+  // ReadinessCheckIn model below.
+  readinessCheckIns ReadinessCheckIn[]
+  // MIRROR-COACH P7 (2026-09-29): the breath toolbox's use log (lib/breath/rampGate.ts). Additive only — see the
+  // BreathLog model below.
+  breathLogs        BreathLog[]
+
+  // M4 compliance stubs
+  dobYear        Int? // Year of birth for 18+ attestation
+  kycStatus      String    @default("NONE") // NONE | PENDING | VERIFIED | REJECTED
+  kycProvider    String? // provider name when verified
+  kycVerifiedAt  DateTime?
+  selfExcludedAt DateTime? // non-null = user opted out of real-money
+  declaredState  String? // US state code declared by user (e.g. "CA")
+
+  // Task 4: Policy acceptance
+  policyVersion    String? // version of ToS/Privacy accepted (e.g. "2026-07-15")
+  policyAcceptedAt DateTime? // when the user accepted the policy
+
+  // CRM relations
+  crmContacts     CrmContact[]  @relation("CrmContactOwner")
+  crmContactLinks CrmContact[]  @relation("CrmContactLinkedUser")
+  crmDeals        CrmDeal[]     @relation("CrmDealOwner")
+  crmActivities   CrmActivity[] @relation("CrmActivityOwner")
+  crmNotes        CrmNote[]     @relation("CrmNoteAuthor")
+
+  // ADVENTURE PHASE B (2026-10-07): the Adventure's server save, one row per account. See AdventureSave below.
+  adventureSave AdventureSave?
+}
+
+model PlayerProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strength        Float
+  speed           Float
+  endurance       Float
+  agility         Float
+  power           Float
+  flexibility     Float
+  recovery        Float
+  mental          Float
+  labCredits      Int      @default(500)
+  xp              Int      @default(0)
+  shards          Int      @default(0)
+  streakDays      Int      @default(0)
+  avatarKey       String?  @default("male-athletic")
+  cosmeticAssetId String? // equipped AvatarCard cosmetic (assetId from card-catalog); null = none
+  lastStreakAt    DateTime @default(now())
+  lastActiveAt    DateTime @default(now())
+  lastDecayAt     DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model GameSession {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode          String
+  score         Int
+  opponentScore Int         @default(0)
+  won           Boolean     @default(false)
+  xp            Int         @default(0)
+  shards        Int         @default(0)
+  prqDelta      Float       @default(0)
+  credits       Int         @default(0)
+  duration      Int         @default(0)
+  // Standardized fun-loop tallies (M6 game parity). All defaulted = backward-compatible.
+  hits          Int         @default(0)
+  misses        Int         @default(0)
+  dodges        Int         @default(0)
+  combos        Int         @default(0)
+  maxCombo      Int         @default(0)
+  // ECONOMY-CAPS C5: the server-issued SessionRun id — one GameSession row per run (NULL allowed on legacy rows).
+  runId         String?     @unique
+  run           SessionRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ECONOMY-SESSIONS-HARDEN (2026-09-28): a run the SERVER started. POST /api/sessions/start issues it (the run id is
+// the one idempotency key every payout of the run is filed under), and POST /api/sessions finishes it at most once:
+// its duration is now - startedAt, never a client number; payoutEligible is decided at start from signals the server
+// controls (?agent=1, the playtest flag, User.role / the test allowlist) and nothing in the finish can turn it on.
+// status: open -> paid (an eligible run's grants were written) | recorded (validated, ineligible: score kept, nothing
+// paid) | rejected (SCORE_INVALID and friends) | expired (never finished inside maxDurationMs + grace).
+// `result` is the response the finish returned, replayed verbatim (with replayed: true) to any retry.
+model SessionRun {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode             String
+  status           String    @default("open")
+  payoutEligible   Boolean
+  ineligibleReason String?
+  agentRun         Boolean   @default(false)
+  startedAt        DateTime  @default(now())
+  expiresAt        DateTime
+  finishedAt       DateTime?
+  score            Int?
+  durationMs       Int?
+  rejectReason     String?
+  sessionId        String?
+  result           Json?
+
+  grants      SessionGrant[]
+  gameSession GameSession?
+
+  @@index([userId, status])
+  @@index([expiresAt])
+}
+
+// ECONOMY-SESSIONS-HARDEN: the one ledger every payout of a run is written to, inside the run's transaction and BEFORE
+// any balance moves. The unique key is the idempotency: a second write of any grant of the same run fails, the whole
+// transaction rolls back, and the stored result is returned instead. grantType: xp | shards | wallet_lc | wallet_coins
+// | wallet_shards | season_xp | mastery | prq.
+model SessionGrant {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runId     String
+  run       SessionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  grantType String
+  amount    Float
+  metadata  Json?
+  createdAt DateTime   @default(now())
+
+  @@unique([userId, runId, grantType])
+  @@index([runId])
+}
+
+model CreditLedger {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount       Int
+  reason       String
+  balanceAfter Int      @default(0)
+  dedupeKey    String?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@index([userId, reason, createdAt])
+}
+
+model CardOwnership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardKey   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, cardKey])
+}
+
+model StoryNodeProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  nodeId      String
+  sessionId   String?  @unique
+  score       Int
+  completedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, nodeId])
+  @@index([userId])
+}
+
+model LessonProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackKey    String
+  lessonKey   String
+  completedAt DateTime @default(now())
+
+  @@unique([userId, trackKey, lessonKey])
+}
+
+// ─── CELL × NEXUS Studio ───
+
+model CellProject {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  genre      String        @default("")
+  status     String        @default("draft") // draft | building | ready | failed
+  buildPlan  String        @default("") // JSON BuildPlan from architect
+  artifacts  String        @default("") // JSON manifest of generated files
+  prompt     String        @default("") // original user prompt
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  wisdomLogs CellWisdom[]
+  messages   CellMessage[]
+  files      ProjectFile[]
+  usages     CellUsage[]
+
+  @@index([userId, updatedAt])
+}
+
+// ─── Cost engine (Phase 2) ───
+
+model CellApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider  String // openai | anthropic | google
+  keyCipher String // AES-256-GCM encrypted API key (never returned to client)
+  hint      String   @default("") // last 4 chars for display
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+model CellSettings {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  budgetUsd   Float    @default(0) // per-build cost cap in USD; 0 = no cap
+  preferCheap Boolean  @default(true) // pick cheapest-capable model per job
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CellUsage {
+  id           String      @id @default(cuid())
+  projectId    String
+  project      CellProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  buildId      String // groups one runBuild invocation
+  laneId       String      @default("")
+  laneTitle    String      @default("")
+  role         String      @default("")
+  provider     String      @default("")
+  model        String      @default("")
+  inputTokens  Int         @default(0)
+  outputTokens Int         @default(0)
+  costUsd      Float       @default(0)
+  escalated    Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([buildId])
+}
+
+model ProjectFile {
+  id          String      @id @default(cuid())
+  projectId   String
+  project     CellProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  path        String // e.g. "index.html", "js/game.js", "assets/logo.png"
+  content     String      @default("") // text content (code); binary assets store a URL/reference
+  kind        String      @default("code") // code | asset
+  contentHash String      @default("")
+  summary     String      @default("") // one-line auto summary for cheap context packing
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([projectId, path])
+  @@index([projectId])
+}
+
+model CellMessage {
+  id        String      @id @default(cuid())
+  projectId String
+  project   CellProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  role      String // user | architect | builder | critic | system
+  content   String
+  model     String      @default("") // which LLM produced this
+  tokens    Int         @default(0)
+  createdAt DateTime    @default(now())
+
+  @@index([projectId, createdAt])
+}
+
+model CellWisdom {
+  id        String       @id @default(cuid())
+  projectId String?
+  project   CellProject? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  category  String // e.g. "architecture", "prompt_quality", "asset_pipeline"
+  insight   String // the learned principle
+  score     Float        @default(1.0) // relevance/confidence, decays over time
+  createdAt DateTime     @default(now())
+
+  @@index([category, score])
+}
+
+// ─── Exercise Knowledge Base ───
+
+model ExerciseCategory {
+  id          String     @id @default(cuid())
+  name        String     @unique // e.g. "Oscillatory Drills", "Neural Flush", "CARs"
+  description String     @default("")
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  exercises   Exercise[]
+}
+
+model Exercise {
+  id             String           @id @default(cuid())
+  name           String // e.g. "Single-Leg Pogo Hops"
+  slug           String           @unique // URL-safe key
+  categoryId     String
+  category       ExerciseCategory @relation(fields: [categoryId], references: [id])
+  phase          Int              @default(1) // Blueprint phase 1-5
+  chapter        Int              @default(1) // Blueprint chapter 1-20
+  bounceLevel    String           @default("foundation") // foundation / intermediate / advanced / elite
+  coachingCues   String           @default("") // Authored text — what Elijah says
+  commonMistakes String           @default("") // What to avoid
+  progressions   String           @default("") // Next-level variations
+  regressions    String           @default("") // Easier alternatives
+  prerequisites  String           @default("") // What must be mastered first
+  targetPrqStat  String           @default("") // strength|speed|endurance|agility|power|flexibility|recovery|mental
+  dosage         String           @default("") // Sets x reps, timing
+  videoUrl       String           @default("") // YouTube or cloud URL
+  thumbnailUrl   String           @default("") // Preview image
+  published      Boolean          @default(false) // Only published exercises visible to learners
+  sortOrder      Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([categoryId])
+  @@index([phase, chapter])
+}
+
+// ===========================================================================
+// M1 — Double-entry ledger foundation (additive; unifies LC + real money).
+//   Convention: every LedgerTransaction has >= 2 postings whose signed
+//   `amount` values sum to exactly 0 (sum(debits) == sum(credits)).
+//   An account's balance = SUM(amount) over its postings.
+//   Non-EXTERNAL account balances must stay >= 0.
+// ===========================================================================
+
+enum LedgerCurrency {
+  LC // virtual Lab Credits (soft currency)
+  USD_CENTS // real money, integer cents
+  STUDIO_CREDIT // virtual prepaid NEXUS Studio build-overage unit (M3); isolated book
+}
+
+enum LedgerAccountType {
+  USER_WALLET // per-user spendable balance
+  ESCROW // funds held for an open match / contest
+  PLATFORM_REVENUE // platform fees / cut
+  CREATOR_ACCRUAL // creator earnings awaiting payout
+  EXTERNAL // counterparty for value entering/leaving the system (mint/burn, Stripe, payouts)
+}
+
+model LedgerAccount {
+  id        String            @id @default(cuid())
+  type      LedgerAccountType
+  currency  LedgerCurrency
+  userId    String? // set for USER_WALLET / CREATOR_ACCRUAL; null for system singletons
+  scopeId   String? // optional scope (e.g. matchId for ESCROW)
+  key       String            @unique // canonical: "<TYPE>:<CURRENCY>[:<scope>]"
+  createdAt DateTime          @default(now())
+
+  postings LedgerPosting[]
+
+  @@index([type, currency])
+  @@index([userId])
+}
+
+model LedgerTransaction {
+  id             String         @id @default(cuid())
+  kind           String // reason/category, e.g. LESSON_COMPLETE, CARD_PURCHASE, STRIPE_SUBSCRIPTION
+  idempotencyKey String         @unique
+  currency       LedgerCurrency
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+
+  postings LedgerPosting[]
+
+  @@index([kind, createdAt])
+}
+
+model LedgerPosting {
+  id            String            @id @default(cuid())
+  transactionId String
+  transaction   LedgerTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  accountId     String
+  account       LedgerAccount     @relation(fields: [accountId], references: [id])
+  amount        Int // signed; +credit / -debit; per-transaction postings sum to 0
+  createdAt     DateTime          @default(now())
+
+  @@index([accountId])
+  @@index([transactionId])
+}
+
+// =====================================================================
+// M2 — Track A Revenue (Stripe + marketplace + ladder)
+// =====================================================================
+
+enum SubscriptionProduct {
+  FEL_PRO
+  STUDIO_CREATOR
+  /// A single credentialed facilitator: mentees, plans, assessments, session logging.
+  FEL_COACH
+  /// An organisation: everything a coach has, plus CRM, templates and multiple facilitators.
+  FEL_FACILITY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum OrderType {
+  SUBSCRIPTION
+  COSMETIC
+  MARKETPLACE
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model StripeCustomer {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id])
+  stripeCustomerId String   @unique
+  createdAt        DateTime @default(now())
+}
+
+model Subscription {
+  id                   String              @id @default(cuid())
+  userId               String
+  user                 User                @relation(fields: [userId], references: [id])
+  stripeSubscriptionId String              @unique
+  stripePriceId        String
+  product              SubscriptionProduct
+  status               SubscriptionStatus  @default(ACTIVE)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean             @default(false)
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([userId, product])
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  userId          String
+  user            User        @relation(fields: [userId], references: [id])
+  stripeSessionId String      @unique
+  type            OrderType
+  amount          Int // in cents
+  currency        String      @default("usd")
+  status          OrderStatus @default(PENDING)
+  itemKey         String? // e.g. cosmetic key or marketplace listing id
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([userId, type])
+}
+
+model PayoutRequest {
+  id               String       @id @default(cuid())
+  userId           String
+  user             User         @relation(fields: [userId], references: [id])
+  amount           Int // in cents
+  currency         String       @default("usd")
+  status           PayoutStatus @default(PENDING)
+  stripeTransferId String?
+  ledgerTxId       String?
+  idempotencyKey   String       @unique
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([userId, status])
+}
+
+model MarketplaceListing {
+  id          String   @id @default(cuid())
+  creatorId   String
+  creator     User     @relation("CreatorListings", fields: [creatorId], references: [id])
+  title       String
+  description String?
+  itemKey     String   @unique // unique content identifier
+  priceUsd    Int // in cents
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // M3 (Track C): listing type + cartridge manifest
+  listingType     String  @default("COSMETIC") // COSMETIC | CARTRIDGE
+  version         String  @default("1.0.0")
+  manifest        String  @default("") // JSON CartridgeManifest (empty for COSMETIC)
+  sourceProjectId String? // originating CellProject for a CARTRIDGE
+
+  purchases MarketplacePurchase[]
+
+  @@index([creatorId])
+  @@index([listingType, active])
+}
+
+// ─── M3 Track C — Studio Creator partner API ───
+
+model StudioPartnerKey {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation("PartnerKeys", fields: [userId], references: [id], onDelete: Cascade)
+  name         String    @default("")
+  keyHash      String    @unique // sha256 of the raw partner key; raw is shown once at creation
+  keyHint      String    @default("") // e.g. "nxk_live_...ab12" for display
+  scopes       String    @default("build:read") // comma-separated scopes
+  active       Boolean   @default(true)
+  monthlyQuota Int       @default(1000) // metered partner calls per billing month; -1 = unlimited
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+
+  usages PartnerUsage[]
+
+  @@index([userId])
+  @@index([active])
+}
+
+model PartnerUsage {
+  id           String           @id @default(cuid())
+  partnerKeyId String
+  partnerKey   StudioPartnerKey @relation(fields: [partnerKeyId], references: [id], onDelete: Cascade)
+  endpoint     String           @default("")
+  units        Int              @default(1) // billable units for this call
+  costUsd      Float            @default(0)
+  status       Int              @default(200) // HTTP status recorded
+  billingMonth String           @default("") // YYYY-MM for cheap monthly rollups
+  createdAt    DateTime         @default(now())
+
+  @@index([partnerKeyId, createdAt])
+  @@index([partnerKeyId, billingMonth])
+}
+
+model MarketplacePurchase {
+  id         String             @id @default(cuid())
+  buyerId    String
+  buyer      User               @relation("BuyerPurchases", fields: [buyerId], references: [id])
+  listingId  String
+  listing    MarketplaceListing @relation(fields: [listingId], references: [id])
+  orderId    String?
+  ledgerTxId String?
+  createdAt  DateTime           @default(now())
+
+  @@unique([buyerId, listingId])
+  @@index([listingId])
+}
+
+model LadderSeason {
+  id        String   @id @default(cuid())
+  weekStart DateTime @unique // Monday 00:00 UTC
+  weekEnd   DateTime
+  mode      String   @default("dunk")
+  prizePool Int      @default(500) // LC amount
+  finalized Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  entries LadderEntry[]
+}
+
+model LadderEntry {
+  id        String       @id @default(cuid())
+  seasonId  String
+  season    LadderSeason @relation(fields: [seasonId], references: [id])
+  userId    String
+  user      User         @relation("LadderEntries", fields: [userId], references: [id])
+  score     Int          @default(0)
+  attempts  Int          @default(0)
+  bestScore Int          @default(0)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@unique([seasonId, userId])
+  @@index([seasonId, bestScore])
+}
+
+// ─── M4 Track B — Real-money competition ───
+
+model CompetitionMatch {
+  id            String  @id @default(cuid())
+  mode          String // game mode key, e.g. "dunkContest"
+  matchType     String  @default("H2H") // H2H | SCORE_DUEL | GHOST_DUEL
+  status        String  @default("WAITING") // WAITING | ACTIVE | SCORED | SETTLED | DISPUTED | VOIDED | EXPIRED
+  // M14 Triumph Arena: which currency book this match settles in.
+  //   LC        = virtual Lab Credits (skill competition, no cash on-ramp, always live)
+  //   USD_CENTS = real-money (DARK, flag-gated by REAL_MONEY_COMPETITION)
+  currency      String  @default("USD_CENTS")
+  entryFeeCents Int     @default(0) // per-player entry fee (USD cents for real-money; LC units for Arena)
+  rakePercent   Int     @default(10) // platform rake percentage (e.g. 10 = 10%)
+  seed          String? // deterministic RNG seed (hex) for skill-game compliance
+
+  player1Id          String
+  player1            User      @relation("MatchPlayer1", fields: [player1Id], references: [id])
+  player1Score       Int?
+  player1SubmittedAt DateTime?
+
+  player2Id          String?
+  player2            User?     @relation("MatchPlayer2", fields: [player2Id], references: [id])
+  player2Score       Int?
+  player2SubmittedAt DateTime?
+
+  winnerId String?
+  winner   User?   @relation("MatchWinner", fields: [winnerId], references: [id])
+
+  escrowTxId String? // ledger transaction ID for escrow lock
+  settleTxId String? // ledger transaction ID for settlement
+  refundTxId String? // ledger transaction ID for refund (dispute/void)
+
+  // Async score-duel: deadline for both players to submit
+  expiresAt     DateTime?
+  disputeReason String?
+  disputedAt    DateTime?
+  disputedBy    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events MatchEvent[]
+
+  @@index([status])
+  @@index([player1Id])
+  @@index([player2Id])
+  @@index([matchType, status])
+  @@index([currency, status, mode])
+}
+
+model MatchEvent {
+  id        String           @id @default(cuid())
+  matchId   String
+  match     CompetitionMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  seq       Int              @default(0)
+  eventType String // CREATED | JOINED | ESCROW_LOCKED | SCORE_SUBMITTED | SETTLED | DISPUTED | VOIDED | REFUNDED | EXPIRED
+  userId    String? // who triggered the event (null for system events like EXPIRED)
+  user      User?            @relation(fields: [userId], references: [id])
+  payload   String           @default("{}") // JSON
+  createdAt DateTime         @default(now())
+
+  @@index([matchId, seq])
+}
+
+// Mirror Triumph — free tier beat-your-own-ghost streaks
+model MirrorTriumph {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode          String // game mode key
+  bestScore     Int       @default(0)
+  currentStreak Int       @default(0)
+  longestStreak Int       @default(0)
+  totalBeats    Int       @default(0) // total times the user beat their ghost
+  lastBeatAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([userId, mode])
+  @@index([userId])
+}
+
+// Task 3 — PRQ / Digital-Twin Foundation: honest, sourced attribute entries.
+// Every value knows where it came from (source) and when it was measured.
+// source: manual = user-reported, device = connected device (seam only in v1),
+//         drillResult = computed from a game/drill session.
+model PrqEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attribute  String // PRQ attribute key (strength, speed, etc.)
+  value      Float // measured / reported numeric value
+  unit       String // unit of measurement (e.g. "in", "sec", "lbs", "score")
+  source     String // manual | device | drillResult
+  sessionId  String? // link to GameSession if source=drillResult
+  measuredAt DateTime // when the measurement was taken
+  createdAt  DateTime @default(now())
+
+  @@index([userId, attribute, measuredAt])
+  @@index([userId, createdAt])
+}
+
+// ===========================================================================
+// M13 — Foundation for a Classic (guest mode, seasons, mastery, challenge
+// links, analytics). All additive; server owns all grants and scores.
+// ===========================================================================
+
+// --- Guest mode (Blueprint 2.1) -------------------------------------------
+// Server-issued anonymous session so the landing page can reach a judged dunk
+// with zero auth. Carries NO PII (M13 FIREWALL). `data` holds the scripted
+// taste-run PRQ snapshot that migrates into the account on claim.
+model GuestSession {
+  id             String   @id @default(cuid())
+  token          String   @unique
+  data           Json? // taste-run state (scores/cards) migrated on claim
+  migratedUserId String? // set when the guest converts to a real account
+  createdAt      DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+
+  @@index([migratedUserId])
+}
+
+// --- Season engine (Blueprint 2.3) ----------------------------------------
+// Season CONTENT (rewards) is data (Json), so future seasons ship without
+// deploys. Only one season is `active` at a time.
+model Season {
+  id        String   @id @default(cuid())
+  key       String   @unique // e.g. "S1"
+  name      String // e.g. "Golden Hour"
+  theme     String? // cosmetic theme tag
+  tiers     Int      @default(50)
+  rewards   Json? // per-tier reward table (data, not code)
+  startsAt  DateTime
+  endsAt    DateTime
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  progress PassProgress[]
+  grants   PassGrant[]
+}
+
+// Per-user pass state for a season. XP from ANY mode advances tiers.
+model PassProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  seasonId    String
+  season      Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  xp          Int      @default(0) // XP into current tier
+  tier        Int      @default(0)
+  hasPro      Boolean  @default(false)
+  claimedFree Json? // array of claimed FREE-lane tier numbers
+  claimedPro  Json? // array of claimed PRO-lane tier numbers
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, seasonId])
+  @@index([userId])
+}
+
+// Idempotent grant log (ledger-keyed like LC). One row per (user, dedupeKey).
+model PassGrant {
+  id        String   @id @default(cuid())
+  userId    String
+  seasonId  String
+  season    Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  tier      Int
+  lane      String // "free" | "pro"
+  reward    Json // the granted reward descriptor
+  dedupeKey String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([userId, seasonId])
+}
+
+// --- Mastery ladder (Blueprint 2.2) ---------------------------------------
+// Per-mode graded ladder. Rolling window of samples in Json; tier never
+// decays below earned.
+model ModeMastery {
+  id        String   @id @default(cuid())
+  userId    String
+  mode      String
+  samples   Json // number[] rolling window (max 10)
+  tier      Int      @default(0) // 0 = Unranked, 1..5 = Bronze..Venice Legend
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, mode])
+  @@index([userId])
+}
+
+// Weekly seeded Signature Challenge attempt (one per user per challenge per day).
+model SignatureAttempt {
+  id           String   @id @default(cuid())
+  userId       String
+  mode         String
+  challengeKey String // seeded weekly key, e.g. "dunkContest:2026-W29"
+  score        Int
+  createdAt    DateTime @default(now())
+
+  @@index([mode, challengeKey, score])
+  @@index([userId, challengeKey])
+}
+
+// --- Challenge links (Blueprint 2.4) — the K-factor engine ----------------
+// Server signs + stamps the payload; funnel counters instrument the loop.
+model ChallengeLink {
+  id          String   @id @default(cuid())
+  code        String   @unique // base64url payload id (short hash)
+  ownerUserId String? // null if minted by a guest
+  modeKey     String
+  score       Int
+  display     String?
+  tag         String
+  payload     Json // signed ChallengePayload
+  sig         String // HMAC signature
+  opened      Int      @default(0)
+  attempted   Int      @default(0)
+  beaten      Int      @default(0)
+  signups     Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([ownerUserId])
+  @@index([modeKey])
+}
+
+// --- Analytics pipeline (Blueprint Part 3) --------------------------------
+// First-party only, no third-party trackers. Telemetry only — never carries
+// credit amounts or PRQ deltas (those are server-authoritative elsewhere).
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  props      Json?
+  sessionKey String? // groups a browsing session
+  userId     String? // null for guests
+  guestId    String? // GuestSession token when unauthenticated
+  ts         DateTime // client wall-clock
+  createdAt  DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+// Daily rollup of the funnel/retention metrics for /admin/metrics.
+model MetricRollup {
+  id        String   @id @default(cuid())
+  day       String   @unique // YYYY-MM-DD (UTC)
+  payload   Json // { dau, newUsers, d1, d7, d30, kFactor, conv, ... }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =====================================================================
+// FEL — Server-Authoritative Dual-Currency Wallet (coins / shards)
+// Distinct from the LC CreditLedger and the double-entry LedgerAccount books.
+//   coins  = high-volume grind currency, purchasable (Stripe -> coins ONLY)
+//   shards = low-volume prestige currency, milestone-earned, NEVER purchasable
+// Balances are reconstructable from WalletLedgerEntry alone (audit trail).
+// Non-negativity is enforced by conditional atomic decrement in the service
+// layer AND by DB CHECK constraints applied post-push (see prisma/wallet-constraints.sql).
+// =====================================================================
+
+enum WalletCurrency {
+  coins
+  shards
+  lc // lab credits — folded into the wallet 2026-09-04 (owner decision); PlayerProfile.labCredits is a read-only mirror
+}
+
+enum WalletLedgerSource {
+  gameplay
+  milestone
+  purchase
+  spend
+  admin_adjust
+  refund
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  playerId  String   @unique
+  player    User     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  coins     BigInt   @default(0) // CHECK >= 0 (applied via wallet-constraints.sql)
+  shards    BigInt   @default(0) // CHECK >= 0
+  lc        BigInt   @default(0) // lab credits (CHECK >= 0) — the arena house book and the shop spend this; the profile column mirrors it
+  version   BigInt   @default(0) // optimistic-concurrency counter
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries WalletLedgerEntry[]
+
+  @@index([playerId])
+}
+
+model WalletLedgerEntry {
+  id             String             @id @default(cuid())
+  walletId       String
+  wallet         Wallet             @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  currency       WalletCurrency
+  delta          BigInt // signed; negative = spend
+  balanceAfter   BigInt // snapshot for audit
+  reasonCode     String // see lib/wallet/reward-rules.ts
+  source         WalletLedgerSource
+  idempotencyKey String             @unique
+  metadata       Json?
+  createdAt      DateTime           @default(now())
+
+  @@index([walletId, createdAt])
+  @@index([reasonCode])
+  @@index([createdAt])
+}
+
+// Server-side reward config. Editable at runtime (no client release, no deploy).
+model RewardRule {
+  id                String         @id @default(cuid())
+  reasonCode        String         @unique
+  currency          WalletCurrency
+  formula           String         @default("flat") // flat | scoreLinear
+  baseAmount        Int            @default(0)
+  scaleNum          Float          @default(0) // multiplier input for scoreLinear
+  minGrant          Int            @default(0)
+  maxGrant          Int            @default(0)
+  perMinuteCap      Int            @default(0) // 0 = no per-minute cap
+  perDayCurrencyCap Int            @default(0) // 0 = no rolling-24h currency cap
+  active            Boolean        @default(true)
+  updatedAt         DateTime       @updatedAt
+  createdAt         DateTime       @default(now())
+}
+
+// Raw client-reported performance events. Retained even when rejected — this
+// is the anti-cheat + tuning dataset.
+model PerfEarnEvent {
+  id              String   @id @default(cuid())
+  playerId        String
+  player          User     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  eventType       String
+  payload         Json
+  payloadHash     String // for replay detection
+  resolvedEntryId String? // WalletLedgerEntry.id this produced, if any
+  rejectedReason  String? // set when validation failed
+  createdAt       DateTime @default(now())
+
+  @@index([playerId, createdAt])
+  @@index([playerId, payloadHash, createdAt])
+}
+
+// Grant-on-purchase / grant-on-spend unlocks (minimal; no catalog UI).
+model PlayerEntitlement {
+  id        String   @id @default(cuid())
+  playerId  String
+  player    User     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  skuId     String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([playerId, skuId])
+  @@index([playerId])
+}
+
+// ===========================================================================
+// SECOND-PASS SYSTEMS — marketing funnel, referral loop, async multiplayer,
+// creator cards. All additive; existing models untouched.
+// ===========================================================================
+
+enum FunnelStage {
+  lead // captured email, not yet engaged
+  welcomed // welcome email sent
+  activated // played at least one session
+  converted // created a full account
+  dormant // went inactive after engaging
+}
+
+model MarketingLead {
+  id              String      @id @default(cuid())
+  email           String      @unique
+  name            String?
+  source          String      @default("landing") // landing | signup | referral | import
+  stage           FunnelStage @default(lead)
+  welcomeEmailAt  DateTime?
+  reengagedAt     DateTime?
+  referredByCode  String? // ReferralCode.code that sent this lead
+  ipHash          String?
+  convertedUserId String?     @unique
+  convertedUser   User?       @relation("LeadConversion", fields: [convertedUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  lastSeenAt      DateTime    @default(now())
+
+  @@index([stage])
+  @@index([createdAt])
+}
+
+model ReferralCode {
+  id          String               @id @default(cuid())
+  userId      String               @unique
+  user        User                 @relation("UserReferralCode", fields: [userId], references: [id], onDelete: Cascade)
+  code        String               @unique
+  clicks      Int                  @default(0)
+  signups     Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  conversions ReferralConversion[]
+}
+
+model ReferralConversion {
+  id             String       @id @default(cuid())
+  codeId         String
+  code           ReferralCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  referrerId     String
+  referredUserId String       @unique
+  shardsAwarded  Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@index([referrerId])
+}
+
+// --- Async multiplayer (challenge / PvP; NOT realtime) ---------------------
+enum MpStatus {
+  open // host posted a score, awaiting a challenger
+  pending // guest joined, awaiting their play
+  settled // both played, winner resolved
+  expired // timed out with no challenger
+}
+
+enum MpKind {
+  online // asynchronous online challenge between two accounts
+  local // pass-and-play on one device (both slots same account)
+}
+
+model MpMatch {
+  id     String   @id @default(cuid())
+  mode   String // game mode key (e.g. "sprint", "threepoint")
+  kind   MpKind   @default(online)
+  status MpStatus @default(open)
+  code   String   @unique // short shareable challenge code
+
+  hostId       String
+  host         User      @relation("MpHost", fields: [hostId], references: [id], onDelete: Cascade)
+  hostName     String
+  hostScore    Int?
+  hostPlayedAt DateTime?
+
+  guestId       String?
+  guest         User?     @relation("MpGuest", fields: [guestId], references: [id], onDelete: SetNull)
+  guestName     String?
+  guestScore    Int?
+  guestPlayedAt DateTime?
+
+  winnerId String? // resolved user id, or null for a draw/unsettled
+  rewarded Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+
+  @@index([status])
+  @@index([mode])
+  @@index([hostId])
+  @@index([guestId])
+}
+
+// --- Creator cards ---------------------------------------------------------
+// ── M28 Creative Modes — five-discipline UGC card (art/music/dance/acting/sport) ──
+// Distinct from the athlete-identity CreatorCard above. Additive only.
+model CreativeCard {
+  id               String   @id
+  ownerId          String
+  title            String
+  primary          String // Discipline: sport|music|art|dance|acting|scene|cooking|fashion|writing (lane 4)
+  secondary        String[] // up to 2 secondary disciplines
+  sportDesignation String? // required when sport is primary/secondary
+  art              Json // ArtPayload (discriminated union keyed by discipline)
+  stats            Json // CardStats
+  rarityTier       String   @default("common")
+  rarityMult       Float    @default(1.0)
+  isPublic         Boolean  @default(false)
+  remixOf          String? // parent card id — powers the remix graph
+  licenseAccepted  Boolean  @default(false)
+  reviewState      String   @default("approved") // approved|pending_review|rejected
+  createdAt        DateTime @default(now())
+
+  owner User @relation("UserCreativeCards", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([primary, isPublic, reviewState])
+  @@index([remixOf])
+}
+
+model CardSlot {
+  userId String @id
+  extra  Int    @default(0)
+  user   User   @relation("UserCardSlot", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum CreatorCardRarity {
+  common
+  rare
+  epic
+  legendary
+}
+
+model CreatorCard {
+  id          String            @id @default(cuid())
+  ownerId     String
+  owner       User              @relation("CreatorCards", fields: [ownerId], references: [id], onDelete: Cascade)
+  slug        String            @unique // shareable public handle
+  displayName String
+  tagline     String?
+  mode        String            @default("dunk") // signature mode
+  rarity      CreatorCardRarity @default(common)
+  accent      String            @default("#00E5FF") // hex accent color
+  avatarUrl   String?
+
+  // Snapshot stats (denormalized for fast card render)
+  prq           Int     @default(0)
+  topScore      Int     @default(0)
+  wins          Int     @default(0)
+  signatureMove String?
+  /// 'athlete' (default) | 'facilitator' — Camp Blueprint (2026-09-03): the Facilitator Card is a Creator Card with a kind.
+  kind          String  @default("athlete")
+
+  /// lane 5 (SPEC-PASSION-PIPELINES, owner 2026-09-06): which stat blocks the owner shows on the public card —
+  /// { prq, mastery, records, resiliency, movement, highlights } booleans; null = all shown (lib/creator/card-stats.ts)
+  showStats  Json?
+  /// lane 5: up to 6 pinned highlights [{ id, kind: 'session'|'signature', mode, score, won, at, label? }] — ids must be the owner's
+  highlights Json?
+  published  Boolean  @default(false)
+  views      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([published])
+  @@index([kind])
+}
+
+// ===========================================================================
+// M17 — Personalized Workout + Mini-Avatar (scan -> movement screen -> plan)
+// Raw video NEVER stored; only a keypoint timeline + derived metrics.
+// ===========================================================================
+model WorkoutScan {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String   @default("movement_screen") // movement_screen|jump|run|dunk|freestyle
+  // Derived movement-screen metrics (numbers only — privacy safe).
+  metrics    Json // { jumpHeightCm, depthDeg, asymmetryPct, valgusL, valgusR, cadenceSpm, ... }
+  avatarSpec Json? // proportions + palette produced by avatarBuilder
+  createdAt  DateTime @default(now())
+
+  plans WorkoutPlan[]
+
+  @@index([userId])
+}
+
+model WorkoutPlan {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scanId    String?
+  scan      WorkoutScan? @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  tier      String       @default("plan_4w") // plan_4w | program_12w
+  weeks     Json // generated plan structure
+  focus     String       @default("") // primary focus derived from weakest metric
+  createdAt DateTime     @default(now())
+
+  @@index([userId])
+}
+
+// ===========================================================================
+// M20 — The Closet (avatar identity: face + wearables + creator-card skins)
+// ===========================================================================
+/// The athlete BUILD — everything the creator decides that the look tables do not already own.
+/// Deliberately NOT a second copy of AvatarLook: the face, the equipped garments and the jersey plate
+/// stay in AvatarLook, which the Closet writes and every mode spawns from ("one canonical record. No mode
+/// may persist its own parallel profile"). What lands here is attributes, tendencies, traits, hot zones,
+/// mechanics slots, the three frame scales, the archetype/stance, and the palette overrides — none of
+/// which has a home anywhere else.
+///
+/// One per account. A roster of saved builds is a real feature and a different schema; shipping a `slot`
+/// column before there is a screen that uses it would be inventing a shape from a guess.
+model AthleteBuild {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// BuildPayload from lib/creator/schema/saveBuild.ts.
+  build         Json
+  /// The schema the build was written against, so a future migration knows what it is reading.
+  schemaVersion String    @default("1.0.0")
+  /// The measured axes the ceilings were resolved against when it was saved, or null for no scan.
+  prq           Json?
+  /// Set when Finalize accepted it. A build can be stored while still invalid; this says it passed.
+  finalizedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+}
+
+model AvatarLook {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  face       Json // FaceConfig: skinTone, faceShape, hairStyle, hairColor, eyeShape, eyeColor, brows, mouth, nose
+  equipped   Json // { headwear, tops, shorts, shoes, accessory } -> itemId|null
+  skinCardId String? // applied creator-card skin (ownership verified server-side)
+  jersey     Json? // JerseyConfig: { number 0-99, name <=12 } rendered on the hero's back
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+model OwnedWearable {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId     String
+  acquiredAt DateTime @default(now())
+
+  @@unique([userId, itemId])
+  @@index([userId])
+}
+
+// ===========================================================================
+// M21 — Group Sessions + Booking (paid with shards; server-gated join)
+// ===========================================================================
+model SessionBooking {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String // group_workout | seminar | private_1on1
+  sessionKey String // schedule slot id (from sessionSchedule config) or booking slot
+  status     String   @default("confirmed") // confirmed | cancelled | refunded | pending
+  shardsPaid Int      @default(0)
+  startsAt   DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([sessionKey])
+}
+
+/// How a booked player actually attends (owner decision 2026-09-24): the Zoom/Meet/etc. link an admin or the slot's
+/// coach pastes for one slot. One row per slot, keyed exactly like SessionBooking.sessionKey. Readable only by a player
+/// holding a CONFIRMED booking for that key, the coach and admins (lib/sessions/joinLinkServer.ts). Purely additive:
+/// no relation, so User and SessionBooking are untouched, and the readers treat a missing table as "not posted yet".
+model SessionJoinLink {
+  sessionKey String   @id // schedule slot id, e.g. gw_2026-09-25 or pv_2026-09-28_16
+  url        String // normalised https URL, at most 500 characters (lib/sessions/joinLink.ts normaliseJoinUrl)
+  setById    String // the admin or coach who posted it
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ===========================================================================
+// CRM — Contacts, Companies, Deals, Activities, Notes
+// ===========================================================================
+
+enum CrmDealStage {
+  lead
+  qualified
+  proposal
+  negotiation
+  closed_won
+  closed_lost
+}
+
+enum CrmActivityKind {
+  call
+  email
+  meeting
+  task
+  note
+}
+
+enum CrmActivityStatus {
+  pending
+  completed
+  cancelled
+}
+
+model CrmCompany {
+  id        String   @id @default(cuid())
+  name      String
+  domain    String? // website domain
+  industry  String?
+  size      String? // 1-10, 11-50, 51-200, 201-500, 500+
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts CrmContact[]
+  deals    CrmDeal[]
+
+  @@index([name])
+}
+
+model CrmContact {
+  id           String  @id @default(cuid())
+  firstName    String
+  lastName     String
+  email        String? @unique
+  phone        String?
+  title        String? // job title
+  source       String  @default("manual") // manual | import | signup | lead
+  linkedUserId String? // linked FEL User if applicable
+  linkedUser   User?   @relation("CrmContactLinkedUser", fields: [linkedUserId], references: [id], onDelete: SetNull)
+
+  companyId String?
+  company   CrmCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  ownerId String? // assigned sales rep (User.id)
+  owner   User?   @relation("CrmContactOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  tags      String? // comma-separated tags
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deals      CrmDeal[]
+  activities CrmActivity[]
+  crmNotes   CrmNote[]
+
+  @@index([ownerId])
+  @@index([companyId])
+  @@index([lastName, firstName])
+}
+
+model CrmDeal {
+  id          String       @id @default(cuid())
+  title       String
+  value       Float        @default(0) // deal value in dollars
+  stage       CrmDealStage @default(lead)
+  probability Int          @default(0) // 0-100 close probability
+  closeDate   DateTime? // expected close date
+  description String?
+
+  contactId String?
+  contact   CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  companyId String?
+  company   CrmCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  ownerId String? // assigned sales rep
+  owner   User?   @relation("CrmDealOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities CrmActivity[]
+  crmNotes   CrmNote[]
+
+  @@index([stage])
+  @@index([ownerId])
+  @@index([contactId])
+}
+
+model CrmActivity {
+  id          String            @id @default(cuid())
+  kind        CrmActivityKind   @default(task)
+  title       String
+  description String?
+  status      CrmActivityStatus @default(pending)
+  dueDate     DateTime?
+
+  contactId String?
+  contact   CrmContact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  dealId String?
+  deal   CrmDeal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  ownerId String? // assigned to
+  owner   User?   @relation("CrmActivityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([contactId])
+  @@index([dealId])
+  @@index([dueDate])
+  @@index([status])
+}
+
+model CrmNote {
+  id      String @id @default(cuid())
+  content String
+
+  contactId String?
+  contact   CrmContact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  dealId String?
+  deal   CrmDeal? @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("CrmNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contactId])
+  @@index([dealId])
+}
+
+// =========================================================================== 
+// COACH PROGRAMMING SYSTEM (FEL Train Tab)
+// Exercise library, program builder, client programming, session logging
+// ===========================================================================
+
+model ProgramExercise {
+  id       String @id @default(cuid())
+  coachId  String // Coach who created this exercise
+  // MIRROR-COACH P2 (2026-09-25/26): NAMES ARE UNIQUE PER COACH. The old FEL-wide `name @unique` meant the second coach to
+  // type "Goblet Squat" was refused (first a unique-constraint 500, then an honest 409 name_taken_fel). The swap to
+  // @@unique([coachId, name]) drops the index "ProgramExercise_name_key", which is outside the owner's additive-only GO
+  // (#16), so it waited for an explicit go: owner decision #28 (2026-09-26), applied with
+  // painfree/p2/schema-structure/held-unique-swap.sql. It is strictly looser than the old key, so it cannot fail on data.
+  // catalogueServer.ts looks a coach's own row up with findFirst and still answers name_taken_fel if a legacy key is met.
+  name     String
+  category String @default("general") // lower-body, upper-push, upper-pull, core, mobility, etc.
+
+  // Demo & cues
+  demoVideoUrl String? // URL to demo video (phase 2: replaced with avatar animation)
+  primaryCues  String[] @default([]) // Max 3 NASM-style setup/execution cues
+  commonFaults Json? // Array of { fault: string, correctionCue: string }
+
+  // Progression
+  equipment       String[] @default([])
+  defaultTempo    String   @default("3-1-1-0") // e.g. "3-1-1-0" (eccentric-pause-concentric-pause)
+  // P2 review (2026-09-26): these two comments said the opposite of what every reader does. The P1 fixture and the P2
+  // catalogue editor, Today read model and KB bridge all read regressionOfId as the EASIER version and progressionOfId
+  // as the HARDER one (Goblet Squat.regressionOfId = Box Squat).
+  progressionOfId String? // the HARDER version of this exercise (step up to): another ProgramExercise id, same coach
+  regressionOfId  String? // the EASIER version of this exercise (step down to): another ProgramExercise id, same coach
+
+  // MIRROR-COACH P2 (2026-09-25): THREE TAGS THE CATALOGUE NEVER HAD. `category` is a body region (lower-body,
+  // upper-push…), so nothing could tell a hinge from a squat, a set-and-hold lift from a reactive cut, or which of the
+  // owner's Playbook layers an exercise trains — the warm-up generator (P6), the weekly pattern-coverage check (P8)
+  // and the roster's "stuck on" strip all key on these. All three are NULLABLE and default to nothing: null means
+  // "untagged", which is the honest state of every row that exists today (a default of `other`/`none` would claim a
+  // coach had tagged it). The skill-layer ids live in lib/coach/taxonomy.ts, taken from the Playbook's own chapters.
+  pattern    MovementPattern?
+  braceMode  BraceMode?
+  skillLayer String? // lib/coach/taxonomy.ts SKILL_LAYERS id; validated there, a String so the list can grow without a push
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sessionExercises SessionExercise[]
+
+  @@unique([coachId, name])
+  @@index([coachId])
+  @@index([category])
+}
+
+/// MIRROR-COACH P2 (2026-09-25): the movement pattern an exercise trains. `breath` and `mobility` are here because
+/// the prep and cool-down sections are prescribed from the same catalogue; `other` is a coach's explicit choice,
+/// distinct from null (never tagged).
+enum MovementPattern {
+  squat
+  hinge
+  lunge
+  push
+  pull
+  carry
+  rotation
+  locomotion
+  breath
+  mobility
+  other
+}
+
+/// MIRROR-COACH P2 (2026-09-25): how the trunk is braced for this exercise. `set` = a planned brace you build
+/// before the rep (a lift); `reflex` = the brace that has to show up on its own mid-play (a cut, a landing);
+/// `none` = no brace asked for (a breath drill, an easy mobility flow).
+enum BraceMode {
+  set
+  reflex
+  none
+}
+
+model CoachingProgram {
+  id       String @id @default(cuid())
+  coachId  String
+  clientId String
+
+  name          String
+  startDate     DateTime
+  durationWeeks Int      @default(4)
+
+  // Blocks (e.g. "Week 1", "Accumulation Phase")
+  blocks Block[]
+
+  // Metadata
+  isActive    Boolean   @default(true)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  clientSessions ClientSession[]
+  messages       ProgramMessage[] // coach ↔ client thread (SPEC-PASSION-PIPELINES lane 1, C3)
+
+  @@index([coachId])
+  @@index([clientId])
+  @@index([isActive])
+}
+
+model Block {
+  id        String          @id @default(cuid())
+  programId String
+  program   CoachingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  order      Int // 1, 2, 3...
+  label      String // "Week 1", "Accumulation", etc.
+  targetDate DateTime? // Camp Blueprint: a milestone's target date
+
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([programId])
+}
+
+model Session {
+  id      String @id @default(cuid())
+  blockId String
+  block   Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  order Int // 1, 2, 3... within block
+  label String // "Day 1 — Lower Push", "Session A", etc.
+
+  // MIRROR-COACH P6 (2026-09-29): AN OFF DAY WAS A BLANK. A week of three sessions had four days nothing said anything
+  // about, and a coach who wanted an easy walk, some mobility and a long-exhale breath on one of them had no way to
+  // write it as anything but another training session (crossref: "no 'recovery day' session type"). `recovery` is
+  // FEL's off-day session (lib/coach/offDay.ts: 15–20 easy minutes, walk + mobility + breath), logged like any other
+  // coached session, so P9's PRQ recovery can count the completed ones by this column. Additive and defaulted: every
+  // existing session reads `training`, exactly what it was.
+  kind SessionKind @default(training)
+
+  exercises      SessionExercise[]
+  clientSessions ClientSession[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([blockId])
+}
+
+model SessionExercise {
+  id        String  @id @default(cuid())
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   ProgramExercise @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  order       Int // 1, 2, 3... within session
+  sets        Int    @default(3)
+  reps        String @default("8-10") // Can be "10", "8-10", "3x10", etc.
+  load        String @default("RPE7") // "225 lbs", "%85 1RM", "RPE7", etc.
+  tempo       String @default("3-1-1-0")
+  restSeconds Int    @default(90)
+
+  coachNote String? // Coach's override cue for this client/session
+
+  // MIRROR-COACH P2 (2026-09-25): A SESSION HAD NO SHAPE. Session held an order and a label and nothing else, so a
+  // warm-up, the main lift, the accessories and a wind-down were one flat list, and a 30-second hold had to be typed
+  // into `reps` as "30 seconds each side" (lib/coach/mirrorToProgram.ts). All additive, all defaulted: every
+  // existing row reads as a plain `key`-section exercise with no timer, no group and no band — exactly what it was.
+  section       SessionSection @default(key)
+  isKeySet      Boolean        @default(false) // the one set the session is built around; the ramp-up sets + breath attach here (P7)
+  supersetGroup String? // exercises sharing a label ("A", "B") alternate set for set; null = done on its own
+  workSeconds   Int? // a timed dose: seconds of work per set (a carry, a flow). null = counted in reps
+  holdSeconds   Int? // seconds held at the end of each rep/set (an end-range hold). null = no hold
+  setupCues     String[]       @default([]) // ids from lib/coach/taxonomy.ts SETUP_CUES (a pick-list, not free text)
+  effortBand    String? // lib/coach/taxonomy.ts EFFORT_BANDS id (FEL's five named bands); null = not set
+
+  exerciseLogs ExerciseLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([exerciseId])
+}
+
+/// MIRROR-COACH P2 (2026-09-25): where an exercise sits in the session, in running order.
+enum SessionSection {
+  prep
+  prime
+  key
+  assist
+  finish
+  cooldown
+}
+
+/// MIRROR-COACH P6 (2026-09-29): what a session is for. `training` = every session written before this (and the
+/// default); `recovery` = FEL's off day (lib/coach/offDay.ts), 15–20 low-intensity minutes.
+enum SessionKind {
+  training
+  recovery
+}
+
+model ClientSession {
+  id        String          @id @default(cuid())
+  programId String
+  program   CoachingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  sessionId String
+  session   Session @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  clientId String
+
+  completedAt    DateTime?
+  // MIRROR-COACH P6 (2026-09-29): when the client tapped "done" on Today's automatic cool-down for this session (the
+  // one Today adds after the last item when the coach wrote no Cool-down section — lib/coach/cooldown.ts). null = not
+  // done, or the coach wrote their own cool-down (that one is logged like any exercise). P9's PRQ recovery counts it;
+  // nothing scores, pays or streaks on it here. Additive, nullable.
+  cooldownDoneAt DateTime?
+  exerciseLogs   ExerciseLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([programId, sessionId, clientId, createdAt])
+  @@index([programId])
+  @@index([sessionId])
+  @@index([clientId])
+  @@index([completedAt])
+}
+
+model ExerciseLog {
+  id              String        @id @default(cuid())
+  clientSessionId String
+  clientSession   ClientSession @relation(fields: [clientSessionId], references: [id], onDelete: Cascade)
+
+  sessionExerciseId String
+  sessionExercise   SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Restrict)
+
+  actualSets     Int?
+  actualReps     String? // "10", "8,9,10", etc.
+  actualLoad     String? // What they actually lifted
+  rpe            Int? // Rate of Perceived Exertion (1-10)
+  clientNote     String? // Client's notes (felt weird, form breakdown, etc.)
+  videoUrl       String? // lane 1 C2: a form video the client attached to this log (http(s) only, validated in lib/coach/loop.ts)
+  coachComment   String? // lane 1 C3: the coach's review of this log
+  coachCommentAt DateTime?
+
+  completedAt      DateTime?
+  // MIRROR-COACH P8 FIX (2026-09-30): what the athlete did on a slot the protocol gate swapped for its ladder's easier
+  // step — that step's ProgramExercise id (lib/coach/todayServer.ts servedOnSlots, server-checked). null = done as
+  // written, or a slot the gate never decides. The coach's inbox names it ("Did X in place of Y"), so a logged easier
+  // step is never read as the jump. No relation (the ladder links are bare ids too). Additive, nullable.
+  servedExerciseId String?
+
+  setLogs SetLog[] // MIRROR-COACH P2: per-set rows; the fields above stay as the per-exercise summary
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientSessionId])
+  @@index([sessionExerciseId])
+}
+
+/// MIRROR-COACH P2 (2026-09-25): ONE ROW PER SET. ExerciseLog was one row per exercise with reps as free text
+/// ("8,9,10") and load as free text that mixed kilograms with "RPE7", so no progress line could be drawn and no
+/// reps-in-reserve could be kept. Here the weight and the effort are separate numbers. ExerciseLog keeps every field
+/// it had (old clients and the coach review read them). (exerciseLogId, setIndex) is unique so a re-save of set 2
+/// replaces set 2 instead of adding a second one.
+model SetLog {
+  id            String      @id @default(cuid())
+  exerciseLogId String
+  exerciseLog   ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+  setIndex      Int // 0-based, in the order the sets were done
+  reps          Int?
+  weightKg      Float? // absolute load; null for bodyweight / timed work
+  rir           Int? // reps in reserve (0 = nothing left)
+  effort        Int? // RPE 1-10
+  workSeconds   Int? // timed sets: seconds actually worked
+  note          String?
+  createdAt     DateTime    @default(now())
+
+  // (no separate @@index([exerciseLogId]): the unique index leads with it, and Postgres uses it for every lookup by
+  // log and for the cascade — P2 review, 2026-09-26: two indexes would be paid for on every set write)
+  @@unique([exerciseLogId, setIndex])
+}
+
+/// lane 1 C3 — the coach ↔ client thread on a program (both sides write; read by both).
+model ProgramMessage {
+  id        String          @id @default(cuid())
+  programId String
+  program   CoachingProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  authorId  String
+  body      String
+  createdAt DateTime        @default(now())
+  readAt    DateTime?
+
+  @@index([programId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CAMP BLUEPRINT — Education pillar: Mentorship (2026-09-03, ship pass Phase 7)
+// Layered on what exists: a GoalPlan's milestones are a CoachingProgram's
+// Blocks, a CampSession's outcomes live in a ClientSession, the Facilitator
+// Card is a CreatorCard with kind='facilitator'. Nothing existing changes
+// shape (two nullable/defaulted columns added above). Owner decisions in
+// PHASE2_BENCHMARK_LOCKS.md "ship pass".
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum CertificationStatus {
+  none
+  in_progress
+  certified
+  revoked
+}
+
+model FacilitatorProfile {
+  id                  String              @id @default(cuid())
+  userId              String              @unique
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificationStatus CertificationStatus @default(none)
+  curriculumVersion   String? // the curriculum the credential was earned on
+  certifiedAt         DateTime?
+  revokedAt           DateTime?
+  revokedReason       String?
+  facilitatorCardId   String? // CreatorCard.id with kind='facilitator'
+  bio                 String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  goalPlans           GoalPlan[]
+  campSessions        CampSession[]
+  templates           CampTemplate[]
+
+  @@index([certificationStatus])
+}
+
+/// One graded attempt at a curriculum module's assessment. Certification is
+/// auto-graded: every required module ≥ passMark (80) → certified; the owner
+/// keeps a revoke switch on FacilitatorProfile.
+model Credential {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trackKey          String
+  moduleKey         String
+  curriculumVersion String
+  score             Int // 0..100
+  passMark          Int      @default(80)
+  passed            Boolean
+  answers           Json // [{ questionKey, chosen, correct }]
+  earnedAt          DateTime @default(now())
+
+  @@index([userId, trackKey, moduleKey])
+  @@index([userId, passed])
+}
+
+/// Mentees may be minors (owner decision): intake records a birth year and
+/// guardian consent; a GoalPlan cannot go active without an accepted consent
+/// when the mentee is under 18.
+model GuardianConsent {
+  id              String    @id @default(cuid())
+  menteeId        String
+  mentee          User      @relation("ConsentMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+  guardianName    String
+  guardianEmail   String
+  menteeBirthYear Int
+  token           String    @unique // emailed acceptance token
+  requestedAt     DateTime  @default(now())
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  // MIRROR-COACH P6 (2026-09-29), both additive. selfRequested: the mentee asked for this themselves (the "Ask a
+  // parent or guardian" screen), set by the SERVER from who made the request, never from the request body — so the
+  // minor, who holds this link, cannot opt their own request out of the stricter accept (app/api/v1/camp/consent).
+  // false = a facilitator asked (coach-managed camp flow, accepted exactly as before), and every row written before
+  // this column existed. acceptedById: the signed-in account that said yes to a self-requested consent; null for camp
+  // accepts (unchanged) and for anything accepted before this column. A plain id, no relation: FEL has no account
+  // delete path today, and a relation would add a field to User for a value nothing reads back by join.
+  selfRequested   Boolean   @default(false)
+  acceptedById    String?
+
+  @@index([menteeId])
+}
+
+enum GoalPlanStatus {
+  draft
+  locked
+  active
+  done
+  abandoned
+}
+
+/// "What do you want to be when you grow up" → a locked goal, a milestone
+/// timeline (Blocks on a CoachingProgram), and the curriculum modules it draws on.
+model GoalPlan {
+  id                 String             @id @default(cuid())
+  menteeId           String
+  mentee             User               @relation("GoalPlanMentee", fields: [menteeId], references: [id], onDelete: Cascade)
+  facilitatorUserId  String
+  facilitator        User               @relation("GoalPlanFacilitator", fields: [facilitatorUserId], references: [id], onDelete: Restrict)
+  facilitatorId      String
+  facilitatorProfile FacilitatorProfile @relation(fields: [facilitatorId], references: [id], onDelete: Restrict)
+  goalText           String
+  tags               String[]           @default([])
+  status             GoalPlanStatus     @default(draft)
+  programId          String? // CoachingProgram.id — the milestone timeline
+  linkedModuleKeys   String[]           @default([]) // "trackKey/moduleKey"
+  curriculumVersion  String
+  templateId         String? // CampTemplate this plan was instantiated from
+  pathwayMap         Json? // the six-field Pathway Map Protocol worksheet, filled with the mentee (Camp Blueprint)
+  lockedAt           DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  sessions           CampSession[]
+
+  @@index([menteeId])
+  @@index([facilitatorId])
+  @@index([status])
+}
+
+/// One facilitated session. Outcomes: modules covered, game sessions played,
+/// PRQ + movement deltas (cached from PrqEntry / WorkoutScan), the resiliency
+/// log (owner decision: retry rate after failed attempts).
+model CampSession {
+  id                 String             @id @default(cuid())
+  goalPlanId         String
+  goalPlan           GoalPlan           @relation(fields: [goalPlanId], references: [id], onDelete: Cascade)
+  facilitatorId      String
+  facilitatorProfile FacilitatorProfile @relation(fields: [facilitatorId], references: [id], onDelete: Restrict)
+  menteeId           String
+  date               DateTime           @default(now())
+  clientSessionId    String? // ClientSession.id — exercise outcomes
+  moduleKeys         String[]           @default([])
+  gameSessionIds     String[]           @default([])
+  prqDelta           Json? // { attribute: delta } since the previous camp session
+  movementDelta      Json? // pillar deltas between the two nearest WorkoutScans
+  resiliency         Json? // { attempts, failures, retriesAfterFail, retryRate, returnedAfterLoss }
+  notes              String?
+  createdAt          DateTime           @default(now())
+
+  @@index([goalPlanId])
+  @@index([facilitatorId])
+  @@index([menteeId, date])
+}
+
+/// A facilitator's replicable program: blocks of sessions, each naming the
+/// curriculum modules and the game mode. Versioned against the curriculum so a
+/// template built on one curriculum never silently imports into another.
+model CampTemplate {
+  id                String             @id @default(cuid())
+  authorId          String
+  author            FacilitatorProfile @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  version           Int                @default(1)
+  curriculumVersion String
+  forkedFromId      String?
+  structure         Json // { blocks: [{ label, pacingDays, sessions: [{ label, moduleKeys, modeKey }] }] }
+  published         Boolean            @default(false)
+  uses              Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([authorId])
+  @@index([published])
+}
+
+/// A Neuromechanic Mirror session — the summary the overlay already computes and, until
+/// 2026-09-12, discarded when the tab closed. Persisting it is what turns a live coaching toy
+/// into a training record: reps, tempo, time-in-stable per zone and fault counts over time.
+/// Free tier writes and reads its own recent sessions; trends across history are FEL Pro.
+model MirrorSession {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patternId      String
+  startedAt      DateTime
+  durationMs     Int
+  reps           Int      @default(0)
+  /// Average tempo across completed reps, ms. Null before the first rep.
+  avgTempoMs     Int?
+  /// Rolling average per-frame engine+pose processing time — a quality signal for the capture.
+  avgFrameMs     Float    @default(0)
+  /// Real accumulated ms each zone spent estimated-stable. Zone-keyed.
+  timeInStableMs Json
+  /// Real count of transitions INTO an estimated-fault state. Zone-keyed.
+  faultCounts    Json
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, patternId, createdAt])
+}
+
+// ===========================================================================
+// HEALTH INTAKE + PAIN LOOP (MIRROR-COACH P5, 2026-09-29)
+//
+// PHASE-5 CONTRACT — these three model names and shapes are the contract the rest of the pass codes against
+// (lib/health/painRule.ts's `decide()`, lib/health/intake.ts's question set, the /api/health/intake route, and
+// whatever mounts the pain check-in UI in a later step of this same phase). Additive only: three new models, three
+// new array relations on User (above). Nothing existing changes shape.
+//
+// Owner decisions #4/#5/#6/#15/#17/#20 (DECISIONS.md, DECISIONS-2.md): opt-in consent before ANY of this is stored;
+// FEL keeps every threshold and every line of pain copy in one reviewable module because there is no clinician
+// review (decision #15 — conservative by construction, not by audit); a coach reads a client's health data only with
+// that client's own coach_view consent; none of it is ever scored, rewarded, or sold; a blank birth year reads as a
+// minor (decision #20) until the intake answers it.
+// ===========================================================================
+
+/// One pre-participation intake, dated and versioned. `answers` is keyed by lib/health/intake.ts's question ids
+/// (INTAKE_QUESTIONS) — FEL's own plain-words questions, never the book's. `redFlags` is the SAME ids, filtered down
+/// by lib/health/intake.ts's `redFlagsFor()`: pure and derived from `answers`, but stored rather than recomputed on
+/// every read, because a later change to which questions count as red flags must never silently reinterpret an
+/// intake someone already consented to and was gated by.
+///
+/// A non-empty `redFlags` hard-stops the Mirror, pain check-ins and training features (lib/health/intake.ts's
+/// `isHardStopped`) until `clearedAt` — a SELF-ATTESTED, dated "I checked with a clinician" tick, never a diagnosis
+/// and never verified by FEL. `birthYear` mirrors what this intake wrote to `User.dobYear` (only when that field was
+/// blank — decision #20: an existing `dobYear` is never overwritten by an intake). Re-asked yearly: a stale
+/// `version` (lib/health/intake.ts's `INTAKE_VERSION`) or a `createdAt` over a year old means the gate asks again
+/// (`needsIntake()`), so a changed question set or a birthday into adulthood is never stuck on a year-old answer.
+model HealthIntake {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// lib/health/intake.ts INTAKE_VERSION at the time this was answered.
+  version     String
+  /// { [questionId]: boolean | number | null }, keyed by INTAKE_QUESTIONS ids. FEL's own questions, never the book's.
+  answers     Json
+  /// Question ids whose answer read as a red flag at submission time (see the model doc above for why this is
+  /// stored, not recomputed).
+  redFlags    String[]
+  /// Written by the intake when User.dobYear was blank (decision #20). Null when the athlete declined ("prefer not
+  /// to say") — which reads as a minor, same as never having answered.
+  birthYear   Int?
+  /// When the opt-in health-data consent (HealthConsent, scope 'health_data') was given for THIS intake. Required:
+  /// an intake is never stored without it (owner decision #4).
+  consentedAt DateTime
+  /// Self-attested, dated clearance after a red-flag stop. Null = still stopped, if redFlags is non-empty.
+  clearedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// One pain check-in — during/after an exercise, or the next-morning follow-up on one. `decision` is the exact
+/// string lib/health/painRule.ts's `decide()` returned for this row, stored (not recomputed) for the same reason
+/// HealthIntake.redFlags is: the rule is allowed to change later, and a row must keep saying what the athlete was
+/// actually told at the time. Never scored, never touches PRQ or any rewarded number (owner decision #4/#12) and
+/// never rides along in a share link (lib/share/screen.ts's leak checks cover WorkoutScan/ShareLink payloads, not
+/// this table — this table is simply never read by anything that builds one).
+model PainCheckIn {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The ProgramExercise this check-in is about, when it came from a coached session. Null for a Mirror-side or
+  /// unprescribed exercise, where only the free-text name below is known.
+  programExerciseId String?
+  /// Always present, even when programExerciseId is set — the display name at check-in time, so history reads even
+  /// if the exercise is later renamed or removed from a coach's catalogue.
+  exerciseName      String
+  /// A fixed id from lib/health/painRule.ts BODY_AREAS — never free text, so the rule and any future reporting can
+  /// group on it.
+  bodyArea          String
+  /// 0–10.
+  score             Int
+  /// during | after | next_morning — which point in lib/health/painRule.ts's decision this row is.
+  kind              String
+  /// Acute-event ids from lib/health/painRule.ts ACUTE_EVENTS present in this check-in (a pop, sudden swelling,
+  /// giving way, pain after a fall/impact). Usually empty.
+  acute             String[]
+  /// Optional free text. Never read by decide() — the rule runs on the fixed fields only, so a coach or a later
+  /// reviewer can't accidentally depend on prose no rule actually used.
+  note              String?
+  /// The exact PainDecision id lib/health/painRule.ts returned for this row at submission time.
+  decision          String
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Opt-in consent for health data, scoped separately from the app's general ToS/Privacy acceptance
+/// (User.policyVersion/policyAcceptedAt) because this data gets its own export/erase path and its own rule: never
+/// sold, never used for ads, never in a share link. Two scopes: 'health_data' (the athlete consenting to FEL storing
+/// their own intake/pain-check-in data at all — required before either HealthIntake or PainCheckIn can be written)
+/// and 'coach_view' (that specific athlete additionally letting a named coach read it — scoped to `coachId`, not a
+/// blanket "my coach can see everything"). `revokedAt` null = currently granted; a revoked row survives so consent
+/// history is auditable, it is never deleted out from under the record.
+model HealthConsent {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'health_data' | 'coach_view'.
+  scope     String
+  /// Set only for scope 'coach_view' — the one coach this grant is for.
+  coachId   String?
+  grantedAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId, scope])
+}
+
+/// AB-04 (2026-10-03, Elijah): one row per account for saving movement NUMBERS.
+/// Scope `jump_numbers` is the only scope. It covers jump numbers, Prove It, and
+/// re-screen history together — not three consents. `granted` defaults false.
+/// `revokedAt` set means withdrawn; the row stays so the withdrawal has a time.
+/// Video, images, and pose frames are never stored under this grant.
+///
+/// `coachShares` is the per-booking "Share with my coach" list, JSON so this
+/// lane does not add columns to SessionBooking (that table is read on the
+/// sessions page; a missing column there would 500 a deploy that raced the SQL).
+/// Each entry is `{ bookingId, coachId, sharedAt, withdrawnAt }`. A withdrawn
+/// entry stays. COACH-STORE-V1 should call `adultOptedInAndSharedWithCoach`
+/// (lib/privacy/coachShare.ts) rather than reading this JSON itself.
+model ScanSaveOptIn {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'jump_numbers' — jump numbers, Prove It, and re-screen history.
+  scope              String    @default("jump_numbers")
+  granted            Boolean   @default(false)
+  grantedAt          DateTime?
+  revokedAt          DateTime?
+  consentTextVersion String
+  /// Per-booking coach shares. Null means none. See the model note.
+  coachShares        Json?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId, scope])
+}
+
+/// MIRROR-COACH P6 (2026-09-29): the unscored daily readiness check-in — four tap scales on Today before a session,
+/// every one optional, the whole card skippable (lib/health/readiness.ts; owner decision #12). A NEW table rather than
+/// P5's: PainCheckIn needs an exercise, a body area, a 0–10 score and a stored rule decision, and none of those exist
+/// here — squeezing this into it would mean fake values in required columns.
+///
+/// Health-adjacent data under P5's rules: written only with a live 'health_data' HealthConsent (and, for a minor, an
+/// accepted guardian consent — the same gate as a pain check-in), exported and erased with the rest of the health
+/// data (lib/prq-data-rights.ts), readable by a coach only with that client's live 'coach_view' grant, never in a
+/// share link, and NEVER read by anything that scores, pays, ranks or keeps a streak (lib/health/readiness-never-scored
+/// .test.ts walks the source tree for that). It only lengthens today's warm-up and suggests an easier day.
+///
+/// ONE ROW PER ATHLETE PER DAY, editable that day: the route upserts on (userId, date), so a second answer the same
+/// day edits the first instead of adding a row, and a day that is no longer "today" anywhere on Earth cannot be written.
+model ReadinessCheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// The athlete's OWN calendar day, 'YYYY-MM-DD' in their local time zone (the device sends it; the route accepts
+  /// only a day that is currently "today" in some time zone, UTC-12 to UTC+14). A string, not a DateTime: a check-in
+  /// belongs to a day, not an instant, and a Date at UTC midnight reads as the previous day west of Greenwich.
+  date      String
+  /// 1 (rough night) to 5 (great night). Null = not answered.
+  sleep     Int?
+  /// 1 (not sore at all) to 5 (very sore) — the natural direction for the word, so a coach or an export reads it
+  /// without a legend. lib/health/readiness.ts turns it around internally. Null = not answered.
+  soreness  Int?
+  /// 1 (drained) to 5 (charged). Null = not answered.
+  energy    Int?
+  /// 1 (low) to 5 (great). Null = not answered.
+  mood      Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
+/// MIRROR-COACH P7 (2026-09-29): one row per use of a breath from FEL's breath toolbox. Today it holds kind 'ramp' —
+/// the adults-only Dial-Up Breath before a session's flagged key set (lib/breath/rampGate.ts), written by
+/// POST /api/breath/ramp at the moment the athlete starts it, and counted against FEL's own weekly limit
+/// (RAMP_LIMIT). A NEW table rather than a column on P5/P6's: a use is not an intake answer, a pain reading or a daily
+/// check-in, and the limit needs a row per use with its time.
+///
+/// It stores no health answer — only that a breath was used, for which coached session, and when. It is still in the
+/// export and in both erases (lib/prq-data-rights.ts), because the ramp kind is only ever written behind the health
+/// gates. NEVER read by anything that scores, pays, ranks or keeps a streak (lib/breath/ramp-never-scored.test.ts).
+/// `seconds` is for a kind that logs time (phase 9 may count breath minutes toward recovery, owner decision #12); a
+/// ramp use leaves it null.
+model BreathLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 'ramp' (lib/breath/rampGate.ts BREATH_LOG_KINDS). A string, not an enum, so a new breath kind is a code change
+  /// and never a schema change.
+  kind      String
+  /// The coached Session (Session.id) the breath was for, when it was for one — how "one key set per session" is
+  /// held. No foreign key on purpose: a coach deleting the session must not erase, or fail on, the athlete's record.
+  sessionId String?
+  /// Seconds breathed, for a kind that logs time. Null for 'ramp'.
+  seconds   Int?
+  createdAt DateTime @default(now())
+
+  @@index([userId, kind, createdAt])
+}
+
+// ===========================================================================
+// TRAINER SHARING — a coach texts programming to a client (lib/share/).
+// Free between a trainer and their own clients; selling to strangers is the
+// store (lib/store/) and is the only path that takes a platform cut.
+// ===========================================================================
+
+/// One shared thing at one unguessable URL.
+///
+/// The URL is the entire access control (a text gets forwarded — see
+/// lib/share/shareable.ts), so `token` is 192 bits of randomness and is the
+/// only lookup key. The payload is a built Share and carries content only,
+/// never a client's PRQ, scans or id; `assertNoAthleteData` enforces that
+/// before anything is written here.
+model ShareLink {
+  id      String  @id @default(cuid())
+  /// base64url, 32 chars. Unique, unguessable, never derived from the content.
+  token   String  @unique
+  coachId String
+  coach   User    @relation("CoachShares", fields: [coachId], references: [id], onDelete: Cascade)
+  /// program | drill | recommendation | selection
+  kind    String
+  /// The built Share object. Screened and leak-checked before it lands here.
+  /// Nullable because revoking CLEARS it — a revoked link has no content, not
+  /// content behind a flag.
+  payload Json?
+  /// Shown in the trainer's own list so they can tell two links apart.
+  title   String
+  /// Optional first name the trainer typed. The only personal data a share carries.
+  forName String?
+
+  /// Revocation NULLS `payload` rather than setting a flag: the content is
+  /// genuinely unreadable afterwards, including to a render path that forgot
+  /// to check a boolean. The row survives so the trainer keeps their history.
+  revokedAt DateTime?
+  /// Optional self-destruct for a capability URL. Null means no expiry.
+  expiresAt DateTime?
+
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([coachId, createdAt])
+  @@index([revokedAt])
+}
+
+/// A coach's invite link. Until this existed there was NO way to add a client: the roster
+/// was derived from existing programs, so a client did not exist until the coach had already
+/// built them one. An invite is a capability URL and follows ShareLink's rules — unguessable,
+/// revocable, expiring, and carrying nothing about anybody except the coach who made it.
+model CoachInvite {
+  id        String    @id @default(cuid())
+  /// base64url, 32 chars. Unguessable, never derived from the coach or the client.
+  token     String    @unique
+  coachId   String
+  coach     User      @relation("CoachInvites", fields: [coachId], references: [id], onDelete: Cascade)
+  /// once | many — a texted link dies when it is used, a flyer link keeps working.
+  use       String    @default("once")
+  /// Set when a one-shot has been spent or the coach revoked it. A closed invite stops resolving.
+  closedAt  DateTime?
+  expiresAt DateTime
+  /// How many clients joined through it — a flyer's own analytics.
+  joined    Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([coachId, createdAt])
+}
+
+/// The coach-client relationship itself, which the tree never had: the roster was inferred from
+/// CoachingProgram rows. A client belongs to a coach from the moment they accept an invite,
+/// before any programming exists — which is the right way round, because you write the program
+/// for somebody who is already there.
+model CoachClient {
+  id           String             @id @default(cuid())
+  coachId      String
+  coach        User               @relation("CoachOf", fields: [coachId], references: [id], onDelete: Cascade)
+  clientId     String
+  client       User               @relation("ClientOf", fields: [clientId], references: [id], onDelete: Cascade)
+  /// How they got here, for the coach's own history: invite | manual.
+  via          String             @default("invite")
+  /// Set when the relationship ends; the row survives so neither side loses the history.
+  endedAt      DateTime?
+  createdAt    DateTime           @default(now())
+  availability CoachAvailability?
+
+  @@unique([coachId, clientId])
+  @@index([clientId])
+}
+
+/// Coach <-> athlete availability: one row while the athlete is Limited or Out. Full is no row. No free text, by design.
+model CoachAvailability {
+  coachId  String
+  clientId String
+  /// 'limited' | 'out'.
+  status   String
+  /// Expected return day 'YYYY-MM-DD', or null.
+  returnBy String?
+  setAt    DateTime    @default(now())
+  link     CoachClient @relation(fields: [coachId, clientId], references: [coachId, clientId], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([coachId, clientId])
+  @@index([clientId])
+}
+
+// ===========================================================================
+// COACH-STORE-V1. New tables only. User ids are plain strings (no relation),
+// like SessionJoinLink, so User is untouched. Nothing here is applied to
+// production by the lane: prisma/pending/ holds the SQL for Elijah's yes.
+// ===========================================================================
+
+/// Coach storefront profile and the hours he sells. One row per coach.
+model Instructor {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  slug                   String   @unique
+  displayName            String
+  headline               String?
+  bio                    String?
+  certifications         String[] @default([])
+  specialties            String[] @default([])
+  affiliationLine        String?
+  creatorCardId          String?
+  timeZone               String   @default("America/Los_Angeles")
+  weeklyHours            Json     @default("[]")
+  blackoutDates          Json     @default("[]")
+  bufferMinutes          Int      @default(15)
+  minNoticeHours         Int      @default(12)
+  maxDaysAhead           Int      @default(28)
+  /// Elijah, 6:03 PM PT: reviews are promised within 48 hours. A dashboard setting, not a hardcoded promise.
+  reviewSlaHours         Int      @default(48)
+  /// Free cancel/reschedule window before start, in hours. Dashboard setting (default 24).
+  clientFullRefundHours  Int      @default(24)
+  /// CA refund window in business days. Null until set. No default address and no default ruling.
+  refundBusinessDays     Int?
+  /// Shown on the store only when set. Never a home address.
+  businessMailingAddress String?
+  published              Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  programAccess ProgramAccess[]
+  bookings      Booking[]
+}
+
+/// A buyer's access to a program, the adult membership, or a parent-bought teen code.
+model ProgramAccess {
+  id                    String     @id @default(cuid())
+  userId                String
+  instructorId          String
+  instructor            Instructor @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  listingId             String
+  lane                  String
+  billing               String
+  /// lane | all | teen_all
+  scope                 String     @default("lane")
+  /// self | teen
+  beneficiary           String     @default("self")
+  status                String     @default("PENDING")
+  priceCents            Int
+  platformFeeCents      Int        @default(0)
+  stripeFeeCents        Int        @default(0)
+  reviewCredits         Int        @default(0)
+  lastCreditInvoiceId   String?
+  stripeCheckoutId      String?    @unique
+  stripeSubscriptionId  String?    @unique
+  stripePaymentIntentId String?    @unique
+  accessUntil           DateTime?
+  cancelAtPeriodEnd     Boolean    @default(false)
+  coachingProgramId     String?
+  startedAt             DateTime?
+  nextRescreenAt        DateTime?
+  unlockCodeHash        String?    @unique
+  deviceTokenHash       String?
+  codeActive            Boolean    @default(true)
+  redeemedAt            DateTime?
+  reissueCount          Int        @default(0)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@unique([userId, listingId, beneficiary])
+  @@index([instructorId, status])
+  @@index([unlockCodeHash])
+}
+
+/// One paid unit of the coach's time: a live 1:1 or an async video review.
+model Booking {
+  id                    String     @id @default(cuid())
+  kind                  String
+  instructorId          String
+  instructor            Instructor @relation(fields: [instructorId], references: [id], onDelete: Restrict)
+  coachUserId           String
+  clientUserId          String
+  listingId             String
+  status                String     @default("HELD")
+  durationMin           Int?
+  priceCents            Int
+  platformFeeCents      Int        @default(0)
+  stripeFeeCents        Int        @default(0)
+  refundCents           Int        @default(0)
+  stripeCheckoutId      String?    @unique
+  stripePaymentIntentId String?    @unique
+  holdExpiresAt         DateTime?
+  startsAt              DateTime?
+  endsAt                DateTime?
+  slotLock              String?    @unique
+  clientTimeZone        String?
+  clientNote            String?
+  reschedulesUsed       Int        @default(0)
+  connectionFailedAt    DateTime?
+  failureCreditOpen     Boolean    @default(false)
+  shareWithCoach        Boolean    @default(false)
+  goal                  String?
+  painYes               Boolean?
+  reviewNote            String?
+  clipPaths             Json?
+  clipConsentAt         DateTime?
+  consentTextVersion    String?
+  submittedAt           DateTime?
+  dueAt                 DateTime?
+  replyText             String?
+  replyClipPath         String?
+  attachedDrillIds      Json?
+  deliveredAt           DateTime?
+  originalClipDeleteAt  DateTime?
+  originalsDeletedAt    DateTime?
+  cancelledAt           DateTime?
+  cancelledBy           String?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  signals CallSignal[]
+
+  @@index([coachUserId, startsAt])
+  @@index([clientUserId, createdAt])
+  @@index([status, holdExpiresAt])
+  @@index([kind, status, dueAt])
+  @@index([originalClipDeleteAt])
+}
+
+/// Short-lived WebRTC handshake rows. The app sweeps expired ones. That is the only delete in this lane.
+model CallSignal {
+  id        Int      @id @default(autoincrement())
+  bookingId String
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  fromRole  String
+  epoch     Int      @default(0)
+  kind      String
+  payload   String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([bookingId, id])
+  @@index([expiresAt])
+}
+
+/// Referral cut on a coach-store sale, paid out of FEL's 15% fee. The ledger has no referral account, so this table holds it.
+model CoachStoreReferral {
+  id               String   @id @default(cuid())
+  paymentKey       String   @unique
+  referrerUserId   String
+  buyerUserId      String
+  coachUserId      String
+  sourceKind       String
+  sourceId         String
+  grossCents       Int
+  platformFeeCents Int
+  shareOfFee       Float
+  cutCents         Int
+  renewalIndex     Int      @default(0)
+  status           String   @default("PENDING")
+  holdUntil        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([referrerUserId, status])
+  @@index([buyerUserId])
+  @@index([holdUntil])
+}
+
+/// ADVENTURE PHASE B (2026-10-07): one row per account, the Adventure's save document as JSON (save/save.ts).
+/// Matches the live table from prisma/pending/2026-10-07-adventure-save.sql (applied by the owner). Verified adults only;
+/// the route must refuse teen / unknown-age uploads (save/policy.ts adventureSavePolicy).
+model AdventureSave {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  version   Int
+  doc       Json
+  updatedAt DateTime @default(now())
+}
+
+/// RATE-LIMIT-WIRE (PR #289 rebuilt on release, 2026-10-23): one counting window of one rate-limit bucket, shared by every
+/// server instance. "bucket" is "<route>:<kind>:<HMAC>" (lib/rate-limits/store.ts), so no email, address or account id is
+/// stored in the clear. The table arrives with prisma/pending/2026-10-16-rate-limits.sql; the code writes it with raw SQL
+/// and fails open (logs, lets the request through) while the table is missing.
+model RateLimit {
+  bucket  String   @id
+  hits    Int
+  resetAt DateTime @map("reset_at") @db.Timestamp(3)
+
+  @@index([resetAt], map: "rate_limits_reset_at_idx")
+  @@map("rate_limits")
+}

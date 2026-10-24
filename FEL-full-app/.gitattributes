@@ -14,3 +14,7 @@
 # Marking it generated keeps the remaining churn out of diffs and reviews. It stays tracked.
 public/_prisma/client/** -diff linguist-generated=true
 public/_prisma/client/*.node binary
+# PRISMA-PUBLIC step 1 (2026-10-24): the parallel client that will replace public/_prisma/client (docs/PRISMA-PUBLIC-PLAN.md).
+# Same artifact, same attributes. It targets debian-openssl-3.0.x only (no `native`), so it does not go dirty per machine.
+lib/generated/prisma/** -diff linguist-generated=true
+lib/generated/prisma/*.node binary
