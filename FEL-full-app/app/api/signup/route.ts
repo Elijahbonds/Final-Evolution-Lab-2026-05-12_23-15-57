@@ -12,7 +12,9 @@ import { findGuestSession, guestIdFrom } from '@/lib/guestSession';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
 import { sendWelcomeEmail } from '@/lib/marketing/email';
 import { isUnreachable } from '@/lib/db/errors';
-import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { AGE_BLOCK_COOKIE, AGE_INVALID, ageBlockCookieHeader, ageScreenOutcome, postedBirthDate } from '@/lib/privacy/ageScreen';
+import { writeUserDob } from '@/lib/age/userDob';
+import type { RawDb } from '@/lib/coach/pendingSchema';
 import { logU13Lock } from '@/lib/privacy/u13LockLog';
 
 export const dynamic = 'force-dynamic';
@@ -24,6 +26,9 @@ const signupSchema = z.object({
   policyVersion: z.string().max(60).optional(),
   ref: z.string().trim().max(16).optional(),
   birthYear: z.number({ required_error: AGE_INVALID, invalid_type_error: AGE_INVALID }).int(AGE_INVALID),
+  // FN-BOX-1b: the full date beside the year, 'YYYY-MM-DD'. Optional (an older client sends the year alone); when sent it
+  // must be a real, past date in birthYear's year.
+  birthDate: z.string({ invalid_type_error: AGE_INVALID }).max(10, AGE_INVALID).optional(),
 });
 
 function randAttr() {
@@ -53,7 +58,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const { email, password, name, policyVersion, ref, birthYear } = parsed.data;
+    const { email, password, name, policyVersion, ref, birthYear, birthDate } = parsed.data;
 
     // AGE-SCREEN, before bcrypt or any prisma call. assumption: (FE PM can reverse) a cookie-present retry logs nothing.
     if (cookies().get(AGE_BLOCK_COOKIE)) {
@@ -69,6 +74,11 @@ export async function POST(req: Request) {
         { error: 'age_screen_blocked' },
         { status: 403, headers: { 'Set-Cookie': ageBlockCookieHeader() } },
       );
+    }
+    // FN-BOX-1b: checked after the block, so an under-13 year is turned away whatever date came with it.
+    const dob = birthDate === undefined ? null : postedBirthDate(birthYear, birthDate);
+    if (birthDate !== undefined && dob === null) {
+      return NextResponse.json({ error: AGE_INVALID }, { status: 400 });
     }
 
     // RATE-LIMIT-WIRE (PR #289 QA rework): counted per email and per the address the TRUSTED proxy set, in the shared
@@ -105,6 +115,10 @@ export async function POST(req: Request) {
       }
       throw e;
     }
+
+    // FN-BOX-1b: User.dob, beside dobYear. Raw SQL behind a column probe (lib/age/userDob.ts): skipped until the owner
+    // applies prisma/pending/2026-10-19-user-dob.sql, and never a reason to fail the signup.
+    if (dob) await writeUserDob(prisma as unknown as RawDb, user.id, dob);
 
     await prisma.playerProfile.create({
       data: {

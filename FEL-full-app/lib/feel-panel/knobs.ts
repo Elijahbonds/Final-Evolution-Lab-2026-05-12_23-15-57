@@ -605,6 +605,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/shotLooks.ts BANK_GLANCE_MS',
     hint: 'How long the eyes stay on the square after the set and the release of a called bank.',
   },
+  // ── tiebreak-cam (2026-10-23): Tennis and its tiebreak variant, a phone held upright only ──
+  {
+    id: 'tennis.portraitHeroMargin', label: 'Upright: keep the player this far in', def: 0.15, min: 0.05, max: 0.35, step: 0.01, unit: '', group: 'Tennis · camera',
+    source: 'lib/babylon/modes/netPortraitCam.ts PORTRAIT_HERO_MARGIN',
+    hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

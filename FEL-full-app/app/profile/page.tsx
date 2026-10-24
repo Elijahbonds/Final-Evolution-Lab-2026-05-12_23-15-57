@@ -1,124 +1,43 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { Gem, Shirt, Store, CalendarDays, PersonStanding } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
-import { readWallet } from '@/lib/wallet/wallet-service';
-import { prqScore, prqGrade } from '@/lib/prq';
-import { recoveryAsOf } from '@/lib/prq-recovery';
-import { gameVitals, ownedFromEntitlements } from '@/lib/cards/boosts';
+import { loadProfile, type ProfileDb } from '@/lib/profile-v2/load';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
-import { ProfileView } from '@/components/profile-view';
+import { ProfileBody, ProfileActions } from '@/components/profile-v2/profile-body';
 import { AthleteStatusSection } from '@/components/profile/athlete-status-card';
-import { BoostShelf } from '@/components/cards/boost-shelf';
-import { ReferralCard } from '@/components/marketing/referral-card';
-import { CardEditor } from '@/components/creator/card-editor';
-import { MotionSetting } from '@/components/settings/motion-setting';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * PROFILE — who you are, what you have, where you stand.
+ * PROFILE — PROFILE V2 (owner 2026-10-24: "We've gotta improve the profile view too"). docs/PROFILE-V2.md.
  *
- * The third tab. It used to carry its own AppHeader and BottomNav; both are gone, because the shell now owns
- * getting around and a page that draws its own navigation is how an app ends up with three of them.
+ * It leads with progress, the product's promise ("get measurably better"): the athlete, the PRQ grade and this week's
+ * measured numbers against last week. Then four blocks, each with one job: stats and bests, badges and milestones,
+ * squad and friends, highlights; then who can see it. Editing (the athlete pick, the creator card, the referral card,
+ * logging a measurement) moved to /profile/edit, and the settings (motion, data rights, health data) to /account.
+ *
+ * Everything on it is read on the server in one batch (lib/profile-v2/load.ts) — the page used to draw an empty shell
+ * and fetch eight things after it hydrated. The 3D athlete loads only when asked for.
  */
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
-  if (!session) redirect(loginPath('/profile'));
+  if (!session || !me) redirect(loginPath('/profile'));
 
-  const [profile, entitlements, wallet] = await Promise.all([
-    me ? prisma.playerProfile.findUnique({ where: { userId: me } }).catch(() => null) : null,
-    me ? prisma.playerEntitlement.findMany({ where: { playerId: me }, select: { skuId: true } }).catch(() => []) : [],
-    // The SHARDS THAT BUY are the wallet's, not PlayerProfile.shards. Two fields carry that name and only this one
-    // is what spend() decrements -- showing the other would price the shelf against a balance nobody can spend.
-    me ? readWallet(prisma, me).catch(() => null) : null,
-  ]);
-
-  // MIRROR-COACH P9 fix (2026-09-30): recovery as of now (its half-life runs only inside a settle; this page reads the
-  // row directly, so an idle player saw last month's recovery here — lib/prq-recovery.ts recoveryAsOf, pure, no write)
-  const base = prqScore((profile ? recoveryAsOf(profile) : null) as unknown as Record<string, number> | null);
-  const owned = ownedFromEntitlements(entitlements.map((e) => e.skuId));
-  const vitals = gameVitals(base, owned);
-  // The grade an athlete IS graded at is the measured one. CARD-SAFE-2: cards are cosmetic, so there is no lift to show.
-  const grade = prqGrade(vitals.base);
-  const shards = wallet?.shards ?? 0;
-
-  const shortcuts = [
-    // HOTFIX (2026-09-24): the athlete creator shipped with no link anywhere -- reachable only by typing
-    // /creator/athlete. It is who you are on court, so it sits first, beside the Closet that dresses the same body.
-    { href: '/creator/athlete', icon: PersonStanding, accent: '#FFD700', label: 'Athlete' },
-    { href: '/closet', icon: Shirt, accent: '#00E5FF', label: 'Closet' },
-    { href: '/store', icon: Store, accent: '#FF7A2F', label: 'Store' },
-    { href: '/wallet', icon: Gem, accent: '#A855F7', label: 'Wallet' },
-    { href: '/sessions', icon: CalendarDays, accent: '#00FF9D', label: 'Sessions' },
-  ];
+  const data = await loadProfile(prisma as unknown as ProfileDb, me);
 
   return (
-    <TabPage
-      eyebrow="Profile"
-      title={session.user?.name ?? 'Athlete'}
-      lede="Your measured self, your deck, and the card you hand to somebody else."
-      accent="#FFD700"
-      aside={
-        <div className="flex items-end gap-5">
-          <div className="text-right">
-            <p className="font-mono text-[9.5px] font-bold uppercase tracking-[0.18em] text-white/35">PRQ</p>
-            <p className="fel-heading text-[34px] font-black leading-none" style={{ color: grade.color }}>
-              {Math.round(vitals.base)}
-            </p>
-            <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: grade.color }}>
-              {grade.label}
-            </p>
-          </div>
-        </div>
-      }
+    <TabPage eyebrow="Profile" title={data.identity.name} lede="Getting measurably better: your week, your bests, your record." accent="#FFD700"
+      aside={<ProfileActions />}
     >
-      <nav className="mb-7 flex flex-wrap gap-2">
-        {shortcuts.map((s) => {
-          const Icon = s.icon;
-          return (
-            <Link
-              key={s.href}
-              href={s.href}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2
-                         text-[12.5px] font-bold text-white/70 transition-colors hover:bg-white/[0.05] hover:text-white"
-            >
-              <Icon className="h-[15px] w-[15px]" style={{ color: s.accent }} strokeWidth={2.1} />
-              {s.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <ProfileBody data={data} />
 
-      <ProfileView userName={session.user?.name ?? 'Athlete'} email={session.user?.email ?? ''} />
-
-      {/* #337: the athlete status card (components/profile/athlete-status-card.tsx), placed by profile-v2 when it lands */}
+      {/* #337: the athlete status card (components/profile/athlete-status-card.tsx), placed under the profile body */}
       <AthleteStatusSection userId={me} />
-
-      <BoostShelf shards={shards} owned={owned} />
-
-      <section className="mt-10">
-        <div className="flex items-center gap-2">
-          <h2 className="fel-heading text-[19px] font-bold text-white">Your creator card</h2>
-          <span className="rounded-full bg-[#A855F7]/20 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#C79BFF]">
-            Shareable
-          </span>
-        </div>
-        <p className="mt-1 text-[12.5px] text-white/40">
-          Scanned by somebody new, it pays you both in shards.
-        </p>
-        <div className="mt-3"><CardEditor /></div>
-      </section>
-
-      <div className="mt-8"><ReferralCard /></div>
-      {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
-      <div className="mt-8"><MotionSetting /></div>
       <DoorsRow tab="profile" hide={isCoachStoreEnabled() ? [] : ['/account/bookings']} />
     </TabPage>
   );
