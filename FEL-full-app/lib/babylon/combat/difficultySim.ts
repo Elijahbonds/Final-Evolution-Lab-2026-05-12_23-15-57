@@ -39,7 +39,7 @@ import { weaponById } from './arsenal';
 import { blendTraits, PURE } from './schools';
 import { SHOWDOWN, attackerChakraGain, ultimateReaches, ultLungeStep, UltimateArm } from '../modes/showdownRules';
 import { DUEL, chiForOutcome, rivalWeaponFor, holdFromEdge, safeSubstitutionSpot, type DuelWeapon } from '../modes/duelRules';
-import { dragonLicensed, RIVAL_POWER_BY_LOADOUT } from '../modes/mixedRules';
+import { dragonLicensed, rivalTierCap, RIVAL_POWER_BY_LOADOUT } from '../modes/mixedRules';
 
 export type SimMode = 'kvs' | 'showdown' | 'duel' | 'mixed';
 export type SimTier = 'rookie' | 'pro' | 'elite';
@@ -485,6 +485,7 @@ class KMatch {
       // Mixed rebuilds its brain every round (applyLoadouts)
       const b = new RivalFightBrain(BASE_DIFF.mixed, this.foeAttacks);
       b.setRound(round); b.setStanding(foeWins, myWins, 2); b.setDifficulty(this.diff());
+      b.setSkillCap(rivalTierCap(this.cfg.tier));   // MC75-1: mirrors MixedCombatMode applyLoadouts
       b.setCanSpecial(dragonLicensed(BASELINE_RATINGS));
       b.setEdge((x, z) => insideBy({ x, z }, this.arena.shape));
       this.brainF = b;

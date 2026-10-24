@@ -60,7 +60,8 @@ export const MP_MODES: { key: string; label: string }[] = [
   { key: 'skateboard', label: 'Venice Lines' },
   { key: 'surf', label: 'The Break' },
   { key: 'golf', label: 'The Loop' },
-  { key: 'baseball', label: 'Moonshot Derby' },
+  { key: 'baseball', label: 'Baseball' },   // BASEBALL-3INN: a 'baseball' challenge lands on /play/baseball, three innings
+  { key: 'derby', label: 'Moonshot Derby' },   // DERBY-KEY (2026-10-23): the derby's own challenge, on its own session key
   { key: 'soccer', label: 'Twelve Yards' },
   { key: 'football', label: 'Breakaway' },
   { key: 'freerun', label: 'Free Run' },
@@ -98,7 +99,7 @@ export const MP_DEFAULT_MODE = MP_MODES[0].key;
 // fourteen keys never matched a session mode, so best scores read 0 and those challenges settled as ties.
 export const MP_SESSION_MODE: Record<string, string> = {
   dunk: 'dunkContest', threepoint: 'threePoint', 'big-air': 'bigAir', snowboard: 'snowboarding',
-  skateboard: 'skateboarding', surf: 'surfing', golf: 'golf', baseball: 'baseball', soccer: 'soccer', football: 'football',
+  skateboard: 'skateboarding', surf: 'surfing', golf: 'golf', baseball: 'baseball', derby: 'derby', soccer: 'soccer', football: 'football',
   freerun: 'freerun', tennis: 'tennis', tiebreak: 'tiebreak',
   'karate-vs': 'karateVersus', onevone: 'hoops1v1', threevthree: 'hoops3v3', carnival: 'carnival', volleyball: 'volleyball', dance: 'dance',
   karate: 'karateEndless', mixedcombat: 'mixedcombat', dunkduel: 'dunkduel', 'who-scene-it': 'whoSceneIt',

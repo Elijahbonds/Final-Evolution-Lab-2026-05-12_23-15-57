@@ -19,6 +19,7 @@ import { hnode } from './hud-format';
 import { HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudLine, HudMeter, HudPlate, HudText, ScoreValue, Scorebug } from './tv-hud';
 import { HoopsShotMeter } from './hoops-shot-meter';
 import { HoopsShotClock } from './hoops-shot-clock';   // lane/hoops-shot-core: ELITE's shot clock on the scorebug
+import { overtimeHeadline } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): a tie at the horn is sudden death
 import { MicCaption, MicToggle } from './mic-caption';   // THE MIC (2026-09-24): what the court's MC just said, and the voice switch
 
 type Hud = Record<string, HudValue>;
@@ -46,9 +47,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      // 'DRAW' is a real outcome at the buzzer now, and it is neither a win nor a defeat.
-      // Reporting a level game as GAME OVER would be as dishonest as the WIN it replaced.
-      const drew = r.outcome === 'DRAW';
+      // NB-3: the mode never ends level (a tie at the horn is sudden-death overtime), so it ends WIN or LOSS only — the
+      // level-game branch (its headline 'dead even') is gone: tests/locomotion/verdict-contract.test.ts holds the host to what the mode emits
       const won = r.outcome === 'WIN';
       const result: GameResult = {
         score: r.score,
@@ -56,7 +56,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         opponentScore: r.stats?.foeScore ?? 0,
         won,
         duration: r.durationSec,
-        headline: won ? 'GAME WON' : drew ? 'DEAD EVEN' : 'GAME OVER',
+        // NB-3: a game decided in overtime says so ('WON IN OT')
+        headline: overtimeHeadline(won, Number(r.stats?.overtimes ?? 0)) ?? (won ? 'GAME WON' : 'GAME OVER'),
       };
       onEndRef.current(result);
     };
@@ -142,7 +143,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
             </HudPlate>
           );
         })()}
-        <HudChip tone="score" size="body">{typeof hud.time === 'number' ? `${hud.time}s` : 'TO 21'}</HudChip>
+        {/* NB-3: the clock chip names the period in overtime ('OT 30s'), so the copy matches the clock */}
+        <HudChip tone="score" size="body">{typeof hud.time === 'number' ? `${typeof hud.period === 'string' && hud.period ? `${hud.period} ` : ''}${hud.time}s` : 'TO 21'}</HudChip>
       </div>
 
       {/* shot meter */}

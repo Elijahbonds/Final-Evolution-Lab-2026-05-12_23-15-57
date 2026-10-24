@@ -105,6 +105,11 @@ const ALLOWED: Record<string, Allowed> = {
     kind: 'draw-only', why: 'the release point is the hand (drawing); made = rimDecides(rim, root offset, pct of the grade), carried by the arc',
     proof: [/const toShooter = s\.root\.position\.subtract\(h\.rim\)/, /const v = rimDecides\(h\.rim, toShooter, pct, q01,/, /this\.arc\.start\(from, h\.rim, v\.made,/],
   },
+  // BASEBALL-FEEL: the innings batter's bat is Derby's two-hand placement (drawing); the swing's grade is the press's timing
+  'lib/babylon/modes/baseballBat.ts': {
+    kind: 'draw-only', why: 'the innings bat is drawn through the fists; the grade is baseballGame.gradeSwing (press timing)',
+    proof: [/bat\.position\.copyFrom\(grip\.addInPlace\(/],
+  },
   // VIS-COURT: the racket arm's swing streak is bound to the right hand and forearm bones (drawing only); a swing's grade is the
   // press's timing against the flight (gradeSwing(dt)) and the AI's is a roll against its skill — neither reads a hand
   'lib/babylon/modes/NetSportMode.ts': {

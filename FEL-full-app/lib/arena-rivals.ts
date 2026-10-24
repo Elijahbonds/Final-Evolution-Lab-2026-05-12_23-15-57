@@ -162,7 +162,14 @@ export const ARENA_SCORE_BASELINES: Record<string, number> = {
   skateboarding: 500,
   bigAir: 400,
   golf: 200,
-  baseball: 300,
+  // DERBY-KEY (owner, 2026-10-23): the home-run derby keeps the 300 it had under 'baseball' (its own key now). Baseball is
+  // the three-inning game (BASEBALL-3INN), whose score is runs and whose most is 27 (arena-score-integrity
+  // baseballCeiling): 300 put every cold-start rival above a perfect game, so the house was clamped to 27 and the best a
+  // player could do was tie. TUNED 300 → 19: the median of 400 games on the real core (baseballGame.ts, pitchSpec's
+  // pitches) pressing at the crossing ± a 90 ms (σ) timing error, the "beginner at ±90 ms" the music row reads as grade C;
+  // the band is 16–22. assumption: 90 ms is a mid-band player; no live three-inning run has been measured. TUNE(elijah).
+  baseball: 19,
+  derby: 300,
   soccer: 3,
   tiebreak: 7,
   freerun: 300,

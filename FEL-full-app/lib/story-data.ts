@@ -494,7 +494,10 @@ const ZONES: readonly StoryZone[] = [
   defineZone({
     id: 'diamond',
     title: 'The Diamond',
-    mode: 'baseball',
+    // DERBY-KEY (2026-10-23): the Diamond is the home-run derby (its rails and boss are on the derby's scale, below), which
+    // lives at /play/derby and saves under 'derby' now. Under 'baseball' it launched the three-inning game (runs, at most
+    // 27), where no rail could ever be cleared.
+    mode: 'derby',
     act: 2,
     narrative:
       'The diamond deals in milliseconds. A swing decision lives and dies inside a window thinner than a heartbeat, and the Initiative’s high-speed rigs will time yours to the frame. This is where rebuilt mechanics either become reflex or get exposed.',

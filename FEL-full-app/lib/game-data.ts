@@ -19,7 +19,7 @@ export const VENUES: Venue[] = [
   { key: 'surfbreak', name: 'Surf Break', image: '/venues/surfbreak.jpg', modes: ['The Break'], playable: true, href: '/play/surf' },
   { key: 'links', name: 'Coastal Links', image: '/venues/links.jpg', modes: ['The Loop'], playable: true, href: '/play/golf' },
   { key: 'soccerstadium', name: 'Coastal FC Stadium', image: '/venues/soccerstadium.jpg', modes: ['Twelve Yards'], playable: true, href: '/play/soccer' },
-  { key: 'baseballpark', name: 'Catalina Ballpark', image: '/venues/baseballpark.jpg', modes: ['Moonshot Derby'], playable: true, href: '/play/baseball' },
+  { key: 'baseballpark', name: 'Catalina Ballpark', image: '/venues/baseballpark.jpg', modes: ['Baseball', 'Moonshot Derby'], playable: true, href: '/play/baseball' },
   { key: 'gridiron', name: 'The Gridiron', image: '', modes: ['Breakaway'], playable: true, href: '/play/football' },
   { key: 'lumaveniceshop', name: 'Luma Venice Shop', image: '/venues/lumaveniceshop.jpg', modes: ['Market Browse'], playable: false },
   { key: 'courtcarnival', name: 'Court Carnival', image: '/venues/courtcarnival.jpg', modes: ['Slam Rush', 'Strike Storm', 'Trick Gauntlet', 'Hot Shot', 'Coin Storm', 'Counter Strike', '+ mini-game night'], playable: true, href: '/play/carnival' },
@@ -181,7 +181,12 @@ export const MODE_INFO: Record<string, { name: string; venue: string; href: stri
   brainBrawl: { name: 'Brain Brawl', venue: 'NeuroArena', href: '/play/brain-brawl' },
   skateboarding: { name: 'Venice Lines', venue: 'Venice Skatepark', href: '/play/skateboard' },
   soccer: { name: 'Twelve Yards', venue: 'Coastal FC Stadium', href: '/play/soccer' },
-  baseball: { name: 'Moonshot Derby', venue: 'Catalina Ballpark', href: '/play/baseball' },
+  // BASEBALL-3INN (2026-10-22): /play/baseball is three innings (BaseballInningsMode), and the home-run derby moved to
+  // /play/derby. DERBY-KEY (owner, 2026-10-23): the derby saves under its own key, 'derby', so it has its own row again
+  // and is back on the shelf and the Catalina Ballpark card. A row is keyed by what its shell saves (sessionModeKeys.test.ts).
+  // Derby sessions saved before DERBY-KEY are still stored under 'baseball'; nothing was migrated.
+  baseball: { name: 'Baseball', venue: 'Catalina Ballpark', href: '/play/baseball' },
+  derby: { name: 'Moonshot Derby', venue: 'Catalina Ballpark', href: '/play/derby' },
   snowboarding: { name: 'Gate Crasher', venue: 'Mountain Slope', href: '/play/snowboard' },
   surfing: { name: 'The Break', venue: 'Surf Break', href: '/play/surf' },
   golf: { name: 'The Loop', venue: 'Coastal Links', href: '/play/golf' },

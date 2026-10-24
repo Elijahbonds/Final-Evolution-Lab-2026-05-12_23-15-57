@@ -15,13 +15,16 @@ import { LANE_PLATE_ALPHA, PASSED_CUE_OPACITY, hitRingStyle } from './cue-lane-s
 import { surfaceBootError } from './boot-error';
 import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
+import type { ModeDefinition } from '@/lib/babylon/core/ModeHarness';
 import { MODES } from '@/lib/babylon/modes/registry';
+import { baseballHeadline } from '@/lib/babylon/modes/baseballGame';   // BASEBALL-3INN: the card line read off the posted score
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';
 import {
   HUD_TEXT_ALPHA, HudBanner, HudChip, HudFrame, HudMeter, HudPlate, HudText, ScoreCell, ScoreDivider, ScoreValue, Scorebug, hudColor, hudType, HudLowerThird } from './tv-hud';
 import { timingMaxCombo } from './timing-combo';
 import { timingGameResult } from '@/lib/sessions/gameResultFromSession';
+import { volleyballHeadline } from './volleyCard';
 import { CUE_LOOKAHEAD_SEC, CUE_LINGER_SEC, type HudCue } from '@/lib/babylon/core/danceTracks';
 import { ACCURACY_CENTER as GOLF_ACC_CENTER, ACCURACY_HALF as GOLF_ACC_HALF } from '@/lib/babylon/core/golfHud';
 import { breakawayLine } from '@/lib/babylon/core/penaltyHud';   // IMPROVE (2026-10-06, Penalty #12)
@@ -64,6 +67,9 @@ export interface TimingHostOpts {
   swingLabel: string;
   /** Log tag for boot errors. */
   tag: string;
+  /** BASEBALL-3INN (2026-10-22): a definition mounted outside the registry (BaseballInningsMode at /play/baseball — see its
+   *  header for why it is not a registry key yet). Omitted, the host mounts MODES[modeKey] as every other route does. */
+  def?: ModeDefinition;
 }
 
 /** Build a GameShell-compatible timing host bound to a specific registry mode. */
@@ -101,10 +107,14 @@ export function makeTimingHost(opts: TimingHostOpts) {
         const base = timingGameResult(r, { headline: '', modeKey });
         const won = base.won;
         const headline = modeKey === 'tennis' ? `${won ? 'MATCH WON' : 'MATCH LOST'} · ${r.score} GAMES · ${n('style')} STYLE${st.rackets !== undefined ? ` · ${n('rackets')} RACKETS LEFT` : ''}`
-          : modeKey === 'volleyball' ? `${won ? 'SET WON' : 'SET LOST'} · ${r.score} PTS · ${n('style')} STYLE`
+          // TENNIS-TIEBREAK-FOLD: the Tennis tiebreak variant — points, both sides
+          : modeKey === 'tiebreak' ? `${won ? 'TIEBREAK WON' : 'TIEBREAK LOST'} · ${r.score}–${n('theirs')} · ${n('style')} STYLE`
+          : modeKey === 'volleyball' ? volleyballHeadline(base)   // VB75-2: both scores, off the same result the shell saves
           : modeKey === 'golf' ? `${won ? 'CARD IN — UNDER PAR' : 'CARD IN'} · ${n('overPar') > 0 ? '+' : ''}${n('overPar')} · ${n('holes')} HOLES · ${n('pickUps')} PICK-UPS`
           // IMPROVE (2026-10-06, Derby #2): the derby ends WIN / LOSS against the rival's round (the mode's `beatRival`); the
           // posted `won` (timingWon: three homers, the Story's Diamond goal) is unchanged
+          // BASEBALL-3INN: three innings, the runs ARE the posted score (baseballGame.baseballHeadline reads r.score)
+          : modeKey === 'baseball' ? baseballHeadline(r)
           : modeKey === 'derby' ? `${st.beatRival !== undefined ? (n('beatRival') ? 'BEAT THE RIVAL' : 'RIVAL TAKES IT') : won ? 'DERBY CHAMPION' : 'DERBY OVER'} · ${n('homers')}–${n('rivalHomers')} HR · ${n('outs')} OUTS · ${Math.round(n('longestFt'))} FT`
           // IMPROVE (2026-10-06, Penalty #12): and the breakaway's tricks, when there were any (penaltyHud.breakawayLine)
           : modeKey === 'penalty' ? `${won ? 'SHOOTOUT WON' : 'SHOOTOUT LOST'} · ${n('goals')}–${n('themGoals')} · ${n('stylePts')} STYLE${breakawayLine(st) ? ` · ${breakawayLine(st)}` : ''}`
@@ -114,7 +124,7 @@ export function makeTimingHost(opts: TimingHostOpts) {
         onEndRef.current({ ...base, headline, maxCombo: timingMaxCombo(st) });
       };
 
-      const def = MODES[modeKey];
+      const def = opts.def ?? MODES[modeKey];
       // DEFER THE START. React StrictMode runs effect -> cleanup -> effect, and
       // calling runMode synchronously means the PHANTOM mount also builds a
       // Babylon engine that its own cleanup cannot cancel: `stop` is not

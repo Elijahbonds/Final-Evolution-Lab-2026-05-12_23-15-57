@@ -17,6 +17,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
 import { claimSeasonRewards } from '@/lib/season/season-service';
 import type { Lane } from '@/lib/season/season-pass-core';
 
@@ -24,6 +26,12 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id as string | undefined;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // RATE-LIMIT-WIRE (PR #289 QA rework): per account, in the shared rate_limits table (lib/rate-limits/policy.ts)
+  const limited = await checkRateLimits(prisma, 'seasonClaim', [{ kind: 'user', value: userId }]);
+  if (!limited.ok) {
+    return NextResponse.json({ error: 'rate_limited', retryAfterSec: limited.retryAfterSec }, { status: 429, headers: retryAfterHeaders(limited) });
+  }
 
   const body = await req.json().catch(() => ({} as any));
 
