@@ -25,7 +25,7 @@
 // of the app can wrap its own content in the same `<HealthIntakeGate>` (see lib/health/intake.ts's PUBLIC_INTAKE_
 // QUESTIONS / HEALTH_DATA_CONSENT_COPY for the shapes this reads from the API).
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { INTAKE_IDS, PUBLIC_INTAKE_QUESTIONS, RED_FLAG_COPY, isValidBirthYear } from '@/lib/health/intake';
 import {
@@ -127,6 +127,28 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
   const browserOnly = !canWriteHealth || declined;
   const questions = browserOnly ? PUBLIC_INTAKE_QUESTIONS : status?.questions ?? [];
 
+  const applyServerStatus = useCallback((data: StatusResponse) => {
+    setStatus(data);
+    const band = readAge(tabStorage());
+    if (band !== null && isKid(band)) forgetIntakeMemory();
+    const memory = band !== null && isKid(band) ? null : readIntakeMemory();
+    const plan = data.hardStopped || !data.needsIntake ? 'none' : recallPlan(band, true, memory);
+    if (memory && plan !== 'none') setAnswers(memory.answers);
+    if (plan === 'pain' && memory) {
+      const rest = { ...memory.answers };
+      delete rest[INTAKE_IDS.currentPain];
+      setAnswers(rest);
+    }
+    setStage(data.hardStopped ? 'stopped' : !data.needsIntake ? 'ready' : plan === 'one-tap' ? 'recall' : plan === 'pain' ? 'pain' : plan === 'full' ? 'question' : 'consent');
+  }, []);
+
+  const retryStatus = useCallback(() => {
+    if (!canWriteHealth) return;
+    setStage('loading');
+    setError(null);
+    void fetchStatus().then(applyServerStatus).catch(() => setStage('error'));
+  }, [applyServerStatus, canWriteHealth]);
+
   useEffect(() => {
     // browser-only: no status GET. A kid, teen or unknown account never keeps the on-device answers.
     if (!canWriteHealth) forgetIntakeMemory();
@@ -135,18 +157,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     fetchStatus()
       .then((data) => {
         if (cancelled) return;
-        setStatus(data);
-        const band = readAge(tabStorage());
-        if (band !== null && isKid(band)) forgetIntakeMemory();
-        const memory = band !== null && isKid(band) ? null : readIntakeMemory();
-        const plan = data.hardStopped || !data.needsIntake ? 'none' : recallPlan(band, true, memory);
-        if (memory && plan !== 'none') setAnswers(memory.answers);
-        if (plan === 'pain' && memory) {
-          const rest = { ...memory.answers };
-          delete rest[INTAKE_IDS.currentPain];
-          setAnswers(rest);
-        }
-        setStage(data.hardStopped ? 'stopped' : !data.needsIntake ? 'ready' : plan === 'one-tap' ? 'recall' : plan === 'pain' ? 'pain' : plan === 'full' ? 'question' : 'consent');
+        applyServerStatus(data);
       })
       .catch(() => {
         if (!cancelled) setStage('error');
@@ -154,7 +165,7 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyServerStatus, canWriteHealth]);
 
   async function submitAnswers(finalAnswers: Record<string, AnswerValue>) {
     // BROWSER-ONLY: lib/health/intake.ts's red-flag rule, in page memory. Nothing is sent, so nothing can be saved.
@@ -251,7 +262,10 @@ export function HealthIntakeGate({ children, canWriteHealth = false, localStatus
   if (stage === 'error') {
     return (
       <GateShell>
-        <p className="text-[14px] text-white/60">Couldn&apos;t load the health check. Refresh to try again.</p>
+        <p className="text-[14px] text-white/60">Couldn&apos;t load the health check. Try again when your connection is back.</p>
+        <button type="button" onClick={retryStatus} className={`${quietBtn} mt-3`}>
+          Try again
+        </button>
       </GateShell>
     );
   }

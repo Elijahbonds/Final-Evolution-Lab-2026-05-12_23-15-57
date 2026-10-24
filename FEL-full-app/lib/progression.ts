@@ -128,6 +128,7 @@ export interface CampaignStatus {
   completedNodes: number;
   /** 0–100, one decimal place. */
   completionPct: number;
+  totalBadges: number;
   badgesEarned: string[];
   nextRecommendedNodeId: string | null;
 }
@@ -280,6 +281,9 @@ export function evaluateCampaign(input: ProgressionInput): CampaignStatus {
       const boss = z.nodes.find((n) => n.kind === 'boss');
       return boss?.badge?.id ?? `badge.${z.id}`;
     });
+  const totalBadges = zones.filter((z) =>
+    z.nodes.some((n) => n.kind === 'boss' && n.badge),
+  ).length;
 
   const nextRecommendedNodeId = findNextRecommendedNodeId(zones);
 
@@ -287,12 +291,14 @@ export function evaluateCampaign(input: ProgressionInput): CampaignStatus {
     campaign: {
       id: CAMPAIGN.id,
       title: CAMPAIGN.title,
-      tagline: CAMPAIGN.tagline,
+      // IRON-PARADISE-OUT: the authored campaign still has thirteen zones, but the player-visible ladder is twelve.
+      tagline: ladder.length === CAMPAIGN.zones.length ? CAMPAIGN.tagline : `${ladder.length} grounds. One athlete, rebuilt.`,
     },
     zones,
     totalNodes,
     completedNodes,
     completionPct,
+    totalBadges,
     badgesEarned,
     nextRecommendedNodeId,
   };

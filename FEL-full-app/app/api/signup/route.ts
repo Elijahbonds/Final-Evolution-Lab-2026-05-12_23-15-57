@@ -8,7 +8,7 @@ import { rateLimit, clientKeyFromHeaders } from '@/lib/rate-limit';
 import { trustedClientIp } from '@/lib/rate-limits/clientIp';
 import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
 import { recordServerEvent } from '@/lib/analytics-server';
-import { GUEST_COOKIE } from '@/lib/guest';
+import { findGuestSession, guestIdFrom } from '@/lib/guestSession';
 import { convertReferralOnSignup } from '@/lib/marketing/referral';
 import { sendWelcomeEmail } from '@/lib/marketing/email';
 import { isUnreachable } from '@/lib/db/errors';
@@ -125,20 +125,21 @@ export async function POST(req: Request) {
 
     // M13 Step 1 — migrate any anonymous guest state into the new account and
     // close out the growth funnel (guest_claim + signup_complete). Best-effort:
-    // a telemetry hiccup must never fail a signup.
-    const guestToken = cookies().get(GUEST_COOKIE)?.value ?? null;
+    // a telemetry hiccup must never fail a signup. TIP-GUEST-TOKEN-HASH: the
+    // session is found by the token's hash and the events carry the hash.
+    const guestHash = guestIdFrom(cookies());
     try {
-      if (guestToken) {
-        const guest = await prisma.guestSession.findUnique({ where: { token: guestToken } });
+      if (guestHash) {
+        const guest = await findGuestSession(prisma, guestHash);
         if (guest && !guest.migratedUserId) {
           await prisma.guestSession.update({
-            where: { token: guestToken },
+            where: { id: guest.id },
             data: { migratedUserId: user.id },
           });
           await recordServerEvent({
             name: 'guest_claim',
             userId: user.id,
-            guestId: guestToken,
+            guestId: guestHash,
             props: { migrated: true },
           });
         }
@@ -146,8 +147,8 @@ export async function POST(req: Request) {
       await recordServerEvent({
         name: 'signup_complete',
         userId: user.id,
-        guestId: guestToken,
-        props: { fromGuest: Boolean(guestToken) },
+        guestId: guestHash,
+        props: { fromGuest: Boolean(guestHash) },
       });
     } catch (err) {
       console.error('signup funnel telemetry failed', err);

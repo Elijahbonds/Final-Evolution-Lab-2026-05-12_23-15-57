@@ -14,6 +14,12 @@ import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
+import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
+import { POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M } from '@/lib/babylon/core/PossessionSwap';
+import { DEFENSE_STANCE_ON, DEFENSE_RAISE_M, RAISE_REACH, STANCE_EASE_SEC, DEFEND_LEAN_DEG, DEFEND_SPINE1_DEG } from '@/lib/babylon/core/DefenseStance';
+import {
+  MATE_READ_ON, MATE_SETTLE_SEC, MATE_READ_SEC, MATE_HOLD_MAX_SEC, MATE_SHOOT_RANGE_M, MATE_DRIVE_FROM_M, MATE_FINISH_M, MATE_DRIVE_MAX_SEC, MATE_LANE_M,
+} from '@/lib/babylon/modes/threevthreeMate';
 import { AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC } from '@/lib/babylon/core/ReachTell';
 import { BODY_SEP_ON, ONEVONE_CAPSULE_RADIUS, BODY_HARD_GAP, SEP_PUSH_MPS, SEP_DEADBAND, SEP_POP_MAX } from '@/lib/babylon/core/BodySeparation';
 import * as BLK from '@/lib/babylon/core/HoopsBlocks';
@@ -75,6 +81,31 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
     expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
     expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
+    // lane/h3-aware (groups "Hoops · 3v3 awareness" and "Hoops · teammate": PR #313 / #315's numbers)
+    expect(def('hoops.offBallLookOn')).toBe(OFF_BALL_LOOK_ON);
+    expect(def('hoops.manGlanceEverySec')).toBe(MAN_GLANCE_EVERY_SEC);
+    expect(def('hoops.manGlanceSec')).toBe(MAN_GLANCE_SEC);
+    expect(def('hoops.possessionSwapOn')).toBe(POSSESSION_SWAP_ON);
+    expect(def('hoops.foeSpaceAngleK')).toBe(FOE_SPACE_ANGLE_K);
+    expect(def('hoops.hasBallM')).toBe(HAS_BALL_M);
+    expect(def('hoops.defenseStanceOn')).toBe(DEFENSE_STANCE_ON);
+    expect(def('hoops.defenseRaiseM')).toBe(DEFENSE_RAISE_M);
+    expect(def('hoops.raiseReach')).toBe(RAISE_REACH);
+    expect(def('hoops.stanceEaseSec')).toBe(STANCE_EASE_SEC);
+    expect(def('hoops.defendLeanDeg')).toBe(DEFEND_LEAN_DEG);
+    expect(def('hoops.defendSpine1Deg')).toBe(DEFEND_SPINE1_DEG);
+    expect([OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC, POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M]).toEqual([1, 1.6, 0.4, 1, 0.3, 1.0]);
+    expect([DEFENSE_STANCE_ON, DEFENSE_RAISE_M, RAISE_REACH, STANCE_EASE_SEC, DEFEND_LEAN_DEG, DEFEND_SPINE1_DEG]).toEqual([1, 0.15, 0.97, 0.18, -6, 2]);
+    expect(def('hoops.mateReadOn')).toBe(MATE_READ_ON);
+    expect(def('hoops.mateSettleSec')).toBe(MATE_SETTLE_SEC);
+    expect(def('hoops.mateReadSec')).toBe(MATE_READ_SEC);
+    expect(def('hoops.mateHoldMaxSec')).toBe(MATE_HOLD_MAX_SEC);
+    expect(def('hoops.mateShootRangeM')).toBe(MATE_SHOOT_RANGE_M);
+    expect(def('hoops.mateDriveFromM')).toBe(MATE_DRIVE_FROM_M);
+    expect(def('hoops.mateFinishM')).toBe(MATE_FINISH_M);
+    expect(def('hoops.mateDriveMaxSec')).toBe(MATE_DRIVE_MAX_SEC);
+    expect(def('hoops.mateLaneM')).toBe(MATE_LANE_M);
+    expect([MATE_READ_ON, MATE_SETTLE_SEC, MATE_READ_SEC, MATE_HOLD_MAX_SEC, MATE_SHOOT_RANGE_M, MATE_DRIVE_FROM_M, MATE_FINISH_M, MATE_DRIVE_MAX_SEC, MATE_LANE_M]).toEqual([1, 0.35, 0.9, 1.8, 7.3, 8.5, 2.4, 1.6, 0.9]);
     // lane/hoops-def-tell (#273 T-A, T-C; #274 BLK-1)
     expect(def('hoops.aiReachTellOn')).toBe(AI_REACH_TELL_ON ? 1 : 0);
     expect(def('hoops.aiReachTellSec')).toBe(AI_REACH_TELL_SEC);

@@ -6,38 +6,42 @@
  * A guest gets an opaque rotating token in an httpOnly cookie and a matching
  * GuestSession row. NO PII is ever collected (M13 FIREWALL). The taste-run
  * state lives in GuestSession.data and migrates into the account on signup.
+ *
+ * TIP-GUEST-TOKEN-HASH (2026-10-19): the row and the guest_start event carry
+ * hashGuestToken(token), never the token (lib/guestSession.ts). A browser that
+ * carries the AGE-SCREEN block flag gets no row and no cookie (403), the same
+ * backstop signup has; /try only calls this after an adult answer.
  */
 
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import crypto from 'node:crypto';
 import { prisma } from '@/lib/db';
 import { recordServerEvent } from '@/lib/analytics-server';
-import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE } from '@/lib/guest';
+import { hashGuestToken, mintGuestToken } from '@/lib/guest';
+import { createGuestSession, findGuestSession, guestTokenFrom, setGuestCookie } from '@/lib/guestSession';
+import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
   const jar = cookies();
-  let token = jar.get(GUEST_COOKIE)?.value ?? null;
-
-  // Reuse an existing valid guest token if present; otherwise mint a new one.
-  let existing = token ? await prisma.guestSession.findUnique({ where: { token } }) : null;
-  if (!existing) {
-    token = crypto.randomBytes(24).toString('base64url');
-    existing = await prisma.guestSession.create({ data: { token, data: {} } });
-    await recordServerEvent({ name: 'guest_start', guestId: token, props: {} });
-  } else {
-    await prisma.guestSession.update({ where: { token: token! }, data: { lastSeenAt: new Date() } });
+  if (jar.get(AGE_BLOCK_COOKIE)) {
+    return NextResponse.json({ ok: false }, { status: 403 });
   }
 
-  jar.set(GUEST_COOKIE, token!, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: GUEST_COOKIE_MAX_AGE,
-  });
+  // Reuse an existing valid guest token if present; otherwise mint a new one.
+  let token = guestTokenFrom(jar)?.token ?? null;
+  const existing = token ? await findGuestSession(prisma, hashGuestToken(token)) : null;
+  if (!existing) {
+    token = mintGuestToken();
+    const hash = hashGuestToken(token);
+    await createGuestSession(prisma, hash);
+    await recordServerEvent({ name: 'guest_start', guestId: hash, props: {} });
+  } else {
+    await prisma.guestSession.update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } });
+  }
+
+  setGuestCookie(jar, token!);
 
   return NextResponse.json({ ok: true, guest: true });
 }

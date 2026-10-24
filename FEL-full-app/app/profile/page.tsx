@@ -13,6 +13,7 @@ import { gameVitals, ownedFromEntitlements } from '@/lib/cards/boosts';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileView } from '@/components/profile-view';
+import { AthleteStatusSection } from '@/components/profile/athlete-status-card';
 import { BoostShelf } from '@/components/cards/boost-shelf';
 import { ReferralCard } from '@/components/marketing/referral-card';
 import { CardEditor } from '@/components/creator/card-editor';
@@ -96,6 +97,9 @@ export default async function ProfilePage() {
       </nav>
 
       <ProfileView userName={session.user?.name ?? 'Athlete'} email={session.user?.email ?? ''} />
+
+      {/* #337: the athlete status card (components/profile/athlete-status-card.tsx), placed by profile-v2 when it lands */}
+      <AthleteStatusSection userId={me} />
 
       <BoostShelf shards={shards} owned={owned} />
 
