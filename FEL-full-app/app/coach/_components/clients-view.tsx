@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Loader2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
 import { AttentionPanel } from '@/components/coach/attention-panel';
+import { DraftsInbox } from '@/components/coach/drafts-inbox';
 import { ScreenPrescriptions } from '@/components/coach/screen-prescriptions';
 import { ProgramBuilder, type BuilderCatalogueItem } from '@/components/coach/program-builder';
 import { CoverageLegend, CoverageStrip } from '@/components/coach/coverage-strip';
@@ -94,6 +95,8 @@ export function ClientsView() {
           coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
           the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}
       <AttentionPanel />
+      {/* COACH-AI-DRAFT (2026-10-24): this week's drafted program changes, one card per athlete; nothing changes until approved */}
+      <DraftsInbox />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
