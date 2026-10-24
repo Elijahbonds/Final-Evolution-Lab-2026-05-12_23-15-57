@@ -482,7 +482,7 @@ The policy must be live before the switch is turned on (§7, step 7).
 | `components/nexus-studio/studio-app.tsx` | one import and one mount line. That file changed 9 h before this lane on `lane/finish-release`, so expect a trivial merge |
 | `tests/helpers/writeSpyDb.ts` | `$queryRaw*` recorded, returning no rows |
 | `lib/nav/modules.test.ts` | the STAGED line removed: `cloudRoute.ts` is wired now |
-| `lib/privacy/u13-lock-log.test.ts` | the schema-ban pin advanced to `fe5064a8`, then to `cb1029d8` (the four models), as its own rule requires. Measured: it fails without the bump |
+| `lib/privacy/u13-lock-log.test.ts` | the schema-ban pin advanced to `fe5064a8`, then to `cb1029d8` (the four models), then to `d4d15aca` (the merge with release carrying RateLimit too), as its own rule requires. Measured: it fails without the bump |
 | `scripts/sql-guard-prisma-tests.ts`, `docs/DB-GUARD.md` | (merge with release, 2026-10-24) seven cases for this PR's four pending files; the PartyReport DROP case re-cast as a table the schema lacks (`test changed:` PartyReport is modelled now); the §7 rollback row and dated §6/§8 notes |
 
 **Routed:** `docs/NEXUS-STUDIO.md` §2.1 still says "No server persistence". Its holder this round is studio-5. The

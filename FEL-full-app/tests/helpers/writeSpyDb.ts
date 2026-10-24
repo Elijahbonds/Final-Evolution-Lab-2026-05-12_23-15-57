@@ -143,20 +143,27 @@ function table(db: SpyDb, model: string) {
 
 /** A Prisma-shaped client over `db`. Pass it where a route's `prisma` (or a transaction client) goes. */
 export function spyPrisma(db: SpyDb): any {
+  return spyClient(db, false);
+}
+
+// `$queryRaw*` exists on the TRANSACTION client only (a read-only raw query there: the Studio save's advisory lock,
+// `SELECT pg_advisory_xact_lock(...)::text`; recorded, not a write, no rows). The top-level stand-in keeps no
+// `$queryRaw*`, as it had before lane/studio-save: lib/rate-limits/store.ts treats a client without raw SQL as "a test
+// stand-in, fail open silently", while a raw query answering no rows is a failed count it logs (MERGE 2026-10-24).
+function spyClient(db: SpyDb, inTx: boolean): any {
   const client: any = new Proxy({}, {
     get: (_t, prop) => {
       if (prop === 'then' || typeof prop === 'symbol') return undefined;
       if (prop === '$transaction') {
         return async (arg: unknown) => {
           db.calls.push({ op: '$transaction', args: typeof arg === 'function' ? 'callback' : 'array' });
-          return typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(client) : Promise.all(arg as Promise<unknown>[]);
+          return typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(inTx ? client : spyClient(db, true)) : Promise.all(arg as Promise<unknown>[]);
         };
       }
       if (String(prop).startsWith('$executeRaw')) {
         return async (...a: unknown[]) => { db.calls.push({ op: String(prop), args: a }); return 0; };
       }
-      // a read-only raw query (an advisory lock: `SELECT pg_advisory_xact_lock(...)::text`): recorded, not a write, no rows
-      if (String(prop).startsWith('$queryRaw')) {
+      if (inTx && String(prop).startsWith('$queryRaw')) {
         return async (...a: unknown[]) => { db.calls.push({ op: String(prop), args: a }); return []; };
       }
       return table(db, String(prop));

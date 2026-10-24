@@ -53,7 +53,9 @@ const UA = 'AgeScreenTest/1.0';
 // RATE-LIMITS (lane/rate-limits, PR #289 rebuilt on release, 2026-10-23): the RateLimit model (table rate_limits) in
 // schema.prisma and prisma/pending/2026-10-16-rate-limits.sql at 3887ceef. lane/studio-save (#373) also changes prisma/:
 // whichever of the two lands second bumps this to the merge commit carrying both.
-const PARENT = 'cb1029d888353898f4c14e30af1face0f7861564'; // MERGE-PENDING: re-pinned in the next commit
+// STUDIO-SAVE x RATE-LIMITS: lane/studio-save landed second, so pinned at its merge of lane/finish-release, the first
+// commit carrying both (RateLimit and #373's five models in one regenerated client), d4d15aca.
+const PARENT = 'd4d15acab50ecaaaa6362f450e9226dfcc226d97';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
