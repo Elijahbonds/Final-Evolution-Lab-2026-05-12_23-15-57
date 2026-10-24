@@ -219,6 +219,13 @@ export const SCHEMES: Record<string, VCScheme> = {
     buttons: [{ pos: 'a', label: 'SWING', key: ' ', color: GREEN }],
     hint: 'A swings — time it as the ball enters the hit zone.',
   },
+  // DERBY-KEY (2026-10-23): GameShell looks its scheme up by session key, and /play/derby saves under 'derby' now. The
+  // same pad the derby had under 'baseball' (its 2D / R3F fallbacks are the same components).
+  derby: {
+    dir: null,
+    buttons: [{ pos: 'a', label: 'SWING', key: ' ', color: GREEN }],
+    hint: 'A swings — time it as the ball enters the hit zone.',
+  },
   golf: {
     dir: null,
     buttons: [{ pos: 'a', label: 'STROKE', key: ' ', color: GREEN }],

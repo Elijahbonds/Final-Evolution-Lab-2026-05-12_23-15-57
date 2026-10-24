@@ -54,7 +54,7 @@ export const FAMILIES: Family[] = [
   },
   {
     id: 'field', label: 'Field & Court', blurb: 'The other sports, one skill each.', accent: PALETTE.emerald,
-    modes: ['football', 'soccer', 'baseball', 'tennis', 'volleyball', 'golf', 'tiebreak'],
+    modes: ['football', 'soccer', 'baseball', 'derby', 'tennis', 'volleyball', 'golf', 'tiebreak'],   // DERBY-KEY: the derby is back on the shelf
   },
   {
     id: 'party', label: 'Party', blurb: 'What you put on when people are round.', accent: PALETTE.gold,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { finishCountGate } from '@/lib/sessions/finishRateLimit';
 import { finishTierRefusal, runTierOf } from '@/lib/sessions/runTier';
 import { applyLc, sessionWalletGrant } from '@/lib/wallet/wallet-service';
 import { REASON } from '@/lib/wallet/reward-rules';
@@ -182,6 +183,13 @@ export async function POST(req: Request) {
     const mode = String(body?.mode ?? '');
     const opponentScore = Math.max(0, Math.floor(Number(body?.opponentScore ?? 0)));
     const claimedWon = Boolean(body?.won);
+    // RATE-LIMIT-WIRE (partial): more recorded finishes in the last minute than any honest player makes is refused 429
+    // before anything is read or written (lib/sessions/finishRateLimit.ts; GameSession [userId, createdAt])
+    const finishGate = await finishCountGate(prisma, userId);
+    if (!finishGate.ok) {
+      console.warn(`[sessions] RATE_LIMITED finish: ${finishGate.count} in the window (limit ${finishGate.limit}) user ${userId}`);
+      return NextResponse.json({ ok: false, reason: 'RATE_LIMITED', retryAfterSec: finishGate.retryAfterSec }, { status: 429, headers: { 'Retry-After': String(finishGate.retryAfterSec) } });
+    }
     // ECONOMY-SESSIONS-HARDEN (2026-09-28): the client's `score` is checked AS SENT (lib/sessions/modeScoreRules.ts) and
     // its `duration` is not believed at all — a run's duration is the server's, now − the run's startedAt, below. The
     // client's duration is kept only as the length a Studio creation save reports (telemetry; a creation pays nothing).

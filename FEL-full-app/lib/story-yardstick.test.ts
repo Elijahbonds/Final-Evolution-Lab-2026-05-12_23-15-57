@@ -148,7 +148,7 @@ describe('each yardstick is what its mode actually posts', () => {
     }
     const homer = Math.round(q * (80 + launch * 60));
     expect([timingWon('DERBY_END', { homers: 3 }), timingWon('DERBY_END', { homers: 2 })]).toEqual([true, false]);
-    expect(STORY_YARDSTICKS.baseball).toMatchObject({ reach: 3 * homer, postsWin: true });
+    expect(STORY_YARDSTICKS.derby).toMatchObject({ reach: 3 * homer, postsWin: true });   // DERBY-KEY: the derby's own key
   });
 
   it('Breakaway: five drives, a touchdown pays 100 or more — and finishing all five posts a win', () => {

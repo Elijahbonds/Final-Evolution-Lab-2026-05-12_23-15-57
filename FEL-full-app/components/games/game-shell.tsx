@@ -346,7 +346,7 @@ function GameShellInner({
             windowEvents: inputCount.current,
             harnessEvidence: countedSince(sessionStore.record(), runMark.current),
             agentEvidence: agentPlayEvidence(),
-          }),
+          }, mode),
           // HOOPS BODY (P10): the body's form read for this run — null for a minor or an unknown age (formForPost); the route
           // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
           ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }

@@ -15,8 +15,11 @@ const BaseballGame2D = dynamicImport(() => import('@/components/games/baseball-g
 const Baseball3D = dynamicImport(() => import('@/components/games/baseball-3d'), { ssr: false, loading: spinner });
 
 // BASEBALL-3INN (2026-10-22): the home-run derby's own route — the same timing host, mode and title that /play/baseball
-// served until baseball became its own three-inning mode there. Sessions still post under 'baseball' (the catalogue key
-// the derby has always been scored and paid under; GameShell's mode below is unchanged).
+// served until baseball became its own three-inning mode there.
+// DERBY-KEY (owner, 2026-10-23): the derby saves its sessions under its own key, 'derby', with its own score rules, stake
+// ceiling and arena baseline (each copied from the values it had under 'baseball'), so the three-inning game keeps
+// 'baseball' to itself. Sessions saved before this change stay under 'baseball'; nothing was migrated.
+// The renderer flag is still the route flag 'baseball', which flips both ballpark routes (components/three/flags.ts).
 const DerbyBabylon = dynamicImport(
   () => import('@/components/games/timing-babylon').then((m) => ({
     default: m.makeTimingHost({ modeKey: 'derby', tag: 'FEL-DERBY', swingLabel: 'STRIKE', hint: 'Move the PCI onto the pitch with the stick · STRIKE as it crosses the plate' }),
@@ -27,5 +30,5 @@ const DerbyBabylon = dynamicImport(
 export function DerbyLoader() {
   const babylon = isBabylon('baseball');
   const Game = babylon ? DerbyBabylon : is3D('baseball') ? Baseball3D : BaseballGame2D;
-  return <GameShell mode="baseball" title="MOONSHOT DERBY" venue="Catalina Ballpark" Game={Game} ownControls={babylon} />;
+  return <GameShell mode="derby" title="MOONSHOT DERBY" venue="Catalina Ballpark" Game={Game} ownControls={babylon} />;
 }

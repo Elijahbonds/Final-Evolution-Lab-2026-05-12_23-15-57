@@ -22,7 +22,7 @@ export const MODE_DISCIPLINE: Record<string, Discipline> = {
   karateEndless: 'sport', karateVersus: 'sport', mixedcombat: 'sport', duel: 'sport', showdown: 'sport',
   skateboarding: 'sport', snowboarding: 'sport', surfing: 'sport', bigAir: 'sport',
   velocityKart: 'sport', aeroAces: 'sport', freerun: 'sport', sprint: 'sport',   // HOTFIX (2026-09-24): was 'velocitykart' / 'aeroaces', which matched no racing session
-  football: 'sport', soccer: 'sport', baseball: 'sport', tennis: 'sport', volleyball: 'sport',
+  football: 'sport', soccer: 'sport', baseball: 'sport', derby: 'sport', tennis: 'sport', volleyball: 'sport',
   golf: 'sport', tiebreak: 'sport', training: 'sport',
 
   // The craft modes each map to their own thing.
