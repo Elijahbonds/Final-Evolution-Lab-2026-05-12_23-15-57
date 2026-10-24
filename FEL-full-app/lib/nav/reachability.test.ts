@@ -184,4 +184,14 @@ describe('the doors', () => {
     expect(labelFor('/live')).toBe('Program guide');
     expect(labelFor('/create')).toBe('Create');
   });
+
+  it('distinguishes couch multiplayer from the social party room on Play', () => {
+    const playPage = readFileSync(join(ROOT, 'app/play/page.tsx'), 'utf8');
+    const partyDoor = DOORS.find((d) => d.href === '/party');
+
+    expect(playPage).toContain('href="/play/party"');
+    expect(playPage).toContain('Couch multiplayer');
+    expect(playPage).not.toContain('Play with friends');
+    expect(partyDoor?.label).toBe('Party chat');
+  });
 });
