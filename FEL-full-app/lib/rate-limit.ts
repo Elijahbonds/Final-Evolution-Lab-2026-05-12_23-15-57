@@ -61,6 +61,11 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   };
 }
 
+/** Tests only: forget every window (a test file that drives one limited route many times as one caller). */
+export function resetRateLimitMemory(): void {
+  store.clear();
+}
+
 /** Best-effort client identifier for anonymous endpoints (signup). */
 export function clientKeyFromHeaders(headers: Headers): string {
   const forwarded = headers.get('x-forwarded-for');
