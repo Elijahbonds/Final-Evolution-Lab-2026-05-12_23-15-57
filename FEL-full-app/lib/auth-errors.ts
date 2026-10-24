@@ -14,3 +14,6 @@
  * and port.
  */
 export const AUTH_SERVICE_UNAVAILABLE = 'ServiceUnavailable';
+
+/** Too many sign-in attempts for this email or address (RATE-LIMIT-WIRE, lib/rate-limits/login.ts): wait, then retry. */
+export const AUTH_RATE_LIMITED = 'RateLimited';
