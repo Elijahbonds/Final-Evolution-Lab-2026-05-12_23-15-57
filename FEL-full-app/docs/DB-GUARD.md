@@ -256,6 +256,9 @@ db-guard, but not a person at a terminal. The verify step catches whatever resul
    - **Never apply the DROP.**
    - The fix is a lane change that adds the model to `schema.prisma` and regenerates `public/_prisma` on Linux. Each
      pending file's header has the model block. Until then, **every** db-guard run stops here (§8).
+   - **Done for all four by PR #373** (`lane/studio-save`, owner 2026-10-20 "Add the 3 models"). Once #373 is on the
+     branch db-guard reads, these four files are schema-backed and match like any other (`sql-guard-prisma-tests.ts`),
+     so a `DROP` of one of them then means something else is wrong: stop and read the diff.
 3. **NO PENDING FILE.** Production is behind a schema change that has no reviewed file. Write the file in a lane and
    review it, then run db-guard again.
 4. **PARTLY APPLIED?** Production has part of a file. Find out what landed (the "Diff now" block), then decide by
@@ -295,6 +298,7 @@ of the apply order: call-signal before booking, booking before instructor. These
 | `2026-10-13-creator-inquiry.sql` | `DROP TABLE "CreatorInquiry";` |
 | `2026-10-13-party-report.sql` | `DROP TABLE "PartyReport";` |
 | `2026-10-16-rate-limits.sql` | `DROP TABLE "rate_limits";` (the limits then fail open) |
+| `2026-10-17-studio-project-save.sql` | `DROP TABLE "StudioProjectSave";` (only after a deploy without the model, and with `STUDIO_CLOUD_SAVE_ENABLED` off) |
 
 To run one by hand: `npx prisma db execute --url "$PROD_DIRECT_URL" --stdin <<< '<the line>'`. Then run the read-only
 `migrate diff`. It will now list the object again.
@@ -310,6 +314,10 @@ To run one by hand: `npx prisma db execute --url "$PROD_DIRECT_URL" --stdin <<< 
   - The fix is the post-launch lane the runbook already names: add both models to `schema.prisma` and regenerate the
     client on Linux. The book shop's two tables do the same on the day it opens.
   - Until that lane lands, db-guard can still guard a release, but it cannot apply one.
+  - **Landed in PR #373** (2026-10-24): `PartyReport`, `CreatorInquiry`, `BookFulfillmentEvent` and `BookEntitlement`
+    are modelled, each matching its pending file statement for statement, so this limit and the next one no longer
+    apply once #373 is merged. `lib/party/social/reports.ts` and `lib/creator/inquiryStore.ts` still write through raw
+    SQL behind their `information_schema` probe; the models only keep the schema and the database in agreement.
 - **The raw-SQL pending files are never applied by db-guard.** They are not in the schema, so they never appear in the
   diff. `OWNER-RUNBOOK.md` §6 stays the way to apply them.
 - **Hand-written files must be in Prisma's form to auto-apply.** `2026-10-07-adventure-save.sql` is not (§2).

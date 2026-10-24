@@ -55,17 +55,19 @@ describe('no mailing address set', () => {
 
   // test changed (2026-10-16, owner-approved Studio AI builder disclosure): the version pin was '2026-10-14b'; the version moves with
   // the policy text (lib/policies.ts STUDIO-AI-DISCLOSURE). Both pins below follow it.
+  // test changed (2026-10-24, merge of lane/finish-release into lane/studio-save, PR #373): '2026-10-16' -> '2026-10-17', the
+  // owner-approved Studio-save §1/§2/§4 text (lib/policies.ts STUDIO-SAVE; fingerprint pinned in lib/policies.test.ts).
   it('/privacy reads cleanly after the dropped clause', async () => {
     const html = await render(PrivacyPage);
     expect(html).toContain('from the email address on your account. We may ask you to confirm it is you');
     expect(html).toContain('Final Evolution LLC');
-    expect(html).toContain('Policy version: 2026-10-16');
+    expect(html).toContain('Policy version: 2026-10-17');
   });
 
   it('/terms keeps its Contact section and version', async () => {
     const html = await render(TermsPage);
     expect(html).toContain('Final Evolution LLC');
-    expect(html).toContain('Policy version: 2026-10-16');
+    expect(html).toContain('Policy version: 2026-10-17');
   });
 
   it('/store-terms drops only the mailing-address section', async () => {

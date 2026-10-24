@@ -46,10 +46,16 @@ const UA = 'AgeScreenTest/1.0';
 // pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
 // PARTY-PRIVACY (this lane) prisma/pending/2026-10-13-party-report.sql RETENTION comment only (12 months, with the delete
 // statement; pending SQL only, no column or index added) at 521c52c1.
+// STUDIO-SAVE (owner-approved 2026-10-17) StudioProjectSave model + regenerated client +
+// prisma/pending/2026-10-17-studio-project-save.sql (pending SQL only, applied in the deploy session) at fe5064a8.
+// PENDING-MODELS (owner 2026-10-20, "Add the 3 models"; lane/studio-save) PartyReport, CreatorInquiry,
+// BookFulfillmentEvent and BookEntitlement models matching their pending SQL + regenerated client at cb1029d8.
 // RATE-LIMITS (lane/rate-limits, PR #289 rebuilt on release, 2026-10-23): the RateLimit model (table rate_limits) in
 // schema.prisma and prisma/pending/2026-10-16-rate-limits.sql at 3887ceef. lane/studio-save (#373) also changes prisma/:
 // whichever of the two lands second bumps this to the merge commit carrying both.
-const PARENT = '3887ceef5e26ac2efe47bb901a8ec81203e7acea';
+// STUDIO-SAVE x RATE-LIMITS: lane/studio-save landed second, so pinned at its merge of lane/finish-release, the first
+// commit carrying both (RateLimit and #373's five models in one regenerated client), d4d15aca.
+const PARENT = 'd4d15acab50ecaaaa6362f450e9226dfcc226d97';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

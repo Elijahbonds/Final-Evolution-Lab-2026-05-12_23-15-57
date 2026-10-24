@@ -11,8 +11,8 @@
  *
  * Measured 2026-10-20 (Prisma 6.7.0): every schema-backed pending file matches; the hand-written AdventureSave file
  * does NOT (inline PRIMARY KEY / REFERENCES, not Prisma's form), so if production ever lacked that table the guard
- * would stop and ask rather than apply it; a production that already has a raw-SQL table (PartyReport) prints a DROP,
- * and the guard stops.
+ * would stop and ask rather than apply it; a production that has a table the schema lacks prints a DROP, and the guard
+ * stops. Since #373 (2026-10-24) PartyReport, CreatorInquiry and the book tables are modelled and match too.
  *
  * Run: npx tsx scripts/sql-guard-prisma-tests.ts
  */
@@ -135,10 +135,36 @@ const cases: Case[] = [
     prod: withoutType(SCHEMA, 'AdventureSave'),
     expect: d => { assert.strictEqual(d.kind, 'unexpected'); assert.match(d.kind === 'unexpected' ? d.reasons.join('\n') : '', /NO PENDING FILE: CREATE TABLE "AdventureSave"/); },
   },
+  // STUDIO-SAVE (#373, owner 2026-10-20 "Add the 3 models"): PartyReport, CreatorInquiry and the two book tables are
+  // modelled now, so each of their pending files is schema-backed and must match what Prisma prints, alone and as the
+  // deploy session applies them.
+  { name: 'book shop: two tables and the User FK', prod: ['BookEntitlement', 'BookFulfillmentEvent'].reduce(withoutType, SCHEMA), expect: match('book-shop') },
+  { name: 'creator inquiry', prod: withoutType(SCHEMA, 'CreatorInquiry'), expect: match('creator-inquiry') },
+  { name: 'party report', prod: withoutType(SCHEMA, 'PartyReport'), expect: match('party-report') },
+  { name: 'studio project save: composite key and the User FK', prod: withoutType(SCHEMA, 'StudioProjectSave'), expect: match('studio-project-save') },
   {
-    name: 'production already has the raw-SQL PartyReport table: the DROP stops',
-    prod: `${SCHEMA}\nmodel PartyReport {\n  id           String   @id\n  reporterId   String?\n  reportedId   String?\n  reportedName String\n  partyCode    String\n  reason       String\n  reportedAt   DateTime\n  createdAt    DateTime @default(now())\n  @@index([reportedId])\n  @@index([createdAt])\n}\n`,
-    expect: d => { assert.strictEqual(d.kind, 'unexpected'); assert.match(d.kind === 'unexpected' ? d.reasons.join('\n') : '', /DESTRUCTIVE: DROP TABLE "PartyReport".*2026-10-13-party-report\.sql/); },
+    name: '#373 deploy session: all four files at once, in apply order',
+    prod: ['BookEntitlement', 'BookFulfillmentEvent', 'CreatorInquiry', 'PartyReport', 'StudioProjectSave'].reduce(withoutType, SCHEMA),
+    expect: match('book-shop', 'creator-inquiry', 'party-report', 'studio-project-save'),
+  },
+  {
+    name: '#373 deploy session when production already has the raw-SQL tables: only book shop + studio save',
+    prod: ['BookEntitlement', 'BookFulfillmentEvent', 'StudioProjectSave'].reduce(withoutType, SCHEMA),
+    expect: match('book-shop', 'studio-project-save'),
+  },
+  {
+    name: '#373 deploy session together with rate limits (both lanes pending)',
+    prod: ['BookEntitlement', 'BookFulfillmentEvent', 'CreatorInquiry', 'PartyReport', 'StudioProjectSave', 'RateLimit'].reduce(withoutType, SCHEMA),
+    expect: match('book-shop', 'creator-inquiry', 'party-report', 'rate-limits', 'studio-project-save'),
+  },
+  // test changed (#373): this case appended a second `model PartyReport` to stand for production's raw-SQL table. With
+  // PartyReport modelled that is a duplicate model (Prisma P1012), and no raw-SQL table is left unmodelled. The case
+  // now stands for a table production has and the schema dropped: Prisma prints the DROP, and the guard stops. That a
+  // DROP of a pending file's table names that file stays proven on hand-built diffs (sql-guard-tests.ts).
+  {
+    name: 'production has a table the schema does not: the DROP stops',
+    prod: `${SCHEMA}\nmodel RetiredTable {\n  id        String   @id\n  createdAt DateTime @default(now())\n}\n`,
+    expect: d => { assert.strictEqual(d.kind, 'unexpected'); assert.match(d.kind === 'unexpected' ? d.reasons.join('\n') : '', /DESTRUCTIVE: DROP TABLE "RetiredTable"/); },
   },
   { name: 'production equals the schema: empty', prod: SCHEMA, expect: d => assert.deepStrictEqual(d, { kind: 'empty' }) },
 ];
