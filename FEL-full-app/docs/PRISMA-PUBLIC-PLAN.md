@@ -91,7 +91,10 @@ Controls, run locally against the guard: a field added to `prisma/schema.prisma`
 `public/_prisma/schema.prisma`. Costs:
 
 - about +3 s for every generate, including `postinstall`, `build`, and CI's two generates;
-- +27 MB on disk, and about +10 MB packed in git (measured in the lane report).
+- +27.5 MB in the checkout, but only **~0.17 MB of new packed git objects** (measured: `git rev-list --objects
+  9af2c2ae..<step 1> | git pack-objects --stdout | wc -c` = 173,665 bytes). The engine and the runtime files are
+  byte-identical to the ones under `public/_prisma/client`, and git stores a blob once. A clone does not grow in any
+  way that matters. Step 4 then takes 46.6 MB out of the checkout (about 18 MB packed), but not out of history.
 
 From now on, every schema lane regenerates both clients. It already does: `npm run prisma:generate` runs both.
 
@@ -120,14 +123,35 @@ From now on, every schema lane regenerates both clients. It already does: `npm r
   `outputFileTracingIncludes` traces `./lib/generated/prisma/**/*` in place of `./node_modules/.prisma/client/**/*`,
   which nothing imports any more. A missing engine is a no-op, not a failed build: CI's `.next-verify` build still
   works without a generate.
-- All 113 `@/public/_prisma/client` imports (110 `from`, 3 `import()`, 1 `vi.mock`) and the two probes'
+- All `@/public/_prisma/client` imports in 113 files (110 `from`, 3 `import()`, 1 `vi.mock`) and the two probes'
   `../../public/_prisma/client/index.js` become `@/lib/generated/prisma`. The change is mechanical, and a test pins
   that none are left.
 - `public/_prisma` is **not** deleted and not changed. It keeps shipping, unused, so a rollback is a plain revert.
 
-**Risk: MEDIUM.** This is the step that changes what production loads. Locally it is proven (see the lane report:
-`next build` copies the engine, and a server started from a directory with **no `lib/`** answers DB-backed routes
-through `.next/prisma-engine`). The packaging is the part only a deploy proves.
+**Risk: MEDIUM.** This is the step that changes what production loads.
+
+**Proven locally on 2026-10-24**, with no deploy and a throwaway Postgres on :55441 (deleted afterwards):
+
+- **The build.** `next build` (`NEXT_DIST_DIR=.next-prisma-move`, 565 s) wrote
+  `.next-prisma-move/prisma-engine/libquery_engine-debian-openssl-3.0.x.so.node`. It is byte-identical to the committed
+  engine.
+- **A function-shaped directory.** It held only `package.json`, `next.config.js`, `public/` and the build output,
+  with **no `lib/`**, and `next start` was run from it.
+  - `GET /p/nope` returned **404** through a real `shareLink.findUnique` (the table was created by hand in the
+    throwaway).
+  - `/api/coach/invite/nope` failed with Prisma's own P2021 "table does not exist". That is the engine answering;
+    the throwaway database has no such table.
+  - `/proc/<pid>/maps` of the server shows exactly one engine mapped:
+    `.next-prisma-move/prisma-engine/libquery_engine-debian-openssl-3.0.x.so.node`.
+- **The rollback lever.** The same server was restarted with `PRISMA_QUERY_ENGINE_LIBRARY` set to the
+  `public/_prisma/client` engine. `/p/nope` still returned 404, and the maps show the public engine.
+- **A negative control, in plain Node.** The lib client was copied without its engine, with the engine only in
+  `.next/prisma-engine`.
+  - With `resolveQueryEngine()`, `findUnique` returned `null` and `select 1` worked.
+  - Without it, Prisma threw `PrismaClientInitializationError`, listing `lib/generated/prisma` among the paths it had
+    searched. That is the 2026-09 production failure, reproduced.
+
+The packaging is the part only a deploy proves.
 
 **Deploy proof (the owner approves and runs it; nothing merges to `main` without it).** See §7.
 
