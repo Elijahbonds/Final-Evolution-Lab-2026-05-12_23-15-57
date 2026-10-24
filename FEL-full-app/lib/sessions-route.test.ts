@@ -169,6 +169,11 @@ vi.mock('@/lib/db', () => {
   return {
     prisma: {
       $transaction: transaction,
+      // RATE-LIMIT-WIRE: the finish gate's count of the user's recorded finishes (GameSession [userId, createdAt])
+      gameSession: {
+        count: async ({ where }: { where: { userId: string; createdAt: { gte: Date } } }) => h.sessions
+          .filter((s) => s.userId === where.userId && new Date(String(s.createdAt ?? new Date())).getTime() >= where.createdAt.gte.getTime()).length,
+      },
       sessionRun: {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
@@ -1441,5 +1446,51 @@ describe('PRQ-ATTR-RACE: every run\'s PRQ gain lands, however many finish at onc
     // the two prq ledger rows add up to what the row gained — each says what IT added, not the other run's gain too
     expect(h.grants.filter((g) => g.grantType === 'prq')).toHaveLength(2);
     expect(Math.abs(filedPrq() - (prqScore(h.profile as never) - start))).toBeLessThan(0.11);
+  });
+});
+
+// RATE-LIMIT-WIRE (QA top-5 #4, partial): QA's repro looped start+finish and nothing ever returned 429. The finish now
+// counts the user's recorded finishes (GameSession) over the last minute; past RUN_RATE_LIMITS.finish.perUser it is 429.
+describe('the finish rate limit (GameSession count, per user)', () => {
+  it('normal play stays under it: five dunk contests back to back are all paid', async () => {
+    for (let i = 0; i < 5; i++) {
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status, `finish ${i + 1}`).toBe(200);
+    }
+  });
+  it('the next finish past the limit is 429 RATE_LIMITED with Retry-After, and nothing of the run is read or written', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });
+    const writesBefore = h.writes.length;
+    const runId = openRun('dunkContest', 120);
+    const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120, runId });
+    expect(r.status).toBe(429);
+    expect(r.body).toMatchObject({ ok: false, reason: 'RATE_LIMITED', retryAfterSec: 60 });
+    expect(h.writes.length).toBe(writesBefore);
+    expect(h.runs[runId].status).toBe('open');   // the run is still there to finish once the window passes
+  });
+  it('finishes older than the window and other players\' finishes do not count', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) {
+      h.sessions.push({ userId: 'u1', createdAt: new Date(Date.now() - 61_000) });
+      h.sessions.push({ userId: 'someone-else', createdAt: new Date() });
+    }
+    expect((await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 })).status).toBe(200);
+  });
+  it('FAIL OPEN (lane/rate-limits): when the count cannot be read, the finish is paid as before and one line is logged', async () => {
+    const { prisma } = (await import('@/lib/db')) as unknown as { prisma: { gameSession: { count: unknown } } };
+    const real = prisma.gameSession.count;
+    prisma.gameSession.count = async () => { throw Object.assign(new Error("Can't reach database server at 10.0.0.1:5432"), { name: 'PrismaClientInitializationError' }); };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');
+      for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });   // over it
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status).toBe(200);
+      expect(warn.mock.calls.map((c) => String(c[0]))).toContain('[rate-limits] finish_count_failed_failing_open PrismaClientInitializationError');
+    } finally {
+      prisma.gameSession.count = real;
+      warn.mockRestore();
+    }
   });
 });

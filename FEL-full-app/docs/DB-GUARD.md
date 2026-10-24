@@ -294,6 +294,7 @@ of the apply order: call-signal before booking, booking before instructor. These
 | `2026-10-09-book-shop.sql` | `DROP TABLE "BookEntitlement"; DROP TABLE "BookFulfillmentEvent";` |
 | `2026-10-13-creator-inquiry.sql` | `DROP TABLE "CreatorInquiry";` |
 | `2026-10-13-party-report.sql` | `DROP TABLE "PartyReport";` |
+| `2026-10-16-rate-limits.sql` | `DROP TABLE "rate_limits";` (the limits then fail open) |
 
 To run one by hand: `npx prisma db execute --url "$PROD_DIRECT_URL" --stdin <<< '<the line>'`. Then run the read-only
 `migrate diff`. It will now list the object again.
