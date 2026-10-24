@@ -13,7 +13,7 @@ export function BookCover({ title, tall = false }: { title: string; tall?: boole
       />
       <p className="relative text-[10px] font-semibold uppercase tracking-[0.18em] text-[#F5C518]">Final Evolution Press</p>
       <p className="fel-heading relative text-xl leading-tight text-white">{title}</p>
-      <p className="relative text-[10px] uppercase tracking-wider text-white/35">Cover placeholder</p>
+      <p className="relative text-[10px] uppercase tracking-wider text-white/35">Final Evolution title card</p>
     </div>
   );
 }
