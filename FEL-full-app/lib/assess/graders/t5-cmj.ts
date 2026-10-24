@@ -14,6 +14,15 @@
 //
 // A jump whose hands left the hips is not the standard (the arm-swing variant is not built) and is not counted.
 //
+// JUMP-PRO (2026-10-24): EACH FLIGHT IS THEN RE-TIMED FROM THE WHOLE FLIGHT (lib/jump/refine.ts). The finder above
+// still finds, refuses and orders every flight; the refiner moves its two edges to where the hips' free-fall parabola
+// meets the airborne leg, measures how much lower the body landed than it left, and takes that extra fall back out.
+// `heightCm` is then the TAKE-OFF-VELOCITY height (v0²/2g, the force plate's definition); `heightFlightCm` keeps the
+// plain g·T²/8 of the refined flight, and `heightSdCm` its own ±1 SD. On the ground-truth bench (lib/jump/bench.ts) the
+// finder alone read bent-knee landings +5 cm and flat-foot landings +3 cm high, and its take-off 7–12 ms late at
+// 120–240 fps; see docs/JUMP-PRO.md for the before/after table. A flight the refiner cannot re-time keeps the
+// finder's read (`method: 'frames'`).
+//
 // Pure.
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import type { FrontCalibration } from '../calibration';
@@ -25,6 +34,8 @@ import {
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 import type { GradeContext } from './t1-overhead-squat';
+import { refineFlight } from '@/lib/jump/refine';
+import { CI95_Z, trialQuality, sessionStats } from '@/lib/jump/session';
 
 export const G = 9.81;
 
@@ -240,9 +251,11 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
   const wLanding = th('t5.landingWindowMs');
   const jumps: (JumpRead & { landFrame: number; takeFrame: number })[] = [];
   for (const fl of flights) {
-    const flightMs = fl.landT - fl.takeoffT;
-    if (flightMs < th('t5.flightMinMs')) continue;                       // a hop, not an attempt
-    const heightCm = heightCmOf(flightMs);
+    if (fl.landT - fl.takeoffT < th('t5.flightMinMs')) continue;          // a hop, not an attempt (on the finder's own edges)
+    // JUMP-PRO: re-timed from the whole flight when it can be; the finder's frames otherwise
+    const rf = fl.landed && fl.check.ok ? refineFlight(raw, front, fl.takeoffT, fl.landT) : null;
+    const flightMs = rf ? rf.flightMs : fl.landT - fl.takeoffT;
+    const heightCm = rf ? rf.heightTovCm : heightCmOf(flightMs);
     const index = jumps.length + 1;
     let invalidWhy: string | undefined;
     if (!fl.landed) invalidWhy = 'the camera never saw you land';
@@ -268,7 +281,12 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
     jumps.push({
       index, valid: !invalidWhy, ...(invalidWhy ? { invalidWhy } : {}),
       flightMs: Math.round(flightMs), heightCm: Math.round(heightCm * 10) / 10,
-      takeoffT: Math.round(fl.takeoffT), landT: Math.round(fl.landT),
+      takeoffT: Math.round(rf ? rf.takeoffT : fl.takeoffT), landT: Math.round(rf ? rf.landT : fl.landT),
+      method: rf ? 'refined' : 'frames',
+      heightFlightCm: Math.round((rf ? rf.heightFlightCm : heightCm) * 10) / 10,
+      heightSdCm: rf ? Math.round(rf.heightTovSdCm * 10) / 10 : null,
+      landDropCm: rf && rf.landDropCm !== null ? Math.round(rf.landDropCm * 10) / 10 : null,
+      quality: trialQuality({ refined: rf, poseHz: hz, valid: !invalidWhy }),
       landingFlex: landed ? Math.round(deepest * 1000) / 1000 : null,
       landingValgus: { left: valg('left'), right: valg('right') },
       landingSymMs: !fpsLow && dl !== null && dr !== null ? Math.round(Math.abs(dl - dr)) : null,
@@ -321,9 +339,13 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
     bestFlightMs: bestJ ? bestJ.flightMs : null,
     bestJump: bestJ ? bestJ.index : null,
     poseFps: hz, cameraFps: ctx.cameraFps ?? null, fpsLow,
-    // one frame of timing on the best flight: dh = g·t·dt / 4
-    heightPlusMinusCm: bestJ && hz > 0 ? Math.round(((G * (bestJ.flightMs / 1000) * (1 / hz)) / 4) * 1000) / 10 : null,
+    // one frame of timing on the best flight: dh = g·t·dt / 4 — or, when it is wider, the best jump's own 95 % range
+    // (JUMP-PRO: the refiner's ±1 SD × 1.96). The band shown is never narrower than one frame's worth.
+    heightPlusMinusCm: bestJ && hz > 0
+      ? Math.round(Math.max((G * (bestJ.flightMs / 1000) * (1 / hz)) / 4 * 100, CI95_Z * (bestJ.heightSdCm ?? 0)) * 10) / 10
+      : null,
     cvPct, inconsistent: cvPct !== null && cvPct >= bandOf('t5.cvPct').fault!,
+    session: sessionStats(valid),
   };
   const passing = ok.filter(Boolean).length;
   const confidence = confidenceOf(passing, raw.length, hz);
