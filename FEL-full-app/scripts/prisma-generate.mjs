@@ -54,7 +54,7 @@ const SOURCE_SCHEMA = join(APP, 'prisma', 'schema.prisma');
 export const LIB_BINARY_TARGETS = ['debian-openssl-3.0.x'];
 const TEXT = /\.(js|mjs|cjs|ts|json|prisma)$/;
 
-/** Strip the app root from every text file of the generated client. Returns the files it changed. */
+/** Strip the app root (and the CI-only `ciName`) from every text file of the generated client. Returns the files it changed. */
 export function normalizeClientPaths(clientDir = CLIENT, appRoot = APP) {
   const roots = [...new Set([appRoot, existsSync(appRoot) ? realpathSync(appRoot) : appRoot])].map((r) => `${r}/`);
   const changed = [];
@@ -67,6 +67,9 @@ export function normalizeClientPaths(clientDir = CLIENT, appRoot = APP) {
     const before = readFileSync(file, 'utf8');
     let after = before;
     for (const r of roots) after = after.split(r).join('');
+    // `ciName` is written only when the generate runs under a CI (e.g. "GitHub Actions"), so a CI regeneration differs
+    // from a local one. The runtime reads it for one Vercel/Netlify caching warning, so dropping it changes nothing.
+    after = after.replace(/^[ \t]*"ciName": "[^"\n]*",\n/gm, '');
     if (after !== before) { writeFileSync(file, after); changed.push(file.slice(appRoot.length + 1)); }
   }
   // Refuse to leave an absolute path in the generator config behind (a root this script did not know about).

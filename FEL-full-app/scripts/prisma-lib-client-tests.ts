@@ -160,6 +160,12 @@ async function main() {
     assert.ok(!libOutput.test(source), 'prisma/schema.prisma is unchanged by step 1 (no second generator)');
   });
 
+  await ok('the committed clients carry no CI-only ciName (scripts/prisma-generate.mjs drops it)', () => {
+    for (const f of [`${LIB}/index.js`, `${LIB}/edge.js`, `${PUB}/index.js`, `${PUB}/edge.js`]) {
+      assert.ok(!/"ciName":/.test(read(f)), `${f} carries a ciName: regenerate with \`npm run prisma:generate\``);
+    }
+  });
+
   await ok('CI: the regenerated lib client is byte-identical to the committed one', () => {
     if (!process.env.CI) { console.log('      (local run: skipped; CI compares after npm ci regenerates it)'); return; }
     // Working tree against the index (in CI the index is the commit): changed files, then files the commit lacks.
