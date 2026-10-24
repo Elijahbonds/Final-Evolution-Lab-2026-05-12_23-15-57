@@ -926,9 +926,27 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(sessionRulesMax('hoops3v3', SCORE_CEILINGS.hoops3v3)).toBe(SCORE_CEILINGS.hoops3v3.max);   // no option: the stake row
     expect(Object.keys(SESSION_RULES_CEILINGS)).toEqual(['hoops1v1', 'threePoint']);   // IMPROVE (2026-10-06, 3PT #5): the money rack is the second option
     for (const t of [one, three]) {
-      for (const m of t.matchAll(/myScore \+= (\w+);/g)) expect(['arcPoints', 'points', '2']).toContain(m[1]);
+      // `n` is the free-throw line's host (lane/hoops-shot-content): the line adds one point a make and the host ends the game
+      // the moment the mode's own rule says so — bounded below the ceiling, proved just after this loop
+      for (const m of t.matchAll(/myScore \+= (\w+);/g)) expect(['arcPoints', 'points', '2', 'n']).toContain(m[1]);
+      expect([...t.matchAll(/myScore \+= n;/g)]).toHaveLength(1);
       expect(t).not.toMatch(/arcPoints = [^;]*\? 4/);
     }
+    // FREE THROWS cannot pass the ceiling. A make is FREE_THROW_POINTS (1, under bucketMax), the line scores only through
+    // host.score and stops the trip the moment it returns true, and each host's score() is the mode's own end rule after
+    // every single point: 1v1 checkGameOver (first to TARGET_SCORE, or the win-by-2 cap), 3v3 TARGET_SCORE. So a trip from
+    // below the target ends AT the target, never past it. Free throws only start while the game is live: every and-one site
+    // runs its end check before the trip. The one place a trip is not stopped by the target is 3v3 sudden-death overtime,
+    // because the horn waits for the trip. There the score starts tied below TARGET_SCORE and at most three shots are made
+    // before the horn ends it, so the score is at most TARGET_SCORE - 1 + 3, the same as the bucketMax bucket the ceiling
+    // already allows for.
+    const ftLine = src('lib/babylon/core/FreeThrowLine.ts'), ftRules = src('lib/babylon/core/FreeThrows.ts');
+    expect(num(ftRules, /export const FREE_THROW_POINTS = (\d+);/, 'FREE_THROW_POINTS')).toBeLessThanOrEqual(MIRRORED.bucketMax);
+    expect([...ftLine.matchAll(/\.score\(([^)]*)\)/g)].map((m) => m[1])).toEqual(['FREE_THROW_POINTS']);
+    expect(ftLine).toMatch(/if \(h\.score\(FREE_THROW_POINTS\)\) \{ this\.stopped = true; this\.seq\.cancel\(\);/);
+    expect(ftRules).toMatch(/if \(call\.id === 'shooting_foul'\) return shotWasThree \? 3 : call\.shots;/);   // at most three a trip
+    expect(one).toMatch(/score: \(n\) => \{ myScore \+= n; ctx\.setHud\(\{ score: myScore \}\); return checkGameOver\(ctx\); \}/);
+    expect(three).toMatch(/score: \(n\) => \{ myScore \+= n; putHud\(ctx, \{ score: myScore \}\); if \(myScore < TARGET_SCORE\) return false; ended = true;[^}]*ctx\.end\('WIN'/);
   });
 
   it('three-point racks and the money ball', () => {
