@@ -10,6 +10,8 @@ import { requestMove, type HandleHost } from './handleMotion';
 import { attachBallToHand } from './ballRig';
 import { pathFor, pathAt, PAUSIN_MAX_SEC } from './handlePaths';
 import { HOOPS_DRIBBLE } from './Dribble';
+import { MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } from './MoveEase';
+import { openFeel, closeFeel } from '@/tests/helpers/feelOverrides';
 
 function rig(scene: Scene) {
   const root = new TransformNode('root', scene);
@@ -351,30 +353,48 @@ describe('the modes\' wiring (U19)', () => {
 });
 
 describe('the contact schedule on the arms (plan §3.3)', () => {
-  it('between contacts the arm is the clip\'s (weight 0): a stub clip pose read back unchanged in the flight; on the ball the carry reaches for it', () => {
-    const s = setup();
-    const sh = s.r.nodes.LeftArm, el = s.r.nodes.LeftForeArm, rsh = s.r.nodes.RightArm;
-    const clipSh = sh.rotationQuaternion!.clone(), clipEl = el.rotationQuaternion!.clone(), clipR = rsh.rotationQuaternion!.clone();
-    const clip = () => { sh.rotationQuaternion!.copyFrom(clipSh); el.rotationQuaternion!.copyFrom(clipEl); rsh.rotationQuaternion!.copyFrom(clipR); };
-    const off = (a: Quaternion, b: Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(a, b)))) * 180 / Math.PI;
-    let n = 0; while (n++ < 200 && !(n > 60 && s.carry.phase < 0.03)) s.d.frame(1 / 60, 0.3, true, clip);
-    s.carry.runMove('crossover');
-    let inFlight = 0, onBall = 0;
-    for (let i = 0; i < 40; i++) {
-      const m0 = s.carry.move; if (!m0) break;
-      s.d.frame(1 / 60, 0.3, true, clip);
-      const m = s.carry.move; if (!m) break;
-      // (the move's state is read after the frame; the pass drew the sample of this t)
-      if (m.reach.right === 0 && m.reach.left === 0) {   // no hand on it or fading onto / off it: both arms the clip's own
-        inFlight++;
-        expect(off(sh.rotationQuaternion!, clipSh)).toBeLessThan(1e-3);   // the push arm (rig Left)
-        expect(off(rsh.rotationQuaternion!, clipR)).toBeLessThan(1e-3);   // the catch arm (rig Right)
+  // lane/h3-handler (#314 port) CHANGED this test, the way #314's e91824b5 did (same intent: between contacts the CARRY does not drive the
+  // arm — the clip owns it). The old assertion read the clip's pose back EXACTLY on every flight frame, i.e. the arm snapping from the reach
+  // to the clip in one frame (140° on this rig): the move pop #314 eases (anim/MoveEase). It is kept, word for word, as the A/B with the
+  // ease off (hoops.moveEaseOn 0); with the ease on (the default) the arm only ever goes TOWARD the clip's pose in the flight, no faster than
+  // the ease allows, and gets there.
+  const flight = (ease: boolean) => {
+    if (!ease) openFeel({ 'hoops.moveEaseOn': 0 });
+    try {
+      const s = setup();
+      const sh = s.r.nodes.LeftArm, el = s.r.nodes.LeftForeArm, rsh = s.r.nodes.RightArm;
+      const clipSh = sh.rotationQuaternion!.clone(), clipEl = el.rotationQuaternion!.clone(), clipR = rsh.rotationQuaternion!.clone();
+      const clip = () => { sh.rotationQuaternion!.copyFrom(clipSh); el.rotationQuaternion!.copyFrom(clipEl); rsh.rotationQuaternion!.copyFrom(clipR); };
+      const off = (a: Quaternion, b: Quaternion) => 2 * Math.acos(Math.min(1, Math.abs(Quaternion.Dot(a, b)))) * 180 / Math.PI;
+      let n = 0; while (n++ < 200 && !(n > 60 && s.carry.phase < 0.03)) s.d.frame(1 / 60, 0.3, true, clip);
+      s.carry.runMove('crossover');
+      let inFlight = 0, onBall = 0, reached = 0; let prevL: number | null = null, prevR: number | null = null;
+      const step = Math.max(MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG) / 60 + 1e-6;
+      for (let i = 0; i < 40; i++) {
+        const m0 = s.carry.move; if (!m0) break;
+        s.d.frame(1 / 60, 0.3, true, clip);
+        const m = s.carry.move; if (!m) break;
+        // (the move's state is read after the frame; the pass drew the sample of this t)
+        if (m.reach.right === 0 && m.reach.left === 0) {   // no hand on it or fading onto / off it: both arms the clip's own
+          inFlight++;
+          const dL = off(sh.rotationQuaternion!, clipSh), dR = off(rsh.rotationQuaternion!, clipR);   // the push arm (rig Left), the catch arm (rig Right)
+          if (!ease) { expect(dL).toBeLessThan(1e-3); expect(dR).toBeLessThan(1e-3); }   // (the old assertion)
+          else {
+            if (prevL !== null) { expect(dL).toBeLessThanOrEqual(prevL + 1e-6); expect(prevL - dL).toBeLessThanOrEqual(step); }
+            if (prevR !== null) { expect(dR).toBeLessThanOrEqual(prevR + 1e-6); expect(prevR - dR).toBeLessThanOrEqual(step); }
+            prevL = dL; prevR = dR;
+          }
+          if (dL < 1e-3 && dR < 1e-3) reached++;
+        } else { prevL = null; prevR = null; }
+        if (m.reach.left === 1) { onBall++; expect(off(rsh.rotationQuaternion!, clipR)).toBeGreaterThan(0.5); }   // the catch: the carry's reach
       }
-      if (m.reach.left === 1) { onBall++; expect(off(rsh.rotationQuaternion!, clipR)).toBeGreaterThan(0.5); }   // the catch: the carry's reach
-    }
-    expect(inFlight).toBeGreaterThan(0); expect(onBall).toBeGreaterThan(0);
-    s.carry.dispose();
-  });
+      expect(inFlight).toBeGreaterThan(0); expect(onBall).toBeGreaterThan(0);
+      expect(reached).toBeGreaterThan(0);   // the flight ends on the clip's own pose
+      s.carry.dispose();
+    } finally { if (!ease) closeFeel(); }
+  };
+  it('between contacts the arm is the clip\'s (weight 0), the ease OFF (the A/B): a stub clip pose read back unchanged in the flight; on the ball the carry reaches for it', () => flight(false));
+  it('between contacts the arm is the clip\'s (weight 0), the ease ON (#314): in the flight it eases to the stub clip pose and reaches it; on the ball the carry reaches for it', () => flight(true));
 });
 
 describe('the stride lock after a crossing (U20)', () => {

@@ -10,6 +10,11 @@ import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotC
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
+import { PROTECT_DRIBBLE_ON, REST_BOUNCE_ON, REST_TEMPO_IDLE, REST_TEMPO_PROTECT, CLIP_LOCK_GAIN, CLIP_LOCK_HZ_MAX, CLIP_LOCK_MAX_MPS, PROTECT_GUARD_ON, GUARD_BACK_M, GUARD_OUT_M, GUARD_DROP_M, GUARD_SEC, GUARD_BAR_X_M, GUARD_BAR_Y_M, GUARD_BAR_Z_M } from '@/lib/babylon/anim/RestDribble';
+import { EYES_ON_DEFENDER_ON, READ_RANGE_M, READ_SPEED01, READ_GLANCE_EVERY_SEC, READ_GLANCE_SEC, PROTECT_POSTURE_ON, PROTECT_TURN_DEG, PROTECT_EYES, PROTECT_CHEST_AIM } from '@/lib/babylon/core/HoopsLook';
+import { PROTECT_SINK_M, PROTECT_SINK_SEC } from '@/lib/babylon/anim/ProtectSink';
+import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } from '@/lib/babylon/anim/MoveEase';
+import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
@@ -84,6 +89,22 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
     expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
     expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
+    // lane/h3-handler (#312 / #314 ports): "Hoops · handle (rest)" and "Hoops · jump shot"
+    const pins: [string, number][] = [
+      ['hoops.protectDribbleOn', PROTECT_DRIBBLE_ON], ['hoops.restBounceOn', REST_BOUNCE_ON], ['hoops.restTempoIdle', REST_TEMPO_IDLE], ['hoops.restTempoProtect', REST_TEMPO_PROTECT],
+      ['hoops.clipLockGain', CLIP_LOCK_GAIN], ['hoops.clipLockHzMax', CLIP_LOCK_HZ_MAX], ['hoops.clipLockMaxMps', CLIP_LOCK_MAX_MPS],
+      ['hoops.eyesOnDefenderOn', EYES_ON_DEFENDER_ON], ['hoops.readRangeM', READ_RANGE_M], ['hoops.readSpeed01', READ_SPEED01], ['hoops.readGlanceEverySec', READ_GLANCE_EVERY_SEC], ['hoops.readGlanceSec', READ_GLANCE_SEC],
+      ['hoops.protectGuardOn', PROTECT_GUARD_ON], ['hoops.guardBackM', GUARD_BACK_M], ['hoops.guardOutM', GUARD_OUT_M], ['hoops.guardDropM', GUARD_DROP_M], ['hoops.guardSec', GUARD_SEC],
+      ['hoops.guardBarXM', GUARD_BAR_X_M], ['hoops.guardBarYM', GUARD_BAR_Y_M], ['hoops.guardBarZM', GUARD_BAR_Z_M],
+      ['hoops.protectPostureOn', PROTECT_POSTURE_ON], ['hoops.protectTurnDeg', PROTECT_TURN_DEG], ['hoops.protectEyes', PROTECT_EYES], ['hoops.protectChestAim', PROTECT_CHEST_AIM],
+      ['hoops.protectSinkM', PROTECT_SINK_M], ['hoops.protectSinkSec', PROTECT_SINK_SEC],
+      ['hoops.moveEaseOn', MOVE_EASE_ON], ['hoops.moveEaseSec', MOVE_EASE_SEC], ['hoops.moveEaseRateDeg', MOVE_EASE_RATE_DEG], ['hoops.moveArmRateDeg', MOVE_ARM_RATE_DEG],
+      ['hoops.jumperHopOn', JUMPER_HOP_ON], ['hoops.jumperApexAfterReleaseSec', JUMPER_APEX_AFTER_RELEASE_SEC], ['hoops.jumperMinLoadSec', JUMPER_MIN_LOAD_SEC], ['hoops.jumperHangOn', JUMPER_HANG_ON], ['hoops.jumperHangScale', JUMPER_HANG_SCALE],
+    ];
+    for (const [id, v] of pins) expect(def(id), id).toBe(v);
+    // the ported numbers (#312: REST_TEMPO 1.2 / 1.45, clip lock gain 3 / 2.6 Hz, READ 3.5 m / 0.42, PROTECT_TURN 50°, eyes 0.9, chestAim 0.8,
+    // PROTECT_SINK 0.06; #314: MOVE_EASE 0.2 s / 1000°/s / 1800°/s, JUMPER apex +0.03 s, load 0.08 s, hang 0.1) and every feature ON
+    expect(pins.map(([, v]) => v)).toEqual([1, 1, 1.2, 1.45, 3, 2.6, 0.4, 1, 3.5, 0.42, 2.4, 0.55, 1, 0.22, 0.06, 0.06, 0.15, 0.15, 1.06, 0.34, 1, 50, 0.9, 0.8, 0.06, 0.18, 1, 0.2, 1000, 1800, 1, 0.03, 0.08, 1, 0.1]);
     // lane/h3-aware (groups "Hoops · 3v3 awareness" and "Hoops · teammate": PR #313 / #315's numbers)
     expect(def('hoops.offBallLookOn')).toBe(OFF_BALL_LOOK_ON);
     expect(def('hoops.manGlanceEverySec')).toBe(MAN_GLANCE_EVERY_SEC);

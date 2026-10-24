@@ -195,6 +195,8 @@ import { BasketballAnimTree, FootPlant } from '../anim/basketballTree';
 import { MoveLegs } from '../anim/moveLegs';   // H2: the legs keep running under a handle move
 import { MoveDip } from '../anim/moveDip';   // hoops-dip
 import { LocoAccent } from '../anim/locoAccent';   // hoops-dip movement pass
+import { HandlerRest } from './handlerRest';   // lane/h3-handler (#312 port): the eyes on the defender, the protect's turn / sink / guard
+import { JumperRise } from '../core/JumperHop';   // lane/h3-handler (#314 port): the jump shot's hop timed to the release, the hang
 import { FootGlide } from '../anim/footGlide';   // hoops-dip movement pass
 import { DrawnFacing } from '../core/DrawnFacing';   // hoops-dip movement pass
 import { AiMover } from '../core/AiMovement';
@@ -580,7 +582,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let pumpWindow = 0;                    // M8: seconds left in which a squeeze is a STEP-THROUGH (he bit the fake)
   let banked: Vector3 | null = null;     // M12: the glass point this release is routed through
   let finish: { plan: FinishPlan; t: number; released: boolean } | null = null;
-  let riseHop: { t: number; dur: number } | null = null;   // DEFENSE-LOOK: the jump shot's hop (the finishes had theirs; the jumper shot flat-footed — measured from the side, feet on the floor at the release)      // M3: a layup / floater in flight (the stride, the hop, the finish clip)
+  let riseHop: JumperRise | null = null;   // DEFENSE-LOOK: the jump shot's hop (the finishes had theirs; the jumper shot flat-footed — measured from the side, feet on the floor at the release)      // M3: a layup / floater in flight (the stride, the hop, the finish clip)
   let driveContest: DriveContest | null = null;                                      // M2: the body in the dunk's path
   let finishFoul = false;                                                            // M2: fouled in the air on a dunk / a finish — and-one on a make, the ball back on a miss
   const foeVelLast = new Vector3();                                                  // the defender's velocity this frame (the contest reads set vs moving)
@@ -592,6 +594,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hopRelease: HopRelease = null;   // the double-tapped hop's finish: 'armed' from the second press, 'auto' once that press came up during the hop (decisions 17-19)
   const tapRead = (): DoubleTapRead => ({ sinceSqueezeSec: performance.now() / 1000 - squeezeAt, gatherSec: !shooting ? 0 : finish ? finish.t : gather ? gather.t : Infinity,
     speed: Math.hypot(squeezeVel.x, squeezeVel.z), rimDist: distXZ(me.root.position, RIM_FLOOR), hopAlready: gather?.plan.kind === 'hop', dunking });
+  const meRest = new HandlerRest();   // lane/h3-handler (#312 port, modes/handlerRest)
   const guardHand = new PlayerGuardHand(), meFlow = new ComboFlow();   // hoops-moves (owner 10-20): my outside hand when guarded (core/GuardHand), my combo window (anim/comboFlow)
   let strongHand: StrongHandState = STRONG_HAND_IDLE, strongBacks = 0;   // H2d (§3.8): the strong-hand return's clock and its count (reported, never a move)
   let foeReact: DefReaction | null = null;   // H2c: the rival's read of a fake — his mover takes the step (core/DefenderReact)
@@ -1101,8 +1104,8 @@ export const OneVOneMode: ModeDefinition = (() => {
       // DEV `?pp=0` (HOOPS-DEPTH S7): no Posture Poses layer on either body — the foot-plant probe's A/B for what the layer does to the feet
       const ppOff = process.env.NODE_ENV === 'development' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('pp') === '0';
       if (ppOff) console.info('[1V1-DEV] posture layer OFF (?pp=0)');
-      if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking), '1V1-PP');   // DRIBBLE PACE: a sprint LOOKS like work
-      LocoAccent.for(ctx.scene, me.skeleton, me.root, () => meAnimTree.state);   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carry)
+      if (!ppOff) mePosture = mountPostureLayer(ctx.scene, me.skeleton, me.root, () => meRest.dress(feedFor(meBio, possession === 'mine' ? RIM : foe.root.position, possession === 'mine' ? RIM : ballWorld(), meMotion, Math.max(1 - turbo.t01, meIntensity01 * 0.7), myJumpAge !== Infinity || dunking)), '1V1-PP');   // (+ h3-handler: meRest.dress) DRIBBLE PACE: a sprint LOOKS like work
+      LocoAccent.for(ctx.scene, me.skeleton, me.root, () => meAnimTree.state); meRest.mount(ctx.scene, me.skeleton, me.root);   // (+ h3-handler: the protect's sink, same slot)   // hoops-dip movement pass: the decel step and the push-off drawn on the body (anim/locoAccent; after the posture, before the carry)
       if (!ppOff) foePosture = mountPostureLayer(ctx.scene, foe.skeleton, foe.root, () => feedFor(foeBio, possession === 'mine' ? me.root.position : RIM, possession === 'mine' ? ballWorld() : RIM, foeMotion, 0, foeBlockJumpAge !== Infinity || !!foeDunkFlight), '1V1-PP-FOE');
       // HOOPS MOTION phase 3c: THE MOTION LAYERS (anim/motionLayers — the dunk pass's, lifted out of DunkMode) on both bodies: the limb drag
       // insert-first (the legs only in the air, the ball arm left on its clip around a release), the side lean right after the posture
@@ -1255,9 +1258,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       }
       // DEFENSE-LOOK: the jump shot's hop — the same arc the finishes ride (finishHopY), on the jumper's own clock
       if (riseHop && !finish && !dunking) {
-        riseHop.t += dt;
-        me.root.position.y = Math.max(0, Math.sin(Math.min(1, riseHop.t / riseHop.dur) * Math.PI) * JUMPER_HOP_APEX);
-        if (riseHop.t >= riseHop.dur) { riseHop = null; me.root.position.y = 0; meAnimTree.beat('bball_land_absorb', { fadeSec: 0.08 }); }   // HOOPS-DEPTH S4: feet-down is an absorb, not the loop
+        const rf = riseHop.step(dt, meShotWin === 'load'); me.root.position.y = rf.y;   // lane/h3-handler (#314 port, core/JumperHop): the load on the floor, the apex at the release
+        if (rf.clipScale !== null) me.animator.setPlaybackScale('jumpshot', rf.clipScale);   // (#314 port) a late release HANGS at the set point instead of looping
+        if (rf.land) { riseHop = null; me.root.position.y = 0; meAnimTree.beat('bball_land_absorb', { fadeSec: 0.08 }); }   // HOOPS-DEPTH S4: feet-down is an absorb, not the loop
       } else if (riseHop) riseHop = null;
       // a posterized rival gets up when the stun ends (the tree held the floor)
       if (foeFloored && foeStunSec === 0) { foeFloored = false; foeAnimTree.beat('karate_get_up'); }
@@ -2403,6 +2406,7 @@ export const OneVOneMode: ModeDefinition = (() => {
         posting, spinning: !!spin,   // HOOPS-MOVE-KIT-B: the seal turns the chest AWAY from the rim; the pivot owns it through the turn
         hesi: meDribble.hanging,     // H2b (plan §4.8): the hitch's posture through the hang
       } satisfies HoopsPostureInput);
+      meRest.step({ bio: meBio, self: me.root.position, ball: ballWorld(), rim: RIM, defender: foeStunSec > 0 || foeFloored ? null : foe.root.position, carry: meCarry, dt });   // lane/h3-handler (#312 port)
       Object.assign(foeBio, {
         role: possession === 'mine' ? 'defense' : 'offense', hasBall: possession === 'defense' && defPhase !== 'shot' && defPhase !== 'over' && !loose, speed01: foeSpeed01,
         nearestDefender: possession === 'defense' ? foeDist : Infinity, shot: foeShotWin, flight: foeDunkFlight, landed: false, celebrate: false,
@@ -2933,11 +2937,12 @@ export const OneVOneMode: ModeDefinition = (() => {
   /** The rise: the jumpshot HELD, paced so its release frame lands on the meter's green (ShotReleaseSync) — after the gather. */
   function beginRise(kind?: GatherKind): void {
     meShotWin = 'load'; meShotSec = 0;   // BIOMECH-HOOPS-WAVE1: the shot's posture clock
-    riseHop = { t: 0, dur: shotMeter.riseSec + 0.32 };   // leave the floor with the rise, land a beat after the release
     const rc = riseClipFor(kind, me.animator);   // hoops-shot-content: a step-back rises on its own release (same green: paced on its own release key)
     const clipSec = me.animator.durationOf(rc.clip) ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    meAnimTree.hold(rc.clip, { speedRatio: syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01), fadeSec: 0.08 });
+    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01);
+    riseHop = new JumperRise(shotMeter.riseSec, greenInRise01, JUMPER_HOP_APEX, sync);   // lane/h3-handler (#314 port): leave the floor after the load, the apex at the release
+    meAnimTree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08 });
   }
   /** M3: a layup / floater. The ball into the finishing hand (the side the drive comes from, or away from the defender),
    *  the finish clip paced so its release key (the top of the hop) is the green, the body strides the last step and hops. */
