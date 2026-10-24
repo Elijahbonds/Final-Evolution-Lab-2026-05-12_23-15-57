@@ -98,6 +98,8 @@ import { CoachNote } from '@/components/coach/coach-note';
 // COACH-AI Phase 8 (2026-10-07): the thread's read markers ("N new", "Seen"; nothing until the pending SQL is applied)
 import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
 import { markReadIfNeeded, unreadInThread } from '@/lib/coach/messageReadsView';
+import { PlanUpdateCard } from '@/components/coach/plan-update-card';
+import { PLAN_UPDATES_API } from '@/lib/coach/weeklyDraft/view';
 // COACH-AI Phase 8 (2026-10-07): the availability the coach set (Full / Limited / Out), one line, never a diagnosis
 import { MyAvailabilityLine } from '@/components/coach/my-availability';
 import { AVAILABILITY_API } from '@/components/coach/availability-picker';
@@ -105,8 +107,8 @@ import { AVAILABILITY_API } from '@/components/coach/availability-picker';
 // of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
 import { lastTimeLine } from '@/lib/coach/loop';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -260,6 +262,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     <div className="space-y-4" data-testid="today">
       {finishedCard}
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
+      {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
+      {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
