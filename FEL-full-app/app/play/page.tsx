@@ -14,6 +14,7 @@ import { SeasonPassTrack } from '@/components/season-pass-track';
 // MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
 import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
+import { WeekCardEntry } from '@/components/progress-card/week-entry';
 import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -61,6 +62,7 @@ export default async function PlayPage() {
       }
     >
       <TodayCard view={todayCard} />
+      <WeekCardEntry />
       <PlayShelf />
       <VenueStrip />
       <div className="mt-10 empty:mt-0"><SeasonPassTrack /></div>
