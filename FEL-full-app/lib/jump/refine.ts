@@ -65,6 +65,15 @@ export const REFINE = {
    * is the picture, not the body, and is read as none — over this (cm) it marks the landing unreadable.
    */
   riseTolCm: 4,
+  /** A re-timed flight vouches for itself (over the finder's rise check) when its apex sits this near mid-flight (rise ÷ fall)… */
+  vouchRiseFall: 0.3,
+  /** …and the hips' parabola fits within this RMS (cm). */
+  vouchRmsCm: 2,
+  /**
+   * The fits' own SD understates the error by this much (bench, every condition: the error over the claimed SD had an
+   * SD of 1.1–1.3, not 1), so every ± is widened by it. The ± a jump is shown with must not promise more than it keeps.
+   */
+  sdInflate: 1.2,
   /** The leg-length noise prior (cm, one frame): MediaPipe-lite foot jitter at the default rig, pooled into every fit. */
   legNoiseCm: 1.5,
 } as const;
@@ -258,10 +267,10 @@ export function refineFlight(raw: readonly PoseFrame[], front: FrontCalibration,
   const rose = rawDrop * 100 > R.riseTolCm;
   const dropSkipped: RefinedFlight['dropSkipped'] = !rulerOk ? 'ruler' : moved ? 'moved' : rose ? 'rose' : null;
   const dropM = dropSkipped ? null : Math.min(0, rawDrop);
-  const dropSdM = dropM !== null ? Math.hypot(seTo, seTd) * ruler : null;
+  const dropSdM = dropM !== null ? R.sdInflate * Math.hypot(seTo, seTd) * ruler : null;
   // each edge's timing SD (ms): the leg line's and the floor's error over the crossing speed
   const sdEdge = (se: number, seF: number, slope: number) => (slope > 1e-9 ? Math.hypot(se, seF) / slope : 0);
-  const sdT = Math.hypot(sdEdge(seTo, seFloorPre, slopeTo), sdEdge(seTd, seFloorPost, slopeTd)) / 1000;
+  const sdT = (R.sdInflate * Math.hypot(sdEdge(seTo, seFloorPre, slopeTo), sdEdge(seTd, seFloorPost, slopeTd))) / 1000;
   const heightFlightCm = ((G * T * T) / 8) * 100;
   const heightFlightSdCm = ((G * T * sdT) / 4) * 100;
   // the drop, shrunk by its own noise (a positive-part James–Stein weight): a clean landing's noise is not "taken out"
@@ -281,3 +290,7 @@ export function refineFlight(raw: readonly PoseFrame[], front: FrontCalibration,
     shiftMs: { takeoff: to - takeoffT, land: td - landT },
   };
 }
+
+/** A re-timed flight that is plainly a body in free fall: its apex near mid-flight, its hip parabola tight. */
+export const refineVouches = (r: RefinedFlight): boolean =>
+  Number.isFinite(r.riseFall) && Math.abs(r.riseFall - 1) <= REFINE.vouchRiseFall && r.rmsCm <= REFINE.vouchRmsCm;

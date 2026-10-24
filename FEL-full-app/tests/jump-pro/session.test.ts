@@ -86,7 +86,7 @@ describe('verified (owner rule 2026-10-24)', () => {
     expect(v({ valid: false })).toContain('notValid');
     expect(v({ method: 'frames' })).toContain('framesOnly');
     expect(v({ quality: { flags: ['landedLow'], clean: false } })).toContain('landing');
-    expect(v({ heightSdCm: 2 })).toContain('unclear');
+    expect(v({ heightSdCm: 2 })).toContain('unclear');   // over jump.verifiedSdCm (1.75)
     expect(v({ quality: { flags: ['moved'], clean: false } })).toContain('moved');
     expect(v({ quality: { flags: ['outlier'], clean: false } })).toContain('outlier');
   });

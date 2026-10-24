@@ -55,6 +55,13 @@ export function trialQuality(o: { refined: RefinedFlight | null; poseHz: number;
 /** The tip a set of flags gets: the most important one. */
 export const tipFor = (q: TrialQuality | undefined): string | null => (q?.flags.length ? TRIAL_TIPS[q.flags[0]] : null);
 
+/** The session's one tip: the most important flag on any counted jump (a low landing before "estimate"). */
+export function sessionTip(trials: readonly { valid: boolean; quality?: TrialQuality }[]): string | null {
+  const seen = new Set(trials.filter((t) => t.valid).flatMap((t) => t.quality?.flags ?? []));
+  const f = FLAG_ORDER.find((x) => seen.has(x));
+  return f ? TRIAL_TIPS[f] : null;
+}
+
 /** The trial shape session.ts reads (JumpRead's fields). */
 export interface TrialLike { index: number; heightCm: number; heightSdCm?: number | null; quality?: TrialQuality }
 

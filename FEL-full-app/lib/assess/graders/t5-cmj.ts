@@ -34,7 +34,7 @@ import {
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 import type { GradeContext } from './t1-overhead-squat';
-import { refineFlight } from '@/lib/jump/refine';
+import { refineFlight, refineVouches } from '@/lib/jump/refine';
 import { CI95_Z, trialQuality, sessionStats } from '@/lib/jump/session';
 
 export const G = 9.81;
@@ -107,6 +107,9 @@ const EDGE_TOP = FD.edgeTop;
  */
 const EDGE_SLACK_MS = FD.edgeSlackMs;
 
+/** A settle (the feet planted again after a step) spans at least this long (ms): settleFrames at 30 fps, less jitter. */
+const SETTLE_SPAN_MS = (FD.settleFrames - 1) * 30;
+
 /** A flight: take-off and landing, or a reason it is not one. */
 export type FlightCheck = { ok: true } | { ok: false; why: string };
 
@@ -173,9 +176,16 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
     const pre = floorAt(i - 1, -1);
     if (!(both(i, pre) > air)) { i++; continue; }
     // stepped to a new spot: the feet settle again within ~0.1 s, still low — a new floor, not a flight
-    let k = i, still = 0;
-    while (k < n && t(k) - t(i) <= FD.settleMs && still < FD.settleFrames) { still = plantedBoth(k) ? still + 1 : 0; k++; }
-    if (still >= FD.settleFrames && both(k - 1, pre) < FD.settleRise * air) { i = k; continue; }
+    // JUMP-PRO (2026-10-24): the settle must also SPAN SETTLE_SPAN_MS, not only settleFrames frames. At 240 fps three
+    // frames are 12 ms, and a flight's first frames read "planted" (the toe has barely moved over the PLANTED_MS
+    // window), so a real jump was taken for a step: 1 jump in 18 lost at 120–240 fps on the bench. 30 fps is unchanged
+    // (three frames there span 66 ms).
+    let k = i, still = 0, runFrom = t(i);
+    while (k < n && t(k) - t(i) <= FD.settleMs && !(still >= FD.settleFrames && t(k - 1) - runFrom >= SETTLE_SPAN_MS)) {
+      if (plantedBoth(k)) { if (!still) runFrom = t(k); still++; } else still = 0;
+      k++;
+    }
+    if (still >= FD.settleFrames && t(k - 1) - runFrom >= SETTLE_SPAN_MS && both(k - 1, pre) < FD.settleRise * air) { i = k; continue; }
     // the last frame down before it, against the floor the feet left from
     let b = i - 1;
     while (b >= 0 && !(both(b, pre) <= contact)) b--;
@@ -253,13 +263,16 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
   for (const fl of flights) {
     if (fl.landT - fl.takeoffT < th('t5.flightMinMs')) continue;          // a hop, not an attempt (on the finder's own edges)
     // JUMP-PRO: re-timed from the whole flight when it can be; the finder's frames otherwise
-    const rf = fl.landed && fl.check.ok ? refineFlight(raw, front, fl.takeoffT, fl.landT) : null;
+    // A flight the finder's rise check refused (its edges read a longer flight than the feet rose for) is re-timed too:
+    // when the hips' own parabola tops out mid-flight and fits (refineVouches), the re-timed flight stands.
+    const rf0 = fl.landed ? refineFlight(raw, front, fl.takeoffT, fl.landT) : null;
+    const rf = rf0 && (fl.check.ok || refineVouches(rf0)) ? rf0 : null;
     const flightMs = rf ? rf.flightMs : fl.landT - fl.takeoffT;
     const heightCm = rf ? rf.heightTovCm : heightCmOf(flightMs);
     const index = jumps.length + 1;
     let invalidWhy: string | undefined;
     if (!fl.landed) invalidWhy = 'the camera never saw you land';
-    else if (!fl.check.ok) invalidWhy = fl.check.why;
+    else if (!fl.check.ok && !rf) invalidWhy = fl.check.why;
     else if (flightMs > th('t5.flightMaxMs') || Math.round(heightCm * 10) / 10 > th('t5.maxHeightCm')) invalidWhy = `it read over ${th('t5.maxHeightCm')} cm, so the camera lost your feet`;
     else if (fl.airIdx.some((k) => raw[k].image.length >= 33 && wristsAboveShoulders(raw[k].image) > th('t5.armSwingWrist'))) invalidWhy = 'your hands left your hips';
     // the landing: the deepest hip drop within the window, and the knees there

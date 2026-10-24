@@ -25,7 +25,7 @@ export const JUMP = {
     'Landed this much lower (cm, hips at touch-down vs take-off) AND beyond 2 SD of its own read: a flexed or flat-foot landing. The height is corrected; the trial is not verified and gets the landing tip. ≈ the benchmark\'s "~15° more knee flexion than at take-off" (an assumption there too)'),
   'jump.unclearSdCm': e(3, 'bench-2026-10-24',
     'A trial whose own ±1 SD is wider than this (cm) was read through blur or occlusion: kept, never verified, and the tip asks for light and the whole body in the shot. Bench: realistic noise 0.5–1.5 cm; motion blur 2–4 cm'),
-  'jump.verifiedSdCm': e(1.5, 'bench-2026-10-24', 'A verified live jump\'s ±1 SD is at most this (cm)'),
+  'jump.verifiedSdCm': e(1.75, 'bench-2026-10-24', 'A verified live jump\'s own ±1 SD is at most this (cm). Bench, clean landings at 60 fps: the claimed SD runs 1.2–1.7 cm (true SD 1.5, 95 % within ±3 cm, the benchmark\'s LoA target); at 30 fps it is wider and the frame-rate rule blocks it anyway'),
   'jump.verifiedFps': e(th('gate.jumpFps') as number, 'reuses-screen-gate', 'A verified live jump was timed at this pose rate or more (the screen\'s jump gate)'),
   'jump.labFps': e(120, 'benchmark-2026-10-24', 'At or over this frame rate the read is lab-grade, not an "estimate" (benchmark target 3: live under 120 fps is flagged as an estimate)'),
   'jump.outlierPct': e(15, 'lane-guess', 'With 3+ jumps, one this far (%) above the others\' median is an outlier: shown, never the verified best'),
