@@ -30,6 +30,7 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
   type OffenseJob, type DefenseJob, type ScreenState,
 } from './HoopsOffball';
 import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
+import { hasBallM } from './PossessionSwap';   // lane/h3-aware (#313 H3c): "his man has the ball" — HAS_BALL_M, a feel knob
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -829,7 +830,7 @@ export class DefenderBrain implements AIBehavior {
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
-    const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    const markHasBall = mark ? distXZ(mark, ball) < hasBallM() : false;   // lane/h3-aware (#313): 1.8 → 1.0 m (core/PossessionSwap HAS_BALL_M)
     // A LIVE BALL outranks everything. Measured in 3v3: after a miss every one of the six bodies sat
     // 8-19 m from the ball holding its seal or its crash lane, and the board fell through to the dice
     // roll — because no job in the system meant "go and get the actual ball".
