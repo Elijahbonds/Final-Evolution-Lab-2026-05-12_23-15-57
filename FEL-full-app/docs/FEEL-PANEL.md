@@ -137,3 +137,15 @@ lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `Ba
 0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
 **assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
 speed or timing window reads a knob here.
+
+lane/hoops-def-tell (#273 and #274 rebuilt, owner 2026-10-23). Group "Hoops · defense", the tell and the separation shipped ON:
+`hoops.aiReachTellOn` 1 (`ReachTell.ts` `AI_REACH_TELL_ON`; 0 = the release's reach exactly), `hoops.aiReachTellSec` 0.25 s,
+`hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5, `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
+now 1v1's too), `hoops.pokeReadOn` 1 (0 = the old per-frame poke at the deny point exactly), `hoops.stealRatePerSec` 1.2 /s,
+`hoops.pokeRangeM` 1.2 m, `hoops.pokeLeadSec` 0.1 s; `hoops.bodySepOn` 1 (`BodySeparation.ts` `BODY_SEP_ON`; 0 = the release's contact
+exactly), `hoops.capsuleRadius1v1M` 0.55 m (read when 1v1 loads its bodies: restart the run after changing it), `hoops.bodyHardGapM`
+0.90 m, `hoops.sepPushMps` 2.4 m/s, `hoops.sepDeadbandM` 0.01 m, `hoops.sepPopMaxM` 0.10 m. Group "Hoops · blocks" (`HoopsBlocks.ts`,
+BLK-1): the six windows' centres and half-widths (`hoops.blk<Type>TMs` / `hoops.blk<Type>HalfMs`), `hoops.blkHoldMs` 220,
+`hoops.blkCatchMeterFullMs` 320, the swat ranges 1.5 / 1.2 m, the catch's 35° / 1.1 m, the spike's 30°, the pin's 0.9 m and the four foul
+odds 25 / 50 / 15 / 35 % with their angle (60°) and late margin (100 ms). **These block knobs move nothing in a game yet**: the selector
+is not wired into the modes until BLK-2, which waits on T-B. **assumption:** the bounds are safe, not tuned.

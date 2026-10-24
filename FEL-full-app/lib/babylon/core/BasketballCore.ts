@@ -30,6 +30,7 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
   type OffenseJob, type DefenseJob, type ScreenState,
 } from './HoopsOffball';
 import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
+import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -862,6 +863,9 @@ export class DefenderBrain implements AIBehavior {
     const handlerPos = onBall ? (mark ?? foes[0] ?? null) : null;
     const handlerSpeed = handlerPos && this.prevHandler && dt > 1e-4
       ? Vector3.Distance(handlerPos, this.prevHandler) / dt : 0;
+    // lane/hoops-def-tell (#273): the handler's planar velocity — the poke leads the ball by it (core/ReachTell aiPokes)
+    const hvx = handlerPos && this.prevHandler && dt > 1e-4 ? (handlerPos.x - this.prevHandler.x) / dt : 0;
+    const hvz = handlerPos && this.prevHandler && dt > 1e-4 ? (handlerPos.z - this.prevHandler.z) / dt : 0;
     if (handlerPos) this.prevHandler = handlerPos.clone();
 
     this.stillSec = onBall && handlerSpeed < 0.5 ? this.stillSec + dt : 0;
@@ -956,7 +960,7 @@ export class DefenderBrain implements AIBehavior {
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
     const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
-      onBall && dist < 1.1 && this.rng() < this.aggression * 0.02);
+      onBall && aiPokes(this.rng, this.aggression, dt, dist, ball, { x: hvx, z: hvz }, self));   // #273: core/ReachTell (the old `dist < 1.1 && rng() < aggression × 0.02` is its A/B off)
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;
   }

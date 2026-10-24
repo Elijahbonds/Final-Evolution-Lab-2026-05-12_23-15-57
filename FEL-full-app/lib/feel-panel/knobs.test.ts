@@ -11,6 +11,9 @@ import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
+import { AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC } from '@/lib/babylon/core/ReachTell';
+import { BODY_SEP_ON, ONEVONE_CAPSULE_RADIUS, BODY_HARD_GAP, SEP_PUSH_MPS, SEP_DEADBAND, SEP_POP_MAX } from '@/lib/babylon/core/BodySeparation';
+import * as BLK from '@/lib/babylon/core/HoopsBlocks';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -54,6 +57,45 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
     expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
     expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
+    // lane/hoops-def-tell (#273 T-A, T-C; #274 BLK-1)
+    expect(def('hoops.aiReachTellOn')).toBe(AI_REACH_TELL_ON ? 1 : 0);
+    expect(def('hoops.aiReachTellSec')).toBe(AI_REACH_TELL_SEC);
+    expect(def('hoops.aiReachStunSec')).toBe(AI_REACH_STUN_SEC);
+    expect(def('hoops.aiReachGate')).toBe(AI_REACH_GATE);
+    expect(def('hoops.aiStealChance')).toBe(AI_STEAL_CHANCE);
+    expect(def('hoops.aiStealOnBump')).toBe(AI_STEAL_ON_BUMP);
+    expect(def('hoops.pokeReadOn')).toBe(POKE_READ_ON ? 1 : 0);
+    expect(def('hoops.stealRatePerSec')).toBe(STEAL_RATE_PER_SEC);
+    expect(def('hoops.pokeRangeM')).toBe(POKE_RANGE);
+    expect(def('hoops.pokeLeadSec')).toBe(POKE_LEAD_SEC);
+    expect([AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC])
+      .toEqual([true, 0.25, 0.35, 0.5, 0.22, 0.6, true, 1.2, 1.2, 0.1]);
+    expect(def('hoops.bodySepOn')).toBe(BODY_SEP_ON ? 1 : 0);
+    expect(def('hoops.capsuleRadius1v1M')).toBe(ONEVONE_CAPSULE_RADIUS);
+    expect(def('hoops.bodyHardGapM')).toBe(BODY_HARD_GAP);
+    expect(def('hoops.sepPushMps')).toBe(SEP_PUSH_MPS);
+    expect(def('hoops.sepDeadbandM')).toBe(SEP_DEADBAND);
+    expect(def('hoops.sepPopMaxM')).toBe(SEP_POP_MAX);
+    expect([BODY_SEP_ON, ONEVONE_CAPSULE_RADIUS, BODY_HARD_GAP, SEP_PUSH_MPS, SEP_DEADBAND, SEP_POP_MAX]).toEqual([true, 0.55, 0.9, 2.4, 0.01, 0.1]);
+    for (const [nm, U] of [['Contest', 'CONTEST'], ['Swat', 'SWAT'], ['Spike', 'SPIKE'], ['Chase', 'CHASE'], ['Pin', 'PIN'], ['Catch', 'CATCH']] as const) {
+      expect(def(`hoops.blk${nm}TMs`)).toBe(BLK[`BLK_${U}_T_MS`]);
+      expect(def(`hoops.blk${nm}HalfMs`)).toBe(BLK[`BLK_${U}_HALF_MS`]);
+    }
+    expect(def('hoops.blkHoldMs')).toBe(BLK.HOLD_MS);
+    expect(def('hoops.blkCatchMeterFullMs')).toBe(BLK.CATCH_METER_FULL_MS);
+    expect(def('hoops.blkSwatRangeLayupM')).toBe(BLK.SWAT_RANGE_LAYUP);
+    expect(def('hoops.blkSwatRangeJumperM')).toBe(BLK.SWAT_RANGE_JUMPER);
+    expect(def('hoops.blkCatchMaxAngleDeg')).toBe(BLK.CATCH_MAX_ANGLE);
+    expect(def('hoops.blkCatchMaxDistM')).toBe(BLK.CATCH_MAX_DIST);
+    expect(def('hoops.blkSpikeMaxAngleDeg')).toBe(BLK.SPIKE_MAX_ANGLE);
+    expect(def('hoops.blkPinGlassMaxM')).toBe(BLK.PIN_GLASS_MAX);
+    expect(def('hoops.blkFoulAngleDeg')).toBe(BLK.FOUL_BAD_ANGLE_DEG);
+    expect(def('hoops.blkFoulAnglePct')).toBe(BLK.FOUL_BAD_ANGLE_PCT);
+    expect(def('hoops.blkFoulHardGapPct')).toBe(BLK.FOUL_HARD_GAP_PCT);
+    expect(def('hoops.blkFoulStandoffPct')).toBe(BLK.FOUL_STANDOFF_PCT);
+    expect(def('hoops.blkFoulLateMarginMs')).toBe(BLK.FOUL_LATE_MARGIN_MS);
+    expect(def('hoops.blkFoulLatePct')).toBe(BLK.FOUL_LATE_PCT);
+    expect([BLK.FOUL_BAD_ANGLE_PCT, BLK.FOUL_HARD_GAP_PCT, BLK.FOUL_STANDOFF_PCT, BLK.FOUL_LATE_PCT]).toEqual([0.25, 0.5, 0.15, 0.35]);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
