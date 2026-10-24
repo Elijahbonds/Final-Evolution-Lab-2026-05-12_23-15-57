@@ -1439,6 +1439,12 @@ exports.Prisma.AdventureSaveScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.RateLimitScalarFieldEnum = {
+  bucket: 'bucket',
+  hits: 'hits',
+  resetAt: 'resetAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1730,7 +1736,8 @@ exports.Prisma.ModelName = {
   Booking: 'Booking',
   CallSignal: 'CallSignal',
   CoachStoreReferral: 'CoachStoreReferral',
-  AdventureSave: 'AdventureSave'
+  AdventureSave: 'AdventureSave',
+  RateLimit: 'RateLimit'
 };
 
 /**

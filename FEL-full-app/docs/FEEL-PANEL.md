@@ -132,6 +132,82 @@ combo; flow only, no odds), and `hoops.guardRangeM` 2.0 m (`GuardHand.ts` `GUARD
 player's ball to the outside hand; the dwell and gap are the AI hand's `hoops.aiHandDwellSec` / `hoops.aiHandGapSec`).
 **assumption:** the bounds are safe, not tuned.
 
+lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `BallSideShade.ts`: `hoops.ballSideShadeOn` 1
+(`BALL_SIDE_SHADE_ON`; 0 = the old anchor exactly, for an A/B on the phone), `hoops.shadeOffsetM` 0.5 m, `hoops.shadeHoldSec`
+0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
+**assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
+speed or timing window reads a knob here.
+
+lane/hoops-def-tell (#273 and #274 rebuilt, owner 2026-10-23). Group "Hoops · defense", the tell and the separation shipped ON:
+`hoops.aiReachTellOn` 1 (`ReachTell.ts` `AI_REACH_TELL_ON`; 0 = the release's reach exactly), `hoops.aiReachTellSec` 0.25 s,
+`hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5, `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
+now 1v1's too), `hoops.pokeReadOn` 1 (0 = the old per-frame poke at the deny point exactly), `hoops.stealRatePerSec` 1.2 /s,
+`hoops.pokeRangeM` 1.2 m, `hoops.pokeLeadSec` 0.1 s; `hoops.bodySepOn` 1 (`BodySeparation.ts` `BODY_SEP_ON`; 0 = the release's contact
+exactly), `hoops.capsuleRadius1v1M` 0.55 m (read when 1v1 loads its bodies: restart the run after changing it), `hoops.bodyHardGapM`
+0.90 m, `hoops.sepPushMps` 2.4 m/s, `hoops.sepDeadbandM` 0.01 m, `hoops.sepPopMaxM` 0.10 m. Group "Hoops · blocks" (`HoopsBlocks.ts`,
+BLK-1): the six windows' centres and half-widths (`hoops.blk<Type>TMs` / `hoops.blk<Type>HalfMs`), `hoops.blkHoldMs` 220,
+`hoops.blkCatchMeterFullMs` 320, the swat ranges 1.5 / 1.2 m, the catch's 35° / 1.1 m, the spike's 30°, the pin's 0.9 m and the four foul
+odds 25 / 50 / 15 / 35 % with their angle (60°) and late margin (100 ms). **These block knobs move nothing in a game yet**: the selector
+is not wired into the modes until BLK-2, which waits on T-B. **assumption:** the bounds are safe, not tuned.
+lane/hoops-reverse (group "Hoops · movement"), all in `lib/babylon/core/HoopsStick.ts`, read per frame by `CourtMovement` on the
+hoops gears (the 1v1 / 3v3 player's DribbleController and the dunk approach; `hoops.handlerTurnDeg` is the DribbleController's
+alone). The owner's decision of 2026-10-23: port PR #311's H3a ("the ball handler answers the stick: quicker starts, firmer stops,
+a real reversal") as knobs whose **defaults are the release values**, so nobody's game changes until the owner dials them in.
+
+**The reversal fix ships ON** (`hoops.reverseDeg` 135): a bug fix, not a feel change. Release steered the run with
+`Lerp(dir, wantDir).normalize()`; for a stick thrown straight back that lerp shrinks along the same line and normalises back to the
+old direction, so after the plant the handler ran the OLD way again. A stick 135° or more round from the run now brakes through zero
+and pushes off the new way. **assumption:** its brake (`hoops.reverseDecel`) defaults to today's plant bleed, 47.6 m/s².
+
+The H3a preset (#311's tuned values; `H3A_STICK_PRESET` in `HoopsStick.ts`):
+
+| Knob | Release (default) | H3a | What it is |
+|---|---|---|---|
+| `hoops.jogTau` | 0.17 s | 0.10 s | the lag to jog speed |
+| `hoops.sprintTau` | 0.15 s | 0.10 s | the lag to sprint speed |
+| `hoops.jogAccel` | 15 m/s² | 22 m/s² | the accel cap toward a jog |
+| `hoops.sprintAccel` | 24 m/s² | 26 m/s² | the accel cap toward a sprint |
+| `hoops.loadScale` | 0.45 | 0.7 | the loaded first step (1 = no load) |
+| `hoops.gearDownDecel` | 9 m/s² | 12 m/s² | easing down off the turbo |
+| `hoops.stopDecelLow` | 22 m/s² | 32 m/s² | the stop's brake at a walk |
+| `hoops.stopDecelHigh` | 11 m/s² | 26 m/s² | the stop's brake at top speed |
+| `hoops.plantDecel` | 47.6 m/s² | 34 m/s² | the plant's bleed on a cut over ~110° at pace |
+| `hoops.handlerTurnDeg` | 540 °/s | 720 °/s | the handler's turn rate |
+| `hoops.turnTrueArc` (new) | 0 | 1 | 1 = a turn is a real rotation (slerp); 0 = the lerp, which turns a 90° stick at ~64 % of the rate |
+| `hoops.kickSec` (new) | 0 s | 0.1 s | the turbo press's 0.9 m/s kick spread over this (0 = one frame) |
+| `hoops.cutSec` (new) | 0 s | 0.08 s | the cut cost paid over this (0 = one frame) |
+| `hoops.jerk` (new) | 0 (off) | 900 m/s³ | the most the acceleration changes per second |
+| `hoops.reverseDeg` (new) | 135° | 135° | THE FIX: a stick this far round is a reversal |
+| `hoops.reverseDecel` (new) | 47.6 m/s² | 34 m/s² | the reversal's brake through zero |
+| `hoops.retreatSpeedK` (TUNED, new) | 0.7 | 0.7 | the retreat (the stick held more than 120° from the facing the retreat dribble keeps) tops out at this share of a jog; forward runs, sprints and slides never read it; 1 = no cap |
+
+**The retreat cap** (owner decision 2026-10-24: "a real backpedal is slower than running forward"): with the fix a held straight pull-back
+retreats, and before the cap it backpedalled at a full jog, or at a full sprint with the turbo held. `hoops.retreatSpeedK` 0.7 caps it at
+0.7 × jog (3.05 m/s), with the turbo held too. It is not part of #311 and is the same in the H3a preset.
+
+`hoops.turnTrueArc` is the one knob #311 did not have as a number: its slerp came on with `reverseDeg`. It is split out so the fix can
+ship on while the turn stays exactly as it is. A committed hop (the step-back's `ignoreStickFor`) always glides on the release stop
+(22 / 11), whatever the stop knobs say, as #311 kept it: its travel is the move's separation.
+
+Paste this into the panel's values (the format **Copy values** produces) to play H3a:
+
+```json
+{ "hoops.jogTau": 0.1, "hoops.sprintTau": 0.1, "hoops.jogAccel": 22, "hoops.sprintAccel": 26, "hoops.loadScale": 0.7,
+  "hoops.gearDownDecel": 12, "hoops.stopDecelLow": 32, "hoops.stopDecelHigh": 26, "hoops.plantDecel": 34,
+  "hoops.handlerTurnDeg": 720, "hoops.turnTrueArc": 1, "hoops.kickSec": 0.1, "hoops.cutSec": 0.08, "hoops.jerk": 900,
+  "hoops.reverseDecel": 34 }
+```
+
+Measured (`scripts/probes/_stick-response.mts`, the real DribbleController at 60 fps; `PRESET=h3a` applies the preset through
+`feel()`), release → H3a: jog to 90 % 450 → 267 ms; sprint to 90 % 400 → 300 ms; stop from a jog 233 ms / 0.53 m → 150 ms / 0.32 m;
+from a sprint 400 ms / 1.41 m → 233 ms / 0.73 m; the velocity flips on a straight pull-back never (before the fix) → 217 ms (the fix
+at defaults) → 250 ms (H3a), and the retreat then runs at 3.05 m/s (the cap); a 90° cut settled 250 → 167 ms; the largest one-frame speed jump 1.13 → 0.57 m/s. These are #311's own
+numbers, reproduced exactly (the retreat cap aside: it came after #311). **assumption:** the bounds are safe, not tuned.
+
+lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30 s (`threevthreeOvertime.ts` `OVERTIME_3V3_SEC`, PR #268's
+number): a 3v3 tied at the horn plays sudden-death overtime on this clock, and level again when it runs out is another overtime.
+It moves only how long an overtime lasts, never who wins it or what a bucket is worth. **assumption:** the bounds (10–90 s) are
+safe, not tuned.
 lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by that lane: `tennis.portraitHeroMargin` 0.15
 (`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
 only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
