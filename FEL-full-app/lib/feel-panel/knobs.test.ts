@@ -10,8 +10,21 @@ import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotC
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
+import { PROTECT_DRIBBLE_ON, REST_BOUNCE_ON, REST_TEMPO_IDLE, REST_TEMPO_PROTECT, CLIP_LOCK_GAIN, CLIP_LOCK_HZ_MAX, CLIP_LOCK_MAX_MPS, PROTECT_GUARD_ON, GUARD_BACK_M, GUARD_OUT_M, GUARD_DROP_M, GUARD_SEC, GUARD_BAR_X_M, GUARD_BAR_Y_M, GUARD_BAR_Z_M } from '@/lib/babylon/anim/RestDribble';
+import { EYES_ON_DEFENDER_ON, READ_RANGE_M, READ_SPEED01, READ_GLANCE_EVERY_SEC, READ_GLANCE_SEC, PROTECT_POSTURE_ON, PROTECT_TURN_DEG, PROTECT_EYES, PROTECT_CHEST_AIM } from '@/lib/babylon/core/HoopsLook';
+import { PROTECT_SINK_M, PROTECT_SINK_SEC } from '@/lib/babylon/anim/ProtectSink';
+import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } from '@/lib/babylon/anim/MoveEase';
+import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
+import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
+import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
+import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
+import { POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M } from '@/lib/babylon/core/PossessionSwap';
+import { DEFENSE_STANCE_ON, DEFENSE_RAISE_M, RAISE_REACH, STANCE_EASE_SEC, DEFEND_LEAN_DEG, DEFEND_SPINE1_DEG } from '@/lib/babylon/core/DefenseStance';
+import {
+  MATE_READ_ON, MATE_SETTLE_SEC, MATE_READ_SEC, MATE_HOLD_MAX_SEC, MATE_SHOOT_RANGE_M, MATE_DRIVE_FROM_M, MATE_FINISH_M, MATE_DRIVE_MAX_SEC, MATE_LANE_M,
+} from '@/lib/babylon/modes/threevthreeMate';
 import { AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC } from '@/lib/babylon/core/ReachTell';
 import { BODY_SEP_ON, ONEVONE_CAPSULE_RADIUS, BODY_HARD_GAP, SEP_PUSH_MPS, SEP_DEADBAND, SEP_POP_MAX } from '@/lib/babylon/core/BodySeparation';
 import * as BLK from '@/lib/babylon/core/HoopsBlocks';
@@ -20,6 +33,7 @@ import {
   HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
   HOOPS_RETREAT_SPEED_K,
 } from '@/lib/babylon/core/HoopsStick';
+import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -53,7 +67,19 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.comboOpenK')).toBe(COMBO_OPEN_K);
     expect(def('hoops.comboGraceSec')).toBe(COMBO_GRACE_SEC);
     expect(def('hoops.guardRangeM')).toBe(GUARD_RANGE_M);
+    // tiebreak-cam (group "Tennis · camera")
+    expect(def('tennis.portraitHeroMargin')).toBe(PORTRAIT_HERO_MARGIN);
     expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
+    // hoops-shot-content
+    expect(def('hoops.ftSetupSec')).toBe(FT_SETUP_SEC);
+    expect(def('hoops.ftRoutineSec')).toBe(FT_ROUTINE_SEC);
+    expect(def('hoops.ftSetSec')).toBe(FT_SET_SEC);
+    expect(def('hoops.ftResultSec')).toBe(FT_RESULT_SEC);
+    expect(def('hoops.bankSetDeg')).toBe(BANK_SET_DEG);
+    expect(def('hoops.bankGlanceMs')).toBe(BANK_GLANCE_MS);
+    expect([FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, BANK_SET_DEG, BANK_GLANCE_MS]).toEqual([0.9, 1.2, 0.3, 1.1, 12, 1100]);
+    expect(def('hoops.ftDistNarrow01')).toBe(FT_DIST_NARROW_01);
+    expect(FT_DIST_NARROW_01).toBe(0);   // owner 2026-10-24: the line keeps the full open window
     // hoops-defense-fx
     expect(def('hoops.ballSideShadeOn')).toBe(BALL_SIDE_SHADE_ON ? 1 : 0);
     expect(def('hoops.shadeOffsetM')).toBe(SHADE_OFFSET_M);
@@ -63,6 +89,47 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
     expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
     expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
+    // lane/h3-handler (#312 / #314 ports): "Hoops · handle (rest)" and "Hoops · jump shot"
+    const pins: [string, number][] = [
+      ['hoops.protectDribbleOn', PROTECT_DRIBBLE_ON], ['hoops.restBounceOn', REST_BOUNCE_ON], ['hoops.restTempoIdle', REST_TEMPO_IDLE], ['hoops.restTempoProtect', REST_TEMPO_PROTECT],
+      ['hoops.clipLockGain', CLIP_LOCK_GAIN], ['hoops.clipLockHzMax', CLIP_LOCK_HZ_MAX], ['hoops.clipLockMaxMps', CLIP_LOCK_MAX_MPS],
+      ['hoops.eyesOnDefenderOn', EYES_ON_DEFENDER_ON], ['hoops.readRangeM', READ_RANGE_M], ['hoops.readSpeed01', READ_SPEED01], ['hoops.readGlanceEverySec', READ_GLANCE_EVERY_SEC], ['hoops.readGlanceSec', READ_GLANCE_SEC],
+      ['hoops.protectGuardOn', PROTECT_GUARD_ON], ['hoops.guardBackM', GUARD_BACK_M], ['hoops.guardOutM', GUARD_OUT_M], ['hoops.guardDropM', GUARD_DROP_M], ['hoops.guardSec', GUARD_SEC],
+      ['hoops.guardBarXM', GUARD_BAR_X_M], ['hoops.guardBarYM', GUARD_BAR_Y_M], ['hoops.guardBarZM', GUARD_BAR_Z_M],
+      ['hoops.protectPostureOn', PROTECT_POSTURE_ON], ['hoops.protectTurnDeg', PROTECT_TURN_DEG], ['hoops.protectEyes', PROTECT_EYES], ['hoops.protectChestAim', PROTECT_CHEST_AIM],
+      ['hoops.protectSinkM', PROTECT_SINK_M], ['hoops.protectSinkSec', PROTECT_SINK_SEC],
+      ['hoops.moveEaseOn', MOVE_EASE_ON], ['hoops.moveEaseSec', MOVE_EASE_SEC], ['hoops.moveEaseRateDeg', MOVE_EASE_RATE_DEG], ['hoops.moveArmRateDeg', MOVE_ARM_RATE_DEG],
+      ['hoops.jumperHopOn', JUMPER_HOP_ON], ['hoops.jumperApexAfterReleaseSec', JUMPER_APEX_AFTER_RELEASE_SEC], ['hoops.jumperMinLoadSec', JUMPER_MIN_LOAD_SEC], ['hoops.jumperHangOn', JUMPER_HANG_ON], ['hoops.jumperHangScale', JUMPER_HANG_SCALE],
+    ];
+    for (const [id, v] of pins) expect(def(id), id).toBe(v);
+    // the ported numbers (#312: REST_TEMPO 1.2 / 1.45, clip lock gain 3 / 2.6 Hz, READ 3.5 m / 0.42, PROTECT_TURN 50°, eyes 0.9, chestAim 0.8,
+    // PROTECT_SINK 0.06; #314: MOVE_EASE 0.2 s / 1000°/s / 1800°/s, JUMPER apex +0.03 s, load 0.08 s, hang 0.1) and every feature ON
+    expect(pins.map(([, v]) => v)).toEqual([1, 1, 1.2, 1.45, 3, 2.6, 0.4, 1, 3.5, 0.42, 2.4, 0.55, 1, 0.22, 0.06, 0.06, 0.15, 0.15, 1.06, 0.34, 1, 50, 0.9, 0.8, 0.06, 0.18, 1, 0.2, 1000, 1800, 1, 0.03, 0.08, 1, 0.1]);
+    // lane/h3-aware (groups "Hoops · 3v3 awareness" and "Hoops · teammate": PR #313 / #315's numbers)
+    expect(def('hoops.offBallLookOn')).toBe(OFF_BALL_LOOK_ON);
+    expect(def('hoops.manGlanceEverySec')).toBe(MAN_GLANCE_EVERY_SEC);
+    expect(def('hoops.manGlanceSec')).toBe(MAN_GLANCE_SEC);
+    expect(def('hoops.possessionSwapOn')).toBe(POSSESSION_SWAP_ON);
+    expect(def('hoops.foeSpaceAngleK')).toBe(FOE_SPACE_ANGLE_K);
+    expect(def('hoops.hasBallM')).toBe(HAS_BALL_M);
+    expect(def('hoops.defenseStanceOn')).toBe(DEFENSE_STANCE_ON);
+    expect(def('hoops.defenseRaiseM')).toBe(DEFENSE_RAISE_M);
+    expect(def('hoops.raiseReach')).toBe(RAISE_REACH);
+    expect(def('hoops.stanceEaseSec')).toBe(STANCE_EASE_SEC);
+    expect(def('hoops.defendLeanDeg')).toBe(DEFEND_LEAN_DEG);
+    expect(def('hoops.defendSpine1Deg')).toBe(DEFEND_SPINE1_DEG);
+    expect([OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC, POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M]).toEqual([1, 1.6, 0.4, 1, 0.3, 1.0]);
+    expect([DEFENSE_STANCE_ON, DEFENSE_RAISE_M, RAISE_REACH, STANCE_EASE_SEC, DEFEND_LEAN_DEG, DEFEND_SPINE1_DEG]).toEqual([1, 0.15, 0.97, 0.18, -6, 2]);
+    expect(def('hoops.mateReadOn')).toBe(MATE_READ_ON);
+    expect(def('hoops.mateSettleSec')).toBe(MATE_SETTLE_SEC);
+    expect(def('hoops.mateReadSec')).toBe(MATE_READ_SEC);
+    expect(def('hoops.mateHoldMaxSec')).toBe(MATE_HOLD_MAX_SEC);
+    expect(def('hoops.mateShootRangeM')).toBe(MATE_SHOOT_RANGE_M);
+    expect(def('hoops.mateDriveFromM')).toBe(MATE_DRIVE_FROM_M);
+    expect(def('hoops.mateFinishM')).toBe(MATE_FINISH_M);
+    expect(def('hoops.mateDriveMaxSec')).toBe(MATE_DRIVE_MAX_SEC);
+    expect(def('hoops.mateLaneM')).toBe(MATE_LANE_M);
+    expect([MATE_READ_ON, MATE_SETTLE_SEC, MATE_READ_SEC, MATE_HOLD_MAX_SEC, MATE_SHOOT_RANGE_M, MATE_DRIVE_FROM_M, MATE_FINISH_M, MATE_DRIVE_MAX_SEC, MATE_LANE_M]).toEqual([1, 0.35, 0.9, 1.8, 7.3, 8.5, 2.4, 1.6, 0.9]);
     // lane/hoops-def-tell (#273 T-A, T-C; #274 BLK-1)
     expect(def('hoops.aiReachTellOn')).toBe(AI_REACH_TELL_ON ? 1 : 0);
     expect(def('hoops.aiReachTellSec')).toBe(AI_REACH_TELL_SEC);

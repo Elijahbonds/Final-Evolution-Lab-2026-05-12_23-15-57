@@ -34,6 +34,7 @@ import {
   buildPostUp, buildFadeaway, buildHook, buildSpin,   // HOOPS-MOVE-KIT-B (2026-09-08): the post kit (M4–M6)
   buildPumpFake, buildStepThrough, buildPivot, buildReverseLayup, buildHopStep, buildEuroStep,   // HOOPS-MOVE-KIT-B wave 2: the footwork (M8–M14)
 } from './basketball';
+import { buildStepbackRelease, buildBankFollowThrough, buildCatchHop } from './shotKit';   // hoops-shot-content (2026-10-20): the step-back's release, the bank's follow-through, the 3PT catch hop
 import { buildBatStance, buildBatSwing, buildPitchOver, buildPitchSide } from './baseball';
 import { buildPartyThink, buildPartyBuzz, buildPartyLocked, buildPartyYes, buildPartyFacepalm, buildPartyShrug, buildPartyWin, buildPartyWinIn, buildPartyLose, buildPartyTalk, buildPartyPresent } from './party';   // BRAINBRAWL-MAJOR (+ talk/present: RESIDUAL)
 import { buildGolfAddress, buildGolfSwing, buildGolfPutt, buildGolfFinishHold } from './golf';
@@ -275,6 +276,11 @@ export function registerAuthoredClips(
     ['bball_layup_reverse_left', () => buildReverseLayup(scene, skeleton, 'left')],
     ['bball_hop_step', () => buildHopStep(scene, skeleton)],               // the two-foot gather (M13)
     ['bball_euro_step', () => buildEuroStep(scene, skeleton)],              // sell, cross (M14)
+    // hoops-shot-content (2026-10-20): the shot types that played someone else's body (anim/authored/shotKit.ts)
+    ['bball_stepback_release', () => buildStepbackRelease(scene, skeleton)],             // the step-back rises out of its own set
+    ['bball_follow_through_bank_left', () => buildBankFollowThrough(scene, skeleton, 'left')],    // called glass: the follow-through to the square
+    ['bball_follow_through_bank_right', () => buildBankFollowThrough(scene, skeleton, 'right')],
+    ['bball_catch_hop', () => buildCatchHop(scene, skeleton)],                           // 3PT: the hop into the set on the catch
     // Baseball packages (Phase 6, 2026-09-03) — the derby borrowed karate clips.
     ['baseball_stance', () => buildBatStance(scene, skeleton)],
     ['baseball_swing', () => buildBatSwing(scene, skeleton)],

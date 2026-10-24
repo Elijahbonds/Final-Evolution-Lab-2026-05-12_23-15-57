@@ -5,6 +5,7 @@
 // pre-boot pad before the fix: a forward push held facing-vs-travel at 1.00, a lateral push sat at −0.13 with 71% of
 // moving frames sideways. `travelOffRad` is what tells the tree which of those it is looking at.
 import { describe, it, expect } from 'vitest';
+import { openFeel, closeFeel } from '@/tests/helpers/feelOverrides';
 import { chooseBasketballClip, BasketballAnimTree, LEFT_TWIN_STATES, leftTwinOf, basketballClipTable, type AnimTreeInput } from './basketballTree';
 
 const base: AnimTreeInput = {
@@ -55,7 +56,11 @@ describe('basketballTree — the ball hand (phase 4b)', () => {
     // no twin where there is no ball arm: the stance (protect), defence. H2d REWROTE the carrier-loop lines (4g arrived, as this comment
     // said it would): the side and back dribbles twin, and a SIDE loop twins ACROSS — the mirror of the other side's clip (a mirror flips
     // the travel with the hand), so going right with the left hand is the left-going right-hand capture, mirrored
-    expect(at({ ballHand: 'left', speed01: 0, nearestDefender: 1 }).clip).toBe('bball_defend_stance');
+    // lane/h3-handler (#312 port) CHANGED this line: the protect is a DRIBBLE now (anim/RestDribble), so it twins like every dribble loop. The
+    // old assertion is kept as the feature's A/B: with hoops.protectDribbleOn 0 it is the stance again, with no twin.
+    expect(at({ ballHand: 'left', speed01: 0, nearestDefender: 1 }).clip).toBe('bball_dribble_idle_left');
+    openFeel({ 'hoops.protectDribbleOn': 0 });
+    try { expect(at({ ballHand: 'left', speed01: 0, nearestDefender: 1 }).clip).toBe('bball_defend_stance'); } finally { closeFeel(); }
     expect(at({ ballHand: 'left', travelOffRad: Math.PI / 2 }).clip).toBe('bball_dribble_side_left_left');
     expect(at({ ballHand: 'left', travelOffRad: -Math.PI / 2 }).clip).toBe('bball_dribble_side_right_left');
     expect(at({ ballHand: 'left', travelOffRad: Math.PI }).clip).toBe('bball_dribble_back_left');

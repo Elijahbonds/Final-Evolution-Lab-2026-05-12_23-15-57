@@ -506,15 +506,32 @@ export const MODE_CONTROLLERS: Record<string, ModeControllerConfig> = {
     ],
   },
 
-  // The Cypher: tap on the beat — one verb, no movement. (The touch overlay
-  // already covers playing ON the phone; this is the second-screen path.)
+  // The Cypher's SECOND-SCREEN DANCE PAD (lane/dance-extras-2, owner 2026-10-24: "a phone can drive dance like the on-glass pad").
+  // It was one TAP button, so a phone could not play MATCH, a freestyle section, a held freeze's release on the right finger, or the
+  // pick screen at all. Now it is the on-glass pad (lib/babylon/dance/ui/DancePad.tsx) as Controller Link's own kinds:
+  //   · FOUR MOVE BUTTONS, A B X Y, each named for the MATCH families it carries — padModel.padButtons in 'match', the same words the
+  //     on-glass pad prints (A TOP ROCK · BOUNCE, B FOOTWORK · POWER, X WAVE · SPIN, Y FREEZE · HOLD) — in the slot colours of
+  //     MODE_VERBS.dance. HOLD buttons (`A:down` / `A:up`): modeBridge makes them a press and a release, so a freeze is held for as long
+  //     as the thumb is down, exactly as on the glass. Opt-in `haptics` (as PERFORM's lanes): a buzz on each press and touch-action on
+  //     the buttons, so two fast taps are two taps, not a zoom. No velocity (a dance press lands or it does not).
+  //   · THE D-PAD, forwarded as the d-pad (`dpad`): the pick screen's ◀ ▶ songs and ▲ ▼ level — the on-glass pad's pick keys.
+  // On the pick screen A / B start, Y is MATCH and X is FREE DANCE, as on the glass. Every press reaches DanceMode as the FelInput
+  // the on-glass pad sends: lib/controller-link/schemas/dancePad.test.ts pins the labels to padModel, the colours to MODE_VERBS and the
+  // events through modeBridge to the room's own chain. One phone (maxPlayers 1): the Cypher has one dancer; in a couch room the seat
+  // rule applies unchanged (lib/party/seats.ts — the pad is whoever holds a seat).
   dance: {
     modeId: 'dance',
     title: 'The Cypher',
     maxPlayers: 1,
     askName: true,
     schemas: [
-      { kind: 'button', buttons: [{ action: 'A', label: 'TAP' }] },
+      { kind: 'button', columns: 2, haptics: true, buttons: [
+        { action: 'A', label: 'A · TOP ROCK · BOUNCE', color: '#22d3ee', hold: true },
+        { action: 'B', label: 'B · FOOTWORK · POWER', color: '#ff6b3d', hold: true },
+        { action: 'X', label: 'X · WAVE · SPIN', color: '#a78bfa', hold: true },
+        { action: 'Y', label: 'Y · FREEZE · HOLD', color: '#ffd75e', hold: true },
+      ] },
+      { kind: 'dpad', dpad: { action: 'dpad' } },
     ],
   },
 

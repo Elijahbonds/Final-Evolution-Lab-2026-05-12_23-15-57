@@ -35,7 +35,7 @@
 // cannot build.
 
 import type { SlotRow, SectionTable } from './types';
-import { WEARABLES, wearablesForSlot, defaultEquipped, getWearable, type WearableSlot } from '../../closet/wearable-catalog';
+import { WEARABLES, wearablesForSlot, defaultEquipped, getWearable, wearableLabel, type WearableSlot } from '../../closet/wearable-catalog';
 import { DEFAULT_AVATAR } from '../../babylon/types/avatar';
 
 /** Display names for one closet slot, in catalog order. */
@@ -73,6 +73,7 @@ function defaultNameFor(slot: WearableSlot): string | undefined {
 const kit = (id: string, label: string, slot: WearableSlot, allowNone: boolean, glossary: string): SlotRow => ({
   kind: 'slot', id, label, section: 'gear', tab: 'Kit',
   options: optionsForSlot(slot), allowNone, defaultOption: defaultNameFor(slot), requires: null,
+  optionLabels: Object.fromEntries(wearablesForSlot(slot).filter((w) => w.label).map((w) => [w.name, wearableLabel(w)])),
   glossary: glossary + priceLine(slot) + ' Owning it is decided by the server when you save, not by this screen.',
 });
 

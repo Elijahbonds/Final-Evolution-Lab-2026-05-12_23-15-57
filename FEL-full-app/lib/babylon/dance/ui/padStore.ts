@@ -11,7 +11,7 @@ let state: DancePadState = DEFAULT_PAD_STATE;
 const subs = new Set<() => void>();
 
 const same = (a: DancePadState, b: DancePadState): boolean =>
-  a.mode === b.mode && a.matchOn === b.matchOn && JSON.stringify(a.free) === JSON.stringify(b.free);
+  a.mode === b.mode && a.matchOn === b.matchOn && a.freeDance === b.freeDance && JSON.stringify(a.free) === JSON.stringify(b.free);
 
 export const padStore = {
   /** The current state (a stable object until it changes: useSyncExternalStore's contract). */

@@ -155,7 +155,8 @@ function possession(defender: (t: number, rival: Vector3) => Vector3, opts: { se
 {
   type Play = { clip: string; loop: boolean; onEnd?: () => void; restart?: boolean };
   const plays: Play[] = [];
-  const fake = { play: (clip: string, o: Play) => { plays.push({ clip, loop: !!o.loop, onEnd: o.onEnd, restart: o.restart }); return null; } } as never;
+  // #427 (RestDribble): the tree now eases the rest/protect dribble tempo through setPlaybackScale, as the other tree tests' fakes already provide
+  const fake = { play: (clip: string, o: Play) => { plays.push({ clip, loop: !!o.loop, onEnd: o.onEnd, restart: o.restart }); return null; }, setPlaybackScale: () => {} } as never;
   const BASE: AnimTreeInput = { speed01: 0, crossover: false, nearestDefender: 5, hasBall: true, shooting: false, dunking: false, driving: false, defending: false, bracing: false, staggered: false };
   const tree = new BasketballAnimTree(fake);
   tree.update(BASE); tree.update(BASE);

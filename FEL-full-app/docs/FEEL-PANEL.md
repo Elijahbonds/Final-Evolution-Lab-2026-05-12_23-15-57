@@ -132,12 +132,45 @@ combo; flow only, no odds), and `hoops.guardRangeM` 2.0 m (`GuardHand.ts` `GUARD
 player's ball to the outside hand; the dwell and gap are the AI hand's `hoops.aiHandDwellSec` / `hoops.aiHandGapSec`).
 **assumption:** the bounds are safe, not tuned.
 
+lane/hoops-shot-content (group "Hoops · shooting"), defaults unchanged: `hoops.ftSetupSec` 0.9 s, `hoops.ftRoutineSec` 1.2 s,
+`hoops.ftSetSec` 0.3 s and `hoops.ftResultSec` 1.1 s (`FreeThrows.ts` `FT_SETUP_SEC`, `FT_ROUTINE_SEC`, `FT_SET_SEC`,
+`FT_RESULT_SEC`: the free-throw trip's beats, never its meter), `hoops.bankSetDeg` 12° and `hoops.bankGlanceMs` 1100 ms
+(`hoops/shotLooks.ts` `BANK_SET_DEG`, `BANK_GLANCE_MS`: the called bank's angled set and glance; look only, the ball's route is
+unchanged), and `hoops.ftDistNarrow01` 0 (`FreeThrows.ts` `FT_DIST_NARROW_01`: the share of a jumper's distance narrowing the line's
+green takes; owner 2026-10-24: 0, the full open window, ±65 ms; 1 = a jumper from the stripe, ±59 ms). Not knobs: the bank follow-through clips' own
+chest / glance yaw (`shotKit.ts` `BANK_CHEST_YAW_DEG` 14, `BANK_GLANCE_YAW_DEG` 22), which are baked into the clip's keys when
+the clip is built, not read at use. **assumption:** the bounds are safe, not tuned.
+
 lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `BallSideShade.ts`: `hoops.ballSideShadeOn` 1
 (`BALL_SIDE_SHADE_ON`; 0 = the old anchor exactly, for an A/B on the phone), `hoops.shadeOffsetM` 0.5 m, `hoops.shadeHoldSec`
 0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
 **assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
 speed or timing window reads a knob here.
 
+lane/h3-handler (owner 2026-10-24: the still-missing parts of PRs #312 and #314, ported). Group "Hoops · handle (rest)": the dribble at
+rest — `hoops.protectDribbleOn` 1, `hoops.restBounceOn` 1, `hoops.restTempoIdle` 1.2, `hoops.restTempoProtect` 1.45, `hoops.clipLockGain` 3,
+`hoops.clipLockHzMax` 2.6 Hz, `hoops.clipLockMaxMps` 0.4 m/s (`anim/RestDribble.ts`); the eyes on the defender — `hoops.eyesOnDefenderOn` 1,
+`hoops.readRangeM` 3.5 m, `hoops.readSpeed01` 0.42, `hoops.readGlanceEverySec` 2.4 s, `hoops.readGlanceSec` 0.55 s (`core/HoopsLook.ts`); the
+guard — `hoops.protectGuardOn` 1, `hoops.guardBackM` 0.22 m, `hoops.guardOutM` 0.06 m, `hoops.guardDropM` 0.06 m, `hoops.guardSec` 0.15 s,
+`hoops.guardBarXM` / `YM` / `ZM` 0.15 / 1.06 / 0.34 m (`anim/RestDribble.ts`); the protect posture — `hoops.protectPostureOn` 1,
+`hoops.protectTurnDeg` 50°, `hoops.protectEyes` 0.9, `hoops.protectChestAim` 0.8 (`core/HoopsLook.ts`), `hoops.protectSinkM` 0.06 m,
+`hoops.protectSinkSec` 0.18 s (`anim/ProtectSink.ts`); the move ease — `hoops.moveEaseOn` 1, `hoops.moveEaseSec` 0.2 s,
+`hoops.moveEaseRateDeg` 1000°/s, `hoops.moveArmRateDeg` 1800°/s (`anim/MoveEase.ts`). Group "Hoops · jump shot": `hoops.jumperHopOn` 1
+(TUNED: the jump's air time 0.88–1.02 s → ~0.5 s; 0 = the old float), `hoops.jumperApexAfterReleaseSec` 0.03 s, `hoops.jumperMinLoadSec`
+0.08 s, `hoops.jumperHangOn` 1, `hoops.jumperHangScale` 0.1 (`core/JumperHop.ts`). Every `…On` knob at 0 gives back the old behaviour
+exactly (each module's test pins it). None of them moves a timing window, the release frame, a speed or an odds number. **assumption:**
+the bounds are safe, not tuned.
+
+lane/h3-aware (PR #313 / #315 ported onto release, owner 2026-10-24). Group "Hoops · 3v3 awareness": `hoops.offBallLookOn` 1
+(`OffBallLook.ts` `OFF_BALL_LOOK_ON`; 0 = the release feed), `hoops.manGlanceEverySec` 1.6 s, `hoops.manGlanceSec` 0.4 s;
+`hoops.possessionSwapOn` 1 (`PossessionSwap.ts`; 0 = every body keeps its own brain on their ball), `hoops.foeSpaceAngleK` 0.3 (×π),
+`hoops.hasBallM` 1.0 m (TUNED: release 1.8; 1.8 = release); `hoops.defenseStanceOn` 1 (`DefenseStance.ts`; 0 = no raise, the table's
+lean), `hoops.defenseRaiseM` 0.15 m, `hoops.raiseReach` 0.97, `hoops.stanceEaseSec` 0.18 s, `hoops.defendLeanDeg` −6° (TUNED: the table's
+10 / 8 in 3v3; the table itself is unchanged) and `hoops.defendSpine1Deg` 2° (TUNED: 8). Group "Hoops · teammate" (`threevthreeMate.ts`):
+`hoops.mateReadOn` 1 (0 = release's 1 %-a-frame roll), `hoops.mateSettleSec` 0.35 s, `hoops.mateReadSec` 0.9 s, `hoops.mateHoldMaxSec`
+1.8 s, `hoops.mateShootRangeM` 7.3 m, `hoops.mateDriveFromM` 8.5 m, `hoops.mateFinishM` 2.4 m, `hoops.mateDriveMaxSec` 1.6 s and
+`hoops.mateLaneM` 0.9 m. **assumption:** the bounds are safe, not tuned. No make rate reads a knob here: the teammate's shot is
+`teammateShoots` on the ring (RimDecides), unchanged.
 lane/hoops-def-tell (#273 and #274 rebuilt, owner 2026-10-23). Group "Hoops · defense", the tell and the separation shipped ON:
 `hoops.aiReachTellOn` 1 (`ReachTell.ts` `AI_REACH_TELL_ON`; 0 = the release's reach exactly), `hoops.aiReachTellSec` 0.25 s,
 `hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5, `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
@@ -208,3 +241,7 @@ lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30
 number): a 3v3 tied at the horn plays sudden-death overtime on this clock, and level again when it runs out is another overtime.
 It moves only how long an overtime lasts, never who wins it or what a bucket is worth. **assumption:** the bounds (10–90 s) are
 safe, not tuned.
+lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by that lane: `tennis.portraitHeroMargin` 0.15
+(`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
+only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
+**assumption:** the bounds (0.05 to 0.35) are safe, not tuned.

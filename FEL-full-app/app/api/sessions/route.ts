@@ -20,7 +20,7 @@ import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGat
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
   ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
-  type StreakProfile, type StreakStep,
+  isFreeDanceSession, FREE_DANCE_REASON, type StreakProfile, type StreakStep,
 } from '@/lib/session-payout';
 import type { Prisma } from '@/lib/generated/prisma';
 import { canonicalModeKey } from '@/lib/game-data';
@@ -287,6 +287,13 @@ export async function POST(req: Request) {
     }
     const score = check.ok ? check.score : (unruled as { ok: true; score: number }).score;
     const noRules = !check.ok;
+    // lane/dance-extras-2 (owner 2026-10-24): a FREE DANCE run (the Cypher with its judge off) has no score, so a free-dance post
+    // with one is never recorded as a scored run — refused here, like every other impossible score. One with score 0 is recorded
+    // unpaid below (lib/session-payout.ts isFreeDanceSession).
+    const freeDance = isFreeDanceSession(rulesMode, stats);
+    if (freeDance && score !== 0) {
+      return send(await refuse(userId, mode, 'SCORE_INVALID', 422, { detail: 'free_dance_scored', limit: 0 }, { id: run.id, close: 'rejected', score, durationMs }));
+    }
     // OWNER DECISION: a floor-only mode (Prove It) pays as a score of 0 and no win — the played floor — and keeps its
     // validated score on the history row (modeScoreRules.ts payFloorOnly)
     const floorOnly = check.ok && check.rule.payFloorOnly === true;
@@ -362,8 +369,9 @@ export async function POST(req: Request) {
     // of a staked set never spends the player's one Arena pay for that duel.)
     // OWNER DECISION: a mode with no rules row yet (NO_RULES) is recorded the same way — and, returning here, it never
     // reaches the paying transaction either, so it never makes the pay-once claim (verifiedMusicDuel above only reads).
-    if (!run.payoutEligible || noRules || run.agentRun) {
-      const reason = run.agentRun ? 'AGENT' : !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : 'NO_RULES';
+    // lane/dance-extras-2: and a FREE DANCE run (FREE_DANCE): judged by nobody, paid nothing, no GameSession row for a rival or a best
+    if (!run.payoutEligible || noRules || run.agentRun || freeDance) {
+      const reason = run.agentRun ? 'AGENT' : !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : noRules ? 'NO_RULES' : FREE_DANCE_REASON;
       await recordServerEvent({ name: 'session_unpaid', userId, props: { mode, score, won, duration, reason } });
       return send(await closeRun(prisma, run.id, {
         status: RUN_STATUS.recorded, score, durationMs, now,
