@@ -47,7 +47,8 @@ import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';
 import { mountHitchProbe } from './hitchProbe';
-import { mountPerfStats } from './perfStats';                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
+import { mountPerfStats } from './perfStats';
+import { setGradeExposure } from '../scene/gradeUniform';                // PERF-LAG (2026-10-24): the per-frame exposure beat as a uniform                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
@@ -1001,7 +1002,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       gradeState = stepped.state;
       if (stepped.write) {
         lights.pipeline.imageProcessing.vignetteWeight = stepped.write.vignette;
-        lights.pipeline.imageProcessing.exposure = stepped.write.exposure;
+        setGradeExposure(lights.pipeline.imageProcessing, stepped.write.exposure);   // PERF-LAG: the same value, without re-preparing every material (gradeUniform.ts)
       }
     }
     // IMPROVE (2026-10-06, 3PT #18): every tick renders, except a paused one inside ~100 ms of the last paused render
