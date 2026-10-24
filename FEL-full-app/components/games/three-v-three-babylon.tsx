@@ -47,9 +47,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
       endedRef.current = true;
-      // 'DRAW' is a real outcome at the buzzer now, and it is neither a win nor a defeat.
-      // Reporting a level game as GAME OVER would be as dishonest as the WIN it replaced.
-      const drew = r.outcome === 'DRAW';
+      // NB-3: the mode never ends level (a tie at the horn is sudden-death overtime), so it ends WIN or LOSS only — the
+      // level-game branch (its headline 'dead even') is gone: tests/locomotion/verdict-contract.test.ts holds the host to what the mode emits
       const won = r.outcome === 'WIN';
       const result: GameResult = {
         score: r.score,
@@ -57,8 +56,8 @@ export default function ThreeVThreeBabylon({ onEnd }: GameProps) {
         opponentScore: r.stats?.foeScore ?? 0,
         won,
         duration: r.durationSec,
-        // NB-3: a game decided in overtime says so ('WON IN OT'); 'DEAD EVEN' is left for a client that predates overtime
-        headline: overtimeHeadline(won, Number(r.stats?.overtimes ?? 0)) ?? (won ? 'GAME WON' : drew ? 'DEAD EVEN' : 'GAME OVER'),
+        // NB-3: a game decided in overtime says so ('WON IN OT')
+        headline: overtimeHeadline(won, Number(r.stats?.overtimes ?? 0)) ?? (won ? 'GAME WON' : 'GAME OVER'),
       };
       onEndRef.current(result);
     };

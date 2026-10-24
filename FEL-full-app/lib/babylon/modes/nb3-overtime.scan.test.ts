@@ -77,5 +77,6 @@ describe('NB-3: the copy matches the clock', () => {
   it('the scorebug\'s clock chip names the period in overtime; the card\'s headline says it was decided there', () => {
     expect(HOST).toMatch(/hud\.period === 'string' && hud\.period \? `\$\{hud\.period\} ` : ''\}\$\{hud\.time\}s`/);
     expect(HOST).toMatch(/headline: overtimeHeadline\(won, Number\(r\.stats\?\.overtimes \?\? 0\)\) \?\? /);
+    expect(HOST).not.toMatch(/'DRAW'|DEAD EVEN/);   // the mode never ends level now (verdict-contract)
   });
 });
