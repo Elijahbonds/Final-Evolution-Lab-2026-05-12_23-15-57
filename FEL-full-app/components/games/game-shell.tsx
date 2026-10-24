@@ -31,6 +31,7 @@ import type { EndGoals } from './end-screen/types';
 import { unpaidReason } from '@/lib/sessions/unpaidCopy';
 import { sendFinish, flushFinishes, settled, type FinishDeps } from '@/lib/sessions/finishOutbox';   // QA-H2: a finish survives a reload
 import { feelOverridesUsed } from '@/lib/feel-panel/feel';   // feel-panel lane (owner 10-20)
+import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
 import {
@@ -568,6 +569,7 @@ function GameShellInner({
   // PACK THE FIVE #3: `display` may be overridden — the dunk proof card mints the same link with the make/miss line.
   const shareChallenge = useCallback(async (displayOverride?: string) => {
     if (!result || feelOverridesUsed()) return;   // feel-panel: a run played with the owner's feel overrides is never minted as a challenge
+    if (isFreeDanceResult(result)) return;   // lane/dance-extras-2: a free-dance run has no score for anyone to beat
     setShareState('minting');
     try {
       const j = await fetch('/api/challenge/mint', {

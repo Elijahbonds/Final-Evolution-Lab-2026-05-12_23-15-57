@@ -15,9 +15,11 @@ describe('the hooks (1v1 and 3v3)', () => {
       expect(s.match(/new JumperRise\(/g)?.length).toBe(1);
       expect(s.match(/riseHop\.step\(/g)?.length).toBe(1);
       expect(s).not.toMatch(/riseHop\.dur/);
-      // the meter's pace is still syncedShotSpeed's, computed before the rise is built and handed to the held clip unchanged
-      expect(s).toMatch(/const sync = syncedShotSpeed\(clipSec, shotMeter\.riseSec, greenInRise01, releaseFrameOf\(/);
-      expect(s).toMatch(/hold\('jumpshot', \{ speedRatio: sync, fadeSec: 0\.08 \}\)/);
+      // the meter's pace is still syncedShotSpeed's, computed before the rise is built and handed to the held clip unchanged.
+      // The clip and its release key come from riseClipFor (hoops-shot-content: 'jumpshot' at releaseFrameOf, or the step-back's own).
+      expect(s).toMatch(/const rc = riseClipFor\(kind, /);
+      expect(s).toMatch(/const sync = syncedShotSpeed\(clipSec, shotMeter\.riseSec, greenInRise01, rc\.release01\)/);
+      expect(s).toMatch(/hold\(rc\.clip, \{ speedRatio: sync, fadeSec: 0\.08 \}\)/);
     });
   }
 });

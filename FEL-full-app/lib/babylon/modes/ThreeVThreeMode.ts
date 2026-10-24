@@ -80,8 +80,7 @@ import { dunkMissVelocity, dunkVerdict, matePct, rimDecidesExact } from '../core
 import { startFlush, stepFlush, type FlushState } from '../core/RimFlush';   // DUNK-FANATIC (2026-09-17): the contest's flush on the game's dunks
 import { RIM_RADIUS } from '../core/RimPhysics';
 import { NET_EXIT_MPS, NET_DROP_NUDGE } from '../core/NetExit';
-import { syncedShotSpeed, RELEASE_FRAME_01 } from '../core/BallHandling';
-import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
+import { syncedShotSpeed } from '../core/BallHandling';   // (hoops-shot-content: the release frame of the clip that plays is read in hoops/shotLooks.riseClipFor)
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';   // suite pass: the sanctioned spawn paths
@@ -92,6 +91,9 @@ import { VenueKit } from '../visual/VenueKit';
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { BallSim } from '../core/BallPhysics';
+import { FreeThrowLine, ftBody, ftIdleInput, FT_STILL } from '../core/FreeThrowLine';   // hoops-shot-content: free throws (the line's own scene half)
+import { BankLook, riseClipFor, gatherClipFor } from '../hoops/shotLooks';   // hoops-shot-content: the step-back's gather and release, the bank's look
+import type { GatherKind } from '../core/HoopsMoves';
 import { attachBallToHand, gatherBallToHand, releaseBall } from '../anim/ballRig';
 import { rightHandHoops, rightHandBall, hoopsHand, leftDribbleTwins } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen, every body
 import { sideAwayFrom, sideOfVector } from '../anim/athleteSide'; // HOOPS MOTION phase 3: the one visual-side helper (phase 4b: a crossing move's side is its end hand's; the bite's is still sideAwayFrom's)
@@ -111,7 +113,7 @@ import {
   DribbleController, ShotMeter, DefenderBrain, TeammateBrain, contestLevel, clampToHalfCourt, isThree,
   resolveBodyCollision, checkAnkleBreak, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, DUNK_PCT,
-  SHOT_QUALITY_PCT, followThroughFor, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
 import { lockTarget, choosePassType, PassFlight, type PassType, type PassTarget, leadPoint, PASS_SPEED } from '../core/BallHandling';
 import { HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
 import {   // HOOPS-MOVE-KIT-A
@@ -367,6 +369,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // THE SHOT METER (owner, 2026-09-18): the world bar beside the shooter's head + the HUD's green window, fed by the
   // same ShotMeter numbers the release is graded by
   let meter3d: ShotMeter3DHandle | null = null; let hudGreen = '';
+  const bankLook = new BankLook();   // hoops-shot-content: the angled set, the glance and the follow-through of a called-glass shot
+  let ftLine: FreeThrowLine | null = null;   // hoops-shot-content: the free-throw line — a foul site's continuation runs after the trip
+  const ftAfter = (...a: Parameters<FreeThrowLine['after']>): void => { if (ftLine) ftLine.after(...a); else a[2](); };
   let meReach: RimReachHandle | null = null;   // HAND AND RIM: the dunk's hand onto the ring
   const meterStart = (contest: number, style?: Parameters<ShotMeter['start']>[1], gather?: number): void => {
     shotMeter.start(contest, style ?? 'jumper', gather ?? 0); shotMeter.narrowBy(distanceGreenFactor(distXZ(me.char.root.position, RIM_FLOOR), style ?? 'jumper'));   // lane/hoops-shot-core: distance narrows the green (ShotWindow)
@@ -981,7 +986,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const topTinted = char.meshes.some((m) => SLOT_KEYS.jersey.some((k) => `${m.name} ${m.material?.name ?? ''}`.toLowerCase().includes(k)));
           if (!topTinted) tintGarmentSlot(char, SLOT_KEYS.shorts, TEAM_SHORTS[side]);
         }
-        char.secondary?.setLookTarget(() => ball?.position ?? null);   // Phase 2: all six watch the ball
+        char.secondary?.setLookTarget(() => (ai ? null : bankLook.target()) ?? ball?.position ?? null);   // Phase 2: all six watch the ball (hoops-shot-content: the hero on the glass through a called bank)
         neverBindPose(char.animator, SPORT_CLIP.idle);
         rightHandDunks(char.animator, char.skeleton);   // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): all six
         rightHandHoops(char.animator, char.skeleton);   // HOOPS MOTION phase 3: the whole bball_* family too (captures included) — all six
@@ -1087,6 +1092,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       handleFx?.dispose(); handleFx = mountHandleFx(ctx, { carry: () => carries.get(me) ?? null });   // hoops-defense-fx
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, RIM);   // A+ P0: juice-only ring + net, material clones — no meshy_hoop_* transform is touched
       meter3d?.dispose(); meter3d = mountShotMeter3D(ctx.scene);
+      ftLine?.dispose(); ftLine = new FreeThrowLine({ scene: ctx.scene, ball, rim: RIM, rimFloor: RIM_FLOOR, out: BOARD_NORMAL, tag: '3V3', meter3d: () => meter3d,   // hoops-shot-content
+        shooter: () => ftBody(me.char, me.tree, carries.get(me) ?? null), others: () => [...foes, ...mates].map((b) => ftBody(b.char, b.tree, carries.get(b) ?? null)), held: () => me.slot.intent.actionHeld > 0.02,
+        place: (b, p, yaw) => { b.root.position.copyFrom(p); b.root.rotation.y = yaw; if (b.root === me.char.root) me.drib.setFacing(yaw); for (const o of everyBody()) if (o.char.root === b.root) { o.vel.setAll(0); o.mover?.stop(); } },
+        tickBodies: (dt, loop) => { for (const o of everyBody()) if (o !== me || loop) o.tree.update(ftIdleInput(dt, o === me)); },
+        hud: (u) => putHud(ctx, u), banner: (t, ms) => bannerFlash(ctx, t, ms),
+        score: (n) => { myScore += n; putHud(ctx, { score: myScore }); if (myScore < TARGET_SCORE) return false; ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, endStats()); return true; },
+        camera: (_dt, snap) => (snap ? ctx.camDirector.snapTo(me.char.root.position, RIM) : ctx.camDirector.update(me.char.root.position, FT_STILL, RIM)) });
       // THE MIC: one per run (the banks load in the background; the welcome waits for the first live frame, in micTick)
       mic?.dispose(); micParked?.dispose(); micParked = null;
       mic = new ModeMic(ctx, { groups: ['game', 'names'], court: ctx.location, players: { ...MIC_PLAYERS } });
@@ -1205,7 +1217,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       lodTick(ctx);   // #14
       micTick(ctx);   // THE MIC: its clock, the welcome on the first live frame, an open mate calling for it
       if (hoopsFx?.holdIntro(me.char.root.position, RIM)) return;   // vis-hoops-court: the broadcast intro holds the first possession (and the game clock)
-      if (shotClock.tick(dt, { token: possessionToken, ours: carrierId !== 'foeTeam', live: carrierId !== 'foeTeam' && !board && !arc.active && !mateArc.active && !shooting && !mateShooting && !dunking && !gather && !finish })) { shotClockViolation(ctx); return; }   // lane/hoops-shot-core: ELITE's shot clock
+      if (shotClock.tick(dt, { token: possessionToken, ours: carrierId !== 'foeTeam', live: carrierId !== 'foeTeam' && !board && !arc.active && !mateArc.active && !shooting && !mateShooting && !dunking && !gather && !finish && !ftLine?.active })) { shotClockViolation(ctx); return; }   // lane/hoops-shot-core: ELITE's shot clock (hoops-shot-content: stopped at the line)
       // HOOPS KINETIC 3v3: the clocks, the vault, the overdrive's infinite turbo, the gauge on the HUD
       synergy.tick(dt); driftCool = Math.max(0, driftCool - dt); meBurstLeft = Math.max(0, meBurstLeft - dt); mateBurst[0] = Math.max(0, mateBurst[0] - dt); mateBurst[1] = Math.max(0, mateBurst[1] - dt);
       if (vault) { vault.t += dt; const u = Math.min(1, vault.t / PARRY.sec); const q = vaultAt(vault.from, vault.dir, u); me.char.root.position.set(q.x, q.y, q.z); me.drib.vel.set(0, 0, 0); if (u >= 1) vault = null; }
@@ -1220,6 +1232,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       else if (!driver) { driverPrevFor = null; driverVelEst.setAll(0); }
       { const sv = Math.round(synergy.value), od = Math.ceil(synergy.overdriveLeft); if (sv !== synHud || od !== odHud) { synHud = sv; odHud = od; putHud(ctx, { synergy: sv, overdrive: od }); } }
+      if (ftLine?.active) { me.slot.poll(dt); ftLine.update(dt); return; }   // hoops-shot-content: a dead ball at the line — the clock and live play wait for the trip
       if (timeLeft > 0) timeLeft -= dt;
       else if (!buzzer) { buzzer = true; SoundKit.play('whistle'); }
       const liveAtBuzzer = arc.active || mateArc.active || !!foeDunkFlight || dunking || shooting || mateShooting;
@@ -1469,7 +1482,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           // HOOPS-MOVE-KIT-A M2: fouled on the finish. The REF names the call and decides who gets the
           // ball; this branch used to write the banner itself and then hand the ball over unconditionally,
           // which meant an and-one in 3v3 was worth strictly less than an and-one in 1v1 for no stated
-          // reason. `foulAward` says what a foul is worth in a format with no free throws: the ball.
+          // reason. `foulAward` says what a foul is worth (hoops-shot-content: shots, then the ball).
           const andOneCall = finishFoul ? judge('and_one', { offense: 'me', shooter: 'me', fouled: 'me' }) : null;
           finishFoul = false;
           putHud(ctx, {
@@ -1492,7 +1505,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           }
           // an and-one keeps the ball with the fouled team; otherwise the FORMAT decides, and 3x3 alternates
           const next = andOneCall ? andOneCall.ball ?? 'me' : possessionAfterScore(FORMAT, 'me');
-          later(300, () => (next === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
+          later(300, () => ftAfter(andOneCall, false, () => (next === 'me' ? resetPossession(true) : void opponentPossession(ctx))));   // hoops-shot-content: an and-one shoots its one first
         } else if (res === 'missed') {
           SoundKit.play('miss');
           me.shotWin = 'none';
@@ -1513,12 +1526,12 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             const call = judge('shooting_foul', { offense: 'me', shooter: 'me', fouled: 'me', detail: 'ON THE FINISH' });
             console.info(`[3V3-REF] ${call.id} → ${call.ball} (${foulAward(call)})`);
             if (call.whistle) SoundKit.play('whistle');
-            // no free throws in this format (Ref.FREE_THROWS_IMPLEMENTED) — a foul is answered with the ball
+            // the free throws first (Ref.FREE_THROWS_IMPLEMENTED, hoops-shot-content), then the ball back
             putHud(ctx, { banner: `${call.banner} — ${call.ball === 'me' ? 'BALL BACK' : 'THEIR BALL'}` });
             bannerClearLater(ctx, 900);
             mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
             const back = call.ball ?? 'me';
-            later(900, () => (back === 'me' ? resetPossession(true) : void opponentPossession(ctx)));
+            later(900, () => ftAfter(call, arcPoints === 3, () => (back === 'me' ? resetPossession(true) : void opponentPossession(ctx))));   // hoops-shot-content: the line first
           } else {
             putHud(ctx, { banner: 'RIMS OUT' });
             bannerClearLater(ctx, 700);
@@ -1761,7 +1774,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       }
       const nearestFoeDist = foes.reduce((best, f) => f.stunSec > 0 ? best : Math.min(best, Vector3.Distance(f.char.root.position, me.char.root.position)), Infinity);
       if (shooting) {   // BIOMECH-HOOPS-WAVE1 G1: the shooter squares to the rim through the meter
-        me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM), FACE_RIM_RATE, dt); me.drib.setFacing(me.char.root.rotation.y);
+        me.char.root.rotation.y = slewYaw(me.char.root.rotation.y, yawTo(me.char.root.position, RIM) + bankLook.setYaw(me.char.root.position, RIM, RIM_FLOOR, BOARD_NORMAL, me.slot.intent.glass), FACE_RIM_RATE, dt); me.drib.setFacing(me.char.root.rotation.y);   // hoops-shot-content: + the angled set off the glass
       }
       // HOOPS-MOVE-KIT-A M1/M3: the gather moves the body (the pull-up's plant, the step-back), the finish strides and hops
       if (gather) {
@@ -1771,7 +1784,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           const plan = gather.plan; gather = null;
           // HOOPS-MOVE-KIT-B wave 2: the footwork gathers (step-through / hop / euro) end IN a finish, where the feet land
           if (plan.then && plan.then !== 'rise') { startFinish(ctx, plan.then, shotContest, nearestLiveFoe()?.char.root.position ?? null, plan.side, plan.sec); if (plan.glass) banked = bankPoint(me.char.root.position, RIM, BOARD_NORMAL); }   // H2e: the skip gather off the high glass
-          else beginRise();
+          else beginRise(plan.kind);   // hoops-shot-content: the step-back rises on its own release
         }
       }
       if (finish) stepFinish(dt);
@@ -2385,6 +2398,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       handleFx?.dispose(); handleFx = null;   // hoops-defense-fx
       hoopJuice?.dispose(); hoopJuice = null;        // A+ P0: restores any hoop material the punch swapped
       meter3d?.dispose(); meter3d = null;
+      ftLine?.dispose(); ftLine = null;   // hoops-shot-content
       mic?.dispose(); mic = null; micParked?.dispose(); micParked = null; micTierOff?.(); micTierOff = null;   // THE MIC stops with the mode
       ambient?.dispose(); ambient = null;                                        // IMPROVE (2026-10-06) #17: the gulls (the extra trail no longer exists, #8)
       mark?.dispose(); mark = null; markMat?.dispose(); markMat = null;          // #5 #6: the ring on the floor
@@ -2506,7 +2520,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // arc resolves. HOOPS-MOVE-KIT-A M3: a layup / floater lets go from its OWN clip at the top of the hop and rides it to
     // feet-down (it used to cut to the dunk launch clip — a two-arm sweep through a T)
     if (finish) finish.released = true;
-    else me.tree.beat(followThroughFor(quality), { fadeSec: 0.2 });   // HOOPS-DEPTH S6: an early / late release reads in the body before the rim
+    else me.tree.beat(bankLook.followThrough(quality, banked, me.char.root.position, me.char.root.rotation.y), { fadeSec: 0.2 });   // hoops-shot-content: a green bank follows through to the glass;   // HOOPS-DEPTH S6: an early / late release reads in the body before the rim
     // HOOPS-MOVE-KIT-B: a fade / a hook keeps its OWN posture window to feet-down (the release stance would stand the lean
     // back up in mid-air, which IS the shot)
     me.shotWin = finish && (finish.plan.style === 'fadeaway' || finish.plan.style === 'hook')
@@ -2778,7 +2792,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (fouled && myScore < TARGET_SCORE) mic?.then({ moment: 'game.andone', priority: 2 });
         if (!posterized) { swing('highlight_dunk'); putHud(ctx, { momentum }); }   // 1v1's clean slam (a poster reported at the victim's fall); it reported nothing
         if (myScore >= TARGET_SCORE) { ended = true; SoundKit.play('whistle'); micEnd('WIN'); ctx.end('WIN', myScore, endStats()); return; }
-        later(400, () => void opponentPossession(ctx));
+        later(400, () => ftAfter(fouled ? 'and_one' : null, false, () => void opponentPossession(ctx)));   // hoops-shot-content
       } else {
         SoundKit.play('miss');
         SoundKit.play('crowdGroan', { volume: 0.4 });
@@ -2787,7 +2801,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           putHud(ctx, { banner: 'FOULED AT THE RIM — BALL BACK' });
           mic?.say({ moment: 'game.foul' });   // THE MIC: the whistle
           bannerClearLater(ctx, 900);
-          later(900, () => resetPossession(true));
+          later(900, () => ftAfter('shooting_foul', false, () => resetPossession(true)));   // hoops-shot-content
         } else if (swatted) {   // D1: the ball went loose at the bump
           putHud(ctx, { banner: 'SWATTED AT THE RIM!' });
           mic?.say({ moment: 'game.blocked', priority: 2, crowd: { moment: 'crowd.heckle', n: 2 } }); micTalk(swatBy, 'player.trash.stop'); micSlump();   // THE MIC
@@ -2819,20 +2833,22 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     if (plan.sec > 0) {
       gather = { plan, t: 0 };
       me.shotWin = 'gather'; me.shotSec = 0;
-      const clipSec = me.char.animator.durationOf('bball_pullup_gather') ?? 0.3;
-      me.tree.beat('bball_pullup_gather', { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
+      const gatherClip = gatherClipFor(plan.kind);   // hoops-shot-content: a step-back gathers on its own clip (1v1's; it played the pull-up's here)
+      const clipSec = me.char.animator.durationOf(gatherClip) ?? 0.3;
+      me.tree.beat(gatherClip, { holdEnd: true, fadeSec: 0.06, speedRatio: clipSec / plan.sec });
       SoundKit.play('whoosh', { pitch: 1.0, volume: 0.2 });
       console.info(`[3V3-MOVE] gather ${plan.kind} ${plan.sec.toFixed(2)} s from ${plan.v0.length().toFixed(1)} m/s`);
     } else { gather = null; beginRise(); }
     putHud(ctx, { shotType: gatherLabel(plan.kind, currentShot?.label ?? 'JUMPER') });
   }
-  function beginRise(): void {
+  function beginRise(kind?: GatherKind): void {
     me.shotWin = 'load'; me.shotSec = 0;
-    const clipSec = me.char.animator.durationOf('jumpshot') ?? 1.0;
+    const rc = riseClipFor(kind, me.char.animator);   // hoops-shot-content: a step-back rises on its own release (same green: paced on its own release key)
+    const clipSec = me.char.animator.durationOf(rc.clip) ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, releaseFrameOf(me.char.animator, 'jumpshot', RELEASE_FRAME_01));
+    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01);
     riseHop = new JumperRise(shotMeter.riseSec, greenInRise01, JUMPER_HOP_APEX, sync);   // lane/h3-handler (#314 port): DEFENSE-LOOK's hop, leaving the floor after the load, the apex at the release
-    me.tree.hold('jumpshot', { speedRatio: sync, fadeSec: 0.08 });
+    me.tree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08 });
   }
   /** M3: a layup / floater — the ball into the finishing hand, the finish clip paced to the green, the stride and the hop. */
   function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null, sideIn?: 'left' | 'right', preSec = 0): void {

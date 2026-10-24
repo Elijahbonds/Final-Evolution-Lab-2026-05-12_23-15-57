@@ -15,6 +15,8 @@ import { EYES_ON_DEFENDER_ON, READ_RANGE_M, READ_SPEED01, READ_GLANCE_EVERY_SEC,
 import { PROTECT_SINK_M, PROTECT_SINK_SEC } from '@/lib/babylon/anim/ProtectSink';
 import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } from '@/lib/babylon/anim/MoveEase';
 import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
+import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
+import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
@@ -68,6 +70,16 @@ describe('the feel knob catalogue', () => {
     // tiebreak-cam (group "Tennis · camera")
     expect(def('tennis.portraitHeroMargin')).toBe(PORTRAIT_HERO_MARGIN);
     expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
+    // hoops-shot-content
+    expect(def('hoops.ftSetupSec')).toBe(FT_SETUP_SEC);
+    expect(def('hoops.ftRoutineSec')).toBe(FT_ROUTINE_SEC);
+    expect(def('hoops.ftSetSec')).toBe(FT_SET_SEC);
+    expect(def('hoops.ftResultSec')).toBe(FT_RESULT_SEC);
+    expect(def('hoops.bankSetDeg')).toBe(BANK_SET_DEG);
+    expect(def('hoops.bankGlanceMs')).toBe(BANK_GLANCE_MS);
+    expect([FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, BANK_SET_DEG, BANK_GLANCE_MS]).toEqual([0.9, 1.2, 0.3, 1.1, 12, 1100]);
+    expect(def('hoops.ftDistNarrow01')).toBe(FT_DIST_NARROW_01);
+    expect(FT_DIST_NARROW_01).toBe(0);   // owner 2026-10-24: the line keeps the full open window
     // hoops-defense-fx
     expect(def('hoops.ballSideShadeOn')).toBe(BALL_SIDE_SHADE_ON ? 1 : 0);
     expect(def('hoops.shadeOffsetM')).toBe(SHADE_OFFSET_M);

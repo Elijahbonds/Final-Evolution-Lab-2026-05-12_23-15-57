@@ -746,6 +746,42 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/modes/threevthreeOvertime.ts OVERTIME_3V3_SEC',
     hint: 'A 3v3 tied at the horn plays sudden death on this clock: the next bucket wins; still level when it runs out, another overtime.',
   },
+  // ── hoops-shot-content (hoops round 2): the free-throw trip's beats and the bank's look (presentation; no window, no odds) ──
+  {
+    id: 'hoops.ftSetupSec', label: 'Free throw: whistle to the line', def: 0.9, min: 0.3, max: 2.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_SETUP_SEC',
+    hint: 'The dead-ball setup: the cut to the shooter on the stripe before the routine starts.',
+  },
+  {
+    id: 'hoops.ftRoutineSec', label: 'Free throw: routine', def: 1.2, min: 0.4, max: 3.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_ROUTINE_SEC',
+    hint: 'The dribbles at the stripe before the ball comes up to the set.',
+  },
+  {
+    id: 'hoops.ftSetSec', label: 'Free throw: the set', def: 0.3, min: 0.1, max: 1.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_SET_SEC',
+    hint: 'The ball up to the set before the line meter can start (a press during it waits).',
+  },
+  {
+    id: 'hoops.ftResultSec', label: 'Free throw: result shown', def: 1.1, min: 0.4, max: 2.5, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_RESULT_SEC',
+    hint: 'How long a free throw\'s make or miss is shown before the next one (or the end of the trip).',
+  },
+  {
+    id: 'hoops.ftDistNarrow01', label: 'Free throw: jumper narrowing at the line', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_DIST_NARROW_01',
+    hint: 'Share of a jumper\'s distance narrowing the line\'s green takes: 0 = the full open window (±65 ms, owner 2026-10-24), 1 = a jumper from 4.19 m (±59 ms).',
+  },
+  {
+    id: 'hoops.bankSetDeg', label: 'Bank: angled set', def: 12, min: 0, max: 25, step: 1, unit: '°', group: 'Hoops · shooting',
+    source: 'lib/babylon/hoops/shotLooks.ts BANK_SET_DEG',
+    hint: 'How far the shooter turns toward the glass while R1 "called glass" is held in the bank band (look only; the ball\'s route is unchanged).',
+  },
+  {
+    id: 'hoops.bankGlanceMs', label: 'Bank: glance at the glass', def: 1100, min: 300, max: 2500, step: 50, unit: 'ms', group: 'Hoops · shooting',
+    source: 'lib/babylon/hoops/shotLooks.ts BANK_GLANCE_MS',
+    hint: 'How long the eyes stay on the square after the set and the release of a called bank.',
+  },
   // ── tiebreak-cam (2026-10-23): Tennis and its tiebreak variant, a phone held upright only ──
   {
     id: 'tennis.portraitHeroMargin', label: 'Upright: keep the player this far in', def: 0.15, min: 0.05, max: 0.35, step: 0.01, unit: '', group: 'Tennis · camera',
