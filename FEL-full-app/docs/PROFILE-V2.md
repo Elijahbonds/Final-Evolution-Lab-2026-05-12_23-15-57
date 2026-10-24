@@ -159,6 +159,29 @@ server-rendered and only the islands hydrate, so the after numbers are conservat
 | Page JS beyond the chrome, minified / gzipped | 69.3 kB / 20.5 kB | 30.2 kB / 11.3 kB (3D: a lazy chunk, loaded only on tap) |
 | Animation library on the page | framer-motion | none |
 | `backdrop-filter` elements on the page body | 0 | 0 (no blur stacks; the shell's chrome is perf-lag's) |
-| Time to content, FCP, long tasks, scroll | see the measured table below | |
 
-**Measured on the phone rig** (median of 3 runs each, interleaved under the shared gate lock): the table below.
+**Measured on the phone rig** (median of 3 runs each, before and after interleaved, all under one hold of the shared
+gate lock; `logs/perf.jsonl`):
+
+| | Before | After | Change |
+|---|---|---|---|
+| First contentful paint | 2,096 ms | 1,668 ms | −20% |
+| Last content commit (data rendered) | 1,406 ms | 1,184 ms | −16% |
+| Requests during load (page + chrome) | 12 | 5 | the page's own: 8 → 0 |
+| Long tasks in the first 8 s | 5 (745 ms) | 3 (583 ms) | −2 (−22% blocked time) |
+| Worst long task | 281 ms | 229 ms | −52 ms |
+| React commits during boot | 8 (232 ms) | 6 (209 ms) | −2 |
+| Scroll frame interval, p50 / p95 | 33.4 / 66.7 ms | 16.7 / 33.4 ms | 30 fps → 60 fps |
+| DOM nodes | 844 | 485 | −43% |
+| Page height at 390 px | 7,340 px | 3,582 px | −51% |
+| `backdrop-filter` elements | 3 | 2 | both from the shell chrome (the perf-lag lane's area) |
+| Horizontal overflow at 390 px | 0 | 0 | |
+
+The rig paints late under the 4× throttle, so on the rig the before page's 150 ms requests finished before its first
+paint. On a real phone, with a real network, the before page showed its shell with dashes until 8 requests came back.
+The after page arrives with its numbers, because the server read them in one batch.
+
+Screenshots: `scratchpad/round7/profile-v2/shots/`:
+- before: `before-phone.png`, `before-phone-full.png`, `before-desktop.png`
+- after: `after-phone-adult.png`, `after-phone-adult-full.png`, `after-phone-fresh.png` (a new account: every tile a
+  dash with a way to measure it), `after-phone-teen.png`, `after-desktop.png`, `after-tv.png`
