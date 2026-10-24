@@ -9,6 +9,7 @@ import type { Scene } from '@babylonjs/core';
 import type { GrindLine } from '../core/GroundRide';
 import { applyFloorDetailToMesh, floorDetailFor } from './groundTextures';
 import { paintCrowdStand, paintTurf, paintTrack, paintTrackTile } from './PlacePack';
+import { RIM_HEIGHT_M, VENUE_HOOP } from '../core/courtDims';
 
 /** Venue props are PBR now (Phase 1, 2026-09-03): they take the procedural IBL
  *  and the tier's shadows like the hero does. Matte by default; the emissive
@@ -249,14 +250,14 @@ export const VenueKit = {
     });
     venueBox(scene, 34, 44, 7, [paintOcean, paintBoardwalk, paintBleachers(CROWD), paintGraffiti]);
     // Hoop: pole + backboard + rim + net
-    const pole = MeshBuilder.CreateCylinder('hoop_pole', { height: 3.9, diameter: 0.16 }, scene);
-    pole.position.set(0, 1.95, -1.6); pole.material = mat(scene, 'pole', '#33383f');
-    const board = MeshBuilder.CreateBox('backboard', { width: 1.8, height: 1.05, depth: 0.06 }, scene);
-    board.position.set(0, 3.45, -1.15); board.material = mat(scene, 'board', '#dfe8f2', 0.15);
-    const rim = MeshBuilder.CreateTorus('rim', { diameter: 0.46, thickness: 0.03 }, scene);
-    rim.position.set(0, 3.05, -0.6); rim.material = mat(scene, 'rim', '#ff5a3c', 0.25);
-    const net = MeshBuilder.CreateCylinder('net', { height: 0.42, diameterTop: 0.44, diameterBottom: 0.3, tessellation: 12 }, scene);
-    net.position.set(0, 2.83, -0.6);
+    const pole = MeshBuilder.CreateCylinder('hoop_pole', { height: VENUE_HOOP.POLE_H_M, diameter: VENUE_HOOP.POLE_D_M }, scene);
+    pole.position.set(0, VENUE_HOOP.POLE_Y, VENUE_HOOP.POLE_Z); pole.material = mat(scene, 'pole', '#33383f');
+    const board = MeshBuilder.CreateBox('backboard', { width: VENUE_HOOP.BOARD_W, height: VENUE_HOOP.BOARD_H, depth: VENUE_HOOP.BOARD_D }, scene);
+    board.position.set(0, VENUE_HOOP.BOARD_Y, VENUE_HOOP.BOARD_Z); board.material = mat(scene, 'board', '#dfe8f2', 0.15);
+    const rim = MeshBuilder.CreateTorus('rim', { diameter: VENUE_HOOP.RIM_RADIUS * 2, thickness: VENUE_HOOP.RIM_TUBE_M }, scene);
+    rim.position.set(0, RIM_HEIGHT_M, VENUE_HOOP.RIM_Z); rim.material = mat(scene, 'rim', '#ff5a3c', 0.25);
+    const net = MeshBuilder.CreateCylinder('net', { height: VENUE_HOOP.NET_H, diameterTop: VENUE_HOOP.NET_TOP_D, diameterBottom: VENUE_HOOP.NET_BOTTOM_D, tessellation: 12 }, scene);
+    net.position.set(0, VENUE_HOOP.NET_Y, VENUE_HOOP.RIM_Z);
     const netMat = mat(scene, 'net', '#ffffff', 0.2); netMat.alpha = 0.55; net.material = netMat;
     // Palms (cones+cylinders read as palms at distance)
     for (const x of [-12, 12]) for (const z of [-14, 4, 16]) {

@@ -499,7 +499,7 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   hoops3v3: {
     max: firstToCeiling(m.threevthreeTarget, m.bucketMax), kind: 'rules', swapsUnderKillSwitch: true,
     why: `the game ends at ${m.threevthreeTarget} and no bucket is worth more than ${m.bucketMax}`,
-    basis: `ThreeVThreeMode TARGET_SCORE ${m.threevthreeTarget}: ${m.threevthreeTarget - 1} + a ${m.bucketMax} (the buzzer only ends it lower)`,
+    basis: `ThreeVThreeMode TARGET_SCORE ${m.threevthreeTarget}: ${m.threevthreeTarget - 1} + a ${m.bucketMax} (the buzzer only ends it lower; a tie at the horn is under ${m.threevthreeTarget} and its sudden-death overtime adds one bucket — threevthreeOvertime)`,
   },
   threePoint: {
     max: m.threePointRacks * ((m.threePointBallsPerRack - 1) + m.threePointMoneyWorth), kind: 'rules', swapsUnderKillSwitch: true,

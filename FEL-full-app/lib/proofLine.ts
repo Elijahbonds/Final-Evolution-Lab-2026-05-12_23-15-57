@@ -3,6 +3,7 @@
 import { gradeFor } from '@/lib/babylon/core/danceTracks';
 import { boxLine } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06): the 1v1's box score line (pure)
 import { boxLine as boxLine3 } from '@/lib/babylon/modes/threevthreeBox';   // IMPROVE (2026-10-06, 3v3 #9): the 3v3's (import-free)
+import { periodLabel } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): 'OT', 'OT2' …
 /** ARENA-10PHASE (2026-09-07): an outside verdict overrides the mode's own W/L — a Triumph Arena run is settled against the
  *  house rival, not the mode's in-game rival, and the card must say ONE thing. TIE = both entries refunded; PENDING = the
  *  opponent has not posted yet. */
@@ -34,7 +35,8 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
       return fga === null ? line : `${line} · ${boxLine({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, ankles: n(s, 'ankles') ?? 0 })}`;
     }
     case 'hoops3v3': {
-      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
+      const ot = periodLabel(n(s, 'overtimes') ?? 0);   // NB-3: a game decided in overtime says so
+      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}${ot ? ` · ${ot}` : ''}`;
       // IMPROVE (2026-10-06, 3v3 #9): the box score the mode now ends with (FG, threes, assists, steals, blocks, overdrives)
       const fga = n(s, 'fga');
       return fga === null ? line : `${line} · ${boxLine3({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, assists: n(s, 'assists') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, overdrives: n(s, 'overdrives') ?? 0 })}`;
