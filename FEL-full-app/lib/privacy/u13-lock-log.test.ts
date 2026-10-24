@@ -53,7 +53,11 @@ const UA = 'AgeScreenTest/1.0';
 // 2026-10-19-guest-token-hash-{1-add,2-clear-raw}.sql (pending SQL only; schema.prisma untouched) at a8838788, the
 // lane's merge of lane/finish-release, the first commit carrying them beside RATE-LIMITS. lane/fn-box-1b also adds
 // pending SQL: whichever lands second bumps this to the merge carrying both.
-const PARENT = 'cd23ff752906dc6fb7940ca5af6689892db46110';
+// COACH-VIDEO-REVIEW (lane/coach-video-review, 2026-10-24) prisma/pending/2026-10-24-coach-form-review.sql (pending SQL only;
+// schema.prisma untouched; CoachFormReview, additive) at 02c1e49c, the lane commit carrying it on top of every file above.
+// lane/coach-ai-draft also adds pending SQL (2026-10-24-coach-ai-draft.sql): whichever lands second bumps this to the merge
+// carrying both.
+const PARENT = '02c1e49cc24b741cd001165cf5ca0e0b59462aa0';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
