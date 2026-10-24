@@ -51,7 +51,8 @@ const UA = 'AgeScreenTest/1.0';
 // whichever of the two lands second bumps this to the merge commit carrying both.
 // TIP-GUEST-TOKEN-HASH (lane/guest-token-hash, 2026-10-19; release sync 2026-10-24) prisma/pending/
 // 2026-10-19-guest-token-hash-{1-add,2-clear-raw}.sql (pending SQL only; schema.prisma untouched) at a8838788, the
-// lane's merge of lane/finish-release, the first commit carrying them beside RATE-LIMITS.
+// lane's merge of lane/finish-release, the first commit carrying them beside RATE-LIMITS. lane/fn-box-1b also adds
+// pending SQL: whichever lands second bumps this to the merge carrying both.
 const PARENT = 'a8838788168cec05427d544e48ffb58dbd98ed5d';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
