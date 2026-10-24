@@ -157,6 +157,113 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/BallSideShade.ts SHADE_RESEED_M',
     hint: 'A handler who moved this far between two reads (a check, a switch) is a new look: no beat, he is simply on the ball side.',
   },
+  // lane/h3-aware (owner 2026-10-24: #313 / #315 ported): TUNED (new) unless the hint names a release value
+  {
+    id: 'hoops.offBallLookOn', label: 'Off-ball look on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/OffBallLook.ts OFF_BALL_LOOK_ON',
+    hint: 'A/B: 0 is the release feed (the offence off the ball looks at the rim, every defender\'s chest on the job).',
+  },
+  {
+    id: 'hoops.manGlanceEverySec', label: 'Off-ball D: a glance at his man every', def: 1.6, min: 0.4, max: 4, step: 0.1, unit: 's', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/OffBallLook.ts MAN_GLANCE_EVERY_SEC',
+    hint: 'An off-ball defender watches the ball and checks his man this often.',
+  },
+  {
+    id: 'hoops.manGlanceSec', label: 'Off-ball D: the glance lasts', def: 0.4, min: 0, max: 1.2, step: 0.05, unit: 's', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/OffBallLook.ts MAN_GLANCE_SEC',
+    hint: 'How long the eyes stay on the man before they go back to the ball (0: never).',
+  },
+  {
+    id: 'hoops.possessionSwapOn', label: 'Their ball: roles swap on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/PossessionSwap.ts POSSESSION_SWAP_ON',
+    hint: 'A/B: 0 is release (my teammates run their offence on D; their men off the ball stand in the paint).',
+  },
+  {
+    id: 'hoops.foeSpaceAngleK', label: 'Their ball: wing angle of their spacers', def: 0.3, min: 0, max: 0.5, step: 0.05, unit: '×π', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/PossessionSwap.ts FOE_SPACE_ANGLE_K',
+    hint: 'Their men off the ball hold the wings at ± this share of π from the top (0: all at the top).',
+  },
+  {
+    id: 'hoops.hasBallM', label: 'D: his man has the ball inside', def: 1.0, min: 0.6, max: 2.0, step: 0.1, unit: 'm', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/PossessionSwap.ts HAS_BALL_M',
+    hint: 'Release 1.8: a screener beside the handler read as the handler and two defenders went to the ball.',
+  },
+  {
+    id: 'hoops.defenseStanceOn', label: 'D stance raised on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFENSE_STANCE_ON',
+    hint: 'A/B: 0 is release (the deep capture\'s near-kneel, the table\'s forward lean).',
+  },
+  {
+    id: 'hoops.defenseRaiseM', label: 'D stance: hips raised by', def: 0.15, min: 0, max: 0.25, step: 0.01, unit: 'm', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFENSE_RAISE_M',
+    hint: 'The standing stance and the box-out sit this much taller; the feet stay put.',
+  },
+  {
+    id: 'hoops.raiseReach', label: 'D stance: leg reach cap', def: 0.97, min: 0.85, max: 1.0, step: 0.01, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts RAISE_REACH',
+    hint: 'The raise stops where a leg would pass this share of its length (the knee keeps a bend).',
+  },
+  {
+    id: 'hoops.stanceEaseSec', label: 'D stance: ease in / out', def: 0.18, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts STANCE_EASE_SEC',
+    hint: 'How fast the raise comes on and goes off between the stance and a slide.',
+  },
+  {
+    id: 'hoops.defendLeanDeg', label: 'D stance: lower-back lean', def: -6, min: -15, max: 15, step: 1, unit: '°', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFEND_LEAN_DEG',
+    hint: 'The defend / slide windows\' lean with the stance on (release 10 / 8: + bends forward).',
+  },
+  {
+    id: 'hoops.defendSpine1Deg', label: 'D stance: mid-back pitch', def: 2, min: -10, max: 12, step: 1, unit: '°', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFEND_SPINE1_DEG',
+    hint: 'The defend / slide windows\' Spine1 with the stance on (release 8).',
+  },
+  // lane/h3-aware (#315 H3e): my teammate with the ball — TUNED (new)
+  {
+    id: 'hoops.mateReadOn', label: 'Teammate reads with the ball on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_READ_ON',
+    hint: 'A/B: 0 is release (he dribbles until you call for it; a 1 %-a-frame shot inside 3.5 m of the ring).',
+  },
+  {
+    id: 'hoops.mateSettleSec', label: 'Teammate: a beat after the catch', def: 0.35, min: 0, max: 1, step: 0.05, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_SETTLE_SEC',
+    hint: 'He catches it before any read.',
+  },
+  {
+    id: 'hoops.mateReadSec', label: 'Teammate: swing it on after', def: 0.9, min: 0.3, max: 2.5, step: 0.05, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_READ_SEC',
+    hint: 'With nothing on, he moves it to the open man (you first) this long after the catch.',
+  },
+  {
+    id: 'hoops.mateHoldMaxSec', label: 'Teammate: holds it at most', def: 1.8, min: 0.6, max: 4, step: 0.1, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_HOLD_MAX_SEC',
+    hint: 'Then a look in range, else the swing.',
+  },
+  {
+    id: 'hoops.mateShootRangeM', label: 'Teammate: shoots off the catch inside', def: 7.3, min: 3, max: 9, step: 0.1, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_SHOOT_RANGE_M',
+    hint: 'Open (2.4 m from his nearest man) and inside this of the rim: the shot. The make rate is the ring\'s, unchanged.',
+  },
+  {
+    id: 'hoops.mateDriveFromM', label: 'Teammate: drives a clear lane from', def: 8.5, min: 3, max: 11, step: 0.1, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_DRIVE_FROM_M',
+    hint: 'Nobody on his line to the rim and inside this: he puts it on the floor.',
+  },
+  {
+    id: 'hoops.mateFinishM', label: 'Teammate: finishes the drive at', def: 2.4, min: 1, max: 4, step: 0.1, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_FINISH_M',
+    hint: 'The drive\'s shot goes up this close to the rim.',
+  },
+  {
+    id: 'hoops.mateDriveMaxSec', label: 'Teammate: drive lasts at most', def: 1.6, min: 0.5, max: 3, step: 0.1, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_DRIVE_MAX_SEC',
+    hint: 'A drive that has not got there by now pulls up.',
+  },
+  {
+    id: 'hoops.mateLaneM', label: 'Teammate: a clear lane is', def: 0.9, min: 0.3, max: 1.5, step: 0.05, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_LANE_M',
+    hint: 'No defender within this of his line to the rim.',
+  },
   // ── lane/hoops-def-tell (#273 T-A): the AI reach shows a tell before it resolves; the poke reads the ball (core/ReachTell) ──
   {
     id: 'hoops.aiReachTellOn', label: 'AI reach tell on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
