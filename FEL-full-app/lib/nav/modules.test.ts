@@ -116,9 +116,9 @@ const KNOWN_ORPHANS: readonly string[] = [
   // (MIRROR-COACH P1 baseline): lib/mirror/fixtures/measure.ts runs it on every landmark fixture, so it is MEASURED
   // now — but it is still not mounted in the Mirror; that is phase 4. This one is still waiting.
   'lib/kitchens/fromScreen.ts',
-  // The coach layer — written, tested, unreachable.
+  // The coach layer — written, tested, unreachable. (lib/coach-service.ts came off on 2026-10-24: COACH-AI-DRAFT's
+  // weekly drafts call its kill-switched callCoachLLM — lib/coach/weeklyDraft/server.ts aiCallerFromEnv.)
   'lib/coach-interfaces.ts',
-  'lib/coach-service.ts',
   // Engine and platform pieces. bvh.ts and recognisable.ts came off on 2026-09-21: they were never orphaned,
   // the checker just could not see the .mts scripts importing them. sourceScan.ts moved to NOT_IMPORTED.
   'lib/babylon/anim/mocapClip.ts',
