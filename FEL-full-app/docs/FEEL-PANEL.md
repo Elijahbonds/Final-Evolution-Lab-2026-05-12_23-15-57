@@ -137,3 +137,17 @@ lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `Ba
 0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
 **assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
 speed or timing window reads a knob here.
+
+lane/h3-handler (owner 2026-10-24: the still-missing parts of PRs #312 and #314, ported). Group "Hoops · handle (rest)": the dribble at
+rest — `hoops.protectDribbleOn` 1, `hoops.restBounceOn` 1, `hoops.restTempoIdle` 1.2, `hoops.restTempoProtect` 1.45, `hoops.clipLockGain` 3,
+`hoops.clipLockHzMax` 2.6 Hz, `hoops.clipLockMaxMps` 0.4 m/s (`anim/RestDribble.ts`); the eyes on the defender — `hoops.eyesOnDefenderOn` 1,
+`hoops.readRangeM` 3.5 m, `hoops.readSpeed01` 0.42, `hoops.readGlanceEverySec` 2.4 s, `hoops.readGlanceSec` 0.55 s (`core/HoopsLook.ts`); the
+guard — `hoops.protectGuardOn` 1, `hoops.guardBackM` 0.22 m, `hoops.guardOutM` 0.06 m, `hoops.guardDropM` 0.06 m, `hoops.guardSec` 0.15 s,
+`hoops.guardBarXM` / `YM` / `ZM` 0.15 / 1.06 / 0.34 m (`anim/RestDribble.ts`); the protect posture — `hoops.protectPostureOn` 1,
+`hoops.protectTurnDeg` 50°, `hoops.protectEyes` 0.9, `hoops.protectChestAim` 0.8 (`core/HoopsLook.ts`), `hoops.protectSinkM` 0.06 m,
+`hoops.protectSinkSec` 0.18 s (`anim/ProtectSink.ts`); the move ease — `hoops.moveEaseOn` 1, `hoops.moveEaseSec` 0.2 s,
+`hoops.moveEaseRateDeg` 1000°/s, `hoops.moveArmRateDeg` 1800°/s (`anim/MoveEase.ts`). Group "Hoops · jump shot": `hoops.jumperHopOn` 1
+(TUNED: the jump's air time 0.88–1.02 s → ~0.5 s; 0 = the old float), `hoops.jumperApexAfterReleaseSec` 0.03 s, `hoops.jumperMinLoadSec`
+0.08 s, `hoops.jumperHangOn` 1, `hoops.jumperHangScale` 0.1 (`core/JumperHop.ts`). Every `…On` knob at 0 gives back the old behaviour
+exactly (each module's test pins it). None of them moves a timing window, the release frame, a speed or an odds number. **assumption:**
+the bounds are safe, not tuned.

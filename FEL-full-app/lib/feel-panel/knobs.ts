@@ -157,6 +157,183 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/BallSideShade.ts SHADE_RESEED_M',
     hint: 'A handler who moved this far between two reads (a check, a switch) is a new look: no beat, he is simply on the ball side.',
   },
+  // lane/h3-handler (owner 2026-10-24: the #312 / #314 ports): the dribble at rest, the protect, the move ease ("Hoops · handle (rest)")
+  // and the jump shot's hop ("Hoops · jump shot"). Defaults are the ported numbers; the 0/1 rows are each feature's A/B.
+  {
+    id: 'hoops.protectDribbleOn', label: 'Protect plays a dribble on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts PROTECT_DRIBBLE_ON',
+    hint: 'A/B (#312): 1 = the protect at rest plays the idle dribble loop; 0 = the defender\'s stance (no ball arm), as before.',
+  },
+  {
+    id: 'hoops.restBounceOn', label: 'Bounce on the clip at rest on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts REST_BOUNCE_ON',
+    hint: 'A/B (#312): 1 = the rest tempo and the bounce locked to the clip hand; 0 = the loop at its capture pace, the bounce on its own clock.',
+  },
+  {
+    id: 'hoops.restTempoIdle', label: 'Rest dribble tempo (× capture)', def: 1.2, min: 0.8, max: 1.8, step: 0.05, unit: '×', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts REST_TEMPO_IDLE',
+    hint: 'How fast the idle dribble loop plays at rest (1.2 = 1.56 bounces a second).',
+  },
+  {
+    id: 'hoops.restTempoProtect', label: 'Protect dribble tempo (× capture)', def: 1.45, min: 0.8, max: 2, step: 0.05, unit: '×', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts REST_TEMPO_PROTECT',
+    hint: 'How fast the dribble plays in the protect: low and hard (1.45 = 1.88 bounces a second).',
+  },
+  {
+    id: 'hoops.clipLockGain', label: 'Clip lock: pull', def: 3, min: 0, max: 6, step: 0.1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts CLIP_LOCK_GAIN',
+    hint: 'How hard the bounce is pulled onto the clip hand\'s tops (0 = it keeps its own clock).',
+  },
+  {
+    id: 'hoops.clipLockHzMax', label: 'Clip lock: fastest bounce', def: 2.6, min: 1.5, max: 3.5, step: 0.05, unit: 'Hz', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts CLIP_LOCK_HZ_MAX',
+    hint: 'The locked bounce never runs faster than this.',
+  },
+  {
+    id: 'hoops.clipLockMaxMps', label: 'Clip lock: at rest under', def: 0.4, min: 0.1, max: 1, step: 0.05, unit: 'm/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts CLIP_LOCK_MAX_MPS',
+    hint: 'The clip lock runs while the body moves slower than this.',
+  },
+  {
+    id: 'hoops.eyesOnDefenderOn', label: 'Eyes on the defender on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts EYES_ON_DEFENDER_ON',
+    hint: 'A/B (#312): 1 = sizing him up, the eyes go to his chest (a glance at the rim now and then); 0 = the rim, as before.',
+  },
+  {
+    id: 'hoops.readRangeM', label: 'Eyes: read a defender within', def: 3.5, min: 1.5, max: 6, step: 0.05, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_RANGE_M',
+    hint: 'A defender inside this (and between you and the rim) is read.',
+  },
+  {
+    id: 'hoops.readSpeed01', label: 'Eyes: read at speed up to', def: 0.42, min: 0.1, max: 0.8, step: 0.01, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_SPEED01',
+    hint: 'Moving faster than this (share of top speed) the eyes stay on the rim.',
+  },
+  {
+    id: 'hoops.readGlanceEverySec', label: 'Eyes: rim glance every', def: 2.4, min: 0.8, max: 6, step: 0.1, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_GLANCE_EVERY_SEC',
+    hint: 'How often the eyes flick to the rim while sizing him up.',
+  },
+  {
+    id: 'hoops.readGlanceSec', label: 'Eyes: rim glance lasts', def: 0.55, min: 0, max: 1.5, step: 0.05, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_GLANCE_SEC',
+    hint: 'How long that glance lasts (0 = never glances).',
+  },
+  {
+    id: 'hoops.protectGuardOn', label: 'Protect guard on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts PROTECT_GUARD_ON',
+    hint: 'A/B (#312): 1 = in the protect the bounce goes back by the hip and the off forearm comes across as a bar; 0 = as before.',
+  },
+  {
+    id: 'hoops.guardBackM', label: 'Guard: bounce back by', def: 0.22, min: 0, max: 0.4, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BACK_M',
+    hint: 'How far back beside the hip the protect\'s bounce goes.',
+  },
+  {
+    id: 'hoops.guardOutM', label: 'Guard: bounce wider by', def: 0.06, min: 0, max: 0.2, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_OUT_M',
+    hint: 'How much wider the protect\'s bounce goes.',
+  },
+  {
+    id: 'hoops.guardDropM', label: 'Guard: palm lower by', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_DROP_M',
+    hint: 'How much lower the palm meets the ball in the protect.',
+  },
+  {
+    id: 'hoops.guardSec', label: 'Guard: ease', def: 0.15, min: 0.02, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_SEC',
+    hint: 'How fast the guard comes on and goes off.',
+  },
+  {
+    id: 'hoops.guardBarXM', label: 'Guard bar: across', def: 0.15, min: -0.1, max: 0.4, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BAR_X_M',
+    hint: 'Where the off hand sits across the front (toward the ball side).',
+  },
+  {
+    id: 'hoops.guardBarYM', label: 'Guard bar: height', def: 1.06, min: 0.8, max: 1.4, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BAR_Y_M',
+    hint: 'How high the off hand\'s bar sits.',
+  },
+  {
+    id: 'hoops.guardBarZM', label: 'Guard bar: forward', def: 0.34, min: 0.1, max: 0.6, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BAR_Z_M',
+    hint: 'How far in front of the body the bar sits.',
+  },
+  {
+    id: 'hoops.protectPostureOn', label: 'Protect posture on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_POSTURE_ON',
+    hint: 'A/B (#312): 1 = in the protect the chest turns side-on, the eyes hold him and the hips sink; 0 = the protect stance as before.',
+  },
+  {
+    id: 'hoops.protectTurnDeg', label: 'Protect: chest turn off him', def: 50, min: 0, max: 80, step: 1, unit: '°', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_TURN_DEG',
+    hint: 'How far the chest turns off the defender toward the ball (the off shoulder into him).',
+  },
+  {
+    id: 'hoops.protectEyes', label: 'Protect: eyes weight', def: 0.9, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_EYES',
+    hint: 'How hard the head turns to the defender in the protect (was 0.6).',
+  },
+  {
+    id: 'hoops.protectChestAim', label: 'Protect: chest aim weight', def: 0.8, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_CHEST_AIM',
+    hint: 'How much of the side-on turn the chest takes (was 0).',
+  },
+  {
+    id: 'hoops.protectSinkM', label: 'Protect: hips lower by', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/ProtectSink.ts PROTECT_SINK_M',
+    hint: 'How much lower the hips sit in the protect (the feet and hands stay put).',
+  },
+  {
+    id: 'hoops.protectSinkSec', label: 'Protect: sink ease', def: 0.18, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/ProtectSink.ts PROTECT_SINK_SEC',
+    hint: 'How fast the protect\'s sink goes in and comes out.',
+  },
+  {
+    id: 'hoops.moveEaseOn', label: 'Move hand-over ease on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_EASE_ON',
+    hint: 'A/B (#314): 1 = an arm cannot whip at a move\'s start or end (no entry pops); 0 = as before.',
+  },
+  {
+    id: 'hoops.moveEaseSec', label: 'Move ease: hand-over window', def: 0.2, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_EASE_SEC',
+    hint: 'How long the gentle limit holds at a move\'s start and end.',
+  },
+  {
+    id: 'hoops.moveEaseRateDeg', label: 'Move ease: arm limit in the hand-over', def: 1000, min: 300, max: 3000, step: 50, unit: '°/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_EASE_RATE_DEG',
+    hint: 'The fastest an arm bone may turn in that window.',
+  },
+  {
+    id: 'hoops.moveArmRateDeg', label: 'Move ease: arm limit mid-move', def: 1800, min: 600, max: 5000, step: 50, unit: '°/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_ARM_RATE_DEG',
+    hint: 'The fastest an arm bone may turn through the rest of a move.',
+  },
+  {
+    id: 'hoops.jumperHopOn', label: 'Jumper hop timed to the release on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_HOP_ON',
+    hint: 'A/B (#314, TUNED): 1 = the load on the floor, the apex at the release, ~0.5 s in the air; 0 = the old float (~0.9-1.0 s). Never moves the release timing.',
+  },
+  {
+    id: 'hoops.jumperApexAfterReleaseSec', label: 'Jumper: apex after the release', def: 0.03, min: -0.1, max: 0.15, step: 0.01, unit: 's', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_APEX_AFTER_RELEASE_SEC',
+    hint: 'The top of the jump lands this long after the ball leaves (the body only; the release timing never moves).',
+  },
+  {
+    id: 'hoops.jumperMinLoadSec', label: 'Jumper: least load on the floor', def: 0.08, min: 0, max: 0.25, step: 0.01, unit: 's', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_MIN_LOAD_SEC',
+    hint: 'The dip before take-off is at least this long.',
+  },
+  {
+    id: 'hoops.jumperHangOn', label: 'Jumper hang on a late release on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_HANG_ON',
+    hint: 'A/B (#314): 1 = held past the release frame, the shot hangs at the set point; 0 = the clip runs on and loops, as before.',
+  },
+  {
+    id: 'hoops.jumperHangScale', label: 'Jumper: hang pace', def: 0.1, min: 0, max: 0.5, step: 0.01, unit: '×', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_HANG_SCALE',
+    hint: 'How slowly the held shot drifts once it hangs (0 = frozen).',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
