@@ -137,3 +137,8 @@ lane/hoops-defense-fx (group "Hoops · defense"), defaults unchanged, all in `Ba
 0.22 s, `hoops.shadeSlideMps` 2.4 m/s, `hoops.shadeDeadBandM` 0.08 m, `hoops.shadeRangeM` 2.4 m and `hoops.shadeReseedM` 1.0 m.
 **assumption:** the bounds are safe, not tuned. The shade moves only where the on-ball defender stands; no steal or strip odds,
 speed or timing window reads a knob here.
+
+lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30 s (`threevthreeOvertime.ts` `OVERTIME_3V3_SEC`, PR #268's
+number): a 3v3 tied at the horn plays sudden-death overtime on this clock, and level again when it runs out is another overtime.
+It moves only how long an overtime lasts, never who wins it or what a bucket is worth. **assumption:** the bounds (10–90 s) are
+safe, not tuned.

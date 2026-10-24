@@ -368,7 +368,8 @@ export function sessionWon(
  * WIN-SERVER: the server's own result of a head-to-head hoops game, or null for a mode it does not judge here.
  *  · hoops1v1: first to 11 (lib/babylon/modes/onevoneRules.ts gameWinner), or the win-by-2 option (cap 15); a won game is
  *    one either rule ends in this player's favour. 3–11 is not a win under any of them.
- *  · hoops3v3: the game ends at 21 or on the buzzer, so the winner is whoever has more; a tie is not a win.
+ *  · hoops3v3: the game ends at 21 or on the buzzer, so the winner is whoever has more; a tie is not a win (since NB-3 a tie at the
+ *    horn goes to sudden-death overtime, so the mode never posts one — an older client's tie still pays no win).
  *  · showdown, duel (DUEL-IDLE-FIX): the rounds to win, read back off the score and the foe's rounds (roundVerdict.ts).
  * A score missing from the call (a caller that is not the finish route) leaves the old answer to the caller.
  */

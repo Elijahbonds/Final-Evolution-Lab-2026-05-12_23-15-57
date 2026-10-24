@@ -10,6 +10,7 @@ import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotC
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
+import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 
 function tsFiles(dir: string): string[] {
@@ -54,6 +55,9 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
     expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
     expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
+    // hoops-overtime (new: PR #268's 30 s)
+    expect(def('hoops.overtime3v3Sec')).toBe(OVERTIME_3V3_SEC);
+    expect(OVERTIME_3V3_SEC).toBe(30);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {

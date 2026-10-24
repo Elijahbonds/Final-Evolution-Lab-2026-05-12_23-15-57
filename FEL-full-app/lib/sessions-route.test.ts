@@ -877,6 +877,29 @@ describe('ECONOMY-SESSIONS-HARDEN: a session must finish a run the server starte
     expect(h.wallet.filter((w) => w.reasonCode === 'MODE_SESSION_COMPLETED')).toHaveLength(1);
   });
 
+  // NB-3 (lane/hoops-overtime): a 3v3 level at the horn goes to sudden-death overtime and ends ONCE, on the first bucket. Its
+  // finish is an ordinary one: inside the 3v3's rules ceiling (20–20 + a three = 23), judged a win off the posted pair, paid once.
+  it('NB-3: a 3v3 decided in overtime posts once — 23–20 (the ceiling) pays one win; its retry is the first answer; 24 is refused', async () => {
+    const ot = { mode: 'hoops3v3', score: 23, opponentScore: 20, won: true, duration: 160, stats: { foeScore: 20, assists: 3, overtimes: 1 } };
+    const first = await post(ot);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ ok: true, paid: true, replayed: false, runId: first.runId });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]).toMatchObject({ mode: 'hoops3v3', score: 23, opponentScore: 20, won: true });
+    const again = await post({ ...ot, runId: first.runId });
+    expect(again.body).toEqual({ ...first.body, replayed: true });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.updates).toHaveLength(1);
+    expect(h.wallet.filter((w) => w.reasonCode === 'MODE_SESSION_COMPLETED')).toHaveLength(1);
+    // the overtime LOSS posts the other side of the pair: a claimed win the score does not support is no win
+    const lost = await post({ ...ot, score: 20, opponentScore: 23, stats: { foeScore: 23, assists: 0, overtimes: 1 } });
+    expect(lost.body).toMatchObject({ ok: true, won: false });
+    // no overtime can post above the rules ceiling (a tie is under 21, and overtime adds one bucket)
+    const forged = await post({ ...ot, score: 24 });
+    expect(forged.status).toBe(422);
+    expect(forged.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 23 });
+  });
+
   it('a run of another mode: RUN_MODE_MISMATCH, and the run is closed (a corrected retry is refused the same way)', async () => {
     const runId = openRun('tennis', 60);
     const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 60, runId });
