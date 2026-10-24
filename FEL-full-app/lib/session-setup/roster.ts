@@ -163,7 +163,7 @@ export function consentControls(settingsOpen: boolean): readonly string[] {
   return settingsOpen ? [...CONSENT_CONTROLS, ...CONSENT_SETTINGS_CONTROLS] : CONSENT_CONTROLS;
 }
 
-/** Taps from /play to the OS camera prompt on the solo path: "Dunk session", then "Start". */
+/** Taps from /play to the OS camera prompt on the solo path: "Prove It dunk duel", then "Start". */
 export const SOLO_TAPS_FROM_PLAY = 2;
 
 export type WatchingPiece = 'video' | 'wash' | 'status' | 'mute' | 'title' | 'intro' | 'score-cards' | 'camera' | 'record' | 'attempts' | 'up-next';
