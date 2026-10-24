@@ -125,6 +125,7 @@ export function auditConditions(seeds = 6): Condition[] {
     out.push({ name: 'partial occlusion', fps, trials: STD_TRIALS(), film: { occlusion: { burstsPerS: 0.6, burstMs: 120 } }, seeds });
     out.push({ name: 'motion blur', fps, trials: STD_TRIALS(), film: { blur: true }, seeds });
     out.push({ name: 'drops 10%', fps, trials: STD_TRIALS(), film: { dropRate: 0.1, missRate: 0.03 }, seeds });
+    out.push({ name: 'repeated jumps (150 ms contacts)', fps, trials: Array.from({ length: 6 }, (_, i) => ({ heightM: 0.3, ...(i < 5 ? { reboundMs: 150 } : {}) })), seeds: Math.max(2, seeds >> 1) });
     out.push({
       name: 'decoys (squat, calf raise, hop, step)', fps, trials: STD_TRIALS(),
       decoys: [{ decoy: { kind: 'squat', depth: 0.6 } }, { decoy: { kind: 'calfRaise', deg: 35 } }, { decoy: { kind: 'hop', heightM: 0.025 } }, { decoy: { kind: 'step', dz: 0.25 } }],

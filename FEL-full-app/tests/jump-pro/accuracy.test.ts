@@ -3,9 +3,10 @@
 // the jump read worse is seen. Targets: the benchmark's |bias| ≤ 1 cm and 95 % limits within ±3 cm (1.96·SD ≤ 3),
 // against the FORCE-PLATE height (v0²/2g), not the flight time.
 import { describe, expect, it } from 'vitest';
-import { runCondition, STD_TRIALS, type Condition } from '@/lib/jump/bench';
+import { calibrateTake, runCondition, STD_TRIALS, type Condition } from '@/lib/jump/bench';
 import { framesReader, t5Reader } from '@/lib/jump/readers';
-import { buildTake } from '@/lib/jump/ballistic';
+import { buildTake, filmTake } from '@/lib/jump/ballistic';
+import { gradeT5 } from '@/lib/assess/graders/t5-cmj';
 
 const run = (c: Partial<Condition> & { fps: number }, reader = t5Reader) =>
   runCondition({ name: 'x', trials: STD_TRIALS(), seeds: 4, ...c }, reader);
@@ -60,5 +61,29 @@ describe('T5 against the force-plate height (lib/jump/refine.ts)', () => {
     const r = run({ fps: 120, seeds: 2 });
     const late = r.pairs.map((p) => p.read.takeoffT - p.truth.takeoffT);
     expect(Math.abs(late.reduce((a, b) => a + b, 0) / late.length)).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('repeated jumps: contact time and RSI (lib/jump/rebound.ts)', () => {
+  const rebounds = (fps: number, contactMs: number) => {
+    const take = buildTake(Array.from({ length: 6 }, (_, i) => ({ trial: { heightM: 0.3, ...(i < 5 ? { reboundMs: contactMs } : {}) } })), { leadS: 3.2 });
+    const err: number[] = [];
+    for (let seed = 1; seed <= 3; seed++) {
+      const { frames } = filmTake(take, { fps, seed });
+      const cal = calibrateTake(frames)!;
+      const t5 = gradeT5(frames, { calibration: cal, aspect: cal.aspect }).t5;
+      expect(t5.rebounds!.rebounds).toHaveLength(5);
+      t5.rebounds!.rebounds.forEach((r) => err.push(r.contactMs - contactMs));
+    }
+    const m = err.reduce((a, b) => a + b, 0) / err.length;
+    return { bias: m, sd: Math.sqrt(err.reduce((a, x) => a + (x - m) ** 2, 0) / (err.length - 1)) };
+  };
+  // 15 rebounds a rate: the mean's own SE is ~2.7 ms at 60 fps (SD ~10), so the bias bound is 6 ms (6 seeds read −3.1)
+  it('every rebound found; contact within 6 ms on average, SD ≤ 12 ms at 60 fps and ≤ 6 ms at 240', () => {
+    const at60 = rebounds(60, 200), at240 = rebounds(240, 150);
+    expect(Math.abs(at60.bias)).toBeLessThanOrEqual(6);
+    expect(at60.sd).toBeLessThanOrEqual(12);
+    expect(Math.abs(at240.bias)).toBeLessThanOrEqual(5);
+    expect(at240.sd).toBeLessThanOrEqual(6);
   });
 });

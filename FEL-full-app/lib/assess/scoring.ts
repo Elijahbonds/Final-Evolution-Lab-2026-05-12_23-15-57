@@ -19,6 +19,7 @@ import { gradeOf } from '@/lib/mirror/assessment';
 import { th, type Band, type ThresholdId } from './thresholds';
 import type { AssessMode, Side, TestId } from './protocol';
 import type { JumpSession, TrialQuality } from '@/lib/jump/session';
+import type { ReboundSet } from '@/lib/jump/rebound';
 
 export type Score03 = 0 | 1 | 2 | 3;
 export type Grade = 'ELITE' | 'PRIMED' | 'READY' | 'RECOVERING';
@@ -240,6 +241,8 @@ export interface T5Extra {
   inconsistent: boolean;
   /** JUMP-PRO: the session's valid jumps as a set — best, mean ± SD, the typical error and the smallest real change. */
   session?: JumpSession;
+  /** JUMP-PRO: jumps that rebounded out of a landing (contact under 400 ms): contact time and RSI. */
+  rebounds?: ReboundSet;
 }
 
 export interface TestResult {

@@ -104,6 +104,12 @@ export interface TrialSpec {
   landToeDeg?: number;
   /** Absorb depth after touch-down (default 0.5). */
   absorb?: number;
+  /**
+   * REBOUND: land and leave again after this long on the floor (ms) — the next trial starts at its take-off, no
+   * stand, no dip (a 10/5 repeated-jump or a pogo). The contact dips to `reboundDip` and stays on the toes.
+   */
+  reboundMs?: number;
+  reboundDip?: number;
 }
 
 export interface TrialTruth {
@@ -117,6 +123,8 @@ export interface TrialTruth {
   heightFlightCm: number;
   /** Hip height at touch-down minus at take-off (cm): negative = landed lower (the flight runs long). */
   landDropCm: number;
+  /** Ground contact before this take-off (ms), when it rebounded out of the last landing. */
+  contactMs?: number;
 }
 
 /** Something that moved but was not a jump (the false-trial set). */
@@ -139,6 +147,8 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
   const still = (dur: number, j: Joints = stand) => { segs.push({ from: t, to: t + dur, at: () => j }); t += dur; };
   still(o.leadS ?? 1.4);
   let zOff = 0;
+  /** The last trial rebounded: the next one takes off from the contact (no stand, no dip). */
+  let chained: { contactMs: number } | null = null;
   const shift = (j: Joints, dy = 0): Joints => mapJ(j, (v) => [v[0], v[1] + dy, v[2] + zOff]);
   for (const b of beats) {
     if ('rest' in b) { const z = zOff; segs.push({ from: t, to: t + b.rest, at: () => mapJ(stand, (v) => [v[0], v[1], v[2] + z]) }); t += b.rest; continue; }
@@ -172,9 +182,11 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
     const tuck = s.tuck ?? 0, landKnee = s.landKnee ?? 0, landToe = s.landToeDeg ?? toeOff, absorb = s.absorb ?? 0.5;
     const z = zOff;
     const at = (p: Posture, dy = 0) => mapJ(posed(p), (v) => [v[0], v[1] + dy, v[2] + z]);
-    // the dip and the drive (the heels rise through the last 60 % of the drive)
+    const contactMs = chained?.contactMs;
+    chained = null;
+    // the dip and the drive (the heels rise through the last 60 % of the drive) — unless it rebounds out of a contact
     const t0 = t, down = 0.35, hold = 0.05, drive = 0.25;
-    segs.push({
+    if (contactMs === undefined) segs.push({
       from: t0, to: t0 + down + hold + drive,
       at: (x) => {
         const u = x - t0;
@@ -184,7 +196,7 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
         return at({ d: dip * (1 - ease(w)), toeDeg: toeOff * ease((w - 0.4) / 0.6) });
       },
     });
-    t += down + hold + drive;
+    if (contactMs === undefined) t += down + hold + drive;
     // the flight
     const v0 = Math.sqrt(2 * G * s.heightM), Tn = (2 * v0) / G, tTO = t;
     const pose = (tau: number): Posture => {
@@ -207,7 +219,22 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
         takeoffT: tTO * 1000, landT: (tTO + T) * 1000, flightMs: T * 1000,
         heightV0Cm: s.heightM * 100, heightFlightCm: ((G * T * T) / 8) * 100,
         landDropCm: (hipOf(pTD) - hip0) * 100,
+        ...(contactMs !== undefined ? { contactMs } : {}),
       });
+    }
+    if (s.reboundMs !== undefined) {
+      // the contact: down onto the toes, a short dip, and straight back to the next take-off posture
+      const tC = t, pTD = pose(T), c = s.reboundMs / 1000, rd = s.reboundDip ?? 0.15;
+      segs.push({
+        from: tC, to: tC + c,
+        at: (x) => {
+          const u = (x - tC) / c;
+          return at({ d: lerp(pTD.d, 0, u) + rd * Math.sin(Math.PI * u), toeDeg: lerp(pTD.toeDeg, toeOff, u) - 12 * Math.sin(Math.PI * u) });
+        },
+      });
+      t += c;
+      chained = { contactMs: s.reboundMs };
+      return;
     }
     // the landing: heels down, absorb, stand up, stand still
     const tL = t, pTD = pose(T), heels = 0.06, sink = 0.15, up = 0.45, rest = 1.0;

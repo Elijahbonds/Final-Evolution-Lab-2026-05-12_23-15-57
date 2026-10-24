@@ -82,6 +82,12 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
           Next time, a change of {pmIn(s.realChangeCm)} in or more is a real change; less is within the noise.
         </p>
       ) : null}
+      {t5.rebounds?.bestRsi != null ? (
+        <p data-jump-rebound className="mt-1 text-[16px] text-white/80">
+          Rebound: {(t5.rebounds.bestContactMs! / 1000).toFixed(2)} s on the ground, RSI {t5.rebounds.bestRsi.toFixed(2)}
+          {t5.rebounds.best5Rsi !== null ? ` · best-5 RSI ${t5.rebounds.best5Rsi.toFixed(2)}` : ''}{source === 'live' && t5.poseFps < 120 ? ' (estimate)' : ''}
+        </p>
+      ) : null}
       <p data-jump-verified={v.verified || !!vc?.verified} className="mt-3 flex items-start gap-1.5 text-[16px] font-bold" style={{ color: v.verified || vc?.verified ? '#00FF9D' : 'rgba(255,255,255,0.7)' }}>
         {v.verified || vc?.verified ? <BadgeCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> : <CircleDashed aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />}
         <span>{v.verified ? 'Verified jump' : vc?.verified && clean ? `Verified best: ${inch(clean.heightCm)} in (jump ${clean.index})` : `Not verified: ${BLOCK_WORDS[v.blocks[0]]}`}</span>

@@ -170,7 +170,11 @@ const FEET = [27, 28, 29, 30, 31, 32];
  * Re-time one flight. `takeoffT` / `landT` are the finder's edges. Null when the flight has too few airborne frames
  * with the hips and feet seen, or its hips do not fall like a body in free fall (then the finder's read stands).
  */
-export function refineFlight(raw: readonly PoseFrame[], front: FrontCalibration, takeoffT: number, landT: number): RefinedFlight | null {
+export function refineFlight(
+  raw: readonly PoseFrame[], front: FrontCalibration, takeoffT: number, landT: number,
+  /** The neighbouring flights' edges: a floor is never read inside another flight (a rebound's contact is short). */
+  near: { prevLandT?: number; nextTakeoffT?: number } = {},
+): RefinedFlight | null {
   const vis = th('gate.visibility');
   const hipsOk = (f: PoseFrame) => f.present && f.image.length >= 33 && HIPS.every((k) => f.image[k].v >= vis);
   const feetOk = (f: PoseFrame) => hipsOk(f) && FEET.every((k) => f.image[k].v >= vis);
@@ -185,6 +189,9 @@ export function refineFlight(raw: readonly PoseFrame[], front: FrontCalibration,
   let floorPre = NaN, floorPost = NaN;
   let Lto = NaN, Ltd = NaN, seTo = NaN, seTd = NaN, slopeTo = NaN, slopeTd = NaN, seFloorPre = NaN, seFloorPost = NaN;
   const R = REFINE;
+  // the floor windows, kept inside this flight's own contacts
+  const preFrom = (to: number) => Math.max(to - R.floorToMs, (near.prevLandT ?? -Infinity) + R.floorFromMs);
+  const postTo = (td: number) => Math.min(td + R.floorToMs, (near.nextTakeoffT ?? Infinity) - R.floorFromMs);
   const nominalRuler = (front.worldHeight ?? th('t5.nominalHeightM')) / front.bodyHeight;
   const s0 = R.legNoiseCm / 100 / nominalRuler;
   for (let pass = 0; pass < 3; pass++) {
@@ -194,8 +201,8 @@ export function refineFlight(raw: readonly PoseFrame[], front: FrontCalibration,
     par = robustParabola(air.map((f) => ({ t: f.t, v: hipU(f) })), t0, 0.015 / ((front.worldHeight ?? th('t5.nominalHeightM')) / front.bodyHeight));
     if (!par || par.c >= 0) return null;
     used = air.length;
-    const pre = raw.filter((f) => feetOk(f) && f.t <= to - R.floorFromMs && f.t >= to - R.floorToMs).map(lowU);
-    const post = raw.filter((f) => feetOk(f) && f.t >= td + R.floorFromMs && f.t <= td + R.floorToMs).map(lowU);
+    const pre = raw.filter((f) => feetOk(f) && f.t <= to - R.floorFromMs && f.t >= preFrom(to)).map(lowU);
+    const post = raw.filter((f) => feetOk(f) && f.t >= td + R.floorFromMs && f.t <= postTo(td)).map(lowU);
     floorPre = median(pre); floorPost = median(post);
     // a median's standard error: 1.25 σ/√n
     seFloorPre = (1.25 * s0) / Math.sqrt(Math.max(1, pre.length)); seFloorPost = (1.25 * s0) / Math.sqrt(Math.max(1, post.length));
@@ -259,8 +266,8 @@ export function refineFlight(raw: readonly PoseFrame[], front: FrontCalibration,
   const nominal = (front.worldHeight ?? th('t5.nominalHeightM')) / front.bodyHeight;
   const rulerOk = Math.abs(ruler / nominal - 1) <= R.rulerTol;
   const width = (f: PoseFrame) => Math.abs(f.image[11].x - f.image[12].x) + Math.abs(f.image[23].x - f.image[24].x);
-  const wPre = median(raw.filter((f) => feetOk(f) && f.t <= to - R.floorFromMs && f.t >= to - R.floorToMs).map(width));
-  const wPost = median(raw.filter((f) => feetOk(f) && f.t >= td + R.floorFromMs && f.t <= td + R.floorToMs).map(width));
+  const wPre = median(raw.filter((f) => feetOk(f) && f.t <= to - R.floorFromMs && f.t >= preFrom(to)).map(width));
+  const wPost = median(raw.filter((f) => feetOk(f) && f.t >= td + R.floorFromMs && f.t <= postTo(td)).map(width));
   const depthRatio = Number.isFinite(wPre) && Number.isFinite(wPost) && wPre > 0 ? wPost / wPre : null;
   const moved = depthRatio === null || Math.abs(depthRatio - 1) > R.depthTol;
   const rawDrop = (Ltd - Lto) * ruler;

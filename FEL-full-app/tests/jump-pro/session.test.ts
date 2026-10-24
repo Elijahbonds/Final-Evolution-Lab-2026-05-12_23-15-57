@@ -121,3 +121,38 @@ describe('T5 carries it all, in memory only', () => {
     expect(r.t5.heightPlusMinusCm!).toBeGreaterThanOrEqual((9.81 * (r.t5.bestFlightMs! / 1000) * (1 / 60)) / 4 * 100 - 0.05);
   });
 });
+
+describe('rebounds', () => {
+  it('contact, RSI and RSI-flight between jumps under 400 ms apart; the 10/5 best-five mean', async () => {
+    const { reboundStats } = await import('@/lib/jump/rebound');
+    const j = (index: number, takeoffT: number, landT: number, heightCm: number) => ({ index, valid: true, takeoffT, landT, heightCm, flightMs: landT - takeoffT });
+    const r = reboundStats([j(1, 0, 500, 30), j(2, 700, 1190, 29.5), j(3, 3000, 3500, 30)]);
+    expect(r.rebounds).toEqual([{ from: 1, to: 2, contactMs: 200, rsi: 1.48, rsiFlight: 2.45 }]);
+    expect(r).toMatchObject({ bestRsi: 1.48, bestContactMs: 200, best5Rsi: null });
+  });
+});
+
+describe('the seam for later lanes (lib/jump/seam.ts)', () => {
+  it('a verified CMJ record from a clean 60 fps read; never a power field', async () => {
+    const { jumpRecords } = await import('@/lib/jump/seam');
+    const take = buildTake([0.42, 0.44, 0.43].map((h) => ({ trial: { heightM: h } })), { leadS: 3.2 });
+    const { frames } = filmTake(take, { fps: 60, seed: 4 });
+    const cal = calibrateTake(frames)!;
+    const recs = jumpRecords(gradeT5(frames, { calibration: cal, aspect: cal.aspect }).t5, { source: 'live' });
+    expect(recs).toHaveLength(1);
+    expect(recs[0]).toMatchObject({ type: 'cmj', source: 'live', fps: expect.any(Number), rsi: null });
+    expect(recs[0].heightCm).toBeGreaterThan(40);
+    expect(Object.keys(recs[0])).not.toContain('power');
+    expect(jumpRecords(gradeT5(frames, { calibration: cal, aspect: cal.aspect }).t5, { source: 'live', trust: 'low' })[0]).toMatchObject({ verified: false, blocks: expect.arrayContaining(['trustLow']) });
+  });
+  it('rebounds add a repeated-jump record with its RSI', async () => {
+    const { jumpRecords } = await import('@/lib/jump/seam');
+    const take = buildTake(Array.from({ length: 4 }, (_, i) => ({ trial: { heightM: 0.3, ...(i < 3 ? { reboundMs: 200 } : {}) } })), { leadS: 3.2 });
+    const { frames } = filmTake(take, { fps: 120, seed: 2 });
+    const cal = calibrateTake(frames)!;
+    const recs = jumpRecords(gradeT5(frames, { calibration: cal, aspect: cal.aspect }).t5, { source: 'live' });
+    expect(recs.map((r) => r.type)).toEqual(['cmj', 'repeated']);
+    expect(recs[1].rsi!).toBeGreaterThan(1.2);
+    expect(recs[1].rsi!).toBeLessThan(1.8);                       // 0.30 m / 0.20 s = 1.5
+  });
+});

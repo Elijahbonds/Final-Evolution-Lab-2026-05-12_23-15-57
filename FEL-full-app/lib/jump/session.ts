@@ -146,6 +146,10 @@ export function defaultTypicalErrorCm(heightCm: number, poseHz: number | null): 
   return Math.max(meas, (heightCm * jr('jump.bioCvPct')) / 100);
 }
 
+/** The smallest real change (cm) between two sessions like this one: a jump of `heightCm` timed at `poseHz`. */
+export const jumpRealChangeCm = (heightCm: number, poseHz: number | null): number =>
+  jr('jump.realChangeZ') * Math.SQRT2 * defaultTypicalErrorCm(heightCm, poseHz);
+
 // ── verified ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** PR #424's levels, restated (its trust-rows.ts is not imported, so this lane never edits or depends on it). */

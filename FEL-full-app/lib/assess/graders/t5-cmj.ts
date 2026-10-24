@@ -36,6 +36,7 @@ import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 import type { GradeContext } from './t1-overhead-squat';
 import { refineFlight, refineVouches } from '@/lib/jump/refine';
 import { CI95_Z, trialQuality, sessionStats } from '@/lib/jump/session';
+import { reboundStats } from '@/lib/jump/rebound';
 
 export const G = 9.81;
 
@@ -242,6 +243,21 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
   return flights;
 }
 
+/**
+ * JUMP-PRO (2026-10-24): one flight per jump. At 240 fps the finder can land a flight at its apex (the feet barely move
+ * there) and then find the same take-off again: two overlapping flights, the first cut short (bench, rebounds with
+ * 150 ms contacts: 2 jumps in 36). Overlapping flights are one; the one that lands later is the whole of it.
+ */
+export function withoutOverlaps<F extends { takeoffT: number; landT: number }>(flights: readonly F[]): F[] {
+  const out: F[] = [];
+  for (const f of [...flights].sort((a, b) => a.takeoffT - b.takeoffT)) {
+    const last = out[out.length - 1];
+    if (last && f.takeoffT < last.landT) { if (f.landT > last.landT) out[out.length - 1] = f; continue; }
+    out.push(f);
+  }
+  return out;
+}
+
 export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraFps?: number | null }): TestResult & { t5: T5Extra } {
   const front = ctx.calibration.front, aspect = ctx.aspect;
   const hz = ctx.poseHz ?? poseHz(raw);
@@ -257,7 +273,7 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
   const frames = smooth(raw);
   const vis = th('gate.visibilityScoring');
   const ok = frames.map((f) => f.present && passes(f.image, SCORING_POINTS, 'front', vis));
-  const flights = detectFlights(raw, front);
+  const flights = withoutOverlaps(detectFlights(raw, front));
   const wLanding = th('t5.landingWindowMs');
   const jumps: (JumpRead & { landFrame: number; takeFrame: number })[] = [];
   for (const fl of flights) {
@@ -265,7 +281,8 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
     // JUMP-PRO: re-timed from the whole flight when it can be; the finder's frames otherwise
     // A flight the finder's rise check refused (its edges read a longer flight than the feet rose for) is re-timed too:
     // when the hips' own parabola tops out mid-flight and fits (refineVouches), the re-timed flight stands.
-    const rf0 = fl.landed ? refineFlight(raw, front, fl.takeoffT, fl.landT) : null;
+    const k = flights.indexOf(fl);
+    const rf0 = fl.landed ? refineFlight(raw, front, fl.takeoffT, fl.landT, { prevLandT: flights[k - 1]?.landT, nextTakeoffT: flights[k + 1]?.takeoffT }) : null;
     const rf = rf0 && (fl.check.ok || refineVouches(rf0)) ? rf0 : null;
     const flightMs = rf ? rf.flightMs : fl.landT - fl.takeoffT;
     const heightCm = rf ? rf.heightTovCm : heightCmOf(flightMs);
@@ -359,6 +376,7 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
       : null,
     cvPct, inconsistent: cvPct !== null && cvPct >= bandOf('t5.cvPct').fault!,
     session: sessionStats(valid),
+    rebounds: reboundStats(jumps),
   };
   const passing = ok.filter(Boolean).length;
   const confidence = confidenceOf(passing, raw.length, hz);
