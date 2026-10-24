@@ -11,9 +11,17 @@
 
 import { readCourtLocation } from '@/lib/babylon/nexus/courtLocations';
 import { courtArtSkin } from '@/lib/modes/art/apply-art-card';
-import { freshOrder, syncLobby, slotDrives, recordTurn, turnBanner, MAX_SHOOTERS, type ShootoutOrder } from '@/lib/controller-link/shootoutTurns';
+// COUCH TURNS (lane/hoops-couch, 2026-10-24): friends each take their own run, the camera's body included — lib/hoops/couchTurns.ts
+import {
+  activeShooter, couchBoard, couchLineup, couchTurnsBlocked, finalLine, handoffCopy, joinedCount, padDrives, phoneDrives, pickerShown,
+  postsSession, shooterName, startCouch, turnLine as couchTurnLine, waitLine, wantAfterJoin, type CouchTurns, type Shooter,
+} from '@/lib/hoops/couchTurns';
+import { recordTurnScore, turnsDone } from '@/lib/party/turns';
+import { bodyPlay } from '@/lib/move/bodyPlay';
+import type { PadInfo } from '@/lib/babylon/core/InputBus';
+import { TurnsFinal, TurnsHandoff, TurnsPicker } from './shoot-turns';
 import type { LobbyPeer } from '@/lib/controller-link/types';
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
@@ -48,12 +56,13 @@ type Hud = Record<string, HudValue>;
 
 type StandingRow = { name: string; score: number | string; line: string; form?: string };
 /** The shootout's standings rows (the board key): YOU, then the field, each with form, score and where they stand. */
-function Standings({ rows }: { rows: StandingRow[] }) {
+function Standings({ rows, you }: { rows: StandingRow[]; you?: string }) {
   return (
     <>
       {rows.map((r) => (
         <div key={r.name} className="flex items-baseline gap-3 py-0.5">
-          <HudText size="body" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-16 truncate">{r.name}</HudText>
+          {/* COUCH TURNS: the human's row carries the name of whoever is shooting this run */}
+          <HudText size="body" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-16 truncate">{r.name === 'YOU' && you ? you : r.name}</HudText>
           {/* IMPROVE (2026-10-06) #7: the rival's form — the reveal runs coldest first, so the HOT cards land last */}
           <HudText size="caption" tone={r.form === 'HOT' ? 'heat' : 'info'} className="w-8" style={{ fontWeight: 800 }}>{r.form ?? ''}</HudText>
           <HudText size="value" tone={r.name === 'YOU' ? 'score' : 'text'} className="w-8 text-right">{r.score}</HudText>
@@ -71,10 +80,24 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
   const [phase, setPhase] = useState<ModePhase>('loading');
-  // the running order lives in a ref AND state: the input callback reads it every frame (ref) while the
-  // banner renders from it (state)
-  const orderRef = useRef<ShootoutOrder>(freshOrder());
-  const [order, setOrder] = useState<ShootoutOrder>(orderRef.current);
+  // COUCH TURNS (lane/hoops-couch): who has joined (local pads, phones), how many take turns, and the shootout once it runs.
+  // The input gates read gateRef every event (the shooter who is up); the screens render from state.
+  const [pads, setPads] = useState<PadInfo[]>([]);
+  const [peers, setPeers] = useState<LobbyPeer[]>([]);
+  const [want, setWant] = useState(1);
+  const [couch, setCouch] = useState<CouchTurns | null>(null);
+  const couchRef = useRef<CouchTurns | null>(null);
+  const [handoff, setHandoff] = useState<{ next: Shooter; prev: Shooter | null } | null>(null);
+  const [couchDone, setCouchDone] = useState(false);
+  const [couchAllowed, setCouchAllowed] = useState(false);
+  const [waitHint, setWaitHint] = useState('');
+  const gateRef = useRef<{ shooters: Shooter[]; at: number }>({ shooters: [], at: 0 });
+  const cameraRef = useRef(false);
+  const [lobbyKept, setLobbyKept] = useState(false);
+  /** Each couch run gets a NEW canvas: a second runMode on the same canvas failed to boot (measured on the rig: Babylon's bloom
+   *  blur read an undefined kernel weight, "reading 'toFixed'", in mountLightRig). The party room remounts its game the same way. */
+  const [canvasGen, setCanvasGen] = useState(0);
+  const nextRunRef = useRef<() => void>(() => {});
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
@@ -100,20 +123,30 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     if (!canvas) return;
     const bus = new InputBus();
     busRef.current = bus;
+    // COUCH TURNS: only the shooter who is up drives (solo: every pad, as always — padDrives answers true)
+    bus.padFilter = (slot) => padDrives(gateRef.current.shooters, gateRef.current.at, slot);
     setBusReady(true);
     let stop: (() => void) | null = null;
     let disposed = false;
 
     const resultSink = async (r: SessionResult) => {
       if (endedRef.current) return;
-      // A SHOOTOUT IS TURN-BASED. With phones in the room the run that just ended was one player's turn:
-      // bank it, pass the ball, and only end the session once the last shooter has been.
+      // A SHOOTOUT IS TURN-BASED. In a couch shootout the run that just ended was one shooter's: bank it under their name and
+      // mount the next shooter's run (the old phone order banked a turn and waited for a remount nothing did). A couch
+      // shootout never reaches onEnd — it is unranked, unstaked and unpaid (couchTurns.postsSession), like the party room.
       const score = Number(r.stats?.points ?? r.score ?? 0);
-      if (orderRef.current.shooters.length > 1) {
-        const next = recordTurn(orderRef.current, score);
-        orderRef.current = next;
-        setOrder(next);
-        if (!next.done) return;      // the next phone is up; the host remounts for their turn
+      const c = couchRef.current;
+      if (c && !postsSession(c.shooters.length)) {
+        const next: CouchTurns = { ...c, turns: recordTurnScore(c.turns, score) };
+        couchRef.current = next;
+        gateRef.current = { shooters: next.shooters, at: next.turns.at };
+        setCouch(next);
+        if (turnsDone(next.turns)) { setCouchDone(true); return; }
+        setHandoff({ next: next.shooters[next.turns.at], prev: next.shooters[next.turns.at - 1] ?? null });
+        // one camera, a new body: the space check again for THEM (the safety note, the reach for their height, a still stand)
+        if (cameraRef.current) bodyPlay.handOver();
+        nextRunRef.current();
+        return;
       }
       endedRef.current = true;
       const pts = Number(r.stats?.points ?? r.score ?? 0);
@@ -180,38 +213,121 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
   // ONE adapter per bus (CONTROLLER-UNIVERSAL-MULTI): toInputBus holds the held-charge ramp between events, and a
   // fresh adapter per event could never stop the ramp its own 'charge:down' started.
   const linkSink = useRef<{ bus: InputBus; sink: ReturnType<typeof toInputBus> } | null>(null);
-  const onControllerInput = useCallback((ev: Parameters<ReturnType<typeof toInputBus>>[0], slot: number) => {
-    if (!slotDrives(orderRef.current, slot)) return;
+  const onControllerInput = useCallback((ev: Parameters<ReturnType<typeof toInputBus>>[0], _slot: number, peerId?: string) => {
+    if (!phoneDrives(gateRef.current.shooters, gateRef.current.at, peerId)) return;
     const bus = busRef.current;
     if (!bus) return;
     if (linkSink.current?.bus !== bus) linkSink.current = { bus, sink: toInputBus(bus) };
     linkSink.current.sink(ev);
   }, []);
   // a controller paired to a phone arrives canonical (the binary relay) — same turn gate, straight onto the bus
-  const onPhonePad = useCallback((e: Parameters<InputBus['emit']>[0], slot: number) => {
-    if (slotDrives(orderRef.current, slot)) busRef.current?.emit(e);
+  const onPhonePad = useCallback((e: Parameters<InputBus['emit']>[0], _slot: number, peerId?: string) => {
+    if (phoneDrives(gateRef.current.shooters, gateRef.current.at, peerId)) busRef.current?.emit(e);
   }, []);
 
-  const onPeers = useCallback((peers: LobbyPeer[]) => {
-    const next = syncLobby(orderRef.current, peers.map((p) => ({ slot: p.slot, name: p.name, connected: p.connected })));
-    orderRef.current = next;
-    setOrder(next);
-  }, []);
+  const onPeers = useCallback((next: LobbyPeer[]) => { setPeers(next); }, []);
 
   const controllerConfig = useMemo(() => controllerConfigFor('threepoint'), []);
-  const turnLine = turnBanner(order);
-  void MAX_SHOOTERS;
+
+  // ── COUCH TURNS (lane/hoops-couch) ──
+  // the next couch run: a fresh canvas, then the same remount the error retry uses
+  nextRunRef.current = () => { setCanvasGen((g) => g + 1); retryBoot(); };
+  // not on a ranked, staked, challenge, Story, Carnival, online or party-room run (read once the page is in the browser)
+  useEffect(() => { setCouchAllowed(couchTurnsBlocked(window.location.pathname, window.location.search) === null); }, []);
+  // the camera: body play on this page (the space check running or set). Only read where a couch shootout may run.
+  const cameraStage = useSyncExternalStore(
+    couchAllowed ? bodyPlay.subscribe : noSubscribe,
+    () => (couchAllowed ? bodyPlay.view().stage : 'off'),
+    () => 'off',
+  );
+  const camera = cameraStage === 'checking' || cameraStage === 'set';
+  cameraRef.current = camera;
+  useEffect(() => { if (busReady) setLobbyKept(true); }, [busReady]);
+  // the connect chips' roster, for the lineup (each new bus: a turn's remount)
+  useEffect(() => {
+    const b = busRef.current;
+    if (!busReady || !b) return undefined;
+    return b.onPads(setPads);
+  }, [busReady, bootAttempt]);   // bootAttempt too: a remount's busReady false → true is batched into no change at all
+  const padsIn = useMemo(() => pads.map((p) => ({ slot: p.slot, name: p.name })), [pads]);
+  const phonesIn = useMemo(() => peers.map((p) => ({ peerId: p.peerId, name: p.name, slot: p.slot, ready: p.ready, connected: p.connected })), [peers]);
+  const joined = joinedCount(padsIn, phonesIn);
+  const joinedRef = useRef(joined);
+  useEffect(() => {
+    const before = joinedRef.current;   // read now: the updater below runs later, after the ref has moved on
+    joinedRef.current = joined;
+    setWant((w) => wantAfterJoin(w, before, joined));
+  }, [joined]);
+  const lineup = useMemo(() => couchLineup(want, padsIn, phonesIn), [want, padsIn, phonesIn]);
+  // who drives now: the shootout's shooter, or before the first run the planned P1 (solo: nobody is gated)
+  gateRef.current = couch ? { shooters: couch.shooters, at: couch.turns.at } : { shooters: couchAllowed ? lineup : [], at: 0 };
+  const gateMulti = gateRef.current.shooters.length > 1;
+  // the first run of a planned shootout starts it; any run starting clears the hand-over card
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    setHandoff(null);
+    if (!couchRef.current && couchAllowed) {
+      const c = startCouch(lineup);
+      if (c) { couchRef.current = c; setCouch(c); }
+    }
+  }, [phase]);   // eslint-disable-line react-hooks/exhaustive-deps -- the lineup is snapshotted at the first whistle only
+  // a press from a pad whose shooter is not up does nothing; it is told to wait
+  useEffect(() => {
+    const b = busRef.current;
+    if (!busReady || !b || !gateMulti) return undefined;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const off = b.onSlot((e, slot) => {
+      if (e.t !== 'button' || !e.pressed) return;
+      const g = gateRef.current;
+      if (padDrives(g.shooters, g.at, slot)) return;
+      setWaitHint(waitLine(g.shooters, g.at));
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setWaitHint(''), WAIT_HINT_MS);
+    });
+    return () => { off(); if (timer) clearTimeout(timer); };
+  }, [busReady, bootAttempt, gateMulti]);
+  const shootAgain = useCallback(() => {
+    const c = couchRef.current;
+    if (!c) return;
+    const again = startCouch(c.shooters);
+    couchRef.current = again;
+    setCouch(again);
+    setCouchDone(false);
+    if (again) setHandoff({ next: again.shooters[0], prev: again.shooters[again.shooters.length - 1] ?? null });
+    if (cameraRef.current) bodyPlay.handOver();
+    nextRunRef.current();
+  }, []);
+  const backToSolo = useCallback(() => {
+    couchRef.current = null;
+    setCouch(null);
+    setCouchDone(false);
+    setHandoff(null);
+    setWant(1);
+    gateRef.current = { shooters: [], at: 0 };
+    nextRunRef.current();
+  }, []);
+  const up = couch ? activeShooter(couch) : null;
+  // over the run (the hand-over card on READY says it there)
+  const turnLine = couch && !couchDone && (phase === 'playing' || phase === 'paused') ? couchTurnLine(couch) : '';
+  const couchRows = couch ? couchBoard(couch) : [];
+  const handCopy = handoff ? handoffCopy(handoff.next, handoff.prev, camera) : null;
+  const showPicker = pickerShown({ allowed: couchAllowed, phase, started: couch !== null, camera, joined });
 
   return (
     <div className="relative h-[calc(100dvh-3.25rem)] w-full overflow-hidden rounded-none border-0 bg-transparent">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
+      <canvas key={canvasGen} ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
 
       {/* TV HUD (A9.13, lane/hud-hoops): the shootout's readouts on the shared system — same keys, same gates, same slots. */}
       <HudFrame>
       {/* Whose turn it is, on the TV, whenever more than one phone is in the room. */}
       {turnLine && (
-        <div className="absolute left-1/2 top-3 -translate-x-1/2">
+        // top-14: under the connect line the lobby keeps at the top while a pad is in (it ran across the chip at 960 px)
+        <div className="absolute left-1/2 top-14 z-[21] flex -translate-x-1/2 flex-col items-center gap-1" data-couch-turn>
           <HudChip tone="you" size="value" className="tracking-[0.2em]">{turnLine}</HudChip>
+          {/* COUCH TURNS: every shooter on one line, by name — banked scores, who is up, who is still to go */}
+          {phase === 'playing' && (
+            <HudChip size="caption" alpha={0.85}>{couchRows.map((r) => `${r.display} ${r.score ?? (r.up ? 'UP' : '—')}`).join('  ·  ')}</HudChip>
+          )}
         </div>
       )}
 
@@ -220,7 +336,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           under the shooter drawn from the SAME bands the mode grades with. */}
       {phase === 'playing' && (
         // pt-9 while a turn banner is up: at its own top-3 slot the score covered it (measured), so the stack starts under it
-        <div className={`absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 ${turnLine ? 'pt-9' : ''}`}>
+        <div className={`absolute inset-x-0 top-3 z-20 flex flex-col items-center gap-1.5 ${turnLine ? 'pt-[7.5rem]' : ''}`}>
           <div className="flex items-end gap-5">
             <HudPlate className="px-5 py-1.5 leading-none"><ScoreValue value={hnum(hud.score)} size="hero" tone="score" /></HudPlate>
             {/* IMPROVE (2026-10-06) #6: the practice rack has no clock (the mode sends clock: null) */}
@@ -278,7 +394,7 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           {/* WAVE 3: the standings, on a phone (see the corner plate below) */}
           {Array.isArray(hud.board) && (
             <HudPlate className="px-3 py-1.5 sm:hidden" data-hud="standings-stack">
-              <Standings rows={hud.board as StandingRow[]} />
+              <Standings rows={hud.board as StandingRow[]} you={up ? shooterName(up) : undefined} />
             </HudPlate>
           )}
         </div>
@@ -307,8 +423,14 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
           and 720p). Same rows, same keys, same tones. */}
       {phase === 'playing' && Array.isArray(hud.board) && (
         <HudPlate className="absolute right-4 top-4 z-20 hidden px-3 py-2 sm:block lg:top-[33%]" data-hud="standings-corner">
-          <Standings rows={hud.board as StandingRow[]} />
+          <Standings rows={hud.board as StandingRow[]} you={up ? shooterName(up) : undefined} />
         </HudPlate>
+      )}
+      {/* COUCH TURNS: a press from a shooter who is not up */}
+      {waitHint && phase === 'playing' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-[11rem] z-20 flex justify-center" data-couch-wait>
+          <HudChip tone="heat" size="label">{waitHint}</HudChip>
+        </div>
       )}
       </HudFrame>
 
@@ -322,11 +444,22 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
         onRetry={retryBoot}
+        readyLead={handCopy && !couchDone ? <TurnsHandoff title={handCopy.title} sub={handCopy.sub} rows={couchRows} /> : undefined}
+        readyExtra={showPicker ? <div className="mt-3"><TurnsPicker want={want} lineup={lineup} camera={camera} onPick={setWant} /></div> : undefined}
       />
 
       {/* Lobby is expanded until the whistle, then collapses to a status badge
           so it never sits on top of live play. */}
-      {controllerConfig && busReady && (
+      {/* COUCH TURNS: the hand-over card while the next shooter's run loads and waits on READY; the picker on the first READY;
+          the board once everyone has shot. Over the splash (z-40), catching only their own taps. */}
+      {couchDone && couch && (
+        <div className="absolute inset-0 z-[46] grid place-items-center bg-black/55 px-4">
+          <TurnsFinal line={finalLine(couch)} rows={couchRows} onAgain={shootAgain} onDone={backToSolo} />
+        </div>
+      )}
+
+      {/* the lobby stays mounted across a couch shootout's runs (each run is a remount): the phones keep their link */}
+      {controllerConfig && (busReady || lobbyKept) && (
         <HostLobby
           config={controllerConfig}
           onInput={onControllerInput}
@@ -363,6 +496,11 @@ export default function ThreePointBabylon({ onEnd }: GameProps) {
     </div>
   );
 }
+
+/** COUCH TURNS: no subscription where a couch shootout cannot run (the party room runs its own turns, a staked run none). */
+const noSubscribe = (): (() => void) => () => {};
+/** How long "wait for your turn" stays up after a press from a shooter who is not up (ms). */
+const WAIT_HINT_MS = 1800;
 
 /** IMPROVE (2026-10-06) #4: the release-history ticks (threePointRules.pipFor): early short, late long, the green between. */
 const PIP_TICK: Record<string, { tone: HudTone; label: string } | undefined> = {
