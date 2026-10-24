@@ -15,6 +15,7 @@
 // owner decision (Prisma), and is not needed for this.
 
 import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
+import { rivalHistorySince } from '@/lib/rival-history';
 
 export type AccountBestAnswer =
   | { scope: 'device' }
@@ -25,7 +26,7 @@ export interface BestsDb {
   user: { findUnique(a: { where: { id: string }; select: { dobYear: true } }): Promise<{ dobYear: number | null } | null> };
   gameSession: {
     aggregate(a: {
-      where: { userId: string; mode: string; NOT?: { id: string } };
+      where: { userId: string; mode: string; NOT?: { id: string }; createdAt?: { gte: Date } };
       _max: { score: true };
       _count: { _all: true };
     }): Promise<{ _max: { score: number | null }; _count: { _all: number } }>;
@@ -55,8 +56,11 @@ export async function readAccountBest(db: BestsDb, userId: string, mode: string,
     dobYear = null;
   }
   if (!verifiedAdult(dobYear, now)) return { scope: 'device' };
+  // DERBY-KEY (2026-10-23): a mode whose key changed meaning (`baseball` held the Derby's runs before) compares
+  // only against runs from its own game, so an old Derby 300 never hides a 3-inning best (lib/rival-history).
+  const since = rivalHistorySince(mode);
   const agg = await db.gameSession.aggregate({
-    where: { userId, mode, ...(exclude ? { NOT: { id: exclude } } : {}) },
+    where: { userId, mode, ...(exclude ? { NOT: { id: exclude } } : {}), ...(since ? { createdAt: { gte: since } } : {}) },
     _max: { score: true },
     _count: { _all: true },
   });

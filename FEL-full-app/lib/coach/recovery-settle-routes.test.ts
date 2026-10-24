@@ -22,6 +22,9 @@ vi.mock('@/lib/camp/server', () => ({
 vi.mock('@/lib/db', () => ({ prisma: { __fake: 'prisma' } }));
 vi.mock('@/lib/coach/todayServer', () => ({ saveClientLog: async () => h.save }));
 vi.mock('@/lib/coach/cooldownServer', () => ({ recordCooldown: async () => h.cool }));
+// COACH-LOOP P1 (2026-10-20): the teen gate runs first on both routes; it is pinned in teen-gate-routes.test.ts, and here
+// it lets the athlete through so these tests stay about the settle
+vi.mock('@/lib/coach/teenGateServer', () => ({ teenGateRefusal: async () => null }));
 vi.mock('@/lib/prq-recovery', () => ({ settleRecoveryFor: (...a: unknown[]) => (h.settle as (...x: unknown[]) => unknown)(...a) }));
 
 import { NextRequest } from 'next/server';

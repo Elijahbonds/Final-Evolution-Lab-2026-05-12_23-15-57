@@ -91,7 +91,7 @@ describe('the jump result', () => {
 
   it('an adult sees inches, the attempts, the meaning line, and the three ways on', () => {
     const h = html(false);
-    expect(text(h)).toContain('15.7 in');
+    expect(text(h)).toContain('about 16 in');   // MIRROR flight-time: a rounded estimate, never an exact number
     expect(text(h)).toContain('3 attempts, best kept');
     expect(text(h)).toContain('A personal best to beat next time.');
     expect(h).toContain('text-[40px]');
@@ -102,7 +102,7 @@ describe('the jump result', () => {
 
   it('a kid sees the number and the full screen, and no band, program, or personal best', () => {
     const h = html(true);
-    expect(text(h)).toContain('15.7 in');
+    expect(text(h)).toContain('about 16 in');   // MIRROR flight-time: a rounded estimate, never an exact number
     expect(h).toContain('Do the full screen');
     expect(h).not.toMatch(/data-cta|personal best|Brain Brawl|dunking/i);
     expect(view(true)).not.toMatch(/\b(green|yellow|red)\b/i);

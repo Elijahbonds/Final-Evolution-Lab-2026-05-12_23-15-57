@@ -34,7 +34,6 @@ describe('the registry says what it means', () => {
     // one will not have a table quietly covering for it.
     const ALLOWED = [
       'snowboard_slalom → modeId "snowboard"',
-      'derby → modeId "baseball"',
       'penalty → modeId "soccer"',
       'karate_vs → modeId "karate-vs"',
     ];
@@ -152,7 +151,7 @@ describe('every mode has its body profile', () => {
     }
     expect(bad).toEqual([]);
     const aliases = Object.entries(MODES).filter(([key, def]) => def.modeId !== key).map(([key, def]) => `${key}→${BODY_PROFILES[def.modeId]?.key}`);
-    expect(aliases.sort()).toEqual(['derby→derby', 'karate_vs→karate_vs', 'penalty→penalty', 'snowboard_slalom→snowboard_slalom']);
+    expect(aliases.sort()).toEqual(['karate_vs→karate_vs', 'penalty→penalty', 'snowboard_slalom→snowboard_slalom']);
   });
 
   it('no orphan rows: every row names a registered, enabled mode, once', () => {

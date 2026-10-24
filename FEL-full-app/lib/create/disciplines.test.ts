@@ -1,6 +1,6 @@
 // CREATE HUB: every tile says where the work shows up, music leads, and nothing claims a consumer that is not wired.
 import { describe, expect, it } from 'vitest';
-import { ALL_GUIDES, HUB_ORDER, guideFor } from './disciplines';
+import { ALL_GUIDES, HUB_ORDER, guideFor, visibleShowcases } from './disciplines';
 import { DISCIPLINES } from '@/lib/creator/creative-card-types';
 
 describe('the Create tiles', () => {
@@ -31,6 +31,20 @@ describe('the Create tiles', () => {
       'scene: The pack picker in Spot the Scene, credited',
       'cooking: Community recipes on the Fuel floor',
       'writing: Community reads on the Story page',
+    ]);
+  });
+  it('user-facing showcase rows hide future consumers and keep every tile concrete', () => {
+    for (const g of ALL_GUIDES) {
+      const rows = visibleShowcases(g);
+      expect(rows.length).toBeGreaterThan(0);
+      expect(rows.every((s) => s.live)).toBe(true);
+      expect(rows.map((s) => s.where).join('\n')).not.toMatch(/\bsoon\b/i);
+    }
+    expect(visibleShowcases(guideFor('fashion')).map((s) => s.where)).toEqual([
+      'Saved in My Creations for review, remixing and reuse',
+    ]);
+    expect(visibleShowcases(guideFor('music')).map((s) => s.where)).toEqual([
+      'The Dance floor, with its chart',
     ]);
   });
 });

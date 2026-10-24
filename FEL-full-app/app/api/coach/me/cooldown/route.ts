@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { recordCooldown } from '@/lib/coach/cooldownServer';
 import { settleRecoveryFor } from '@/lib/prq-recovery';
+import { teenGateRefusal } from '@/lib/coach/teenGateServer';
 
 /**
  * POST /api/coach/me/cooldown — the client tapped "done" on Today's automatic cool-down (MIRROR-COACH P6, 2026-09-29).
@@ -20,6 +21,9 @@ import { settleRecoveryFor } from '@/lib/prq-recovery';
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  // COACH-LOOP P1 (2026-10-20): the cool-down tap is training data — the same teen gate as the log (lib/coach/teenGate.ts)
+  const refused = await teenGateRefusal(prisma, userId);
+  if (refused) return refused;
   let body: unknown;
   try { body = await req.json(); } catch { return bad('invalid_json'); }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return bad('invalid_json');

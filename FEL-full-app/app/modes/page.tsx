@@ -38,7 +38,7 @@ function ModeCard({ tile }: { tile: ModeTile }) {
     >
       <span
         aria-hidden
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--mode-accent)]/10 text-[var(--mode-accent)] transition-transform duration-200 group-hover:scale-105"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl [background-color:color-mix(in_srgb,var(--mode-accent)_10%,transparent)] text-[var(--mode-accent)] transition-transform duration-200 group-hover:scale-105"
       >
         <Icon className="h-5 w-5" />
       </span>

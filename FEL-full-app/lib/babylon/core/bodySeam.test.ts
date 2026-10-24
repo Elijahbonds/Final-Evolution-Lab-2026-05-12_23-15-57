@@ -89,7 +89,7 @@ describe('bodySeamFor: the harness picks the mode\'s own row', () => {
   it('the four aliases land on their own rows by def.modeId, never by the registry key', () => {
     expect(bodySeamFor({ modeId: 'karate-vs' }).profile.key).toBe('karate_vs');
     expect(bodySeamFor({ modeId: 'snowboard' }).profile.key).toBe('snowboard_slalom');
-    expect(bodySeamFor({ modeId: 'baseball' }).profile.key).toBe('derby');
+    expect(bodySeamFor({ modeId: 'baseball' }).profile.key).toBe('baseball'); expect(bodySeamFor({ modeId: 'derby' }).profile.key).toBe('derby');
     expect(bodySeamFor({ modeId: 'soccer' }).profile.key).toBe('penalty');
     // a registry key that is not a modeId is a mode no row names: session-only, not its alias's bindings
     expect(bodySeamFor({ modeId: 'karate_vs' }).profile).toStrictEqual(sessionOnly('karate_vs'));

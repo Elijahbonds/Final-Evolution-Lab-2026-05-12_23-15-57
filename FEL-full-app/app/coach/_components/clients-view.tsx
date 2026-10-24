@@ -17,6 +17,10 @@ import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
 import { clearProgram, markReadIfNeeded, unreadBadge, unreadInThread, type ThreadMsg, type UnreadView } from '@/lib/coach/messageReadsView';
 import { AVAILABILITY_API, AvailabilityPicker } from '@/components/coach/availability-picker';
 import { availabilityLine, type AvailabilityView } from '@/lib/coach/availability';
+// COACH-LOOP P1 (2026-10-20): assign the selected program to a group (the duplicate route's first button)
+import { AssignProgram } from '@/components/coach/assign-program';
+// COACH-LOOP P1: the guardian's training report, for teens with an accepted consent only (the server decides who)
+import { GUARDIAN_REPORT_API, GuardianReportButton } from '@/components/coach/guardian-report-button';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -38,6 +42,7 @@ export function ClientsView() {
   // null until the server says the feature is on (the pending SQL applied); then every roster row gets the picker
   const [availability, setAvailability] = useState<Record<string, AvailabilityView> | null>(null);
   const [linked, setLinked] = useState<string[]>([]);
+  const [guardian, setGuardian] = useState<{ eligible: string[]; email: boolean }>({ eligible: [], email: false });
 
   const load = useCallback(async () => {
     const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
@@ -48,6 +53,7 @@ export function ClientsView() {
   }, [selected]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { fetch('/api/coach/messages/unread').then((r) => (r.ok ? r.json() : null)).then((j) => setUnread(j)).catch(() => {}); }, []);
+  useEffect(() => { fetch(GUARDIAN_REPORT_API).then((r) => (r.ok ? r.json() : null)).then((j) => { if (Array.isArray(j?.eligible)) setGuardian({ eligible: j.eligible, email: !!j.email }); }).catch(() => {}); }, []);
   useEffect(() => { fetch(AVAILABILITY_API).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.available) { setAvailability(j.byClient ?? {}); setLinked(Array.isArray(j.linked) ? j.linked : []); } }).catch(() => {}); }, []);
   useEffect(() => {
     if (!selected) return;
@@ -104,6 +110,7 @@ export function ClientsView() {
               <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
               {/* the six-pattern strip, last 7 days; absent when this coach has no active program for them */}
               {r.coverage && <CoverageStrip strip={r.coverage} />}
+              {guardian.eligible.includes(r.clientId) && <GuardianReportButton clientId={r.clientId} name={r.name} emailOn={guardian.email} />}
               {availability && linked.includes(r.clientId) && (
                 <AvailabilityPicker
                   clientId={r.clientId}
@@ -149,6 +156,7 @@ export function ClientsView() {
         <div className="text-[11px] uppercase tracking-wider text-white/40">Programs I coach</div>
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
         <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
+        {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
         {/* The screen's correctives, offered before the blank builder below them: the coach came here to write
             work for this athlete, and the athlete's own screen already says what the work should be. */}
         {prog?.clientId && (

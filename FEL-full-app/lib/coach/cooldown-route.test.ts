@@ -54,7 +54,7 @@ const rowsFor = (sessionId: string) => h.store.cs.filter((c) => c.sessionId === 
 
 beforeEach(() => {
   h.store = newTodayStore();
-  h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test', dobYear: 1995 }, { id: 'client-2', name: 'Ria', email: 'ria@x.test' });
+  h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test', dobYear: 1995 }, { id: 'client-2', name: 'Ria', email: 'ria@x.test', dobYear: 1995 }); // COACH-LOOP P1: an adult, so the 403 below is the program's, not the teen gate's
   h.store.pe.push(
     catalogueRow({ id: 'pe-goblet', coachId: 'coach-1', name: 'Goblet Squat', pattern: 'squat' }),
     catalogueRow({ id: 'pe-row', coachId: 'coach-1', name: 'Half-kneeling Row', pattern: 'pull' }),

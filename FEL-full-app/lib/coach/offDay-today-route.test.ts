@@ -12,6 +12,10 @@ import { pacerLengthSec } from '@/lib/breath/pacer';
 
 const h = vi.hoisted(() => ({ user: 'client-1' as string | null, store: null as unknown as import('./todayMemoryDb').TodayStore }));
 
+// COACH-LOOP P1 (owner 2026-10-23): a teen's consent counts only if it was asked under the coach-training wording, which
+// is not live yet (lib/coach/coachConsent.ts, null = every teen fails closed). This suite stands after go-live.
+const cc = vi.hoisted(() => ({ since: new Date('2026-01-01') as Date | null }));
+vi.mock('@/lib/coach/coachConsent', async (orig) => (await import('@/tests/helpers/coachConsent')).coachConsentAt(await orig(), () => cc.since));
 vi.mock('@/lib/camp/server', () => ({
   currentUserId: async () => h.user,
   bad: (error: string, status = 400) => Response.json({ error }, { status }),
@@ -50,6 +54,9 @@ beforeEach(() => {
   h.store = newTodayStore();
   // a youth account (no birth year): the off day is for them too
   h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test', dobYear: null });
+  // COACH-LOOP P1 (2026-10-20): a youth saves coached training only with a guardian's yes (lib/coach/teenGate.ts) — this
+  // youth has one, which records a 15-year-old's birth year
+  h.store.guardianConsent!.push({ id: 'gc-1', menteeId: 'client-1', menteeBirthYear: new Date().getFullYear() - 15, requestedAt: new Date('2026-09-01'), acceptedAt: new Date('2026-09-02'), revokedAt: null });
   h.store.pe.push(catalogueRow({ id: 'pe-goblet', coachId: 'coach-1', name: 'Goblet Squat', pattern: 'squat' }));
   for (const i of OFF_DAY_ITEMS) h.store.pe.push(catalogueRow({ id: `pe-${i.key}`, coachId: 'coach-1', ...i.catalogue }));
   const ids = seedProgram(h.store, {

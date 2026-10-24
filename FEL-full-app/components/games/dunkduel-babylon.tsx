@@ -9,6 +9,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue, type HudScoreCard } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -32,6 +33,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
   const onEndRef = useRef(onEnd);
   onEndRef.current = onEnd;
 
@@ -63,33 +65,37 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
       onEndRef.current(result);
     };
 
-    runMode(MODES.dunkduel, {
-      canvas,
-      location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
-      applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-      },
-      onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
-      resultSink,
-    })
-      .then((s) => {
-        // A newer mount owns the canvas: do NOT run our teardown.
-        if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
-        stop = s;
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.dunkduel, {
+        canvas,
+        location: readCourtLocation(),   // court location pick (docs/SPEC-COURT-LOCATIONS.md)
+        applySkin: courtArtSkin,   // PIPELINES (2026-10-06): the player's court art card, a centre-court decal
+        input: bus,
+        onPhase: (p, cd) => {
+          setPhase(p);
+          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        },
+        onHud: (u) => setHud((prev) => ({ ...prev, ...u })),
+        resultSink,
       })
-      .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-DUNKDUEL] boot failed', setPhase, setLoadError }));
+        .then((s) => {
+          // A newer mount owns the canvas: do NOT run our teardown.
+          if (disposed) { if (canvasOwner.get(canvas) === token) s(); return; }
+          stop = s;
+        })
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-DUNKDUEL] boot failed', setPhase, setLoadError }));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       if (canvasOwner.get(canvas) === token) stop?.();
       busRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- onEnd via ref, mount once
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks are refs; bootAttempt remounts after a rejected runMode().
+  }, [bootAttempt]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -182,7 +188,7 @@ export default function DunkDuelBabylon({ onEnd }: GameProps) {
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
-        onRetry={tapStart}
+        onRetry={retryBoot}
       />
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (

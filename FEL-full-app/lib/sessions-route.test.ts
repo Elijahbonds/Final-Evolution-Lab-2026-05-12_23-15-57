@@ -31,6 +31,8 @@ const h = vi.hoisted(() => ({
   creationWrites: [] as Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>,
   /** MUSIC-SUITE P3: when set, the profile a request reads (a stale read racing another request); h.profile is the row. */
   staleRead: null as Record<string, unknown> | null,
+  /** STREAK-CLAIM-RACE: the play path's conditional streak writes inside the paying transaction (tx.playerProfile.updateMany). */
+  streakWrites: [] as Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>,
   /** MUSIC-SUITE P6 FIX PASS: the duels' MatchEvents (attempts, the pay-once claim) and the row locks the claim took. */
   matchEvents: [] as Array<{ matchId: string; userId: string | null; eventType: string; payload: string; seq: number; createdAt: Date }>,
   locks: [] as string[],
@@ -80,13 +82,33 @@ vi.mock('@/lib/db', () => {
       },
     },
     playerProfile: {
+      // PRQ-ATTR-RACE: the paying transaction's read under the row lock sees the row as committed (h.profile), never h.staleRead
+      findUnique: async () => ({ ...h.profile }),
       update: async ({ data }: { data: Record<string, unknown> }) => {
         h.writes.push('profile');
         h.updates.push(data);
         // MUSIC-SUITE P3: the streak fields persist, so the next request reads what this one wrote
         for (const k of ['streakDays', 'lastStreakAt', 'lastActiveAt'] as const) if (data[k] !== undefined) h.profile[k] = data[k];
+        // PRQ-ATTR-RACE: so do the PRQ attributes (a literal number is what the row then holds)
+        for (const k of ['strength', 'speed', 'endurance', 'agility', 'power', 'flexibility', 'recovery', 'mental']) if (typeof data[k] === 'number') h.profile[k] = data[k];
         const plain = Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v === 'number'));
         return { ...h.profile, ...plain, labCredits: 100 };
+      },
+      // STREAK-CLAIM-RACE: matches only while the row still holds what the request saw — a Date equal to the row's, or
+      // { lt } below it (Postgres compares the timestamps); a request that lost the race to a committed write matches nothing
+      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        h.streakWrites.push({ where, data });
+        const ms = (v: unknown) => (v === null || v === undefined ? null : new Date(v as Date).getTime());
+        for (const k of ['lastStreakAt', 'lastActiveAt'] as const) {
+          const w = where[k];
+          if (w === undefined) continue;
+          const row = ms(h.profile[k]);
+          const lt = w !== null && typeof w === 'object' && !(w instanceof Date) ? ms((w as { lt?: unknown }).lt) : undefined;
+          if (lt !== undefined ? !(row !== null && lt !== null && row < lt) : row !== ms(w)) return { count: 0 };
+        }
+        h.writes.push('lastStreakAt' in where ? 'profile:streak' : 'profile:active');
+        Object.assign(h.profile, data);
+        return { count: 1 };
       },
     },
     gameSession: {
@@ -124,9 +146,34 @@ vi.mock('@/lib/db', () => {
       throw new Error(`unexpected raw SQL in test: ${sql} (${args.length} args)`);
     },
   };
+  // PRQ-ATTR-RACE: the PlayerProfile row lock. A transaction's SELECT … FOR UPDATE holds it until the transaction ends,
+  // and another transaction's FOR UPDATE waits for that — as Postgres makes it wait for the commit. Without this, two
+  // runs racing through Promise.all both "locked" at once and a read under the lock could not be told from a stale one.
+  let rowLock: Promise<void> | null = null;
+  const transaction = async (fn: (t: typeof tx) => unknown) => {
+    let held = false;
+    let release = () => {};
+    const t = {
+      ...tx,
+      $queryRawUnsafe: async (sql: string, ...args: unknown[]) => {
+        if (/FOR UPDATE/.test(sql) && !held) {
+          while (rowLock) await rowLock;
+          rowLock = new Promise<void>((r) => { release = () => { rowLock = null; r(); }; });
+          held = true;
+        }
+        return tx.$queryRawUnsafe(sql, ...args);
+      },
+    };
+    try { return await fn(t); } finally { if (held) release(); }
+  };
   return {
     prisma: {
-      $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx),
+      $transaction: transaction,
+      // RATE-LIMIT-WIRE: the finish gate's count of the user's recorded finishes (GameSession [userId, createdAt])
+      gameSession: {
+        count: async ({ where }: { where: { userId: string; createdAt: { gte: Date } } }) => h.sessions
+          .filter((s) => s.userId === where.userId && new Date(String(s.createdAt ?? new Date())).getTime() >= where.createdAt.gte.getTime()).length,
+      },
       sessionRun: {
         findUnique: async ({ where }: { where: { id: string } }) => (h.runs[where.id] ? { ...h.runs[where.id] } : null),
         updateMany: runUpdateMany,
@@ -197,6 +244,7 @@ import { canonicalModeKey } from '@/lib/game-data';
 import { MODE_SCORE_RULES, SCORE_COLUMN_MAX } from '@/lib/sessions/modeScoreRules';
 import { ENDLESS_SESSION_CEILING, endlessCeilingFor, sessionShards, sessionXp } from '@/lib/session-payout';
 import { applyPerRunCap, PER_RUN_SHARDS, PER_RUN_XP } from '@/lib/economy-caps';
+import { prqScore } from '@/lib/prq';
 
 let runSeq = 0;
 /** ECONOMY-SESSIONS-HARDEN: an open run the server started `durationSec` ago, as POST /api/sessions/start leaves it. */
@@ -232,9 +280,11 @@ function perfectScore(notes: number): number {
 }
 
 beforeEach(() => {
-  // streaked today already, so the only credits in play are the win's
-  h.profile = { userId: 'u1', streakDays: 3, lastStreakAt: new Date(), labCredits: 100, strength: 50, speed: 50, endurance: 50, agility: 50, power: 50, flexibility: 50, recovery: 50, mental: 50 };
-  for (const k of ['updates', 'sessions', 'lc', 'prqRows', 'season', 'mastery', 'events', 'creationWrites', 'grants', 'wallet', 'writes'] as const) h[k] = [];
+  // streaked today already, so the only credits in play are the win's (STREAK-CLAIM-RACE: and active then — both columns
+  // are NOT NULL in the schema, so every real row has a lastActiveAt for a run's forward-only activity write to move)
+  const streakedAt = new Date(Date.now() - 1000);
+  h.profile = { userId: 'u1', streakDays: 3, lastStreakAt: streakedAt, lastActiveAt: streakedAt, labCredits: 100, strength: 50, speed: 50, endurance: 50, agility: 50, power: 50, flexibility: 50, recovery: 50, mental: 50 };
+  for (const k of ['updates', 'sessions', 'lc', 'prqRows', 'season', 'mastery', 'events', 'creationWrites', 'streakWrites', 'grants', 'wallet', 'writes'] as const) h[k] = [];
   h.matches = {};
   h.staleRead = null;
   h.matchEvents = [];
@@ -832,6 +882,29 @@ describe('ECONOMY-SESSIONS-HARDEN: a session must finish a run the server starte
     expect(h.wallet.filter((w) => w.reasonCode === 'MODE_SESSION_COMPLETED')).toHaveLength(1);
   });
 
+  // NB-3 (lane/hoops-overtime): a 3v3 level at the horn goes to sudden-death overtime and ends ONCE, on the first bucket. Its
+  // finish is an ordinary one: inside the 3v3's rules ceiling (20–20 + a three = 23), judged a win off the posted pair, paid once.
+  it('NB-3: a 3v3 decided in overtime posts once — 23–20 (the ceiling) pays one win; its retry is the first answer; 24 is refused', async () => {
+    const ot = { mode: 'hoops3v3', score: 23, opponentScore: 20, won: true, duration: 160, stats: { foeScore: 20, assists: 3, overtimes: 1 } };
+    const first = await post(ot);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ ok: true, paid: true, replayed: false, runId: first.runId });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.sessions[0]).toMatchObject({ mode: 'hoops3v3', score: 23, opponentScore: 20, won: true });
+    const again = await post({ ...ot, runId: first.runId });
+    expect(again.body).toEqual({ ...first.body, replayed: true });
+    expect(h.sessions).toHaveLength(1);
+    expect(h.updates).toHaveLength(1);
+    expect(h.wallet.filter((w) => w.reasonCode === 'MODE_SESSION_COMPLETED')).toHaveLength(1);
+    // the overtime LOSS posts the other side of the pair: a claimed win the score does not support is no win
+    const lost = await post({ ...ot, score: 20, opponentScore: 23, stats: { foeScore: 23, assists: 0, overtimes: 1 } });
+    expect(lost.body).toMatchObject({ ok: true, won: false });
+    // no overtime can post above the rules ceiling (a tie is under 21, and overtime adds one bucket)
+    const forged = await post({ ...ot, score: 24 });
+    expect(forged.status).toBe(422);
+    expect(forged.body).toMatchObject({ reason: 'SCORE_INVALID', detail: 'above_run_cap', limit: 23 });
+  });
+
   it('a run of another mode: RUN_MODE_MISMATCH, and the run is closed (a corrected retry is refused the same way)', async () => {
     const runId = openRun('tennis', 60);
     const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 60, runId });
@@ -928,7 +1001,8 @@ describe('ECONOMY-SESSIONS-HARDEN FIX 2: one run id keys every grant, and the le
     expect(h.grants.find((g) => g.grantType === 'wallet_coins')).toMatchObject({ amount: 40 });
     expect(h.grants.find((g) => g.grantType === 'wallet_shards')).toMatchObject({ amount: 2 });
     // claim, then the ledger, then balances; season and mastery inside the transaction; the answer stored last
-    expect(h.writes).toEqual(['run:paid', 'profile:lock', 'grants', 'profile', 'session', 'lc', 'wallet:MODE_SESSION_COMPLETED', 'wallet:MODE_SESSION_WON', 'season:tx', 'mastery:tx', 'run:result']);
+    // (STREAK-CLAIM-RACE: the run's streak step — here, not due, the forward-only activity write — before the ledger)
+    expect(h.writes).toEqual(['run:paid', 'profile:lock', 'profile:active', 'grants', 'profile', 'session', 'lc', 'wallet:MODE_SESSION_COMPLETED', 'wallet:MODE_SESSION_WON', 'season:tx', 'mastery:tx', 'run:result']);
     // every wallet movement is keyed by the run
     expect(h.lc[0]).toMatchObject({ idempotencyKey: `session-lc:${id}` });
     expect(h.wallet.map((w) => w.idempotencyKey)).toEqual([`run:${id}:coins`, `run:${id}:won`]);
@@ -1050,7 +1124,8 @@ describe('MERGE: the Arena music rules live inside the run the server started', 
     const r = await post(body);
     expect(r.body).toMatchObject({ paid: true, capped: true, xp: 14_150 });
     // the daily-cap row lock (ECONOMY-CAPS review fix) runs after the duel's claim and before the ledger is filed
-    expect(h.writes.slice(0, 5)).toEqual(['run:paid', 'duel:lock', `event:${MUSIC_SESSION_PAID}`, 'profile:lock', 'grants']);
+    // (STREAK-CLAIM-RACE: and so does the run's streak step)
+    expect(h.writes.slice(0, 6)).toEqual(['run:paid', 'duel:lock', `event:${MUSIC_SESSION_PAID}`, 'profile:lock', 'profile:active', 'grants']);
     expect(h.grants.find((g) => g.grantType === 'xp')).toMatchObject({ amount: 14_150, metadata: { arenaSet: true, arenaMatchId: 'm1', rejudged: house } });
     expect(h.runs[r.runId!]).toMatchObject({ status: 'paid', score: house, sessionId: 's1' });
   });
@@ -1213,5 +1288,209 @@ describe('FOLLOW-UP (2026-09-29): the finite pay cap on skateboarding and surfin
     expect(honest.body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
     // another finite mode is capped by C1 per-run ceiling too
     expect((await post({ mode: 'snowboarding', score: 400_000, won: true, duration: 90 })).body).toMatchObject({ capped: true, xp: PER_RUN_XP, shards: PER_RUN_SHARDS });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// STREAK-CLAIM-RACE (merge review 2026-09-28): the play path decided the streak from a profile read OUTSIDE the paying
+// transaction and wrote it back unconditionally, and the SessionGrant key is per run — so N runs finishing at once each
+// paid the day's streak Lab Credits. Measured at a1a1c5f9 and a8035176: due, two finishes paid [20, 20] (LC [35, 35]);
+// owed, three finishes after one creation each paid 35 LC with streakOwed. h.staleRead is the race: every request reads
+// the row as it was before any of them wrote.
+// ---------------------------------------------------------------------------
+
+describe('STREAK-CLAIM-RACE: the day\'s streak Lab Credits are paid once, however many runs finish at once', () => {
+  const dunk = () => post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+  const asc = (xs: unknown[]) => xs.map(Number).sort((a, b) => a - b);
+
+  it('due: two runs finishing together pay the streak bonus once (was [20, 20], LC [35, 35])', async () => {
+    streakedAgo(25);
+    h.staleRead = { ...h.profile };
+    const rs = await Promise.all([dunk(), dunk()]);
+    expect(rs.map((r) => r.body.paid)).toEqual([true, true]);
+    expect(asc(rs.map((r) => r.body.streakBonus))).toEqual([0, 20]);
+    expect(asc(rs.map((r) => r.body.credits))).toEqual([15, 35]);
+    expect(asc(h.lc.map((l) => l.delta))).toEqual([15, 35]);
+    // the ledger files what was paid: one wallet_lc row carries the streak share, the other only the win's 15
+    expect(asc(h.grants.filter((g) => g.grantType === 'wallet_lc').map((g) => g.amount))).toEqual([15, 35]);
+    expect(h.profile.streakDays).toBe(4);
+  });
+
+  it('owed: three runs finishing together after a creation opened the day pay its LC once (was 35 LC each, streakOwed)', async () => {
+    streakedAgo(25);
+    expect((await post(creation())).body).toMatchObject({ counted: true, streakDays: 4 });
+    h.staleRead = { ...h.profile };
+    const rs = await Promise.all([dunk(), dunk(), dunk()]);
+    expect(asc(rs.map((r) => r.body.streakBonus))).toEqual([0, 0, 20]);
+    expect(asc(h.lc.map((l) => l.delta))).toEqual([15, 15, 35]);
+    expect(h.lc.filter((l) => (l.metadata as Record<string, unknown>).streakOwed)).toHaveLength(1);
+    expect(asc(h.grants.filter((g) => g.grantType === 'wallet_lc').map((g) => g.amount))).toEqual([15, 15, 35]);
+    expect(h.profile.streakDays).toBe(4);
+    // the debt is closed: a later run, reading the row fresh, owes nothing
+    h.staleRead = null;
+    expect((await dunk()).body).toMatchObject({ streakBonus: 0, credits: 15 });
+  });
+
+  it('the claim comes after the run\'s claim and the profile lock, before the ledger and every balance — one stamp, keyed on lastStreakAt', async () => {
+    streakedAgo(25);
+    const r = await dunk();
+    expect(r.body).toMatchObject({ streakDays: 4, streakBonus: 20, credits: 35 });
+    expect(h.writes.slice(0, 5)).toEqual(['run:paid', 'profile:lock', 'profile:streak', 'grants', 'profile']);
+    expect(h.streakWrites).toHaveLength(1);
+    const [claim] = h.streakWrites;
+    expect(claim.where).toEqual({ userId: 'u1', lastStreakAt: expect.any(Date) });
+    expect(claim.data).toEqual({ streakDays: 4, lastStreakAt: expect.any(Date), lastActiveAt: expect.any(Date) });
+    expect(claim.data.lastActiveAt).toBe(claim.data.lastStreakAt);
+    // the profile write after the ledger carries no streak field: the claim above is their only writer on this path
+    for (const k of ['streakDays', 'lastStreakAt', 'lastActiveAt']) expect(h.updates[0], k).not.toHaveProperty(k);
+  });
+
+  it('a run that loses the day to a creation pays the win alone and writes no lastActiveAt — the creation\'s owed LC is the next run\'s', async () => {
+    streakedAgo(25);
+    h.staleRead = { ...h.profile };                                  // the run reads the day as due…
+    expect((await post(creation())).body).toMatchObject({ counted: true, streakDays: 4 });   // …and a creation opens it first
+    const active = h.profile.lastActiveAt;
+    const lost = await dunk();
+    expect(lost.body).toMatchObject({ paid: true, streakDays: 4, streakBonus: 0, credits: 15 });
+    expect(h.lc[0]).toMatchObject({ delta: 15, metadata: { streakBonus: false } });
+    expect(h.lc[0].metadata).not.toHaveProperty('streakOwed');
+    expect(h.grants.find((g) => g.grantType === 'wallet_lc')).toMatchObject({ amount: 15 });
+    expect(h.profile.lastActiveAt).toBe(active);                     // the debt is still open
+    h.staleRead = null;
+    const next = await dunk();
+    expect(next.body).toMatchObject({ streakDays: 4, streakBonus: 20, credits: 35 });
+    expect(h.lc[1]).toMatchObject({ delta: 35, metadata: { streakOwed: true } });
+  });
+
+  it('a lesson finishing while a run finishes does not cost the run its streak day (the due claim ignores lastActiveAt)', async () => {
+    streakedAgo(25);
+    h.staleRead = { ...h.profile };
+    h.profile.lastActiveAt = new Date();                             // learnRoutes / education complete: lastActiveAt only
+    expect((await dunk()).body).toMatchObject({ streakDays: 4, streakBonus: 20, credits: 35 });
+    expect(h.profile.streakDays).toBe(4);
+  });
+
+  it('owed: a lesson that ended the debt after the run read the row leaves nothing to claim (the documented rule)', async () => {
+    streakedAgo(25);
+    await post(creation());
+    h.staleRead = { ...h.profile };
+    h.profile.lastActiveAt = new Date();
+    expect((await dunk()).body).toMatchObject({ streakBonus: 0, credits: 15 });
+    expect(h.lc[0].metadata).not.toHaveProperty('streakOwed');
+  });
+
+  it('a run neither due nor owed writes back no streak field and never moves lastActiveAt backward (either could pay the day twice)', async () => {
+    // this run read the row just before another run's due claim committed, and took its stamp before that run took its own
+    const before = new Date(Date.now() - 23 * HOUR);
+    h.staleRead = { ...h.profile, streakDays: 3, lastStreakAt: before, lastActiveAt: before };
+    const claimedAt = new Date(Date.now() + 1000);
+    Object.assign(h.profile, { streakDays: 4, lastStreakAt: claimedAt, lastActiveAt: claimedAt });
+    const r = await dunk();
+    expect(r.body).toMatchObject({ paid: true, streakDays: 4, streakBonus: 0, credits: 15 });
+    // the old write put back streakDays 3 and the 23 h old lastStreakAt: the day was due again and the next run paid it twice
+    expect(h.profile).toMatchObject({ streakDays: 4, lastStreakAt: claimedAt, lastActiveAt: claimedAt });
+    for (const k of ['streakDays', 'lastStreakAt', 'lastActiveAt']) expect(h.updates[0], k).not.toHaveProperty(k);
+    expect(h.streakWrites).toEqual([{ where: { userId: 'u1', lastActiveAt: { lt: expect.any(Date) } }, data: { lastActiveAt: expect.any(Date) } }]);
+    h.staleRead = null;
+    expect((await dunk()).body).toMatchObject({ streakBonus: 0, credits: 15 });
+  });
+
+  it('a run neither due nor owed still marks the player active: lastActiveAt moves forward to its stamp', async () => {
+    streakedAgo(2);                                                  // a run 2 h ago opened today: not due, not owed
+    const streakAt = h.profile.lastStreakAt;
+    expect((await dunk()).body).toMatchObject({ streakDays: 3, streakBonus: 0, credits: 15 });
+    expect((h.profile.lastActiveAt as Date).getTime()).toBeGreaterThan((streakAt as Date).getTime());
+    expect(h.profile.lastStreakAt).toBe(streakAt);                   // the day is untouched
+  });
+
+  it('sequential runs still pay the day once (the control: the claim changes nothing without a race)', async () => {
+    streakedAgo(25);
+    const rs = [await dunk(), await dunk(), await dunk()];
+    expect(rs.map((r) => r.body.streakBonus)).toEqual([20, 0, 0]);
+    expect(rs.map((r) => r.body.streakDays)).toEqual([4, 4, 4]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRQ-ATTR-RACE (found 2026-10-14 during STREAK-CLAIM-RACE): the play path computed each trained attribute as
+// (the profile read BEFORE the transaction) + this run's delta and wrote it as a literal number, so two runs finishing at
+// once each wrote stale + their own delta and one run's gain was lost — while both runs' prq ledger rows and answers
+// claimed their deltas. h.staleRead is the race: every request reads the row as it was before any of them wrote.
+// ---------------------------------------------------------------------------
+
+describe('PRQ-ATTR-RACE: every run\'s PRQ gain lands, however many finish at once', () => {
+  const dunk = () => post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+  const TRAINED = ['power', 'speed', 'flexibility'] as const;       // MODE_ATTRS.dunkContest
+  /** The prq ledger rows filed so far, summed — what the runs SAY they added to the player's PRQ. */
+  const filedPrq = () => h.grants.filter((g) => g.grantType === 'prq').reduce((n, g) => n + Number(g.amount), 0);
+
+  it('the control: two runs one after the other each add their gain, and the ledger adds up to the row', async () => {
+    const start = prqScore(h.profile as never);
+    await dunk();
+    const gain = Number(h.profile.power) - 50;
+    expect(gain).toBeGreaterThan(0);
+    await dunk();
+    for (const a of TRAINED) expect(Number(h.profile[a]), a).toBeCloseTo(50 + 2 * gain, 2);
+    expect(Math.abs(filedPrq() - (prqScore(h.profile as never) - start))).toBeLessThan(0.11);   // prqScore is rounded to 0.1
+  });
+
+  it('two runs finishing together each add their gain (measured before the fix: power 51.2, not 52.4)', async () => {
+    await dunk();                                                    // one run's gain on this fixture
+    const gain = Number(h.profile.power) - 50;
+    for (const a of TRAINED) h.profile[a] = 50;
+    h.grants = [];
+    const start = prqScore(h.profile as never);
+    h.staleRead = { ...h.profile };
+    await Promise.all([dunk(), dunk()]);
+    for (const a of TRAINED) expect(Number(h.profile[a]), a).toBeCloseTo(50 + 2 * gain, 2);
+    // the two prq ledger rows add up to what the row gained — each says what IT added, not the other run's gain too
+    expect(h.grants.filter((g) => g.grantType === 'prq')).toHaveLength(2);
+    expect(Math.abs(filedPrq() - (prqScore(h.profile as never) - start))).toBeLessThan(0.11);
+  });
+});
+
+// RATE-LIMIT-WIRE (QA top-5 #4, partial): QA's repro looped start+finish and nothing ever returned 429. The finish now
+// counts the user's recorded finishes (GameSession) over the last minute; past RUN_RATE_LIMITS.finish.perUser it is 429.
+describe('the finish rate limit (GameSession count, per user)', () => {
+  it('normal play stays under it: five dunk contests back to back are all paid', async () => {
+    for (let i = 0; i < 5; i++) {
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status, `finish ${i + 1}`).toBe(200);
+    }
+  });
+  it('the next finish past the limit is 429 RATE_LIMITED with Retry-After, and nothing of the run is read or written', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });
+    const writesBefore = h.writes.length;
+    const runId = openRun('dunkContest', 120);
+    const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120, runId });
+    expect(r.status).toBe(429);
+    expect(r.body).toMatchObject({ ok: false, reason: 'RATE_LIMITED', retryAfterSec: 60 });
+    expect(h.writes.length).toBe(writesBefore);
+    expect(h.runs[runId].status).toBe('open');   // the run is still there to finish once the window passes
+  });
+  it('finishes older than the window and other players\' finishes do not count', async () => {
+    const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');   // the staged numbers, read only
+    for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) {
+      h.sessions.push({ userId: 'u1', createdAt: new Date(Date.now() - 61_000) });
+      h.sessions.push({ userId: 'someone-else', createdAt: new Date() });
+    }
+    expect((await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 })).status).toBe(200);
+  });
+  it('FAIL OPEN (lane/rate-limits): when the count cannot be read, the finish is paid as before and one line is logged', async () => {
+    const { prisma } = (await import('@/lib/db')) as unknown as { prisma: { gameSession: { count: unknown } } };
+    const real = prisma.gameSession.count;
+    prisma.gameSession.count = async () => { throw Object.assign(new Error("Can't reach database server at 10.0.0.1:5432"), { name: 'PrismaClientInitializationError' }); };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { RUN_RATE_LIMITS } = await import('@/lib/sessions/runRateLimit');
+      for (let i = 0; i < RUN_RATE_LIMITS.finish.perUser; i++) h.sessions.push({ userId: 'u1', createdAt: new Date() });   // over it
+      const r = await post({ mode: 'dunkContest', score: 240, won: true, duration: 120 });
+      expect(r.status).toBe(200);
+      expect(warn.mock.calls.map((c) => String(c[0]))).toContain('[rate-limits] finish_count_failed_failing_open PrismaClientInitializationError');
+    } finally {
+      prisma.gameSession.count = real;
+      warn.mockRestore();
+    }
   });
 });

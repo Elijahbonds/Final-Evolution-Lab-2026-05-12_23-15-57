@@ -5,9 +5,12 @@ import {
   EXAMPLE_AUDIO_CENTS,
   EXAMPLE_BUNDLE_CENTS,
   EXAMPLE_EBOOK_CENTS,
+  EXAMPLE_PRICE_NOTE,
   PARTNERS,
   getBook,
   getOffer,
+  publicBookDescription,
+  publicChapterInventoryNotice,
 } from './bookCatalog';
 
 const TITLES = [
@@ -25,7 +28,7 @@ describe('the press catalog', () => {
     expect(BOOKS.map((b) => b.title)).toEqual(TITLES);
     for (const book of BOOKS) {
       expect(book.offers.map((o) => o.format)).toEqual(['ebook', 'audiobook', 'bundle']);
-      expect(book.description).toBe('Description placeholder.');
+      expect(book.description).toBe('Description pending confirmation.');
       expect(book.files.some((f) => f.kind === 'epub')).toBe(true);
       expect(book.files.some((f) => f.kind === 'pdf')).toBe(true);
       expect(book.files.some((f) => f.kind === 'mp3')).toBe(true);
@@ -44,19 +47,40 @@ describe('the press catalog', () => {
     }
   });
 
-  it('keeps direct ebook sales off while a title is flagged in KDP Select, and leaves the audiobook on', () => {
+  it('keeps direct sales off while KDP Select or pending audio inventory blocks the offer', () => {
     const blocked = ['building-in-the-loop', 'architecture-of-raising-humans', 'vibe-coders-handbook', 'neuro-mechanic-playbook', 'art-of-dunking'];
     for (const slug of blocked) {
       const book = getBook(slug)!;
       expect(book.kdpSelect).toBe(true);
       expect(getOffer(`${slug}:ebook`)!.directSale).toBe(false);
       expect(getOffer(`${slug}:bundle`)!.directSale).toBe(false);
-      expect(getOffer(`${slug}:audiobook`)!.directSale).toBe(true);
+      expect(getOffer(`${slug}:audiobook`)!.directSale).toBe(!book.chaptersArePlaceholder);
     }
     for (const slug of ['blueprint', 'unfair-advantages']) {
+      const book = getBook(slug)!;
       expect(getBook(slug)!.kdpSelect).toBe(false);
       expect(getOffer(`${slug}:ebook`)!.directSale).toBe(true);
-      expect(getOffer(`${slug}:bundle`)!.directSale).toBe(true);
+      expect(getOffer(`${slug}:audiobook`)!.directSale).toBe(!book.chaptersArePlaceholder);
+      expect(getOffer(`${slug}:bundle`)!.directSale).toBe(!book.chaptersArePlaceholder);
+    }
+  });
+
+  it('keeps unfinished catalog copy out of public Press surfaces', () => {
+    expect(EXAMPLE_PRICE_NOTE).not.toMatch(/placeholder/i);
+    for (const book of BOOKS) {
+      expect(publicBookDescription(book), book.slug).not.toMatch(/placeholder/i);
+      expect(publicChapterInventoryNotice(book) ?? '', book.slug).not.toMatch(/placeholder/i);
+    }
+
+    for (const file of [
+      'app/press/page.tsx',
+      'app/press/[slug]/page.tsx',
+      'components/press/press-frame.tsx',
+      'components/press/offer-card.tsx',
+      'lib/books/bookCheckout.ts',
+    ]) {
+      const src = readFileSync(file, 'utf8');
+      expect(src, file).not.toMatch(/book\.description|featured\.description|placeholder until/i);
     }
   });
 

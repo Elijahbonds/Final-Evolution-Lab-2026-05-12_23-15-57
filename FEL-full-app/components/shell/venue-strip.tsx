@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import { VENUES } from '@/lib/game-data';
+import { playableGameVenues } from '@/lib/venueModes';
 
 /**
  * The way into the venues, from Play, in one row instead of nine hundred pixels.
@@ -12,7 +13,7 @@ import { VENUES } from '@/lib/game-data';
  * the artwork is the reason anybody would want to browse that way at all.
  */
 export function VenueStrip() {
-  const playable = VENUES.filter((v) => v.playable);
+  const playable = playableGameVenues(VENUES);
   const withArt = playable.filter((v) => v.image).slice(0, 4);
 
   return (

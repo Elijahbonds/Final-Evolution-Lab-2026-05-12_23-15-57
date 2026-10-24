@@ -9,7 +9,7 @@ import { CLIP_MIME, GET_TTL_SEC, MAX_CLIP_BYTES, ORIGINALS_PREFIX, PUT_TTL_SEC, 
 
 export class UploadsComingSoon extends Error {
   constructor() {
-    super('Uploads coming soon');
+    super('Uploads are not available right now.');
     this.name = 'UploadsComingSoon';
   }
 }

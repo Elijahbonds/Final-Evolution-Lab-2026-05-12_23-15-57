@@ -27,7 +27,7 @@ export interface ButtonRow {
 
 /** Splash / route ids that differ from the registry key. */
 const ALIAS: Record<string, string> = {
-  snowboard: 'snowboard_slalom', 'karate-vs': 'karate_vs', baseball: 'derby', soccer: 'penalty',
+  snowboard: 'snowboard_slalom', 'karate-vs': 'karate_vs', soccer: 'penalty',   // baseball→derby gone (BASEBALL-3INN): /play/baseball is its own mode
   'big-air': 'bigair', 'aero-aces': 'aeroaces', 'velocity-kart': 'velocitykart', 'who-scene-it': 'who_scene_it', 'brain-brawl': 'brainbrawl',
 };
 export const slotModeKey = (modeId: string): string => ALIAS[modeId] ?? modeId;

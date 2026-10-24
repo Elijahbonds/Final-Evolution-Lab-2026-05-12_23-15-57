@@ -45,7 +45,9 @@ const exOf = (p: TodayPayload, name: string) => p.today!.session.exercises.find(
 
 beforeEach(() => {
   h.store = newTodayStore();
-  h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test' });
+  // COACH-LOOP P1 (2026-10-20): the client is an adult (a birth year on file); the log route's teen gate reads a blank year
+  // as a minor and asks for it first (lib/coach/teenGate.ts, pinned in teen-gate-routes.test.ts)
+  h.store.user.push({ id: 'coach-1', name: 'Coach One', email: 'c1@x.test' }, { id: 'client-1', name: 'Sam', email: 'sam@x.test', dobYear: 1990 });
   h.store.pe.push(
     catalogueRow({ id: 'pe-goblet', coachId: 'coach-1', name: 'Goblet Squat', pattern: 'squat', braceMode: 'set', equipment: ['kettlebell'], demoVideoUrl: 'https://video.example/goblet-squat.mp4',
       primaryCues: ['Elbows inside the knees', 'Spread the floor', 'Chest proud'], commonFaults: [{ fault: 'Knees drift in', correctionCue: 'Push the knees out over the toes' }], regressionOfId: 'pe-box' }),

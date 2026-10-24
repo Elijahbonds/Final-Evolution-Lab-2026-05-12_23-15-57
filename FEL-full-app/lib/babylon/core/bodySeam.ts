@@ -62,7 +62,7 @@ export function bodySeamFor(def: Pick<ModeDefinition, 'modeId' | 'body' | 'onBod
 
 // FN-BOX-1 FIGHT-BODY-AGE-GATE (2026-10-19, PM queue: Karate VS is the boxing slot). The kid rule: under 18 plays with a
 // controller or a phone, never the camera. A fight mode's body path (its onBody, its claims, its P3 row's presses) is
-// offered only to a player whose birth year is certainly 18+, and never in couch mode (FN-0, not built: the host says
+// offered only to a player whose birth year is certainly 18+, and never in couch mode (FN-0, now on release: the host says
 // so with `couch`). FN-BOX-1-STRICT (owner, 2026-10-19): the year rule is the strict one, isVerifiedAdultStrict —
 // more than 18 years since the birth year, so anyone born in 2008 is refused for all of 2026 (they may still be 17)
 // and first plays on 2027-01-01. No birth year on file is refused: the gate fails closed. Refused, the mode runs

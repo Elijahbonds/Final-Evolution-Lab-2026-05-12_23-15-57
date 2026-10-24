@@ -7,6 +7,7 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
 import { VenueShelf } from '@/components/shell/venue-shelf';
 import { VENUES } from '@/lib/game-data';
+import { playableGameVenues } from '@/lib/venueModes';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function VenuesPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/venues'));
 
-  const live = VENUES.filter((v) => v.playable).length;
+  const live = playableGameVenues(VENUES).length;
 
   return (
     <TabPage

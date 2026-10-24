@@ -9,7 +9,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
-import { surfaceBootError } from './boot-error';
+import { bootErrorRequiresPageReload, surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { hnode } from './hud-format';
@@ -43,6 +44,17 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({
+    busRef,
+    endedRef,
+    setPhase,
+    setCountdown,
+    setLoadError,
+    reset: () => {
+      setHud({});
+      replayAtRef.current = null;
+    },
+  });
   useBabylonPlaytestBridge('who_scene_it', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
@@ -72,8 +84,8 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       }).then((s) => { if (disposed) { s(); return; } stop = s; }).catch((e) => surfaceBootError(e, { disposed, label: '[FEL-WSI] boot failed', setPhase, setLoadError }));
     }, 0);
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: callbacks are refs; bootAttempt is the retry remount key after a rejected runMode().
+  }, [bootAttempt]);
 
   // IMPROVE (#16): REPLAY on the shell's end card — a new set of rounds on this stage, same players, no reboot
   const restart = useCallback((): boolean => {
@@ -85,6 +97,14 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
+  const reloadRequired = bootErrorRequiresPageReload(loadError);
+  const recoverFromError = useCallback(() => {
+    if (reloadRequired) {
+      window.location.reload();
+      return;
+    }
+    retryBoot();
+  }, [reloadRequired, retryBoot]);
   const revealing = typeof hud.reveal === 'string' && hud.reveal.length > 0;
   // #2: once the question resolves, the right card and each seat's pick (-1 = none)
   const answerIdx = typeof hud.answerIdx === 'number' ? hud.answerIdx : -1;
@@ -247,14 +267,14 @@ export default function WhoSceneItBabylon({ onEnd }: GameProps) {
       {phase === 'countdown' && countdown != null && <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><span className="fel-heading text-7xl font-black text-white drop-shadow">{countdown}</span></div>}
       {phase === 'error' && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6 text-center">
-          <div className="fel-panel max-w-md rounded-2xl border-[var(--fel-red)]/50 px-6 py-5">
+          <div className="fel-panel max-w-md rounded-2xl [border-color:color-mix(in_srgb,var(--fel-red)_50%,transparent)] px-6 py-5">
             <div className="font-mono text-sm text-[var(--fel-red)]">{loadError}</div>
             <button
               type="button"
-              onClick={tapStart}
+              onClick={recoverFromError}
               className="mt-4 rounded-xl bg-[var(--fel-cyan)] px-5 py-2 font-bold text-black"
             >
-              RETRY
+              {reloadRequired ? 'RELOAD' : 'RETRY'}
             </button>
           </div>
         </div>

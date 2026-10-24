@@ -14,7 +14,7 @@ import {
 import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
-import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
+import { AUTH_RATE_LIMITED, AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 import { loginPath, safeLoginNext, safePostSignInDestination } from '@/lib/auth/safeNext';
 import {
   challengeCodeFromReturnPath,
@@ -139,10 +139,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         // backend that cannot reach its database also fails sign-in, and
         // telling the athlete to check their password sends them chasing a
         // problem they cannot fix.
+        // RATE-LIMIT-WIRE: too many tries for this email (or address) is its own answer, not a wrong password.
         toast.error(
           result.error.includes(AUTH_SERVICE_UNAVAILABLE)
             ? "Sign-in is temporarily unavailable — the server can't reach its database. This is on our end, not your password."
-            : 'Invalid email or password'
+            : result.error.includes(AUTH_RATE_LIMITED)
+              ? 'Too many sign-in attempts. Please wait a few minutes, then try again.'
+              : 'Invalid email or password'
         );
         setLoading(false);
         return;
@@ -202,9 +205,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         <div className="absolute -top-40 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-[#00E5FF]/10 blur-[120px]" />
         <div className="absolute bottom-0 right-0 h-72 w-72 rounded-full bg-[#A855F7]/10 blur-[120px]" />
       </div>
+      {/* LOGIN-NO-PAINT (2026-10-20): no `opacity: 0` in `initial`. framer-motion writes `initial` into the server
+          HTML, so the whole card (title, email, password, ENTER THE LAB) shipped as style="opacity:0" and stayed
+          invisible until the client bundle hydrated and ran the fade. On a phone that is a blank page for as long as
+          the JS takes, and for good if it never runs. The slide-in stays; the card paints from the first byte. */}
       <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ y: 24 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
         className={`fel-panel relative w-full rounded-2xl p-5 sm:p-8 ${mode === 'signup' ? 'max-w-2xl' : 'max-w-md'}`}
       >

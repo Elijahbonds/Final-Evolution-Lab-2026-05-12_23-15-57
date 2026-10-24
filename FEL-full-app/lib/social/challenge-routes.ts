@@ -8,6 +8,12 @@ const CHALLENGE_MODE_ALIASES: Record<string, string> = {
   showDown: 'showdown',
 };
 
+const NO_CHALLENGE_PLAY_HANDOFF = new Set<string>([
+  // /play/dunkduel is the IRL Prove It camera route, not the Babylon GameShell route.
+  // Until that flow reads ?c= and posts a challenge attempt, a signed-in handoff would drop the match.
+  'dunkduel',
+]);
+
 export function challengeReturnPath(code: string): string {
   return `/c/${encodeURIComponent(code)}`;
 }
@@ -33,6 +39,7 @@ export function challengeLoginHref(code: string): string {
 
 export function challengePlayHref(modeKey: string, code: string): string | null {
   const key = CHALLENGE_MODE_ALIASES[modeKey] ?? canonicalModeKey(modeKey);
+  if (NO_CHALLENGE_PLAY_HANDOFF.has(key)) return null;
   const route = MODE_INFO[key]?.href;
   // Iron Paradise's /play/training 307s to /train and would drop ?c=. A parked mode has no play handoff.
   if (!route?.startsWith('/play/') || isUnlistedPlayHref(route)) return null;

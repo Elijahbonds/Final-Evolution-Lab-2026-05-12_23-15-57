@@ -251,17 +251,17 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                   </div>
                 ))}
                 <div className="flex gap-1.5 items-center text-xs pt-1">
-                  <select aria-label="Exercise to add" value={add.exerciseId} onChange={(ev) => setAdding((x) => ({ ...x, [s.id]: { ...add, exerciseId: ev.target.value } }))} className={`flex-1 ${input}`}>
+                  <select aria-label="Exercise to add" value={add.exerciseId} onChange={(ev) => setAdding((x) => ({ ...x, [s.id]: { ...add, exerciseId: ev.target.value } }))} className={`min-w-0 flex-1 ${input}`}>
                     {catalogue.length === 0 && <option value="">Your catalogue is empty</option>}
                     {catalogue.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  <select aria-label="Section to add into" value={add.section} onChange={(ev) => setAdding((x) => ({ ...x, [s.id]: { ...add, section: ev.target.value as SessionSection } }))} className={input}>
+                  <select aria-label="Section to add into" value={add.section} onChange={(ev) => setAdding((x) => ({ ...x, [s.id]: { ...add, section: ev.target.value as SessionSection } }))} className={`shrink-0 ${input}`}>
                     {SESSION_SECTIONS.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}
                   </select>
                   <button
                     disabled={busy || !add.exerciseId}
                     onClick={() => void call({ action: 'add', sessionId: s.id, ...bodyFromDraft(emptyDraft(add.exerciseId, add.section, patternOf(add.exerciseId))) })}
-                    className="rounded-lg border border-[#00E5FF]/40 text-[#00E5FF] px-2 py-1 disabled:opacity-30"
+                    className="shrink-0 rounded-lg border border-[#00E5FF]/40 text-[#00E5FF] px-2 py-1 disabled:opacity-30"
                     aria-label="Add exercise"
                   ><Plus className="h-3.5 w-3.5" /></button>
                 </div>

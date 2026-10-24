@@ -17,6 +17,7 @@ import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -42,6 +43,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
   useBabylonPlaytestBridge('velocitykart', () => ({ phase, countdown, loadError, hud }), busRef.current);
 
   useEffect(() => {
@@ -83,8 +85,8 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
     }, 0);
 
     return () => { disposed = true; clearTimeout(startTimer); stop?.(); busRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: callbacks are refs; bootAttempt is the retry remount key after a rejected runMode().
+  }, [bootAttempt]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => { busRef.current?.emit(e); }, []);
   const tapStart = useCallback(() => emit({ t: 'button', btn: 'START', pressed: true }), [emit]);
@@ -160,7 +162,7 @@ export default function VelocityKartBabylon({ onEnd }: GameProps) {
       <BootSplash
         modeId="velocitykart" title="VELOCITY KART" phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
-        onStart={tapStart} onRetry={tapStart}
+        onStart={tapStart} onRetry={retryBoot}
       />
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (
         <TouchOverlay bus={busRef.current} modeId="velocitykart" visible />

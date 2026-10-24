@@ -19,6 +19,7 @@ import type { DbClient } from '@/lib/ledger';
 import { applyLc, WalletError } from '@/lib/wallet/wallet-service';
 import { canonicalModeKey } from '@/lib/game-data';
 import { isStakingPaused } from '@/lib/stakingPause';
+import { isUnlistedMode } from '@/lib/unlisted-modes';
 import {
   rakeAmount,
   winnerPayout,
@@ -81,6 +82,7 @@ export const ARENA_MODES: readonly string[] = [
   'bigAir',
   'golf',
   'baseball',
+  'derby',   // DERBY-KEY (owner, 2026-10-23): the home-run derby on its own session key, ceiling and baseline
   'soccer',
   'tennis',
   'tiebreak',
@@ -114,12 +116,12 @@ export function isArenaMode(mode: string): boolean {
 
 /**
  * MUSIC-SUITE P1 (2026-09-25, owner decision #9: "pause staking both now"). The list above is every mode the Arena can
- * SETTLE: it keeps music and dance, because a duel opened on them before the pause still has to take its score against
- * the mode's ceiling and pay out. Whether a NEW stake may be opened is this question, and lib/stakingPause.ts answers it
- * for every gate (create, quick match, join) and for the lobby's mode picker. Re-enabling a mode is one line there.
+ * SETTLE: it keeps paused and parked rows, because a duel opened before a gate changed still has to take its score
+ * against the mode's ceiling and pay out. Whether a NEW stake may be opened is this question: paused modes are blocked
+ * by lib/stakingPause.ts, and parked modes (lib/unlisted-modes.ts) are blocked because their /play routes redirect.
  */
 export function isArenaStakeable(mode: string): boolean {
-  return isArenaMode(mode) && !isStakingPaused(mode);
+  return isArenaMode(mode) && !isStakingPaused(mode) && !isUnlistedMode(mode);
 }
 
 /** The modes the lobby offers for a new duel, in roster order. */

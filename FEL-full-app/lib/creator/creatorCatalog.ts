@@ -10,12 +10,15 @@
  * could look like a decision is an EXAMPLE until Elijah replaces it.
  *
  * - `approved: false` entries never render. A profile that is not approved hides everything under it.
- * - Bios, specialties and stats are placeholders. Do not replace them with invented copy in a code change;
+ * - Bios, specialties and stats are pending confirmation. Do not replace them with invented copy in a code change;
  *   paste the real text.
  * - Media-kit package rates are EXAMPLE (`priceIsExample`) until the owner sets real ones.
  */
 
 import { PARTNERS } from '@/lib/books/bookCatalog';
+import { ELIJAH_COACH_STORE_SLUG, ELIJAH_PROFILE_SLUG } from './coachStoreHrefs';
+
+export { ELIJAH_COACH_STORE_HREF, ELIJAH_DUNK_PROGRAM_HREF, ELIJAH_PROFILE_SLUG } from './coachStoreHrefs';
 
 export interface CreatorLink {
   label: string;
@@ -45,7 +48,7 @@ export interface CreatorProfile {
   approved: boolean;
   /** Public image path or null for the initials tile. */
   photoUrl: string | null;
-  /** Placeholder copy. Elijah replaces this. */
+  /** Public profile copy. Keep generic until Elijah replaces this. */
   bio: string;
   specialty: string;
   reels: CreatorLink[];
@@ -86,7 +89,21 @@ export interface AudienceStats {
   stats: Array<{ label: string; value: string }>;
 }
 
-export const EXAMPLE_RATE_NOTE = 'EXAMPLE — placeholder rate pending Elijah\'s decision. Not a live price.';
+export const EXAMPLE_RATE_NOTE = 'EXAMPLE — draft rate pending Elijah\'s decision. Not a live price.';
+export const PUBLIC_PROFILE_BIO_FALLBACK = 'Profile details are being confirmed with the Final Evolution Lab team.';
+export const PUBLIC_PROFILE_SPECIALTY_FALLBACK = 'Final Evolution Lab sessions and creative collaborations';
+export const PUBLIC_SERVICE_NAME_FALLBACK = 'FEL team session';
+export const PUBLIC_SERVICE_DESCRIPTION_FALLBACK = 'Scope is confirmed before booking or quoting.';
+export const PUBLIC_MEDIA_KIT_HIGHLIGHT_FALLBACK = 'Partner-facing highlights are confirmed during inquiry.';
+export const PUBLIC_MEDIA_KIT_PACKAGE_FALLBACK = 'Deliverables and usage terms are confirmed during inquiry.';
+
+const PLACEHOLDER_COPY = /\bplaceholder\b/i;
+const EXAMPLE_SUFFIX = /\s*\(EXAMPLE\)\s*$/i;
+
+export function publicCreatorCopy(value: string | null | undefined, fallback: string): string {
+  const trimmed = (value ?? '').trim();
+  return trimmed && !PLACEHOLDER_COPY.test(trimmed) ? trimmed : fallback;
+}
 
 export const AUDIENCE_STATS: AudienceStats = {
   isExample: true,
@@ -104,37 +121,37 @@ function service(input: Omit<CreatorService, 'approved'> & { approved?: boolean 
 
 export const PROFILES: readonly CreatorProfile[] = [
   {
-    slug: 'elijah-bonds',
+    slug: ELIJAH_PROFILE_SLUG,
     name: 'Elijah Bonds',
     approved: true,
     photoUrl: null,
-    bio: 'Bio placeholder.',
-    specialty: 'Specialty placeholder.',
+    bio: 'Bio details are pending confirmation.',
+    specialty: 'Services and collaborations through Final Evolution Lab.',
     reels: [],
     socials: [
       { label: 'Books on FEL Press', href: '/press' },
       { label: 'Amazon author page', href: 'https://www.amazon.com/Elijah-Bonds/e/B0H63J1Q7B' },
     ],
     // The coach-store page /coach/elijahbonds (the store terms name it). Book buttons go there.
-    coachStoreSlug: 'elijahbonds',
+    coachStoreSlug: ELIJAH_COACH_STORE_SLUG,
     services: [
       service({
         id: 'elijah-bonds:session-60',
         profileSlug: 'elijah-bonds',
         name: '1-on-1 session (EXAMPLE)',
-        description: 'Service description placeholder.',
+        description: 'Details are confirmed through the coach store.',
         durationMinutes: 60,
       }),
       service({
         id: 'elijah-bonds:consult-30',
         profileSlug: 'elijah-bonds',
         name: 'Consult call (EXAMPLE)',
-        description: 'Service description placeholder.',
+        description: 'Details are confirmed through the coach store.',
         durationMinutes: 30,
       }),
     ],
     stats: [
-      { label: 'Stat placeholder', value: 'EXAMPLE', isExample: true },
+      { label: 'Confirmed stat', value: 'EXAMPLE', isExample: true },
     ],
   },
   {
@@ -143,8 +160,8 @@ export const PROFILES: readonly CreatorProfile[] = [
     name: 'Example Teammate',
     approved: false,
     photoUrl: null,
-    bio: 'Bio placeholder.',
-    specialty: 'Specialty placeholder.',
+    bio: 'Bio details are pending confirmation.',
+    specialty: 'Services and collaborations through Final Evolution Lab.',
     reels: [],
     socials: [],
     coachStoreSlug: null,
@@ -153,26 +170,26 @@ export const PROFILES: readonly CreatorProfile[] = [
         id: 'example-teammate:session-60',
         profileSlug: 'example-teammate',
         name: 'Session (EXAMPLE)',
-        description: 'Service description placeholder.',
+        description: 'Details are confirmed through the coach store.',
         durationMinutes: 60,
       }),
     ],
-    stats: [{ label: 'Stat placeholder', value: 'EXAMPLE', isExample: true }],
+    stats: [{ label: 'Confirmed stat', value: 'EXAMPLE', isExample: true }],
   },
 ];
 
 export const MEDIA_KIT: MediaKit = {
   profileSlug: 'elijah-bonds',
-  highlights: ['Highlight placeholder.'],
+  highlights: ['Highlights are pending confirmation.'],
   highlightsArePlaceholder: true,
   // Taken from the Press partner links, which are real links. Whether each counts as a past partner for a
   // brand deck is Elijah's call, so the kit marks the list unconfirmed.
   pastPartners: PARTNERS.map((p) => p.name),
   partnersConfirmed: false,
   packages: [
-    { id: 'reel', name: 'Sponsored reel (EXAMPLE)', detail: 'Package description placeholder.', priceCents: 100000, priceIsExample: true },
-    { id: 'story-set', name: 'Story set (EXAMPLE)', detail: 'Package description placeholder.', priceCents: 50000, priceIsExample: true },
-    { id: 'appearance', name: 'Event appearance (EXAMPLE)', detail: 'Package description placeholder.', priceCents: 250000, priceIsExample: true },
+    { id: 'reel', name: 'Sponsored reel (EXAMPLE)', detail: 'Scope is confirmed by inquiry before any offer.', priceCents: 100000, priceIsExample: true },
+    { id: 'story-set', name: 'Story set (EXAMPLE)', detail: 'Scope is confirmed by inquiry before any offer.', priceCents: 50000, priceIsExample: true },
+    { id: 'appearance', name: 'Event appearance (EXAMPLE)', detail: 'Scope is confirmed by inquiry before any offer.', priceCents: 250000, priceIsExample: true },
   ],
 };
 
@@ -183,8 +200,11 @@ function assertCatalog(profiles: readonly CreatorProfile[]): void {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(p.slug)) throw new Error(`bad profile slug ${p.slug}`);
     if (slugs.has(p.slug)) throw new Error(`duplicate profile ${p.slug}`);
     slugs.add(p.slug);
-    if (p.bio.trim() === '') throw new Error(`${p.slug} needs a bio placeholder`);
+    if (p.bio.trim() === '') throw new Error(`${p.slug} needs a bio line`);
     if (p.coachStoreSlug != null && !/^[a-z0-9][a-z0-9-]*$/.test(p.coachStoreSlug)) throw new Error(`bad coach-store slug on ${p.slug}`);
+    if (p.slug === ELIJAH_PROFILE_SLUG && p.coachStoreSlug !== ELIJAH_COACH_STORE_SLUG) {
+      throw new Error(`Elijah's coach-store slug must stay ${ELIJAH_COACH_STORE_SLUG}`);
+    }
     for (const s of p.services) {
       if (s.profileSlug !== p.slug || !s.id.startsWith(`${p.slug}:`)) throw new Error(`service ${s.id} is on the wrong profile`);
       if (serviceIds.has(s.id)) throw new Error(`duplicate service ${s.id}`);
@@ -210,6 +230,30 @@ export function approvedServices(profile: CreatorProfile): CreatorService[] {
   return profile.approved ? profile.services.filter((s) => s.approved) : [];
 }
 
+export function publicProfileBio(profile: CreatorProfile | undefined): string {
+  return publicCreatorCopy(profile?.bio, PUBLIC_PROFILE_BIO_FALLBACK);
+}
+
+export function publicProfileSpecialty(profile: CreatorProfile): string {
+  return publicCreatorCopy(profile.specialty, PUBLIC_PROFILE_SPECIALTY_FALLBACK);
+}
+
+export function publicServiceName(service: CreatorService): string {
+  return publicCreatorCopy(service.name.replace(EXAMPLE_SUFFIX, ''), PUBLIC_SERVICE_NAME_FALLBACK);
+}
+
+export function publicServiceDescription(service: CreatorService): string {
+  return publicCreatorCopy(service.description, PUBLIC_SERVICE_DESCRIPTION_FALLBACK);
+}
+
+export function publicMediaKitHighlight(highlight: string): string {
+  return publicCreatorCopy(highlight, PUBLIC_MEDIA_KIT_HIGHLIGHT_FALLBACK);
+}
+
+export function publicMediaKitPackageDetail(pkg: MediaKitPackage): string {
+  return publicCreatorCopy(pkg.detail, PUBLIC_MEDIA_KIT_PACKAGE_FALLBACK);
+}
+
 /**
  * Where a "Book" button goes: the coach store's page for this person (`/coach/<slug>`), which lists what they sell and
  * is adults-only (sign-in, 18+, store terms are enforced there). Null when the profile is not in the coach store, or
@@ -218,6 +262,13 @@ export function approvedServices(profile: CreatorProfile): CreatorService[] {
 export function coachStoreBookHref(profile: CreatorProfile): string | null {
   if (!profile.approved || !profile.coachStoreSlug) return null;
   return `/coach/${profile.coachStoreSlug}`;
+}
+
+export function requiredCoachStoreBookHref(profileSlug: string): string {
+  const profile = getApprovedProfile(profileSlug);
+  const href = profile ? coachStoreBookHref(profile) : null;
+  if (!href) throw new Error(`${profileSlug} needs an approved coach-store slug`);
+  return href;
 }
 
 export function mediaKitProfile(): CreatorProfile | undefined {

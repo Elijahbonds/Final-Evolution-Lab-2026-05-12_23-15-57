@@ -74,6 +74,12 @@ describe('appearance points at the closet rather than restating it', () => {
   it('splits into the two tabs the screen derives, without either being declared', () => {
     expect(tabsOf(APPEARANCE)).toEqual(['Face', 'Fine Tune']);
   });
+
+  it('states saved-only face presets as current behavior, not future promise copy', () => {
+    const appearanceCopy = APPEARANCE.rows.map((r) => r.glossary).join('\n');
+    expect(appearanceCopy).not.toMatch(/coming soon|opens soon|not yet|\bTBD\b/i);
+    expect(appearanceCopy).toContain('Saved with your look.');
+  });
 });
 
 describe('vitals map onto the scales the rig actually applies', () => {

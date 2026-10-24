@@ -8,6 +8,8 @@ import { decideRunEligibility, isAgentRunRequest } from '@/lib/sessions/runEligi
 import { ruleFor } from '@/lib/sessions/modeScoreRules';
 import { startRun } from '@/lib/sessions/sessionRuns';
 import { serverTierFor } from '@/lib/sessions/runTier';
+import { trustedClientIp } from '@/lib/rate-limits/clientIp';
+import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,14 +22,25 @@ export const dynamic = 'force-dynamic';
  * query, an x-fel-agent header or the page's own URL), the playtest flag, and the account's server-side test allowlist
  * (lib/sessions/runEligibility.ts). Nothing sent later can make it pay.
  *
- * Rate limits for this route and the finish are STAGED (lib/sessions/runRateLimit.ts), not wired: they go live with the
- * claim rate limits once the live database is back.
+ * RATE-LIMIT-WIRE (PR #289 QA rework, 2026-10-16): starts are limited per account and per the address the trusted proxy
+ * set, at runRateLimit's staged start numbers, counted in the shared rate_limits table (lib/rate-limits) — not in this
+ * instance's memory, and never on a client-written X-Forwarded-For. The finish counts its GameSession rows
+ * (lib/sessions/finishRateLimit.ts).
  */
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as { id?: string } | undefined)?.id;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // before anything is read or written: past the window's starts, 429 (the finish's shape and header)
+    const limited = await checkRateLimits(prisma, 'runStart', [
+      { kind: 'user', value: userId },
+      { kind: 'ip', value: trustedClientIp(req.headers) },
+    ]);
+    if (!limited.ok) {
+      return NextResponse.json({ ok: false, reason: 'RATE_LIMITED', retryAfterSec: limited.retryAfterSec }, { status: 429, headers: retryAfterHeaders(limited) });
+    }
 
     const body = await req.json().catch(() => ({}));
     const mode = typeof body?.mode === 'string' ? body.mode : '';

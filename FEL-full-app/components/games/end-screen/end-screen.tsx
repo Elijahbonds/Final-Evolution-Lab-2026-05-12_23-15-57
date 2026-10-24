@@ -74,7 +74,8 @@ function Beat({ show, instant, children, className = '' }: { show: boolean; inst
     <div
       aria-hidden={show ? undefined : true}
       data-beat={show ? 'shown' : 'waiting'}
-      className={`${className} ${instant ? '' : 'transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.2,1.4,0.4,1)]'} ${show ? 'opacity-100' : 'pointer-events-none translate-y-3 scale-95 opacity-0'}`}
+      className={`${className} ${instant ? '' : 'transition-[opacity,transform] duration-300'} ${show ? 'opacity-100' : 'pointer-events-none translate-y-3 scale-95 opacity-0'}`}
+      style={instant ? undefined : { transitionTimingFunction: 'cubic-bezier(0.2,1.4,0.4,1)' }}
     >
       {children}
     </div>
@@ -336,7 +337,9 @@ export function EndScreen(props: EndScreenProps) {
 
   // ── WHAT IS SHOWN ──
   const fig = scoreFigures(props);
-  const score = useCountUp(fig.mine, { active: true, instant: fast, ms: Math.max(250, durs[1] ?? 500) });
+  // QA-H5 (hoops grade 0d16f5dd): the card's score is the board's number from its first frame — it counted up from 0, so a
+  // screenshot or share in the first second read "2 SCORE" against a 4–12 board. The reward tiles still count up.
+  const score = fig.mine;
   const confettiWin = !instant && won;
   const confettiGold = !instant && newBest && shown('callouts');
   const longHead = headline.length > 16;

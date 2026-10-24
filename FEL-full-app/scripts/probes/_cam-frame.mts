@@ -2,8 +2,9 @@
 // The hero is the skinned character whose root is nearest the active camera's target. Samples over ~3 s.
 //   URL=http://localhost:3000/dev/mode/dunk npx tsx scripts/probes/_cam-frame.mts
 import { chromium } from 'playwright-core';
+import { chromiumExe } from './_chromium.mts';
 const URL_ = process.env.URL ?? 'http://localhost:3000/dev/mode/dunk';
-const b = await chromium.launch({ executablePath: process.env.HOME + '/Library/Caches/ms-playwright/chromium-1234/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing', args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
+const b = await chromium.launch({ executablePath: chromiumExe(), args: ['--use-gl=angle', '--use-angle=metal', '--enable-webgl', '--ignore-gpu-blocklist'] });
 const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
 await p.goto(URL_, { waitUntil: 'domcontentloaded' }); await p.waitForSelector('canvas', { timeout: 60000 }); await p.waitForTimeout(Number(process.env.WAIT_MS ?? 8000));
 const samples: number[] = [];

@@ -27,11 +27,14 @@ export interface TodayStore {
   painCheckIn?: Row[];
   workoutScan?: Row[];
   fac?: Row[];
+  // COACH-LOOP P1 (2026-10-20): the teen gate on the log and cool-down routes reads the athlete's GuardianConsent rows
+  // (lib/coach/teenGateServer.ts). Optional and empty by default, like the P8 tables above.
+  guardianConsent?: Row[];
 }
 
 export const newTodayStore = (): TodayStore => ({
   seq: 0, clock: Date.parse('2026-09-28T09:00:00Z'), program: [], block: [], session: [], se: [], pe: [], user: [], cs: [], log: [], setLog: [], healthIntake: [],
-  healthConsent: [], painCheckIn: [], workoutScan: [], fac: [],
+  healthConsent: [], painCheckIn: [], workoutScan: [], fac: [], guardianConsent: [],
 });
 
 /** ExerciseLog columns a write may name (prisma/schema.prisma model ExerciseLog, less id / timestamps / relations). */
@@ -125,6 +128,10 @@ export function todayMemoryDb(s: TodayStore) {
     },
     facilitatorProfile: {
       findUnique: async (a: Row) => { const f = (s.fac ?? []).find((x) => x.userId === a.where.userId); return f ? pick(f, a.select) : null; },
+    },
+    // COACH-LOOP P1: the teen gate's consent read (every row naming this mentee)
+    guardianConsent: {
+      findMany: async (a: Row) => (s.guardianConsent ?? []).filter((g) => g.menteeId === a.where.menteeId).map((g) => pick(g, a.select)),
     },
     user: {
       findUnique: async (a: Row) => { const u = s.user.find((x) => x.id === a.where.id); return u ? pick(u, a.select) : null; },

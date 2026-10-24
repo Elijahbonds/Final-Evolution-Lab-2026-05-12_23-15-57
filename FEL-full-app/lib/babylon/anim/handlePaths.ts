@@ -116,7 +116,7 @@ const bounce = (t: [number, number, number, number, number], rel: P3, floor: P3,
  *  - the hesi, the yoyo, the jab and PAUSIN's release are authored here (the plan gives their shapes, not their keys); their releases sit
  *    lower than a dribble's top so each drop stays under 9 m/s;
  *  - the double cross is one path with two crossings, the second lower (the plan's two queued front paths, joined at the left hand's
- *    low catch instead of its top);
+ *    catch up at the crossover's height instead of its top);
  *  - the spin's hold ends at 0.28 s (plan 0.34): released at 0.34 its drop to the floor by 0.44 s reads 0.154 m a frame;
  *  - the behind-the-back's wrap is lower (0.74–0.76 m; plan 0.80) and its catch starts at 0.56 m, the double cross is 0.60 s (plan 0.56),
  *    the hesi's path 0.66 s (its clip, plan §4.8: 0.62) and the yoyo's 0.67 s (0.66) — each to stay inside 0.15 m a frame at the turbo's
@@ -154,9 +154,9 @@ const AUTHORED: Partial<Record<PathMove, Authored>> = {
     spans: [{ kind: 'hold', hand: 'start' }, { kind: 'hold', hand: 'start' }, fall, rise, catchEnd], crossings: 1,
   },
   snatch_back: bounce([0, 0.09, 0.17, 0.25, 0.40], [0.12, 0.62, 0.34], [0.00, R0, 0.42], [-0.24, 0.58, 0.30], TOP_L),
-  double_cross: {   // two front crossings, the second lower: R → L, the left hand's low catch pushes it straight back, L → R
-    knots: [{ t: 0, p: TOP_R, rest: true }, { t: 0.08, p: [0.14, 0.62, 0.26] }, { t: 0.17, p: [-0.02, R0, 0.34] }, { t: 0.25, p: [-0.28, 0.50, 0.24] }, { t: 0.29, p: [-0.30, 0.54, 0.22] },
-      { t: 0.35, p: [-0.14, 0.50, 0.28] }, { t: 0.43, p: [0.02, R0, 0.34] }, { t: 0.51, p: [0.26, 0.52, 0.24] }, { t: 0.60, p: TOP_R, rest: true }],
+  double_cross: {   // two front crossings, the second lower: R → L, the left hand's catch up at the crossover's height pushes it straight back, L → R
+    knots: [{ t: 0, p: TOP_R, rest: true }, { t: 0.08, p: [0.14, 0.62, 0.26] }, { t: 0.17, p: [-0.02, R0, 0.34] }, { t: 0.26, p: [-0.32, 0.60, 0.26] }, { t: 0.32, p: [-0.30, 0.66, 0.22] },
+      { t: 0.36, p: [-0.14, 0.54, 0.28] }, { t: 0.44, p: [0.02, R0, 0.34] }, { t: 0.52, p: [0.28, 0.58, 0.26] }, { t: 0.60, p: TOP_R, rest: true }],
     spans: [push, fall, rise, catchEnd, { kind: 'push', hand: 'end' }, fall, rise, catchStart], crossings: 2,
   },
   pausin: {   // the ball held out to the side at hip height, the palm on top (plan §4.18), for up to PAUSIN_MAX_SEC
@@ -233,7 +233,9 @@ function concatPaths(a: HandlePath, b: HandlePath, move: PathMove): HandlePath {
  *  now, → 1 at its next strike), `period` = the stride (s). `phiAtStrike` defaults to PATH_PHI_AT_STRIKE. */
 export interface PathLock { strikePhase: number; period: number; phiAtStrike?: number }
 /** The drawn ball at a mid-bounce start (root frame): the path starts from it (blendFrom). */
-export interface PathFrom { p: V3; v: V3 }
+/** `held` (hoops-moves, the combo window's cut-in — anim/comboFlow): the ball is at rest IN the palm (the hesi's float top), so the start
+ *  hand pushes it on (the meet below) rather than letting it fall to the path's floor point. */
+export interface PathFrom { p: V3; v: V3; held?: boolean }
 
 /**
  * The path of a move. `startHand` is the hand the ball is in (the athlete's); `pace` the move's playback rate (moveRateFor: 1 = real
@@ -259,6 +261,18 @@ export function pathFor(move: PathMove, startHand: Hand, pace = 1, stance: Parti
   if (from) path = blendFrom(path, from);
   if (lock) path = relockCatch(path, lock);
   return path;
+}
+
+/**
+ * hoops-moves (the combo window, anim/comboFlow): where a following move may take the ball out of a running path EARLY — a path that
+ * FLOATS the ball and then POUNDS it (the hesitation) hands it on at the float's top, the start of the pound, until the pound lets go:
+ * [from, to] in the path's own seconds, or null (the move hands on at its catch, as before). Read off the segments, so a mid-bounce
+ * blend and the pace carry through.
+ */
+export function cutInWindow(path: Pick<HandlePath, 'segs'>): { from: number; to: number } | null {
+  const s = path.segs;
+  for (let i = 1; i < s.length; i++) if (s[i].kind === 'pound' && s[i - 1].kind === 'float' && s[i].hand) return { from: s[i].t0, to: s[i].t1 };
+  return null;
 }
 
 /** The mirror of a path: x → −x, the hands swapped. */
@@ -355,7 +369,7 @@ function blendFrom(p: HandlePath, from: PathFrom): HandlePath {
   const r = fi >= 0 ? p.segs[fi].p1.y : DEFAULT_STANCE.r;   // the floor contact's height (the stance's ball radius)
   const meetY = r + (MEET_Y - R0) * ((s0.p0.y - r) / (P0 - R0));   // (s0.p0 is the start hand's top: the stance's P)
   // a FALLING ball, re-aimed at the path's floor contact
-  if (!handFirst && from.v.y <= 0) {
+  if (!handFirst && from.v.y <= 0 && !from.held) {
     const F = p.segs[fi].p1, tf = fallTime(from.p.y, from.v.y, F.y);
     const v0 = v3((F.x - from.p.x) / tf, from.v.y, (F.z - from.p.z) / tf);
     const vEnd = Math.hypot(v0.x, from.v.y - PATH_G * tf, v0.z);
@@ -367,7 +381,7 @@ function blendFrom(p: HandlePath, from: PathFrom): HandlePath {
   if (handFirst) { const m = meetSeg(from.p, from.v, s0.p1, s0.v1, meetY, p.startHand, meetKind); if (m) return spliced(p, [m], 1); }
   // the start hand meets it: after its own bounce (a falling ball) and its free rise to where a hand takes it
   const pre: PathSeg[] = []; let pos = from.p, vel = from.v, t = 0;
-  if (vel.y <= 0) {
+  if (vel.y <= 0 && !from.held) {
     const f = flightSeg(pos, vel, 0, fallTime(pos.y, vel.y, r), 'fall'); f.p1 = { ...f.p1, y: r }; pre.push(f);
     pos = f.p1; vel = v3(f.v1.x, -RESTITUTION * f.v1.y, f.v1.z); t = f.t1;
   }

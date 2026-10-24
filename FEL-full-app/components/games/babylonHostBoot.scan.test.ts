@@ -12,6 +12,8 @@ const babylonHosts = fs.readdirSync(HOST_DIR)
 
 const read = (file: string): string =>
   stripComments(fs.readFileSync(path.join(HOST_DIR, file), 'utf8'));
+const readFromRoot = (file: string): string =>
+  stripComments(fs.readFileSync(path.join(ROOT, file), 'utf8'));
 
 describe('Babylon hosts own their boot effect for the mount', () => {
   it('keeps the host inventory visible to this guard', () => {
@@ -41,23 +43,49 @@ describe('Babylon hosts own their boot effect for the mount', () => {
       /\.catch\(\(e\) => surfaceBootError\(e, \{[\s\S]*?setPhase,\s*setLoadError[\s\S]*?\}\)\);/,
     );
   });
+
+  it.each(babylonHosts)('%s remounts when a rejected boot is retried', (file) => {
+    const src = read(file);
+
+    expect(src).toContain('bootAttempt');
+    expect(src).toContain('retryBoot');
+    expect(src).toMatch(/\},\s*\[[^\]]*bootAttempt[^\]]*\]\);/);
+    expect(src).not.toContain('onRetry={tapStart}');
+    if (file === 'who-scene-it-babylon.tsx') {
+      expect(src).toContain('onClick={recoverFromError}');
+      expect(src).toContain('retryBoot();');
+    }
+    else expect(src).toContain('onRetry={retryBoot}');
+  });
+
+  it('who-scene-it offers a page reload after context-reset boot errors', () => {
+    const src = read('who-scene-it-babylon.tsx');
+
+    expect(src).toContain('bootErrorRequiresPageReload');
+    expect(src).toContain('window.location.reload()');
+    expect(src).toContain("{reloadRequired ? 'RELOAD' : 'RETRY'}");
+  });
 });
 
-// #158: these hosts defer their Babylon boot one tick so a fast remount does not tear down
-// the shared WebGL context; the lane guard above still requires surfaceBootError on the catch.
-const DEFERRED_HOSTS = [
-  'duel-babylon.tsx',
-  'football-babylon.tsx',
-  'mixedcombat-babylon.tsx',
-  'air-session-babylon.tsx',
-];
-
 describe('deferred Babylon host boot', () => {
-  it.each(DEFERRED_HOSTS)('%s defers boot and reports a load error', (file) => {
+  it.each(babylonHosts)('%s defers boot and reports a load error', (file) => {
     const src = read(file);
     expect(src).toContain('const startTimer = setTimeout');
     expect(src).toContain('clearTimeout(startTimer)');
     expect(src).toContain('onEndRef');
     expect(src).toContain('.catch((e) => surfaceBootError(e, {');
+  });
+});
+
+describe('controller host boot recovery', () => {
+  it('remounts a rejected TV host boot from the retry button', () => {
+    const src = readFromRoot('components/controller-link/host-stage.tsx');
+
+    expect(src).toContain("from '@/components/games/boot-error'");
+    expect(src).toContain("from '@/components/games/use-babylon-boot-retry'");
+    expect(src).toContain('const { bootAttempt, retryBoot } = useBabylonBootRetry');
+    expect(src).toContain('onRetry={retryBoot}');
+    expect(src).toMatch(/\.catch\(\(e\) => surfaceBootError\(e, \{[\s\S]*?setPhase,\s*setLoadError[\s\S]*?\}\)\)/);
+    expect(src).toMatch(/\},\s*\[[^\]]*bootAttempt[^\]]*\]\);/);
   });
 });
