@@ -21,6 +21,7 @@ import { forWire } from '@/lib/mp/dunkCard';
 import { checkStakeScore, killSwitchOn, STAKE_REFUSAL_STATUS } from '@/lib/arena-score-integrity';
 import { isExpired } from '@/lib/arena-reclaim';
 import { readDuelRun } from '@/lib/arena-duel-run';
+import { checkRateLimits, retryAfterHeaders } from '@/lib/rate-limits/policy';
 
 /**
  * POST /api/arena/submit-score
@@ -58,6 +59,16 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  // RATE-LIMIT-WIRE (PR #289 QA rework): per account, in the shared rate_limits table (lib/rate-limits/policy.ts), before
+  // the body is read or the duel's row is locked. The refusal has the Arena's own `{ error: code, detail }` shape.
+  const limited = await checkRateLimits(prisma, 'arenaSubmit', [{ kind: 'user', value: String(userId) }]);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { error: 'RATE_LIMITED', detail: 'Too many score submissions. Please wait a moment, then try again.', retryAfterSec: limited.retryAfterSec },
+      { status: 429, headers: retryAfterHeaders(limited) },
+    );
+  }
 
   const body = await req.json().catch(() => ({}));
   const matchId = String(body?.matchId ?? '');

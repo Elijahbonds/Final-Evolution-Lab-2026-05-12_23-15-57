@@ -52,7 +52,7 @@ export const MODE_MENU_META: Record<string, ModeMenuMeta> = {
   freerun: { icon: Sparkles, color: '#A855F7', desc: 'Free-running tricking. Momentum unlocks vaults, wall runs and cat leaps; flip off anything and land it clean to bank the line.' },
   training: { icon: Dumbbell, color: '#FF3366', desc: 'Iron Paradise circuit at Muscle Beach. Rep timing drills that push every attribute.' },
   hoops1v1: { icon: Target, color: '#FF3366', desc: 'Ones at Venice. Break down your defender on offense, lock up on D. First to 11.' },
-  hoops3v3: { icon: Users, color: '#00E5FF', desc: 'Streetball with your squad. Swing it to the open lane and knock down shots. First to 21.' },
+  hoops3v3: { icon: Users, color: '#00E5FF', desc: 'Streetball with your squad. Swing it to the open lane and knock down shots. First to 21, or ahead when the 90-second clock runs out. A tie goes to overtime: next bucket wins.' },
   carnival: { icon: Sparkles, color: '#FFD700', desc: 'A rotating party night: native carnival events plus quick-score stops, chained into one run.' },
   threePoint: { icon: Crosshair, color: '#FFD700', desc: 'Five racks, five balls, sixty seconds. Money balls count double - drain 18+ to win.' },
   karateVersus: { icon: Shield, color: '#FF3366', desc: 'Best of 3 vs the Rival Sensei. Strike, block the telegraph, unleash your chi special.' },
