@@ -338,6 +338,21 @@ Production may already have some of these: b and c were "safe in either order" a
 drift this fixes. **Apply only the files whose statements the preview lists**; a second `CREATE TABLE` fails with
 "already exists".
 
+**Merged with release on 2026-10-24 (owner: "Yes, land it").** Release had gained `RateLimit` (table `rate_limits`) and
+`prisma/pending/2026-10-16-rate-limits.sql` (#405). Both models' lanes are in `schema.prisma` and the one regenerated
+client, so the preview may also list that file: it is applied between c and d (filename order; nothing depends on it),
+and the limits fail open until it is. Each of the five files was put through `npx tsx scripts/sql-guard/cli.ts decide`
+against the schema-only diff Prisma prints without it: **exact match, additive only**, and the deploy session's four
+together (with or without rate limits, and with b and c already applied) also match exactly
+(`scripts/sql-guard-prisma-tests.ts`). So **db-guard can apply them** (`docs/DB-GUARD.md` §3–4) once it can reach
+production; until then the hand steps below do the same. Their rollback lines are in `docs/DB-GUARD.md` §7.
+
+**Deployed before the SQL, the Studio fails safe.** With both switches on and `StudioProjectSave` missing, list, read,
+save and delete each answer `503 {"error":"save_unavailable"}` (no-store), write nothing and log no user id, and the
+Studio's account panel stays hidden; the export lists none. Proven through the real route files with Prisma's own P2021
+(`lib/nexus-studio/studioProjectsRoutes.test.ts`, "switched ON before … is applied", with a control that fails when the
+route's guard is removed). The switch still stays off until the SQL is in (step 7).
+
 Run by the owner, or the deploy owner the owner names, from the deploy tree with the **production** env
 (`docs/LANES.md` §4), in this order:
 
@@ -468,6 +483,7 @@ The policy must be live before the switch is turned on (§7, step 7).
 | `tests/helpers/writeSpyDb.ts` | `$queryRaw*` recorded, returning no rows |
 | `lib/nav/modules.test.ts` | the STAGED line removed: `cloudRoute.ts` is wired now |
 | `lib/privacy/u13-lock-log.test.ts` | the schema-ban pin advanced to `fe5064a8`, then to `cb1029d8` (the four models), as its own rule requires. Measured: it fails without the bump |
+| `scripts/sql-guard-prisma-tests.ts`, `docs/DB-GUARD.md` | (merge with release, 2026-10-24) seven cases for this PR's four pending files; the PartyReport DROP case re-cast as a table the schema lacks (`test changed:` PartyReport is modelled now); the §7 rollback row and dated §6/§8 notes |
 
 **Routed:** `docs/NEXUS-STUDIO.md` §2.1 still says "No server persistence". Its holder this round is studio-5. The
 one-liner is: "Server save: built behind `STUDIO_CLOUD_SAVE_ENABLED`, see `docs/NEXUS-STUDIO-SAVE.md`."

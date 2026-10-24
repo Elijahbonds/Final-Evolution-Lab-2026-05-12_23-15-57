@@ -160,3 +160,47 @@ describe('the round trip through the real routes', () => {
     spy.mockRestore();
   });
 });
+
+// FAIL-SAFE BEFORE THE SQL (owner 2026-10-24, "land it": merged and deployed first, the SQL applied after, by db-guard or
+// the runbook). With BOTH switches on and the table missing, every Studio-save route answers a clean "not available" —
+// never a 500 — and writes nothing. The error is the one Prisma really throws for a missing table (P2021).
+describe('switched ON before prisma/pending/2026-10-17-studio-project-save.sql is applied', () => {
+  it('list, read, save and delete all answer 503 save_unavailable; no 500, nothing written, no user id in the log', async () => {
+    const { Prisma } = await import('@/public/_prisma/client');
+    const missing = new Prisma.PrismaClientKnownRequestError('The table `public.StudioProjectSave` does not exist in the current database.', { code: 'P2021', clientVersion: Prisma.prismaVersion.client, meta: { modelName: 'StudioProjectSave', table: 'public.StudioProjectSave' } });
+    const real = h.db;
+    h.db = new Proxy(real, { get: (t, k) => (k === 'tables' ? new Proxy(t.tables, { get: (tt, kk) => { if (kk === 'studioProjectSave') throw missing; return tt[kk]; } }) : t[k]) });
+    expect(process.env.NEXUS_STUDIO_ENABLED).toBe('1');
+    expect(process.env.STUDIO_CLOUD_SAVE_ENABLED).toBe('1');
+    const logs = (['log', 'info', 'warn', 'error'] as const).map((l) => vi.spyOn(console, l).mockImplementation(() => {}));
+    try {
+      const p = project();
+      const answers: [string, Response][] = [
+        ['list', await listGET()],
+        ['get', await oneGET(new Request('http://x'), { params: { id: p.id } })],
+        ['put new', await put(p.id, { baseRev: 0, project: p })],
+        ['put update', await put(p.id, { baseRev: 3, project: p })],
+        ['delete', await oneDELETE(new Request('http://x'), { params: { id: p.id } })],
+      ];
+      for (const [what, r] of answers) {
+        expect([what, r.status]).toEqual([what, 503]);
+        expect([what, await json(r)]).toEqual([what, { error: 'save_unavailable' }]);
+        expect([what, r.headers.get('Cache-Control')]).toEqual([what, 'no-store']);
+      }
+      // the spy records the calls that were attempted (and threw); what matters is that no row landed anywhere
+      expect(real.tables.studioProjectSave ?? []).toEqual([]);
+      expect(writesOf(real).filter((op) => op !== '$transaction' && !op.startsWith('studioProjectSave.'))).toEqual([]);
+      const logged = logs.flatMap((s) => s.mock.calls.flat()).map(String).join(' ');
+      expect(logged).not.toContain(uid);
+      expect(logged).not.toContain(p.name);
+    } finally { logs.forEach((s) => s.mockRestore()); }
+  });
+
+  it('control: the same routes with the table present answer 200 (the stand-in really is what failed above)', async () => {
+    const p = project();
+    expect((await put(p.id, { baseRev: 0, project: p })).status).toBe(200);
+    expect((await listGET()).status).toBe(200);
+    expect((await oneGET(new Request('http://x'), { params: { id: p.id } })).status).toBe(200);
+    expect((await oneDELETE(new Request('http://x'), { params: { id: p.id } })).status).toBe(200);
+  });
+});

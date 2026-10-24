@@ -22,7 +22,8 @@ export const CARNIVAL_EXTERNAL_POOL = [
   'training',   // parked (IRON-PARADISE-OUT, lib/unlisted-modes.ts): kept in the pool, never dealt while unlisted
   'threePoint',
   'whoSceneIt',
-  'tiebreak',
+  // 'tiebreak' left the pool with TENNIS-TIEBREAK-FOLD (2026-10-22): /play/tiebreak now redirects to the Tennis
+  // variant, and a stop whose page redirects sends the night away mid-run (carnival-depth-tests §C).
 ] as const;
 
 export type CarnivalExternalMode = (typeof CARNIVAL_EXTERNAL_POOL)[number];

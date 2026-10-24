@@ -12,12 +12,12 @@
 //                                cross-origin audio as silence without it). An approval COPIES each pending object to
 //                                tracks/<userId>/<fileId>.<ext> here, immutable-cached.
 // FAILS CLOSED: either name unset (or malformed) and every call throws UploadsComingSoon, which the routes turn into a
-// 503 "uploads coming soon". Nothing falls back to the old public S3 path.
+// 503 unavailable response. Nothing falls back to the old public S3 path.
 
 import { createHash } from 'node:crypto';
 
 export class UploadsComingSoon extends Error {
-  constructor() { super('Uploads coming soon'); this.name = 'UploadsComingSoon'; }
+  constructor() { super('Uploads are not available right now.'); this.name = 'UploadsComingSoon'; }
 }
 
 const HOST = 'storage.googleapis.com';

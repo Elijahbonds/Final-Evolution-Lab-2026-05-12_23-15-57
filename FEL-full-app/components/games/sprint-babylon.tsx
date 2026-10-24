@@ -9,6 +9,7 @@ import type { GameProps, GameResult } from './game-shell';
 import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
@@ -79,6 +80,7 @@ export function makeSprintHost(modeKey: string, title: string) {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
     // WAVE 3: the photo finish holds the result for a couple of seconds (the print on screen); any press or tap hands it over at once
     const hudRef = useRef<Hud>({});
     hudRef.current = hud;
@@ -153,7 +155,7 @@ export function makeSprintHost(modeKey: string, title: string) {
         if (holdRef.current) { clearTimeout(holdRef.current.timer); holdRef.current = null; }   // a result held for the print is not sent from a host that has gone
         if (canvasOwner.get(canvas) === token) stop?.();
       };
-    }, []);   // mount once — see onEndRef above
+    }, [bootAttempt]);   // callbacks are refs; bootAttempt remounts after a rejected runMode().
 
     const tapStart = useCallback(() => {
       busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
@@ -216,7 +218,7 @@ export function makeSprintHost(modeKey: string, title: string) {
           phase={phase}
           detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
           onStart={tapStart}
-          onRetry={tapStart}
+          onRetry={retryBoot}
         />
 
         {(phase === 'playing' || phase === 'countdown') && busRef.current && (

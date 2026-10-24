@@ -36,10 +36,12 @@ The live store terms, `store-terms-2026-10-12` (LEGAL-COPY-2), cover **audiobook
 only, **no download**, 14-day refund, one per person, a refund ends the license. They do **not** cover **ebooks or the
 bundle** (the approved "block C" is held for EBOOK-1). So the shop sells what the terms say and nothing else:
 
-- **Sold:** the audiobook, as a stream. The free sample chapter also streams.
-- **Hidden and refused, fail closed:** ebooks, the bundle, and every download path (EPUB/PDF files, and any audiobook
+- **Sold:** audiobooks whose audio masters are inventoried, as streams. Today that is Blueprint and Art of Dunking.
+  The free sample chapter also streams.
+- **Hidden and refused, fail closed:** ebooks, the bundle, audiobooks whose audio masters are still pending inventory,
+  and every download path (EPUB/PDF files, and any audiobook
   download). The UI does not draw them, and the API refuses them:
-  `POST /api/books/checkout` answers `409 format_not_offered` (before any Stripe customer is made);
+  `POST /api/books/checkout` answers `409 format_not_offered` or `409 not_for_sale` (before any Stripe customer is made);
   `POST /api/books/download` signs no EPUB/PDF, whatever the buyer owns; fulfilment
   (`recordBookCheckout`, used by the receipt page and both webhooks) ignores a paid ebook/bundle session
   (`ignored: format_not_offered`) and does not remember it, so a replay grants once a later terms version covers it.
@@ -49,11 +51,12 @@ bundle** (the approved "block C" is held for EBOOK-1). So the shop sells what th
   its row (`bookTerms.test.ts` fails first and says so).
 - **Switching ebooks on later (EBOOK-1):** publish the terms version that covers them, then add its row with
   `formats: ['audiobook', 'ebook', 'bundle'], downloads: true`. The KDP Select flags (`directSale`) still apply on
-  top. The ebook and download code paths are kept and tested under a fixture policy (`tests/helpers/bookTermsPolicies.ts`).
+  top, and a bundle stays off until the audiobook side is inventoried. The ebook and download code paths are kept and
+  tested under a fixture policy (`tests/helpers/bookTermsPolicies.ts`).
 - Not changed by this: `BOOK_STORE_ENABLED`, `VIRTUAL_PURCHASES_ENABLED`, the 18+ gate and the terms tick. The legal
   copy is untouched.
-- `scripts/stripe-prices.example.json` still lists the ebook and bundle test products (it mirrors the catalog, and
-  creating a Stripe test Product sells nothing). Checkout will not sell them.
+- `scripts/stripe-prices.example.json` mirrors only catalog `directSale` offers. Creating a Stripe test Product sells
+  nothing; checkout still applies the terms and catalog gates.
 
 ## Listening: the stream-only player (owner, 2026-10-13)
 
@@ -112,11 +115,11 @@ the owner reversed that rule.
 ## What Elijah has to decide
 
 1. **Prices.** Replace `priceCents` on each offer and set `priceIsExample` to `false` when the number is real. Do not price a direct ebook below the Kindle list price unless Amazon price-matching is acceptable.
-2. **KDP Select.** Five titles are flagged `kdpSelect: true` from a public Amazon check on 2026-09-26 (Building In The Loop, Architecture Of Raising Humans, Vibe Coders Handbook, Neuro Mechanic Playbook, Art of Dunking). Their ebook and bundle buttons stay off. Audiobooks are unaffected. Confirm each title in KDP Bookshelf, then set `kdpSelect` to `false` only after the ebook may be sold outside KDP. Blueprint and Unfair Advantages are flagged off; confirm those too.
+2. **KDP Select.** Five titles are flagged `kdpSelect: true` from a public Amazon check on 2026-09-26 (Building In The Loop, Architecture Of Raising Humans, Vibe Coders Handbook, Neuro Mechanic Playbook, Art of Dunking). Their ebook and bundle buttons stay off. Audiobooks are unaffected by KDP Select, but still need inventoried audio masters. Confirm each title in KDP Bookshelf, then set `kdpSelect` to `false` only after the ebook may be sold outside KDP. Blueprint and Unfair Advantages are flagged off; confirm those too.
 3. ~~Which Stripe account~~ Decided 2026-10-13: the platform account (`STRIPE_SECRET_KEY`), test mode only.
 4. **Tax.** Leave `STRIPE_BOOKS_TAX` unset until Stripe Tax is activated on the platform account. Turning the flag on without Tax configured makes Checkout session creation fail.
 5. **Chapter lists** for the five titles whose audio masters are not inventoried. Blueprint is opening + 20 chapters + close. Art of Dunking is opening + 12 chapters + close. The others are placeholders (`chaptersArePlaceholder: true`).
-6. **Descriptions.** Every book says `Description placeholder.` Replace them in the catalog. Do not invent them in a later code change without the real copy.
+6. **Descriptions.** Every book uses generic pending-confirmation copy. Replace it in the catalog with the real copy; do not invent descriptions in a later code change.
 7. **Go-live** is a separate change: remove the `sk_test_` refusal in `assertStripeTestKey`, use live keys, and only after a test purchase and a refund have been done, and after the terms question above is settled. This branch does not do that, and it does not deploy.
 
 ## Environment

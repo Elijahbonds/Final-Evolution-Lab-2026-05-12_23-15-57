@@ -1503,6 +1503,12 @@ exports.Prisma.BookEntitlementScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.RateLimitScalarFieldEnum = {
+  bucket: 'bucket',
+  hits: 'hits',
+  resetAt: 'resetAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -1799,7 +1805,8 @@ exports.Prisma.ModelName = {
   PartyReport: 'PartyReport',
   CreatorInquiry: 'CreatorInquiry',
   BookFulfillmentEvent: 'BookFulfillmentEvent',
-  BookEntitlement: 'BookEntitlement'
+  BookEntitlement: 'BookEntitlement',
+  RateLimit: 'RateLimit'
 };
 
 /**

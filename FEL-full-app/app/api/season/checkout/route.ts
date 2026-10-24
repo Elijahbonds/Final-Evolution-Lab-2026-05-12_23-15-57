@@ -17,6 +17,7 @@
  *   - Nothing is unlocked here. The lane opens only in the signature-verified
  *     webhook (app/api/v1/wallet/stripe-webhook) after Stripe confirms payment.
  *   - Dark by default behind SEASON_PASS_PURCHASE (403 while off).
+ *   - LAUNCH-SALES: verified adults only (lib/stripe/adult-gate.ts), 403 adults_only with a reason.
  */
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ import { FEATURE_DISABLED, isSeasonPassPurchaseEnabled, isVirtualPurchasesEnable
 import { getActiveSeason, getPassState } from '@/lib/season/season-service';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
+import { adultBuyerGate } from '@/lib/stripe/adult-gate';
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -63,6 +65,9 @@ export async function POST(req: NextRequest) {
   // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
   const origin = siteOrigin();
   if (!origin) return storeClosed('site_url_not_set');
+  // LAUNCH-SALES: the PRO lane is real money — verified adults only (403 adults_only), before any Stripe call.
+  const refused = await adultBuyerGate(prisma, userId);
+  if (refused) return refused;
   const stripe = getStripe();
 
   try {

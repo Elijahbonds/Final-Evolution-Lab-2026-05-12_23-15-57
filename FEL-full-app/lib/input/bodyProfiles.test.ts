@@ -44,7 +44,7 @@ describe('the table', () => {
     // the four registry keys whose modeId differs
     expect(byKey('karate_vs').modeId).toBe('karate-vs');
     expect(byKey('snowboard_slalom').modeId).toBe('snowboard');
-    expect(byKey('derby').modeId).toBe('baseball');
+    expect(byKey('derby').modeId).toBe('derby');
     expect(byKey('penalty').modeId).toBe('soccer');
   });
 
@@ -117,7 +117,7 @@ describe('THE NEVER-TABLE — the baseline\'s misfires, impossible by the data',
   });
   it('nothing at all in the quizzes, the rhythm game and the modes with no plan phase', () => {
     const where = ROWS.filter((p) => ['quiz', 'rhythm', 'later'].includes(p.family));
-    expect(where.map((p) => p.key).sort()).toEqual(['brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'tiebreak', 'volleyball', 'who_scene_it']);
+    expect(where.map((p) => p.key).sort()).toEqual(['baseball', 'brainbrawl', 'carnival', 'dance', 'derby', 'football', 'golf', 'penalty', 'tennis', 'tiebreak', 'volleyball', 'who_scene_it']);
     for (const p of where) expect(p.bindings, p.key).toEqual([]);
     expect(byKey('who_scene_it').later).toBeNull();
     expect(byKey('brainbrawl').later).toBeNull();

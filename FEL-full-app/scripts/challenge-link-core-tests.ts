@@ -109,6 +109,7 @@ check('signed-in challenge routing preserves code on the matching play route', (
   assert.strictEqual(challengePlayHref('unknown-mode', 'x'), null);
   assert.strictEqual(challengePlayHref('storyMode', 'x'), null);
   assert.strictEqual(challengePlayHref('training', 'x'), null);
+  assert.strictEqual(challengePlayHref('dunkduel', 'x'), null);
 });
 
 // 9. challenge auth handoff

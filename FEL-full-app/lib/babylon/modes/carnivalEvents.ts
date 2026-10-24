@@ -12,7 +12,7 @@
 // animator's fade handler (the stranded-fade freeze the combat pass measured). Bodies on a loop + beats use BeatOwner;
 // the trick gauntlet rides BoardAnimTree with the TrickMachine in external mode, exactly like the skate mode.
 
-import { Color3, MeshBuilder, PBRMaterial, Vector3 } from '@babylonjs/core';
+import { Color3, MeshBuilder, PBRMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { AbstractMesh, Scene } from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { neverBindPose } from '../anim/importSanitizer';
@@ -61,6 +61,13 @@ export interface CarnivalEvent {
    * it is torn down and built again between turns (the old path; the trick gauntlet's rider physics has no reset).
    */
   reset?(ctx: ModeContext): void;
+  /**
+   * S1 HITCH-KILLER (ALL-MODES-TO-75 §2, CC75-2, 2026-10-22): put a PRELOADED event on at its card. CourtCarnivalMode builds the
+   * night's events behind the GAME NIGHT board and parks each off screen (enabled off, clips paused); its card enables it again
+   * and calls this, which puts back what the build's whistle set — the camera, the hero, the HUD hint — on a stage nothing has
+   * played on yet. Nothing is spawned here. An event without it is built at its card, as before.
+   */
+  wake?(ctx: ModeContext): void;
   teardown(): void;
 }
 
@@ -225,6 +232,7 @@ export function slamRush(): CarnivalEvent {
       if (body.busy) body.settle();   // a held gather or a launch from P1's last second: P2 starts standing
       whistle(ctx);
     },
+    wake(ctx) { hudCtx = ctx; whistle(ctx); },   // S1 HITCH: built behind the board, on at its card
     onInput(ctx, e) {
       if (e.t === 'trigger' && e.side === 'R') {
         if (e.value > 0.02) { charging = true; charge = Math.max(charge, e.value); gather(); showCharge(ctx, charge); }   // a launch in flight settles into the new charge
@@ -302,6 +310,7 @@ export function strikeStorm(): CarnivalEvent {
       whistle(ctx);
     },
     reset(ctx) { whistle(ctx); },
+    wake(ctx) { whistle(ctx); },   // S1 HITCH: built behind the board, on at its card
     onInput(ctx, e) {
       if (e.t === 'button' && e.pressed && !striking && (e.btn === 'A' || e.btn === 'B' || e.btn === 'Y')) {
         striking = true;
@@ -330,13 +339,15 @@ export function trickGauntlet(): CarnivalEvent {
   const LAND_BEAT_SEC = 0.4, BAIL_BEAT_SEC = 0.8;   // board_land 0.42 s, skate_bail 0.75 s — the tree settles them when the window closes
   let callT = 0;
   const CALL_SEC = 0.9;   // the trick call's banner hold (snow and surf hold theirs as long)
+  const START = new Vector3(0, 0, -6);
+  const HINT = 'POP, flip in the air — stick sideways + TRICK spins — chain combos before you land';
 
   return {
     id: 'trick_gauntlet', title: 'TRICK GAUNTLET', durationSec: 20, pointsPerUnit: 0.4, rivalRange: [300, 900],
     verbs: { buttons: ['A', 'B', 'Y', 'X'], says: 'GO POPS · TRICK SPINS' },
     async build(ctx) {
       world = buildSkatepark(ctx.scene);
-      rig = await buildRig(ctx, cfg.heroUrl, new Vector3(0, 0, -6), 0, world.ground, '#ffd75e');
+      rig = await buildRig(ctx, cfg.heroUrl, START.clone(), 0, world.ground, '#ffd75e');
       animTree = new BoardAnimTree(rig.char.animator);
       // The machine's HUD keys are namespaced here: its `score` is the raw trick total, and the carnival's `score` is P1's
       // night total (the host renders it), so a banked combo used to replace the night's points with a trick count.
@@ -346,7 +357,15 @@ export function trickGauntlet(): CarnivalEvent {
         onBeat: (b) => { if (b === 'land' || b === 'land_sketchy') { landBeatT = LAND_BEAT_SEC; lastLanding = b === 'land_sketchy' ? 'sketchy' : 'clean'; animTree.clearBeat('land_clean', 'land_sketchy'); } else { bailBeatT = BAIL_BEAT_SEC; animTree.clearBeat('bail'); } },
       });
       stickX = 0; pump = 0; airT = 0; landBeatT = 0; bailBeatT = 0; callT = 0;
-      ctx.setHud({ hint: 'POP, flip in the air — stick sideways + TRICK spins — chain combos before you land' });
+      ctx.setHud({ hint: HINT });
+    },
+    /** S1 HITCH: built behind the board, on at its card — the rig has not moved, so this is buildRig's camera and the hint again
+     *  (the rider's physics has no reset, so a played gauntlet is still built again for P2). */
+    wake(ctx) {
+      ctx.heroRef.current = rig.char.root;
+      ctx.camDirector.setPreset('board');
+      ctx.camDirector.snapTo(START, START.add(new Vector3(0, 0, 8)));   // buildRig's snap at yaw 0
+      ctx.setHud({ hint: HINT });
     },
     onInput(ctx, e) {
       if (e.t === 'stick' && e.side === 'L') stickX = e.x;
@@ -427,6 +446,8 @@ export function hotShot(): CarnivalEvent {
   let keeper: SpawnedCharacter, keeperBody: BeatOwner;
   let stage: AbstractMesh[] = [];
   let goal: AbstractMesh[] = [];
+  /** S1 HITCH: the late Meshy goal lands under this (at the origin), so it parks and goes with the event's stage */
+  let goalRoot: TransformNode | null = null;
   let goals = 0, phase: 'aim' | 'power' | 'flight' = 'aim', stickX = 0, stickY = 0;
   /** the keeper's call for the shot in the air, and the beat (event clock) his rise waits for */
   let call: { dive: DiveSign; timing: DiveTiming } = { dive: 0, timing: 'none' };
@@ -466,7 +487,8 @@ export function hotShot(): CarnivalEvent {
       tornDown = false;
       const before = meshIds(ctx.scene);
       VenueKit.buildField(ctx.scene, 'pitch');
-      goal = buildGoal(ctx.scene, () => !tornDown);
+      goalRoot = new TransformNode('carn_goal_root', ctx.scene);
+      goal = buildGoal(ctx.scene, () => !tornDown, goalRoot);
       stage = bornSince(ctx.scene, before);
       player = await CharacterLibrary.spawn(ctx.scene, cfg.heroUrl, { position: new Vector3(0, 0, 0), startClip: SPORT_CLIP.penaltyIdle });
       neverBindPose(player.animator, SPORT_CLIP.penaltyIdle); installSafePlay(player.animator, 'carnival-hotshot');
@@ -493,6 +515,7 @@ export function hotShot(): CarnivalEvent {
       keeperBody.loop(SPORT_CLIP.keeperIdle);
       whistle(ctx);
     },
+    wake(ctx) { whistle(ctx); },   // S1 HITCH: built behind the board, on at its card
     onInput(ctx, e) {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
       if (e.t === 'button' && e.btn === 'A' && e.pressed) {
@@ -538,7 +561,7 @@ export function hotShot(): CarnivalEvent {
       }
       return goals;
     },
-    teardown() { tornDown = true; banner.cancel(); player?.dispose(); keeper?.dispose(); ball?.dispose(); reticle?.dispose(); goal.forEach((g) => g.dispose()); dropStage(stage); },
+    teardown() { tornDown = true; banner.cancel(); player?.dispose(); keeper?.dispose(); ball?.dispose(); reticle?.dispose(); goal.forEach((g) => g.dispose()); goalRoot?.dispose(); goalRoot = null; dropStage(stage); },
   };
 }
 
@@ -602,6 +625,7 @@ export function coinStorm(): CarnivalEvent {
       whistle(ctx);
     },
     reset(ctx) { whistle(ctx); },
+    wake(ctx) { whistle(ctx); },   // S1 HITCH: built behind the board, on at its card
     onInput(_ctx, e) {
       if (e.t === 'stick' && e.side === 'L') { stickX = e.x; stickY = e.y; }
     },
@@ -676,6 +700,7 @@ export function counterStrike(): CarnivalEvent {
       body.loop(SPORT_CLIP.karateStance); rivalBody.loop(SPORT_CLIP.karateStance);
       whistle(ctx);
     },
+    wake(ctx) { whistle(ctx); },   // S1 HITCH: built behind the board, on at its card
     onInput(ctx, e) {
       // NOTE: was gated on btn 'X', which the carnival deck's 4-button budget
       // (CHARGE/GO/TRICK/POWER → RT/A/B/Y) never maps — the parry window was

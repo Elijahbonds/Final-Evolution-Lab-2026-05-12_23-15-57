@@ -14,6 +14,7 @@
 
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { isPlayInput, roundIsEmpty, NO_PLAY_OUTCOME } from './carnivalEmptyRound';
 import * as BABYLON from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
@@ -38,6 +39,7 @@ import {
 } from '../core/CarnivalNight';
 import { mountCarnivalFx, type CarnivalFx } from '../court/mount/carnivalFx';   // vis-hoops-court (2026-10-14): the fair, its marquee, the intro's camera and the celebrations
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the MC calls Game Night, the stands react
+import { countHitch, prewarmMeshes } from '../core/hitchProbe';   // S1 HITCH (2026-10-22): the night is built behind the board
 
 type Phase = 'pick' | 'reveal' | 'playing' | 'handoff' | 'eventOver' | 'finale';
 /** IMPROVE (2026-10-06): the pick screen's auto-start counts from the last ◀ ▶ ▲ ▼ change, never from the screen opening —
@@ -121,6 +123,10 @@ interface St {
   players: number;
   turn: number;
   turnPoints: [number, number];
+  /** CC75-3: inputs each player put into the event while it played (a press, or a stick past PLAY_STICK_MIN) */
+  turnInputs: [number, number];
+  /** CC75-3: every such input across the night */
+  nightInputs: number;
   tally: NightTally;
   rivalTarget: number;
   ended: boolean;
@@ -149,7 +155,16 @@ interface St {
   micOpened: boolean;
   micQuiet: string;
   micClock: boolean;
+  /** S1 HITCH: the night's events built behind the GAME NIGHT board, each parked off screen until its card swaps it in */
+  parked: Map<CarnivalEvent, Parked>;
 }
+
+/** S1 HITCH: a built event, off screen — everything its build added under one disabled holder, and the clips it had playing,
+ *  paused (a parked body costs no skinning; the hub's own party-goers sleep the same way through an event). */
+interface Parked { holder: BABYLON.TransformNode; paused: BABYLON.AnimationGroup[] }
+/** S1 HITCH: an event that can be put on from a parked build — its `wake` puts back the camera, the hero and the HUD its build set.
+ *  One without is still built at its card (the old path). */
+const swapsIn = (ev: CarnivalEvent): boolean => !!ev.wake;
 
 const states = new WeakMap<BABYLON.Scene, St>();
 const live = new Set<St>();
@@ -299,7 +314,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   // ── an event ────────────────────────────────────────────────────────
   function startEvent(ctx: ModeContext, S: St): void {
     S.current = S.events[S.idx];
-    S.turn = 0; S.turnPoints = [0, 0]; S.eventLatch = false; S.kept = false;   // a fresh event gets one win punch at most
+    S.turn = 0; S.turnPoints = [0, 0]; S.turnInputs = [0, 0]; S.eventLatch = false; S.kept = false;   // a fresh event gets one win punch at most
     setPhase(S, 'reveal');
     // IMPROVE (2026-10-06): the card is the only rules text an event gets. The first time an event appears this session it
     // HOLDS (GO starts the event; it gives up after REVEAL_HOLD_MAX_S); after that it is the 2 s card, and GO skips it.
@@ -324,6 +339,58 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     S.mic?.say({ moment: 'carnival.event', tags: [`ev:${S.current.id}`], priority: 2 });
   }
 
+  /**
+   * S1 HITCH-KILLER (ALL-MODES-TO-75 §2 Court Carnival, CC75-2, 2026-10-22): the night is built behind the GAME NIGHT board, not
+   * between its cards. The old attempt awaited the event's build() mid-night — a venue stage, one or two bodies and their materials
+   * spawned and compiled at the card, and disposed at the whistle (the main hitch suspect). Here, in load() before the hub and the
+   * fair are raised (so a stage is never drawn over them, and a stage's dressing never sees the hub), each event of the draw is
+   * built once, its stage and bodies are gathered under one holder (every root node its build added), compiled while it is the
+   * only stage up, then parked: the holder off and its clips paused. Its card swaps it in by enabling it (wakeParked). The event's
+   * spawn stamp (felCarnivalEvent) is the build's, as at the card, and is put back after.
+   */
+  async function preloadNight(ctx: ModeContext, S: St): Promise<void> {
+    const md = (ctx.scene.metadata ??= {}) as { felCarnivalEvent?: string };
+    const stamp = md.felCarnivalEvent;
+    for (const ev of new Set(S.events)) {
+      if (!swapsIn(ev) || S.parked.has(ev) || S.scene.isDisposed) continue;
+      const roots = new Set<BABYLON.Node>(ctx.scene.rootNodes);
+      const groups = new Set(ctx.scene.animationGroups);
+      md.felCarnivalEvent = ev.id;
+      try {
+        await ev.build(ctx);
+      } catch (err) {
+        console.warn(`[FEL-CARNIVAL] ${ev.id} preload failed — it will be built at its card`, err);
+        try { ev.teardown(); } catch { /* a half-built event: what landed goes with the scene */ }
+        continue;
+      }
+      if (S.scene.isDisposed) return;
+      const holder = new BABYLON.TransformNode(`carnival_parked_${ev.id}`, ctx.scene);
+      for (const n of ctx.scene.rootNodes.slice()) if (n !== holder && !roots.has(n) && !(n instanceof BABYLON.Camera)) n.parent = holder;
+      await prewarmMeshes(ctx.scene, holder.getChildMeshes(false));
+      holder.setEnabled(false);
+      const paused = ctx.scene.animationGroups.filter((g) => !groups.has(g) && g.isPlaying);
+      for (const g of paused) g.pause();
+      S.parked.set(ev, { holder, paused });
+    }
+    if (stamp === undefined) delete md.felCarnivalEvent; else md.felCarnivalEvent = stamp;
+  }
+
+  /** S1 HITCH: a parked event on, at its card — its stage and bodies enabled, their clips resumed, and its wake puts the camera, the
+   *  hero and the HUD back the way its build set them. Nothing is spawned or compiled here. */
+  function wakeParked(ctx: ModeContext, ev: CarnivalEvent, p: Parked): void {
+    p.holder.setEnabled(true);
+    for (const g of p.paused) if (ctx.scene.animationGroups.includes(g)) g.restart();   // (a group its body disposed is gone from the scene)
+    ev.wake?.(ctx);
+  }
+
+  /** S1 HITCH: a played event's teardown takes what it built; the holder (and anything that landed under it late) goes with it. */
+  function dropParked(S: St, ev: CarnivalEvent): void {
+    const p = S.parked.get(ev);
+    if (!p) return;
+    S.parked.delete(ev);
+    if (!p.holder.isDisposed()) p.holder.dispose();
+  }
+
   /** The attempt: build the event (or, for P2, reset the one P1 played) and blow the whistle. Never runs twice at once —
    *  the hand-off used to start a fresh build on every frame its build was still in flight. */
   async function runAttempt(ctx: ModeContext, S: St): Promise<void> {
@@ -335,12 +402,16 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     // HOOPS MOTION phase 3c (review): the bodies this event spawns are built for IT — the hoops smoothing and the overhead pole rule reach
     // only Slam Rush's (smoothKeys.hoopsMotionModeOf); the karate, coin, trick and goal events keep their core clips as their own modes do
     (ctx.scene.metadata ??= {}).felCarnivalEvent = S.current.id;
+    const parked = S.parked.get(ev);
     if (S.kept && ev.reset) {
       S.kept = false;
       ev.reset(ctx);                                 // IMPROVE (2026-10-06): P2 plays P1's stage — nothing is spawned again
+    } else if (parked && !parked.holder.isDisposed()) {
+      wakeParked(ctx, ev, parked);                   // S1 HITCH: built behind the board — swapped in, not built (CC75-2)
     } else {
       const token = ++S.attempt;
       S.building = true; S.buildSec = 0;
+      countHitch(ctx.scene, 'build');                // S1 HITCH: a build at the card is a mid-night hitch (0 after the board for a parked night)
       try {
         await S.current.build(ctx);   // (S.current is `ev` here: the stamp above names the event this build spawns for)
       } catch (err) {
@@ -372,6 +443,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     S.attempt++; S.building = false; S.kept = false;
     console.warn(`[FEL-CARNIVAL] watchdog: ${ev?.id ?? '?'} never finished building — skipping it`);
     try { ev?.teardown(); } catch { /* a half-built event: whatever did land is dropped with the scene */ }
+    if (ev) dropParked(S, ev);
     S.current = null;
     refuse(ctx, 'EVENT SKIPPED');
     advance(ctx, S);
@@ -385,7 +457,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     // IMPROVE (2026-10-06): two on one screen, P1's event stays up for P2 (reset, not torn down and built again) when the
     // event can reset itself; the hand-off card plays over its stage
     const keep = S.players > 1 && S.turn === 0 && !!S.current.reset;
-    if (!keep) S.current.teardown();
+    if (!keep) { S.current.teardown(); dropParked(S, S.current); }
     S.turnPoints[S.turn] = points;
     if (S.players > 1 && S.turn === 0) {
       // pass the pad: same event, P2's turn
@@ -405,6 +477,20 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   function settleEvent(ctx: ModeContext, S: St): void {
     if (!S.current) return;
     const [a, b] = S.turnPoints;
+    // CC75-3: a round nobody put an input into is not banked — no points, no event to either side — and the night moves on
+    if (roundIsEmpty(S.players, S.turnInputs)) {
+      showHub(ctx, S, true);
+      S.fx?.board({ title: 'STANDINGS', rows: nightBoard(S.tally, names(S)), footer: 'NO PLAY' });
+      hud(ctx, S, {
+        banner: `${S.current.title}: ${names(S)[0]} 0 · ${names(S)[1]} 0`, blurb: 'NO PLAY — NOTHING SAVED',   // the result line's shape, nothing banked
+        board: nightBoard(S.tally, names(S)),
+        boardTitle: S.idx + 1 < S.events.length ? `NEXT — EVENT ${S.idx + 2} / ${S.events.length}` : 'FINAL EVENT DONE',
+        time: null, turnLabel: '',
+      });
+      S.current = null;
+      setPhase(S, 'eventOver');
+      return;
+    }
     const w = bankEvent(S.tally, S.current.title, a, b);
     SoundKit.play('score');
     showHub(ctx, S, true);
@@ -447,6 +533,17 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     if (S.ended) return;
     setPhase(S, 'finale');
     S.ended = true;
+    // CC75-3: a whole night with no input is not a result: NO_PLAY at 0 (the shell posts played:false, the route pays nothing)
+    if (S.nightInputs === 0) {
+      setResult(S, null);
+      hud(ctx, S, { banner: 'NO PLAY', blurb: 'NOTHING SAVED', board: nightBoard(S.tally, names(S)), boardTitle: 'FINAL' });
+      S.mic?.hush();
+      ctx.end(NO_PLAY_OUTCOME, 0, {
+        rivalPoints: 0, events: S.events.length, players: S.players,
+        eventsWon: 0, rivalEventsWon: 0, champion: -1, practice: S.practice ? 1 : 0, noPlay: 1,
+      });
+      return;
+    }
     SoundKit.play('whistle');
     const champ = nightChampion(S.tally);
     const won = champ === 0;
@@ -528,10 +625,10 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         // Nothing is built before the harness is PLAYING: an event built inside load() had its camera reset by the
         // harness's own start-of-play step and the first event rendered sky (measured on /play/carnival?players=1).
         autoBegin: !!q, starting: false, current: null,
-        players, turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
+        players, turn: 0, turnPoints: [0, 0], turnInputs: [0, 0], nightInputs: 0, tally: freshTally(), rivalTarget: 0,
         ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, fx: null, eventLatch: false, champLatch: false,
         hostPP: null, guestPP: null, hostBio: { ...STAGE_INPUT_IDLE, watching: true }, guestBio: { ...STAGE_INPUT_IDLE, watching: true },
-        mic: null, micOpening: true, micOpened: false, micQuiet: '', micClock: false,
+        mic: null, micOpening: true, micOpened: false, micQuiet: '', micClock: false, parked: new Map(),
       };
       states.set(ctx.scene, S); live.add(S);
       SoundKit.startAmbient('stadium');
@@ -555,6 +652,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
           aim: () => { const g = S.guest; return g ? { x: g.root.position.x, y: g.root.position.y + 1.32, z: g.root.position.z } : null; },
         };
       }
+      // S1 HITCH (CC75-2): every event of the night built, compiled and parked behind the board, before the hub and the fair go up
+      await preloadNight(ctx, S);
       if (S.scene.isDisposed) return;
       S.fx = mountCarnivalFx(ctx);   // vis-hoops-court: before the first showHub, which raises the fair with the hub
       S.fx.board({ title: 'GAME NIGHT', rows: [], footer: `${S.events.length} EVENTS` });
@@ -595,6 +694,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // most presses were simply the wrong button for the event on screen. The event declares what it reads; anything
       // else is answered with the verb that would have worked, which is both a feel fix and the only teaching this
       // 15-second format has room for.
+      // CC75-3: count what the player put into the event (a wrong button is still a press: they were playing)
+      if (isPlayInput(e)) { S.turnInputs[S.turn]++; S.nightInputs++; }
       const v = S.current.verbs;
       if (v && e.t === 'button' && e.pressed && !v.buttons.includes(e.btn ?? '')) { refuse(ctx, v.says); return; }
       // no carnival event reads the d-pad — every one of them steers with the stick — so a direction tapped on it was

@@ -24,13 +24,68 @@ import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: t
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
+import { HOOPS_HANDLER_TURN_DEG, retreatCapK } from './HoopsStick';   // hoops-reverse: the handler's turn rate (a feel knob; 540 = DEFAULT_MOVEMENT's)
+import { PERFECT_BAND_SHARE } from './shotBands';   // lane/hoops-shot-core: the perfect band's share, one constant for the grade and both bars
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
   type OffenseJob, type DefenseJob, type ScreenState,
 } from './HoopsOffball';
+import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
+import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
+
+/** HOOPS-TWO-HAND-CROSS (DR-3): below this the body has no travel to turn — the redirect turns the FACING instead (m/s). assumption: 0.5. */
+export const REDIRECT_MIN_TRAVEL_MPS = 0.5;
+/** The redirect's speed cap, × top speed: the left-stick crossover's own cap (DribbleController.update's cut). */
+export const REDIRECT_TOP_K = 1.15;
+/** SHAMMGOD-PEAK (tuned, flagged): the forward-dominant burst's cap (of the movers only the Shammgod), × top speed. The 1.15 cap
+ *  (7.36 target) peaked 7.21 m/s from a 4.34 jog once the cut's blend paid its decel; this target lands the jog peak at ~7.6 m/s, the
+ *  pre-8faaa228 7.63. DribbleController's move redirect passes it to redirectFor; redirectFor's default stays REDIRECT_TOP_K. */
+export const REDIRECT_BURST_TOP_K = 1.21;
+/** HOOPS-CROSS-ANGLE (owner 2026-10-20): the left stick past this magnitude on the move's frame is HELD — the move takes the wide turn. */
+export const REDIRECT_HELD_STICK = 0.5;
+/** The tight (stick released) turn: a move's atan2 angle passes unchanged up to the knee, and only REDIRECT_TIGHT_SLOPE of it past the
+ *  knee — so the Shammgod's 13° (under the knee) keeps its line and the crossover's 76° lands at 16.5°. ESTIMATE [TUNE]. */
+export const REDIRECT_TIGHT_KNEE_RAD = (14 * Math.PI) / 180;
+export const REDIRECT_TIGHT_SLOPE = 0.04;
+/** The tight turn's hard cap: a plain move never turns the travel more than 25° (owner bar). */
+export const REDIRECT_TIGHT_MAX_RAD = (25 * Math.PI) / 180;
+/** The turn a move's push maps to. Held stick: atan2(lateral, forward), the full angle (a crossover's 0.4 / 1.6 is 76°). Released: the
+ *  2K-style tight crossover — the hand changes, the line barely does (14–19°, never over 25°). A move that comes BACK (past 90°, the
+ *  snatchback's push) keeps its own angle either way. */
+export function redirectTurn(forward: number, lateral: number, stickHeld: boolean): number {
+  const full = Math.atan2(lateral, forward);
+  const a = Math.abs(full);
+  if (stickHeld || a <= REDIRECT_TIGHT_KNEE_RAD || a >= Math.PI / 2) return full;
+  return Math.sign(full) * Math.min(REDIRECT_TIGHT_MAX_RAD, REDIRECT_TIGHT_KNEE_RAD + (a - REDIRECT_TIGHT_KNEE_RAD) * REDIRECT_TIGHT_SLOPE);
+}
+/**
+ * HOOPS-TWO-HAND-CROSS (DR-3, pure): a handle move's impulse (forward, lateral: the body's frame, lateral + toward the athlete's right)
+ * as a REDIRECT — ROTATE the travel, don't add to it. The direction is the current travel turned toward the move's side by
+ * redirectTurn (HOOPS-CROSS-ANGLE: the stick held, atan2(lateral, forward) — a crossover's 0.4 / 1.6 is 76°; released, the tight 2K
+ * cross, 16.5°) — or the facing turned, with no travel (or travel backwards against the facing) to turn. The speed is max(current, |(forward, lateral)|), capped at top × REDIRECT_TOP_K — but never below the current
+ * speed (a momentum streak over the cap is not braked by a move). Null for a fake (zero impulse: the hesi, the yoyo, the in-and-out).
+ * ESTIMATE [TUNE]: the angle mapping is the spec's; the eye judges it.
+ */
+export function redirectFor(vx: number, vz: number, yaw: number, forward: number, lateral: number, stickHeld = false, top = DEFAULT_MOVEMENT.maxSpeed, burstTopK = REDIRECT_TOP_K): { x: number; z: number; speed: number; turnRad: number } | null {
+  if (forward === 0 && lateral === 0) return null;
+  const cur = Math.hypot(vx, vz);
+  const along = vx * Math.sin(yaw) + vz * Math.cos(yaw);
+  const base = cur > REDIRECT_MIN_TRAVEL_MPS && along > 0 ? Math.atan2(vx, vz) : yaw;
+  const turnRad = redirectTurn(forward, lateral, stickHeld);
+  const head = base + turnRad;
+  const mag = Math.hypot(forward, lateral);
+  // HOOPS-CROSS-FIXUP (QA PR #384 item 3): a move that pushes the ball out AHEAD (forward-dominant — of the movers only the Shammgod,
+  // 3.4 / 0.8) keeps the burst the old addition gave it: current + |impulse|, under the same cap. The max(current, |impulse|) rule
+  // left its 3.49 below a 4.34 m/s jog, so it exited at 4.35 — a plain crossover's speed (it peaked 7.63 before 8faaa228). The turn is
+  // unchanged. FEEL CHANGE (flagged): from a 4.34 jog the Shammgod's target is 7.36 m/s (the cap), from a 6.40 sprint 7.36 too.
+  // SHAMMGOD-PEAK: the burst has its own cap (burstTopK; the controller passes REDIRECT_BURST_TOP_K) — every other move keeps top × REDIRECT_TOP_K.
+  const burst = forward > Math.abs(lateral);
+  const speed = Math.max(cur, burst ? Math.min(top * burstTopK, cur + mag) : Math.min(top * REDIRECT_TOP_K, mag));
+  return { x: Math.sin(head), z: Math.cos(head), speed, turnRad };
+}
 
 /** Planar movement now runs on CourtMovement (Phase 2 weight model):
  *  ramped accel, stronger decel, speed-scaled plant-and-cut, turn-rate cap.
@@ -75,9 +130,16 @@ export class DribbleController {
   /** The explode-out leaves at no less than this share of top speed: the plant took the run down to ~0.3 m/s, and
    *  "0.3 + the boost" was 2.3 m/s — a jog, not the separation the move exists to buy (measured, onevone-depth). */
   static readonly EXPLODE_FLOOR = 0.7;
+  /** H2-HESI-SAME-FRAME (2026-10-17): the HESITATION's explode floor. The hang (HESI_HANG_SEC) holds the body while a plain stop-and-go
+   *  is already pushing, so the explode is read against a control that has had the hang's frames to build: at 0.7 it left at 4.48 m/s,
+   *  1.58× the control on that same frame (2.84). FEEL CHANGE (flagged): 0.95 → 6.08 m/s, 2.14× — about the crossover's own burst out
+   *  of a jog (6.22). PAUSIN's explode keeps EXPLODE_FLOOR. */
+  static readonly HESI_EXPLODE_FLOOR = 0.95;
+  /** The floor of the explode window that is armed now: the hang's (HESI_EXPLODE_FLOOR) or PAUSIN's (EXPLODE_FLOOR). */
+  private explodeFloor = DribbleController.EXPLODE_FLOOR;
 
   constructor(cfg = { maxSpeed: 6.4, accel: 26, decel: 34, turnRate: 9, crossoverBoost: 2.2 }) {
-    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: GEARS_HOOPS, cutCost: CUT_COST_HOOPS });   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
+    this.movement = new CourtMovement({ ...DEFAULT_MOVEMENT, maxSpeed: cfg.maxSpeed, gears: { ...GEARS_HOOPS, turnRateDeg: HOOPS_HANDLER_TURN_DEG }, cutCost: CUT_COST_HOOPS });   // hoops-reverse: the handler's turn rate is a feel knob (540, as before)   // Phase 5: a stick cut at pace costs speed   // DRIBBLE PACE: the gears are on for the ball handler
     this.crossoverBoost = cfg.crossoverBoost;
   }
   private crossoverBoost: number;
@@ -87,6 +149,8 @@ export class DribbleController {
   private momentumStreak = 0; private momentumAt = -Infinity; private clock = 0;
   /** THE SMOOTH CUT: a redirect is eased over CUT_BLEND_SEC rather than written into the velocity in one frame. */
   private pendingCut: { x: number; z: number; speed: number; left: number } | null = null;
+  /** HOOPS-CROSS-ANGLE: a handle move's push waiting for the next update, which reads the left stick to pick the tight or wide turn. */
+  private pendingMove: { forward: number; lateral: number; yaw: number } | null = null;
   static readonly CUT_BLEND_SEC = 0.07;
   static readonly MOMENTUM_STREAK_SEC = 0.55;
   static readonly MOMENTUM_TOP = 1.2;          // × top speed a momentum streak can reach
@@ -111,6 +175,28 @@ export class DribbleController {
     const v = this.movement.vel;
     v.x += (c.x * c.speed - v.x) * k; v.z += (c.z * c.speed - v.z) * k;
     c.left -= dt; if (c.left <= 1e-4) { v.x = c.x * c.speed; v.z = c.z * c.speed; this.pendingCut = null; }
+  }
+  /** HOOPS-TWO-HAND-CROSS (DR-3): a handle move's impulse REDIRECTS the travel (redirectFor), eased through cutTo — it used to be added
+   *  to the velocity in one frame (the body slid sideways, its heading barely turned). `yaw` is the body's facing (the impulse's frame).
+   *  A cut already blending (the left stick's own reversal, the momentum cross, the step-back: an authored redirect this beat) keeps
+   *  its line: the addition it used to get was eased out inside CUT_BLEND_SEC anyway. False when nothing changed (a fake, a cut pending).
+   *  HOOPS-CROSS-ANGLE (owner 2026-10-20): the move is resolved on the next update, which reads the left stick — released, the tight
+   *  turn; held (past REDIRECT_HELD_STICK), the wide one. The cut starts blending on that same update, as it did when written here. */
+  redirect(forward: number, lateral: number, yaw: number): boolean {
+    if (this.pendingCut || this.pendingMove) return false;
+    if (forward === 0 && lateral === 0) return false;
+    this.pendingMove = { forward, lateral, yaw };
+    return true;
+  }
+  /** The queued move, resolved with this frame's stick. An authored cut (or the slide) written since the move keeps its line — it
+   *  overwrote the move's cut when the redirect was written at once. */
+  private resolveMove(moveX: number, moveY: number): void {
+    const m = this.pendingMove; if (!m) return;
+    this.pendingMove = null;
+    if (this.pendingCut || this.pendingSlide) return;
+    const r = redirectFor(this.movement.vel.x, this.movement.vel.z, m.yaw, m.forward, m.lateral, Math.hypot(moveX, moveY) > REDIRECT_HELD_STICK, DEFAULT_MOVEMENT.maxSpeed, REDIRECT_BURST_TOP_K);
+    if (!r) return;
+    this.cutTo(r.x, r.z, r.speed, Math.abs(r.turnRad) < Math.PI / 2);   // a move that comes BACK keeps the chest where it is (the step-back's rule)
   }
   /** HOOPS KINETIC (2026-09-18): the MOMENTUM DRIFT — a slide-cut onto a new line with the dribble speed kept. */
   drift(dx: number, dz: number): void { this.cutTo(dx, dz, Math.max(this.movement.vel.length(), 0.1)); }
@@ -211,7 +297,7 @@ export class DribbleController {
   /** PAUSIN': the dribble frozen — the body stops on a dime and the stick is ignored until `pause(false)`, which arms the explode. */
   pause(on: boolean): void {
     this.movement.pause(on);
-    if (!on) { this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC; this.movement.launchFor(0.5); }
+    if (!on) { this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC; this.explodeFloor = DribbleController.EXPLODE_FLOOR; this.movement.launchFor(0.5); }
   }
   get paused(): boolean { return this.movement.paused; }
   /** A hesitation thrown from the stick (the L-stick pull-back tap does this on its own): the plant, eased, and the window. */
@@ -227,28 +313,34 @@ export class DribbleController {
    * — with the stick still forward, the pause lasted ONE frame; the left-stick tap's pull-then-push wrote the explode on the same
    * frame. Both now enter one hang: for HESI_HANG_SEC the body is held at ≤ HESI_HANG_MAX_MPS and the stick moves nothing; the
    * latest forward push inside it is REMEMBERED and the explode leaves on the hang's last frame. The explode window counts from
-   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.18 s later than it was — that pause IS
+   * the hang's end, so it keeps its 0.6 s. FEEL CHANGE (flagged): the explode is up to 0.09 s later than it was — that pause IS
    * the hesitation the defender bites on.
    */
-  static readonly HESI_HANG_SEC = 0.18;
+  static readonly HESI_HANG_SEC = 0.09;
   static readonly HESI_HANG_MAX_MPS = 0.3;
   private hangLeft = 0;
   private hangPush: Vector3 | null = null;
   private enterHang(): void {
     this.hangLeft = DribbleController.HESI_HANG_SEC; this.hangPush = null;
     this.hesiBoostLeft = DribbleController.HESI_BOOST_SEC + DribbleController.HESI_HANG_SEC;
+    this.explodeFloor = DribbleController.HESI_EXPLODE_FLOOR;
+    // the hesitation spends the run's direction: the hang returns before a direction is recorded, so the pull-back stayed the last
+    // one (0.22 s old after the hang) and the explode's own push read as a reversal of it — a phantom crossover whose cooldown ate
+    // the real one (H2-HESI-SAME-FRAME, measured)
+    this.lastDirAge = Infinity;
   }
   /** Is the body inside a hesitation's hang? */
   get hanging(): boolean { return this.hangLeft > 0; }
   private explodeAlong(dir: Vector3): void {
     const top = DEFAULT_MOVEMENT.maxSpeed;
     this.pendingCut = null;
-    this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.movement.vel.length() + this.crossoverBoost))));
+    this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * this.explodeFloor, this.movement.vel.length() + this.crossoverBoost))));
     this.movement.facing = Math.atan2(dir.x, dir.z);
     this.hesiBoostLeft = 0;
   }
   update(dt: number, moveX: number, moveY: number, sprint: boolean): DribbleResult {
     this.clock += dt;
+    this.resolveMove(moveX, moveY);   // HOOPS-CROSS-ANGLE: a move's push, turned by this frame's stick
     this.stepCut(dt);
     this.stepSlide(dt);   // H2: the BTB slide's committed hop
     this.crossoverCooldown = Math.max(0, this.crossoverCooldown - dt);
@@ -280,6 +372,7 @@ export class DribbleController {
       this.hangLeft = Math.max(0, this.hangLeft - dt);
       if (mag > 0.5) { const d = new Vector3(moveX, 0, -moveY).normalize(); if (d.x * facingX + d.z * facingZ > 0.3) this.hangPush = d; }
     }
+    this.movement.retreatK = retreatCapK(moveX, moveY, facingX, facingZ);   // hoops-reverse (owner 2026-10-24): the retreat dribble runs at ≤ 0.7 of a jog
     const state = this.movement.update(dt, hanging ? 0 : moveX, hanging ? 0 : moveY, sprint);
     if (hanging) {
       const v = this.movement.vel, n = v.length();
@@ -319,6 +412,11 @@ export class DribbleController {
         // A flick straight back OUT (pull then push in one motion) is the explode — remembered, and it leaves on the hang's last
         // frame (H2b; it used to be written on this same frame, a hesitation with no pause in it).
         if (dir && fwd > 0.3) this.hangPush = dir.clone();
+      } else if (this.pullbackSec >= 0 && this.pullbackSec <= DribbleController.PULLBACK_TAP_SEC) {
+        // H2-HESI-COOLDOWN-CONSUME (also HOOPS-CROSS-FIXUP): a tap the cooldown refuses is still a tap, not a run — it is consumed.
+        // Its pull-back stayed the last direction, so the push out of it read as a reversal: a phantom crossover on every refused
+        // tap (3 of 6 at 0.5 s; QA: 3 of 6 cycles at 3f back / 6f neutral / 30f forward), whose own cooldown ate the real one.
+        this.lastDirAge = Infinity;
       }
       this.pullbackSec = -1;
     }
@@ -343,13 +441,7 @@ export class DribbleController {
     if (!hesitation && this.hesiBoostLeft > 0 && mag > 0.5) {
       const dir = new Vector3(moveX, 0, -moveY).normalize();
       const fwd = dir.x * Math.sin(this.movement.facing) + dir.z * Math.cos(this.movement.facing);
-      if (fwd > 0.3) {
-        const top = DEFAULT_MOVEMENT.maxSpeed;
-        this.pendingCut = null;   // see above
-        this.movement.vel.copyFrom(dir.scale(Math.min(top * 1.15, Math.max(top * DribbleController.EXPLODE_FLOOR, this.movement.vel.length() + this.crossoverBoost))));
-        this.movement.facing = Math.atan2(dir.x, dir.z);
-        this.hesiBoostLeft = 0;
-      }
+      if (fwd > 0.3) this.explodeAlong(dir);   // the same explode as the hang's (its floor is the window's: the hesi's or PAUSIN's)
     }
 
     // CHANGE OF PACE — the R2 press inside the gear-down window: the explode-out's burst along the stick (the hesi's
@@ -603,6 +695,16 @@ export class ShotMeter {
     if (!(factor > 1)) return;
     this.greenHalfWidth *= factor;
   }
+  /** lane/hoops-shot-core: NARROW the green after start() — distance (ShotWindow.distanceGreenFactor). The mirror of widenBy:
+   *  `factor` is never allowed to WIDEN (≥ 1 is a no-op) or close the window (floored at 0.5). The rise is untouched. */
+  narrowBy(factor: number): void {
+    if (!(factor < 1)) return;
+    this.greenHalfWidth *= Math.max(0.5, factor);
+  }
+  /** lane/hoops-shot-core: where the last release (or the bar now) sits against the green's centre, in SECONDS (− early, + late),
+   *  and the green's half-width in seconds — the finer banner grade reads both (ShotWindow.releaseGradeLabel). */
+  get offsetSec(): number { return (this.t - this.greenCenter) * this.duration; }
+  get greenHalfSec(): number { return this.greenHalfWidth * this.duration; }
   /** The gather's seconds at the front of the meter, and the rise's own seconds (pace the shot clip to THIS, not durationSec). */
   get gatherSec(): number { return this.gather; }
   get riseSec(): number { return this.rise; }
@@ -613,7 +715,7 @@ export class ShotMeter {
   release(): ShotQuality {
     this.active = false;
     const d = this.t - this.greenCenter;
-    if (Math.abs(d) <= this.greenHalfWidth * 0.35) return 'perfect';
+    if (Math.abs(d) <= this.greenHalfWidth * PERFECT_BAND_SHARE) return 'perfect';
     if (Math.abs(d) <= this.greenHalfWidth) return 'good';
     if (d < 0) return 'early';
     // YOU CANNOT HOLD A LAYUP. A meter that runs all the way out is a shot the player never released, and for a
@@ -684,6 +786,8 @@ export class DefenderBrain implements AIBehavior {
   private stillSec = 0;
   /** Handler body position last frame (press clock + slide lever). */
   private prevHandler: Vector3 | null = null;
+  /** hoops-defense-fx: the side of the handler he has read the ball on (core/BallSideShade — the on-ball anchor). */
+  private readonly shade = new BallSideShade();
 
   /** Ball still this long → the on-ball defender steps UP into the handler
    *  instead of holding the cushion. */
@@ -761,6 +865,9 @@ export class DefenderBrain implements AIBehavior {
     const handlerPos = onBall ? (mark ?? foes[0] ?? null) : null;
     const handlerSpeed = handlerPos && this.prevHandler && dt > 1e-4
       ? Vector3.Distance(handlerPos, this.prevHandler) / dt : 0;
+    // lane/hoops-def-tell (#273): the handler's planar velocity — the poke leads the ball by it (core/ReachTell aiPokes)
+    const hvx = handlerPos && this.prevHandler && dt > 1e-4 ? (handlerPos.x - this.prevHandler.x) / dt : 0;
+    const hvz = handlerPos && this.prevHandler && dt > 1e-4 ? (handlerPos.z - this.prevHandler.z) / dt : 0;
     if (handlerPos) this.prevHandler = handlerPos.clone();
 
     this.stillSec = onBall && handlerSpeed < 0.5 ? this.stillSec + dt : 0;
@@ -806,7 +913,7 @@ export class DefenderBrain implements AIBehavior {
     // never adjusted at all: measured live, the 1v1 defender moved < 1m in
     // an entire possession and could never be caught closing (which the hesi
     // bite needs). A statue can't bite on a fake; a sliding defender can.
-    const anchor = onBall ? ball : mark!;
+    const anchor = onBall ? (handlerPos ? this.shade.anchor(dt, handlerPos, ball, hoop, self) : ball) : mark!;   // hoops-defense-fx: on the ball, the side he has READ (core/BallSideShade)
     // DEFENSE-LOOK (2026-09-17). Two reads a real defender makes that this one never did:
     //   BEATEN — the handler is nearer the rim than I am: stop guarding the spot he left, RECOVER toward the rim at a run
     //            (the deny point drops to the rim side of him) with the chest still on him — the backpedal.
@@ -855,7 +962,7 @@ export class DefenderBrain implements AIBehavior {
     // ~1.4m — just OUTSIDE poke range (1.1m). Pressure without arrival is a
     // statue with intent. Measured live: never stripped, never stole.
     const out = steer(to, (dist > 3 || beaten || closingOut) && !fighting, press ? 0.2 : onBall ? 0.6 : 1.4,
-      onBall && dist < 1.1 && this.rng() < this.aggression * 0.02);
+      onBall && aiPokes(this.rng, this.aggression, dt, dist, ball, { x: hvx, z: hvz }, self));   // #273: core/ReachTell (the old `dist < 1.1 && rng() < aggression × 0.02` is its A/B off)
     if (fighting && this.over) { out.moveX *= 0.7; out.moveY *= 0.7; }   // fighting OVER the screen costs speed (FIGHT_SLOW)
     return out;
   }

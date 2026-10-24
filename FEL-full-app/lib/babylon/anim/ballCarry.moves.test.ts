@@ -147,7 +147,7 @@ describe('runMove: the ball on the move\'s path, from the ball as drawn', () => 
     const s = setup();
     dribbleTo(s, 0.2);
     s.carry.switchHand(); expect(s.carry.move?.name).toBe('crossover');
-    s.carry.toSide('left'); expect(s.carry.hand).toBe('Left');   // already on its way there
+    s.carry.toSide('left'); expect(s.carry.handAfterMove).toBe('Left');   // already on its way there
     s.carry.switchHand(); expect(s.carry.hand).toBe('Right');    // queued: back across at the catch
     for (let i = 0; i < 120; i++) s.d.frame(1 / 60, 0.3, true);
     expect(s.carry.side).toBe('Left'); expect(s.carry.move).toBeNull();

@@ -10,7 +10,7 @@
  * Roles map to models by config so providers can be swapped.
  */
 
-import { abacusEnabled, AiDisabledError } from '@/lib/abacus/killSwitch';
+import { requireAbacusApiKey } from '@/lib/abacus/killSwitch';
 
 // ── Model role mapping ────────────────────────────────────────────
 
@@ -140,8 +140,8 @@ export async function callLLM(opts: {
   jsonMode?: boolean;
   maxTokens?: number;
 }): Promise<Response> {
-  // ABACUS-KILL: no request leaves while the switch is off (lib/abacus/killSwitch.ts).
-  if (!abacusEnabled()) throw new AiDisabledError('callLLM');
+  // ABACUS-KILL: no request leaves while the switch is off or its server key is missing.
+  const apiKey = requireAbacusApiKey('callLLM');
   const model = getModelForRole(opts.role);
   const body: Record<string, any> = {
     model,
@@ -157,7 +157,7 @@ export async function callLLM(opts: {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.ABACUSAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });
@@ -254,7 +254,7 @@ export async function completeText(opts: {
   jsonMode?: boolean;
   maxTokens?: number;
 }): Promise<string> {
-  if (!abacusEnabled()) throw new AiDisabledError('completeText');
+  const apiKey = requireAbacusApiKey('completeText');
   const model = getModelForRole(opts.role);
   const body: Record<string, any> = {
     model,
@@ -268,7 +268,7 @@ export async function completeText(opts: {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.ABACUSAI_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });

@@ -34,7 +34,7 @@ type Spec = { slug: string; path: string };
 const ROUTES: Spec[] = [
   { slug: 'dunk', path: '/play/dunk' }, { slug: 'karate', path: '/play/karate' }, { slug: 'football', path: '/play/football' },
   { slug: 'skateboard', path: '/play/skateboard' }, { slug: 'snowboard_slalom', path: '/play/snowboard' }, { slug: 'surf', path: '/play/surf' },
-  { slug: 'tennis', path: '/play/tennis' }, { slug: 'derby', path: '/play/baseball' }, { slug: 'penalty', path: '/play/soccer' },
+  { slug: 'tennis', path: '/play/tennis' }, { slug: 'derby', path: '/play/derby' }, { slug: 'penalty', path: '/play/soccer' },
   { slug: 'golf', path: '/play/golf' }, { slug: 'onevone', path: '/play/onevone' }, { slug: 'threevthree', path: '/play/threevthree' },
   { slug: 'carnival', path: '/play/carnival' }, { slug: 'karate_vs', path: '/play/karate-vs' }, { slug: 'mixedcombat', path: '/play/mixedcombat' },
   { slug: 'sprint', path: '/play/sprint' }, { slug: 'showdown', path: '/play/showdown' }, { slug: 'duel', path: '/play/duel' },

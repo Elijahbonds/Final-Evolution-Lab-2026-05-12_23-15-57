@@ -50,6 +50,7 @@ const matchesWhere = (where: Row): Row[] => h.matches.filter((m) => {
   if (where.player1Id?.not && m.player1Id === where.player1Id.not) return false;
   if (typeof where.player1Id === 'string' && m.player1Id !== where.player1Id) return false;
   if (where.mode?.in && !where.mode.in.includes(m.mode)) return false;
+  if (where.mode?.notIn && where.mode.notIn.includes(m.mode)) return false;
   if (where.OR) return where.OR.some((c: Row) => Object.entries(c).every(([k, v]) => m[k] === v));
   return true;
 });
@@ -202,9 +203,12 @@ describe('the one list (lib/stakingPause.ts)', () => {
     }
   });
 
-  it('every other Arena mode can still be staked', () => {
-    expect(arenaStakeableModes()).toEqual(ARENA_MODES.filter((m) => !PAUSED.includes(m as never)));
-    expect(arenaStakeableModes()).toHaveLength(ARENA_MODES.length - PAUSED.length);
+  it('every other listed Arena mode can still be staked', () => {
+    const expectedStakeable = ARENA_MODES.filter((m) => !PAUSED.includes(m as never) && !isUnlistedMode(m));
+    expect(isArenaMode('training')).toBe(true);        // historical duels and score ceilings stay readable
+    expect(isArenaStakeable('training')).toBe(false);  // but /play/training redirects, so no new stake can open
+    expect(arenaStakeableModes()).toEqual(expectedStakeable);
+    expect(arenaStakeableModes()).toHaveLength(expectedStakeable.length);
     for (const m of arenaStakeableModes()) expect(isArenaStakeable(m), m).toBe(true);
   });
 
@@ -268,6 +272,19 @@ describe('the Arena refuses a NEW stake on dance, and nothing is written', () =>
     const res = await createPOST(post({ mode: 'notAMode', feeLc: 50 }));
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('invalid_mode');
+  });
+
+  it('a parked mode refuses every NEW Arena stake path before LC moves', async () => {
+    const create = await createPOST(post({ mode: 'training', feeLc: 50 }));
+    const quick = await quickPOST(post({ mode: 'training', feeLc: 50 }));
+    h.matches = [duel({ id: 'training-waiting', mode: 'training', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null })];
+    const join = await joinPOST(post({ matchId: 'training-waiting' }));
+
+    expect([create.status, quick.status, join.status]).toEqual([400, 400, 400]);
+    expect([await create.json(), await quick.json(), await join.json()].map((b) => b.error)).toEqual(['invalid_mode', 'invalid_mode', 'invalid_mode']);
+    expect(h.created).toEqual([]);
+    expect(h.locks).toEqual([]);
+    expect(h.houseCalls).toBe(0);
   });
 });
 
@@ -370,13 +387,57 @@ describe('the Arena lobby', () => {
     const body = await (await configGET()).json();
     const keys = body.modes.map((m: Row) => m.key);
     for (const m of PAUSED) expect(keys).not.toContain(m);
-    // IRON-PARADISE-OUT (2026-10-03): the picker is the stakeable list MINUS the parked modes
-    // (lib/unlisted-modes.ts) — a stake on a redirecting /play route is a trap. The paused/dance assertions
-    // below are unchanged.
-    expect(keys).toEqual(arenaStakeableModes().filter((k: string) => !isUnlistedMode(k)));
+    // IRON-PARADISE-OUT (2026-10-03): arenaStakeableModes has already removed parked modes — a stake on a redirecting
+    // /play route is a trap. The paused/dance assertions below are unchanged.
+    expect(keys).toEqual(arenaStakeableModes());
     expect(keys).not.toContain('training');
     expect(body.pausedModes.map((p: Row) => p.key).sort()).toEqual(['dance']);
     expect(keys).toContain('music');   // P6: offered again
+  });
+
+  it('does not advertise a parked duel nobody can now accept', async () => {
+    h.matches = [
+      duel({ id: 'open-training', mode: 'training', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null, expiresAt: new Date(Date.now() + 60_000) }),
+      duel({ id: 'open-music', mode: 'music', status: 'WAITING', matchType: 'SCORE_DUEL', player1Id: OTHER, player2Id: null, expiresAt: new Date(Date.now() + 60_000) }),
+    ];
+    const body = await (await listGET()).json();
+    expect(body.open.map((d: Row) => d.id)).toEqual(['open-music']);
+  });
+
+  it('filters parked/paused open rows before the open challenge cap, so joinable duels are not crowded out', async () => {
+    const later = new Date(Date.now() + 60_000);
+    const parked = Array.from({ length: 45 }, (_, i) => duel({
+      id: `parked-${i}`,
+      mode: i % 2 === 0 ? 'training' : 'dance',
+      status: 'WAITING',
+      matchType: 'SCORE_DUEL',
+      player1Id: OTHER,
+      player2Id: null,
+      expiresAt: later,
+    }));
+    const joinable = duel({
+      id: 'joinable-music',
+      mode: 'music',
+      status: 'WAITING',
+      matchType: 'SCORE_DUEL',
+      player1Id: OTHER,
+      player2Id: null,
+      expiresAt: later,
+    });
+    h.matches = [...parked, joinable];
+    const body = await (await listGET()).json();
+    expect(body.open.map((d: Row) => d.id)).toEqual(['joinable-music']);
+  });
+
+  it('marks my old parked duels so the lobby does not offer a PLAY link into a redirect', async () => {
+    h.matches = [
+      duel({ id: 'mine-training', mode: 'training', status: 'ACTIVE', matchType: 'SCORE_DUEL', player1Id: USER, player2Id: OTHER, expiresAt: new Date(Date.now() + 60_000) }),
+      duel({ id: 'mine-music', mode: 'music', status: 'ACTIVE', matchType: 'SCORE_DUEL', player1Id: USER, player2Id: OTHER, expiresAt: new Date(Date.now() + 60_000) }),
+    ];
+    const body = await (await listGET()).json();
+    const mine = Object.fromEntries(body.mine.map((d: Row) => [d.id, d]));
+    expect(mine['mine-training']).toMatchObject({ mode: 'training', href: '/play/training', unlistedMode: true });
+    expect(mine['mine-music']).toMatchObject({ mode: 'music', href: '/play/music', unlistedMode: false });
   });
 
   it('does not advertise a paused duel nobody can accept, and keeps mine with its PLAY link and a paused flag', async () => {
@@ -402,6 +463,15 @@ describe('the Arena lobby', () => {
     h.matches = [...newer, old];
     const body = await (await listGET()).json();
     expect(body.mine.map((d: Row) => d.id)).toContain('old-paused');
+  });
+
+  it('keeps a parked WAITING duel in MY DUELS even behind 30 newer duels, so its CANCEL is always there', async () => {
+    const old = duel({ id: 'old-parked', mode: 'training', status: 'WAITING', matchType: 'SCORE_DUEL', player2Id: null });
+    const newer = Array.from({ length: 30 }, (_, i) => duel({ id: `newer-${i}`, mode: 'threePoint', status: 'SETTLED' }));
+    h.matches = [...newer, old];
+    const body = await (await listGET()).json();
+    const mine = Object.fromEntries(body.mine.map((d: Row) => [d.id, d]));
+    expect(mine['old-parked']).toMatchObject({ id: 'old-parked', unlistedMode: true });
   });
 });
 

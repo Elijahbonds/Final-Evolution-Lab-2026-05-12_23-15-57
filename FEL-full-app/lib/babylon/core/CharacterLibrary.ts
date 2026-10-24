@@ -284,6 +284,10 @@ export const CharacterLibrary = {
     const meshes = root.getChildMeshes();
 
     if (!skeleton) throw new Error(`[FEL-CHAR] no skeleton in ${effectiveUrl}`);
+    // Low-end/mobile GPUs can expose fewer vertex-uniform vectors than a rigged
+    // athlete needs. Store bone matrices in a texture so characters do not
+    // silently disappear on those devices.
+    skeleton.useTextureToStoreBoneMatrices = true;
 
     // ── THE M30 FIX: restore original clip names on this spawn's animation
     // groups. 'guard_c58' -> 'guard' so aliases (run_forward->run, jab, hook…)

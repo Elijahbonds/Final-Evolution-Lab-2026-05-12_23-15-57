@@ -1,7 +1,7 @@
 // lib/coach/aiChatAccess.ts — COACH-AI Phase 8 (2026-10-07): who may talk to the AI coach.
 //
 // TWO CHECKS, BOTH SERVER-SIDE, BOTH BEFORE ANYTHING IS SENT (plan item #9; owner decision 8: the AI coach stays off
-// until this lands — abacusEnabled() is untouched and still runs first in the route):
+// until this lands — the Abacus readiness guard still runs first in the route):
 //   1. ADULTS ONLY. Verified 18+ from the DATABASE's User.dobYear (lib/privacy/scanSaveGate readDobYear +
 //      verifiedAdult, the same strict rule as canWriteHealthData). Unknown age is not an adult. Never the session
 //      token, never the request body.

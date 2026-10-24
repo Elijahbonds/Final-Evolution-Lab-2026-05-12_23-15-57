@@ -23,6 +23,7 @@ import { touchDeckLayout, type TouchDeckLayout } from '@/lib/ui/consoleView';
 // THE CYPHER'S PAD (lane/dance-extras, 2026-10-14): dance draws its own thumb pairs in place of the generic rig below — the
 // same overlay (bus, safe-area, fit), the same verbs (MODE_VERBS.dance); see lib/babylon/dance/ui/padModel.ts (what each button is) and padStore.ts (what the room tells it).
 import { DancePad } from '@/lib/babylon/dance/ui/DancePad';
+import { TurboPad } from './TurboPad';   // hoops round 2 (owner 2026-10-23): R2 on the touch deck, for the modes whose R2 is the turbo
 
 // setPointerCapture throws NotFoundError if the browser has already dropped
 // the pointer session by the time the handler runs (seen on some mobile
@@ -123,13 +124,19 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
           {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
           <div className="flex flex-col items-center gap-2">
             {cfg.boost && <BoostPill bus={props.bus} />}
+            {cfg.turbo && <TurboPad bus={props.bus} shape="pill" />}
             <ButtonDiamond bus={props.bus} buttons={buttons} />
           </div>
         </div>
       ) : (
         <div ref={colR} className="pointer-events-auto absolute bottom-3 right-3 flex flex-col items-center gap-2" style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}>
           {cfg.boost && <BoostPill bus={props.bus} />}
-          <ButtonDiamond bus={props.bus} buttons={buttons} />
+          {cfg.turbo && landscape && <TurboPad bus={props.bus} shape="pill" />}
+          {/* portrait: TURBO beside the diamond, inboard and out of the column's flow — the column keeps its size (a phone's stage has no
+              height to spare: fitDeck already scales it), so the diamond and the stick stay exactly where they were */}
+          {cfg.turbo && !landscape
+            ? <div className="relative"><div className="absolute right-full top-1/2 mr-2 -translate-y-1/2"><TurboPad bus={props.bus} shape="round" /></div><ButtonDiamond bus={props.bus} buttons={buttons} /></div>
+            : <ButtonDiamond bus={props.bus} buttons={buttons} />}
           {cfg.rStick === null ? <HollowStick /> : <AnalogStick bus={props.bus} side="R" label={cfg.rStick} />}
         </div>
       )}

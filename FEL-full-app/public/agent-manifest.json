@@ -1,5 +1,5 @@
 {
-  "$comment": "Served at /agent-manifest.json. STATIC discovery: an agent fetches this BEFORE loading the app, so it knows what exists without booting a 3D scene first. The live window.__NEXUS_AGENT__.describe() is authoritative at runtime; this file must be kept in step with the app's mode registry.",
+  "$comment": "Served at /agent-manifest.json. STATIC discovery: an agent fetches this BEFORE loading the app, so it knows what exists without booting a 3D scene first. The live window.__NEXUS_AGENT__.describe() is authoritative at runtime. This file tracks shipping GameShell play routes; dev-only registry modes stay out.",
   "schemaVersion": "1.0.0",
   "product": "Final Evolution Lab",
   "auth": {
@@ -24,14 +24,14 @@
   },
   "modes": [
     { "id": "aeroaces",         "route": "/play/aero-aces",     "label": "Aero Aces",      "venue": "The Flyway",           "actions": ["move", "sprint", "idle"] },
+    { "id": "baseball",         "route": "/play/baseball",      "label": "Baseball",       "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
     { "id": "bigair",           "route": "/play/big-air",       "label": "Stomp",          "venue": "Mountain Slope",       "actions": ["move", "sprint", "idle"] },
     { "id": "brainbrawl",       "route": "/play/brain-brawl",   "label": "Brain Brawl",    "venue": "NeuroArena",           "actions": ["move", "shoot", "idle"] },
     { "id": "carnival",         "route": "/play/carnival",      "label": "Carnival",       "venue": "Venice Beach Court",   "actions": ["move", "shoot", "idle"] },
     { "id": "dance",            "route": "/play/dance",         "label": "The Cypher",     "venue": "The Cypher",           "actions": ["move", "idle"] },
-    { "id": "derby",            "route": "/play/baseball",      "label": "Moonshot Derby", "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
+    { "id": "derby",            "route": "/play/derby",         "label": "Moonshot Derby", "venue": "Catalina Ballpark",    "actions": ["move", "shoot", "idle"] },
     { "id": "duel",             "route": "/play/duel",          "label": "Duel",           "venue": "Shimogamo Dojo",       "actions": ["move", "guard", "strike", "idle"] },
     { "id": "dunk",             "route": "/play/dunk",          "label": "Dunk Contest",   "venue": "Venice Beach Court",   "actions": ["move", "sprint", "dunk", "shoot", "idle"] },
-    { "id": "dunkduel",         "route": "/play/dunkduel",      "label": "Prove It",       "venue": "Venice Beach Court",   "actions": ["move", "sprint", "dunk", "shoot", "idle"] },
     { "id": "football",         "route": "/play/football",      "label": "Breakaway",      "venue": "The Gridiron",         "actions": ["move", "sprint", "turbo", "idle"] },
     { "id": "freerun",          "route": "/play/freerun",       "label": "Free Run",       "venue": "The Yard",             "actions": ["move", "sprint", "idle"] },
     { "id": "golf",             "route": "/play/golf",          "label": "The Loop",       "venue": "Coastal Links",        "actions": ["move", "shoot", "idle"] },

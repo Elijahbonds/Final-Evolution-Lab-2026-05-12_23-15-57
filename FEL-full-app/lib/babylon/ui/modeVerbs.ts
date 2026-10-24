@@ -28,6 +28,9 @@ export type ModeVerbConfig = {
   /** BOOST (FINISH-RELEASE, 2026-09-14): the mode spends the shared BoostKit meter on a HELD R1. TouchOverlay draws a
    *  BOOST pill for it above the face diamond — one boost control in every speed mode, on every input. */
   boost: boolean;
+  /** TURBO (owner 2026-10-23, hoops round 2: "Touch R2: add a TURBO pad"): the mode reads a HELD R2 (the 2K turbo and its escapes).
+   *  TouchOverlay draws a TURBO pad that sends exactly a pad's R2 (TurboPad.tsx). */
+  turbo: boolean;
 };
 
 const A = (btn: 'A' | 'B' | 'X' | 'Y'): FelInput => ({ t: 'button', btn, pressed: true });
@@ -45,13 +48,13 @@ const SLOT_COLOR = { A: '#22d3ee', B: '#ff6b3d', X: '#a78bfa', Y: '#ffd75e' } as
 const inert = (): VerbButton => ({ label: '', color: '#4b5563', emit: null });
 /** Build a 4-slot config from up to 4 {slot, label, emit, hold} entries; any
  *  slot not supplied comes back inert (drawn hollow, not pressable). */
-function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): Omit<ModeVerbConfig, 'rStick' | 'boost'> {
+function verbs(defs: Partial<Record<'A' | 'B' | 'X' | 'Y', { label: string; emit: FelInput; hold?: boolean }>>): Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'> {
   const slot = (k: 'A' | 'B' | 'X' | 'Y'): VerbButton =>
     defs[k] ? { label: defs[k]!.label, color: SLOT_COLOR[k], emit: defs[k]!.emit, hold: defs[k]!.hold } : inert();
   return { buttons: [slot('A'), slot('B'), slot('X'), slot('Y')] };
 }
 
-const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
+const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost' | 'turbo'>> = {
   dunk: verbs({
     A: { label: 'SLAM', emit: A('A') },
     B: { label: 'STYLE', emit: A('B') },
@@ -113,16 +116,21 @@ const VERBS: Record<string, Omit<ModeVerbConfig, 'rStick' | 'boost'>> = {
     X: { label: 'DROP', emit: A('X') },
     Y: { label: 'LOB', emit: A('Y') },
   }),
-  // Tiebreak's route draws its own two large swing buttons; the dev harness and
-  // creator-card readout still need honest verbs for the registry entry.
+  // TENNIS-TIEBREAK-FOLD (2026-10-22): `tiebreak` is the Tennis tiebreak variant on NetSportMode now, so it plays Tennis's
+  // four shots (the old Blitz's two swing buttons went with TiebreakMode's unregistering).
   tiebreak: verbs({
-    B: { label: 'SWING R', emit: A('B') },
-    X: { label: 'SWING L', emit: A('X') },
+    A: { label: 'DRIVE', emit: A('A') },
+    B: { label: 'SLICE', emit: A('B') },
+    X: { label: 'DROP', emit: A('X') },
+    Y: { label: 'LOB', emit: A('Y') },
   }),
   // PARKOUR DERBY (2026-09-18): B is the BAT-FLIP VAULT, the wind-up trick that fills flow for a KINETIC swing. It
   // shipped with no touch slot, so on a tablet or the on-screen pad the derby's whole trick economy was unreachable —
   // a player could swing, and could never earn the swing that scores.
   derby: verbs({ A: { label: 'SWING', emit: A('A') }, B: { label: 'BAT FLIP', emit: A('B') } }),
+  // BASEBALL-3INN (2026-10-22): three innings at /play/baseball (BaseballInningsMode) — one verb, the swing. No bat flip,
+  // no quit: B ended the old stub's game and is gone.
+  baseball: verbs({ A: { label: 'SWING', emit: A('A') } }),
   // IMPROVE (2026-10-06, Penalty #3): Y at the top of a kick switches it between the breakaway and CLASSIC PENS.
   penalty: verbs({ A: { label: 'STRIKE', emit: A('A') }, Y: { label: 'CLASSIC', emit: A('Y') } }),
   // PARKOUR GOLF (2026-09-18): Y sets the SPRINGBOARD before the swing — a percentage multiplier off the pad, and the
@@ -303,6 +311,7 @@ const R_STICK: Record<string, string | null> = {
   tennis: null, tiebreak: null,                          // the rally camera is a cut behind the baseline
   volleyball: 'AIM',                                     // IMPROVE (2026-10-06): the R stick aims the spike and the serve, apart from the feet
   golf: null, derby: null, penalty: null,                // fixed shots (setFixedBehind) — no orbit to give
+  baseball: null,                                        // BASEBALL-3INN: the fixed batting camera, like the derby's
   carnival: null,                                        // the hub's bursts cut between fixed and follow shots
   dance: null, who_scene_it: null,                       // no follow camera
   freerun: null,                                         // the runner cam follows the heading (b8f97fb) but has no look orbit wired
@@ -310,6 +319,8 @@ const R_STICK: Record<string, string | null> = {
 };
 /** The speed modes that spend the shared boost (lib/babylon/core/BoostKit.ts) on a held R1. */
 export const BOOST_MODES: ReadonlySet<string> = new Set(['velocitykart', 'aeroaces', 'skateboard', 'snowboard_slalom', 'surf', 'bigair']);
+/** The modes whose R2 is the 2K turbo (PlayerSlot: sprint, and the escapes — the snatch-back, the momentum cross / wrap, the steezo roll). */
+export const TURBO_MODES: ReadonlySet<string> = new Set(['onevone', 'threevthree']);
 export const MODE_VERBS: Record<string, ModeVerbConfig> = Object.fromEntries(
-  Object.entries(VERBS).map(([k, v]) => [k, { ...v, rStick: R_STICK[k] === undefined ? 'LOOK' : R_STICK[k], boost: BOOST_MODES.has(k) }]),
+  Object.entries(VERBS).map(([k, v]) => [k, { ...v, rStick: R_STICK[k] === undefined ? 'LOOK' : R_STICK[k], boost: BOOST_MODES.has(k), turbo: TURBO_MODES.has(k) }]),
 );

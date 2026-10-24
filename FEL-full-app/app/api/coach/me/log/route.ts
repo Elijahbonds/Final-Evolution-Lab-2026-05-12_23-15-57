@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { saveClientLog } from '@/lib/coach/todayServer';
 import { settleRecoveryFor } from '@/lib/prq-recovery';
+import { teenGateRefusal } from '@/lib/coach/teenGateServer';
 
 /**
  * POST /api/coach/me/log — the client logs a session (lane 1 C2).
@@ -23,6 +24,10 @@ import { settleRecoveryFor } from '@/lib/prq-recovery';
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
+  // COACH-LOOP P1 (2026-10-20): a teen saves training only with an accepted guardian consent, an under-13 never, and a
+  // blank birth year is asked for first (lib/coach/teenGate.ts). Checked before anything is read or written.
+  const refused = await teenGateRefusal(prisma, userId);
+  if (refused) return refused;
   let body: unknown;
   try { body = await req.json(); } catch { return bad('invalid_json'); }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return bad('invalid_json');

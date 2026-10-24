@@ -50,7 +50,10 @@ const UA = 'AgeScreenTest/1.0';
 // prisma/pending/2026-10-17-studio-project-save.sql (pending SQL only, applied in the deploy session) at fe5064a8.
 // PENDING-MODELS (owner 2026-10-20, "Add the 3 models"; lane/studio-save) PartyReport, CreatorInquiry,
 // BookFulfillmentEvent and BookEntitlement models matching their pending SQL + regenerated client at cb1029d8.
-const PARENT = 'cb1029d888353898f4c14e30af1face0f7861564';
+// RATE-LIMITS (lane/rate-limits, PR #289 rebuilt on release, 2026-10-23): the RateLimit model (table rate_limits) in
+// schema.prisma and prisma/pending/2026-10-16-rate-limits.sql at 3887ceef. lane/studio-save (#373) also changes prisma/:
+// whichever of the two lands second bumps this to the merge commit carrying both.
+const PARENT = 'cb1029d888353898f4c14e30af1face0f7861564'; // MERGE-PENDING: re-pinned in the next commit
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

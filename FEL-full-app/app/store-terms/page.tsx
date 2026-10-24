@@ -4,6 +4,7 @@ import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { STORE_TERMS_SECTIONS, STORE_TERMS_VERSION, BUSINESS_ADDRESS_TOKEN } from '@/lib/store-terms';
 import { renderStoreTerms } from '@/lib/store-terms/render';
 import { REAL_MAILING_ADDRESS, isMailingAddressSet, renderMailingAddress } from '@/lib/legal/business';
+import { LEGAL_PROSE, LEGAL_QUOTE_GOLD } from '@/lib/legal/legalProse';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,13 +29,8 @@ export default async function StoreTermsPage() {
       {session ? null : <PublicTopBar />}
       <main className="mx-auto max-w-[700px] px-4 py-8">
         <div className="fel-panel rounded-xl p-6">
-          <div className="prose prose-invert prose-sm max-w-none
-            prose-headings:fel-heading prose-headings:text-white
-            prose-p:text-white/70 prose-li:text-white/70
-            prose-blockquote:border-[#FFD700]/40 prose-blockquote:text-[#FFD700]/80
-            prose-strong:text-white prose-em:text-white/50
-            prose-a:text-cyan-300 prose-a:underline
-            prose-table:w-full prose-td:border prose-td:border-white/10 prose-td:px-2 prose-td:py-1 prose-td:align-top">
+          {/* TW-DEAD-CLASSES: the prose-* classes compiled to nothing (no typography plugin); lib/legal/legalProse.ts */}
+          <div className={`${LEGAL_PROSE} ${LEGAL_QUOTE_GOLD}`}>
             <div dangerouslySetInnerHTML={{ __html: html }} />
           </div>
           <div className="mt-4 text-center text-[10px] text-white/30">

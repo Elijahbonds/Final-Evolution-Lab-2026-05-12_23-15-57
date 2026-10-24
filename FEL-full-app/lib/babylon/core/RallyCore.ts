@@ -343,6 +343,30 @@ export class VolleyScore {
   }
 }
 
+/**
+ * TENNIS-TIEBREAK-FOLD (ALL-MODES-TO-75 §1 + S6, 2026-10-22): Tiebreak is a Tennis variant now, not its own mode. The
+ * tiebreak game: every rally scores, first to TIEBREAK_TARGET points, win by 2 (7-5 ends it, 7-6 plays on, 8-6 ends it).
+ */
+export const TIEBREAK_TARGET = 7;   //TUNE(elijah) — the real tiebreak's 7 (Tiebreak Blitz played to 7 too)
+
+/**
+ * Tennis tiebreak scoring. Rally scoring to a target, win by 2, is VolleyScore with no cap — so it IS one, and
+ * NetSportMode's points reads serve it unchanged. `award` answers 'set' when the tiebreak is won. It adds what tennis
+ * needs on top: the umpire's call and the tiebreak serve rotation.
+ */
+export class TiebreakScore extends VolleyScore {
+  constructor(target = TIEBREAK_TARGET) { super(target, Number.POSITIVE_INFINITY); }
+
+  /** The umpire's call, the asking side first: "5-3". */
+  callFor(side: 0 | 1): string { return `${this.points[side]}-${this.points[1 - side]}`; }
+
+  /** Who serves the next point: `first` serves point one, then the serve changes every two points (the real rule). */
+  serverFor(first: 0 | 1): 0 | 1 {
+    const played = this.points[0] + this.points[1];
+    return Math.floor((played + 1) / 2) % 2 === 0 ? first : (1 - first) as 0 | 1;
+  }
+}
+
 // ── rally state ───────────────────────────────────────────────────────────
 
 export type RallySide = 0 | 1;

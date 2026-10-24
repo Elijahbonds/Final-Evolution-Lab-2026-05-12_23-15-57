@@ -8,11 +8,12 @@
 // rejection and retry boxes and the paused card's words all live on the steps where reading is safe (framing /
 // position / the done beats / the mini-result) or are spoken instead. After each test the pain check is a full-screen
 // Yes/No with targets at least a quarter of the screen tall, and it waits for the tap — no timeout, no default.
-import { Check } from 'lucide-react';
+import { Check, Eye, EyeOff } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { RunnerView } from '@/lib/assess/runner';
 import { testDef, type Side } from '@/lib/assess/protocol';
-import { SCREEN_TEST_NAMES } from '@/lib/screen/copy';
+import { FRAMING_IN_FRAME, JUMP_LAND_TALL, READ_CLEAR, READ_PARTIAL, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
+import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { cuesDue, cueFlash, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
 
 /** SCREEN A: a rep is up on these steps — voice and colour only, no reading. */
@@ -34,6 +35,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
   const inTest = v.step === 'position' || v.step === 'countdown' || v.step === 'active' || v.step === 'paused' || v.step === 'calibrateSide';
   const showGuide = v.step === 'framing' || v.step === 'position' || v.step === 'calibrate' || v.step === 'calibrateSide';
   const framingOk = !!v.framing?.ok || v.setupReady;
+  const sideOn = v.view === 'side';
   const flashColour = v.flash ? FLASH_COLOUR[v.flash] : null;
   // the big rep number flashes green for FLASH_MS on a counted rep (a rep that did not count leaves it unchanged)
   const counted = v.flash === 'captured';
@@ -42,7 +44,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
     <div className="absolute inset-0">
       {/* full-screen colour flash */}
       {flashColour ? (
-        <div key={newest || v.flash} className="pointer-events-none absolute inset-0 z-[5] animate-pulse" style={{ backgroundColor: flashColour, opacity: 0.55, animationDuration: `${FLASH_MS}ms` }} aria-hidden />
+        <div key={newest || v.flash} className="pointer-events-none absolute inset-0 z-[5] motion-safe:animate-pulse" style={{ backgroundColor: flashColour, opacity: 0.55, animationDuration: `${FLASH_MS}ms` }} aria-hidden />
       ) : null}
 
       {/* move header: readable from ~3 m — never while a rep is up (SCREEN A) */}
@@ -67,16 +69,36 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
         </div>
       ) : null}
 
+      {/* reading-quality badge (UX §3): icon + word, two states, never a percentage; while a rep is up only the icon */}
+      {v.readQuality ? (
+        <div data-read-quality={v.readQuality} aria-label={v.readQuality === 'clear' ? READ_CLEAR : READ_PARTIAL}
+          className={`pointer-events-none absolute bottom-3 left-3 z-[6] flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1 text-[16px] font-bold ${v.readQuality === 'clear' ? 'text-white' : 'text-[#FFB020]'}`}>
+          {v.readQuality === 'clear' ? <Eye aria-hidden className="h-5 w-5" /> : <EyeOff aria-hidden className="h-5 w-5" />}
+          {!noReading ? <span>{v.readQuality === 'clear' ? READ_CLEAR : READ_PARTIAL}</span> : null}
+        </div>
+      ) : null}
+
       {/* setup helper */}
       {showGuide ? (
         <>
           <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" className="pointer-events-none absolute inset-0 z-[2] h-full w-full" aria-hidden>
-            <g fill="none" stroke={framingOk ? '#00FF9D' : 'rgba(255,255,255,0.45)'} strokeWidth="0.6" strokeDasharray={framingOk ? '0' : '2 1.5'}>
+            <g data-framing-ghost={sideOn ? 'side' : 'front'} fill="none" stroke={framingOk ? '#00FF9D' : '#00E5FF'} strokeWidth="0.6" strokeDasharray={framingOk ? '0' : '2 1.5'}>
               <circle cx="50" cy="16" r="5" />
-              <path d="M42 24 L58 24 L61 50 L56 52 L55 86 L51 86 L50 56 L49 86 L45 86 L44 52 L39 50 Z" />
+              {sideOn
+                ? <path d="M47 24 L54 24 L55 50 L53 52 L54 86 L50 86 L49 56 L47 86 L44 86 L46 52 L45 50 Z" />
+                : <path d="M42 24 L58 24 L61 50 L56 52 L55 86 L51 86 L50 56 L49 86 L45 86 L44 52 L39 50 Z" />}
               <rect x="30" y="86" width="40" height="6" rx="1" />
             </g>
           </svg>
+          {/* the state is never colour alone: a check (always) and the words (only where reading is safe) */}
+          {framingOk ? (
+            <div data-in-frame className="pointer-events-none absolute right-3 top-3 z-[6] flex items-center gap-1.5 rounded-full bg-[#00FF9D] px-3 py-1 text-[16px] font-black text-black">
+              <Check aria-hidden className="h-5 w-5" strokeWidth={3} />{!noReading ? <span>{FRAMING_IN_FRAME}</span> : null}
+            </div>
+          ) : null}
+          {sideOn && !framingOk && !noReading ? (
+            <p data-turn-side className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-[#00E5FF]">{SIDE_TURNED}</p>
+          ) : null}
           <div className="absolute inset-x-3 bottom-20 z-[6] rounded-2xl border border-white/15 bg-black/75 p-3 text-center backdrop-blur">
             <p className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Camera setup</p>
             <p className="mt-1 text-[16px] leading-snug text-white/85">Prop your device at hip height, 2–3 m away, portrait or landscape.</p>
@@ -85,6 +107,10 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
             </p>
           </div>
         </>
+      ) : null}
+      {/* MIRROR flight-time (PM): written only, under the jump setup — the flight time reads truest on straight legs */}
+      {v.test === 'T5' && !noReading ? (
+        <p data-jump-land-tall className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{JUMP_LAND_TALL}</p>
       ) : null}
       {v.dimWarning && !noReading ? (
         <p className="absolute inset-x-3 top-[7.5rem] z-[6] text-center text-[16px] font-bold text-[#FFB020]">Low light — move closer to a window if you can</p>
