@@ -238,10 +238,10 @@ describe('STATIC: health-intake-gate.tsx reaches the network only on the verifie
   });
 
   it('the status GET runs only after `if (!canWriteHealth) return;` (declined is false at mount)', () => {
-    const effect = between('useEffect(() => {', '}, []);');
+    const effect = between('useEffect(() => {', '}, [applyServerStatus, canWriteHealth]);');
     expect(effect.indexOf('if (!canWriteHealth) return;')).toBeGreaterThan(-1);
     expect(effect.indexOf('if (!canWriteHealth) return;')).toBeLessThan(effect.indexOf('fetchStatus()'));
-    expect(code.match(/fetchStatus\(\)/g)).toHaveLength(2);            // its definition and this one call
+    expect(code.match(/fetchStatus\(\)/g)).toHaveLength(3);            // its definition, retry, and this mount call
   });
 
   it('the submit and the clear are sent only after the browser-only branch has returned', () => {

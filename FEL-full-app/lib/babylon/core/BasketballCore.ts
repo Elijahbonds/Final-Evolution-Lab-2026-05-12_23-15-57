@@ -23,6 +23,7 @@ import { spinBackspin } from '../visual/BallSpin';
 import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the one visual-side helper (the rival's crossover side)
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
+import { hasBallM } from './PossessionSwap';   // lane/h3-aware (#313 H3c): "his man has the ball" — HAS_BALL_M, a feel knob
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
 import { HOOPS_HANDLER_TURN_DEG, retreatCapK } from './HoopsStick';   // hoops-reverse: the handler's turn rate (a feel knob; 540 = DEFAULT_MOVEMENT's)
 import { PERFECT_BAND_SHARE } from './shotBands';   // lane/hoops-shot-core: the perfect band's share, one constant for the grade and both bars
@@ -832,7 +833,7 @@ export class DefenderBrain implements AIBehavior {
 
   decide(dt: number, self: Vector3, ball: Vector3, hoop: Vector3, allies: Vector3[] = [], foes: Vector3[] = []): Intent {
     const mark = this.markIndex !== null ? foes[this.markIndex] ?? null : null;
-    const markHasBall = mark ? distXZ(mark, ball) < 1.8 : false;
+    const markHasBall = mark ? distXZ(mark, ball) < hasBallM() : false;   // lane/h3-aware (#313): 1.8 → 1.0 m (core/PossessionSwap HAS_BALL_M)
     // A LIVE BALL outranks everything. Measured in 3v3: after a miss every one of the six bodies sat
     // 8-19 m from the ball holding its seal or its crash lane, and the board fell through to the dice
     // roll — because no job in the system meant "go and get the actual ball".

@@ -13,9 +13,10 @@
 // anything.
 
 import { Vector3 } from '@babylonjs/core';
+import { RIM_RADIUS } from './courtDims';   // HOOP-UNIFY: moved to the shared dims, re-exported here unchanged
 
 /** Regulation-ish: an 18" ring is 0.2286 m radius. The ball is 0.12 m. */
-export const RIM_RADIUS = 0.2286;
+export { RIM_RADIUS };
 export const BALL_RADIUS = 0.12;
 
 export type RimHitKind = 'swish' | 'front' | 'back' | 'left' | 'right' | 'in_and_out' | 'backboard';

@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { GUEST_COOKIE } from '@/lib/guest';
+import { GUEST_COOKIE, GUEST_COOKIE_LEGACY, hashGuestToken } from '@/lib/guest';
 import { rateLimit } from '@/lib/rate-limit';
 import { publicCardWhere } from '@/lib/creator/creative-card-review';
 import { listenerOf, utcDayStart } from '@/lib/soundtrack/playCount';
@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
   if (!cardId) return NextResponse.json({ error: 'bad card id' }, { status: 400 });
 
   const session = await getServerSession(authOptions);
-  const listener = listenerOf((session?.user as { id?: string } | undefined)?.id, cookies().get(GUEST_COOKIE)?.value);
+  const jar = cookies();
+  const who = listenerOf((session?.user as { id?: string } | undefined)?.id, jar.get(GUEST_COOKIE)?.value ?? jar.get(GUEST_COOKIE_LEGACY)?.value);
+  // TIP-GUEST-TOKEN-HASH: a guest listener is stored as the token's hash, never the cookie.
+  const listener = who && 'guestId' in who ? { guestId: hashGuestToken(who.guestId) } : who;
   if (!listener) return NextResponse.json({ counted: false, reason: 'anonymous' });
   const key = 'userId' in listener ? `u:${listener.userId}` : `g:${listener.guestId}`;
   if (!rateLimit(`community-play:${key}`, PLAY_RATE.limit, PLAY_RATE.windowMs).ok) return NextResponse.json({ counted: false, reason: 'rate' });
