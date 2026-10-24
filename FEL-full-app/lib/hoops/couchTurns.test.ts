@@ -129,7 +129,8 @@ describe('a couch shootout is never ranked, staked or paid', () => {
     const src = readFileSync(path.join(ROOT, 'components/games/three-point-babylon.tsx'), 'utf8');
     const sink = src.slice(src.indexOf('const resultSink'), src.indexOf('onEndRef.current({'));
     expect(sink).toMatch(/if \(c && !postsSession\(c\.shooters\.length\)\) \{[\s\S]*?return;\s*\}/);
-    expect(sink).toMatch(/bodyPlay\.handOver\(\)/);
+    expect(sink).toMatch(/bodyPlay\.handOver\(\);\s*nextRunRef\.current\(\);/);
+    expect(src).toMatch(/<canvas key=\{canvasGen\}/);
     expect(src).toMatch(/bus\.padFilter = \(slot\) => padDrives\(/);
     expect(src).toMatch(/phoneDrives\(gateRef\.current\.shooters, gateRef\.current\.at, peerId\)/);
     expect(src).toMatch(/couchTurnsBlocked\(window\.location\.pathname, window\.location\.search\) === null/);

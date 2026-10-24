@@ -64,7 +64,7 @@ export function CouchBoard({ rows }: { rows: CouchRow[] }) {
 /** Between two runs: who is up, what to do, and the board so far. */
 export function TurnsHandoff({ title, sub, rows }: { title: string; sub: string; rows: CouchRow[] }) {
   return (
-    <HudPlate className="pointer-events-none flex max-w-[min(92vw,560px)] flex-col items-center gap-2 px-5 py-3 text-center" data-couch-handoff>
+    <HudPlate className="pointer-events-none mx-auto my-2 flex max-w-[min(92vw,560px)] flex-col items-center gap-2 px-5 py-3 text-center" data-couch-handoff>
       <HudText as="div" size="banner" tone="you">{title}</HudText>
       <HudText as="div" size="body">{sub}</HudText>
       <CouchBoard rows={rows} />
