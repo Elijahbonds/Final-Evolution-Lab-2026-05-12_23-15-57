@@ -68,15 +68,26 @@ export interface LandingAbsorbOpts {
   auto?: boolean;
   /** 0..1 scale on the sink (mobile can pass less). Default 1. */
   intensity?: number;
+  /** lane/h3-aware: run FIRST after the animations (before the posture, the carries and the feet), so every later layer works off the
+   *  held body. Default false (as before). */
+  first?: boolean;
 }
 
 export interface LandingAbsorbHandle {
   /** A touchdown at `vImpact` m/s (the mode knows its own landing). A harder landing during an absorb restarts it deeper. */
   impact(vImpact: number): void;
-  /** The sink being applied now (m), for probes. */
+  /** lane/h3-aware (PR #313's H3b/H3c hold, ported): a HELD offset (m) the body sits in, eased in and out over `easeSec`. Positive sinks
+   *  the hips (a landing's absorb wins when it is deeper); NEGATIVE RAISES them (a capture that sits too deep: the legs straighten under
+   *  it, the feet stay), down to −HOLD_RAISE_MAX and never past `reach` of a leg's length (hip to ankle). 0 lets it go. A body that never
+   *  calls it behaves exactly as before. */
+  hold(m: number, opts?: { reach?: number; easeSec?: number }): void;
+  /** The sink being applied now (m, negative = raised), for probes. */
   readonly drop: number;
   dispose(): void;
 }
+
+/** lane/h3-aware: the most a hold may raise the hips (m) — a safety bound, not a feel number. */
+export const HOLD_RAISE_MAX = 0.25;
 
 export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: TransformNode, opts: LandingAbsorbOpts = {}): LandingAbsorbHandle {
   const hips = boneNode(skeleton, 'Hips');
@@ -91,6 +102,7 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
   const fromClip = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (!q) return; const [x, y, z, w] = t.baseFor(q.x, q.y, q.z, q.w); q.set(x, y, z, w); };
   const wroteLeg = (n: TransformNode, t: AdditiveQuat) => { const q = n.rotationQuaternion; if (q) t.wrote(q.x, q.y, q.z, q.w); };
   let depth = 0, t = 0, drop = 0, applied = false;
+  let held = 0, holdTarget = 0, holdReach = 1, holdEase = 0.18;   // lane/h3-aware: the hold (0 = never asked: the old path exactly)
   const inv = new Matrix(), worldDown = new Vector3(), local = new Vector3();
   const start = (v: number) => { const d = absorbDepth(v) * intensity; if (d > (depth > 0 ? absorbAt(t, depth) : 0)) { depth = d; t = 0; } };
   const obs: Observer<Scene> | null = !hips || legs.length < 2 ? null : scene.onAfterAnimationsObservable.add(() => {
@@ -99,10 +111,14 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     root.computeWorldMatrix(true);
     if (detector) { const v = detector.step(root.getAbsolutePosition().y, dt); if (v > 0) start(v); }
     if (depth > 0) { t += dt; drop = absorbAt(t, depth); if (t >= absorbSec(depth)) { depth = 0; drop = 0; } } else drop = 0;
+    if (held !== 0 || holdTarget !== 0) {   // lane/h3-aware: the hold, eased; a landing's sink wins over a raise
+      held += (holdTarget - held) * Math.min(1, dt / Math.max(1e-3, holdEase)); if (Math.abs(held) < 1e-5 && holdTarget === 0) held = 0;
+      drop = held < 0 ? (drop > 0 ? drop : held) : Math.max(drop, held);
+    }
     const p = hips.position;
     const base = { x: track.x.baseFor(p.x), y: track.y.baseFor(p.y), z: track.z.baseFor(p.z) };
     for (const t of legTracks) { fromClip(t.l.hip, t.hip); fromClip(t.l.knee, t.knee); }
-    if (drop <= 1e-4) {
+    if (Math.abs(drop) <= 1e-4) {
       // nothing to add: a hips position no clip keys goes back to its own value once (held-pose memory), then is left alone
       if (applied) { p.set(base.x, base.y, base.z); track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = false; }
       for (const t of legTracks) { wroteLeg(t.l.hip, t.hip); wroteLeg(t.l.knee, t.knee); }
@@ -112,18 +128,32 @@ export function mountLandingAbsorb(scene: Scene, skeleton: Skeleton, root: Trans
     const feet = legs.map((l) => { l.ankle.computeWorldMatrix(true); return l.ankle.getAbsolutePosition().clone(); });
     const knees = legs.map((l) => { l.knee.computeWorldMatrix(true); return l.knee.getAbsolutePosition().clone(); });
     const hipW = legs.map((l) => { l.hip.computeWorldMatrix(true); return l.hip.getAbsolutePosition().clone(); });
+    // lane/h3-aware: a RAISE never asks a leg for more than `reach` of its length (hip to ankle, as the clip has it) — past it the leg
+    // snaps straight and back (#313: thigh pops to 4,800°/s on the 3v3 slides)
+    let d = drop;
+    if (d < 0) legs.forEach((_, i) => {
+      const L = (Vector3.Distance(hipW[i], knees[i]) + Vector3.Distance(knees[i], feet[i])) * holdReach;
+      const hx = hipW[i].x - feet[i].x, hz = hipW[i].z - feet[i].z, h2 = L * L - hx * hx - hz * hz;
+      const rMax = h2 > 0 ? Math.max(0, Math.sqrt(h2) - (hipW[i].y - feet[i].y)) : 0;
+      d = Math.max(d, -rMax);
+    });
     // a world-down sink in the hips' parent space (the armature may be rotated and scaled)
     const parent = hips.parent as TransformNode | null;
-    worldDown.set(0, -drop, 0);
+    worldDown.set(0, -d, 0);
     if (parent) { parent.computeWorldMatrix(true); parent.getWorldMatrix().invertToRef(inv); Vector3.TransformNormalToRef(worldDown, inv, local); } else local.copyFrom(worldDown);
     p.set(base.x + local.x, base.y + local.y, base.z + local.z);
     track.x.wrote(p.x); track.y.wrote(p.y); track.z.wrote(p.z); applied = true;
     hips.computeWorldMatrix(true);
     legs.forEach((l, i) => solveChainInFrame(l.hip, l.knee, l.ankle, feet[i], bendPole(hipW[i], knees[i], feet[i], root.forward), 1));
     for (const t of legTracks) { wroteLeg(t.l.hip, t.hip); wroteLeg(t.l.knee, t.knee); }
-  });
+  }, undefined, !!opts.first);
   return {
     impact: (v: number) => start(v),
+    hold: (m: number, o?: { reach?: number; easeSec?: number }) => {
+      holdTarget = Math.max(-HOLD_RAISE_MAX, Number.isFinite(m) ? m : 0) * intensity;
+      if (o?.reach !== undefined && Number.isFinite(o.reach)) holdReach = Math.max(0.5, Math.min(1, o.reach));
+      if (o?.easeSec !== undefined && Number.isFinite(o.easeSec)) holdEase = o.easeSec;
+    },
     get drop() { return drop; },
     dispose() { if (obs) scene.onAfterAnimationsObservable.remove(obs); },
   };
