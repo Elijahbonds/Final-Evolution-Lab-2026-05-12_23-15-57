@@ -1,4 +1,27 @@
 const path = require('path');
+const fs = require('fs');
+
+// PRISMA-PUBLIC step 2 (docs/PRISMA-PUBLIC-PLAN.md §4). The app's Prisma client is lib/generated/prisma. Webpack bundles
+// its JS into the server chunks, but its 17 MB query engine is a native file webpack does not carry, and the deployed
+// function never receives lib/ (it gets public/ and <distDir>/ — firebase-tools copies <distDir>/** whole). So the
+// production server compilation copies the one engine into <distDir>/prisma-engine, and lib/db/queryEngine.ts points
+// PRISMA_QUERY_ENGINE_LIBRARY at it. It runs inside `next build`, which Firebase does run; it ignores the custom build
+// script. assumption: that is why scripts/copy-prisma-schema.mjs's .next copy "never arrived" (it was never written on
+// the deploy machine); the step-2 deploy proof settles it. A missing engine (no generate yet) copies nothing rather than
+// failing the build.
+const PRISMA_ENGINE_FILES = ['libquery_engine-debian-openssl-3.0.x.so.node'];
+function copyPrismaEngine(distDir = process.env.NEXT_DIST_DIR || '.next') {
+  const from = path.join(__dirname, 'lib', 'generated', 'prisma');
+  const to = path.resolve(__dirname, distDir, 'prisma-engine');
+  const copied = [];
+  for (const f of PRISMA_ENGINE_FILES) {
+    if (!fs.existsSync(path.join(from, f))) continue;
+    fs.mkdirSync(to, { recursive: true });
+    fs.copyFileSync(path.join(from, f), path.join(to, f));
+    copied.push(f);
+  }
+  return copied;
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -13,9 +36,10 @@ const nextConfig = {
     // threw "@prisma/client did not initialize yet" on every page. Tracing it (and
     // the schema the client resolves at runtime) into .next means it ships with the
     // build instead of depending on a generate step that never runs there.
+    // PRISMA-PUBLIC step 2: the client is lib/generated/prisma now; nothing imports node_modules/.prisma any more.
     outputFileTracingIncludes: {
       '/**/*': [
-        './node_modules/.prisma/client/**/*',
+        './lib/generated/prisma/**/*',
         './prisma/schema.prisma',
       ],
     },
@@ -50,7 +74,9 @@ const nextConfig = {
   // and beaconed up to 20 client errors a page (stack + URL) to /__abacus/client-error — a route this app never had.
   // Crashes are reported to our own /api/telemetry/crash. lib/build-config.test.ts fails if an injection like it
   // comes back.
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev, nextRuntime }) => {
+    // PRISMA-PUBLIC step 2: the production Node server build only (not dev, not edge, not a bare call in a test).
+    if (isServer && !dev && nextRuntime === 'nodejs') copyPrismaEngine();
     config.ignoreWarnings = [
       ...(config.ignoreWarnings || []),
       {

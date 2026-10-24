@@ -24,7 +24,7 @@
 //
 // Pure: no Prisma client value, no DOM. The route (app/api/coach/roster/route.ts) and the builder
 // (components/coach/program-builder.tsx) hand it plain rows.
-import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
+import type { MovementPattern, SessionSection } from '@/lib/generated/prisma';
 
 // ── the six patterns ────────────────────────────────────────────────────────────────────────────────────────────────
 

@@ -25,7 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 import { toLook, toBuild, fromStorage, validateForSave, type Values, type BuildPayload, type LookPayload } from '@/lib/creator/schema/saveBuild';
 import { filterEquipped, refusedItems } from '@/lib/closet/ownership';
 import { defaultFace, defaultEquipped, getWearable } from '@/lib/closet/wearable-catalog';

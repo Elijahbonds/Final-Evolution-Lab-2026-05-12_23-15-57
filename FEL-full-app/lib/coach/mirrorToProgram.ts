@@ -38,7 +38,7 @@
 //     feet and joints") through the program builder's own add path (lib/coach/builderServer.ts builderAction 'add').
 //
 // Pure: no database, no session, no fetch. app/api/coach/prescribe/route.ts is the IO around coachDraft.
-import type { MovementPattern } from '@/public/_prisma/client';
+import type { MovementPattern } from '@/lib/generated/prisma';
 import type { CheckId } from '@/lib/mirror/assessment';
 import type { ScreenResultSummary, CheckResult, ScreenId } from '@/lib/mirror/screen';
 import type { PlaybookBlock } from '@/lib/mirror/program';

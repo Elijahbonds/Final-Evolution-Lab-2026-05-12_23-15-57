@@ -1,6 +1,6 @@
 // The guardian report's reads (coach-loop P1). Training columns only — the selects below are the whole of what is
 // read, and none of them touches a health, pain, readiness, intake, scan or PRQ table.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { guardianStatus } from '@/lib/consent/guardianGate';
 import { teenGate } from './teenGate';
 import { buildGuardianReport, type GuardianReport } from './guardianReport';

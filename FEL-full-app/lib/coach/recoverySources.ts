@@ -29,7 +29,7 @@
 // an effort number the athlete typed either: the band is the coach's prescription, the minutes are the set timer's.
 //
 // Pure: Prisma types only, no client value, no DOM.
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { LOGGED_WORK_WHERE } from './setLog';
 
 /** The session kind an off day is stored as (prisma/schema.prisma SessionKind). Moved from offDay.ts (re-exported there). */

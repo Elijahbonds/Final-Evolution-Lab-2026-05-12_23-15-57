@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 import { prisma } from '@/lib/db';
 import { CURRICULUM, CURRICULUM_VERSION, PASS_MARK, requiredModules } from '@/lib/curriculum/blueprint';
 // HOTFIX (2026-09-24): the questions, the answer key and the grader are server-only now (they used to ship

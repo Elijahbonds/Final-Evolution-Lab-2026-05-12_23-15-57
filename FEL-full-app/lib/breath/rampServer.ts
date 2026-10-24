@@ -38,7 +38,7 @@
 //
 // Takes the database as an argument (the Today pattern), so lib/breath/ramp-route.test.ts runs the real route over the
 // in-memory Today store on a lane whose database is offline on purpose.
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { loadToday, type TodayDb } from '../coach/todayServer';
 import { PAIN_LOOKBACK_DAYS, painDecisionToday } from '../coach/warmup';
 import { activeHealthDataConsent, type ConsentRow } from '../health/consent';

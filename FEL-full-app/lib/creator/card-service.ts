@@ -8,7 +8,7 @@
  */
 
 import 'server-only';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { computeTraceablePrq } from '@/lib/prq-entries';
 import { isVerifiedAdult } from '@/lib/coach-store/adult';
 import {

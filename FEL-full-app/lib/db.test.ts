@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({
   made: [] as { args: unknown[]; url: string | undefined }[],
 }));
 
-vi.mock('@/public/_prisma/client', () => {
+vi.mock('@/lib/generated/prisma', () => {
   class PrismaClientInitializationError extends Error {
     constructor(message: string, readonly clientVersion: string, readonly errorCode?: string) { super(message); }
   }
@@ -129,7 +129,7 @@ describe('lib/db with CLOUD_SQL_INSTANCE set (production)', () => {
   it('a failed start surfaces as Prisma\'s initialization error', async () => {
     delete process.env.DB_PASS;
     const { prisma } = await import('@/lib/db');
-    const { Prisma } = await import('@/public/_prisma/client');
+    const { Prisma } = await import('@/lib/generated/prisma');
     const e = await (prisma as any).user.count().catch((x: unknown) => x);
     expect(e).toBeInstanceOf(Prisma.PrismaClientInitializationError);
     expect(e.message).toBe('cloud-sql connector: missing environment variable(s): DB_PASS');

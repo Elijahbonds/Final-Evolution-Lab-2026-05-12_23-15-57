@@ -8,7 +8,7 @@ import { existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 import { isUnreachable } from './errors';
 import {
   CLOUD_SQL_STATE, DEFAULT_CONNECTION_LIMIT, POOL_TIMEOUT_S, SOCKET_FILE, cloudSqlEnabled, createCloudSqlPrisma,

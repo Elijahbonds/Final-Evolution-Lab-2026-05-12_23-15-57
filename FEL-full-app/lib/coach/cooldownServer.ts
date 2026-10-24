@@ -19,7 +19,7 @@
 // Which row it stamps is cooldown.ts cooldownTarget (open session, else the one just completed, else a new open one —
 // never a new row on a session completed longer ago than the tap window: 409 cooldown_window_passed). A second tap
 // keeps the first time. P9 counts a stamp only on a COMPLETED session (lib/coach/offDay.ts COOLDOWN_DONE_WHERE).
-import type { PrismaClient } from '@/public/_prisma/client';
+import type { PrismaClient } from '@/lib/generated/prisma';
 import { isHardStopped, latestIntake } from '../health/intake';
 import { cooldownTarget, needsAutoCooldown } from './cooldown';
 

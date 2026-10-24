@@ -5,7 +5,7 @@
 // own words — nothing that names a condition, promises an outcome, says "risk" or "prevent", or borrows the book.
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import type { MovementPattern } from '@/public/_prisma/client';
+import type { MovementPattern } from '@/lib/generated/prisma';
 import { PROTOCOL_WHY } from './protocolGate';
 import { WAKE_UP } from '@/lib/drills/drills';
 import { DrillRunner } from '@/lib/drills/DrillRunner';

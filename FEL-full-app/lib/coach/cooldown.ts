@@ -41,7 +41,7 @@
 // skip it"), which the screen allows on purpose. cooldown.test.ts lints every line a plan can show.
 //
 // Pure: no DOM, no fetch, no clock (every time-aware function takes `now`). Runs on the client (Today) and in tests.
-import type { MovementPattern } from '@/public/_prisma/client';
+import type { MovementPattern } from '@/lib/generated/prisma';
 import { isPattern } from './catalogue';
 import { WORKING_SECTIONS } from './coverage';
 import { rockHoldLines, guidedElapsed, type GuidedRun } from './warmup';

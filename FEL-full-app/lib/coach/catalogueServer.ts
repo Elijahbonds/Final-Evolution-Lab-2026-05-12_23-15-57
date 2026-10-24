@@ -17,7 +17,7 @@
 // answers name_taken_fel — never "You already have an exercise with that name", which was false. A coach's own row is
 // looked up with findFirst({ coachId, name }), never by the compound key the held swap would add.
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import type { TextFlag } from '@/lib/share/screen';
 import {
   kbToCatalogueItem, nameKey, validateCatalogueCreate, validateCatalogueUpdate,

@@ -12,7 +12,7 @@
 //   prisma db execute --url postgresql://…/fel_p8_tpl_X --file s.sql
 // Run: P8_PG_URL=postgresql://localhost:5432/fel_p8_tpl_X DATABASE_URL=$P8_PG_URL node tsx scripts/probes/_p8-template-clone-pg.ts [out.json]
 import { writeFileSync } from 'node:fs';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { builderAction, loadProgram, type BuilderDb } from '@/lib/coach/builderServer';
 import { planTemplateClone, templateById, expandTemplate } from '@/lib/coach/templates';
 import { easierKey, harderKey, templateExercise } from '@/lib/coach/templateCatalogue';

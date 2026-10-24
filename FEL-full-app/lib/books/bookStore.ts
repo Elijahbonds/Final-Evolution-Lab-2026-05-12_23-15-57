@@ -10,7 +10,7 @@
  */
 
 import 'server-only';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 import { prisma } from '@/lib/db';
 import type { BookEntitlementWrite, BookFulfillStore } from './bookFulfill';
 import type { OwnedOffer } from './bookEntitlements';

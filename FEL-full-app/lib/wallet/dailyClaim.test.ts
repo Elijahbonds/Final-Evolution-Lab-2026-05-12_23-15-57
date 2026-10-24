@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 
 // DAILY-KEY-HOTFIX (2026-09-28). Both earn routes run for real here, and so do earn() and awardCredits(). The stand-ins
 // are the signed-in session and an in-memory database. The database keeps the two unique keys that matter:

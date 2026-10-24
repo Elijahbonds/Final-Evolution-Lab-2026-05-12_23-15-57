@@ -21,7 +21,7 @@
 //   · MIRROR-COACH P8 FIX (2026-09-30): no birth year, nothing sold or claimed (409 age_needed); a youth reader buys the
 //     4-week plan only; the server sells only the template the page previewed; the offer says why it is blocked.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 

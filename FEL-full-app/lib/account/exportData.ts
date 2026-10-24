@@ -4,7 +4,7 @@
 // The user id is the signed-in session's. This function has no other way to choose a person.
 // profile is an allow-list: password, KYC, and every other User column are not copied.
 
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { collectPrqExport } from '@/lib/prq-data-rights';
 
 type Db = Pick<

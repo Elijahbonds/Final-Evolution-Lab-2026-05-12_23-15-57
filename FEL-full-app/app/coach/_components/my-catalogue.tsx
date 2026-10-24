@@ -17,7 +17,7 @@ import {
   type CommonFault,
 } from '@/lib/coach/catalogue';
 import { SKILL_LAYERS, setupCuesFor, skillLayer } from '@/lib/coach/taxonomy';
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 
 export interface CatalogueItem {
   id: string; name: string; category: string; demoVideoUrl: string | null; primaryCues: string[];
