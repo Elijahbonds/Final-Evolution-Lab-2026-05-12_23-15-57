@@ -178,9 +178,9 @@ describe('DR-13 bindings', () => {
 });
 
 describe('DR-14 / DR-D6 Check C', () => {
-  it('scripts/onevone-depth-tests.ts is byte-identical to ce122bb7 (Check C word for word)', () => {
+  it('scripts/onevone-depth-tests.ts is byte-identical to release 757534fe (#406 rewrote its retreat check; Check C word for word)', () => {
     const buf = readFileSync(path.resolve(__dirname, '../../../scripts/onevone-depth-tests.ts'));
-    expect(createHash('sha256').update(buf).digest('hex')).toBe('d1477126398cdd9bf4d27bacbf127cc8831b2f4bf49e46a0e63d533b210b5992');
+    expect(createHash('sha256').update(buf).digest('hex')).toBe('631e1cade2665dea2d11ea3298e5e6c121bffb4b74e20f816b81b3dc6e8e811a');
   });
 });
 
