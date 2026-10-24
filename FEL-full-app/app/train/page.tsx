@@ -7,6 +7,10 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
 import { TabPage } from '@/components/shell/tab-page';
+// DAILY-DRILL (value round item 3): today's drill from the weakest measured number, for every account
+import { DailyDrillCard } from '@/components/daily-drill/daily-drill-card';
+import { loadDailyDrill } from '@/lib/daily-drill/load';
+import { loadWarmupContext } from '@/lib/coach/warmupServer';
 import { DoorsRow } from '@/components/shell/doors-row';
 // MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
 import { TodayCard } from '@/components/coach/today-card';
@@ -26,11 +30,12 @@ export default async function TrainPage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount, todayCard] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
     todayCardFor(prisma, me),
+    loadDailyDrill(prisma, me, { warmupContext: (id, now) => loadWarmupContext(prisma, id, now) }).catch(() => null),
   ]);
 
   const cards = [
@@ -107,6 +112,7 @@ export default async function TrainPage() {
       lede="Screen it, program it, eat for it. This is the loop the games are the proof of."
       accent="#00FF9D"
     >
+      <DailyDrillCard view={dailyDrill} />
       <TodayCard view={todayCard} />
       <ul className="grid gap-3 sm:grid-cols-2">
         {shown.map((c, i) => {

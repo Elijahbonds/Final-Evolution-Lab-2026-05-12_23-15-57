@@ -76,6 +76,10 @@ export const REASON = {
   // (lib/wallet/kit-grandfather.ts). Not a purchase and not an earn: no balance moves, the dead-buy sweep never reads it
   // (dead-buys.ts DEAD_BUY_REASONS), and the owned-kits read counts it as backing the kit (dead-buys.ts backedEntitlements).
   KIT_GRANDFATHER_2026_09: 'KIT_GRANDFATHER_2026_09',
+  // DAILY-DRILL (value round item 3, 2026-10-24): finishing the day's drill on the camera (lib/daily-drill/claim.ts), once
+  // per player per America/Los_Angeles day (the wallet's daily day, dailyKey.ts ptDay). Server-granted only: it is NOT in
+  // EVENT_REASON, so no client can name it to POST /v1/wallet/earn; the claim route checks the drill is today's first.
+  DAILY_DRILL_COMPLETE: 'DAILY_DRILL_COMPLETE', // lc
 } as const;
 
 export type ReasonCode = (typeof REASON)[keyof typeof REASON];
@@ -229,6 +233,15 @@ export const DEFAULT_REWARD_RULES: Record<string, RewardRuleConfig> = {
   [REASON.CREATIVE_CARD_REMIX_ROYALTY]: {
     reasonCode: REASON.CREATIVE_CARD_REMIX_ROYALTY, currency: 'coins', formula: 'flat',
     baseAmount: 25, scaleNum: 0, minGrant: 25, maxGrant: 25, // TUNE(elijah)
+    perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
+  },
+  // DAILY-DRILL: the day's drill done. (new) 10 LC — the owner's number to set. For scale: a streak day pays 5 LC × the day
+  // (5..35, session-payout STREAK_LC_PER_DAY), a hero-mode win 15, the welcome grant 500. The streak day's own LC, when the
+  // drill is what opens the day, rides on the same ledger row (claim.ts). Editable live in the RewardRule table. The caps
+  // stay 0 because the claim's per-day key is the cap (daily_drill:<PT day>:<user>), as EDU_COURSE_COMPLETE's is.
+  [REASON.DAILY_DRILL_COMPLETE]: {
+    reasonCode: REASON.DAILY_DRILL_COMPLETE, currency: 'lc', formula: 'flat',
+    baseAmount: 10, scaleNum: 0, minGrant: 10, maxGrant: 10, // TUNE(elijah) (new)
     perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
   },
 };
