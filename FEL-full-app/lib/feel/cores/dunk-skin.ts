@@ -18,9 +18,10 @@
 
 import { feelConfig, type FeelConfig, type Vec3 } from '../index';
 import type { CourtSkin } from './court-core';
+import { RIM_HEIGHT_M } from '../../babylon/core/courtDims';
 
 /** Venice court hoop, matching HOOP_POS in dunk-game-3d.tsx space. */
-export const DUNK_HOOP: Vec3 = { x: 0, y: 3.05, z: 0 };
+export const DUNK_HOOP: Vec3 = { x: 0, y: RIM_HEIGHT_M, z: 0 };
 
 export interface DunkSkinOpts {
   feel?: FeelConfig;

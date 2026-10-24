@@ -44,6 +44,7 @@ import { attachBallToHand, palmOffsetOf, releaseBall } from '../anim/ballRig';
 import { rightHandHoops, rightHandBall, hoopsHand } from '../anim/hoopsHand';   // HOOPS MOTION phase 3: right-handed on screen
 import { rightHandDunks } from '../anim/dunkHand';                             // …the dunk family too (the make's celebration is a dunk_ clip)
 import { mountBallCarry, type BallCarry } from '../anim/ballCarry';            // HOOPS MOTION phase 3: the jog's hold is the shared carry's
+import { RIM_HEIGHT_M } from '../core/courtDims';
 /** HOOPS MOTION phase 3b (review): the shooter's idle between shots has its own knees (idle_stand keys no leg: 76 / 41° take to take). */
 const WATCH_IDLE = 'bball_idle_stand';
 import { mountPostureLayer, type PostureLayer } from '../anim/PostureLayer';   // BIOMECH-HOOPS-WAVE1
@@ -173,7 +174,7 @@ export const RACK_ANGLES = [30, 60, 90, 120, 150].map((d) => (d * Math.PI) / 180
 export const rackRadius = threePointRadius;
 
 /** Rim position matches VenueKit.buildCourt's hoop. */
-export const RIM = new Vector3(0, 3.05, -0.6);
+export const RIM = new Vector3(0, RIM_HEIGHT_M, -0.6);
 
 /** Rack stations swept along the arc in FRONT of the rim (+z side). */
 export const RACK_POS = RACK_ANGLES.map(

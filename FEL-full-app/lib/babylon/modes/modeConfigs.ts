@@ -3,6 +3,7 @@
 import { Vector3 } from '@babylonjs/core';
 import type { VenueMood } from '../scene/moods';
 import type { GrindLine } from '../core/GroundRide';
+import { RIM_HEIGHT_M } from '../core/courtDims';
 
 const HERO_URL = '/models/fel-hero.glb'; // forged (scripts/avatar/forge.mts) — the Meshy hero is retired
 
@@ -23,7 +24,7 @@ export const DUNK_CONFIG = {
   // further downcourt. The approach distances below are UNCHANGED — gather is
   // still 2.78 out from the rim and the start is still 6.3 behind the gather —
   // the whole run-up is simply relocated to where the basket is.
-  startZ: -1.2, gatherZ: -7.5, rimZ: -10.28, rimHeight: 3.05,
+  startZ: -1.2, gatherZ: -7.5, rimZ: -10.28, rimHeight: RIM_HEIGHT_M,
   qteWindowSec: 0.28,
   target: 21,
   rivalMakeChance: 0.55,
