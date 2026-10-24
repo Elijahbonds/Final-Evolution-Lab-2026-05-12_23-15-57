@@ -50,6 +50,10 @@ export const REASON = {
   // Phase 5 — referral loop (viral). Referrer earns shards when a lead they
   // referred converts to a registered athlete. Server-granted, never client.
   REFERRAL_BONUS: 'REFERRAL_BONUS', // shards
+  // CHALLENGES-2 (owner, 2026-10-22: "both players get Lab Credits on a referral"): paid to BOTH the referrer and the
+  // friend, once, when the friend finishes their first week (lib/social/challenge-referral.ts). Server-granted only,
+  // never an event a client can name; keyed per referred account, so it pays once per friend, ever.
+  REFERRAL_WEEK_ONE: 'REFERRAL_WEEK_ONE', // lc
   // The movement course (lib/education/course.ts). Finishing a chapter of the Playbook is a milestone, which is
   // what shards are for -- earned, never purchasable.
   EDU_CHAPTER_COMPLETE: 'EDU_CHAPTER_COMPLETE', // shards
@@ -179,6 +183,13 @@ export const DEFAULT_REWARD_RULES: Record<string, RewardRuleConfig> = {
   [REASON.REFERRAL_BONUS]: {
     reasonCode: REASON.REFERRAL_BONUS, currency: 'shards', formula: 'flat',
     baseAmount: 10, scaleNum: 0, minGrant: 1, maxGrant: 50, // TUNE(elijah)
+    perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
+  },
+  // CHALLENGES-2: the week-one referral Lab Credits, each player. (new) 100 LC — the owner's number to set. For scale: the
+  // welcome grant is 500 LC, a hero-mode win pays 15. Editable live in the RewardRule table like every rule here.
+  [REASON.REFERRAL_WEEK_ONE]: {
+    reasonCode: REASON.REFERRAL_WEEK_ONE, currency: 'lc', formula: 'flat',
+    baseAmount: 100, scaleNum: 0, minGrant: 100, maxGrant: 100, // TUNE(elijah) (new)
     perMinuteCap: 0, perDayCurrencyCap: 0, active: true,
   },
   [REASON.EDU_CHAPTER_COMPLETE]: {
