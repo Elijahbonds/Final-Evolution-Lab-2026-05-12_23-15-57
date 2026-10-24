@@ -24,20 +24,12 @@ export const KEPT_LINE = 'Only the fact that you finished today’s drill is kep
 export const PREP_LINE = 'Four calm minutes of the Wake-Up first, then the drill.';
 export const CLAIM_FAILED_LINE = "We couldn't save that you finished. Your drill still counts if you try again today.";
 
-const FOCUS_WORDS: Record<Focus, string> = {
-  jump: 'your jump',
-  form: 'your squat form',
-  shot: 'your shooting',
-  mobility: 'your mobility',
-  starter: 'the whole body',
-};
-
 /** Why this drill: the number it was picked from, said as the player knows it. */
 export function whyLine(focus: Focus, skill: SkillReading | null, tied: boolean): string {
-  if (!skill || focus === 'starter') return 'A good all-round start: the Pre-Game Wake-Up, ten minutes for the whole body.';
+  if (!skill || focus === 'starter') return 'A good all-round start: the Pre-Game Wake-Up, for the whole body.';
   const slipping = skill.trend === 'worse' ? ', and it slipped against last week' : '';
   const tie = tied ? ' (tied with another of your numbers; the pick is fixed for today)' : '';
-  return `Picked for ${FOCUS_WORDS[focus]}: your lowest number right now is ${skill.label.toLowerCase()} (${skill.display})${slipping}${tie}.`;
+  return `Picked from your lowest number: ${skill.label.toLowerCase()}, ${skill.display}${slipping}${tie}.`;
 }
 
 /** The credit line before the drill is done. `streakOpens`: finishing it is what opens today's streak day. */

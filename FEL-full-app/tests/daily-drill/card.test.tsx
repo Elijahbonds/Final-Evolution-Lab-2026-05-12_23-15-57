@@ -30,7 +30,7 @@ describe('the daily drill card', () => {
     expect(out).toContain('data-daily-drill="open"');
     expect(out).toContain("Today's drill · 6 min");
     expect(out).toContain('Safe Landing Check');
-    expect(out).toContain('your lowest number right now is shooting (40% of 30 shots made)');
+    expect(out).toContain('Picked from your lowest number: shooting, 40% of 30 shots made.');
     expect(out).toContain('Finish it for 10 Lab Credits, and day 4 of your streak.');
     expect(out).toContain('href="/train/today-drill"');
     expect(out).not.toContain('data-daily-nudge');

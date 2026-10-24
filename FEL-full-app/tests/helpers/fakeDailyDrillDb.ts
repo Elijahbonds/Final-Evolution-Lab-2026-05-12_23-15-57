@@ -47,6 +47,11 @@ export function fakeDailyDrillDb(profiles: Record<string, FakeProfile>) {
         return [{}];
       },
       playerProfile: {
+        async findUnique(a: { where: { userId: string } }) {
+          await tick();
+          const row = profiles[a.where.userId];
+          return row ? { streakDays: row.streakDays } : null;
+        },
         async updateMany(a: { where: Record<string, unknown>; data: Record<string, unknown> }) {
           await tick();
           const id = a.where.userId as string;

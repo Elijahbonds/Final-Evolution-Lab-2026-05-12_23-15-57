@@ -39,10 +39,10 @@ export function DailyDrillCard({ view }: { view: DailyDrillView | null }) {
             {done ? doneLine(done.amount, done.streakDays) : rewardLine(view.credit, view.streak.opensToday, view.streak.nextDays)}
           </p>
           {view.nudge && (
-            <p className="mt-2 text-[12.5px] text-white/55" data-daily-nudge>
-              {view.nudge.text}{' '}
-              <Link href={view.nudge.href} className="font-bold text-[#00E5FF] underline-offset-2 hover:underline">{view.nudge.cta}</Link>
-            </p>
+            <div className="mt-2" data-daily-nudge>
+              <p className="text-[12.5px] text-white/55">{view.nudge.text}</p>
+              <Link href={view.nudge.href} className="inline-flex min-h-[44px] items-center text-[13px] font-bold text-[#00E5FF] underline-offset-2 hover:underline">{view.nudge.cta} →</Link>
+            </div>
           )}
         </div>
       </div>

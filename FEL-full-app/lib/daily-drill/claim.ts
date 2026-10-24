@@ -101,7 +101,9 @@ export async function claimDailyDrill(db: Db, userId: string, view: DailyDrillVi
       const streakClaimed = await claimPlayStreak(tx, userId, seen, step, stamp);
       const streakBonus = streakClaimed ? step.streakBonus : 0;
       const amount = view.credit + streakBonus;
-      const streakDays = streakClaimed ? step.streakDays : Math.max(0, Number(seen?.streakDays ?? 0));
+      // the streak as the row has it now (this claim's day, or the one a game or another claim took a moment ago)
+      const row = await tx.playerProfile.findUnique({ where: { userId }, select: { streakDays: true } }).catch(() => null);
+      const streakDays = Number.isFinite(Number(row?.streakDays)) ? Number(row.streakDays) : streakClaimed ? step.streakDays : Math.max(0, Number(seen?.streakDays ?? 0));
       // the rule switched off (RewardRule.active false) and no streak day to pay: nothing to file, so nothing is recorded
       if (amount <= 0) return { status: 'granted' as const, amount: 0, streakBonus: 0, streakDays };
       const paid = await deps.applyLc(tx, {

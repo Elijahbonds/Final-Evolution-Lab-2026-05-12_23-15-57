@@ -108,6 +108,8 @@ describe('claiming today\'s drill', () => {
     expect(streakPaid).toBe(1);
     expect(s.profiles[U].streakDays).toBe(4);
     expect(drill.status).toBe('granted');
+    // the drill's answer says the streak as the row has it, whichever claim took the day
+    expect(drill.streakDays).toBe(4);
   });
 
   it('a claim that loses the unique-key race inside its transaction rolls back whole (its streak write too)', async () => {

@@ -162,7 +162,7 @@ describe('the view: deterministic per user per day, the same drill all day', () 
     const v = viewFrom(U, hooper(), OPEN, NOW);
     expect(v.day).toBe('2026-10-24');
     expect(v.plan!.key).toBe('shot:safe-landing');
-    expect(v.why).toBe('Picked for your shooting: your lowest number right now is shooting (40% of 30 shots made).');
+    expect(v.why).toBe('Picked from your lowest number: shooting, 40% of 30 shots made.');
     expect(v.nudge).toBeNull();
   });
 
