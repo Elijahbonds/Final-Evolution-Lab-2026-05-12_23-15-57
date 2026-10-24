@@ -50,6 +50,7 @@ import { ArenaCard, CarnivalCard, ChallengeCard, MpCard, StoryRewardCard } from 
 import { Confetti } from './confetti';
 import { claimLines } from './claim';
 import { ClaimBar } from './claim-bar';
+import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
 
 const fmt = (v: number) => Math.round(v).toLocaleString('en-US');
 
@@ -646,8 +647,8 @@ export function EndScreen(props: EndScreenProps) {
               <button type="button" data-end-focus="home" data-focused={focusId === 'home'} onClick={guard(() => onNavigate(storyNodeId ? '/story' : '/'))} className={`${btnBase} border border-white/20 bg-white/[0.04] px-[0.9em] py-[0.55em] text-[0.9em] text-white/85 data-[focused=true]:ring-[#00E5FF]`}>
                 {storyNodeId ? <><MapIcon className="h-[1em] w-[1em]" /> Story map</> : <><Home className="h-[1em] w-[1em]" /> Home</>}
               </button>
-              {/* M13.4 share challenge (K-factor loop) — not for a score the Arena refused */}
-              {!arenaRefused && (
+              {/* M13.4 share challenge (K-factor loop) — not for a score the Arena refused, nor a free-dance run (lane/dance-extras-2: no score to beat) */}
+              {!arenaRefused && !isFreeDanceResult(run as never) && (
                 <button type="button" data-end-focus="challenge" data-focused={focusId === 'challenge'} onClick={guard(share.onChallenge)} disabled={share.state === 'minting'} className={`${btnBase} border border-[#A855F7]/60 bg-[#A855F7]/10 px-[0.9em] py-[0.55em] text-[0.9em] text-[#C99BFF] data-[focused=true]:ring-[#A855F7]`}>
                   {share.state === 'copied' ? <><Check className="h-[1em] w-[1em]" /> Challenge link copied</> : share.state === 'minting' ? <><Loader2 className="h-[1em] w-[1em] animate-spin" /> Minting…</> : <><Share2 className="h-[1em] w-[1em]" /> Challenge a friend</>}
                 </button>

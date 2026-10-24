@@ -70,6 +70,7 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'tiebreak': case 'volleyball': return `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
     case 'carnival': { const ev = n(s, 'events'), rp = n(s, 'rivalPoints'); return `${r.score}–${rp ?? r.opponentScore ?? 0} OVER ${ev ?? '?'} EVENTS · ${r.verdict ?? (r.won ? 'CHAMPION' : 'RUNNER-UP')}`; }
     case 'dance': {
+      if (n(s, 'freeDance') === 1) return null;   // lane/dance-extras-2: a free-dance run proves no score, so it has no proof line to share
       const stars = n(s, 'stars'), acc = n(s, 'accuracy'), combo = n(s, 'maxCombo');
       const grade = acc !== null ? gradeFor(acc / 100) : null;
       return `${r.score} PTS${stars !== null ? ` · ${'★'.repeat(Math.max(0, Math.min(5, stars)))}` : ''}${acc !== null ? ` · ${acc}%` : ''}${grade ? ` · GRADE ${grade}` : ''}${combo !== null ? ` · ×${combo} COMBO` : ''}`;

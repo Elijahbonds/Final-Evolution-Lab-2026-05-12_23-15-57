@@ -158,3 +158,16 @@ describe('the room: free dance never reaches the judge', () => {
     expect(bodyOf(mode, 'function beginCountIn(', '\n  }\n')).toContain('if (freeDance) fillBand(band as never, STEM_ORDER);');
   });
 });
+
+describe('the end card has nothing of a free run for anyone to beat', () => {
+  it('no proof line (the "Share proof" button), and no "Challenge a friend" — the shell mints no link from it either', async () => {
+    const { proofLineFor } = await import('@/lib/proofLine');
+    expect(proofLineFor('dance', { score: 0, won: false, outcome: 'GOOD', stats: freeDanceStats({ moves: 44, bpm: 96, difficulty: 1 }) })).toBeNull();
+    expect(proofLineFor('dance', { score: 1200, won: true, stats: { stars: 3, accuracy: 80, maxCombo: 22 } })).toContain('1200 PTS');
+    const card = fs.readFileSync(path.join(__dirname, '../../../components/games/end-screen/end-screen.tsx'), 'utf8');
+    expect(card).toContain('{!arenaRefused && !isFreeDanceResult(run as never) && (');
+    const shell = fs.readFileSync(path.join(__dirname, '../../../components/games/game-shell.tsx'), 'utf8');
+    const mint = shell.slice(shell.indexOf('const shareChallenge = useCallback('), shell.indexOf("fetch('/api/challenge/mint'"));
+    expect(mint).toContain('if (isFreeDanceResult(result)) return;');
+  });
+});
