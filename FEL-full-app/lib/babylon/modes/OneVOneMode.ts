@@ -157,6 +157,7 @@ import { DribbleStateMachine, syncedShotSpeed, RELEASE_FRAME_01 } from '../core/
 import { releaseFrameOf } from '../anim/opponentMotion';   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
+import { HardHitDebounce } from './hardHitDebounce';
 import { pickHoopsDunk, dunkSpeedRatio, PAUSIN_DUNK } from '../core/HoopsDunks';
 import { trickFromFlick, trickWindow, judgeFlick, STICK_TRICK, CONTACT_TRICK_BONUS } from '../core/DunkTrickStick';
 import {   // HOOPS-MOVE-KIT-A (2026-09-08): the gather, the finish kit, the drive contest
@@ -379,6 +380,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let possessionToken = 0;
   const shotClock = new PlayerShotClock(() => playerShotClockSec('1v1', runTier()), (v) => hud({ shotClock: v }));   // lane/hoops-shot-core: ELITE's 12 s shot clock (core/ShotClock)
   let carrying = true, shooting = false, dunking = false;
+  const hardHitGate = new HardHitDebounce();   // OV75-2: one contact reaction per bump (per ordered pair)
   /** The ball is live on the floor (a miss, a block) — BallSim owns it, whoever's possession it is. */
   let loose = false;
   /** What the shot earned, recorded at the RELEASE so the iron can answer it when the arc arrives. */
@@ -3187,9 +3189,11 @@ export const OneVOneMode: ModeDefinition = (() => {
    *  a body the dunk's own bump is handling, never on a floored one, never on a body inside a held beat (the follow-through,
    *  a reach: a react cut the held follow-through, measured). */
   function hardHit(ctx: ModeContext, attacker: string, victim: string, closing: number): void {
+    // OV75-2: a brush under the speed gate is silent, and the same pair is quiet for HARD_HIT_DEBOUNCE_MS after a hit
+    if (dunking || closing < HARD_CONTACT_SPEED) return;
+    if (!hardHitGate.accept(attacker, victim, performance.now())) return;
     SoundKit.play('impact', { pitch: 1.0, volume: 0.3 });
     ctx.feel?.impact?.(0.25);
-    if (dunking || closing < HARD_CONTACT_SPEED) return;
     let react = false;
     if (victim === 'foe' && foeStunSec === 0 && !foeFloored && !foeAnimTree.busy) { foeAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); react = true; }
     else if (victim === 'me' && meStunSec === 0 && !shooting && !finish && !gather && meShotWin === 'none' && !meAnimTree.busy) { meAnimTree.beat('bball_contact_react', { fadeSec: 0.06 }); react = true; }
