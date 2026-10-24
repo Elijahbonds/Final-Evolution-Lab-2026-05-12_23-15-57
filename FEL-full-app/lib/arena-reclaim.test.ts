@@ -814,3 +814,47 @@ describe('P6 fix pass: the lobby row says an attempt is used, and a deadline set
     expect(view).toMatch(/the \{d\.feeLc\} LC stake went to the house/);
   });
 });
+
+// NB-3 (lane/hoops-overtime): a staked 3v3 tied at the horn goes to sudden-death overtime and ends ONCE, on the first bucket — so
+// the duel gets one score from it, inside the 3v3's ceiling (20–20 + a three = 23), and settles once. The pays-once checks above,
+// on a 3v3 that went to overtime.
+describe('NB-3: a staked 3v3 that went to overtime settles once', () => {
+  const post = (fn: (r: never) => Promise<Response>, body: unknown) =>
+    fn(new Request('http://fel.local/api', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }) as never)
+      .then(async (r) => ({ status: r.status, json: await r.json() as Row }));
+
+  it('the overtime winner\'s 23 (the ceiling) settles the duel: one payout; the same finish posted again pays nothing more', async () => {
+    const d = duel({ mode: 'hoops3v3', expiresAt: new Date(Date.now() + HOUR), player2Score: 21 });
+    const runId = ran(d, 'u1', 23);
+    const r = await post(submitPOST, { matchId: d.id, score: 23, runId });
+    expect(r).toMatchObject({ status: 200, json: { settled: true, winnerId: 'u1', payout: 90 } });
+    expect(d).toMatchObject({ status: 'SETTLED', player1Score: 23, player2Score: 21 });
+    const paid = snapshot();
+    const again = await post(submitPOST, { matchId: d.id, score: 23, runId });
+    expect(again.status).toBe(409);
+    expect(snapshot()).toBe(paid);
+    expect([...h.store.ledger]).toEqual([[`arena-settle:${d.id}`, { playerId: 'u1', delta: 90, reasonCode: 'ARENA_WINNINGS' }]]);
+    expect(h.store.balances).toEqual({ u1: 90 });
+  });
+
+  it('two overtime games that end level on the duel (both 12) refund each stake once — never a payout on top', async () => {
+    const d = duel({ mode: 'hoops3v3', expiresAt: new Date(Date.now() + HOUR), player2Score: 12 });
+    const r = await post(submitPOST, { matchId: d.id, score: 12, runId: ran(d, 'u1', 12) });
+    expect(r.status).toBe(200);
+    expect(d.status).toBe('VOIDED');
+    expect(h.store.balances).toEqual({ u1: 50, u2: 50 });
+    const paid = snapshot();
+    expect((await post(submitPOST, { matchId: d.id, score: 12, runId: ran(d, 'u1', 12) })).status).toBe(409);
+    expect(snapshot()).toBe(paid);
+  });
+
+  it('no overtime can post above the ceiling: a 24 is refused before anything is written', async () => {
+    const d = duel({ mode: 'hoops3v3', expiresAt: new Date(Date.now() + HOUR), player2Score: 21 });
+    const before = snapshot();
+    const r = await post(submitPOST, { matchId: d.id, score: 24, runId: ran(d, 'u1', 24) });
+    expect(r.status).toBe(422);
+    expect(r.json.error).toBe('SCORE_ABOVE_CEILING');
+    expect(JSON.parse(snapshot()).l).toEqual(JSON.parse(before).l);
+    expect(d.player1Score).toBeNull();
+  });
+});

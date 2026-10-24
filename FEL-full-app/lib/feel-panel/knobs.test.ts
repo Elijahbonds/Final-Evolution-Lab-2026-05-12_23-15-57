@@ -15,7 +15,16 @@ import { EYES_ON_DEFENDER_ON, READ_RANGE_M, READ_SPEED01, READ_GLANCE_EVERY_SEC,
 import { PROTECT_SINK_M, PROTECT_SINK_SEC } from '@/lib/babylon/anim/ProtectSink';
 import { MOVE_EASE_ON, MOVE_EASE_SEC, MOVE_EASE_RATE_DEG, MOVE_ARM_RATE_DEG } from '@/lib/babylon/anim/MoveEase';
 import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMPER_HANG_ON, JUMPER_HANG_SCALE } from '@/lib/babylon/core/JumperHop';
+import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
+import { AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC } from '@/lib/babylon/core/ReachTell';
+import { BODY_SEP_ON, ONEVONE_CAPSULE_RADIUS, BODY_HARD_GAP, SEP_PUSH_MPS, SEP_DEADBAND, SEP_POP_MAX } from '@/lib/babylon/core/BodySeparation';
+import * as BLK from '@/lib/babylon/core/HoopsBlocks';
+import {
+  HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
+  HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
+  HOOPS_RETREAT_SPEED_K,
+} from '@/lib/babylon/core/HoopsStick';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -75,6 +84,70 @@ describe('the feel knob catalogue', () => {
     // the ported numbers (#312: REST_TEMPO 1.2 / 1.45, clip lock gain 3 / 2.6 Hz, READ 3.5 m / 0.42, PROTECT_TURN 50°, eyes 0.9, chestAim 0.8,
     // PROTECT_SINK 0.06; #314: MOVE_EASE 0.2 s / 1000°/s / 1800°/s, JUMPER apex +0.03 s, load 0.08 s, hang 0.1) and every feature ON
     expect(pins.map(([, v]) => v)).toEqual([1, 1, 1.2, 1.45, 3, 2.6, 0.4, 1, 3.5, 0.42, 2.4, 0.55, 1, 0.22, 0.06, 0.06, 0.15, 0.15, 1.06, 0.34, 1, 50, 0.9, 0.8, 0.06, 0.18, 1, 0.2, 1000, 1800, 1, 0.03, 0.08, 1, 0.1]);
+    // lane/hoops-def-tell (#273 T-A, T-C; #274 BLK-1)
+    expect(def('hoops.aiReachTellOn')).toBe(AI_REACH_TELL_ON ? 1 : 0);
+    expect(def('hoops.aiReachTellSec')).toBe(AI_REACH_TELL_SEC);
+    expect(def('hoops.aiReachStunSec')).toBe(AI_REACH_STUN_SEC);
+    expect(def('hoops.aiReachGate')).toBe(AI_REACH_GATE);
+    expect(def('hoops.aiStealChance')).toBe(AI_STEAL_CHANCE);
+    expect(def('hoops.aiStealOnBump')).toBe(AI_STEAL_ON_BUMP);
+    expect(def('hoops.pokeReadOn')).toBe(POKE_READ_ON ? 1 : 0);
+    expect(def('hoops.stealRatePerSec')).toBe(STEAL_RATE_PER_SEC);
+    expect(def('hoops.pokeRangeM')).toBe(POKE_RANGE);
+    expect(def('hoops.pokeLeadSec')).toBe(POKE_LEAD_SEC);
+    expect([AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC])
+      .toEqual([true, 0.25, 0.35, 0.5, 0.22, 0.6, true, 1.2, 1.2, 0.1]);
+    expect(def('hoops.bodySepOn')).toBe(BODY_SEP_ON ? 1 : 0);
+    expect(def('hoops.capsuleRadius1v1M')).toBe(ONEVONE_CAPSULE_RADIUS);
+    expect(def('hoops.bodyHardGapM')).toBe(BODY_HARD_GAP);
+    expect(def('hoops.sepPushMps')).toBe(SEP_PUSH_MPS);
+    expect(def('hoops.sepDeadbandM')).toBe(SEP_DEADBAND);
+    expect(def('hoops.sepPopMaxM')).toBe(SEP_POP_MAX);
+    expect([BODY_SEP_ON, ONEVONE_CAPSULE_RADIUS, BODY_HARD_GAP, SEP_PUSH_MPS, SEP_DEADBAND, SEP_POP_MAX]).toEqual([true, 0.55, 0.9, 2.4, 0.01, 0.1]);
+    for (const [nm, U] of [['Contest', 'CONTEST'], ['Swat', 'SWAT'], ['Spike', 'SPIKE'], ['Chase', 'CHASE'], ['Pin', 'PIN'], ['Catch', 'CATCH']] as const) {
+      expect(def(`hoops.blk${nm}TMs`)).toBe(BLK[`BLK_${U}_T_MS`]);
+      expect(def(`hoops.blk${nm}HalfMs`)).toBe(BLK[`BLK_${U}_HALF_MS`]);
+    }
+    expect(def('hoops.blkHoldMs')).toBe(BLK.HOLD_MS);
+    expect(def('hoops.blkCatchMeterFullMs')).toBe(BLK.CATCH_METER_FULL_MS);
+    expect(def('hoops.blkSwatRangeLayupM')).toBe(BLK.SWAT_RANGE_LAYUP);
+    expect(def('hoops.blkSwatRangeJumperM')).toBe(BLK.SWAT_RANGE_JUMPER);
+    expect(def('hoops.blkCatchMaxAngleDeg')).toBe(BLK.CATCH_MAX_ANGLE);
+    expect(def('hoops.blkCatchMaxDistM')).toBe(BLK.CATCH_MAX_DIST);
+    expect(def('hoops.blkSpikeMaxAngleDeg')).toBe(BLK.SPIKE_MAX_ANGLE);
+    expect(def('hoops.blkPinGlassMaxM')).toBe(BLK.PIN_GLASS_MAX);
+    expect(def('hoops.blkFoulAngleDeg')).toBe(BLK.FOUL_BAD_ANGLE_DEG);
+    expect(def('hoops.blkFoulAnglePct')).toBe(BLK.FOUL_BAD_ANGLE_PCT);
+    expect(def('hoops.blkFoulHardGapPct')).toBe(BLK.FOUL_HARD_GAP_PCT);
+    expect(def('hoops.blkFoulStandoffPct')).toBe(BLK.FOUL_STANDOFF_PCT);
+    expect(def('hoops.blkFoulLateMarginMs')).toBe(BLK.FOUL_LATE_MARGIN_MS);
+    expect(def('hoops.blkFoulLatePct')).toBe(BLK.FOUL_LATE_PCT);
+    expect([BLK.FOUL_BAD_ANGLE_PCT, BLK.FOUL_HARD_GAP_PCT, BLK.FOUL_STANDOFF_PCT, BLK.FOUL_LATE_PCT]).toEqual([0.25, 0.5, 0.15, 0.35]);
+    // hoops-reverse (group "Hoops · movement"): #311's H3a stick, every default the release value
+    expect(def('hoops.jogTau')).toBe(HOOPS_JOG_TAU);
+    expect(def('hoops.sprintTau')).toBe(HOOPS_SPRINT_TAU);
+    expect(def('hoops.jogAccel')).toBe(HOOPS_JOG_ACCEL);
+    expect(def('hoops.sprintAccel')).toBe(HOOPS_SPRINT_ACCEL);
+    expect(def('hoops.loadScale')).toBe(HOOPS_LOAD_SCALE);
+    expect(def('hoops.gearDownDecel')).toBe(HOOPS_GEAR_DOWN_DECEL);
+    expect(def('hoops.stopDecelLow')).toBe(HOOPS_STOP_DECEL_LOW);
+    expect(def('hoops.stopDecelHigh')).toBe(HOOPS_STOP_DECEL_HIGH);
+    expect(def('hoops.plantDecel')).toBe(HOOPS_PLANT_DECEL);
+    expect(def('hoops.handlerTurnDeg')).toBe(HOOPS_HANDLER_TURN_DEG);
+    expect(def('hoops.turnTrueArc')).toBe(HOOPS_TURN_TRUE_ARC);
+    expect(def('hoops.kickSec')).toBe(HOOPS_KICK_SEC);
+    expect(def('hoops.cutSec')).toBe(HOOPS_CUT_SEC);
+    expect(def('hoops.jerk')).toBe(HOOPS_JERK);
+    expect(def('hoops.reverseDeg')).toBe(HOOPS_REVERSE_DEG);
+    expect(def('hoops.reverseDecel')).toBe(HOOPS_REVERSE_DECEL);
+    expect([HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
+      HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL])
+      .toEqual([0.17, 0.15, 15, 24, 0.45, 9, 22, 11, 47.6, 540, 0, 0, 0, 0, 135, 47.6]);
+    expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24
+    expect(HOOPS_RETREAT_SPEED_K).toBe(0.7);
+    // hoops-overtime (new: PR #268's 30 s)
+    expect(def('hoops.overtime3v3Sec')).toBe(OVERTIME_3V3_SEC);
+    expect(OVERTIME_3V3_SEC).toBe(30);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
