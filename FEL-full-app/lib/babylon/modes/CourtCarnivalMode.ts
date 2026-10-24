@@ -14,6 +14,7 @@
 
 import type { HudValue, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
+import { isPlayInput, roundIsEmpty, NO_PLAY_OUTCOME } from './carnivalEmptyRound';
 import * as BABYLON from '@babylonjs/core';
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
@@ -122,6 +123,10 @@ interface St {
   players: number;
   turn: number;
   turnPoints: [number, number];
+  /** CC75-3: inputs each player put into the event while it played (a press, or a stick past PLAY_STICK_MIN) */
+  turnInputs: [number, number];
+  /** CC75-3: every such input across the night */
+  nightInputs: number;
   tally: NightTally;
   rivalTarget: number;
   ended: boolean;
@@ -309,7 +314,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   // ── an event ────────────────────────────────────────────────────────
   function startEvent(ctx: ModeContext, S: St): void {
     S.current = S.events[S.idx];
-    S.turn = 0; S.turnPoints = [0, 0]; S.eventLatch = false; S.kept = false;   // a fresh event gets one win punch at most
+    S.turn = 0; S.turnPoints = [0, 0]; S.turnInputs = [0, 0]; S.eventLatch = false; S.kept = false;   // a fresh event gets one win punch at most
     setPhase(S, 'reveal');
     // IMPROVE (2026-10-06): the card is the only rules text an event gets. The first time an event appears this session it
     // HOLDS (GO starts the event; it gives up after REVEAL_HOLD_MAX_S); after that it is the 2 s card, and GO skips it.
@@ -472,6 +477,20 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
   function settleEvent(ctx: ModeContext, S: St): void {
     if (!S.current) return;
     const [a, b] = S.turnPoints;
+    // CC75-3: a round nobody put an input into is not banked — no points, no event to either side — and the night moves on
+    if (roundIsEmpty(S.players, S.turnInputs)) {
+      showHub(ctx, S, true);
+      S.fx?.board({ title: 'STANDINGS', rows: nightBoard(S.tally, names(S)), footer: 'NO PLAY' });
+      hud(ctx, S, {
+        banner: `${S.current.title}: ${names(S)[0]} 0 · ${names(S)[1]} 0`, blurb: 'NO PLAY — NOTHING SAVED',   // the result line's shape, nothing banked
+        board: nightBoard(S.tally, names(S)),
+        boardTitle: S.idx + 1 < S.events.length ? `NEXT — EVENT ${S.idx + 2} / ${S.events.length}` : 'FINAL EVENT DONE',
+        time: null, turnLabel: '',
+      });
+      S.current = null;
+      setPhase(S, 'eventOver');
+      return;
+    }
     const w = bankEvent(S.tally, S.current.title, a, b);
     SoundKit.play('score');
     showHub(ctx, S, true);
@@ -514,6 +533,17 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
     if (S.ended) return;
     setPhase(S, 'finale');
     S.ended = true;
+    // CC75-3: a whole night with no input is not a result: NO_PLAY at 0 (the shell posts played:false, the route pays nothing)
+    if (S.nightInputs === 0) {
+      setResult(S, null);
+      hud(ctx, S, { banner: 'NO PLAY', blurb: 'NOTHING SAVED', board: nightBoard(S.tally, names(S)), boardTitle: 'FINAL' });
+      S.mic?.hush();
+      ctx.end(NO_PLAY_OUTCOME, 0, {
+        rivalPoints: 0, events: S.events.length, players: S.players,
+        eventsWon: 0, rivalEventsWon: 0, champion: -1, practice: S.practice ? 1 : 0, noPlay: 1,
+      });
+      return;
+    }
     SoundKit.play('whistle');
     const champ = nightChampion(S.tally);
     const won = champ === 0;
@@ -595,7 +625,7 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
         // Nothing is built before the harness is PLAYING: an event built inside load() had its camera reset by the
         // harness's own start-of-play step and the first event rendered sky (measured on /play/carnival?players=1).
         autoBegin: !!q, starting: false, current: null,
-        players, turn: 0, turnPoints: [0, 0], tally: freshTally(), rivalTarget: 0,
+        players, turn: 0, turnPoints: [0, 0], turnInputs: [0, 0], nightInputs: 0, tally: freshTally(), rivalTarget: 0,
         ended: false, hub: null, host: null, guest: null, hostBody: null, guestBody: null, anchor: null, fx: null, eventLatch: false, champLatch: false,
         hostPP: null, guestPP: null, hostBio: { ...STAGE_INPUT_IDLE, watching: true }, guestBio: { ...STAGE_INPUT_IDLE, watching: true },
         mic: null, micOpening: true, micOpened: false, micQuiet: '', micClock: false, parked: new Map(),
@@ -664,6 +694,8 @@ export const CourtCarnivalMode: ModeDefinition = (() => {
       // most presses were simply the wrong button for the event on screen. The event declares what it reads; anything
       // else is answered with the verb that would have worked, which is both a feel fix and the only teaching this
       // 15-second format has room for.
+      // CC75-3: count what the player put into the event (a wrong button is still a press: they were playing)
+      if (isPlayInput(e)) { S.turnInputs[S.turn]++; S.nightInputs++; }
       const v = S.current.verbs;
       if (v && e.t === 'button' && e.pressed && !v.buttons.includes(e.btn ?? '')) { refuse(ctx, v.says); return; }
       // no carnival event reads the d-pad — every one of them steers with the stick — so a direction tapped on it was
