@@ -1,0 +1,33 @@
+-- FN-BOX-1b (2026-10-19; owner-approved tip): User.dob — the account's full date of birth, beside User.dobYear.
+-- The fight body path (lib/babylon/core/bodySeam.ts bodyFightAllowed) uses it for an exact 18th-birthday rule
+-- (lib/age/ageRules.ts isAdult18); an account without it keeps the strict year rule and fails closed.
+-- ADDITIVE ONLY: one nullable column on an existing table. No default, no backfill, no index. dobYear is unchanged and
+-- still written on every signup and birth-year answer.
+--
+-- Written by hand in `prisma migrate diff --script` form. This lane ran no Prisma command (no migrate, no db push, no
+-- generate) and did not touch public/_prisma/**.
+--
+-- SAFE IN EITHER ORDER WITH THE DEPLOY. lib/age/userDob.ts reads and writes the column with raw, parameterised SQL after
+-- an information_schema probe: without the column the date is not stored, every read is "no full date on file", and
+-- signup and the age step work as before. Within ~5 minutes of this file being applied, dates are stored and read.
+-- Existing Prisma queries are unaffected: the committed client does not select a column it has never heard of.
+--
+-- THE OWNER'S STEPS (docs/LANES.md section 4), in this order:
+--   1. Locally, add ONE line to `model User` in prisma/schema.prisma, after `dobYear`:
+--          dob             DateTime?   @db.Date // Full date of birth (FN-BOX-1b); dobYear stays
+--      (Without it, step 2 shows nothing and, after step 3, every later `migrate diff` would propose DROP COLUMN "dob".)
+--   2. Preview, read-only: npx prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script
+--      It should print exactly the ALTER below (plus anything another unapplied lane adds — stop and review if so).
+--   3. Apply: npx prisma db execute --url "$PROD_DIRECT_URL" --file prisma/pending/2026-10-19-user-dob.sql
+--   4. Verify: the same migrate diff prints an empty migration.
+--   5. Then the client: node scripts/copy-prisma-schema.mjs && npm run prisma:generate; npx vitest run
+--      lib/db/prismaSchemaSync.test.ts and npx tsx scripts/prisma-artifact-tests.ts; commit prisma/schema.prisma,
+--      public/_prisma/schema.prisma and public/_prisma/client, and bump PARENT in lib/privacy/u13-lock-log.test.ts to
+--      that commit. A deploy of that regenerated client MUST come after step 3: the regenerated client selects dob on
+--      every User read that has no `select`.
+--
+-- ROLLBACK (loses only the stored dates; dobYear stays): ALTER TABLE "User" DROP COLUMN "dob";
+--   (Revert the schema line too if step 5 was done; the code goes back to the year rule on its own.)
+
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "dob" DATE;
