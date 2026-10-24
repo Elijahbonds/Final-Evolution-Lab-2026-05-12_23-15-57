@@ -41,6 +41,7 @@ const NOT_IMPORTED: Record<string, string> = {
   // lane/hoops-def-tell (owner 2026-10-23, #274 rebuilt): HOOPS-BLOCK-SET BLK-1 is the selector core, pure, landed BEFORE its mode
   // wiring (BLK-2, which waits on T-B, the contest window). Its tests and the feel panel's catalogue read it. BLK-2 deletes this line.
   'lib/controller-link/shootoutTurns.ts': 'the phone-only shootout running order, superseded by lib/hoops/couchTurns.ts (lane/hoops-couch, #435: camera + pads + phones in one lineup); only its own test calls it — delete both in a cleanup once #435 has played on a real couch',
+  'lib/jump/seam.ts': 'the typed per-jump-type record (with its trust level, never power) for the game lanes the owner chose on 2026-10-24: vertical unlocks dunks, the avatar jump rating, beat-my-vertical challenges — only its test reads it until the first of those lanes wires it',
   'lib/babylon/core/HoopsBlocks.ts': 'BLK-1 block selector core (selectBlock / blockFoul), pure; the modes call it from BLK-2, after T-B — only its test calls it today',
   'lib/babylon/core/trainingSim.ts': 'the training scoring model — run by trainingSim.test.ts and the integrity suite\'s ceiling basis; tests are not counted as consumers',
   // BODY-PLAY-WORKS (2026-10-01): the public-repo rule for a committed pose recording. The walk lives in
