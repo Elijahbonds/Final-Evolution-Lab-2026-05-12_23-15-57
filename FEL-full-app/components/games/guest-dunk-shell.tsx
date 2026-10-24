@@ -8,6 +8,8 @@ import { Loader2, Trophy, Flame, ArrowRight, ExternalLink, X } from 'lucide-reac
 import { prqGrade } from '@/lib/prq';
 import { is3D, isBabylon } from '@/components/three/flags';
 import { track, flush } from '@/lib/analytics';
+import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
+import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import type { GameProps, GameResult } from '@/components/games/game-shell';
 
 const spinner = () => (
@@ -27,7 +29,15 @@ const DunkBabylon = dynamicImport(() => import('@/components/games/dunk-babylon'
  * record the funnel events (play_now_click → first_dunk_judged), optionally
  * resolve a challenge attempt, then invite the guest to claim an athlete.
  * Server owns all grants/scores; nothing here mutates a real account.
+ *
+ * TIP-GUEST-TOKEN-HASH Part A (PRIVACY-CORE 1b, 2026-10-19): the year question comes FIRST, and nothing leaves the
+ * browser before it is answered. Only an adult answer starts the guest (POST /api/guest, then play_now_click) and lets
+ * analytics, the challenge attempt and the claim through. A blocked answer (or the block flag already present) writes
+ * the constant flag and plays the run locally; a teen answer, or "play without saving", also plays locally with no
+ * guest row and no telemetry until GUEST-SAVE C1 decides otherwise. The year itself is never sent or stored.
  */
+type GuestGate = 'ask' | 'blocked' | 'local' | 'adult';
+
 export function GuestDunkShell({ challengeCode }: { challengeCode?: string | null }) {
   // Engine selection must match /play/dunk: isBabylon FIRST, then the 3D
   // fallback. This shell checked only is3D, so the guest path — the PLAY NOW
@@ -52,11 +62,21 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   // same-tab /signup. A guest run is not saved anywhere, so a claim that navigates away is a
   // claim that throws the night (and GO AGAIN) away — the one trade this page must never ask.
   const [claimOpen, setClaimOpen] = useState(false);
+  const [gate, setGate] = useState<GuestGate>('ask');
+  // true only after an adult answer: the one state in which this shell may send anything carrying data
+  const online = useRef(false);
   const started = useRef(false);
   const judged = useRef(false);
 
-  // Ensure an anonymous guest token exists, then record the play_now click.
+  // A browser that already carries the block flag skips the question. Reads only; sends nothing.
   useEffect(() => {
+    if (gate === 'ask' && ageBlockPresent()) setGate('blocked');
+  }, [gate]);
+
+  // Adult only: ensure an anonymous guest token exists, then record the play_now click.
+  const startGuest = () => {
+    online.current = true;
+    setGate('adult');
     if (started.current) return;
     started.current = true;
     (async () => {
@@ -66,13 +86,22 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
       track('play_now_click', { target: 'dunk' });
       void flush();
     })();
-  }, []);
+  };
+  const onAgeLocked = (year: number) => {
+    if (ageScreenOutcome(year) === 'adult') startGuest();
+    else setGate('local');
+  };
+  const onAgeBlocked = () => {
+    writeAgeBlockFlag();
+    setGate('blocked');
+  };
 
   const claimHref = challengeCode ? `/signup?c=${challengeCode}` : '/signup';
 
   const handleEnd = useCallback(
     async (res: GameResult) => {
       setResult(res);
+      if (!online.current) return;
       track('first_dunk_judged', { card: 1 });
       void flush();
       if (challengeCode) {
@@ -100,6 +129,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   const handleCard = useCallback(
     async (res: GameResult) => {
       setCards((c) => c + 1);
+      if (!online.current) return;
       // the funnel event is the FIRST card, not every one of them — a continuous night
       // reaches this handler once a contest and would otherwise re-fire it all evening
       if (!judged.current) { judged.current = true; track('first_dunk_judged', { card: 1 }); void flush(); }
@@ -144,8 +174,9 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
     return () => window.removeEventListener('keydown', onKey, true);
   }, [claimOpen]);
 
-  // Secondary by construction: an outline button UNDER GO AGAIN that only opens the sheet.
-  const claimLink = (
+  // Secondary by construction: an outline button UNDER GO AGAIN that only opens the sheet. Adults only: a run that
+  // started no guest session has nothing to claim.
+  const claimLink = gate === 'adult' ? (
     <button
       type="button"
       onClick={() => setClaimOpen(true)}
@@ -153,7 +184,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
     >
       <Flame className="h-4 w-4" /> CLAIM YOUR ATHLETE — SAVE THIS RUN
     </button>
-  );
+  ) : null;
 
   // The sheet. Sign-up opens in a NEW TAB (the guest cookie rides along, so the claim still lands
   // on this run) and the sheet closes itself; this tab — the stage, the card, GO AGAIN — is never
@@ -236,7 +267,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
               front of the game — one quiet link in the chrome. The old shape was the opposite:
               a full-screen modal whose primary button left the page, with DUNK AGAIN as a small
               grey afterthought beside it. */}
-          {cards > 0 && !result && (
+          {gate === 'adult' && cards > 0 && !result && (
             <button
               type="button"
               onClick={() => setClaimOpen(true)}
@@ -259,7 +290,18 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
       </header>
 
       <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
-        {babylon ? (
+        {gate === 'ask' ? (
+          <div className="py-10" data-testid="guest-age-step">
+            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} />
+            <button
+              type="button"
+              onClick={() => setGate('local')}
+              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white"
+            >
+              Play without saving
+            </button>
+          </div>
+        ) : babylon ? (
           // G7: NO `key={gameKey}` on this one. The Babylon dunk resets itself in place;
           // remounting it would dispose the engine and cold-boot the venue, the rig and the
           // 3-2-1 for what the mode does on the next frame.

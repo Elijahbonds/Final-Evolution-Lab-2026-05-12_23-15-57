@@ -162,8 +162,6 @@ export async function getLatestPrqVector(
   db: DbClient,
   userId: string
 ): Promise<Map<PrqAttr, PrqAttributeValue>> {
-  const map = new Map<PrqAttr, PrqAttributeValue>();
-
   // Single query: fetch all entries for this user, ordered by measuredAt desc.
   // Then pick the first (latest) per attribute in JS — avoids 8 parallel DB connections.
   const allEntries = await (db as any).prqEntry.findMany({
@@ -172,7 +170,18 @@ export async function getLatestPrqVector(
     select: { id: true, attribute: true, value: true, unit: true, source: true, measuredAt: true },
   });
 
-  for (const entry of allEntries) {
+  return latestVectorFrom(allEntries);
+}
+
+/**
+ * PROFILE V2 (2026-10-24): the latest-per-attribute pick, pure, so a page that read the entries in its own batch gets
+ * the SAME vector as getLatestPrqVector (which now calls this). `entries` must be newest first (measuredAt desc).
+ */
+export function latestVectorFrom(
+  entries: readonly { id: string; attribute: string; value: number; unit: string; source: string; measuredAt: Date }[],
+): Map<PrqAttr, PrqAttributeValue> {
+  const map = new Map<PrqAttr, PrqAttributeValue>();
+  for (const entry of entries) {
     const attr = entry.attribute as PrqAttr;
     if (!countsInVector(entry)) continue;   // MIRROR-COACH P9 fix: a game's recovery copy (RECOVERY_RETIRED_SOURCES)
     if (!map.has(attr) && PRQ_ATTRS.includes(attr)) {
@@ -186,7 +195,6 @@ export async function getLatestPrqVector(
       });
     }
   }
-
   return map;
 }
 
@@ -231,7 +239,11 @@ export async function computeTraceablePrq(
   db: DbClient,
   userId: string
 ): Promise<{ score: number; measured: number; total: number }> {
-  const vec = await getLatestPrqVector(db, userId);
+  return traceableFrom(await getLatestPrqVector(db, userId));
+}
+
+/** computeTraceablePrq's arithmetic over a vector already in hand (PROFILE V2: the page reads the entries itself). */
+export function traceableFrom(vec: ReadonlyMap<PrqAttr, { value: number }>): { score: number; measured: number; total: number } {
   if (vec.size === 0) return { score: 0, measured: 0, total: PRQ_ATTRS.length };
   let sum = 0;
   for (const v of vec.values()) sum += v.value;

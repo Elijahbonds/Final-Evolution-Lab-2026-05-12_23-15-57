@@ -12,7 +12,8 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth';
 import { resolveAttempt } from '@/lib/social/challenge-service';
-import { GUEST_COOKIE } from '@/lib/guest';
+import { guestIdFrom } from '@/lib/guestSession';
+import { AGE_BLOCK_COOKIE } from '@/lib/privacy/ageScreen';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,9 @@ export async function POST(req: Request, { params }: { params: { code: string } 
 
   const session = await getServerSession(authOptions);
   const userId = (session?.user as any)?.id ?? null;
-  const guestId = userId ? null : cookies().get(GUEST_COOKIE)?.value ?? null;
+  // TIP-GUEST-TOKEN-HASH: the events carry the token's hash; none at all for a browser with the age-block flag.
+  const jar = cookies();
+  const guestId = userId || jar.get(AGE_BLOCK_COOKIE) ? null : guestIdFrom(jar);
 
   const result = await resolveAttempt({
     code: params.code,

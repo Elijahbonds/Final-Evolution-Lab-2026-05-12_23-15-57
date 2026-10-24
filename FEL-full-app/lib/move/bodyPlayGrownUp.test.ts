@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { GrownUpStep } from '@/app/play/mirror/assess/_components/gate-steps';
 import { GROWN_UP_BODY, GROWN_UP_CHECKBOX, GROWN_UP_TITLE } from '@/lib/screen/copy';
 import { createBodyPlay, type BodyPlayDeps } from './bodyPlay';
-import { bodyPlayNeedsGrownUp, readBodyPlayAge, setBodyPlayDobYear, type BodyPlayAge } from './bodyPlayGrownUp';
+import { bodyPlayNeedsGrownUp, readBodyPlayAge, setBodyPlayDob, setBodyPlayDobYear, type BodyPlayAge } from './bodyPlayGrownUp';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { bodySeamFor } from '@/lib/babylon/core/bodySeam';
 import { lockAge, forgetAgeForTests, type StorageLike } from '@/lib/screen/store';
@@ -150,5 +150,60 @@ describe('the step on screen is the Mirror\'s, and the Mirror\'s flow is unchang
     expect(src).not.toMatch(/getUserMedia/);
     const mirror = readFileSync(join(__dirname, '../../app/play/mirror/assess/_components/assess-app.tsx'), 'utf8');
     expect(mirror).toContain("{phase === 'grownUp' ? <GrownUpStep onContinue={grownUp} /> : null}");
+  });
+});
+
+// FN-BOX-1b-2: a full birth date makes the year half exact (from the 18th birthday); without one, the year rule as before.
+describe('a full birth date, before a game camera', () => {
+  const TODAY = new Date(2026, 9, 19, 12, 0, 0);   // 2026-10-19, local calendar (isAdult18 reads `now` locally)
+
+  it('born 2008 with the birthday already past this year needs no grown-up step', () => {
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008, dob: '2008-03-05' }, TODAY)).toBe(false);
+    expect(bodyPlayNeedsGrownUp({ dob: '2008-03-05' }, TODAY)).toBe(false);
+    expect(bodyPlayNeedsGrownUp({ band: '18+', dobYear: 2008, dob: '2008-10-19' }, TODAY)).toBe(false);   // the birthday itself
+  });
+
+  it('born 2008 with the birthday still to come this year still waits', () => {
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008, dob: '2008-10-20' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008, dob: '2008-12-25' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ band: '18+', dobYear: 2008, dob: '2008-12-25' }, TODAY)).toBe(true);
+  });
+
+  it('no full date and born 2008 still waits (the strict year rule, fail closed)', () => {
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008 }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008, dob: null }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008, dob: undefined }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ band: '18+', dobYear: 2008 }, TODAY)).toBe(true);
+  });
+
+  it('a date never opens what the screen band closes, and a bad or mismatched date waits', () => {
+    expect(bodyPlayNeedsGrownUp({ band: '13-17', dob: '1990-01-01' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ band: 'under-13', dob: '1990-01-01' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ band: 'unknown', dob: '1990-01-01' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dobYear: 1990, dob: '2008-03-05' }, TODAY)).toBe(true);   // year on file disagrees
+    expect(bodyPlayNeedsGrownUp({ dobYear: 2008, dob: '2007-03-05' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dob: '2008-02-30' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dob: 'not a date' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dob: '2027-01-01' }, TODAY)).toBe(true);
+    expect(bodyPlayNeedsGrownUp({ dob: '2012-03-05' }, TODAY)).toBe(true);
+  });
+
+  it('reads the page\'s held full date beside the held year', () => {
+    forgetAgeForTests();
+    try {
+      setBodyPlayDobYear(2008);
+      expect(bodyPlayNeedsGrownUp(readBodyPlayAge(null), TODAY)).toBe(true);
+      setBodyPlayDob('2008-03-05');
+      expect(readBodyPlayAge(null).dob).toBe('2008-03-05');
+      expect(bodyPlayNeedsGrownUp(readBodyPlayAge(null), TODAY)).toBe(false);
+      setBodyPlayDob('2008-12-25');
+      expect(bodyPlayNeedsGrownUp(readBodyPlayAge(null), TODAY)).toBe(true);
+      setBodyPlayDob(null);
+      expect(bodyPlayNeedsGrownUp(readBodyPlayAge(null), TODAY)).toBe(true);
+    } finally {
+      setBodyPlayDob(undefined);
+      setBodyPlayDobYear(undefined);
+      forgetAgeForTests();
+    }
   });
 });

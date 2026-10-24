@@ -131,7 +131,7 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
           </p>
           <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-slate-400">
             <Trophy className="h-3 w-3 text-amber-400" aria-hidden />
-            {data.badgesEarned.length}/13
+            {data.badgesEarned.length}/{data.totalBadges}
           </div>
         </div>
       </header>

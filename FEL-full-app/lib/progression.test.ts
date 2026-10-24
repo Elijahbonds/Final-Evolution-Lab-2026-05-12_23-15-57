@@ -108,6 +108,14 @@ describe('the map payload says what each node asks, in words', () => {
   const status = evaluateCampaign({ completedNodeIds: new Set(), prqOverall: 0, lessonsCompleted: 0 });
   const zone = (id: string) => status.zones.find((z) => z.id === id)!;
 
+  it('describes the visible ladder, not parked authored zones', () => {
+    // IRON-PARADISE-OUT: Gym Dome stays authored but hidden, so the player-visible map is a twelve-badge campaign.
+    expect(status.zones).toHaveLength(12);
+    expect(status.totalBadges).toBe(12);
+    expect(status.campaign.tagline).toBe('12 grounds. One athlete, rebuilt.');
+    expect(status.campaign.tagline).not.toMatch(/thirteen/i);
+  });
+
   it('zones carry the mode\'s player-facing name, not the route id', () => {
     expect(zone('blacktop')).toMatchObject({ mode: 'onevone', modeLabel: 'Ones' });
     // IRON-PARADISE-OUT (2026-10-03): 'Iron Paradise' is UNLISTED — the gymDome zone it named is parked out of

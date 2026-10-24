@@ -54,6 +54,16 @@ function readStore(storage: ProgressStorage): Stored | null {
   return empty;
 }
 
+/**
+ * PROFILE V2 (2026-10-24): the same kept entries WITH their times, oldest first, so the profile can say "this week vs
+ * last week" for a set kept on this phone. Read here so nothing else touches the key. [] / null as readDeviceHistory.
+ */
+export function readDeviceEntries(movement: ProgressMovement, storage: ProgressStorage | null = deviceStorage()): DeviceEntry[] | null {
+  if (!storage) return null;
+  const s = readStore(storage);
+  return s ? (s.byMovement[movement] ?? []).map((e) => ({ at: e.at, value: e.value })) : null;
+}
+
 /** This movement's kept values, oldest first; [] when there are none; null when this phone keeps nothing (no storage). */
 export function readDeviceHistory(movement: ProgressMovement, storage: ProgressStorage | null = deviceStorage()): number[] | null {
   if (!storage) return null;

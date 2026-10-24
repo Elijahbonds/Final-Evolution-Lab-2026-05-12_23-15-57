@@ -52,6 +52,12 @@ describe('mode menu contract', () => {
     }
   });
 
+  it('story mode copy matches the linked map flow, not the parked standalone boss route', () => {
+    const desc = modeMenuMetaFor('storyMode').desc;
+    expect(desc).toMatch(/clear zone bosses/i);
+    expect(desc).not.toMatch(/Glitch Boss/i);
+  });
+
   it('only hides keys that exist in MODE_INFO', () => {
     const unknownHiddenKeys = [...HIDDEN_FROM_MODE_MENU].filter((key) => !(key in MODE_INFO));
     expect(unknownHiddenKeys).toEqual([]);
