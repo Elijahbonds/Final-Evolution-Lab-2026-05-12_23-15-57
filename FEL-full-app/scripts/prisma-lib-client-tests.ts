@@ -167,7 +167,21 @@ async function main() {
                    git('ls-files', '--others', '--exclude-standard', '--', 'lib/generated')].filter(Boolean).join('\n');
     assert.strictEqual(dirty, '',
       `regenerating lib/generated/prisma changed committed files:\n${dirty}\nThe commit is missing the regenerated ` +
-      'client: run `npm run prisma:generate` and commit lib/generated/prisma.');
+      'client: run `npm run prisma:generate` and commit lib/generated/prisma.\n' +
+      // What changed, so a CI-only difference can be read off the log instead of guessed at.
+      (dirty ? dirty.split('\n') : []).map((f) => {
+        // `diff --name-only` names files from the repo root, `ls-files` from appDir.
+        const top = git('rev-parse', '--show-toplevel');
+        const abs = existsSync(path.join(top, f)) ? path.join(top, f) : path.join(appDir, f);
+        if (!existsSync(abs)) return `${f}: missing`;
+        const rel = path.relative(appDir, abs);
+        if (!git('ls-files', '--', rel)) return `${f}: not in the commit`;
+        const was = git('show', `HEAD:./${rel}`), now = readFileSync(path.join(appDir, rel), 'utf8');
+        let i = 0;
+        while (i < was.length && was[i] === now[i]) i++;
+        return `${f} first differs at ${i}:\n  committed: ${JSON.stringify(was.slice(Math.max(0, i - 120), i + 200))}\n  ` +
+          `regenerated: ${JSON.stringify(now.slice(Math.max(0, i - 120), i + 200))}`;
+      }).join('\n'));
   });
 
   console.log(`\n✅ prisma-lib-client-tests: ${pass} checks green`);
