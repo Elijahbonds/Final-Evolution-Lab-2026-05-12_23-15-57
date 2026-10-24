@@ -232,3 +232,7 @@ lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30
 number): a 3v3 tied at the horn plays sudden-death overtime on this clock, and level again when it runs out is another overtime.
 It moves only how long an overtime lasts, never who wins it or what a bucket is worth. **assumption:** the bounds (10–90 s) are
 safe, not tuned.
+lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by that lane: `tennis.portraitHeroMargin` 0.15
+(`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
+only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
+**assumption:** the bounds (0.05 to 0.35) are safe, not tuned.

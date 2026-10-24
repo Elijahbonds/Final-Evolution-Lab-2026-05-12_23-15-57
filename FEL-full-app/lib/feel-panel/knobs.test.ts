@@ -31,6 +31,7 @@ import {
   HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
   HOOPS_RETREAT_SPEED_K,
 } from '@/lib/babylon/core/HoopsStick';
+import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -64,6 +65,8 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.comboOpenK')).toBe(COMBO_OPEN_K);
     expect(def('hoops.comboGraceSec')).toBe(COMBO_GRACE_SEC);
     expect(def('hoops.guardRangeM')).toBe(GUARD_RANGE_M);
+    // tiebreak-cam (group "Tennis · camera")
+    expect(def('tennis.portraitHeroMargin')).toBe(PORTRAIT_HERO_MARGIN);
     expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
     // hoops-defense-fx
     expect(def('hoops.ballSideShadeOn')).toBe(BALL_SIDE_SHADE_ON ? 1 : 0);
