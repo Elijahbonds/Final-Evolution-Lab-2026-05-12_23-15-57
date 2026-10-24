@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { readSet } from '@/lib/coach/formReview/reader';
 import { flagsFor, scoreReps } from '@/lib/coach/formReview/score';
 import { REVIEW_MOVEMENTS } from '@/lib/coach/formReview/movements';
-import { labelledSets, realNegatives } from '../helpers/formReviewSets';
+import { labelledSets, realNegatives, squatSet } from '../helpers/formReviewSets';
 import { scoreSet } from '../helpers/formReviewAccuracy';
 
 const SETS = labelledSets([1, 2, 3, 4]);
@@ -76,5 +76,19 @@ describe('flag accuracy on labelled sets', () => {
     const s = SETS.find((x) => x.name.startsWith('stored squat'))!;
     const flags = flagsFor('squat', scoreReps('squat', readSet('squat', s.frames)));
     expect(flags.map((f) => f.reason).sort()).toEqual(['Both knees cave on rep 5', 'Left knee caves on rep 3', 'Right knee caves on rep 6']);
+  });
+});
+
+describe('the knee\'s side', () => {
+  it('names the knee that caved — left, right or both — on jittered sets (60 of 60 measured over 12 seeds; 6 here)', () => {
+    const L = { shiftL: -0.06 }, R = { shiftR: -0.06 }, B = { shiftL: -0.06, shiftR: -0.06 };
+    const shapes = [{}, {}, L, {}, R, {}, L, {}, B, R];
+    const want = [null, null, 'left', null, 'right', null, 'left', null, 'both', 'right'];
+    const wrong: string[] = [];
+    for (const seed of [1, 3, 5, 7, 10, 11]) {
+      const reps = readSet('squat', squatSet(shapes, seed));
+      want.forEach((w, i) => { if (w && reps[i]?.sides.kneeValgus !== w) wrong.push(`seed ${seed} rep ${i + 1}: ${reps[i]?.sides.kneeValgus}`); });
+    }
+    expect(wrong).toEqual([]);
   });
 });

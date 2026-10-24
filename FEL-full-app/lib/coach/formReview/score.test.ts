@@ -82,3 +82,14 @@ describe('the summary and the words', () => {
     expect(trendLine([{ at: 'a', setScore: 90 }, { at: 'b', setScore: null }, { at: 'c', setScore: 60 }])).toBe('Down 30 on the last set.');
   });
 });
+
+describe('kneeSide', () => {
+  it('a side counts only with at least half the stronger side\'s frames', async () => {
+    const { kneeSide, KNEE_SIDE_SHARE } = await import('./reader');
+    expect(KNEE_SIDE_SHARE).toBe(0.5);
+    expect(kneeSide(10, 0)).toBe('left');
+    expect(kneeSide(10, 2)).toBe('left');      // a jittered frame or two on the straight knee
+    expect(kneeSide(0, 7)).toBe('right');
+    expect(kneeSide(8, 6)).toBe('both');
+  });
+});

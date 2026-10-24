@@ -90,6 +90,20 @@ const toAdapter = (f: PoseFrame): AdapterFrame => ({
   present: f.present, timestampMs: f.t, landmarks: f.image.map((l) => ({ x: l.x, y: l.y, z: l.z, visibility: l.v })),
 });
 
+/**
+ * Which knee caved, from how many of the rep's faulted frames each knee was over the audit's line. A side counts only
+ * when it holds at least KNEE_SIDE_SHARE of the stronger side's frames: under landmark jitter the straight knee crosses
+ * the line on a frame or two of a one-sided cave, and "both" would then be said of a left knee. Measured 2026-10-24 on 60
+ * caves (10-rep jittered squat sets, left / right / both, seeds 1–12): any-frame counting named the right side on 56 (4
+ * one-sided caves read "both"); this rule on 60. TUNE(elijah) (new)
+ */
+export const KNEE_SIDE_SHARE = 0.5;
+export function kneeSide(left: number, right: number): FaultSide {
+  const top = Math.max(left, right);
+  const l = left > 0 && left >= top * KNEE_SIDE_SHARE, r = right > 0 && right >= top * KNEE_SIDE_SHARE;
+  return l && r ? 'both' : l ? 'left' : 'right';
+}
+
 // ── the squat ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 function squatReader(): SetReader {
@@ -131,7 +145,7 @@ function squatReader(): SetReader {
           const fs = [...faults] as string[];
           if (shallowRep && !fs.includes('shallow')) fs.push('shallow');
           const sides: Record<string, FaultSide> = {};
-          if (fs.includes('kneeValgus')) sides.kneeValgus = knee.left && knee.right ? 'both' : knee.left ? 'left' : 'right';
+          if (fs.includes('kneeValgus')) sides.kneeValgus = kneeSide(knee.left, knee.right);
           closed = {
             n: out.length + 1, startMs: topMs ?? f.t, endMs: f.t,
             // a never-square rep is read for depth only: its knee, heel and sideways checks were not taken

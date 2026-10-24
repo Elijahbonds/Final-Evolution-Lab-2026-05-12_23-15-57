@@ -68,3 +68,13 @@ describe('the record screen and the queue, first paint', () => {
     expect(reviewCountLine(3)).toBe('3 filmed sets to review — the flagged rep first');
   });
 });
+
+describe('the live overlay sits on the cover-cropped self-view', () => {
+  it('a 4:3 camera in a 3:4 box: the centre stays, the sides are cropped (x stretched by 16/9), y unchanged', async () => {
+    const { coverMap } = await import('./record-set');
+    const [c, l] = coverMap([{ x: 0.5, y: 0.5, z: 0, v: 1 }, { x: 0.25, y: 0.1, z: 0, v: 1 }], 4 / 3, 3 / 4);
+    expect(c).toMatchObject({ x: 0.5, y: 0.5 });
+    expect(l.x).toBeCloseTo(0.5 - 0.25 * (16 / 9));
+    expect(l.y).toBeCloseTo(0.1);
+  });
+});

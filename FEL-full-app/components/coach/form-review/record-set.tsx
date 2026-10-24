@@ -17,8 +17,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Camera, CheckCircle2, Loader2, Send, Square, Trash2 } from 'lucide-react';
 import { poseService } from '@/lib/pose/PoseService';
-import type { PoseFrame } from '@/lib/pose/landmarks';
-import { MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
+import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
+import { HUD_HZ, MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
+import { drawSkeleton, SKELETON_COLOURS } from '@/app/play/mirror/assess/_components/skeleton';
 import { MOVEMENT_SPECS } from '@/lib/coach/formReview/movements';
 import { createSetReader, type SetReader } from '@/lib/coach/formReview/reader';
 import { flagsFor, scoreReps, setHeadline, summarize, type RepFlag, type ScoredRep, type SetSummary } from '@/lib/coach/formReview/score';
@@ -41,6 +42,15 @@ const CHIP_CLASS: Record<string, string> = {
   unread: 'border-white/10 text-white/35',
 };
 
+/**
+ * Image landmarks (normalised to the camera frame) → normalised to a box of aspect `box` that shows the frame with
+ * object-fit: cover, so the overlay sits on the picture (a landscape camera in a portrait box is cropped at the sides).
+ */
+export function coverMap(img: readonly Lm[], camAspect: number, box: number): Lm[] {
+  const sx = camAspect > box ? camAspect / box : 1, sy = camAspect > box ? 1 : box / camAspect;
+  return img.map((l) => ({ ...l, x: 0.5 + (l.x - 0.5) * sx, y: 0.5 + (l.y - 0.5) * sy }));
+}
+
 /** The body as the page posts it: JSON of the pose-only submission, and nothing else (no FormData, no Blob). */
 export function submissionBody(sub: FormReviewSubmission): string {
   return JSON.stringify(sub);
@@ -60,6 +70,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   const reader = useRef<SetReader | null>(null);
   const off = useRef<(() => void)[]>([]);
   const wake = useRef<MirrorWakeLock | null>(null);
+  const overlay = useRef<HTMLCanvasElement>(null);
+  const latest = useRef<PoseFrame | null>(null);
 
   const loadMine = useCallback(() => {
     fetch(`${api}?mine=1`).then((r) => (r.ok ? r.json() : null)).then((j) => setMine(j?.available ? j.items : null)).catch(() => setMine(null));
@@ -71,6 +83,20 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
     void wake.current?.release();
   }, []);
   useEffect(() => () => { release(); wake.current?.dispose(); if (poseService().status.source === 'camera') poseService().stop(); }, [release]);
+
+  // the tracked skeleton over the self-view while recording, so the athlete can see the camera has them (the Mirror's
+  // painter; repainted at the HUD's rate, not every frame — lib/mirror/liveCamera.ts HUD_HZ)
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    const t = setInterval(() => {
+      const c = overlay.current, f = latest.current, ctx = c?.getContext('2d');
+      if (!c || !ctx) return;
+      ctx.clearRect(0, 0, c.width, c.height);
+      const cam = poseService().status.camera;
+      if (f?.present) drawSkeleton(ctx, coverMap(f.image, cam && cam.height ? cam.width / cam.height : 4 / 3, c.width / c.height), { colour: SKELETON_COLOURS.tracking, mirror: true });
+    }, 1000 / HUD_HZ);
+    return () => clearInterval(t);
+  }, [phase]);
 
   const finish = useCallback(() => {
     release();
@@ -102,7 +128,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
       t0 ??= f.t;
       // only what the reader and the replay need: the image landmarks, never the picture
       frames.current.push({ t: f.t, present: f.present, image: f.present ? f.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [] });
-      const closed = reader.current?.step(frames.current[frames.current.length - 1]);
+      latest.current = frames.current[frames.current.length - 1];
+      const closed = reader.current?.step(latest.current);
       if (closed) setCount(closed.n);
       if (f.t - t0 >= MAX_SET_MS) finish();
     }));
@@ -145,8 +172,10 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         <p className="text-xs text-white/45">The camera counts your reps and reads each one. Every number is an estimate.</p>
       </div>
 
-      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black" style={{ aspectRatio: '3 / 4' }}>
+      {/* collapsed (not unmounted: the camera attaches to it on "Film it again") once a set has been read */}
+      <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-black ${result && phase !== 'recording' && phase !== 'starting' ? 'hidden' : ''}`} style={{ aspectRatio: '3 / 4' }} data-camera-box>
         <div ref={host} className="absolute inset-0 [&>video]:-scale-x-100" data-self-view />
+        <canvas ref={overlay} width={480} height={640} aria-hidden className={`pointer-events-none absolute inset-0 h-full w-full ${phase === 'recording' ? '' : 'hidden'}`} data-live-skeleton />
         {phase === 'recording' && (
           <div className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-1.5 text-white" aria-live="polite">
             <span className="text-3xl font-black tabular-nums" data-rep-count>{count}</span>
