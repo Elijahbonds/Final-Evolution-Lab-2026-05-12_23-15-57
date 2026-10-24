@@ -13,6 +13,7 @@ import {
   GRADED_CHECKS, THRESHOLDS_VERSION, TOP_PRIORITIES, bandWordOf, bands3Of, type BandWord, type CheckId, type ScreenCheck,
 } from './PROPOSED-thresholds';
 import { pickLane, type LaneSlug } from './PROPOSED-program-lanes';
+import type { MeasureTrust, TrustRow } from './trust-rows';
 
 export const SUMMARY_VERSION = 1 as const;
 
@@ -39,6 +40,11 @@ export interface ScreenSummary {
   topFlag: CheckId | null;
   /** The best valid jump, in inches: a personal best, never a band (the draft). */
   jumpBestIn: number | null;
+  /**
+   * MIRROR-TRUST-RATING: how clearly the camera saw each measure. Optional, so an older summary still parses
+   * (SUMMARY_VERSION stays 1). Only ids, sides, levels and reason words: no number, frame or landmark.
+   */
+  trust?: TrustRow[];
 }
 
 const RANK: Record<BandWord, number> = { green: 0, yellow: 1, red: 2 };
@@ -119,4 +125,19 @@ export function summarize(result: SessionResult): ScreenSummary | null {
     priorities: priorities(checks), lane: pick.lane, topFlag: pick.flag,
     jumpBestIn: best === null ? null : inches(best),
   };
+}
+
+/** The trust rows a summary keeps (MIRROR-TRUST-RATING): ids, sides, levels and reasons, copied; nothing else. */
+export function keptTrust(rows: readonly MeasureTrust[]): TrustRow[] {
+  return rows.map((r) => ({ id: r.id, ...(r.side ? { side: r.side } : {}), level: r.level, reasons: [...r.reasons] }));
+}
+
+/**
+ * The summary with the session's trust rows beside it (MIRROR-TRUST-RATING): summarize() unchanged, plus `trust` copied
+ * as ids, sides, levels and reasons only. Nothing in the grading reads it.
+ */
+export function summarizeWithTrust(result: SessionResult): ScreenSummary | null {
+  const s = summarize(result);
+  if (!s || !result.trust?.length) return s;
+  return { ...s, trust: keptTrust(result.trust) };
 }

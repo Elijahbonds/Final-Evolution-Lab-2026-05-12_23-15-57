@@ -52,7 +52,8 @@ import type { TestResult } from '@/lib/assess/scoring';
 import type { Side } from '@/lib/assess/protocol';
 import { maybeSaveAdultScreen } from '@/lib/privacy/screenHistoryClient';
 import { landingDevice, maybeSaveLandingCheck } from '@/lib/privacy/landingCheckSave';
-import { summarize } from '@/lib/screen/checks';
+import { keptTrust, summarize } from '@/lib/screen/checks';
+import type { MeasureTrust, TrustLevel, TrustReason } from '@/lib/screen/trust-rows';
 import { clearReplay, holdReplay } from '@/lib/screen/rep-memory';
 import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
@@ -76,7 +77,7 @@ import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
 type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError' | 'noCamera';
-interface JumpView { heightCm: number | null; plusMinusCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
+interface JumpView { heightCm: number | null; plusMinusCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean; trust: { level: TrustLevel; reasons: readonly TrustReason[] } | null }
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'takeoff', 'cameraInfo', 'starting', 'device', 'running'];
 /** SCREEN A: while a rep is up, nobody reads — the caption bar hides on these steps (voice off keeps it). */
@@ -121,6 +122,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const takeoffRef = useRef<Side | null>(null);                 // the take-off tap (SCREEN A); an under-18's lives here only
   const modeRef = useRef<ScreenKind | 'rest'>(initialRun ?? 'full');
   const carryRef = useRef<TestResult | null>(null);
+  const carryTrustRef = useRef<MeasureTrust[]>([]);
   const booted = useRef(false);
   const [jumpView, setJumpView] = useState<JumpView | null>(null);
   const deviceOkSince = useRef<number | null>(null);
@@ -215,17 +217,23 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     cleanup();                                                   // the camera stops the moment the screen ends
     clearReplay();                                               // MIRROR step 2: a new screen never shows the last one's rep
     const summary = v.result ? summarize(v.result) : null;
+    if (summary && v.result?.trust.length) summary.trust = keptTrust(v.result.trust);   // MIRROR-TRUST-RATING: beside it, never in the grading
     if (!summary || v.result?.pain) { setPhase('stopped'); return; }
     if (modeRef.current === 'jump') {
       const t5 = v.result?.tests.find((t) => t.id === 'T5') ?? null;
       carryRef.current = t5;
+      // MIRROR-TRUST-RATING: the jump's trust rows ride with the carried jump (priorTrust), kept as they were rated
+      carryTrustRef.current = (v.result?.trust ?? []).filter((r) => r.id.startsWith('jump.'));
+      const kidView = keepResult(tabStorage(), gateRef.current, summary) === 'kid';
+      const jumpTrust = kidView ? null : v.result?.trust.find((r) => r.id === 'jump.height') ?? null;
       const view: JumpView = {
         heightCm: t5?.t5?.bestHeightCm ?? null,
         plusMinusCm: t5?.t5?.heightPlusMinusCm ?? null,
         attempts: t5?.t5?.jumps.length ?? 0,
         jumpIn: summary.jumpBestIn,
         lastIn: lastJumpRef.current,
-        kid: keepResult(tabStorage(), gateRef.current, summary) === 'kid',
+        kid: kidView,
+        trust: jumpTrust ? { level: jumpTrust.level, reasons: jumpTrust.reasons } : null,
       };
       if (view.kid) lastJumpRef.current = summary.jumpBestIn ?? lastJumpRef.current;
       // DRILLS round 3: the landing check, for a verified adult who opted in (the server says); a kid's run sends nothing
@@ -262,7 +270,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       // the pre-camera take-off tap (SCREEN A), null for "Not sure": the runner is never left to guess a foot
       aspect, takeoffLeg: takeoffRef.current, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current,
       ...(kind === 'jump' ? { parts: JUMP_PARTS } : {}),
-      ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined } : {}),
+      ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined, priorTrust: carryRef.current ? carryTrustRef.current : undefined } : {}),
     });
     runnerRef.current = runner;
     lastSayRef.current = 0;
@@ -447,7 +455,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       ) : null}
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
       {phase === 'jumpResult' && jumpView ? (
-        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
+        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} trust={jumpView.trust} />
       ) : null}
 
       {live ? (
