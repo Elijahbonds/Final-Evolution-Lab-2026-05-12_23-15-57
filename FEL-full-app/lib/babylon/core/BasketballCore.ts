@@ -23,6 +23,7 @@ import { spinBackspin } from '../visual/BallSpin';
 import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: the one visual-side helper (the rival's crossover side)
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
+import { hasBallM } from './PossessionSwap';   // lane/h3-aware (#313 H3c): "his man has the ball" — HAS_BALL_M, a feel knob
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
 import { PERFECT_BAND_SHARE } from './shotBands';   // lane/hoops-shot-core: the perfect band's share, one constant for the grade and both bars
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
@@ -30,7 +31,6 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
   type OffenseJob, type DefenseJob, type ScreenState,
 } from './HoopsOffball';
 import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
-import { hasBallM } from './PossessionSwap';   // lane/h3-aware (#313 H3c): "his man has the ball" — HAS_BALL_M, a feel knob
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
