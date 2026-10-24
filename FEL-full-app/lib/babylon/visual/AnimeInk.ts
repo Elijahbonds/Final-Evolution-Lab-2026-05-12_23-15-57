@@ -33,7 +33,7 @@ export type InkStyle = 'anime' | 'distance' | 'off';
 /** The photoreal sports (keyed by ModeDefinition.modeId). Unlisted modes are 'anime'. */
 export const INK_STYLE_BY_MODE: Readonly<Record<string, InkStyle>> = {
   dunk: 'distance', dunkduel: 'distance', onevone: 'distance', threevthree: 'distance', threepoint: 'distance',
-  tennis: 'distance', tiebreak: 'distance', volleyball: 'distance', golf: 'distance', baseball: 'distance',
+  tennis: 'distance', tiebreak: 'distance', volleyball: 'distance', golf: 'distance', baseball: 'distance', derby: 'distance',
   soccer: 'distance', football: 'distance', sprint: 'distance', skateboard: 'distance', snowboard: 'distance',
   surf: 'distance', bigair: 'distance', freerun: 'distance',
 };

@@ -13,6 +13,8 @@ import {
 import { draftsOn, payPathFor } from '@/lib/education/chapterCheck';
 import { payChapter, prismaRewardDeps } from '@/lib/education/rewards';
 
+type ProgressRow = { lessonKey: string };
+
 /**
  * The Playbook course's progress, and what finishing a chapter pays.
  *
@@ -32,10 +34,15 @@ export async function GET() {
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const rows = await prisma.lessonProgress.findMany({
-    where: { userId, trackKey: TRACK },
-    select: { lessonKey: true },
-  }).catch(() => []);
+  let rows: ProgressRow[];
+  try {
+    rows = await prisma.lessonProgress.findMany({
+      where: { userId, trackKey: TRACK },
+      select: { lessonKey: true },
+    });
+  } catch {
+    return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  }
 
   return NextResponse.json({ done: rows.map((r) => r.lessonKey) });
 }
@@ -59,16 +66,25 @@ export async function POST(req: NextRequest) {
   }
 
   const id = lessonId(chapter.number, lessonKey);
-  await prisma.lessonProgress.upsert({
-    where: { userId_trackKey_lessonKey: { userId, trackKey: TRACK, lessonKey: id } },
-    update: {},
-    create: { userId, trackKey: TRACK, lessonKey: id },
-  }).catch(() => null);
+  try {
+    await prisma.lessonProgress.upsert({
+      where: { userId_trackKey_lessonKey: { userId, trackKey: TRACK, lessonKey: id } },
+      update: {},
+      create: { userId, trackKey: TRACK, lessonKey: id },
+    });
+  } catch {
+    return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  }
 
   // Recomputed from storage, not from what the client believes.
-  const rows = await prisma.lessonProgress.findMany({
-    where: { userId, trackKey: TRACK }, select: { lessonKey: true },
-  }).catch(() => []);
+  let rows: ProgressRow[];
+  try {
+    rows = await prisma.lessonProgress.findMany({
+      where: { userId, trackKey: TRACK }, select: { lessonKey: true },
+    });
+  } catch {
+    return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+  }
   const done = new Set(rows.map((r) => r.lessonKey));
 
   const completedChapters = new Set(

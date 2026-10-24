@@ -46,7 +46,8 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   surf: true,
   // Rollout wave 3 — timing family (tennis / home-run derby / penalty shootout /
   // golf) on the shared makeTimingSportMode core with swept-hit contact. The
-  // route flag keys map to registry modes: baseball→derby, soccer→penalty.
+  // route flag keys map to registry modes: soccer→penalty. `baseball` flips both ballpark routes (BASEBALL-3INN):
+  // /play/baseball (three innings, BaseballInningsMode) and /play/derby (the home-run derby, registry `derby`).
   tennis: true,
   golf: true,
   baseball: true,
@@ -74,7 +75,8 @@ const BABYLON_MODES: Partial<Record<string, boolean>> = {
   // Rollout wave 6 — combat/duel modes (M53/M56)
   karateVersus: true,
   mixedcombat: true,
-  dunkduel: true,
+  // dunkduel's Babylon mode stays in the registry/dev harness, but /play/dunkduel is the IRL Prove It camera route.
+  // The live route does not ask this renderer flag.
   // These four mount Babylon unconditionally from their own loaders (all pass `ownControls`), so the flag was simply
   // untrue for them — and anything that asks "is this a Babylon mode?" (the shell's input owner, above) read the wrong
   // answer. Ported from elijahbonds-fel-upgrade-pass, 2026-09-12.

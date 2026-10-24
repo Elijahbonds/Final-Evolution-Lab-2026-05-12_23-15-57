@@ -374,6 +374,12 @@ export class RivalFightBrain {
   }
   get skill(): number { return this.difficulty; }
 
+  /** MC75-1: a ceiling on the EFFECTIVE skill (the dial plus the round ramp), or null for none (every mode but Mixed). */
+  private skillCap: number | null = null;
+  setSkillCap(cap: number | null): void { this.skillCap = cap !== null && Number.isFinite(cap) ? cap : null; }
+  /** MC75-1: the skill the brain fights at this round — the dial plus the round ramp, under 0.92 and under the tier cap. */
+  get effectiveSkill(): number { return Math.min(0.92, this.skillCap ?? Infinity, this.difficulty + this.roundBonus); }
+
   /** IMPROVE (2026-10-06): see `canSpecial`. Default true keeps the old behaviour for a mode that never says. */
   setCanSpecial(ok: boolean): void { this.canSpecial = ok; }
 
@@ -468,7 +474,7 @@ export class RivalFightBrain {
     const dist = Math.hypot(tx, tz);
     const dx = dist > 0 ? tx / dist : 0, dz = dist > 0 ? tz / dist : 0;
     const idealRange = this.attacks.jab.range * 0.9;
-    const effDiff = Math.min(0.92, this.difficulty + this.roundBonus);
+    const effDiff = this.effectiveSkill;   // MC75-1: the tier cap (Mixed) sits on top of the 0.92 ceiling
 
     // RIVAL-PRESSURE-FLOOR: the clock only runs inside the swing gate used
     // below (dist <= attacks.heavy.range) and resets the moment it leaves

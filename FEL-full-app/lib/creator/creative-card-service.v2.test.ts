@@ -80,6 +80,11 @@ describe('rights on media cards', () => {
     await expect(createCard(prisma, ADULT, input('music', { art: art as ArtPayload }))).rejects.toMatchObject({ status: 422, message: expect.stringMatching(/rights/) });
     await expect(createCard(prisma, ADULT, input('music', { art: art as ArtPayload }))).rejects.toBeInstanceOf(CardError);
   });
+  it('refuses unresolved client upload placeholders if a request bypasses the flow', async () => {
+    await expect(createCard(prisma, ADULT, input('music', {
+      art: { ...payloadFor('music'), mixUrl: 'https://upload.pending/mixUrl' } as ArtPayload,
+    }))).rejects.toMatchObject({ status: 422, message: 'upload still pending' });
+  });
   it("the stored record keeps the owner's words and version and the SERVER's time", async () => {
     const before = Date.parse(new Date().toISOString()) - 1000;
     const c = await createCard(prisma, ADULT, input('music'));

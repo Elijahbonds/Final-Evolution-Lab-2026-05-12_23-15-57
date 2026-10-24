@@ -48,7 +48,8 @@ import { SPORT_CLIP } from '../anim/clipRegistry';
 import { BeatOwner } from '../anim/beatOwner';
 import { registerMirroredClips } from '../anim/mirrored-clips';
 import { GOLF_CONTACT_SEC } from '../anim/authored/golf';
-import { batLineAt, batRightSign, BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
+import { BAT_SWING_SEC, BAT_RECOVER_SEC } from '../anim/authored/baseball';
+import { dressBatGlb, placeTwoHandBat, BAT_LEN, BAT_DIAM, type BatLookHandle } from './baseballBat';   // BASEBALL-FEEL: the shared two-hand bat (spec §4) and its look
 import { SoundKit } from '../audio/SoundKit';
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { VenueKit } from '../visual/VenueKit';
@@ -118,7 +119,7 @@ const CLUTCH_MULT = 1.5;
 /** Seconds into soccer_kick_shoot where the boot meets the ball (the strike-through key). */
 const KICK_CONTACT_SEC = 0.45;
 /** Seconds into baseball_pitch_over / _side where the ball leaves the hand (between the over-the-top key and the release). */
-const PITCH_RELEASE_SEC = 0.52;
+export const PITCH_RELEASE_SEC = 0.52;
 
 // ── GOLF: the three pillars the benchmark's own lock names ──────────────────
 // "Club selection + shot timing + course reading". Shot timing was here and
@@ -981,12 +982,8 @@ export function pitchSpec(round: number, seed?: number): PitchSpec {
   };
 }
 
-/** The derby bat: length, the knob's overhang past the fists, and wrist → fist along the forearm (ANIM-SURGICAL). */
-const BAT_LEN = 0.86, BAT_KNOB_M = 0.08, BAT_PALM_M = 0.07;
-/** Fists closer than this are one grip (the line between them is noise); further apart, they set the handle's line. */
-const BAT_SPLIT_M = 0.05;
-/** At most this share of the barrel's line comes from the fists; the rest is the swing's authored line. */
-const BAT_HANDS_PULL = 0.7;
+// The derby bat's numbers (BAT_LEN 0.86, knob 0.08, palm 0.07, split 0.05, pull 0.7) and its two-hand placement live in
+// baseballBat.ts since BASEBALL-FEEL (2026-10-23): one placement, shared with the three-innings batter (spec §4).
 
 export const DerbyMode: ModeDefinition = (() => {
   let me: SpawnedCharacter, pitcher: SpawnedCharacter;
@@ -997,6 +994,8 @@ export const DerbyMode: ModeDefinition = (() => {
   let bat: AbstractMesh | null = null;
   /** VIS-COURT: the bat's streak, the home run's tracer / card / board / fireworks, the replay's focus and its pacing. */
   let batTip: TransformNode | null = null, batTrail: SwingTrailHandle | null = null;
+  /** BASEBALL-FEEL (2026-10-23): bat.glb, copying the cylinder's computed transform every frame (not a RightHand child). */
+  let batGlb: BatLookHandle | null = null;
   let hrTracer: ShotTracer | null = null, hrReadout: ReadoutHandle | null = null, jumbo: JumbotronHandle | null = null, shells: FireworkShow | null = null;
   let focusProxy: TransformNode | null = null, launchVel: { x: number; y: number; z: number } | null = null, cardPending = false, replayWanted = false;
   const derbyPacer = new HighlightPacer();
@@ -1060,7 +1059,7 @@ export const DerbyMode: ModeDefinition = (() => {
   /** #11: the hit's tracer. */
   let trail: ParticleSystem | null = null;
   // #13 / #14 / #16: scratch for the per-frame bat, fielder, posture and camera feeds (nothing allocated a frame).
-  const ZERO_V = Vector3.Zero(), UP_V = Vector3.Up();
+  const ZERO_V = Vector3.Zero();
   const pitchAimAt = new Vector3();
   const bearingOf = (x: number, z: number) => (Math.atan2(x, z) * 180) / Math.PI;
   const onWall = (deg: number, r: number, y = 0, out = new Vector3()) => { const rad = (deg * Math.PI) / 180; return out.set(Math.sin(rad) * r, y, Math.cos(rad) * r); };
@@ -1330,7 +1329,7 @@ export const DerbyMode: ModeDefinition = (() => {
   }
 
   return {
-    modeId: 'baseball', get mood() { return studioMood('derby', 'goldenHour'); }, camPreset: 'court',   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one
+    modeId: 'derby', get mood() { return studioMood('derby', 'goldenHour'); }, camPreset: 'court',   // NEXUS STUDIO: 'goldenHour' unless a dev-only ?venue= names one
     get intro() { return studioIntroOr('derby', 'walkIn'); },   // VIS-COURT: the broadcast intro — a crane over the park, then a shot on the batter; the first pitch waits for it. NEXUS STUDIO: 'walkIn' unless a dev-only ?venue= picks one
     replay: true,      // VIS-COURT: a home run, replayed from the broadcast angles, following the ball (a proxy body is the replay's focus)
     replayCast: () => ({ bodies: [focusProxy, me?.root, pitcher?.root].filter((r): r is TransformNode => !!r), loose: ball ? [ball] : [] }),
@@ -1367,14 +1366,14 @@ export const DerbyMode: ModeDefinition = (() => {
       // A two-handed bat is placed every frame instead: the handle through BOTH fists, the barrel along the swing's authored
       // line (anim/authored/baseball BAT_LINE) in the batter's root frame. After the clips and the posture layer have run.
       {
+        // the bones are looked up here (the derby's own read, reachFreeze B4 draw-only) and handed to the shared placement
         const lh = boneNode(me.skeleton, 'LeftHand'), rh = boneNode(me.skeleton, 'RightHand');
-        const lf = boneNode(me.skeleton, 'LeftForeArm'), rf = boneNode(me.skeleton, 'RightForeArm');
-        const lsh = boneNode(me.skeleton, 'LeftArm'), rsh = boneNode(me.skeleton, 'RightArm');
-        /** ANIM-RESIDUAL (2026-09-14): which way the batter's RIGHT really lies along the root's +x — +1 or −1, latched from
-         *  the shoulders on the stance before any swing turns them; 0 until it reads. See the root → world line below. */
-        let rightSign = 0;
-        if (lh && rh) {
-          bat = MeshBuilder.CreateCylinder('derby_bat', { height: BAT_LEN, diameterTop: 0.065, diameterBottom: 0.03, tessellation: 12 }, ctx.scene);
+        const bones = lh && rh ? {
+          lh, rh, lf: boneNode(me.skeleton, 'LeftForeArm'), rf: boneNode(me.skeleton, 'RightForeArm'),
+          lsh: boneNode(me.skeleton, 'LeftArm'), rsh: boneNode(me.skeleton, 'RightArm'),
+        } : null;
+        if (bones) {
+          bat = MeshBuilder.CreateCylinder('derby_bat', { height: BAT_LEN, diameterTop: BAT_DIAM.top, diameterBottom: BAT_DIAM.bottom, tessellation: 12 }, ctx.scene);
           const bm = new StandardMaterial('derby_bat_m', ctx.scene);
           bm.diffuseColor = Color3.FromHexString('#c9a06a'); bm.specularColor = Color3.Black();
           bat.material = bm;
@@ -1382,53 +1381,10 @@ export const DerbyMode: ModeDefinition = (() => {
           // VIS-COURT: the barrel's end (the cylinder's +y is the barrel along the swing's line) carries the streak
           batTip = new TransformNode('derby_bat_tip', ctx.scene); batTip.parent = bat; batTip.position.set(0, BAT_LEN / 2, 0);
           batTrail?.dispose(); batTrail = mountSwingTrail(ctx.scene, batTip, { color: '#fff4d0', width: 0.14, length: 20, alpha: 0.7, name: 'bat' });
-          const batRef = bat, meRef = me;
-          // IMPROVE (2026-10-06, Derby #13): the placement runs every frame, so it writes into these — it allocated ~8
-          // Vector3s a frame (clone, subtract, add, new Vector3, toEulerAngles, Vector3.Up()).
-          const sL = new Vector3(), sR = new Vector3(), sAlong = new Vector3(), sGrip = new Vector3(), sDir = new Vector3(), sSpan = new Vector3(), sEuler = new Vector3();
-          /** The fist, not the wrist: a hand bone's origin is the wrist, the handle sits a palm further along the forearm line. */
-          const fist = (hand: typeof lh, fore: typeof lf, out: Vector3): Vector3 => {
-            hand.computeWorldMatrix(true);
-            out.copyFrom(hand.getAbsolutePosition());
-            if (!fore) return out;
-            fore.computeWorldMatrix(true);
-            const along = out.subtractToRef(fore.getAbsolutePosition(), sAlong);
-            return along.lengthSquared() > 1e-8 ? out.addInPlace(along.normalize().scaleInPlace(BAT_PALM_M)) : out;
-          };
-          batObs = ctx.scene.onBeforeRenderObservable.add(() => {
-            if (batRef.isDisposed()) return;
-            const fL = fist(lh, lf, sL), fR = fist(rh, rf, sR);
-            const grip = fL.addToRef(fR, sGrip).scaleInPlace(0.5);
-            const d = batLineAt(batSwingSec);
-            const yaw = meRef.root.rotationQuaternion ? meRef.root.rotationQuaternion.toEulerAnglesToRef(sEuler).y : meRef.root.rotation.y;
-            // root → world: +x = (cos, 0, -sin), +z forward = (sin, 0, cos) — the axes the hand targets are authored in.
-            // ANIM-RESIDUAL: +x is NOT the batter's right on the runtime rig. Measured on dev :3061 (/dev/mode/derby, kit body):
-            // RightArm at −0.20 and LeftArm at +0.13 along this +x, both fists at −0.23 by the right shoulder (the clip's
-            // mirroring put them there), and the barrel laid off toward +x — up from the right-shoulder hands, ACROSS the
-            // face: 2 cm from the head's centre on the median stance frame, inside 9 cm of the spine on 874 of 918 (the eye's
-            // "batBleed, bat through the torso/shoulder"). The side is read off the body, not assumed.
-            if (rightSign === 0 && lsh && rsh && batSwingSec == null) {
-              const across = rsh.getAbsolutePosition().subtract(lsh.getAbsolutePosition());
-              rightSign = batRightSign(across.x, across.z, yaw);
-              if (rightSign !== 0) console.info(`[DERBY-BAT] batter's right is ${rightSign > 0 ? '+' : '−'}x on this rig`);
-            }
-            const dx = d[0] * (rightSign || 1);
-            const dir = sDir.set(dx * Math.cos(yaw) + d[2] * Math.sin(yaw), d[1], -dx * Math.sin(yaw) + d[2] * Math.cos(yaw));
-            // Hands that come apart through the swing lie ON the handle, so the line between the fists pulls the handle
-            // onto it (signed along the authored line). Measured on the first cut: fists 6 cm off the axis at the swing
-            // median, 29 of 66 swing frames past 8 cm. A full pull fixed the grip but let a stacked pair of fists tip the
-            // barrel into the dirt (14 swing frames below −0.3); at 0.7 the fists stay on the handle (2.9 cm median, none past
-            // 8 cm) and the barrel only dips ≤ 27° at the launch and through the zone, the way a real swing's does.
-            const span = fR.subtractToRef(fL, sSpan); const sep = span.length();
-            if (sep > BAT_SPLIT_M) {
-              span.scaleInPlace((Vector3.Dot(span, dir) < 0 ? -1 : 1) / sep);
-              const k = BAT_HANDS_PULL * Math.min(1, (sep - BAT_SPLIT_M) / 0.08);
-              dir.scaleInPlace(1 - k).addInPlace(span.scaleInPlace(k)).normalize();
-            }
-            Quaternion.FromUnitVectorsToRef(UP_V, dir, batRef.rotationQuaternion!);
-            // the cylinder is centred on its origin: the knob just past the fists, the barrel out along the line
-            batRef.position.copyFrom(grip.addInPlace(dir.scaleInPlace(BAT_LEN / 2 - BAT_KNOB_M)));
-          });
+          batGlb?.dispose(); batGlb = dressBatGlb(ctx.scene, bat, BAT_LEN);
+          // the shared placement (baseballBat.ts): both fists, the swing's authored line, the side latched off the shoulders
+          batObs = placeTwoHandBat(ctx.scene, me.root, bones, bat, () => batSwingSec,
+            (rightSign) => console.info(`[DERBY-BAT] batter's right is ${rightSign > 0 ? '+' : '−'}x on this rig`));
         }
       }
       pitcher = await spawnFoe(ctx, CFG.heroUrl, new Vector3(0, 0.35, 18), Math.PI, SPORT_CLIP.idle);
@@ -1487,7 +1443,7 @@ export const DerbyMode: ModeDefinition = (() => {
       flight = new Flight(ball, -6);
       ctx.objectiveRef.current = ball.position;
       battingCam(ctx, true);
-      assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'baseball' });
+      assertSpawned(ctx.scene, { hero: me.root, minWorldMeshes: 5, modeId: 'derby' });
 
       // THE BODY (2026-09-13). Derby mounted no posture layer at all, so a batter waited on a 14 m/s pitch
       // with his chest wherever the idle left it and his eyes on nothing. FieldPosture's batting chain is
@@ -1684,7 +1640,7 @@ export const DerbyMode: ModeDefinition = (() => {
 
     // IMPROVE (2026-10-06, Derby #9): ended = true and every pending timer cleared — the next pitch's setTimeout checked
     // only `!ended`, which dispose never set, so a pitch could be thrown into a torn-down scene.
-    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; studio?.dispose(); studio = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
+    dispose() { ended = true; pending = false; timers.clear(); bannerCh = null; batTrail?.dispose(); batTrail = null; batTip?.dispose(); batTip = null; hrTracer?.dispose(); hrTracer = null; hrReadout?.dispose(); hrReadout = null; jumbo?.dispose(); jumbo = null; shells?.clear(); shells = null; focusProxy?.dispose(); focusProxy = null; trail?.dispose(); trail = null; cueRing?.dispose(); cueRing = null; cueMat?.dispose(); cueMat = null; tokenMat?.dispose(); tokenMat = null; for (const m of targetMats) m.dispose(true, true); targetMats = []; pci?.dispose(); for (const f of fielders) f.char.dispose(); fielders = []; token?.mesh.dispose(); token = null; targetMeshes.clear(); batPosture?.dispose(); batPosture = null; pitchPosture?.dispose(); pitchPosture = null; derbyVenue?.dispose?.(); derbyVenue = null; studio?.dispose(); studio = null; gallery?.dispose(); gallery = null; stands?.dispose(); stands = null; if (batObs) { bat?.getScene().onBeforeRenderObservable.remove(batObs); batObs = null; } batSwingSec = null; batGlb?.dispose(); batGlb = null; bat?.dispose(); bat = null; me?.dispose(); pitcher?.dispose(); furniture.forEach((f) => f.dispose()); ball?.dispose(); SoundKit.stopAmbient(); },
   };
 })();
 

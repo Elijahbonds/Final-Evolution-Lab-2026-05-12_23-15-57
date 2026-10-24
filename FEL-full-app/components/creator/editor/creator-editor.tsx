@@ -127,7 +127,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
             return (
               <div key={row.id} onClick={() => { setFocusId(row.id); onFocus?.(row.id); }}
                 className={`mb-1 rounded-xl px-3 py-2 transition-colors ${
-                  focused ? 'bg-white/10 ring-1 ring-[var(--fel-cyan)]/60' : 'bg-white/[0.03]'} ${bad ? 'ring-1 ring-[var(--fel-red)]/70' : ''}`}>
+                  focused ? 'bg-white/10 ring-1 [--tw-ring-color:color-mix(in_srgb,var(--fel-cyan)_60%,transparent)]' : 'bg-white/[0.03]'} ${bad ? 'ring-1 ![--tw-ring-color:color-mix(in_srgb,var(--fel-red)_70%,transparent)]' : ''}`}>
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-mono text-[11px] uppercase tracking-wide text-white/70">{row.label}</p>
@@ -177,7 +177,7 @@ export default function CreatorEditor({ table, values, onChange, axes, issues = 
                 )}
                 {focused && (
                   <button onClick={(e) => { e.stopPropagation(); setGlossaryFor(row); }}
-                    className="mt-1 font-mono text-[10px] text-[var(--fel-cyan)]/70 underline">What does this do?</button>
+                    className="mt-1 font-mono text-[10px] [color:color-mix(in_srgb,var(--fel-cyan)_70%,transparent)] underline">What does this do?</button>
                 )}
               </div>
             );

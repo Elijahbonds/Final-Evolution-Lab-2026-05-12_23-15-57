@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { getBook } from '@/lib/books/bookCatalog';
+import { getBook, publicBookDescription, publicChapterInventoryNotice } from '@/lib/books/bookCatalog';
 import { bookFormatAllowed } from '@/lib/books/bookTerms';
 import { hasBookAccess, normalizeBookEmail } from '@/lib/books/bookEntitlements';
 import { prismaBookStore } from '@/lib/books/bookStore';
@@ -55,6 +55,7 @@ export default async function BookPage({
     canPlay: Boolean(file.sample) || hasBookAccess(owned, book.slug, 'audiobook'),
   }));
   const offers = book.offers.filter((o) => bookFormatAllowed(o.format));
+  const chapterNotice = publicChapterInventoryNotice(book);
 
   return (
     <PressFrame signedIn={signedIn}>
@@ -73,9 +74,9 @@ export default async function BookPage({
           {book.eyebrow ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.eyebrow}</p> : null}
           {book.track ? <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{book.track}</p> : null}
           <h2 className="fel-heading text-4xl text-white">{book.title}</h2>
-          <p className="mt-2 text-sm text-white/60">{book.description}</p>
-          {book.chaptersArePlaceholder ? (
-            <p className="mt-2 text-[11px] text-white/35">Chapter list is a placeholder until the audio masters are uploaded.</p>
+          <p className="mt-2 text-sm text-white/60">{publicBookDescription(book)}</p>
+          {chapterNotice ? (
+            <p className="mt-2 text-[11px] text-white/35">{chapterNotice}</p>
           ) : null}
         </div>
       </div>

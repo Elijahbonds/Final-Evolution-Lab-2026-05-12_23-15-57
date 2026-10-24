@@ -41,6 +41,8 @@ import { readSetLength, setLengthOf } from './babylon/nexus/setLength';
 import { buildResult } from './babylon/core/sessionResult';
 import { RINGS, BANK } from './babylon/core/ParkourGolf';
 import { TOKEN, TARGETS } from './babylon/core/ParkourDerby';
+import { BaseballGame, crossSec, INNINGS, BATTERS_PER_INNING_CAP, type BaseballResult } from './babylon/modes/baseballGame';   // DERBY-KEY
+import { pitchSpec as baseballPitchSpec, PITCH_RELEASE_SEC as BASEBALL_RELEASE_SEC } from './babylon/modes/baseballPitch';
 import { REGULATION_KICKS } from './babylon/core/ShootoutCore';
 import { BREAK } from './babylon/core/Breakaway';
 import { RUN } from './babylon/core/RushRun';
@@ -301,6 +303,27 @@ function firstToMax(target: number): number {
   return best;
 }
 
+/**
+ * DERBY-KEY (2026-10-23): a whole three-inning game on baseballGame.ts (the rules BaseballInningsMode only draws), with the
+ * pitches the mode throws (baseballPitch.pitchSpec, seeded), pressing `offsetSec` after each pitch crosses the plate.
+ */
+function baseballRun(offsetSec: number, seed = 7): number {
+  const ends: BaseballResult[] = [];
+  const game = new BaseballGame({
+    windup: () => {}, release: () => {}, swing: () => {}, contact: () => {}, banner: () => {}, hud: () => {},
+    end: (r) => { ends.push(r); },
+  }, (n) => { const p = baseballPitchSpec(n, seed); return { speed: p.speed, label: p.label }; }, BASEBALL_RELEASE_SEC);
+  game.start();
+  const DT = 1 / 60;
+  let at: number | null = null, forPitch = 0;
+  for (let t = 0; t < 1800 && !ends.length; t += DT) {
+    game.tick(DT);
+    if (game.phase === 'pitch' && game.pitch && forPitch !== game.pitchNo) { forPitch = game.pitchNo; at = crossSec(game.pitch, BASEBALL_RELEASE_SEC) + offsetSec; }
+    if (game.phase === 'pitch' && at !== null && !game.swung && game.pitchSec >= at) game.press();
+  }
+  return ends.length ? ends[0].score : -1;
+}
+
 /** A perfect run of maximum length for every stakeable mode. */
 const PERFECT_RUNS: Record<string, () => number> = {
   dunkContest: () => {
@@ -325,12 +348,15 @@ const PERFECT_RUNS: Record<string, () => number> = {
     });
     return s;
   },
-  baseball: () => {
+  // DERBY-KEY (2026-10-23): the home-run derby's run, on its own key now (it was this table's 'baseball')
+  derby: () => {
     const perPitch = Math.max(Math.round((80 + 0.9 * 60) * MIRRORED.clutchMult), ...TARGETS.map((t) => t.pts));
     let s = 0, tokens = TARGETS.filter((t) => t.kind === 'glass').length;
     for (let p = 0; p < MIRRORED.derbyPitches; p++) { const mult = tokens > 0 ? TOKEN.mult : 1; if (tokens > 0) tokens--; s += perPitch * mult; }
     return s;
   },
+  // DERBY-KEY: three innings played on the real core with the real pitches, every press dead on the crossing (a homer)
+  baseball: () => baseballRun(0),
   soccer: () => {
     const wallRuns = Math.ceil(BREAK.clockSec / (2 / RUN.lateralAccel)) + 1;
     return (REGULATION_KICKS + MIRRORED.penaltySdCap) * (20 + MIRRORED.maxFeints * MIRRORED.feintStylePts + 15 + 5 + wallRuns * 5);
@@ -426,7 +452,7 @@ describe('the ceiling table', () => {
 
   it('sets the rules ceilings at what the rules can award', () => {
     const want: Record<string, number> = {
-      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 33_260, golf: 2250, baseball: 6432,
+      dunkContest: 240, hoops1v1: 13, hoops3v3: 23, threePoint: 30, bigAir: 33_260, golf: 2250, derby: 6432, baseball: 27,   // DERBY-KEY
       soccer: 6660, tennis: 6, tiebreak: 1350, brainBrawl: 4500, whoSceneIt: 3540, karateVersus: 300, mixedcombat: 250,
       dance: 79680, training: 9400, music: 378_300,
     };
@@ -924,6 +950,17 @@ describe('drift guards — the numbers mirrored out of mode files still match th
     expect(tpOptionsOffered('')).toBe(true);
     expect(src('components/games/three-point-options.tsx')).toMatch(/optionsOffered\(window\.location\.search\)/);
     expect(t).toMatch(/runOptions\(search, \{ practice: readPracticePick\(\), moneyRack: readMoneyRackPick\(\) \}\)/);
+  });
+
+  it('three-inning baseball (DERBY-KEY): the innings and the batter cap are the game\'s own, and no batter scores twice', () => {
+    expect(INNINGS).toBe(MIRRORED.baseballInnings);
+    expect(BATTERS_PER_INNING_CAP).toBe(MIRRORED.baseballBattersPerInning);
+    const t = src('lib/babylon/modes/baseballGame.ts');
+    expect(num(t, /export const INNINGS = (\d+);/, 'INNINGS')).toBe(MIRRORED.baseballInnings);
+    expect(num(t, /export const BATTERS_PER_INNING_CAP = (\d+);/, 'BATTERS_PER_INNING_CAP')).toBe(MIRRORED.baseballBattersPerInning);
+    expect(t).toContain('score: s.runs');                       // the posted score is the runs
+    expect(t).toContain('this.batters >= BATTERS_PER_INNING_CAP');   // the side retires at the cap, outs or not
+    expect(t).toContain("this.bases = [false, false, false]");  // the bases clear between innings
   });
 
   it('golf, derby and penalties', () => {

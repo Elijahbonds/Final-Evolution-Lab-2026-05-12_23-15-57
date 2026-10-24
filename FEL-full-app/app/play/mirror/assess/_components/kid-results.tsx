@@ -6,9 +6,10 @@
 // line when this page already ran a screen, the save-your-number line, "Run it again" (in the page), and the privacy
 // page. No link out of the screen. Nothing here writes or sends anything: the numbers come in as props, from the page's
 // memory.
+import { aboutInches } from '@/lib/screen/jump';
 import Link from 'next/link';
 import { jumpChange, jumpChangeLine } from '@/lib/screen/kid';
-import { DISCLAIMER, KID_JUMP, KID_NO_JUMP, KID_SAVE_LINE, PRIVACY_LINK, RUN_IT_AGAIN, STOP_LINE } from '@/lib/screen/copy';
+import { DISCLAIMER, KID_JUMP, KID_NO_CAMERA_BODY, KID_NO_CAMERA_BUTTON, KID_NO_CAMERA_TITLE, KID_NO_JUMP, KID_SAVE_LINE, PRIVACY_LINK, RUN_IT_AGAIN, STOP_LINE } from '@/lib/screen/copy';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import { primaryBtn } from './screen-ui';
 
@@ -22,7 +23,7 @@ export function KidResults({ jumpIn, lastIn, onRunAgain }: { jumpIn: number | nu
       </div>
       {jumpIn !== null ? (
         <section data-kid-number className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
-          <p className="text-[16px] text-white/80">{KID_JUMP}: <b data-kid-jump className="text-[32px] font-black text-white">{jumpIn} in</b></p>
+          <p className="text-[16px] text-white/80">{KID_JUMP}: <b data-kid-jump className="text-[32px] font-black text-white">{aboutInches(jumpIn)}</b></p>
           {change ? <p data-kid-change className="mt-1 text-[16px] font-bold text-white/85">{jumpChangeLine(change)}</p> : null}
           <p data-kid-save-line className="mt-3 text-[16px] leading-snug text-white/75">{KID_SAVE_LINE}</p>
         </section>
@@ -32,6 +33,26 @@ export function KidResults({ jumpIn, lastIn, onRunAgain }: { jumpIn: number | nu
         </section>
       )}
       <button type="button" data-primary data-run-again onClick={onRunAgain} className={primaryBtn}>{RUN_IT_AGAIN}</button>
+      <p className="text-center text-[16px] text-white/60">
+        <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * SCREEN-MINOR-LOCK (2026-10-21): the screen for under 18, "rather not say" or no age, shown the moment the age is
+ * answered (assess-app.tsx `noCamera`). Nothing here asks for the camera or mounts one: no camera card, no picture, no
+ * number. Its one button ('Continue without the camera') goes back to the start; the privacy page; no link out. It holds until the parent flow ships.
+ */
+export function KidNoCamera({ onRestart }: { onRestart: () => void }) {
+  return (
+    <div data-kid-no-camera className="space-y-3">
+      <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5">
+        <h2 className="text-[21px] font-black leading-tight">{KID_NO_CAMERA_TITLE}</h2>
+        <p className="mt-2 text-[16px] leading-snug text-white/75">{KID_NO_CAMERA_BODY}</p>
+      </section>
+      <button type="button" data-primary data-restart onClick={onRestart} className={primaryBtn}>{KID_NO_CAMERA_BUTTON}</button>
       <p className="text-center text-[16px] text-white/60">
         <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
       </p>

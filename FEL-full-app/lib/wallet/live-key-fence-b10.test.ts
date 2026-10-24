@@ -139,7 +139,10 @@ beforeEach(() => {
   h.fetchCalls = [];
   h.retrieveCalls = [];
   h.stripeSessions = {};
-  h.store = {};
+  // test changed: (LAUNCH-SALES, 2026-10-20) every checkout here now runs the 18+ buyer gate (lib/stripe/adult-gate.ts)
+  // last, right before Stripe. The signed-in USER is seeded as a verified adult (born 1990) so (b) and (g) still reach
+  // Stripe; no assertion changed. Minors and unknown ages are proven in lib/stripe/launch-sales-matrix.test.ts.
+  h.store = { user: [{ id: USER, email: 'user-1@fel.test', dobYear: 1990 }] };
   h.grants = { coins: [], shards: [] };
   process.env.STRIPE_SECRET_KEY = 'sk_live_fake';
   delete process.env.VIRTUAL_PURCHASES_ENABLED;

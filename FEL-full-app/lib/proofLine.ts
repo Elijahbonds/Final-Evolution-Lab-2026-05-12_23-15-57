@@ -3,6 +3,7 @@
 import { gradeFor } from '@/lib/babylon/core/danceTracks';
 import { boxLine } from '@/lib/babylon/modes/onevoneRules';   // IMPROVE (2026-10-06): the 1v1's box score line (pure)
 import { boxLine as boxLine3 } from '@/lib/babylon/modes/threevthreeBox';   // IMPROVE (2026-10-06, 3v3 #9): the 3v3's (import-free)
+import { periodLabel } from '@/lib/babylon/modes/threevthreeOvertime';   // lane/hoops-overtime (NB-3): 'OT', 'OT2' …
 /** ARENA-10PHASE (2026-09-07): an outside verdict overrides the mode's own W/L — a Triumph Arena run is settled against the
  *  house rival, not the mode's in-game rival, and the card must say ONE thing. TIE = both entries refunded; PENDING = the
  *  opponent has not posted yet. */
@@ -34,7 +35,8 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
       return fga === null ? line : `${line} · ${boxLine({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, ankles: n(s, 'ankles') ?? 0 })}`;
     }
     case 'hoops3v3': {
-      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}`;
+      const ot = periodLabel(n(s, 'overtimes') ?? 0);   // NB-3: a game decided in overtime says so
+      const line = `${r.score}–${r.opponentScore ?? 0} · ${wl(r)}${ot ? ` · ${ot}` : ''}`;
       // IMPROVE (2026-10-06, 3v3 #9): the box score the mode now ends with (FG, threes, assists, steals, blocks, overdrives)
       const fga = n(s, 'fga');
       return fga === null ? line : `${line} · ${boxLine3({ fgm: n(s, 'fgm') ?? 0, fga, threes: n(s, 'threes') ?? 0, assists: n(s, 'assists') ?? 0, steals: n(s, 'steals') ?? 0, blocks: n(s, 'blocks') ?? 0, overdrives: n(s, 'overdrives') ?? 0 })}`;
@@ -52,7 +54,7 @@ export function proofLineFor(mode: string, r: ProofInput): string | null {
     case 'freerun': { const t = n(s, 'timeSec'), tricks = n(s, 'tricks'), combo = n(s, 'bestCombo'), high = n(s, 'highLine'); return `${r.score} PTS${t !== null ? ` · ${t}s` : ''}${tricks !== null ? ` · ${tricks} TRICK` : ''}${combo ? ` · ×${combo}` : ''}${high ? ' · HIGH LINE' : ''}`; }
     case 'sprint': { const st = n(s, 'stumbles'); return `${r.score} PTS${st !== null ? ` · ${st} STUMBLE${st === 1 ? '' : 'S'}` : ''} · ${wl(r)}`; }
     case 'golf': { const strokes = n(s, 'strokes'), holes = n(s, 'holes'); return strokes !== null ? `${strokes} STROKES${holes !== null ? ` · ${holes} HOLES` : ''}` : `${r.score} PTS`; }
-    case 'baseball': {
+    case 'baseball': case 'derby': {   // DERBY-KEY (2026-10-23): the derby's own key reads the same line it did under 'baseball'
       const hr = n(s, 'homers'), outs = n(s, 'outs'), longest = n(s, 'longestFt'), rival = n(s, 'rivalHomers');
       if (hr !== null) return `${hr} HR${rival !== null ? ` vs ${rival}` : ''}${outs !== null ? ` · ${outs} OUTS` : ''}${longest ? ` · LONGEST ${longest} FT` : ''}`;
       const hits = n(s, 'hits'), misses = n(s, 'misses'); return hits !== null ? `${hits}/${hits + (misses ?? 0)} CONTACT · ${r.score} PTS` : null;
