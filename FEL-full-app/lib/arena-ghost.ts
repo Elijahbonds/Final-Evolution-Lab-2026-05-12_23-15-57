@@ -16,6 +16,7 @@ import { arenaModeKey } from '@/lib/arena';
 import {
   drawRivalScore, median, ownDuelScores, RIVAL_FROM_DUEL_SCORES, RIVAL_SCORE_EVENT, storedModeKeys, type RivalDraw,
 } from '@/lib/arena-rivals';
+import { rivalHistorySince } from '@/lib/rival-history';
 
 export interface HouseDraw { score: number; draw: RivalDraw }
 
@@ -41,11 +42,16 @@ export async function drawHouseScore(
   const fromDuels = RIVAL_FROM_DUEL_SCORES.has(sessionMode);
   const scoreEvent: string | undefined = RIVAL_SCORE_EVENT[sessionMode];
   const createdAt = new Date(match.createdAt);
+  // BASEBALL-GHOST (owner, 2026-10-23, "ignore old scores"): and not before the mode's cutoff (lib/rival-history.ts).
+  // 'baseball' rows from before BASEBALL_INNINGS_SINCE are derby nights in the hundreds; with none left, the draw falls
+  // to the baseline (19). An AND, so the strictly-before-the-duel bound above stays as it was.
+  const since = rivalHistorySince(sessionMode);
+  const notBeforeCutoff = since ? { AND: [{ createdAt: { gte: since } }] } : {};
   const [recent, population] = await Promise.all([
     fromDuels
       ? tx.competitionMatch.findMany({
         where: {
-          currency: 'LC', mode: { in: storedModeKeys(sessionMode) }, createdAt: { lt: createdAt },
+          currency: 'LC', mode: { in: storedModeKeys(sessionMode) }, createdAt: { lt: createdAt }, ...notBeforeCutoff,
           OR: [{ player1Id: humanId, player1Score: { not: null } }, { player2Id: humanId, player2Score: { not: null } }],
           ...(scoreEvent ? { events: { some: { eventType: scoreEvent, userId: humanId } } } : {}),
         },
@@ -58,7 +64,7 @@ export async function drawHouseScore(
       }).then((rows: { player1Id: string; player1Score: number | null; player2Score: number | null; events?: { eventType: string; userId: string | null }[] }[]) =>
         ownDuelScores(rows, humanId, ceilingMax, scoreEvent))
       : tx.gameSession.findMany({
-        where: { userId: humanId, mode: sessionMode, createdAt: { lt: createdAt } },
+        where: { userId: humanId, mode: sessionMode, createdAt: { lt: createdAt }, ...notBeforeCutoff },
         orderBy: { createdAt: 'desc' },
         take: 10,
         select: { score: true },
@@ -66,7 +72,7 @@ export async function drawHouseScore(
     fromDuels
       ? []
       : tx.gameSession.findMany({
-        where: { mode: sessionMode, createdAt: { lt: createdAt } },
+        where: { mode: sessionMode, createdAt: { lt: createdAt }, ...notBeforeCutoff },
         orderBy: { createdAt: 'desc' },
         take: 200,
         select: { score: true },
