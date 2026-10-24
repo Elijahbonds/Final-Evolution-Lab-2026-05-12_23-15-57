@@ -15,6 +15,8 @@ import { DoorsRow } from '@/components/shell/doors-row';
 // MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
 import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
+// PROGRESS CARD (value round item 1): the weekly door to /profile/week; reads nothing
+import { WeekCardEntry } from '@/components/progress-card/week-entry';
 
 export const dynamic = 'force-dynamic';
 
@@ -114,6 +116,7 @@ export default async function TrainPage() {
     >
       <DailyDrillCard view={dailyDrill} />
       <TodayCard view={todayCard} />
+      <WeekCardEntry />
       <ul className="grid gap-3 sm:grid-cols-2">
         {shown.map((c, i) => {
           const Icon = c.icon;
