@@ -22,14 +22,18 @@ const h = vi.hoisted(() => ({
   spy: null as unknown as SpyDb,
 }));
 
+// Only GuestSession SQL is a guest op. Release's shared rate limit (lib/rate-limits, #405) also reaches the raw client from
+// /api/signup; answering it with no rows leaves it failing open, as it does before its table exists.
 const fake = {
   async $queryRawUnsafe(sql: string, ...v: unknown[]) {
+    if (!sql.includes('GuestSession')) return [];
     h.guestOps.push('raw');
     if (sql.includes('information_schema.columns')) return h.column ? [{ ok: 1 }] : [];
     const r = h.guests.find((x) => x.tokenHash === v[0] || x.token === v[0]);
     return r ? [{ id: r.id, migratedUserId: r.migratedUserId }] : [];
   },
-  async $executeRawUnsafe(_sql: string, ...v: unknown[]) {
+  async $executeRawUnsafe(sql: string, ...v: unknown[]) {
+    if (!sql.includes('GuestSession')) return 0;
     h.guestOps.push('stamp');
     const r = h.guests.find((x) => x.id === v[1] && x.tokenHash == null);
     if (r) r.tokenHash = v[0] as string;
