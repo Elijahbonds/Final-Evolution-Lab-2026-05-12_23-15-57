@@ -9,7 +9,7 @@ import { CourtMovement, DEFAULT_MOVEMENT, GEARS_HOOPS, type GearTuning } from '.
 import {
   H3A_STICK_PRESET, HOOPS_CUT_SEC, HOOPS_GEAR_DOWN_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_JERK, HOOPS_JOG_ACCEL, HOOPS_JOG_TAU, HOOPS_KICK_SEC,
   HOOPS_LOAD_SCALE, HOOPS_PLANT_DECEL, HOOPS_REVERSE_DECEL, HOOPS_REVERSE_DEG, HOOPS_SPRINT_ACCEL, HOOPS_SPRINT_TAU, HOOPS_STOP_DECEL_HIGH,
-  HOOPS_STOP_DECEL_LOW, HOOPS_TURN_TRUE_ARC, jerkLimit, turnToward,
+  HOOPS_STOP_DECEL_LOW, HOOPS_TURN_TRUE_ARC, HOOPS_RETREAT_SPEED_K, jerkLimit, turnToward,
 } from './HoopsStick';
 import { FEEL_KNOB_BY_ID, clampKnob } from '../../feel-panel/knobs';
 import { FEEL_STORAGE_KEY, resetFeelForTests, setFeelSession, setFeelUser } from '../../feel-panel/feel';
@@ -66,13 +66,15 @@ describe('THE REVERSAL FIX — a stick thrown straight back reverses the handler
     expect(flipSec(tr)).toBe(Infinity);
     expect(tr.at(-1)![1]).toBeGreaterThan(4);   // back up to a full jog the old way
   });
-  it('with it (the default): a jog and a sprint both flip inside 0.25 s, and then run the new way at a jog', () => {
+  // (test changed, owner 2026-10-24: this lane's own check read "then the new way at ≥ 0.9 of a jog"; the retreat cap now holds a straight
+  // pull-back to hoops.retreatSpeedK of a jog — the cap's own tests are below)
+  it('with it (the default): a jog and a sprint both flip inside 0.25 s, and then retreat the new way at the retreat cap', () => {
     for (const sprint of [false, true]) {
       const d = new DribbleController();
       drive(d, 1.5, FWD(sprint));
       const tr = drive(d, 1.5, BACK(sprint));
       expect(flipSec(tr), sprint ? 'sprint' : 'jog').toBeLessThan(0.25);
-      expect(tr.at(-1)![1]).toBeLessThan(-DEFAULT_MOVEMENT.maxSpeed * DEFAULT_MOVEMENT.jogFactor * 0.9);
+      expect(tr.at(-1)![1]).toBeLessThan(-DEFAULT_MOVEMENT.maxSpeed * DEFAULT_MOVEMENT.jogFactor * HOOPS_RETREAT_SPEED_K * 0.99);
     }
   });
   it('a stick 140° round is a reversal too (brake through zero, never a slow swing round); 120° is still a turn', () => {
@@ -169,6 +171,45 @@ describe('the H3a preset (group "Hoops · movement"): #311\'s tuned stick, throu
     openPanel({ 'hoops.handlerTurnDeg': 1080 });
     expect(cut(new DribbleController())).toBeGreaterThan(closed.handler + 0.1);   // the handler turns quicker
     expect(cut(approach())).toBeCloseTo(closed.approach, 9);                      // the dunk approach does not
+  });
+});
+
+describe('THE RETREAT CAP (owner 2026-10-24: "a real backpedal is slower than running forward") — hoops.retreatSpeedK 0.7', () => {
+  afterEach(() => { resetFeelForTests(); delete g.window; });
+  const JOG = DEFAULT_MOVEMENT.maxSpeed * DEFAULT_MOVEMENT.jogFactor;   // 4.352 m/s at a full stick
+  const speed = (tr: [number, number][]) => Math.hypot(...tr.at(-1)!);
+  /** Run forward (the facing comes round to the run), then hold the stick straight back: the retreat dribble. */
+  const retreat = (sprint: boolean) => { const d = new DribbleController(); drive(d, 1.5, FWD(sprint)); const tr = drive(d, 1.5, BACK(sprint)); return { tr, d }; };
+  it('a held straight pull-back retreats at no more than 0.7 of a jog (from a jog and with the turbo held), facing kept, after the same flip', () => {
+    for (const sprint of [false, true]) {
+      const { tr, d } = retreat(sprint);
+      expect(speed(tr), sprint ? 'turbo' : 'jog').toBeLessThanOrEqual(HOOPS_RETREAT_SPEED_K * JOG + 1e-9);
+      expect(speed(tr)).toBeGreaterThan(HOOPS_RETREAT_SPEED_K * JOG * 0.99);   // it does retreat, at the cap
+      expect(tr.at(-1)![1]).toBeLessThan(0);                                   // the new way
+      expect(Math.cos(d.facing)).toBeGreaterThan(0.99);                        // the chest still up the court (+z)
+      expect(flipSec(tr)).toBeLessThan(0.25);                                  // the reversal itself is unchanged
+    }
+  });
+  it('forward runs, sprints and lateral slides are not capped', () => {
+    const fwd = (sprint: boolean) => speed(drive(new DribbleController(), 1.5, FWD(sprint)));
+    expect(fwd(false)).toBeCloseTo(JOG, 2);
+    expect(fwd(true)).toBeCloseTo(DEFAULT_MOVEMENT.maxSpeed, 2);
+    const side = new DribbleController(); drive(side, 1.0, FWD());
+    expect(speed(drive(side, 1.2, () => [1, 0, false]))).toBeCloseTo(JOG, 2);   // a 90° stick: a cut, then a full jog the new way
+    const slide = new DribbleController();   // a slow slide off a standstill, the stick square to the facing
+    expect(speed(drive(slide, 1.2, () => [1, 0, false]))).toBeCloseTo(JOG, 2);
+  });
+  it('at 1.0 the knob is off: the retreat runs at a full jog (a full sprint on the turbo), exactly as before the cap', () => {
+    openPanel({ 'hoops.retreatSpeedK': 1 });
+    expect(speed(retreat(false).tr)).toBeCloseTo(JOG, 2);
+    expect(speed(retreat(true).tr)).toBeCloseTo(DEFAULT_MOVEMENT.maxSpeed, 2);
+    expect(flipSec(retreat(false).tr)).toBeCloseTo(0.217, 2);
+  });
+  it('the dunk approach (CourtMovement with no DribbleController) never reads it', () => {
+    openPanel({ 'hoops.retreatSpeedK': 0.3 });
+    const m = new CourtMovement({ ...DEFAULT_MOVEMENT, gears: GEARS_HOOPS });
+    drive(m, 1.5, FWD());
+    expect(speed(drive(m, 1.5, BACK()))).toBeCloseTo(JOG, 2);
   });
 });
 

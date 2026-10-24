@@ -55,6 +55,11 @@ export const HOOPS_REVERSE_DEG = 135;
  *  fixed reversal brakes exactly as hard as the plant it follows. H3a: 34. */
 export const HOOPS_REVERSE_DECEL = 47.6;
 
+/** TUNED (new) — owner decision 2026-10-24: "a real backpedal is slower than running forward". The share of JOG speed the handler may reach
+ *  while RETREATING: the stick held against his facing (DribbleController's retreat dribble — the stick past 120° from the facing it holds,
+ *  committed). Forward running, sprinting and lateral slides never read it. 1 = no cap (the game before this number). */
+export const HOOPS_RETREAT_SPEED_K = 0.7;
+
 /** THE H3a PRESET: #311's tuned stick (owner 2026-10-16/17, "acceleration felt off… too twitchy"), as feel-panel values. Paste it into the
  *  panel (Copy values' own format) to play it; docs/FEEL-PANEL.md has the from → to table. */
 export const H3A_STICK_PRESET: Readonly<Record<string, number>> = Object.freeze({
@@ -98,6 +103,15 @@ export function liveGears(base: GearTuning, out: GearTuning): GearTuning {
   out.reverseDeg = base.reverseDeg === undefined ? undefined : feel('hoops.reverseDeg', base.reverseDeg);
   out.reverseDecel = base.reverseDecel === undefined ? undefined : feel('hoops.reverseDecel', base.reverseDecel);
   return out;
+}
+
+/** The retreat cap for this frame (core/CourtMovement.retreatK): the knob when the stick is committed (past 0.6) and held more than 120°
+ *  from the facing (`facingX`, `facingZ`: the facing the retreat dribble holds), else 1 (no cap). Stick space as CourtMovement: +Y = −Z. */
+export function retreatCapK(moveX: number, moveY: number, facingX: number, facingZ: number): number {
+  const mag = Math.hypot(moveX, moveY);
+  if (mag <= 0.6) return 1;
+  const back = (moveX * facingX - moveY * facingZ) / mag;
+  return back < -0.5 ? feel('hoops.retreatSpeedK', HOOPS_RETREAT_SPEED_K) : 1;
 }
 
 /** The speed after a jerk limit: the acceleration (newSpeed − speed) / dt may differ from last frame's `accPrev` by at most `jerk`·dt.

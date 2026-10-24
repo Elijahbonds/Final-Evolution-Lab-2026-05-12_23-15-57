@@ -24,7 +24,7 @@ import { sideOfVector } from '../anim/athleteSide';   // HOOPS MOTION phase 3: t
 import { sampleRimPlay, type RimPlay, type RimTouch } from './RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import type { AIBehavior, Intent } from './PlayerSlot';
 import { CourtMovement, CUT_COST_HOOPS, DEFAULT_MOVEMENT, GEARS_HOOPS, type Gear } from './CourtMovement';
-import { HOOPS_HANDLER_TURN_DEG } from './HoopsStick';   // hoops-reverse: the handler's turn rate (a feel knob; 540 = DEFAULT_MOVEMENT's)
+import { HOOPS_HANDLER_TURN_DEG, retreatCapK } from './HoopsStick';   // hoops-reverse: the handler's turn rate (a feel knob; 540 = DEFAULT_MOVEMENT's)
 import { PERFECT_BAND_SHARE } from './shotBands';   // lane/hoops-shot-core: the perfect band's share, one constant for the grade and both bars
 import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop / crash, box-out, navigating a screen)
   screenSpot, pickScreenSide, stepScreen, SCREEN_IDLE, rollLaneOpen, rollTarget, crashSpot, navigateAround, boxOutSpot, SCREEN_MIN_RIM_DIST,
@@ -371,6 +371,7 @@ export class DribbleController {
       this.hangLeft = Math.max(0, this.hangLeft - dt);
       if (mag > 0.5) { const d = new Vector3(moveX, 0, -moveY).normalize(); if (d.x * facingX + d.z * facingZ > 0.3) this.hangPush = d; }
     }
+    this.movement.retreatK = retreatCapK(moveX, moveY, facingX, facingZ);   // hoops-reverse (owner 2026-10-24): the retreat dribble runs at ≤ 0.7 of a jog
     const state = this.movement.update(dt, hanging ? 0 : moveX, hanging ? 0 : moveY, sprint);
     if (hanging) {
       const v = this.movement.vel, n = v.length();

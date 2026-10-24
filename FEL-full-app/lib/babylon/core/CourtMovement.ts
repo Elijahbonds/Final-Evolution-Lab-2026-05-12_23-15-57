@@ -138,6 +138,8 @@ export class CourtMovement {
   private cutDebt = 0;         // hoops-reverse (H3a): m/s of the cut cost still to pay (spread over cutSec)
   private cutRate = 0;
   private accPrev = 0;         // hoops-reverse (H3a): last frame's speed acceleration (m/s²), for the jerk limit
+  /** hoops-reverse (owner 2026-10-24): this frame's retreat cap, a share of jog speed (DribbleController sets it from the stick; 1 = none). */
+  retreatK = 1;
   private live: MovementTuning | null = null;   // hoops-reverse: this frame's tuning, the gears through the feel panel (built once)
   private liveTune(): MovementTuning {
     const g = this.tune.gears; if (!g) return this.tune;
@@ -208,7 +210,8 @@ export class CourtMovement {
       const gearTop = t.gears
         ? (sprint ? t.maxSpeed : mag < t.gears.walkStick ? t.maxSpeed * t.gears.walkFactor * (mag / t.gears.walkStick) : t.maxSpeed * t.jogFactor * (0.85 + 0.15 * (mag - t.gears.walkStick) / (1 - t.gears.walkStick)))
         : t.maxSpeed * (sprint ? 1 : t.jogFactor) * mag;
-      const topSpeed = gearTop * this.speedScale;
+      let topSpeed = gearTop * this.speedScale;
+      if (this.retreatK < 1) topSpeed = Math.min(topSpeed, t.maxSpeed * t.jogFactor * this.speedScale * this.retreatK);   // hoops-reverse: a backpedal is slower
       if (t.gears) this.gearNow = sprint ? 'sprint' : mag < t.gears.walkStick ? 'walk' : 'jog';
       const speed = this.vel.length();
 
