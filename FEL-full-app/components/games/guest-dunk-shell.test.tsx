@@ -20,6 +20,7 @@ vi.mock('@/lib/analytics', () => ({
 
 import { GuestDunkShell } from './guest-dunk-shell';
 import { AgeStep } from '@/components/age-step';
+import { AGE_QUESTION } from '@/lib/privacy/ageScreen';
 
 const THIS_YEAR = new Date().getFullYear();
 let fetchCalls: Array<[string, RequestInit | undefined]> = [];
@@ -67,7 +68,7 @@ describe('/try asks the year before any guest row', () => {
     const r = mount();
     await settle();
     expect(findAll(r.tree, (e) => e.type === AgeStep)).toHaveLength(1);
-    expect(r.html).toContain('What year were you born?');
+    expect(r.html).toContain(AGE_QUESTION);
     expect(r.html).toContain('Play without saving');
     expect(r.html).not.toContain('CLAIM');
     nothingSent();
@@ -89,7 +90,7 @@ describe('/try asks the year before any guest row', () => {
     expect(cookieWrites.length).toBeGreaterThan(0);
     for (const c of cookieWrites) expect(c).toMatch(/^fel_age_gate=1; Max-Age=31536000; Path=\/; SameSite=Lax/);
     expect(store.get('fel:ageGate')).toBe('1');
-    expect(r.html).not.toContain('What year were you born?');
+    expect(r.html).not.toContain(AGE_QUESTION);
     expect(r.html).not.toContain('CLAIM');
     expect(r.html).not.toContain('SAVE THIS RUN');
     nothingSent();
@@ -99,7 +100,7 @@ describe('/try asks the year before any guest row', () => {
   it.each([['teen (thisYear−15)', THIS_YEAR - 15], ['teen (thisYear−17)', THIS_YEAR - 17]])('%s: 0 /api/guest, 0 track, the run plays locally', async (_l, year) => {
     const r = drive(() => GuestDunkShell({ challengeCode: 'C1' }), [(tree) => ageStep(tree).props.onLocked(year)]);
     await settle();
-    expect(r.html).not.toContain('What year were you born?');
+    expect(r.html).not.toContain(AGE_QUESTION);
     expect(r.html).not.toContain('CLAIM');
     nothingSent();
   });
@@ -109,7 +110,7 @@ describe('/try asks the year before any guest row', () => {
       (tree) => { findAll(tree, (e) => e.type === 'button' && e.props.children === 'Play without saving')[0].props.onClick(); },
     ]);
     await settle();
-    expect(r.html).not.toContain('What year were you born?');
+    expect(r.html).not.toContain(AGE_QUESTION);
     nothingSent();
   });
 
@@ -121,7 +122,7 @@ describe('/try asks the year before any guest row', () => {
     expect(fetchCalls).toHaveLength(1);
     expect(fx.track).toEqual([['play_now_click', { target: 'dunk' }]]);
     expect(beacons).toEqual([]);
-    expect(r.html).not.toContain('What year were you born?');
+    expect(r.html).not.toContain(AGE_QUESTION);
     // nothing about the year rides on the request
     expect(JSON.stringify(fetchCalls)).not.toContain(String(THIS_YEAR - 30));
   });
@@ -131,7 +132,7 @@ describe('/try asks the year before any guest row', () => {
     const r = mount();
     await settle();
     expect(findAll(r.tree, (e) => e.type === AgeStep)).toEqual([]);
-    expect(r.html).not.toContain('What year were you born?');
+    expect(r.html).not.toContain(AGE_QUESTION);
     expect(r.html).not.toContain('CLAIM');
     nothingSent();
     expect(cookieWrites).toEqual([]);   // read only
@@ -141,7 +142,7 @@ describe('/try asks the year before any guest row', () => {
     const r = mount();
     await settle();
     expect(findAll(r.tree, (e) => e.type === AgeStep)).toHaveLength(1);
-    expect(r.html).toContain('What year were you born?');
+    expect(r.html).toContain(AGE_QUESTION);
     nothingSent();
   });
 
