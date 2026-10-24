@@ -8,7 +8,8 @@
  * past 'baseball' scores to pick a rival or a stake reads only the sessions created at or after the cutoff; with none
  * left, the arena ghost falls to its cold-start baseline (ARENA_SCORE_BASELINES.baseball, 19).
  *
- * Not applied to the player's own history (profile, cards, the end card's personal best): those show what was played.
+ * Also applied to the end card's account personal best (lib/records/account-bests), so an old derby 300 never hides a
+ * three-inning best. Not applied to profile/cards history: those show what was played.
  */
 
 import { canonicalModeKey } from '@/lib/game-data';
@@ -16,12 +17,12 @@ import { canonicalModeKey } from '@/lib/game-data';
 /**
  * The first moment a 'baseball' session can be a three-inning game and not a derby night.
  *
- * assumption: #403 merged into lane/finish-release at 2026-10-23T23:32:06Z (GitHub merged_at); the brief says to take
- * the start of the following hour. That is NOT the deploy: #403 was not on `main` when this was written, so production
- * keeps saving derby nights under 'baseball' until it ships. The owner should move this to (at or after) the hour #403
- * deploys, so that no derby run is ever counted. A later cutoff only costs a few three-inning games falling back to 19.
+ * assumption: #403 (the derby-key split) merged into lane/finish-release at 2026-10-23T23:32:06Z and auto-deploys to
+ * production after its release CI (in progress past midnight UTC). Until it ships, production keeps saving derby nights
+ * under 'baseball', so the coordinator set this to 06:00 UTC on 10-24, safely after that deploy. A later cutoff only
+ * costs a few three-inning games falling back to the house baseline of 19.
  */
-export const BASEBALL_INNINGS_SINCE = '2026-10-24T00:00:00Z';
+export const BASEBALL_INNINGS_SINCE = '2026-10-24T06:00:00Z';
 
 /** Session keys whose older history is on another game's scale, and the first instant that counts (ISO, UTC). */
 export const RIVAL_HISTORY_SINCE: Readonly<Record<string, string>> = {

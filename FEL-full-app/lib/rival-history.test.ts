@@ -66,10 +66,10 @@ const baseline = ARENA_SCORE_BASELINES.baseball;
 const bandOf = (c: number) => [Math.round(c * (1 - RIVAL_BAND)), Math.round(c * (1 + RIVAL_BAND))];
 
 describe('BASEBALL_INNINGS_SINCE', () => {
-  it('is the hour after #403 merged (2026-10-23T23:32:06Z), and only baseball has a cutoff', () => {
-    expect(BASEBALL_INNINGS_SINCE).toBe('2026-10-24T00:00:00Z');
+  it('is after #403 deploys to production (merged 2026-10-23T23:32:06Z, deployed after midnight UTC), and only baseball has a cutoff', () => {
+    expect(BASEBALL_INNINGS_SINCE).toBe('2026-10-24T06:00:00Z');
     expect(Object.keys(RIVAL_HISTORY_SINCE)).toEqual(['baseball']);
-    expect(rivalHistorySince('baseball')?.toISOString()).toBe('2026-10-24T00:00:00.000Z');
+    expect(rivalHistorySince('baseball')?.toISOString()).toBe('2026-10-24T06:00:00.000Z');
     expect(rivalHistorySince('derby')).toBeNull();
     expect(rivalHistorySince('music')).toBeNull();
   });
