@@ -280,7 +280,7 @@ describe('BB-7 no borrowed combat clip in baseballTree (ANIM-ALL-1)', () => {
   });
 
   it('the throw is a pitch and the celebration a jump; every clip the baseball view plays is in the baseball scope', () => {
-    expect(base(chooseBaseballClip({ ...REST, throwing: true }).clip)).toBe('baseball_pitch_over');
+    expect(base(chooseBaseballClip({ ...REST, throwing: true }).clip)).toBe('baseball_pitch_side');
     expect(chooseBaseballClip({ ...REST, celebrating: true }).clip).toBe('jump_up');
     const scope = scopeForMode('baseball');
     for (const i of [{ ...REST }, { ...REST, releasing: true }, { ...REST, batting: true }, { ...REST, batting: true, swinging: 'contact' as const }, { ...REST, celebrating: true }]) {
