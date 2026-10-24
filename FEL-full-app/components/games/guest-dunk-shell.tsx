@@ -53,6 +53,8 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   const [result, setResult] = useState<GameResult | null>(null);
   const [beat, setBeat] = useState<boolean | null>(null);
   const [rematch, setRematch] = useState<string | null>(null);
+  // CHALLENGES-2: the result card (/c/<code>?r=<receipt>): both scores, who won, and sign-up to save it or to rematch
+  const [resultHref, setResultHref] = useState<string | null>(null);
   // TRY-ONBOARD G1/G3: how many NIGHT CARDS this guest has finished. It is the "has
   // dunked at least once" gate for the claim offer, and it is a counter rather than a
   // flag because the claim is shown once — on the first card — and after that lives as
@@ -114,6 +116,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
           if (j) {
             setBeat(Boolean(j.beat));
             if (j.rematch?.path) setRematch(j.rematch.path);
+            if (typeof j.receipt === 'string') setResultHref(`/c/${encodeURIComponent(challengeCode)}?r=${encodeURIComponent(j.receipt)}`);
           }
         } catch {}
       }
@@ -143,6 +146,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
           if (j) {
             setBeat(Boolean(j.beat));
             if (j.rematch?.path) setRematch(j.rematch.path);
+            if (typeof j.receipt === 'string') setResultHref(`/c/${encodeURIComponent(challengeCode)}?r=${encodeURIComponent(j.receipt)}`);
           }
         } catch {}
       }
@@ -156,6 +160,7 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
     setResult(null);
     setBeat(null);
     setRematch(null);
+    setResultHref(null);
     setGameKey((k) => k + 1);
   };
 
@@ -267,6 +272,15 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
               front of the game — one quiet link in the chrome. The old shape was the opposite:
               a full-screen modal whose primary button left the page, with DUNK AGAIN as a small
               grey afterthought beside it. */}
+          {resultHref && !result && (
+            <Link
+              href={resultHref}
+              className="rounded-md border border-[#FFD700]/40 px-2.5 py-1 font-mono text-[10px] text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
+              data-action="challenge-result"
+            >
+              RESULT
+            </Link>
+          )}
           {gate === 'adult' && cards > 0 && !result && (
             <button
               type="button"
@@ -361,6 +375,14 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
                 {claimLink}
 
                 <div className="mt-4 flex items-center justify-center gap-3">
+                  {resultHref && (
+                    <Link
+                      href={resultHref}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#FFD700]/40 px-4 py-2 font-mono text-xs text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
+                    >
+                      CHALLENGE RESULT <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
                   {rematch && (
                     <Link
                       href={rematch}
