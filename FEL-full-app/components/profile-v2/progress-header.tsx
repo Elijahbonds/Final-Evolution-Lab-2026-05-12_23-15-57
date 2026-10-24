@@ -1,6 +1,7 @@
 // THE TOP OF THE PROFILE (owner 2026-10-24: "lead with progress"): the athlete, the PRQ grade, and this week's real
 // numbers — jump, form, reaction, streak — each against last week. A number nobody measured is a dash and a way to get
 // it, never a placeholder value (lib/profile-v2/tiles.ts).
+import Link from 'next/link';
 import type { ProfileV2Data } from '@/lib/profile-v2/assemble';
 import { AthleteStage } from './athlete-stage';
 import { DeviceFormTile } from './device-form-tile';
@@ -37,6 +38,8 @@ export function ProgressHeader({ data, viewer = false }: { data: ProfileV2Data; 
             ? <DeviceFormTile key={t.key} fallback={t} accent={ACCENT[t.key]} />
             : <TileView key={t.key} tile={t} accent={ACCENT[t.key]} />))}
         </div>
+        {/* PROGRESS CARD (value round item 1): the week as a card, with a share image */}
+        <Link href="/profile/week" data-testid="profile-week-card" className="mt-2.5 inline-flex min-h-11 items-center text-[12px] font-bold text-[#00E5FF] underline-offset-2 hover:underline">Your weekly card, and an image to share →</Link>
       </div>}
     </section>
   );
