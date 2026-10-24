@@ -8,6 +8,7 @@ import { loadProfile, type ProfileDb } from '@/lib/profile-v2/load';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileBody, ProfileActions } from '@/components/profile-v2/profile-body';
+import { AthleteStatusSection } from '@/components/profile/athlete-status-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,9 @@ export default async function ProfilePage() {
       aside={<ProfileActions />}
     >
       <ProfileBody data={data} />
+
+      {/* #337: the athlete status card (components/profile/athlete-status-card.tsx), placed under the profile body */}
+      <AthleteStatusSection userId={me} />
       <DoorsRow tab="profile" hide={isCoachStoreEnabled() ? [] : ['/account/bookings']} />
     </TabPage>
   );
