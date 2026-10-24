@@ -58,7 +58,10 @@ describe('dribble pace: three speeds', () => {
 
 describe('DribbleController change of pace', () => {
   it('R2 let off at pace, then pressed again inside the window = the explode burst (once)', () => {
-    const d = new DribbleController();
+    // TEST CHANGED (hoops-reverse, owner 2026-10-24): the controller's facing starts at 0 (+z) and this stick runs −z, so the "sprint at pace"
+    // was a backpedal with the chest held the other way — the retreat dribble, which the owner's retreat cap now holds to 0.7 of a jog.
+    // The intent is a sprint at pace: face the run, as the modes do at spawn (setFacing).
+    const d = new DribbleController(); d.setFacing(Math.PI);
     for (let i = 0; i < 90; i++) d.update(DT, 0, 1, true);
     const atPace = d.vel.length();
     for (let i = 0; i < 12; i++) d.update(DT, 0, 1, false);   // 0.2 s off the turbo, stick held

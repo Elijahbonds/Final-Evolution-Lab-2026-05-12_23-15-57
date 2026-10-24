@@ -15,7 +15,7 @@ import { ENABLED_BABYLON_MODES } from '../../lib/babylon/modes/registry';
 /** registry key -> multiplayer key, where the two spellings differ. */
 const MP_KEY: Readonly<Record<string, string>> = {
   snowboard_slalom: 'snowboard', karate_vs: 'karate-vs', bigair: 'big-air',
-  derby: 'baseball', penalty: 'soccer', who_scene_it: 'who-scene-it',
+  penalty: 'soccer', who_scene_it: 'who-scene-it',   // DERBY-KEY (2026-10-23): registry 'derby' is challenge 'derby' now
 };
 const NON_GAMESHELL_CHALLENGE_EXEMPT = new Set(['dunkduel']);
 const mpKeyFor = (registryKey: string) => MP_KEY[registryKey] ?? registryKey;

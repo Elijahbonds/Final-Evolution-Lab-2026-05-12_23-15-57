@@ -111,6 +111,8 @@ const cases: Case[] = [
   },
   { name: 'read markers: ProgramMessage.readAt', prod: withoutField(SCHEMA, 'ProgramMessage', 'readAt'), expect: match('message-read-markers') },
   { name: 'coach availability', prod: withoutType(SCHEMA, 'CoachAvailability'), expect: match('coach-availability') },
+  // RATE-LIMIT-WIRE (lane/rate-limits): an @@map'd table with a named index, so Prisma's names must be the file's
+  { name: 'rate limits: rate_limits and its reset_at index', prod: withoutType(SCHEMA, 'RateLimit'), expect: match('rate-limits') },
   {
     name: 'two files at once (p5 + p7), interleaved by Prisma',
     prod: ['HealthIntake', 'PainCheckIn', 'HealthConsent', 'BreathLog'].reduce(withoutType, SCHEMA),

@@ -28,13 +28,13 @@ const staticAttr = (attrs: string, name: string): string | null => {
 /**
  * Static in-game labels that deliberately differ from MODE_INFO. A route that wants
  * different shell copy has to name why, so accidental venue/card drift stays visible.
- * `route` scopes an exception to one shell when two routes save under the same key (BASEBALL-3INN: /play/derby saves
- * 'baseball' like /play/baseball); without it the exception covers the mode's one /play shell.
+ * `route` scopes an exception to one shell when two routes save under the same key (/play/tiebreak and the Tennis
+ * variant); without it the exception covers the mode's one /play shell. DERBY-KEY (2026-10-23): the derby's entry is gone —
+ * /play/derby saves under 'derby' now, whose own catalogue row is MOONSHOT DERBY at Catalina Ballpark.
  */
 const DOCUMENTED_SHELL_COPY: Record<string, { venue?: string; title?: string; route?: string; reason: string }> = {
   acting: { venue: 'Soundstage', reason: 'the mode plays on a stage while the catalogue groups the discipline as Acting Stage' },
   aeroAces: { venue: 'Gate Run', reason: 'the race instance names the current course; MODE_INFO names the broader Flyway venue' },
-  baseball: { route: '/play/derby', title: 'MOONSHOT DERBY', reason: 'the home-run derby moved to /play/derby but still saves under baseball (its stake ceiling and history); the catalogue row names the three-inning game' },
   bigAir: { venue: 'Alpine Ridge', reason: 'the run starts at the ridge inside the Mountain Slope venue family' },
   carnival: { venue: 'Venice Beach Carnival', reason: 'the shell names the event overlay; MODE_INFO keeps the shelf grouped at Venice Beach Court' },
   irl: { title: 'VERT', venue: 'Anywhere', reason: 'the camera tool labels the measured activity, not the Hang Time catalogue wrapper' },
@@ -85,6 +85,10 @@ describe('mode keys are session keys', () => {
     expect(byRoute.get('/play/music')).toBe('music');
     expect(byRoute.get('/play/velocity-kart')).toBe('velocityKart');
     expect(byRoute.get('/play/aero-aces')).toBe('aeroAces');
+    // DERBY-KEY (2026-10-23): the two ballpark games save under two keys, each with its own catalogue row
+    expect(byRoute.get('/play/baseball')).toBe('baseball');
+    expect(byRoute.get('/play/derby')).toBe('derby');
+    expect(MODE_INFO.derby?.href).toBe('/play/derby');
   });
 
   it('keeps static /play GameShell copy aligned with the catalogue, unless the alternate is documented', () => {

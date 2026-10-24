@@ -46,7 +46,10 @@ const UA = 'AgeScreenTest/1.0';
 // pinned at the lane/party-chat merge of lane/finish-release, the first commit carrying all three pending files.
 // PARTY-PRIVACY (this lane) prisma/pending/2026-10-13-party-report.sql RETENTION comment only (12 months, with the delete
 // statement; pending SQL only, no column or index added) at 521c52c1.
-const PARENT = '521c52c1466eef149872a469b631e31572b318f2';
+// RATE-LIMITS (lane/rate-limits, PR #289 rebuilt on release, 2026-10-23): the RateLimit model (table rate_limits) in
+// schema.prisma and prisma/pending/2026-10-16-rate-limits.sql at 3887ceef. lane/studio-save (#373) also changes prisma/:
+// whichever of the two lands second bumps this to the merge commit carrying both.
+const PARENT = '3887ceef5e26ac2efe47bb901a8ec81203e7acea';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

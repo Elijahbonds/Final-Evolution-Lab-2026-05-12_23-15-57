@@ -26,6 +26,16 @@ export function dragonLicensed(r: FightRatings): boolean {
  * calibrated to the same PRO target. (The source of the gap — your staff has the book's reach, not the staff's — is the
  * owner's call; this evens the picks without touching how either swings.)
  */
+/**
+ * MC75-1 (ALL-MODES-TO-75 §8; Gameplay TUNE sheet 2026-10-23, PM option (b)): the most the Mixed Combat rival's EFFECTIVE
+ * skill may reach at ROOKIE, every round — the round ramp (RivalFightBrain.setRound) can no longer lift a ROOKIE rival above
+ * its own tier value (0.68 − 0.22 = 0.46). PRO and ELITE stay uncapped (a 0.73 PRO cap pushed the decent player's PRO
+ * rate to 68 %, over difficultyBands' 65 % ceiling — measured).
+ */
+export const RIVAL_TIER_CAP: Readonly<Partial<Record<'rookie' | 'pro' | 'elite', number>>> = { rookie: 0.46 };   //TUNE(elijah)
+export function rivalTierCap(tier: 'rookie' | 'pro' | 'elite' | null | undefined): number | null {
+  return tier ? RIVAL_TIER_CAP[tier] ?? null : null;
+}
 export const RIVAL_POWER_BY_LOADOUT: Readonly<Record<'fists' | 'staff', number>> = { fists: 1, staff: 1.3 };
 
 /** A ring-out victim's fall: 0.14 m a RENDER before (8.4 m/s at 60 Hz, twice that at 120 Hz). The same 8.4 m/s, per

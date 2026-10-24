@@ -10,7 +10,13 @@ import { SHOT_CLOCK_1V1_SEC, SHOT_CLOCK_3V3_SEC } from '@/lib/babylon/core/ShotC
 import { DUNK_RING_QUALITY, DUNK_SHORT_BIAS, DUNK_CLANK_MIN_MPS, DUNK_CLANK_SPAN_MPS } from '@/lib/babylon/core/RimForAll';
 import { COMBO_OPEN_K, COMBO_GRACE_SEC } from '@/lib/babylon/anim/comboFlow';
 import { GUARD_RANGE_M } from '@/lib/babylon/core/GuardHand';
+import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
+import {
+  HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
+  HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
+  HOOPS_RETREAT_SPEED_K,
+} from '@/lib/babylon/core/HoopsStick';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -54,6 +60,31 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.shadeRangeM')).toBe(SHADE_RANGE_M);
     expect(def('hoops.shadeReseedM')).toBe(SHADE_RESEED_M);
     expect([BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M]).toEqual([true, 0.5, 0.22, 2.4, 0.08, 2.4, 1.0]);
+    // hoops-reverse (group "Hoops · movement"): #311's H3a stick, every default the release value
+    expect(def('hoops.jogTau')).toBe(HOOPS_JOG_TAU);
+    expect(def('hoops.sprintTau')).toBe(HOOPS_SPRINT_TAU);
+    expect(def('hoops.jogAccel')).toBe(HOOPS_JOG_ACCEL);
+    expect(def('hoops.sprintAccel')).toBe(HOOPS_SPRINT_ACCEL);
+    expect(def('hoops.loadScale')).toBe(HOOPS_LOAD_SCALE);
+    expect(def('hoops.gearDownDecel')).toBe(HOOPS_GEAR_DOWN_DECEL);
+    expect(def('hoops.stopDecelLow')).toBe(HOOPS_STOP_DECEL_LOW);
+    expect(def('hoops.stopDecelHigh')).toBe(HOOPS_STOP_DECEL_HIGH);
+    expect(def('hoops.plantDecel')).toBe(HOOPS_PLANT_DECEL);
+    expect(def('hoops.handlerTurnDeg')).toBe(HOOPS_HANDLER_TURN_DEG);
+    expect(def('hoops.turnTrueArc')).toBe(HOOPS_TURN_TRUE_ARC);
+    expect(def('hoops.kickSec')).toBe(HOOPS_KICK_SEC);
+    expect(def('hoops.cutSec')).toBe(HOOPS_CUT_SEC);
+    expect(def('hoops.jerk')).toBe(HOOPS_JERK);
+    expect(def('hoops.reverseDeg')).toBe(HOOPS_REVERSE_DEG);
+    expect(def('hoops.reverseDecel')).toBe(HOOPS_REVERSE_DECEL);
+    expect([HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
+      HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL])
+      .toEqual([0.17, 0.15, 15, 24, 0.45, 9, 22, 11, 47.6, 540, 0, 0, 0, 0, 135, 47.6]);
+    expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24
+    expect(HOOPS_RETREAT_SPEED_K).toBe(0.7);
+    // hoops-overtime (new: PR #268's 30 s)
+    expect(def('hoops.overtime3v3Sec')).toBe(OVERTIME_3V3_SEC);
+    expect(OVERTIME_3V3_SEC).toBe(30);
   });
 
   it('every row is well formed: unique `<area>.<camelName>` id, min ≤ default ≤ max, the default on the step grid, a source', () => {
