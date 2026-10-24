@@ -22,7 +22,8 @@ describe('TV75-3: a 3v3 assist is credited on the board', () => {
     expect(MODE).toMatch(/myScore = 0; foeScore = 0; assists = 0;/);
   });
   it('the end card prints the credited assists from the stats the run posts', () => {
-    expect(MODE).toContain('function endStats(): Record<string, number> { return { foeScore, assists, ...box }; }');
+    // #407 (3v3 overtime) appends `...(overtimes ? { overtimes } : {})` to the same return; the assists credit is unchanged
+    expect(MODE).toMatch(/function endStats\(\): Record<string, number> \{ return \{ foeScore, assists, \.\.\.box[ ,}]/);
     expect(proofLineFor('hoops3v3', { score: 21, opponentScore: 15, won: true, stats: { foeScore: 15, assists: 4, fgm: 9, fga: 16, threes: 1, steals: 0, blocks: 0, overdrives: 0 } }))
       .toContain('AST 4');
   });
