@@ -46,7 +46,8 @@ import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST
 import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';
-import { mountHitchProbe } from './hitchProbe';                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
+import { mountHitchProbe } from './hitchProbe';
+import { mountPerfStats } from './perfStats';                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
 import { AGENT_MODES } from './agentModes';
@@ -345,6 +346,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // once from the same fill-rate signal (visual-foundation: + the GPU, the high tier and the Graphics menu).
   let guard!: ReturnType<typeof mountPerfGuard>;
   let hitch!: ReturnType<typeof mountHitchProbe>;
+  let perfStats: ReturnType<typeof mountPerfStats> | null = null;
   let declaredMood!: VenueMood;
   const look = await mountLookStack({
     canvas: opts.canvas,
@@ -363,6 +365,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // (worst frame, p5 fps over live play) and the per-scene counters a mode keeps at 0 after its intro: mid-play build(),
       // clone() and first-use shader compiles. Published as window.__FEL_HITCH__ under dev / agent runs (hitchProbe.ts).
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
+      perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
       // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
       // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
@@ -421,6 +424,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     else if (p === 'error') setReady(def.modeId, 'failed', typeof detail === 'string' ? detail : undefined);
     store.setPhase(p);   // MOVEMENT PLAY P4: the body-play store and the shell's Body button read the phase here
     guard.setPhase(p);   // PERF-GUARD: a pause, an end card or an error refreshes at 2 fps instead of the cap
+    perfStats?.setPhase(p);   // PERF-LAG: READY, START and live play, for the fps and ttfp reports
     opts.onPhase?.(p, detail);
   };
 
@@ -1033,6 +1037,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     perf.dispose();       // M67
     guard.dispose();      // PERF-GUARD
     hitch.dispose();      // S1 HITCH
+    perfStats?.dispose(); // PERF-LAG (before the engine goes: a mount left before play still reports its wait)
     clearReady();         // M67
     unink();              // M59
     backdrop.dispose();   // M61
