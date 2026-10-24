@@ -39,7 +39,15 @@ export interface PlayEvidenceCounts {
 export function isPlayedRun(
   res: { score?: number; opponentScore?: number } | null | undefined,
   counts: PlayEvidenceCounts,
+  mode?: string,
 ): boolean {
   if (counts.windowEvents >= 3 || counts.harnessEvidence >= 3 || counts.agentEvidence >= 3) return true;
-  return Number(res?.score ?? 0) > 0 || Number(res?.opponentScore ?? 0) > 0;
+  if (Number(res?.score ?? 0) > 0) return true;
+  // DU75-1 (ALL-MODES-TO-75 §3): in Duel the rival fights on its own, so the foe taking rounds off an idle player is not
+  // evidence the player played — an idle Duel loss must post played:false and be paid nothing (route NO_PLAY).
+  if (mode !== undefined && FOE_SCORE_NOT_PLAY_MODES.includes(mode)) return false;
+  return Number(res?.opponentScore ?? 0) > 0;
 }
+
+/** DU75-1: modes whose rival scores without any input from the player, so opponentScore alone never proves play. */
+export const FOE_SCORE_NOT_PLAY_MODES: readonly string[] = ['duel'];
