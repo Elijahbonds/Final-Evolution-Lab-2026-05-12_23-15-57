@@ -30,6 +30,8 @@ describe('NB-3 in the mode: the buzzer site asks hornCall, and a tie starts an o
   it('startOvertime: the period counted, the horn re-armed on the knob\'s clock, the banner, the period on the HUD, a fresh check', () => {
     const ot = fn('startOvertime');
     expect(ot).toMatch(/overtimes\+\+; buzzer = false; timeLeft = overtimeSec\(\);/);
+    expect(fn('bannerFlash')).toMatch(/if \(modeClock < otBannerHold\) return;/);   // rig run 2: THEY SWITCHED wiped the banner at the check
+    expect(ot).toMatch(/otBannerHold = modeClock \+ OVERTIME_BANNER_MS \/ 1000;/);
     expect(ot).toMatch(/bannerFlash\(ctx, overtimes > 1 \? `\$\{periodLabel\(overtimes\)\} — NEXT BUCKET WINS` : OVERTIME_BANNER, OVERTIME_BANNER_MS\);/);
     expect(ot).toMatch(/putHud\(ctx, \{ time: Math\.ceil\(timeLeft\), period: periodLabel\(overtimes\) \}\);/);
     expect(ot).toMatch(/if \(OVERTIME_BALL === 'me'\) resetPossession\(true\); else void opponentPossession\(ctx\);/);
@@ -42,7 +44,7 @@ describe('NB-3 in the mode: the buzzer site asks hornCall, and a tie starts an o
     expect(CODE).toMatch(/shotClock\.tick\(dt, \{ token: possessionToken,/);
   });
   it('a new run starts in regulation, and an overtime game says so in its stats', () => {
-    expect(CODE).toMatch(/ended = false; buzzer = false; overtimes = 0;/);
+    expect(CODE).toMatch(/ended = false; buzzer = false; overtimes = 0; otBannerHold = 0;/);
     expect(CODE).toMatch(/time: timeLeft, ast: assists, period: '',/);
     expect(fn('endStats')).toMatch(/\.\.\.\(overtimes \? \{ overtimes \} : \{\}\)/);
   });

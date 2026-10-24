@@ -314,6 +314,7 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   let shooting = false, dunking = false, ended = false, lastPasserWasMe = false;
   let buzzer = false;   // HOOPS-TO-75 WA-1: the horn fired — wait for live shots before posting the final score
   let overtimes = 0;    // NB-3 (lane/hoops-overtime): the overtimes played — a tie at the horn is sudden death (threevthreeOvertime)
+  let otBannerHold = 0; // NB-3: the mode-clock time the OVERTIME banner holds the banner channel until (the rig saw THEY SWITCHED wipe it at the check)
   /** HOOPS MOTION phase 3b: a MATE's shot is up (the one-shot-at-a-time guard). teammateShoots used to raise the hero's own `shooting`,
    *  which nothing cleared when their ball followed his make (opponentPossession leaves it): the hero looped `bball_shoot_jumper` while
    *  sliding on defence and was slewed toward the rim until the next possession of ours (V:3v3 C6). */
@@ -790,6 +791,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  a banner flashed just before a pause is still up after it, and nothing fires into a disposed mode. */
   function bannerClearLater(_ctx: ModeContext, ms: number): void { bannerUntil = modeClock + ms / 1000; }
   function bannerFlash(ctx: ModeContext, text: string, ms = 800): void {
+    if (modeClock < otBannerHold) return;   // NB-3: the overtime's banner is not cut off by a passing call (THEY SWITCHED at the check)
     putHud(ctx, { banner: text });
     bannerUntil = modeClock + ms / 1000;
   }
@@ -1057,7 +1059,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[3V3-HANDLE] handle ${handle} (override)`); }
       }
 
-      myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false; buzzer = false; overtimes = 0;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
+      myScore = 0; foeScore = 0; assists = 0; timeLeft = POSSESSION_SEC; ended = false; buzzer = false; overtimes = 0; otBannerHold = 0;   // IMPROVE (2026-10-06) #17: a second run on this closure started with the last run's horn blown (it ended at its first quiet frame)
       shotContest = 0; foeCloseMem = foes.map(() => 0);
       ctx.heroRef.current = me.char.root;
       ctx.objectiveRef.current = RIM;
@@ -3934,7 +3936,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
    *  next possession is a fresh check (OVERTIME_BALL), which also restarts ELITE's shot clock (it reads the possession token). */
   function startOvertime(ctx: ModeContext): void {
     overtimes++; buzzer = false; timeLeft = overtimeSec();
-    bannerFlash(ctx, overtimes > 1 ? `${periodLabel(overtimes)} — NEXT BUCKET WINS` : OVERTIME_BANNER, OVERTIME_BANNER_MS);
+    otBannerHold = 0; bannerFlash(ctx, overtimes > 1 ? `${periodLabel(overtimes)} — NEXT BUCKET WINS` : OVERTIME_BANNER, OVERTIME_BANNER_MS);
+    otBannerHold = modeClock + OVERTIME_BANNER_MS / 1000;
     putHud(ctx, { time: Math.ceil(timeLeft), period: periodLabel(overtimes) });
     mic?.crowd('crowd.hype', 2);   // the stands feel it (audio only: no momentum report, so no shot odds move)
     console.info(`[3V3-RULES] overtime ${overtimes} at ${myScore}–${foeScore}: next bucket wins (${timeLeft}s, ${OVERTIME_BALL === 'me' ? 'our' : 'their'} ball)`);
