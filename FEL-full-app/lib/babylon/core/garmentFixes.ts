@@ -23,7 +23,7 @@
 //      (makeGeometryUnique); the loaded container and the GLB are untouched.
 //   3. Two-tone: the sole triangles (the bottom SOLE_THICKNESS of the shoe) move to a sibling mesh with a light matte
 //      material whose names carry no `shoe`, so tintSlot leaves the sole light while the upper takes the tint.
-// A spawn whose skeleton has not posed the shoe yet (parked rivals measure a 0.16 m boot) gets the geometry pass on
+// A spawn whose skeleton has not posed the shoe yet (MIN_POSED_SHOE_HEIGHT) gets the geometry pass on
 // its first rendered frame instead. Everything here is best-effort and never throws into the spawn: a fake mesh (unit
 // tests), a mesh without a skeleton or without geometry gets the material pass or nothing.
 import { Color3, Matrix, Mesh, PBRMaterial, Vector3, VertexBuffer } from '@babylonjs/core';
@@ -50,9 +50,18 @@ const COLLAR_HEIGHT = 0.035;
  */
 const SOLE_THICKNESS = 0.05;
 const SOLE_COLOR = '#F4F2EC';
-/** A skinned shoe shorter than this has not been posed yet (a parked rival's skeleton at spawn, measured 0.16 m
- *  for a 0.5 m boot); its geometry pass waits for the first render. */
-const MIN_POSED_SHOE_HEIGHT = 0.19;
+/**
+ * A skinned shoe shorter than this has not been posed yet; its geometry pass waits for the first render.
+ *
+ * KIT-NO-HIGH-BOOTS (owner, 2026-10-24: "fix the sole band"): was 0.19, set when the kit shoe was a 0.51 m knee boot
+ * (a parked rival's skeleton measured that boot at 0.16). The kit now ships one low-cut shoe on all 28 kit/hero/rival
+ * bodies, and on the real spawn path (CharacterLibrary.spawn, desktop and mobile, player and rival) it measures
+ * 0.147–0.161 m POSED — under 0.19, so every spawn retried for 180 frames, settled 'late:unposed', and never got its
+ * light sole. Unposed frames measure ~0 (no bone matrices yet) or ~0.0002 m (a spawn at root scale 0.001; isShrunk also
+ * holds those back), and the same parked distortion on a 0.15 m shoe would read ~0.05 m. 0.12 sits 18 % under the
+ * lowest posed shoe and well over every unposed reading. Pinned by garmentFixes.lowShoe.test.ts.
+ */
+export const MIN_POSED_SHOE_HEIGHT = 0.12;
 /** Frames the late geometry pass keeps waiting for a shrunk / unposed shoe (a materialise tween is ~20). */
 const LATE_WAIT_FRAMES = 180;
 
@@ -97,12 +106,20 @@ function fixShoe(mesh: Mesh, itemId: string): string {
     // 0.0002 m shoe on its first frame — 'unposed' for good, and the collar flare that waits on `late:` then ran on the
     // shrunk body (see bodyMask.isShrunk). So the late pass keeps waiting while the mesh is shrunk or unposed, frame by
     // frame, up to LATE_WAIT_FRAMES before it settles for 'unposed'.
+    // KIT-NO-HIGH-BOOTS (2026-10-24): "frame by frame" did not hold. An observer added to the observable that is calling
+    // it runs in that same notify (Babylon's Observable walks its live list — measured: one notify ran the retry 181
+    // times), so every wait burnt all LATE_WAIT_FRAMES in the first frame and a shrunk spawn settled 'late:shrunk' with
+    // no sole. The retry now re-arms from the scene's after-render, which is the next frame's before-render.
     let waited = 0;
     const late = () => {
       try {
         const shrunk = isShrunk(mesh);
         const r = shrunk ? null : fixShoeGeometry(mesh, itemId, skeleton, positions, indices);
-        if (r === null && waited++ < LATE_WAIT_FRAMES) { mesh.onBeforeRenderObservable.addOnce(late); return; }
+        if (r === null && waited++ < LATE_WAIT_FRAMES) {
+          const scene = mesh.getScene();
+          scene.onAfterRenderObservable.addOnce(() => { if (!mesh.isDisposed()) mesh.onBeforeRenderObservable.addOnce(late); });
+          return;
+        }
         mesh.metadata = { ...(mesh.metadata ?? {}), felGarmentFix: `${notes.join('+')}+late:${r ?? (shrunk ? 'shrunk' : 'unposed')}` };
       } catch (e) { console.warn(`[FEL-KIT] late shoe fix skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
     };

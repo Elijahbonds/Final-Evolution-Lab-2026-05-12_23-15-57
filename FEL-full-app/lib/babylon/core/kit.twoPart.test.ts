@@ -69,7 +69,9 @@ describe('a garment without UVs gets an atlas (Creator paint draws through UVs)'
     for (const m of shown) {
       const b = before.get(m.name)!;
       expect(m.isVerticesDataPresent(VertexBuffer.UVKind), m.name).toBe(true);
-      expect((m.getIndices()!.length) / 3, m.name).toBe(b.tris);
+      // every triangle is still drawn: the shoe's light sole band (garmentFixes) moves its bottom triangles to a KitSole mesh
+      const sole = scene.meshes.find((x) => x.metadata?.felSoleOf === m.name);
+      expect((m.getIndices()!.length + (sole?.getIndices()?.length ?? 0)) / 3, m.name).toBe(b.tris);
       if (b.uv) expect(m.getTotalVertices(), m.name).toBe(b.verts);   // the shoe had a map: untouched
       else expect(m.getTotalVertices(), m.name).toBe(b.tris * 3);
       expect(m.getVerticesData(VertexBuffer.MatricesWeightsKind)!.length, m.name).toBe(m.getTotalVertices() * 4);
