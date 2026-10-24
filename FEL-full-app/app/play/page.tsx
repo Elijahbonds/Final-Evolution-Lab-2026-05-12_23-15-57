@@ -32,14 +32,14 @@ export default async function PlayPage() {
       accent="#00E5FF"
       aside={
         <div className="flex flex-wrap items-center gap-2">
-          {/* DUNK-LOOP-HANDSFREE: one obvious way in. One tap to the solo dunk session. */}
+          {/* DUNK-LOOP-HANDSFREE: one obvious way into the camera-forward Prove It flow. */}
           <Link
             href="/play/dunkduel"
             data-testid="play-dunk-session-entry"
             className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#FFD700]/60 bg-[#FFD700]/[0.14] px-5 py-3
                        text-base font-black text-white transition-colors hover:bg-[#FFD700]/25"
           >
-            <Camera className="h-5 w-5 text-[#FFD700]" /> Dunk session
+            <Camera className="h-5 w-5 text-[#FFD700]" /> Prove It dunk duel
           </Link>
           {/* MULTIPLAYER (2026-10-06): the couch — one screen, phones and pads, friends join by QR. The first door. */}
           <Link
@@ -48,7 +48,7 @@ export default async function PlayPage() {
             className="inline-flex items-center gap-2 rounded-xl border border-[#00E5FF]/45 bg-[#00E5FF]/[0.1] min-h-12 px-4 py-2.5
                        text-base font-bold text-white transition-colors hover:bg-[#00E5FF]/20"
           >
-            <Users className="h-4 w-4 text-[#00E5FF]" /> Play with friends
+            <Users className="h-4 w-4 text-[#00E5FF]" /> Couch multiplayer
           </Link>
           <Link
             href="/multiplayer"

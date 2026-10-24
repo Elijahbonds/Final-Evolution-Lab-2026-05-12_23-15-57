@@ -395,7 +395,7 @@ describe('dunk loop: hands-free re-arm', () => {
 });
 
 describe('dunk loop: solo Start, consent, hard rule', () => {
-  it('5. solo happy path is 2 taps from /play (Dunk session, Start)', () => {
+  it('5. solo happy path is 2 taps from /play (Prove It dunk duel, Start)', () => {
     const d = soloDefaults(false);
     expect(SOLO_TAPS_FROM_PLAY).toBe(2);
     expect(d.players).toBe(1);

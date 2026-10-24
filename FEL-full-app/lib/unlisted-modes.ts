@@ -11,17 +11,9 @@
 // unlisted mode is skipped, and the next zone still unlocks). Reads of STORED data (an old session, a saved
 // pick, an open duel) are not filtered: history stays readable.
 
-/** Mode ids parked out of every player-facing listing. Remove an entry and the mode comes back everywhere. */
-export const UNLISTED_MODES = ['training'] as const;
-
-export type UnlistedModeId = (typeof UNLISTED_MODES)[number];
-
-const UNLISTED: ReadonlySet<string> = new Set<string>(UNLISTED_MODES);
-
-/** Is this mode id parked? Accepts the catalogue/session spelling ('training'); null and unknown ids are listed. */
-export function isUnlistedMode(id: string | null | undefined): boolean {
-  return typeof id === 'string' && UNLISTED.has(id);
-}
+import { modeKeyForHref } from './mode-routes';
+export { UNLISTED_MODES, isUnlistedMode, type UnlistedModeId } from './unlisted-mode-ids';
+import { isUnlistedMode } from './unlisted-mode-ids';
 
 /** The mode slug of a '/play/<slug>' href, or null when the href points somewhere else. */
 export function playSlugOf(href: string | null | undefined): string | null {
@@ -29,8 +21,13 @@ export function playSlugOf(href: string | null | undefined): string | null {
   return slug || null;
 }
 
+/** The catalogue/session mode id behind a '/play/<slug>' href, even when the route slug is an alias. */
+export function modeIdOfPlayHref(href: string | null | undefined): string | null {
+  const slug = playSlugOf(href);
+  return slug === null ? null : modeKeyForHref(href) ?? slug;
+}
+
 /** Does this href open a parked mode's play route? ('/play/training' today.) */
 export function isUnlistedPlayHref(href: string | null | undefined): boolean {
-  const slug = playSlugOf(href);
-  return slug !== null && isUnlistedMode(slug);
+  return isUnlistedMode(modeIdOfPlayHref(href));
 }
