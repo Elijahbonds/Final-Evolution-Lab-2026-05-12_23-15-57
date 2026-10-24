@@ -26,6 +26,7 @@ import { Onlookers } from '../visual/Onlookers';
 import { heroPalmScale, VENICE_BOARDWALK_ROW, VENICE_ENV2_DIR, VENICE_HERO_PALMS, VENICE_PALM_LODS, VENICE_ROW_PALMS } from '../visual/venuePropSets';
 import { veniceSunPosition } from '../visual/veniceSurroundVisibility';
 import type { AbstractMesh, Material, Scene } from '@babylonjs/core';
+import { setPbrRoughnessUniform } from '../scene/pbrUniform';   // perf-lag: the sea's shimmer without a shader re-prepare a frame
 
 const COURT = { hx: 8, hz: 14 };                 // 16 × 28 court slab (venueSpecs basketball_*)
 export const BOARDWALK = { apron: 3, grass: 5, walkW: 9, sandW: 34 };
@@ -169,8 +170,9 @@ export function decorateVeniceBoardwalk(scene: Scene, root: TransformNode, scanS
   let t = 0;
   const obs = scene.onBeforeRenderObservable.add(() => {
     const dt = scene.getEngine().getDeltaTime() / 1000; t += dt;
-    if (!waves) { seaMat.roughness = 0.35 + Math.sin(t * 0.7) * 0.06; return; }
-    seaMat.roughness = SEA.roughness + Math.sin(t * 0.7) * 0.025;
+    // perf-lag: the same value through the uniform, not the setter (which re-prepared the sea's shader every frame: pbrUniform.ts)
+    if (!waves) { setPbrRoughnessUniform(seaMat, 0.35 + Math.sin(t * 0.7) * 0.06); return; }
+    setPbrRoughnessUniform(seaMat, SEA.roughness + Math.sin(t * 0.7) * 0.025);
     waves.uOffset = (waves.uOffset + dt * 0.011) % 1; waves.vOffset = (waves.vOffset + dt * 0.006) % 1;
   });
   holder.onDisposeObservable.add(() => { scene.onBeforeRenderObservable.remove(obs); waves?.dispose(); });
