@@ -10,6 +10,7 @@ There is no schema change, no new dependency and no deploy file.
 |---|---|---|
 | `/train` | The daily drill card, above the coach's Today card, for every account | `components/daily-drill/daily-drill-card.tsx`; one read and one mount line in `app/train/page.tsx` |
 | `/train/today-drill` | The drill: why it was picked, its phases, and the camera run | `app/train/today-drill/page.tsx`, `_components/today-drill-run.tsx` |
+| `/profile/week` (progress card, #432) | One line under the card: "Daily drill done on N of the last 7 days" and a door to today's. It is not on the share image | `components/daily-drill/week-line.tsx`; one read (a count over the 7 claim keys) and one line in `app/profile/week/page.tsx` |
 | `POST /api/daily-drill/claim` | `{ key }` → the day's credit and streak day, once | `app/api/daily-drill/claim/route.ts` |
 | Logic | Skills, pick, plan, compose, load, claim, copy | `lib/daily-drill/**` |
 
@@ -98,7 +99,7 @@ for when a friends lane lands one:
 
 | | Result |
 |---|---|
-| Unit and route tests | `lib/daily-drill` (pick 27, claim 13, load 6, compose 4), `lib/streak` 4, `tests/daily-drill` (route 6, card 7, DrillLive 3, claim call 2): 72 |
+| Unit and route tests | `lib/daily-drill` (pick 27, claim 13, load 6, compose 4), `lib/streak` 4, `tests/daily-drill` (route 6, card 7, DrillLive 3, claim call 2, week line 3): 75 |
 | Concurrent claims (test double: row lock, unique key) | 8 at once × 5 rounds → 1 granted, 7 already; one row; streak 3 → 4 once |
 | **Real Postgres probe** (throwaway local PG 16; tables from the client's DMMF, no Prisma CLI; real `applyLc`, `postLc`, lock, streak claim, gated reads) | 17 of 17. 8 concurrent × 5 → exactly 1 granted, 1 ledger row, 1 house-book row, +30 LC once, streak 3 → 4. Drill and game at once → the streak day once. Pick from real rows through real gated queries; a teen's rows are not returned. **CONTROL:** naive check-then-write with no transaction → +240 LC on one ledger row. Database dropped and cluster deleted afterwards |
 | Control for the throwaway schema | `wallet-tests` 33 of 33 and `economy-tests` 18 of 18 against it |
@@ -123,5 +124,4 @@ for when a friends lane lands one:
    - 28 days of readings count as current.
    - 10 shots are enough for a make rate.
    - The five-point shot band reads as "same".
-6. **Progress card line** (once #432 merges): one line under the card's tiles, reading "Today's drill: <name> · done /
-   not yet", from `loadDailyDrill`. It is not applied here because #432 is not in this lane's base.
+6. **Progress card line:** applied after #432 merged. It is one line under the card and is left off the share image.

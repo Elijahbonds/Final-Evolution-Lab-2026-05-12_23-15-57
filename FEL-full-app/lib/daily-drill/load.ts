@@ -138,3 +138,29 @@ export async function loadDailyDrill(db: DailyDrillDb, userId: string, deps: Loa
   ]);
   return viewFrom(userId, rows, drillsAccess(ctx), now);
 }
+
+/** The last `n` PT days, today first (DST-safe: each day is the one before the previous day's start). */
+export function lastPtDays(now: Date, n = 7): string[] {
+  const out: string[] = [];
+  let at = now;
+  for (let i = 0; i < n; i++) {
+    const b = ptDayBounds(at);
+    out.push(b.day);
+    at = new Date(b.start.getTime() - 1);
+  }
+  return out;
+}
+
+/**
+ * Days in the last seven (today included) with the day's drill done: one count over the claims' own ledger keys, no
+ * amounts read. For the progress card's page. A failed read is null (the line is left out), never a 0 nobody measured.
+ */
+export async function drillDaysThisWeek(db: Pick<DailyDrillDb, 'walletLedgerEntry'> & { walletLedgerEntry: { count(a: unknown): Promise<number> } }, userId: string, now: Date = new Date()): Promise<number | null> {
+  const keys = lastPtDays(now).map((d) => dailyDrillKey(userId, d));
+  try {
+    const n = Number(await db.walletLedgerEntry.count({ where: { idempotencyKey: { in: keys } } }));
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
