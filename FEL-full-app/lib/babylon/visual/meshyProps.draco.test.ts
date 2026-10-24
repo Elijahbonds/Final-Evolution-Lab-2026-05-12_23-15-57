@@ -145,21 +145,21 @@ describe.each(DRACO_FILES)('$url is 3D Art\'s Draco file, and it decodes to the 
   });
 });
 
-describe('fel-kit-male.glb is the shrunk kit: new textures, the same body', () => {
-  it('is 3D Art\'s file (sha256 e4791bbf…); its JSON and all 23 geometry, skin and morph views are byte-identical to c9468a40', () => {
+describe('fel-kit-male.glb is the KIT-NO-HIGH-BOOTS kit (pass 3): low shoes, compression tee, the same body', () => {
+  it('is the pass-3 file (sha256 d2aa002f…); its JSON and all 54 geometry, skin and morph views are pinned', () => {
     const KIT = urlForHeroBody('kit-male');   // the guest's own body on /try
     expect(KIT).toBe('/models/candidates/fel-kit-male.glb');
-    expect(createHash('sha256').update(readFileSync(pub(KIT))).digest('hex')).toBe('e4791bbf7c2f219d3b4be0053fd6aa6e00ce54191e7d57e0a054cb57ad0344fb');
+    expect(createHash('sha256').update(readFileSync(pub(KIT))).digest('hex')).toBe('d2aa002f378cd73b1f560b288b3c7e701a0a04a171f042b219451cf4fab1016e');
     const { json, bin } = glb(KIT);
     const images = new Set((json.images ?? []).map((i) => i.bufferView));
-    expect(images.size).toBe(15);   // the image order phoneTextureCap's #image7 reads is the source's
+    expect(images.size).toBe(11);   // the image order phoneTextureCap's #image7 reads is the source's (#image7 is still the 2048² skin)
     const h = createHash('sha256'); let views = 0;
     json.bufferViews.forEach((v, i) => { if (images.has(i)) return; views++; h.update(bin.subarray(v.byteOffset ?? 0, (v.byteOffset ?? 0) + v.byteLength)); });
-    expect(views).toBe(23);
-    // pinned from the kit shipped before FDB-2 (blob c9468a40): the same two hashes over the same views and the same JSON
-    expect(h.digest('hex')).toBe('a360d96f08a75cccf412e7ff18c56002bad7286dc47347c8ad695e7ff2e83a70');
+    expect(views).toBe(54);
+    // pinned from the pass-3 kit (KIT-NO-HIGH-BOOTS, 2026-10-20, rebuilt on 4c45862a's textures), measured from the file
+    expect(h.digest('hex')).toBe('5ed36a554d2e85c0a31b4dcbcf8c45184bacac03c7e58920a54c9a268bcb0773');
     const { bufferViews: _v, buffers: _b, ...rest } = json;
-    expect(createHash('sha256').update(JSON.stringify(rest)).digest('hex')).toBe('9590adb833c3844ce66963fef0c47c17810dbb54b8ed05a294117322f09c10ed');
+    expect(createHash('sha256').update(JSON.stringify(rest)).digest('hex')).toBe('bf2a2e438dba0bd717e5dcff1d70eb96eed3a1a945d60fb591c2ba809000d0ea');
     expect([...(json.extensionsRequired ?? [])].sort()).toEqual(['EXT_texture_webp', 'KHR_mesh_quantization']);
   });
 });

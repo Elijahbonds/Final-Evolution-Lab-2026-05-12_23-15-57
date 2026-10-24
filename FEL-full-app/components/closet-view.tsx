@@ -15,7 +15,7 @@ import { PublishLookAsCard } from '@/components/pipelines/publish-look';   // PI
 import {
   SKIN_TONES, FACE_SHAPES, HAIR_STYLES, HAIR_COLORS, EYE_SHAPES, EYE_COLORS,
   BROWS, MOUTHS, NOSES, defaultFace, defaultEquipped, defaultJersey, sanitizeJersey, SLOTS,
-  wearablesForSlot, getWearable, type FaceConfig, type WearableSlot, type JerseyConfig,
+  wearablesForSlot, getWearable, wearableLabel, type FaceConfig, type WearableSlot, type JerseyConfig,
 } from '@/lib/closet/wearable-catalog';
 import { FACE_MORPH_NAMES, faceFieldRenders, faceOptionRenders, type FaceField } from '@/lib/babylon/core/faceMorphs';
 import { faceMorphList } from '@/lib/creator/look/faceMorphList';
@@ -70,6 +70,8 @@ const ClothesTab = dynamic(() => import('@/components/closet/clothes-tab').then(
 const HairTab = dynamic(() => import('@/components/closet/hair-tab').then((m) => m.HairTab), { ssr: false });
 // CREATOR-PLAN phase 4d: photo mode (loaded when opened).
 const PhotoMode = dynamic(() => import('@/components/closet/studio/photo-mode').then((m) => m.PhotoMode), { ssr: false });
+/** A Closet item's shown name (its display label; the stored name stays what a saved build names). */
+const labelOf = (itemId: string): string | null => { const w = getWearable(itemId); return w ? wearableLabel(w) : null; };
 
 /** The editor's tabs, in order (the pad's shoulder buttons and the [ ] keys cycle them). */
 const STUDIO_TABS: readonly StudioTab[] = ['face', 'hair', 'shape', 'parts', 'paint', 'clothes', 'wear', 'skins'];
@@ -620,7 +622,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
       if (res.status === 409) { toast.error('Not enough coins. Top up in the Wallet.'); return; }
       if (!res.ok) throw new Error(j?.error || 'buy failed');
       setOwned((p) => new Set(p).add(itemId));
-      toast.success(`${w.name} unlocked!`);
+      toast.success(`${wearableLabel(w)} unlocked!`);
     } catch (e: any) { toast.error(e?.message || 'Purchase failed'); }
     finally { setBuying(null); }
   };
@@ -924,7 +926,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                 locks={clothLocks} onLocks={setClothLocks} onRoll={rollClothes}
                 canUndo={canUndo(hist)} canRedo={canRedo(hist)} onUndo={() => setHist(undo)} onRedo={() => setHist(redo)}
                 selectedId={clothSel} onSelect={setClothSel}
-                storeItems={{ tops: equipped.tops ? getWearable(equipped.tops)?.name ?? null : null, shorts: equipped.shorts ? getWearable(equipped.shorts)?.name ?? null : null, shoes: equipped.shoes ? getWearable(equipped.shoes)?.name ?? null : null }}
+                storeItems={{ tops: equipped.tops ? labelOf(equipped.tops) : null, shorts: equipped.shorts ? labelOf(equipped.shorts) : null, shoes: equipped.shoes ? labelOf(equipped.shoes) : null }}
                 onStore={() => setTab('wear')} />
             </motion.div>
           )}
@@ -988,7 +990,7 @@ export function ClosetView({ adult = false, fullBleed = false, faceScan: faceSca
                       return (
                         <div key={w.itemId} className="rounded-xl border p-3 transition" style={{ borderColor: isOn ? w.accent : 'rgba(255,255,255,0.1)', backgroundColor: isOn ? `${w.accent}18` : 'rgba(255,255,255,0.02)' }}>
                           <div className="mb-2 h-10 rounded-lg" style={{ background: `linear-gradient(135deg, ${w.accent}, transparent)` }} />
-                          <div className="text-xs font-semibold text-white">{w.name}</div>
+                          <div className="text-xs font-semibold text-white">{wearableLabel(w)}</div>
                           {isOwned ? (
                             <button onClick={() => setEquipped((p) => ({ ...p, [slot]: w.itemId }))} className="mt-2 w-full rounded-lg py-1.5 text-[11px] font-bold" style={{ backgroundColor: isOn ? w.accent : 'rgba(255,255,255,0.08)', color: isOn ? '#050505' : '#fff' }}>{isOn ? 'Equipped' : 'Equip'}</button>
                           ) : (

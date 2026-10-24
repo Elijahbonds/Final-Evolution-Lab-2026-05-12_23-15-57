@@ -37,6 +37,12 @@ export function displayValue(row: AnyRow, value: RowValue): string {
   return v;
 }
 
+/** What the value control reads as on screen: the shown value, through a slot's display labels (a stored name stays stored). */
+export function displayLabel(row: AnyRow, value: RowValue): string {
+  const v = displayValue(row, value);
+  return row.kind === 'slot' ? row.optionLabels?.[v] ?? v : v;
+}
+
 /**
  * What a row is worth before anybody has touched it.
  *
