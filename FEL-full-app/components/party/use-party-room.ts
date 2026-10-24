@@ -22,7 +22,7 @@ import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { linkErrorText } from '@/lib/controller-link/transport/signaling';
 import type { ControlEvent, LinkState, LobbyPeer } from '@/lib/controller-link/types';
 import { InputBus, liveInputBuses, type FelInput, type PadInfo } from '@/lib/babylon/core/InputBus';
-import { PARTY_MODES, partyModeById, type PartyMode } from '@/lib/party/catalog';
+import { PARTY_MODES, partyModeFor, type PartyMode } from '@/lib/party/catalog';
 import { partyControllerConfig } from '@/lib/party/controls';
 import { parsePartyCmd, partyCmdAllowed, samePartyView, type PartyPhase, type PartyView } from '@/lib/party/protocol';
 import { routeSeatInput } from '@/lib/party/route';
@@ -89,7 +89,9 @@ function setModeParam(id: string): void {
 }
 
 export function usePartyRoom(initialModeId: string | null): PartyRoom {
-  const initialIndex = Math.max(0, PARTY_MODES.findIndex((m) => m.id === (partyModeById(initialModeId)?.id ?? '')));
+  const initialMode = partyModeFor(initialModeId);
+  const [initialModeRejected] = useState(() => Boolean(initialModeId && !initialMode));
+  const initialIndex = initialMode ? PARTY_MODES.findIndex((m) => m.id === initialMode.id) : 0;
   const [modeIndex, setModeIndex] = useState(initialIndex);
   const mode = PARTY_MODES[modeIndex];
   const [phase, setPhase] = useState<PartyPhase>('lobby');
@@ -104,7 +106,7 @@ export function usePartyRoom(initialModeId: string | null): PartyRoom {
   const [between, setBetween] = useState(false);
   const [gameKey, setGameKey] = useState(0);
   const [result, setResult] = useState<GameResult | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(initialModeRejected ? 'That link is not a Party game yet — pick one below.' : null);
 
   const table = useMemo(() => seatTable(
     pads.map((p) => ({ slot: p.slot, name: p.name })),
@@ -161,6 +163,12 @@ export function usePartyRoom(initialModeId: string | null): PartyRoom {
   }, [routeFromPhone]);
 
   // ── the game flow ─────────────────────────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!initialModeRejected) return undefined;
+    const t = setTimeout(() => setToast(null), TOAST_MS);
+    return () => clearTimeout(t);
+  }, [initialModeRejected]);
+
   const start = useCallback(() => {
     const m = modeRef.current;
     const seats = tableRef.current.seats.slice(0, m.maxPlayers);

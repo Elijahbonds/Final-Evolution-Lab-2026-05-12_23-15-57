@@ -7,6 +7,7 @@ import { LOGGED_WORK_WHERE } from '@/lib/coach/setLog';
 import { MIRROR_SCREEN_KIND } from '@/lib/mirror/screen';
 import { coachPainFlag, type PainCheckInHistoryRow } from '@/lib/health/pain';
 import { COACH_READINESS_WINDOW_MS, coachReadinessView, type ReadinessHistoryRow } from '@/lib/health/readiness';
+import { complianceAlerts, missedFactsFor, type CoachAlert } from '@/lib/coach/alerts';
 
 /**
  * GET /api/coach/attention — who on my roster needs me today, and who is drifting.
@@ -41,7 +42,7 @@ export async function GET() {
     prisma.coachClient.findMany({ where: { coachId: userId, endedAt: null }, select: { clientId: true, createdAt: true } }),
   ]);
   const clientIds = [...new Set([...linked.map((l) => l.clientId), ...programs.map((p) => p.clientId)])];
-  if (!clientIds.length) return NextResponse.json({ triage: { flags: [], totalFlagged: 0, clear: 0, summary: 'No athletes on your roster yet.' }, drift: [], headline: null, painFlags: [], readiness: [] });
+  if (!clientIds.length) return NextResponse.json({ triage: { flags: [], totalFlagged: 0, clear: 0, summary: 'No athletes on your roster yet.' }, drift: [], headline: null, painFlags: [], readiness: [], alerts: [] });
   const programIds = programs.map((p) => p.id);
 
   const since = new Date(Date.now() - HISTORY_DAYS * 86_400_000);
@@ -150,5 +151,31 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ ...attentionBoard(facts, Date.now()), painFlags, readiness });
+  const board = attentionBoard(facts, Date.now());
+
+  // COACH-LOOP P1 (2026-10-20): compliance alerts (lib/coach/alerts.ts) — the drift above, plus sessions MISSED this
+  // week against the active program's plan (compliance.ts's expectedPerWeek, which nothing filled). Additive and
+  // best-effort: one more read (the active programs' shape), and a failure leaves the board exactly as it was. No pain,
+  // readiness or health data goes in.
+  let alerts: CoachAlert[] = [];
+  try {
+    const shapes = await prisma.coachingProgram.findMany({
+      where: { coachId: userId, isActive: true },
+      select: { clientId: true, startDate: true, durationWeeks: true, blocks: { select: { sessions: { select: { kind: true } } } } },
+    });
+    const nowMs = Date.now();
+    const missedBy = new Map(clientIds.map((cid) => [cid, missedFactsFor(
+      shapes.filter((p) => p.clientId === cid).map((p) => ({
+        startMs: p.startDate.getTime(), durationWeeks: p.durationWeeks,
+        trainingSessions: p.blocks.flatMap((b) => b.sessions).filter((x) => x.kind !== 'recovery').length,
+      })),
+      (coachedBy.get(cid) ?? []).flatMap((x) => (x.completedAt ? [x.completedAt.getTime()] : [])),
+      nowMs,
+    )]));
+    alerts = complianceAlerts(board.drift, missedBy);
+  } catch (e) {
+    console.error('[coach/attention] alerts not computed', e instanceof Error ? e.message : 'unknown');
+  }
+
+  return NextResponse.json({ ...board, painFlags, readiness, alerts });
 }

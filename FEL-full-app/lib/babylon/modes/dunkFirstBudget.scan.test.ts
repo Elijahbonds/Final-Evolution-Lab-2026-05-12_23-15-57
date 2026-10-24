@@ -43,6 +43,14 @@ describe('the /try chunk is the dunk, not every game', () => {
     expect(host).toContain('runMode(MODES.dunk, {');
     expect(host).not.toMatch(/from '@\/lib\/babylon\/modes\/registry'/);
   });
+  it('the guest retry button remounts a rejected boot instead of only pressing START into a dead bus', () => {
+    const host = read('components/games/dunk-babylon.tsx');
+    expect(host).toContain('const [bootAttempt, setBootAttempt] = useState(0);');
+    expect(host).toContain('setBootAttempt((n) => n + 1);');
+    expect(host).toContain('}, [bootAttempt]);');
+    expect(host).toContain('onRetry={retryBoot}');
+    expect(host).not.toContain('onRetry={tapStart}');
+  });
   it('its static graph reaches no other mode and not registry.ts (control: the registry reaches them all)', () => {
     const modes = (g: Set<string>) => [...g].filter((f) => /lib\/babylon\/modes\/[A-Z]\w*Mode\.ts$/.test(f)).map((f) => path.basename(f)).sort();
     const host = staticGraph('components/games/dunk-babylon.tsx');

@@ -17,6 +17,9 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowUpRight, BatteryLow, CheckCircle2, Hourglass, Loader2, MoonStar, ShieldAlert, SunMedium, Timer, TrendingDown } from 'lucide-react';
 import { readinessDayLabel } from '@/lib/health/readiness';
+// COACH-LOOP P1 (2026-10-20): missed-session alerts and the alert email (lib/coach/alerts.ts)
+import { AlertsStrip } from './alerts-strip';
+import type { CoachAlert } from '@/lib/coach/alerts';
 
 interface Flag {
   clientId: string; displayName: string; kind: string;
@@ -42,6 +45,8 @@ interface Board {
   painFlags?: PainFlagRow[];
   /** Absent on an older cached response, same as painFlags. */
   readiness?: ReadinessRow[];
+  /** COACH-LOOP P1: compliance alerts; absent on an older response. */
+  alerts?: CoachAlert[];
 }
 
 const ICON: Record<string, typeof AlertTriangle> = {
@@ -146,6 +151,8 @@ export function AttentionPanel() {
         </ul>
       )}
 
+      <AlertsStrip alerts={board.alerts} shownIds={new Set([...waiting, ...flags.map((f) => ({ clientId: f.clientId })), ...drifting].map((x) => x.clientId))} />
+
       {/* MIRROR-COACH P5: a pain check-in that stepped down or stopped, per client. Consent-gated in the API — see
          lib/health/pain.ts coachPainFlag; this list only ever renders what it was already given. */}
       {painFlags.length > 0 && (
@@ -193,7 +200,7 @@ export function AttentionPanel() {
         </div>
       )}
 
-      {flags.length === 0 && waiting.length === 0 && drifting.length === 0 && painFlags.length === 0 && (
+      {flags.length === 0 && waiting.length === 0 && drifting.length === 0 && painFlags.length === 0 && !(board.alerts?.length) && (
         <p className="mt-3 flex items-center gap-2 text-sm text-white/55">
           <CheckCircle2 className="h-4 w-4 text-[#00FF9D]" aria-hidden="true" />
           {board.triage.clear > 0 ? `All ${board.triage.clear} training normally.` : 'Nothing to read yet.'}

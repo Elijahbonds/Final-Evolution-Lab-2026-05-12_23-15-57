@@ -6,7 +6,7 @@ import { runBuild } from '@/lib/cell-build';
 import { extractWisdom, type BuildPlan } from '@/lib/cell-engine';
 import { isStudioCreatorEnabled } from '@/lib/flags';
 import { checkBuildAllowed, settleBuildOverage } from '@/lib/studio-service';
-import { abacusEnabled, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
+import { abacusAvailable, aiComingSoonResponse, AiDisabledError } from '@/lib/abacus/killSwitch';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -22,7 +22,7 @@ export const maxDuration = 300;
  */
 export async function POST(req: Request) {
   // ABACUS-KILL: before the session, the body or any database read or write (lib/abacus/killSwitch.ts).
-  if (!abacusEnabled()) return aiComingSoonResponse('studio');
+  if (!abacusAvailable()) return aiComingSoonResponse('studio');
   try {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id;

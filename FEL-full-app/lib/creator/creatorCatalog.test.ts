@@ -7,6 +7,13 @@ import {
   approvedServices,
   coachStoreBookHref,
   getApprovedProfile,
+  publicCreatorCopy,
+  publicMediaKitHighlight,
+  publicMediaKitPackageDetail,
+  publicProfileBio,
+  publicProfileSpecialty,
+  publicServiceDescription,
+  publicServiceName,
 } from './creatorCatalog';
 
 describe('creator catalog', () => {
@@ -18,14 +25,29 @@ describe('creator catalog', () => {
     expect(getApprovedProfile('nobody')).toBeUndefined();
   });
 
-  it('invents no bio, marks every stat and media-kit rate as an example', () => {
+  it('keeps unconfirmed bio copy generic, marks every stat and media-kit rate as an example', () => {
     for (const p of PROFILES) {
-      expect(p.bio).toBe('Bio placeholder.');
+      expect(p.bio).toBe('Bio details are pending confirmation.');
       for (const stat of p.stats) expect(stat.isExample).toBe(true);
     }
     for (const pkg of MEDIA_KIT.packages) expect(pkg.priceIsExample, pkg.id).toBe(true);
     expect(MEDIA_KIT.partnersConfirmed).toBe(false);
     expect(AUDIENCE_STATS.isExample).toBe(true);
+  });
+
+  it('keeps fixture placeholders out of public display copy', () => {
+    const profile = getApprovedProfile('elijah-bonds')!;
+    const [service] = approvedServices(profile);
+    if (!service) throw new Error('expected an approved service fixture');
+    expect(publicCreatorCopy('Real words', 'Fallback')).toBe('Real words');
+    expect(publicCreatorCopy('Bio placeholder.', 'Fallback')).toBe('Fallback');
+    expect(publicProfileBio(profile)).not.toMatch(/placeholder/i);
+    expect(publicProfileSpecialty(profile)).not.toMatch(/placeholder/i);
+    expect(publicServiceName(service)).toBe('1-on-1 session');
+    expect(publicServiceName(service)).not.toMatch(/example|placeholder/i);
+    expect(publicServiceDescription(service)).not.toMatch(/placeholder/i);
+    expect(publicMediaKitHighlight(MEDIA_KIT.highlights[0])).not.toMatch(/placeholder/i);
+    expect(publicMediaKitPackageDetail(MEDIA_KIT.packages[0])).not.toMatch(/placeholder/i);
   });
 
   it('lists services as information only: no price, no slot, nothing to buy here', () => {

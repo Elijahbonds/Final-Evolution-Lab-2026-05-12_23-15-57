@@ -9,6 +9,11 @@
 // "Does anything hurt right now?" → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right /
 // Not sure — kept in takeoffRef, page memory only, so "Do the full screen" and "Run it again" never re-ask it;
 // writeTakeoff persists it for adults only) → the camera card → only then the camera → the checks → results.
+//   · SCREEN-MINOR-LOCK (PM 2026-10-21): the camera is for 18 or older only, until the parent flow ships. Under 18,
+//     "rather not say" or no age goes from the age answer straight to the camera-free card (`noCamera`, kid-results.tsx
+//     KidNoCamera): no grown-up step, no camera card, no camera asked for or mounted, and startCamera refuses on its own.
+//     A kid answer holds for the whole session (lib/screen/store.ts lockSessionAge): every new Start re-locks the run to
+//     it, and "18 or older" afterwards cannot loosen it. sessionStorage only.
 //   · KIDS SEND NOTHING. This file has no fetch. Under 18 (and "rather not say") return before any save. A self-reported
 //     18+ result stays in this tab, and lib/privacy/screenHistoryClient.ts may POST numbers only after the server says
 //     the account is a verified adult who opted in. No assessment POST, no PRQ write, no analytics (SCREEN-FIX-2 amend 4).
@@ -53,7 +58,7 @@ import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
 } from '@/lib/screen/copy';
 import { isKid, type AgeBand } from '@/lib/screen/age';
-import { clearScreen, keepResult, localForClear, lockAge, readAge, resetAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
+import { cameraAllowed, clearScreen, keepResult, localForClear, lockAge, lockSessionAge, readAge, readSessionAge, resetAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
 import { PRE_START, preStep, type PreEvent, type PreState, type ScreenKind } from '@/lib/screen/flow';
 import { forgetIntakeMemory } from '@/lib/health/intakeForget';
 import { ASSESS_PATH, RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
@@ -62,7 +67,7 @@ import { SKELETON_EURO, SKELETON_MIN_VISIBILITY } from '@/lib/screen/ui';
 import { drawSkeleton, SKELETON_COLOURS } from './skeleton';
 import { useVoice } from './use-voice';
 import { CameraHelp } from './camera-help';
-import { KidResults } from './kid-results';
+import { KidNoCamera, KidResults } from './kid-results';
 import { screenPose } from './screen-pose';
 import { LiveHud } from './live-hud';
 import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep, TakeoffStep } from './gate-steps';
@@ -70,8 +75,8 @@ import { JumpResult } from './jump-result';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
-type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError';
-interface JumpView { heightCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
+type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError' | 'noCamera';
+interface JumpView { heightCm: number | null; plusMinusCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean }
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'takeoff', 'cameraInfo', 'starting', 'device', 'running'];
 /** SCREEN A: while a rep is up, nobody reads — the caption bar hides on these steps (voice off keeps it). */
@@ -169,6 +174,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   }, [phase, attach]);
 
   const startCamera = useCallback(async (model?: 'lite') => {
+    // SCREEN-MINOR-LOCK: never for a run that is not 18 or older, whichever button asked (retry, lighter model, full)
+    if (!cameraAllowed(preRef.current.age, readAge(tabStorage()), readSessionAge(tabStorage()))) { setPhase('noCamera'); return; }
     // a camera already running is restarted (the lighter model); a QA feed standing in for it is kept (lib/pose/feed.ts)
     cleanup(true);
     const run = ++camRunRef.current;
@@ -214,6 +221,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       carryRef.current = t5;
       const view: JumpView = {
         heightCm: t5?.t5?.bestHeightCm ?? null,
+        plusMinusCm: t5?.t5?.heightPlusMinusCm ?? null,
         attempts: t5?.t5?.jumps.length ?? 0,
         jumpIn: summary.jumpBestIn,
         lastIn: lastJumpRef.current,
@@ -307,11 +315,16 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   }, [view?.wantsHighFps]);
 
   // the steps before the camera (lib/screen/flow.ts): the camera is asked for only from the camera card's button
-  const pre = (e: PreEvent) => {
+  const pre = (input: PreEvent) => {
+    // SCREEN-MINOR-LOCK: an age answer joins the session lock first, so the run's lock below gets the band that holds
+    const e: PreEvent = input.type === 'age' ? { type: 'age', age: lockSessionAge(tabStorage(), input.age) } : input;
     if (e.type === 'start') clearScreen(tabStorage(), localForClear());   // a new screen wipes the last one first (shared devices)
     // AGE-RESET (audit 2.2, 2026-10-03): a new Start is maybe a new person on a shared phone — the stored age and with
     // it the grown-up tick are cleared, so the question is asked again. The lock still holds WITHIN the run (lockAge).
     if (e.type === 'start') resetAge(tabStorage());
+    // SCREEN-MINOR-LOCK: an answer under 18 or "rather not say" holds for the session, so the new run starts locked to it
+    const held = e.type === 'start' ? readSessionAge(tabStorage()) : null;
+    if (held && !cameraAllowed(held)) lockAge(tabStorage(), held);
     // a start carries the tab's answer (none, after the reset above: the flow asks); a mid-run answer is locked (lockAge)
     const ev: PreEvent = e.type === 'start' ? { type: 'start', locked: readAge(tabStorage()), kind: e.kind }
       : e.type === 'age' ? { type: 'age', age: lockAge(tabStorage(), e.age) } : e;
@@ -320,6 +333,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     preRef.current = next;
     gateRef.current = next.gate;
     if (e.type === 'start' && e.kind) modeRef.current = e.kind;
+    // SCREEN-MINOR-LOCK: past the age question, a run that is not 18 or older ends on the camera-free card
+    if (next.step !== 'intro' && next.step !== 'age' && !cameraAllowed(next.age, readSessionAge(tabStorage()))) { setPhase('noCamera'); return; }
     if (next.step === 'camera') { void startCamera(); return; }
     setPhase(next.step);
   };
@@ -375,7 +390,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const back: string | (() => void) = phase === 'intro' || phase === 'toResults' ? introBack
     : phase === 'running' ? () => setStopAsk(true)
     : phase === 'starting' || phase === 'device' ? cameraBack
-    : phase === 'stopped' || phase === 'kidResults' || phase === 'jumpResult' ? restart
+    : phase === 'stopped' || phase === 'kidResults' || phase === 'jumpResult' || phase === 'noCamera' ? restart
     : () => pre({ type: 'back' });
 
   if (phase === 'cameraError') return <CameraHelp why={status?.why ?? null} onRetry={() => void startCamera()} onBack={restart} />;
@@ -399,6 +414,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       {phase === 'intro' ? <StartStep onJump={() => startNew('jump')} onFull={() => startNew('full')} /> : null}
       {phase === 'age' ? <AgeStep onAnswer={answerAge} /> : null}
       {phase === 'grownUp' ? <GrownUpStep onContinue={grownUp} /> : null}
+      {phase === 'noCamera' ? <KidNoCamera onRestart={restart} /> : null}
       {phase === 'pain' ? <PainStep onAnswer={answerPainFirst} /> : null}
       {phase === 'painStop' ? <PainStopStep onRestart={restart} /> : null}
       {phase === 'takeoff' ? <TakeoffStep onAnswer={answerTakeoffPre} /> : null}
@@ -411,7 +427,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
               <span className="flex-1">
                 <span className="block text-[16px]">{COACH_READY}</span>
                 <span role="progressbar" aria-valuetext={COACH_READY} className="mt-2 block h-2 overflow-hidden rounded-full bg-white/10">
-                  <span className="block h-full w-1/3 animate-pulse bg-[#00E5FF]" />
+                  <span className="block h-full w-1/3 motion-safe:animate-pulse bg-[#00E5FF]" />
                 </span>
               </span>
             ) : <span className="text-[16px]">Asking for the camera…</span>}
@@ -431,7 +447,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       ) : null}
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
       {phase === 'jumpResult' && jumpView ? (
-        <JumpResult heightCm={jumpView.heightCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
+        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
       ) : null}
 
       {live ? (

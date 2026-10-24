@@ -265,7 +265,7 @@ describe('the hoops carry', () => {
     carry.switchHand();
     // phase 4b: the crossover's path starts now; the rig hand is the one on the ball until the other catches it, the athlete's hand (what the
     // stick maps read) is the destination at once
-    expect(carry.move?.name).toBe('crossover'); expect(carry.side).toBe('Left'); expect(carry.hand).toBe('Left'); expect(carry.crossing).toBe(true);
+    expect(carry.move?.name).toBe('crossover'); expect(carry.side).toBe('Left'); expect(carry.handAfterMove).toBe('Left'); expect(carry.crossing).toBe(true);
     const xs: number[] = [];
     for (let i = 0; i < 60; i++) { const p = d.frame(1 / 60, 0.2, true); xs.push(localX(r.root, p)); }
     expect(Math.max(...d.path)).toBeLessThan(0.15);
@@ -285,7 +285,7 @@ describe('the hoops carry', () => {
     carry.switchHand();
     expect(carry.move?.name).toBe('crossover');   // phase 3 held it as pending until the next top (up to 0.9 s of the ball on the old side)
     expect(carry.side).toBe('Left');       // still his until the other hand catches it…
-    expect(carry.hand).toBe('Left');       // …but on its way to the left hand
+    expect(carry.handAfterMove).toBe('Left');       // …but on its way to the left hand
     n = 0; while (carry.side === 'Left' && n++ < 200) d.frame(1 / 60, 0.2, true);
     expect(carry.side).toBe('Right');
     expect(n).toBeLessThanOrEqual(Math.ceil(0.75 * 60));   // caught within the path: well inside a bounce and a half at 1.7 Hz
@@ -300,7 +300,7 @@ describe('the hoops carry', () => {
     const d = driver(scene, carry, r.ball);
     d.frame(1 / 60, 0.2, true);
     carry.toSide('right'); expect(carry.crossing).toBe(false);
-    carry.toSide('left'); expect(carry.hand).toBe('Left');
+    carry.toSide('left'); expect(carry.handAfterMove).toBe('Left');
     for (let i = 0; i < 60; i++) d.frame(1 / 60, 0.2, true);
     d.frame(1 / 60, 0, false);
     carry.reset();

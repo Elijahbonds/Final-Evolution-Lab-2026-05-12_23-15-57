@@ -143,7 +143,8 @@ const SEEN_ELSEWHERE: ReadonlyArray<{ mode: string; score: number; sec: number |
   { mode: 'bigAir', score: 651, sec: 32, where: 'rc gauntlet (8 s wall at qaSpeed 4)' },
   { mode: 'soccer', score: 184, sec: 29, where: 'finish-release/mechanics-rc9.json (SHOOTOUT_WIN)' },
   { mode: 'dance', score: 1450, sec: null, where: 'finish-release/mechanics (partial at 31 s)' },
-  { mode: 'baseball', score: 261, sec: null, where: 'finish-release/mechanics (partial at 31 s)' },
+  // DERBY-KEY (2026-10-23): a derby run (points, not runs), seen when the derby saved under 'baseball'
+  { mode: 'derby', score: 261, sec: null, where: 'finish-release/mechanics (partial at 31 s)' },
 ];
 
 describe('the cross-check: no real run seen anywhere is refused', () => {

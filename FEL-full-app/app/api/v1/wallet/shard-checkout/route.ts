@@ -9,6 +9,7 @@ import { purchasesEnabledFromEnv } from '@/lib/wallet/purchases';
 import { getShardPack, shardPackTotal } from '@/lib/shard-packs';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
+import { adultBuyerGate } from '@/lib/stripe/adult-gate';
 
 /**
  * POST /api/v1/wallet/shard-checkout
@@ -48,6 +49,9 @@ export async function POST(req: NextRequest) {
   // STORE-READY B3/B10: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
   const origin = siteOrigin();
   if (!origin) return storeClosed('site_url_not_set');
+  // LAUNCH-SALES: real money — verified adults only (403 adults_only with a reason), before any Stripe call.
+  const refused = await adultBuyerGate(prisma, playerId);
+  if (refused) return refused;
   const stripe = getStripe();
 
   try {

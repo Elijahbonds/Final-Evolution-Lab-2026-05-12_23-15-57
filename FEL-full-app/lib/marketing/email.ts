@@ -9,7 +9,7 @@
  */
 
 import 'server-only';
-import { abacusEnabled } from '@/lib/abacus/killSwitch';
+import { abacusApiKey, abacusEnabled } from '@/lib/abacus/killSwitch';
 
 const API = 'https://apps.abacus.ai/api/sendNotificationEmail';
 
@@ -36,13 +36,18 @@ async function send(opts: {
     console.info(`[marketing/email] skipped: ABACUS_ENABLED off (${opts.kind})`);
     return false;
   }
+  const apiKey = abacusApiKey();
+  if (!apiKey) {
+    console.info(`[marketing/email] skipped: ABACUSAI_API_KEY missing (${opts.kind})`);
+    return false;
+  }
   if (!opts.notificationId) return false;
   try {
     const res = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        deployment_token: process.env.ABACUSAI_API_KEY,
+        deployment_token: apiKey,
         app_id: process.env.WEB_APP_ID,
         notification_id: opts.notificationId,
         subject: opts.subject,

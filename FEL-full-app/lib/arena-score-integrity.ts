@@ -85,6 +85,10 @@ export const MIRRORED = {
   golfHoles: 5, golfPar: [3, 4, 4, 3, 5] as readonly number[], clutchMult: 1.5, holeBasePts: 120, holePerStroke: 40,
   /** precisionModes.ts DerbyMode — TOTAL pitches; a homer pays round(q × (80 + launch × 60) × clutch), q ≤ 1, launch ≤ 0.9. */
   derbyPitches: 30, derbyOutsCap: 15, derbyHomerBase: 80, derbyLaunchPts: 60, derbyLaunchMax: 0.9,
+  /** lib/babylon/modes/baseballGame.ts — INNINGS, BATTERS_PER_INNING_CAP (BASEBALL-3INN, the three-inning game at
+   *  /play/baseball). The score is runs, and a run is a batter crossing the plate: no batter scores twice, and the bases
+   *  clear between innings. (baseballGame imports aimSwingCore, which is Babylon, so the numbers are mirrored.) */
+  baseballInnings: 3, baseballBattersPerInning: 9,
   /** precisionModes.ts PenaltyMode — SD_CAP sudden-death kicks, MAX_FEINTS × FEINT_STYLE_PTS, a goal is 20; the
    *  breakaway pays a shot kind up to 15 (+5 kinetic) and +5 a wall run. */
   penaltySdCap: 5, maxFeints: 2, feintStylePts: 8, goalPts: 20, shotStyleMax: 15, kineticStylePts: 5, wallRunStylePts: 5,
@@ -256,6 +260,12 @@ export function derbyCeiling(): number {
   const perPitch = Math.max(homerMax, targetMax);
   const tokens = TARGETS.filter((t) => t.kind === 'glass').length;
   return m.derbyPitches * perPitch + tokens * perPitch * (TOKEN.mult - 1);
+}
+
+/** Three-inning baseball (DERBY-KEY, 2026-10-23): every batter of every inning a home run — one run each, the most a
+ *  batter can bring in for himself, and the side retires at the batter cap whatever the outs. */
+export function baseballCeiling(): number {
+  return MIRRORED.baseballInnings * MIRRORED.baseballBattersPerInning;
 }
 
 /** Penalties: every kick of regulation + sudden death a goal with every style point the breakaway can pay. A wall run
@@ -489,7 +499,7 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
   hoops3v3: {
     max: firstToCeiling(m.threevthreeTarget, m.bucketMax), kind: 'rules', swapsUnderKillSwitch: true,
     why: `the game ends at ${m.threevthreeTarget} and no bucket is worth more than ${m.bucketMax}`,
-    basis: `ThreeVThreeMode TARGET_SCORE ${m.threevthreeTarget}: ${m.threevthreeTarget - 1} + a ${m.bucketMax} (the buzzer only ends it lower)`,
+    basis: `ThreeVThreeMode TARGET_SCORE ${m.threevthreeTarget}: ${m.threevthreeTarget - 1} + a ${m.bucketMax} (the buzzer only ends it lower; a tie at the horn is under ${m.threevthreeTarget} and its sudden-death overtime adds one bucket — threevthreeOvertime)`,
   },
   threePoint: {
     max: m.threePointRacks * ((m.threePointBallsPerRack - 1) + m.threePointMoneyWorth), kind: 'rules', swapsUnderKillSwitch: true,
@@ -506,7 +516,16 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
     why: `${m.golfHoles} holes in one (the last clutch), every ring and the bank ride`,
     basis: 'precisionModes GolfMode: Σ holes max(20, 120 − (1 − par) × 40) × clutch on the last + ParkourGolf RINGS (first + chained) + BANK.pts',
   },
+  // DERBY-KEY (owner, 2026-10-23): the home-run derby saves under 'derby' now and keeps the ceiling it had under 'baseball'.
+  // 'baseball' is the three-inning game (BASEBALL-3INN), sized from its own core. TUNED 6432 → 27: the derby's ceiling let
+  // a forged 6,432 stake and pay in a game whose perfect run is 27 runs, and the house was clamped at 6,432, not 27.
+  // The kill switch mounts the old derby-style 2D / R3F games at /play/baseball, on another scale, so both rows swap.
   baseball: {
+    max: baseballCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
+    why: `${m.baseballInnings} innings of at most ${m.baseballBattersPerInning} batters, each a home run worth one run`,
+    basis: 'baseballGame INNINGS × BATTERS_PER_INNING_CAP: the score is runs, a batter scores at most once, and the side retires at the batter cap',
+  },
+  derby: {
     max: derbyCeiling(), kind: 'rules', swapsUnderKillSwitch: true,
     why: `${m.derbyPitches} pitches, each at most a perfect clutch homer, two of them doubled by the glass tokens`,
     basis: 'precisionModes DerbyMode TOTAL pitches × round(q 1 × (80 + 0.9 × 60) × CLUTCH_MULT) + each ParkourDerby glass TARGET\'s TOKEN ×2 once',
@@ -620,7 +639,7 @@ export const SCORE_CEILINGS: Readonly<Record<string, ScoreCeiling>> = {
 export const STAKE_MODE_ALIASES: Readonly<Record<string, string>> = {
   dunk: 'dunkContest', onevone: 'hoops1v1', threevthree: 'hoops3v3', threepoint: 'threePoint',
   skateboard: 'skateboarding', snowboard_slalom: 'snowboarding', surf: 'surfing', bigair: 'bigAir',
-  derby: 'baseball', penalty: 'soccer', brainbrawl: 'brainBrawl', who_scene_it: 'whoSceneIt',
+  penalty: 'soccer', brainbrawl: 'brainBrawl', who_scene_it: 'whoSceneIt',   // DERBY-KEY: 'derby' is a row of its own now
   karate: 'karateEndless', karate_vs: 'karateVersus',
 };
 

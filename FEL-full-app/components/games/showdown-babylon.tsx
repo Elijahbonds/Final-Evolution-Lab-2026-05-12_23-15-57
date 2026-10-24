@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { GameProps, GameResult } from './game-shell';
 import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
+import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import { MODES } from '@/lib/babylon/modes/registry';
 import { mergeHud } from '@/lib/babylon/core/hudMerge';   // IMPROVE (2026-10-06): an unchanged HUD patch is not a render
@@ -31,6 +32,7 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hud, setHud] = useState<Hud>({});
+  const { bootAttempt, retryBoot } = useBabylonBootRetry({ busRef, endedRef, setPhase, setCountdown, setLoadError, reset: () => setHud({}) });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,30 +61,34 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
       onEndRef.current(result);
     };
 
-    runMode(MODES.showdown, {
-      canvas,
-      input: bus,
-      onPhase: (p, cd) => {
-        setPhase(p);
-        setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
-        setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
-      },
-      onHud: (u) => setHud((prev) => mergeHud(prev, u)),
-      resultSink,
-    })
-      .then((s) => {
-        if (disposed) { s(); return; }
-        stop = s;
+    const startTimer = setTimeout(() => {
+      if (disposed) return;
+      runMode(MODES.showdown, {
+        canvas,
+        input: bus,
+        onPhase: (p, cd) => {
+          setPhase(p);
+          setCountdown(p === 'countdown' && typeof cd === 'number' ? cd : null);
+          setLoadError(p === 'error' ? (typeof cd === 'string' ? cd : 'Failed to load this mode.') : null);
+        },
+        onHud: (u) => setHud((prev) => mergeHud(prev, u)),
+        resultSink,
       })
-      .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-COMBAT] boot failed', setPhase, setLoadError }));
+        .then((s) => {
+          if (disposed) { s(); return; }
+          stop = s;
+        })
+        .catch((e) => surfaceBootError(e, { disposed, label: '[FEL-COMBAT] boot failed', setPhase, setLoadError }));
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       stop?.();
       busRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- G7: the stage is owned by the mount; callbacks are read through refs.
-  }, []);
+  }, [bootAttempt]);
 
   const emit = useCallback((e: Parameters<InputBus['emit']>[0]) => {
     busRef.current?.emit(e);
@@ -134,7 +140,7 @@ export default function ShowdownBabylon({ onEnd }: GameProps) {
         phase={phase}
         detail={phase === 'error' ? (loadError ?? undefined) : (countdown ?? undefined)}
         onStart={tapStart}
-        onRetry={tapStart}
+        onRetry={retryBoot}
       />
 
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (

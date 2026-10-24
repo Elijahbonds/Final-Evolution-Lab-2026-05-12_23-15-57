@@ -159,6 +159,7 @@ describe('the pick screen (#8, #13)', () => {
     await n.run(0.7); await n.press('A');                           // the first card holds: GO starts it
     expect(evs.map((e) => e.builds)).toEqual([0, 1, 0, 0]);
     evs[1].score = 9;                                               // 90 points against a rival who can only make 10
+    await n.run(0.1); await n.press('B');                          // CC75-3: one press during the event
     await n.run(2.1);                                               // the clock runs out
     await n.run(0.7); await n.press('A');                           // skip the board
     expect(n.end).toHaveBeenCalledTimes(1);
@@ -320,7 +321,7 @@ describe('the fair and its marquee (vis-hoops-court)', () => {
     const win = [fake(), fake(), fake(), fake()]; win.forEach((e) => { e.score = 5; });   // 50 against the rival\'s 10
     const n = await night(win);
     await n.press('A');                                             // the pick screen: begin the night
-    for (let i = 0; i < 4; i++) { await n.run(0.7); await n.press('A'); await n.run(2.1); await n.run(0.7); await n.press('A'); }
+    for (let i = 0; i < 4; i++) { await n.run(0.7); await n.press('A'); await n.run(0.1); await n.press('B'); await n.run(2.1); await n.run(0.7); await n.press('A'); }   // CC75-3: one press in each event
     expect(fxCalls.filter((c) => c === 'result:0').length).toBe(4);
     expect(fxCalls).toContain('finale:true');
     expect(fxCalls.find((c) => c.startsWith('board:CHAMPION'))).toBeTruthy();
@@ -330,7 +331,7 @@ describe('the fair and its marquee (vis-hoops-court)', () => {
     const lose = [fake(), fake(), fake(), fake()];   // 0 against the rival\'s 10
     const n = await night(lose);
     await n.press('A');
-    for (let i = 0; i < 4; i++) { await n.run(0.7); await n.press('A'); await n.run(2.1); await n.run(0.7); await n.press('A'); }
+    for (let i = 0; i < 4; i++) { await n.run(0.7); await n.press('A'); await n.run(0.1); await n.press('B'); await n.run(2.1); await n.run(0.7); await n.press('A'); }   // CC75-3: one press in each event
     expect(fxCalls.filter((c) => c === 'result:1').length).toBe(4);
     expect(fxCalls).toContain('finale:false');
     expect(fxCalls.find((c) => c.startsWith('board:FINAL'))).toBeTruthy();

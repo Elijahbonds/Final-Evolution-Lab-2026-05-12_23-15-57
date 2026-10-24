@@ -14,6 +14,7 @@
  */
 import 'server-only';
 import { sessionModeFor } from './match-core';
+import { rivalHistorySince } from '@/lib/rival-history';
 import { isStakingPaused } from '@/lib/stakingPause';
 import type { PrismaClient } from '@/public/_prisma/client';
 import { grantServerReward } from '@/lib/wallet/wallet-service';
@@ -22,8 +23,13 @@ import { generateMatchCode, resolveOutcome, winnerIdFor } from '@/lib/mp/match-c
 
 /** Best recorded score for a user in a mode (server-authoritative). 0 if none. */
 export async function bestScoreFor(prisma: PrismaClient, userId: string, mode: string): Promise<number> {
+  const sessionMode = sessionModeFor(mode);   // pass 5: the challenge key is not the session mode
+  // BASEBALL-GHOST (owner, 2026-10-23, "ignore old scores"): a challenge's score is the one the other side has to beat,
+  // so 'baseball' reads only three-inning games (lib/rival-history.ts). A derby night saved under 'baseball' before #403
+  // is not a host's 300 in a game whose most is 27. None left is 0, as with no runs at all.
+  const since = rivalHistorySince(sessionMode);
   const row = await prisma.gameSession.findFirst({
-    where: { userId, mode: sessionModeFor(mode) },   // pass 5: the challenge key is not the session mode
+    where: { userId, mode: sessionMode, ...(since ? { createdAt: { gte: since } } : {}) },
     orderBy: { score: 'desc' },
     select: { score: true },
   });

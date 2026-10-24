@@ -32,7 +32,6 @@ describe('renderer flags', () => {
       dance: 'dance',
       duel: 'duel',
       dunkContest: 'dunkContest',
-      dunkduel: 'dunkduel',
       football: 'football',
       freerun: 'freerun',
       golf: 'golf',
@@ -49,6 +48,7 @@ describe('renderer flags', () => {
       surfing: 'surf',
       tennis: 'tennis',
       threePoint: 'threePoint',
+      tiebreak: 'tiebreak',
       velocityKart: 'velocityKart',
       volleyball: 'volleyball',
       whoSceneIt: 'whoSceneIt',
@@ -57,6 +57,10 @@ describe('renderer flags', () => {
     for (const [sessionKey, flagKey] of Object.entries(shippedBabylonRouteFlags)) {
       expect(isBabylon(flagKey), `${sessionKey} -> ${flagKey}`).toBe(true);
     }
+  });
+
+  it('Prove It is the live IRL camera route, not the dev-only Babylon dunkduel mode', () => {
+    expect(isBabylon('dunkduel')).toBe(false);
   });
 
   it('never answers yes on a prototype-chain key — the classic lookup-table hole', () => {

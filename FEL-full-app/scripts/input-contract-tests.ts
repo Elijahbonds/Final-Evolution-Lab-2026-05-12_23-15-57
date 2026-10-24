@@ -59,6 +59,9 @@ const LOADER_BYPASS_ROUTES: Record<string, string> = {
   dunkduel: 'IRL Prove It route mounts its camera tracker instead of the legacy Babylon loader',
   // IRON-PARADISE-OUT: /play/training is a temporary redirect to /train. The loader file stays; the page does not mount it.
   training: 'Iron Paradise is parked; /play/training redirects to /train and does not mount its loader',
+  // TENNIS-TIEBREAK-FOLD (2026-10-22): /play/tiebreak redirects to /play/tennis?variant=tiebreak. The old loader file
+  // stays (removing it is the owner's call); the page does not mount it.
+  tiebreak: 'Tiebreak is a Tennis variant now; /play/tiebreak redirects to /play/tennis?variant=tiebreak and does not mount its loader',
 };
 
 function routeUsesLoader(route: string): boolean {
