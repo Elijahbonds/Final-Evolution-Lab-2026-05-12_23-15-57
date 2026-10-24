@@ -176,7 +176,9 @@ async function main() {
         if (!existsSync(abs)) return `${f}: missing`;
         const rel = path.relative(appDir, abs);
         if (!git('ls-files', '--', rel)) return `${f}: not in the commit`;
-        const was = git('show', `HEAD:./${rel}`), now = readFileSync(path.join(appDir, rel), 'utf8');
+        // Untrimmed (the git() helper trims, which would invent a difference at byte 0).
+        const was = execFileSync('git', ['show', `HEAD:./${rel}`], { cwd: appDir, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+        const now = readFileSync(path.join(appDir, rel), 'utf8');
         let i = 0;
         while (i < was.length && was[i] === now[i]) i++;
         return `${f} first differs at ${i}:\n  committed: ${JSON.stringify(was.slice(Math.max(0, i - 120), i + 200))}\n  ` +
