@@ -157,6 +157,92 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/BallSideShade.ts SHADE_RESEED_M',
     hint: 'A handler who moved this far between two reads (a check, a switch) is a new look: no beat, he is simply on the ball side.',
   },
+  // ── hoops-reverse (#311's H3a, ported): the ball handler's stick — every default is the release value (core/HoopsStick) ──
+  {
+    id: 'hoops.jogTau', label: 'Jog: lag to top speed', def: 0.17, min: 0.05, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_JOG_TAU',
+    hint: 'How quickly a pushed stick reaches jog speed (lower = snappier). H3a: 0.10.',
+  },
+  {
+    id: 'hoops.sprintTau', label: 'Sprint: lag to top speed', def: 0.15, min: 0.05, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_SPRINT_TAU',
+    hint: 'How quickly the turbo reaches sprint speed (lower = snappier). H3a: 0.10.',
+  },
+  {
+    id: 'hoops.jogAccel', label: 'Jog: acceleration cap', def: 15, min: 5, max: 40, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_JOG_ACCEL',
+    hint: 'The most the handler gains per second toward a jog. H3a: 22.',
+  },
+  {
+    id: 'hoops.sprintAccel', label: 'Sprint: acceleration cap', def: 24, min: 5, max: 40, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_SPRINT_ACCEL',
+    hint: 'The most the handler gains per second toward a sprint. H3a: 26.',
+  },
+  {
+    id: 'hoops.loadScale', label: 'First step: load', def: 0.45, min: 0.2, max: 1, step: 0.05, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_LOAD_SCALE',
+    hint: 'Share of the acceleration on the first step from a standstill (1 = no loaded step). H3a: 0.7.',
+  },
+  {
+    id: 'hoops.gearDownDecel', label: 'Off the turbo: ease-down', def: 9, min: 3, max: 30, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_GEAR_DOWN_DECEL',
+    hint: 'How fast the speed eases down when the turbo is let go with the stick held. H3a: 12.',
+  },
+  {
+    id: 'hoops.stopDecelLow', label: 'Stop: brake from a walk', def: 22, min: 8, max: 60, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_STOP_DECEL_LOW',
+    hint: 'The brake when the stick is released at a walk. H3a: 32.',
+  },
+  {
+    id: 'hoops.stopDecelHigh', label: 'Stop: brake from a sprint', def: 11, min: 5, max: 60, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_STOP_DECEL_HIGH',
+    hint: 'The brake when the stick is released at top speed (lower = a longer slide). H3a: 26.',
+  },
+  {
+    id: 'hoops.plantDecel', label: 'Plant: bleed on a hard cut', def: 47.6, min: 10, max: 80, step: 0.2, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_PLANT_DECEL',
+    hint: 'How hard the plant bleeds speed on a cut of over ~110° at pace. H3a: 34.',
+  },
+  {
+    id: 'hoops.handlerTurnDeg', label: 'Handler: turn rate', def: 540, min: 270, max: 1080, step: 10, unit: '°/s', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_HANDLER_TURN_DEG',
+    hint: 'How fast the run of the ball handler turns toward the stick (slower near top speed). H3a: 720.',
+  },
+  {
+    id: 'hoops.turnTrueArc', label: 'Turn: true arc (1) / lerp (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_TURN_TRUE_ARC',
+    hint: '1 = a turn rotates at the full turn rate; 0 = the steer as shipped, which turns wide angles slower. H3a: 1.',
+  },
+  {
+    id: 'hoops.kickSec', label: 'Turbo kick: spread over', def: 0, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_KICK_SEC',
+    hint: 'The kick of a turbo press is added over this long (0 = all in one frame, as shipped). H3a: 0.10.',
+  },
+  {
+    id: 'hoops.cutSec', label: 'Cut cost: paid over', def: 0, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_CUT_SEC',
+    hint: 'The speed a cut costs is paid over this long (0 = in one frame, as shipped). H3a: 0.08.',
+  },
+  {
+    id: 'hoops.jerk', label: 'Smoothing: jerk limit', def: 0, min: 0, max: 2000, step: 50, unit: 'm/s³', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_JERK',
+    hint: 'The most the acceleration can change per second: no one-frame flip from push to brake (0 = off, as shipped). H3a: 900.',
+  },
+  {
+    id: 'hoops.reverseDeg', label: 'Reversal: from this angle', def: 135, min: 90, max: 180, step: 5, unit: '°', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_REVERSE_DEG',
+    hint: 'A stick this far round from the run is a reversal: brake through zero, then go the new way (the fix; 180 = an exact pull-back only).',
+  },
+  {
+    id: 'hoops.reverseDecel', label: 'Reversal: brake', def: 47.6, min: 10, max: 80, step: 0.2, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_REVERSE_DECEL',
+    hint: 'How hard a reversal brakes through zero after the plant. H3a: 34.',
+  },
+  {
+    id: 'hoops.retreatSpeedK', label: 'Retreat: share of jog speed', def: 0.7, min: 0.3, max: 1, step: 0.05, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HOOPS_RETREAT_SPEED_K',
+    hint: 'The backpedal (the stick held against the facing) tops out at this share of a jog. Forward runs, sprints and slides never. 1 = no cap.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

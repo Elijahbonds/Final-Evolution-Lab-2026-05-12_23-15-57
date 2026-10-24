@@ -159,8 +159,13 @@ function run(d: DribbleController, frames: [number, number][], sprint = false) {
   hold.setFacing(Math.PI);
   run(hold, Array(60).fill([0, 1]));
   run(hold, Array(30).fill([0, -1]));         // held past the tap window
-  run(hold, [[0, 0]]);
-  ok(hold.vel.z <= 0.01, 'a held pull-back (retreat) never fires the boost');
+  // TEST CHANGED (lane/hoops-reverse, from PR #311): this read `hold.vel.z <= 0.01` — it passed only because of the reversal bug (a straight
+  // pull-back put the handler back on the OLD line after the plant, so he never went toward his own half at all). With the fix the held
+  // pull-back RETREATS by design (the retreat dribble), so the body moves toward its own half. Same intent: on the release no hesitation
+  // fires and nothing bursts.
+  const beforeRelease = hold.vel.length();
+  const [rel] = run(hold, [[0, 0]]);
+  ok(!rel.hesitation && hold.vel.length() <= beforeRelease + 1e-6, 'a held pull-back (retreat) never fires the boost');
 }
 
 // ── C2. repeated hesitations inside the cooldown (HOOPS-CROSS-FIXUP) ───────
