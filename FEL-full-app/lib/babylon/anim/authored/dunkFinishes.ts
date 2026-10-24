@@ -66,12 +66,15 @@ const TUCK2_LEGS: Record<string, Deg3> = { LeftUpLeg: [-56, 0, 8], LeftLeg: [84,
 // (arms thrown overhead, knees soft) stretched over a 550 ms flight: no hang, no hammer. This is the flight: off one
 // foot, the ball in the strong hand, the knees come up under the chest at the top, and the arm comes down THROUGH the
 // iron with the body long.
+/** The power slam's ball-hand heights over the feet, as keyed below: the HANG beat (t 0.3) and the slam end (t T). The dragon ride
+ *  reads these keys (DR-H9) rather than typing them. */
+export const POWER_HANG_HAND_Y = 2.08, POWER_SLAM_HAND_Y = 1.80;
 export function buildFinishPower(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const T = 0.6;
   return buildPoseClip(scene, sk, 'dunk_finish_power', T, [
     { t: 0,    bones: { Hips: [0, 0, 0], Spine: [-6, 0, 0],  Neck: [-4, 0, 0], ...TAKEOFF_LEGS }, hands: { Right: [0.22, 1.56, 0.30], Left: [-0.22, 1.46, 0.30] }, poles: { Right: [0.8, -0.3, 0.2], Left: [-0.8, -0.3, 0.2] } },   // the ball rising in front, the guide hand still on it
-    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-18, 0, 0], Neck: [-10, 0, 0], ...TUCK_LEGS }, hands: { Right: [0.20, 2.08, 0.06], Left: [-0.46, 1.60, 0.02] }, poles: { Right: [0.9, 0.3, -0.4], Left: [-0.8, -0.5, -0.2] } },   // the hang: one hand cocked high, the knees up, the chest open
-    { t: T,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.16, 1.80, 0.46], Left: [-0.40, 1.40, 0.20] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // hammered down and through
+    { t: 0.3,  bones: { Hips: [0, 0, 0], Spine: [-18, 0, 0], Neck: [-10, 0, 0], ...TUCK_LEGS }, hands: { Right: [0.20, POWER_HANG_HAND_Y, 0.06], Left: [-0.46, 1.60, 0.02] }, poles: { Right: [0.9, 0.3, -0.4], Left: [-0.8, -0.5, -0.2] } },   // the hang: one hand cocked high, the knees up, the chest open
+    { t: T,    bones: { Hips: [0, 0, 0], Spine: [12, 0, 0],  Neck: [6, 0, 0],  ...LONG_LEGS }, hands: { Right: [0.16, POWER_SLAM_HAND_Y, 0.46], Left: [-0.40, 1.40, 0.20] }, poles: { Right: UP.Right, Left: [-0.8, -0.5, 0.1] } },   // hammered down and through
   ]);
 }
 

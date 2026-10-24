@@ -466,10 +466,11 @@ export const CREDITS: Credit[] = [
       'models/_forge/: the FORGE hero and its roster, "built from nothing but code" (scripts/avatar/forge.mts, scripts/avatar/roster.mts), archived there 2026-09-04 (docs/history/SHIP-PASS-3.md)',
       'models/props/venice/: "the second writer\'s venice kit (far pier, three sail billboards)" (docs/history/SHIP-PASS-6-LOOK.md); the files are Blender boxes and cylinders (pier_deck, pier_post_*, sail_hull/mast/cloth) with flat materials and no textures',
       'og-image.png: the app\'s name and tagline in the brand colours over plain circles and lines; no outside imagery in it',
+      'models/dragon/: the dragon ride partner (v5, phase4-swoop p4s5 LODs), built from scratch in free Blender 4.2.3 by the 3D Art lane (65-bone DR_ rig, clips, sculpt and bakes; sparse morphs by its own script); its build notes record "No Meshy GLB was opened or edited" and free tools only (fel-specs dragon-ride-build/phase4-power/README.md, phase4-detail/README.md)',
     ],
     covers: [
       'favicon.svg', 'models/navmesh/', 'anim-audit/', 'agent-manifest.json', 'backdrops/baked/beach.jpg',
-      'models/_forge/', 'models/props/venice/', 'og-image.png',
+      'models/_forge/', 'models/props/venice/', 'og-image.png', 'models/dragon/',
     ],
     manifestLicences: [],
   },

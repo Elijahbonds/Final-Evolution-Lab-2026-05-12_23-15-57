@@ -104,6 +104,7 @@ import { rimDecides, type RimVerdict } from '../core/RimDecides';   // THE RIM D
 import { planRimPlay, forcedMakeProfile, maybeAirball, rimPlaySuffix, type RimPlay } from '../core/RimPlay';   // RIM PLAY (2026-09-18): the ball's time on the iron
 import { inStance, stanceWish } from '../core/DefensiveStance';   // the slide was cosmetic until now
 import { judge, rule, isGoaltending, paintClock, THREE_SECOND_LIMIT, possessionAfterScore, type ScoringFormat } from '../core/Ref';   // the rules live in the handbook, not in here
+import { RIM_HEIGHT_M } from '../core/courtDims';
 import {
   CHAIN_IDLE, BASELINE_HANDLE, MOVES_UNLOCKED_GATE, doubleMoveOf, moveDisplayName, pushChain, tickChain, tightness, moveFromContext, gathersIntoShot, moveRate, moveFadeSec,
   resolveHandleMove, SHAKE_RANGE, OFF_THE_HEAD_RANGE, offTheHeadOdds, offTheHeadLoose,
@@ -231,7 +232,7 @@ import {   // IMPROVE (2026-10-06) #1 #2 #3 #4 #10: the pure rules (onevoneRules
 } from './onevoneRules';
 
 /** Exported so hoop-alignment-tests can check it against the venue's hoop. */
-export const RIM = new Vector3(0, 3.05, -0.6);
+export const RIM = new Vector3(0, RIM_HEIGHT_M, -0.6);
 /** The rim's point on the floor — what a drive's range is measured against (see the checkDriveDunk call). */
 const RIM_FLOOR = new Vector3(RIM.x, 0, RIM.z);
 /** HOOPS-MOVE-KIT-B M12: the backboard hangs behind the ring and faces the court (+z) — the square's own direction. */
