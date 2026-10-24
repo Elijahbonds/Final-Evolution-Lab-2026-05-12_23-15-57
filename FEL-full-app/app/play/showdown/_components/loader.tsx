@@ -3,6 +3,7 @@
 import dynamicImport from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
+import { useHeldDob, useHeldDobYear } from '@/lib/move/useHeldDobYear';
 
 const spinner = () => (
   <div className="flex h-[60vh] items-center justify-center">
@@ -15,6 +16,8 @@ const ShowdownBabylon = dynamicImport(() => import('@/components/games/showdown-
   ssr: false, loading: spinner,
 });
 
-export function ShowdownLoader() {
+export function ShowdownLoader({ dobYear, dob = null }: { dobYear: number | null; dob?: string | null }) {
+  useHeldDobYear(dobYear);
+  useHeldDob(dob);
   return <GameShell mode="showdown" title="SHOWDOWN" venue="Shimogamo Dojo" Game={ShowdownBabylon} ownControls />;
 }

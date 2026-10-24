@@ -6,11 +6,13 @@ import {
   AGE_BLOCK_COOKIE,
   AGE_BLOCK_STORAGE_KEY,
   AGE_BLOCK_VALUE,
+  AGE_DATE_INVALID,
   AGE_INVALID,
   AGE_QUESTION,
   AGE_TURN_AWAY,
   ageBlockCookieHeader,
   ageScreenOutcome,
+  birthDateFor,
   birthYearOptions,
 } from '@/lib/privacy/ageScreen';
 
@@ -47,8 +49,11 @@ export function AgeTurnAway() {
 }
 
 /**
- * The year question. Signup: a blocked year writes the flag and makes no request. Account (an existing sign-in
+ * The birth-date question. Signup: a blocked year writes the flag and makes no request. Account (an existing sign-in
  * with no year on file): every locked year, including a block, is posted to /api/account/birth-year.
+ * FN-BOX-1b (2026-10-19): the month and day are asked beside the year, and the full date travels with it as
+ * `birthDate` ('YYYY-MM-DD'). The block rule still reads the year alone, first: an under-13 year is turned away whatever
+ * the month and day say. Any other year needs a real, past date before it locks.
  */
 export function AgeStep({
   mode,
@@ -57,14 +62,16 @@ export function AgeStep({
   nextPath = '/',
 }: {
   mode: 'signup' | 'account';
-  onLocked?: (year: number) => void;
+  onLocked?: (year: number, birthDate: string) => void;
   onBlocked?: () => void;
   nextPath?: string;
 }) {
   const [away, setAway] = useState(ageBlockPresent);
   const [year, setYear] = useState('');
+  const [month, setMonth] = useState('');
+  const [day, setDay] = useState('');
   const [locked, setLocked] = useState<number | null>(null);
-  const [invalid, setInvalid] = useState(false);
+  const [invalid, setInvalid] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (away) return <AgeTurnAway />;
@@ -74,10 +81,15 @@ export function AgeStep({
     const n = Number(year);
     const outcome = year === '' ? 'invalid' : ageScreenOutcome(n);
     if (outcome === 'invalid') {
-      setInvalid(true);
+      setInvalid(AGE_INVALID);
       return;
     }
-    setInvalid(false);
+    const birthDate = outcome === 'blocked' ? null : birthDateFor(n, Number(month), Number(day));
+    if (outcome !== 'blocked' && birthDate === null) {
+      setInvalid(AGE_DATE_INVALID);
+      return;
+    }
+    setInvalid(null);
     setLocked(n);
     if (mode === 'signup') {
       if (outcome === 'blocked') {
@@ -86,7 +98,7 @@ export function AgeStep({
         setAway(true);
         return;
       }
-      onLocked?.(n);
+      onLocked?.(n, birthDate as string);
       return;
     }
     setBusy(true);
@@ -94,7 +106,7 @@ export function AgeStep({
       const res = await fetch('/api/account/birth-year', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ birthYear: n }),
+        body: JSON.stringify(birthDate ? { birthYear: n, birthDate } : { birthYear: n }),
       });
       if (outcome === 'blocked' || res.status === 403) {
         writeAgeBlockFlag();
@@ -114,7 +126,7 @@ export function AgeStep({
       {locked === null ? (
         <select
           value={year}
-          onChange={(e) => { setYear(e.target.value); setInvalid(false); }}
+          onChange={(e) => { setYear(e.target.value); setInvalid(null); }}
           className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[#00E5FF]/60"
         >
           <option value="" disabled>Select year</option>
@@ -125,7 +137,33 @@ export function AgeStep({
       ) : (
         <p className="rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white">{locked}</p>
       )}
-      {invalid ? <p className="text-xs text-white/50">{AGE_INVALID}</p> : null}
+      {locked === null ? (
+        <div className="flex gap-3">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={12}
+            placeholder="Month"
+            aria-label="Month"
+            value={month}
+            onChange={(e) => { setMonth(e.target.value); setInvalid(null); }}
+            className="w-1/2 rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[#00E5FF]/60"
+          />
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={31}
+            placeholder="Day"
+            aria-label="Day"
+            value={day}
+            onChange={(e) => { setDay(e.target.value); setInvalid(null); }}
+            className="w-1/2 rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[#00E5FF]/60"
+          />
+        </div>
+      ) : null}
+      {invalid ? <p className="text-xs text-white/50">{invalid}</p> : null}
       {locked === null ? (
         <button
           type="button"

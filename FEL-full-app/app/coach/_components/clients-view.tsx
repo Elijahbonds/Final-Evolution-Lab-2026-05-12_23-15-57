@@ -119,6 +119,8 @@ export function ClientsView() {
                 />
               )}
             </div>
+            {/* PROFILE V2 (2026-10-24): a coach sees their athlete's profile, teen or adult, public or not (/u/[slug]) */}
+            {r.card?.slug && <a href={`/u/${r.card.slug}`} className="shrink-0 rounded-md border border-white/20 px-2 py-1 text-white/70">profile</a>}
             {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]">card · {r.card.rarity}</a> : <span className="shrink-0 text-white/30">no public card</span>}
           </div>
         ))}
