@@ -484,6 +484,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long a free throw\'s make or miss is shown before the next one (or the end of the trip).',
   },
   {
+    id: 'hoops.ftDistNarrow01', label: 'Free throw: jumper narrowing at the line', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_DIST_NARROW_01',
+    hint: 'Share of a jumper\'s distance narrowing the line\'s green takes: 0 = the full open window (±65 ms, owner 2026-10-24), 1 = a jumper from 4.19 m (±59 ms).',
+  },
+  {
     id: 'hoops.bankSetDeg', label: 'Bank: angled set', def: 12, min: 0, max: 25, step: 1, unit: '°', group: 'Hoops · shooting',
     source: 'lib/babylon/hoops/shotLooks.ts BANK_SET_DEG',
     hint: 'How far the shooter turns toward the glass while R1 "called glass" is held in the bank band (look only; the ball\'s route is unchanged).',

@@ -12,10 +12,11 @@
 //   3. Every free throw is a DEAD BALL: make or miss, nobody rebounds it — no lane players (the brief made them optional).
 //   4. After the last shot the ball goes where the ref's call ALREADY sends it (the fouled side, then the mode's format), exactly as
 //      before free throws existed. The trip adds points; it does not change who has the ball next.
-//   5. The line's meter is the uncontested jumper's window (ShotMeter.start(0, 'jumper', 0): 0.72 s, green at 0.62 ± 0.09) narrowed
-//      for the stripe's distance exactly as lane/hoops-shot-core narrows any hero jumper (ShotWindow.distanceGreenFactor at
-//      FREE_THROW_M 4.19 m: ×0.912, ≈ ±59 ms), and its make chance is the release's own SHOT_QUALITY_PCT — no contest, no
-//      momentum, no fatigue, no new odds table.
+//   5. The line's meter is the FULL uncontested jumper's window (ShotMeter.start(0, 'jumper', 0): 0.72 s, green at 0.62 ± 0.09,
+//      ±64.8 ms) — owner decision 2026-10-24: "free throws should be easier than a jumper from the same spot", so lane/hoops-shot-core's
+//      distance narrowing is NOT applied at the line by default (feel knob hoops.ftDistNarrow01, default 0; 1 = the hero jumper's
+//      ×0.912 at 4.19 m, ±59 ms). Its make chance is the release's own SHOT_QUALITY_PCT — no contest, no momentum, no fatigue,
+//      no new odds table.
 //   6. No clock at the line: the shooter takes it when he presses (the AI's internal timers are untouched; the player has none).
 //   7. Only a fouled HERO shoots them — the modes only ever detect a foul on the hero's shot (the rival is never fouled shooting).
 
@@ -44,9 +45,17 @@ export function freeThrowsFor(call: Pick<Call, 'id' | 'shots'> | null | undefine
 /** The make chance of a release at the line (assumption 5): the meter's grade, nothing else. */
 export function freeThrowPct(q: ShotQuality): number { return SHOT_QUALITY_PCT[q]; }
 
-/** Start the line's meter (assumption 5): the uncontested jumper's window, no gather, narrowed for the stripe's distance the way
- *  every hero jumper is (lane/hoops-shot-core's ShotWindow; its hoops.distGreen* knobs move this one too). */
-export function startLineMeter(m: ShotMeter): void { m.start(0, 'jumper', 0); m.narrowBy(distanceGreenFactor(FREE_THROW_M, 'jumper')); }
+/** How much of a hero jumper's distance narrowing the line takes (0 = none, the full open window; 1 = a jumper from the stripe).
+ *  Owner decision 2026-10-24: 0 — a free throw is easier than a jumper from the same spot. Feel knob hoops.ftDistNarrow01. */
+export const FT_DIST_NARROW_01 = 0;
+
+/** Start the line's meter (assumption 5): the uncontested jumper's window, no gather; narrowed by FT_DIST_NARROW_01 of the stripe's
+ *  distance factor (lane/hoops-shot-core's ShotWindow) — none by default. */
+export function startLineMeter(m: ShotMeter): void {
+  m.start(0, 'jumper', 0);
+  const k = feel('hoops.ftDistNarrow01', FT_DIST_NARROW_01);
+  if (k > 0) m.narrowBy(1 - k * (1 - distanceGreenFactor(FREE_THROW_M, 'jumper')));
+}
 
 /** The trip's beats, in game seconds (all `(new)` numbers — presentation only: none of them is a timing window). */
 /** The whistle to the shooter at the line: the bodies walk off, the camera cuts. Feel knob hoops.ftSetupSec. */
