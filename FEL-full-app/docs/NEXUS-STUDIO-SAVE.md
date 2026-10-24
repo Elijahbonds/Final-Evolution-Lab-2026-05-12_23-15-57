@@ -314,35 +314,71 @@ the editor's columns are desktop-sized. The panel sheet stays inside the viewpor
 
 ## 7. The deploy session (Q8: the SQL is applied in the same session as the deploy that carries the route)
 
+**Four pending SQL files land in this session (owner, 2026-10-20, "Add the 3 models").** Besides `StudioProjectSave`,
+this PR now carries the models for three tables that until now existed only as pending SQL, in the same regenerated
+`public/_prisma/client`: `BookFulfillmentEvent` and `BookEntitlement` (the book shop), `CreatorInquiry` and
+`PartyReport`. Without them, every `prisma migrate diff` against a database that has those tables proposes dropping
+them. `prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script` (offline, prisma 6.7.0)
+prints, for each of the four, exactly the statements in its pending file: 14 statements, compared statement by
+statement after normalising whitespace and comments, all identical (the comparator was checked against a mutated copy
+first, and caught each mutation).
+
+The files, in dependency order. Every one depends only on `User` (or on nothing), so this order is the filename order,
+and it follows the launch runbook's (`lane/launch-docs`, `docs/OWNER-RUNBOOK.md` §5.1, files 1–15), which applies the
+older pending files first:
+
+| # | File (`prisma/pending/`) | Creates | Depends on | Without it, once this PR is deployed |
+|---|---|---|---|---|
+| a | `2026-10-09-book-shop.sql` | BookFulfillmentEvent, BookEntitlement (+ FK to `User`, ON DELETE SET NULL) | `User` | **the client now has the book delegates**, so `bookTablesReady()` is true: the `/press` pages log P2021 and degrade, the stream route answers 503, and the download route (403 today, before any lookup, while downloads are closed) would answer 503 to a signed-in visitor even for the free sample. Apply it **before the deploy**. The shop stays closed: selling is behind `BOOK_STORE_ENABLED` and `VIRTUAL_PURCHASES_ENABLED` |
+| b | `2026-10-13-creator-inquiry.sql` | CreatorInquiry | nothing | the form says inquiries are unavailable (raw SQL behind an `information_schema` probe; unchanged) |
+| c | `2026-10-13-party-report.sql` | PartyReport | nothing | a report answers `{stored:false}`, the block still works (raw SQL behind the probe; unchanged) |
+| d | `2026-10-17-studio-project-save.sql` | StudioProjectSave (+ FK to `User`, cascade) | `User` | the Studio-save routes answer 503 and the export lists none |
+
+Production may already have some of these: b and c were "safe in either order" and may have been applied, which is the
+drift this fixes. **Apply only the files whose statements the preview lists**; a second `CREATE TABLE` fails with
+"already exists".
+
 Run by the owner, or the deploy owner the owner names, from the deploy tree with the **production** env
 (`docs/LANES.md` §4), in this order:
 
-1. **Merge** `lane/studio-save` into `lane/finish-release` (the owner's PR). It carries the model, the regenerated
+1. **Merge** `lane/studio-save` into `lane/finish-release` (the owner's PR). It carries the five models, the regenerated
    client, the pending SQL, the routes and the panel. The switch is off.
 2. **Preview, read-only:**
    `npx prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script > /tmp/prod-diff.sql`
-   It must equal the statements in `prisma/pending/2026-10-17-studio-project-save.sql` (the `CREATE TABLE` and the
-   foreign key). Anything more means production is behind another change too: stop and review.
-3. **Apply exactly the reviewed file:**
-   `npx prisma db execute --url "$PROD_DIRECT_URL" --file prisma/pending/2026-10-17-studio-project-save.sql`
-4. **Verify:** the same `migrate diff` now prints an empty migration.
+   Every statement must come from the files above (a–d) or from a pending file of the runbook's §5.1 that production
+   does not have yet. Note which of a–d it lists. It must contain **no `DROP`**: before this PR the diff listed
+   `DROP TABLE "PartyReport"` / `"CreatorInquiry"` on a database that had them, and now it must not. Anything else
+   (a `DROP`, or a statement no pending file explains) means stop and review.
+3. **Apply exactly the reviewed files,** one at a time, in the order a, b, c, d, skipping each one the preview did not
+   list:
+   `npx prisma db execute --url "$PROD_DIRECT_URL" --file prisma/pending/<FILE>.sql`
+   Each prints `Script executed successfully.`
+4. **Verify:** the same `migrate diff` now prints an empty migration, with no `DROP` lines for PartyReport or
+   CreatorInquiry any more (the runbook's §5.4 exception for them no longer applies once this PR is merged).
 5. **Deploy,** after `git checkout -- public/_prisma/client yarn.lock` so the upload matches the commit (§4 of
-   `LANES.md`). The committed client already knows `studioProjectSave`; it must not be regenerated on the deploy
-   machine and left dirty.
+   `LANES.md`). The committed client already knows `studioProjectSave`, `bookEntitlement`, `bookFulfillmentEvent`,
+   `creatorInquiry` and `partyReport`; it must not be regenerated on the deploy machine and left dirty.
 6. **Verify live** with the switch still off:
    - `GET /api/studio/projects` signed in answers 200 with `saving.enabled: false` (not 503: the table is there);
-   - `/api/account/export` downloads with `"studioProjects": []`.
+   - `/api/account/export` downloads with `"studioProjects": []`;
+   - `/press/library` signed in as a verified adult shows the library (an empty one), not "unavailable";
+   - `/work-with-us` shows the form (within ~5 minutes of applying b).
 7. **Turn the switch on.** Set `STUDIO_CLOUD_SAVE_ENABLED=1` in the function's environment (next to
    `NEXUS_STUDIO_ENABLED`), after the §8 policy text is live. Then, with a test adult and a test teen, check:
    - save, list, load on a second browser, a stale-rev 409, delete;
    - a test under-13 or unknown-age account gets the 403.
 
+The book shop's own launch steps (`docs/BOOK-SHOP.md`, "Do these in order") are unchanged apart from step 4, which is
+now only "apply the SQL", done here. Opening the shop is still the two switches, with the owner's go-ahead.
+
 **Rollback.**
 
 - Turn the switch off. The device save is unaffected, and what was saved stays readable and deletable.
-- If the table must go, run `DROP TABLE "StudioProjectSave";` only **after** a deploy without the model, because a
-  client with the model fails when it queries a missing table. Until then the routes answer 503 and the export lists
-  none.
+- If a table must go, run its file's rollback line (`DROP TABLE "StudioProjectSave";`, `DROP TABLE "BookEntitlement";
+  DROP TABLE "BookFulfillmentEvent";`, `DROP TABLE "CreatorInquiry";`, `DROP TABLE "PartyReport";`) only **after** a
+  deploy without that model, because a client with the model fails when it queries a missing table. Until then the
+  Studio routes answer 503 and the export lists none; the book pages degrade as in row a. Dropping loses every row
+  written since.
 
 ---
 
@@ -423,14 +459,15 @@ The policy must be live before the switch is turned on (§7, step 7).
 
 | File | Change |
 |---|---|
-| `prisma/schema.prisma`, `public/_prisma/**` | owner-approved via the coordinator |
+| `prisma/schema.prisma`, `public/_prisma/**` | owner-approved via the coordinator: StudioProjectSave (2026-10-17), then PartyReport, CreatorInquiry, BookFulfillmentEvent and BookEntitlement (owner 2026-10-20, `cb1029d8`; §7) |
+| `lib/books/bookStore.ts`, `docs/BOOK-SHOP.md` | a comment and a dated note: the book models are in the client now, so the book SQL is applied before the deploy (§7) |
 | `lib/flags.ts` | one function |
 | `.env.example` | one line |
 | `lib/account/exportData.ts` | one field |
 | `components/nexus-studio/studio-app.tsx` | one import and one mount line. That file changed 9 h before this lane on `lane/finish-release`, so expect a trivial merge |
 | `tests/helpers/writeSpyDb.ts` | `$queryRaw*` recorded, returning no rows |
 | `lib/nav/modules.test.ts` | the STAGED line removed: `cloudRoute.ts` is wired now |
-| `lib/privacy/u13-lock-log.test.ts` | the schema-ban pin advanced to `fe5064a8`, as its own rule requires. Measured: it fails without the bump |
+| `lib/privacy/u13-lock-log.test.ts` | the schema-ban pin advanced to `fe5064a8`, then to `cb1029d8` (the four models), as its own rule requires. Measured: it fails without the bump |
 
 **Routed:** `docs/NEXUS-STUDIO.md` §2.1 still says "No server persistence". Its holder this round is studio-5. The
 one-liner is: "Server save: built behind `STUDIO_CLOUD_SAVE_ENABLED`, see `docs/NEXUS-STUDIO-SAVE.md`."

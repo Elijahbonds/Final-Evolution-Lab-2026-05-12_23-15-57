@@ -159,6 +159,15 @@ free sample still signs. The owner's step, in order: apply the SQL, add the two 
 to `prisma/schema.prisma`, regenerate `public/_prisma` on Linux. No agent runs `prisma db push` or regenerates the
 client.
 
+**Models added (owner, 2026-10-20, "Add the 3 models"; `lane/studio-save`, PR #373).** Both models and
+`User.bookEntitlements` are now in `prisma/schema.prisma`, and the committed client carries both delegates; `prisma
+migrate diff --from-empty` prints exactly this file's statements for them. So once #373 is deployed `bookTablesReady()`
+is **true**, and the SQL has to be applied **before that deploy** (`docs/NEXUS-STUDIO-SAVE.md` §7), not on the day the
+shop opens. Applying the empty tables does not open the shop: selling stays behind `BOOK_STORE_ENABLED` and
+`VIRTUAL_PURCHASES_ENABLED`. Deployed without the tables, a store call fails with P2021 instead of `BookTablesNotReady`:
+the `/press` pages log it and degrade, the stream route answers 503, and the download route (403 for every file today,
+before any lookup, while downloads are closed) would answer 503 to a signed-in visitor even for the free sample. Launch step 4 below is therefore only "apply the SQL" now.
+
 There is no guest checkout (owner, 2026-10-13), but an entitlement row is still keyed by email: My Library and the download route claim rows whose email matches the signed-in account, and every ownership check also matches by email, so an unclaimed row still counts. (MERGE 2026-10-09: the extra claim at sign-in in `lib/auth.ts` was removed. It was redundant, and it pulled the whole book catalog, with its partner and affiliate links, into every page that imports `authOptions`, including the Quick Screen, whose guard `lib/screen/offsite.test.ts` allows no off-site address.)
 
 A refund (`charge.refunded`) sets the row to `REVOKED`. Revoked rows do not get signed URLs.
@@ -273,7 +282,8 @@ Do these in order. This branch does not perform them.
 1. (Held for EBOOK-1.) Confirm KDP Select for all seven titles. Flip `kdpSelect` only when the ebook may be sold on the site.
 2. Replace example prices. Set `priceIsExample: false` on the offers you are actually charging.
 3. Upload EPUB, PDF, and MP3s to the private paths above. Play chapter 1 and the last chapter.
-4. Apply `prisma/pending/2026-10-09-book-shop.sql`, add the models, regenerate `public/_prisma` (the owner's step; see Database).
+4. Apply `prisma/pending/2026-10-09-book-shop.sql` (the owner's step; see Database). The models and the regenerated
+   `public/_prisma` are in PR #373 (2026-10-20), so the SQL is applied in that PR's deploy session, before its deploy.
 5. Test-mode webhook endpoint, test key, one purchase, receipt page, My Library, a chapter, then a refund that removes access.
 6. Decide tax (Stripe Tax on, or off and filed yourself).
 7. **Store terms.** Done in code (see "The shop matches the store terms"): the shop sells stream-only audiobooks, which

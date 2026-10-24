@@ -48,7 +48,9 @@ const UA = 'AgeScreenTest/1.0';
 // statement; pending SQL only, no column or index added) at 521c52c1.
 // STUDIO-SAVE (owner-approved 2026-10-17) StudioProjectSave model + regenerated client +
 // prisma/pending/2026-10-17-studio-project-save.sql (pending SQL only, applied in the deploy session) at fe5064a8.
-const PARENT = 'fe5064a8a4b84c67a18b3835a008bfeefc3de76a';
+// PENDING-MODELS (owner 2026-10-20, "Add the 3 models"; lane/studio-save) PartyReport, CreatorInquiry,
+// BookFulfillmentEvent and BookEntitlement models matching their pending SQL + regenerated client at cb1029d8.
+const PARENT = 'cb1029d888353898f4c14e30af1face0f7861564';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
