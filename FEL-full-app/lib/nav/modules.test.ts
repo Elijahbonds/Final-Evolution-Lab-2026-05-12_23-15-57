@@ -24,6 +24,8 @@ const ROOT = join(__dirname, '..', '..');
 /** Files that are reached some way other than an import, each with the reason. */
 const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/modes/registry.ts': 'the mode registry — loaded by key at runtime, not by a static import',
+  // COACH-AI-DRAFT (2026-10-24): the brief says behind a flag, off, until an AI-coach surface makes it natural; none does yet
+  'lib/coach/weeklyDraft/solo.ts': 'solo drafts (the weekly draft with safe limits, no human coach): an owner call, flagged off (COACH_SOLO_DRAFTS_ENABLED) and wired to no surface yet; tested in solo.test.ts',
   // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06, "storage = Google Cloud Storage"): the creative-card upload route was
   // this file's only caller and now signs GCS uploads (lib/soundtrack/storage.ts). Cards made before still point at S3
   // objects, and removing the AWS path is the owner's call (a file this lane did not create), so it stays, named here.
