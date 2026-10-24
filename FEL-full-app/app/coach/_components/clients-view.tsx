@@ -21,6 +21,8 @@ import { availabilityLine, type AvailabilityView } from '@/lib/coach/availabilit
 import { AssignProgram } from '@/components/coach/assign-program';
 // COACH-LOOP P1: the guardian's training report, for teens with an accepted consent only (the server decides who)
 import { GUARDIAN_REPORT_API, GuardianReportButton } from '@/components/coach/guardian-report-button';
+// COACH-VIDEO-REVIEW (2026-10-24): filmed sets, the camera's flagged rep first (components/coach/form-review)
+import { FormReviewQueue } from '@/components/coach/form-review/review-queue';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -94,6 +96,7 @@ export function ClientsView() {
           coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
           the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}
       <AttentionPanel />
+      <FormReviewQueue />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
