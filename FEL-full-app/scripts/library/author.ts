@@ -28,7 +28,7 @@ import { BLOCKS } from './authoring/blocks';
 import { MODIFIERS } from './authoring/modifiers';
 import type { Family, Variant } from './authoring/types';
 
-export const AUTHORED_LICENCE = 'FEL original (Final Evolution Lab), all rights reserved';
+export const AUTHORED_LICENCE = 'FEL original (Final Evolution Lab)';
 
 function arg(name: string): string | null {
   const i = process.argv.indexOf(name);

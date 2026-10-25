@@ -61,6 +61,8 @@ const PHRASES: readonly [RegExp, string][] = [
   [/\bwarm(ing)? up\b/g, 'warm up'],
   [/\bcool(ing)? down\b/g, 'cool down'],
   [/\bjump(ing)? rope\b/g, 'jump rope'],
+  [/\blay ups?\b/g, 'layup'],
+  [/\bwarm ups\b/g, 'warm up'],
   [/\bstiff legged\b/g, 'stiff leg'],
   [/\brear foot elevated\b/g, 'rear foot elevated'],
 ];
