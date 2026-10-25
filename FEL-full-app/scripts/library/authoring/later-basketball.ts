@@ -474,7 +474,7 @@ export const LATER_BASKETBALL: Family[] = [
     dosage: reps(3, '5 each side', 30), variants: finishVariants(),
   },
   {
-    ...BB, family: 'pull-up-shooting', block: 'basketball-shooting-2', category: 'sport-skill', pattern: 'push', plane: 'sagittal', laterality: 'unilateral', skillLayer: 'speed', braceMode: 'reflex',
+    ...BB, family: 'off-dribble-shooting', block: 'basketball-shooting-2', category: 'sport-skill', pattern: 'push', plane: 'sagittal', laterality: 'unilateral', skillLayer: 'speed', braceMode: 'reflex',
     primary: ['quads', 'triceps', 'delts'], secondary: ['calves', 'forearms', 'deep-core'], goals: ['shooting', 'handles'], lowLoad: ['back'], equipment: ['basketball', 'hoop'], clip: 'shoot',
     setup: 'Start a step beyond the shooting spot, ball in triple threat.',
     cues: ['Stop on two feet, square to the rim, then rise straight up.', 'Release at the top and hold the follow-through to the target.', 'Land on the spot you left from, quiet.'],

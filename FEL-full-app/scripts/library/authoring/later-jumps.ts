@@ -214,7 +214,7 @@ export const LATER_JUMPS: Family[] = [
     dosage: reps(3, '5', 45), variants: jumpLandVariants(),
   },
   {
-    ...PLYO, family: 'drop-landing-ladder', block: 'plyometrics-landing', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral',
+    ...PLYO, family: 'drop-landing-heights', block: 'plyometrics-landing', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral',
     primary: ['quads', 'glutes'], secondary: ['calves', 'hamstrings', 'foot'], goals: ['landing', 'knee'], sport: ['general', 'basketball', 'volleyball', 'soccer'],
     lowLoad: ['back'], youthOk: true, equipment: ['box'], clip: 'jump',
     setup: 'Stand on the box, toes at the edge.',
@@ -226,7 +226,7 @@ export const LATER_JUMPS: Family[] = [
     dosage: reps(3, '4', 45), variants: dropLandingVariants(),
   },
   {
-    ...PLYO, family: 'jump-progressions-2', block: 'plyometrics-2', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral',
+    ...PLYO, family: 'jump-builds', block: 'plyometrics-2', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral',
     primary: ['quads', 'glutes', 'calves'], secondary: ['hamstrings', 'foot'], goals: ['vertical', 'power', 'landing'], sport: ['general', 'basketball', 'volleyball', 'track'],
     lowLoad: ['back'], youthOk: true, equipment: [], clip: 'jump',
     setup: 'Stand tall, feet hip-width, arms ready to swing.',
@@ -239,7 +239,7 @@ export const LATER_JUMPS: Family[] = [
     dosage: reps(3, '5', 60), variants: progressionVariants(),
   },
   {
-    ...PLYO, family: 'upper-body-plyo', block: 'plyometrics-2', category: 'plyometric', pattern: 'push', plane: 'sagittal', laterality: 'bilateral',
+    ...PLYO, family: 'upper-body-power', block: 'plyometrics-2', category: 'plyometric', pattern: 'push', plane: 'sagittal', laterality: 'bilateral',
     primary: ['chest', 'triceps'], secondary: ['delts', 'serratus', 'deep-core'], goals: ['power'], sport: ['general', 'basketball', 'football'],
     lowLoad: ['knee', 'ankle'], youthOk: true, equipment: [], clip: 'push', cautions: ['Only once a full push-up is smooth; stop the set when the hands land loud.'],
     setup: 'Hands a little wider than the shoulders, body in one long line.',

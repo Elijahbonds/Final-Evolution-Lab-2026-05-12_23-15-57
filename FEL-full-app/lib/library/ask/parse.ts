@@ -104,6 +104,16 @@ const equipmentWords: readonly [string, RegExp][] = EQUIPMENT.filter((e) => !['o
   return [e.id, new RegExp(`\\b(?:${names.map((n) => `${n}s?`).join('|')})\\b`)] as [string, RegExp];
 });
 
+/**
+ * Every equipment name on its own, longest first, so a longer name claims its words before a shorter one inside it:
+ * "trap bar" is the trap bar, not a barbell ("bar") plus a stray "trap" (batches 2–4: that stray word then searched
+ * the traps muscle and returned snatch and clean deadlifts for "trap bar deadlift").
+ */
+const equipmentNames: readonly [string, RegExp][] = EQUIPMENT.filter((e) => !['other', 'wall', 'mat', 'towel', 'hoop', 'basketball', 'step', 'cone', 'strongman'].includes(e.id))
+  .flatMap((e) => [e.label, ...e.aliases].map((n) => [e.id, fold(n).replace(/\s+/g, ' ')] as [string, string]))
+  .sort((a, b) => b[1].length - a[1].length)
+  .map(([id, n]) => [id, new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s?\\b`)] as [string, RegExp]);
+
 const NO_EQUIPMENT = /\bno (?:equipment|gear|weights?)\b|\bwithout (?:any )?(?:equipment|weights?|gear)\b|\bbody ?weight\b|\bequipment free\b|\bnothing but (?:my )?body\b|\bat home with nothing\b|\bhotel room\b/;
 const ONLY = /\bonly\b|\bjust\b/;
 
@@ -200,12 +210,12 @@ export function parseAsk(question: string): ParsedAsk {
     chips.push({ key: 'equipmentOnly', value: 'none', label: 'No equipment' });
     consume(NO_EQUIPMENT);
   } else {
-    const eq = equipmentWords.filter(([, re]) => re.test(f)).map(([id]) => id);
+    const eq: string[] = [];
+    for (const [id, re] of equipmentNames) if (re.test(f)) { if (!eq.includes(id)) eq.push(id); consume(re); }
     if (eq.length) {
       filters.equipment = eq;
       if (ONLY.test(f)) filters.equipmentOnly = true;
       for (const id of eq) chips.push({ key: 'equipment', value: id, label: `${filters.equipmentOnly ? 'Only ' : ''}${EQUIPMENT.find((e) => e.id === id)?.label ?? id}` });
-      for (const [id, re] of equipmentWords) if (eq.includes(id)) consume(re);
     }
   }
 

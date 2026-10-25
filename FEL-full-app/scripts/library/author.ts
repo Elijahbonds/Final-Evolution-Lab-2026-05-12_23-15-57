@@ -169,8 +169,9 @@ export function buildModifierBatch(base: readonly LibraryExercise[], batch: numb
         ...b, id, slug: id, name, aliases: [], variation: `${b.variation}+${m.id}`, level,
         laterality: m.laterality ?? b.laterality, equipment, cues: [m.cue, ...b.cues.filter((c) => c !== m.cue && !(m.dropCues?.test(c)))].slice(0, 3),
         dosage: m.dosage ? m.dosage(b.dosage) : { ...b.dosage }, youthOk: b.youthOk && (m.youthOk ?? true),
-        // an easier (down) modifier is the step BELOW its base; every other one is the step above
-        regressionId: m.level === 'down' ? null : b.id, progressionId: m.level === 'down' ? b.id : null, variantOf: b.id,
+        // an easier (down) modifier is the step BELOW its base and a harder (up) one the step above; a same-level one (a
+        // 4-second lower, a wide stance) is a variant, not a step, so it carries no ladder link ("harder than" stays harder)
+        regressionId: m.level === 'up' ? b.id : null, progressionId: m.level === 'down' ? b.id : null, variantOf: b.id,
         demo: { ...b.demo, imageRef: null },
         source: { kind: 'authored', ref: `${b.id}+${m.id}`, url: null, licence: AUTHORED_LICENCE },
         review: { status: 'draft', reviewer: null, batch: `authored-b${batch}-${b.review.batch.replace(/^(authored-b\d+|seed)-/, '')}` },

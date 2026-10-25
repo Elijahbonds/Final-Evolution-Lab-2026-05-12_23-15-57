@@ -65,6 +65,9 @@ const PHRASES: readonly [RegExp, string][] = [
   [/\bwarm ups\b/g, 'warm up'],
   [/\bstiff legged\b/g, 'stiff leg'],
   [/\brear foot elevated\b/g, 'rear foot elevated'],
+  // batches 2–4: "trap bar" is one implement; split, its "trap" matched every entry that trains the traps (a "trap bar
+  // deadlift" search ranked the snatch and clean deadlifts above the trap-bar carry and jump)
+  [/\b(?:trap|hex) bar\b/g, 'trapbar'],
 ];
 
 /** Words that carry no meaning in an exercise name or a search. */
