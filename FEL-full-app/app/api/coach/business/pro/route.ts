@@ -1,5 +1,5 @@
 // COACH-BUSINESS: POST → a Stripe Checkout for Coach Pro (the FEL_COACH subscription at the owner's
-// COACH_PRO_PRICE_USD_CENTS). Closed (409 store_closed) while COACH_PRO_ENABLED is off or no price is set; the existing
+// COACH_PRO_PRICE_USD_CENTS, default $39). Closed (409 store_closed) while COACH_PRO_ENABLED is off; the existing
 // webhook, verify and refund paths handle the subscription once bought (lib/coach-business/pro.ts).
 import { prisma } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';

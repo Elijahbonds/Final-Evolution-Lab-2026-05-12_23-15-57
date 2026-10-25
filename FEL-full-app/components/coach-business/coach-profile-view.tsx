@@ -7,6 +7,7 @@ import { goalLabel, sportLabel } from '@/lib/coach-business/market';
 import type { PublicHighlight, PublicProfile } from '@/lib/coach-business/profile';
 import { PAYMENTS_NOT_LIVE } from '@/lib/coach-business/config';
 import { ApplyForm, PackageCta } from './package-actions';
+import { FeeBreakdown } from './fee-breakdown';
 
 export interface ProfilePackage extends CoachPackage { spotsLeft: number | null; action: PackageAction | null }
 
@@ -94,6 +95,7 @@ export function CoachProfileView(p: CoachProfileViewProps) {
                 <ul className="mt-3 space-y-1 text-sm text-white/80">
                   {k.includes.map((line) => <li key={line} className="flex gap-2"><span aria-hidden="true" className="text-cyan-300">✓</span><span>{line}</span></li>)}
                 </ul>
+                {k.action === 'book' ? <FeeBreakdown priceCents={k.priceCents} kind={k.kind} /> : null}
                 <div className="mt-4">{k.action ? <PackageCta slug={profile.slug} packageId={k.id} action={k.action} /> : null}</div>
               </li>
             ))}
