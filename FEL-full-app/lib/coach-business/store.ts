@@ -65,7 +65,8 @@ export const SQL = {
   // capacity: what holds a spot right now
   takenFor:
     `SELECT "packageId", COUNT(*)::int AS "n" FROM "CoachSale" WHERE "packageId" = ANY($1::text[]) AND ("status" IN ('PAID', 'ACTIVE', 'PARTIALLY_REFUNDED') OR ("status" = 'PENDING' AND "holdExpiresAt" > $2)) GROUP BY "packageId"`,
-  lockPackage: `SELECT pg_advisory_xact_lock(hashtext($1))`,
+  // pg_advisory_xact_lock returns void, which Prisma cannot deserialize: select a constant FROM it instead
+  lockPackage: `SELECT 1 AS "locked" FROM pg_advisory_xact_lock(hashtext($1))`,
   // connect
   connectFor: `SELECT "userId", "stripeAccountId", "livemode", "chargesEnabled", "payoutsEnabled", "detailsSubmitted" FROM "CoachConnectAccount" WHERE "userId" = $1`,
   insertConnect:
