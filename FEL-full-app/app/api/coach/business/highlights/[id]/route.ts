@@ -4,12 +4,12 @@
 //        hides it at once. The coach may withdraw too. Approving needs a verified adult: a minor's result is never public.
 import { rateLimit } from '@/lib/rate-limit';
 import { highlightById, consentHighlight, revokeHighlight } from '@/lib/coach-business/store';
-import { bad, isVerifiedAdultUser, json, notReady, rawDb, readJson, sessionUserId } from '@/lib/coach-business/server';
+import { bad, isVerifiedAdultUser, json, notReady, rawDb, readJson, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   const db = rawDb();
   const off = await notReady(db);
@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:hl-answer:${userId}`, 30, 60_000).ok) return bad('rate_limited', 429);
   const db = rawDb();

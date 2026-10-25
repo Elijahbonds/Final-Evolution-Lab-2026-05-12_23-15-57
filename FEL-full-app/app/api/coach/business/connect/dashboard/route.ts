@@ -3,14 +3,14 @@
 import { rateLimit } from '@/lib/rate-limit';
 import { connectGate, expressDashboardLink, paymentsClosed } from '@/lib/coach-business/connect';
 import { connectFor } from '@/lib/coach-business/store';
-import { bad, connectStripe, json, notReady, rawDb, sessionUserId } from '@/lib/coach-business/server';
+import { bad, connectStripe, json, notReady, rawDb, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
   const gate = connectGate();
   if (!gate.ok) return paymentsClosed(gate.reason);
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:dash:${userId}`, 10, 60_000).ok) return bad('rate_limited', 429);
   const db = rawDb();

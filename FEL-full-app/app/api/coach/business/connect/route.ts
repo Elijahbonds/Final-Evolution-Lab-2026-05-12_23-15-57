@@ -8,14 +8,14 @@ import { rateLimit } from '@/lib/rate-limit';
 import { connectGate, createExpressAccount, onboardingLink, paymentsClosed, readAccountStatus } from '@/lib/coach-business/connect';
 import { coachFeatureRefusal } from '@/lib/coach-business/planServer';
 import { connectFor, keepConnect, updateConnect } from '@/lib/coach-business/store';
-import { bad, connectStripe, isVerifiedAdultUser, json, notReady, planDb, rawDb, sessionUserId } from '@/lib/coach-business/server';
+import { bad, connectStripe, isVerifiedAdultUser, json, notReady, planDb, rawDb, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST() {
   const gate = connectGate();
   if (!gate.ok) return paymentsClosed(gate.reason);
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:connect:${userId}`, 10, 60_000).ok) return bad('rate_limited', 429);
   if (!(await isVerifiedAdultUser(userId))) return bad('adults_only', 403);
@@ -41,7 +41,7 @@ export async function POST() {
 export async function GET() {
   const gate = connectGate();
   if (!gate.ok) return paymentsClosed(gate.reason);
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:connect-status:${userId}`, 30, 60_000).ok) return bad('rate_limited', 429);
   const db = rawDb();

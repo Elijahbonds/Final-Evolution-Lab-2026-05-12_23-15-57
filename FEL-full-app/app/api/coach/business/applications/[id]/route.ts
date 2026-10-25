@@ -2,12 +2,12 @@
 // Accepting records the answer; the coach then sends their usual invite link (the roster's own path and gates).
 import { rateLimit } from '@/lib/rate-limit';
 import { setApplicationStatus } from '@/lib/coach-business/store';
-import { bad, json, notReady, rawDb, readJson, sessionUserId } from '@/lib/coach-business/server';
+import { bad, json, notReady, rawDb, readJson, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:app:${userId}`, 60, 60_000).ok) return bad('rate_limited', 429);
   const db = rawDb();

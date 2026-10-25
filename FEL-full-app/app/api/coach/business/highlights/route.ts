@@ -4,12 +4,12 @@ import { prisma } from '@/lib/db';
 import { rateLimit } from '@/lib/rate-limit';
 import { HIGHLIGHT_MAX } from '@/lib/coach-business/profile';
 import { insertHighlight } from '@/lib/coach-business/store';
-import { bad, json, notReady, rawDb, readJson, sessionUserId } from '@/lib/coach-business/server';
+import { bad, json, notReady, rawDb, readJson, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:hl:${userId}`, 20, 60_000).ok) return bad('rate_limited', 429);
   const db = rawDb();

@@ -4,14 +4,14 @@
 import { rateLimit } from '@/lib/rate-limit';
 import { connectGate, paymentsClosed } from '@/lib/coach-business/connect';
 import { startPackageCheckout } from '@/lib/coach-business/service';
-import { bad, json, liveDeps, readJson, sessionUserId } from '@/lib/coach-business/server';
+import { bad, json, liveDeps, readJson, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const gate = connectGate();
   if (!gate.ok) return paymentsClosed(gate.reason);
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:checkout:${userId}`, 10, 60_000).ok) return bad('rate_limited', 429);
   const body = (await readJson(req)) as { packageId?: unknown } | undefined;

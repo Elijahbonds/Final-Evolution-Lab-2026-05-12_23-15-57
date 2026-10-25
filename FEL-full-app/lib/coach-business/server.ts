@@ -14,7 +14,7 @@ import { readCoachPlan } from './planServer';
 import type { ConnectDeps } from './webhook';
 import type { PlanDb } from './planServer';
 
-export async function sessionUserId(): Promise<string | null> {
+export async function currentUserId(): Promise<string | null> {
   const session = await getServerSession(authOptions);
   return ((session?.user as { id?: string } | undefined)?.id) ?? null;
 }

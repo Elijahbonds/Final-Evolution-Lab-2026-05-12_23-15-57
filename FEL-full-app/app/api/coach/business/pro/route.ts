@@ -9,7 +9,7 @@ import { ensureStripeCustomer } from '@/lib/stripe/product-checkout';
 import { PAYMENTS_NOT_LIVE } from '@/lib/coach-business/config';
 import { proCheckoutParams, proGate } from '@/lib/coach-business/pro';
 import { readCoachPlan } from '@/lib/coach-business/planServer';
-import { bad, json, planDb, sessionUserId } from '@/lib/coach-business/server';
+import { bad, json, planDb, currentUserId } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,7 @@ export async function POST() {
     console.warn(`[coach-business] pro closed reason=${gate.reason}`);
     return bad('store_closed', 409, { reason: gate.reason, message: PAYMENTS_NOT_LIVE });
   }
-  const userId = await sessionUserId();
+  const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-business:pro:${userId}`, 5, 60_000).ok) return bad('rate_limited', 429);
   if ((await readCoachPlan(planDb(), userId)) === 'pro') return bad('already_pro', 409);
