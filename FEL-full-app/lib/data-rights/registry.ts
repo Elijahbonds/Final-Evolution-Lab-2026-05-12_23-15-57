@@ -324,6 +324,9 @@ export const REGISTRY: Record<string, TableRights> = {
     ],
   },
   LibraryExercise: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: 'Shared catalogue entry; the reviewer is no longer named.' }] },
+  // SIGNATURE-PROGRAMS (#451)
+  SignatureEnrollment: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's place in a signature program: the sessions done and the plan's adaptations. Their own training data." }] },
+  SignatureProgramReview: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: "The owner's review of FEL's own program (one row per program); the program stays, the reviewer is no longer named." }] },
   // TEAMS-SQUADS (#441)
   TrainingGroup: { omit: ['inviteToken'], subjects: [{ col: 'ownerId', export: true, erase: 'delete', why: 'An owner cannot leave a group, only delete it (lib/groups/rules.ts); erasing the owner deletes it, and its members and feed cascade.' }] },
   TrainingGroupMember: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'Leaves every group.' }] },
