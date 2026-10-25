@@ -9,6 +9,7 @@ import { MarketplaceView } from '@/components/coach-business/marketplace-view';
 import { BusinessDashboard } from '@/components/coach-business/business-dashboard';
 import type { Dashboard } from '@/lib/coach-business/dashboard';
 import type { MarketCard } from '@/lib/coach-business/market';
+import { ProBuy } from '@/components/pro/pro-buy';
 
 const pkg = (o: Partial<CoachProfileViewProps['packages'][number]>): CoachProfileViewProps['packages'][number] => ({
   id: 'p', coachId: 'c', kind: 'monthly', title: 'Online coaching', summary: '', priceCents: 12_000, includes: ['x'], capacity: null, sessions: null, active: true, sortOrder: 0, spotsLeft: null, action: 'apply', ...o,
@@ -89,4 +90,6 @@ const root = createRoot(document.getElementById('root')!);
 if (view === 'profile') root.render(shell(createElement(CoachProfileView, PROFILE)));
 else if (view === 'profile-live') root.render(shell(createElement(CoachProfileView, LIVE)));
 else if (view === 'market') root.render(shell(createElement(MarketplaceView, { q: { sport: 'basketball', goal: null }, cards: CARDS, ready: true })));
+// PAYMENTS-READY: the FEL Pro buy page (/pro), on sale, at the products' prices
+else if (view === 'pro') root.render(shell(createElement(ProBuy, { open: true, plan: 'monthly', prices: { weekly: 600, monthly: 999 }, terms: { version: 'store-terms-2026-10-12', href: '/store-terms' }, description: 'Keep the attribute upgrades you earn, billed monthly. Playing and PRQ scanning stay free.' })));
 else root.render(shell(createElement(BusinessDashboard)));

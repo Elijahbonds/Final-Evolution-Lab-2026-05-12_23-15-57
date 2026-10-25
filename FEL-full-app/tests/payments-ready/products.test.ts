@@ -41,6 +41,7 @@ const { POST: bookCheckout } = await import('@/app/api/books/checkout/route');
 const { BOOKS } = await import('@/lib/books/bookCatalog');
 const { bookOfferAllowed } = await import('@/lib/books/bookTerms');
 const { STORE_TERMS_VERSION } = await import('@/lib/store-terms');
+const { buyPro } = await import('@/lib/payments/proBuy');
 
 const ENV: Record<string, string> = {
   STRIPE_SECRET_KEY: 'sk_test_payments_ready_fake',
@@ -159,5 +160,30 @@ describe('FEL Pro: the buyer ticks the terms before Stripe is called', () => {
       expect(meta.terms_version).toBe(STORE_TERMS_VERSION);
       expect(Date.parse(meta.terms_accepted_at)).toBeGreaterThanOrEqual(before - 1000);
     }
+  });
+});
+
+describe('the /pro page\'s button, end to end through the real route', () => {
+  // the page's fetch, answered by the route itself
+  const viaRoute = (async (_url: string, init: RequestInit) => stripeCheckout(jsonRequest(JSON.parse(String(init.body))))) as unknown as typeof fetch;
+
+  it('an adult goes to Stripe with the plan they picked and the tick on the metadata', async () => {
+    const out = await buyPro(viaRoute, 'weekly', STORE_TERMS_VERSION);
+    expect(out.kind).toBe('redirect');
+    expect(h.stripe.created[0].line_items[0].price_data).toMatchObject({ unit_amount: 600, recurring: { interval: 'week' } });
+    expect(h.stripe.created[0].metadata.terms_version).toBe(STORE_TERMS_VERSION);
+  });
+
+  it('a teen sees exactly what the route answers today, and nothing reaches Stripe', async () => {
+    h.user = MINOR;
+    const direct = await call(stripeCheckout, { product: 'FEL_PRO_MONTHLY', ...TICK });
+    expect(direct.status).toBe(403);
+    expect(await buyPro(viaRoute, 'monthly', STORE_TERMS_VERSION)).toEqual({ kind: 'refused', message: direct.json.message });
+    expect(h.stripe.created).toHaveLength(0);
+  });
+
+  it('closed by the allow list: the page\'s not-on-sale line', async () => {
+    process.env.PURCHASES_ALLOWLIST = 'coins';
+    expect((await buyPro(viaRoute, 'monthly', STORE_TERMS_VERSION)).kind).toBe('closed');
   });
 });

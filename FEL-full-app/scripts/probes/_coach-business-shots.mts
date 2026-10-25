@@ -54,6 +54,7 @@ const VIEWS: { view: string; ready: string; open?: string }[] = [
   { view: 'dashboard', ready: '[data-business-dashboard]', open: 'Add a package' },
   { view: 'dashboard-live', ready: '[data-business-dashboard]' },
   { view: 'dashboard-setup', ready: '[data-disputes]' }, // PAYMENTS-READY: "finish your Stripe setup" + disputes
+  { view: 'pro', ready: '[data-pro-buy]' }, // PAYMENTS-READY: the /pro buy page
 ];
 const WIDTHS = [{ name: 'phone', w: 390, h: 844 }, { name: 'desktop', w: 1280, h: 900 }];
 

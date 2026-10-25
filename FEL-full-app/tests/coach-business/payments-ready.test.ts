@@ -19,6 +19,8 @@ import { platformFeePolicy, refundProcessingFee, PLATFORM_FEE_BPS_FREE_DEFAULT, 
 import { connectInvoiceCreated, connectInvoicePaid, fulfilCoachConnect, type ConnectDeps } from '@/lib/coach-business/webhook';
 import { coachConnectEvent, disputeFunds, disputeOutcome, type EventDeps } from '@/lib/coach-business/events';
 import { fakeCoachBusinessDb, fakeLedger, seedCoach } from '@/tests/helpers/fakeCoachBusinessDb';
+import { readCoachPlan } from '@/lib/coach-business/planServer';
+import { vi } from 'vitest';
 
 const NOW = new Date('2026-10-26T18:00:00Z');
 const ON = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_abc', NEXTAUTH_URL: 'https://fel.test' } as unknown as NodeJS.ProcessEnv;
@@ -497,5 +499,23 @@ describe('disputes on a coach\'s sale', () => {
     expect(disputeFunds(dispute({ balance_transactions: REINSTATED }) as any, 'charge.dispute.closed')).toEqual({ withdrawnCents: 22_128, reinstatedCents: 20_628 });
     expect(disputeFunds(dispute() as any, 'charge.dispute.funds_withdrawn')).toEqual({ withdrawnCents: 20_628, reinstatedCents: 0 });
     expect(disputeFunds(dispute() as any, 'charge.dispute.created')).toEqual({ withdrawnCents: 0, reinstatedCents: 0 });
+  });
+});
+
+describe('a failed plan read (coordinator 2026-10-26: keep the Pro rate, log one line)', () => {
+  it('counts as Pro, so the fee is the Pro rate even when it is the lower one; one PII-free line', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const db = { subscription: { findMany: async () => { throw Object.assign(new Error('db blip for coach-secret-id'), { name: 'PrismaClientKnownRequestError' }); } }, coachClient: { count: async () => 0 } };
+    expect(await readCoachPlan(db as never, 'coach-secret-id', {} as NodeJS.ProcessEnv)).toBe('pro');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls[0])).not.toContain('coach-secret-id');
+    expect(String(warn.mock.calls[0][0])).toContain('counted as Pro');
+    warn.mockRestore();
+    const policy = platformFeePolicy({ PLATFORM_FEE_BPS_FREE: '500', PLATFORM_FEE_BPS_PRO: '0' } as never);
+    expect(platformFee(policy, 'pro', 19_999).felShareCents).toBe(0);
+    // and through the checkout: a coach whose plan read failed (deps.plan answers what readCoachPlan answered)
+    const s = setup({ env: env({ PLATFORM_FEE_BPS_PRO: '0' }), plan: 'pro' });
+    await startPackageCheckout(s.deps, 'buyer-1', 'pkg-1', TICK);
+    expect([...s.fake.state.sales.values()][0].feeCents).toBe(0);
   });
 });

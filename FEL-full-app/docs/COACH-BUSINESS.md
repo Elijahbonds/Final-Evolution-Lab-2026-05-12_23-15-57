@@ -218,8 +218,9 @@ switch-on (it prints no secret).
   month so far is FEL's `COACH_CONNECT_FEE` less `COACH_CONNECT_FEE_REFUND` for that coach this UTC month (every ledger
   row now carries the `coachId`), plus the coach's open checkouts. A monthly renewal is capped on its draft
   (`invoice.created` writes the capped split on the invoice's own metadata); `invoice.paid` caps a renewal whose draft
-  was missed. The plan is read as today (`planServer.ts`): a failed read counts as Pro, so with a lower Pro rate a
-  database blip can charge a Free coach the Pro rate for that sale.
+  was missed. The plan is read as today (`planServer.ts`): a failed read counts as Pro, on purpose (coordinator,
+  2026-10-26: charging a coach more than their plan allows is worse than FEL losing a few cents), so a sale made during a
+  database blip takes the Pro rate; one PII-free log line says so.
 
 **Owner's Stripe steps this adds:** on the platform endpoint also subscribe `charge.dispute.created`,
 `charge.dispute.updated`, `charge.dispute.closed`, `charge.dispute.funds_withdrawn`, `charge.dispute.funds_reinstated`;
