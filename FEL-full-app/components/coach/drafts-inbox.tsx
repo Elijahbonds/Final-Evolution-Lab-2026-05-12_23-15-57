@@ -24,7 +24,7 @@ const SAFETY_STYLE: Record<string, string> = {
 
 export function DraftsInbox({ api = DRAFTS_API, safeApi = DRAFTS_SAFE_API }: { api?: string; safeApi?: string }) {
   const [data, setData] = useState<InboxAnswer | null>(null);
-  const [state, setState] = useState<'loading' | 'ready' | 'hidden' | 'error'>('loading');
+  const [state, setState] = useState<'loading' | 'ready' | 'hidden' | 'error' | 'pro'>('loading');
   const [busy, setBusy] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
 
@@ -32,6 +32,7 @@ export function DraftsInbox({ api = DRAFTS_API, safeApi = DRAFTS_SAFE_API }: { a
     try {
       const r = await fetch(api, { cache: 'no-store' });
       if (r.status === 403 || r.status === 401) { setState('hidden'); return; }
+      if (r.status === 402) { setState('pro'); return; } // COACH-BUSINESS: AI drafts are Coach Pro while the Pro gates are on
       if (!r.ok) { setState('error'); return; }
       setData(await r.json());
       setState('ready');
@@ -72,6 +73,7 @@ export function DraftsInbox({ api = DRAFTS_API, safeApi = DRAFTS_SAFE_API }: { a
   };
 
   if (state === 'hidden') return null;
+  if (state === 'pro') return <div className="fel-card rounded-xl p-4 text-sm text-white/60" data-testid="drafts-inbox">Weekly AI drafts are part of Coach Pro. <a href="/coach/business#pro" className="font-bold text-cyan-300 underline">See Coach Pro</a></div>;
   if (state === 'loading') return <div className="fel-card rounded-xl p-4 text-sm text-white/50" data-testid="drafts-inbox"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" aria-hidden="true" />Drafting this week…</div>;
   if (state === 'error' || !data) return <div className="fel-card rounded-xl p-4 text-sm text-white/50" data-testid="drafts-inbox">This week’s drafts did not load. Reload to try again.</div>;
   return (
