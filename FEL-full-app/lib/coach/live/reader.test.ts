@@ -20,6 +20,11 @@ describe('the live reader (interim, the Mirror audits by #438\'s rules)', () => 
     expect(reps[0].faults).not.toContain('kneeValgus');
   });
 
+  it('the same set filmed on a phone held upright counts the same', () => {
+    const { reps } = read('squat', squatSet(['clean', 'kneeInLeft', 'clean'], 0, { width: 480, height: 640 }));
+    expect(reps.map((r) => r.faults.includes('kneeValgus'))).toEqual([false, true, false]);
+  });
+
   it('a frame at or before the last one is ignored (no double count on a resent frame)', () => {
     const frames = squatSet(['clean']);
     const r = createLiveReader('squat');

@@ -111,8 +111,10 @@ export function ClientLive({ room, join, signalApi = '/api/coach/live/signal' }:
     catch { note('Your microphone is off or blocked: your coach cannot hear you. Cues still show here.'); }
     tracks.current = [video, audio].filter((t): t is MediaStreamTrack => !!t);
     setSending({ video: !!video, pose: poseOk, voice: !!audio });
+    // the camera's shape, for the coach's pose-only stage: the pose service's camera, else the video track's own
     const cam = svc.status.camera;
-    const aspect = cam && cam.width && cam.height ? cam.width / cam.height : 3 / 4;
+    const vs = video?.getSettings?.();
+    const aspect = cam && cam.width && cam.height ? cam.width / cam.height : vs?.width && vs?.height ? vs.width / vs.height : 3 / 4;
     hello.current = { t: 'hello', role: 'client', video: !!video, aspect };
     const l = new LiveLink({
       role: 'client', iceServers: join.iceServers, signaller: new HttpSignaller(room, signalApi),
