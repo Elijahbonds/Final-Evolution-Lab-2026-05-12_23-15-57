@@ -207,7 +207,7 @@ export function buildApproach(s: ApproachSpec): ApproachTake {
   let t = 0;
   // the plant is the right foot (one) — or the right then the left (two); the steps alternate back from it
   const plantFeet: ('L' | 'R')[] = two ? ['R', 'L'] : ['R'];
-  const penFoot: 'L' | 'R' = two ? 'L' : 'L';
+  const penFoot: 'L' | 'R' = 'L';
   const runFeet: ('L' | 'R')[] = [];
   for (let k = 0; k < nSteps; k++) runFeet.unshift(k % 2 === 0 ? (penFoot === 'L' ? 'R' : 'L') : penFoot);
   for (const f of runFeet) { contacts.push({ foot: f, td: t, to: t + ST }); t += ST + FL; }
@@ -276,8 +276,6 @@ export function buildApproach(s: ApproachSpec): ApproachTake {
     const u = ease((x - tApexGuess) / (tApexGuess - tTo));
     return { flex: lerp(reach.flex, down.flex, u), elbow: lerp(reach.elbow, down.elbow, u) };
   };
-  const quietArm = (x: number): Arm => armAt(x, 'R');
-  void quietArm;
   const leanAt = (x: number) => (x < tPenTd ? rad(12) : x < tPlantTd ? lerp(rad(12), rad(15), ease((x - tPenTd) / (tPlantTd - tPenTd))) : x <= tTo ? lerp(rad(15), rad(5), ease((x - tPlantTd) / PLANT)) : lerp(rad(5), rad(3), ease((x - tTo) / 0.2)));
   // ── a foot at time x on the ground: its contact, pitch (heel strike → flat → the heel rising), kept in reach
   const contactOf = (f: 'L' | 'R', x: number) => contacts.find((c) => c.foot === f && x >= c.td - 1e-9 && x <= c.to + 1e-9) ?? null;
@@ -326,7 +324,7 @@ export function buildApproach(s: ApproachSpec): ApproachTake {
   const cTo: YZ = [comY(bTo), comZ(bTo)];
   const vy0 = vCom(vHip), vz0 = (comZ(bTo) - comZ(groundBody(tTo - 0.002, vHip))) / 0.002;
   const relTo = { R: relOf(bTo, bTo.R), L: relOf(bTo, bTo.L) };
-  const hipVel = (comY(bTo) - comY(bTo)) + (bTo.py - groundBody(tTo - 0.002, vHip).py) / 0.002;
+  const hipVel = (bTo.py - groundBody(tTo - 0.002, vHip).py) / 0.002;
   const lk = s.landKnee ?? 0;
   const landRel: YZ = [-0.82 + 0.3 * lk, 0.12 + 0.12 * lk];
   const P_LAND = rad(22) - rad(15) * lk;
