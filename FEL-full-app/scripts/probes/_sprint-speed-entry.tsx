@@ -4,6 +4,7 @@
 // camera the tests use (tests/helpers/sprintSynth.ts), so every number on screen is a real read of frames.
 //   app     the speed app (the probe drives the gate, flying, trace and 5-10-5 runs in it)
 //   teen    a non-adult opens the page: one line, no camera
+//   combine combine day's run screen at a sprint station the coach set to the camera (an adult: the camera timer)
 import { createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SpeedApp } from '@/components/sprint/speed-app';
@@ -12,6 +13,10 @@ import { poseService } from '@/lib/pose/PoseService';
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import { makeCamera, project } from '@/lib/pose/synth';
 import { agilityRunState, bisect, film, sprinter } from '../../tests/helpers/sprintSynth';
+import { CombineRun } from '@/components/combine/combine-run';
+import { newEvent, recordAttempts } from '@/lib/combine/draft';
+import { parseStation } from '@/lib/combine/catalogue';
+import { OPEN_TODAY } from '@/lib/combine/today';
 
 const scene = location.hash.slice(1) || 'app';
 const W = 1280, H = 720;
@@ -71,4 +76,10 @@ w.__sprint = {
 const shell = (child: unknown) => h('main', { className: 'mx-auto min-h-screen max-w-md bg-[#050505] px-4 py-6 pb-20' }, child as never);
 const root = createRoot(document.getElementById('root')!);
 if (scene === 'teen') root.render(shell(h('div', { className: 'fel-card rounded-xl p-5 text-sm text-white/75', 'data-sprint-adults-only': '' }, ADULTS_ONLY_LINE)));
-else root.render(shell(h(SpeedApp)));
+else if (scene === 'combine') {
+  const st = parseStation({ kind: 'sprint', variant: '40yd', timing: 'camera' })!;
+  const a = (id: string, name: string, camera: boolean) => ({ id, name, source: 'roster' as const, access: { testable: true, camera, saveCamera: camera, held: null, today: OPEN_TODAY } });
+  let ev = newEvent({ name: 'Fall tryout', athletes: [a('maya', 'Maya Okafor', true), a('jo', 'Jo Reyes', true), a('h', 'Hana (16)', false)], stations: [st], localId: 'L' });
+  ev = recordAttempts(ev, 'maya', st.id, [{ value: 5.04, method: 'camera' }]);
+  root.render(shell(h(CombineRun, { ev, onChange: () => {}, onReport: () => {}, onHome: () => {}, roster: [], saving: true, status: null })));
+} else root.render(shell(h(SpeedApp)));

@@ -144,5 +144,5 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   // COMBINE-DAY (2026-10-25): a coach's combine — the jump, approach and skill-drill NUMBERS a coach's camera read for an
   // athlete, never a frame. Kept per athlete only for a verified adult with the live opt-in (lib/combine/gate.ts
   // canKeepOnServer, decided on the server from fresh rows); anyone else's camera numbers stay on the coach's phone.
-  { id: '1m', file: 'app/api/coach/combine/[id]/route.ts', handler: 'PUT', writes: 'CombineResult camera/video rows (jump, approach, skill drill; pending SQL 2026-10-25-combine-day.sql), per athlete through profileGates canSaveScan; hand-timed rows are not movement data', status: 'gated', holder: null, via: ['lib/combine/server.ts', 'lib/combine/store.ts'] },
+  { id: '1m', file: 'app/api/coach/combine/[id]/route.ts', handler: 'PUT', writes: 'CombineResult camera/video rows (jump, approach, skill drill, and, only once lib/sprint/cameraSprint.ts CAMERA_TIMES_SAVED is on (an owner call, off), a sprint or 5-10-5 timed by the camera — SPRINT-SPEED; pending SQL 2026-10-25-combine-day.sql), per athlete through profileGates canSaveScan; hand-timed rows are not movement data', status: 'gated', holder: null, via: ['lib/combine/server.ts', 'lib/combine/store.ts'] },
 ];

@@ -190,6 +190,22 @@ await page.close();
   await p2.close();
 }
 
+// 7. combine day: a sprint station set to the camera
+{
+  const p3 = await context.newPage();
+  const errs: string[] = [];
+  p3.on('pageerror', (e) => errs.push(String(e)));
+  await p3.goto(`file://${html}#combine`);
+  await p3.waitForSelector('[data-combine-camera-timer]');
+  await p3.screenshot({ path: join(OUT, '13-combine-camera-station-390.png'), fullPage: true });
+  report.combine = { name: await text(p3, 'h2'), slotCamera: !!(await p3.$('[data-slot-camera]')), stopwatchFallback: !!(await p3.$('[data-combine-use-stopwatch]')), scrollWidth: await p3.evaluate('document.documentElement.scrollWidth'), errors: errs };
+  check((report.combine as { name: string }).name === 'Sprint · 40 yd (camera)', 'combine: the station says camera');
+  check((report.combine as { slotCamera: boolean }).slotCamera, 'combine: the camera attempt is marked');
+  check(errs.length === 0, `combine: no page error (${errs.join(' | ')})`);
+  check(((report.combine as { scrollWidth: number }).scrollWidth) <= WIDTH, 'combine: no sideways scroll');
+  await p3.close();
+}
+
 await browser.close();
 console.log(JSON.stringify({ out: OUT, ok: fails.length === 0, fails, report }, null, 1));
 process.exit(fails.length ? 1 : 0);

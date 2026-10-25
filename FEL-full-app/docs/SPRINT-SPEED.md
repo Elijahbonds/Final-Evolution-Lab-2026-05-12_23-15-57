@@ -91,21 +91,28 @@ consent copy this lane may not change. The ready alternative, no new table: `POS
 `SCAN_SAVE_ROUTES`, `'sprint'` added to `SAVED_NUMBER_KINDS` so withdrawing consent erases it — once the consent
 sentence covers sprint numbers.
 
-## 8. Combine day hook (`cameraSprint`)
+## 8. Combine day: camera or hand, per station (`cameraSprint`)
 
-Combine day (PR #453, `lane/combine-day`) **had not merged** into `lane/finish-release` when this lane finished, so
-the hook is a documented adapter:
+Combine day (PR #453) **merged into `lane/finish-release` while this lane ran**, so it is wired (the final merge commit
+of this lane picked it up):
 
-- `lib/sprint/cameraSprint.ts` — `cameraSprint` (id `camera`, `supports(kind, variant)`, `distanceM(variant)` for
-  combine's `10yd…30m` ids, `attempt()`), `timingChoices(kind, variant)` (camera for straight sprints and the 5-10-5;
-  the 3-cone and shuffle stay hand), `TIMING_TAG` (`hand-timed` / `camera`).
-- `components/sprint/camera-sprint-timer.tsx` — `<CameraSprintTimer kind variant onTime />`, the same contract as
-  combine's `<HandTimer kind onTime />`; `onTime(seconds, { method: 'camera', sdS, startKind, reactionIncluded })`.
-
-Wiring when #453 lands (combine's files, so its lane or the next): a per-station `timing: 'hand' | 'camera'` the coach
-picks in setup; the run screen mounts `CameraSprintTimer` for a camera station **only when the athlete's
-`access.camera` is true** (verified adult), else `HandTimer`; the attempt keeps `method` and the report prints "camera"
-next to those times; `stationName`'s "(hand-timed)" suffix becomes per-attempt.
+- **Setup** (`components/combine/combine-setup.tsx`): a sprint station (any straight distance) or the 5-10-5 has a
+  "Timed by: hand / camera · switch" button. The pick is `StationConfig.timing = 'camera'`, kept by `parseStation` only
+  where `timingChoices(kind, variant)` offers the camera (the 3-cone and the shuffle stay hand), stored with the combine
+  and read back. The station is named "Sprint · 40 yd (camera)"; a hand station keeps "(hand-timed)".
+- **Run** (`components/combine/combine-run.tsx`): at a camera station, an athlete whose `access.camera` is true (a
+  verified adult) gets `<CameraSprintTimer>` (`components/sprint/camera-sprint-timer.tsx`: the finish-line run or the
+  5-10-5 through the same runner as `/train/speed`, then "Record 5.04 s ± 0.01 (camera)"), with a "Use the stopwatch for
+  this one" fallback; everyone else gets the `HandTimer`. The attempt keeps `method: 'camera'` (`Attempt.method`,
+  `recordAttempts` only for a camera-open athlete, `cleanSlots` keeps it) and its slot says "camera".
+- **Report and CSV**: the best of a camera station says "camera" or "hand-timed"; the CSV gets a "<station> timed by"
+  column (camera / hand-timed / camera + hand) for a camera station only (hand stations' headers are unchanged); the
+  footer says **camera and hand times are not directly comparable** (hand reads ≈ 0.2 s fast over 40 yd) — mixing them
+  in one ranking is an owner call.
+- **Save** (`lib/combine/server.ts`): a camera-timed attempt is a camera number. `CAMERA_TIMES_SAVED`
+  (`lib/sprint/cameraSprint.ts`) is **off**: such a station is returned in `keptOnDevice` and stays on the coach's phone,
+  for the consent reason in §7. On, it would be kept exactly as combine's camera stations are (a verified adult with the
+  live opt-in, row 1m; `method` column `'camera'`), and read back only while that still holds.
 
 ## 9. Who may use it
 
