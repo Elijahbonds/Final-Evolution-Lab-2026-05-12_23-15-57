@@ -104,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l' | '1m';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -141,4 +141,7 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   // COACH-READINESS (2026-10-25): the daily jump check — the day's jump NUMBERS (best, mean, typical error, the band), never
   // a frame. Verified adults who opted in; everyone else keeps the history on their own phone (lib/coach/readiness/gate.ts).
   { id: '1l', file: 'app/api/readiness/check/route.ts', handler: 'POST', writes: 'ReadinessJumpCheck (the day\'s jump numbers and band; pending SQL 2026-10-25-coach-readiness.sql) and the ReadinessAlert it fires', status: 'gated', holder: null, via: ['lib/coach/readiness/server.ts', 'lib/coach/readiness/store.ts'] },
+  // VBT (2026-10-25): a tracked set's bar-speed NUMBERS (speeds, reps, velocity loss, a warm-up's band), never a frame.
+  // Verified adults who opted in; an adult who has not keeps sets on the phone; a teen's are kept nowhere (lib/vbt/gate.ts).
+  { id: '1m', file: 'app/api/vbt/sets/route.ts', handler: 'POST', writes: 'VbtSet (a set\'s bar-speed numbers; pending SQL 2026-10-26-vbt.sql)', status: 'gated', holder: null, via: ['lib/vbt/server.ts', 'lib/vbt/store.ts'] },
 ];
