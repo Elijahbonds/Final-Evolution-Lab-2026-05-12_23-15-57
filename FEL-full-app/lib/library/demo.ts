@@ -365,7 +365,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
 export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press']);
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
-export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_reverse_fly', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt']);
+export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. */
 export type DemoProp = 'seat' | 'bench' | 'incline';

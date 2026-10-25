@@ -4,7 +4,7 @@
 // Owner decision (2026-10-25): raise the library's demo coverage only with correct, authored loops — a wrong movement
 // never shows. A variation the library tags with a shape modifier (lib/library/demo.ts SHAPE_MODIFIERS: single-arm,
 // alternating, half-kneeling, …) used to show the cue card because no loop did it; these are those loops.
-//   · ONE ARM (`_one`): the right arm does the rep; the left stays where the lift starts (hanging, or at the shoulder for a
+//   · ONE ARM (`_one`): the right arm does the rep (the left on a hinged lift, the side the stage's side camera sees); the left stays where the lift starts (hanging, or at the shoulder for a
 //     press the other hand still holds) — or, where the lift's start is a two-hand grip a free hand would not keep (behind
 //     the head, at a cable), hangs at the side.
 //   · ALTERNATING (`_alt`): a right rep, then a left rep; the resting side holds the start.
@@ -12,7 +12,7 @@
 //     (`_tk`): both knees down. The arms do the standing lift's rep from there.
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
 import {
-  ANKLE, ELBOWS_OUT, HANG, HANG_POLES, loop, mix, repOf, UPPER, both, bothDir, type Deg3, type ExKey, type Pair, type RepPair, type V3,
+  ANKLE, HANG, HANG_POLES, loop, mix, repOf, UPPER, both, bothDir, type Deg3, type ExKey, type Pair, type RepPair, type V3,
 } from './exerciseKit';
 
 type Pose = Omit<ExKey, 't'>;
@@ -37,9 +37,9 @@ export function sides(right: Pose, left: Pose): Pose {
 const HANG_LEFT: Pose = { hands: { Left: HANG.Left }, poles: { Left: HANG_POLES.Left } };
 
 /** A one-arm version of a lift: the right arm reps, the left holds `free` (default: the lift's start). */
-export function oneArm(p: RepPair, free?: Pose): RepPair {
+export function oneArm(p: RepPair, free?: Pose, working: Side = 'Right'): RepPair {
   const f = free ? { ...p.a, ...free, rel: free.rel, hands: free.hands, poles: free.poles } : p.a;
-  return { a: sides(p.a, f), b: sides(p.b, f), t: p.t };
+  return working === 'Right' ? { a: sides(p.a, f), b: sides(p.b, f), t: p.t } : { a: sides(f, p.a), b: sides(f, p.b), t: p.t };
 }
 
 /** An alternating loop: a right rep, then a left rep (each as the two-arm lift's timing), the resting side at the start. */
@@ -105,20 +105,22 @@ export const MORE_UPPER = {
   scaption: { a: UPPER.lateral.a, b: { ...UPPER.lateral.b, hands: both(0.60, 1.38, 0.38), poles: bothDir(0.4, 0.4, -0.8) }, t: [0.8, 0.2, 1.0, 0.3] },
 } satisfies Record<string, RepPair>;
 
-/** ex_front_raise_overhead — the front raise carried on up to overhead, arms long all the way (front raise to overhead). */
+/** ex_front_raise_overhead — the front raise carried on up to overhead, arms long all the way (front raise to overhead): the
+ *  hands keyed on the arm's arc from the shoulder (a straight line between two far-apart hand targets would cut through
+ *  the face). */
 function frontRaiseOverhead(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const down = UPPER.front.a, level = UPPER.front.b;
-  const top: Pose = { ...level, hands: both(0.18, 2.06, 0.12), poles: bothDir(1, 0.2, -0.2) };
-  const mid: Pose = { ...level, hands: both(0.18, 1.82, 0.46), poles: bothDir(1, 0, -0.3) };
-  const low: Pose = { ...level, hands: both(0.18, 1.12, 0.48), poles: ELBOWS_OUT };
+  const arc = (deg: number): Pose => {
+    const r = (deg * Math.PI) / 180, L = 0.52;
+    return { ...UPPER.front.a, hands: undefined, rel: { Left: [0.03, -L * Math.cos(r), L * Math.sin(r)], Right: [-0.03, -L * Math.cos(r), L * Math.sin(r)] }, poles: bothDir(1, -0.2, -0.2) };
+  };
   return loop(scene, sk, 'ex_front_raise_overhead', 3.2, [
-    { ...down, t: 0, hold: true }, { ...low, t: 0.4 }, { ...level, t: 0.7 }, { ...mid, t: 1.0 }, { ...top, t: 1.3, hold: true }, { ...top, t: 1.55, hold: true },
-    { ...mid, t: 1.9 }, { ...level, t: 2.2 }, { ...low, t: 2.5 }, { ...down, t: 2.85, hold: true },
+    { ...arc(8), t: 0, hold: true }, { ...arc(50), t: 0.4 }, { ...arc(90), t: 0.75 }, { ...arc(130), t: 1.05 }, { ...arc(168), t: 1.35, hold: true }, { ...arc(168), t: 1.6, hold: true },
+    { ...arc(130), t: 1.95 }, { ...arc(90), t: 2.25 }, { ...arc(50), t: 2.55 },
   ]);
 }
 
 type Builder = (scene: Scene, sk: Skeleton) => AnimationGroup | null;
-const one = (name: string, p: RepPair, free?: Pose): [string, Builder] => [name, (scene, sk) => repOf(scene, sk, name, oneArm(p, free))];
+const one = (name: string, p: RepPair, free?: Pose, working?: Side): [string, Builder] => [name, (scene, sk) => repOf(scene, sk, name, oneArm(p, free, working))];
 const alt = (name: string, p: RepPair): [string, Builder] => [name, (scene, sk) => alternating(scene, sk, name, p)];
 const two = (name: string, p: RepPair): [string, Builder] => [name, (scene, sk) => repOf(scene, sk, name, p)];
 
@@ -126,7 +128,7 @@ const two = (name: string, p: RepPair): [string, Builder] => [name, (scene, sk) 
 export const MORE_BUILDERS: readonly [string, Builder][] = [
   // one arm
   one('ex_curl_one', UPPER.curl), one('ex_press_one', UPPER.press, HANG_LEFT), one('ex_lateral_raise_one', UPPER.lateral), one('ex_front_raise_one', UPPER.front),
-  one('ex_triceps_overhead_one', UPPER.tricepsOverhead, HANG_LEFT), one('ex_pushdown_one', UPPER.pushdown, HANG_LEFT), one('ex_row_one', UPPER.row), one('ex_upright_row_one', UPPER.upright),
+  one('ex_triceps_overhead_one', UPPER.tricepsOverhead, HANG_LEFT), one('ex_pushdown_one', UPPER.pushdown, HANG_LEFT), one('ex_row_one', UPPER.row, undefined, 'Left'), one('ex_upright_row_one', UPPER.upright),
   one('ex_seated_press_one', UPPER.seatedPress, SEATED_HANG_LEFT), one('ex_seated_curl_one', UPPER.seatedCurl), one('ex_seated_lateral_raise_one', UPPER.seatedLateral),
   one('ex_seated_triceps_one', UPPER.seatedTriceps, SEATED_HANG_LEFT),
   one('ex_skull_crusher_one', UPPER.skull), one('ex_fly_one', UPPER.fly), one('ex_incline_press_one', UPPER.inclinePress), one('ex_incline_fly_one', UPPER.inclineFly),
@@ -134,7 +136,7 @@ export const MORE_BUILDERS: readonly [string, Builder][] = [
   alt('ex_curl_alt', UPPER.curl), alt('ex_press_alt', UPPER.press), alt('ex_lateral_raise_alt', UPPER.lateral), alt('ex_front_raise_alt', UPPER.front), alt('ex_row_alt', UPPER.row),
   alt('ex_seated_press_alt', UPPER.seatedPress), alt('ex_seated_curl_alt', UPPER.seatedCurl), alt('ex_incline_press_alt', UPPER.inclinePress),
   // more standing lifts
-  two('ex_kickback', MORE_UPPER.kickback), one('ex_kickback_one', MORE_UPPER.kickback), two('ex_reverse_fly', MORE_UPPER.reverseFly), two('ex_pull_apart', MORE_UPPER.pullApart),
+  two('ex_kickback', MORE_UPPER.kickback), one('ex_kickback_one', MORE_UPPER.kickback, undefined, 'Left'), two('ex_reverse_fly', MORE_UPPER.reverseFly), two('ex_pull_apart', MORE_UPPER.pullApart),
   two('ex_face_pull', MORE_UPPER.facePull), two('ex_scaption', MORE_UPPER.scaption), ['ex_front_raise_overhead', frontRaiseOverhead],
   // half-kneeling (the right knee down)
   two('ex_press_hk', hk(UPPER.press)), one('ex_press_hk_one', hk(UPPER.press), kneel({ ...UPPER.press.a, ...HANG_LEFT, rel: undefined }, ['Right'])), alt('ex_press_hk_alt', hk(UPPER.press)),
