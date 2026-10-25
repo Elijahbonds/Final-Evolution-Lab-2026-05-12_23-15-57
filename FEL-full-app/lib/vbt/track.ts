@@ -147,3 +147,18 @@ export function trackOf(lift: Lift, frames: readonly VbtFrame[], aspect: number,
   const samples = raw.filter((s, i) => i === 0 || s.t > raw[i - 1].t).map((s) => ({ t: s.t, x: (s.x - x0) * k, y: -(s.y - y0) * k }));
   return { ok: true, track: { source, ruler, posSdM: (source === 'plate' ? PLATE_JITTER : POSE_JITTER) * k, samples } };
 }
+
+/**
+ * Where to look for the plate in one frame, and how big it may be (image heights): the hands' visibility-weighted mean,
+ * and a radius range from the body ruler (a 22.5 cm radius, 0.8–1.9× for the plate standing nearer the lens than the
+ * body), or a wide 4–20 % of the picture's height without one.
+ */
+export function plateGuess(image: readonly Lm[], aspect: number, heightM: number | null): { wrist: { x: number; y: number }; range: { min: number; max: number } } | null {
+  const pts = [image[LEFT_WRIST], image[RIGHT_WRIST]].filter(ok);
+  if (!pts.length) return null;
+  const wrist = wmean(pts, aspect);
+  const seg = segmentUnits(image, aspect);
+  if (!heightM || !seg) return { wrist, range: { min: 0.04, max: 0.2 } };
+  const r = PLATE_DIAMETER_M / 2 / ((SEGMENT_STATURE_SHARE * heightM) / seg);
+  return { wrist, range: { min: 0.8 * r, max: 1.9 * r } };
+}
