@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { REGISTRY, PRQ_MOVEMENT, type TableRights } from './registry';
 import { erasePlan, TOMBSTONE } from './rights';
-import { personTables, scanPendingSql, scanPrismaSchema, PERSON_COLUMN, type Scan } from './schemaScan';
+import { personTables, scanPendingSql, scanPrismaSchema, PERSON_COLUMN, type Scan } from '@/tests/helpers/schemaScan';
 
 const ROOT = join(__dirname, '../..');
 const PENDING = join(ROOT, 'prisma/pending');

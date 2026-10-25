@@ -12,7 +12,7 @@
 // object. Anything else fails the build.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { parsePrismaModels, relationFields, stripSqlComments } from '@/lib/data-rights/schemaScan';
+import { parsePrismaModels, relationFields, stripSqlComments } from './schemaScan';
 
 const PG: Record<string, string> = {
   String: 'TEXT', Int: 'INTEGER', BigInt: 'BIGINT', Float: 'DOUBLE PRECISION', Boolean: 'BOOLEAN',

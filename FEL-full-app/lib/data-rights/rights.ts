@@ -34,10 +34,17 @@ export async function presentSchema(db: RawDb): Promise<Map<string, Set<string>>
   return out;
 }
 
-/** Does `db` carry the raw calls? A real Prisma client and transaction always do; some test stand-ins do not. */
+/**
+ * Does `db` carry the raw calls? A real Prisma client and transaction always do; some test stand-ins do not, and some
+ * throw on any property they do not model (lib/mirror/screen-route.test.ts). Asking never throws: no raw calls → false.
+ */
 export function hasRaw(db: unknown): db is RawDb {
-  const d = db as Partial<RawDb> | null;
-  return !!d && typeof d.$queryRawUnsafe === 'function' && typeof d.$executeRawUnsafe === 'function';
+  try {
+    const d = db as Partial<RawDb> | null;
+    return !!d && typeof d.$queryRawUnsafe === 'function' && typeof d.$executeRawUnsafe === 'function';
+  } catch {
+    return false;
+  }
 }
 
 const whereOf = (s: Subject): string => s.where ?? `${q(s.col)} = $1`;

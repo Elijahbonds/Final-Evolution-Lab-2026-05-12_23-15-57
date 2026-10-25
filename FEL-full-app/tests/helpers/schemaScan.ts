@@ -1,9 +1,9 @@
-// lib/data-rights/schemaScan.ts — DATA-RIGHTS-SWEEP (2026-10-25): which tables hold a person's data, read from the two
+// tests/helpers/schemaScan.ts — DATA-RIGHTS-SWEEP (2026-10-25): which tables hold a person's data, read from the two
 // places a table can come from: prisma/schema.prisma (applied) and prisma/pending/*.sql (written, waiting for the owner).
 //
-// Pure: it takes file text and returns what it found. The guard (./registry.test.ts) reads the files and checks every
-// table and person column it finds is classified in ./registry.ts. The real-Postgres test builds its database from the
-// same parse (tests/helpers/prismaDdl.ts), so the guard and the database it is checked against cannot disagree.
+// Pure: it takes file text and returns what it found. The guard (lib/data-rights/registry.test.ts) reads the files and checks every
+// table and person column it finds is classified in lib/data-rights/registry.ts. The real-Postgres test builds its database from the
+// same parse (./prismaDdl.ts), so the guard and the database it is checked against cannot disagree.
 //
 // A PERSON COLUMN is either
 //   · a foreign key to "User" (a Prisma relation of type User, or `REFERENCES "User"` in SQL), whatever its name; or
