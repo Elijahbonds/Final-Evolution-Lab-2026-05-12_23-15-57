@@ -75,7 +75,9 @@ const UA = 'AgeScreenTest/1.0';
 // COACH-READINESS (lane/coach-readiness, 2026-10-25) prisma/pending/2026-10-25-coach-readiness.sql (pending SQL only; schema.prisma
 // untouched; ReadinessJumpCheck + ReadinessRule + ReadinessAlert, additive) at 80954d8b, the lane commit carrying it on top of
 // every file above.
-const PARENT = '80954d8b8bc2dc668d6eeb86f849528aa210951e';
+// VBT (lane/vbt, 2026-10-25) prisma/pending/2026-10-26-vbt.sql (pending SQL only; schema.prisma untouched; VbtSet +
+// VbtZoneTarget, additive) at e9125b4b, the lane commit carrying it on top of every file above.
+const PARENT = 'e9125b4b15bb9a66458eba8feda49416dd275041';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
