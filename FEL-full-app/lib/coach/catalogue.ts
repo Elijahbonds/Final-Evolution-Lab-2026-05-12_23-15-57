@@ -20,7 +20,7 @@
 // labels it in the form so nobody has to guess: regressionOfId = "step down to" (the easier version), progressionOfId
 // = "step up to" (the harder one). assumption: the Today lane (P2) reads it the same way, since it renders the
 // fixture's Box Squat as the regression.
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 import { screenText, type TextFlag } from '@/lib/share/screen';
 import { isSkillLayerId } from './taxonomy';
 

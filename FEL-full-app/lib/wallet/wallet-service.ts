@@ -27,7 +27,7 @@
  * the original entry.
  */
 
-import { Prisma, type PrismaClient, type WalletLedgerEntry } from '@/public/_prisma/client';
+import { Prisma, type PrismaClient, type WalletLedgerEntry } from '@/lib/generated/prisma';
 import {
   DAILY_EVENT_TYPES,
   DEFAULT_REWARD_RULES,

@@ -12,7 +12,7 @@
 // off (P2021, or no accessor on an older client). Only the session and the house book (postLc) are stubbed. Nothing
 // here needs a database.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { Prisma } from '@/public/_prisma/client';
+import { Prisma } from '@/lib/generated/prisma';
 
 interface WalletRow { id: string; playerId: string; coins: bigint; shards: bigint; lc: bigint; version: bigint; updatedAt: Date }
 interface EntryRow {

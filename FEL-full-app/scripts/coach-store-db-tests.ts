@@ -4,7 +4,7 @@
  */
 import 'dotenv/config';
 import assert from 'node:assert';
-import { PrismaClient } from '@/public/_prisma/client';
+import { PrismaClient } from '@/lib/generated/prisma';
 import { holdPrivateSlot } from '../lib/sessions/privateHold';
 
 const prisma = new PrismaClient();

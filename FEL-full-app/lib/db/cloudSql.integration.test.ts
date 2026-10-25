@@ -81,7 +81,7 @@ describe.skipIf(!RUN)('DB-CONNECTOR against the real Prisma engine and a throwaw
 
   beforeAll(async () => {
     h.upstream = { host: up.hostname, port: Number(up.port || 5432) };
-    ({ PrismaClient, Prisma } = await import('@/public/_prisma/client'));
+    ({ PrismaClient, Prisma } = await import('@/lib/generated/prisma'));
     cloud = await import('./cloudSql');
   });
 

@@ -31,7 +31,7 @@
 // PRQ recovery (owner decision #12), and a line that turns false the day P9 lands is not one to ship.
 //
 // Pure: no Prisma client value (types only), no DOM.
-import type { BraceMode, MovementPattern, SessionSection } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern, SessionSection } from '@/lib/generated/prisma';
 import { HOLD_SEC, ROCK_HOLDS, ROCK_HOLD_ROUNDS, ROCK_SEC } from './warmupContent';
 import { RECOVERY_BREATH, RECOVERY_BREATH_STEP, breathCycleSec } from './cooldown';
 // MIRROR-COACH P9 (2026-09-30): the off-day kind and the two recovery filters moved to a leaf (./recoverySources) so the

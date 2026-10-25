@@ -51,7 +51,7 @@ import { WAVE_LINE } from '@/lib/coach/templates/waves';
 import { CoachGateLine } from '@/components/coach/protocol-gate-line';
 import type { CoachGateView } from '@/lib/coach/protocolGate';
 import { OFF_DAY_ADD_LINE, OFF_DAY_LINE, offDayWouldRewind } from '@/lib/coach/offDay';
-import type { MovementPattern, SessionSection } from '@/public/_prisma/client';
+import type { MovementPattern, SessionSection } from '@/lib/generated/prisma';
 import type { ProgramTree, TreeExercise } from '@/lib/coach/loop';
 import { mentionsShoulder, pullPushCheck } from '@/lib/coach/coverage';
 import { doseLine, groupBySection, sessionWarnings, supersetLabels, warningText } from '@/lib/coach/structure';

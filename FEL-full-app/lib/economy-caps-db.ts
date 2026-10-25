@@ -3,7 +3,7 @@
  * Only used inside the sessions route transaction; never against production from agents.
  */
 
-import type { Prisma, PrismaClient } from '@/public/_prisma/client';
+import type { Prisma, PrismaClient } from '@/lib/generated/prisma';
 import { GAMEPLAY_SHARD_REASONS, utcDayStart } from '@/lib/economy-caps';
 
 type Db = PrismaClient | Prisma.TransactionClient;

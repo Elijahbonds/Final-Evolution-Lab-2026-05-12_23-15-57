@@ -46,7 +46,7 @@
 // body part. Rung names ("Glute Bridge, 5-Second Squeeze") are the owner's ch8 names and are not cues; they stay.
 //
 // Pure data + lookups: no Prisma client value (types only), no DOM.
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 import type { CommonFault } from './catalogue';
 
 // ── the row ──────────────────────────────────────────────────────────────────────────────────────────────────────────

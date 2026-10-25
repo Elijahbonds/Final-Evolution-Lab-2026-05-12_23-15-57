@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Loader2, Search, ChevronRight, Play, Dumbbell, Target, Zap, X, Check, Plus } from 'lucide-react';
 import { ExerciseDemo } from '@/components/coach/exercise-demo';
 import { CATALOGUE_ERROR_COPY, PATTERN_INFO, nameKey } from '@/lib/coach/catalogue';
-import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
+import type { BraceMode, MovementPattern } from '@/lib/generated/prisma';
 import { MyCatalogue, TagRow } from './my-catalogue';
 
 interface Category { id: string; name: string }

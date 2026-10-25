@@ -9,7 +9,7 @@
 // NEVER SCORED, NEVER RE-DECIDED. This module calls painRule.ts's decide() exactly once per submission and stores
 // exactly what it returned; it does not add a second opinion, and nothing here feeds PRQ, a payout or a streak
 // (decision #4/#12 — see painRule.ts's own header for why that is a hard rule, not an oversight).
-import type { Prisma } from '@/public/_prisma/client';
+import type { Prisma } from '@/lib/generated/prisma';
 import { isMinorForMirror } from '../mirror/youth';
 import {
   ACUTE_EVENT_IDS,
