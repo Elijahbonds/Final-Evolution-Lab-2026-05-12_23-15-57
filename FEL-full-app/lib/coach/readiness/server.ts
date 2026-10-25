@@ -27,7 +27,7 @@ import {
   type RawDb, type StoredCheck,
 } from './store';
 import { ALERT_WINDOW_DAYS, BASELINE_WINDOW_DAYS, MIN_JUMPS, READINESS_TODAY_HOURS, TREND_CHECKS, TWICE_GAP_DAYS } from './thresholds';
-import type { DayJumps, PriorCheck, ReadinessBand, ReadinessFacts, ReadinessReason, ReadinessRule, RuleScope } from './types';
+import type { DayJumps, PriorCheck, ReadinessFacts, RuleScope, TodayReadiness } from './types';
 import { readDay, viewOf, type CoachRuleCtx, type ReadinessView, type TrendPoint } from './view';
 
 const DAY_MS = 86_400_000;
@@ -165,18 +165,6 @@ export async function deleteHistory(db: ReadinessDb, userId: string, now: Date =
 
 // ── Today ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export interface TodayReadiness {
-  band: ReadinessBand;
-  reason: ReadinessReason;
-  /** The coach's rule says ease off and today's check read Low under it. */
-  ease: boolean;
-  dropPct: number | null;
-  rule: ReadinessRule;
-  coachTold: boolean;
-  shared: boolean;
-  day: string;
-}
-
 /**
  * Today's saved check (one saved in the last READINESS_TODAY_HOURS, on a day that is plausibly today) under THIS coach's
  * rule as it stands now. null = no check today (Today is served as written), or the tables are not there.
@@ -192,7 +180,7 @@ export async function todayReadiness(db: ReadinessDb, userId: string, coachId: s
   const prev = recent.filter((c) => c.day < today.day).sort((a, b) => (a.day < b.day ? 1 : -1))[0];
   const read = applyRule(factsOf(today), ctx.rule, prev ? asPrior(prev) : null, today.day);
   const told = await toldFor(db, userId, today.day, nowMs);
-  return { band: read.band, reason: read.reason, ease: read.ease, dropPct: today.dropPct, rule: ctx.rule, coachTold: told.includes(coachId), shared: ctx.shared, day: today.day };
+  return { band: read.band, reason: read.reason, ease: read.ease, dropPct: today.dropPct, feel: today.feel, baselineN: today.baselineN ?? 0, rule: ctx.rule, coachTold: told.includes(coachId), shared: ctx.shared, day: today.day };
 }
 
 // ── the coach ────────────────────────────────────────────────────────────────────────────────────────────────────

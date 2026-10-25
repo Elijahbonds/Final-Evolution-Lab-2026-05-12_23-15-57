@@ -85,3 +85,18 @@ export interface ReadinessRead {
   /** Low AND the rule says ease: today's session eases (coached), or a gentle suggestion (solo). */
   ease: boolean;
 }
+
+/** Today's saved check under the program coach's CURRENT rule (server.ts todayReadiness). */
+export interface TodayReadiness {
+  band: ReadinessBand;
+  reason: ReadinessReason;
+  /** The coach's rule says ease off and today's check read Low under it. */
+  ease: boolean;
+  dropPct: number | null;
+  feel: number | null;
+  baselineN: number;
+  rule: ReadinessRule;
+  coachTold: boolean;
+  shared: boolean;
+  day: string;
+}
