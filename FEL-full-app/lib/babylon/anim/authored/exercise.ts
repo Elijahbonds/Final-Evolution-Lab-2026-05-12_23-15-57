@@ -29,6 +29,7 @@ import {
 import { MORE_BUILDERS } from './exerciseMore';
 import { FLOOR_BUILDERS } from './exerciseFloor';
 import { ATHLETIC_BUILDERS } from './exerciseAthletic';
+import { BODY_BUILDERS } from './exerciseBody';
 
 
 // ── lower body ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -411,6 +412,8 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   ...FLOOR_BUILDERS,
   // LIBRARY-ANATOMY-2: anti-rotation, throws, chops, carries, swings, rotator cuff (exerciseAthletic.ts)
   ...ATHLETIC_BUILDERS,
+  // LIBRARY-ANATOMY-2: lunges sideways, single-leg hinges, trunk, planks, conditioning, drills, jumps, rope, crawls (exerciseBody.ts)
+  ...BODY_BUILDERS,
 ];
 /** Build one exercise loop by name (authored/index.ts registers each name through this). */
 export function buildExerciseClip(name: string, scene: Scene, sk: Skeleton): AnimationGroup | null {

@@ -16,31 +16,31 @@ type Pose = Omit<ExKey, 't'>;
 const KNEEL_Y = -0.43;
 /** A down knee by bones (the thigh under the hip, the shin flat behind, the foot pointed). */
 const downKnee = (s: 'Left' | 'Right'): Record<string, Deg3> => ({ [`${s}UpLeg`]: [0, 0, s === 'Left' ? 3 : -3], [`${s}Leg`]: [90, 0, 0], [`${s}Foot`]: [62, 0, 0] });
-const QUAD_HANDS: Pair = both(0.18, 0.05, 0.52);
+export const QUAD_HANDS: Pair = both(0.18, 0.05, 0.52);
 /** Hands and knees by targets: the knee under the hip, the shin flat behind, the foot pointed (so a move to or from a
  *  position solved by targets interpolates targets, not a bone pose into a target pose). */
-const QUAD_LEGS = { feet: both(0.12, 0.09, -0.42), kneePoles: bothDir(0, -1, 0.1) };
+export const QUAD_LEGS = { feet: both(0.12, 0.09, -0.42), kneePoles: bothDir(0, -1, 0.1) };
 
 // ── the base poses the lying, side-lying and seated positions are made from ──
 /** On the back, knees bent, feet flat (the bridge's floor pose, exercise.ts ex_bridge). */
-const SUPINE: Pose = { bones: { Hips: [-86, 0, 0], Spine: [0, 0, 0], Neck: [10, 0, 0] }, feet: both(0.14, ANKLE, 0.50), kneePoles: bothDir(0.1, 1, 0.2), hands: both(0.30, 0.04, -0.20), poles: bothDir(0.6, 0.3, 0), hipsY: -0.82 };
+export const SUPINE: Pose = { bones: { Hips: [-86, 0, 0], Spine: [0, 0, 0], Neck: [10, 0, 0] }, feet: both(0.14, ANKLE, 0.50), kneePoles: bothDir(0.1, 1, 0.2), hands: both(0.30, 0.04, -0.20), poles: bothDir(0.6, 0.3, 0), hipsY: -0.82 };
 /** On the back with the legs keyed by bones (no foot targets): the base the legs-in-the-air positions add their legs to. */
-const LIE_BACK: Pose = { bones: { Hips: [-86, 0, 0], Spine: [0, 0, 0], Neck: [10, 0, 0] }, hands: both(0.30, 0.04, -0.20), poles: bothDir(0.6, 0.3, 0), hipsY: -0.84 };
+export const LIE_BACK: Pose = { bones: { Hips: [-86, 0, 0], Spine: [0, 0, 0], Neck: [10, 0, 0] }, hands: both(0.30, 0.04, -0.20), poles: bothDir(0.6, 0.3, 0), hipsY: -0.84 };
 /** Face down, the forehead on the hands, the legs long, the feet pointed. */
-const PRONE: Pose = { bones: { Hips: [88, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], LeftFoot: [60, 0, 0], RightFoot: [60, 0, 0] }, feet: both(0.11, 0.06, -0.86), kneePoles: bothDir(0, -1, 0), hands: both(0.10, 0.10, 0.42), poles: bothDir(1, 0.2, 0), hipsY: -0.84 };
+export const PRONE: Pose = { bones: { Hips: [88, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], LeftFoot: [60, 0, 0], RightFoot: [60, 0, 0] }, feet: both(0.11, 0.06, -0.86), kneePoles: bothDir(0, -1, 0), hands: both(0.10, 0.10, 0.42), poles: bothDir(1, 0.2, 0), hipsY: -0.84 };
 /** Face down, the arms long overhead on the floor (the superman's start). */
 const PRONE_LONG: Pose = { ...PRONE, hands: both(0.20, 0.06, 0.98), poles: bothDir(0.3, 1, 0) };
 /** On the right side, the head toward −z and the chest toward +x (the stage's floor camera), the knees bent and stacked,
  *  the head on the bottom arm. The Hips' yaw −90 then roll 90 lays the body down that way (measured on the rig). */
-const SIDE: Pose = { bones: { Hips: [0, -90, 90], Spine: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-45, 0, 0], RightUpLeg: [-45, 0, 0], LeftLeg: [90, 0, 0], RightLeg: [90, 0, 0] }, hands: { Right: [0.04, 0.06, -0.92], Left: [0.10, 0.36, 0.10] }, poles: { Right: [0, 1, 0], Left: [0.2, 0.4, 1] }, hipsY: -0.78 };
+export const SIDE: Pose = { bones: { Hips: [0, -90, 90], Spine: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-45, 0, 0], RightUpLeg: [-45, 0, 0], LeftLeg: [90, 0, 0], RightLeg: [90, 0, 0] }, hands: { Right: [0.04, 0.06, -0.92], Left: [0.10, 0.36, 0.10] }, poles: { Right: [0, 1, 0], Left: [0.2, 0.4, 1] }, hipsY: -0.78 };
 /** Side-lying with the knees bent to right angles and both arms long in front at shoulder height (the open book's start). */
 const SIDE_ARMS: Pose = { ...SIDE, bones: { ...SIDE.bones, LeftUpLeg: [-90, 0, 0], RightUpLeg: [-90, 0, 0] }, hands: { Right: [0.46, 0.10, -0.42], Left: [0.46, 0.16, -0.42] }, poles: { Right: [0, 1, 0.2], Left: [0, 1, 0.2] } };
 /** Hands and knees, neutral (defined with the targets the moves interpolate). */
-const QUAD_POSE: Pose = { bones: { Hips: [90, 0, 0], Spine: [0, 0, 0], Neck: [-40, 0, 0], LeftFoot: [60, 0, 0], RightFoot: [60, 0, 0] }, ...QUAD_LEGS, hands: QUAD_HANDS, poles: bothDir(0.6, 0.2, -0.5), hipsY: -0.40 };
+export const QUAD_POSE: Pose = { bones: { Hips: [90, 0, 0], Spine: [0, 0, 0], Neck: [-40, 0, 0], LeftFoot: [60, 0, 0], RightFoot: [60, 0, 0] }, ...QUAD_LEGS, hands: QUAD_HANDS, poles: bothDir(0.6, 0.2, -0.5), hipsY: -0.40 };
 /** Child's pose (POSITIONS.child). */
-const CHILD: Pose = { bones: { Hips: [96, 0, 0], Spine: [12, 0, 0], Spine1: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [60, 0, 0], RightFoot: [60, 0, 0] }, feet: both(0.11, 0.08, -0.10), kneePoles: bothDir(0.1, -0.1, 1), hands: both(0.20, 0.05, 0.80), poles: bothDir(0.3, 0.2, -1), hipsY: -0.63 };
+export const CHILD: Pose = { bones: { Hips: [96, 0, 0], Spine: [12, 0, 0], Spine1: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [60, 0, 0], RightFoot: [60, 0, 0] }, feet: both(0.11, 0.08, -0.10), kneePoles: bothDir(0.1, -0.1, 1), hands: both(0.20, 0.05, 0.80), poles: bothDir(0.3, 0.2, -1), hipsY: -0.63 };
 /** Down dog (POSITIONS.dog). */
-const DOG: Pose = { bones: { Hips: [134, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], LeftFoot: [4, 0, 0], RightFoot: [4, 0, 0] }, feet: both(0.13, ANKLE + 0.05, -0.70), kneePoles: bothDir(0, 0, 1), hands: both(0.22, 0.05, 0.52), poles: bothDir(0.5, 0, -1), hipsY: -0.26, hipsZ: -0.16 };
+export const DOG: Pose = { bones: { Hips: [134, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], LeftFoot: [4, 0, 0], RightFoot: [4, 0, 0] }, feet: both(0.13, ANKLE + 0.05, -0.70), kneePoles: bothDir(0, 0, 1), hands: both(0.22, 0.05, 0.52), poles: bothDir(0.5, 0, -1), hipsY: -0.26, hipsZ: -0.16 };
 /** The 90/90 sit, right leg in front (POSITIONS.ninety is it mirrored, left leg in front). */
 const NINETY: Pose = { bones: { Hips: [-4, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0] }, feet: { Right: [-0.30, 0.08, 0.40], Left: [-0.48, 0.08, -0.40] }, kneePoles: { Right: [0.4, 0.3, 1], Left: [-1, 0.3, 0] }, hands: both(0.32, 0.05, -0.06), poles: bothDir(0.5, 0, -1), hipsY: -0.80 };
 /** Sitting with both knees up, the feet flat in front, the hands behind on the floor (the 90/90 switch's middle). */
