@@ -5,6 +5,7 @@
 import { MODE_INFO } from '@/lib/game-data';
 import { CLEAN_SHARE_SAME_BAND } from '@/lib/mirror/progressReading';
 import { compareWeeks, type Point, type WeekCompare } from './week';
+import { jumpRealChangeCm } from '@/lib/jump/session';
 import type { ProfileGates } from './gate';
 
 // ── where to go to get a number (the empty states point here) ─────────────────────────────────────────────────────
@@ -14,8 +15,13 @@ export const ACCOUNT_HREF = '/account';
 export const PLAY_HREF = '/play';
 export const SPRINT_HREF = MODE_INFO.sprint?.href ?? '/play/sprint';
 
-/** A jump within half an inch of last week's reads "same" (assumption: camera jump reads wobble about that much). */
-export const JUMP_SAME_BAND_IN = 0.5;
+/**
+ * A jump within this of last week's reads "same". JUMP-PRO (2026-10-24): MEASURED, no longer the 0.5 in guess
+ * ("camera jump reads wobble about that much"): two week-bests each carry the camera jump's typical error (bench, live
+ * 30–60 fps: ~1.5 cm a jump, lib/jump/session.ts defaultTypicalErrorCm), so a change is real at 90 % past
+ * 1.645·√2·1.5 cm ≈ 1.4 in (lib/jump/session.ts realChange). Under it, "better" would be the camera's noise.
+ */
+export const JUMP_SAME_BAND_IN = Math.round((jumpRealChangeCm(40, 30) / 2.54) * 10) / 10;
 /** A saved jump above this is a misread, not a jump (the Mirror's own cap is 80 in for a re-screen). */
 export const MAX_JUMP_CM = 203;
 

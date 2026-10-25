@@ -72,6 +72,8 @@ import { screenPose } from './screen-pose';
 import { LiveHud } from './live-hud';
 import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep, TakeoffStep } from './gate-steps';
 import { JumpResult } from './jump-result';
+import { JumpSessionCard } from '@/components/jump/jump-session-card';
+import { SlowMoUpload } from '@/components/jump/slowmo-upload';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
@@ -449,6 +451,10 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       {phase === 'jumpResult' && jumpView ? (
         <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} />
       ) : null}
+      {/* JUMP-PRO: every jump with its ±, the set, the tip and the verified mark — adults only. MIRROR-TRUST-RATING hook:
+          pass jumpView.trust?.level as trustLevel once PR #424 lands (its Low hides the number, and this card with it). */}
+      {phase === 'jumpResult' && jumpView && !jumpView.kid ? <JumpSessionCard t5={carryRef.current?.t5 ?? null} trustLevel={null} /> : null}
+      {phase === 'jumpResult' && jumpView && !jumpView.kid ? <SlowMoUpload /> : null}
 
       {live ? (
         <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: 'min(72vh, 100dvh - 12rem)' }}>

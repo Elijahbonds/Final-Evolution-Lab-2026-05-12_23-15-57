@@ -370,11 +370,15 @@ export function cmj(jumps: readonly CmjJump[], opts: { fps?: number; noise?: boo
   hold(Math.round(1.2 * SRC_FPS), standing);
   for (const jp of jumps) {
     const T = flightOf(jp.heightM), v0 = G * T / 2;
-    truth.push({ flightMs: T * 1000, heightCm: jp.heightM * 100 });
     // the dip and the drive
     for (const d of [...repCurve(0, 0.35, 0.05, 0.25, 0)]) frames.push(handsOnHips(squatPose(0.55 * d)));
     // flight: the standing body, ballistic
     const nFlight = Math.max(2, Math.round(T * SRC_FPS));
+    // JUMP-PRO (2026-10-24): the truth is the flight this clip FLIES — nFlight source frames — not the one asked for. The
+    // arc is squeezed into a whole number of 60 Hz frames, so a 45 cm jump (0.606 s) flies 0.600 s here: 44.1 cm, and a
+    // reader that times the clip exactly was scored 0.9 cm "wrong". lib/jump/ballistic.ts solves its truth instead.
+    const flown = nFlight / SRC_FPS;
+    truth.push({ flightMs: flown * 1000, heightCm: ((G * flown * flown) / 8) * 100 });
     const late = (jp.rightLateMs ?? 0) / 1000;
     for (let i = 1; i <= nFlight; i++) {
       const t = (i / nFlight) * T, y = v0 * t - (G * t * t) / 2;

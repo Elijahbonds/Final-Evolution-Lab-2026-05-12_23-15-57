@@ -14,6 +14,15 @@
 //
 // A jump whose hands left the hips is not the standard (the arm-swing variant is not built) and is not counted.
 //
+// JUMP-PRO (2026-10-24): EACH FLIGHT IS THEN RE-TIMED FROM THE WHOLE FLIGHT (lib/jump/refine.ts). The finder above
+// still finds, refuses and orders every flight; the refiner moves its two edges to where the hips' free-fall parabola
+// meets the airborne leg, measures how much lower the body landed than it left, and takes that extra fall back out.
+// `heightCm` is then the TAKE-OFF-VELOCITY height (v0²/2g, the force plate's definition); `heightFlightCm` keeps the
+// plain g·T²/8 of the refined flight, and `heightSdCm` its own ±1 SD. On the ground-truth bench (lib/jump/bench.ts) the
+// finder alone read bent-knee landings +5 cm and flat-foot landings +3 cm high, and its take-off 7–12 ms late at
+// 120–240 fps; see docs/JUMP-PRO.md for the before/after table. A flight the refiner cannot re-time keeps the
+// finder's read (`method: 'frames'`).
+//
 // Pure.
 import type { PoseFrame } from '@/lib/pose/landmarks';
 import type { FrontCalibration } from '../calibration';
@@ -25,6 +34,9 @@ import {
 } from '../scoring';
 import { bandOf, isProvisional, th, type ThresholdId } from '../thresholds';
 import type { GradeContext } from './t1-overhead-squat';
+import { refineFlight, refineVouches } from '@/lib/jump/refine';
+import { CI95_Z, trialQuality, sessionStats } from '@/lib/jump/session';
+import { reboundStats } from '@/lib/jump/rebound';
 
 export const G = 9.81;
 
@@ -96,6 +108,9 @@ const EDGE_TOP = FD.edgeTop;
  */
 const EDGE_SLACK_MS = FD.edgeSlackMs;
 
+/** A settle (the feet planted again after a step) spans at least this long (ms): settleFrames at 30 fps, less jitter. */
+const SETTLE_SPAN_MS = (FD.settleFrames - 1) * 30;
+
 /** A flight: take-off and landing, or a reason it is not one. */
 export type FlightCheck = { ok: true } | { ok: false; why: string };
 
@@ -162,9 +177,16 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
     const pre = floorAt(i - 1, -1);
     if (!(both(i, pre) > air)) { i++; continue; }
     // stepped to a new spot: the feet settle again within ~0.1 s, still low — a new floor, not a flight
-    let k = i, still = 0;
-    while (k < n && t(k) - t(i) <= FD.settleMs && still < FD.settleFrames) { still = plantedBoth(k) ? still + 1 : 0; k++; }
-    if (still >= FD.settleFrames && both(k - 1, pre) < FD.settleRise * air) { i = k; continue; }
+    // JUMP-PRO (2026-10-24): the settle must also SPAN SETTLE_SPAN_MS, not only settleFrames frames. At 240 fps three
+    // frames are 12 ms, and a flight's first frames read "planted" (the toe has barely moved over the PLANTED_MS
+    // window), so a real jump was taken for a step: 1 jump in 18 lost at 120–240 fps on the bench. 30 fps is unchanged
+    // (three frames there span 66 ms).
+    let k = i, still = 0, runFrom = t(i);
+    while (k < n && t(k) - t(i) <= FD.settleMs && !(still >= FD.settleFrames && t(k - 1) - runFrom >= SETTLE_SPAN_MS)) {
+      if (plantedBoth(k)) { if (!still) runFrom = t(k); still++; } else still = 0;
+      k++;
+    }
+    if (still >= FD.settleFrames && t(k - 1) - runFrom >= SETTLE_SPAN_MS && both(k - 1, pre) < FD.settleRise * air) { i = k; continue; }
     // the last frame down before it, against the floor the feet left from
     let b = i - 1;
     while (b >= 0 && !(both(b, pre) <= contact)) b--;
@@ -221,6 +243,21 @@ export function detectFlights(raw: readonly PoseFrame[], front: FrontCalibration
   return flights;
 }
 
+/**
+ * JUMP-PRO (2026-10-24): one flight per jump. At 240 fps the finder can land a flight at its apex (the feet barely move
+ * there) and then find the same take-off again: two overlapping flights, the first cut short (bench, rebounds with
+ * 150 ms contacts: 2 jumps in 36). Overlapping flights are one; the one that lands later is the whole of it.
+ */
+export function withoutOverlaps<F extends { takeoffT: number; landT: number }>(flights: readonly F[]): F[] {
+  const out: F[] = [];
+  for (const f of [...flights].sort((a, b) => a.takeoffT - b.takeoffT)) {
+    const last = out[out.length - 1];
+    if (last && f.takeoffT < last.landT) { if (f.landT > last.landT) out[out.length - 1] = f; continue; }
+    out.push(f);
+  }
+  return out;
+}
+
 export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraFps?: number | null }): TestResult & { t5: T5Extra } {
   const front = ctx.calibration.front, aspect = ctx.aspect;
   const hz = ctx.poseHz ?? poseHz(raw);
@@ -236,17 +273,23 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
   const frames = smooth(raw);
   const vis = th('gate.visibilityScoring');
   const ok = frames.map((f) => f.present && passes(f.image, SCORING_POINTS, 'front', vis));
-  const flights = detectFlights(raw, front);
+  const flights = withoutOverlaps(detectFlights(raw, front));
   const wLanding = th('t5.landingWindowMs');
   const jumps: (JumpRead & { landFrame: number; takeFrame: number })[] = [];
   for (const fl of flights) {
-    const flightMs = fl.landT - fl.takeoffT;
-    if (flightMs < th('t5.flightMinMs')) continue;                       // a hop, not an attempt
-    const heightCm = heightCmOf(flightMs);
+    if (fl.landT - fl.takeoffT < th('t5.flightMinMs')) continue;          // a hop, not an attempt (on the finder's own edges)
+    // JUMP-PRO: re-timed from the whole flight when it can be; the finder's frames otherwise
+    // A flight the finder's rise check refused (its edges read a longer flight than the feet rose for) is re-timed too:
+    // when the hips' own parabola tops out mid-flight and fits (refineVouches), the re-timed flight stands.
+    const k = flights.indexOf(fl);
+    const rf0 = fl.landed ? refineFlight(raw, front, fl.takeoffT, fl.landT, { prevLandT: flights[k - 1]?.landT, nextTakeoffT: flights[k + 1]?.takeoffT }) : null;
+    const rf = rf0 && (fl.check.ok || refineVouches(rf0)) ? rf0 : null;
+    const flightMs = rf ? rf.flightMs : fl.landT - fl.takeoffT;
+    const heightCm = rf ? rf.heightTovCm : heightCmOf(flightMs);
     const index = jumps.length + 1;
     let invalidWhy: string | undefined;
     if (!fl.landed) invalidWhy = 'the camera never saw you land';
-    else if (!fl.check.ok) invalidWhy = fl.check.why;
+    else if (!fl.check.ok && !rf) invalidWhy = fl.check.why;
     else if (flightMs > th('t5.flightMaxMs') || Math.round(heightCm * 10) / 10 > th('t5.maxHeightCm')) invalidWhy = `it read over ${th('t5.maxHeightCm')} cm, so the camera lost your feet`;
     else if (fl.airIdx.some((k) => raw[k].image.length >= 33 && wristsAboveShoulders(raw[k].image) > th('t5.armSwingWrist'))) invalidWhy = 'your hands left your hips';
     // the landing: the deepest hip drop within the window, and the knees there
@@ -268,7 +311,12 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
     jumps.push({
       index, valid: !invalidWhy, ...(invalidWhy ? { invalidWhy } : {}),
       flightMs: Math.round(flightMs), heightCm: Math.round(heightCm * 10) / 10,
-      takeoffT: Math.round(fl.takeoffT), landT: Math.round(fl.landT),
+      takeoffT: Math.round(rf ? rf.takeoffT : fl.takeoffT), landT: Math.round(rf ? rf.landT : fl.landT),
+      method: rf ? 'refined' : 'frames',
+      heightFlightCm: Math.round((rf ? rf.heightFlightCm : heightCm) * 10) / 10,
+      heightSdCm: rf ? Math.round(rf.heightTovSdCm * 10) / 10 : null,
+      landDropCm: rf && rf.landDropCm !== null ? Math.round(rf.landDropCm * 10) / 10 : null,
+      quality: trialQuality({ refined: rf, poseHz: hz, valid: !invalidWhy }),
       landingFlex: landed ? Math.round(deepest * 1000) / 1000 : null,
       landingValgus: { left: valg('left'), right: valg('right') },
       landingSymMs: !fpsLow && dl !== null && dr !== null ? Math.round(Math.abs(dl - dr)) : null,
@@ -321,9 +369,14 @@ export function gradeT5(raw: readonly PoseFrame[], ctx: GradeContext & { cameraF
     bestFlightMs: bestJ ? bestJ.flightMs : null,
     bestJump: bestJ ? bestJ.index : null,
     poseFps: hz, cameraFps: ctx.cameraFps ?? null, fpsLow,
-    // one frame of timing on the best flight: dh = g·t·dt / 4
-    heightPlusMinusCm: bestJ && hz > 0 ? Math.round(((G * (bestJ.flightMs / 1000) * (1 / hz)) / 4) * 1000) / 10 : null,
+    // one frame of timing on the best flight: dh = g·t·dt / 4 — or, when it is wider, the best jump's own 95 % range
+    // (JUMP-PRO: the refiner's ±1 SD × 1.96). The band shown is never narrower than one frame's worth.
+    heightPlusMinusCm: bestJ && hz > 0
+      ? Math.round(Math.max((G * (bestJ.flightMs / 1000) * (1 / hz)) / 4 * 100, CI95_Z * (bestJ.heightSdCm ?? 0)) * 10) / 10
+      : null,
     cvPct, inconsistent: cvPct !== null && cvPct >= bandOf('t5.cvPct').fault!,
+    session: sessionStats(valid),
+    rebounds: reboundStats(jumps),
   };
   const passing = ok.filter(Boolean).length;
   const confidence = confidenceOf(passing, raw.length, hz);
