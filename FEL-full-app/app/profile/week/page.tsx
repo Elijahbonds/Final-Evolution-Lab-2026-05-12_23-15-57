@@ -14,6 +14,8 @@ import { ShareWeek } from '@/components/progress-card/share-week';
 // DAILY-DRILL (value round item 3): the daily drill's week, one line under the card (not on the share image)
 import { DrillWeekLine } from '@/components/daily-drill/week-line';
 import { drillDaysThisWeek } from '@/lib/daily-drill/load';
+// COACH-READINESS (2026-10-25): the daily jump check's trend, adults only (the card fetches; anyone the check refuses sees nothing)
+import { ReadinessTrendCard } from '@/components/readiness/readiness-trend';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +45,7 @@ export default async function WeekPage() {
       aside={<Link href="/profile" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Back to profile</Link>}>
       {phoneForm ? <DeviceCard card={card} /> : <ProgressCardView card={card} />}
       <DrillWeekLine days={drillDays} />
+      <ReadinessTrendCard />
       <ShareWeek minor={card.minorOrUnknown} phoneOnly={phoneForm} />
       {/* SEAM (lib/progress-card/summary.ts ProgressCard.clips): before/after clips arrive with the user's own clip store */}
       <div className="mt-6">

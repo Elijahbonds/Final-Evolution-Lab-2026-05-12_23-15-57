@@ -72,7 +72,10 @@ const UA = 'AgeScreenTest/1.0';
 // lane/coach-business landed first (#442): pinned at this lane's merge of lane/finish-release, the first commit carrying
 // all four 2026-10-24/25 pending files, ef5ed65f.
 // Teams + exercise library both landed: pinned at the merge of lane/finish-release into lane/teams-squads that carries every pending file above.
-const PARENT = 'c0ceffae5af100057e40967d65505e4dd344e2a8';
+// COACH-READINESS (lane/coach-readiness, 2026-10-25) prisma/pending/2026-10-25-coach-readiness.sql (pending SQL only; schema.prisma
+// untouched; ReadinessJumpCheck + ReadinessRule + ReadinessAlert, additive) at 80954d8b, the lane commit carrying it on top of
+// every file above.
+const PARENT = '80954d8b8bc2dc668d6eeb86f849528aa210951e';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

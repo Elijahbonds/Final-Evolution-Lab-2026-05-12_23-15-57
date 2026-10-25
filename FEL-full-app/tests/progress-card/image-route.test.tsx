@@ -2,9 +2,9 @@
 // Proven: signed out gets nothing; the owner gets a PNG of their own card that no cache may keep; an under-18 or
 // unknown-age account's image never carries a name even when the request asks for one; an adult's name is drawn only
 // when ticked; the draw is rate limited per account.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProfileRows } from '@/lib/profile-v2/assemble';
-import { adultTwoWeeks, teenActive, newUser } from '@/tests/helpers/progressCardRows';
+import { adultTwoWeeks, teenActive, newUser, NOW } from '@/tests/helpers/progressCardRows';
 
 const h = vi.hoisted(() => ({ user: 'u1' as string | null, rows: null as unknown, drawn: [] as { card: any; opts: any }[] }));
 
@@ -33,7 +33,10 @@ async function get(q = '') {
 }
 const PNG = [0x89, 0x50, 0x4e, 0x47];
 
-beforeEach(() => { h.user = 'u1'; h.rows = adultTwoWeeks(); h.drawn = []; resetRateLimitMemory(); });
+// The fixture rows are dated against the helpers' fixed NOW, but the route reads the real clock: pin the clock to NOW
+// (Date only; timers stay real for next/og), or the week buckets drift as days pass and the headline changes.
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW); h.user = 'u1'; h.rows = adultTwoWeeks(); h.drawn = []; resetRateLimitMemory(); });
+afterEach(() => { vi.useRealTimers(); });
 
 describe('GET /api/v1/progress-card/image', () => {
   it('signed out: 401, nothing drawn', async () => {
