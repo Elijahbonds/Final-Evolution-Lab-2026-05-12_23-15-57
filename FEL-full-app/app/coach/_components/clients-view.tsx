@@ -7,6 +7,7 @@ import { Loader2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
 import { AttentionPanel } from '@/components/coach/attention-panel';
 import { DraftsInbox } from '@/components/coach/drafts-inbox';
+import { TeamsPanel } from '@/components/groups/teams-panel';
 import { ScreenPrescriptions } from '@/components/coach/screen-prescriptions';
 import { ProgramBuilder, type BuilderCatalogueItem } from '@/components/coach/program-builder';
 import { CoverageLegend, CoverageStrip } from '@/components/coach/coverage-strip';
@@ -97,6 +98,7 @@ export function ClientsView() {
       <AttentionPanel />
       {/* COACH-AI-DRAFT (2026-10-24): this week's drafted program changes, one card per athlete; nothing changes until approved */}
       <DraftsInbox />
+      <TeamsPanel />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>

@@ -91,6 +91,12 @@ export default async function TrainPage() {
       line: 'Meals keyed to the numbers you enter, and the kitchens behind it.',
       tag: 'Eat',
     },
+    {
+      // TEAMS-SQUADS (2026-10-25): squads (friends) and teams (a coach's) — daily drills together, a weekly league
+      href: '/squads', icon: Users, accent: '#00E5FF', title: 'Squads and teams',
+      line: 'Train with friends: a group streak on the daily drill, a weekly league, reactions. No messages.',
+      tag: 'Train together',
+    },
     ...(coachesAnyone ? [{
       href: '/coach', icon: Users, accent: '#A855F7', title: 'Your roster',
       line: 'The athletes you coach, what they have done this fortnight, and who is drifting.',
