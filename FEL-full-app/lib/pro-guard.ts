@@ -11,6 +11,7 @@
 
 import { prisma } from './db';
 import { hasActivePro, FEL_PRO_WEEKLY_USD } from './progression/upgradeGate';
+import { coachProPriceCents, usdPlain } from './coach-business/config';
 
 export interface ProStatus {
   isPro: boolean;
@@ -111,13 +112,14 @@ export interface B2BPaywallBody extends PaywallBody {
 
 /** The 402 body for a B2B surface. Names the tier and what the caller can still do. */
 export function b2bPaywall(feature: string, tier: B2BTier, freeAlternative: string): B2BPaywallBody {
-  const price = tier === 'coach' ? 39 : 199;
+  // FEL Coach's price is the one config value (COACH_PRO_PRICE_USD_CENTS, default $39); Facility's is unchanged.
+  const price = tier === 'coach' ? usdPlain(coachProPriceCents()) : '$199';
   const key = tier === 'coach' ? 'FEL_COACH' : 'FEL_FACILITY';
   return {
     error: 'pro_required',
     feature,
     tier,
-    message: `${feature} is part of ${tier === 'coach' ? 'FEL Coach' : 'FEL Facility'} ($${price}/month).`,
+    message: `${feature} is part of ${tier === 'coach' ? 'FEL Coach' : 'FEL Facility'} (${price}/month).`,
     weeklyUsd: FEL_PRO_WEEKLY_USD,
     checkout: { weekly: `/api/stripe/checkout?product=${key}`, monthly: `/api/stripe/checkout?product=${key}` },
     free: freeAlternative,

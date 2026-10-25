@@ -3,7 +3,7 @@
 // prove that a closed switch reaches neither the database nor Stripe.
 import { connectGate, createCheckout, refundPayment, type ConnectGate, type ConnectStripe } from './connect';
 import { CHECKOUT_HOLD_MINUTES, isCoachProEnabled } from './config';
-import { applicationFeeCents } from './fees';
+import { saleSplit } from './fees';
 import { featureGate, type CoachPlan } from './plan';
 import { cleanGoals } from './market';
 import { attachCheckout, businessReady, connectFor, holdSpot, markExpired, packageById, saleById, saveApplication, type TxDb } from './store';
@@ -49,13 +49,14 @@ export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, 
   }
   const slug = await deps.coachSlug(pkg.coachId);
   if (!slug) return { ok: false, status: 404, error: 'package_not_found' };
-  const feeCents = applicationFeeCents(pkg.priceCents);
-  const held = await holdSpot(deps.db, { pkg, buyerId, feeCents, stripeAccountId: acct.stripeAccountId, livemode: gate.live, now: deps.now, holdMinutes: CHECKOUT_HOLD_MINUTES });
+  // The buyer pays the price plus the processing fee; the sale records the price and FEL's 5% of it (fees.ts).
+  const split = saleSplit(pkg.priceCents);
+  const held = await holdSpot(deps.db, { pkg, buyerId, feeCents: split.felShareCents, stripeAccountId: acct.stripeAccountId, livemode: gate.live, now: deps.now, holdMinutes: CHECKOUT_HOLD_MINUTES });
   if (!held.ok) return { ok: false, status: 409, error: 'package_full', message: 'This package is full right now.' };
   try {
     const stripe = deps.stripe();
     const customerId = await deps.ensureCustomer(buyerId);
-    const s = await createCheckout(stripe, { pkg, saleId: held.saleId, buyerId, customerId, coachSlug: slug, destination: acct.stripeAccountId, feeCents, origin: gate.origin, now: deps.now });
+    const s = await createCheckout(stripe, { pkg, saleId: held.saleId, buyerId, customerId, coachSlug: slug, destination: acct.stripeAccountId, split, origin: gate.origin, now: deps.now });
     await attachCheckout(deps.db, held.saleId, s.id);
     return { ok: true, url: s.url, saleId: held.saleId };
   } catch (e) {
@@ -69,8 +70,8 @@ export interface RefundDeps { db: TxDb; stripe: () => ConnectStripe; env: NodeJS
 export type RefundResult = { ok: true; refundedCents: number; status: string } | Refusal;
 
 /**
- * The coach refunds part or all of a one-off sale. Monthly coaching is cancelled, not refunded, here (the Stripe dashboard
- * refunds an invoice). The sale's record and FEL's ledger move at once, through the same code the webhook runs, so the
+ * The coach refunds part or all of a one-off sale's price (the processing fee is not refunded: fees.ts "REFUNDS"). Monthly
+ * coaching is cancelled, not refunded, here (the Stripe dashboard refunds an invoice). The sale's record and FEL's ledger move at once, through the same code the webhook runs, so the
  * webhook's later charge.refunded finds nothing left to do.
  */
 export async function refundSale(deps: RefundDeps, coachId: string, saleId: string, amountCents: number | null): Promise<RefundResult> {
@@ -89,10 +90,27 @@ export async function refundSale(deps: RefundDeps, coachId: string, saleId: stri
   const amount = amountCents ?? left;
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > left) return { ok: false, status: 400, error: 'invalid_amount' };
   const after = sale.refundedCents + amount;
-  const r = await refundPayment(deps.stripe(), { saleId: sale.id, paymentIntentId: sale.paymentIntentId, amountCents: amount, cumulativeAfter: after });
+  let r: { chargeId: string | null };
+  try {
+    r = await refundPayment(deps.stripe(), { saleId: sale.id, paymentIntentId: sale.paymentIntentId, amountCents: amount, cumulativeAfter: after });
+  } catch (e) {
+    console.error('[coach-business] refund failed', e instanceof Error ? e.name : typeof e);
+    return { ok: false, status: 502, error: 'refund_failed', message: 'The refund did not go through. Try again.' };
+  }
   if (r.chargeId) {
-    const charge = await deps.stripe().charges.retrieve(r.chargeId);
-    await recordConnectRefund(deps.ledger, sale.id, r.chargeId, Number(charge.amount_refunded ?? after));
+    // Stripe has accepted the refund. If handing back FEL's share or booking it fails here, the charge.refunded webhook
+    // runs the same step (state-based, so nothing is paid twice) and Stripe retries it until it succeeds.
+    try {
+      const charge = await deps.stripe().charges.retrieve(r.chargeId);
+      const fee = charge.application_fee;
+      await recordConnectRefund(deps.ledger, sale.id, {
+        id: r.chargeId,
+        refundedTotal: Number(charge.amount_refunded ?? after),
+        applicationFeeId: typeof fee === 'string' ? fee : fee?.id ?? null,
+      });
+    } catch (e) {
+      console.error('[coach-business] refund recorded later by the webhook', e instanceof Error ? e.message : typeof e);
+    }
   }
   return { ok: true, refundedCents: after, status: after >= sale.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED' };
 }

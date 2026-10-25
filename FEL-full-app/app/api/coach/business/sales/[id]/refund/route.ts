@@ -1,5 +1,6 @@
-// COACH-BUSINESS: POST { amountCents? } — the coach refunds part or all of one of their own one-off sales (the coach's
-// transfer is reversed and FEL's 5% handed back in proportion), or cancels a monthly one. lib/coach-business/service.ts.
+// COACH-BUSINESS: POST { amountCents? } — the coach refunds part or all of the price of one of their own one-off sales (the
+// coach's transfer is reversed and FEL's 5% handed back in proportion; the processing fee is not refunded), or cancels a
+// monthly one. lib/coach-business/service.ts.
 import { rateLimit } from '@/lib/rate-limit';
 import { connectGate, paymentsClosed } from '@/lib/coach-business/connect';
 import { refundSale } from '@/lib/coach-business/service';

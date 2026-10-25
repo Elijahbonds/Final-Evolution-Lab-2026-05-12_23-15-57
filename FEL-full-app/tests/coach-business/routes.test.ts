@@ -73,13 +73,15 @@ describe('every money route is closed by default — and touches nothing', () =>
     expect(h.stripeCalls).toBe(0);
   });
 
-  it('Coach Pro: closed while COACH_PRO_ENABLED is off, and while no price is set', async () => {
+  // test changed (coach-fee-passthrough): `price_not_set` no longer exists (the price defaults to the owner's $39), so
+  // with the Pro switch on the next fence in the same order is the site URL — still closed, still no Stripe call.
+  it('Coach Pro: closed while COACH_PRO_ENABLED is off, and while the site URL is unset', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test_x';
     expect((await (await pro()).json()).reason).toBe('pro_off');
     process.env.COACH_PRO_ENABLED = '1';
     const r = await pro();
     expect(r.status).toBe(409);
-    expect((await r.json()).reason).toBe('price_not_set');
+    expect((await r.json()).reason).toBe('site_url_not_set');
     expect(h.stripeCalls).toBe(0);
   });
 });
@@ -91,8 +93,16 @@ describe('the shared Stripe webhook routes a COACH_CONNECT event to the coach bu
     seedCoach(fake.state);
     fake.state.sales.set('sale-1', { id: 'sale-1', packageId: 'pkg-1', coachId: 'coach-1', buyerId: 'b', kind: 'session_pack', status: 'PAID', amountCents: 19_999, feeCents: 999, refundedCents: 0, feeRefundedCents: 0, paymentIntentId: 'pi_1' });
     const ledger = fakeLedger();
-    h.deps = { db: fake.db, post: ledger.post };
-    h.event = { id: 'evt_1', type: 'charge.refunded', data: { object: { id: 'ch_1', amount_refunded: 19_999, metadata: { product: 'COACH_CONNECT', saleId: 'sale-1' } } } };
+    // test changed (coach-fee-passthrough): the charge names its application fee, and FEL's share goes back to the coach
+    // through Stripe (one application-fee refund of 999), so the deps carry a fee-refund recorder.
+    const feeRefunds: number[] = [];
+    let refunded = 0;
+    const stripe = { applicationFees: {
+      retrieve: async () => ({ amount: 1_628, amount_refunded: refunded }),
+      createRefund: async (_id: string, p: { amount: number }) => { feeRefunds.push(p.amount); refunded += p.amount; return {}; },
+    } };
+    h.deps = { db: fake.db, post: ledger.post, stripe: () => stripe };
+    h.event = { id: 'evt_1', type: 'charge.refunded', data: { object: { id: 'ch_1', amount_refunded: 19_999, application_fee: 'fee_1', metadata: { product: 'COACH_CONNECT', saleId: 'sale-1' } } } };
     const call = () => webhook(new Request('https://fel.test/api/stripe/webhook', { method: 'POST', headers: { 'stripe-signature': 't=1,v1=x' }, body: '{}' }) as any);
     const first = await call();
     expect(await first.json()).toEqual({ received: true, coachConnect: 'refunded' });
@@ -100,6 +110,7 @@ describe('the shared Stripe webhook routes a COACH_CONNECT event to the coach bu
     expect(h.bookTouched).toBe(0);
     expect(fake.state.sales.get('sale-1')).toMatchObject({ status: 'REFUNDED', feeRefundedCents: 999 });
     expect(ledger.rows).toHaveLength(1);
+    expect(feeRefunds).toEqual([999]);
   });
 
   it('a failure answers 500 so Stripe retries', async () => {

@@ -59,14 +59,20 @@ const UA = 'AgeScreenTest/1.0';
 // schema.prisma untouched; CoachFormReview, additive) at 02c1e49c, the lane commit carrying it on top of every file above.
 // lane/coach-ai-draft landed first (#436): pinned at c2c5140e, this lane's merge of lane/finish-release, the first
 // commit carrying both pending files.
+// TEAMS-SQUADS (lane/teams-squads, 2026-10-25) prisma/pending/2026-10-25-teams-squads.sql (pending SQL only; schema.prisma
+// untouched; TrainingGroup + TrainingGroupMember + TrainingGroupAct, additive) at e0adbbd8, the lane commit carrying it on
+// top of every file above; lane/coach-video-review landed first (#438): pinned at the merge of lane/finish-release into
+// this lane (f123fb66), the first commit carrying all three 2026-10-24/25 pending files.
 // COACH-BUSINESS (lane/coach-business, 2026-10-25) prisma/pending/2026-10-25-coach-business.sql (pending SQL only; schema.prisma
 // untouched; six additive tables) at 44680dbc. lane/coach-video-review landed first (#438): pinned at b4857b8d, this
 // lane's merge of lane/finish-release, the first commit carrying all three 2026-10-24/25 pending files.
+// Both landed: pinned at the merge of lane/finish-release into lane/teams-squads carrying teams-squads + coach-business SQL.
 // EXERCISE-LIBRARY (lane/exercise-library, 2026-10-25) prisma/pending/2026-10-25-exercise-library.sql (pending SQL only;
 // schema.prisma untouched; LibraryExercise + LibrarySubmission + ProgramExercise.libraryExerciseId, additive) at 8656ba16.
 // lane/coach-business landed first (#442): pinned at this lane's merge of lane/finish-release, the first commit carrying
 // all four 2026-10-24/25 pending files, ef5ed65f.
-const PARENT = 'ef5ed65fe3a4254cb7fc4c24a24aaf2968a52d11';
+// Teams + exercise library both landed: pinned at the merge of lane/finish-release into lane/teams-squads that carries every pending file above.
+const PARENT = 'c0ceffae5af100057e40967d65505e4dd344e2a8';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
