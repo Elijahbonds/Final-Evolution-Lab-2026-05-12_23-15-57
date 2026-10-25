@@ -336,6 +336,10 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'toUserId', export: true, erase: 'delete', why: 'Reactions, nudges and trophies aimed at the person (the foreign key cascades the same way).' },
     ],
   },
+  // COMBINE-DAY (lane/combine-day; prisma/pending/2026-10-25-combine-day.sql). Numbers only: no frame, video or note.
+  CombineEvent: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own combines (name, stations, weights). Erasing the coach deletes them, and their entrants and results cascade (the foreign keys do the same), as a team goes with its owner." }] },
+  CombineEntrant: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "That the athlete was on a coach's combine; it goes with them (the foreign key cascades the same way)." }] },
+  CombineResult: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own combine numbers (jump, approach and drill reads, hand-timed times). Other athletes' results stay with the coach's combine (the foreign key cascades the same way)." }] },
 
   // ── camp / facilitator ────────────────────────────────────────────────────────────────────────────────────────────
   FacilitatorProfile: {

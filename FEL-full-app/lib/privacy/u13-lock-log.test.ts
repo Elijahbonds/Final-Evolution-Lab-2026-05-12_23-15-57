@@ -78,7 +78,10 @@ const UA = 'AgeScreenTest/1.0';
 // SIGNATURE-PROGRAMS (lane/signature-programs, 2026-10-25) prisma/pending/2026-10-25-signature-programs.sql (pending SQL only;
 // schema.prisma untouched; SignatureProgramReview + SignatureEnrollment, additive) at 3b1851c6, the lane commit carrying it on
 // top of every file above.
-const PARENT = '3b1851c68b6a2e5c4ac339e4feef53451fd882e7';
+// COMBINE-DAY (lane/combine-day, 2026-10-25) prisma/pending/2026-10-25-combine-day.sql (pending SQL only; schema.prisma
+// untouched; CombineEvent + CombineEntrant + CombineResult, additive) at f1954c91; with the signature programs' file it is
+// carried by the merge 0fba61f1, the first commit holding every file above.
+const PARENT = '0fba61f116e8f34c2f20649ad828d9acaa6514cc';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
