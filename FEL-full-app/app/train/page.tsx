@@ -114,6 +114,17 @@ export default async function TrainPage() {
       line: 'The athletes you coach, what they have done this fortnight, and who is drifting.',
       tag: 'Coach',
     }] : []),
+    // COMBINE-DAY (2026-10-25): a coach's tryout / testing day; a coached athlete's own combine numbers
+    ...(coachesAnyone ? [{
+      href: '/coach/combine', icon: Timer, accent: '#00E5FF', title: 'Combine day',
+      line: 'Run a tryout: jump, agility, sprint and a skill drill, station by station, then a ranked report.',
+      tag: 'Run a combine',
+    }] : []),
+    ...(coachLink ? [{
+      href: '/train/combine', icon: Timer, accent: '#00E5FF', title: 'Your combines',
+      line: 'Your numbers from your coach’s combines, and where you placed.',
+      tag: 'See results',
+    }] : []),
     {
       href: '/profile', icon: Activity, accent: '#7B61FF', title: 'Where you stand',
       line: 'PRQ, your grade, and what has moved since the last screen.',
