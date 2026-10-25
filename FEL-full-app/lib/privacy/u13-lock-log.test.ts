@@ -82,8 +82,9 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; CombineEvent + CombineEntrant + CombineResult, additive) at f1954c91; with the signature programs' file it is
 // carried by the merge 0fba61f1, the first commit holding every file above.
 // VBT (lane/vbt, 2026-10-25) prisma/pending/2026-10-26-vbt.sql (pending SQL only; schema.prisma untouched; VbtSet +
-// VbtZoneTarget, additive) at e9125b4b, the lane commit carrying it on top of every file above.
-const PARENT = '0fba61f116e8f34c2f20649ad828d9acaa6514cc';
+// VbtZoneTarget, additive) at e9125b4b; with signature programs and combine day landed first (#451, #453), pinned at
+// c1cf9937, this lane's merge of lane/finish-release, the first commit carrying every pending file above.
+const PARENT = 'c1cf9937cd3cfbb3d0798d52bb1a2647648bf8ea';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
