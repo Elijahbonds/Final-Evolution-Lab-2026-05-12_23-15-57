@@ -150,6 +150,9 @@ Check the webhook's deliveries in the Dashboard: every event should answer 200. 
    FEL Facility (roadmap: after launch), shard packs (roadmap: not at launch) and the legacy coach block and
    marketplace listings. (a) **Add a per-product allow list next to it** *(recommended: one small change in
    `/api/stripe/checkout` and the wallet routes)*; (b) accept it for launch.
+   **Built (payments-ready, 2026-10-26):** `PURCHASES_ALLOWLIST` (`lib/payments/allowlist.ts`). Unset = as above; set,
+   e.g. `PURCHASES_ALLOWLIST=fel_pro,coins`, = only those sell. FEL Pro now also asks the store-terms tick before Stripe
+   (409 `terms_required`), with the version and time on the session and subscription metadata.
 2. **The cosmetic SKU delivers no item.** `cosm-chrome-visor` writes an Order and nothing reads it: no wardrobe item is
    granted and no UI sells it. Cosmetics are really bought with coins. (a) **Do not sell the SKU; sell coins**
    *(recommended)*; (b) wire the SKU to a wardrobe item first.

@@ -48,6 +48,11 @@ const DASH: Dashboard = {
   market: { listed: true, acceptingClients: true, sports: ['basketball', 'volleyball'], goals: ['vertical', 'speed'] },
   packages: PACKAGES.map((k) => ({ ...k, spotsLeft: k.spotsLeft })),
   connect: null,
+  // PAYMENTS-READY fixtures: the Connect tick box (test mode, coach terms not written yet), the fee line, no disputes
+  needsStripeSetup: true,
+  coachTerms: { version: 'coach-terms-unsigned-test-mode', href: null, signed: false },
+  feeLabel: '5%',
+  disputes: [],
   sales: [
     { id: 's1', packageId: 'p2', title: 'Four live sessions', kind: 'session_pack', status: 'PAID', amountCents: 24_000, feeCents: 1_200, refundedCents: 0, feeRefundedCents: 0, livemode: false, paidAt: '2026-10-20T10:00:00Z', createdAt: '2026-10-20T10:00:00Z' },
     { id: 's2', packageId: 'p1', title: 'Monthly online coaching', kind: 'monthly', status: 'ACTIVE', amountCents: 14_900, feeCents: 745, refundedCents: 0, feeRefundedCents: 0, livemode: false, paidAt: '2026-10-18T10:00:00Z', createdAt: '2026-10-18T10:00:00Z' },
@@ -60,13 +65,21 @@ const DASH: Dashboard = {
     { id: 'h3', text: 'Ran a 4.6 forty after twelve weeks.', state: 'waiting' },
   ],
 };
-const LIVE_DASH: Dashboard = { ...DASH, plan: { ...DASH.plan, plan: 'pro' }, paymentsLive: true, connect: { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, livemode: false } };
+const LIVE_DASH: Dashboard = { ...DASH, plan: { ...DASH.plan, plan: 'pro' }, paymentsLive: true, needsStripeSetup: false, connect: { chargesEnabled: true, payoutsEnabled: true, detailsSubmitted: true, livemode: false, requirementsDue: false } };
+// PAYMENTS-READY: Stripe asks the coach for more (requirements due) and a client disputed a sale
+const SETUP_DASH: Dashboard = {
+  ...LIVE_DASH, needsStripeSetup: true, connect: { chargesEnabled: true, payoutsEnabled: false, detailsSubmitted: true, livemode: false, requirementsDue: true },
+  disputes: [
+    { id: 'dp_1', saleId: 's1', title: 'Four live sessions', amountCents: 24_773, reason: 'fraudulent', stripeStatus: 'needs_response', outcome: 'OPEN', livemode: false, createdAt: '2026-10-24T10:00:00Z', closedAt: null },
+    { id: 'dp_2', saleId: 's2', title: 'Monthly online coaching', amountCents: 15_373, reason: 'product_not_received', stripeStatus: 'won', outcome: 'WON', livemode: false, createdAt: '2026-10-02T10:00:00Z', closedAt: '2026-10-20T10:00:00Z' },
+  ],
+};
 
 const view = (window as unknown as { __VIEW?: string }).__VIEW ?? 'profile';
 window.fetch = async (input: RequestInfo | URL) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const path = url.replace(/^https?:\/\/[^/]+/, '').split('?')[0];
-  if (path === '/api/coach/business') return Response.json(view === 'dashboard-live' ? LIVE_DASH : DASH);
+  if (path === '/api/coach/business') return Response.json(view === 'dashboard-live' ? LIVE_DASH : view === 'dashboard-setup' ? SETUP_DASH : DASH);
   if (path === '/api/coach/roster') return Response.json({ roster: [{ clientId: 'c1', name: 'Alexandria Montgomery' }] });
   return Response.json({ error: 'not_found' }, { status: 404 });
 };

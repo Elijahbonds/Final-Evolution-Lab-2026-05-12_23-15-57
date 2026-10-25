@@ -303,6 +303,9 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'buyerId', export: true, erase: 'keep', why: MONEY },
     ],
   },
+  // PAYMENTS-READY (prisma/pending/2026-10-26-payments-ready.sql): a buyer's dispute on a coach's sale. No buyer column (the
+  // sale names the buyer); the coach sees it as their in-app notice.
+  CoachSaleDispute: { subjects: [{ col: 'coachId', export: true, erase: 'keep', why: 'A dispute on a coach\'s sale: Stripe withdrew and returned money on it. ' + MONEY }] },
   CoachMarketProfile: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The marketplace listing settings; deleting delists the coach.' }] },
   CoachHighlight: {
     subjects: [

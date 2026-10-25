@@ -2,14 +2,15 @@
 // Every dependency is passed in (database, Stripe, age, plan), so the tests drive the real order of refusals and can
 // prove that a closed switch reaches neither the database nor Stripe.
 import { connectGate, createCheckout, refundPayment, type ConnectGate, type ConnectStripe } from './connect';
-import { CHECKOUT_HOLD_MINUTES, isCoachProEnabled } from './config';
-import { saleSplit } from './fees';
+import { CHECKOUT_HOLD_MINUTES, isCoachProEnabled, platformFeePolicy, refundProcessingFee } from './config';
+import { chargeRefundCents, monthStartUtc, needsMonthToDate, platformFee, saleSplit } from './fees';
+import { BUYER_TERMS, checkTerms, type TermsBody } from '@/lib/payments/terms';
 import { featureGate, type CoachPlan } from './plan';
 import { cleanGoals } from './market';
-import { attachCheckout, businessReady, connectFor, holdSpot, markExpired, packageById, saleById, saveApplication, type TxDb } from './store';
+import { attachCheckout, businessReady, coachFeesThisMonth, connectFor, holdSpot, markExpired, packageById, saleById, saveApplication, type TxDb } from './store';
 import { recordConnectRefund, type ConnectDeps } from './webhook';
 
-export type Refusal = { ok: false; status: number; error: string; reason?: string; message?: string };
+export type Refusal = { ok: false; status: number; error: string; reason?: string; message?: string; version?: string | null };
 
 export interface CheckoutDeps {
   db: TxDb;
@@ -20,6 +21,8 @@ export interface CheckoutDeps {
   plan(userId: string): Promise<CoachPlan>;
   ensureCustomer(userId: string): Promise<string>;
   coachSlug(coachId: string): Promise<string | null>;
+  /** PAYMENTS-READY: FEL's fees from a coach so far this month, asked only under a monthly cap (default: the ledger). */
+  feesThisMonth?(coachId: string, now: Date): Promise<number>;
 }
 
 export type CheckoutResult = { ok: true; url: string | null; saleId: string } | Refusal;
@@ -29,9 +32,10 @@ const closed = (g: Extract<ConnectGate, { ok: false }>): Refusal => ({ ok: false
 /**
  * A buyer starts a package checkout. In order: the payments fence (switch, key, live fence, site URL) → the tables → the
  * package (active, not the coach's own) → the coach can charge (Connect ready; Pro, when the gates are on) → the buyer is
- * a verified adult → a capacity spot is held → Stripe. A Stripe failure releases the spot.
+ * a verified adult → the buyer's terms tick (PAYMENTS-READY: 409 terms_required, the store terms' answer) → FEL's share
+ * (by the coach's plan, under the monthly cap) → a capacity spot is held → Stripe. A Stripe failure releases the spot.
  */
-export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, packageId: string): Promise<CheckoutResult> {
+export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, packageId: string, terms?: TermsBody | null): Promise<CheckoutResult> {
   const gate = connectGate(deps.env);
   if (!gate.ok) return closed(gate);
   if (!(await businessReady(deps.db))) return { ok: false, status: 503, error: 'coach_business_not_ready' };
@@ -41,7 +45,8 @@ export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, 
   const acct = await connectFor(deps.db, pkg.coachId);
   if (!acct || !acct.chargesEnabled) return { ok: false, status: 409, error: 'coach_not_ready', message: 'This coach is not taking payments yet. Apply instead.' };
   if (acct.livemode !== gate.live) return { ok: false, status: 409, error: 'coach_not_ready', message: 'This coach is not taking payments yet. Apply instead.' };
-  if (!featureGate(await deps.plan(pkg.coachId), 'payments', isCoachProEnabled(deps.env)).ok) {
+  const plan = await deps.plan(pkg.coachId);
+  if (!featureGate(plan, 'payments', isCoachProEnabled(deps.env)).ok) {
     return { ok: false, status: 409, error: 'coach_not_ready', message: 'This coach is not taking payments yet. Apply instead.' };
   }
   if (!(await deps.isAdult(buyerId))) {
@@ -49,14 +54,23 @@ export async function startPackageCheckout(deps: CheckoutDeps, buyerId: string, 
   }
   const slug = await deps.coachSlug(pkg.coachId);
   if (!slug) return { ok: false, status: 404, error: 'package_not_found' };
-  // The buyer pays the price plus the processing fee; the sale records the price and FEL's 5% of it (fees.ts).
-  const split = saleSplit(pkg.priceCents);
+  // PAYMENTS-READY: the buyer's terms tick, before any spot is held or Stripe is called (the store terms' 409).
+  const tick = checkTerms(terms, BUYER_TERMS.coach_package.version, deps.now);
+  if (!tick.ok) return { ok: false, status: tick.status, error: tick.body.error, version: tick.body.version };
+  // The buyer pays the price plus the processing fee; the sale records the price and FEL's share of it (fees.ts): 5% by
+  // default, or the owner's PLATFORM_FEE_* settings by the coach's plan and monthly cap (config.ts).
+  const policy = platformFeePolicy(deps.env);
+  const soFar = needsMonthToDate(policy)
+    ? await (deps.feesThisMonth ? deps.feesThisMonth(pkg.coachId, deps.now) : coachFeesThisMonth(deps.db, pkg.coachId, monthStartUtc(deps.now), deps.now))
+    : 0;
+  const share = platformFee(policy, plan, pkg.priceCents, soFar);
+  const split = saleSplit(pkg.priceCents, undefined, share.felShareCents);
   const held = await holdSpot(deps.db, { pkg, buyerId, feeCents: split.felShareCents, stripeAccountId: acct.stripeAccountId, livemode: gate.live, now: deps.now, holdMinutes: CHECKOUT_HOLD_MINUTES });
   if (!held.ok) return { ok: false, status: 409, error: 'package_full', message: 'This package is full right now.' };
   try {
     const stripe = deps.stripe();
     const customerId = await deps.ensureCustomer(buyerId);
-    const s = await createCheckout(stripe, { pkg, saleId: held.saleId, buyerId, customerId, coachSlug: slug, destination: acct.stripeAccountId, split, origin: gate.origin, now: deps.now });
+    const s = await createCheckout(stripe, { pkg, saleId: held.saleId, buyerId, customerId, coachSlug: slug, destination: acct.stripeAccountId, split, origin: gate.origin, now: deps.now, terms: tick.accepted });
     await attachCheckout(deps.db, held.saleId, s.id);
     return { ok: true, url: s.url, saleId: held.saleId };
   } catch (e) {
@@ -90,9 +104,27 @@ export async function refundSale(deps: RefundDeps, coachId: string, saleId: stri
   const amount = amountCents ?? left;
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > left) return { ok: false, status: 400, error: 'invalid_amount' };
   const after = sale.refundedCents + amount;
+  // PAYMENTS-READY: with REFUND_PROCESSING_FEE on the buyer also gets the same share of the processing fee back, so the
+  // refund to Stripe is the charge's step, not the price's (fees.ts chargeRefundCents). Off: the price step, as before.
+  let refundCents = amount;
+  let chargeAfter = after;
+  let paymentAmount: number | undefined;
+  if (refundProcessingFee(deps.env)) {
+    try {
+      const pi = await deps.stripe().paymentIntents.retrieve(sale.paymentIntentId);
+      paymentAmount = Number((pi as { amount?: unknown }).amount);
+    } catch (e) {
+      console.error('[coach-business] refund: payment not read', e instanceof Error ? e.name : typeof e);
+      return { ok: false, status: 502, error: 'refund_failed', message: 'The refund did not go through. Try again.' };
+    }
+    const processing = Number.isSafeInteger(paymentAmount) && (paymentAmount as number) >= sale.amountCents ? (paymentAmount as number) - sale.amountCents : saleSplit(sale.amountCents).processingFeeCents;
+    const shape = { priceCents: sale.amountCents, processingFeeCents: processing };
+    chargeAfter = chargeRefundCents(shape, after, true);
+    refundCents = chargeAfter - chargeRefundCents(shape, sale.refundedCents, true);
+  }
   let r: { chargeId: string | null };
   try {
-    r = await refundPayment(deps.stripe(), { saleId: sale.id, paymentIntentId: sale.paymentIntentId, amountCents: amount, cumulativeAfter: after });
+    r = await refundPayment(deps.stripe(), { saleId: sale.id, paymentIntentId: sale.paymentIntentId, amountCents: refundCents, cumulativeAfter: after });
   } catch (e) {
     console.error('[coach-business] refund failed', e instanceof Error ? e.name : typeof e);
     return { ok: false, status: 502, error: 'refund_failed', message: 'The refund did not go through. Try again.' };
@@ -103,10 +135,11 @@ export async function refundSale(deps: RefundDeps, coachId: string, saleId: stri
     try {
       const charge = await deps.stripe().charges.retrieve(r.chargeId);
       const fee = charge.application_fee;
-      await recordConnectRefund(deps.ledger, sale.id, {
+      await recordConnectRefund({ ...deps.ledger, env: deps.ledger.env ?? deps.env }, sale.id, {
         id: r.chargeId,
-        refundedTotal: Number(charge.amount_refunded ?? after),
+        refundedTotal: Number(charge.amount_refunded ?? chargeAfter),
         applicationFeeId: typeof fee === 'string' ? fee : fee?.id ?? null,
+        amountCents: Number((charge as { amount?: unknown }).amount ?? paymentAmount),
       });
     } catch (e) {
       console.error('[coach-business] refund recorded later by the webhook', e instanceof Error ? e.message : typeof e);
