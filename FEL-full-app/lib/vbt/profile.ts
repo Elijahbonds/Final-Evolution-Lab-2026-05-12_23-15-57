@@ -75,6 +75,6 @@ export function loadsForZone(fit: Extract<LvFit, { ok: true }>, zone: ZoneId): {
   let lo = loadAt(fit, Math.min(z.hi, 2.5)), hi = loadAt(fit, z.lo);
   if (fit.e1rmKg != null) hi = Math.min(hi, fit.e1rmKg);
   lo = Math.max(0, lo);
-  const loKg = Math.ceil(lo / LOAD_STEP_KG) * LOAD_STEP_KG, hiKg = Math.floor(hi / LOAD_STEP_KG) * LOAD_STEP_KG;
-  return hiKg >= loKg && hiKg > 0 ? { loKg, hiKg } : null;
+  const loKg = Math.ceil(lo / LOAD_STEP_KG - 1e-9) * LOAD_STEP_KG, hiKg = Math.floor(hi / LOAD_STEP_KG + 1e-9) * LOAD_STEP_KG;
+  return hiKg >= loKg && hiKg > 0 ? { loKg: loKg || 0, hiKg } : null;
 }

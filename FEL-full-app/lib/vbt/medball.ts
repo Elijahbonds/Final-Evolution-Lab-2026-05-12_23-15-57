@@ -27,7 +27,21 @@ export interface Throw {
 /** (new) Two releases closer than this (ms) are one throw. */
 export const THROW_GAP_MS = 700;
 
+/** (new) The release speed's line fit spans at least ±this (ms). */
+export const RELEASE_LINE_MS = 20;
+
 const r2 = (x: number) => Math.round(x * 100) / 100;
+
+/** The least-squares line through the samples within ±hw ms of t: its slopes (m/s) and 1/√Σ(t − t̄)². */
+function lineAt(s: Track['samples'], t: number, hw: number): { vx: number; vy: number; gain: number } | null {
+  const w = s.filter((p) => Math.abs(p.t - t) <= hw);
+  if (w.length < 2) return null;
+  const mt = w.reduce((a, p) => a + p.t, 0) / w.length / 1000;
+  const mx = w.reduce((a, p) => a + p.x, 0) / w.length, my = w.reduce((a, p) => a + p.y, 0) / w.length;
+  let stt = 0, stx = 0, sty = 0;
+  for (const p of w) { const u = p.t / 1000 - mt; stt += u * u; stx += u * (p.x - mx); sty += u * (p.y - my); }
+  return stt > 0 ? { vx: stx / stt, vy: sty / stt, gain: 1 / Math.sqrt(stt) } : null;
+}
 
 export function readThrows(track: Track): { throws: Throw[]; fps: number } {
   const s = track.samples;
@@ -46,12 +60,20 @@ export function readThrows(track: Track): { throws: Throw[]; fps: number } {
     if (prev && k[i].t - prev.releaseT < THROW_GAP_MS) {
       if (sp[i] > prev.speed) throws.pop(); else continue;
     }
-    const sdV = track.posSdM * k[i].slopeGain;
+    // the speed itself from a short LINE fit (the mean speed over ±hw): a curved fit across the release's kink — fast
+    // acceleration, then the hand's sudden stop — overshoots the peak; a line never does
+    const hw = Math.max(RELEASE_LINE_MS, 1.5 * period);
+    let best = { v: 0, vx: 0, vy: 0, gain: Infinity };
+    for (let j = Math.max(0, i - 2); j <= Math.min(k.length - 1, i + 2); j++) {
+      const l = lineAt(s, k[j].t, hw);
+      if (l && Math.hypot(l.vx, l.vy) > best.v) best = { v: Math.hypot(l.vx, l.vy), vx: l.vx, vy: l.vy, gain: l.gain };
+    }
+    if (best.v < MB_MIN_SPEED) continue;
     const rel = Math.hypot(track.ruler.sd, RELEASE_MODEL_SD);
     throws.push({
-      index: 0, releaseT: k[i].t, speed: r2(sp[i]),
-      speedPm: r2(1.96 * Math.hypot(sdV, sp[i] * rel)),
-      angleDeg: Math.round((Math.atan2(k[i].vy, Math.abs(k[i].vx)) * 180) / Math.PI),
+      index: 0, releaseT: k[i].t, speed: r2(best.v),
+      speedPm: r2(1.96 * Math.hypot(track.posSdM * best.gain, best.v * rel)),
+      angleDeg: Math.round((Math.atan2(best.vy, Math.abs(best.vx)) * 180) / Math.PI),
     });
   }
   throws.forEach((t, i) => { t.index = i + 1; });
