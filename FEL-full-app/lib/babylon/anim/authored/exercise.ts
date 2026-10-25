@@ -140,9 +140,10 @@ export function buildExSquat(scene: Scene, sk: Skeleton): AnimationGroup | null 
 /** ex_squat_bar — the same squat with the hands up at the shoulders, holding a bar across the upper back. */
 export function buildExSquatBar(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const bar: Pair = { Left: [-0.24, 0.02, -0.10], Right: [0.24, 0.02, -0.10] };
-  // the wrists bent back so the hands wrap over a bar on the upper back (measured: LeftHand +z / RightHand −z turns the
-  // fingers backward on this rig); an open hand left straight up read as hands raised
-  const grip = { LeftHand: [0, 0, 85] as Deg3, RightHand: [0, 0, -85] as Deg3 };
+  // the wrists bent so the hands close over a bar at the shoulders; an open hand left straight up read as hands raised.
+  // The SAME sign on both sides is what the live stage shows symmetric (rig shots 2026-10-25: −85 on the right alone
+  // left the left hand open and up there, though the node rig's finger-axis measure suggested mirrored signs)
+  const grip = { LeftHand: [0, 0, -85] as Deg3, RightHand: [0, 0, -85] as Deg3 };
   const top = { bones: { ...STAND, ...grip, Hips: [4, 0, 0] as Deg3 }, feet: SQUAT_FEET, kneePoles: KNEES_OUT, rel: bar, poles: bothDir(0.3, -1, -0.3), hipsY: 0 };
   const bottom = { bones: { ...grip, Hips: [30, 0, 0] as Deg3, Spine: [8, 0, 0] as Deg3, Spine1: [0, 0, 0] as Deg3, Neck: [-20, 0, 0] as Deg3, LeftFoot: [-34, 0, 0] as Deg3, RightFoot: [-34, 0, 0] as Deg3 }, feet: SQUAT_FEET, kneePoles: KNEES_OUT, rel: bar, poles: bothDir(0.3, -1, -0.3), hipsY: -0.38 };
   return rep(scene, sk, 'ex_squat_bar', top, bottom, 1.1, 0.25, 0.9, 0.45);
