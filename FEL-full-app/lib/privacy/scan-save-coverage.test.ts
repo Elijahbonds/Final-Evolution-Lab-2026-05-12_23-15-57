@@ -34,6 +34,8 @@ const DETECTORS: { what: string; re: RegExp }[] = [
   { what: 'PrqEntry', re: new RegExp(`\\bprqEntry\\s*\\.\\s*${WRITE}\\b|\\bcreatePrqEntry\\s*\\(|\\bwriteFormPlan\\s*\\(|\\bwriteForm\\s*\\(`) },
   // COACH-VIDEO-REVIEW (2026-10-24): the filmed-set table (pending SQL, raw writes), and the calls that reach it
   { what: 'CoachFormReview', re: /INSERT\s+INTO\s+"?CoachFormReview\b|\bsubmitFormReview\s*\(|\binsertFormReview\s*\(/ },
+  // COACH-READINESS (2026-10-25): the daily jump check's numbers (pending SQL, raw writes), and the calls that reach them
+  { what: 'ReadinessJumpCheck', re: /INSERT\s+INTO\s+"?ReadinessJumpCheck\b|\bkeepCheck\s*\(|\bsaveCheck\s*\(/ },
   { what: 'raw SQL', re: /INSERT\s+INTO\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b|UPDATE\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b/i },
 ];
 
