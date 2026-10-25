@@ -5,12 +5,16 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { signIn, signOut } from 'next-auth/react';
 import { AgeStep, AgeTurnAway, ageBlockPresent } from '@/components/age-step';
-import { Dumbbell, Gamepad2 } from 'lucide-react';
 import { ModeCarousel } from '@/components/onboarding/mode-carousel';
+import { PathPicker } from '@/components/onboarding/path-picker';
 import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
 import {
-  DEFAULT_FIRST_GAME, destinationFor, resolveFirstGame, type OnboardingPath,
+  DEFAULT_FIRST_GAME, destinationFor, pathFor, resolveFirstGame, type OnboardingPath,
 } from '@/lib/onboarding/firstRun';
+import { FIRST_WINS } from '@/lib/onboarding/firstWin';
+import { readFirstTouch, signupAttribution } from '@/lib/marketing/utm';
+import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { track } from '@/lib/analytics';
 import { motion } from 'framer-motion';
 import { Loader2, Check } from 'lucide-react';
 import { CURRENT_POLICY_VERSION } from '@/lib/policies';
@@ -43,8 +47,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // A /c/<code> challenge, or any other safe ?next=, survives the hop between login and signup.
   const [challengeCode, setChallengeCode] = useState<string | null>(null);
   const [returnPath, setReturnPath] = useState<string | null>(null);
-  // WHAT THEY CAME FOR, asked before they commit to anything. Some people arrive to play and some arrive to be
-  // assessed; sending both to the same shelf loses one of them.
+  // WHAT THEY CAME FOR, asked before they commit to anything (ONB-01: play / train / learn / teach / create). Sending
+  // everybody to the same shelf loses most of them; each answer lands on its own first win (lib/onboarding/firstWin.ts).
   const [path, setPath] = useState<OnboardingPath>('play');
   const [firstGame, setFirstGame] = useState<string>(DEFAULT_FIRST_GAME);
   // The creator whose card or QR brought them, resolved from ?ref by /api/onboarding/host.
@@ -54,6 +58,9 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   // FN-BOX-1b: the full date the age step locked with the year ('YYYY-MM-DD'); the server stores it as User.dob.
   const [birthDate, setBirthDate] = useState<string | null>(null);
   const [turnedAway, setTurnedAway] = useState(false);
+  // Teach is offered only once the age step says verified adult (null until it is locked: held meanwhile).
+  const isAdult = birthYear === null ? null : ageScreenOutcome(birthYear) === 'adult';
+  useEffect(() => { if (path === 'teach' && isAdult !== true) setPath('play'); }, [path, isAdult]);
 
   useEffect(() => {
     // The last game they picked, so somebody coming back is offered what they chose before rather than the default.
@@ -114,10 +121,14 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           setLoading(false);
           return;
         }
+        // ONB-04: where the first visit came from (utm_* / ?ref, kept first-party by AttributionCapture), sent once, with
+        // the account. Nothing at all when the visit carried no tags.
+        let utm: ReturnType<typeof signupAttribution>;
+        try { utm = signupAttribution(readFirstTouch(window.localStorage)); } catch { utm = undefined; }
         const res = await fetch('/api/signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(birthDate ? { birthDate } : {}), ...(refCode ? { ref: refCode } : {}) }),
+          body: JSON.stringify({ email, password, name, policyVersion: CURRENT_POLICY_VERSION, birthYear, ...(birthDate ? { birthDate } : {}), ...(refCode ? { ref: refCode } : {}), ...(utm ? { utm } : {}) }),
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -166,7 +177,11 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         window.location.replace(challengeReturnPath(challengeCode));
         return;
       }
-      const fallback = destinationFor(path, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
+      // Teach is for verified adults; anyone else who somehow holds it lands on train (pathFor). Play keeps the creator's
+      // game first: a scanned card still opens the creator's signature mode (resolveFirstGame).
+      const landing = pathFor(path, { adult: isAdult === true });
+      if (mode === 'signup') track('path_chosen', { path: landing, where: 'signup' });
+      const fallback = destinationFor(landing, resolveFirstGame({ creatorMode: host?.mode, chosen: firstGame }));
       // safePostSignInDestination (not loginDestination) also refuses a ?next= that points back at /login itself
       // (bare, or nested as next=/login?next=/login), so a crafted or re-encoded query cannot recreate the loop.
       const dest = safePostSignInDestination(nextRaw, fallback);
@@ -262,47 +277,19 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             </span>
             <p className="min-w-0 text-[13px] leading-snug text-white/70">
               <span className="font-bold text-white">{host.name}</span> sent you
-              {host.mode && MODE_INFO[host.mode] && (
+              {host.mode && MODE_INFO[host.mode] && path === 'play' && (
                 <> — you are starting in <span className="font-bold text-white">{MODE_INFO[host.mode].name}</span>.</>
               )}
             </p>
           </div>
         )}
 
-        {/* THE TWO WAYS IN. This used to be six hardcoded sports that saved your answer to localStorage and then
-            sent you to the home page regardless. Asking is only worth doing if the answer changes where you land,
-            and now it does. */}
+        {/* THE WAYS IN (ONB-01). This used to be six hardcoded sports that saved your answer to localStorage and then
+            sent you to the home page regardless; then two (play or body). Asking is only worth doing if the answer
+            changes where you land, and each of the five lands on its own first win. */}
         {mode === 'signup' && (
           <div className="mb-5">
-            <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
-              What did you come for?
-            </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {([
-                { id: 'play' as const, icon: Gamepad2, title: 'Play first', line: 'Drop into a game now.', accent: '#00E5FF' },
-                { id: 'body' as const, icon: Dumbbell, title: 'Body first', line: 'Screen your movement, then train.', accent: '#00FF9D' },
-              ]).map((o) => {
-                const on = path === o.id;
-                const Icon = o.icon;
-                return (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => setPath(o.id)}
-                    aria-pressed={on}
-                    className="rounded-2xl border p-3.5 text-left transition-all duration-200"
-                    style={{
-                      borderColor: on ? `${o.accent}66` : 'rgba(255,255,255,0.10)',
-                      background: on ? `${o.accent}10` : 'rgba(255,255,255,0.02)',
-                    }}
-                  >
-                    <Icon className="h-[18px] w-[18px]" style={{ color: on ? o.accent : 'rgba(255,255,255,0.35)' }} strokeWidth={2.2} />
-                    <span className="fel-heading mt-2 block text-[14px] font-bold leading-none text-white">{o.title}</span>
-                    <span className="mt-1.5 block text-[11.5px] leading-snug text-white/45">{o.line}</span>
-                  </button>
-                );
-              })}
-            </div>
+            <PathPicker value={path} onChange={setPath} adult={isAdult} />
           </div>
         )}
 
@@ -313,12 +300,13 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           </div>
         )}
 
-        {mode === 'signup' && path === 'body' && (
-          <div className="mb-6 rounded-2xl border border-[#00FF9D]/25 bg-[#00FF9D]/[0.04] p-4">
-            <p className="fel-heading text-[14px] font-bold text-white">You will start in the Mirror</p>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/50">
-              A movement screen from your phone camera — prop it up, step back, and it scores what it sees. The
-              games are still there when you want them.
+        {mode === 'signup' && path !== 'play' && (
+          <div className="mb-6 rounded-2xl border p-4" data-first-win-preview={path}
+            style={{ borderColor: `${FIRST_WINS[path].accent}40`, background: `${FIRST_WINS[path].accent}0A` }}>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: FIRST_WINS[path].accent }}>Your first win</p>
+            <p className="fel-heading mt-1 text-[14px] font-bold text-white">{FIRST_WINS[path].title}</p>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/60">
+              {FIRST_WINS[path].steps[0].text} About {FIRST_WINS[path].aboutSec} seconds, right after you join.
             </p>
           </div>
         )}

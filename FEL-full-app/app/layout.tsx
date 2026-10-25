@@ -8,6 +8,7 @@ import './theme.css'
 // ~80% without clipping any control. Desktop/landscape/tablet are untouched.
 import './game-surface.css'
 import { Providers } from '@/components/providers'
+import { AttributionCapture } from '@/components/onboarding/attribution-capture'
 import { Toaster } from '@/components/ui/sonner'
 import { ChunkLoadErrorHandler } from '@/components/chunk-load-error-handler'
 import { SoundtrackDock } from '@/components/soundtrack/soundtrack-dock'
@@ -116,6 +117,8 @@ export default function RootLayout({
           <StatusRail />
           {/* CREATOR SOUNDTRACK (owner, 2026-10-06): the menu music and its Now Playing chip; silent on the Quick Screen */}
           <SoundtrackDock />
+          {/* ONB-04: utm_* / ?ref on the first page view, kept first-party on this browser for the sign-up (renders nothing) */}
+          <AttributionCapture />
           {children}
           {/* The same three tabs, at the bottom of a phone where a thumb is. On a desktop this renders nothing and
               the rail above carries them instead. */}

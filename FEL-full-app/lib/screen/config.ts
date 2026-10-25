@@ -33,7 +33,7 @@ export const SIGNED_IN_ONLY_ROUTES: readonly string[] = [
   '/login', '/signup', '/account', '/api', '/dev',
   '/admin', '/age', '/arena', '/camp', '/cards', '/closet', '/coach', GUARDIAN_PAGES, '/create', '/creator', '/education', '/guidance', '/kitchens',
   '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/squads', '/store',
-  '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/workout',
+  '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/welcome', '/workout',
 ];
 
 /** The path a same-origin route opens, as the server will read it: dot segments resolved, decoded, lower case. */
