@@ -17,12 +17,13 @@ import { HELD_LINES, CAMERA_ADULTS_LINE } from '@/lib/combine/copy';
 import { isSignedInOnly } from '@/lib/screen/config';
 import { stripComments } from '@/lib/testing/sourceScan';
 import type { CombineAthlete } from '@/lib/combine/types';
+import { HELD_TODAY, OPEN_TODAY } from '@/lib/combine/today';
 
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel: string) => stripComments(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
-const adult = (id: string, name: string, saveCamera = true): CombineAthlete => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera, held: null } });
-const teen: CombineAthlete = { id: 'teen', name: 'Riley', source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required' } };
-const handOnly: CombineAthlete = { id: 'h', name: 'Hana', source: 'roster', access: { testable: true, camera: false, saveCamera: false, held: null } };
+const adult = (id: string, name: string, saveCamera = true): CombineAthlete => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera, held: null, today: OPEN_TODAY } });
+const teen: CombineAthlete = { id: 'teen', name: 'Riley', source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required', today: HELD_TODAY } };
+const handOnly: CombineAthlete = { id: 'h', name: 'Hana', source: 'roster', access: { testable: true, camera: false, saveCamera: false, held: null, today: HELD_TODAY } };
 const CTX: CombineCtx = { available: true, athletes: [adult('maya', 'Maya'), adult('jo', 'Jo', false), handOnly, teen], teams: [{ id: 't1', name: 'Varsity', athleteIds: ['maya', 'teen'] }], events: [] };
 const noop = () => {};
 
@@ -68,6 +69,17 @@ describe('the run', () => {
     // the hand-only athlete and the typed name are not in the jump line
     expect(html).not.toMatch(/data-combine-line[^]*Hana[^]*data-combine-current/);
     expect(html).not.toContain('Walk On');
+  });
+
+  it('an athlete the jump gate holds today: in the line, struck through, "Held today" (placeholder) and no capture', () => {
+    const held: CombineAthlete = { ...adult('jo', 'Jo', false), access: { ...adult('jo', 'Jo', false).access, today: { jump: true, skills: [] } } };
+    const ev = newEvent({ name: 'T', athletes: [held], stations: [...DEFAULT_STATIONS], localId: 'L' });
+    const html = renderToStaticMarkup(h(CombineRun, { ev, onChange: noop, onReport: noop, onHome: noop, roster: [], saving: true, status: null }));
+    expect(html).toContain('data-held-today="true"');
+    expect(html).toContain('data-combine-held-today');
+    expect(html).toContain('Held today: no attempts at this station today.');
+    expect(html).not.toContain('pain');
+    expect(html).not.toContain('data-combine-start-camera');
   });
 
   it('the stopwatch says hand-timed; a drill\'s score is its own timing share', () => {

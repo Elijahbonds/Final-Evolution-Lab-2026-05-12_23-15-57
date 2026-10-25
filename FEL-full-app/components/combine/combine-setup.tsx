@@ -6,7 +6,7 @@
 import { useMemo, useState } from 'react';
 import { Minus, Plus, UserPlus, X } from 'lucide-react';
 import { MAX_ATTEMPTS, MAX_STATIONS, STATIONS, STATION_KINDS, parseStation, stationName, type StationConfig, type StationKind } from '@/lib/combine/catalogue';
-import { CAMERA_ADULTS_LINE, HELD_LINES, say } from '@/lib/combine/copy';
+import { CAMERA_ADULTS_LINE, HELD_LINES, HELD_TODAY_LINE, say } from '@/lib/combine/copy';
 import { adhocAthlete, defaultEventName, newEvent } from '@/lib/combine/draft';
 import type { CombineAthlete, CombineEvent } from '@/lib/combine/types';
 
@@ -27,6 +27,7 @@ export const DEFAULT_STATIONS: readonly StationConfig[] = [
 export function athleteNote(a: CombineAthlete): string | null {
   if (a.access.held) return say(HELD_LINES[a.access.held]);
   if (!a.access.camera) return say(CAMERA_ADULTS_LINE);
+  if (a.access.today.jump) return `${say(HELD_TODAY_LINE)}: jump stations`;
   return null;
 }
 

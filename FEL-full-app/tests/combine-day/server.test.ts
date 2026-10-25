@@ -5,8 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { fakeCombineDb, seedRoster, type FakeCombineDb } from '@/tests/helpers/fakeCombineDb';
 
-const h = vi.hoisted(() => ({ db: null as unknown as FakeCombineDb, user: null as string | null }));
+const h = vi.hoisted(() => ({ db: null as unknown as FakeCombineDb, user: null as string | null, ctx: {} as Record<string, unknown>, reads: [] as string[] }));
 vi.mock('@/lib/db', () => ({ prisma: new Proxy({}, { get: (_t, p) => (p === 'then' ? undefined : (h.db as unknown as Record<string | symbol, unknown>)[p]) }) }));
+// THE JUMP GATE's reader (the warm-up's own): each athlete's context by id; 'throw' = the read failed. Default: open.
+vi.mock('@/lib/coach/warmupServer', () => ({
+  loadWarmupContext: async (_db: unknown, id: string) => {
+    h.reads.push(id);
+    const c = h.ctx[id];
+    if (c === 'throw') throw new Error('health tables unreachable');
+    return c ?? { isYouth: false, painDecision: null, zone: null, screen: 'none', screenAt: null, hardStopped: false, jumpGate: { closed: false, why: '', href: null } };
+  },
+}));
 vi.mock('@/lib/camp/server', () => ({ currentUserId: async () => h.user, bad: (error: string, status = 400) => Response.json({ error }, { status }) }));
 
 import { GET as listGET, POST as createPOST } from '@/app/api/coach/combine/route';
@@ -34,6 +43,8 @@ const writes = () => h.db.log.filter((x) => /^(INSERT|UPDATE|DELETE)/.test(x.q))
 beforeEach(() => {
   h.db = fakeCombineDb();
   h.user = 'coach';
+  h.ctx = {};
+  h.reads = [];
   resetCombineProbe();
   resetGroupsProbe();
   seedRoster(h.db, 'coach', 'maya', { name: 'Maya Okafor' });                       // adult, opted in
@@ -70,9 +81,11 @@ describe('the roster, through the team gate', () => {
   it('adults in (camera numbers kept only with the opt-in); every teen held; under 13 never; blank asked; no one off the roster', async () => {
     const { json } = await list();
     const by = Object.fromEntries(json.athletes.map((a: J) => [a.id, a.access]));
-    expect(by.maya).toEqual({ testable: true, camera: true, saveCamera: true, held: null });
-    expect(by.jo).toEqual({ testable: true, camera: true, saveCamera: false, held: null });
-    expect(by.teen).toEqual({ testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required' });
+    expect(by.maya).toEqual({ testable: true, camera: true, saveCamera: true, held: null, today: { jump: false, skills: [] } });
+    expect(by.jo).toEqual({ testable: true, camera: true, saveCamera: false, held: null, today: { jump: false, skills: [] } });
+    expect(by.teen).toMatchObject({ testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required', today: { jump: true } });
+    // the jump gate is read only for the athletes the camera stations are open to
+    expect(h.reads.sort()).toEqual(['jo', 'maya']);
     expect(by.blank.held).toBe('age_required');
     expect(by.kid.held).toBe('under_13');
     expect(by.gone).toBeUndefined();
@@ -181,6 +194,54 @@ describe('saving a combine', () => {
     expect(await del(id)).toEqual({ status: 200, json: { deleted: true } });
     expect(h.db.results).toEqual([]);
     expect(h.db.entrants).toEqual([]);
+  });
+});
+
+describe('THE JUMP GATE (the warm-up\'s rule (b), read per athlete)', () => {
+  const SHUT_PAIN = { isYouth: false, painDecision: 'step_down_flag_coach', zone: null, screen: 'none', screenAt: null, hardStopped: false, jumpGate: { closed: false, why: '', href: null } };
+  const SHUT_GATE = { ...SHUT_PAIN, painDecision: null, jumpGate: { closed: true, why: 'Do the landing check first.', href: '/play/mirror/assess' } };
+  const T = 'skill:lateral-bound';
+  const made = async () => (await create({ name: 'Gate', stations: [...STATIONS, { kind: 'skill', variant: 'lateral-bound' }], athleteIds: ['maya', 'jo'] })).json.id as string;
+
+  it('shut by pain today: the coach reads "held" for the jump stations and nothing about why; the hand-timed ones stay open', async () => {
+    h.ctx.maya = SHUT_PAIN;
+    const r = await list();
+    const maya = r.json.athletes.find((a: J) => a.id === 'maya');
+    expect(maya.access.today).toEqual({ jump: true, skills: expect.arrayContaining(['lateral-bound']) });
+    expect(maya.access.today.skills).not.toContain('countermovement-geometry');
+    // (the held skills list names drill ids such as 'safe-landing'; nothing names the reason)
+    expect(JSON.stringify(r.json)).not.toMatch(/pain|step_down|landing check|clinician|"why"|href|jumpGate|painDecision/i);
+  });
+
+  it('shut: a save takes nothing at a held station (named in heldToday), and the hand-timed numbers are kept', async () => {
+    const id = await made();
+    h.ctx.maya = SHUT_GATE;
+    const r = await put(id, { results: { maya: { [J]: [slot(50), null, null], [T]: [slot(80)], [S]: [slot(4.8), null] } } });
+    expect(r.json.heldToday).toEqual([{ athleteId: 'maya', stationId: J }, { athleteId: 'maya', stationId: T }]);
+    expect(h.db.results.map((x) => x.stationId)).toEqual([S]);
+  });
+
+  it('open: the jump numbers are kept', async () => {
+    const id = await made();
+    const r = await put(id, { results: { maya: { [J]: [slot(50), null, null], [T]: [slot(80)] } } });
+    expect(r.json.heldToday).toEqual([]);
+    expect(h.db.results.map((x) => x.stationId).sort()).toEqual([J, T].sort());
+  });
+
+  it('a failed read closes it, as the warm-up does: held at the jump stations, nothing kept there', async () => {
+    const id = await made();
+    h.ctx.maya = 'throw';
+    expect((await list()).json.athletes.find((a: J) => a.id === 'maya').access.today.jump).toBe(true);
+    const r = await put(id, { results: { maya: { [J]: [slot(50), null, null], [S]: [slot(4.8), null] } } });
+    expect(r.json.heldToday).toEqual([{ athleteId: 'maya', stationId: J }]);
+    expect(h.db.results.map((x) => x.stationId)).toEqual([S]);
+  });
+
+  it('a held day hides nothing already saved: the coach still reads last time\'s jumps', async () => {
+    const id = await made();
+    await put(id, { results: { maya: { [J]: [slot(50), null, null] } } });
+    h.ctx.maya = SHUT_PAIN;
+    expect((await one(id)).json.event.results.maya[J][0].value).toBe(50);
   });
 });
 

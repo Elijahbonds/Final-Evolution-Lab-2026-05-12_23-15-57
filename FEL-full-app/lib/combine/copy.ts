@@ -50,6 +50,17 @@ export const NUMBERS_ONLY_LINE: DraftLine = {
   placeholder: '',
 };
 
+/**
+ * THE JUMP GATE's hold, as the coach reads it (lib/combine/today.ts). The coordinator's wording is the draft; it names
+ * pain/readiness, which tells the coach something health-adjacent about the athlete, so until the owner approves it the
+ * placeholder says only "Held today". The gate's other reasons (no landing check yet, no health consent, an intake
+ * answer) hold a station too, and neither line names them.
+ */
+export const HELD_TODAY_LINE: DraftLine = {
+  draft: 'Held today (pain/readiness)',
+  placeholder: 'Held today',
+};
+
 export const WHO_SEES_LINE: DraftLine = {
   draft: 'Results are seen by you, and by each athlete for their own numbers only. There is no public ranking.',
   placeholder: '',
@@ -62,7 +73,7 @@ export const ATHLETE_PAGE_LINE: DraftLine = {
 
 /** Every draft line, for the copy test and the owner's list. */
 export const DRAFT_LINES: readonly DraftLine[] = [
-  ...Object.values(HELD_LINES), CAMERA_ADULTS_LINE, KEPT_ON_DEVICE_LINE, NUMBERS_ONLY_LINE, WHO_SEES_LINE, ATHLETE_PAGE_LINE,
+  ...Object.values(HELD_LINES), CAMERA_ADULTS_LINE, HELD_TODAY_LINE, KEPT_ON_DEVICE_LINE, NUMBERS_ONLY_LINE, WHO_SEES_LINE, ATHLETE_PAGE_LINE,
 ];
 
 /** The line to show: the draft once the owner approved them, the placeholder until then. */

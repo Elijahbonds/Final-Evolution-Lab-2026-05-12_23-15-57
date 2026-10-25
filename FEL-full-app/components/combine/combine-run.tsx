@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronRight, RotateCcw, UserPlus } from 'lucide-react';
 import { STATIONS, formatValue, stationName, type StationConfig } from '@/lib/combine/catalogue';
-import { KEPT_ON_DEVICE_LINE, NO_ACCURACY_LINE, say } from '@/lib/combine/copy';
+import { HELD_TODAY_LINE, KEPT_ON_DEVICE_LINE, NO_ACCURACY_LINE, say } from '@/lib/combine/copy';
+import { heldToday } from '@/lib/combine/gate';
 import { lineFor, nextAthlete, nextSlot, recordAttempts, redoAttempt, setReach, stationProgress } from '@/lib/combine/draft';
 import type { CombineAthlete, CombineEvent } from '@/lib/combine/types';
 import { drillById } from '@/lib/drills/drills';
@@ -68,6 +69,8 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
   const athleteId = st ? current[st.id] ?? nextAthlete(ev, st.id, null) ?? line[0]?.id ?? null : null;
   const athlete = line.find((a) => a.id === athleteId) ?? null;
   const slot = athlete && st ? nextSlot(ev, athlete.id, st.id) : null;
+  // THE JUMP GATE (lib/combine/today.ts): this station is held for this athlete today — shown, no attempt, ranked missing
+  const isHeld = !!athlete && !!st && heldToday(athlete, st);
   const left = athlete && st ? st.attempts - (ev.results[athlete.id]?.[st.id] ?? []).filter((s) => s !== null).length : 0;
   const progress = st ? stationProgress(ev, st.id) : { done: 0, total: 0 };
   useEffect(() => { setDrillOpen(false); }, [athleteId, stationIdx]);
@@ -118,10 +121,11 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
 
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" data-combine-line>
         {line.map((a) => {
-          const done = nextSlot(ev, a.id, st.id) === null;
+          const held = heldToday(a, st);
+          const done = !held && nextSlot(ev, a.id, st.id) === null;
           return (
-            <button key={a.id} type="button" onClick={() => select(a.id)} aria-current={a.id === athlete?.id}
-              className={`flex min-h-10 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-bold ${a.id === athlete?.id ? 'border-white bg-white text-black' : done ? 'border-white/10 text-white/35' : 'border-white/20 text-white/80'}`}>
+            <button key={a.id} type="button" onClick={() => select(a.id)} aria-current={a.id === athlete?.id} data-held-today={held || undefined}
+              className={`flex min-h-10 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-bold ${a.id === athlete?.id ? 'border-white bg-white text-black' : done || held ? 'border-white/10 text-white/35' : 'border-white/20 text-white/80'} ${held ? 'line-through' : ''}`}>
               {done && <Check className="h-3 w-3" />}{a.name}
             </button>
           );
@@ -132,8 +136,9 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
         <section className="space-y-4 rounded-2xl border border-white/12 bg-white/[0.03] p-4" data-combine-current={athlete.id}>
           <div>
             <div className="text-3xl font-black leading-tight text-white" data-combine-current-name>{athlete.name}</div>
-            <div className="text-sm font-bold text-[#00E5FF]" data-combine-attempt>{slot === null ? `All ${st.attempts} attempts taken` : `Attempt ${slot + 1} of ${st.attempts}`}</div>
+            <div className="text-sm font-bold text-[#00E5FF]" data-combine-attempt>{isHeld ? say(HELD_TODAY_LINE) : slot === null ? `All ${st.attempts} attempts taken` : `Attempt ${slot + 1} of ${st.attempts}`}</div>
           </div>
+          {isHeld && <p className="rounded-lg border border-[#FFB020]/30 bg-[#FFB020]/[0.06] px-3 py-2 text-sm font-bold text-[#FFB020]" data-combine-held-today>{say(HELD_TODAY_LINE)}: no attempts at this station today.</p>}
           <Slots ev={ev} athleteId={athlete.id} st={st} />
           {saving && def.method !== 'hand' && !athlete.access.saveCamera && <p className="text-xs text-white/50" data-combine-device-only>{say(KEPT_ON_DEVICE_LINE)}</p>}
 
@@ -152,8 +157,8 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
           )}
 
           <div className="grid grid-cols-3 gap-2">
-            <button type="button" onClick={() => record([{ value: null }])} disabled={slot === null} data-combine-no-mark className="min-h-12 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30">No mark</button>
-            <button type="button" onClick={() => { pin(athlete.id); onChange(redoAttempt(ev, athlete.id, st.id)); }} disabled={slot === 0} data-combine-redo className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30"><RotateCcw className="h-4 w-4" /> Redo</button>
+            <button type="button" onClick={() => record([{ value: null }])} disabled={slot === null || isHeld} data-combine-no-mark className="min-h-12 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30">No mark</button>
+            <button type="button" onClick={() => { pin(athlete.id); onChange(redoAttempt(ev, athlete.id, st.id)); }} disabled={slot === 0 || isHeld} data-combine-redo className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30"><RotateCcw className="h-4 w-4" /> Redo</button>
             <button type="button" onClick={next} data-combine-next className={`flex min-h-12 items-center justify-center gap-1 rounded-xl text-sm font-black ${slot === null ? 'bg-white text-black' : 'border border-white/20 text-white/80'}`}>Next <ChevronRight className="h-4 w-4" /></button>
           </div>
         </section>

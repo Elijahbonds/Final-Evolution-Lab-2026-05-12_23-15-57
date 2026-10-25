@@ -19,6 +19,8 @@ import { groupGate } from '@/lib/groups/gates';
 import type { TeenGateConsent } from '@/lib/coach/teenGate';
 import { profileGates, type OptInRow } from '@/lib/profile-v2/gate';
 import { STATIONS, type StationKind } from './catalogue';
+import { HELD_TODAY, stationHeldToday, type TodayHolds } from './today';
+import type { StationConfig } from './catalogue';
 import type { AthleteAccess, CombineAthlete } from './types';
 
 export interface AccessInput {
@@ -27,24 +29,32 @@ export interface AccessInput {
   optIn: OptInRow | null | undefined;
 }
 
-/** What the gates allow for one roster athlete. */
-export function athleteAccess(input: AccessInput, now: Date = new Date()): AthleteAccess {
+/**
+ * What the gates allow for one roster athlete. `today`: the jump gate's holds (lib/combine/today.ts), read by the server
+ * for camera athletes; absent = not read = everything held (the careful side).
+ */
+export function athleteAccess(input: AccessInput, now: Date = new Date(), today: TodayHolds = HELD_TODAY): AthleteAccess {
   const g = groupGate('team', { dobYear: input.dobYear, consents: input.consents }, now);
-  if (!g.ok) return { testable: false, camera: false, saveCamera: false, held: g.error };
+  if (!g.ok) return { testable: false, camera: false, saveCamera: false, held: g.error, today: HELD_TODAY };
   const gates = profileGates(input.dobYear ?? null, input.optIn ?? null, now);
   const camera = g.band === 'adult' && gates.adult;
-  return { testable: true, camera, saveCamera: camera && gates.canSaveScan, held: null };
+  return { testable: true, camera, saveCamera: camera && gates.canSaveScan, held: null, today: camera ? today : HELD_TODAY };
 }
 
 /** A name the coach typed: no account, no birth year — held, as an unknown age always is. */
-export const ADHOC_ACCESS: AthleteAccess = { testable: false, camera: false, saveCamera: false, held: 'age_unknown' };
+export const ADHOC_ACCESS: AthleteAccess = { testable: false, camera: false, saveCamera: false, held: 'age_unknown', today: HELD_TODAY };
+
+/** Is this station held for this athlete TODAY by the jump gate (shown in the line, no attempt taken, ranked as missing)? */
+export function heldToday(a: Pick<CombineAthlete, 'access'>, st: Pick<StationConfig, 'kind' | 'variant'>): boolean {
+  return stationHeldToday(a.access.today, st);
+}
 
 /** May this athlete be tested at a station of this kind? */
 export function canTest(a: Pick<CombineAthlete, 'access'>, kind: StationKind): boolean {
   return a.access.testable && (STATIONS[kind].method === 'hand' || a.access.camera);
 }
 
-/** May this athlete's number at a station of this kind be kept on the server? */
+/** May this athlete's number at a station of this kind be kept on the server (the age and opt-in rules; not today's gate)? */
 export function canKeepOnServer(a: Pick<CombineAthlete, 'access' | 'source'>, kind: StationKind): boolean {
   if (a.source !== 'roster' || !canTest(a, kind)) return false;
   return STATIONS[kind].method === 'hand' || a.access.saveCamera;

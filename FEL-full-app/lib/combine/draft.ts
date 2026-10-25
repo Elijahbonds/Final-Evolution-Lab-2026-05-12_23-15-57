@@ -7,7 +7,8 @@
 // Storage reads and writes are wrapped: a private window or blocked storage gives an empty list and a combine that
 // still runs (it just does not outlive the tab).
 import { parseStations, STATIONS, type StationConfig } from './catalogue';
-import { ADHOC_ACCESS, canTest } from './gate';
+import { ADHOC_ACCESS, canTest, heldToday } from './gate';
+import { HELD_TODAY, type TodayHolds } from './today';
 import { cleanWeights } from './score';
 import type { AthleteAccess, Attempt, CombineAthlete, CombineEvent, HeldReason, Reach, ResultGrid, Slots } from './types';
 
@@ -58,11 +59,11 @@ function withSlots(ev: CombineEvent, athleteId: string, stationId: string, slots
   return { ...ev, updatedAt: now, results: { ...ev.results, [athleteId]: { ...(ev.results[athleteId] ?? {}), [stationId]: slots } } };
 }
 
-/** The station, and the athlete, if they may be tested there; null otherwise. */
+/** The station, and the athlete, if they may be tested there today; null otherwise (a jump-gate hold included). */
 function find(ev: CombineEvent, athleteId: string, stationId: string): { st: StationConfig; a: CombineAthlete } | null {
   const st = ev.stations.find((s) => s.id === stationId);
   const a = ev.athletes.find((x) => x.id === athleteId);
-  return st && a && canTest(a, st.kind) ? { st, a } : null;
+  return st && a && canTest(a, st.kind) && !heldToday(a, st) ? { st, a } : null;
 }
 
 /** The next attempt's slot (0-based), or null when every attempt is taken. */
@@ -132,7 +133,9 @@ export function stationProgress(ev: CombineEvent, stationId: string): { done: nu
   const st = ev.stations.find((s) => s.id === stationId);
   if (!st) return { done: 0, total: 0 };
   const line = lineFor(ev, stationId);
-  return { done: line.reduce((t, a) => t + slotsOf(ev, a.id, st).filter((s) => s !== null).length, 0), total: line.length * st.attempts };
+  // an athlete held today by the jump gate takes no attempt here: not counted against the station
+  const open = line.filter((a) => !heldToday(a, st));
+  return { done: open.reduce((t, a) => t + slotsOf(ev, a.id, st).filter((s) => s !== null).length, 0), total: open.length * st.attempts };
 }
 
 export function setWeights(ev: CombineEvent, weights: Record<string, number>, now: number = Date.now()): CombineEvent {
@@ -168,7 +171,14 @@ function cleanAccess(raw: unknown, source: 'roster' | 'adhoc'): AthleteAccess {
   const testable = r.testable === true;
   const camera = testable && r.camera === true;
   const held = HELD.has(r.held as HeldReason) ? (r.held as HeldReason) : null;
-  return { testable, camera, saveCamera: camera && r.saveCamera === true, held: testable ? null : held ?? 'age_required' };
+  return { testable, camera, saveCamera: camera && r.saveCamera === true, held: testable ? null : held ?? 'age_required', today: camera ? cleanToday(r.today) : HELD_TODAY };
+}
+
+/** A stored day's holds: anything not plainly read as open is held (a draft from before the jump gate: all held). */
+function cleanToday(raw: unknown): TodayHolds {
+  const r = (raw && typeof raw === 'object' ? raw : null) as Record<string, unknown> | null;
+  if (!r || typeof r.jump !== 'boolean' || !Array.isArray(r.skills)) return HELD_TODAY;
+  return { jump: r.jump, skills: r.skills.filter((x): x is string => typeof x === 'string') };
 }
 
 /** Slots from untrusted input (a stored draft, a request body): one per attempt, numbers only. */

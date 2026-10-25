@@ -21,12 +21,13 @@ w.__feedPush = (f) => poseService().pushFeed(f);
 w.__frames = (k, seed) => filmTake(buildTake([0.46, 0.48, 0.47].map((m) => ({ trial: { heightM: m * k } })), { leadS: 3.2 }), { fps: 60, seed }).frames;
 try { localStorage.clear(); } catch { /* a fresh page anyway */ }
 
-const adult = (id: string, name: string, saveCamera = true) => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera, held: null } });
+const OPEN = { jump: false, skills: [] as string[] };
+const adult = (id: string, name: string, saveCamera = true, today = OPEN) => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera, held: null, today } });
 const CTX = {
   available: scene === 'coach',
   athletes: [
-    adult('a1', 'Maya Okafor'), adult('a2', 'Jordan Reyes', false), adult('a3', 'Sam Lee'), adult('a4', 'Dev Patel'),
-    { id: 't1', name: 'Riley Chen', source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required' } },
+    adult('a1', 'Maya Okafor'), adult('a2', 'Jordan Reyes', false), adult('a3', 'Sam Lee'), adult('a4', 'Dev Patel', true, { jump: true, skills: [] }),   // THE JUMP GATE shut today: held at the jump station
+    { id: 't1', name: 'Riley Chen', source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required', today: { jump: true, skills: [] } } },
   ],
   teams: [{ id: 'team-1', name: 'Varsity', athleteIds: ['a1', 'a2', 'a3', 'a4', 't1'] }],
   events: [],

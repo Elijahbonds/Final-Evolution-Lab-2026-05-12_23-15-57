@@ -3,9 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { adhocAthlete, cleanEvent, cleanName, DRAFTS_KEY, dropDraft, keepDraft, lineFor, loadDrafts, MAX_DRAFTS, newEvent, nextAthlete, nextSlot, recordAttempts, redoAttempt, setReach, stationProgress, type DraftStorage } from './draft';
 import { parseStation, parseStations, stationId, stationName, formatValue, MAX_ATTEMPTS, MAX_STATIONS, SKILL_DRILLS } from './catalogue';
 import type { CombineAthlete } from './types';
+import { HELD_TODAY, OPEN_TODAY } from './today';
 
-const adult = (id: string): CombineAthlete => ({ id, name: id.toUpperCase(), source: 'roster', access: { testable: true, camera: true, saveCamera: false, held: null } });
-const handOnly = (id: string): CombineAthlete => ({ id, name: id, source: 'roster', access: { testable: true, camera: false, saveCamera: false, held: null } });
+const adult = (id: string): CombineAthlete => ({ id, name: id.toUpperCase(), source: 'roster', access: { testable: true, camera: true, saveCamera: false, held: null, today: OPEN_TODAY } });
+const handOnly = (id: string): CombineAthlete => ({ id, name: id, source: 'roster', access: { testable: true, camera: false, saveCamera: false, held: null, today: HELD_TODAY } });
 const JUMP = { kind: 'cmj', variant: 'standing', attempts: 3 } as const;
 const SPRINT = { kind: 'sprint', variant: '40yd', attempts: 2 } as const;
 const J = stationId('cmj', 'standing'), S = stationId('sprint', '40yd');
@@ -102,6 +103,36 @@ describe('the run', () => {
   });
 });
 
+describe('THE JUMP GATE in the run', () => {
+  const heldJump = (id: string): CombineAthlete => ({ ...adult(id), access: { ...adult(id).access, today: { jump: true, skills: ['pogo-bilateral'] } } });
+
+  it('an athlete held today stays in the line, takes no attempt (record and No mark refused), and does not hold the station open', () => {
+    let ev = newEvent({ name: 'T', athletes: [adult('a'), heldJump('x')], stations: [{ id: '', ...JUMP }, { id: '', ...SPRINT }], localId: 'L' });
+    expect(lineFor(ev, J).map((a) => a.id)).toEqual(['a', 'x']);
+    expect(recordAttempts(ev, 'x', J, [{ value: 40 }])).toBe(ev);
+    expect(recordAttempts(ev, 'x', J, [{ value: null }])).toBe(ev);
+    expect(nextSlot(ev, 'x', J)).toBeNull();
+    // hand-timed stations are not part of the jump gate
+    ev = recordAttempts(ev, 'x', S, [{ value: 5 }]);
+    expect(ev.results.x[S][0]?.value).toBe(5);
+    // the station is done once the open athletes are: the held one is not counted, and Next skips them
+    expect(stationProgress(ev, J)).toEqual({ done: 0, total: 3 });
+    expect(nextAthlete(ev, J, 'a')).toBe('a');
+    ev = recordAttempts(ev, 'a', J, [{ value: 40 }, { value: 41 }, { value: 42 }]);
+    expect(stationProgress(ev, J)).toEqual({ done: 3, total: 3 });
+    expect(nextAthlete(ev, J, 'a')).toBeNull();
+  });
+
+  it('a stored draft that never read the gate (or a forged one) is held at the camera stations', () => {
+    const raw = { ...newEvent({ name: 'T', athletes: [adult('a')], stations: [{ id: '', ...JUMP }], localId: 'L' }) };
+    const noToday = { ...raw, athletes: [{ id: 'a', name: 'A', source: 'roster', access: { testable: true, camera: true, saveCamera: true } }] };
+    expect(cleanEvent(noToday)!.athletes[0].access.today).toEqual(HELD_TODAY);
+    const forged = { ...raw, athletes: [{ id: 'a', name: 'A', source: 'roster', access: { testable: true, camera: true, today: { jump: 'no' } } }] };
+    expect(cleanEvent(forged)!.athletes[0].access.today).toEqual(HELD_TODAY);
+    expect(cleanEvent(raw)!.athletes[0].access.today).toEqual(OPEN_TODAY);
+  });
+});
+
 describe('the draft on the phone', () => {
   it('keeps, replaces, lists newest first and drops', () => {
     const s = memStore();
@@ -144,7 +175,7 @@ describe('the draft on the phone', () => {
     };
     const ev = cleanEvent(raw)!;
     expect(ev.athletes[0]).toMatchObject({ source: 'adhoc', access: { testable: false, camera: false, held: 'age_unknown' } });
-    expect(ev.athletes[1].access).toEqual({ testable: false, camera: false, saveCamera: false, held: 'age_required' });
+    expect(ev.athletes[1].access).toEqual({ testable: false, camera: false, saveCamera: false, held: 'age_required', today: HELD_TODAY });
     expect(ev.results.a[J]).toEqual([{ value: null, at: 1 }, { value: 41, at: 2 }, null]);
   });
 

@@ -5,6 +5,7 @@
 //
 // Pure, client-safe.
 import type { StationConfig } from './catalogue';
+import type { TodayHolds } from './today';
 
 /** Why an athlete cannot be tested. The first three are the coach loop's own teen-gate refusals (lib/coach/teenGate.ts). */
 export type HeldReason = 'age_required' | 'guardian_consent_required' | 'under_13' | 'age_unknown';
@@ -18,6 +19,8 @@ export interface AthleteAccess {
   /** Their camera numbers may be kept on the server: a verified adult with the live movement-numbers opt-in. */
   saveCamera: boolean;
   held: HeldReason | null;
+  /** THE JUMP GATE today (lib/combine/today.ts): which camera stations are held. Booleans only, never the reason. */
+  today: TodayHolds;
 }
 
 export interface CombineAthlete {

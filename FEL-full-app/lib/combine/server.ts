@@ -13,7 +13,10 @@
 //   · what the coach reads back: athletes still on the live roster, and a camera number only while that athlete still
 //     passes the save gate (a revoked opt-in hides it), as lib/groups checks each member again on the way out;
 //   · what an athlete reads: their own rows only; the group is used to place them, and no other athlete leaves the server.
-import { athleteAccess, canKeepOnServer } from './gate';
+import { athleteAccess, canKeepOnServer, heldToday } from './gate';
+import { HELD_TODAY, todayHolds, type TodayHolds } from './today';
+import { loadWarmupContext, type WarmupDb } from '@/lib/coach/warmupServer';
+import { FALLBACK_WARMUP_CONTEXT } from '@/lib/coach/warmup';
 import { STATIONS, parseStations, type StationConfig } from './catalogue';
 import { cleanName, cleanSlots, MAX_ATHLETES } from './draft';
 import { bestOf, cleanWeights, rankValues } from './score';
@@ -42,8 +45,20 @@ const displayName = (name: unknown, i: number): string => {
   return n || `Athlete ${i + 1}`;
 };
 
-/** The coach's live roster, each athlete with what the gates allow. A read that fails closes the gate (no athlete). */
-export async function rosterAthletes(db: CombineDb, coachId: string, now: Date): Promise<CombineAthlete[]> {
+/**
+ * THE JUMP GATE today for one athlete: the warm-up's own reader (loadWarmupContext) through the drills page's verdict
+ * (lib/combine/today.ts). A read that fails is the careful context (FALLBACK_WARMUP_CONTEXT), as /play/drills does.
+ */
+export async function todayFor(db: CombineDb, athleteId: string, now: Date): Promise<TodayHolds> {
+  const ctx = await loadWarmupContext(db as unknown as WarmupDb, athleteId, now).catch(() => FALLBACK_WARMUP_CONTEXT);
+  return todayHolds(ctx);
+}
+
+/**
+ * The coach's live roster, each athlete with what the gates allow. A read that fails closes the gate (no athlete).
+ * `today`: also read each camera athlete's jump gate (the context, the run and a save need it; a create does not).
+ */
+export async function rosterAthletes(db: CombineDb, coachId: string, now: Date, today = true): Promise<CombineAthlete[]> {
   const links = await soft(db.coachClient.findMany({ where: { coachId, endedAt: null }, select: { clientId: true } }), []);
   const ids = [...new Set((links as { clientId: string }[]).map((l) => l.clientId))].filter((id) => id !== coachId);
   if (!ids.length) return [];
@@ -53,10 +68,14 @@ export async function rosterAthletes(db: CombineDb, coachId: string, now: Date):
   ]);
   type U = { id: string; name: string | null; dobYear: number | null; scanSaveOptIn: { scope: string; granted: boolean; revokedAt: Date | null } | null };
   type C = { menteeId: string; requestedAt: Date; acceptedAt: Date | null; revokedAt: Date | null; menteeBirthYear: number | null };
-  return (users as U[]).map((u, i) => ({
-    id: u.id, name: displayName(u.name, i), source: 'roster' as const,
-    access: athleteAccess({ dobYear: u.dobYear, consents: (consents as C[]).filter((c) => c.menteeId === u.id), optIn: u.scanSaveOptIn }, now),
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  const athletes = (users as U[]).map((u, i) => {
+    const input = { dobYear: u.dobYear, consents: (consents as C[]).filter((c) => c.menteeId === u.id), optIn: u.scanSaveOptIn };
+    return { id: u.id, name: displayName(u.name, i), source: 'roster' as const, input, access: athleteAccess(input, now) };
+  });
+  // the jump gate is read only for an athlete the camera stations are open to (everyone else is held there anyway)
+  const holds = await Promise.all(athletes.map((a) => (today && a.access.camera ? todayFor(db, a.id, now) : Promise.resolve(HELD_TODAY))));
+  return athletes.map((a, i) => ({ id: a.id, name: a.name, source: a.source, access: athleteAccess(a.input, now, holds[i]) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** The teams the coach runs (owner or coach), each as its members on the coach's live roster. Before the teams SQL: none. */
@@ -93,7 +112,7 @@ function parseSetup(body: unknown, roster: readonly CombineAthlete[], teams: rea
 export async function createCombine(db: CombineDb, coachId: string, body: unknown, now = new Date()): Promise<Res> {
   const t = now.getTime();
   if (!(await store.combineReady(db, t))) return NOT_READY;
-  const roster = await rosterAthletes(db, coachId, now);
+  const roster = await rosterAthletes(db, coachId, now, false);
   const teams = await coachTeams(db, coachId, roster, t);
   const s = parseSetup(body, roster, teams);
   if (!s.stations.length) return err(400, 'no_stations');
@@ -172,12 +191,18 @@ export async function saveCombine(db: CombineDb, coachId: string, id: string, bo
   const rows: store.ResultWrite[] = [];
   const clear: { athleteId: string; stationId: string; attempt: number }[] = [];
   const keptOnDevice: { athleteId: string; stationId: string }[] = [];
+  const held: { athleteId: string; stationId: string }[] = [];
   for (const [athleteId, byStation] of Object.entries(raw)) {
     const a = testable.find((x) => x.id === athleteId);
     if (!a || !on.has(athleteId) || !byStation || typeof byStation !== 'object') continue;
     for (const st of stations) {
       if (!(st.id in byStation)) continue;
       const slots = cleanSlots(byStation[st.id], st.attempts);
+      // THE JUMP GATE: a station held today for this athlete takes nothing, whatever the phone sent
+      if (heldToday(a, st)) {
+        if (slots.some((s) => s !== null)) held.push({ athleteId, stationId: st.id });
+        continue;
+      }
       const camera = STATIONS[st.kind].method !== 'hand';
       if (!canKeepOnServer(a, st.kind) || (camera && !scanSave.has(athleteId))) {
         if (slots.some((s) => s !== null)) keptOnDevice.push({ athleteId, stationId: st.id });
@@ -195,7 +220,7 @@ export async function saveCombine(db: CombineDb, coachId: string, id: string, bo
     const u = await store.updateEvent(db, id, coachId, cleanName(b.name, ev.name), cleanWeights(b.weights ?? ev.weights, stations), t);
     if (!u.ok) return fromWrite(u)!;
   }
-  return ok({ saved: w.value, keptOnDevice });
+  return ok({ saved: w.value, keptOnDevice, heldToday: held });
 }
 
 /** DELETE /api/coach/combine/[id]: the coach's own combine and everything in it. */

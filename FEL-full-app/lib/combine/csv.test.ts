@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { combineCsv, csvCell, csvFileName } from './csv';
 import { newEvent, recordAttempts } from './draft';
 import type { CombineAthlete } from './types';
+import { HELD_TODAY, OPEN_TODAY } from './today';
 
-const adult = (id: string, name: string): CombineAthlete => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera: true, held: null } });
-const held: CombineAthlete = { id: 't', name: 'Teen', source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required' } };
+const adult = (id: string, name: string): CombineAthlete => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera: true, held: null, today: OPEN_TODAY } });
+const held: CombineAthlete = { id: 't', name: 'Teen', source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required', today: HELD_TODAY } };
 
 function sample() {
   let ev = newEvent({

@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { bestOf, cleanWeights, compositeTable, ordinal, rankValues, stationTable, takenCount, WEIGHT_MAX } from './score';
 import { stationId, type StationConfig } from './catalogue';
 import type { Attempt, CombineAthlete, CombineEvent } from './types';
+import { HELD_TODAY, OPEN_TODAY } from './today';
 
 const A = (value: number | null): Attempt => ({ value, at: 1 });
-const adult = (id: string, name = id): CombineAthlete => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera: true, held: null } });
-const handOnly = (id: string): CombineAthlete => ({ id, name: id, source: 'roster', access: { testable: true, camera: false, saveCamera: false, held: null } });
-const held = (id: string): CombineAthlete => ({ id, name: id, source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required' } });
+const adult = (id: string, name = id): CombineAthlete => ({ id, name, source: 'roster', access: { testable: true, camera: true, saveCamera: true, held: null, today: OPEN_TODAY } });
+const handOnly = (id: string): CombineAthlete => ({ id, name: id, source: 'roster', access: { testable: true, camera: false, saveCamera: false, held: null, today: HELD_TODAY } });
+const held = (id: string): CombineAthlete => ({ id, name: id, source: 'roster', access: { testable: false, camera: false, saveCamera: false, held: 'guardian_consent_required', today: HELD_TODAY } });
 const JUMP: StationConfig = { id: stationId('cmj', 'standing'), kind: 'cmj', variant: 'standing', attempts: 3 };
 const SPRINT: StationConfig = { id: stationId('sprint', '40yd'), kind: 'sprint', variant: '40yd', attempts: 2 };
 
@@ -113,6 +114,16 @@ describe('the composite', () => {
   it('every weight 0: no composite for anyone', () => {
     const rows = compositeTable(event(athletes, results), cleanWeights({ [JUMP.id]: 0, [SPRINT.id]: 0 }, [JUMP, SPRINT]));
     expect(rows.every((r) => r.composite === null && r.rank === null)).toBe(true);
+  });
+});
+
+describe('an athlete held today by the jump gate', () => {
+  it('is on the jump table with no number and ranked as missing: the composite is incomplete, after the complete ones', () => {
+    const heldJump: CombineAthlete = { ...adult('x'), access: { ...adult('x').access, today: { jump: true, skills: [] } } };
+    const ev = event([adult('a'), heldJump], { a: { [JUMP.id]: [A(40), null, null], [SPRINT.id]: [A(5), null] }, x: { [SPRINT.id]: [A(4.8), null] } });
+    expect(stationTable(ev, JUMP).map((r) => [r.id, r.value, r.rank])).toEqual([['a', 40, 1], ['x', null, null]]);
+    const rows = compositeTable(ev, cleanWeights({}, [JUMP, SPRINT]));
+    expect(rows.map((r) => [r.id, r.rank, r.complete])).toEqual([['a', 1, true], ['x', null, false]]);
   });
 });
 

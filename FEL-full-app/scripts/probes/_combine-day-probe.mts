@@ -72,7 +72,7 @@ async function typeTime(page: Page, s: string) {
   await page.waitForSelector('[data-combine-run]');
 
   // the jump station: every athlete in turn, three jumps each from a live take (each athlete their own height)
-  const JUMPERS: [string, number, number][] = [['a1', 1, 7], ['a2', 0.86, 11], ['a3', 1.12, 13], ['a4', 0.95, 17]];
+  const JUMPERS: [string, number, number][] = [['a1', 1, 7], ['a2', 0.86, 11], ['a3', 1.12, 13]];
   const jumpSlots: Record<string, string[]> = {};
   for (const [id, k, seed] of JUMPERS) {
     await page.waitForSelector(`[data-combine-current="${id}"] [data-combine-start-camera]`);
@@ -94,6 +94,12 @@ async function typeTime(page: Page, s: string) {
     if (id === 'a1') await shot(page, '4-run-jump-recorded');
     await page.click('[data-combine-next]');
   }
+  // Dev Patel: the jump gate is shut today — in the line, held, no camera, and the station is done without him
+  await page.click('[data-combine-line] [data-held-today]');
+  await page.waitForSelector('[data-combine-current="a4"] [data-combine-held-today]');
+  check(!(await page.$('[data-combine-start-camera]')), 'run: no camera for the athlete held today');
+  check(!!(await page.$('[data-combine-station-done]')), 'run: the jump station is done without the held athlete');
+  await shot(page, '4b-run-jump-held-today');
   for (const [id, slots] of Object.entries(jumpSlots)) check(slots.length === 3 && slots.every((t) => /\d+\.\d in/.test(t)), `run: ${id} three camera jumps recorded (got ${JSON.stringify(slots)})`);
   report.jump = jumpSlots;
 
@@ -139,7 +145,8 @@ async function typeTime(page: Page, s: string) {
   await page.waitForTimeout(100);
   const rows = await page.evaluate(`[...document.querySelectorAll('[data-combine-row]')].map((r) => r.textContent)`) as string[];
   check(rows.length === 4, `report: 4 rows on the composite (got ${rows.length})`);
-  check(rows.every((r) => !/incomplete/.test(r)) && rows.every((r) => /^\d/.test(r)), 'report: every athlete complete and ranked');
+  check(rows.filter((r) => /^\d/.test(r) && !/incomplete/.test(r)).length === 3, 'report: the three open athletes complete and ranked');
+  check(/^–Dev Patelincomplete/.test(rows[3] ?? ''), `report: the athlete held today ranked as missing, last (got ${rows[3]})`);
   check(!!(await page.$('[data-combine-csv]')), 'report: CSV button');
   report.report = { rows, scrollWidth: await scrollWidth(page) };
   await shot(page, '7-report');
