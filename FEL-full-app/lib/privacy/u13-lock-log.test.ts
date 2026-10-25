@@ -55,10 +55,14 @@ const UA = 'AgeScreenTest/1.0';
 // pending SQL: whichever lands second bumps this to the merge carrying both.
 // COACH-AI-DRAFT (lane/coach-ai-draft, 2026-10-24) prisma/pending/2026-10-24-coach-ai-draft.sql (pending SQL only; schema.prisma
 // untouched; CoachProgramDraft + CoachDraftDecision, additive) at ad3b04fa, the lane commit carrying it on top of every file above.
+// COACH-VIDEO-REVIEW (lane/coach-video-review, 2026-10-24) prisma/pending/2026-10-24-coach-form-review.sql (pending SQL only;
+// schema.prisma untouched; CoachFormReview, additive) at 02c1e49c, the lane commit carrying it on top of every file above.
+// lane/coach-ai-draft landed first (#436): pinned at c2c5140e, this lane's merge of lane/finish-release, the first
+// commit carrying both pending files.
 // COACH-BUSINESS (lane/coach-business, 2026-10-25) prisma/pending/2026-10-25-coach-business.sql (pending SQL only; schema.prisma
-// untouched; six additive tables) at 44680dbc, the lane commit carrying it on top of every file above. lane/coach-video-review
-// also adds pending SQL: whichever lands second bumps this to the merge carrying both.
-const PARENT = '44680dbc9637c7502cc8d6921684b84c5ebca866';
+// untouched; six additive tables) at 44680dbc. lane/coach-video-review landed first (#438): pinned at MERGE_SHA, this
+// lane's merge of lane/finish-release, the first commit carrying all three 2026-10-24/25 pending files.
+const PARENT = 'c2c5140eff710ae7e2b4aa936f87a98af1bd4924';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

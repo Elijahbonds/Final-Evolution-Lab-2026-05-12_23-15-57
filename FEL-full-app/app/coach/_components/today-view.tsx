@@ -78,6 +78,8 @@ import { toast } from 'sonner';
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
 import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
+// COACH-VIDEO-REVIEW (2026-10-24): film a set of a readable exercise; the camera counts and flags (components/coach/form-review)
+import { FilmSetLink } from '@/components/coach/form-review/film-set-link';
 import { SetTimer } from '@/components/coach/set-timer';
 import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
 import { ReadinessCheckInCard } from '@/components/coach/readiness-checkin';
@@ -451,6 +453,7 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
          note can say "felt off" about form or effort with no pain in it at all. */}
       <textarea value={draft.clientNote} onChange={(ev) => onNote(ev.target.value)} placeholder={NOTE_PROMPT} aria-label={`${e.name}: note to your coach`} rows={2} maxLength={500} className="w-full resize-y rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" />
       <PainCheckInChip exerciseName={e.name} programExerciseId={e.exerciseId} />
+      <FilmSetLink exercise={e} />
       <div className="flex items-center gap-2"><Video className="h-4 w-4 shrink-0 text-white/40" /><input value={draft.videoUrl} onChange={(ev) => onVideo(ev.target.value)} placeholder="Form video link (https://…)" aria-label={`${e.name}: form video link`} className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /></div>
     </div>
   );
