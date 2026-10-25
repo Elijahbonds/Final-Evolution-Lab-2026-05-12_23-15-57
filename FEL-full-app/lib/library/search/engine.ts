@@ -10,7 +10,12 @@
 //     (Damerau-Levenshtein), and the last word also matches as a prefix while someone is still typing;
 //   · facets with counts (each facet counted with every OTHER filter applied, so a count says what clicking it gives);
 //   · zero-result recovery: "did you mean" from the corrected words, any-term results when every term cannot match,
-//     and, when the filters emptied the list, which ONE filter to relax and how many results that brings back.
+//     and, when the filters emptied the list, which ONE filter to relax and how many results that brings back;
+//   · VARIANTS DO NOT CROWD THE LIST (batches 2–4, 5,000+ entries): every entry with a `variantOf` is grouped under its
+//     base, the group shows once (the base, unless a variant clearly matches the words better) with "+N variants", and
+//     paging counts groups; a family that already holds a top-10 place pays a diversity penalty for the next one;
+//     and a query word that names a goal ("vert" → vertical) lifts the entries that carry that goal, so vertical-jump
+//     work outranks an exercise that merely has the word in its name ("Vertical Swing").
 //
 // Pure: no Prisma, no DOM, no clock except the optional `now` used for tookMs. Server-side in the app (the library
 // is ~2 MB of JSON); the test and the bench build it directly.
@@ -61,10 +66,17 @@ export interface SearchOptions {
   boostPrimary?: string[];
   /** Soft boost toward a level (the Ask parser's "easier", "beginner"). */
   preferLevel?: string;
+  /** Group variants under their base (default true). false = one hit per entry (the review screen, the tests' controls). */
+  group?: boolean;
   now?: () => number;
 }
 
-export interface SearchHit { entry: LibraryExercise; score: number }
+export interface SearchHit {
+  entry: LibraryExercise;
+  score: number;
+  /** The other matching members of this entry's group (its base and the base's variants), best first. */
+  variants: LibraryExercise[];
+}
 
 export interface FacetValue { value: string; label: string; count: number }
 
@@ -72,7 +84,10 @@ export interface Relaxation { filter: FacetKey | 'lowLoad'; count: number }
 
 export interface SearchResponse {
   query: string;
+  /** Matching ENTRIES (what the facet counts add up to). */
   total: number;
+  /** Matching GROUPS (a base and its variants count once): what paging walks through. Equal to total when ungrouped. */
+  groups: number;
   hits: SearchHit[];
   facets: Record<FacetKey, FacetValue[]>;
   /** The query with each unknown word replaced by its nearest indexed word, when that differs. */
@@ -134,6 +149,8 @@ export interface LibraryIndex {
   names: string[];
   facetVals: Record<FacetKey, string[][]>;
   synonyms: Map<string, { terms: string[]; weight: number }[]>;
+  /** Each doc's group: the doc index of its base (variantOf, when the base is in this index) or its own. */
+  groupOf: Int32Array;
   builtMs: number;
 }
 
@@ -141,6 +158,30 @@ export interface LibraryIndex {
 export const SCORE_FLOOR = 0.15;
 const BM25_K1 = 1.2;
 const BM25_B = 0.6;
+
+/** A hit's base: the variant's base when that base is in the index, else itself. */
+function groupsOf(docs: readonly LibraryExercise[]): Int32Array {
+  const at = new Map(docs.map((e, i) => [e.id, i]));
+  return Int32Array.from(docs, (e, i) => (e.variantOf ? at.get(e.variantOf) ?? i : i));
+}
+
+/** Query words that name a goal: an entry carrying the goal is lifted by GOAL_LIFT (once per goal named), one without it damped. */
+export const GOAL_WORDS: Readonly<Record<string, string>> = Object.fromEntries([
+  ['vertical', 'vertical'], ['speed', 'speed'], ['agility', 'agility'], ['landing', 'landing'], ['balance', 'balance'], ['mobility', 'mobility'],
+  ['conditioning', 'conditioning'], ['footwork', 'footwork'], ['handle', 'handles'], ['handling', 'handles'], ['finishing', 'finishing'],
+  ['shooting', 'shooting'], ['defense', 'defense'], ['defensive', 'defense'], ['grip', 'grip'], ['posture', 'posture'], ['trunk', 'trunk'],
+].map(([w, g]) => [stem(w), g]));
+/** Query words that are a movement pattern ("lunges", "hinge", "squat"): entries of that pattern are lifted a little. */
+export const PATTERN_WORDS: Readonly<Record<string, string>> = Object.fromEntries(['squat', 'hinge', 'lunge', 'push', 'pull', 'carry', 'rotation'].map((p) => [stem(p), p]));
+export const PATTERN_LIFT = 1.4;
+export const GOAL_LIFT = 1.4;
+/** …and an entry that only has the word in its name or cues, not the goal, is damped. */
+export const GOAL_MISS = 0.8;
+/** A base keeps the group's place unless a variant scores this much better (then the variant is what was asked for). */
+export const REP_SHARE = 0.85;
+/** Each earlier top-10 group of the same family costs this share of the best score. */
+export const DIVERSITY = 0.15;
+const DIVERSE_TOP = 10;
 
 /** Build the index once per library version (lib/library/server.ts caches it). */
 export function buildIndex(entries: readonly LibraryExercise[], now: () => number = Date.now): LibraryIndex {
@@ -206,7 +247,7 @@ export function buildIndex(entries: readonly LibraryExercise[], now: () => numbe
   return {
     docs, byId: new Map(docs.map((e, i) => [e.id, i])), postings, docLen, avgLen,
     vocab: [...postings.keys()].sort(), surface: new Map([...surface].map(([t, s]) => [t, s.word])),
-    names: docs.map((e) => terms(e.name).join(' ')), facetVals, synonyms, builtMs: now() - t0,
+    names: docs.map((e) => terms(e.name).join(' ')), facetVals, synonyms, groupOf: groupsOf(docs), builtMs: now() - t0,
   };
 }
 
@@ -254,7 +295,9 @@ export function parseQuery(index: LibraryIndex, q: string): Group[] {
     const alts: Alt[] = [];
     let corrected: string | null = null;
     const last = i === ws.length - 1;
-    const prefixes = last ? prefixMatches(index, t) : [];
+    // a prefix stands in only for a word the index does not hold whole ("kettl" while typing); a complete word is not
+    // widened ("traps" is the muscle, not "trapbar"; "pull" is not "pullover")
+    const prefixes = last && !index.postings.has(t) ? prefixMatches(index, t) : [];
     const cap = index.postings.has(t) ? idf(index, t) : undefined;
     if (index.postings.has(t)) alts.push({ terms: [t], weight: 1 });
     for (const s of index.synonyms.get(t) ?? []) if (usable(s)) alts.push({ ...s, cap });
@@ -362,6 +405,17 @@ export function search(index: LibraryIndex, q: string, filters: SearchFilters = 
       for (let d = 0; d < n; d++) if (hitCount[d] > 0) { textMatch[d] = 1; any++; }
       if (any) fallback = 'any-term';
     }
+    // a word that names a goal lifts the entries that carry it ("vert" is vertical-jump work, not "Vertical Swing")
+    const goalsNamed = [...new Set(groups.map((g) => GOAL_WORDS[stem(g.word)] ?? (g.corrected ? GOAL_WORDS[stem(g.corrected)] : undefined)).filter((x): x is string => !!x))];
+    if (goalsNamed.length) {
+      for (let d = 0; d < n; d++) {
+        if (!textMatch[d]) continue;
+        const has = index.docs[d].goals.filter((g) => goalsNamed.includes(g)).length;
+        score[d] *= has ? GOAL_LIFT ** has : GOAL_MISS;
+      }
+    }
+    const patternsNamed = new Set(groups.map((g) => PATTERN_WORDS[stem(g.word)]).filter((x): x is string => !!x));
+    if (patternsNamed.size) for (let d = 0; d < n; d++) if (textMatch[d] && patternsNamed.has(index.docs[d].pattern)) score[d] *= PATTERN_LIFT;
     // phrase boosts on the name
     const phrase = terms(q).join(' ');
     if (phrase.length >= 3) {
@@ -427,9 +481,62 @@ export function search(index: LibraryIndex, q: string, filters: SearchFilters = 
     : null;
   const offset = Math.max(0, opts.offset ?? 0);
   const limit = Math.min(100, Math.max(1, opts.limit ?? 24));
+  const scored = !(textless && !boost.size && prefer === null && !opts.boostPrimary?.length);
+  const ranked = opts.group === false ? matched.map((d) => ({ rep: d, members: [d] })) : groupHits(index, matched, score, scored);
+  if (scored && ranked.length > 1) diversify(index, ranked, score);
+  const round = (d: number) => Math.round(score[d] * 1000) / 1000;
   return {
-    query: q, total: matched.length,
-    hits: matched.slice(offset, offset + limit).map((d) => ({ entry: index.docs[d], score: Math.round(score[d] * 1000) / 1000 })),
+    query: q, total: matched.length, groups: ranked.length,
+    hits: ranked.slice(offset, offset + limit).map((g) => ({
+      entry: index.docs[g.rep], score: round(g.rep),
+      variants: g.members.filter((d) => d !== g.rep).map((d) => index.docs[d]),
+    })),
     facets, didYouMean, corrected, fallback, relaxations, tookMs: now() - t0,
   };
+}
+
+interface RankedGroup { rep: number; members: number[] }
+
+/**
+ * Variants under their base: groups in the order of their best member; the base represents the group unless a variant
+ * scores clearly better (REP_SHARE) — "paused goblet squat" shows the paused one, "goblet squat" shows the base.
+ */
+function groupHits(index: LibraryIndex, matched: readonly number[], score: Float64Array, scored: boolean): RankedGroup[] {
+  const order: number[] = [];
+  const members = new Map<number, number[]>();
+  for (const d of matched) {
+    const g = index.groupOf[d];
+    let m = members.get(g);
+    if (!m) { m = []; members.set(g, m); order.push(g); }
+    m.push(d);
+  }
+  return order.map((g) => {
+    const m = members.get(g)!;
+    const best = m[0];
+    const rep = m.includes(g) && (!scored || score[g] >= REP_SHARE * score[best]) ? g : best;
+    return { rep, members: [rep, ...m.filter((d) => d !== rep)] };
+  });
+}
+
+/**
+ * The diversity penalty: walking the top 10, a group whose family already holds an earlier place competes with its
+ * score lowered by DIVERSITY × the best score per earlier place, so one family cannot take the whole first screen. Past
+ * the top 10 the order is the plain score order.
+ */
+function diversify(index: LibraryIndex, ranked: RankedGroup[], score: Float64Array): void {
+  const top = Math.abs(score[ranked[0].rep]) || 1;
+  const seen = new Map<string, number>();
+  const window = Math.min(ranked.length, DIVERSE_TOP * 4);
+  for (let i = 0; i < Math.min(DIVERSE_TOP, ranked.length); i++) {
+    let pick = i;
+    let bestAdj = -Infinity;
+    for (let j = i; j < window; j++) {
+      const fam = index.docs[ranked[j].rep].family;
+      const adj = score[ranked[j].rep] - DIVERSITY * top * (seen.get(fam) ?? 0);
+      if (adj > bestAdj) { bestAdj = adj; pick = j; }
+    }
+    if (pick !== i) { const [g] = ranked.splice(pick, 1); ranked.splice(i, 0, g); }
+    const fam = index.docs[ranked[i].rep].family;
+    seen.set(fam, (seen.get(fam) ?? 0) + 1);
+  }
 }

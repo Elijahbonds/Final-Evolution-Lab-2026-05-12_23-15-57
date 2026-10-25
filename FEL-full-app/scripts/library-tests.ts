@@ -2,7 +2,8 @@
 // scripts/library-tests.ts — EXERCISE-LIBRARY (2026-10-25): the shared exercise library's CI suite.
 //
 //   A. THE DATA: every entry in data/library/** passes lib/library/validate.ts checkLibrary (schema, fixed lists, links,
-//      duplicates, cueLint, no medical claims, source + licence + review), the library holds at least 1,500 entries,
+//      duplicates, cueLint, no medical claims, source + licence + review, modifier rules), the library holds at least
+//      5,000 entries (owner decision 2026-10-25; batches 2–4 — it was 1,500 after batch 1),
 //      every unreviewed entry is a draft, every prehab entry carries the prehab note, and lib/library/files.ts imports
 //      exactly the files on disk.
 //   B. THE SEED'S LICENCE: the licence text and the pinned source are in the repo, and every seed entry links back.
@@ -28,7 +29,7 @@ const entries = loadLibraryFiles();
 // ── A. the data ─────────────────────────────────────────────────────────────────────────────────────────────────────
 const issues = checkLibrary(entries);
 ok(issues.length === 0, `A1 validator: ${issues.length} issue(s), first: ${issues.slice(0, 5).map((i) => `${i.id} [${i.check}] ${i.detail}`).join(' | ')}`);
-ok(entries.length >= 1500, `A2 at least 1,500 entries (have ${entries.length})`);
+ok(entries.length >= 5000, `A2 at least 5,000 entries (have ${entries.length})`);
 ok(entries.every((e) => e.review.status === 'draft' || !!e.review.reviewer), 'A3 every entry is a draft or names its reviewer');
 ok(entries.filter((e) => e.category === 'prehab').every((e) => e.prehabNote === PREHAB_NOTE), 'A4 every prehab entry carries the prehab note');
 ok(entries.filter((e) => e.category !== 'prehab').every((e) => e.prehabNote === null), 'A5 no prehab note outside prehab');
@@ -64,6 +65,30 @@ const twin = mutant({ id: 'twin', slug: 'twin', name: `${base.name}s` });
 ok(checkLibrary([base, twin]).some((i) => i.check === 'duplicate'), 'C8 a near-duplicate name is caught');
 ok(checkLibrary([mutant({ regressionId: 'no-such-entry' })]).some((i) => i.check === 'links'), 'C9 a dangling link is caught');
 ok(caught(mutant({ youthOk: true, cues: ['Go all-out against the floor.'] }), 'youth'), 'C10 max-effort wording on a youth entry is caught');
+
+// the modifier rules (lib/library/modifiers.ts): a '+modifier' entry on a base its rule refuses fails the library check
+const named = (n: string) => entries.find((e) => e.name === n)!;
+const variant = (b: LibraryExercise, mod: string, name: string): LibraryExercise => ({
+  ...structuredClone(b), id: `ctl-${mod}`, slug: `ctl-${mod}`, name, aliases: [], variation: `${b.variation}+${mod}`, variantOf: b.id,
+  regressionId: b.id, progressionId: null, source: { kind: 'authored', ref: null, url: null, licence: 'FEL original (Final Evolution Lab)' },
+  review: { status: 'draft', reviewer: null, batch: 'authored-b9-control' },
+});
+const modifierCaught = (b: LibraryExercise, v: LibraryExercise) => checkLibrary([b, v]).some((i) => i.id === v.id && i.check === 'modifier');
+const plyoPush = named('Plyo Kettlebell Pushups');
+ok(modifierCaught(plyoPush, variant(plyoPush, 'paused', 'Paused Plyo Kettlebell Pushups')), 'C11 R1: a paused plyometric entry is caught');
+ok(modifierCaught(plyoPush, variant(plyoPush, 'iso-hold', 'Plyo Kettlebell Pushups Isometric Hold')), 'C12 R1: an isometric hold on a plyometric entry is caught');
+const swing = named('Vertical Swing');
+ok(modifierCaught(swing, variant(swing, 'timed', 'Vertical Swing Against the Clock')), 'C13 R2: "Against the Clock" on a swing is caught');
+const barbellPress = entries.find((e) => e.category === 'strength' && e.pattern === 'push' && e.equipment.includes('barbell'))!;
+ok(modifierCaught(barbellPress, variant(barbellPress, 'single-arm', `Single-Arm ${barbellPress.name}`)), 'C14 R3: a single-arm barbell lift is caught');
+const thrust = entries.find((e) => e.category === 'strength' && e.pattern === 'hinge' && /hip thrust/i.test(e.name))!;
+ok(modifierCaught(thrust, variant(thrust, 'deficit', `Deficit ${thrust.name}`)), 'C15 R4: a deficit on a lift that does not stand on the floor is caught');
+const goblet = named('Goblet Squat');
+const tempoGoblet = variant(goblet, 'tempo', 'Goblet Squat Slow Lower Control');
+const stacked = { ...variant(tempoGoblet, 'paused', 'Paused Goblet Squat Slow Lower Control'), id: 'ctl-stacked', slug: 'ctl-stacked', variantOf: tempoGoblet.id };
+ok(checkLibrary([goblet, tempoGoblet, stacked]).some((i) => i.id === 'ctl-stacked' && i.check === 'modifier'), 'C16 R5: a modifier stacked on a modifier is caught');
+ok(checkEntry({ ...tempoGoblet, variantOf: undefined }).some((i) => i.check === 'modifier'), 'C17 a "+modifier" entry that names no base is caught');
+ok(!modifierCaught(goblet, tempoGoblet), 'C18 control: a tempo goblet squat passes (the rules refuse nonsense, not everything)');
 
 console.log(`library: ${entries.length} entries; ${checks - fail.length}/${checks} checks passed`);
 if (fail.length) { for (const f of fail) console.error(`  ✗ ${f}`); process.exit(1); }

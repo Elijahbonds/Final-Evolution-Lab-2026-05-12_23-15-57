@@ -38,7 +38,12 @@ export function resetLibraryCache(): void { cache = null; }
 
 export function mergeOverlay(files: readonly LibraryExercise[], overlay: readonly LibraryExercise[]): LibraryExercise[] {
   const byId = new Map(overlay.map((e) => [e.id, e]));
-  const out = files.map((e) => byId.get(e.id) ?? e);
+  // the table has no variantOf column (no schema change): an owner edit keeps the file entry's base link
+  const out = files.map((e) => {
+    const o = byId.get(e.id);
+    if (!o) return e;
+    return e.variantOf && o.variantOf === undefined ? { ...o, variantOf: e.variantOf } : o;
+  });
   const have = new Set(files.map((e) => e.id));
   for (const e of overlay) if (!have.has(e.id)) out.push(e);
   return out;
@@ -75,9 +80,18 @@ export async function libraryViewer(userId: string, role: string | undefined): P
 
 // ── what a card shows ───────────────────────────────────────────────────────────────────────────────────────────────
 
-export interface LibraryCard extends LibraryExercise { muscleMap: { primary: string[]; secondary: string[] }; avatarClip: string | null }
+/** A search hit's other group members (its base and the base's variants), as the "+N variants" list shows them. */
+export interface VariantRef { id: string; name: string; level: LibraryExercise['level']; status: LibraryExercise['review']['status'] }
+
+export interface LibraryCard extends LibraryExercise {
+  muscleMap: { primary: string[]; secondary: string[] };
+  avatarClip: string | null;
+  /** On a search hit: the other matching members of its group. Absent elsewhere. */
+  variants?: VariantRef[];
+}
 
 export const toCard = (e: LibraryExercise): LibraryCard => ({ ...e, muscleMap: muscleMap(e), avatarClip: avatarClip(e.demo.clipKey) });
+export const toVariantRef = (e: LibraryExercise): VariantRef => ({ id: e.id, name: e.name, level: e.level, status: e.review.status });
 
 const LIST = (v: string | null): string[] | undefined => {
   const out = (v ?? '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
@@ -107,7 +121,7 @@ export async function searchLibrary(viewer: LibraryViewer, params: URLSearchPara
   const r = search(index, q, filtersFromParams(params), { drafts, youth: viewer.youth, offset, limit });
   const approved = index.docs.filter((e) => e.review.status === 'approved' && (!viewer.youth || e.youthOk)).length;
   return {
-    ...r, hits: r.hits.map((h) => toCard(h.entry)),
+    ...r, hits: r.hits.map((h) => ({ ...toCard(h.entry), variants: h.variants.map(toVariantRef) })),
     viewer: { coach: viewer.isCoach, admin: viewer.isAdmin, drafts, youth: viewer.youth },
     library: { total: index.docs.length, approved, drafts: index.docs.filter((e) => e.review.status === 'draft').length, ready },
   };

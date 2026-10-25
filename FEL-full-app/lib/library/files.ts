@@ -32,11 +32,67 @@ import authoredB1StrengthLower from '@/data/library/authored/b1-strength-lower.j
 import authoredB1StrengthUpper from '@/data/library/authored/b1-strength-upper.json';
 import authoredB1Trunk from '@/data/library/authored/b1-trunk.json';
 import authoredB1Variety from '@/data/library/authored/b1-variety.json';
+import authoredB2BasketballCombos from '@/data/library/authored/b2-basketball-combos.json';
+import authoredB2BasketballDefense2 from '@/data/library/authored/b2-basketball-defense-2.json';
+import authoredB2BasketballFinishing2 from '@/data/library/authored/b2-basketball-finishing-2.json';
+import authoredB2BasketballFootwork2 from '@/data/library/authored/b2-basketball-footwork-2.json';
+import authoredB2BasketballHandles2 from '@/data/library/authored/b2-basketball-handles-2.json';
+import authoredB2BasketballPassing2 from '@/data/library/authored/b2-basketball-passing-2.json';
+import authoredB2BasketballShooting2 from '@/data/library/authored/b2-basketball-shooting-2.json';
+import authoredB2ConditioningRope from '@/data/library/authored/b2-conditioning-rope.json';
+import authoredB2Plyometrics2 from '@/data/library/authored/b2-plyometrics-2.json';
+import authoredB2PlyometricsLanding from '@/data/library/authored/b2-plyometrics-landing.json';
+import authoredB2Speed2 from '@/data/library/authored/b2-speed-2.json';
+import authoredB2SpeedCuts from '@/data/library/authored/b2-speed-cuts.json';
+import authoredB2SpeedFootwork from '@/data/library/authored/b2-speed-footwork.json';
+import authoredB2SpeedStarts from '@/data/library/authored/b2-speed-starts.json';
+import authoredB2SportMulti from '@/data/library/authored/b2-sport-multi.json';
+import authoredB3AthleticExtra from '@/data/library/authored/b3-athletic-extra.json';
+import authoredB3BasketballDefense2 from '@/data/library/authored/b3-basketball-defense-2.json';
+import authoredB3BasketballDefense from '@/data/library/authored/b3-basketball-defense.json';
+import authoredB3BasketballFinishing2 from '@/data/library/authored/b3-basketball-finishing-2.json';
+import authoredB3BasketballFinishing from '@/data/library/authored/b3-basketball-finishing.json';
+import authoredB3BasketballFootwork2 from '@/data/library/authored/b3-basketball-footwork-2.json';
+import authoredB3BasketballFootwork from '@/data/library/authored/b3-basketball-footwork.json';
+import authoredB3BasketballHandles2 from '@/data/library/authored/b3-basketball-handles-2.json';
+import authoredB3BasketballHandles from '@/data/library/authored/b3-basketball-handles.json';
+import authoredB3BasketballPassing2 from '@/data/library/authored/b3-basketball-passing-2.json';
+import authoredB3BasketballPassing from '@/data/library/authored/b3-basketball-passing.json';
+import authoredB3BasketballShooting2 from '@/data/library/authored/b3-basketball-shooting-2.json';
+import authoredB3BasketballShooting from '@/data/library/authored/b3-basketball-shooting.json';
+import authoredB3Conditioning2 from '@/data/library/authored/b3-conditioning-2.json';
+import authoredB3ConditioningRecovery from '@/data/library/authored/b3-conditioning-recovery.json';
+import authoredB3ConditioningRope from '@/data/library/authored/b3-conditioning-rope.json';
+import authoredB3Conditioning from '@/data/library/authored/b3-conditioning.json';
+import authoredB3MobilityFlows from '@/data/library/authored/b3-mobility-flows.json';
+import authoredB3MobilityStretches from '@/data/library/authored/b3-mobility-stretches.json';
+import authoredB3Plyometric from '@/data/library/authored/b3-plyometric.json';
+import authoredB3Plyometrics from '@/data/library/authored/b3-plyometrics.json';
+import authoredB3PrehabAnkle2 from '@/data/library/authored/b3-prehab-ankle-2.json';
+import authoredB3PrehabAnkle from '@/data/library/authored/b3-prehab-ankle.json';
+import authoredB3PrehabHip2 from '@/data/library/authored/b3-prehab-hip-2.json';
+import authoredB3PrehabKnee2 from '@/data/library/authored/b3-prehab-knee-2.json';
+import authoredB3PrehabShoulder2 from '@/data/library/authored/b3-prehab-shoulder-2.json';
+import authoredB3RecoveryBreathing from '@/data/library/authored/b3-recovery-breathing.json';
+import authoredB3Speed2 from '@/data/library/authored/b3-speed-2.json';
+import authoredB3SpeedAgility from '@/data/library/authored/b3-speed-agility.json';
+import authoredB3SpeedCuts from '@/data/library/authored/b3-speed-cuts.json';
+import authoredB3SpeedFootwork from '@/data/library/authored/b3-speed-footwork.json';
+import authoredB3SpeedStarts from '@/data/library/authored/b3-speed-starts.json';
+import authoredB3SportMulti from '@/data/library/authored/b3-sport-multi.json';
+import authoredB3Trunk2 from '@/data/library/authored/b3-trunk-2.json';
+import authoredB3TrunkThrows from '@/data/library/authored/b3-trunk-throws.json';
+import authoredB4Core from '@/data/library/authored/b4-core.json';
+import authoredB4DumbbellHome from '@/data/library/authored/b4-dumbbell-home.json';
+import authoredB4StrengthExtra from '@/data/library/authored/b4-strength-extra.json';
+import authoredB4StrengthLower from '@/data/library/authored/b4-strength-lower.json';
+import authoredB4StrengthUpper from '@/data/library/authored/b4-strength-upper.json';
+import authoredB4Strength from '@/data/library/authored/b4-strength.json';
 
 /** Every data file, by path (the validator checks this list against the directory). */
-export const LIBRARY_FILES: readonly string[] = ["seed/conditioning.json","seed/core.json","seed/mobility.json","seed/plyometric.json","seed/power.json","seed/prehab.json","seed/recovery.json","seed/speed-agility.json","seed/strength.json","authored/b1-athletic-extra.json","authored/b1-basketball-defense.json","authored/b1-basketball-finishing.json","authored/b1-basketball-footwork.json","authored/b1-basketball-handles.json","authored/b1-basketball-passing.json","authored/b1-basketball-shooting.json","authored/b1-conditioning-recovery.json","authored/b1-dumbbell-home.json","authored/b1-mobility.json","authored/b1-plyometrics.json","authored/b1-prehab-ankle.json","authored/b1-prehab-hip.json","authored/b1-prehab-knee.json","authored/b1-prehab-shoulder.json","authored/b1-speed-agility.json","authored/b1-strength-extra.json","authored/b1-strength-lower.json","authored/b1-strength-upper.json","authored/b1-trunk.json","authored/b1-variety.json"];
+export const LIBRARY_FILES: readonly string[] = ["seed/conditioning.json","seed/core.json","seed/mobility.json","seed/plyometric.json","seed/power.json","seed/prehab.json","seed/recovery.json","seed/speed-agility.json","seed/strength.json","authored/b1-athletic-extra.json","authored/b1-basketball-defense.json","authored/b1-basketball-finishing.json","authored/b1-basketball-footwork.json","authored/b1-basketball-handles.json","authored/b1-basketball-passing.json","authored/b1-basketball-shooting.json","authored/b1-conditioning-recovery.json","authored/b1-dumbbell-home.json","authored/b1-mobility.json","authored/b1-plyometrics.json","authored/b1-prehab-ankle.json","authored/b1-prehab-hip.json","authored/b1-prehab-knee.json","authored/b1-prehab-shoulder.json","authored/b1-speed-agility.json","authored/b1-strength-extra.json","authored/b1-strength-lower.json","authored/b1-strength-upper.json","authored/b1-trunk.json","authored/b1-variety.json","authored/b2-basketball-combos.json","authored/b2-basketball-defense-2.json","authored/b2-basketball-finishing-2.json","authored/b2-basketball-footwork-2.json","authored/b2-basketball-handles-2.json","authored/b2-basketball-passing-2.json","authored/b2-basketball-shooting-2.json","authored/b2-conditioning-rope.json","authored/b2-plyometrics-2.json","authored/b2-plyometrics-landing.json","authored/b2-speed-2.json","authored/b2-speed-cuts.json","authored/b2-speed-footwork.json","authored/b2-speed-starts.json","authored/b2-sport-multi.json","authored/b3-athletic-extra.json","authored/b3-basketball-defense-2.json","authored/b3-basketball-defense.json","authored/b3-basketball-finishing-2.json","authored/b3-basketball-finishing.json","authored/b3-basketball-footwork-2.json","authored/b3-basketball-footwork.json","authored/b3-basketball-handles-2.json","authored/b3-basketball-handles.json","authored/b3-basketball-passing-2.json","authored/b3-basketball-passing.json","authored/b3-basketball-shooting-2.json","authored/b3-basketball-shooting.json","authored/b3-conditioning-2.json","authored/b3-conditioning-recovery.json","authored/b3-conditioning-rope.json","authored/b3-conditioning.json","authored/b3-mobility-flows.json","authored/b3-mobility-stretches.json","authored/b3-plyometric.json","authored/b3-plyometrics.json","authored/b3-prehab-ankle-2.json","authored/b3-prehab-ankle.json","authored/b3-prehab-hip-2.json","authored/b3-prehab-knee-2.json","authored/b3-prehab-shoulder-2.json","authored/b3-recovery-breathing.json","authored/b3-speed-2.json","authored/b3-speed-agility.json","authored/b3-speed-cuts.json","authored/b3-speed-footwork.json","authored/b3-speed-starts.json","authored/b3-sport-multi.json","authored/b3-trunk-2.json","authored/b3-trunk-throws.json","authored/b4-core.json","authored/b4-dumbbell-home.json","authored/b4-strength-extra.json","authored/b4-strength-lower.json","authored/b4-strength-upper.json","authored/b4-strength.json"];
 
 /** All entries in the data files, seed first, in file order. */
 export function loadLibraryFiles(): LibraryExercise[] {
-  return ([seedConditioning, seedCore, seedMobility, seedPlyometric, seedPower, seedPrehab, seedRecovery, seedSpeedAgility, seedStrength, authoredB1AthleticExtra, authoredB1BasketballDefense, authoredB1BasketballFinishing, authoredB1BasketballFootwork, authoredB1BasketballHandles, authoredB1BasketballPassing, authoredB1BasketballShooting, authoredB1ConditioningRecovery, authoredB1DumbbellHome, authoredB1Mobility, authoredB1Plyometrics, authoredB1PrehabAnkle, authoredB1PrehabHip, authoredB1PrehabKnee, authoredB1PrehabShoulder, authoredB1SpeedAgility, authoredB1StrengthExtra, authoredB1StrengthLower, authoredB1StrengthUpper, authoredB1Trunk, authoredB1Variety] as unknown as LibraryExercise[][]).flat();
+  return ([seedConditioning, seedCore, seedMobility, seedPlyometric, seedPower, seedPrehab, seedRecovery, seedSpeedAgility, seedStrength, authoredB1AthleticExtra, authoredB1BasketballDefense, authoredB1BasketballFinishing, authoredB1BasketballFootwork, authoredB1BasketballHandles, authoredB1BasketballPassing, authoredB1BasketballShooting, authoredB1ConditioningRecovery, authoredB1DumbbellHome, authoredB1Mobility, authoredB1Plyometrics, authoredB1PrehabAnkle, authoredB1PrehabHip, authoredB1PrehabKnee, authoredB1PrehabShoulder, authoredB1SpeedAgility, authoredB1StrengthExtra, authoredB1StrengthLower, authoredB1StrengthUpper, authoredB1Trunk, authoredB1Variety, authoredB2BasketballCombos, authoredB2BasketballDefense2, authoredB2BasketballFinishing2, authoredB2BasketballFootwork2, authoredB2BasketballHandles2, authoredB2BasketballPassing2, authoredB2BasketballShooting2, authoredB2ConditioningRope, authoredB2Plyometrics2, authoredB2PlyometricsLanding, authoredB2Speed2, authoredB2SpeedCuts, authoredB2SpeedFootwork, authoredB2SpeedStarts, authoredB2SportMulti, authoredB3AthleticExtra, authoredB3BasketballDefense2, authoredB3BasketballDefense, authoredB3BasketballFinishing2, authoredB3BasketballFinishing, authoredB3BasketballFootwork2, authoredB3BasketballFootwork, authoredB3BasketballHandles2, authoredB3BasketballHandles, authoredB3BasketballPassing2, authoredB3BasketballPassing, authoredB3BasketballShooting2, authoredB3BasketballShooting, authoredB3Conditioning2, authoredB3ConditioningRecovery, authoredB3ConditioningRope, authoredB3Conditioning, authoredB3MobilityFlows, authoredB3MobilityStretches, authoredB3Plyometric, authoredB3Plyometrics, authoredB3PrehabAnkle2, authoredB3PrehabAnkle, authoredB3PrehabHip2, authoredB3PrehabKnee2, authoredB3PrehabShoulder2, authoredB3RecoveryBreathing, authoredB3Speed2, authoredB3SpeedAgility, authoredB3SpeedCuts, authoredB3SpeedFootwork, authoredB3SpeedStarts, authoredB3SportMulti, authoredB3Trunk2, authoredB3TrunkThrows, authoredB4Core, authoredB4DumbbellHome, authoredB4StrengthExtra, authoredB4StrengthLower, authoredB4StrengthUpper, authoredB4Strength] as unknown as LibraryExercise[][]).flat();
 }

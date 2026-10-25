@@ -8,11 +8,12 @@
 // Two ways to look: SEARCH (typo-tolerant, synonyms, facets with counts, did-you-mean, relax-one-filter) and ASK (a
 // plain-words question → the filters it read, shown as chips you can remove; a pain or injury question shows FEL's
 // existing "see a professional" lines and general prehab only). The server does both (/api/library/search, /ask);
-// this file only draws them.
+// this file only draws them. Batches 2–4 (5,000+ entries): a search hit is a BASE exercise; its matching variants
+// ("Paused …", "… on the Move") fold under it as "+N variants", opened on demand, so one exercise never fills a page.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { AlertTriangle, ArrowDown, ArrowUp, Check, Loader2, MessageCircleQuestion, Plus, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Loader2, MessageCircleQuestion, Plus, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
 import { ExerciseDemo } from '@/components/coach/exercise-demo';
 import type { LibraryCard } from '@/lib/library/server';
 import type { AskChip } from '@/lib/library/ask/parse';
@@ -22,7 +23,8 @@ interface FacetValue { value: string; label: string; count: number }
 type Filters = Partial<Record<FacetKey | 'lowLoad' | 'notCategory' | 'notEquipment', string[]>> & { only?: boolean };
 
 interface SearchPayload {
-  total: number; hits: LibraryCard[]; facets: Record<FacetKey, FacetValue[]>; didYouMean: string | null; corrected: Record<string, string>;
+  /** total = matching entries; groups = matching base exercises (a base and its variants count once; paging walks these). */
+  total: number; groups?: number; hits: LibraryCard[]; facets: Record<FacetKey, FacetValue[]>; didYouMean: string | null; corrected: Record<string, string>;
   fallback: 'none' | 'any-term'; relaxations: { filter: string; count: number }[]; tookMs: number;
   viewer: { coach: boolean; admin: boolean; drafts: boolean; youth: boolean };
   library: { total: number; approved: number; drafts: number; ready: boolean };
@@ -288,7 +290,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {/* results */}
       <div className="space-y-2" data-testid="library-results">
-        {results.map((e) => <ResultCard key={e.id} e={e} onOpen={() => setSelected(e)} />)}
+        {results.map((e) => <ResultCard key={e.id} e={e} onOpen={() => setSelected(e)} onOpenVariant={(id) => void openById(id, setSelected)} />)}
         {!loading && results.length === 0 && (mode === 'search' ? data : ask) && (
           <div className="py-8 text-center text-sm text-white/35">
             {mode === 'search' && data && data.library.approved === 0 && !drafts
@@ -296,8 +298,8 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
               : 'Nothing matches. Try fewer words or another filter.'}
           </div>
         )}
-        {mode === 'search' && data && data.total > results.length && (
-          <button onClick={() => void loadMore()} className="w-full rounded-xl border border-white/10 py-2 text-xs text-white/60 hover:text-white">Show more ({(data.total - results.length).toLocaleString()} more)</button>
+        {mode === 'search' && data && (data.groups ?? data.total) > results.length && (
+          <button onClick={() => void loadMore()} className="w-full rounded-xl border border-white/10 py-2 text-xs text-white/60 hover:text-white">Show more ({((data.groups ?? data.total) - results.length).toLocaleString()} more)</button>
         )}
       </div>
 
@@ -331,19 +333,41 @@ function Badges({ e }: { e: LibraryCard }) {
   );
 }
 
-function ResultCard({ e, onOpen }: { e: LibraryCard; onOpen: () => void }) {
+function ResultCard({ e, onOpen, onOpenVariant }: { e: LibraryCard; onOpen: () => void; onOpenVariant: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const variants = e.variants ?? [];
   return (
-    <button onClick={onOpen} className="fel-card w-full rounded-xl p-3 text-left transition-colors hover:border-[#00E5FF]/20" data-testid="library-card">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="truncate text-sm font-medium text-white">{e.name}</div>
-          <Badges e={e} />
-          <p className="line-clamp-1 text-[12px] text-white/60">{e.cues[0]}</p>
-          {e.faults[0] && <p className="line-clamp-1 text-[11px] text-white/40"><span className="text-[#FF3366]/70">Watch for:</span> {e.faults[0].fault.toLowerCase()}</p>}
+    <div className="fel-card w-full rounded-xl transition-colors hover:border-[#00E5FF]/20" data-testid="library-card">
+      <button onClick={onOpen} className="w-full p-3 text-left">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1 space-y-1">
+            <div className="truncate text-sm font-medium text-white">{e.name}</div>
+            <Badges e={e} />
+            <p className="line-clamp-1 text-[12px] text-white/60">{e.cues[0]}</p>
+            {e.faults[0] && <p className="line-clamp-1 text-[11px] text-white/40"><span className="text-[#FF3366]/70">Watch for:</span> {e.faults[0].fault.toLowerCase()}</p>}
+          </div>
+          {e.avatarClip && <span className="shrink-0 rounded bg-[#00E5FF]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#00E5FF]/80">3D</span>}
         </div>
-        {e.avatarClip && <span className="shrink-0 rounded bg-[#00E5FF]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#00E5FF]/80">3D</span>}
-      </div>
-    </button>
+      </button>
+      {variants.length > 0 && (
+        <div className="border-t border-white/5 px-3 pb-2.5 pt-1.5">
+          <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 text-[11px] text-[#00E5FF]/80 hover:text-[#00E5FF]" data-testid="variants-toggle">
+            {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />} +{variants.length} variant{variants.length === 1 ? '' : 's'}
+          </button>
+          {open && (
+            <ul className="mt-1.5 flex flex-wrap gap-1.5" data-testid="variants-list">
+              {variants.map((v) => (
+                <li key={v.id}>
+                  <button onClick={() => onOpenVariant(v.id)} className="rounded-lg border border-white/10 px-2 py-0.5 text-[11px] text-white/70 hover:border-[#00E5FF]/30 hover:text-white">
+                    {v.name}{v.status === 'draft' ? <span className="ml-1 text-[#FFD700]/70">draft</span> : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

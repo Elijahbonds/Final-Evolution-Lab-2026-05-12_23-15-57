@@ -88,6 +88,13 @@ export interface LibraryExercise {
   regressionId: string | null;
   /** The HARDER version (step up to). */
   progressionId: string | null;
+  /**
+   * The BASE exercise this one is a variant of (a modifier entry — "Paused Goblet Squat" → goblet-squat — or one axis of
+   * an authored matrix — the on-the-move version of a stationary combo). Search shows a base once with "+N variants".
+   * Absent on a base. The data files carry it; the LibraryExercise table does not (server.ts mergeOverlay keeps the
+   * file's value under an owner edit), so it is optional here.
+   */
+  variantOf?: string | null;
   cautions: string[];
   /** Joints this entry keeps the load low on ("knee-friendly" = 'knee'). */
   lowLoad: Joint[];

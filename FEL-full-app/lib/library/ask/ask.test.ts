@@ -98,7 +98,9 @@ describe('Ask: the deterministic parser (AI off)', () => {
     const mean = sum / CASES.length;
     // the table the report quotes
     console.log(`Ask relevance, top-5 precision, ${CASES.length} questions, mean ${(mean * 100).toFixed(1)}%\n${rows.join('\n')}`);
-    expect(mean).toBeGreaterThanOrEqual(0.85);
+    // batches 2–4 (2026-10-25): the floor is the brief's 95% at 5,000+ entries (it was 0.85 at 1,502, measured 97.5%)
+    expect(ALL.length).toBeGreaterThanOrEqual(5000);
+    expect(mean).toBeGreaterThanOrEqual(0.95);
   });
 
   it('the warm-up is a plan that adds up to the minutes asked', async () => {

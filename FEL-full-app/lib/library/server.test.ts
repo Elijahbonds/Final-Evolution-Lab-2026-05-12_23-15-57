@@ -109,6 +109,18 @@ describe('after the pending SQL', () => {
     expect(seen.hits.some((e) => e.review.batch === batch)).toBe(true);
     expect(seen.library.approved).toBe(SEED_APPROVED + n);
   });
+  it('an owner edit keeps the variant\'s base link (the table has no variantOf column); search still groups it', async () => {
+    const v = FILES.find((e) => e.variantOf === 'goblet-squat' && /^Paused/.test(e.name))!;
+    const r = await server.reviewAct('owner', { action: 'edit', entry: { ...v, cues: ['Stop dead at the bottom for a two-count, then stand.', ...v.cues.slice(1)] } });
+    expect(r).toMatchObject({ ok: true, written: 1 });
+    const { index } = await server.libraryState();
+    expect(index.docs[index.byId.get(v.id)!].variantOf).toBe('goblet-squat');
+    expect(server.mergeOverlay([v], [{ ...v, variantOf: undefined }])[0].variantOf).toBe('goblet-squat');
+    const seen = await server.searchLibrary(coach, new URLSearchParams('q=goblet+squat&drafts=1'));
+    const hit = seen.hits.find((e) => e.id === 'goblet-squat')!;
+    expect(hit.variants?.map((x) => x.id)).toContain(v.id);
+    expect(seen.groups).toBeLessThan(seen.total);
+  });
   it('a rejected entry is gone for everyone, coaches with drafts on included', async () => {
     await server.reviewAct('owner', { action: 'reject', ids: ['pogo-hop'] });
     const r = await server.searchLibrary(coach, new URLSearchParams('q=pogo hop&drafts=1'));

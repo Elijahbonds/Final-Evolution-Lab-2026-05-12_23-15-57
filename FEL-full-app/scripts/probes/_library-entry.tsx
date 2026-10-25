@@ -40,7 +40,7 @@ async function answer(url: string, init?: RequestInit): Promise<Response> {
     const drafts = !athlete && p.get('drafts') === '1';
     const r = search(index, p.get('q') ?? '', filtersFrom(p), { drafts, offset: Number(p.get('offset') ?? 0), limit: 24 });
     return Response.json({
-      ...r, hits: r.hits.map((h) => card(h.entry)), viewer: { ...viewer, drafts },
+      ...r, hits: r.hits.map((h) => ({ ...card(h.entry), variants: h.variants.map((v) => ({ id: v.id, name: v.name, level: v.level, status: v.review.status })) })), viewer: { ...viewer, drafts },
       library: { total: entries.length, approved: entries.filter((e) => e.review.status === 'approved').length, drafts: entries.filter((e) => e.review.status === 'draft').length, ready: false },
     });
   }

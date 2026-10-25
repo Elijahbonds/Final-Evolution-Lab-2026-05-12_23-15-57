@@ -41,10 +41,18 @@ export interface Variant {
   clip?: ClipKey;
   /** Ladders inside one family ('main' unless named): each is linked easiest → hardest in listed order. */
   ladder?: string;
+  /**
+   * This variant is one axis of another entry (the on-the-move version of a stationary combo, the 20 m version of a
+   * 10 m start): that entry's `v` in this family, or `id:<entry id>` for an entry written earlier (batch 1 or the seed).
+   * Becomes `variantOf`, which search uses to show the base once with "+N variants".
+   */
+  base?: string;
 }
 
 export interface Family {
   family: string;
+  /** The authoring batch that writes this family (1 unless a later batch adds it). */
+  batch?: 1 | 2 | 3 | 4;
   /** The review batch block: 'strength-lower', 'basketball-footwork', … */
   block: string;
   category: CategoryId;
