@@ -88,7 +88,8 @@ const UA = 'AgeScreenTest/1.0';
 // PAYMENTS-READY (lane/payments-ready, 2026-10-26) prisma/pending/2026-10-26-payments-ready.sql (pending SQL only; schema.prisma
 // untouched; CoachConnectAccount.requirementsDue + CoachSaleDispute, additive) at 8f79c9cb; combine-day landed first (#453):
 // pinned at this lane's merge of lane/finish-release (d754d041), the first commit carrying both files.
-const PARENT = 'd754d0413f9aaec15bf1efa36a328bfa3abd74db';
+// MERGE 5418784a: the first commit carrying every pending file above.
+const PARENT = '5418784a2fcfcc390d42af5fa599e6f0a7130906';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
