@@ -11,6 +11,8 @@
  * The call sites (signup, coach) will not need to change.
  */
 
+import { trustedClientIp, trustedProxyHops } from '@/lib/rate-limits/clientIp';
+
 interface WindowEntry {
   count: number;
   resetAt: number;
@@ -66,8 +68,18 @@ export function resetRateLimitMemory(): void {
   store.clear();
 }
 
-/** Best-effort client identifier for anonymous endpoints (signup). */
+/**
+ * Best-effort client identifier for anonymous endpoints (signup).
+ *
+ * SECURITY-REVIEW S-01 (quality-gates, 2026-10-25): the FIRST X-Forwarded-For entry is whatever the client wrote, so
+ * every limit keyed on it (signup, the invite and group code lookups, mp create/join, books, card) could be skipped by
+ * sending a new made-up address each time. When the deploy says how many proxies it trusts (TRUSTED_PROXY_HOPS, the
+ * same setting lib/rate-limits/clientIp.ts reads for login and signup), the key is the address THOSE proxies set.
+ * Unset, the old first-entry read stays (unchanged behaviour) — setting TRUSTED_PROXY_HOPS is the owner's call
+ * (docs/SECURITY-REVIEW.md).
+ */
 export function clientKeyFromHeaders(headers: Headers): string {
+  if (trustedProxyHops() !== null) return trustedClientIp(headers) ?? 'unknown';
   const forwarded = headers.get('x-forwarded-for');
   if (forwarded) return forwarded.split(',')[0]!.trim();
   return headers.get('x-real-ip') ?? 'unknown';

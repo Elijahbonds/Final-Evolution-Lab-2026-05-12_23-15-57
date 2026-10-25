@@ -6,6 +6,9 @@ import { prisma } from '@/lib/db';
 import { isUnreachable } from '@/lib/db/errors';
 import { AUTH_SERVICE_UNAVAILABLE } from '@/lib/auth-errors';
 
+/** A bcrypt hash (cost 12, as signup hashes) of 32 random bytes nobody kept: the compare an unknown email pays. */
+export const UNKNOWN_ACCOUNT_HASH = '$2a$12$slGU6R9ecNa34YUWMPL2u.28Omr6b63Hm6gtmFsrr8cvVBiggfXXm';
+
 export const authOptions: NextAuthOptions = {
   // @next-auth/prisma-adapter is typed against a client generated into node_modules/.prisma. Ours is generated into
   // the source tree so it survives the deploy (see prisma/schema.prisma), which makes the two clients NOMINALLY
@@ -61,7 +64,14 @@ export const authOptions: NextAuthOptions = {
           throw new Error(AUTH_SERVICE_UNAVAILABLE);
         }
 
-        if (!user?.password) return null;
+        // SECURITY-REVIEW S-02 (quality-gates, 2026-10-25): an unknown email (or an account with no password) still pays
+        // one bcrypt compare, against a fixed hash no password matches, so the answer takes as long as a wrong password
+        // for a real account. Without it a sign-in for an unregistered email returned ~250 ms sooner, which told anyone
+        // timing the endpoint which emails have accounts. The result is unchanged: null.
+        if (!user?.password) {
+          await bcrypt.compare(credentials.password, UNKNOWN_ACCOUNT_HASH);
+          return null;
+        }
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;
         return {
