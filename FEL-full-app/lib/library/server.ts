@@ -25,6 +25,7 @@ import {
   submissionQueue, upsertEntries, withdrawSubmission, libraryReady, type RawDb,
 } from './store';
 import type { LibraryExercise } from './types';
+import { matchLibraryByName } from './match';
 import { checkAgainst, checkEntry } from './validate';
 
 export const CACHE_MS = 60_000;
@@ -137,6 +138,21 @@ export async function libraryEntry(viewer: LibraryViewer, id: string) {
   if (e.review.status !== 'approved' && !viewer.isCoach) return null;
   const link = (lid: string | null) => { const x = lid ? index.docs[index.byId.get(lid) ?? -1] : null; return x ? { id: x.id, name: x.name, level: x.level, status: x.review.status } : null; };
   return { entry: toCard(e), regression: link(e.regressionId), progression: link(e.progressionId) };
+}
+
+/**
+ * LIBRARY-ANATOMY-2 (2026-10-25): the library card each row from elsewhere shows — a Blueprint KB exercise, by the names
+ * it goes by (lib/library/match.ts: exactly one entry, by its name or an alias) — as this viewer may see it (libraryEntry's
+ * rules), or null: the row shows its cue card.
+ */
+export async function libraryCardsByName(viewer: LibraryViewer, rows: readonly (readonly (string | null | undefined)[])[]): Promise<(LibraryCard | null)[]> {
+  const { index } = await libraryState();
+  return rows.map((names) => {
+    const e = matchLibraryByName(index.docs, names);
+    if (!e || e.review.status === 'rejected' || (viewer.youth && !e.youthOk)) return null;
+    if (e.review.status !== 'approved' && !viewer.isCoach) return null;
+    return toCard(e);
+  });
 }
 
 export async function askLibrary(viewer: LibraryViewer, question: string, ai: ((system: string, user: string) => Promise<string>) | null, drafts: boolean) {

@@ -136,8 +136,11 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (prop === 'pullbar') return { alpha: FRONT_ALPHA - 0.5, beta: 1.5, radius: 3.6, y: 1.5 };
           if (prop === 'dipbars') return { alpha: FRONT_ALPHA - 0.7, beta: 1.45, radius: 3.0, y: 1.15 };
           if (prop === 'wall') return { alpha: 0.05, beta: 1.36, radius: 3.0, y: 0.9 };
-          if (prop === 'box' || prop === 'boxside' || prop === 'stepbox' || prop === 'boxback' || prop === 'rearbench') return { alpha: 0.55, beta: 1.36, radius: 3.3, y: 1.0 };
+          if (prop === 'box' || prop === 'boxside' || prop === 'stepbox' || prop === 'boxback' || prop === 'rearbench' || prop === 'wallback') return { alpha: 0.55, beta: 1.36, radius: 3.3, y: 1.0 };
+          if (prop === 'calfstep') return { alpha: 0.6, beta: 1.4, radius: 2.7, y: 0.85 };
           if (prop) return { alpha: 0.45, beta: 1.22, radius: 2.6, y: 0.6 };
+          // sitting on the floor (the Z press): low, the arms going overhead
+          if (p.clip?.startsWith('ex_z_press')) return { alpha: FRONT_ALPHA - 0.6, beta: 1.32, radius: 2.5, y: 0.55 };
           return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
         };
         const play = (clip: string, hold: number | null | undefined) => {

@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Search, ChevronRight, Play, Dumbbell, Target, Zap, X, Check, Plus } from 'lucide-react';
-import { ExerciseDemo } from '@/components/coach/exercise-demo';
+// LIBRARY-ANATOMY-2 (owner, 2026-10-25): the KB detail shows the library's stage (the athlete's avatar, demoFor's loop) where
+// the library has the exercise by name, and its cue card otherwise — not the old one-clip avatar (exercise-demo.tsx), which
+// played the same baked clip for every exercise
+import { LibraryDemo, videoSource } from '@/components/library/library-demo';
+import type { LibraryCard } from '@/lib/library/server';
 import { CATALOGUE_ERROR_COPY, PATTERN_INFO, nameKey } from '@/lib/coach/catalogue';
 import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
 import { MyCatalogue, TagRow } from './my-catalogue';
@@ -19,6 +23,8 @@ interface Exercise {
   category?: { id: string; name: string };
   /** MIRROR-COACH P2: FEL's tags for this KB item (lib/coach/kbTags.ts), added by GET /api/coach/catalogue. */
   tags?: { pattern: MovementPattern | null; braceMode: BraceMode | null; skillLayer: string | null; prescribable: boolean; why: string; copyName?: string };
+  /** LIBRARY-ANATOMY-2: the library entry this is, by name (GET /api/coach/catalogue, lib/library/match.ts), or null */
+  library?: LibraryCard | null;
 }
 
 /**
@@ -303,16 +309,11 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
           )}
         </div>
 
-        {/* Demo — YOUR AVATAR / COACH VIDEO tabs (never blank) */}
+        {/* Demo — the library's stage where the library has this exercise; else the cue card (never a wrong movement) */}
         <div className="mb-4">
-          <ExerciseDemo
-            exercise={{
-              name: ex.name,
-              videoUrl: ex.videoUrl,
-              targetPrqStat: ex.targetPrqStat,
-              dosage: ex.dosage,
-            }}
-          />
+          {ex.library
+            ? <LibraryDemo entry={{ ...ex.library, demo: { ...ex.library.demo, videoUrl: ex.library.demo.videoUrl ?? (ex.videoUrl || null) } }} />
+            : <KbCueCard ex={ex} />}
         </div>
 
         {/* Details */}
@@ -347,6 +348,35 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A KB exercise the library does not have: its first cues, and its coach video when it has one (no 3D: no wrong movement). */
+function KbCueCard({ ex }: { ex: Exercise }) {
+  const [on, setOn] = useState(false);
+  const video = videoSource(ex.videoUrl);
+  const cues = (ex.coachingCues ?? '').split(/(?<=[.!?])\s+/).map((c) => c.trim()).filter(Boolean).slice(0, 2);
+  return (
+    <div className="space-y-2" data-testid="kb-cue-card">
+      <div className="flex items-center gap-3 rounded-xl bg-[#16161a] p-4">
+        <Dumbbell className="h-8 w-8 shrink-0 text-white/30" aria-hidden />
+        <div className="min-w-0 space-y-1">
+          <p className="text-[12px] text-white/55">No 3D demo for this one. Follow the cues:</p>
+          <ul className="space-y-0.5 text-[13px] text-white/85">{cues.map((c) => <li key={c}>{c}</li>)}</ul>
+        </div>
+      </div>
+      {video && (on || video.kind === 'file' ? (
+        <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+          {video.kind === 'youtube'
+            ? <iframe src={video.src} className="h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen title={`${ex.name} video`} />
+            : <video src={video.src} className="h-full w-full" controls playsInline preload="metadata" title={`${ex.name} video`} />}
+        </div>
+      ) : (
+        <button onClick={() => setOn(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF3366]/40 px-3 py-1.5 text-xs text-[#FF3366]">
+          <Play className="h-3.5 w-3.5" aria-hidden /> Play the coach video
+        </button>
+      ))}
     </div>
   );
 }

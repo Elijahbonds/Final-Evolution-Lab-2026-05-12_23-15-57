@@ -9,4 +9,8 @@ export const PROPPED_LOOPS = {
   ex_incline_pushup: 'handbench', ex_decline_pushup: 'feetbench', ex_wall_pushup: 'wall',
   ex_incline_curl: 'incline', ex_incline_curl_alt: 'incline', ex_spider_curl: 'proneincline', ex_chest_row: 'proneincline', ex_incline_y: 'proneincline', ex_incline_t: 'proneincline', ex_incline_w: 'proneincline',
   ex_preacher_curl: 'preacher', ex_preacher_curl_one: 'preacher', ex_concentration_curl: 'seat',
+  // exerciseVariants.ts
+  ex_calf_raise_step: 'calfstep', ex_calf_raise_step_sl: 'calfstep', ex_calf_raise_bent_step: 'calfstep', ex_calf_raise_bent_step_sl: 'calfstep',
+  ex_wall_sit: 'wallback', ex_wall_sit_sl: 'wallback', ex_seated_row: 'rowseat', ex_seated_row_one: 'rowseat',
+  ex_decline_press: 'decline', ex_decline_fly: 'decline', ex_decline_fly_one: 'decline', ex_decline_skull: 'decline', ex_decline_skull_one: 'decline',
 } as const satisfies Record<string, string>;

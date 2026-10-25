@@ -95,6 +95,9 @@ interface DemoRule {
   notMods?: RegExp;
   /** LIBRARY-ANATOMY-2: for a clip chosen by a function, every loop it can return (DEMO_CLIPS lists them) */
   emits?: readonly string[];
+  /** LIBRARY-ANATOMY-2: the variation IS a hold (a wall sit, a split squat held at half depth): the second of the loop it
+   *  holds at, whatever its modifiers — the loop's own frame at that depth */
+  hold?: number;
 }
 
 const weak = (right: string, left: string) => (base: string) => (/-weak\b|-weak-/.test(`${base}-`) ? left : right);
@@ -141,7 +144,9 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_bridge', families: ['bridge-thrust'], bases: /^(glut-bridg|hip-lift)$/ },
   { clip: 'ex_bridge', families: ['db-hinge'], bases: /^bridge$/ },
   { clip: 'ex_calf_raise', families: ['calf-raise'], bases: /^(stand-calf-rais|calf-rais|smith-calf-rais|rock-stand-calf-rais)$/ },
-  { clip: 'ex_calf_raise', families: ['calf-capacity'], bases: /^straight-double-(step|slow)$/ },
+  { clip: 'ex_calf_raise', families: ['calf-capacity'], bases: /^straight-double-slow$/ },
+  // LIBRARY-ANATOMY-2: off a step, the heels drop below it (the first pass showed the flat raise)
+  { clip: 'ex_calf_raise_step', families: ['calf-capacity'], bases: /^straight-double-step$/ },
   // ── upper body ──
   { clip: 'ex_press', families: ['overhead-press'], bases: /^(shoulder-press|stand-press|db-standing|stand-palm-press|two-arm-military-press|stand-military-press|bb|shoulder-military-press)$/ },
   { clip: 'ex_seated_press', families: ['overhead-press'], bases: /^(seat-press|db-seated|seat-shoulder-press|seat-military-press)$/ },
@@ -315,6 +320,56 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: (b) => ({ 'inclin-curl': 'ex_incline_curl', 'inclin-hammer-curl': 'ex_incline_curl', 'inclin-inner-bicep-curl': 'ex_incline_curl', 'flexor-inclin-curl': 'ex_incline_curl', 'alternat-inclin-curl': 'ex_incline_curl_alt', 'spider-curl': 'ex_spider_curl', 'pron-inclin-curl': 'ex_spider_curl', 'preacher-curl': 'ex_preacher_curl', 'two-arm-preacher-curl': 'ex_preacher_curl', 'preacher-hammer-curl': 'ex_preacher_curl', 'revers-preacher-curl': 'ex_preacher_curl', 'singl-arm-preacher-curl': 'ex_preacher_curl_one', 'concentration-curl': 'ex_concentration_curl' } as Record<string, string>)[b] ?? null, families: ['curl'], bases: /^(inclin-inner-bicep-curl|singl-arm-preacher-curl|two-arm-preacher-curl|alternat-inclin-curl|preacher-hammer-curl|revers-preacher-curl|inclin-hammer-curl|flexor-inclin-curl|concentration-curl|pron-inclin-curl|preacher-curl|inclin-curl|spider-curl)$/, emits: ['ex_incline_curl', 'ex_incline_curl_alt', 'ex_spider_curl', 'ex_preacher_curl', 'ex_preacher_curl_one', 'ex_concentration_curl'] },
   { clip: (b) => ({ 'incline-y': 'ex_incline_y', 'incline-t': 'ex_incline_t', 'incline-w': 'ex_incline_w' } as Record<string, string>)[b] ?? null, families: ['scap-work'], bases: /^(incline-y|incline-t|incline-w)$/, emits: ['ex_incline_y', 'ex_incline_t', 'ex_incline_w'] },
   { clip: (b) => ({ 'incline-y': 'ex_incline_y' } as Record<string, string>)[b] ?? null, families: ['db-upper'], bases: /^(incline-y)$/, emits: ['ex_incline_y'] },
+  // ── LIBRARY-ANATOMY-2: the same lift on other kit (a Smith bar, chains, a band, a kettlebell for a dumbbell): the body does what the loop shows ──
+  { clip: 'ex_bench_press', families: ['bench-press'], bases: /^(smith-bench-press|smith-clos-grip-bench-press|clos-grip-press|clos-grip-ez-bar-press|paused|revers-bench-press)$/ },
+  { clip: 'ex_incline_press', families: ['bench-press'], bases: /^smith-inclin-bench-press$/ },
+  { clip: 'ex_floor_press', families: ['bench-press'], bases: /^floor-press-chain$/ },
+  // the incline dumbbell press the overhead-press family files (the bench at 45°, the same press as bench-press's)
+  { clip: 'ex_incline_press', families: ['overhead-press'], bases: /^inclin-press$/ },
+  // a bottoms-up kettlebell is a one-arm press (the bell upside down is the grip, not the path)
+  { clip: 'ex_press_one', families: ['push-extra'], bases: /^bottoms-up-press$/ },
+  // assumption: the reverse-grip bench press shows the bench press (the same bar path; the grip is not drawn)
+  { clip: 'ex_bench_press', families: ['triceps'], bases: /^revers-tricep-bench-press$/ },
+  { clip: 'ex_row', families: ['row'], bases: /^(two-arm-row|smith-bent-over-row)$/ },
+  // assumption: the lying T-bar row's chest pad is the incline chest-supported row's
+  { clip: 'ex_chest_row', families: ['row'], bases: /^lying-t-bar-row$/ },
+  // bent over, a cable in each hand drawn out to the sides: the bent-over reverse fly
+  { clip: 'ex_reverse_fly', families: ['raise'], bases: /^bent-over-low-pulley-sid-lateral$/ },
+  { clip: 'ex_straight_arm_pulldown', families: ['pull-extra'], bases: /^band-straight-arm$/ },
+  // ── LIBRARY-ANATOMY-2: a variation that IS a hold — the loop's own frame at the depth it names ──
+  { clip: 'ex_split_squat', families: ['knee-capacity'], bases: /^(split-deep|split-iso)$/, hold: 1.09 },
+  { clip: 'ex_split_squat', families: ['knee-capacity'], bases: /^split-half$/, hold: 0.49 },
+  { clip: 'ex_split_squat', families: ['knee-capacity'], bases: /^split-quarter$/, hold: 0.33 },
+  { clip: 'ex_split_squat', families: ['isometric-capacity'], bases: /^split-hover$/, hold: 1.09 },
+  { clip: 'ex_calf_raise', families: ['calf-capacity'], bases: /^straight-double-iso$/, hold: 0.8 },
+  { clip: 'ex_calf_raise', families: ['calf-raise'], bases: /^iso-wall$/, hold: 0.8 },
+  // ── LIBRARY-ANATOMY-2: calf raises on one leg, knees bent, off a step; the high curl; the Z press; the wall sit; the seated row (anim/authored/exerciseVariants.ts) ──
+  { clip: (b) => ({ 'bent-double-slow': 'ex_calf_raise_bent', 'bent-double-step': 'ex_calf_raise_bent_step', 'bent-single-slow': 'ex_calf_raise_bent_sl', 'bent-single-step': 'ex_calf_raise_bent_step_sl', 'straight-single-slow': 'ex_calf_raise_sl', 'straight-single-step': 'ex_calf_raise_step_sl' } as Record<string, string>)[b] ?? null,
+    families: ['calf-capacity'], bases: /^(bent-double-slow|bent-double-step|bent-single-slow|bent-single-step|straight-single-slow|straight-single-step)$/, emits: ['ex_calf_raise_bent', 'ex_calf_raise_bent_step', 'ex_calf_raise_bent_sl', 'ex_calf_raise_bent_step_sl', 'ex_calf_raise_sl', 'ex_calf_raise_step_sl'] },
+  { clip: 'ex_calf_raise_bent', families: ['calf-capacity'], bases: /^bent-double-iso$/, hold: 0.9 },
+  { clip: 'ex_calf_raise_bent_sl', families: ['calf-capacity'], bases: /^bent-single-iso$/, hold: 0.9 },
+  { clip: 'ex_calf_raise_sl', families: ['calf-capacity'], bases: /^straight-single-iso$/, hold: 0.9 },
+  { clip: (b) => ({ 'bent-knee': 'ex_calf_raise_bent_step', 'eccentric-sl': 'ex_calf_raise_step_sl', step: 'ex_calf_raise_step', 'step-sl': 'ex_calf_raise_step_sl', 'step-sl-db': 'ex_calf_raise_step_sl' } as Record<string, string>)[b] ?? null,
+    families: ['calf-raise'], bases: /^(bent-knee|eccentric-sl|step|step-sl|step-sl-db)$/, emits: ['ex_calf_raise_bent_step', 'ex_calf_raise_step_sl', 'ex_calf_raise_step'] },
+  { clip: 'ex_high_curl', families: ['curl'], bases: /^(high-curl|overhead-curl)$/ },
+  { clip: 'ex_z_press', families: ['push-extra'], bases: /^z-press$/ },
+  { clip: 'ex_wall_sit', families: ['knee-capacity'], bases: /^wall-shallow$/, hold: 0.2 },
+  { clip: 'ex_wall_sit', families: ['knee-capacity'], bases: /^wall-sit-quarter$/, hold: 0.7 },
+  { clip: 'ex_wall_sit', families: ['knee-capacity'], bases: /^wall-sit-half$/, hold: 1.1 },
+  { clip: 'ex_wall_sit', families: ['knee-capacity'], bases: /^wall-sit-deep$/, hold: 2.2 },
+  { clip: 'ex_wall_sit', families: ['squat'], bases: /^wall-sit$/, hold: 2.2 },
+  { clip: 'ex_wall_sit_sl', families: ['knee-capacity'], bases: /^wall-sl$/, hold: 1.1 },
+  { clip: 'ex_wall_sit_sl', families: ['isometric-capacity'], bases: /^wall-sit-lift$/ },
+  { clip: 'ex_spanish_squat', families: ['knee-capacity'], bases: /^spanish-quarter$/, hold: 0.8 },
+  { clip: 'ex_spanish_squat', families: ['knee-capacity'], bases: /^spanish-half$/, hold: 1.05 },
+  { clip: 'ex_spanish_squat', families: ['knee-capacity'], bases: /^spanish-deep$/, hold: 2.2 },
+  { clip: 'ex_seated_row', families: ['row'], bases: /^(seat-row|elevat-row)$/ },
+  { clip: 'ex_seated_row_one', families: ['row'], bases: /^seat-singl-arm-pulley-row$/ },
+  { clip: 'ex_decline_press', families: ['bench-press'], bases: /^(declin-bench-press|wid-grip-declin-bench-press|declin-smith-press)$/ },
+  { clip: 'ex_decline_fly', families: ['fly'], bases: /^declin-fly$/ },
+  { clip: 'ex_decline_skull', families: ['triceps'], bases: /^(declin-tricep-extension|declin-ez-bar-tricep-extension)$/ },
+  { clip: 'ex_spiderman_pushup', families: ['push-extra'], bases: /^spiderman$/ },
+  { clip: 'ex_archer_pushup', families: ['push-up'], bases: /^archer$/ },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -438,6 +493,13 @@ export const ISO_HOLD_SEC: Readonly<Record<string, number>> = {
   ex_kickback: 0.75, ex_kickback_one: 0.75, ex_reverse_fly: 0.95, ex_pull_apart: 0.85, ex_face_pull: 0.85, ex_scaption: 0.85,
   ex_pullup: 1.05, ex_chinup: 1.05, ex_inverted_row: 0.95, ex_bulgarian: 1.1, ex_hip_thrust: 1.0, ex_leg_extension: 1.05, ex_lying_leg_curl: 1.05, ex_pulldown: 0.95,
   ex_chest_row: 0.85, ex_incline_y: 0.95, ex_incline_t: 0.95, ex_wall_pushup: 1.0, ex_incline_pushup: 1.0, ex_decline_pushup: 1.0, ex_dip: 1.0, ex_bench_dip: 1.0,
+  // arm after arm: the first (right) arm at the hold its two-arm lift names, the other down (measured on the rig)
+  ex_curl_alt: 0.4, ex_press_alt: 0.38, ex_lateral_raise_alt: 0.85, ex_row_alt: 0.85, ex_incline_curl: 0.4, ex_incline_curl_alt: 0.4,
+  ex_concentration_curl: 0.63, ex_preacher_curl: 0.37, ex_spider_curl: 0.4, ex_front_raise_overhead: 1.48, ex_hand_release: 1.09,
+  ex_lateral_lunge: 1.14, ex_curtsy_lunge: 1.06, ex_pos_cossack: 0.4, ex_sl_rdl: 1.35, ex_kickstand_rdl: 1.2, ex_pistol: 1.37, ex_pistol_goblet: 1.37,
+  ex_skater_squat: 1.26, ex_bridge_sl: 1.02, ex_bulgarian_bar: 1.14, ex_straight_arm_pulldown: 0.96, ex_pulldown_close: 0.96,
+  ex_decline_press: 1.1, ex_decline_skull: 1.0, ex_decline_skull_one: 1.0, ex_spiderman_pushup: 1.0, ex_archer_pushup: 1.0,
+  ex_high_curl: 0.4, ex_high_curl_one: 0.4, ex_z_press: 0.38, ex_z_press_one: 0.38, ex_seated_row: 0.99, ex_seated_row_one: 0.99,
 };
 
 export interface DemoPick {
@@ -459,10 +521,12 @@ export const MODIFIER_LOOPS: Readonly<Record<string, Readonly<Record<string, str
     ex_seated_press: 'ex_seated_press_one', ex_seated_curl: 'ex_seated_curl_one', ex_seated_lateral_raise: 'ex_seated_lateral_raise_one',
     ex_seated_triceps: 'ex_seated_triceps_one', ex_skull_crusher: 'ex_skull_crusher_one', ex_fly: 'ex_fly_one', ex_incline_press: 'ex_incline_press_one',
     ex_incline_fly: 'ex_incline_fly_one', ex_kickback: 'ex_kickback_one', ex_press_hk: 'ex_press_hk_one', ex_preacher_curl: 'ex_preacher_curl_one', ex_pulldown: 'ex_pulldown_one',
+    ex_high_curl: 'ex_high_curl_one', ex_z_press: 'ex_z_press_one', ex_seated_row: 'ex_seated_row_one', ex_decline_fly: 'ex_decline_fly_one', ex_decline_skull: 'ex_decline_skull_one',
   },
   alternating: {
     ex_curl: 'ex_curl_alt', ex_press: 'ex_press_alt', ex_lateral_raise: 'ex_lateral_raise_alt', ex_front_raise: 'ex_front_raise_alt', ex_row: 'ex_row_alt',
     ex_seated_press: 'ex_seated_press_alt', ex_seated_curl: 'ex_seated_curl_alt', ex_incline_press: 'ex_incline_press_alt', ex_press_hk: 'ex_press_hk_alt', ex_incline_curl: 'ex_incline_curl_alt',
+    ex_z_press: 'ex_z_press_alt',
   },
   // the kickstand: one foot back on its toes, the hinge on the front leg
   staggered: { ex_hinge: 'ex_kickstand_rdl' },
@@ -484,6 +548,7 @@ export function demoFor(e: { family: string; variation: string; equipment: reado
     let clip = typeof r.clip === 'string' ? r.clip : r.clip(base, e.equipment);
     for (const m of mods) if (clip && m !== 'iso-hold' && SHAPE_MODIFIERS.has(m)) clip = MODIFIER_LOOPS[m]?.[clip] ?? null;
     if (!clip) return null;
+    if (r.hold != null) return { clip, hold: r.hold };
     if (!iso) return { clip, hold: null };
     return clip in ISO_HOLD_SEC ? { clip, hold: ISO_HOLD_SEC[clip] } : null;
   }
@@ -506,7 +571,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press'].concat(
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup'].concat(
   // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
   ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm',
     'supine', 'supine9090', 'legsup', 'kneehug', 'oneknee', 'happybaby', 'kneerock', 'figure4', 'lyinghams', 'prone', 'pike', 'straddle', 'switch', 'rockback', 'childside', 'dogpedal',
@@ -523,7 +588,7 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_mor
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
 export type DemoProp = 'seat' | 'bench' | 'incline' | 'box' | 'boxside' | 'stepbox' | 'boxback' | 'rearbench' | 'handbench' | 'feetbench' | 'feetbenchfront' | 'thrust'
-  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall';
+  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat';
 /** A plain box (metres, the body's frame: +x its right, +y up, +z its front; rx tips it about x — negative raises its −z end).
  *  (The stage puts the body's +x at its own −x: the spawned root carries the importer's mirror.) */
 export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number }
@@ -547,9 +612,17 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   dipbench: [{ w: 0.90, h: 0.44, d: 0.34, y: 0.22, z: -0.42 }],
   legcurl: [{ w: 0.30, h: 0.44, d: 1.35, y: 0.22, z: 0.30 }],
   proneincline: [{ w: 0.34, h: 0.50, d: 0.30, y: 0.25, z: -0.28 }, { w: 0.34, h: 0.07, d: 0.90, y: 0.80, z: 0.02, rx: 0.66 }],
-  decline: [{ w: 0.30, h: 0.07, d: 1.05, y: 0.44, z: -0.50, rx: 0.25 }, { w: 0.30, h: 0.40, d: 0.30, y: 0.20, z: -0.20 }, { w: 0.40, h: 0.08, d: 0.10, y: 0.52, z: 0.40 }],
+  // LIBRARY-ANATOMY-2: the decline bench as exerciseVariants.ts lies on it (the pad 14° head-down, its top 0.60 at the hips;
+  // the roller in front of the ankles at its high end)
+  decline: [{ w: 0.30, h: 0.07, d: 1.20, y: 0.458, z: -0.42, rx: 0.25 }, { w: 0.24, h: 0.40, d: 0.24, y: 0.20, z: -0.40 }, { w: 0.06, h: 0.30, d: 0.06, y: 0.15, z: 0.52 }, { w: 0.40, h: 0.08, d: 0.08, y: 0.30, z: 0.51 }],
   preacher: [{ w: 0.34, h: 0.44, d: 0.42, y: 0.22, z: -0.02 }, { w: 0.40, h: 0.05, d: 0.36, y: 0.86, z: 0.30, rx: -0.8 }],
   wall: [{ w: 1.40, h: 2.10, d: 0.06, y: 1.05, z: 0.72 }],
+  // the calf-raise step: its back edge just behind the balls of the feet (exerciseVariants.ts CALF_STEP)
+  calfstep: [{ w: 0.50, h: 0.20, d: 0.30, y: 0.10, z: 0.33 }],
+  // the wall a wall sit leans on: its face a hand behind the hip joints
+  wallback: [{ w: 1.40, h: 2.10, d: 0.06, y: 1.05, z: -0.15 }],
+  // the cable row's low seat and its foot plate
+  rowseat: [{ w: 0.34, h: 0.30, d: 0.70, y: 0.15, z: -0.12 }, { w: 0.44, h: 0.36, d: 0.05, y: 0.18, z: 0.84 }],
 };
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',

@@ -8,6 +8,8 @@
 //   perf            the phone profile (390×844, DPR 3, 4× CPU throttle): frame time and FPS, JS heap, draw calls, with
 //                   the Muscles tab open and with the Demo tab playing, after the body has loaded
 //   chunks          the lazy chunk sizes (esbuild, minified, code-split the way next/dynamic splits them)
+//   ttfc            LIBRARY-ANATOMY-2: time to first useful content on the phone (390 px, 4× CPU throttle): from the tap on a
+//                   card's Demo / Muscles link to the cue card or muscle list in the stage's box, and to the 3D ready
 //   OUT=<dir> npx tsx scripts/probes/_library-anatomy.mts <job> [args]
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
@@ -238,6 +240,48 @@ async function perfJob(): Promise<void> {
   console.log(JSON.stringify(out, null, 1));
 }
 
+async function ttfcJob(): Promise<void> {
+  const { url, close } = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const out: Record<string, unknown> = {};
+  const CASES: [string, string, 'demo' | 'muscles'][] = [['demo-goblet', 'goblet squat', 'demo'], ['muscles-rdl', 'romanian deadlift', 'muscles'], ['demo-wall-sit', 'wall sit thighs level', 'demo']];
+  for (const [name, q, tab] of CASES) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage(); await page.addInitScript(NAME_SHIM);
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto(`${url}/#ui`);
+    await page.waitForSelector('[data-testid="library-browser"]', { timeout: 120_000 });
+    await page.fill('input[aria-label="Search the exercise library"]', q); await page.waitForTimeout(1500);
+    // the times are read in the page, from the tap: every DOM change is checked for the preview and the ready stage
+    await page.evaluate(() => {
+      const w = window as unknown as { __ttfc: Record<string, number> };
+      w.__ttfc = {};
+      const check = () => {
+        const now = performance.now();
+        const p = document.querySelector('[data-testid="stage-preview"]');
+        if (p && p.getAttribute('data-shown') === 'true' && w.__ttfc.preview == null) w.__ttfc.preview = now;
+        if (document.querySelector('[data-testid="demo-cue-card"]') && w.__ttfc.cueCard == null) w.__ttfc.cueCard = now;
+        if (document.querySelector('[data-testid="exercise-stage"]')?.getAttribute('data-state') === 'ready' && w.__ttfc.ready == null) w.__ttfc.ready = now;
+      };
+      new MutationObserver(check).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-state', 'data-shown'] });
+      document.addEventListener('pointerdown', () => { w.__ttfc.tap = performance.now(); }, { capture: true, once: true });
+    });
+    await page.locator('[data-testid="library-card"]').first().locator(`[data-testid="card-link-${tab}"]`).click();
+    await page.waitForFunction(() => (window as unknown as { __ttfc: Record<string, number> }).__ttfc.preview != null || (window as unknown as { __ttfc: Record<string, number> }).__ttfc.cueCard != null, undefined, { timeout: 60_000 });
+    await page.screenshot({ path: join(OUT, `ttfc-${name}-preview.png`) });
+    await stageReady(page, 600_000).catch(() => undefined);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: join(OUT, `ttfc-${name}-ready.png`) });
+    const t = await page.evaluate(() => (window as unknown as { __ttfc: Record<string, number> }).__ttfc);
+    const first = Math.min(t.preview ?? Infinity, t.cueCard ?? Infinity);
+    out[name] = { firstUsefulMs: Math.round(first - t.tap), stageReadyMs: t.ready != null ? Math.round(t.ready - t.tap) : null };
+    await ctx.close();
+  }
+  await browser.close(); close();
+  console.log(JSON.stringify(out, null, 1));
+}
+
 async function chunksJob(): Promise<void> {
   // the same split next/dynamic makes: the library page's own code, then the stage (Babylon, the body pipeline) only when
   // a 3D tab opens. Minified, so the numbers are a release build's, not the rig's dev bundle.
@@ -284,3 +328,4 @@ else if (job === 'muscles') await musclesJob();
 else if (job === 'ui') await uiJob();
 else if (job === 'perf') await perfJob();
 else if (job === 'chunks') await chunksJob();
+else if (job === 'ttfc') await ttfcJob();
