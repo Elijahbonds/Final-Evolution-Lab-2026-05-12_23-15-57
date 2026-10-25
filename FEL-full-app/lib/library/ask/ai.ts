@@ -1,6 +1,6 @@
 // lib/library/ask/ai.ts — EXERCISE-LIBRARY (2026-10-25): the AI layer over Ask. Optional, off by default.
 //
-// It runs ONLY through the existing Abacus seam (lib/coach-service.ts callCoachLLM, behind ABACUS_ENABLED, which is
+// It runs ONLY through the existing Abacus seam (lib/coach-service.ts callCoachLLM, behind the Abacus kill switch, which is
 // off unless the owner sets it — lib/abacus/killSwitch.ts), and ONLY on top of the deterministic answer: the parser has
 // already chosen filters and the search has already retrieved real candidates. What the model may do, enforced here
 // in code whatever it returns (ai.test.ts):
