@@ -28,6 +28,7 @@ import { VIDEO_STAYS_LINE } from '@/lib/coach/formReview/clipPolicy';
 import type { RecordContext } from '@/lib/coach/formReview/gate';
 import { repChips, replayPick } from '@/lib/coach/formReview/view';
 import { PoseReplay } from './pose-replay';
+import { SelfView } from '@/components/games/body-play';
 
 export const FORM_REVIEWS_API = '/api/coach/form-reviews';
 
@@ -65,7 +66,6 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   const [focus, setFocus] = useState<number | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [mine, setMine] = useState<{ id: string; exerciseName: string; reps: number; setScore: number | null; status: string; createdAt: string }[] | null>(null);
-  const host = useRef<HTMLDivElement>(null);
   const frames = useRef<PoseFrame[]>([]);
   const reader = useRef<SetReader | null>(null);
   const off = useRef<(() => void)[]>([]);
@@ -120,7 +120,6 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
     const svc = poseService();
     const live = await svc.start();
     if (!live) { setWhy(svc.why ?? 'The camera did not start.'); setPhase('ready'); return; }
-    if (host.current) off.current.push(svc.showIn(host.current));
     wake.current ??= new MirrorWakeLock((navigator as Navigator & { wakeLock?: WakeLockApiLike }).wakeLock ?? null, document);
     void wake.current.hold();
     let t0: number | null = null;
@@ -174,7 +173,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
 
       {/* collapsed (not unmounted: the camera attaches to it on "Film it again") once a set has been read */}
       <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-black ${result && phase !== 'recording' && phase !== 'starting' ? 'hidden' : ''}`} style={{ aspectRatio: '3 / 4' }} data-camera-box>
-        <div ref={host} className="absolute inset-0 [&>video]:-scale-x-100" data-self-view />
+        {/* Z-P4-4: the camera picture is shown in one place only, SelfView (components/games/body-play.tsx), mirrored as before */}
+        <SelfView className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }} />
         <canvas ref={overlay} width={480} height={640} aria-hidden className={`pointer-events-none absolute inset-0 h-full w-full ${phase === 'recording' ? '' : 'hidden'}`} data-live-skeleton />
         {phase === 'recording' && (
           <div className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-1.5 text-white" aria-live="polite">
