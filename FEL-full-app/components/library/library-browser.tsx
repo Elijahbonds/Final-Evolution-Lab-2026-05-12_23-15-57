@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronDown, ChevronUp, Loader2, MessageCircleQuestion, Plus, Search, SlidersHorizontal, Sparkles, X } from 'lucide-react';
-import { ExerciseDemo } from '@/components/coach/exercise-demo';
+import { LibraryDemo, DEMO_TAB_LABEL, demoTabs, type DemoTab } from '@/components/library/library-demo';
 import type { LibraryCard } from '@/lib/library/server';
 import type { AskChip } from '@/lib/library/ask/parse';
 
@@ -82,6 +82,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
   const [loading, setLoading] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<LibraryCard | null>(null);
+  const [sheetTab, setSheetTab] = useState<DemoTab | undefined>(undefined);   // LIBRARY-ANATOMY: the card's quick links open the sheet on a tab
   const [more, setMore] = useState<LibraryCard[]>([]);
   const seq = useRef(0);
 
@@ -290,7 +291,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
 
       {/* results */}
       <div className="space-y-2" data-testid="library-results">
-        {results.map((e) => <ResultCard key={e.id} e={e} onOpen={() => setSelected(e)} onOpenVariant={(id) => void openById(id, setSelected)} />)}
+        {results.map((e) => <ResultCard key={e.id} e={e} onOpen={(t) => { setSheetTab(t); setSelected(e); }} onOpenVariant={(id) => { setSheetTab(undefined); void openById(id, setSelected); }} />)}
         {!loading && results.length === 0 && (mode === 'search' ? data : ask) && (
           <div className="py-8 text-center text-sm text-white/35">
             {mode === 'search' && data && data.library.approved === 0 && !drafts
@@ -303,7 +304,7 @@ export function LibraryBrowser({ onUse, onAdded, canAdd = false, title }: {
         )}
       </div>
 
-      {selected && <EntrySheet e={selected} onClose={() => setSelected(null)} onUse={onUse} canAdd={canAdd} onAdded={onAdded} onOpen={(id) => void openById(id, setSelected)} />}
+      {selected && <EntrySheet e={selected} tab={sheetTab} onClose={() => { setSelected(null); setSheetTab(undefined); }} onUse={onUse} canAdd={canAdd} onAdded={onAdded} onOpen={(id) => void openById(id, setSelected)} />}
     </div>
   );
 }
@@ -333,12 +334,12 @@ function Badges({ e }: { e: LibraryCard }) {
   );
 }
 
-function ResultCard({ e, onOpen, onOpenVariant }: { e: LibraryCard; onOpen: () => void; onOpenVariant: (id: string) => void }) {
+function ResultCard({ e, onOpen, onOpenVariant }: { e: LibraryCard; onOpen: (tab?: DemoTab) => void; onOpenVariant: (id: string) => void }) {
   const [open, setOpen] = useState(false);
   const variants = e.variants ?? [];
   return (
     <div className="fel-card w-full rounded-xl transition-colors hover:border-[#00E5FF]/20" data-testid="library-card">
-      <button onClick={onOpen} className="w-full p-3 text-left">
+      <button onClick={() => onOpen()} className="w-full p-3 text-left">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1 space-y-1">
             <div className="truncate text-sm font-medium text-white">{e.name}</div>
@@ -349,6 +350,15 @@ function ResultCard({ e, onOpen, onOpenVariant }: { e: LibraryCard; onOpen: () =
           {e.avatarClip && <span className="shrink-0 rounded bg-[#00E5FF]/10 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-[#00E5FF]/80">3D</span>}
         </div>
       </button>
+      {/* LIBRARY-ANATOMY (2026-10-25): the four ways to see it, one tap from the card (each opens the sheet on that tab) */}
+      <div className="flex flex-wrap gap-1.5 px-3 pb-2.5" data-testid="card-demo-links">
+        {demoTabs(e).map((t) => (
+          <button key={t} onClick={() => onOpen(t)} data-testid={`card-link-${t}`}
+            className="min-h-[28px] rounded-full border border-white/10 px-2.5 text-[11px] text-white/60 hover:border-[#00E5FF]/30 hover:text-white">
+            {t === 'demo' && !e.avatarClip ? 'How to' : DEMO_TAB_LABEL[t]}
+          </button>
+        ))}
+      </div>
       {variants.length > 0 && (
         <div className="border-t border-white/5 px-3 pb-2.5 pt-1.5">
           <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="inline-flex items-center gap-1 text-[11px] text-[#00E5FF]/80 hover:text-[#00E5FF]" data-testid="variants-toggle">
@@ -376,8 +386,8 @@ const dose = (d: LibraryCard['dosage']) => [
   d.restSec ? `rest ${d.restSec} s` : null, d.tempo ? `tempo ${d.tempo}` : null,
 ].filter(Boolean).join(' · ');
 
-function EntrySheet({ e, onClose, onUse, canAdd, onAdded, onOpen }: {
-  e: LibraryCard; onClose: () => void; onUse?: (e: LibraryCard) => Promise<void> | void; canAdd: boolean; onAdded?: () => void; onOpen: (id: string) => void;
+function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
+  e: LibraryCard; tab?: DemoTab; onClose: () => void; onUse?: (e: LibraryCard) => Promise<void> | void; canAdd: boolean; onAdded?: () => void; onOpen: (id: string) => void;
 }) {
   const [busy, setBusy] = useState<'add' | 'use' | null>(null);
   const [added, setAdded] = useState(false);
@@ -419,7 +429,7 @@ function EntrySheet({ e, onClose, onUse, canAdd, onAdded, onOpen }: {
         )}
 
         <div className="mt-4">
-          <ExerciseDemo exercise={{ name: e.name, videoUrl: e.demo.videoUrl ?? undefined, clip: e.avatarClip }} />
+          <LibraryDemo entry={e} initialTab={tab} />
         </div>
 
         <div className="mt-4 space-y-3 text-sm">

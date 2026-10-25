@@ -23,9 +23,17 @@ import { CLIP_ALIASES } from './clipAliases';
 
 export type ClipSuite =
   | 'core' | 'dunk' | 'hoops' | 'football' | 'combat' | 'freerun' | 'board'
-  | 'golf' | 'tennis' | 'volleyball' | 'soccer' | 'baseball' | 'party';
+  | 'golf' | 'tennis' | 'volleyball' | 'soccer' | 'baseball' | 'party' | 'exercise';
 
-export const ALL_SUITES: readonly ClipSuite[] = ['core', 'dunk', 'hoops', 'football', 'combat', 'freerun', 'board', 'golf', 'tennis', 'volleyball', 'soccer', 'baseball', 'party'];
+export const ALL_SUITES: readonly ClipSuite[] = ['core', 'dunk', 'hoops', 'football', 'combat', 'freerun', 'board', 'golf', 'tennis', 'volleyball', 'soccer', 'baseball', 'party', 'exercise'];
+
+/**
+ * LIBRARY-ANATOMY (2026-10-25): suites an UNSCOPED body does not build. The exercise library's demo loops (`ex_*`,
+ * anim/authored/exercise.ts) are only ever played on the library stage, which names the suite in its scope; building
+ * them on every Closet, profile and dev spawn would add their solve time to each one for nothing. A scope that names the
+ * suite builds it; scopeAllows is unchanged (a registered clip stays playable).
+ */
+export const OPT_IN_SUITES: readonly ClipSuite[] = ['exercise'];
 
 /** The suite a clip NAME belongs to, by its sport prefix. Names with no sport prefix (idle_stand, run, walk, guard, the
  *  base strikes, jump_up, strafe_left, cheer, dance steps, mirrored '.M' groups) are core: every body may play them. */
@@ -42,7 +50,8 @@ export function suiteOfClip(name: string): ClipSuite {
   if (n.startsWith('volleyball_')) return 'volleyball';
   if (/^(soccer_|keeper_|penalty_)/.test(n)) return 'soccer';
   if (/^(baseball_|derby_)/.test(n)) return 'baseball';
-  if (n.startsWith('party_')) return 'party';   // the quiz podium (BRAINBRAWL-MAJOR): only a mode that names the suite builds it
+  if (n.startsWith('party_')) return 'party';
+  if (n.startsWith('ex_')) return 'exercise';   // LIBRARY-ANATOMY: the exercise library's demo loops (opt-in, OPT_IN_SUITES)   // the quiz podium (BRAINBRAWL-MAJOR): only a mode that names the suite builds it
   return 'core';
 }
 
@@ -68,6 +77,16 @@ const PARTY = { suites: [], borrow: ['karate_hit_react', 'dunk_celebrate_big'] }
 // used to land there (SHARED-ANIM-BUS), and a request that still reaches one is a bleed — it lands on the bat stance now.
 const FIGHTER_BASE = ['guard', 'jab', 'hook', 'uppercut', 'roundhouse', 'high_kick'] as const;
 const DERBY = { suites: ['baseball'], borrow: [], omit: FIGHTER_BASE } as const;
+/** LIBRARY-ANATOMY (2026-10-25): the hoops clips the exercise library's basketball entries play (lib/library/demo.ts
+ *  DEMO_RULES names each one; demo.test.ts holds the two lists equal). */
+export const LIBRARY_HOOPS_BORROW: readonly string[] = [
+  'bball_behind_back_left', 'bball_between_legs_left', 'bball_closeout', 'bball_crossover_left', 'bball_defend_backpedal',
+  'bball_defend_slide_left', 'bball_dribble_idle', 'bball_drop_step', 'bball_euro_step', 'bball_euro_step_left', 'bball_finger_roll',
+  'bball_finger_roll_left', 'bball_floater', 'bball_floater_left', 'bball_hesi', 'bball_hook', 'bball_hook_left', 'bball_hop_step',
+  'bball_in_and_out_left', 'bball_jab', 'bball_layup_gather', 'bball_layup_gather_left', 'bball_layup_reverse', 'bball_layup_reverse_left',
+  'bball_layup_scoop', 'bball_layup_scoop_left', 'bball_layup_spin', 'bball_layup_spin_left', 'bball_mikan', 'bball_pivot', 'bball_spin',
+  'bball_up_and_under', 'bball_up_and_under_left',
+];
 
 /** Keyed by the harness's `def.modeId` (what ModeHarness stamps on `scene.metadata.felModeId`). */
 export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; borrow: readonly string[]; omit?: readonly string[] }> = {
@@ -99,6 +118,10 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   // ADVENTURE A4 (2026-10-06): the Adventure's bodies run, grind and fight — A1's MOVEMENT_CLIP_SUITES (freerun, board, combat)
   adventure: { suites: ['freerun', 'board', 'combat'], borrow: [] },
   adventure_br: { suites: ['freerun', 'board', 'combat'], borrow: [] },   // ADVENTURE C: the BR's fighters are the Adventure's bodies
+  // LIBRARY-ANATOMY (2026-10-25): not a game mode — the exercise library's demo stage (components/library/exercise-stage.tsx
+  // stamps felModeId 'library'). It owns the exercise loops, and borrows the hoops clips a basketball library entry plays
+  // (LIBRARY_HOOPS_BORROW, lib/library/demo.ts DEMO_RULES): the drill's own movement, from the suite the court plays it with.
+  library: { suites: ['exercise'], borrow: LIBRARY_HOOPS_BORROW, omit: FIGHTER_BASE },
 };
 
 /** The scope for a mode, or null (unscoped: every suite) for a body no mode owns. */

@@ -7,7 +7,7 @@
 
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
 import type { CharacterAnimator } from '../CharacterAnimator';
-import { ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } from '../clipScope';
+import { OPT_IN_SUITES, ledgerFor, scopeAllows, scopeForScene, suiteOfClip, type ClipScope } from '../clipScope';
 import { buildEastbay } from './eastbay';
 import { buildChargeGather, buildLaunch, buildScoreHang, buildLandCrouch } from './dunkSuite';
 import { buildDunkLandAbsorb } from './dunkLandAbsorb';
@@ -47,6 +47,12 @@ import {
   buildSkateKickflip, buildSkateBail, buildSnowBail,
   buildBoardManual, buildSkateOllie,   // VENICE-SKATE-THPS (2026-09-09): the manual had no clip and the pop had no body
 } from './boardSuite';
+import {
+  buildExSquat, buildExSquatBar, buildExHinge, buildExGoodMorning, buildExSplitSquat, buildExLunge, buildExReverseLunge, buildExCalfRaise,
+  buildExJump, buildExPogo, buildExJumpRope, buildExMarch, buildExCarry, buildExJumpingJack, buildExPlankHigh, buildExMountainClimber, buildExPress, buildExCurl, buildExLateralRaise, buildExFrontRaise,
+  buildExRow, buildExUprightRow, buildExShrug, buildExTricepsOverhead, buildExPushdown, buildExPushup, buildExPlank, buildExBridge,
+  buildExDeadBug, buildExBirdDog, buildExCrunch, buildExArmCircles, buildExQuadStretch, buildExBreathe,
+} from './exercise';   // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops — opt-in suite, built on the library stage only
 
 export function registerAuthoredClips(
   animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
@@ -293,11 +299,47 @@ export function registerAuthoredClips(
     ['party_win', () => buildPartyWin(scene, skeleton)], ['party_win_in', () => buildPartyWinIn(scene, skeleton)], ['party_lose', () => buildPartyLose(scene, skeleton)],
     // BRAINBRAWL-RESIDUAL: the podiums and the host talk
     ['party_talk', () => buildPartyTalk(scene, skeleton)], ['party_present', () => buildPartyPresent(scene, skeleton)],
+    // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops (anim/authored/exercise.ts) — the 'exercise' suite, opt-in
+    ['ex_squat', () => buildExSquat(scene, skeleton)],
+    ['ex_squat_bar', () => buildExSquatBar(scene, skeleton)],
+    ['ex_hinge', () => buildExHinge(scene, skeleton)],
+    ['ex_good_morning', () => buildExGoodMorning(scene, skeleton)],
+    ['ex_split_squat', () => buildExSplitSquat(scene, skeleton)],
+    ['ex_lunge', () => buildExLunge(scene, skeleton)],
+    ['ex_reverse_lunge', () => buildExReverseLunge(scene, skeleton)],
+    ['ex_calf_raise', () => buildExCalfRaise(scene, skeleton)],
+    ['ex_jump', () => buildExJump(scene, skeleton)],
+    ['ex_pogo', () => buildExPogo(scene, skeleton)],
+    ['ex_jump_rope', () => buildExJumpRope(scene, skeleton)],
+    ['ex_march', () => buildExMarch(scene, skeleton)],
+    ['ex_carry', () => buildExCarry(scene, skeleton)],
+    ['ex_jumping_jack', () => buildExJumpingJack(scene, skeleton)],
+    ['ex_press', () => buildExPress(scene, skeleton)],
+    ['ex_curl', () => buildExCurl(scene, skeleton)],
+    ['ex_lateral_raise', () => buildExLateralRaise(scene, skeleton)],
+    ['ex_front_raise', () => buildExFrontRaise(scene, skeleton)],
+    ['ex_row', () => buildExRow(scene, skeleton)],
+    ['ex_upright_row', () => buildExUprightRow(scene, skeleton)],
+    ['ex_shrug', () => buildExShrug(scene, skeleton)],
+    ['ex_triceps_overhead', () => buildExTricepsOverhead(scene, skeleton)],
+    ['ex_pushdown', () => buildExPushdown(scene, skeleton)],
+    ['ex_pushup', () => buildExPushup(scene, skeleton)],
+    ['ex_plank', () => buildExPlank(scene, skeleton)],
+    ['ex_plank_high', () => buildExPlankHigh(scene, skeleton)],
+    ['ex_mountain_climber', () => buildExMountainClimber(scene, skeleton)],
+    ['ex_bridge', () => buildExBridge(scene, skeleton)],
+    ['ex_dead_bug', () => buildExDeadBug(scene, skeleton)],
+    ['ex_bird_dog', () => buildExBirdDog(scene, skeleton)],
+    ['ex_crunch', () => buildExCrunch(scene, skeleton)],
+    ['ex_arm_circles', () => buildExArmCircles(scene, skeleton)],
+    ['ex_quad_stretch', () => buildExQuadStretch(scene, skeleton)],
+    ['ex_breathe', () => buildExBreathe(scene, skeleton)],
   ];
   const registered: string[] = [];
   let skipped = 0;
   for (const [name, build] of builders) {
     if (!scopeAllows(scope, name)) { skipped++; continue; }   // another sport's clip: never built, never playable here
+    if (!scope && OPT_IN_SUITES.includes(suiteOfClip(name))) { skipped++; continue; }   // LIBRARY-ANATOMY: an opt-in suite is built only where a scope names it
     const g = build();
     if (g) { animator.register(g); registered.push(g.name); }
   }

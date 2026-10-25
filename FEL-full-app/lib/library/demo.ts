@@ -2,7 +2,7 @@
 //
 // Owner decision (2026-10-25): every exercise gets all four demos — the 3D avatar, a coach video, a muscle view on the
 // 3D body, and text cues and faults. This lane ships the text and the data the other three key on:
-//   · CLIP_KEYS — one avatar clip key per movement shape, chosen BY PATTERN (and family where a pattern holds two
+//   · CLIP_KEYS — one avatar clip key per movement shape (LIBRARY-ANATOMY: the loop an ENTRY plays is demoClipFor), chosen BY PATTERN (and family where a pattern holds two
 //     shapes: a jump is locomotion, so is a sprint). CLIP_COVERAGE says which keys the shipped rig can already play
 //     (components/coach/exercise-avatar-canvas.tsx loads public/models/elijah.glb); the rest are null until the avatar
 //     clip lane authors them, and a card shows no avatar for an uncovered key rather than the wrong motion.
@@ -22,13 +22,20 @@ export type ClipKey = (typeof CLIP_KEYS)[number];
 export const isClipKey = (v: unknown): v is ClipKey => typeof v === 'string' && (CLIP_KEYS as readonly string[]).includes(v);
 
 /**
- * Clip key → the rig clip that plays it today, or null (not authored yet). The three non-null ones are the clips the
- * shipped demo already loops (exercise-avatar-canvas.tsx clipForStat): this lane maps onto them, it adds no motion.
+ * Clip key → the loop that shows that movement shape on the library stage, or null (no faithful loop yet).
+ * LIBRARY-ANATOMY (2026-10-25): the keys were 5 of 22 covered, and the five were not what they said — the R3F demo's
+ * model (public/models/elijah.glb) carries ONE baked animation, so `idle_stand`, `jump_up` and `run_forward` were never
+ * found and every entry played that same clip (exercise-avatar-canvas falls back to clipNames[0]). The library now plays
+ * on the athlete's own body (components/library/exercise-stage.tsx): the exercise loops authored for it
+ * (anim/authored/exercise.ts) and the hoops clips the court already plays. This table is the key's REPRESENTATIVE loop
+ * (what clipCoverage counts); what an ENTRY plays is demoClipFor below, which is stricter — a key covered here can still
+ * be a cue card for a variation the loop would show wrong (a seated press is not the standing press).
  */
 export const CLIP_COVERAGE: Readonly<Record<ClipKey, string | null>> = {
-  idle: 'idle_stand', jump: 'jump_up', hop: 'jump_up', bound: 'jump_up', sprint: 'run_forward',
-  squat: null, hinge: null, lunge: null, push: null, pull: null, carry: null, rotate: null, brace: null, shuffle: null,
-  backpedal: null, dribble: null, shoot: null, layup: null, stretch: null, breathe: null, throw: null, crawl: null,
+  idle: null, squat: 'ex_squat', hinge: 'ex_hinge', lunge: 'ex_lunge', push: 'ex_press', pull: 'ex_row', carry: 'ex_carry',
+  rotate: null, brace: 'ex_plank', jump: 'ex_jump', hop: 'ex_pogo', bound: null, sprint: 'run', shuffle: 'bball_defend_slide_left',
+  backpedal: 'bball_defend_backpedal', dribble: 'bball_dribble_idle', shoot: 'jumpshot', layup: 'bball_layup_gather',
+  stretch: 'ex_arm_circles', breathe: 'ex_breathe', throw: null, crawl: null,
 };
 
 /** The clip a pattern shows when its family names no better one. */
@@ -53,16 +60,241 @@ export function clipKeyFor(pattern: MovementPattern, family: string): ClipKey {
   return CLIP_BY_FAMILY[family] ?? CLIP_BY_PATTERN[pattern];
 }
 
-/** The rig clip to play, or null when the avatar cannot show this motion yet. */
+/** The key's representative loop, or null (see CLIP_COVERAGE). An entry plays demoClipFor(entry), not this. */
 export function avatarClip(key: ClipKey | null | undefined): string | null {
   return key ? CLIP_COVERAGE[key] ?? null : null;
 }
 
-/** How many of the keys the rig covers today (the avatar clip lane's backlog is the rest). */
+/** How many of the keys have a representative loop (the rest show the cue card for every entry). */
 export function clipCoverage(): { covered: ClipKey[]; missing: ClipKey[] } {
   const covered = CLIP_KEYS.filter((k) => CLIP_COVERAGE[k] !== null);
   return { covered, missing: CLIP_KEYS.filter((k) => CLIP_COVERAGE[k] === null) };
 }
+
+// ── the loop an entry plays (LIBRARY-ANATOMY, 2026-10-25) ───────────────────────────────────────────────────────────
+//
+// Owner: every entry plays the clip for its pattern and variation; where there is no faithful clip, the cue card —
+// never a wrong movement. So the choice reads the entry's STRUCTURED tags only (family, the base variation, the
+// modifiers after '+', equipment — never the English name), and every rule is a whitelist: a family a rule does not
+// name, or a variation its pattern does not match, shows the cue card. A rule is written for what the loop shows: the
+// standing press is not the seated press, the incline press or the landmine press; a curl is not a preacher curl.
+//
+// MODIFIERS that change what the body does (anything else — paused, tempo, a vest, game speed — is the same movement):
+//   iso-hold (a hold, not reps), single-arm / alternating / off-hand (one side), half-kneeling, supported, staggered.
+export const SHAPE_MODIFIERS: ReadonlySet<string> = new Set(['iso-hold', 'single-arm', 'alternating', 'off-hand', 'half-kneeling', 'supported', 'staggered']);
+
+interface DemoRule {
+  /** the loop, or a function of the entry's base variation (a weak-hand finish plays the left-hand clip) */
+  clip: string | ((base: string, equipment: readonly string[]) => string | null);
+  families: readonly string[];
+  /** the base variation must match (anchored) */
+  bases: RegExp;
+}
+
+const weak = (right: string, left: string) => (base: string) => (/-weak\b|-weak-/.test(`${base}-`) ? left : right);
+/** A barbell back squat holds the bar on the back; a goblet, front, dumbbell or bodyweight squat holds the load in front. */
+const squatClip = (base: string, eq: readonly string[]) => (eq.includes('barbell') && !/front|zercher|goblet/.test(base) ? 'ex_squat_bar' : 'ex_squat');
+
+/** Every rule (first match wins). DEMO_CLIPS (below) is the set of loops these name; demo.test.ts holds the hoops ones
+ *  equal to the stage scope's borrow list (clipScope LIBRARY_HOOPS_BORROW). */
+export const DEMO_RULES: readonly DemoRule[] = [
+  // ── lower body ──
+  { clip: squatClip, families: ['squat'], bases: /^(squat|bodyweight-squat|full-squat|front-squat|front-squat-two|front-kb2|goblet-squat|goblet-db|goblet-heels-up|goblet-box-db|goblet-db-tempo|back-bb|back-bb-pause|box-bw|box-squat|squat-bench|narrow-stanc-squat|wid-stanc-squat|pli-squat|counterweight|olympic-squat|weight-squat|squat-chain|front-squat-clean-grip|front-squat-bench)$/ },
+  { clip: 'ex_squat', families: ['db-lower'], bases: /^(front|heels-up|sumo|box)$/ },
+  { clip: 'ex_squat', families: ['kb-lower'], bases: /^sumo-squat$/ },
+  { clip: 'ex_squat', families: ['sandbag'], bases: /^bear-hug-squat$/ },
+  { clip: 'ex_squat', families: ['landmine-lower'], bases: /^squat$/ },
+  { clip: 'ex_hinge', families: ['rdl'], bases: /^(romanian-deadlift|romanian-deadlift-deficit|stiff-leg-deadlift|wid-stanc-stiff-leg|smith-stiff-leg-deadlift)$/ },
+  { clip: 'ex_hinge', families: ['deadlift'], bases: /^(deadlift|trap-bar-deadlift|axl-deadlift|rack-pull|deficit-deadlift)$/ },
+  { clip: 'ex_hinge', families: ['hinge-pattern'], bases: /^(kb-rdl|kb-deadlift|db-rdl|band-rdl|bb-deadlift)$/ },
+  { clip: 'ex_hinge', families: ['db-hinge'], bases: /^suitcase-rdl$/ },
+  { clip: 'ex_hinge', families: ['kb-lower'], bases: /^suitcase-dl$/ },
+  { clip: 'ex_hinge', families: ['landmine-lower'], bases: /^rdl$/ },
+  { clip: 'ex_good_morning', families: ['good-morning'], bases: /^(morn|stiff-leg-morn|morn-pin)$/ },
+  { clip: 'ex_good_morning', families: ['db-hinge'], bases: /^good-morning$/ },
+  { clip: 'ex_lunge', families: ['lunge'], bases: /^(lung|forward-bw)$/ },
+  { clip: 'ex_reverse_lunge', families: ['lunge'], bases: /^(rear-lung|reverse-db|reverse-bb|reverse-bw)$/ },
+  { clip: 'ex_reverse_lunge', families: ['kb-lower'], bases: /^(rack-reverse-lunge|goblet-reverse-lunge)$/ },
+  { clip: 'ex_reverse_lunge', families: ['landmine-lower', 'sandbag'], bases: /^reverse-lunge$/ },
+  { clip: 'ex_reverse_lunge', families: ['db-lower'], bases: /^step-back-knee$/ },
+  { clip: 'ex_split_squat', families: ['lunge'], bases: /^split-squat$/ },
+  { clip: 'ex_split_squat', families: ['split-squat'], bases: /^(bw|offset-kb|landmine)$/ },
+  { clip: 'ex_bridge', families: ['bridge'], bases: /^(bw|mini-band)$/ },
+  { clip: 'ex_bridge', families: ['bridge-thrust'], bases: /^(glut-bridg|hip-lift)$/ },
+  { clip: 'ex_bridge', families: ['db-hinge'], bases: /^bridge$/ },
+  { clip: 'ex_calf_raise', families: ['calf-raise'], bases: /^(stand-calf-rais|calf-rais|smith-calf-rais|rock-stand-calf-rais)$/ },
+  { clip: 'ex_calf_raise', families: ['calf-capacity'], bases: /^straight-double-(step|slow)$/ },
+  // ── upper body ──
+  { clip: 'ex_press', families: ['overhead-press'], bases: /^(shoulder-press|stand-press|db-standing|stand-palm-press|two-arm-military-press|stand-military-press|bb|shoulder-military-press)$/ },
+  { clip: 'ex_curl', families: ['curl'], bases: /^(bicep-curl|stand-bicep-curl|hammer-curl|curl|ez-bar-curl|clos-grip-ez-bar-curl|clos-grip-stand-curl|stand-revers-curl|revers-curl|stand-inner-bicep-curl)$/ },
+  { clip: 'ex_curl', families: ['arm-accessory'], bases: /^(band-curl|tempo-curl)$/ },
+  { clip: 'ex_lateral_raise', families: ['raise'], bases: /^(sid-lateral-rais|lateral-rais)$/ },
+  { clip: 'ex_front_raise', families: ['raise'], bases: /^(front-rais|front-two-rais|front-plat-rais)$/ },
+  { clip: 'ex_row', families: ['row'], bases: /^(db-bent|bent-over-two-row|bent-over-row|bent-over-two-arm-long-bar-row|revers-grip-bent-over-row|bent-over-two-row-palm|t-bar-row-handl)$/ },
+  { clip: 'ex_upright_row', families: ['upright-row-shrug'], bases: /^(upright-row|stand-upright-row|smith-upright-row)$/ },
+  { clip: 'ex_shrug', families: ['upright-row-shrug'], bases: /^(shrug|leverag-shrug)$/ },
+  { clip: 'ex_triceps_overhead', families: ['triceps'], bases: /^(overhead-tricep-extension|stand-overhead-tricep-extension|rop-overhead-tricep-extension|stand-tricep-extension|stand-towel-tricep-extension)$/ },
+  { clip: 'ex_triceps_overhead', families: ['triceps-accessory'], bases: /^db-overhead-ext$/ },
+  { clip: 'ex_pushdown', families: ['triceps'], bases: /^(tricep-pushdown|revers-grip-tricep-pushdown)$/ },
+  { clip: 'ex_pushdown', families: ['triceps-accessory'], bases: /^band-pushdown$/ },
+  { clip: 'ex_pushup', families: ['push-up'], bases: /^(push-up|push-up-wid|clos-grip-push-up|push-ups-clos-tricep-position|push-up-clos-wid-hand-position|tempo|vest|band|deficit)$/ },
+  { clip: 'ex_pushup', families: ['triceps-accessory'], bases: /^close-push-up$/ },
+  { clip: 'ex_plank_high', families: ['isometric-hold'], bases: /^push-up-top$/ },
+  { clip: 'ex_plank_high', families: ['plank'], bases: /^high$/ },
+  // ── trunk ──
+  { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
+  { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
+  { clip: 'ex_dead_bug', families: ['dead-bug'], bases: /^(weighted|band)$/ },
+  { clip: 'ex_bird_dog', families: ['dead-bug'], bases: /^bird-dog$/ },
+  { clip: 'ex_crunch', families: ['flexion'], bases: /^(crunch|ab-crunch)$/ },
+  { clip: 'ex_crunch', families: ['trunk-flexion'], bases: /^curl-up$/ },
+  { clip: 'ex_mountain_climber', families: ['conditioning-circuit', 'cardio'], bases: /^mountain-climber$/ },
+  // ── jumps, hops, conditioning ──
+  { clip: 'ex_jump', families: ['vertical-jump'], bases: /^(squat-jump|cmj|cmj-stick|cmj-repeat)$/ },
+  { clip: 'ex_jump', families: ['vertical-jump-builds'], bases: /^(squat-jump-pause|cmj-target|cmj-hips|squat-jump-hips)$/ },
+  { clip: 'ex_jump', families: ['jump'], bases: /^(freehand-jump-squat|weight-jump-squat|rocket-jump)$/ },
+  { clip: 'ex_jump', families: ['loaded-jump'], bases: /^vest-cmj$/ },
+  { clip: 'ex_jump', families: ['rebound-jump'], bases: /^touches$/ },
+  { clip: 'ex_jumping_jack', families: ['conditioning-circuit'], bases: /^jumping-jack$/ },
+  { clip: 'ex_pogo', families: ['pogo'], bases: /^(ankle-bounce|pogo)$/ },
+  { clip: 'ex_jump_rope', families: ['jump-rope'], bases: /^basic$/ },
+  { clip: 'ex_jump_rope', families: ['cardio'], bases: /^rop-jump$/ },
+  { clip: 'ex_carry', families: ['carry'], bases: /^(farmer-kb|farmer-db|farmer-walk|farmer-trap|suitcase)$/ },
+  { clip: 'ex_march', families: ['sprint-mechanics'], bases: /^a-march$/ },
+  { clip: 'ex_march', families: ['sprint-development'], bases: /^band-a-march$/ },
+  { clip: 'run', families: ['sprint-development'], bases: /^(strides|fly-20|fly-30|fly-float|tempo-100|tempo-200)$/ },
+  { clip: 'run', families: ['sprint-drill'], bases: /^wind-sprint$/ },
+  { clip: 'run', families: ['sprint-conditioning'], bases: /^tempo$/ },
+  { clip: 'run', families: ['cardio'], bases: /^(jog-treadmill|run-treadmill)$/ },
+  { clip: 'run', families: ['conditioning-intervals'], bases: /^treadmill-/ },
+  { clip: 'walk', families: ['cardio'], bases: /^walk-treadmill$/ },
+  { clip: 'walk', families: ['breathing-2'], bases: /^walk-nasal$/ },
+  // ── mobility, breathing ──
+  { clip: 'ex_arm_circles', families: ['dynamic-flow'], bases: /^arm-circles$/ },
+  { clip: 'ex_arm_circles', families: ['dynamic-warmup'], bases: /^arm-circl$/ },
+  { clip: 'ex_arm_circles', families: ['joint-circles'], bases: /^shoulder-standing$/ },
+  { clip: 'ex_quad_stretch', families: ['dynamic-flow'], bases: /^quad-pull$/ },
+  { clip: 'ex_quad_stretch', families: ['stretch-quad-hip'], bases: /^quad-stretch$/ },
+  { clip: 'ex_breathe', families: ['breath-drill'], bases: /^box$/ },
+  { clip: 'ex_breathe', families: ['breathing-2'], bases: /^(sigh|humming|straw)$/ },
+  // ── basketball (the court's own clips; the ball is not drawn on the stage, and the card says so) ──
+  { clip: 'bball_dribble_idle', families: ['ball-handling'], bases: /^(pound|pound-low)$/ },
+  { clip: 'bball_dribble_idle', families: ['one-hand-dribble'], bases: /^wide-pound$/ },
+  { clip: 'bball_crossover_left', families: ['ball-handling', 'moving-handles'], bases: /^crossover$/ },
+  { clip: 'bball_between_legs_left', families: ['ball-handling', 'moving-handles'], bases: /^between$/ },
+  { clip: 'bball_behind_back_left', families: ['ball-handling', 'moving-handles'], bases: /^behind$/ },
+  { clip: 'bball_in_and_out_left', families: ['ball-handling'], bases: /^in-out$/ },
+  { clip: 'bball_hesi', families: ['ball-handling', 'moving-handles'], bases: /^hesi$/ },
+  // a two-move combo shows its named move (a finish or a pull-up on the end is a second movement: cue card)
+  { clip: 'bball_crossover_left', families: ['handle-combo'], bases: /^id-pound-crossover-combo(-move|-pressure)?$/ },
+  { clip: 'bball_between_legs_left', families: ['handle-combo'], bases: /^combo-pound-between(-move|-pressure)?$/ },
+  { clip: 'bball_behind_back_left', families: ['handle-combo'], bases: /^combo-pound-behind(-move|-pressure)?$/ },
+  { clip: 'bball_in_and_out_left', families: ['handle-combo'], bases: /^combo-pound-inout(-move|-pressure)?$/ },
+  { clip: 'bball_hesi', families: ['handle-combo'], bases: /^combo-pound-hesi(-move|-pressure)?$/ },
+  { clip: 'bball_defend_slide_left', families: ['defense'], bases: /^(slide|zig-zag)$/ },
+  { clip: 'bball_defend_slide_left', families: ['defense-drills-2'], bases: /^(lane-slides|slide-drop-slide|mirror-slides|wall-slides-def)$/ },
+  { clip: 'bball_defend_slide_left', families: ['lateral-movement'], bases: /^shuffle$/ },
+  { clip: 'bball_defend_slide_left', families: ['court-movement'], bases: /^slide-race$/ },
+  { clip: 'bball_defend_slide_left', families: ['basketball-warmup'], bases: /^slide$/ },
+  { clip: 'bball_defend_slide_left', families: ['shuffle-backpedal-2'], bases: /^shuffle-3-stick$/ },
+  { clip: 'bball_closeout', families: ['defense'], bases: /^(closeout|closeout-slide)$/ },
+  { clip: 'bball_closeout', families: ['closeout-series'], bases: /^closeout-[a-z]+-contest$/ },
+  { clip: 'bball_closeout', families: ['court-movement'], bases: /^shell-closeout$/ },
+  { clip: 'bball_closeout', families: ['basketball-warmup'], bases: /^closeout$/ },
+  { clip: 'bball_defend_backpedal', families: ['lateral-movement'], bases: /^backpedal$/ },
+  { clip: weak('bball_layup_gather', 'bball_layup_gather_left'), families: ['finish-series'], bases: /^overhand-/ },
+  { clip: weak('bball_layup_reverse', 'bball_layup_reverse_left'), families: ['finish-series'], bases: /^reverse-/ },
+  { clip: weak('bball_floater', 'bball_floater_left'), families: ['finish-series'], bases: /^(floater|runner)-/ },
+  { clip: weak('bball_euro_step', 'bball_euro_step_left'), families: ['finish-series'], bases: /^euro-/ },
+  { clip: weak('bball_finger_roll', 'bball_finger_roll_left'), families: ['finish-series'], bases: /^fingerroll-/ },
+  { clip: weak('bball_layup_scoop', 'bball_layup_scoop_left'), families: ['finish-series'], bases: /^scoop-/ },
+  { clip: weak('bball_hook', 'bball_hook_left'), families: ['finish-series'], bases: /^babyhook-/ },
+  { clip: weak('bball_layup_spin', 'bball_layup_spin_left'), families: ['finish-series'], bases: /^spin-/ },
+  { clip: weak('bball_up_and_under', 'bball_up_and_under_left'), families: ['finish-series'], bases: /^upunder-/ },
+  { clip: 'bball_hop_step', families: ['finish-series'], bases: /^prohop-/ },
+  { clip: 'bball_layup_gather', families: ['finishing'], bases: /^layup-right$/ },
+  { clip: 'bball_layup_gather_left', families: ['finishing'], bases: /^layup-left$/ },
+  { clip: 'bball_layup_reverse', families: ['finishing'], bases: /^reverse$/ },
+  { clip: 'bball_floater', families: ['finishing'], bases: /^floater$/ },
+  { clip: 'bball_euro_step', families: ['finishing'], bases: /^euro$/ },
+  { clip: 'bball_mikan', families: ['finishing'], bases: /^mikan$/ },
+  { clip: 'bball_finger_roll', families: ['finishing-touch'], bases: /^finger-roll$/ },
+  { clip: 'bball_layup_scoop', families: ['finishing-touch'], bases: /^scoop$/ },
+  { clip: 'bball_hook', families: ['finishing-touch'], bases: /^(baby-hook|jump-hook)$/ },
+  { clip: 'bball_hop_step', families: ['finishing-touch'], bases: /^hop-step$/ },
+  { clip: 'bball_up_and_under', families: ['finishing-touch'], bases: /^up-under-finish$/ },
+  { clip: 'bball_hop_step', families: ['finishing-reads'], bases: /^pro-hop$/ },
+  { clip: 'bball_drop_step', families: ['post-moves'], bases: /^drop-step-/ },
+  { clip: 'bball_hook', families: ['post-moves'], bases: /^jump-hook-/ },
+  { clip: 'bball_spin', families: ['post-moves'], bases: /^spin-/ },
+  { clip: 'bball_hop_step', families: ['post-moves'], bases: /^hop-step-/ },
+  { clip: 'bball_jab', families: ['footwork'], bases: /^jab$/ },
+  { clip: 'bball_drop_step', families: ['footwork'], bases: /^drop-step$/ },
+  { clip: 'bball_spin', families: ['footwork'], bases: /^spin$/ },
+  { clip: 'bball_euro_step', families: ['footwork'], bases: /^euro$/ },
+  { clip: 'bball_hop_step', families: ['footwork'], bases: /^hop-gather$/ },
+  { clip: 'bball_up_and_under', families: ['footwork'], bases: /^up-under$/ },
+  { clip: 'bball_pivot', families: ['footwork'], bases: /^(front-pivot|reverse-pivot)$/ },
+  { clip: 'jumpshot', families: ['spot-shooting'], bases: /^[a-z]+-(left|right|centre)-(mid|three)$/ },
+  { clip: 'jumpshot', families: ['shooting-spots'], bases: /^(corner|elbow|spot-up|around-world)$/ },
+];
+
+const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
+  const m = new Map<string, DemoRule[]>();
+  for (const r of DEMO_RULES) for (const f of r.families) (m.get(f) ?? m.set(f, []).get(f)!).push(r);
+  return m;
+})();
+
+/**
+ * An ISOMETRIC HOLD ("stop at the hardest point of the range and hold still", modifiers.ts iso-hold) is its rep's loop
+ * held still at that point: seconds into the loop where the rep is at its hardest (the bottom of a squat, the top of a
+ * row, the half-way of a curl). Only the loops listed here can show a hold; exercise.test.ts checks each time is the
+ * pose it names. Any other loop with an iso-hold variation shows the cue card.
+ */
+export const ISO_HOLD_SEC: Readonly<Record<string, number>> = {
+  ex_squat: 1.2, ex_squat_bar: 1.2, ex_hinge: 1.15, ex_good_morning: 1.15, ex_split_squat: 1.05, ex_lunge: 1.3, ex_reverse_lunge: 1.3,
+  ex_press: 0.5, ex_curl: 0.4, ex_lateral_raise: 0.85, ex_front_raise: 0.85, ex_row: 0.85, ex_upright_row: 0.85, ex_shrug: 0.65,
+  ex_triceps_overhead: 0.4, ex_pushdown: 0.75, ex_pushup: 0.95, ex_bridge: 1.0, ex_calf_raise: 0.8, ex_crunch: 0.85,
+};
+
+export interface DemoPick {
+  clip: string;
+  /** seconds into the loop to hold still at (an isometric hold), or null to loop it */
+  hold: number | null;
+}
+
+/** What a library entry shows on the stage: its loop (or that loop held still), or null — the cue card. */
+export function demoFor(e: { family: string; variation: string; equipment: readonly string[] }): DemoPick | null {
+  const [base, ...mods] = e.variation.split('+');
+  const iso = mods.includes('iso-hold');
+  if (mods.some((m) => m !== 'iso-hold' && SHAPE_MODIFIERS.has(m))) return null;
+  for (const r of RULES_BY_FAMILY.get(e.family) ?? []) {
+    if (!r.bases.test(base)) continue;
+    const clip = typeof r.clip === 'string' ? r.clip : r.clip(base, e.equipment);
+    if (!clip) return null;
+    if (!iso) return { clip, hold: null };
+    return clip in ISO_HOLD_SEC ? { clip, hold: ISO_HOLD_SEC[clip] } : null;
+  }
+  return null;
+}
+
+/** The loop an entry plays (demoFor's clip), or null: the cue card. */
+export const demoClipFor = (e: { family: string; variation: string; equipment: readonly string[] }): string | null => demoFor(e)?.clip ?? null;
+
+/** Every loop a rule can name (the stage must own each one). */
+export const DEMO_CLIPS: readonly string[] = (() => {
+  const out = new Set<string>();
+  for (const r of DEMO_RULES) {
+    if (typeof r.clip === 'string') out.add(r.clip);
+    else for (const b of ['x', 'x-weak']) for (const eq of [[], ['barbell']]) { const c = r.clip(b, eq); if (c) out.add(c); }
+  }
+  return [...out].sort();
+})();
+
+/** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch']);
+/** Ball-handling and finishing loops: the stage draws no ball, and the card says so. */
+export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot');
 
 const ANATOMY: ReadonlyMap<string, string> = new Map(MUSCLES.map((m) => [m.id, m.anatomyKey]));
 
