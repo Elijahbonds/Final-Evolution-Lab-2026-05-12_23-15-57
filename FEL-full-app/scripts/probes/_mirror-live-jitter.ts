@@ -2,6 +2,7 @@
 // default landmark jitter — the three findings lane/coach-video-review measured (docs/COACH-VIDEO-REVIEW.md §8).
 //   npx tsx scripts/probes/_mirror-live-jitter.ts [seeds=1,2,3,4,5,6]
 // Drives the same code the harness drives (LungeAudit + the lunge rep counter; sideRepStage.ts stepSideRep).
+import { readdirSync, readFileSync } from 'node:fs';
 import { LungeAudit } from '@/lib/mirror/lungeAudit';
 import { LungeRepCounter } from '@/lib/mirror/lungeReps';
 import { initialSideRep, stepSideRep, type SideRepSpec } from '@/lib/mirror/sideRepStage';
@@ -12,7 +13,7 @@ import { hingeSets, lungeSets, pushupSets, realNegatives, type JitterSet } from 
 
 const seeds = (process.argv[2] ?? '1,2,3,4,5,6').split(',').map(Number);
 
-export function liveLungeReps(frames: readonly PoseFrame[]): number {
+function liveLungeReps(frames: readonly PoseFrame[]): number {
   const audit = new LungeAudit();
   const counter = new LungeRepCounter();
   let n = 0;
@@ -61,4 +62,15 @@ for (const [name, spec, sets] of [['push-up', PUSHUP_LIVE, pushupSets(seeds)], [
   let missed = 0, total = 0;
   for (const s of sets) { const n = liveSide(spec, s.frames).length; total += n; if (n < s.reps) missed++; }
   console.log(`${name.toUpperCase()} 1.5 s setup: sets short of their reps ${missed}/${sets.length} (clean sets ${clean.length}); reps ${total}/${sets.reduce((a, s) => a + s.reps, 0)}`);
+}
+
+// 4. every owner take in lib/pose/__fixtures__ (none is a lunge, hinge or push-up set): what each live counter reads.
+// Before this lane: lunge 1 on dunk_approach_two_foot, 1 on jump_two_foot_high, 0 elsewhere; hinge and push-up 0 on all.
+// After: the two-foot jumps read 3 lunges each (a countermovement dip to depth01 0.3–0.49 is squat-shaped: the depth
+// counter now counts it, as the old one did whenever the phase stream was clean) — an owner call, see the lane report.
+for (const n of readdirSync('lib/pose/__fixtures__').filter((x) => x.endsWith('.json') && x !== 'index.json')) {
+  const fx = JSON.parse(readFileSync(`lib/pose/__fixtures__/${n}`, 'utf8')) as { frames?: PoseFrame[] };
+  if (!fx.frames?.[0]?.image) continue;
+  const frames = fx.frames.map((f) => ({ t: f.t, present: f.present, image: f.image }));
+  console.log(`owner take ${n}: lunge ${liveLungeReps(frames)}, hinge ${liveSide(HINGE_LIVE, frames).length}, push-up ${liveSide(PUSHUP_LIVE, frames).length}`);
 }
