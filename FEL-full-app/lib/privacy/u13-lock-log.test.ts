@@ -62,8 +62,8 @@ const UA = 'AgeScreenTest/1.0';
 // TEAMS-SQUADS (lane/teams-squads, 2026-10-25) prisma/pending/2026-10-25-teams-squads.sql (pending SQL only; schema.prisma
 // untouched; TrainingGroup + TrainingGroupMember + TrainingGroupAct, additive) at e0adbbd8, the lane commit carrying it on
 // top of every file above; lane/coach-video-review landed first (#438): pinned at the merge of lane/finish-release into
-// this lane, the first commit carrying all three 2026-10-24/25 pending files.
-const PARENT = 'c2c5140eff710ae7e2b4aa936f87a98af1bd4924';
+// this lane (f123fb66), the first commit carrying all three 2026-10-24/25 pending files.
+const PARENT = 'f123fb66bcccba82742264eb4c93699f157ab48f';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
