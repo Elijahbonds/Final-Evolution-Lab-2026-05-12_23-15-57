@@ -60,6 +60,8 @@ export function AcceptButton({ token, flow = 'camp', askBirthYear = false }: { t
   const [state, setState] = useState<'idle' | 'working' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [birthYear, setBirthYear] = useState('');
+  // SAFETY (SAF-01, 2026-10-25): the route answers a fresh yes with the guardian's withdraw link
+  const [withdraw, setWithdraw] = useState<string | null>(null);
 
   const yearReady = !askBirthYear || /^\d{4}$/.test(birthYear);
 
@@ -75,6 +77,7 @@ export function AcceptButton({ token, flow = 'camp', askBirthYear = false }: { t
         setState('error');
         return;
       }
+      if (typeof body?.withdrawHref === 'string' && body.withdrawHref.startsWith('/consent/guardian/withdraw/')) setWithdraw(body.withdrawHref);
       setState('done');
     } catch {
       setError('No connection. Try again in a moment.');
@@ -84,9 +87,17 @@ export function AcceptButton({ token, flow = 'camp', askBirthYear = false }: { t
 
   if (state === 'done') {
     return (
-      <p className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#00FF9D]/40 bg-[#00FF9D]/10 px-5 py-3 font-bold text-[#00FF9D]">
-        <Check className="h-4 w-4" /> Confirmed
-      </p>
+      <>
+        <p className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#00FF9D]/40 bg-[#00FF9D]/10 px-5 py-3 font-bold text-[#00FF9D]">
+          <Check className="h-4 w-4" /> Confirmed
+        </p>
+        {withdraw && (
+          <p className="mt-4 max-w-xs text-xs text-white/55">
+            Changed your mind later? <a href={withdraw} className="font-semibold text-white/80 underline underline-offset-2">Withdraw this OK</a> — keep
+            that link; it works any time.
+          </p>
+        )}
+      </>
     );
   }
 

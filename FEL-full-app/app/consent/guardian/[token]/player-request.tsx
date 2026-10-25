@@ -14,14 +14,14 @@ import { AcceptButton } from './accept-button';
 //
 // LOGIN-RETURN-FOLD: sign-in and signup carry this link as a same-origin ?next=, so the adult lands back on it.
 
-export function PlayerRequest({ step, token, menteeName }: { step: PlayerAcceptStep; token: string; menteeName: string }) {
+export function PlayerRequest({ step, token, menteeName, ask }: { step: PlayerAcceptStep; token: string; menteeName: string; ask?: string }) {
   const intro = (
     <>
       <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
         {menteeName} <span className="text-white/50">wants your OK</span>
       </h1>
       <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
-        {guardianConsentAsk(menteeName)} FEL never contacts you about anything else.
+        {ask ?? guardianConsentAsk(menteeName)} FEL never contacts you about anything else.
       </p>
     </>
   );

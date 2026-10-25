@@ -58,6 +58,9 @@ export interface GuardianConsentLike {
   /** Set if this specific consent was withdrawn. A revoked request does not un-revoke by itself — a fresh request
    *  is a new row, same pattern as `acceptedAt`. */
   revokedAt: Date | null;
+  /** SAFETY (SAF-03, 2026-10-25): the guardian wording this was asked under (lib/consent/wordingVersions.ts), when the
+   *  reader has it. Optional and unread by anything in this file: absent means "judge by the request date". */
+  wordingVersion?: number | null;
 }
 
 export type GuardianStatus = 'none' | 'pending' | 'accepted' | 'revoked';

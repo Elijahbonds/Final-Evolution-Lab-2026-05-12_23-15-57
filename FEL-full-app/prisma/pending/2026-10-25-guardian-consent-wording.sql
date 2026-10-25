@@ -1,0 +1,32 @@
+-- SAFETY (lane/safety, 2026-10-25; SAF-03): GuardianConsent."wordingVersion" — which guardian wording a consent was asked
+-- under, recorded on the row instead of guessed from its request date.
+-- ADDITIVE ONLY: one new nullable column. No existing column, row, index or constraint is changed or dropped.
+--
+-- WHY. The coach-training and squads gates (lib/coach/coachConsent.ts, lib/groups/gates.ts) tell a consent asked under
+-- the new words from an old camp-plan one by comparing requestedAt with a go-live day. That holds only if the words and
+-- the date ship in the same minute. With the column, the request route records the version that was live
+-- (lib/consent/wording.ts stampWordingVersion; versions in lib/consent/wordingVersions.ts) and the gates judge by it.
+-- Every existing row keeps NULL, and a NULL row is judged by its date exactly as before, so applying this changes no
+-- decision for any consent already on file.
+--
+-- Written by hand; no Prisma command was run, prisma/schema.prisma and public/_prisma/** are unchanged.
+--
+-- SAFE IN EITHER ORDER WITH THE DEPLOY. lib/consent/wording.ts probes information_schema.columns for the column
+-- (lib/coach/pendingSchema.ts pendingProbe): without it the stamp and the read are no-ops (no 500, no error to the
+-- guardian); within ~5 minutes of applying, new requests are stamped. No deploy, no env change.
+--
+-- THE OWNER'S STEPS (docs/LANES.md section 4):
+--   1. Locally, add the field to model GuardianConsent in prisma/schema.prisma:
+--        /// Guardian wording version the request was asked under (lib/consent/wordingVersions.ts). Null = before the column.
+--        wordingVersion Int?
+--   2. Preview, read-only: npx prisma migrate diff --from-url "$PROD_DIRECT_URL" --to-schema-datamodel prisma/schema.prisma --script
+--      It should print exactly the statement below (plus anything another unapplied lane adds — stop and review if so).
+--   3. Apply: npx prisma db execute --url "$PROD_DIRECT_URL" --file prisma/pending/2026-10-25-guardian-consent-wording.sql
+--   4. Verify: the same migrate diff prints an empty migration.
+--   5. Then the client (copy-prisma-schema, prisma:generate, the schema-sync and prisma-artifact tests), committed together.
+--
+-- ROLLBACK (loses the recorded versions; every row is then judged by its date again, as today):
+--   ALTER TABLE "GuardianConsent" DROP COLUMN "wordingVersion";
+
+-- AlterTable
+ALTER TABLE "GuardianConsent" ADD COLUMN "wordingVersion" INTEGER;

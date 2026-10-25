@@ -17,12 +17,15 @@
 // assumption: the request date is a sound proxy only if the accept screen shows the new wording from that date on. The
 // go-live steps say so; a `covers` column on GuardianConsent would make it exact (a schema change, not in this lane).
 
+import { consentCovers } from '@/lib/consent/wordingVersions';
+
 /** The day the guardian's screen started asking for coach training. null = not yet: no consent covers it. */
 export const COACH_TRAINING_CONSENT_SINCE: Date | null = null;
 
-/** Was this consent requested under the coach-training wording? */
-export function coversCoachTraining(c: { requestedAt: Date }, since: Date | null = COACH_TRAINING_CONSENT_SINCE): boolean {
-  return since != null && c.requestedAt.getTime() >= since.getTime();
+/** Was this consent requested under the coach-training wording? SAFETY (SAF-03, 2026-10-25): a row that records its
+ *  wordingVersion is judged by that number (lib/consent/wordingVersions.ts); a row without one by the date, as before. */
+export function coversCoachTraining(c: { requestedAt: Date; wordingVersion?: number | null }, since: Date | null = COACH_TRAINING_CONSENT_SINCE): boolean {
+  return consentCovers(c, 'coach_training', since);
 }
 
 /** Where a teen goes to ask: nowhere yet while the wording is not live (there is no request that could satisfy it). */

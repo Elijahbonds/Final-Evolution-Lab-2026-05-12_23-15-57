@@ -7,6 +7,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlayerRequest } from '@/app/consent/guardian/[token]/player-request';
 import { AcceptButton, acceptErrorCopy, acceptRequest } from '@/app/consent/guardian/[token]/accept-button';
+import { askFor, coversForVersion } from '@/lib/consent/wording';
+import { guardianConsentAsk as guardianConsentAskSync } from '@/lib/consent/guardianGate';
 import { PLAYER_ACCEPT_REFUSALS } from '@/lib/consent/guardianAccept';
 
 const render = (step: Parameters<typeof PlayerRequest>[0]['step']) =>
@@ -158,7 +160,13 @@ describe('what a guardian is told the yes covers — what it unlocks today, and 
 
   it('the camp screen reads the same list, and its accept call is still P5\'s GET', () => {
     const page = readFileSync('app/consent/guardian/[token]/page.tsx', 'utf8');
-    expect(page).toContain('{guardianConsentAsk(menteeName)}');
+    // SAFETY (SAF-03, 2026-10-25), test changed: the page now reads the list FOR THE ROW'S RECORDED WORDING VERSION
+    // (lib/consent/wording.ts coversForVersion), which is GUARDIAN_CONSENT_COVERS itself for every row today (no version
+    // recorded, or version 1) — so the words a camp guardian reads are still exactly guardianConsentAsk's.
+    expect(page).toContain('askFor(menteeName, coversForVersion(version))');
+    expect(page).toContain('{ask} That&apos;s all this does');
+    expect(askFor('Jordan', coversForVersion(null))).toBe(guardianConsentAskSync('Jordan'));
+    expect(askFor('Jordan', coversForVersion(1))).toBe(guardianConsentAskSync('Jordan'));
     expect(page).not.toContain('log\n            how an exercise feels (a pain check-in), we ask');
     expect(page).toContain('<AcceptButton token={token} />');
     expect(acceptRequest('camp', 'x')).toEqual({ url: '/api/v1/camp/consent?token=x' });

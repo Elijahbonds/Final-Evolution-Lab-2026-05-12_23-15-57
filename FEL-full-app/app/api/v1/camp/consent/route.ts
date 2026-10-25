@@ -5,6 +5,10 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { decidePlayerAccept, isSelfRequest } from '@/lib/consent/guardianAccept';
+import { stampWordingVersion } from '@/lib/consent/wording';
+import { withdrawHref } from '@/lib/consent/withdraw';
+import { acceptedEmailEnabled, sendAcceptedEmail } from '@/lib/consent/acceptedEmail';
+import type { RawDb } from '@/lib/coach/pendingSchema';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -38,6 +42,9 @@ export async function POST(req: NextRequest) {
   const consent = await prisma.guardianConsent.create({
     data: { menteeId, guardianName, guardianEmail, menteeBirthYear, token, ...(selfRequested ? { selfRequested: true } : {}) },
   });
+  // SAFETY (SAF-03, 2026-10-25): record which guardian wording this request is asked under (a no-op until
+  // prisma/pending/2026-10-25-guardian-consent-wording.sql is applied; a row without one is judged by its date).
+  await stampWordingVersion(prisma as unknown as RawDb, consent.id);
   return NextResponse.json({ id: consent.id, token, requestedAt: consent.requestedAt });
 }
 
@@ -52,7 +59,9 @@ export async function POST(req: NextRequest) {
  * only, since the P6 review), or (b) a certified facilitator requesting for a mentee (menteeId set, certification
  * checked above; the facilitator's copy of the link, components/camp/camp-view.tsx). FEL sends it nowhere (owner decision #21).
  * app/consent/guardian/[token]/page.tsx only READS a row; this file is the only writer of acceptedAt in the repo
- * (grep for guardianConsent.update/create/upsert: these two call sites and nothing else), and nothing sets revokedAt.
+ * (grep for guardianConsent.update/create/upsert: these two call sites and nothing else). SAFETY (SAF-01, 2026-10-25):
+ * revokedAt is written by the guardian's withdraw link only (lib/consent/withdraw.ts, POST /api/consent/withdraw); a
+ * fresh accept below answers with that link (withdrawHref) and, when both email switches are on, emails it.
  *
  * What this GET did with a pending, unrevoked token as of P5 (97ba6d9b), for EVERY row alike:
  *   1. signed out                                   → ACCEPTED ("the token is the credential")
@@ -115,7 +124,9 @@ export async function GET(req: NextRequest) {
   if (callerId && callerId === consent.menteeId) return bad('self_accept_blocked', 403);
 
   const updated = await prisma.guardianConsent.update({ where: { token }, data: { acceptedAt: new Date() } });
-  return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt });
+  // SAFETY (SAF-01): the withdraw link, to the person who just said yes (no read: it is signed from the row's id).
+  if (acceptedEmailEnabled()) await sendAcceptedEmail(consent.guardianEmail, consent.id, await menteeName(consent.menteeId));
+  return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt, withdrawHref: withdrawHref(consent.id) });
 }
 
 /**
@@ -144,7 +155,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 /** The player-requested accept (PATCH only since the P6 review; GET answers use_accept_page). */
-async function acceptPlayerRequested(consent: { token: string; menteeId: string }, callerId: string | null, declaredBirthYear: unknown) {
+async function acceptPlayerRequested(consent: { id: string; token: string; menteeId: string }, callerId: string | null, declaredBirthYear: unknown) {
   const caller = callerId ? await prisma.user.findUnique({ where: { id: callerId }, select: { dobYear: true } }) : null;
   const decision = decidePlayerAccept({
     menteeId: consent.menteeId,
@@ -159,7 +170,8 @@ async function acceptPlayerRequested(consent: { token: string; menteeId: string 
   const accept = prisma.guardianConsent.update({ where: { token: consent.token }, data: { acceptedAt, acceptedById: decision.acceptedById } });
   if (decision.declareDobYear === null) {
     const updated = await accept;
-    return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt });
+    await acceptedEmailTo(decision.acceptedById, consent);
+    return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt, withdrawHref: withdrawHref(consent.id) });
   }
   // Only-when-blank, lib/health/intake.ts's rule: the WHERE carries dobYear null, so a birth year that landed on this
   // account in the meantime is never overwritten. One transaction: the yes and the declaration it rests on land together.
@@ -167,5 +179,19 @@ async function acceptPlayerRequested(consent: { token: string; menteeId: string 
     prisma.user.updateMany({ where: { id: decision.acceptedById, dobYear: null }, data: { dobYear: decision.declareDobYear } }),
     accept,
   ]);
-  return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt });
+  await acceptedEmailTo(decision.acceptedById, consent);
+  return NextResponse.json({ accepted: true, acceptedAt: updated.acceptedAt, withdrawHref: withdrawHref(consent.id) });
+}
+
+/** SAFETY (SAF-01): the athlete's name for the accepted email (read only when that email is switched on). */
+async function menteeName(menteeId: string): Promise<string | null> {
+  const u = await prisma.user.findUnique({ where: { id: menteeId }, select: { name: true } }).catch(() => null);
+  return u?.name ?? null;
+}
+
+/** A player request's accepted email goes to the ADULT ACCOUNT that said yes, never the address the minor typed. */
+async function acceptedEmailTo(acceptedById: string, consent: { id: string; menteeId: string }): Promise<void> {
+  if (!acceptedEmailEnabled()) return;
+  const u = await prisma.user.findUnique({ where: { id: acceptedById }, select: { email: true } }).catch(() => null);
+  await sendAcceptedEmail(u?.email ?? null, consent.id, await menteeName(consent.menteeId));
 }

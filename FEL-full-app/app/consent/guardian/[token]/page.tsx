@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { currentUserId } from '@/lib/camp/server';
 import { playerAcceptStep, type PlayerAcceptStep } from '@/lib/consent/guardianAccept';
-import { guardianConsentAsk } from '@/lib/consent/guardianGate';
+import { askFor, coversForVersion, readWordingVersions } from '@/lib/consent/wording';
+import { withdrawHref } from '@/lib/consent/withdraw';
+import type { RawDb } from '@/lib/coach/pendingSchema';
 import { AcceptButton } from './accept-button';
 import { PlayerRequest } from './player-request';
 
@@ -38,13 +40,19 @@ export default async function GuardianAcceptPage({ params }: { params: { token: 
   const consent = await prisma.guardianConsent.findUnique({
     where: { token },
     select: {
-      guardianName: true, acceptedAt: true, revokedAt: true, requestedAt: true, menteeId: true, selfRequested: true,
+      id: true, guardianName: true, acceptedAt: true, revokedAt: true, requestedAt: true, menteeId: true, selfRequested: true,
       mentee: { select: { name: true, email: true } },
     },
   });
   if (!consent) notFound();
 
   const menteeName = consent.mentee?.name || consent.mentee?.email || 'this FEL athlete';
+  // SAFETY (SAF-03, 2026-10-25): the words OF THIS REQUEST's wording version, so the guardian reads exactly what the
+  // gates judge the yes by (no version recorded, or the column not there yet: today's live words, as before).
+  const version = (await readWordingVersions(prisma as unknown as RawDb, [consent.id])).get(consent.id) ?? null;
+  const ask = askFor(menteeName, coversForVersion(version));
+  // SAFETY (SAF-01): a confirmed request carries the guardian's withdraw link (null when links are off)
+  const withdraw = consent.acceptedAt && !consent.revokedAt ? withdrawHref(consent.id) : null;
 
   // Only a pending PLAYER request needs to know who is looking; a camp link and a finished request read as before.
   let step: PlayerAcceptStep | null = null;
@@ -68,16 +76,21 @@ export default async function GuardianAcceptPage({ params }: { params: { token: 
           <p className="mt-3 max-w-sm text-sm text-white/55">
             You (or someone with this link) already said yes, on {new Date(consent.acceptedAt).toLocaleDateString()}. Nothing else to do.
           </p>
+          {withdraw && (
+            <Link href={withdraw} className="mt-5 text-sm font-semibold text-white/60 underline underline-offset-4 hover:text-white">
+              Changed your mind? Withdraw this OK
+            </Link>
+          )}
         </>
       ) : step ? (
-        <PlayerRequest step={step} token={token} menteeName={menteeName} />
+        <PlayerRequest step={step} token={token} menteeName={menteeName} ask={ask} />
       ) : (
         <>
           <h1 className="fel-heading mt-3 text-3xl font-bold text-white">
             {menteeName} <span className="text-white/50">wants your OK</span>
           </h1>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/60">
-            {guardianConsentAsk(menteeName)} That&apos;s all this does — it doesn&apos;t create an account for you, and
+            {ask} That&apos;s all this does — it doesn&apos;t create an account for you, and
             FEL never contacts you about anything else.
           </p>
           <AcceptButton token={token} />

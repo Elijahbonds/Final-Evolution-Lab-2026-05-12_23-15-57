@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { GuardianConsentGate } from '@/app/play/mirror/_components/guardian-consent-gate';
+import { prisma } from '@/lib/db';
+import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
+import { reaskState, type ReaskScope } from '@/lib/consent/wording';
+import { ReaskPanel } from './_components/reask-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +30,7 @@ export const dynamic = 'force-dynamic';
 export default async function GuardianConsentPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/consent/guardian'));
+  const reask = await reaskScopes((session.user as { id?: string } | undefined)?.id ?? null);
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
@@ -41,6 +46,7 @@ export default async function GuardianConsentPage() {
               Pain check-ins and the daily check-in save only for players who are 18 or over, so under 18 they stay off, with or
               without a guardian&apos;s OK. The Mirror runs on your device either way; under 18 it keeps nothing.
             </p>
+            <ReaskPanel scopes={reask} />
             <div className="mt-4 space-y-2.5">
               <Link href="/play/mirror" className="block w-full rounded-xl bg-[#00E5FF] py-3 text-[15px] font-bold text-black">
                 Go to the Mirror
@@ -54,4 +60,21 @@ export default async function GuardianConsentPage() {
       </GuardianConsentGate>
     </div>
   );
+}
+
+/**
+ * SAFETY lane (SAF-02, 2026-10-25): the scopes a TEEN may re-ask their guardian for — live (its date set), covered by
+ * nothing on file, and a guardian already said yes to something (lib/consent/wording.ts reaskState). Both dates are null
+ * today, so this is always empty and the page reads exactly as before. A read that fails shows nothing extra.
+ */
+async function reaskScopes(userId: string | null): Promise<ReaskScope[]> {
+  if (!userId) return [];
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } });
+    if (ageScreenOutcome(user?.dobYear ?? null) !== 'teen') return [];
+    const consents = await prisma.guardianConsent.findMany({ where: { menteeId: userId }, select: { id: true, requestedAt: true, acceptedAt: true, revokedAt: true } });
+    return (['coach_training', 'squads'] as const).filter((s) => reaskState(s, consents).state === 'reask');
+  } catch {
+    return [];
+  }
 }

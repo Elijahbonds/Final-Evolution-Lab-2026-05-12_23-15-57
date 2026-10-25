@@ -12,6 +12,7 @@
 // proxy is the coach loop's (lib/coach/coachConsent.ts) and holds only if the words and the date ship together.
 
 import { guardianStatus } from '@/lib/consent/guardianGate';
+import { consentCovers } from '@/lib/consent/wordingVersions';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import { teenGate, teenGateBody, type TeenGateConsent, type TeenGateRefusal } from '@/lib/coach/teenGate';
 import type { GroupKind } from './types';
@@ -33,7 +34,8 @@ function latest(consents: readonly TeenGateConsent[]) {
 export function squadsConsented(consents: readonly TeenGateConsent[], since: Date | null = SQUADS_CONSENT_SINCE): boolean {
   if (since == null || guardianStatus(consents) !== 'accepted') return false;
   const l = latest(consents);
-  return !!l && l.requestedAt.getTime() >= since.getTime();
+  // SAFETY (SAF-03): a recorded wordingVersion decides; a row without one falls back to the request date, as before
+  return !!l && consentCovers(l, 'squads', since);
 }
 
 /** May this account join (or start) a group of this kind right now? */
