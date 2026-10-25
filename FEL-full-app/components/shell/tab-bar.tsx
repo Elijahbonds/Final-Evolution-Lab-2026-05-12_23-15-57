@@ -17,6 +17,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Dumbbell, Gamepad2, UserRound } from 'lucide-react';
+import { PALETTE } from '@/lib/design/palette';
+import { COLOR } from '@/lib/design/tokens';
+import { t } from '@/lib/i18n';
 
 export interface TabDef {
   id: 'play' | 'train' | 'profile';
@@ -30,15 +33,15 @@ export interface TabDef {
 
 export const TABS: TabDef[] = [
   {
-    id: 'play', label: 'Play', href: '/play', icon: Gamepad2, accent: '#00E5FF',
+    id: 'play', label: t('shell.tabs.play'), href: '/play', icon: Gamepad2, accent: PALETTE.cyan,
     owns: ['/play', '/modes', '/arena', '/multiplayer', '/ladder', '/story', '/try', '/venues', '/host', '/join', '/party'],
   },
   {
-    id: 'train', label: 'Train', href: '/train', icon: Dumbbell, accent: '#00FF9D',
+    id: 'train', label: t('shell.tabs.train'), href: '/train', icon: Dumbbell, accent: PALETTE.emerald,
     owns: ['/train', '/training', '/coach', '/kitchens', '/workout', '/education', '/camp', '/live', '/learn'],
   },
   {
-    id: 'profile', label: 'Profile', href: '/profile', icon: UserRound, accent: '#FFD700',
+    id: 'profile', label: t('shell.tabs.profile'), href: '/profile', icon: UserRound, accent: PALETTE.gold,
     owns: [
       '/profile', '/cards', '/card', '/closet', '/wallet', '/store', '/shop', '/market', '/creator', '/sessions',
       '/account', '/settings', '/create', '/guidance', '/signature', '/support', '/press', '/team',
@@ -96,7 +99,7 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
                  pb-[max(0.625rem,env(safe-area-inset-bottom))] transition-colors`
               : 'group relative flex items-center gap-2 rounded-xl px-3.5 py-1.5 transition-colors'
           }
-          style={{ color: on ? t.accent : 'rgba(255,255,255,0.45)' }}
+          style={{ color: on ? t.accent : COLOR.textDim }}
         >
           {/* the lit tab carries its own colour as a soft wash rather than a hard pill */}
           {on && (
@@ -121,7 +124,7 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
 
   if (variant === 'inline') {
     return (
-      <nav aria-label="Main">
+      <nav aria-label={t('shell.nav.main')}>
         <ul className="flex items-center gap-1">{items}</ul>
       </nav>
     );
@@ -132,9 +135,9 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
     // PHONE-FIRST-SCREEN (owner's pick, 2026-10-17): the bar's glass also carries the soundtrack strip. SoundtrackDock
     // fills [data-tabbar-strip] with the Now Playing chip while a song plays, so the chip is chrome the page scrolls
     // under, like the tabs, and never a pill floating on a card. Empty, the strip has no height.
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#050505]/90 backdrop-blur-xl md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-fel-bg/90 backdrop-blur-xl md:hidden">
       <div data-tabbar-strip />
-      <nav aria-label="Main">
+      <nav aria-label={t('shell.nav.main')}>
         <ul className="mx-auto flex max-w-md items-stretch justify-around">{items}</ul>
       </nav>
     </div>

@@ -1,4 +1,6 @@
 import type { Config } from 'tailwindcss';
+// A11-06 (2026-10-25): the design tokens' colours as `fel-*` classes (text-fel-dim, bg-fel-bg, border-fel-cyan/45).
+import { TAILWIND_FEL } from './lib/design/tokens';
 
 const config: Config = {
   darkMode: ['class'],
@@ -39,6 +41,7 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        fel: TAILWIND_FEL,
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {
