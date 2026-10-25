@@ -42,7 +42,7 @@ describe('the session card', () => {
 
 describe('the slow-mo reader', () => {
   it('opens from one button; the file is read on the phone and the steps say so', () => {
-    expect(renderToStaticMarkup(createElement(SlowMoUpload, {}))).toContain('Lab-grade: read a slow-motion video');
+    expect(renderToStaticMarkup(createElement(SlowMoUpload, {}))).toContain('Read a slow-motion video');
     const src = readFileSync(join(__dirname, '../../components/jump/slowmo-upload.tsx'), 'utf8');
     expect(src).toContain('never uploaded');
     expect(src).not.toMatch(/fetch\(|sendBeacon|XMLHttpRequest/);

@@ -40,6 +40,7 @@ export const BLOCK_WORDS: Record<VerifyBlock, string> = {
   framesOnly: 'it could only be timed from whole frames',
   trustLow: 'the camera could not see clearly enough',
   notBest: 'not your best jump',
+  manual: 'its take-off and landing frames were picked by hand',
 };
 
 export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5: T5Extra | null; trustLevel?: TrustLevelHook | null; source?: 'live' | 'slowmo' }) {

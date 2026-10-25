@@ -59,8 +59,43 @@ function handsOnHips(j: Joints): Joints {
   return k;
 }
 
-/** A posture: squat depth (0 standing … 1 hips at knee level) and plantarflexion (deg, heels up about the toes). */
-export interface Posture { d: number; toeDeg: number }
+/**
+ * A posture: squat depth (0 standing … 1 hips at knee level) and plantarflexion (deg, heels up about the toes).
+ * JUMP-TESTS (2026-10-25), both optional, both absent = the hands-on-hips, two-foot posture every older take uses:
+ *   armDeg   the arms free instead of on the hips: 0 hanging, 90 forward, 180 overhead, negative swung back
+ *   freeLeg  one leg held up off the floor (single-leg jumps); `lift` 0 → 1 blends it from standing to held
+ */
+export interface Posture { d: number; toeDeg: number; armDeg?: number; freeLeg?: { side: 'Left' | 'Right'; lift: number } }
+
+/** Arms free at `deg` (see Posture.armDeg), straight, a little out from the body. */
+function armsAt(j: Joints, deg: number): Joints {
+  const k = { ...j };
+  const a = rad(deg);
+  for (const s of ['Left', 'Right'] as const) {
+    const f = s === 'Left' ? 1 : -1;
+    const sh = k[`${s}Arm`], dir: V3 = [0.12 * f, -Math.cos(a), Math.sin(a)];
+    const n = Math.hypot(dir[0], dir[1], dir[2]);
+    const u: V3 = [dir[0] / n, dir[1] / n, dir[2] / n];
+    k[`${s}ForeArm`] = add(sh, mul(u, 0.28));
+    k[`${s}Hand`] = add(sh, mul(u, 0.53));
+  }
+  return k;
+}
+
+/** One leg held up: the thigh 20° forward, the knee bent to 90°, the foot behind and off the floor (blended by lift). */
+function liftLeg(j: Joints, side: 'Left' | 'Right', lift: number): Joints {
+  if (lift <= 0) return j;
+  const k = { ...j };
+  const hip = k[`${side}UpLeg`], a = rad(20 * lift), b = rad(70 * lift);
+  const knee = add(hip, [0, -0.43 * Math.cos(a), 0.43 * Math.sin(a)]);
+  const ankle = add(knee, [0, -0.44 * Math.cos(b), -0.44 * Math.sin(b)]);
+  const blend = (from: V3, to: V3): V3 => add(from, mul(sub(to, from), Math.min(1, lift)));
+  const toe = add(ankle, [0, -0.05, 0.1 - 0.16 * Math.min(1, lift)]);
+  k[`${side}Leg`] = blend(k[`${side}Leg`], knee);
+  k[`${side}Foot`] = blend(k[`${side}Foot`], ankle);
+  k[`${side}Toe`] = blend(k[`${side}Toe`], toe);
+  return k;
+}
 
 const FOOT_POINTS = [27, 28, 29, 30, 31, 32];
 
@@ -69,13 +104,14 @@ const FOOT_POINTS = [27, 28, 29, 30, 31, 32];
  * carries everything above the ankle with it, so a body on its toes stands taller.
  */
 export function posed(p: Posture): Joints {
-  let j = handsOnHips(squatPose(Math.max(0, p.d)));
+  let j = p.armDeg === undefined ? handsOnHips(squatPose(Math.max(0, p.d))) : armsAt(squatPose(Math.max(0, p.d)), p.armDeg);
   if (p.toeDeg) {
     const a = rad(p.toeDeg);
     const lf = rotX(j.LeftFoot, j.LeftToe, a), rf = rotX(j.RightFoot, j.RightToe, a);
     const lift = midV(sub(lf, j.LeftFoot), sub(rf, j.RightFoot));
     j = mapJ(j, (v, k) => (k === 'LeftToe' || k === 'RightToe' ? v : k === 'LeftFoot' ? lf : k === 'RightFoot' ? rf : add(v, lift)));
   }
+  if (p.freeLeg) j = liftLeg(j, p.freeLeg.side, p.freeLeg.lift);
   const pts = bodyPoints(j);
   const low = Math.min(...FOOT_POINTS.map((i) => pts[i][1]));
   return mapJ(j, (v) => [v[0], v[1] - low, v[2]]);
@@ -110,6 +146,21 @@ export interface TrialSpec {
    */
   reboundMs?: number;
   reboundDip?: number;
+  /**
+   * JUMP-TESTS (2026-10-25): a SQUAT JUMP. Down to the dip slowly, held still this long (ms), then the drive with no
+   * countermovement. Absent = the countermovement jump every older take uses.
+   */
+  squatHoldMs?: number;
+  /** With squatHoldMs: a cheat — after the hold, a quick extra dip this deep (squat depth) before the drive. */
+  preDip?: number;
+}
+
+/** JUMP-TESTS (2026-10-25): a take's style, every trial in it. Absent = hands on hips, both feet (every older take). */
+export interface TakeStyle {
+  /** Arms swing: back in the dip, up through the drive, down through the flight. */
+  armSwing?: boolean;
+  /** One-leg take: after the stand on both feet, this leg's FOOT is lifted and held up (the athlete jumps off the other). */
+  liftLeg?: 'Left' | 'Right';
 }
 
 export interface TrialTruth {
@@ -139,13 +190,29 @@ export type Beat = { trial: TrialSpec } | { decoy: Decoy } | { rest: number };
 interface Segment { from: number; to: number; at: (t: number) => Joints }
 
 /** Build the 1 kHz clip and its truth. Time 0 is the start of the take. */
-export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): { clip: JointClip; truth: TrialTruth[]; decoys: number } {
+export function buildTake(beats: readonly Beat[], o: { leadS?: number; style?: TakeStyle } = {}): { clip: JointClip; truth: TrialTruth[]; decoys: number } {
   const segs: Segment[] = [];
   const truth: TrialTruth[] = [];
   let t = 0, decoys = 0;
-  const stand = posed({ d: 0, toeDeg: 0 });
+  const style = o.style ?? {};
+  // JUMP-TESTS: the style's posture over a plain one (arms hanging when free; the lifted leg once it is lifted)
+  let lifted = 0;
+  const S = (p: Posture): Posture => ({
+    ...(style.armSwing ? { armDeg: 0 } : {}), ...p,
+    ...(style.liftLeg && lifted > 0 ? { freeLeg: { side: style.liftLeg, lift: lifted } } : {}),
+  });
+  let stand = posed(S({ d: 0, toeDeg: 0 }));
   const still = (dur: number, j: Joints = stand) => { segs.push({ from: t, to: t + dur, at: () => j }); t += dur; };
   still(o.leadS ?? 1.4);
+  if (style.liftLeg) {
+    // the stand on both feet (the calibration), then the free foot lifted over 0.4 s and held
+    const t0 = t, side = style.liftLeg, base = S({ d: 0, toeDeg: 0 });
+    segs.push({ from: t0, to: t0 + 0.4, at: (x) => posed({ ...base, freeLeg: { side, lift: ease((x - t0) / 0.4) } }) });
+    t += 0.4;
+    lifted = 1;
+    stand = posed(S({ d: 0, toeDeg: 0 }));
+    still(0.6);
+  }
   let zOff = 0;
   /** The last trial rebounded: the next one takes off from the contact (no stand, no dip). */
   let chained: { contactMs: number } | null = null;
@@ -181,28 +248,37 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
     const dip = s.dip ?? 0.55, toeOff = s.toeOffDeg ?? 25, lagDeg = s.toeLagDeg ?? 15, lagS = (s.toeLagMs ?? 60) / 1000;
     const tuck = s.tuck ?? 0, landKnee = s.landKnee ?? 0, landToe = s.landToeDeg ?? toeOff, absorb = s.absorb ?? 0.5;
     const z = zOff;
-    const at = (p: Posture, dy = 0) => mapJ(posed(p), (v) => [v[0], v[1] + dy, v[2] + z]);
+    const at = (p: Posture, dy = 0) => mapJ(posed(S(p)), (v) => [v[0], v[1] + dy, v[2] + z]);
     const contactMs = chained?.contactMs;
     chained = null;
+    // JUMP-TESTS: the arms' swing (deg; undefined = hands on hips): back in the dip, up through the drive, down in the air
+    const swing = !!style.armSwing;
+    const ARM_BACK = -45, ARM_TOP = 170, ARM_LAND = 40;
     // the dip and the drive (the heels rise through the last 60 % of the drive) — unless it rebounds out of a contact
-    const t0 = t, down = 0.35, hold = 0.05, drive = 0.25;
+    // JUMP-TESTS: a squat jump goes down slowly, holds, and drives from the hold (a cheat dips once more first)
+    const sj = s.squatHoldMs !== undefined;
+    const pre = sj ? Math.max(0, s.preDip ?? 0) : 0;
+    const down = sj ? 0.7 : 0.35, hold = sj ? s.squatHoldMs! / 1000 : 0.05, dipDown = pre > 0 ? 0.18 : 0, drive = 0.25;
+    const t0 = t, deep = dip + pre;
+    const armOf = (x: number | undefined) => (swing ? x : undefined);
     if (contactMs === undefined) segs.push({
-      from: t0, to: t0 + down + hold + drive,
+      from: t0, to: t0 + down + hold + dipDown + drive,
       at: (x) => {
         const u = x - t0;
-        if (u < down) return at({ d: dip * ease(u / down), toeDeg: 0 });
-        if (u < down + hold) return at({ d: dip, toeDeg: 0 });
-        const w = (u - down - hold) / drive;
-        return at({ d: dip * (1 - ease(w)), toeDeg: toeOff * ease((w - 0.4) / 0.6) });
+        if (u < down) return at({ d: dip * ease(u / down), toeDeg: 0, armDeg: armOf(ARM_BACK * ease(u / down)) });
+        if (u < down + hold) return at({ d: dip, toeDeg: 0, armDeg: armOf(ARM_BACK) });
+        if (u < down + hold + dipDown) return at({ d: dip + pre * Math.sin((Math.PI / 2) * ((u - down - hold) / dipDown)), toeDeg: 0, armDeg: armOf(ARM_BACK) });
+        const w = (u - down - hold - dipDown) / drive;
+        return at({ d: deep * (1 - ease(w)), toeDeg: toeOff * ease((w - 0.4) / 0.6), armDeg: armOf(ARM_BACK + (ARM_TOP - ARM_BACK) * ease(w)) });
       },
     });
-    if (contactMs === undefined) t += down + hold + drive;
+    if (contactMs === undefined) t += down + hold + dipDown + drive;
     // the flight
     const v0 = Math.sqrt(2 * G * s.heightM), Tn = (2 * v0) / G, tTO = t;
     const pose = (tau: number): Posture => {
       const sN = clamp01(tau / Tn), late = ease((sN - 0.5) / 0.5);
       const toeAir = toeOff + lagDeg * clamp01(tau / lagS);
-      return { d: tuck * Math.sin(Math.PI * sN) + landKnee * late, toeDeg: lerp(toeAir, landToe, late) };
+      return { d: tuck * Math.sin(Math.PI * sN) + landKnee * late, toeDeg: lerp(toeAir, landToe, late), ...(swing ? { armDeg: lerp(ARM_TOP, ARM_LAND, ease(sN)) } : {}) };
     };
     const hip0 = hipOf({ d: 0, toeDeg: toeOff });
     const hipAt = (tau: number) => hip0 + v0 * tau - (G * tau * tau) / 2;
@@ -229,7 +305,7 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
         from: tC, to: tC + c,
         at: (x) => {
           const u = (x - tC) / c;
-          return at({ d: lerp(pTD.d, 0, u) + rd * Math.sin(Math.PI * u), toeDeg: lerp(pTD.toeDeg, toeOff, u) - 12 * Math.sin(Math.PI * u) });
+          return at({ d: lerp(pTD.d, 0, u) + rd * Math.sin(Math.PI * u), toeDeg: lerp(pTD.toeDeg, toeOff, u) - 12 * Math.sin(Math.PI * u), ...(swing ? { armDeg: lerp(ARM_LAND, ARM_TOP, ease(u)) } : {}) });
         },
       });
       t += c;
@@ -242,11 +318,12 @@ export function buildTake(beats: readonly Beat[], o: { leadS?: number } = {}): {
       from: tL, to: tL + heels + sink + up + rest,
       at: (x) => {
         const u = x - tL;
-        if (u < heels) { const w = ease(u / heels); return at({ d: lerp(pTD.d, Math.max(pTD.d, absorb * 0.3), w), toeDeg: lerp(pTD.toeDeg, 0, w) }); }
+        const arm = (w: number) => (swing ? { armDeg: lerp(ARM_LAND, 0, clamp01(w)) } : {});
+        if (u < heels) { const w = ease(u / heels); return at({ d: lerp(pTD.d, Math.max(pTD.d, absorb * 0.3), w), toeDeg: lerp(pTD.toeDeg, 0, w), ...arm(0) }); }
         const d1 = Math.max(pTD.d, absorb * 0.3);
-        if (u < heels + sink) return at({ d: lerp(d1, absorb, ease((u - heels) / sink)), toeDeg: 0 });
-        if (u < heels + sink + up) return at({ d: absorb * (1 - ease((u - heels - sink) / up)), toeDeg: 0 });
-        return at({ d: 0, toeDeg: 0 });
+        if (u < heels + sink) return at({ d: lerp(d1, absorb, ease((u - heels) / sink)), toeDeg: 0, ...arm((u - heels) / (sink + up)) });
+        if (u < heels + sink + up) return at({ d: absorb * (1 - ease((u - heels - sink) / up)), toeDeg: 0, ...arm((u - heels) / (sink + up)) });
+        return at({ d: 0, toeDeg: 0, ...arm(1) });
       },
     });
     t += heels + sink + up + rest;
