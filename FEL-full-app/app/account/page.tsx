@@ -9,6 +9,7 @@ import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PrqDataRights, HealthDataSection } from '@/components/profile-view';
+import { DeleteAccount } from '@/components/account/delete-account';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +33,8 @@ export default async function AccountPage() {
       {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
       <div className="mt-8"><MotionSetting /></div>
       <p className="mt-4 text-sm"><Link href="/account/coaching">Coaching</Link></p>
+      {/* ACCOUNT-DELETE (owner, 2026-10-25): delete the account, with a confirm step */}
+      <DeleteAccount />
     </TabPage>
   );
 }
