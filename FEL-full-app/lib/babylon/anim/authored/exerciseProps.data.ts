@@ -12,5 +12,6 @@ export const PROPPED_LOOPS = {
   // exerciseVariants.ts
   ex_calf_raise_step: 'calfstep', ex_calf_raise_step_sl: 'calfstep', ex_calf_raise_bent_step: 'calfstep', ex_calf_raise_bent_step_sl: 'calfstep',
   ex_wall_sit: 'wallback', ex_wall_sit_sl: 'wallback', ex_seated_row: 'rowseat', ex_seated_row_one: 'rowseat',
+  ex_seated_reverse_fly: 'seat', ex_seated_reverse_fly_one: 'seat', ex_seated_kickback: 'seat', ex_seated_kickback_one: 'seat', ex_pullover: 'bench', ex_pullover_bent: 'bench',
   ex_decline_press: 'decline', ex_decline_fly: 'decline', ex_decline_fly_one: 'decline', ex_decline_skull: 'decline', ex_decline_skull_one: 'decline',
 } as const satisfies Record<string, string>;

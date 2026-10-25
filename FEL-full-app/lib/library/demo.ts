@@ -370,6 +370,13 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_decline_skull', families: ['triceps'], bases: /^(declin-tricep-extension|declin-ez-bar-tricep-extension)$/ },
   { clip: 'ex_spiderman_pushup', families: ['push-extra'], bases: /^spiderman$/ },
   { clip: 'ex_archer_pushup', families: ['push-up'], bases: /^archer$/ },
+  { clip: 'ex_seated_reverse_fly', families: ['raise'], bases: /^seat-bent-over-rear-shoulder-rais$/ },
+  { clip: 'ex_seated_kickback', families: ['triceps'], bases: /^seat-bent-over-two-arm-tricep-extension$/ },
+  { clip: 'ex_seated_kickback_one', families: ['triceps'], bases: /^seat-bent-over-singl-arm-tricep-extension$/ },
+  // assumption: a straight-arm dumbbell pullover is shown lying along the bench (some lie across it: the same arc)
+  { clip: 'ex_pullover', families: ['fly'], bases: /^straight-arm-pullover$/ },
+  { clip: 'ex_pullover', families: ['db-upper'], bases: /^pullover$/ },
+  { clip: 'ex_pullover_bent', families: ['fly'], bases: /^bent-arm-pullover$/ },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -498,6 +505,7 @@ export const ISO_HOLD_SEC: Readonly<Record<string, number>> = {
   ex_concentration_curl: 0.63, ex_preacher_curl: 0.37, ex_spider_curl: 0.4, ex_front_raise_overhead: 1.48, ex_hand_release: 1.09,
   ex_lateral_lunge: 1.14, ex_curtsy_lunge: 1.06, ex_pos_cossack: 0.4, ex_sl_rdl: 1.35, ex_kickstand_rdl: 1.2, ex_pistol: 1.37, ex_pistol_goblet: 1.37,
   ex_skater_squat: 1.26, ex_bridge_sl: 1.02, ex_bulgarian_bar: 1.14, ex_straight_arm_pulldown: 0.96, ex_pulldown_close: 0.96,
+  ex_seated_reverse_fly: 0.95, ex_seated_reverse_fly_one: 0.95, ex_seated_kickback: 0.75, ex_seated_kickback_one: 0.75,
   ex_decline_press: 1.1, ex_decline_skull: 1.0, ex_decline_skull_one: 1.0, ex_spiderman_pushup: 1.0, ex_archer_pushup: 1.0,
   ex_high_curl: 0.4, ex_high_curl_one: 0.4, ex_z_press: 0.38, ex_z_press_one: 0.38, ex_seated_row: 0.99, ex_seated_row_one: 0.99,
 };
@@ -522,6 +530,7 @@ export const MODIFIER_LOOPS: Readonly<Record<string, Readonly<Record<string, str
     ex_seated_triceps: 'ex_seated_triceps_one', ex_skull_crusher: 'ex_skull_crusher_one', ex_fly: 'ex_fly_one', ex_incline_press: 'ex_incline_press_one',
     ex_incline_fly: 'ex_incline_fly_one', ex_kickback: 'ex_kickback_one', ex_press_hk: 'ex_press_hk_one', ex_preacher_curl: 'ex_preacher_curl_one', ex_pulldown: 'ex_pulldown_one',
     ex_high_curl: 'ex_high_curl_one', ex_z_press: 'ex_z_press_one', ex_seated_row: 'ex_seated_row_one', ex_decline_fly: 'ex_decline_fly_one', ex_decline_skull: 'ex_decline_skull_one',
+    ex_seated_reverse_fly: 'ex_seated_reverse_fly_one', ex_seated_kickback: 'ex_seated_kickback_one',
   },
   alternating: {
     ex_curl: 'ex_curl_alt', ex_press: 'ex_press_alt', ex_lateral_raise: 'ex_lateral_raise_alt', ex_front_raise: 'ex_front_raise_alt', ex_row: 'ex_row_alt',

@@ -6,8 +6,8 @@
 // Owner decision (2026-10-25): raise coverage only with correct, authored loops — never a near-miss. Each loop here is
 // the movement its entries name; a prop it leans on or sits on is drawn (demo.ts PROP_SHAPES, by exerciseProps.data.ts).
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
-import { ANKLE, TOE_ANKLE, STAND, HANG, HANG_POLES, RACK, OVERHEAD, ELBOWS_BACK, both, bothDir, loop, mix, rep, type Deg3, type ExKey, type Pair, type V3 } from './exerciseKit';
-import { alternating, oneArm } from './exerciseMore';
+import { ANKLE, TOE_ANKLE, STAND, HANG, HANG_POLES, RACK, OVERHEAD, ELBOWS_BACK, SEAT_Y, both, bothDir, lie, loop, mix, rep, type Deg3, type ExKey, type Pair, type V3 } from './exerciseKit';
+import { MORE_UPPER, alternating, oneArm } from './exerciseMore';
 import { run, at } from './exerciseBody';
 
 type Pose = Omit<ExKey, 't'>;
@@ -177,6 +177,28 @@ function archerPushup(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return chain(scene, sk, 'ex_archer_pushup', 4.2, [[top, 0, true], [low('Right'), 0.9, true], [low('Right'), 1.1, true], [top, 1.9, true], [top, 2.1, true], [low('Left'), 3.0, true], [low('Left'), 3.2, true]]);
 }
 
+// ── seated, bent over ────────────────────────────────────────────────────────────────────────────────────────────────
+/** On the end of a bench, the chest down over the thighs, the knees close so the arms hang outside them: the bent-over
+ *  rear-delt raise and the kickback (exerciseMore.ts MORE_UPPER: the same arms, the same timing) done seated. */
+const SEATED_OVER = { bones: { Hips: [52, 0, 0] as Deg3, Spine: [8, 0, 0] as Deg3, Neck: [-30, 0, 0] as Deg3 }, feet: both(0.09, ANKLE, 0.44), kneePoles: bothDir(0, 0.3, 1), hipsY: SEAT_Y };
+const seatedOver = (p: { a: Pose; b: Pose; t: [number, number, number, number] }) => ({ a: { ...p.a, ...SEATED_OVER }, b: { ...p.b, ...SEATED_OVER }, t: p.t });
+// the hands hang a little wider than standing, clear of the shins and the outsides of the thighs
+const wide = (r: Pair | undefined, dx: number): Pair => ({ Left: [(r?.Left?.[0] ?? 0) - dx, r?.Left?.[1] ?? 0, r?.Left?.[2] ?? 0], Right: [(r?.Right?.[0] ?? 0) + dx, r?.Right?.[1] ?? 0, r?.Right?.[2] ?? 0] });
+const SEATED_REVERSE_FLY = (() => { const p = seatedOver(MORE_UPPER.reverseFly); return { ...p, a: { ...p.a, rel: wide(p.a.rel, 0.10) } }; })();
+const SEATED_KICKBACK = (() => { const p = seatedOver(MORE_UPPER.kickback); return { ...p, a: { ...p.a, rel: wide(p.a.rel, 0.06) }, b: { ...p.b, rel: wide(p.b.rel, 0.06) } }; })();
+
+// ── the pullover ─────────────────────────────────────────────────────────────────────────────────────────────────────
+/** ex_pullover — lying along the bench, the arms long over the chest: they arc back past the head to level with the
+ *  bench and pull back over (straight-arm pullover; the arc is keyed half-way so the elbows stay long). `bent`: the
+ *  elbows held bent, the weight passing over the face to behind the head (bent-arm pullover). */
+function pullover(scene: Scene, sk: Skeleton, name: string, bent: boolean): AnimationGroup | null {
+  const P = (rel: Pair, poles: Pair): Pose => lie({ rel, poles });
+  const top = bent ? P({ Left: [0.05, 0.40, -0.18], Right: [-0.05, 0.40, -0.18] }, bothDir(0.1, 0.3, 1)) : P({ Left: [0.04, 0.50, 0.04], Right: [-0.04, 0.50, 0.04] }, bothDir(0.3, 0, 1));
+  const mid = bent ? P({ Left: [0.05, 0.30, -0.36], Right: [-0.05, 0.30, -0.36] }, bothDir(0.1, 1, 0.4)) : P({ Left: [0.04, 0.37, -0.36], Right: [-0.04, 0.37, -0.36] }, bothDir(0.3, 0.7, 0.7));
+  const back = bent ? P({ Left: [0.05, 0.12, -0.44], Right: [-0.05, 0.12, -0.44] }, bothDir(0.1, 1, 0)) : P({ Left: [0.04, 0.08, -0.50], Right: [-0.04, 0.08, -0.50] }, bothDir(0.3, 1, 0));
+  return chain(scene, sk, name, 3.0, [[top, 0, true], [mid, 0.55], [back, 1.1, true], [back, 1.35, true], [mid, 1.95]]);
+}
+
 /** A two-pose rep (exerciseKit rep) over a pair. */
 const pair = (name: string, p: { a: Pose; b: Pose; t: [number, number, number, number] }): [string, Builder] => [name, (scene, sk) => rep(scene, sk, name, p.a, p.b, ...p.t)];
 
@@ -199,4 +221,7 @@ export const VARIANT_BUILDERS: [string, Builder][] = [
   pair('ex_decline_press', DECLINE_PRESS), pair('ex_decline_fly', DECLINE_FLY), pair('ex_decline_fly_one', oneArm(DECLINE_FLY, BENCH_FREE)),
   pair('ex_decline_skull', DECLINE_SKULL), pair('ex_decline_skull_one', oneArm(DECLINE_SKULL, BENCH_FREE)),
   ['ex_spiderman_pushup', spidermanPushup], ['ex_archer_pushup', archerPushup],
+  pair('ex_seated_reverse_fly', SEATED_REVERSE_FLY), pair('ex_seated_reverse_fly_one', oneArm(SEATED_REVERSE_FLY)),
+  pair('ex_seated_kickback', SEATED_KICKBACK), pair('ex_seated_kickback_one', oneArm(SEATED_KICKBACK, undefined, 'Left')),
+  ['ex_pullover', (scene, sk) => pullover(scene, sk, 'ex_pullover', false)], ['ex_pullover_bent', (scene, sk) => pullover(scene, sk, 'ex_pullover_bent', true)],
 ];
