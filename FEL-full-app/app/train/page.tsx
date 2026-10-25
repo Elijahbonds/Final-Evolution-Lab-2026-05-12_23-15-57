@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -17,6 +17,9 @@ import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
 // PROGRESS CARD (value round item 1): the weekly door to /profile/week; reads nothing
 import { WeekCardEntry } from '@/components/progress-card/week-entry';
+// SIGNATURE-PROGRAMS (2026-10-25): FEL's four signature programs. The card is the same for everyone (this page reads no
+// age to draw its cards — tests/drills, tests/mirror-first); the athlete's week shows on /train/programs.
+import { TRAIN_LINE_IDLE } from '@/lib/signature/copy';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,6 +89,12 @@ export default async function TrainPage() {
       tag: programCount > 0 || coachLink ? 'Open' : 'How it works',
     },
     {
+      // SIGNATURE-PROGRAMS (2026-10-25): approved programs only (lib/signature/access.ts); the list shows the athlete's week
+      href: '/train/programs', icon: Layers, accent: '#00FF9D', title: 'Signature programs',
+      line: TRAIN_LINE_IDLE,
+      tag: 'Browse',
+    },
+    {
       // EXERCISE-LIBRARY (2026-10-25): the shared library — search it or ask it; approved entries only for athletes
       href: '/train/library', icon: Library, accent: '#00E5FF', title: 'Exercise library',
       line: 'Search every exercise by name, muscle or goal, or ask in plain words. Cues and faults on every one.',
@@ -119,6 +128,17 @@ export default async function TrainPage() {
       href: '/coach', icon: Users, accent: '#A855F7', title: 'Your roster',
       line: 'The athletes you coach, what they have done this fortnight, and who is drifting.',
       tag: 'Coach',
+    }] : []),
+    // COMBINE-DAY (2026-10-25): a coach's tryout / testing day; a coached athlete's own combine numbers
+    ...(coachesAnyone ? [{
+      href: '/coach/combine', icon: Timer, accent: '#00E5FF', title: 'Combine day',
+      line: 'Run a tryout: jump, agility, sprint and a skill drill, station by station, then a ranked report.',
+      tag: 'Run a combine',
+    }] : []),
+    ...(coachLink ? [{
+      href: '/train/combine', icon: Timer, accent: '#00E5FF', title: 'Your combines',
+      line: 'Your numbers from your coach’s combines, and where you placed.',
+      tag: 'See results',
     }] : []),
     {
       href: '/profile', icon: Activity, accent: '#7B61FF', title: 'Where you stand',
