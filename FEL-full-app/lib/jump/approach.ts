@@ -32,7 +32,7 @@ import { th } from '@/lib/assess/thresholds';
 import { poseHz } from '@/lib/assess/scoring';
 import { comOf } from './com';
 import { legPathOf } from './reach';
-import { REFINE, refineFlight, type RefinedFlight } from './refine';
+import { REFINE, refineFlight, type RefinedFlight, type RefineOpts } from './refine';
 import { CI95_Z, sessionStats, trialQuality, type JumpSession, type TrialQuality } from './session';
 
 /** The approach finder's numbers (new, JUMP-PRO 2; measured on lib/jump/approachBench.ts). */
@@ -124,6 +124,17 @@ export function legCalibration(frames: readonly PoseFrame[], aspect: number): Fr
   };
 }
 
+/**
+ * A side-on flight re-timed from several starts (APPROACH.starts half frames around the finder's take-off): the
+ * re-timed take-off depends a little on where the search starts (the toe leaves slowly, so the leg line beside the
+ * edge is shallow), so the median take-off's read is kept. Null when no start re-times it.
+ */
+export function refineFromStarts(raw: readonly PoseFrame[], front: FrontCalibration, to0: number, td0: number, near: { prevLandT?: number; nextTakeoffT?: number }, opts: RefineOpts, hz: number): RefinedFlight | null {
+  const step = 500 / hz;
+  const reads = APPROACH.starts.map((s) => refineFlight(raw, front, to0 + s * step, td0, near, opts)).filter((x): x is RefinedFlight => x !== null).sort((a, b) => a.takeoffT - b.takeoffT);
+  return reads.length ? reads[(reads.length - 1) >> 1] : null;
+}
+
 /** Every approach jump in a side-on clip. `aspect` is the picture's width ÷ height. */
 export function readApproach(raw: readonly PoseFrame[], o: { aspect?: number; poseHz?: number } = {}): ApproachRead {
   const aspect = o.aspect ?? 4 / 3;
@@ -165,9 +176,7 @@ export function readApproach(raw: readonly PoseFrame[], o: { aspect?: number; po
     // the re-timed take-off depends a little on where the search starts (the toe leaves slowly, so the leg line beside
     // the edge is shallow): start it from each half frame around the finder's edge and keep the median take-off's read
     const near = { prevLandT: k > 0 ? fr[cands[k - 1].b].t : undefined, nextTakeoffT: cands[k + 1] ? fr[cands[k + 1].a].t : undefined };
-    const step = 500 / hz;
-    const reads = APPROACH.starts.map((s) => refineFlight(raw, front, to0 + s * step, td0, near, { point: 'com', plantFloor: true, depthCue: 'legs', aspect, shrinkDrop: false, rescale: true })).filter((x): x is RefinedFlight => x !== null).sort((a, b) => a.takeoffT - b.takeoffT);
-    const rf: RefinedFlight | null = reads.length ? reads[(reads.length - 1) >> 1] : null;
+    const rf = refineFromStarts(raw, front, to0, td0, near, { point: 'com', plantFloor: true, depthCue: 'legs', aspect, shrinkDrop: false, rescale: true }, hz);
     const flightMs = rf ? rf.flightMs : td0 - to0;
     const hFlight = ((9.81 * (flightMs / 1000) ** 2) / 8) * 100;
     const heightCm = rf ? rf.heightTovCm : hFlight;

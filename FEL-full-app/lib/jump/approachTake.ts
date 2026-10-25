@@ -147,6 +147,18 @@ function placer(headingDeg: number, origin: V3) {
 }
 const mapJ = (j: Joints, f: (p: V3) => V3): Joints => Object.fromEntries(Object.entries(j).map(([k, p]) => [k, f(p as V3)])) as Joints;
 
+/**
+ * The side-on body's parts, for the other side-on takes (lib/jump/dropTake.ts): one body, so every take's truth and
+ * every camera read share the same segment lengths and foot.
+ */
+export const SIDE_BODY = { footRel, stance, joints, placer, mapJ, swingFoot, relOf, hipOf, reachPitch, P_FLAT, FLAT, LEG_MAX, HIP_DROP, herm, ease, lerp, clamp01, rad } as const;
+export type SideBody = Body;
+export type SideFoot = Foot;
+export type SideArm = Arm;
+/** The take builder's own reach count (0 is right), for the other side-on takes. */
+export const resetOutOfReach = () => { outOfReach = 0; };
+export const outOfReachCount = () => outOfReach;
+
 // ── a take ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface ApproachSpec {

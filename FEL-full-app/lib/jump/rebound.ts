@@ -38,3 +38,13 @@ export function reboundStats(jumps: readonly { index: number; valid: boolean; ta
     best5Rsi: rebounds.length >= BEST_OF ? Math.round((top.reduce((a, r) => a + r.rsi, 0) / top.length) * 100) / 100 : null,
   };
 }
+
+/**
+ * JUMP-PRO 2: RSI with its own ± (a drop jump's, or any one rebound's): h ÷ contact, and its 95 % range from the
+ * height's and the contact's ±1 SD (independent: the height comes from the flight, the contact from two other edges).
+ */
+export function rsiWithRange(heightCm: number, heightSdCm: number, contactMs: number, contactSdMs: number): { rsi: number; plusMinus: number } {
+  const rsi = heightCm / 100 / (contactMs / 1000);
+  const rel = Math.hypot(heightSdCm / Math.max(1e-6, heightCm), contactSdMs / Math.max(1e-6, contactMs));
+  return { rsi: Math.round(rsi * 100) / 100, plusMinus: Math.round(1.96 * rsi * rel * 100) / 100 };
+}
