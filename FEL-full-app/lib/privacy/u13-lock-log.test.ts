@@ -88,7 +88,9 @@ const UA = 'AgeScreenTest/1.0';
 // SAFETY (lane/safety, 2026-10-25) prisma/pending/2026-10-25-guardian-consent-wording.sql (one nullable column) and
 // prisma/pending/2026-10-25-user-reports.sql (UserReport, UserModeration, ModerationAudit, ProblemReport; additive; pending
 // SQL only, schema.prisma untouched) at 0467a4dc, the lane commit carrying both on top of every file above.
-const PARENT = 'e77691575c433468078159a6249664d0f3c51bea';
+// Coach-parity landed first (#456): pinned at the merge of lane/finish-release into lane/safety (1397dc45), the first
+// commit carrying every pending file above.
+const PARENT = '1397dc45cda3d593bbddbd881d7ee4a992751d24';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
