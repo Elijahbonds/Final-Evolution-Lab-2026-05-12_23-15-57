@@ -6,8 +6,9 @@
 // auditHinge, pushupAudit.ts auditPushup) as PURE, BATCH grades — a whole capture in, one reading out (patterns.ts's
 // contract) — where the squat and the lunge read every camera frame (squat-audit.ts, LungeAudit). The batch audits are
 // tested, and their questions are rep-shaped (how far the hips travelled against the knee over the rep; how deep the
-// rep's bottom was), so this does not re-derive them per frame: it counts the rep live, keeps the frames since the last
-// rep ended, and when a rep closes hands exactly those frames to the pattern's own audit. A rep's faults are what the
+// rep's bottom was), so this does not re-derive them per frame: it counts the rep live, keeps the rep's own frames (from
+// its last frame at the top before it armed — MIRROR-FIXES 2026-10-25), and when a rep closes hands exactly those frames
+// to the pattern's own audit. A rep's faults are what the
 // tested audit said about that rep — nothing here grades.
 //
 // THE SHAPE (the squat's, per patterns.ts hingePattern/pushupPattern `reps: { checkReps: 3, workReps: 8 }`):
@@ -93,7 +94,7 @@ export interface SideRepState<F extends string> {
   /** A rep is under way, and for how many camera frames. */
   armed: boolean;
   armedFrames: number;
-  /** The frames since the last rep closed (setup: the setup frames), capped at REP_BUFFER_MAX_FRAMES. */
+  /** The rep under way's frames, from its last frame at the top (setup: the setup frames), capped at REP_BUFFER_MAX_FRAMES. */
   buffer: PoseFrame[];
   /** Wrong-view frames this stage, and whether its one turn line was said. */
   wrongView: number;
@@ -190,6 +191,12 @@ export function stepSideRep<F extends string>(
     if (sig !== null) {
       if (!armed) {
         if (spec.down(sig) && spec.inPosition(f.image, side)) { armed = true; armedFrames = 0; }
+        // MIRROR-FIXES (2026-10-25): a rep is graded on ITS OWN frames — from the last frame at the top before it armed
+        // to the frame it closed. The buffer used to run from the frame the rep before it closed, which handed the end
+        // of a faulty rep (a head still poked, a plank still sagging at the top) to the next rep's grade: measured on
+        // jittered sets (tests/helpers/mirrorJitterSets.ts, 6 seeds), a false flag on the rep after every faulty one,
+        // 12 of 36 flags. Starting at the last top frame: 0 false, every injected fault still caught.
+        else if (spec.up(sig)) buffer = [f];
       } else {
         armedFrames += 1;
         if (spec.up(sig)) {
@@ -198,8 +205,9 @@ export function stepSideRep<F extends string>(
             reps += 1;
             if (stage === 'check') checkReps = [...checkReps, repClosed];
             else workReps = [...workReps, repClosed];
-            buffer = [f];
           }
+          // back at the top: the next rep's frames start here (after a blip of jitter under the line, dropped, too)
+          buffer = [f];
           armed = false; armedFrames = 0;
         }
       }
