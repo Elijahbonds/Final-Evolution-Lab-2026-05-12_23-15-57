@@ -5,7 +5,7 @@
 //                                                baseline), their coaches' readiness rules, and the zone targets their
 //                                                coaches set on their program's exercises
 //   saveSet         POST   /api/vbt/sets         one set's NUMBERS (never a frame) — the route runs the movement-save gate
-//                                                FIRST (canSaveScanNumbers, row 1m); a warm-up set's band is read again
+//                                                FIRST (canSaveScanNumbers, row 1n); a warm-up set's band is read again
 //                                                here, from the saved history, under the coaches' rules
 //   deleteAll       DELETE /api/vbt/sets         every set of the athlete's own
 //   coachBoard      GET    /api/coach/vbt        the coach's roster athletes who share (live roster + live coach_view +

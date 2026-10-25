@@ -87,7 +87,7 @@ plates blur. That is the pilot.
 
 - Under 13 and an unknown age: refused (one line, no camera). 13–17: **technique speed only** — live speed, zones and
   the loss cue; no e1RM / line / load suggestions, no readiness read, no med ball, **nothing kept** (`TEEN_E1RM`,
-  `TEEN_VBT_SAVE`: owner calls). Adults: everything; saved only through `canSaveScanNumbers` (row **1m**).
+  `TEEN_VBT_SAVE`: owner calls). Adults: everything; saved only through `canSaveScanNumbers` (row **1n**).
 - The video never leaves the phone (`tests/vbt/no-picture.scan.test.ts`): the picture is shown only through SelfView,
   the plate's grey copy is never shown or sent, the core sends nothing, the only POST is a kept set's numbers.
 - Tables (pending SQL `prisma/pending/2026-10-26-vbt.sql`, NOT applied): `VbtSet`, `VbtZoneTarget`; before they exist

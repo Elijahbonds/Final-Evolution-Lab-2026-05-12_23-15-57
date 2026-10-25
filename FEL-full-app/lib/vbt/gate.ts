@@ -10,7 +10,7 @@
 //     needs a guardian consent that is not approved yet (lib/coach/coachConsent.ts; COACH_TRAINING_CONSENT_SINCE is null),
 //     and the movement-save gate (lib/privacy/scanSaveGate.ts) is verified-adult-only anyway. TEEN_VBT_SAVE below.
 //   · ADULTS (verified 18+, lib/privacy/verifiedAdult.ts): everything. Saving to the server is the movement-save gate
-//     (canSaveScanNumbers: verified 18+ AND opted in, row 1m of SCAN_SAVE_ROUTES); an adult who has not opted in keeps
+//     (canSaveScanNumbers: verified 18+ AND opted in, row 1n of SCAN_SAVE_ROUTES); an adult who has not opted in keeps
 //     their history on their own phone (lib/vbt/deviceStore.ts).
 //   · A COACH sees a client's sets only on a live roster link AND a live 'coach_view' grant AND the client an adult (the
 //     readiness check's own rule, lib/coach/readiness/gate.ts coachMaySee). A TEAM view shows only members who are

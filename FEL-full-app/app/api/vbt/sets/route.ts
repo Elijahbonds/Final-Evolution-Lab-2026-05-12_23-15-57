@@ -12,7 +12,7 @@ import { athleteContext, deleteAll, saveSet, type VbtDb } from '@/lib/vbt/server
  *   GET     their tier (adult / teen; under 13 and an unknown age are refused), what they may use, whether sets are kept
  *           on the server (the movement-save gate), their saved sets, their coaches' readiness rules and zone targets.
  *   POST    one set's NUMBERS (never a frame or a picture): SCAN-SAVE GATE FIRST (lib/privacy/scanSaveGate.ts
- *           canSaveScanNumbers: verified 18+ AND opted in; row 1m of SCAN_SAVE_ROUTES) — a teen never gets past it.
+ *           canSaveScanNumbers: verified 18+ AND opted in; row 1n of SCAN_SAVE_ROUTES) — a teen never gets past it.
  *   DELETE  every set of the athlete's own. Taking your data back needs no age.
  */
 const db = () => prisma as unknown as VbtDb;

@@ -9,7 +9,7 @@
 --                   counted rep's velocity (or each throw's release speed), and — for a warm-up readiness set — that
 --                   day's band. NUMBERS ONLY: never a frame, a landmark, a picture or a video (the video never leaves the
 --                   phone). Written ONLY for a verified adult who opted in to saving movement numbers (lib/privacy/
---                   scanSaveGate.ts canSaveScanNumbers, row 1m); everyone else keeps sets on their phone, and a 13–17
+--                   scanSaveGate.ts canSaveScanNumbers, row 1n); everyone else keeps sets on their phone, and a 13–17
 --                   athlete's sets are kept nowhere (lib/vbt/gate.ts).
 --   VbtZoneTarget — a coach's velocity zone for one exercise slot of a program (SessionExercise): the zone id
 --                   (lib/vbt/lifts.ts ZONE_IDS) and the velocity-loss stop line in %. Unique per slot.
