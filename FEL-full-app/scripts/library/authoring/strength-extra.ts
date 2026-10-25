@@ -19,13 +19,13 @@ export const STRENGTH_EXTRA: Family[] = [
     ],
     dosage: reps(3, '8-10', 75),
     variants: [
-      { name: 'Kettlebell Sumo Deadlift', v: 'sumo-dl', level: 'beginner', setup: 'Wide stance, toes out, kettlebell on the floor between the feet.', cue: 'Sit the hips down, grip the handle, and push the floor apart to stand.', primary: ['glutes', 'adductors', 'quads'], secondary: ['hamstrings', 'forearms'] },
+      { name: 'Kettlebell Sumo Deadlift', v: 'sumo-dl', level: 'beginner', pattern: 'hinge', setup: 'Wide stance, toes out, kettlebell on the floor between the feet.', cue: 'Sit the hips down, grip the handle, and push the floor apart to stand.', primary: ['glutes', 'adductors', 'quads'], secondary: ['hamstrings', 'forearms'] },
       { name: 'Kettlebell Sumo Squat', v: 'sumo-squat', level: 'beginner', setup: 'Wide stance, toes out, kettlebell hanging by the horns at arm\'s length.', cue: 'Sit straight down between the heels with the bell hanging still.' },
       { name: 'Kettlebell Front-Rack Reverse Lunge', v: 'rack-reverse-lunge', level: 'intermediate', laterality: 'alternating', setup: 'Two kettlebells in the rack on the front of the shoulders.', cue: 'Step back softly and drive the floor down through your front heel to return.' },
-      { name: 'Kettlebell Suitcase Deadlift', v: 'suitcase-dl', level: 'beginner', laterality: 'unilateral', setup: 'One kettlebell on the floor beside one foot.', cue: 'Stand up tall and level, like the other hand held a matching bell.', goals: ['trunk', 'grip'] },
+      { name: 'Kettlebell Suitcase Deadlift', v: 'suitcase-dl', level: 'beginner', pattern: 'hinge', laterality: 'unilateral', setup: 'One kettlebell on the floor beside one foot.', cue: 'Stand up tall and level, like the other hand held a matching bell.', goals: ['trunk', 'grip'] },
       { name: 'Kettlebell Goblet Reverse Lunge', v: 'goblet-reverse-lunge', level: 'beginner', laterality: 'alternating', setup: 'A kettlebell held by the horns at the chest.', cue: 'Step back softly and drive the floor down through your front heel to return.' },
       { name: 'Kettlebell Goblet Lateral Squat', v: 'goblet-lateral-squat', level: 'intermediate', plane: 'frontal', setup: 'Wide stance, a kettlebell held at the chest.', cue: 'Shift and sit over one heel on the floor, the other leg long, then shift across.' },
-      { name: 'Double Kettlebell Swing', v: 'double-swing', level: 'advanced', equipment: ['kettlebell'], setup: 'Two kettlebells a foot in front, stance wide enough for both to pass.', cue: 'Hike the pair back high, then snap the hips through so each bell floats.', youthOk: false, primary: ['glutes', 'hamstrings'], secondary: ['forearms', 'lower-back'] },
+      { name: 'Double Kettlebell Swing', v: 'double-swing', level: 'advanced', pattern: 'hinge', equipment: ['kettlebell'], setup: 'Two kettlebells a foot in front, stance wide enough for both to pass.', cue: 'Hike the pair back high, then snap the hips through so each bell floats.', youthOk: false, primary: ['glutes', 'hamstrings'], secondary: ['forearms', 'lower-back'] },
     ],
   },
   {

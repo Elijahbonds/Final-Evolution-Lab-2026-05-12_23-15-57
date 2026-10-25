@@ -40,6 +40,10 @@ export interface SearchFilters {
   lowLoad?: string[];
   /** When true, `equipment` means "only what I have": the entry's kit must be a subset of it (plus a wall, a mat, a towel). */
   equipmentOnly?: boolean;
+  /** Leave these categories out (the Ask parser's "no jumping"). */
+  notCategory?: string[];
+  /** Leave out entries that need any of this equipment ("without a machine"). */
+  notEquipment?: string[];
   /** Restrict to these ids (the Ask layer's easier/harder relation). */
   ids?: string[];
 }
@@ -53,6 +57,8 @@ export interface SearchOptions {
   limit?: number;
   /** Soft boosts: goals that raise an entry's score without filtering (the Ask parser's goal words). */
   boostGoals?: string[];
+  /** Soft boost for entries whose PRIMARY muscles include these (a muscle filter matches secondary ones too). */
+  boostPrimary?: string[];
   /** Soft boost toward a level (the Ask parser's "easier", "beginner"). */
   preferLevel?: string;
   now?: () => number;
@@ -310,6 +316,8 @@ function passes(index: LibraryIndex, d: number, f: SearchFilters, opts: SearchOp
   if (e.review.status === 'rejected') return false;
   if (opts.youth && !e.youthOk) return false;
   if (f.ids && !f.ids.includes(e.id)) return false;
+  if (f.notCategory?.includes(e.category)) return false;
+  if (f.notEquipment?.length && e.equipment.some((x) => f.notEquipment!.includes(x))) return false;
   for (const k of FACET_KEYS) {
     if (k === skip) continue;
     const want = f[k];
@@ -379,11 +387,13 @@ export function search(index: LibraryIndex, q: string, filters: SearchFilters = 
     if (!passes(index, d, filters, opts)) continue;
     const e = index.docs[d];
     if (boost.size) score[d] += e.goals.filter((g) => boost.has(g)).length * 0.8;
+    // the first primary muscle is what the entry is FOR; the others it trains too
+    if (opts.boostPrimary?.length) score[d] += e.primaryMuscles.reduce((s, m, i) => s + (opts.boostPrimary!.includes(m) ? (i === 0 ? 1.5 : 0.6) : 0), 0);
     if (prefer !== null) score[d] -= Math.abs(levelRank(e.level) - prefer) * 0.5;
     matched.push(d);
   }
   const textless = !groups.length;
-  matched.sort((a, b) => (textless && !boost.size && prefer === null
+  matched.sort((a, b) => (textless && !boost.size && prefer === null && !opts.boostPrimary?.length
     ? levelRank(index.docs[a].level) - levelRank(index.docs[b].level) || index.docs[a].name.localeCompare(index.docs[b].name)
     : score[b] - score[a] || index.docs[a].name.length - index.docs[b].name.length || index.docs[a].id.localeCompare(index.docs[b].id)));
 
