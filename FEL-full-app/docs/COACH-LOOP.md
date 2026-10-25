@@ -105,6 +105,11 @@ day (in-memory per server instance).
 
 ## 3. Named groups (owner, 2026-10-23: yes — for a schema lane)
 
+> **Built on by lane/teams-squads (2026-10-25):** these two models became one shared core for teams and squads —
+> `TrainingGroup` (kind `team`, owner = the coach) and `TrainingGroupMember`, in
+> `prisma/pending/2026-10-25-teams-squads.sql` (not applied). The roster rule below is kept in code. See
+> `docs/TEAMS-SQUADS.md`. The models and SQL below are the original proposal, kept for the record.
+
 Today "assign to a group" offers Everyone or the athletes who already share a program name. A named group a coach keeps
 (a team, a class) needs two tables. **Not applied by this lane**: no edit to `prisma/schema.prisma`, no file in
 `prisma/pending/`. A schema lane lands it through db-guard.
