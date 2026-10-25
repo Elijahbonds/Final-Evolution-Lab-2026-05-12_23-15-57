@@ -341,6 +341,28 @@ export const REGISTRY: Record<string, TableRights> = {
   CombineEntrant: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "That the athlete was on a coach's combine; it goes with them (the foreign key cascades the same way)." }] },
   CombineResult: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own combine numbers (jump, approach and drill reads, hand-timed times). Other athletes' results stay with the coach's combine (the foreign key cascades the same way)." }] },
 
+  // COACH-PARITY (lane/coach-parity, prisma/pending/2026-10-26-coach-parity.sql): check-in forms and coach habits
+  CoachCheckinForm: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own forms. The assignments and the answers under them cascade with them (the athletes' answers to an erased coach's form go too: owner call, docs/COACH-PARITY.md)." }] },
+  CoachCheckinAssign: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own assignments." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'A coach assigning a form to this one athlete is about them; it goes with them.' },
+    ],
+  },
+  CoachCheckinAnswer: {
+    subjects: [
+      { col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own answers, health answers included (the FK cascades the same way)." },
+      { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's inbox of answers: they cascade with the coach's forms." },
+    ],
+  },
+  CoachHabit: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own habits; the athletes' ticks on them cascade (owner call, docs/COACH-PARITY.md)." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'A habit a coach set for this one athlete is about them; it goes with them, and its ticks with it.' },
+    ],
+  },
+  CoachHabitTick: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own ticks (the FK cascades the same way)." }] },
+
   // ── camp / facilitator ────────────────────────────────────────────────────────────────────────────────────────────
   FacilitatorProfile: {
     subjects: [{
