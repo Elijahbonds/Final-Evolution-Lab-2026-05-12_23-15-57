@@ -25,6 +25,12 @@ export interface ExerciseDemoData {
   videoUrl?: string;
   targetPrqStat?: string;
   dosage?: string;
+  /**
+   * EXERCISE-LIBRARY (2026-10-25): the avatar clip a library entry maps to (lib/library/demo.ts avatarClip). A string
+   * plays that clip; null means the rig has no clip for this movement yet, so the avatar tab is not shown rather than
+   * a motion that does not match. Left out, the old behaviour (a clip chosen from targetPrqStat).
+   */
+  clip?: string | null;
 }
 
 type Tab = 'avatar' | 'video';
@@ -48,7 +54,7 @@ function youTubeEmbed(raw?: string): string | null {
 export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
   const embedUrl = useMemo(() => youTubeEmbed(exercise.videoUrl), [exercise.videoUrl]);
   const hasVideo = !!embedUrl;
-  const hasAvatar = !threeDisabled;
+  const hasAvatar = !threeDisabled && exercise.clip !== null;
   const [tab, setTab] = useState<Tab>(hasAvatar ? 'avatar' : 'video');
   const [showVideo, setShowVideo] = useState(false);
 
@@ -78,7 +84,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {/* AVATAR demo */}
       {tab === 'avatar' && hasAvatar && (
         <div className="relative">
-          <ExerciseAvatarCanvas stat={exercise.targetPrqStat || ''} />
+          <ExerciseAvatarCanvas stat={exercise.targetPrqStat || ''} clip={exercise.clip ?? undefined} />
           <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
             YOUR AVATAR
           </span>
