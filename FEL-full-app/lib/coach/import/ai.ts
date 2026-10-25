@@ -1,6 +1,6 @@
 // lib/coach/import/ai.ts — COACH-PARITY (2026-10-26): the importer's optional AI assist, for a paste the rules could not read.
 //
-// OFF BY DEFAULT, twice: COACH_IMPORT_AI_ENABLED (lib/coach/parity/probe.ts) AND the Abacus kill switch (ABACUS_ENABLED +
+// OFF BY DEFAULT, twice: COACH_IMPORT_AI_ENABLED (lib/coach/parity/probe.ts) AND the Abacus kill switch (the switch +
 // key, lib/abacus/killSwitch.ts); the call is lib/coach-service.ts callCoachLLM, the existing kill-switched completion.
 // It is offered only when the deterministic reader got less than IMPORT_AI_BELOW of the lines.
 //

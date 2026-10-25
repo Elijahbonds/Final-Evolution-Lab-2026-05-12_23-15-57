@@ -11,7 +11,7 @@
 //                                so a coach cannot add one and an athlete is never asked one until the owner approves the
 //                                wording and turns this on. Training questions and habits need no switch.
 //   COACH_IMPORT_AI_ENABLED      the importer may ask the AI to read a paste the rules could not (lib/coach/import/ai.ts).
-//                                It needs the Abacus kill switch on too (ABACUS_ENABLED + key). Off, the deterministic
+//                                It needs the Abacus kill switch on too (lib/abacus/killSwitch.ts, switch + key). Off, the deterministic
 //                                parser does it all.
 import { pendingProbe, type RawDb } from '../pendingSchema';
 
