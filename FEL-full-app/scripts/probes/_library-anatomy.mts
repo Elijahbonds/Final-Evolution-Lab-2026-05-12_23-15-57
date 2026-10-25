@@ -161,14 +161,14 @@ async function perfJob(): Promise<void> {
   const { url, close } = await serve();
   const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: [...GL_ARGS, '--enable-precise-memory-info', '--js-flags=--expose-gc'] });
   const out: Record<string, unknown> = {};
-  for (const [name, hash] of [['muscles', 'muscles:romanian-deadlift:back'], ['demo-squat', 'stage:ex_squat'], ['demo-pushup', 'stage:ex_pushup'], ['demo-layup', 'stage:bball_layup_gather']] as const) {
+  for (const [name, hash] of (process.env.CASES ? process.env.CASES.split(',').map((c) => c.split('=') as [string, string]) : [['idle', 'stage:'], ['muscles', 'muscles:romanian-deadlift:back'], ['demo-squat', 'stage:ex_squat'], ['demo-pushup', 'stage:ex_pushup'], ['demo-layup', 'stage:bball_layup_gather']]) as [string, string][]) {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
     const page = await ctx.newPage(); await page.addInitScript(NAME_SHIM);
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     await cdp.send('Performance.enable');
     const t0 = Date.now();
-    await page.goto(`${url}/#${hash}`);
+    await page.goto(`${url}/?w=358&h=268#${hash}`);
     await stageReady(page, 600_000);
     const loadMs = Date.now() - t0;
     // RASTER: SwiftShader rasterises on this box's CPU (a phone's GPU does not): draw a 390×292 stage at DPR 1.5, the
@@ -176,6 +176,11 @@ async function perfJob(): Promise<void> {
     const sample = await page.evaluate(async () => {
       const st = (window as unknown as { __FEL_LIBRARY_STAGE__: { engine: { getFps(): number; _drawCalls?: { current: number }; getRenderWidth(): number; getRenderHeight(): number }; scene: { getActiveMeshes(): { length: number }; getEngine(): unknown; meshes: unknown[]; textures: { getSize?(): { width: number; height: number } }[] } } }).__FEL_LIBRARY_STAGE__;
       const frames: number[] = [];
+      const js: number[] = [];
+      let t0 = 0;
+      const sc = st.scene as unknown as { onBeforeRenderObservable: { add(f: () => void): unknown }; onAfterRenderObservable: { add(f: () => void): unknown } };
+      sc.onBeforeRenderObservable.add(() => { t0 = performance.now(); });
+      sc.onAfterRenderObservable.add(() => { js.push(performance.now() - t0); });
       let last = performance.now();
       await new Promise<void>((done) => { let n = 0; const tick = () => { const now = performance.now(); frames.push(now - last); last = now; if (++n < 90) requestAnimationFrame(tick); else done(); }; requestAnimationFrame(tick); });
       frames.shift();
@@ -183,7 +188,10 @@ async function perfJob(): Promise<void> {
       const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
       const tex = st.scene.textures.reduce((a, t) => { const s = t.getSize?.(); return a + (s ? s.width * s.height * 4 : 0); }, 0);
       const drawCalls = (st.engine as unknown as { _drawCalls?: { current: number } })._drawCalls?.current ?? null;
-      return { p50: sorted[Math.floor(sorted.length / 2)], p95: sorted[Math.floor(sorted.length * 0.95)], fps: 1000 / (frames.reduce((a, b) => a + b, 0) / frames.length), heapMB: mem ? mem.usedJSHeapSize / 1048576 : null, textureMB: tex / 1048576, activeMeshes: st.scene.getActiveMeshes().length, meshes: st.scene.meshes.length, drawCalls, backing: `${st.engine.getRenderWidth()}x${st.engine.getRenderHeight()}` };
+      const jsSorted = js.slice(5).sort((a, b) => a - b);
+      const T = (window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ?? {};
+      return { reskins: (window as unknown as { __FEL_ANATOMY_RESKIN__?: number }).__FEL_ANATOMY_RESKIN__ ?? null, importedAtMs: T.imported, spawnMs: T.spawned - T.imported, jsP50: jsSorted[Math.floor(jsSorted.length / 2)], jsP95: jsSorted[Math.floor(jsSorted.length * 0.95)], anatomyMs: (window as unknown as { __FEL_ANATOMY_MS__?: number }).__FEL_ANATOMY_MS__ ?? null,
+        p50: sorted[Math.floor(sorted.length / 2)], p95: sorted[Math.floor(sorted.length * 0.95)], fps: 1000 / (frames.reduce((a, b) => a + b, 0) / frames.length), heapMB: mem ? mem.usedJSHeapSize / 1048576 : null, textureMB: tex / 1048576, activeMeshes: st.scene.getActiveMeshes().length, meshes: st.scene.meshes.length, drawCalls, backing: `${st.engine.getRenderWidth()}x${st.engine.getRenderHeight()}` };
     });
     const m = await cdp.send('Performance.getMetrics') as { metrics: { name: string; value: number }[] };
     const metric = (n: string) => m.metrics.find((x) => x.name === n)?.value ?? null;

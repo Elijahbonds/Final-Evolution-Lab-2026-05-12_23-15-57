@@ -59,9 +59,12 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const { DEFAULT_HERO_URL } = await import('@/lib/babylon/core/athleteRoster');
         const { reducedMotion } = await import('@/lib/a11y/reducedMotion');
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
+        const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
         const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
+        const mark = (k: string) => { if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now(); };
+        mark('imported');
 
         const engine = new Engine(canvas, true, { alpha: true, adaptToDeviceRatio: false, powerPreference: 'low-power', stencil: false, doNotHandleTouchAction: true, preserveDrawingBuffer: process.env.NODE_ENV === 'development' });
         engine.setHardwareScalingLevel(1 / Math.min(1.5, window.devicePixelRatio || 1));
@@ -102,6 +105,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
 
         const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
         if (disposed) { hero.dispose(); scene.dispose(); engine.dispose(); return; }
+        mark('spawned');
 
         const still = reducedMotion();
         let anatomy: AnatomyHandle | null = null;
@@ -115,15 +119,17 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         let shownMuscles = '';
 
         const frame = (p: ExerciseStageProps) => {
-          if (p.view === 'muscles') return { alpha: p.side === 'front' ? FRONT_ALPHA : -FRONT_ALPHA, beta: 1.45, radius: 2.85, y: 0.9 };
-          if (p.clip && FLOOR_CLIPS.has(p.clip)) return { alpha: 0.3, beta: 1.25, radius: 2.5, y: 0.3 };
-          if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.9, y: 0.85 };
+          if (p.view === 'muscles') return { alpha: p.side === 'front' ? FRONT_ALPHA : -FRONT_ALPHA, beta: 1.47, radius: 2.5, y: 0.9 };
+          if (p.clip && FLOOR_CLIPS.has(p.clip)) return { alpha: 0.3, beta: 1.25, radius: 2.3, y: 0.3 };
+          if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.6, y: 0.85 };
           const prop = p.clip ? DEMO_PROPS[p.clip] : undefined;
-          if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.6, y: 0.62 };
-          if (prop === 'seat') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.6, y: 0.7 };
-          return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.9, y: 0.88 };
+          if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.4, y: 0.62 };
+          if (prop === 'seat') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };
+          return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
         };
         const play = (clip: string, hold: number | null | undefined) => {
+          // the library scope is lazy: an entry's loop is built the first time it is asked for (clipScope `lazy`)
+          buildAuthoredClip(hero.animator, scene, hero.skeleton, clip);
           const g = hero.animator.play(clip, { loop: true, fadeSec: 0.25, restart: true });
           if (g && hold != null) {
             // an isometric hold: the rep's hardest point, held (CharacterAnimator keeps the group; pause it on that frame)
@@ -139,7 +145,11 @@ export default function ExerciseStage(props: ExerciseStageProps) {
             if (p.view === 'muscles') {
               play('idle_stand', null);
               showProp(null);
-              if (!anatomy && !anatomyFailed) { anatomy = applyAnatomy(scene, hero, p.muscles); anatomyFailed = !anatomy; shownMuscles = musclesKey; }
+              if (!anatomy && !anatomyFailed) {
+                const t0 = performance.now();
+                anatomy = applyAnatomy(scene, hero, p.muscles); anatomyFailed = !anatomy; shownMuscles = musclesKey;
+                if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_ANATOMY_MS__?: number }).__FEL_ANATOMY_MS__ = performance.now() - t0;
+              }
             } else {
               anatomy?.restore(); anatomy = null;
               play(p.clip ?? 'idle_stand', p.clip ? p.hold : null);

@@ -7,7 +7,7 @@ import '@babylonjs/loaders/glTF';
 import { bodyMeshOf } from '@/lib/babylon/creator/shape/renderShape';
 import { clearAnatomyCache, measureBody, weightsOf } from '@/lib/babylon/library/anatomyLook';
 import { ATOMS, ATOM_COUNT, ATOM_GROUP, GROUP_COUNT } from '@/lib/babylon/creator/paint/bodyChart';
-import { ANATOMY_PALETTE, MUSCLE_REGIONS, anatomyColors, anatomyLegend, hexRgb, initialSide, lateralAngle, secondaryShown, type Rgb } from './anatomy';
+import { ANATOMY_PALETTE, MUSCLE_REGIONS, anatomyLegend, hexRgb, initialSide, lateralAngle, secondaryShown, type Rgb } from './anatomy';
 import { muscleMap } from './demo';
 import { loadLibraryFiles } from './files';
 import { MUSCLES } from './vocab';

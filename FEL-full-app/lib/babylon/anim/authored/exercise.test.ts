@@ -12,6 +12,8 @@ import { boneNode } from '../boneLookup';
 import { EXERCISE_BUILDERS, EXERCISE_CLIPS } from './exercise';
 import { ISO_HOLD_SEC, DEMO_CLIPS } from '@/lib/library/demo';
 import { suiteOfClip, OPT_IN_SUITES, scopeAllows, scopeForMode } from '../clipScope';
+import { CharacterAnimator } from '../CharacterAnimator';
+import { buildAuthoredClip, registerAuthoredClips } from './index';
 
 const BODIES = { hero: process.env.FEL_HERO_GLB ?? 'public/models/fel-hero.glb', female: 'public/models/candidates/fel-kit-female.glb' } as const;
 type Body = keyof typeof BODIES;
@@ -83,6 +85,27 @@ describe('every exercise loop', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+describe('the library stage builds on demand (a lazy scope)', () => {
+  it('spawn builds core only; an entry\'s loop is built when asked for; an unscoped body never builds the exercise suite', () => {
+    const { scene, sk } = rigs.hero!;
+    reset('hero');
+    const scope = scopeForMode('library')!;
+    expect(scope.lazy).toBe(true);
+    const a = new CharacterAnimator(scene, []);
+    const spawned = registerAuthoredClips(a, scene, sk, scope);
+    expect(spawned.every((n) => suiteOfClip(n) === 'core')).toBe(true);
+    expect(a.clipNames.has('ex_squat')).toBe(false);
+    reset('hero');
+    expect(buildAuthoredClip(a, scene, sk, 'ex_squat', scope)).toBe(true);
+    expect(buildAuthoredClip(a, scene, sk, 'bball_layup_gather', scope)).toBe(true);
+    expect(buildAuthoredClip(a, scene, sk, 'dunk_launch', scope)).toBe(false);   // outside the scope: refused, not built
+    expect(a.clipNames.has('ex_squat') && a.clipNames.has('bball_layup_gather') && !a.clipNames.has('dunk_launch')).toBe(true);
+    reset('hero');
+    const b = new CharacterAnimator(scene, []);
+    expect(registerAuthoredClips(b, scene, sk, null).some((n) => n.startsWith('ex_'))).toBe(false);
   });
 });
 

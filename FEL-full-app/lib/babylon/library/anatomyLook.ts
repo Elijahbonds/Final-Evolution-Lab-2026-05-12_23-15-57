@@ -55,11 +55,30 @@ export function applyAnatomy(scene: Scene, spawned: { root: TransformNode; meshe
 
   // what we change, to give back
   const hidden: AbstractMesh[] = [];
-  for (const mesh of all) if (mesh !== body && mesh.isEnabled() && mesh.getTotalVertices() > 0) { mesh.setEnabled(false); hidden.push(mesh); }
+  const hideOthers = () => {
+    for (const mesh of [...spawned.meshes, ...spawned.root.getChildMeshes(false)]) {
+      if (mesh !== body && mesh.isEnabled() && mesh.getTotalVertices() > 0 && !hidden.includes(mesh)) { mesh.setEnabled(false); hidden.push(mesh); }
+    }
+  };
+  hideOthers();
   const material: Material | null = body.material;
-  const indices = body.getIndices();
-  const full = (body.metadata as { felBodyIndices0?: ArrayLike<number> } | null | undefined)?.felBodyIndices0;
-  if (full && indices && full.length !== indices.length) body.setIndices(Array.from(full));
+  // THE SKIN UNDER THE CLOTHES. bodyMask (core/bodyMask.ts) drops the skin a garment covers, keeping the full list in
+  // metadata.felBodyIndices0 — and it runs after the first render, and again when the clothes change, so a one-time
+  // restore here was undone a frame later (rig 2026-10-25: the torso and thighs came back as holes). While the view is
+  // open, the full list is put back whenever the mask has taken it, and the garments the identity layer adds late are
+  // hidden too; restore() gives back what the mask last left.
+  let masked: number[] | null = null;
+  const keepFullSkin = () => {
+    const full = (body.metadata as { felBodyIndices0?: ArrayLike<number> } | null | undefined)?.felBodyIndices0;
+    if (!full || body.getTotalIndices() === full.length) return;   // (a count, not the array: this runs every frame)
+    const cur = body.getIndices();
+    if (cur) masked = Array.from(cur);
+    body.setIndices(Array.from(full));
+    if (process.env.NODE_ENV === 'development') { const w = window as unknown as { __FEL_ANATOMY_RESKIN__?: number }; w.__FEL_ANATOMY_RESKIN__ = (w.__FEL_ANATOMY_RESKIN__ ?? 0) + 1; }
+  };
+  keepFullSkin();
+  let frame = 0;
+  const watch = scene.onAfterRenderObservable.add(() => { keepFullSkin(); if (++frame % 30 === 0) hideOthers(); });
   const hadColors = body.isVerticesDataPresent(VertexBuffer.ColorKind) ? body.getVerticesData(VertexBuffer.ColorKind) : null;
   const usedColors = body.useVertexColors;
 
@@ -82,9 +101,10 @@ export function applyAnatomy(scene: Scene, spawned: { root: TransformNode; meshe
     body,
     show,
     restore() {
-      if (body.isDisposed()) { mat.dispose(); return; }
+      if (body.isDisposed()) { scene.onAfterRenderObservable.remove(watch); mat.dispose(); return; }
+      scene.onAfterRenderObservable.remove(watch);
       body.material = material;
-      if (indices && full && full.length !== indices.length) body.setIndices(Array.from(indices));
+      if (masked) body.setIndices(masked);
       if (hadColors) body.setVerticesData(VertexBuffer.ColorKind, hadColors, true, 4);
       else body.removeVerticesData(VertexBuffer.ColorKind);
       body.useVertexColors = usedColors;

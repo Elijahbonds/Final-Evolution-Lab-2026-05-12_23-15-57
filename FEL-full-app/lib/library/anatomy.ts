@@ -82,7 +82,7 @@ export const MUSCLE_REGIONS: Readonly<Record<string, readonly RegionPart[]>> = {
   'rear-delts': [{ atoms: UPPER_ARMS, u: [0.60, 1.01], arc: [150, 62] }, { atoms: TORSO, u: [0.86, 1.01], abs: [112, 150] }],
   'rotator-cuff': [{ atoms: TORSO, u: [0.70, 0.88], abs: [118, 160] }],
   chest: [{ atoms: TORSO, u: [0.68, 0.91], abs: [0, 64] }],
-  serratus: [{ atoms: TORSO, u: [0.56, 0.74], abs: [58, 96] }],
+  serratus: [{ atoms: TORSO, u: [0.54, 0.76], abs: [50, 100] }],
   biceps: [{ atoms: UPPER_ARMS, u: [0.14, 0.76], arc: [0, 60] }],
   triceps: [{ atoms: UPPER_ARMS, u: [0.10, 0.80], arc: [180, 72] }],
   forearms: [{ atoms: ['forearmL', 'forearmR', 'handL', 'handR'] }],

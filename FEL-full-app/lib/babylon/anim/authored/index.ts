@@ -55,11 +55,9 @@ import {
   buildExSeatedPress, buildExSeatedCurl, buildExSeatedLateralRaise, buildExSeatedTriceps, buildExBenchPress, buildExFloorPress, buildExFly, buildExSkullCrusher, buildExInclinePress, buildExInclineFly,
 } from './exercise';   // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops — opt-in suite, built on the library stage only
 
-export function registerAuthoredClips(
-  animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
-  scope: ClipScope | null = scopeForScene(scene),
-): string[] {
-  const builders: [string, () => AnimationGroup | null][] = [
+/** Every authored clip as [name, builder] for this skeleton (the table registerAuthoredClips walks). */
+function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => AnimationGroup | null][] {
+  return [
     ['idle_stand', () => buildIdleStand(scene, skeleton)],
     ['strafe_left', () => buildStrafe(scene, skeleton, 'left')],
     ['strafe_right', () => buildStrafe(scene, skeleton, 'right')],
@@ -346,10 +344,36 @@ export function registerAuthoredClips(
     ['ex_quad_stretch', () => buildExQuadStretch(scene, skeleton)],
     ['ex_breathe', () => buildExBreathe(scene, skeleton)],
   ];
+}
+
+/**
+ * LIBRARY-ANATOMY (2026-10-25): build ONE authored clip on demand and register it — for a LAZY scope (clipScope.ts
+ * `lazy`: the exercise library's stage), which builds only the core clips at spawn and the clip an entry plays when it is
+ * asked for, instead of ~80 a page shows one of at a time (measured: the spawn's clip builds were about half of the
+ * stage's 12 s load on the 4x-throttled phone profile). Refuses a name outside the body's scope. Returns whether the
+ * clip is now registered.
+ */
+export function buildAuthoredClip(animator: CharacterAnimator, scene: Scene, skeleton: Skeleton, name: string, scope: ClipScope | null = scopeForScene(scene)): boolean {
+  if (animator.clipNames.has(name)) return true;
+  if (!scopeAllows(scope, name)) return false;
+  const entry = authoredBuilders(scene, skeleton).find(([n]) => n === name);
+  const g = entry?.[1]() ?? null;
+  if (!g) return false;
+  animator.register(g);
+  ledgerFor(scene).registered.add(g.name);
+  return true;
+}
+
+export function registerAuthoredClips(
+  animator: CharacterAnimator, scene: Scene, skeleton: Skeleton,
+  scope: ClipScope | null = scopeForScene(scene),
+): string[] {
+  const builders = authoredBuilders(scene, skeleton);
   const registered: string[] = [];
   let skipped = 0;
   for (const [name, build] of builders) {
     if (!scopeAllows(scope, name)) { skipped++; continue; }   // another sport's clip: never built, never playable here
+    if (scope?.lazy && suiteOfClip(name) !== 'core') { skipped++; continue; }   // LIBRARY-ANATOMY: a lazy scope builds the rest on demand (buildAuthoredClip)
     if (!scope && OPT_IN_SUITES.includes(suiteOfClip(name))) { skipped++; continue; }   // LIBRARY-ANATOMY: an opt-in suite is built only where a scope names it
     const g = build();
     if (g) { animator.register(g); registered.push(g.name); }

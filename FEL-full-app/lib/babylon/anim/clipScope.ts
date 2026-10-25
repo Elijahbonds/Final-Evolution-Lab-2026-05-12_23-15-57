@@ -62,6 +62,9 @@ export interface ClipScope {
   borrow: readonly string[];
   /** Core clips this mode's bodies must NOT own (ANIM-RESIDUAL): never built, refused onto the resting loop. */
   omit?: readonly string[];
+  /** LIBRARY-ANATOMY (2026-10-25): spawn builds core only; the rest of the scope is built when first asked for
+   *  (authored/index.ts buildAuthoredClip). For a scene that plays one clip at a time out of many (the library stage). */
+  lazy?: boolean;
 }
 
 // The contact reactions a ball sport borrows from the fighter / the carrier: knocked down, on the floor, back up.
@@ -89,7 +92,7 @@ export const LIBRARY_HOOPS_BORROW: readonly string[] = [
 ];
 
 /** Keyed by the harness's `def.modeId` (what ModeHarness stamps on `scene.metadata.felModeId`). */
-export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; borrow: readonly string[]; omit?: readonly string[] }> = {
+export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; borrow: readonly string[]; omit?: readonly string[]; lazy?: boolean }> = {
   // HOOPS-DEPTH S8 (2026-09-23): the runway is a DRIBBLING run — the captured one (78_06, bent arms, the ball hand low) instead of the
   // generic `run`, whose arms read straight on 631 of 733 approach frames (body smoke)
   dunk: { suites: ['dunk'], borrow: ['bball_dribble_run'] },
@@ -121,14 +124,14 @@ export const MODE_CLIP_SCOPES: Record<string, { suites: readonly ClipSuite[]; bo
   // LIBRARY-ANATOMY (2026-10-25): not a game mode — the exercise library's demo stage (components/library/exercise-stage.tsx
   // stamps felModeId 'library'). It owns the exercise loops, and borrows the hoops clips a basketball library entry plays
   // (LIBRARY_HOOPS_BORROW, lib/library/demo.ts DEMO_RULES): the drill's own movement, from the suite the court plays it with.
-  library: { suites: ['exercise'], borrow: LIBRARY_HOOPS_BORROW, omit: FIGHTER_BASE },
+  library: { suites: ['exercise'], borrow: LIBRARY_HOOPS_BORROW, omit: FIGHTER_BASE, lazy: true },
 };
 
 /** The scope for a mode, or null (unscoped: every suite) for a body no mode owns. */
 export function scopeForMode(modeId: string | undefined | null): ClipScope | null {
   if (!modeId) return null;
   const s = MODE_CLIP_SCOPES[modeId];
-  return s ? { modeId, suites: s.suites, borrow: s.borrow, ...(s.omit ? { omit: s.omit } : {}) } : null;
+  return s ? { modeId, suites: s.suites, borrow: s.borrow, ...(s.omit ? { omit: s.omit } : {}), ...(s.lazy ? { lazy: true } : {}) } : null;
 }
 
 export function scopeForScene(scene: Scene | null | undefined): ClipScope | null {

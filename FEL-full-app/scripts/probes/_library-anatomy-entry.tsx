@@ -56,7 +56,10 @@ function Ui() {
 
 const root = createRoot(document.getElementById('root')!);
 if (mode === 'stage' || mode === 'muscles') {
-  root.render(createElement('div', { style: { width: '100vw', height: '100vh', background: '#07070d' } }, createElement(Stage)));
+  // ?w=&h= sizes the stage like the sheet does on a phone (358×268 at 390 px); default: the whole window
+  const q = new URLSearchParams(location.search);
+  const size = q.get('w') ? { width: `${q.get('w')}px`, height: `${q.get('h')}px` } : { width: '100vw', height: '100vh' };
+  root.render(createElement('div', { style: { ...size, background: '#07070d' } }, createElement(Stage)));
 } else {
   root.render(createElement('div', { className: 'min-h-screen bg-[#050505] pb-20' }, createElement(Ui)));
 }
