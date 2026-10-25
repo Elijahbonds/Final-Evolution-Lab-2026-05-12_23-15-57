@@ -260,7 +260,12 @@ describe('minors never exposed; the boards draw only from real or verified data'
     await memberAction(f.db, f.id, 'ada', { action: 'share', on: true });
     const v = await view(f.db, f.id, 'ada');
     // everything a member is shown about others (ids and the invite token are random text, so they are left out)
-    const all = JSON.stringify({ members: v.members, buddies: v.buddies, boards: v.boards, league: v.league, feed: v.feed, duos: v.duos, trophies: v.trophies });
+    // Dates and times are masked first: they are built from the clock, so "…T12:34:56.799Z" or a day like "2026-10-25"
+    // could carry '99', '77' or '55' by chance (a flaky red in CI). Every other place a teen's number could appear stays checked.
+    const all = JSON.stringify({ members: v.members, buddies: v.buddies, boards: v.boards, league: v.league, feed: v.feed, duos: v.duos, trophies: v.trophies })
+      .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '<time>')
+      .replace(/\d{4}-\d{2}-\d{2}/g, '<day>')
+      .replace(/"(?:at|t|ts|createdAt|updatedAt|since|until|weekStart|weekEnd)":\d{10,}/g, '"<clock>":0');
     for (const n of ['99', '77', '55', '21.7', 'Tess Kid']) expect(all).not.toContain(n);
     expect(v.feed.map((x) => x.line)).toContain('Ada set a new best in Downtown: 31');
     expect(v.feed.filter((x) => x.userId === 'tess')).toEqual([]);
