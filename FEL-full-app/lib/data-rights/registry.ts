@@ -197,7 +197,7 @@ export const REGISTRY: Record<string, TableRights> = {
     subjects: [{
       col: 'userId', export: true,
       erase: { scrub: { published: 'false', headline: 'NULL', bio: 'NULL', affiliationLine: 'NULL', certifications: `'{}'`, specialties: `'{}'`, creatorCardId: 'NULL' } },
-      why: 'Bookings and program access (money records) point at it (Restrict), so it stays, unpublished, without the profile text. displayName, slug and the business mailing address stay as the seller on those records (owner call: docs/DATA-RIGHTS.md).',
+      why: 'Bookings and program access (money records) point at it (Restrict), so it stays, unpublished, without the profile text. displayName, slug and the seller postal address stay as the seller on those records (owner call: docs/DATA-RIGHTS.md).',
     }],
   },
   ProgramAccess: {
