@@ -16,6 +16,9 @@ import { DrillWeekLine } from '@/components/daily-drill/week-line';
 import { drillDaysThisWeek } from '@/lib/daily-drill/load';
 // COACH-READINESS (2026-10-25): the daily jump check's trend, adults only (the card fetches; anyone the check refuses sees nothing)
 import { ReadinessTrendCard } from '@/components/readiness/readiness-trend';
+// SIGNATURE-PROGRAMS (2026-10-25): the active signature program's week, one line under the card (not on the share image)
+import { ProgramWeekLine } from '@/components/signature/program-list';
+import { activeSignature } from '@/lib/signature/trainCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,9 +36,10 @@ export default async function WeekPage() {
   if (!session || !me) redirect(loginPath('/profile/week'));
 
   const now = new Date();
-  const [rows, drillDays] = await Promise.all([
+  const [rows, drillDays, program] = await Promise.all([
     readProfileRows(prisma as unknown as ProfileDb, me, now),
     drillDaysThisWeek(prisma, me, now),
+    activeSignature(me, (session.user as { role?: string }).role),
   ]);
   const card = buildProgressCard(me, rows, now, READ_CAP.played);
   const phoneForm = card.metrics.some((m) => m.key === 'form' && m.source === 'device');
@@ -45,6 +49,7 @@ export default async function WeekPage() {
       aside={<Link href="/profile" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Back to profile</Link>}>
       {phoneForm ? <DeviceCard card={card} /> : <ProgressCardView card={card} />}
       <DrillWeekLine days={drillDays} />
+      <ProgramWeekLine card={program} />
       <ReadinessTrendCard />
       <ShareWeek minor={card.minorOrUnknown} phoneOnly={phoneForm} />
       {/* SEAM (lib/progress-card/summary.ts ProgressCard.clips): before/after clips arrive with the user's own clip store */}

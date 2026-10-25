@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -17,6 +17,8 @@ import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
 // PROGRESS CARD (value round item 1): the weekly door to /profile/week; reads nothing
 import { WeekCardEntry } from '@/components/progress-card/week-entry';
+// SIGNATURE-PROGRAMS (2026-10-25): FEL's four signature programs; the card names the athlete's week when they are in one
+import { signatureTrainCard } from '@/lib/signature/trainCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,12 +34,13 @@ export default async function TrainPage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill, signature] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
     todayCardFor(prisma, me),
     loadDailyDrill(prisma, me, { warmupContext: (id, now) => loadWarmupContext(prisma, id, now) }).catch(() => null),
+    signatureTrainCard(me, (session?.user as { role?: string } | undefined)?.role),
   ]);
 
   const cards = [
@@ -78,6 +81,12 @@ export default async function TrainPage() {
       href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',
       line: coachLink?.coach?.name ? `Written by ${coachLink.coach.name}.` : programCount > 0 ? 'Your blocks and sessions.' : 'No coach yet — an invite link puts their programming here.',
       tag: programCount > 0 || coachLink ? 'Open' : 'How it works',
+    },
+    {
+      // SIGNATURE-PROGRAMS (2026-10-25): approved programs only (lib/signature/access.ts); the line says the athlete's week
+      href: '/train/programs', icon: Layers, accent: '#00FF9D', title: 'Signature programs',
+      line: signature.line,
+      tag: signature.tag,
     },
     {
       // EXERCISE-LIBRARY (2026-10-25): the shared library — search it or ask it; approved entries only for athletes
