@@ -41,8 +41,11 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
 
 function Stage() {
   const [, force] = useState(0);
+  // LIBRARY-ANATOMY-2: the rig's sheet job swaps the clip on one loaded stage (window.__rigSetClip) instead of a page per clip
+  const [shown, setShown] = useState<{ clip: string | null; hold: number | null }>({ clip: a || null, hold: b ? Number(b) : null });
+  (window as unknown as { __rigSetClip?: (clip: string | null, hold?: number | null) => void }).__rigSetClip = (clip, hold = null) => setShown({ clip, hold });
   if (mode === 'stage') {
-    return createElement(ExerciseStage, { view: 'demo', clip: a || null, hold: b ? Number(b) : null, muscles: { primary: [], secondary: [] }, side: 'front', onState: () => force((n) => n + 1) });
+    return createElement(ExerciseStage, { view: 'demo', clip: shown.clip, hold: shown.hold, muscles: { primary: [], secondary: [] }, side: 'front', onState: () => force((n) => n + 1) });
   }
   const e = byId(a);
   if (!e) return createElement('p', null, `no entry ${a}`);
