@@ -104,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -135,4 +135,7 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   { id: '1h', file: 'app/api/v1/camp/sessions/route.ts', handler: 'POST', writes: "CampSession prqDelta + movementDelta (the mentee's numbers; the facilitator's record still saves)", status: 'gated', holder: null },
   { id: '1i', file: 'app/api/mirror/prove-it/route.ts', handler: 'POST', writes: 'WorkoutScan kind prove_it (numbers only, idempotent on runId)', status: 'gated', holder: null },
   { id: '1j', file: 'app/api/mirror/screen-history/route.ts', handler: 'POST', writes: 'WorkoutScan kind rescreen (scores and flags, idempotent on runId)', status: 'gated', holder: null },
+  // COACH-VIDEO-REVIEW (2026-10-24): a filmed set sent to the athlete's coach — pose keypoints, rep scores and flags, never
+  // video. Adults: this gate; 13–17: off in code (lib/coach/formReview/gate.ts TEEN_POSE_REVIEW_ENABLED, an owner call).
+  { id: '1k', file: 'app/api/coach/form-reviews/route.ts', handler: 'POST', writes: 'CoachFormReview (pose keypoints, rep scores and flags; pending SQL 2026-10-24-coach-form-review.sql)', status: 'gated', holder: null, via: ['lib/coach/formReview/server.ts', 'lib/coach/formReview/store.ts'] },
 ];
