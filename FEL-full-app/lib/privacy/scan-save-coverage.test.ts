@@ -36,6 +36,8 @@ const DETECTORS: { what: string; re: RegExp }[] = [
   { what: 'CoachFormReview', re: /INSERT\s+INTO\s+"?CoachFormReview\b|\bsubmitFormReview\s*\(|\binsertFormReview\s*\(/ },
   // COACH-READINESS (2026-10-25): the daily jump check's numbers (pending SQL, raw writes), and the calls that reach them
   { what: 'ReadinessJumpCheck', re: /INSERT\s+INTO\s+"?ReadinessJumpCheck\b|\bkeepCheck\s*\(|\bsaveCheck\s*\(/ },
+  // COMBINE-DAY (2026-10-25): a coach's combine results (pending SQL, raw writes), and the calls that reach them
+  { what: 'CombineResult', re: /INSERT\s+INTO\s+"?CombineResult\b|\bwriteResults\s*\(|\bsaveCombine\s*\(/ },
   { what: 'raw SQL', re: /INSERT\s+INTO\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b|UPDATE\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b/i },
 ];
 

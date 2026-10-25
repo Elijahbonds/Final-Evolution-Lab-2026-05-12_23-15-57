@@ -324,6 +324,9 @@ export const REGISTRY: Record<string, TableRights> = {
     ],
   },
   LibraryExercise: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: 'Shared catalogue entry; the reviewer is no longer named.' }] },
+  // SIGNATURE-PROGRAMS (#451)
+  SignatureEnrollment: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's place in a signature program: the sessions done and the plan's adaptations. Their own training data." }] },
+  SignatureProgramReview: { subjects: [{ col: 'reviewerId', export: OTHERS, erase: 'nullify', why: "The owner's review of FEL's own program (one row per program); the program stays, the reviewer is no longer named." }] },
   // TEAMS-SQUADS (#441)
   TrainingGroup: { omit: ['inviteToken'], subjects: [{ col: 'ownerId', export: true, erase: 'delete', why: 'An owner cannot leave a group, only delete it (lib/groups/rules.ts); erasing the owner deletes it, and its members and feed cascade.' }] },
   TrainingGroupMember: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'Leaves every group.' }] },
@@ -333,6 +336,10 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'toUserId', export: true, erase: 'delete', why: 'Reactions, nudges and trophies aimed at the person (the foreign key cascades the same way).' },
     ],
   },
+  // COMBINE-DAY (lane/combine-day; prisma/pending/2026-10-25-combine-day.sql). Numbers only: no frame, video or note.
+  CombineEvent: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own combines (name, stations, weights). Erasing the coach deletes them, and their entrants and results cascade (the foreign keys do the same), as a team goes with its owner." }] },
+  CombineEntrant: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "That the athlete was on a coach's combine; it goes with them (the foreign key cascades the same way)." }] },
+  CombineResult: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own combine numbers (jump, approach and drill reads, hand-timed times). Other athletes' results stay with the coach's combine (the foreign key cascades the same way)." }] },
 
   // ── camp / facilitator ────────────────────────────────────────────────────────────────────────────────────────────
   FacilitatorProfile: {
