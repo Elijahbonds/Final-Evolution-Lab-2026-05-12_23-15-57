@@ -14,7 +14,7 @@ const PLYO = { category: 'plyometric' as const, skillLayer: 'jump-land', braceMo
 
 // ── the jump-and-land matrix ──────────────────────────────────────────────────────────────────────────────────────
 
-type Kind = 'jump' | 'jump1' | 'hop' | 'bound';
+type Kind = 'jump' | 'jump1' | 'one2' | 'hop' | 'bound';
 type Dir = 'forward' | 'backward' | 'lateral' | 'medial' | 'diagonal' | 'rot90' | 'rot180';
 type Fin = 'stick' | 'cont' | 'sprint';
 const DIR: Record<Dir, { label: string; plane: Variant['plane']; cue: string }> = {
@@ -29,6 +29,7 @@ const DIR: Record<Dir, { label: string; plane: Variant['plane']; cue: string }> 
 const KIND: Record<Kind, { noun: string; lvl: number; uni: boolean; setup: string; stickName: (d: string) => string; contName: (d: string) => string; sprintName: (d: string) => string }> = {
   jump: { noun: 'Jump', lvl: 0, uni: false, setup: 'Stand tall, feet hip-width, a line on the floor beside you.', stickName: (d) => `${d} Jump to Stick`, contName: (d) => `Continuous ${d} Jumps`, sprintName: (d) => `${d} Jump to Sprint` },
   jump1: { noun: 'Jump', lvl: 1, uni: true, setup: 'Stand tall on two feet, a line on the floor beside you.', stickName: (d) => `${d} Jump to Single-Leg Stick`, contName: (d) => `Continuous ${d} Two-to-One Jumps`, sprintName: (d) => `${d} Two-to-One Jump to Sprint` },
+  one2: { noun: 'Jump', lvl: 1, uni: true, setup: 'Stand on one leg, a line on the floor beside you.', stickName: (d) => `${d} One-to-Two Jump to Stick`, contName: (d) => `Continuous ${d} One-to-Two Jumps`, sprintName: (d) => `${d} One-to-Two Jump to Sprint` },
   hop: { noun: 'Hop', lvl: 1, uni: true, setup: 'Stand on one leg, knee soft, a line on the floor beside you.', stickName: (d) => `${d} Hop to Stick`, contName: (d) => `Continuous ${d} Hops`, sprintName: (d) => `${d} Hop to Sprint` },
   bound: { noun: 'Bound', lvl: 1, uni: true, setup: 'Stand on one leg, ready to push off to the other.', stickName: (d) => `${d} Bound to Stick`, contName: (d) => `Continuous ${d} Bounds`, sprintName: (d) => `${d} Bound to Sprint` },
 };
@@ -36,6 +37,7 @@ const KIND: Record<Kind, { noun: string; lvl: number; uni: boolean; setup: strin
 const CELLS: Record<Kind, Partial<Record<Dir, Fin[]>>> = {
   jump: { forward: ['sprint'], backward: ['stick', 'cont'], lateral: ['stick', 'cont', 'sprint'], diagonal: ['stick', 'cont', 'sprint'], rot90: ['stick', 'cont'], rot180: ['stick', 'cont'] },
   jump1: { forward: ['stick', 'sprint'], backward: ['stick'], lateral: ['stick', 'sprint'], diagonal: ['stick'], rot90: ['stick'] },
+  one2: { forward: ['stick', 'sprint'], lateral: ['stick', 'cont'], diagonal: ['stick'], rot90: ['stick'] },
   hop: { forward: ['sprint'], backward: ['stick', 'cont'], lateral: ['cont', 'sprint'], medial: ['stick', 'cont'], diagonal: ['stick', 'cont', 'sprint'], rot90: ['stick', 'cont'], rot180: ['stick'] },
   bound: { diagonal: ['stick', 'sprint'] },
 };

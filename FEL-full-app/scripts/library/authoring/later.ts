@@ -6,6 +6,8 @@ import { LATER_JUMPS } from './later-jumps';
 import { LATER_SPEED } from './later-speed';
 import { LATER_MOBILITY } from './later-mobility';
 import { LATER_PREHAB } from './later-prehab';
+import { LATER_SPORTS } from './later-sports';
+import { LATER_TRUNK } from './later-trunk';
 import type { Family } from './types';
 
-export const LATER_BLOCKS: readonly Family[] = [...LATER_BASKETBALL, ...LATER_JUMPS, ...LATER_SPEED, ...LATER_MOBILITY, ...LATER_PREHAB];
+export const LATER_BLOCKS: readonly Family[] = [...LATER_BASKETBALL, ...LATER_JUMPS, ...LATER_SPEED, ...LATER_MOBILITY, ...LATER_PREHAB, ...LATER_SPORTS, ...LATER_TRUNK];

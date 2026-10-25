@@ -87,6 +87,12 @@ function cutVariants(): Variant[] {
   for (const [label, k, l, cue] of CUTS) for (const [entry, ek, el, setup] of ENTRIES) {
     out.push(va(`${label} ${entry}`, key(k, ek), l + el, { cue, setup: `${setup} Cones set for the cut.`, ladder: k, ...(ek !== 'sprint' ? { base: key(k, 'sprint') } : {}) }));
   }
+  for (const [label, k, l, cue] of CUTS) {
+    out.push(va(`${label} with a Dribble`, key(k, 'dribble'), l + 1, {
+      base: key(k, 'sprint'), ladder: k, equipment: ['cone', 'basketball'], sport: ['basketball'], goals: ['agility', 'handles'],
+      setup: 'Speed dribble 10 metres to the cone, then cut.', cue: `${cue} The ball changes to the outside hand on the cut.`,
+    }));
+  }
   return out;
 }
 
@@ -245,6 +251,25 @@ export const LATER_SPEED: Family[] = [
       { fault: 'Heavy, loud contacts', fix: 'Stay on the balls of the feet, quick and quiet on the floor.' },
     ],
     dosage: reps(3, '2 lengths', 30), variants: LADDER.map(([name, k, l, cue, plane]) => va(name, k, l, { cue, plane, ...(k === 'to-sprint' ? { equipment: ['agility-ladder', 'cone'], goals: ['speed'] } : {}) })),
+  },
+  {
+    ...SPEED, category: 'sport-skill', family: 'ladder-dribble', block: 'basketball-handles-2', pattern: 'locomotion', plane: 'sagittal', laterality: 'alternating', skillLayer: 'wake-up',
+    primary: ['calves', 'forearms'], secondary: ['quads', 'delts'], goals: ['handles', 'footwork'], sport: ['basketball'],
+    lowLoad: ['back', 'knee'], equipment: ['agility-ladder', 'basketball'], clip: 'dribble',
+    setup: 'Stand at the end of the agility ladder with the ball.',
+    cues: ['Quick, light contacts on the floor while the ball keeps a steady beat.', 'Eyes ahead down the ladder, not on the ball.', 'Clean first, then fast.'],
+    faults: [
+      { fault: 'Watching the ball and kicking the ladder', fix: 'Eyes ahead; slow down until the feet and the ball both stay clean.' },
+    ],
+    dosage: reps(3, '2 lengths', 30),
+    variants: ([
+      ['Ladder One Foot In with a Dribble', 'one-in', 0, 'One quick step in each square on the floor, pounding the ball beside you.'],
+      ['Ladder Two Feet In with a Dribble', 'two-in', 1, 'Two quick steps in each square on the floor, the ball pounding on the outside.'],
+      ['Ladder Lateral Two In with a Dribble', 'lat-two-in', 1, 'Side-on: two steps in each square on the floor, the ball on the outside hand.'],
+      ['Ladder In-In-Out-Out with a Dribble', 'in-out', 1, 'In, in, out, out along the ladder on the floor, a crossover at every square.'],
+      ['Ladder Hopscotch with a Dribble', 'hopscotch', 2, 'Hopscotch down the ladder on the floor while the ball keeps a steady beat.'],
+      ['Ladder Crossover Steps with a Dribble', 'crossover', 2, 'Cross over into each square on the floor, the ball switching hands as you go.'],
+    ] as const).map(([name, k, l, cue]) => va(name, k, l, { cue })),
   },
   {
     ...SPEED, family: 'quick-feet', block: 'speed-footwork', pattern: 'locomotion', plane: 'multi', laterality: 'alternating', skillLayer: 'wake-up',

@@ -28,6 +28,10 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 function comboVariants(): Variant[] {
   const out: Variant[] = [];
   const settings = (base: string, name: string, lvl: number, cueA: string): Variant[] => [
+    va(`${name} vs Pad Pressure`, key(base, 'pressure'), lv(lvl + 1), {
+      base, equipment: ['basketball'], setup: 'A partner stands in front with a pad, bumping and reaching for the ball.',
+      cue: 'Keep the ball low and on the side away from the pad through every move of the combo.', dosage: secs(3, 30, 30), ladder: base,
+    }),
     va(`${name} on the Move`, key(base, 'move'), lv(lvl), {
       base, equipment: ['basketball', 'cone'], setup: 'Cones in a line down the floor, 5 metres apart, ball in one hand.',
       cue: `Hit the combo at each cone, then push the ball ahead to the next one.`, dosage: meters(3, 25, 30), goals: ['handles', 'footwork'], ladder: base,
@@ -115,21 +119,24 @@ const APPROACH: Record<string, { label: string; setup: string }> = {
   cut: { label: 'off a Catch on the Cut', setup: 'Cut from the wing to the rim; a partner passes as you reach the lane.' },
   transition: { label: 'in Transition', setup: 'Start at half court with the ball and push it ahead at speed to the rim.' },
   top: { label: 'off a Two-Dribble Drive from the Top', setup: 'Start at the top of the key and attack the lane in two dribbles.' },
+  crossDrive: { label: 'off a Crossover Drive', setup: 'Start at the top with a cone at the elbow; cross over at the cone and attack the lane.' },
+  hesiDrive: { label: 'off a Hesitation Drive', setup: 'Start at the wing with a cone at the elbow; hesitate at the cone, then attack the rim.' },
+  spinDrive: { label: 'off a Spin Dribble', setup: 'Start at the wing; drive at a cone in the lane and spin off it toward the rim.' },
 };
 interface Finish { k: string; label: string; cue: string; lvl: number; from: string[]; contact: boolean }
 const FINISHES: readonly Finish[] = [
-  { k: 'overhand', label: 'Overhand Layup', cue: 'Drive the high knee up toward the target and lay the ball soft off the glass.', lvl: 0, from: ['wing', 'baseline', 'middle', 'cut', 'transition', 'top'], contact: true },
-  { k: 'reverse', label: 'Reverse Layup', cue: 'Carry the ball under the rim and finish on the far side, away from the reach.', lvl: 1, from: ['baseline', 'middle', 'transition', 'cut'], contact: true },
-  { k: 'floater', label: 'Floater', cue: 'Release early and high: a soft arc over the outstretched reach.', lvl: 1, from: ['middle', 'top', 'transition', 'wing'], contact: false },
-  { k: 'runner', label: 'One-Foot Runner', cue: 'Keep running through the release: a soft, high shot off the floor in stride.', lvl: 1, from: ['middle', 'top', 'transition', 'baseline'], contact: false },
-  { k: 'euro', label: 'Euro Step Layup', cue: 'Long first step one way, the second across, the ball moving with you.', lvl: 2, from: ['wing', 'top', 'transition', 'middle'], contact: true },
-  { k: 'fingerroll', label: 'Finger Roll', cue: 'Roll the ball off the fingertips up over the rim, soft and high.', lvl: 1, from: ['wing', 'transition', 'cut', 'top'], contact: true },
-  { k: 'scoop', label: 'Scoop Layup', cue: 'Scoop the ball underhand up around the reach, a soft touch off the glass.', lvl: 1, from: ['middle', 'transition', 'baseline'], contact: false },
-  { k: 'power', label: 'Two-Foot Power Finish', cue: 'Jump stop on two feet, ball high at the forehead, and go up strong to the rim.', lvl: 1, from: ['baseline', 'wing', 'cut', 'middle'], contact: true },
-  { k: 'inside', label: 'Inside-Hand Layup', cue: 'Finish with the hand nearer the middle of the floor, the ball away from the shot-blocker.', lvl: 2, from: ['baseline', 'middle', 'wing'], contact: true },
-  { k: 'prohop', label: 'Pro-Hop Layup', cue: 'Hop off one foot onto both, quiet and balanced, then rise to the rim.', lvl: 2, from: ['wing', 'top', 'transition'], contact: true },
+  { k: 'overhand', label: 'Overhand Layup', cue: 'Drive the high knee up toward the target and lay the ball soft off the glass.', lvl: 0, from: ['wing', 'baseline', 'middle', 'cut', 'transition', 'top', 'crossDrive', 'hesiDrive', 'spinDrive'], contact: true },
+  { k: 'reverse', label: 'Reverse Layup', cue: 'Carry the ball under the rim and finish on the far side, away from the reach.', lvl: 1, from: ['baseline', 'middle', 'transition', 'cut', 'crossDrive', 'spinDrive'], contact: true },
+  { k: 'floater', label: 'Floater', cue: 'Release early and high: a soft arc over the outstretched reach.', lvl: 1, from: ['middle', 'top', 'transition', 'wing', 'crossDrive', 'hesiDrive', 'spinDrive'], contact: false },
+  { k: 'runner', label: 'One-Foot Runner', cue: 'Keep running through the release: a soft, high shot off the floor in stride.', lvl: 1, from: ['middle', 'top', 'transition', 'baseline', 'crossDrive', 'hesiDrive'], contact: false },
+  { k: 'euro', label: 'Euro Step Layup', cue: 'Long first step one way, the second across, the ball moving with you.', lvl: 2, from: ['wing', 'top', 'transition', 'middle', 'crossDrive', 'hesiDrive'], contact: true },
+  { k: 'fingerroll', label: 'Finger Roll', cue: 'Roll the ball off the fingertips up over the rim, soft and high.', lvl: 1, from: ['wing', 'transition', 'cut', 'top', 'hesiDrive'], contact: true },
+  { k: 'scoop', label: 'Scoop Layup', cue: 'Scoop the ball underhand up around the reach, a soft touch off the glass.', lvl: 1, from: ['middle', 'transition', 'baseline', 'crossDrive', 'spinDrive'], contact: false },
+  { k: 'power', label: 'Two-Foot Power Finish', cue: 'Jump stop on two feet, ball high at the forehead, and go up strong to the rim.', lvl: 1, from: ['baseline', 'wing', 'cut', 'middle', 'crossDrive', 'spinDrive'], contact: true },
+  { k: 'inside', label: 'Inside-Hand Layup', cue: 'Finish with the hand nearer the middle of the floor, the ball away from the shot-blocker.', lvl: 2, from: ['baseline', 'middle', 'wing', 'crossDrive'], contact: true },
+  { k: 'prohop', label: 'Pro-Hop Layup', cue: 'Hop off one foot onto both, quiet and balanced, then rise to the rim.', lvl: 2, from: ['wing', 'top', 'transition', 'crossDrive', 'hesiDrive'], contact: true },
   { k: 'babyhook', label: 'Baby Hook Finish', cue: 'Shoulder to the rim, ball high, a soft one-hand hook over the reach.', lvl: 1, from: ['middle', 'baseline'], contact: false },
-  { k: 'jumpstop', label: 'Jump-Stop Pivot Finish', cue: 'Jump stop on two feet, pivot away from the cone, and finish off the glass.', lvl: 1, from: ['middle', 'top', 'baseline'], contact: true },
+  { k: 'jumpstop', label: 'Jump-Stop Pivot Finish', cue: 'Jump stop on two feet, pivot away from the cone, and finish off the glass.', lvl: 1, from: ['middle', 'top', 'baseline', 'crossDrive'], contact: true },
   { k: 'spin', label: 'Spin-Back Finish', cue: 'Spin off the cone, the ball tight through the turn, and finish on the far side.', lvl: 2, from: ['middle', 'baseline'], contact: false },
   { k: 'upunder', label: 'Shot-Fake Step-Through Finish', cue: 'Ball fake up toward the target, then step through under the fake and finish.', lvl: 2, from: ['baseline', 'middle'], contact: true },
 ];
@@ -140,6 +147,10 @@ function finishVariants(): Variant[] {
     const name = `${f.label} ${ap.label}`;
     const v = key(f.k, a);
     out.push(va(name, v, f.lvl, { setup: ap.setup, cue: f.cue, ladder: f.k }));
+    out.push(va(`${name}, Weak-Hand Side`, key(v, 'weak'), f.lvl + 1, {
+      base: v, ladder: f.k, setup: `${ap.setup} Every rep on your weaker side.`,
+      cues: ['The ball in your weaker hand on every rep: slower and clean beats fast and sloppy.', f.cue, 'Land quiet and balanced under the basket.'],
+    }));
     if (f.contact) {
       out.push(va(`${name}, Through a Pad Bump`, key(v, 'contact'), f.lvl + 1, {
         base: v, ladder: f.k, setup: `${ap.setup} A partner bumps you with a pad on the take-off.`,
@@ -163,12 +174,17 @@ const PULL_UPS: readonly [string, string, number, string][] = [
   ['Step-Back Jumper', 'step-back', 2, 'Push the floor away from the cone, land balanced and square, then rise.'],
   ['Side-Step Jumper', 'side-step', 2, 'Hop sideways off the drive, land quiet on the floor square to the target, and rise.'],
 ];
-const SPOTS: readonly [string, string, boolean][] = [['Wing', 'wing', true], ['Top', 'top', true], ['Elbow', 'elbow', false]];
+const SPOTS: readonly [string, string, boolean][] = [['Wing', 'wing', true], ['Top', 'top', true], ['Slot', 'slot', true], ['Elbow', 'elbow', false], ['Baseline', 'baseline', false]];
 function pullUpVariants(): Variant[] {
   const out: Variant[] = [];
   for (const [label, k, l, cue] of PULL_UPS) for (const [spot, sk, three] of SPOTS) {
     const v = key(k, sk);
     out.push(va(`${label}, ${spot}`, v, l, { cue, setup: `Start a step beyond the ${spot.toLowerCase()} spot inside the arc, ball in triple threat.`, ladder: k }));
+    // the weaker direction is the one that needs the reps: the same pull-up, finishing toward the weaker hand's side
+    out.push(va(`${label}, ${spot}, Toward the Weak Hand`, key(v, 'weak'), l + 1, {
+      base: v, ladder: k, cue: 'Go toward your weaker hand: same stop, same rise, the ball as low and tight as on your strong side.',
+      setup: `Start a step beyond the ${spot.toLowerCase()} spot inside the arc, ball in triple threat.`,
+    }));
     if (three) out.push(va(`${label}, ${spot} Three`, key(v, 'three'), l + 1, { base: v, ladder: k, cue, setup: `Start a step beyond the three-point line at the ${spot.toLowerCase()}, ball in triple threat.`, goals: ['shooting'] }));
   }
   return out;
@@ -316,6 +332,57 @@ function passingVariants(): Variant[] {
   return out;
 }
 
+// ── spot shooting by spot × side × range, shooting footwork, full-court and rebounding drills ─────────────────────
+
+const SPOT_SHOTS: readonly [string, string, boolean, boolean][] = [
+  // spot, key, has sides, has a three
+  ['Corner', 'corner', true, true], ['Wing', 'wing', true, true], ['Slot', 'slot', true, true], ['Top', 'top', false, true],
+  ['Elbow', 'elbow', true, false], ['Short Corner', 'short-corner', true, false], ['Block Bank Shot', 'block', true, false],
+];
+function spotShootingVariants(): Variant[] {
+  const out: Variant[] = [];
+  for (const [spot, sk, sided, three] of SPOT_SHOTS) {
+    const sides: [string, string][] = sided ? [['Left ', 'left'], ['Right ', 'right']] : [['', 'centre']];
+    const ranges: [string, string][] = three ? [['Mid-Range', 'mid'], ['Three', 'three']] : [['', 'mid']];
+    for (const [side, dk] of sides) for (const [range, rk] of ranges) {
+      const label = `${side}${spot}${range ? ` ${range}` : ''}`.trim();
+      const v = key(sk, dk, rk);
+      out.push(va(`Spin-Out Shooting, ${label}`, v, rk === 'three' ? 1 : 0, {
+        cue: 'Spin the ball out in front, catch it on the hop square to the target, and rise.', setup: `Stand at the ${label.toLowerCase()} spot with the ball.`, ladder: sk,
+      }));
+      out.push(va(`Catch-and-Shoot from a Pass, ${label}`, key(v, 'pass'), rk === 'three' ? 1 : 0, {
+        base: v, ladder: sk, cue: 'Hands ready as a target, catch square to the target, and rise in one motion.', setup: `Stand at the ${label.toLowerCase()} spot; a partner passes from the top or the paint.`,
+      }));
+    }
+  }
+  return out;
+}
+const SHOT_FOOTWORK: readonly [string, string, number, string][] = [
+  ['Hop into Shot Footwork', 'hop', 0, 'Hop onto both feet at once, quiet, square to the target, and rise.'],
+  ['One-Two Step into Shot Footwork', 'one-two', 0, 'Step one-two into the spot, square to the target, and rise.'],
+  ['Turn-and-Face into Shot', 'turn-face', 1, 'Catch with your back to the target, pivot to face it, and rise.'],
+  ['Sprint to Spot and Set', 'sprint-set', 1, 'Sprint to the spot, stop on two feet square to the target, and set the shot.'],
+  ['Pivot into Shot off the Catch', 'pivot-catch', 1, 'Catch, pivot square to the target on the inside foot, and rise.'],
+  ['Step-In Footwork', 'step-in', 0, 'Start a step behind the spot, step in square to the target, and rise.'],
+  ['Shot Fake, Step-Through Footwork', 'fake-through', 1, 'Ball fake up, step through past the cone, and finish the shot off one dribble.'],
+  ['Relocate and Set', 'relocate-set', 1, 'Pass, slide one spot along the arc, set square to the target, and catch.'],
+];
+const FULL_COURT: readonly [string, string, number, string, Partial<Variant>?][] = [
+  ['Full-Court Weak-Hand Speed Dribble to Layup', 'weak-speed', 1, 'Push the ball ahead with the weaker hand the whole way, then finish with it.'],
+  ['Two-Ball Full-Court Dribble', 'two-ball', 2, 'Speed dribble both balls down the floor and back, both hitting the floor hard.'],
+  ['Full-Court Zig-Zag to Layup', 'zig-zag-layup', 1, 'Change hands at every cone down the floor, then attack the rim and finish.', { equipment: ['basketball', 'hoop', 'cone'] }],
+  ['Full-Court Retreat Dribble Series', 'retreat-series', 1, 'Attack each cone, two retreat dribbles, cross, and go to the next.', { equipment: ['basketball', 'cone'] }],
+  ['Coast-to-Coast Euro Step Layup', 'coast-euro', 2, 'Push the ball the length of the floor and finish with a long euro step.'],
+  ['Full-Court Change-of-Pace Dribble', 'change-pace', 1, 'Slow to each line on the floor, then burst past it: slow, fast, slow, fast.'],
+];
+const REBOUND: readonly [string, string, number, string][] = [
+  ['Rebound, Chin and Pivot', 'chin-pivot', 0, 'Catch the ball at its highest point, bring it to the chin, and pivot away from the cone.'],
+  ['Rebound and Two-Foot Put-Back', 'two-foot-putback', 1, 'Catch the miss, land quiet on the floor, and go straight back up to the glass.'],
+  ['Rebound and Outlet off the Glass', 'outlet-glass', 1, 'Toss the ball off the glass, rebound it high, and pivot to throw the outlet.'],
+  ['Off-Hand Tip Drill', 'tip-off', 1, 'Tip the ball off the glass with the weaker hand, again and again, at the top.'],
+  ['Crash and Tip-Out', 'tip-out', 1, 'Crash to the rim on the shot and tip the ball out toward the partner on the arc.'],
+];
+
 // ── the families ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 const BB = { sport: ['basketball'] as Family['sport'], youthOk: true, batch: BATCH };
@@ -444,5 +511,46 @@ export const LATER_BASKETBALL: Family[] = [
       { fault: 'Passing where the partner was, not where they go', fix: 'Lead the partner: throw to the space they are moving into.' },
     ],
     dosage: reps(3, '10', 20), variants: passingVariants(),
+  },
+  {
+    ...BB, family: 'spot-shooting', block: 'basketball-shooting-2', category: 'sport-skill', pattern: 'push', plane: 'sagittal', laterality: 'unilateral', skillLayer: 'speed', braceMode: 'reflex',
+    primary: ['quads', 'triceps', 'delts'], secondary: ['calves', 'forearms'], goals: ['shooting'], lowLoad: ['back'], equipment: ['basketball', 'hoop'], clip: 'shoot',
+    setup: 'Stand at the spot with the ball.',
+    cues: ['Square to the target on the catch, then rise straight up.', 'Release at the top and hold the follow-through to the target.', 'Land on the spot you left from, quiet.'],
+    faults: [
+      { fault: 'Drifting forward or sideways', fix: 'Rise straight up and land on the spot you left from.' },
+      { fault: 'A slow, low catch', fix: 'Catch the ball high and ready, square to the target, and go.' },
+    ],
+    dosage: reps(3, '5 makes', 30), variants: spotShootingVariants(),
+  },
+  {
+    ...BB, family: 'shooting-footwork', block: 'basketball-shooting-2', category: 'sport-skill', pattern: 'locomotion', plane: 'multi', laterality: 'bilateral', skillLayer: 'speed', braceMode: 'reflex',
+    primary: ['quads', 'calves'], secondary: ['glutes', 'adductors'], goals: ['shooting', 'footwork'], lowLoad: ['back'], equipment: ['basketball', 'hoop'], clip: 'shoot',
+    setup: 'Start a step or two from the shooting spot, ball in hand or a partner passing.',
+    cues: ['Arrive square to the target, quiet on the floor.', 'Same footwork every rep, then the same rise.', 'Slow and clean first, then game speed.'],
+    faults: [
+      { fault: 'Arriving off balance', fix: 'Slow the footwork until you land square and still, then speed it up.' },
+    ],
+    dosage: reps(3, '8', 30), variants: SHOT_FOOTWORK.map(([name, k, l, cue]) => va(name, k, l, { cue })),
+  },
+  {
+    ...BB, family: 'full-court-handles', block: 'basketball-handles-2', category: 'sport-skill', pattern: 'locomotion', plane: 'sagittal', laterality: 'alternating', skillLayer: 'speed', braceMode: 'reflex',
+    primary: ['quads', 'calves', 'forearms'], secondary: ['glutes', 'delts'], goals: ['handles', 'conditioning'], lowLoad: ['back'], equipment: ['basketball', 'hoop'], clip: 'dribble',
+    setup: 'Start on the baseline with the ball.',
+    cues: ['Push the ball out ahead and run to it.', 'Eyes up the floor, not on the ball.', 'Finish under control: speed you can stop.'],
+    faults: [
+      { fault: 'Ball too close, slowing the run', fix: 'Push the ball further ahead and run onto it.' },
+    ],
+    dosage: reps(4, '1 length', 45), variants: FULL_COURT.map(([name, k, l, cue, over]) => va(name, k, l, { cue, ...(over ?? {}) })),
+  },
+  {
+    ...BB, family: 'rebounding-2', block: 'basketball-finishing-2', category: 'sport-skill', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral', skillLayer: 'jump-land', braceMode: 'reflex',
+    primary: ['quads', 'calves', 'glutes'], secondary: ['forearms', 'delts'], goals: ['finishing', 'vertical'], lowLoad: ['back'], equipment: ['basketball', 'hoop'], clip: 'jump',
+    setup: 'Stand under the basket with the ball.',
+    cues: ['Catch the ball at its highest point.', 'Land on two feet, quiet and balanced.', 'Ball to the chin, away from the reach.'],
+    faults: [
+      { fault: 'Waiting for the ball to come down', fix: 'Go up and catch it at its highest point.' },
+    ],
+    dosage: reps(3, '8', 30), variants: REBOUND.map(([name, k, l, cue]) => va(name, k, l, { cue })),
   },
 ];

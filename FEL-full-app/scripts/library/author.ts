@@ -135,12 +135,12 @@ export function modifierBase(seed: readonly LibraryExercise[], batch1: readonly 
  * A batch's modifiers: each applied to every base its rule accepts (lib/library/modifiers.ts ruleFailures — the rule the
  * validator enforces), one level deep (never on another variant), never onto a name an earlier entry holds.
  */
-export function buildModifierBatch(base: readonly LibraryExercise[], batch: number, known: Known | Set<string>): LibraryExercise[] {
+export function buildModifierBatch(base: readonly LibraryExercise[], batch: number, known: Known | Set<string>, later: readonly LibraryExercise[] = []): LibraryExercise[] {
   const out: LibraryExercise[] = [];
   const has = (k: string) => (known instanceof Set ? known.has(k) : known.has(k));
   const claim = (k: string, id: string) => { if (known instanceof Set) known.add(k); else known.set(k, id); };
   for (const m of MODIFIERS.filter((x) => x.batch === batch)) {
-    for (const b of base) {
+    for (const b of m.pool === 'all' ? [...base, ...later] : base) {
       if (b.variantOf || ruleFailures(m.rule, b).length) continue;
       const name = m.name(b.name);
       if (name.length > 80 || name === b.name) continue;
@@ -175,9 +175,11 @@ export function buildAll(seed: readonly LibraryExercise[]): { batches: Map<numbe
   batches.set(1, b1.entries);
   linked.set(1, b1.linked);
   const modBase = modifierBase(seed, b1.entries);
+  const later: LibraryExercise[] = [];
   for (const n of [2, 3, 4]) {
     const fam = buildFamilies(LATER_BLOCKS.filter((f) => f.batch === n), n, known);
-    batches.set(n, [...fam.entries, ...buildModifierBatch(modBase, n, known)]);
+    later.push(...fam.entries);
+    batches.set(n, [...fam.entries, ...buildModifierBatch(modBase, n, known, later)]);
     linked.set(n, fam.linked);
   }
   return { batches, linked };
