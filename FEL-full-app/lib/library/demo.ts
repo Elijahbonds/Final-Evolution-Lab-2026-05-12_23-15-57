@@ -153,6 +153,31 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_pushup', families: ['triceps-accessory'], bases: /^close-push-up$/ },
   { clip: 'ex_plank_high', families: ['isometric-hold'], bases: /^push-up-top$/ },
   { clip: 'ex_plank_high', families: ['plank'], bases: /^high$/ },
+  // ── LIBRARY-ANATOMY-2: one arm, arm after arm, and the lifts the first pass had no loop for ──
+  { clip: 'ex_curl_alt', families: ['curl'], bases: /^(alternat-bicep-curl|alternat-hammer-curl)$/ },
+  { clip: 'ex_curl_one', families: ['curl'], bases: /^stand-singl-arm-curl$/ },
+  { clip: 'ex_curl', families: ['curl'], bases: /^wid-grip-stand-curl$/ },
+  { clip: 'ex_press_alt', families: ['overhead-press'], bases: /^(alternat-shoulder-press|alternat-press|stand-alternat-press)$/ },
+  { clip: 'ex_press_one', families: ['overhead-press'], bases: /^(singl-arm-shoulder-press|stand-palm-singl-arm-press|kb)$/ },
+  { clip: 'ex_press_hk_one', families: ['overhead-press'], bases: /^db-hk$/ },
+  { clip: 'ex_lateral_raise_alt', families: ['raise'], bases: /^alternat-deltoid-rais$/ },
+  { clip: 'ex_lateral_raise_one', families: ['raise'], bases: /^singl-arm-sid-lateral$/ },
+  { clip: 'ex_scaption', families: ['raise'], bases: /^scaption$/ },
+  { clip: 'ex_front_raise_overhead', families: ['raise'], bases: /^(stand-front-rais-over-head|stand-straight-arm-front-shoulder-rais-abov-head)$/ },
+  { clip: 'ex_reverse_fly', families: ['raise'], bases: /^bent-over-rear-shoulder-rais-head-bench$/ },
+  { clip: 'ex_reverse_fly', families: ['rear-delt-face-pull'], bases: /^(back-fly|rear-shoulder-fly|revers-fly)$/ },
+  { clip: 'ex_pull_apart', families: ['rear-delt-face-pull'], bases: /^pull-apart$/ },
+  { clip: 'ex_face_pull', families: ['rear-delt-face-pull'], bases: /^(fac-pull|rop-rear-shoulder-row)$/ },
+  { clip: 'ex_face_pull', families: ['upper-back'], bases: /^face-pull-band$/ },
+  { clip: 'ex_face_pull', families: ['pull-extra'], bases: /^strap-face-pull$/ },
+  { clip: (_b, eq) => (eq.includes('dumbbell') ? 'ex_triceps_overhead_one' : null), families: ['triceps'], bases: /^singl-arm-tricep-extension$/ },
+  { clip: 'ex_triceps_overhead_one', families: ['triceps'], bases: /^stand-singl-arm-tricep-extension$/ },
+  { clip: 'ex_pushdown', families: ['triceps'], bases: /^(tricep-pushdown-rop-attachment|tricep-pushdown-v-bar-attachment)$/ },
+  { clip: 'ex_kickback', families: ['triceps'], bases: /^(tricep-kickback|stand-bent-over-two-arm-tricep-extension)$/ },
+  { clip: 'ex_kickback_one', families: ['triceps'], bases: /^stand-bent-over-singl-arm-tricep-extension$/ },
+  { clip: 'ex_row_alt', families: ['row'], bases: /^alternat-row$/ },
+  { clip: 'ex_row_one', families: ['row'], bases: /^singl-arm-row$/ },
+  { clip: 'ex_upright_row_one', families: ['upright-row-shrug'], bases: /^singl-arm-upright-row$/ },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -269,6 +294,11 @@ export const ISO_HOLD_SEC: Readonly<Record<string, number>> = {
   ex_triceps_overhead: 0.4, ex_pushdown: 0.75, ex_pushup: 0.95, ex_bridge: 1.0, ex_calf_raise: 0.8, ex_crunch: 0.85,
   ex_seated_press: 0.38, ex_seated_curl: 0.4, ex_seated_lateral_raise: 0.85, ex_seated_triceps: 0.4, ex_bench_press: 1.1, ex_floor_press: 1.0,
   ex_skull_crusher: 1.0, ex_incline_press: 1.1,
+  // LIBRARY-ANATOMY-2: a one-arm or kneeling loop holds where its two-arm lift does (the same two poses, the same timing)
+  ex_curl_one: 0.4, ex_press_one: 0.38, ex_lateral_raise_one: 0.85, ex_front_raise_one: 0.85, ex_triceps_overhead_one: 0.4, ex_pushdown_one: 0.75,
+  ex_row_one: 0.85, ex_upright_row_one: 0.85, ex_seated_press_one: 0.38, ex_seated_curl_one: 0.4, ex_seated_lateral_raise_one: 0.85, ex_seated_triceps_one: 0.4,
+  ex_skull_crusher_one: 1.0, ex_incline_press_one: 1.1, ex_press_hk: 0.38, ex_press_hk_one: 0.38,
+  ex_kickback: 0.75, ex_kickback_one: 0.75, ex_reverse_fly: 0.95, ex_pull_apart: 0.85, ex_face_pull: 0.85, ex_scaption: 0.85,
 };
 
 export interface DemoPick {
@@ -277,14 +307,40 @@ export interface DemoPick {
   hold: number | null;
 }
 
+/**
+ * LIBRARY-ANATOMY-2 (2026-10-25): a SHAPE modifier turns a loop into the loop that does that version — one arm, arm after
+ * arm, from a half-kneel, the off hand — and only these: a modifier with no row for the loop shows the cue card, as every
+ * shape modifier did before. Each row is a loop authored for it (anim/authored/exerciseMore.ts: the same two poses as the
+ * two-arm lift). Modifiers chain in the order the variation names them (half-kneeling then single-arm, or the reverse).
+ */
+export const MODIFIER_LOOPS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  'single-arm': {
+    ex_curl: 'ex_curl_one', ex_press: 'ex_press_one', ex_lateral_raise: 'ex_lateral_raise_one', ex_front_raise: 'ex_front_raise_one',
+    ex_triceps_overhead: 'ex_triceps_overhead_one', ex_pushdown: 'ex_pushdown_one', ex_row: 'ex_row_one', ex_upright_row: 'ex_upright_row_one',
+    ex_seated_press: 'ex_seated_press_one', ex_seated_curl: 'ex_seated_curl_one', ex_seated_lateral_raise: 'ex_seated_lateral_raise_one',
+    ex_seated_triceps: 'ex_seated_triceps_one', ex_skull_crusher: 'ex_skull_crusher_one', ex_fly: 'ex_fly_one', ex_incline_press: 'ex_incline_press_one',
+    ex_incline_fly: 'ex_incline_fly_one', ex_kickback: 'ex_kickback_one', ex_press_hk: 'ex_press_hk_one',
+  },
+  alternating: {
+    ex_curl: 'ex_curl_alt', ex_press: 'ex_press_alt', ex_lateral_raise: 'ex_lateral_raise_alt', ex_front_raise: 'ex_front_raise_alt', ex_row: 'ex_row_alt',
+    ex_seated_press: 'ex_seated_press_alt', ex_seated_curl: 'ex_seated_curl_alt', ex_incline_press: 'ex_incline_press_alt', ex_press_hk: 'ex_press_hk_alt',
+  },
+  'half-kneeling': { ex_press: 'ex_press_hk', ex_press_one: 'ex_press_hk_one', ex_press_alt: 'ex_press_hk_alt' },
+  // the finishes the court plays with either hand (the right-hand loop's own left-hand twin)
+  'off-hand': {
+    bball_hook: 'bball_hook_left', bball_layup_reverse: 'bball_layup_reverse_left', bball_floater: 'bball_floater_left', bball_euro_step: 'bball_euro_step_left',
+    bball_finger_roll: 'bball_finger_roll_left', bball_layup_scoop: 'bball_layup_scoop_left', bball_up_and_under: 'bball_up_and_under_left', bball_layup_gather: 'bball_layup_gather_left',
+  },
+};
+
 /** What a library entry shows on the stage: its loop (or that loop held still), or null — the cue card. */
 export function demoFor(e: { family: string; variation: string; equipment: readonly string[] }): DemoPick | null {
   const [base, ...mods] = e.variation.split('+');
   const iso = mods.includes('iso-hold');
-  if (mods.some((m) => m !== 'iso-hold' && SHAPE_MODIFIERS.has(m))) return null;
   for (const r of RULES_BY_FAMILY.get(e.family) ?? []) {
     if (!r.bases.test(base)) continue;
-    const clip = typeof r.clip === 'string' ? r.clip : r.clip(base, e.equipment);
+    let clip = typeof r.clip === 'string' ? r.clip : r.clip(base, e.equipment);
+    for (const m of mods) if (clip && m !== 'iso-hold' && SHAPE_MODIFIERS.has(m)) clip = MODIFIER_LOOPS[m]?.[clip] ?? null;
     if (!clip) return null;
     if (!iso) return { clip, hold: null };
     return clip in ISO_HOLD_SEC ? { clip, hold: ISO_HOLD_SEC[clip] } : null;
@@ -302,19 +358,22 @@ export const DEMO_CLIPS: readonly string[] = (() => {
     if (typeof r.clip === 'string') out.add(r.clip);
     else for (const b of ['x', 'x-weak']) for (const eq of [[], ['barbell']]) { const c = r.clip(b, eq); if (c) out.add(c); }
   }
+  for (const table of Object.values(MODIFIER_LOOPS)) for (const c of Object.values(table)) out.add(c);
   return [...out].sort();
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
 export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press']);
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
-export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row']);
+export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_reverse_fly', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. */
 export type DemoProp = 'seat' | 'bench' | 'incline';
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',
   ex_bench_press: 'bench', ex_fly: 'bench', ex_skull_crusher: 'bench', ex_incline_press: 'incline', ex_incline_fly: 'incline',
+  ex_seated_press_one: 'seat', ex_seated_press_alt: 'seat', ex_seated_curl_one: 'seat', ex_seated_curl_alt: 'seat', ex_seated_lateral_raise_one: 'seat',
+  ex_seated_triceps_one: 'seat', ex_skull_crusher_one: 'bench', ex_fly_one: 'bench', ex_incline_press_one: 'incline', ex_incline_press_alt: 'incline', ex_incline_fly_one: 'incline',
 };
 /** Ball-handling and finishing loops: the stage draws no ball, and the card says so. */
 export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot');

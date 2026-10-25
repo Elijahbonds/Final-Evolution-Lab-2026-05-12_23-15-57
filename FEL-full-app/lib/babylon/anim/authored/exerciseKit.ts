@@ -134,3 +134,32 @@ export const INCLINED: Omit<ExKey, 't' | 'hands' | 'rel' | 'poles'> = {
   feet: both(0.22, ANKLE, 0.46), kneePoles: bothDir(0.2, 0.6, 1), hipsY: INCLINE_Y,
 };
 export const incline = (e: Omit<ExKey, 't'>): Omit<ExKey, 't'> => ({ ...INCLINED, ...e, bones: { ...INCLINED.bones, ...(e.bones ?? {}) }, hipsY: INCLINE_Y });
+
+// ── the standing (and seated) upper-body lifts as data: [start, end of range, seconds down, held, up, rested] ──────────
+export interface RepPair { a: Omit<ExKey, 't'>; b: Omit<ExKey, 't'>; t: [number, number, number, number] }
+const PRESS_BASE = { bones: { ...STAND, Spine: [0, 0, 0] as Deg3 }, feet: STANCE };
+const ROW_FEET = both(0.14, ANKLE, 0.18);
+const ROW_BONES = { Hips: [48, 0, 0] as Deg3, Spine: [4, 0, 0] as Deg3, Neck: [-24, 0, 0] as Deg3, LeftLeg: [18, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 };
+const PUSHDOWN_BONES = { ...STAND, Spine: [8, 0, 0] as Deg3 };
+export const UPPER = {
+  press: { a: { ...PRESS_BASE, rel: RACK, poles: bothDir(0.4, -1, 0.3), hipsY: 0 }, b: { ...PRESS_BASE, bones: { ...PRESS_BASE.bones, Neck: [4, 0, 0] as Deg3 }, rel: OVERHEAD, poles: bothDir(1, 0.1, -0.1), hipsY: 0 }, t: [0.8, 0.25, 1.0, 0.35] },
+  curl: { a: { bones: STAND, feet: STANCE, hands: both(0.22, 0.86, 0.10), poles: ELBOWS_BACK, hipsY: 0 }, b: { bones: STAND, feet: STANCE, hands: both(0.20, 1.34, 0.20), poles: bothDir(0.15, -0.8, -0.6), hipsY: 0 }, t: [0.8, 0.2, 1.0, 0.3] },
+  lateral: { a: { bones: STAND, feet: STANCE, hands: both(0.22, 0.86, 0.12), poles: ELBOWS_OUT, hipsY: 0 }, b: { bones: STAND, feet: STANCE, hands: both(0.74, 1.38, 0.10), poles: bothDir(0.2, 0.6, -0.8), hipsY: 0 }, t: [0.8, 0.2, 1.0, 0.3] },
+  front: { a: { bones: STAND, feet: STANCE, hands: both(0.17, 0.86, 0.16), poles: ELBOWS_OUT, hipsY: 0 }, b: { bones: STAND, feet: STANCE, hands: both(0.18, 1.40, 0.60), poles: ELBOWS_OUT, hipsY: 0 }, t: [0.8, 0.2, 1.0, 0.3] },
+  row: { a: { bones: ROW_BONES, feet: ROW_FEET, kneePoles: bothDir(0.1, 0, 1), rel: { Left: [0.04, -0.50, 0.06] as V3, Right: [-0.04, -0.50, 0.06] as V3 }, poles: ELBOWS_OUT, hipsY: -0.08 }, b: { bones: ROW_BONES, feet: ROW_FEET, kneePoles: bothDir(0.1, 0, 1), rel: { Left: [-0.02, -0.30, -0.22] as V3, Right: [0.02, -0.30, -0.22] as V3 }, poles: bothDir(0.4, 0.5, -0.8), hipsY: -0.08 }, t: [0.7, 0.3, 0.9, 0.3] },
+  upright: { a: { bones: STAND, feet: STANCE, hands: both(0.10, 0.84, 0.14), poles: ELBOWS_OUT, hipsY: 0 }, b: { bones: STAND, feet: STANCE, hands: both(0.10, 1.36, 0.16), poles: bothDir(1, 0.5, 0), hipsY: 0 }, t: [0.8, 0.2, 0.9, 0.3] },
+  tricepsOverhead: { a: { bones: STAND, feet: STANCE, rel: { Left: [0.14, 0.22, -0.14] as V3, Right: [-0.14, 0.22, -0.14] as V3 }, poles: bothDir(0.2, 1, 0.3), hipsY: 0 }, b: { bones: STAND, feet: STANCE, rel: { Left: [0.12, 0.52, 0.02] as V3, Right: [-0.12, 0.52, 0.02] as V3 }, poles: bothDir(0.2, 1, 0.3), hipsY: 0 }, t: [0.8, 0.2, 1.0, 0.3] },
+  pushdown: { a: { bones: PUSHDOWN_BONES, feet: STANCE, hands: both(0.15, 1.12, 0.30), poles: ELBOWS_BACK, hipsY: 0 }, b: { bones: PUSHDOWN_BONES, feet: STANCE, hands: both(0.16, 0.86, 0.18), poles: ELBOWS_BACK, hipsY: 0 }, t: [0.7, 0.2, 0.9, 0.3] },
+  seatedPress: { a: seat({ rel: RACK, poles: bothDir(0.4, -1, 0.3) }), b: seat({ rel: OVERHEAD, poles: bothDir(1, 0.1, -0.1) }), t: [0.8, 0.25, 1.0, 0.35] },
+  seatedCurl: { a: seat({ hands: both(0.25, 0.86 + SEAT_Y, 0.08), poles: ELBOWS_BACK }), b: seat({ hands: both(0.21, 1.34 + SEAT_Y, 0.20), poles: bothDir(0.15, -0.8, -0.6) }), t: [0.8, 0.2, 1.0, 0.3] },
+  seatedLateral: { a: seat({ hands: both(0.25, 0.86 + SEAT_Y, 0.10), poles: ELBOWS_OUT }), b: seat({ hands: both(0.74, 1.38 + SEAT_Y, 0.10), poles: bothDir(0.2, 0.6, -0.8) }), t: [0.8, 0.2, 1.0, 0.3] },
+  seatedTriceps: { a: seat({ rel: { Left: [0.14, 0.22, -0.14], Right: [-0.14, 0.22, -0.14] }, poles: bothDir(0.2, 1, 0.3) }), b: seat({ rel: { Left: [0.12, 0.52, 0.02], Right: [-0.12, 0.52, 0.02] }, poles: bothDir(0.2, 1, 0.3) }), t: [0.8, 0.2, 1.0, 0.3] },
+  bench: { a: lie({ hands: both(0.24, 1.10, -0.44), poles: bothDir(0.7, -0.5, 0) }), b: lie({ hands: both(0.27, 0.70, -0.34), poles: bothDir(0.7, -0.7, 0.1) }), t: [1.0, 0.2, 0.9, 0.35] },
+  fly: { a: lie({ hands: both(0.12, 1.08, -0.42), poles: bothDir(0.6, -0.3, 0.2) }), b: lie({ hands: both(0.70, 0.66, -0.40), poles: bothDir(0.2, -1, 0.1) }), t: [1.1, 0.2, 1.0, 0.35] },
+  skull: { a: lie({ hands: both(0.12, 1.10, -0.46), poles: bothDir(0.2, 0.6, 0.6) }), b: lie({ hands: both(0.11, 0.78, -0.70), poles: bothDir(0.15, 1, 0.3) }), t: [0.9, 0.2, 0.9, 0.35] },
+  inclinePress: { a: incline({ hands: both(0.22, 1.42, -0.26), poles: bothDir(0.7, -0.3, 0.1) }), b: incline({ hands: both(0.28, 1.04, -0.14), poles: bothDir(0.7, -0.7, 0.2) }), t: [1.0, 0.2, 0.9, 0.35] },
+  inclineFly: { a: incline({ hands: both(0.12, 1.42, -0.26), poles: bothDir(0.6, -0.3, 0.2) }), b: incline({ hands: both(0.68, 1.00, -0.22), poles: bothDir(0.2, -1, 0.1) }), t: [1.1, 0.2, 1.0, 0.35] },
+} satisfies Record<string, RepPair>;
+
+/** rep() over a RepPair. */
+export const repOf = (scene: Scene, sk: Skeleton, name: string, p: RepPair): AnimationGroup | null => rep(scene, sk, name, p.a, p.b, ...p.t);
