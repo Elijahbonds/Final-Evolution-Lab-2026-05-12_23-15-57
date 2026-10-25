@@ -61,6 +61,12 @@ export default async function TrainPage() {
       tag: 'Check it',
     },
     {
+      // COACH-READINESS (2026-10-25): the 30-second daily jump check (verified adults; the page says so to anyone else)
+      href: '/train/readiness', icon: Activity, accent: '#00FF9D', title: 'Readiness check',
+      line: 'Three jumps a day against your own normal: ready, normal or low. A low day eases your coached session and your coach is told. 18 and over.',
+      tag: 'Check in',
+    },
+    {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
       // camera (/play/drills). The page reads the age and today's checks itself and holds back the jumps they say to;
       // this card reads nothing, so it is the same for every account.

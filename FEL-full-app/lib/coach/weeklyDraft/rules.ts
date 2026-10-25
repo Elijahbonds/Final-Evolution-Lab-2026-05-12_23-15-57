@@ -43,6 +43,7 @@ import {
 } from './thresholds';
 import type { ClientDraft, Confidence, DraftCatalogueRow, DraftChange, DraftFacts, DraftOp, Exposure, HeldItem, OpFields } from './types';
 import { changeId, weekKeyOf } from './week';
+import { draftTrigger as jumpReadinessTrigger } from '../readiness/rules';   // COACH-READINESS (2026-10-25)
 
 const DAY = 86_400_000;
 /** Sections whose rows carry the week's training load (prep, prime and cool-down are left as written). */
@@ -124,6 +125,7 @@ export function draftForClient(f: DraftFacts): ClientDraft {
     context.push(f.pain == null ? 'Pain check-ins: not read.' : f.pain.present ? (f.pain.detailed ? 'Pain check-ins: shared with you.' : 'Pain check-ins: an exercise was paused; details not shared with you.') : 'Pain check-ins: nothing flagged in two weeks.');
     context.push(f.readiness == null ? 'Readiness: not shared with you.' : `Readiness: low on ${f.readiness.lowDays} of their last ${f.readiness.days} check-ins.`);
     context.push(f.numbersShared || f.form != null || f.jump != null ? 'Mirror form and jump numbers: shared with you.' : 'Mirror form and jump numbers: not shared with you.');
+    if (f.jumpReadiness) context.push(`Daily jump check: Low on ${f.jumpReadiness.lowDays} of their last ${f.jumpReadiness.days} checks.`);
   }
   if (f.drill) context.push(`Daily drill focus: ${f.drill.focus}${f.drill.display ? ` (${f.drill.display})` : ''}.`);
   if (f.availability === 'limited') context.push('You marked them Limited: nothing moves up.');
@@ -194,6 +196,9 @@ export function draftForClient(f: DraftFacts): ClientDraft {
     triggers.push({ line: `Their top-set effort has averaged ${Math.round(meanTop * 10) / 10} over ${tops.length} logged exercises in ${DRAFT_LOOKBACK_DAYS} days.`, sensitive: false });
   }
   if (f.readiness && f.readiness.lowDays >= READINESS_LOW_DAYS) triggers.push({ line: `Readiness was low on ${f.readiness.lowDays} of their last ${f.readiness.days} check-ins.`, sensitive: true });
+  // COACH-READINESS (2026-10-25): the daily jump check's Low days feed the same lighter week (sensitive: health-adjacent)
+  const jumpLow = jumpReadinessTrigger(f.jumpReadiness);
+  if (jumpLow) triggers.push({ line: jumpLow, sensitive: true });
   if (f.prq && f.prq.before - f.prq.now >= OFF_BASELINE_DROP) triggers.push({ line: `Their PRQ is down ${Math.round((f.prq.before - f.prq.now) * 10) / 10} (${f.prq.before} → ${f.prq.now}) over two weeks.`, sensitive: false });
   if (!painOpen && triggers.length) {
     const { ops, whats } = stepRows(work, (r) => easeStep(r, youth));

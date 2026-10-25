@@ -104,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -138,4 +138,7 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   // COACH-VIDEO-REVIEW (2026-10-24): a filmed set sent to the athlete's coach — pose keypoints, rep scores and flags, never
   // video. Adults: this gate; 13–17: off in code (lib/coach/formReview/gate.ts TEEN_POSE_REVIEW_ENABLED, an owner call).
   { id: '1k', file: 'app/api/coach/form-reviews/route.ts', handler: 'POST', writes: 'CoachFormReview (pose keypoints, rep scores and flags; pending SQL 2026-10-24-coach-form-review.sql)', status: 'gated', holder: null, via: ['lib/coach/formReview/server.ts', 'lib/coach/formReview/store.ts'] },
+  // COACH-READINESS (2026-10-25): the daily jump check — the day's jump NUMBERS (best, mean, typical error, the band), never
+  // a frame. Verified adults who opted in; everyone else keeps the history on their own phone (lib/coach/readiness/gate.ts).
+  { id: '1l', file: 'app/api/readiness/check/route.ts', handler: 'POST', writes: 'ReadinessJumpCheck (the day\'s jump numbers and band; pending SQL 2026-10-25-coach-readiness.sql) and the ReadinessAlert it fires', status: 'gated', holder: null, via: ['lib/coach/readiness/server.ts', 'lib/coach/readiness/store.ts'] },
 ];

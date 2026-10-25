@@ -50,6 +50,7 @@ import { coachDraft, type CatalogueExercise } from '../mirrorToProgram';
 import { TREE_INCLUDE, toTree } from '../server';
 import { logHasContent, logHasWork } from '../setLog';
 import { teenGate } from '../teenGate';
+import { draftFacts as jumpReadinessFacts } from '../readiness/server';   // COACH-READINESS (2026-10-25): the jump check's lows
 import type { AiCaller } from './ai';
 import { polishWithAi } from './ai';
 import { SKIP_COPY } from './copy';
@@ -152,10 +153,11 @@ export async function readRosterFacts(db: DraftReadDb, coachId: string, now: Dat
   const canSave = new Set(adults.filter((id) => profileGates(users.find((u) => u.id === id)?.dobYear ?? null, optIns.find((o) => o.userId === id) ?? null, now).canSaveScan));
   const numbersFor = adults.filter((id) => shared.has(id) && canSave.has(id));
   const sharedOnly = adults.filter((id) => shared.has(id));
-  const [readiness, jumpScans, mirror] = await Promise.all([
+  const [readiness, jumpScans, mirror, jumpReady] = await Promise.all([
     sharedOnly.length ? soft(db.readinessCheckIn.findMany({ where: { userId: { in: sharedOnly }, updatedAt: { gte: new Date(nowMs - 7 * DAY) } }, select: { userId: true, sleep: true, soreness: true, energy: true, mood: true } }), [], 'readiness') : Promise.resolve([]),
     numbersFor.length ? soft(db.workoutScan.findMany({ where: { userId: { in: numbersFor }, kind: { in: [...JUMP_SCAN_KINDS] }, createdAt: { gte: new Date(nowMs - 28 * DAY) } }, select: { userId: true, kind: true, metrics: true, createdAt: true } }), [], 'jumps') : Promise.resolve([]),
     numbersFor.length ? soft(db.mirrorSession.findMany({ where: { userId: { in: numbersFor }, patternId: { in: ['squat', 'lunge'] }, createdAt: { gte: new Date(nowMs - 28 * DAY) } }, select: { userId: true, patternId: true, reps: true, faultCounts: true, createdAt: true } }), [], 'mirror') : Promise.resolve([]),
+    soft(jumpReadinessFacts(db, numbersFor, nowMs), new Map<string, { lowDays: number; days: number }>(), 'jump readiness'),
   ]);
 
   const sessionsBy = groupBy(sessions, (s) => s.clientId);
@@ -246,6 +248,7 @@ export async function readRosterFacts(db: DraftReadDb, coachId: string, now: Dat
       compliance: { state: drift.state, note: drift.note, daysSince: drift.daysSince, planned, doneLast7: missed.doneLast7, missed: missedThisWeek(missed) },
       availability: availability.available ? (availability.byClient[clientId]?.status ?? null) : null,
       pain, readiness: readinessFact, form, jump, numbersShared: numbersFor.includes(clientId),
+      ...(numbersFor.includes(clientId) ? { jumpReadiness: jumpReady.get(clientId) ?? null } : {}),
       prq: nowSnap && beforeSnap ? { now: nowSnap.composite, before: beforeSnap.composite } : null,
       screen,
       drill: pick.skill ? { focus: pick.skill.label, display: pick.skill.display } : null,

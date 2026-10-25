@@ -190,6 +190,9 @@ export interface DraftFacts {
   pain: PainFacts | null;
   /** Daily readiness check-ins, coach_view consent only; null = not read. */
   readiness: { lowDays: number; days: number } | null;
+  /** COACH-READINESS (2026-10-25): the daily jump check's Low days in the last 7 (lib/coach/readiness); the numbers gate
+   *  below (numbersShared) only. Optional: absent = not read. */
+  jumpReadiness?: { lowDays: number; days: number } | null;
   /** Mirror squat/lunge clean-rep share (0..1) this week vs last; adults who opted in AND shared with this coach only. */
   form: WeekCompareLite | null;
   /** Best jump (inches) this week vs last; same gate as `form`. */
