@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
@@ -8,65 +7,112 @@ import { parseManifest } from '@/lib/coach-store/manifest';
 import { listingPriceLabel } from '@/lib/coach-store/priceLabel';
 import { SCREEN_CONTACT_EMAIL } from '@/lib/screen/copy';
 import { isTestKey } from '@/lib/coach-store/stripeMode';
+import { SITE_ORIGIN } from '@/lib/seo/publicPages';
+import { isCoachMarketplaceEnabled } from '@/lib/coach-business/config';
+import { profileDescription, profileJsonLd, type PublicProfile } from '@/lib/coach-business/profile';
+import { loadBusinessSection } from '@/lib/coach-business/profileServer';
+import { rawDb } from '@/lib/coach-business/server';
+import { CoachProfileView, type StoreListingCard } from '@/components/coach-business/coach-profile-view';
 
 export const dynamic = 'force-dynamic';
 
+// COACH-BUSINESS (2026-10-25): the coach's public page — bio, specialties, client-approved results (adults only, text
+// only), packages with Book or Apply, and the coach store's own listings as before. Open while the coach store OR the
+// marketplace switch is on; a 404 while both are off (the store's rule until now). No minor's data is read for it:
+// lib/coach-business/profileServer.ts says what is.
+
+function pageOn(): boolean {
+  return isCoachStoreEnabled() || isCoachMarketplaceEnabled();
+}
+
+async function publishedInstructor(slug: string) {
+  const i = await prisma.instructor.findUnique({ where: { slug } });
+  return i && i.published ? i : null;
+}
+
+function toProfile(i: { slug: string; displayName: string; headline: string | null; bio: string | null; specialties: string[]; certifications: string[] }): PublicProfile {
+  return { slug: i.slug, displayName: i.displayName, headline: i.headline, bio: i.bio, specialties: i.specialties ?? [], certifications: i.certifications ?? [] };
+}
+
 export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
-  return {
-    title: `Coach ${params.slug} · Final Evolution`,
-    description: 'Live 1:1 coaching, the dunking program, and video review with Final Evolution.',
-    robots: { index: true, follow: true },
-    openGraph: { images: ['/og-image.png'], title: `Coach ${params.slug}` },
+  const fallback: Metadata = {
+    title: 'Coach · Final Evolution',
+    description: 'Coaching, programs and video review on Final Evolution.',
+    robots: { index: false, follow: true },
   };
+  if (!pageOn()) return fallback;
+  try {
+    const i = await publishedInstructor(params.slug);
+    if (!i) return fallback;
+    const profile = toProfile(i);
+    const url = `${SITE_ORIGIN}/coach/${i.slug}`;
+    const description = profileDescription(profile);
+    return {
+      title: `${i.displayName} · Coach · Final Evolution`,
+      description,
+      alternates: { canonical: url },
+      robots: { index: true, follow: true },
+      openGraph: { type: 'profile', url, title: `${i.displayName} · Coach`, description, images: ['/og-image.png'] },
+      twitter: { card: 'summary', title: `${i.displayName} · Coach`, description },
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export default async function CoachStorePage({ params }: { params: { slug: string } }) {
-  if (!isCoachStoreEnabled()) notFound();
+  if (!pageOn()) notFound();
+  const storeOn = isCoachStoreEnabled();
+  const marketOn = isCoachMarketplaceEnabled();
   try {
-    const instructor = await prisma.instructor.findUnique({ where: { slug: params.slug } });
-    if (!instructor || !instructor.published) notFound();
-    const listings = await prisma.marketplaceListing.findMany({
-      where: { creatorId: instructor.userId, listingType: 'COACH_STORE', active: true },
-    });
-    const cards = listings.flatMap((listing) => {
-      const manifest = parseManifest(listing.manifest);
-      if (!manifest) return [];
-      return [{ listing, manifest }];
-    });
+    const instructor = await publishedInstructor(params.slug);
+    if (!instructor) notFound();
+    let store: { listings: StoreListingCard[]; lines: string[] } | null = null;
+    if (storeOn) {
+      const listings = await prisma.marketplaceListing.findMany({
+        where: { creatorId: instructor.userId, listingType: 'COACH_STORE', active: true },
+      });
+      const cards = listings.flatMap((listing) => {
+        const manifest = parseManifest(listing.manifest);
+        if (!manifest) return [];
+        const soon = manifest.kind === 'program' && manifest.lane !== 'dunking';
+        const reviewClosed = manifest.kind === 'video_review' && !reviewsCanBeSold();
+        // NP-1: an unbuilt or closed listing is hidden, never labelled.
+        if (soon || reviewClosed) return [];
+        const href = manifest.kind === 'program'
+          ? `/coach/${instructor.slug}/programs/${manifest.lane}`
+          : `/coach/${instructor.slug}/book/${listing.id}`;
+        return [{ id: listing.id, title: listing.title, description: listing.description, priceLabel: listingPriceLabel(listing.priceUsd, manifest), href }];
+      });
+      store = {
+        listings: cards,
+        lines: [
+          `Seller of record: Final Evolution LLC. ${SCREEN_CONTACT_EMAIL}`,
+          ...(instructor.businessMailingAddress ? [instructor.businessMailingAddress] : []),
+          'FEL keeps 15%. Stripe\'s card fee comes out of the coach\'s share. You pay one price.',
+          `Free cancel or reschedule until ${instructor.clientFullRefundHours} hours before the start. Inside that window there is no refund and one free reschedule.`,
+        ],
+      };
+    }
+    const business = await loadBusinessSection(rawDb(), instructor.userId);
+    const profile = toProfile(instructor);
+    const jsonLd = profileJsonLd(profile, (business?.packages ?? []).filter((k) => k.action !== null), `${SITE_ORIGIN}/coach/${instructor.slug}`);
     return (
-      <main className="mx-auto max-w-3xl px-4 py-8 text-white">
-        {isTestKey(process.env.STRIPE_SECRET_KEY) ? (
-          <p className="mb-4 rounded-xl border border-amber-300/40 bg-amber-300/10 px-3 py-2 text-sm">TEST MODE. Card 4242 4242 4242 4242.</p>
-        ) : null}
-        <p className="text-xs uppercase tracking-widest text-white/50">Final Evolution</p>
-        <h1 className="mt-1 text-3xl font-black">{instructor.displayName}</h1>
-        {instructor.headline ? <p className="mt-2 text-white/80">{instructor.headline}</p> : null}
-        {instructor.affiliationLine ? <p className="mt-1 text-sm text-white/60">{instructor.affiliationLine}</p> : null}
-        {instructor.bio ? <p className="mt-4 text-sm leading-relaxed text-white/75">{instructor.bio}</p> : null}
-        <p className="mt-3 text-sm text-white/60">Seller of record: Final Evolution LLC. {SCREEN_CONTACT_EMAIL}</p>
-        {instructor.businessMailingAddress ? <p className="text-sm text-white/60">{instructor.businessMailingAddress}</p> : null}
-        <p className="mt-2 text-sm text-white/70">FEL keeps 15%. Stripe&apos;s card fee comes out of the coach&apos;s share. You pay one price.</p>
-        <p className="mt-1 text-sm text-white/60">Free cancel or reschedule until {instructor.clientFullRefundHours} hours before the start. Inside that window there is no refund and one free reschedule.</p>
-        <ul className="mt-6 space-y-3">
-          {cards.map(({ listing, manifest }) => {
-            const soon = manifest.kind === 'program' && manifest.lane !== 'dunking';
-            const reviewClosed = manifest.kind === 'video_review' && !reviewsCanBeSold();
-            // NP-1: an unbuilt or closed listing is hidden, never labelled.
-            if (soon || reviewClosed) return null;
-            const href = manifest.kind === 'program'
-              ? `/coach/${instructor.slug}/programs/${manifest.lane}`
-              : `/coach/${instructor.slug}/book/${listing.id}`;
-            return (
-              <li key={listing.id} className="rounded-2xl border border-white/10 p-4">
-                <h2 className="font-bold">{listing.title}</h2>
-                <p className="text-sm text-white/60">{listing.description}</p>
-                <p className="mt-2 text-sm font-bold">{listingPriceLabel(listing.priceUsd, manifest)}</p>
-                <Link href={href} className="mt-3 inline-block rounded-xl bg-cyan-300 px-3 py-2 text-sm font-bold text-black">View</Link>
-              </li>
-            );
-          })}
-        </ul>
-      </main>
+      <>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        <CoachProfileView
+          profile={profile}
+          sports={business?.sports ?? []}
+          goals={business?.goals ?? []}
+          highlights={business?.highlights ?? []}
+          packages={business?.packages ?? []}
+          store={store}
+          paymentsLive={business?.paymentsLive ?? false}
+          testMode={isTestKey(process.env.STRIPE_SECRET_KEY)}
+          acceptingClients={business?.acceptingClients ?? true}
+          marketOn={marketOn && !!business}
+        />
+      </>
     );
   } catch (err) {
     if (isMissingTable(err)) {

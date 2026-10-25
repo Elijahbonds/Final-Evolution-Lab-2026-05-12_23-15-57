@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { inviteState, joinWithInvite, type CoachInvite } from '@/lib/coach/invite';
 import { teenGateRefusal } from '@/lib/coach/teenGateServer';
+import { coachRosterRefusal, type PlanDb } from '@/lib/coach-business/planServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,9 @@ export async function POST(_req: Request, { params }: { params: { token: string 
     // Only on a NEW join — a dead invite still answers 400 as before, and someone already on the roster writes nothing.
     const refused = await teenGateRefusal(prisma, clientId);
     if (refused) return refused;
+    // COACH-BUSINESS: a Free coach keeps COACH_FREE_CLIENT_LIMIT active clients while COACH_PRO_ENABLED is on (off by default).
+    const full = await coachRosterRefusal(prisma as unknown as PlanDb, invite!.coachId);
+    if (full) return full;
     await prisma.coachClient.create({ data: { coachId: invite!.coachId, clientId, via: 'invite' } });
     await prisma.coachInvite.update({
       where: { token },

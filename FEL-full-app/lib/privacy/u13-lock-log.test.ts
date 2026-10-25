@@ -59,7 +59,10 @@ const UA = 'AgeScreenTest/1.0';
 // schema.prisma untouched; CoachFormReview, additive) at 02c1e49c, the lane commit carrying it on top of every file above.
 // lane/coach-ai-draft landed first (#436): pinned at c2c5140e, this lane's merge of lane/finish-release, the first
 // commit carrying both pending files.
-const PARENT = 'c2c5140eff710ae7e2b4aa936f87a98af1bd4924';
+// COACH-BUSINESS (lane/coach-business, 2026-10-25) prisma/pending/2026-10-25-coach-business.sql (pending SQL only; schema.prisma
+// untouched; six additive tables) at 44680dbc. lane/coach-video-review landed first (#438): pinned at b4857b8d, this
+// lane's merge of lane/finish-release, the first commit carrying all three 2026-10-24/25 pending files.
+const PARENT = 'b4857b8d8bafdad562311f2be1e781757a1be7c4';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
