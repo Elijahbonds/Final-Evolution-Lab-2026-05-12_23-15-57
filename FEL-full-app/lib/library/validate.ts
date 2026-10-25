@@ -46,6 +46,16 @@ const strArr = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === '
 export const dupKey = (e: Pick<LibraryExercise, 'pattern' | 'equipment' | 'family' | 'variation'>): string =>
   `${e.pattern}|${[...e.equipment].sort().join('+') || 'none'}|${e.family}|${e.variation}`;
 
+/** Name words that only say the load, not the exercise: "Barbell Romanian Deadlift" with a barbell is "Romanian Deadlift". */
+const LOAD_WORDS = new Set(['dumbbell', 'kettlebell', 'barbell', 'cabl', 'band', 'machin', 'leverag', 'bodyweight']);
+
+/**
+ * The semantic near-duplicate key: pattern, sorted equipment and the name's terms without the load words, so an entry
+ * named for its equipment does not slip past one that holds the same equipment in its tags.
+ */
+export const semanticKey = (e: Pick<LibraryExercise, 'pattern' | 'equipment' | 'name'>): string =>
+  `${e.pattern}|${[...e.equipment].sort().join('+') || 'none'}|${nameKey(e.name).split(' ').filter((t) => !LOAD_WORDS.has(t)).join(' ')}`;
+
 /** Every line of an entry the athlete or coach reads, with the tier the cue policy holds it to. */
 export function entryLines(e: LibraryExercise): { field: string; text: string; tier: CueTier }[] {
   return [
@@ -138,6 +148,7 @@ export function checkLibrary(entries: readonly LibraryExercise[]): Issue[] {
   const byId = new Map<string, LibraryExercise>();
   const names = new Map<string, string>();
   const keys = new Map<string, string>();
+  const semantic = new Map<string, string>();
   for (const e of entries) {
     if (byId.has(e.id)) out.push({ id: e.id, check: 'duplicate', detail: 'id used twice' });
     byId.set(e.id, e);
@@ -149,6 +160,10 @@ export function checkLibrary(entries: readonly LibraryExercise[]): Issue[] {
     const prevKey = keys.get(k);
     if (prevKey) out.push({ id: e.id, check: 'duplicate', detail: `same pattern/equipment/variation key as ${prevKey} (${k})` });
     else keys.set(k, e.id);
+    const sk = semanticKey(e);
+    const prevSem = semantic.get(sk);
+    if (prevSem && !prevName) out.push({ id: e.id, check: 'duplicate', detail: `same exercise as ${prevSem} once the load words are set aside (${sk})` });
+    else semantic.set(sk, e.id);
   }
   for (const e of entries) {
     for (const a of e.aliases) {

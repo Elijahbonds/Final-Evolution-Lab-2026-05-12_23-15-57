@@ -23,9 +23,9 @@ import { PIN_EXERCISE } from '../../lib/coach/taxonomy';
 import { clipKeyFor } from '../../lib/library/demo';
 import { nameKey, slugify, terms } from '../../lib/library/search/text';
 import type { LibraryExercise } from '../../lib/library/types';
-import { dupKey } from '../../lib/library/validate';
+import { dupKey, semanticKey } from '../../lib/library/validate';
 import { PREHAB_NOTE, type CategoryId, type EquipmentId, type Laterality, type LevelId, type MovementPattern, type MuscleId, type Plane, type SportTag } from '../../lib/library/vocab';
-import { DATA, fillSetup, gate, writeEntries } from './common';
+import { DATA, fillSetup, gate, writeEntries, writeFilesIndex } from './common';
 import { GENERAL_FAMILY, SEED_FAMILIES, type SeedFamily, type SeedRow } from './seedFamilies';
 
 const REPO = 'https://github.com/yuhonas/free-exercise-db';
@@ -119,9 +119,9 @@ export function mapRow(r: SeedRow, sha: string): { entry: LibraryExercise; famil
 
   const name = RENAME[r.name.trim()] ?? r.name.trim();
   const id = slugify(name);
-  const variation = terms(name).filter((t) => !['dumbbel', 'kettlebel', 'barbel', 'cabl', 'band', 'machin'].includes(t)).join('-') || 'base';
+  const variation = terms(name).filter((t) => !['dumbbell', 'kettlebell', 'barbell', 'cabl', 'band', 'machin'].includes(t)).join('-') || 'base';
   const entry: LibraryExercise = {
-    id, slug: id, name, aliases: name === r.name.trim() ? [] : [r.name.trim()], family: f.id, variation,
+    id, slug: id, name, aliases: [], family: f.id, variation,
     pattern, plane: planeFor(f, n, pattern), laterality: lat, category, level, equipment,
     primaryMuscles: primary.length ? primary : (f.muscles ?? ['abs']), secondaryMuscles: secondary,
     sportTags: sport, goals: [...new Set(f.goals)], skillLayer: f.skillLayer, braceMode: f.braceMode,
@@ -151,9 +151,10 @@ function main() {
   for (const r of rows) {
     const { entry, family } = mapRow(r, sha);
     const nk = nameKey(entry.name);
-    if (seenName.has(nk) || seenKey.has(dupKey(entry)) || out.some((e) => e.id === entry.id)) { dropped.push(`${entry.name} (same as ${seenName.get(nk) ?? 'an earlier row'})`); continue; }
+    if (seenName.has(nk) || seenKey.has(dupKey(entry)) || seenKey.has(semanticKey(entry)) || out.some((e) => e.id === entry.id)) { dropped.push(`${entry.name} (same as ${seenName.get(nk) ?? 'an earlier row'})`); continue; }
     seenName.set(nk, entry.name);
     seenKey.add(dupKey(entry));
+    seenKey.add(semanticKey(entry));
     families[family] = (families[family] ?? 0) + 1;
     out.push(entry);
   }
@@ -178,6 +179,7 @@ function main() {
   console.log(`seed: ${rows.length} rows → ${out.length} entries (${dropped.length} duplicates dropped), ${(bytes / 1024).toFixed(0)} KB`);
   console.log('families:', JSON.stringify(Object.fromEntries(Object.entries(families).sort((a, b) => b[1] - a[1]))));
   if (dropped.length) console.log('dropped:', dropped.join('; '));
+  console.log(`lib/library/files.ts: ${writeFilesIndex().length} data files`);
 }
 
 if (require.main === module) main();

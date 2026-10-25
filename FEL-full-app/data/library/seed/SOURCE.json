@@ -8,8 +8,8 @@
   "upstream": "https://github.com/wrkout/exercises.json (Unlicense)",
   "retrieved": "2026-10-25",
   "rows": 876,
-  "imported": 875,
-  "droppedAsDuplicates": 1,
+  "imported": 873,
+  "droppedAsDuplicates": 3,
   "taken": [
     "name",
     "level",
