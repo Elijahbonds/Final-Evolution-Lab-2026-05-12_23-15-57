@@ -89,12 +89,12 @@ export interface SearchResponse {
 const AMBIENT = new Set(['wall', 'mat', 'towel']);
 
 const labelMaps = {
-  pattern: new Map(PATTERNS.map((p) => [p, PATTERN_INFO[p].label])),
+  pattern: new Map<string, string>(PATTERNS.map((p) => [p, PATTERN_INFO[p].label])),
   equipment: new Map<string, string>([[NO_EQUIPMENT, 'No equipment'], ...EQUIPMENT.map((e) => [e.id, e.label] as [string, string])]),
   muscle: new Map(MUSCLES.map((m) => [m.id, m.label] as [string, string])),
   level: new Map(LEVELS.map((l) => [l.id, l.label] as [string, string])),
   sport: new Map(SPORT_TAGS.map((s) => [s.id, s.label] as [string, string])),
-  layer: new Map(SKILL_LAYERS.map((l) => [l.id, l.label])),
+  layer: new Map<string, string>(SKILL_LAYERS.map((l) => [l.id, l.label])),
   category: new Map(CATEGORIES.map((c) => [c.id, c.label] as [string, string])),
   goal: new Map(GOALS.map((g) => [g.id, g.label] as [string, string])),
 } satisfies Record<FacetKey, Map<string, string>>;

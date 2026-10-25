@@ -189,3 +189,28 @@ export function countBy<K extends string>(entries: readonly LibraryExercise[], k
   }
   return Object.fromEntries(Object.entries(out).sort((a, b) => b[1] - a[1]));
 }
+
+/**
+ * One new or edited entry against the rest of the library, without re-checking the rest (a review action must answer
+ * in milliseconds): its own checks, then its name, aliases and keys against the others, then its links.
+ */
+export function checkAgainst(e: LibraryExercise, others: readonly LibraryExercise[]): Issue[] {
+  const out = checkEntry(e);
+  const rest = others.filter((o) => o.id !== e.id);
+  const nk = nameKey(e.name);
+  const dk = dupKey(e);
+  const sk = semanticKey(e);
+  for (const o of rest) {
+    if (o.review.status === 'rejected') continue;
+    if (nameKey(o.name) === nk) out.push({ id: e.id, check: 'duplicate', detail: `same name as ${o.id}` });
+    else if (dupKey(o) === dk) out.push({ id: e.id, check: 'duplicate', detail: `same pattern/equipment/variation key as ${o.id}` });
+    else if (semanticKey(o) === sk) out.push({ id: e.id, check: 'duplicate', detail: `same exercise as ${o.id} once the load words are set aside` });
+    for (const a of e.aliases) if (nameKey(a) === nameKey(o.name)) out.push({ id: e.id, check: 'duplicate', detail: `alias "${a}" is the name of ${o.id}` });
+  }
+  const ids = new Set(rest.map((o) => o.id));
+  for (const f of ['regressionId', 'progressionId'] as const) {
+    const to = e[f];
+    if (to !== null && (to === e.id || !ids.has(to))) out.push({ id: e.id, check: 'links', detail: `${f} → ${to} does not resolve` });
+  }
+  return out;
+}
