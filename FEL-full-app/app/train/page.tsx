@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -17,6 +17,9 @@ import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
 // PROGRESS CARD (value round item 1): the weekly door to /profile/week; reads nothing
 import { WeekCardEntry } from '@/components/progress-card/week-entry';
+// SIGNATURE-PROGRAMS (2026-10-25): FEL's four signature programs. The card is the same for everyone (this page reads no
+// age to draw its cards — tests/drills, tests/mirror-first); the athlete's week shows on /train/programs.
+import { TRAIN_LINE_IDLE } from '@/lib/signature/copy';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +81,12 @@ export default async function TrainPage() {
       href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',
       line: coachLink?.coach?.name ? `Written by ${coachLink.coach.name}.` : programCount > 0 ? 'Your blocks and sessions.' : 'No coach yet — an invite link puts their programming here.',
       tag: programCount > 0 || coachLink ? 'Open' : 'How it works',
+    },
+    {
+      // SIGNATURE-PROGRAMS (2026-10-25): approved programs only (lib/signature/access.ts); the list shows the athlete's week
+      href: '/train/programs', icon: Layers, accent: '#00FF9D', title: 'Signature programs',
+      line: TRAIN_LINE_IDLE,
+      tag: 'Browse',
     },
     {
       // EXERCISE-LIBRARY (2026-10-25): the shared library — search it or ask it; approved entries only for athletes
