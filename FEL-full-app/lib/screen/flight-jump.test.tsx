@@ -14,6 +14,7 @@ import { PROTOCOL as TESTS } from '@/lib/assess/protocol';
 import { cmj, kneeWall, ohsFront, ohsSide, singleLegSquat, syntheticCalibration } from '@/lib/assess/replay';
 import * as COPY from './copy';
 import { aboutInches, formatJumpEstimate } from './jump';
+import { CLAIM_WORDS } from '@/tests/helpers/claimFree';
 
 const r = gradeSession({
   calibration: syntheticCalibration(), T1: { front: ohsFront().frames, side: ohsSide().frames },
@@ -60,6 +61,8 @@ describe('flight-time jump height', () => {
     expect(COPY.JUMP_ESTIMATE_LINE).toMatch(/time in the air/);
     const all = Object.values(COPY).filter((v): v is string => typeof v === 'string').join(' ') + TESTS.map((t) => t.setup).join(' ');
     expect(all).not.toMatch(/vertec|force[- ]plate|lab[- ]grade|as accurate as/i);
+    // JUMP-TESTS (2026-10-25): and nothing the jump tools may not say either (accurate, validated, precise, "within ±")
+    expect(all).not.toMatch(CLAIM_WORDS);
   });
 
   it('PM: "Land tall, legs straight" shows on screen during the jump only; the spoken setup line is unchanged', () => {
