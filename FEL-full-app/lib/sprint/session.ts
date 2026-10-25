@@ -10,11 +10,11 @@
 //
 // Pure (no camera, no DOM): components/sprint/sprint-runner.tsx feeds it PoseService's frames.
 import type { PoseFrame } from '@/lib/pose/landmarks';
-import { bodyPoint, heightAxisScale, heightScale, markerScale, markerScaleSdPct, type BodyPointKind, type Line, type Pt } from './geometry';
+import { heightAxisScale, heightScale, markerScale, markerScaleSdPct, type BodyPointKind, type Line, type Pt } from './geometry';
 import { readFlying, readGateRun, GATE_TIPS, type FrameLike, type GateFlag } from './timing';
 import { readTrace, type TraceRead } from './trace';
 import { readAgility, type AgilityCones, type Turn } from './agility';
-import { detectOnset, type StartRead } from './start';
+import type { StartRead } from './start';
 import { newRunId, type SprintRecord, type SprintTest } from './store';
 import { mph } from './copy';
 
@@ -129,25 +129,17 @@ export class SprintSession {
       if (!h.ok) return h;
       scale = heightAxisScale(h.mPerUnit, this.aspect); scaleSdPct = h.sdPct;
     } else return { ok: false, why: 'Tap two markers, or type the athlete\'s height, to scale the run.' };
-    // the start, on the samples' clock (seconds from the arming)
-    let startS: number | null = null;
-    let startRead: StartRead | null = null;
-    if (c.start === 'go' && this.go) startRead = this.go;
-    else if (c.start === 'movement') {
-      const on = detectOnset(this.frames.map((f) => ({ t: f.t, p: bodyPoint(f, 'hips') })), this.aspect, this.from);
-      if (on.ok) startRead = on;
-    }
+    // the model finds its own start (lib/sprint/trace.ts readTrace); a Go here only cues the athlete
     const t0Ms = Number.isFinite(this.from) ? this.from : (this.frames[0]?.t ?? 0);
-    if (startRead) startS = (startRead.t - t0Ms) / 1000;
     const r = readTrace({
-      frames: this.frames.filter((f) => f.t >= t0Ms), scale, point: 'hips', t0Ms, startS, startAtOrigin: !!c.markers && c.startAtOrigin,
+      frames: this.frames.filter((f) => f.t >= t0Ms), scale, point: 'hips', t0Ms, startAtOrigin: !!c.markers && c.startAtOrigin,
       body: { massKg: c.massKg, heightM: c.statureM }, scaleSdPct,
     });
     if (!r.ok) return r;
     return {
-      ok: true, test: 'trace', label: c.label, timeS: null, sdS: null, startKind: startRead?.kind ?? null, reactionIncluded: !!startRead?.reactionIncluded,
+      ok: true, test: 'trace', label: c.label, timeS: null, sdS: null, startKind: null, reactionIncluded: false,
       splits: r.splits.map((s) => ({ label: `${s.m} m`, s: s.s })), trace: r, turns: null, poseHz: r.poseHz,
-      tips: r.model ? [] : ['Only steady running was in view, so this is the top speed alone. To get the speed curve and the profile, have the start inside the picture.'],
+      tips: r.model ? (r.splits.length ? ['Splits are from the first movement the speed curve shows (the model\'s own start), not from a Go.'] : []) : ['Only steady running was in view, so this is the top speed alone. To get the speed curve and the profile, have the start inside the picture.'],
     };
   }
 }

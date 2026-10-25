@@ -80,12 +80,15 @@ function steady(s: readonly PosSample[]): { v: number; sd: number } {
 }
 
 /**
- * The trace's read. `startS`: the start, in the samples' seconds, when known (the Go or first movement); `startAtOrigin`:
- * the first marker is the start line, so the model's x0 is 0 and its splits are from there.
+ * The trace's read. `startAtOrigin`: the first marker is the start line, so the model's x0 is 0 and its splits are from
+ * there. The model's start (t0) is always FITTED, never held: a Go is the athlete's reaction earlier than their first
+ * movement, and a first-movement read is a few frames uncertain — held, either one biases v_max (the rig measured
+ * −3 % from a held first-movement start, outside the fit's own ±). The splits are from the model's own start, the first
+ * movement the curve shows, as MySprint's are.
  */
 export function readTrace(o: {
   frames: readonly FrameLike[]; scale: MarkerScale; point?: BodyPointKind; t0Ms: number;
-  startS?: number | null; startAtOrigin?: boolean; body?: { massKg?: number | null; heightM?: number | null };
+  startAtOrigin?: boolean; body?: { massKg?: number | null; heightM?: number | null };
   splitsM?: readonly number[];
   /** The scale's own ±1 SD (%): lib/sprint/geometry.ts markerScaleSdPct or HeightScale.sdPct. */
   scaleSdPct?: number;
@@ -102,7 +105,7 @@ export function readTrace(o: {
   const iPk = curve.reduce((b, p, i) => (p.v > curve[b].v ? i : b), 0);
   const around = xs.filter((p) => Math.abs(p.t - curve[iPk].t) <= 0.15);
   const top = around.length >= 4 ? steady(around) : { v: curve[iPk].v, sd: curve[iPk].v * 0.05 };
-  const fit = fitSamozino(xs, { t0: o.startS ?? null, x0: o.startAtOrigin && dir === 1 ? 0 : null });
+  const fit = fitSamozino(xs, { t0: null, x0: o.startAtOrigin && dir === 1 ? 0 : null });
   // a model counts only when it explains the curve better than steady running does (the speeding up is in view)
   const flat = steady(xs);
   let flatRss = 0;
@@ -110,8 +113,7 @@ export function readTrace(o: {
   const fitRss = fit.ok ? fit.rmsM ** 2 * fit.n : Infinity;
   const accelerating = fit.ok && fitRss < flatRss * 0.5 && fit.tau < 2.95;
   const model = accelerating && fit.ok ? { vmax: fit.vmax, vmaxSd: Math.hypot(fit.vmaxSd, fit.vmax * k), tau: fit.tau, tauSd: fit.tauSd, t0: fit.t0, rmsM: fit.rmsM } : null;
-  const startKnown = o.startS !== undefined && o.startS !== null;
-  const splits = model && startKnown && o.startAtOrigin
+  const splits = model && o.startAtOrigin
     ? (o.splitsM ?? [5, 10, 20, 30]).map((m) => ({ m, s: Math.round(modelSplit(model, m) * 1000) / 1000 }))
     : [];
   return {

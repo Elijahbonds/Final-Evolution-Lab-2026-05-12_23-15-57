@@ -27,7 +27,7 @@ export const SPRINT = {
   'sprint.holdFrames': e(2, 'bench-2026-10-25', 'A crossing counts only when the point was on the start side for this many frames before and on the far side for this many after (a jittering point at the line is not two crossings)'),
   'sprint.holdMs': e(40, 'bench-2026-10-25', 'And for at least this long each side (ms), whatever the frame rate'),
   'sprint.pointSd': e(0.004, 'lane-guess', 'A body point\'s own jitter (σ, in picture heights) when a read has too few frames to measure it. MediaPipe lite\'s torso ≈ 0.002 of the width standing still (lib/pose/synth.ts DEFAULT_NOISE); doubled for motion blur at speed'),
-  'sprint.minLineFrac': e(0.15, 'lane-guess', 'Two taps closer than this (picture heights) are not a line: tap the two ends of it'),
+  'sprint.minLineFrac': e(0.08, 'lane-guess', 'Two taps closer than this (picture heights) are not a line: tap the two ends of it. A 1.6 m pole seen from 15 m is ≈ 0.15'),
   // ── the start ──
   'sprint.goHoldMinS': e(1.5, 'lane-guess', '"Set" to "Go": the shortest random hold (s), so the Go cannot be anticipated'),
   'sprint.goHoldMaxS': e(2.5, 'lane-guess', '"Set" to "Go": the longest random hold (s)'),

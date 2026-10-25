@@ -18,8 +18,8 @@ export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { 
       <svg viewBox="0 0 320 120" className="h-auto w-full" role="img" aria-label="Speed against time">
         <rect x={0} y={0} width={320} height={120} rx={8} fill="#ffffff08" />
         {[0.25, 0.5, 0.75].map((k) => <line key={k} x1={8} x2={312} y1={Y(vMax * k)} y2={Y(vMax * k)} stroke="#ffffff14" />)}
-        {fit && <path d={fit} fill="none" stroke="#00E5FF" strokeWidth={1.5} strokeDasharray="4 3" />}
-        <path d={seen} fill="none" stroke="#00FF9D" strokeWidth={2} />
+        <path d={seen} fill="none" stroke="#00FF9D" strokeWidth={1.5} strokeOpacity={0.85} />
+        {fit && <path d={fit} fill="none" stroke="#00E5FF" strokeWidth={2} strokeDasharray="5 3" />}
         <text x={10} y={14} fill="#ffffff80" fontSize={9}>{(vMax / 1.1).toFixed(1)} m/s</text>
         <text x={312} y={116} fill="#ffffff80" fontSize={9} textAnchor="end">{(t1 - t0).toFixed(1)} s in view</text>
       </svg>

@@ -48,6 +48,7 @@ type CfgResult = { ok: true; cfg: RunConfig } | { ok: false; why: string };
 
 /** The taps → the run's config, or why not. */
 export function configFrom(b: RunBase, taps: Pt[], aspect: number, useCentre: boolean): CfgResult {
+  if (!(b.test === 'gate' && useCentre) && taps.length < tapPrompts(b).length) return { ok: false, why: 'Tap every point first.' };
   if (b.test === 'gate') {
     if (useCentre) return { ok: true, cfg: { ...b, line: CENTRE_LINE } };
     const l = lineFromTaps(taps[0], taps[1], aspect);
@@ -133,8 +134,9 @@ export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
   // taps complete → config
   useEffect(() => {
     if (phase !== 'calibrate' && phase !== 'ready') return;
-    if (!useCentre && taps.length < prompts.length) { cfg.current = null; if (phase === 'ready') setPhase('calibrate'); return; }
-    const r = configFrom(base, taps, aspect, useCentre);
+    const centre = useCentre && base.test === 'gate';
+    if (!centre && taps.length < prompts.length) { cfg.current = null; if (phase === 'ready') setPhase('calibrate'); return; }
+    const r = configFrom(base, taps, aspect, centre);
     if (!r.ok) { setWhy(r.why); setTaps([]); cfg.current = null; setPhase('calibrate'); return; }
     setWhy(null); cfg.current = r.cfg; setPhase('ready');
   }, [taps, useCentre, phase, base, aspect, prompts.length]);
@@ -165,7 +167,7 @@ export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
     if (!c) return;
     setWhy(null); setGoAt(null);
     const s = new SprintSession(c, aspect);
-    s.arm(latest.current?.t ?? performance.now());
+    s.arm(performance.now());
     session.current = s;
     setPhase('running');
     const startMode = c.test === 'flying' ? null : c.test === 'trace' ? (c.start === 'none' ? null : c.start) : c.start;
@@ -175,8 +177,9 @@ export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
       go.current = playGo(plan, setCall);
       void go.current.done.then(({ goAt: at, outputLatencyMs }) => {
         const distanceM = c.test === 'gate' ? c.distanceM : c.test === 'agility' ? GO_DISTANCE_M.agility : GO_DISTANCE_M.trace;
-        session.current?.setGo(goStart({ goAt: at, outputLatencyMs, distanceM }));
-        setGoAt(at);
+        const read = goStart({ goAt: at, outputLatencyMs, distanceM });
+        session.current?.setGo(read);
+        setGoAt(read.t);   // when the athlete heard it: the run's start (data-sprint-go-at, for the rig)
       });
     } else setCall(null);
     const began = performance.now();
@@ -190,7 +193,7 @@ export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
 
   const lines: Line[] = cfg.current?.test === 'gate' ? [cfg.current.line]
     : cfg.current?.test === 'flying' ? [cfg.current.first, cfg.current.second]
-    : useCentre ? [CENTRE_LINE] : [];
+    : useCentre && base.test === 'gate' ? [CENTRE_LINE] : [];
   const live = phase === 'calibrate' || phase === 'ready' || phase === 'running' || phase === 'reading';
   const prompt = phase === 'calibrate' && !useCentre ? prompts[taps.length] ?? null : null;
 

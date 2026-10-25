@@ -141,7 +141,7 @@ describe('the speed trace and Samozino\'s fit', () => {
     if (!sc.ok) return;
     const vmax = 9.2, tau = 1.15;
     const { frames } = film(sprinter({ vmax, tau, startX: -14 }), 1.8, -0.5, 4.4, 1000, { fps, camera: { width: W, height: Hpx, hfovDeg: 66, distance: D, heightM: 1.1 }, noise: 0.0015, seed: fps });
-    const r = readTrace({ frames, scale: sc.scale, point: 'hips', t0Ms: 1000, startS: 0, startAtOrigin: true, scaleSdPct: markerScaleSdPct(sc.scale) });
+    const r = readTrace({ frames, scale: sc.scale, point: 'hips', t0Ms: 1000, startAtOrigin: true, scaleSdPct: markerScaleSdPct(sc.scale) });
     expect(r.ok, r.ok ? '' : r.why).toBe(true);
     if (!r.ok) return;
     expect(r.model).not.toBeNull();

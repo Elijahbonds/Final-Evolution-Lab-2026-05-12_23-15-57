@@ -78,14 +78,16 @@ function minimise(f: (x: number) => number, lo: number, hi: number, n: number): 
 function search(s: readonly PosSample[], known: { t0: number | null; x0: number | null }): Best | null {
   const tauLo = sr('sprint.tauMin'), tauHi = sr('sprint.tauMax');
   const tFirst = s[0].t;
-  // t0 can be no later than the first sample and, before it, no earlier than ~4 τ_max (the body is still accelerating)
-  const t0Lo = tFirst - 4 * tauHi, t0Hi = tFirst;
+  // t0: up to ~4 τ_max before the first sample (the run started out of view, still speeding up), or inside the trace
+  // (the athlete stood still in view first) up to 1 s before its end
+  const tLast = s[s.length - 1].t;
+  const t0Lo = tFirst - 4 * tauHi, t0Hi = Math.max(tFirst, Math.min(tLast - 1, tFirst + 10));
   const sse = (tau: number, t0: number): number => {
     const r = solveLinear(s, tau, t0, known.x0);
     return r.vmax > 0 && Number.isFinite(r.sse) ? r.sse : Infinity;
   };
   // the profile over τ: for each τ the best t0 (held when known), then the best τ
-  const bestT0 = (tau: number) => (known.t0 !== null ? { x: known.t0, y: sse(tau, known.t0) } : minimise((t0) => sse(tau, t0), t0Lo, t0Hi, 32));
+  const bestT0 = (tau: number) => (known.t0 !== null ? { x: known.t0, y: sse(tau, known.t0) } : minimise((t0) => sse(tau, t0), t0Lo, t0Hi, 48));
   const outer = minimise((tau) => bestT0(tau).y, tauLo, tauHi, 32);
   if (!Number.isFinite(outer.y)) return null;
   const t0 = bestT0(outer.x).x;
