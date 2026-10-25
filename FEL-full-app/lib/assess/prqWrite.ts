@@ -25,6 +25,7 @@ import { PROTOCOL_VERSION, THRESHOLDS_VERSION, bandOf, th } from './thresholds';
 import { bandScore, type Grade, type Mqs, type Score03, type TestResult, type TestStatus } from './scoring';
 import type { AssessMode, Side, TestId } from './protocol';
 import { inches } from './why';
+import { TRIAL_FLAGS, type TrialFlag } from '@/lib/jump/session';
 
 export const ASSESSMENT_KIND = 'mirror_assessment';
 export const RECORD_VERSION = 1 as const;
@@ -58,8 +59,22 @@ export interface RecordTest {
   t5?: {
     bestHeightCm: number | null; bestFlightMs: number | null; bestJump: number | null; poseFps: number; cameraFps: number | null;
     fpsLow: boolean; heightPlusMinusCm: number | null; cvPct: number | null;
-    jumps: { index: number; valid: boolean; flightMs: number; heightCm: number }[];
+    jumps: RecordJump[];
   };
+}
+
+/**
+ * One stored jump. JUMP-PRO 2 (2026-10-25): the three facts the verified rule reads (lib/jump/session.ts verifyJump,
+ * through lib/jump/seam.ts) ride along, optional, in the shape the T5 read holds them — how it was timed, its own ±1 SD
+ * and its quality flags — so a saved, cleanly re-timed jump reads back as verified. Without them every stored jump
+ * failed the rule ("framesOnly"), and the verified-jump board was empty. Numbers and flag names only. Saved only where
+ * the route saves at all: a verified, opted-in adult (lib/privacy/scanSaveGate.ts); nobody else's record is stored.
+ */
+export interface RecordJump {
+  index: number; valid: boolean; flightMs: number; heightCm: number;
+  method?: 'refined' | 'frames';
+  heightSdCm?: number | null;
+  quality?: { flags: TrialFlag[]; clean: boolean };
 }
 
 export interface RecordDevice {
@@ -117,7 +132,12 @@ export function toRecord(s: {
           t5: {
             bestHeightCm: t.t5.bestHeightCm, bestFlightMs: t.t5.bestFlightMs, bestJump: t.t5.bestJump, poseFps: r(t.t5.poseFps, 1)!,
             cameraFps: r(t.t5.cameraFps, 1), fpsLow: t.t5.fpsLow, heightPlusMinusCm: t.t5.heightPlusMinusCm, cvPct: t.t5.cvPct,
-            jumps: t.t5.jumps.map((j) => ({ index: j.index, valid: j.valid, flightMs: j.flightMs, heightCm: j.heightCm })),
+            jumps: t.t5.jumps.map((j): RecordJump => ({
+              index: j.index, valid: j.valid, flightMs: j.flightMs, heightCm: j.heightCm,
+              ...(j.method ? { method: j.method } : {}),
+              ...(j.heightSdCm !== undefined ? { heightSdCm: r(j.heightSdCm ?? null, 2) } : {}),
+              ...(j.quality ? { quality: { flags: [...j.quality.flags], clean: j.quality.clean } } : {}),
+            })),
           },
         } : {}),
       };
@@ -220,8 +240,18 @@ function test(v: unknown, where: string): RecordTest {
       cameraFps: num(t.cameraFps, `${where}.t5.cameraFps`, 0, 240, { nullable: true }), fpsLow: bool(t.fpsLow, `${where}.t5.fpsLow`),
       heightPlusMinusCm: num(t.heightPlusMinusCm, `${where}.t5.heightPlusMinusCm`, 0, 50, { nullable: true }), cvPct: num(t.cvPct, `${where}.t5.cvPct`, 0, 1000, { nullable: true }),
       jumps: (t.jumps as unknown[]).map((j, i) => {
-        const q = obj(j, `${where}.t5.jumps[${i}]`, ['index', 'valid', 'flightMs', 'heightCm']);
-        return { index: num(q.index, 'index', 1, 10, { int: true })!, valid: bool(q.valid, 'valid'), flightMs: num(q.flightMs, 'flightMs', 0, 5000)!, heightCm: num(q.heightCm, 'heightCm', 0, 1000)! };
+        const at = `${where}.t5.jumps[${i}]`;
+        const q = obj(j, at, ['index', 'valid', 'flightMs', 'heightCm', 'method', 'heightSdCm', 'quality']);
+        const out: RecordJump = { index: num(q.index, 'index', 1, 10, { int: true })!, valid: bool(q.valid, 'valid'), flightMs: num(q.flightMs, 'flightMs', 0, 5000)!, heightCm: num(q.heightCm, 'heightCm', 0, 1000)! };
+        // JUMP-PRO 2: the verified rule's three facts, each checked as strictly as the rest
+        if (q.method !== undefined) out.method = oneOf(q.method, `${at}.method`, ['refined', 'frames'] as const);
+        if (q.heightSdCm !== undefined) out.heightSdCm = num(q.heightSdCm, `${at}.heightSdCm`, 0, 50, { nullable: true });
+        if (q.quality !== undefined) {
+          const qq = obj(q.quality, `${at}.quality`, ['flags', 'clean']);
+          if (!Array.isArray(qq.flags) || qq.flags.length > TRIAL_FLAGS.length) fail(`${at}.quality.flags: bad`);
+          out.quality = { flags: (qq.flags as unknown[]).map((f, k) => oneOf(f, `${at}.quality.flags[${k}]`, TRIAL_FLAGS)), clean: bool(qq.clean, `${at}.quality.clean`) };
+        }
+        return out;
       }),
     };
     // a valid jump is one the grader measured under the refusal line

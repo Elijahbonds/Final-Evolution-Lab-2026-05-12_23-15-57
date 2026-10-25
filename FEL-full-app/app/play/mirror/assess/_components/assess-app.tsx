@@ -74,6 +74,7 @@ import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep
 import { JumpResult } from './jump-result';
 import { JumpSessionCard } from '@/components/jump/jump-session-card';
 import { SlowMoUpload } from '@/components/jump/slowmo-upload';
+import { JumpMore } from '@/components/jump/jump-more';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
@@ -455,6 +456,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
           pass jumpView.trust?.level as trustLevel once PR #424 lands (its Low hides the number, and this card with it). */}
       {phase === 'jumpResult' && jumpView && !jumpView.kid ? <JumpSessionCard t5={carryRef.current?.t5 ?? null} trustLevel={null} /> : null}
       {phase === 'jumpResult' && jumpView && !jumpView.kid ? <SlowMoUpload /> : null}
+      {/* JUMP-PRO 2: the approach (touch height), the drop jump (RSI), the standing reach and power — adults only. */}
+      {phase === 'jumpResult' && jumpView && !jumpView.kid ? <JumpMore adult bestHeightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} /> : null}
 
       {live ? (
         <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: 'min(72vh, 100dvh - 12rem)' }}>
