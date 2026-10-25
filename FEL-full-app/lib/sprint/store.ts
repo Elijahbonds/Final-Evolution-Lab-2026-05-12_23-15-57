@@ -1,4 +1,4 @@
-// store — the camera sprint results, kept ON THIS PHONE, numbers only (SPRINT-SPEED, 2026-10-25), and their CSV.
+// store — the camera sprint results, kept ON THIS PHONE, numbers only (SPRINT-SPEED, 2026-10-25), and their CSV (lib/csv).
 //
 // WHY ON THE DEVICE. The brief: "numbers only, reusing how jump numbers are saved (lib/privacy/scanSaveGate.ts) and the
 // youth rules; prefer no new table". The server path that exists for movement numbers is the AB-04 save: verified 18+
@@ -13,6 +13,7 @@
 // out-of-range record reads as none; every storage access is in try/catch.
 //
 // Pure (storage is passed in).
+import { toCsv } from '@/lib/csv/csv';
 
 export const RUNS_KEY = 'fel.sprint.runs.v1';
 export const MAX_RUNS = 200;
@@ -112,27 +113,20 @@ export function clearRuns(store: RunStorage | null): void {
   try { store?.removeItem(RUNS_KEY); } catch { /* nothing kept to clear */ }
 }
 
-// ── CSV (small and local: there is no shared lib/csv yet) ──
+// ── CSV: the shared lib/csv (JUMP-TESTS) — formulas defused, numbers left as numbers, \r\n rows ──
 
 const CSV_HEAD = ['date', 'test', 'what', 'distance_m', 'time_s', 'plus_minus_s', 'start', 'reaction_included', 'splits', 'top_speed_mps', 'top_speed_plus_minus', 'vmax_mps', 'vmax_plus_minus', 'tau_s', 'f0_n_per_kg', 'pmax_w_per_kg', 'pose_hz', 'method', 'note'];
 
-/** One CSV field: quoted when it holds a comma, quote or line break; a leading = + - @ is defused (a spreadsheet formula). */
-export function csvField(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  let s = typeof v === 'number' ? String(Math.round(v * 1000) / 1000) : String(v);
-  if (/^[=+\-@]/.test(s) && typeof v !== 'number') s = `'${s}`;
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+const r3 = (x: number | null): number | null => (x === null ? null : Math.round(x * 1000) / 1000);
 
 /** The runs as CSV. Every row says it is a camera estimate. */
 export function runsCsv(runs: readonly SprintRecord[]): string {
-  const rows = runs.map((r) => [
-    r.at, TEST_LABEL[r.test], r.label, r.distanceM, r.timeS, r.sdS, r.startKind ?? '', r.reactionIncluded ? 'yes' : 'no',
+  return toCsv(CSV_HEAD, runs.map((r) => [
+    r.at, TEST_LABEL[r.test], r.label, r3(r.distanceM), r3(r.timeS), r3(r.sdS), r.startKind ?? '', r.reactionIncluded,
     r.splits.map((s) => `${s.label} ${s.s.toFixed(2)}`).join('; '),
-    r.topSpeed, r.topSpeedSd, r.vmax, r.vmaxSd, r.tau, r.f0PerKg, r.pmaxPerKg, r.poseHz, 'camera',
+    r3(r.topSpeed), r3(r.topSpeedSd), r3(r.vmax), r3(r.vmaxSd), r3(r.tau), r3(r.f0PerKg), r3(r.pmaxPerKg), r.poseHz, 'camera',
     'camera estimate; not validated against timing gates',
-  ].map(csvField).join(','));
-  return [CSV_HEAD.join(','), ...rows].join('\n') + '\n';
+  ]));
 }
 
 /** A short id for a record. */

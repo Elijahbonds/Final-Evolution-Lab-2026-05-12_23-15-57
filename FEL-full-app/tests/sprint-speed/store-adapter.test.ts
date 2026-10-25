@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { sourceFiles, stripComments } from '@/lib/testing/sourceScan';
-import { clearRuns, csvField, keepRun, MAX_RUNS, parseRecord, readRuns, RUNS_KEY, runsCsv, type SprintRecord } from '@/lib/sprint/store';
+import { clearRuns, keepRun, MAX_RUNS, parseRecord, readRuns, RUNS_KEY, runsCsv, type SprintRecord } from '@/lib/sprint/store';
 import { cameraAttempt, cameraSprint, timingChoices, variantMetres, TIMING_TAG } from '@/lib/sprint/cameraSprint';
 import { SprintSession, toRecord, type RunConfig } from '@/lib/sprint/session';
 import { speedWithBand, timeWithBand } from '@/lib/sprint/copy';
@@ -44,16 +44,16 @@ describe('the history, on this phone only', () => {
     expect(parseRecord({ ...rec(), test: 'trace', timeS: null, topSpeed: 9.1 })).not.toBeNull();
   });
 
-  it('CSV: a header, one row per run, every row says camera estimate; formulas defused, commas quoted', () => {
+  // test changed (merge with #455): lib/csv landed, so the CSV is the shared writer's — \r\n rows, its own cell tests
+  it('CSV (lib/csv): a header, one row per run, every row says camera estimate; formulas defused, commas quoted', () => {
     const csv = runsCsv([rec(), rec({ id: 'b', label: '=HYPERLINK("x")', splits: [{ label: '5 m', s: 1.1 }, { label: '10 m', s: 1.82 }] })]);
-    const lines = csv.trim().split('\n');
+    const lines = csv.trim().split('\r\n');
     expect(lines[0].startsWith('date,test,what,distance_m,time_s,plus_minus_s')).toBe(true);
     expect(lines).toHaveLength(3);
     expect(lines[1]).toContain('camera estimate; not validated against timing gates');
+    expect(lines[1]).toContain(',5.12,0.012,go,yes,');
     expect(lines[2]).toContain(`"'=HYPERLINK(""x"")"`);
     expect(lines[2]).toContain('5 m 1.10; 10 m 1.82');
-    expect(csvField('a,b')).toBe('"a,b"');
-    expect(csvField(-1.23456)).toBe('-1.235');
   });
 
   it('the ± is shown as 2 SD, never below the hundredth', () => {

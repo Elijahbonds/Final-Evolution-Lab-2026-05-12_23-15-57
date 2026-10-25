@@ -18,6 +18,8 @@ import { YD } from '@/lib/sprint/cameraSprint';
 import { toRecord, type RunConfig, type RunResult, type StartMode } from '@/lib/sprint/session';
 import { clearRuns, keepRun, readRuns, runStorage, runsCsv, TEST_LABEL, type SprintRecord, type SprintTest } from '@/lib/sprint/store';
 import { timeWithBand, speedWithBand } from '@/lib/sprint/copy';
+import { csvFileName } from '@/lib/csv/csv';
+import { downloadCsv } from '@/lib/csv/download';
 import { SprintRunner, type RunBase } from './sprint-runner';
 import { RunResultCard } from './run-result';
 import { SetupDiagram, SETUP_STEPS } from './setup-diagram';
@@ -75,14 +77,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
     setRuns(readRuns(store));
   }, []);
 
-  const exportCsv = () => {
-    const blob = new Blob([runsCsv(runs)], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `sprint-times-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
+  const exportCsv = () => { downloadCsv(csvFileName('sprint-times'), runsCsv(runs)); };
 
   return (
     <div className="space-y-4" data-speed-app>

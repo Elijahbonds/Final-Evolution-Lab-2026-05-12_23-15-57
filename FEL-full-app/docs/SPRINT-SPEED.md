@@ -80,7 +80,7 @@ another lane holds. That is the next step (owner call), and the core is ready fo
 
 Every run is kept **on this phone** (`lib/sprint/store.ts`, `localStorage` `fel.sprint.runs.v1`, at most 200): times,
 splits, speeds, the F-V numbers per kg, how each was read. No picture, no pose, no body mass, no account id. CSV export
-(local, small: there is no shared `lib/csv` yet; formula cells defused). Nothing is sent (a source scan in
+through the shared `lib/csv` (JUMP-TESTS, #455, merged during this lane: formula cells defused, numbers kept as numbers). Nothing is sent (a source scan in
 `tests/sprint-speed/store-adapter.test.ts` and the rig's `fetch` trap hold it).
 
 **Why not the server** (evidence, for the owner): the movement-save path is the AB-04 gate — verified 18+ **and** the
