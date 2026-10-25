@@ -32,7 +32,7 @@ const GUARDIAN_PAGES = ['/con', 'sent/guardian'].join('');
 export const SIGNED_IN_ONLY_ROUTES: readonly string[] = [
   '/login', '/signup', '/account', '/api', '/dev',
   '/admin', '/age', '/arena', '/camp', '/cards', '/closet', '/coach', GUARDIAN_PAGES, '/create', '/creator', '/education', '/guidance', '/kitchens',
-  '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/store',
+  '/ladder', '/live', '/market', '/multiplayer', '/play', '/profile', '/sessions', '/shop', '/signature', '/squads', '/store',
   '/story', '/studio', '/train', '/training', '/venues', '/wallet', '/workout',
 ];
 
