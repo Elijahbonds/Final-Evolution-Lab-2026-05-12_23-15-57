@@ -1,6 +1,6 @@
 // session — a jump trial's quality, a session's numbers, the verified rule, and when a change is real (JUMP-PRO).
 //
-//   trialQuality   what keeps ONE trial from being lab-grade, as flags with a tip each (never a score)
+//   trialQuality   what keeps ONE trial from being a clean read, as flags with a tip each (never a score)
 //   sessionStats   the valid trials as a set: best, mean ± SD, CV, the typical error and the smallest real change
 //   verifyJump     the owner's rule (2026-10-24): verified only on a high-trust live read — good fps, a clean landing,
 //                  the full body in frame — or on a slow-mo upload. Consumes the trust rating of PR #424 through a hook
@@ -32,7 +32,7 @@ export const TRIAL_TIPS: Record<TrialFlag, string> = {
   moved: 'Jump straight up and land on the same spot.',
   outlier: 'One jump was far above the others, so it was not used as your verified best.',
   framesOnly: 'This jump was timed from whole frames only, so its range is wider.',
-  frameRate: 'Your camera ran under 120 frames a second, so this is an estimate. A slow-motion video gives a lab-grade read.',
+  frameRate: 'Your camera ran under 120 frames a second, so this is an estimate. A slow-motion video times the jump in finer steps.',
 };
 
 const FLAG_ORDER: TrialFlag[] = ['landedLow', 'feetUnclear', 'moved', 'outlier', 'framesOnly', 'frameRate'];
@@ -157,7 +157,7 @@ export const jumpRealChangeCm = (heightCm: number, poseHz: number | null): numbe
 /** PR #424's levels, restated (its trust-rows.ts is not imported, so this lane never edits or depends on it). */
 export type TrustLevelHook = 'high' | 'medium' | 'low';
 
-export type VerifyBlock = 'notValid' | 'frameRate' | 'landing' | 'unclear' | 'moved' | 'outlier' | 'framesOnly' | 'trustLow' | 'notBest';
+export type VerifyBlock = 'notValid' | 'frameRate' | 'landing' | 'unclear' | 'moved' | 'outlier' | 'framesOnly' | 'trustLow' | 'notBest' | 'manual';
 
 export interface Verified { verified: boolean; source: 'live' | 'slowmo'; blocks: VerifyBlock[] }
 
@@ -168,8 +168,12 @@ export interface Verified { verified: boolean; source: 'live' | 'slowmo'; blocks
  *     an outlier — and, when PR #424's rating is passed in, not rated Low;
  *   · or a slow-mo upload (source 'slowmo') at jump.labFps or more with the same per-trial rules.
  * A coach's sign-off is a badge on top (not here: it needs storage — docs/JUMP-PRO.md, follow-ups).
+ *
+ * JUMP-TESTS (2026-10-25), `manual`: the athlete moved the take-off or landing frame by hand (components/jump/
+ * frame-review.tsx). assumption: (owner call) a hand-picked jump is never verified — the app cannot check a frame a
+ * person chose, and "verified" is the app's own read. Blocked as 'manual', whatever else it passes.
  */
-export function verifyJump(j: TrialLike & { valid: boolean; method?: 'refined' | 'frames' }, ctx: { poseHz: number; source: 'live' | 'slowmo'; trust?: TrustLevelHook | null }): Verified {
+export function verifyJump(j: TrialLike & { valid: boolean; method?: 'refined' | 'frames' }, ctx: { poseHz: number; source: 'live' | 'slowmo'; trust?: TrustLevelHook | null; manual?: boolean }): Verified {
   const b = new Set<VerifyBlock>();
   if (!j.valid) b.add('notValid');
   const minFps = ctx.source === 'slowmo' ? jr('jump.labFps') : jr('jump.verifiedFps');
@@ -181,5 +185,6 @@ export function verifyJump(j: TrialLike & { valid: boolean; method?: 'refined' |
   if (fl.includes('moved')) b.add('moved');
   if (fl.includes('outlier')) b.add('outlier');
   if (ctx.trust === 'low') b.add('trustLow');
+  if (ctx.manual) b.add('manual');
   return { verified: b.size === 0, source: ctx.source, blocks: [...b] };
 }
