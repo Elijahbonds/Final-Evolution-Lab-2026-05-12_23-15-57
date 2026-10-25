@@ -79,7 +79,7 @@ export const MUSCLE_REGIONS: Readonly<Record<string, readonly RegionPart[]>> = {
   neck: [{ atoms: ['neck'] }],
   traps: [{ atoms: TORSO, u: [0.80, 1.01], abs: [112, 181] }, { atoms: ['neck'], u: [-0.01, 0.55], abs: [100, 181] }],
   delts: [{ atoms: UPPER_ARMS, u: [0.70, 1.01] }, { atoms: TORSO, u: [0.86, 1.01], abs: [62, 118] }],
-  'rear-delts': [{ atoms: UPPER_ARMS, u: [0.66, 1.01], arc: [150, 55] }],
+  'rear-delts': [{ atoms: UPPER_ARMS, u: [0.60, 1.01], arc: [150, 62] }, { atoms: TORSO, u: [0.86, 1.01], abs: [112, 150] }],
   'rotator-cuff': [{ atoms: TORSO, u: [0.70, 0.88], abs: [118, 160] }],
   chest: [{ atoms: TORSO, u: [0.68, 0.91], abs: [0, 64] }],
   serratus: [{ atoms: TORSO, u: [0.56, 0.74], abs: [58, 96] }],
@@ -89,14 +89,14 @@ export const MUSCLE_REGIONS: Readonly<Record<string, readonly RegionPart[]>> = {
   lats: [{ atoms: TORSO, u: [0.48, 0.80], abs: [100, 152] }],
   'mid-back': [{ atoms: TORSO, u: [0.58, 0.83], abs: [150, 181] }],
   'lower-back': [{ atoms: TORSO, u: [0.34, 0.58], abs: [142, 181] }],
-  abs: [{ atoms: TORSO, u: [0.36, 0.67], abs: [0, 32] }],
+  abs: [{ atoms: TORSO, u: [0.34, 0.68], abs: [0, 36] }],
   obliques: [{ atoms: TORSO, u: [0.36, 0.64], abs: [34, 100] }],
   'deep-core': [{ atoms: TORSO, u: [0.30, 0.50], abs: [0, 98] }],
   diaphragm: [{ atoms: TORSO, u: [0.58, 0.70], abs: [0, 74] }],
   'hip-flexors': [{ atoms: TORSO, u: [0.16, 0.36], abs: [14, 62] }, { atoms: LEGS, u: [0.84, 1.01], arc: [0, 48] }],
   glutes: [{ atoms: TORSO, u: [0.04, 0.36], abs: [118, 181] }, { atoms: LEGS, u: [0.90, 1.01], arc: [180, 70] }],
   'glute-med': [{ atoms: TORSO, u: [0.24, 0.42], abs: [94, 136] }],
-  adductors: [{ atoms: LEGS, u: [0.34, 0.99], arc: [-90, 52] }],
+  adductors: [{ atoms: LEGS, u: [0.34, 0.99], arc: [-68, 50] }],
   abductors: [{ atoms: TORSO, u: [0.14, 0.34], abs: [76, 118] }, { atoms: LEGS, u: [0.70, 1.01], arc: [90, 42] }],
   quads: [{ atoms: LEGS, u: [0.08, 0.88], arc: [12, 78] }],
   hamstrings: [{ atoms: LEGS, u: [0.06, 0.88], arc: [180, 66] }],
@@ -139,7 +139,11 @@ export function muscleWeights(key: string, c: Pick<Classified, 'n' | 'atomW' | '
   const out = new Float32Array(c.n);
   const parts = MUSCLE_REGIONS[key];
   if (!parts) return out;
+  // a part's atoms partition the skin weights, so their contributions ADD (a vertex half upper arm, half torso at the
+  // shoulder is wholly "delts" when both halves are in the region); parts are separate shapes, so a vertex takes the max
+  const part1 = new Float32Array(c.n);
   for (const part of parts) {
+    part1.fill(0);
     for (const atom of part.atoms) {
       const a = ATOM_IX.get(atom);
       if (a === undefined) continue;
@@ -155,9 +159,10 @@ export function muscleWeights(key: string, c: Pick<Classified, 'n' | 'atomW' | '
           if (part.arc) k *= 1 - smooth(part.arc[1] - SOFT_DEG, part.arc[1] + SOFT_DEG, Math.abs(dAng(lat, part.arc[0])));
           if (part.abs) k *= band(part.abs[0], part.abs[1], Math.abs(lat), SOFT_DEG);
         }
-        if (k > out[v]) out[v] = k;
+        part1[v] += k;
       }
     }
+    for (let v = 0; v < c.n; v++) { const k = Math.min(1, part1[v]); if (k > out[v]) out[v] = k; }
   }
   return out;
 }

@@ -52,6 +52,7 @@ import {
   buildExJump, buildExPogo, buildExJumpRope, buildExMarch, buildExCarry, buildExJumpingJack, buildExPlankHigh, buildExMountainClimber, buildExPress, buildExCurl, buildExLateralRaise, buildExFrontRaise,
   buildExRow, buildExUprightRow, buildExShrug, buildExTricepsOverhead, buildExPushdown, buildExPushup, buildExPlank, buildExBridge,
   buildExDeadBug, buildExBirdDog, buildExCrunch, buildExArmCircles, buildExQuadStretch, buildExBreathe,
+  buildExSeatedPress, buildExSeatedCurl, buildExSeatedLateralRaise, buildExSeatedTriceps, buildExBenchPress, buildExFloorPress, buildExFly, buildExSkullCrusher, buildExInclinePress, buildExInclineFly,
 } from './exercise';   // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops — opt-in suite, built on the library stage only
 
 export function registerAuthoredClips(
@@ -331,6 +332,16 @@ export function registerAuthoredClips(
     ['ex_dead_bug', () => buildExDeadBug(scene, skeleton)],
     ['ex_bird_dog', () => buildExBirdDog(scene, skeleton)],
     ['ex_crunch', () => buildExCrunch(scene, skeleton)],
+    ['ex_seated_press', () => buildExSeatedPress(scene, skeleton)],
+    ['ex_seated_curl', () => buildExSeatedCurl(scene, skeleton)],
+    ['ex_seated_lateral_raise', () => buildExSeatedLateralRaise(scene, skeleton)],
+    ['ex_seated_triceps', () => buildExSeatedTriceps(scene, skeleton)],
+    ['ex_bench_press', () => buildExBenchPress(scene, skeleton)],
+    ['ex_floor_press', () => buildExFloorPress(scene, skeleton)],
+    ['ex_fly', () => buildExFly(scene, skeleton)],
+    ['ex_skull_crusher', () => buildExSkullCrusher(scene, skeleton)],
+    ['ex_incline_press', () => buildExInclinePress(scene, skeleton)],
+    ['ex_incline_fly', () => buildExInclineFly(scene, skeleton)],
     ['ex_arm_circles', () => buildExArmCircles(scene, skeleton)],
     ['ex_quad_stretch', () => buildExQuadStretch(scene, skeleton)],
     ['ex_breathe', () => buildExBreathe(scene, skeleton)],

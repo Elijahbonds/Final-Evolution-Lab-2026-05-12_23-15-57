@@ -126,17 +126,29 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_calf_raise', families: ['calf-capacity'], bases: /^straight-double-(step|slow)$/ },
   // ── upper body ──
   { clip: 'ex_press', families: ['overhead-press'], bases: /^(shoulder-press|stand-press|db-standing|stand-palm-press|two-arm-military-press|stand-military-press|bb|shoulder-military-press)$/ },
+  { clip: 'ex_seated_press', families: ['overhead-press'], bases: /^(seat-press|db-seated|seat-shoulder-press|seat-military-press)$/ },
   { clip: 'ex_curl', families: ['curl'], bases: /^(bicep-curl|stand-bicep-curl|hammer-curl|curl|ez-bar-curl|clos-grip-ez-bar-curl|clos-grip-stand-curl|stand-revers-curl|revers-curl|stand-inner-bicep-curl)$/ },
+  { clip: 'ex_seated_curl', families: ['curl'], bases: /^(seat-curl|seat-inner-bicep-curl)$/ },
   { clip: 'ex_curl', families: ['arm-accessory'], bases: /^(band-curl|tempo-curl)$/ },
   { clip: 'ex_lateral_raise', families: ['raise'], bases: /^(sid-lateral-rais|lateral-rais)$/ },
+  { clip: 'ex_seated_lateral_raise', families: ['raise'], bases: /^(seat-lateral-rais|seat-sid-lateral-rais)$/ },
   { clip: 'ex_front_raise', families: ['raise'], bases: /^(front-rais|front-two-rais|front-plat-rais)$/ },
   { clip: 'ex_row', families: ['row'], bases: /^(db-bent|bent-over-two-row|bent-over-row|bent-over-two-arm-long-bar-row|revers-grip-bent-over-row|bent-over-two-row-palm|t-bar-row-handl)$/ },
   { clip: 'ex_upright_row', families: ['upright-row-shrug'], bases: /^(upright-row|stand-upright-row|smith-upright-row)$/ },
   { clip: 'ex_shrug', families: ['upright-row-shrug'], bases: /^(shrug|leverag-shrug)$/ },
   { clip: 'ex_triceps_overhead', families: ['triceps'], bases: /^(overhead-tricep-extension|stand-overhead-tricep-extension|rop-overhead-tricep-extension|stand-tricep-extension|stand-towel-tricep-extension)$/ },
   { clip: 'ex_triceps_overhead', families: ['triceps-accessory'], bases: /^db-overhead-ext$/ },
+  { clip: 'ex_seated_triceps', families: ['triceps'], bases: /^seat-tricep-press$/ },
+  { clip: 'ex_skull_crusher', families: ['triceps'], bases: /^(lying-tricep-extension|lying-tricep-press|skull-crusher|ez-bar-skull-crusher)$/ },
   { clip: 'ex_pushdown', families: ['triceps'], bases: /^(tricep-pushdown|revers-grip-tricep-pushdown)$/ },
   { clip: 'ex_pushdown', families: ['triceps-accessory'], bases: /^band-pushdown$/ },
+  { clip: 'ex_bench_press', families: ['bench-press'], bases: /^(bench-press|bench-press-medium-grip|bench-press-powerlift|bench-press-chain|bench-press-neutral-grip|clos-grip-bench-press|wid-grip-bench-press|technique)$/ },
+  { clip: 'ex_floor_press', families: ['bench-press'], bases: /^floor-press$/ },
+  { clip: 'ex_floor_press', families: ['db-press'], bases: /^kb-floor$/ },
+  { clip: 'ex_incline_press', families: ['bench-press'], bases: /^(inclin-bench-press-medium-grip|hammer-grip-inclin-bench-press|inclin-bench-palm-fac)$/ },
+  { clip: 'ex_incline_press', families: ['db-press'], bases: /^incline$/ },
+  { clip: 'ex_fly', families: ['fly'], bases: /^(fly|flat-bench-fly)$/ },
+  { clip: 'ex_incline_fly', families: ['fly'], bases: /^inclin-fly$/ },
   { clip: 'ex_pushup', families: ['push-up'], bases: /^(push-up|push-up-wid|clos-grip-push-up|push-ups-clos-tricep-position|push-up-clos-wid-hand-position|tempo|vest|band|deficit)$/ },
   { clip: 'ex_pushup', families: ['triceps-accessory'], bases: /^close-push-up$/ },
   { clip: 'ex_plank_high', families: ['isometric-hold'], bases: /^push-up-top$/ },
@@ -253,8 +265,10 @@ const RULES_BY_FAMILY: ReadonlyMap<string, readonly DemoRule[]> = (() => {
  */
 export const ISO_HOLD_SEC: Readonly<Record<string, number>> = {
   ex_squat: 1.2, ex_squat_bar: 1.2, ex_hinge: 1.15, ex_good_morning: 1.15, ex_split_squat: 1.05, ex_lunge: 1.3, ex_reverse_lunge: 1.3,
-  ex_press: 0.5, ex_curl: 0.4, ex_lateral_raise: 0.85, ex_front_raise: 0.85, ex_row: 0.85, ex_upright_row: 0.85, ex_shrug: 0.65,
+  ex_press: 0.38, ex_curl: 0.4, ex_lateral_raise: 0.85, ex_front_raise: 0.85, ex_row: 0.85, ex_upright_row: 0.85, ex_shrug: 0.65,
   ex_triceps_overhead: 0.4, ex_pushdown: 0.75, ex_pushup: 0.95, ex_bridge: 1.0, ex_calf_raise: 0.8, ex_crunch: 0.85,
+  ex_seated_press: 0.38, ex_seated_curl: 0.4, ex_seated_lateral_raise: 0.85, ex_seated_triceps: 0.4, ex_bench_press: 1.1, ex_floor_press: 1.0,
+  ex_skull_crusher: 1.0, ex_incline_press: 1.1,
 };
 
 export interface DemoPick {
@@ -292,7 +306,16 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch']);
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press']);
+/** Hinges and rows read from the side (the angle at the hips is the movement). */
+export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row']);
+/** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
+ *  lying down are framed from the side, like the floor loops. */
+export type DemoProp = 'seat' | 'bench' | 'incline';
+export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
+  ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',
+  ex_bench_press: 'bench', ex_fly: 'bench', ex_skull_crusher: 'bench', ex_incline_press: 'incline', ex_incline_fly: 'incline',
+};
 /** Ball-handling and finishing loops: the stage draws no ball, and the card says so. */
 export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot');
 

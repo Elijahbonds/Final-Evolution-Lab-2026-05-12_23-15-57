@@ -59,7 +59,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const { DEFAULT_HERO_URL } = await import('@/lib/babylon/core/athleteRoster');
         const { reducedMotion } = await import('@/lib/a11y/reducedMotion');
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
-        const { FLOOR_CLIPS } = await import('@/lib/library/demo');
+        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
 
@@ -85,6 +85,21 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         floorMat.diffuseColor = new Color3(0.12, 0.13, 0.17); floorMat.specularColor = Color3.Black(); floorMat.alpha = 0.9;
         floor.material = floorMat;
 
+        // the bench a seated or lying loop needs (DEMO_PROPS): plain boxes, one material, hidden unless the clip asks
+        const propMat = new StandardMaterial('libraryPropMat', scene);
+        propMat.diffuseColor = new Color3(0.2, 0.21, 0.26); propMat.specularColor = new Color3(0.05, 0.05, 0.05);
+        const box = (name: string, w: number, h: number, d: number, x: number, y: number, z: number, rx = 0) => {
+          const m = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
+          m.position.set(x, y, z); m.rotation.x = rx; m.material = propMat; m.isPickable = false; m.setEnabled(false);
+          return m;
+        };
+        const props = {
+          seat: [box('benchSeat', 0.34, 0.44, 0.42, 0, 0.22, -0.02)],
+          bench: [box('benchFlat', 0.30, 0.44, 1.30, 0, 0.22, -0.52)],
+          incline: [box('benchInclineSeat', 0.34, 0.44, 0.42, 0, 0.22, 0.02), box('benchInclineBack', 0.34, 0.08, 0.95, 0, 0.79, -0.43, -Math.PI / 4)],
+        } as const;
+        const showProp = (clip: string | null) => { const want = clip ? DEMO_PROPS[clip] : undefined; for (const [k, ms] of Object.entries(props)) for (const m of ms) m.setEnabled(k === want); };
+
         const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
         if (disposed) { hero.dispose(); scene.dispose(); engine.dispose(); return; }
 
@@ -100,9 +115,13 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         let shownMuscles = '';
 
         const frame = (p: ExerciseStageProps) => {
-          if (p.view === 'muscles') return { alpha: p.side === 'front' ? FRONT_ALPHA : -FRONT_ALPHA, beta: 1.42, radius: 3.4, y: 0.95 };
-          if (p.clip && FLOOR_CLIPS.has(p.clip)) return { alpha: 0.25, beta: 1.22, radius: 2.9, y: 0.32 };
-          return { alpha: FRONT_ALPHA - 0.45, beta: 1.36, radius: 3.5, y: 0.92 };
+          if (p.view === 'muscles') return { alpha: p.side === 'front' ? FRONT_ALPHA : -FRONT_ALPHA, beta: 1.45, radius: 2.85, y: 0.9 };
+          if (p.clip && FLOOR_CLIPS.has(p.clip)) return { alpha: 0.3, beta: 1.25, radius: 2.5, y: 0.3 };
+          if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.9, y: 0.85 };
+          const prop = p.clip ? DEMO_PROPS[p.clip] : undefined;
+          if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.6, y: 0.62 };
+          if (prop === 'seat') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.6, y: 0.7 };
+          return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.9, y: 0.88 };
         };
         const play = (clip: string, hold: number | null | undefined) => {
           const g = hero.animator.play(clip, { loop: true, fadeSec: 0.25, restart: true });
@@ -119,10 +138,12 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (p.view !== shownView || (p.view === 'demo' && (p.clip !== shownClip || p.hold !== shownHold))) {
             if (p.view === 'muscles') {
               play('idle_stand', null);
+              showProp(null);
               if (!anatomy && !anatomyFailed) { anatomy = applyAnatomy(scene, hero, p.muscles); anatomyFailed = !anatomy; shownMuscles = musclesKey; }
             } else {
               anatomy?.restore(); anatomy = null;
               play(p.clip ?? 'idle_stand', p.clip ? p.hold : null);
+              showProp(p.clip);
             }
           }
           if (p.view === 'muscles' && anatomy && musclesKey !== shownMuscles) { anatomy.show(p.muscles); shownMuscles = musclesKey; }
