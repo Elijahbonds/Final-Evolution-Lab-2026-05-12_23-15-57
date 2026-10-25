@@ -55,7 +55,10 @@ const UA = 'AgeScreenTest/1.0';
 // pending SQL: whichever lands second bumps this to the merge carrying both.
 // COACH-AI-DRAFT (lane/coach-ai-draft, 2026-10-24) prisma/pending/2026-10-24-coach-ai-draft.sql (pending SQL only; schema.prisma
 // untouched; CoachProgramDraft + CoachDraftDecision, additive) at ad3b04fa, the lane commit carrying it on top of every file above.
-const PARENT = 'ad3b04faad63dd7be01b45b724971ea2c6e658c6';
+// COACH-BUSINESS (lane/coach-business, 2026-10-25) prisma/pending/2026-10-25-coach-business.sql (pending SQL only; schema.prisma
+// untouched; six additive tables) at 44680dbc, the lane commit carrying it on top of every file above. lane/coach-video-review
+// also adds pending SQL: whichever lands second bumps this to the merge carrying both.
+const PARENT = '44680dbc9637c7502cc8d6921684b84c5ebca866';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
