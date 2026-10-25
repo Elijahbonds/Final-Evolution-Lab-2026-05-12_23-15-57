@@ -1,0 +1,4 @@
+{
+  "_readme": "Checks of the E2E, visual and perf gates that may fail without blocking a PR. The owner agrees to each row. A quarantined check still runs and prints its result; it cannot turn the gate red. Never delete a check to make a gate green: quarantine it here, with the date, the reason and who asked, and fix it. Rules: scripts/e2e/run.ts. Rows: { \"check\": \"<name>\", \"since\": \"YYYY-MM-DD\", \"why\": \"...\", \"askedBy\": \"...\" }",
+  "rows": []
+}
