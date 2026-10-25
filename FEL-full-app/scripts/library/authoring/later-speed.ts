@@ -20,6 +20,8 @@ const NEW_STARTS: readonly [string, string, number, string, string][] = [
   ['Split-Stance Start', 'split', 0, 'Stand in a split stance behind the line, front foot at the line.', 'Push the floor back off the front foot and drive the first steps low.'],
   ['Pogo-and-Go Start', 'pogo-go', 1, 'Stand tall behind the line on the balls of the feet.', 'Three quick pogos on the floor, then fall forward and sprint out low.'],
   ['Lateral Shuffle Start', 'shuffle-go', 1, 'Stand side-on behind the line in an athletic stance.', 'Two shuffles along the line, then open and sprint out low toward the cone.'],
+  ['Med Ball Toss Start', 'toss-go', 1, 'Stand behind the line holding a light medicine ball at the hips.', 'Scoop the ball forward along the floor, then chase it, driving the first steps low.'],
+  ['Backpedal-Turn Start', 'backpedal-go', 1, 'Stand facing away from the cone, a step behind the line.', 'Backpedal two steps, turn, and push the floor back to sprint toward the cone.'],
 ];
 const EXISTING_STARTS: readonly [string, string][] = [
   ['falling-start', 'Falling Start'], ['two-point-start-sprint', 'Two-Point Start'], ['three-point-start-sprint', 'Three-Point Start'],
@@ -124,6 +126,8 @@ const PATTERNS: readonly [string, string, number, string, string][] = [
   ['Z-Drill', 'z-drill', 1, 'Cones in a zig-zag, 5 metres apart.', 'Sprint and cut at each cone, plant outside the hips each time.'],
   ['Arrowhead Drill', 'arrowhead', 2, 'Cones in an arrowhead: a start, a middle, a tip and a side cone.', 'Sprint, cut around the side cone, sprint to the tip and back.'],
   ['N-Drill', 'n-drill', 1, 'Four cones in an N shape, 5 metres apart.', 'Sprint up, shuffle across the diagonal, and sprint up again.'],
+  ['Hourglass Drill', 'hourglass', 1, 'Four cones in an hourglass, 5 metres apart.', 'Sprint the diagonals and shuffle the ends, low and sharp at each cone.'],
+  ['Triangle Drill', 'triangle', 0, 'Three cones in a triangle, 5 metres apart.', 'Sprint, shuffle and backpedal around the triangle, quick at every cone.'],
   ['Four-Cone Square Drill', 'square', 0, 'Four cones in a square, 5 metres apart.', 'Sprint, shuffle, backpedal, shuffle around the square, quick at every cone.'],
 ];
 function patternVariants(): Variant[] {

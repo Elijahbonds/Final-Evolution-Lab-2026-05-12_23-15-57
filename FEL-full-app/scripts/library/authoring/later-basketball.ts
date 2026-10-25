@@ -243,6 +243,8 @@ const POST: readonly [string, string, number, string][] = [
   ['Post Face-Up Jab', 'face-up', 1, 'Pivot to face the rim, jab at the cone, then drive or shoot.'],
   ['Post Spin', 'spin', 2, 'Spin off the cone on the pivot foot, the ball tight, and finish on the glass.'],
   ['Post Turnaround Jumper', 'turnaround', 2, 'Turn on the pivot foot to square up, then rise straight up to the target.'],
+  ['Post Face-Up Crossover', 'face-cross', 2, 'Face up, jab, then rip the ball across low and drive past the cone.'],
+  ['Post Hop-Step Finish', 'hop-step', 1, 'Catch, hop onto both feet toward the rim, quiet, and finish off the glass.'],
   ['Post Shot Fake and Step-Through', 'fake-through', 2, 'Ball fake up toward the target, then step through under it and finish.'],
 ];
 function postVariants(): Variant[] {
@@ -260,6 +262,7 @@ const TRIPLE: readonly [string, string, number, string][] = [
   ['Rip-Through Baseline Drive', 'rip-baseline', 1, 'Rip the ball low and drive along the baseline past the cone.'],
   ['Front Pivot into Jab', 'pivot-jab', 0, 'Front pivot to face the rim, then jab sharp at the cone.'],
   ['Reverse Pivot into Drive', 'pivot-drive', 1, 'Reverse pivot away from the cone, then drive past it in one dribble.'],
+  ['Jab, Step-Back Jumper', 'jab-step-back', 2, 'Jab at the cone, push the floor away into a step-back, land square and rise.'],
   ['Catch, Pivot and Rip', 'catch-pivot-rip', 0, 'Catch on two feet, pivot to face the rim, and rip the ball low.'],
 ];
 function tripleVariants(): Variant[] {
@@ -280,6 +283,7 @@ const CLOSE_FROM: readonly [string, string, string][] = [
   ['from the Opposite Elbow', 'elbow', 'Start at the far elbow, a partner with the ball at the top of the key.'],
   ['from the Nail', 'nail', 'Start at the middle of the free-throw line, a partner with the ball at the wing.'],
   ['from the Opposite Wing', 'opp-wing', 'Start on the far wing, a partner with the ball in the near corner.'],
+  ['from the Corner', 'corner', 'Start in the near corner, a partner with the ball at the wing.'],
 ];
 const CLOSE_TO: readonly [string, string, string][] = [
   ['to Contest', 'contest', 'Sprint, then chop the feet short and get a high hand up toward the ball.'],
@@ -291,7 +295,8 @@ const CLOSE_TO: readonly [string, string, string][] = [
 function closeoutVariants(): Variant[] {
   const out: Variant[] = [];
   for (const [from, fk, setup] of CLOSE_FROM) for (const [to, tk, cue] of CLOSE_TO) {
-    out.push(va(`Closeout ${from} ${to}`, key('closeout', fk, tk), fk === 'help' ? 1 : 2, { setup, cue, ladder: fk }));
+    // the start spot is the variant axis: each finish's help-side closeout is the base the others fold under
+    out.push(va(`Closeout ${from} ${to}`, key('closeout', fk, tk), fk === 'help' ? 1 : 2, { setup, cue, ladder: fk, ...(fk !== 'help' ? { base: key('closeout', 'help', tk) } : {}) }));
   }
   return out;
 }
@@ -342,9 +347,10 @@ const PASSES: readonly [string, string, number, string, ('partner' | 'move' | 'd
   ['Lob Pass', 'lob', 1, 'Loft the ball high to the target over the reach of the cone, soft on the catch.', ['partner', 'dribble']],
   ['Hook Pass', 'hook', 2, 'Shoulder to the cone, swing the ball high over the top to the partner.', ['partner', 'move']],
   ['Kick-Out Pass', 'kick-out', 1, 'Drive two dribbles at the cone, then pass out to the partner on the arc, on a line.', ['dribble']],
+  ['One-Hand Bounce Pass', 'one-bounce', 1, 'One hand behind the ball, step and bounce it past the cone into the partner\'s hands.', ['partner', 'move', 'dribble']],
   ['Pass-Fake Pass', 'fake', 1, 'Fake the pass one way with the ball, then step and pass to the partner the other way.', ['partner', 'move']],
   ['Jump-Stop Pass', 'jump-stop', 1, 'Jump stop on two feet at the cone, pivot, and pass to the partner on a line.', ['dribble']],
-  ['Two-Ball Partner Pass', 'two-ball', 2, 'Pass one ball as the partner passes the other: chest to bounce, on the count.', ['partner']],
+  ['Two-Ball Pass', 'two-ball', 2, 'Pass one ball as the partner passes the other: chest to bounce, on the count.', ['partner']],
 ];
 function passingVariants(): Variant[] {
   const out: Variant[] = [];

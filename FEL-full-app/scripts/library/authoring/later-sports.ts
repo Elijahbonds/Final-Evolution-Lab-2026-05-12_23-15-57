@@ -50,6 +50,8 @@ const SOCCER_TOUCHES: readonly [string, string, number, string][] = [
   ['Laces Push and Stop', 'laces-stop', 0, 'Push the ball ahead with the laces, then stop it dead under the sole.'],
   ['Outside-Foot Taps', 'outside-taps', 1, 'Tap the ball along with the outside of the same foot, small and quick.'],
   ['Sole Pull and Turn', 'sole-turn', 1, 'Pull the ball back under the sole and turn the other way in one move.'],
+  ['Inside-Outside Cut Combo', 'in-out-cut', 2, 'Cut the ball inside, then outside with the same foot, and push it away into space.'],
+  ['Stop-Turn', 'stop-turn', 1, 'Step over and stop the ball with the sole, then turn back the other way with it.'],
 ];
 function soccerVariants(): Variant[] {
   const out: Variant[] = [];

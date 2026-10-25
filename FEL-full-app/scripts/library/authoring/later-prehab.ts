@@ -193,6 +193,7 @@ const COURT: readonly [string, string, number, string, Variant['equipment']][] =
   ['Three-Line Touch Sprint', 'three-line', 1, 'Touch the near free-throw line, half court and far free-throw line, back each time.', []],
   ['Burpee Intervals', 'burpee-int', 1, 'Twenty seconds of smooth burpees, forty easy: every rep lands quiet on the floor.', []],
   ['Bear Crawl Intervals', 'crawl-int', 1, 'Bear crawl along the floor for twenty seconds, forty easy, the knees low.', []],
+  ['Shuffle-Sprint Box Intervals', 'shuffle-box-int', 1, 'Shuffle, sprint, backpedal, shuffle around four cones for 20 seconds, 40 easy.', ['cone']],
   ['Shuttle Run Pyramid', 'shuttle-pyramid', 2, 'Shuttle to the 5, 10, 15 and 20 metre lines and back, then down again.', ['cone']],
 ];
 
@@ -218,6 +219,9 @@ const ISO_HOLDS: readonly [string, string, number, string, Variant['equipment'],
   ['Wall Press External Rotation Hold, Arm Raised', 'wall-er-raised', 1, 'Stand side-on to a wall, upper arm level with the shoulder, the back of the hand on the wall; press and hold.', ['wall'], { goals: ['shoulder'], primary: ['rotator-cuff'] }],
   ['Isometric Calf Hold, Bent Knee', 'calf-bent-hold', 0, 'Sit on a bench, a weight on the knees; rise onto the toes and hold still.', ['bench', 'dumbbell'], { goals: ['ankle'], primary: ['soleus'] }],
   ['Wall Sit, Single-Leg Lift', 'wall-sit-lift', 2, 'In a wall sit, lift one foot an inch off the floor and hold still.', ['wall'], { goals: ['knee'], primary: ['quads'] }],
+  ['Split Squat Hold, Front Knee Forward', 'split-knee-fwd', 1, 'Sink into the split squat with the front knee travelling past the toes on the floor, and hold still.', [], { goals: ['knee'], primary: ['quads'] }],
+  ['Side-Lying Adductor Hold', 'add-side-hold', 0, 'Lie on your side, lift the bottom leg toward the ceiling and hold it still.', ['mat'], { goals: ['hip'], primary: ['adductors'] }],
+  ['Prone Y Hold', 'prone-y-hold', 0, 'Lie face-down and hold both thumbs up off the floor in a Y toward the wall ahead.', ['mat'], { goals: ['shoulder', 'posture'], primary: ['mid-back'] }],
   ['Band Scap Retraction Hold', 'scap-hold', 0, 'Hold a band at chest height, arms long; pull it apart a little and hold still.', ['band'], { goals: ['shoulder', 'posture'], primary: ['mid-back'] }],
   ['Chin Tuck Hold Against the Floor', 'chin-floor', 0, 'Lie face-up, head on the floor; nod the chin a little and press the back of the head gently into the floor, hold.', ['mat'], { goals: ['posture'], primary: ['neck'] }],
 ];
@@ -227,7 +231,6 @@ const CARRIES: readonly [string, string, number, string, Variant['equipment']][]
   ['Sled Push Intervals', 'sled-int', 1, 'Push the sled 20 metres, rest while a partner goes, repeat.', ['sled']],
   ['Sled Drag Intervals', 'sled-drag-int', 0, 'Drag the sled backward 20 metres, rest 40 seconds, repeat.', ['sled']],
   ['Med Ball Slam Intervals', 'slam-int', 1, 'Twenty seconds of hard slams into the floor, forty easy.', ['slam-ball']],
-  ['Shuffle-Sprint Box Intervals', 'shuffle-box-int', 1, 'Shuffle, sprint, backpedal, shuffle around four cones for 20 seconds, 40 easy.', ['cone']],
 ];
 
 export const LATER_PREHAB: Family[] = [
@@ -288,7 +291,7 @@ export const LATER_PREHAB: Family[] = [
     faults: [
       { fault: 'The foot rolling onto its edge', fix: 'Press the big-toe joint back down into the floor.' },
     ],
-    dosage: reps(3, '10', 30), variants: FOOT.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(/balance|hold/i.test(name) ? { dosage: secs(3, 30, 15) } : {}), ...(over ?? {}) })),
+    dosage: reps(3, '10', 30), variants: FOOT.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(/reach/i.test(name) ? { dosage: reps(3, '5 each side', 30) } : /balance|hold/i.test(name) ? { dosage: secs(3, 30, 15) } : {}), ...(over ?? {}) })),
   },
   {
     ...PRE, family: 'hip-capacity', block: 'prehab-hip-2', pattern: 'other', plane: 'frontal', laterality: 'unilateral', skillLayer: 'strength',
@@ -310,7 +313,7 @@ export const LATER_PREHAB: Family[] = [
     faults: [
       { fault: 'Using a load too heavy to move slow', fix: 'Go lighter until every rep stays slow and smooth.' },
     ],
-    dosage: reps(2, '15', 30), variants: SMALL.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(over ?? {}) })),
+    dosage: reps(2, '15', 30), variants: SMALL.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(/hold/i.test(name) ? { dosage: reps(2, '10-second hold each way', 30) } : {}), ...(over ?? {}) })),
   },
   {
     family: 'conditioning-intervals', block: 'conditioning-2', batch: BATCH, category: 'conditioning', pattern: 'locomotion', plane: 'sagittal', laterality: 'alternating', skillLayer: null, braceMode: 'reflex',

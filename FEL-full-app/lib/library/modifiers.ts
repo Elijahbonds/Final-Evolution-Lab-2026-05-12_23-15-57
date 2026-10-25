@@ -130,7 +130,7 @@ const wordsRe = (ws: readonly string[]): RegExp => new RegExp(`(?:^|[^a-z0-9.])(
 
 /** The slow-tempo modifiers fit single-joint lifts too (a paused curl, a slow-lower raise, a held curl, a 1.5-rep
  *  raise); each rule adds its own refusals on top. */
-const SLOW_ANY_NOT: readonly string[] = [...EXPLOSIVE_WORDS, ...MACHINE_NAMES, ...NOT_A_REP, ...SET_BOTTOM, ...ODD, 'step-up', 'step up', 'nordic', 'car deadlift', 'rickshaw', 'london', 'cable deadlift', 'iron cross', 'climb', 'clock', 'glute ham', 'glute-ham', 'renegade', 'seesaw', 'see-saw', 'side to side', 'scapular', 'good morning', 'overhead squat', 'zercher', 'bent press', 'behind the back', 'crucifix', 'board press', 'kneeling squat'];
+const SLOW_ANY_NOT: readonly string[] = [...EXPLOSIVE_WORDS, ...MACHINE_NAMES, ...NOT_A_REP, ...SET_BOTTOM, ...ODD, 'step-up', 'step up', 'nordic', 'car deadlift', 'rickshaw', 'london', 'cable deadlift', 'iron cross', 'climb', 'clock', 'glute ham', 'glute-ham', 'renegade', 'seesaw', 'see-saw', 'side to side', 'scapular', 'good morning', 'overhead squat', 'zercher', 'bent press', 'behind the back', 'crucifix', 'board press', 'kneeling squat', 'around the world'];
 const LOADS: readonly EquipmentId[] = ['dumbbell', 'kettlebell', 'barbell', 'cable', 'landmine', 'trap-bar', 'ez-bar', 'machine', 'sandbag'];
 /** Kit a bodyweight exercise may still use. */
 const AMBIENT: readonly EquipmentId[] = ['wall', 'mat', 'towel', 'box', 'bench', 'step', 'pull-up-bar', 'dip-bars'];
@@ -141,13 +141,13 @@ export const MODIFIERS: readonly Modifier[] = [
     id: 'paused', batch: 4, label: 'Paused',
     rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'axle', 'pull-through', 'back extension', 'hyperextension', 'pullover', 'crossover', 'cross over'], namePatternsNot: [TRANSITION, /\swith\s/i] },
     name: (n) => `Paused ${n}`, cue: 'Stop dead at the hardest point of the rep for a two-count, then finish.', level: 'up', dosage: (d) => ({ ...d, tempo: '2-2-1-0' }),
-    dropCues: /pause|hold still|for a beat|\bcount\b/i,
+    dropCues: /pause|hold still|for a beat|\bcount\b|seconds/i,
   },
   {
     id: 'tempo', batch: 4, label: '4-second lower',
     rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'pull-through', 'conventional', 'sumo deadlift', 'trap bar deadlift', 'axle', 'shrug', 'kickback', 'crossover', 'cross over'], namePatternsNot: [TRANSITION, WITH_SUFFIX] },
     name: (n) => `${n} with 4-Second Lower`, cue: 'Lower on a slow four-count, then move at normal speed.', level: 'same', dosage: (d) => ({ ...d, tempo: '4-0-1-0' }),
-    dropCues: /-count|\bcount\b|slow|pause|for a beat/i,
+    dropCues: /-count|\bcount\b|slow|pause|for a beat|seconds/i,
   },
   {
     id: 'iso-hold', batch: 4, label: 'Isometric hold',
@@ -357,7 +357,8 @@ const re = (ws: readonly string[]): RegExp => {
 /** Why a modifier's rule refuses this base (empty = it applies). Each reason names the rule it breaks. */
 /** Implements a cue names, and the kit that makes the word fit ("the bar" on a cable press is a seed cue-family slip). */
 const KIT_WORDS: readonly [RegExp, readonly EquipmentId[]][] = [
-  [/\bthe bar\b|\bbend the bar\b/i, ['barbell', 'ez-bar', 'trap-bar', 'pull-up-bar', 'landmine', 'dip-bars', 'machine', 'cable', 'other']],
+  [/\bbend the bar\b|\bsnap it in half\b/i, ['barbell', 'ez-bar']],
+  [/\bthe bar\b/i, ['barbell', 'ez-bar', 'trap-bar', 'pull-up-bar', 'landmine', 'dip-bars', 'machine', 'cable', 'other']],
   [/\bthe band\b/i, ['band', 'mini-band']],
   [/\bthe dumbbells?\b/i, ['dumbbell']],
   [/\bthe (?:kettle)?bell\b/i, ['kettlebell', 'dumbbell']],

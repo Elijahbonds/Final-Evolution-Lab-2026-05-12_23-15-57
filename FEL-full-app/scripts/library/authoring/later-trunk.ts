@@ -101,6 +101,7 @@ const THROW_STANCES: readonly [string, string, number, string][] = [
 function throwVariants(): Variant[] {
   const out: Variant[] = [];
   for (const [t, tk, tl, cue, pattern] of THROWS) for (const [st, sk, sl, setup] of THROW_STANCES) {
+    if (tk === 'single-push' && sk === 'single-leg') continue; // one arm and one leg is a balance drill, not a throw
     out.push(va(`${st} Med Ball ${t}`, key(tk, sk), tl + sl, { setup, cue, pattern, plane: pattern === 'rotation' ? 'transverse' : 'sagittal', ladder: tk, equipment: ['medicine-ball', 'wall', ...(sk.includes('kneeling') ? ['mat' as const] : [])] }));
   }
   return out;

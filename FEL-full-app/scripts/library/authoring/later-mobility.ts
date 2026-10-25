@@ -79,7 +79,6 @@ const CIRCLES: readonly [string, string, number, string, Partial<Variant>?][] = 
   ['Controlled Shoulder Circle, Side-Lying', 'shoulder-side', 0, 'Lie on your side and sweep the top hand in a slow circle over the floor and back.', { equipment: ['mat'], goals: ['shoulder'] }],
   ['Controlled Ankle Circle, Seated', 'ankle-seated', 0, 'Draw the biggest slow circle you can with the toes, the shin still on the floor.', { equipment: ['mat'], goals: ['ankle'] }],
   ['Controlled Wrist Circle', 'wrist', 0, 'Draw slow, smooth circles as big as they go, both ways, the forearms still.', {}],
-  ['Standing Spine Wave', 'spine-standing', 0, 'Hands on the thighs, round up toward the ceiling, then arch, slowly, like a wave.', {}],
   ['Controlled Neck Turns', 'neck', 0, 'Turn the eyes slowly to one wall, then the other, the movement small and smooth.', { goals: ['posture'] }],
   ['Controlled Thoracic Circle, Seated', 'thoracic-seated', 1, 'Sit tall on a bench and circle the ribcage slowly, the belt line still.', { equipment: ['bench'] }],
 ];
