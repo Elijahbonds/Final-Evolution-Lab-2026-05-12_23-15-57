@@ -36,6 +36,8 @@ export const TRIAL_TIPS: Record<TrialFlag, string> = {
 };
 
 const FLAG_ORDER: TrialFlag[] = ['landedLow', 'feetUnclear', 'moved', 'outlier', 'framesOnly', 'frameRate'];
+/** Every flag name, for a stored record's allow-list (lib/assess/prqWrite.ts). */
+export const TRIAL_FLAGS: readonly TrialFlag[] = FLAG_ORDER;
 
 /** A trial's flags, from its refined read (null = the finder's frames) and the pose rate it was timed at. */
 export function trialQuality(o: { refined: RefinedFlight | null; poseHz: number; valid: boolean }): TrialQuality {
