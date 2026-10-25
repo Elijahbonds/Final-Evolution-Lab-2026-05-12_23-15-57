@@ -8,11 +8,18 @@
 //     `coach-connect-refund:<charge>:<cumulative refunded>` — and LedgerTransaction.idempotencyKey is unique, so a
 //     redelivered event, the same payment seen by the webhook and the success-page verify, or two retries racing, book
 //     the fee once;
-//   · a refund event older than one already recorded (Stripe does not order events) moves nothing.
+//   · a refund event older than one already recorded (Stripe does not order events) moves nothing;
+//   · every fee hand-back to the coach (a refund's share of the 5%, a monthly invoice's excess fee) is STATE-based: it reads
+//     the application fee's amount_refunded at Stripe first and tops it up to the target (connect.ts returnApplicationFee).
 // A failure throws, so the webhook answers 500 and Stripe retries.
+//
+// THE FEE STEPS (fees.ts): a one-off sale's application fee is exact at checkout. A monthly sale's is set exactly on each
+// renewal draft (invoice.created) and trued up on invoice.paid. These Stripe calls are made for an event Stripe sent about
+// a sale that exists, whatever the payments switch says now: a coach whose client renews after the owner switched
+// payments off is still owed the right split.
 import type Stripe from 'stripe';
-import { CONNECT_PRODUCT } from './connect';
-import { applicationFeeCents, feePostings, feeRefundPostings, refundStep } from './fees';
+import { CONNECT_PRODUCT, invoiceFee, returnApplicationFee, type ConnectFeeStripe } from './connect';
+import { feeExcessCents, feePostings, feeRefundPostings, feeReturnedCents, felShareCents, refundStep } from './fees';
 import { applyRefund, markCanceled, markExpired, markPaid, saleById, type RawDb, type SaleRow } from './store';
 
 type Meta = Record<string, string>;
@@ -47,11 +54,23 @@ export interface ConnectDeps {
   db: RawDb;
   /** Posts one balanced USD_CENTS transaction, idempotent on its key (lib/ledger.ts postTransaction). */
   post(tx: LedgerPost): Promise<void>;
+  /** Stripe, for the fee steps (a refund's share of the 5%, a monthly invoice's exact fee). */
+  stripe(): ConnectFeeStripe;
+}
+
+/** The split a sale's checkout wrote into its metadata (connect.ts saleMetadata), or null for an object without it. */
+export interface MetaSplit { priceCents: number; totalCents: number; felShareCents: number; appFeeCents: number }
+
+export function metaSplit(meta: Meta): MetaSplit | null {
+  const n = (k: string): number | null => (/^\d+$/.test(meta[k] ?? '') ? Number(meta[k]) : null);
+  const priceCents = n('priceCents'); const totalCents = n('totalCents'); const felShare = n('felShareCents'); const appFeeCents = n('appFeeCents');
+  if (priceCents === null || totalCents === null || felShare === null || appFeeCents === null || totalCents <= 0) return null;
+  return { priceCents, totalCents, felShareCents: felShare, appFeeCents };
 }
 
 const idOf = (v: unknown): string | null => (typeof v === 'string' ? v : v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' ? (v as { id: string }).id : null);
 
-export type ConnectOutcome = 'fulfilled' | 'already' | 'pending' | 'expired' | 'canceled' | 'refunded' | 'noop' | 'unknown_sale';
+export type ConnectOutcome = 'fulfilled' | 'already' | 'pending' | 'expired' | 'canceled' | 'refunded' | 'fee_set' | 'noop' | 'unknown_sale';
 
 async function loadSale(deps: ConnectDeps, saleId: string): Promise<SaleRow | null> {
   const sale = await saleById(deps.db, saleId);
@@ -91,14 +110,35 @@ export async function fulfilConnectCheckout(deps: ConnectDeps, session: Stripe.C
   return moved ? 'fulfilled' : 'already';
 }
 
-/** A monthly sale's invoice was paid: book FEL's fee for that month, as Stripe reported it (5% of the invoice otherwise). */
+/**
+ * A monthly sale's invoice was paid. First the true-up: when Stripe took more application fee than this invoice's A (the
+ * first invoice, whose fee is the percent rounded up; or a renewal whose draft was not updated in time), the excess goes
+ * back to the coach. Then FEL's share for that month is booked: 5% of the coaching price, not the processing fee.
+ */
 export async function connectInvoicePaid(deps: ConnectDeps, invoice: Stripe.Invoice): Promise<ConnectOutcome> {
   const meta = coachConnectMeta(invoice);
   if (!meta || !invoice.id) return 'noop';
   const amount = Number(invoice.amount_paid ?? 0);
   if (!Number.isSafeInteger(amount) || amount <= 0) return 'noop';
-  const reported = (invoice as { application_fee_amount?: unknown }).application_fee_amount;
-  const fee = typeof reported === 'number' && Number.isSafeInteger(reported) && reported >= 0 ? reported : applicationFeeCents(amount);
+  const split = metaSplit(meta);
+  let fee: number;
+  if (split && amount === split.totalCents) {
+    const taken = await invoiceFee(deps.stripe(), invoice.id);
+    const excess = taken ? feeExcessCents(taken.feeCents, split.appFeeCents) : 0;
+    if (taken && excess > 0) {
+      if (!taken.feeId) throw new Error('coach-connect invoice fee has no application fee id');
+      await returnApplicationFee(deps.stripe(), taken.feeId, excess, `coach-connect-fee-trueup:${invoice.id}`, { saleId: meta.saleId, invoiceId: invoice.id });
+    }
+    fee = split.felShareCents;
+  } else if (split) {
+    // A different total (a proration, a discount): FEL's 5% of the coaching part of what was paid. Its fee is the
+    // subscription's percent; the dashboard shows it, and it is not trued up (docs/COACH-BUSINESS.md "Known limits").
+    fee = felShareCents(Math.floor((amount * split.priceCents) / split.totalCents));
+  } else {
+    // A sale started before the processing-fee line (none exist in production: the tables were never applied).
+    const reported = (invoice as { application_fee_amount?: unknown }).application_fee_amount;
+    fee = typeof reported === 'number' && Number.isSafeInteger(reported) && reported >= 0 ? reported : felShareCents(amount);
+  }
   const postings = feePostings(fee);
   if (postings.length) {
     await deps.post({
@@ -109,6 +149,22 @@ export async function connectInvoicePaid(deps: ConnectDeps, invoice: Stripe.Invo
     });
   }
   return 'fulfilled';
+}
+
+/**
+ * A renewal invoice was created (a draft for about an hour before Stripe finalises it): set its application fee to A
+ * exactly. Stripe: "The application_fee_amount set directly on an invoice overrides any application fee amount calculated
+ * with application_fee_percent". The first invoice is skipped (Checkout finalised it already; invoice.paid trues it up),
+ * and so is any invoice whose total is not the sale's (a proration keeps the percent).
+ */
+export async function connectInvoiceCreated(deps: ConnectDeps, invoice: Stripe.Invoice): Promise<ConnectOutcome> {
+  const meta = coachConnectMeta(invoice);
+  const split = meta ? metaSplit(meta) : null;
+  if (!meta || !split || !invoice.id) return 'noop';
+  if (invoice.status !== 'draft' || invoice.billing_reason !== 'subscription_cycle') return 'noop';
+  if (Number(invoice.total ?? -1) !== split.totalCents) return 'noop';
+  await deps.stripe().invoices.update(invoice.id, { application_fee_amount: split.appFeeCents });
+  return 'fee_set';
 }
 
 export async function connectCheckoutExpired(deps: ConnectDeps, session: Stripe.Checkout.Session): Promise<ConnectOutcome> {
@@ -127,25 +183,34 @@ export async function connectSubscriptionChanged(deps: ConnectDeps, sub: Stripe.
   return (await markCanceled(deps.db, meta.saleId)) ? 'canceled' : 'noop';
 }
 
+/** The refunded charge, as the refund route and charge.refunded both see it. */
+export interface RefundedCharge { id: string; refundedTotal: number; applicationFeeId: string | null }
+
 /**
- * The cumulative refund on a sale's charge is now `refundedTotal`. Book the share of FEL's fee handed back for the step
- * since the last one recorded, then move the sale's refund total with a compare-and-set. Called by the webhook
- * (charge.refunded) and by the coach's refund route right after Stripe accepts the refund; whichever runs second finds
- * nothing left to do.
+ * The cumulative refund of a sale's price is now `charge.refundedTotal` (capped at the price: a refund of the processing
+ * fee too, from the Stripe dashboard, moves nothing more here). Hand back FEL's share of the 5% for the step since the last
+ * one recorded (an application-fee refund to the coach, state-based), book it, then move the sale's refund total with a
+ * compare-and-set. Called by the webhook (charge.refunded) and by the coach's refund route right after Stripe accepts the
+ * refund; whichever runs second finds nothing left to do.
  */
-export async function recordConnectRefund(deps: ConnectDeps, saleId: string, chargeId: string, refundedTotal: number): Promise<ConnectOutcome> {
+export async function recordConnectRefund(deps: ConnectDeps, saleId: string, charge: RefundedCharge): Promise<ConnectOutcome> {
   const sale = await loadSale(deps, saleId);
   if (!sale) return 'unknown_sale';
-  const after = Math.min(Math.max(0, Math.floor(refundedTotal)), sale.amountCents);
+  const after = Math.min(Math.max(0, Math.floor(charge.refundedTotal)), sale.amountCents);
   const step = refundStep(sale.feeCents, sale.amountCents, sale.refundedCents, after);
   if (step.refundDelta === 0) return 'noop';
+  if (step.feeDelta > 0) {
+    if (!charge.applicationFeeId) throw new Error('coach-connect refund: the charge has no application fee');
+    const target = feeReturnedCents(sale.feeCents, sale.amountCents, after);
+    await returnApplicationFee(deps.stripe(), charge.applicationFeeId, target, `coach-connect-fee-refund:${charge.id}`, { saleId: sale.id, chargeId: charge.id });
+  }
   const postings = feeRefundPostings(step.feeDelta);
   if (postings.length) {
     await deps.post({
       kind: 'COACH_CONNECT_FEE_REFUND',
-      idempotencyKey: `coach-connect-refund:${chargeId}:${after}`,
+      idempotencyKey: `coach-connect-refund:${charge.id}:${after}`,
       postings,
-      metadata: { saleId: sale.id, chargeId, refundedCents: after, feeReturnedCents: step.feeDelta },
+      metadata: { saleId: sale.id, chargeId: charge.id, refundedCents: after, feeReturnedCents: step.feeDelta },
     });
   }
   const status = after >= sale.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
@@ -163,6 +228,8 @@ export async function fulfilCoachConnect(deps: ConnectDeps, event: Stripe.Event)
       return fulfilConnectCheckout(deps, obj as Stripe.Checkout.Session);
     case 'checkout.session.expired':
       return connectCheckoutExpired(deps, obj as Stripe.Checkout.Session);
+    case 'invoice.created':
+      return connectInvoiceCreated(deps, obj as Stripe.Invoice);
     case 'invoice.paid':
       return connectInvoicePaid(deps, obj as Stripe.Invoice);
     case 'customer.subscription.updated':
@@ -172,7 +239,7 @@ export async function fulfilCoachConnect(deps: ConnectDeps, event: Stripe.Event)
       const charge = obj as Stripe.Charge;
       const meta = coachConnectMeta(charge);
       if (!meta) return 'noop';
-      return recordConnectRefund(deps, meta.saleId, charge.id, Number(charge.amount_refunded ?? 0));
+      return recordConnectRefund(deps, meta.saleId, { id: charge.id, refundedTotal: Number(charge.amount_refunded ?? 0), applicationFeeId: idOf(charge.application_fee) });
     }
     default:
       return 'noop';

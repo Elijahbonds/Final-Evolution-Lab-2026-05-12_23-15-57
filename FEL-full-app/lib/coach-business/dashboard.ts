@@ -21,7 +21,7 @@ export interface DashboardProfile {
 export interface Dashboard {
   ready: boolean;
   plan: CoachPlanStatus;
-  proPriceCents: number | null;
+  proPriceCents: number;
   paymentsLive: boolean;
   marketplaceOn: boolean;
   profile: DashboardProfile | null;

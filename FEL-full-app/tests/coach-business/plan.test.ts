@@ -24,12 +24,14 @@ describe('the settings', () => {
     expect(isCoachMarketplaceEnabled(env())).toBe(false);
   });
 
-  it('the Pro price has NO default: unset or nonsense is null (nothing is sold at a price the repo invented)', () => {
-    expect(coachProPriceCents(env())).toBeNull();
-    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '' }))).toBeNull();
-    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '19.99' }))).toBeNull();
-    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '-100' }))).toBeNull();
-    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '50' }))).toBeNull();
+  // test changed (coach-fee-passthrough): the Pro price had no default until the owner set one. Owner, 2026-10-25: Coach
+  // Pro is $39/month, so unset or nonsense is now 3900 (the same fallback rule as the Free client limit).
+  it('the Pro price is a setting: default $39 (the owner\'s price), unset or nonsense falls back to it', () => {
+    expect(coachProPriceCents(env())).toBe(3_900);
+    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '' }))).toBe(3_900);
+    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '19.99' }))).toBe(3_900);
+    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '-100' }))).toBe(3_900);
+    expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '50' }))).toBe(3_900);
     expect(coachProPriceCents(env({ COACH_PRO_PRICE_USD_CENTS: '2900' }))).toBe(2900);
   });
 

@@ -53,6 +53,7 @@ export function connectStripe(): ConnectStripe {
 export function prismaConnectDeps(): ConnectDeps {
   return {
     db: prisma as unknown as RawDb,
+    stripe: connectStripe,
     async post(tx) {
       await postTransaction(prisma, {
         kind: tx.kind,

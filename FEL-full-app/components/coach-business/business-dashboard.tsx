@@ -99,8 +99,6 @@ function PlanCard({ d, api, onNote }: CardProps) {
       </ul>
       {d.plan.plan === 'pro' ? null : !d.plan.gatesOn ? (
         <p className="mt-3 text-sm text-white/60" data-pro-off>Coach Pro is not on sale yet. Nothing is limited until it is.</p>
-      ) : d.proPriceCents === null ? (
-        <p className="mt-3 text-sm text-white/60">Coach Pro is not on sale yet.</p>
       ) : (
         <button type="button" className={`${btn} mt-3`} disabled={busy} onClick={upgrade}>Upgrade to Pro · {money(d.proPriceCents)} / month</button>
       )}
@@ -272,7 +270,7 @@ function SalesCard({ d, api, onSaved, onNote }: CardProps) {
             <li key={s.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 p-3">
               <div className="min-w-0">
                 <p className="font-bold">{s.title}{s.livemode ? '' : ' · test'}</p>
-                <p className="text-xs text-white/50">{money(s.amountCents)} · FEL 5% {money(s.feeCents)}{s.refundedCents ? ` · refunded ${money(s.refundedCents)}` : ''} · you {money(Math.max(0, net))} before Stripe’s fee · {s.status.toLowerCase().replace('_', ' ')}</p>
+                <p className="text-xs text-white/50">{money(s.amountCents)} · FEL 5% {money(s.feeCents)}{s.refundedCents ? ` · refunded ${money(s.refundedCents)}` : ''} · you {money(Math.max(0, net))} · {s.status.toLowerCase().replace('_', ' ')}</p>
               </div>
               {refundable || cancellable ? <button type="button" className={ghost} disabled={busy === s.id} onClick={() => refund(s.id)}>{cancellable ? 'Cancel' : 'Refund'}</button> : null}
             </li>
