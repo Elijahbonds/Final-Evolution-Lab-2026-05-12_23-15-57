@@ -30,6 +30,7 @@ import type { PoseFrame } from '@/lib/pose/landmarks';
 import type { FrontCalibration } from '@/lib/assess/calibration';
 import { footLowY } from '@/lib/assess/geometry';
 import { th } from '@/lib/assess/thresholds';
+import { comOf } from './com';
 
 export const G = 9.81;
 
@@ -76,7 +77,34 @@ export const REFINE = {
   sdInflate: 1.2,
   /** The leg-length noise prior (cm, one frame): MediaPipe-lite foot jitter at the default rig, pooled into every fit. */
   legNoiseCm: 1.5,
+  /**
+   * JUMP-PRO 2 (approach, `plantFloor`): the take-off floor is a line through the PLANT foot's own stance, from this long
+   * before the take-off to this long before it (ms), read at the take-off — no stand before it, and a floor that moves
+   * in the picture under a rolling foot is followed to where the toe leaves. Bench: a plant lasts 180–240 ms.
+   */
+  plantFromMs: 150, plantToMs: 12,
 } as const;
+
+/** JUMP-PRO 2: what an approach read changes (every default is the standing jump's, unchanged). */
+export interface RefineOpts {
+  /** The point that flies the parabola: the hips (hands on hips) or the centre of mass (arms swinging; lib/jump/com.ts). */
+  point?: 'hips' | 'com';
+  /** The take-off floor from the plant step's own stance (a line, read at the take-off) instead of the planted run. */
+  plantFloor?: boolean;
+  /**
+   * How a move toward the lens is seen: the torso's width (facing the lens) or the legs' segment lengths (side-on: the
+   * thigh and shin lie in the picture's plane, so their lengths change only with the distance).
+   */
+  depthCue?: 'torso' | 'legs';
+  /** The picture's width ÷ height (the legs' lengths need it). */
+  aspect?: number;
+  /**
+   * Shrink the landing drop toward none by its own noise (default true: a standing jump should land tall, so a drop
+   * inside its noise is noise). An approach lands lower almost every time (the arms come down, the legs reach for the
+   * floor): there the prior is wrong and the shrink reads high, so the drop is taken out whole.
+   */
+  shrinkDrop?: boolean;
+}
 
 export interface RefinedFlight {
   takeoffT: number;
@@ -109,6 +137,8 @@ export interface RefinedFlight {
   rmsCm: number;
   /** Each edge moved from the finder's (ms). */
   shiftMs: { takeoff: number; land: number };
+  /** JUMP-PRO 2: each refined edge's own ±1 SD (ms), the fits' error over the foot's crossing speed (× sdInflate). */
+  edgeSdMs: { takeoff: number; land: number };
 }
 
 interface Pt { t: number; v: number; w?: number }
@@ -174,13 +204,14 @@ export function refineFlight(
   raw: readonly PoseFrame[], front: FrontCalibration, takeoffT: number, landT: number,
   /** The neighbouring flights' edges: a floor is never read inside another flight (a rebound's contact is short). */
   near: { prevLandT?: number; nextTakeoffT?: number } = {},
+  opts: RefineOpts = {},
 ): RefinedFlight | null {
   const vis = th('gate.visibility');
   const hipsOk = (f: PoseFrame) => f.present && f.image.length >= 33 && HIPS.every((k) => f.image[k].v >= vis);
   const feetOk = (f: PoseFrame) => hipsOk(f) && FEET.every((k) => f.image[k].v >= vis);
   const feetSeen = (f: PoseFrame) => hipsOk(f) && FEET.every((k) => f.image[k].v >= REFINE.unsureVis);
   // image heights grow UP: u = −y
-  const hipU = (f: PoseFrame) => -(f.image[23].y + f.image[24].y) / 2;
+  const hipU = opts.point === 'com' ? (f: PoseFrame) => -comOf(f.image).y : (f: PoseFrame) => -(f.image[23].y + f.image[24].y) / 2;
   const lowU = (f: PoseFrame) => -Math.max(footLowY(f.image, 'left'), footLowY(f.image, 'right'));
   const legL = (f: PoseFrame) => hipU(f) - lowU(f);
 
@@ -190,6 +221,7 @@ export function refineFlight(
   let Lto = NaN, Ltd = NaN, seTo = NaN, seTd = NaN, slopeTo = NaN, slopeTd = NaN, seFloorPre = NaN, seFloorPost = NaN;
   const R = REFINE;
   // the floor windows, kept inside this flight's own contacts
+  const prevLand = near.prevLandT;
   const preFrom = (to: number) => Math.max(to - R.floorToMs, (near.prevLandT ?? -Infinity) + R.floorFromMs);
   const postTo = (td: number) => Math.min(td + R.floorToMs, (near.nextTakeoffT ?? Infinity) - R.floorFromMs);
   const nominalRuler = (front.worldHeight ?? th('t5.nominalHeightM')) / front.bodyHeight;
@@ -206,6 +238,14 @@ export function refineFlight(
     floorPre = median(pre); floorPost = median(post);
     // a median's standard error: 1.25 σ/√n
     seFloorPre = (1.25 * s0) / Math.sqrt(Math.max(1, pre.length)); seFloorPost = (1.25 * s0) / Math.sqrt(Math.max(1, post.length));
+    if (opts.plantFloor) {
+      // the plant's stance, up to the toe-off: a line read at the take-off (its median when the line has too few frames)
+      // a heel rising fast comes back unsure (motion blur): it counts at the unsure weight, as the leg lines count it
+      const st = raw.filter((f) => feetSeen(f) && f.t >= Math.max(to - R.plantFromMs, (prevLand ?? -Infinity) + R.floorFromMs) && f.t <= to - R.plantToMs).map((f) => ({ t: f.t, v: lowU(f), w: feetOk(f) ? 1 : R.unsureWeight }));
+      const ln = st.length >= 4 ? fitLine(st, s0) : null;
+      if (ln) { floorPre = ln.at(to); seFloorPre = ln.se(to); }
+      else if (st.length) { floorPre = median(st.map((q) => q.v)); seFloorPre = (1.25 * s0) / Math.sqrt(st.length); }
+    }
     if (!Number.isFinite(floorPre) || !Number.isFinite(floorPost)) return null;
     const P = par;
     const hipAt = (t: number) => { const x = (t - t0) / 1000; return P.a + P.b * x + P.c * x * x; };
@@ -265,7 +305,11 @@ export function refineFlight(
   const ruler = G / (-2 * par.c);
   const nominal = (front.worldHeight ?? th('t5.nominalHeightM')) / front.bodyHeight;
   const rulerOk = Math.abs(ruler / nominal - 1) <= R.rulerTol;
-  const width = (f: PoseFrame) => Math.abs(f.image[11].x - f.image[12].x) + Math.abs(f.image[23].x - f.image[24].x);
+  const asp = opts.aspect ?? 4 / 3;
+  const seg = (f: PoseFrame, a: number, b: number) => Math.hypot((f.image[a].x - f.image[b].x) * asp, f.image[a].y - f.image[b].y);
+  const width = opts.depthCue === 'legs'
+    ? (f: PoseFrame) => seg(f, 23, 25) + seg(f, 25, 27) + seg(f, 24, 26) + seg(f, 26, 28)
+    : (f: PoseFrame) => Math.abs(f.image[11].x - f.image[12].x) + Math.abs(f.image[23].x - f.image[24].x);
   const wPre = median(raw.filter((f) => feetOk(f) && f.t <= to - R.floorFromMs && f.t >= preFrom(to)).map(width));
   const wPost = median(raw.filter((f) => feetOk(f) && f.t >= td + R.floorFromMs && f.t <= postTo(td)).map(width));
   const depthRatio = Number.isFinite(wPre) && Number.isFinite(wPost) && wPre > 0 ? wPost / wPre : null;
@@ -281,7 +325,7 @@ export function refineFlight(
   const heightFlightCm = ((G * T * T) / 8) * 100;
   const heightFlightSdCm = ((G * T * sdT) / 4) * 100;
   // the drop, shrunk by its own noise (a positive-part James–Stein weight): a clean landing's noise is not "taken out"
-  const w = dropM !== null && dropSdM !== null && dropM !== 0 ? Math.max(0, dropM * dropM - dropSdM * dropSdM) / (dropM * dropM) : 0;
+  const w = dropM === null || dropSdM === null || dropM === 0 ? 0 : opts.shrinkDrop === false ? 1 : Math.max(0, dropM * dropM - dropSdM * dropSdM) / (dropM * dropM);
   let heightTovCm = heightFlightCm, heightTovSdCm = heightFlightSdCm;
   if (dropM !== null && w > 0 && T > 0) {
     const v0 = (dropM * w) / T + (G * T) / 2;
@@ -295,6 +339,7 @@ export function refineFlight(
     heightFlightSdCm, heightTovSdCm, riseFall: fall > 0 ? rise / fall : NaN,
     ruler, frames: used, rmsCm: par.rms * ruler * 100,
     shiftMs: { takeoff: to - takeoffT, land: td - landT },
+    edgeSdMs: { takeoff: R.sdInflate * sdEdge(seTo, seFloorPre, slopeTo), land: R.sdInflate * sdEdge(seTd, seFloorPost, slopeTd) },
   };
 }
 
