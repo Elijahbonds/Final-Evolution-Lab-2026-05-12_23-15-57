@@ -72,7 +72,7 @@ const UA = 'AgeScreenTest/1.0';
 // lane/coach-business landed first (#442): pinned at this lane's merge of lane/finish-release, the first commit carrying
 // all four 2026-10-24/25 pending files, ef5ed65f.
 // Teams + exercise library both landed: pinned at the merge of lane/finish-release into lane/teams-squads that carries every pending file above.
-const PARENT = 'MERGE_PENDING';
+const PARENT = 'c0ceffae5af100057e40967d65505e4dd344e2a8';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
