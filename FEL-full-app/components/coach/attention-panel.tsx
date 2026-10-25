@@ -21,6 +21,8 @@ import { readinessDayLabel } from '@/lib/health/readiness';
 import { AlertsStrip } from './alerts-strip';
 // COACH-VIDEO-REVIEW (2026-10-24): filmed sets waiting, the flagged rep first (components/coach/form-review)
 import { FormReviewCount } from './form-review/review-count';
+// COACH-READINESS (2026-10-25): the daily jump check's alerts and the coach's rules (components/coach/readiness)
+import { ReadinessPanel } from './readiness/readiness-panel';
 import type { CoachAlert } from '@/lib/coach/alerts';
 
 interface Flag {
@@ -104,6 +106,7 @@ export function AttentionPanel() {
       <h2 id="attention-heading" className="text-sm font-semibold text-white/80">Needs you today</h2>
       <p className="mt-0.5 text-xs text-white/45">{board.headline ?? board.triage.summary}</p>
       <div className="mt-3 empty:hidden"><FormReviewCount /></div>
+      <div className="empty:hidden"><ReadinessPanel /></div>
 
       {/* Someone waiting on programming is waiting on THIS coach, so they come first and are named. */}
       {waiting.length > 0 && (

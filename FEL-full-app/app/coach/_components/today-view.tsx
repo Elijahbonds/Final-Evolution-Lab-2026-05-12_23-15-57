@@ -107,9 +107,10 @@ import { AVAILABILITY_API } from '@/components/coach/availability-picker';
 // MIRROR-PROGRESS (2026-10-07; plan Phase 4): each card's "Last time: 3×8 @ 60 kg" — the athlete's own newest completed log
 // of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
 import { lastTimeLine } from '@/lib/coach/loop';
+import { ReadinessTodayLine } from '@/components/readiness/readiness-today-line';   // COACH-READINESS (2026-10-25): wiring only
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check' };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -265,6 +266,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
+      <ReadinessTodayLine note={today.readiness} api={api.readiness} />
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
