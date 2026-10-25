@@ -17,7 +17,7 @@ import { createCatalogueItem, type CatalogueDb } from '@/lib/coach/catalogueServ
 import { nameKey as catalogueNameKey } from '@/lib/coach/catalogue';
 import { answerAsk } from './ask/answer';
 import { libraryToCatalogue, catalogueToSubmission, submissionToEntry } from './bridge';
-import { avatarClip, muscleMap } from './demo';
+import { demoFor, muscleMap } from './demo';
 import { loadLibraryFiles } from './files';
 import { buildIndex, search, FACET_KEYS, type LibraryIndex, type SearchFilters } from './search/engine';
 import {
@@ -85,12 +85,15 @@ export interface VariantRef { id: string; name: string; level: LibraryExercise['
 
 export interface LibraryCard extends LibraryExercise {
   muscleMap: { primary: string[]; secondary: string[] };
+  /** LIBRARY-ANATOMY (2026-10-25): the loop the 3D demo plays (lib/library/demo.ts demoFor), or null — the cue card. */
   avatarClip: string | null;
+  /** …and, for an isometric hold, the second of that loop it holds still at (null: it loops). */
+  avatarHold: number | null;
   /** On a search hit: the other matching members of its group. Absent elsewhere. */
   variants?: VariantRef[];
 }
 
-export const toCard = (e: LibraryExercise): LibraryCard => ({ ...e, muscleMap: muscleMap(e), avatarClip: avatarClip(e.demo.clipKey) });
+export const toCard = (e: LibraryExercise): LibraryCard => { const d = demoFor(e); return { ...e, muscleMap: muscleMap(e), avatarClip: d?.clip ?? null, avatarHold: d?.hold ?? null }; };
 export const toVariantRef = (e: LibraryExercise): VariantRef => ({ id: e.id, name: e.name, level: e.level, status: e.review.status });
 
 const LIST = (v: string | null): string[] | undefined => {

@@ -11,7 +11,7 @@ import { Toaster } from 'sonner';
 import { LibraryBrowser } from '@/components/library/library-browser';
 import { LibraryReview } from '@/components/library/library-review';
 import { answerAsk } from '@/lib/library/ask/answer';
-import { avatarClip, muscleMap } from '@/lib/library/demo';
+import { demoFor, muscleMap } from '@/lib/library/demo';
 import { loadLibraryFiles } from '@/lib/library/files';
 import { buildIndex, search, FACET_KEYS, type SearchFilters } from '@/lib/library/search/engine';
 import type { LibraryExercise } from '@/lib/library/types';
@@ -22,7 +22,7 @@ const RIG_APPROVED = new Set(['authored-b1-basketball-handles', 'authored-b1-ply
 const entries: LibraryExercise[] = loadLibraryFiles().map((e) => (athlete && RIG_APPROVED.has(e.review.batch) ? { ...e, review: { ...e.review, status: 'approved' as const, reviewer: 'rig' } } : e));
 const index = buildIndex(entries);
 const viewer = { coach: !athlete, admin: !athlete, drafts: false, youth: false };
-const card = (e: LibraryExercise) => ({ ...e, muscleMap: muscleMap(e), avatarClip: avatarClip(e.demo.clipKey) });
+const card = (e: LibraryExercise) => { const d = demoFor(e); return { ...e, muscleMap: muscleMap(e), avatarClip: d?.clip ?? null, avatarHold: d?.hold ?? null }; };   // LIBRARY-ANATOMY: the card's loop is the entry's own (lib/library/server.ts toCard)
 
 function filtersFrom(p: URLSearchParams): SearchFilters {
   const f: SearchFilters = {};
