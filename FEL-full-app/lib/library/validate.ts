@@ -15,12 +15,17 @@
 //   7. source and licence present on every entry; review status and batch present; every authored and seed entry
 //      that nobody has reviewed is a draft.
 // Youth: an entry marked youthOk must carry no max-effort cue (taxonomy.ts MAX_EFFORT_CUE) and no pin (PIN_EXERCISE).
+//   8. variants and modifiers (batches 2–4) — `variantOf` names a real BASE entry (never itself, never another variant:
+//      one level deep), an entry whose variation ends in `+<modifier>` is a variant of the entry it modifies, the
+//      modifier is one on ./modifiers.ts's list, and that modifier's applicability rule accepts the base (no "Paused Plyo
+//      …", no "Vertical Swing Against the Clock", no single-arm barbell lift, no seated deficit). check: 'modifier'.
 
 import { lintCue, type CueTier } from '@/lib/coach/cueLint';
 import { CATALOGUE_LIMITS } from '@/lib/coach/catalogue';
 import { MAX_EFFORT_CUE, PIN_EXERCISE, isSkillLayerId } from '@/lib/coach/taxonomy';
 import { screenText } from '@/lib/share/screen';
 import { isClipKey } from './demo';
+import { modifierById, modifierOf, ruleFailures } from './modifiers';
 import { nameKey } from './search/text';
 import type { LibraryExercise } from './types';
 import {
@@ -137,7 +142,30 @@ export function checkEntry(e: LibraryExercise): Issue[] {
   if (e.source?.url !== null && e.source?.url !== undefined && !URL.test(e.source.url)) bad('source', 'source.url must be http(s)');
   if (!e.review || !inList(REVIEW_STATUSES, e.review.status) || typeof e.review.batch !== 'string' || !e.review.batch) bad('review', 'review.status and review.batch required');
   if (e.review?.status === 'approved' && !e.review.reviewer) bad('review', 'an approved entry names its reviewer');
+
+  // 8. variants and modifiers (on their own: the shape; checkLibrary / checkAgainst check the base)
+  if (e.variantOf !== undefined && e.variantOf !== null && (typeof e.variantOf !== 'string' || !SLUG.test(e.variantOf))) bad('modifier', 'variantOf must be an entry id or null');
+  const mod = typeof e.variation === 'string' ? modifierOf(e.variation) : null;
+  if (mod !== null) {
+    if (!modifierById(mod)) bad('modifier', `unknown modifier "${mod}" in variation ${e.variation}`);
+    if (!e.variantOf) bad('modifier', `a "+${mod}" entry names the base it modifies (variantOf)`);
+  }
   return out;
+}
+
+/** Rule 8 across entries: the base resolves, is not itself a variant, and the modifier's rule accepts it. */
+function checkVariant(e: LibraryExercise, get: (id: string) => LibraryExercise | undefined): Issue[] {
+  if (!e.variantOf) return [];
+  const bad = (detail: string): Issue[] => [{ id: e.id, check: 'modifier', detail }];
+  if (e.variantOf === e.id) return bad('variantOf points at itself');
+  const base = get(e.variantOf);
+  if (!base) return bad(`variantOf → ${e.variantOf} does not exist`);
+  if (base.variantOf) return bad(`variantOf → ${base.id}, which is itself a variant of ${base.variantOf} (one level only)`);
+  const mod = modifierOf(e.variation);
+  const m = mod ? modifierById(mod) : undefined;
+  if (!m) return [];
+  const why = ruleFailures(m.rule, base);
+  return why.length ? bad(`"${m.label}" does not apply to ${base.id}: ${why.join('; ')}`) : [];
 }
 
 /** The whole library: each entry, then links and duplicates across entries. */
@@ -176,6 +204,7 @@ export function checkLibrary(entries: readonly LibraryExercise[]): Issue[] {
       if (to === e.id) out.push({ id: e.id, check: 'links', detail: `${f} points at itself` });
       else if (!byId.has(to)) out.push({ id: e.id, check: 'links', detail: `${f} → ${to} does not exist` });
     }
+    out.push(...checkVariant(e, (id) => byId.get(id)));
   }
   return out;
 }
@@ -212,5 +241,6 @@ export function checkAgainst(e: LibraryExercise, others: readonly LibraryExercis
     const to = e[f];
     if (to !== null && (to === e.id || !ids.has(to))) out.push({ id: e.id, check: 'links', detail: `${f} → ${to} does not resolve` });
   }
+  out.push(...checkVariant(e, (id) => rest.find((o) => o.id === id)));
   return out;
 }
