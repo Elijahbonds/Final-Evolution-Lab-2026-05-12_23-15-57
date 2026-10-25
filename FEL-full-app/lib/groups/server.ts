@@ -202,13 +202,15 @@ export async function loadGroupView(db: GroupsDb, groupId: string, viewerId: str
   const activity = await readActivity(db, facts, codes, now);
 
   // the weekly rollover: settle last week's league once
-  const award = rolloverAward(group.createdAt, facts, activity, weekKey, acts);
+  const award = rolloverAward(group.createdAt, group.kind === 'team' ? facts.filter((m) => m.role === 'member') : facts, activity, weekKey, acts);
   if (award) {
     const w = await store.insertAct(db, { groupId, kind: 'trophy', dedupeKey: award.dedupeKey, fromUserId: null, toUserId: award.toUserId, ref: award.ref, preset: award.preset, points: award.points }, t);
     if (w.ok && w.value) acts = [{ id: 'new', kind: 'trophy', dedupeKey: award.dedupeKey, fromUserId: null, toUserId: award.toUserId, ref: award.ref, preset: award.preset, points: award.points, createdAt: t }, ...acts];
   }
 
   const me = facts.find((m) => m.userId === viewerId)!;
+  // in a team the coaches run it and the athletes play it: buddies, streak, duos, boards and league are the athletes'
+  const players = group.kind === 'team' ? facts.filter((m) => m.role === 'member') : facts;
   const today = dayOf(now);
   const seeInvite = can(me.role, 'see_invite');
   const code = codeOfToken(group.inviteToken);
@@ -223,11 +225,11 @@ export async function loadGroupView(db: GroupsDb, groupId: string, viewerId: str
     invite: seeInvite && code ? { code: formatCode(code), path: joinPath(group.inviteToken), open: group.inviteOpen } : null,
     members: facts.map((m) => ({ userId: m.userId, name: m.name, role: m.role, you: m.userId === viewerId })),
     dailyDrillAssigned: group.kind === 'team' && group.dailyDrill,
-    buddies: buddies(facts, activity, viewerId, acts, t),
-    streak: friendStreak(facts, activity, group.createdAt, t),
-    duos: duoGoals(facts, activity, acts, weekKey),
-    boards: boards(facts, activity, weekKey),
-    league: { weekKey, standings: standings(facts, activity, weekKey) },
+    buddies: buddies(players, activity, viewerId, acts, t),
+    streak: friendStreak(players, activity, group.createdAt, t),
+    duos: duoGoals(players, activity, acts, weekKey),
+    boards: boards(players, activity, weekKey),
+    league: { weekKey, standings: standings(players, activity, weekKey) },
     trophies: trophyShelf(facts, acts),
     feed: buildFeed(facts, activity, acts, viewerId, weekKey),
     rollup: rollupAllowed ? teamRollup(facts, activity, weekKey, group.dailyDrill) : null,

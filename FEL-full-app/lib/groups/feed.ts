@@ -1,7 +1,7 @@
 // TEAMS-SQUADS: the teen-safe group feed (owner, 2026-10-22: "reps, PRs, clips; reactions only, no DMs for minors").
 //
 // Every line is built HERE from a template and a member's first name; no member ever typed a word of it. What it shows:
-//   · drill  — "<name> did today's drill" (everyone: done/not done is what training buddies share)
+//   · drill  — "<names> did the daily drill", one item a day (everyone: done/not done is what training buddies share)
 //   · pr     — "<name> set a new best in <mode>: <score>" — verified adults only (a teen's scores stay on the device)
 //   · reps   — "<name> logged <n> <squat|lunge> reps" — adults who save numbers AND share them with this group
 //   · jump   — "<name> verified a <x> in jump" — same gate, and only a VERIFIED JumpRecord (lib/jump/seam.ts)
@@ -36,6 +36,11 @@ export const FEED_MAX = 40;
 
 const PATTERN_WORD: Record<string, string> = { squat: 'squat', lunge: 'lunge' };
 
+/** "A", "A and B", "A, B and C". */
+export function listOf(names: readonly string[]): string {
+  return names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 export const isReactionKey = (v: unknown): v is ReactionKey => typeof v === 'string' && Object.prototype.hasOwnProperty.call(REACTIONS, v);
 export const reactionDedupe = (itemKey: string, fromUserId: string, reaction: ReactionKey) => `reaction:${itemKey}:${fromUserId}:${reaction}`;
 
@@ -50,12 +55,13 @@ export function buildFeed(members: readonly MemberFacts[], raw: Activity, acts: 
   const name = (id: string | null) => (id ? by.get(id)?.name ?? null : null);
   const items: Omit<FeedItem, 'reactions'>[] = [];
 
-  for (const m of members) {
-    for (const day of a.drillDays[m.userId] ?? []) {
-      const at = Date.parse(`${day}T20:00:00Z`); // midday PT: a day, not an instant
-      if (at < from) continue;
-      items.push({ key: `drill:${m.userId}:${day}`, kind: 'drill', userId: m.userId, line: `${m.name} did the daily drill`, at, href: null });
-    }
+  // one item per day: who did the daily drill (a feed of one line per person per day drowns everything else)
+  const byDay = new Map<string, string[]>();
+  for (const m of members) for (const day of a.drillDays[m.userId] ?? []) byDay.set(day, [...(byDay.get(day) ?? []), m.name]);
+  for (const [day, names] of byDay) {
+    const at = Date.parse(`${day}T20:00:00Z`); // midday PT: a day, not an instant
+    if (at < from) continue;
+    items.push({ key: `drill:${day}`, kind: 'drill', userId: null, line: `${listOf(names)} did the daily drill`, at, href: null });
   }
   for (const p of a.prs) {
     const n = name(p.userId); const m = by.get(p.userId);

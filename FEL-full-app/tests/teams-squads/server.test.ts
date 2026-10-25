@@ -165,13 +165,13 @@ describe('reactions only, nudges and duo goals', () => {
   it('a preset reaction to a visible feed item, once; no typed field; no unknown key; no invisible item', async () => {
     const today = dayOf(new Date());
     const { db, id, state } = await squadOf([ADA, BEN], { ledgerKeys: [dailyDrillKey('ben', today)] });
-    const item = `drill:ben:${today}`;
+    const item = `drill:${today}`;
     expect((await groupAct(db, id, 'ada', { kind: 'react', item, reaction: 'fire' })).body).toEqual({ saved: true, already: false });
     expect((await groupAct(db, id, 'ada', { kind: 'react', item, reaction: 'fire' })).body).toEqual({ saved: true, already: true });
     expect((await groupAct(db, id, 'ada', { kind: 'react', item, reaction: 'fire', text: 'nice!' })).body.error).toBe('unexpected_field');
     expect((await groupAct(db, id, 'ada', { kind: 'comment', text: 'hi' })).body.error).toBe('kind_invalid');
     expect((await groupAct(db, id, 'ada', { kind: 'react', item, reaction: 'nice job' })).body.error).toBe('reaction_invalid');
-    expect((await groupAct(db, id, 'ada', { kind: 'react', item: 'drill:ben:1999-01-01', reaction: 'fire' })).status).toBe(404);
+    expect((await groupAct(db, id, 'ada', { kind: 'react', item: 'drill:1999-01-01', reaction: 'fire' })).status).toBe(404);
     const v = await view(db, id, 'ben');
     expect(v.feed.find((f) => f.key === item)?.reactions.find((r) => r.key === 'fire')).toMatchObject({ count: 1, mine: false });
     expect((await groupAct(db, id, 'ada', { kind: 'unreact', item, reaction: 'fire' })).status).toBe(200);
@@ -263,7 +263,8 @@ describe('minors never exposed; the boards draw only from real or verified data'
     const all = JSON.stringify({ members: v.members, buddies: v.buddies, boards: v.boards, league: v.league, feed: v.feed, duos: v.duos, trophies: v.trophies });
     for (const n of ['99', '77', '55', '21.7', 'Tess Kid']) expect(all).not.toContain(n);
     expect(v.feed.map((x) => x.line)).toContain('Ada set a new best in Downtown: 31');
-    expect(v.feed.filter((x) => x.userId === 'tess').map((x) => x.kind)).toEqual(['drill']);
+    expect(v.feed.filter((x) => x.userId === 'tess')).toEqual([]);
+    expect(v.feed.find((x) => x.kind === 'drill')?.line).toBe('Ada and Tess did the daily drill');
     const gated = f.state.wheres.filter((w) => w.model === 'mirrorSession' || w.model === 'workoutScan');
     expect(gated.every((w) => !!(w.where as any).user?.is?.scanSaveOptIn)).toBe(true);
     expect(f.state.wheres.filter((w) => w.model === 'gameSession.groupBy').every((w) => !!(w.where as any).user?.is?.dobYear)).toBe(true);
@@ -285,6 +286,9 @@ describe('a team: the coach\'s roll-up and the assigned daily drill', () => {
     const coachView = await view(f.db, id, 'coach');
     expect(coachView.rollup?.rows.map((r) => [r.userId, r.drillDays])).toEqual([['ada', 1]]);
     expect(coachView.rollup?.drillAssigned).toBe(true);
+    // a team's coach runs it: the league, boards and buddies are the athletes'
+    expect(coachView.league.standings.map((r) => r.userId).sort()).toEqual(['ada', 'ben']);
+    expect(coachView.buddies.some((b) => b.userId === 'coach')).toBe(false);
     expect(coachView.invite?.code).toMatch(/^[0-9A-Z]{4}-[0-9A-Z]{4}$/);
     const athleteView = await view(f.db, id, 'ada');
     expect(athleteView.rollup).toBeNull();
