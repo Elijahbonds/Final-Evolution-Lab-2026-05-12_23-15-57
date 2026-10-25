@@ -31,11 +31,11 @@ window.fetch = (async () => new Response(JSON.stringify(data), { status: 200, he
 function App() {
   if (scene === 'list') {
     const o = data as { ready: boolean; admin: boolean; youth: boolean; programs: ProgramCard[] };
-    return h(TabPage, { eyebrow: 'Train', title: PROGRAMS_TITLE, lede: PROGRAMS_LEDE, accent: '#00FF9D' }, h(ProgramList, o));
+    return h(TabPage, { eyebrow: 'Train', title: PROGRAMS_TITLE, lede: PROGRAMS_LEDE, accent: '#00FF9D', children: h(ProgramList, o) });
   }
   if (scene === 'review') return h('div', { className: 'min-h-screen bg-[#050505] pb-20' }, h(ProgramReview, { initial: data as { ready: boolean; programs: ReviewRow[] } }));
   const v = data as ProgramView;
-  return h(TabPage, { eyebrow: 'Signature program', title: v.title, lede: v.tagline, accent: '#00FF9D' }, h(ProgramPage, { initial: v }));
+  return h(TabPage, { eyebrow: 'Signature program', title: v.title, lede: v.tagline, accent: '#00FF9D', children: h(ProgramPage, { initial: v }) });
 }
 
 createRoot(document.getElementById('root')!).render(h(App));

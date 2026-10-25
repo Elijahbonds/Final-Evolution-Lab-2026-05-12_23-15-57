@@ -6,7 +6,6 @@ import type { ProgramCard } from '@/lib/signature/view';
 import { DRAFT_BADGE, NONE_APPROVED_LINE, NOT_READY_LINE, YOUTH_DEVICE_LINE, FREE_WEEK_LINE } from '@/lib/signature/copy';
 
 export const programHref = (id: string): string => `/train/programs/${id}`;
-export const REVIEW_HREF = '/coach/admin/programs';
 
 export function ProgramList({ ready, admin, youth, programs }: { ready: boolean; admin: boolean; youth: boolean; programs: ProgramCard[] }) {
   return (
@@ -14,7 +13,7 @@ export function ProgramList({ ready, admin, youth, programs }: { ready: boolean;
       {!ready && <p className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[13px] text-white/60">{NOT_READY_LINE}</p>}
       {ready && !programs.length && <p className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[13px] text-white/60">{NONE_APPROVED_LINE}</p>}
       {admin && (
-        <Link href={REVIEW_HREF} data-review-link className="mb-4 flex min-h-[44px] items-center gap-2 text-[13px] font-bold text-[#FFD700]/85 underline-offset-2 hover:underline">
+        <Link href="/coach/admin/programs" data-review-link className="mb-4 flex min-h-[44px] items-center gap-2 text-[13px] font-bold text-[#FFD700]/85 underline-offset-2 hover:underline">
           <ShieldCheck aria-hidden className="h-4 w-4" /> Review the drafts →
         </Link>
       )}
