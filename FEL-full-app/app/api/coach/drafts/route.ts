@@ -6,6 +6,7 @@ import { isCertifiedCoach } from '@/lib/coach/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { aiCallerFromEnv, coachWeek, type DraftReadDb } from '@/lib/coach/weeklyDraft/server';
 import { decideChange, parseDecideBody, type ApproveDb } from '@/lib/coach/weeklyDraft/approve';
+import { coachFeatureRefusal, type PlanDb } from '@/lib/coach-business/planServer';
 
 /**
  * COACH-AI-DRAFT (2026-10-24): the coach's weekly Drafts inbox.
@@ -22,6 +23,9 @@ export async function GET() {
   if (!userId) return bad('unauthorized', 401);
   if (!(await isCertifiedCoach(userId))) return bad('facilitator_not_certified', 403);
   if (!rateLimit(`coach-drafts:get:${userId}`, 30, 60_000).ok) return bad('rate_limited', 429);
+  // COACH-BUSINESS: AI drafts are a Coach Pro feature while COACH_PRO_ENABLED is on (off by default: no change).
+  const pro = await coachFeatureRefusal(prisma as unknown as PlanDb, userId, 'ai_drafts');
+  if (pro) return pro;
   try {
     return NextResponse.json(await coachWeek(prisma as unknown as DraftReadDb, userId, new Date(), aiCallerFromEnv()));
   } catch (e) {
@@ -34,6 +38,8 @@ export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
   if (!rateLimit(`coach-drafts:post:${userId}`, 60, 60_000).ok) return bad('rate_limited', 429);
+  const pro = await coachFeatureRefusal(prisma as unknown as PlanDb, userId, 'ai_drafts');
+  if (pro) return pro;
   let body: unknown;
   try { body = await req.json(); } catch { return bad('invalid_json'); }
   const parsed = parseDecideBody(body);

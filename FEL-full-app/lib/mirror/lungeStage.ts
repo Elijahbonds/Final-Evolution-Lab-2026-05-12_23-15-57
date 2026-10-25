@@ -16,6 +16,10 @@
 // same class the press/row pattern already uses), feeds it lungePhaseToMovement(audit.phase), and hands this step
 // function the boolean `repCompleted` the counter's own feed() call returned on that frame — this step only reacts to
 // that signal (findings, side hand-over, review).
+// MIRROR-FIXES (2026-10-25): the counter the harness drives is lib/mirror/lungeReps.ts LungeRepCounter now (a depth01
+// hysteresis), not RepCounter on lungePhaseToMovement: under landmark jitter the velocity phase flickers and RepCounter
+// counted 24 of 76 lunges (that file's header). This step still only reacts to `repCompleted`; lungePhaseToMovement stays
+// for anything else that reads the lunge as a pull/press stream.
 //
 // VIEW AWARENESS (baseline F5, "audits unaware of view" — closed here for the lunge, which reads front-on): the
 // harness checks lib/mirror/framing.ts's own front-view test every frame and hands this step whether it passed.
@@ -115,7 +119,7 @@ export interface LungeFrameInput {
   framedRight: boolean;
   phase: LungePhase;
   faults: readonly LungeFault[];
-  /** This frame is the one a rep finished on — the harness's own RepCounter.feed() result, reused (see the header). */
+  /** This frame is the one a rep finished on — the harness's own LungeRepCounter.feed() result (see the header). */
   repCompleted: boolean;
 }
 
