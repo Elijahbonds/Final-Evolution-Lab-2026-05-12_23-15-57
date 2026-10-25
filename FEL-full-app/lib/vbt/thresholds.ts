@@ -42,7 +42,7 @@ export const V_PEAK_MIN = 0.1;
 export const MERGE_GAP_MS = 350;
 export const MERGE_DROP_M = 0.03;
 /** (new) A bottom pause shorter than this (ms) after a lowering is a bounce (touch-and-go). */
-export const BOUNCE_MS = 120;
+export const BOUNCE_MS = 80;
 /** (new) A rep whose range is under this share of the set's own range is a partial: shown, not counted. */
 export const PARTIAL_SHARE = 0.7;
 
