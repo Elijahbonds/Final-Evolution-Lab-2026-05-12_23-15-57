@@ -38,7 +38,7 @@ import { DunkTracker, refusalLine, type DunkMetrics } from '@/lib/irl/dunkTracke
 // session ended. This keeps the numbers — and only the numbers; the clip never leaves the phone.
 import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/lib/irl/dunkProgress';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
-import { RepCounter, type RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
+import type { RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, fadeReviewLines, type CueEvent, type FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 // MIRROR-COACH P9 (2026-09-30): the press/row's three faults reach the coach (lib/mirror/pressRowStage.ts), the coach
@@ -72,12 +72,15 @@ import { chipLabel } from '@/lib/mirror/hudChip';
 // changes: `pose` is handed to onFrame for every analysis mode already). RepCounter is REUSED for the rep count (the
 // phase brief's own words), the same class the press/row pattern already counts by — one instance, reset at the
 // left→right hand-over. lungeStage.ts is the pure per-frame step (the same discipline squatStage.ts explains).
+// MIRROR-FIXES (2026-10-25): the lunge's rep book is lib/mirror/lungeReps.ts LungeRepCounter now, counted on LungeAudit's
+// depth01 — RepCounter on the audit's velocity phase counted 24 of 76 jittered lunges (that file's header says why).
+import { LungeRepCounter } from '@/lib/mirror/lungeReps';
 import { MIRROR_PATTERNS } from '@/lib/mirror/patterns';
 import { LungeAudit, type LungeFault } from '@/lib/mirror/lungeAudit';
 import { checkFraming, framingLine } from '@/lib/mirror/framing';
 import { ConfidenceFloor } from '@/lib/pose/confidenceFloor';   // MIRROR P3 (capture): "move closer / more light" on the lite model
 import {
-  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession, lungePhaseToMovement,
+  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession,
   lungeSideResult, stepLungeSession, type LungeSessionState, type LungeSide,
 } from '@/lib/mirror/lungeStage';
 // THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
@@ -358,11 +361,11 @@ export function MirrorHarness({
 
   // THE LUNGE (MIRROR-COACH P4 lane 1, 2026-09-25, owner decision #9: "lunge — mount"). LungeAudit runs live off the
   // raw pose stream (no analysis mode needed — see the import comment above); lib/mirror/lungeStage.ts is the pure
-  // per-frame step (the same discipline as the squat's), and RepCounter is the reused rep book — ONE instance, reset
+  // per-frame step (the same discipline as the squat's), and LungeRepCounter (lungeReps.ts) is the rep book — ONE instance, reset
   // at the left→right hand-over, since the two sides are separate sets. React state below mirrors the session ref
   // for rendering only; lungeSessionRef is what stepLungeSession actually reads and writes.
   const lungeAuditRef = useRef(new LungeAudit());
-  const lungeRepCounterRef = useRef(new RepCounter());
+  const lungeRepCounterRef = useRef(new LungeRepCounter());
   const lungeSessionRef = useRef(initialLungeSession());
   const [lungeSession, setLungeSession] = useState<LungeSessionState>(initialLungeSession());
   // MIRROR-MOVES P2: the lunge's own coach (its own table — the squat's 'shallow' says something else), one set per side
@@ -534,7 +537,7 @@ export function MirrorHarness({
     setSquareUpSaid(false);
     setDeeperSaid(false);
     lungeAuditRef.current.reset();
-    lungeRepCounterRef.current = new RepCounter();
+    lungeRepCounterRef.current = new LungeRepCounter();
     lungeSessionRef.current = initialLungeSession();
     setLungeSession(initialLungeSession());
     lungeCueRef.current.reset();
@@ -688,15 +691,15 @@ export function MirrorHarness({
             hud.set({ lungeFramedRight: framing.ok });
             if (lungeSessionRef.current.stage !== 'review') {
               const was = lungeSessionRef.current.stage;
-              const repInfo = lungeRepCounterRef.current.feed(lungePhaseToMovement(lungeRead.phase), now);
+              const repDone = lungeRepCounterRef.current.feed(lungeRead, now);
               const step = stepLungeSession(lungeSessionRef.current, {
                 nowMs: now, present: lungeRead.present, framedRight: framing.ok, phase: lungeRead.phase,
-                faults: lungeRead.faults, repCompleted: !!repInfo,
+                faults: lungeRead.faults, repCompleted: repDone,
               });
               lungeSessionRef.current = step.state;
               if (step.repCounted || step.stageChanged || step.findingsChanged) setLungeSession(step.state);
               // the left→right hand-over (and review) gets a FRESH rep counter: the two sides are separate sets
-              if (step.stageChanged) lungeRepCounterRef.current = new RepCounter();
+              if (step.stageChanged) lungeRepCounterRef.current = new LungeRepCounter();
               // the turn line is said ONCE per side, never looped (P1's lesson — see lungeStage.ts); the banner
               // itself reads lungeSession.turnPromptSaid[stage] directly, so no separate "said" flag is kept here
               if (step.turnPrompt) {
