@@ -80,89 +80,100 @@ function dropLandingVariants(): Variant[] {
 
 // ── progressions with a base in batch 1 ───────────────────────────────────────────────────────────────────────────
 
-const PROGRESSIONS: readonly [string, string, number, string, string, Partial<Variant>?][] = [
-  // vertical
-  ['Squat Jump from a Pause', 'squat-jump-pause', 1, 'id:squat-jump', 'Sit in the quarter squat for two seconds, then push the floor away hard with no dip.'],
-  ['Squat Jump, Hands on Hips', 'squat-jump-hips', 1, 'id:squat-jump', 'Hands stay on the belt line: the floor push does all the work.'],
-  ['Countermovement Jump, Hands on Hips', 'cmj-hips', 1, 'id:countermovement-jump', 'Hands stay on the belt line: dip and push the floor away in one fast motion.'],
-  ['Countermovement Jump to a Target Touch', 'cmj-target', 1, 'id:countermovement-jump', 'Dip, then reach one hand up to touch the target on the wall at the top.', { equipment: ['wall'] }],
-  ['Tuck Jump to Stick', 'tuck-stick', 1, 'id:tuck-jump', 'Knees up toward the ceiling at the top, then open and stick the landing still and silent.'],
-  ['Switch Split Jump to Stick', 'split-stick', 1, 'id:switch-split-jump', 'Switch the legs in the air and stick the split landing still and silent.'],
-  ['Split Squat Jump from a Pause', 'split-pause', 1, 'id:switch-split-jump', 'Hold the bottom of the split squat for two seconds, then push the floor away.'],
-  ['Single-Leg Vertical Jump to Stick', 'sl-vert-stick', 2, 'id:single-leg-vertical-jump', 'Push the floor away on one leg and stick the landing on the same one.'],
-  ['Single-Leg Vertical Jump to a Target Touch', 'sl-vert-target', 2, 'id:single-leg-vertical-jump', 'Push off one leg and reach a hand to the target on the wall at the top.', { equipment: ['wall'] }],
-  ['Repeated Single-Leg Vertical Jumps', 'sl-vert-repeat', 2, 'id:single-leg-vertical-jump', 'Leave the floor fast each time, on the same leg, quiet on every contact.', { dosage: contacts(3, 6, 60) }],
-  // box
-  ['90° Rotational Box Jump', 'box-rot', 2, 'id:box-jump', 'Jump and turn a quarter in the air to land on the box, still and silent.', { equipment: ['box'] }],
-  ['Split-Stance Box Jump', 'box-split', 1, 'id:box-jump', 'Start in a split stance, then push the floor away and land on the box on both feet.', { equipment: ['box'] }],
-  ['Kneeling Jump to Box', 'box-kneel', 2, 'id:box-jump', 'From tall kneeling, swing and pop up onto the low box, landing quiet.', { equipment: ['box', 'mat'] }],
-  ['Box Jump from a Pause', 'box-pause', 1, 'id:box-jump', 'Hold the quarter squat for two seconds, then jump onto the box with no dip.', { equipment: ['box'] }],
-  ['Hands-on-Hips Box Jump', 'box-hips', 1, 'id:box-jump', 'Hands stay on the belt line: the floor push lifts you onto the box.', { equipment: ['box'] }],
-  ['Single-Leg Lateral Box Jump', 'box-sl-lat', 2, 'id:single-leg-box-jump', 'Push off one leg sideways onto the low box and stick it on the same leg.', { equipment: ['box'], plane: 'frontal' }],
-  // broad
-  ['Single-Leg Broad Jump to Stick', 'broad-sl', 2, 'id:broad-jump-to-stick', 'Push off one leg out to the line and stick it on the same leg.', { laterality: 'unilateral' }],
-  ['Broad Jump to Vertical Jump', 'broad-vert', 2, 'id:broad-jump-to-stick', 'Broad jump to the line, then on landing jump straight up toward the ceiling.'],
-  ['Broad Jump from a Pause', 'broad-pause', 1, 'id:broad-jump-to-stick', 'Hold the quarter squat for two seconds, then jump out to the line with no dip.'],
-  ['Kneeling Broad Jump', 'broad-kneel', 2, 'id:broad-jump-to-stick', 'From tall kneeling, swing and pop up onto both feet as far out as you can land quiet.', { equipment: ['mat'] }],
-  ['Standing Triple Jump', 'triple', 2, 'id:broad-jump-to-stick', 'Hop, step, and jump to the line in three long contacts, then stick it.'],
-  // hurdles
-  ['Mini-Hurdle Jumps', 'hurdle-jumps', 1, '', 'Jump each hurdle with no extra bounce between, the floor hot.', { equipment: ['mini-hurdle'], dosage: contacts(3, 6, 60) }],
-  ['Mini-Hurdle Jump to Stick', 'hurdle-stick', 0, '', 'Jump one hurdle and stick the landing still and silent before the next.', { equipment: ['mini-hurdle'] }],
-  ['Lateral Mini-Hurdle Jumps', 'hurdle-lat', 1, '', 'Jump sideways over each hurdle with no extra bounce, the floor hot.', { equipment: ['mini-hurdle'], plane: 'frontal', dosage: contacts(3, 6, 60) }],
-  ['Single-Leg Mini-Hurdle Hops', 'hurdle-sl', 2, '', 'Hop each hurdle on one leg, quiet on every contact.', { equipment: ['mini-hurdle'], laterality: 'unilateral', dosage: contacts(3, 5, 60) }],
-  ['Lateral Single-Leg Mini-Hurdle Hops', 'hurdle-sl-lat', 2, '', 'Hop sideways over each hurdle on one leg, quiet on every contact.', { equipment: ['mini-hurdle'], laterality: 'unilateral', plane: 'frontal', dosage: contacts(3, 5, 60) }],
-  ['Mini-Hurdle Jumps to Sprint', 'hurdle-sprint', 2, '', 'Jump the last hurdle, land and sprint to a cone 5 metres ahead.', { equipment: ['mini-hurdle', 'cone'], goals: ['speed'] }],
-  ['Mini-Hurdle Stick-and-Go Jumps', 'hurdle-stick-jump', 1, '', 'Jump a hurdle, stick it for a two-count, then jump the next.', { equipment: ['mini-hurdle'] }],
-  ['180° Mini-Hurdle Jumps', 'hurdle-180', 2, '', 'Jump each hurdle turning half way in the air, then stick it.', { equipment: ['mini-hurdle'], plane: 'transverse' }],
-  // approach
-  ['Four-Step Approach Jump', 'approach-4', 2, 'id:three-step-approach-jump', 'Four steps, the last two quick, then plant and lift off toward the target.'],
-  ['Five-Step Approach Jump', 'approach-5', 2, 'id:three-step-approach-jump', 'Five steps building speed, then a quick last two and lift toward the target.'],
-  ['Two-Foot Approach Jump to Rim Touch', 'approach-rim', 2, 'id:three-step-approach-jump', 'Gather on two feet under the target and reach up to touch the rim.', { equipment: ['hoop'] }],
-  ['One-Foot Approach Jump to Backboard Touch', 'approach-board', 2, 'id:one-foot-approach-jump', 'Take off the floor like a layup and touch as high on the backboard as you can.', { equipment: ['hoop'] }],
-  ['Approach Jump with Ball Reach', 'approach-ball', 2, 'id:three-step-approach-jump', 'Carry the ball high and reach it up toward the target at the top of the jump.', { equipment: ['basketball', 'hoop'] }],
-  ['Approach Jump off a Dribble', 'approach-dribble', 2, 'id:one-foot-approach-jump', 'Two hard dribbles, gather, and rise off the floor toward the target.', { equipment: ['basketball', 'hoop'], goals: ['finishing'] }],
-  ['Slide-Step Block Jump', 'block-slide', 1, '', 'Two slides along the line, then jump straight up with hands reaching to the ceiling.', { plane: 'frontal', sport: ['volleyball', 'basketball'] }],
-  ['Crossover-Step Block Jump', 'block-cross', 2, '', 'Crossover step along the line, plant square, and jump straight up, hands high.', { plane: 'frontal', sport: ['volleyball', 'basketball'] }],
-  // drop jumps (adults only)
-  ['Single-Leg Drop Jump', 'drop-sl', 2, 'id:drop-jump-from-low-box', 'Step off the low box onto one leg and leave the floor fast, straight up.', { equipment: ['box'], laterality: 'unilateral', youthOk: false }],
-  ['Drop Jump to Lateral Bound', 'drop-lat-bound', 2, 'id:drop-jump-from-low-box', 'Step off, touch the floor and bound sideways at once, then stick it.', { equipment: ['box'], youthOk: false, plane: 'frontal' }],
-  ['Drop Jump to Sprint', 'drop-sprint', 2, 'id:drop-jump-from-low-box', 'Step off, touch the floor and sprint to the cone 5 metres ahead.', { equipment: ['box', 'cone'], youthOk: false, goals: ['speed'] }],
-  ['Drop Jump to a Target Touch', 'drop-target', 2, 'id:drop-jump-from-low-box', 'Step off, touch the floor and jump to touch the target on the wall.', { equipment: ['box', 'wall'], youthOk: false }],
-  ['Lateral Drop Jump', 'drop-lat', 2, 'id:drop-jump-from-low-box', 'Step sideways off the box, touch the floor and jump straight up, quiet.', { equipment: ['box'], youthOk: false, plane: 'frontal' }],
-  ['Drop Jump, Hands on Hips', 'drop-hips', 2, 'id:drop-jump-from-low-box', 'Hands on the belt line: touch the floor and leave it fast, straight up.', { equipment: ['box'], youthOk: false }],
-  // combinations
-  ['Snap-Down to Vertical Jump', 'snap-vert', 1, 'id:snap-down', 'Snap down into a quiet stance, then jump straight up toward the ceiling at once.'],
-  ['Snap-Down to Lateral Bound', 'snap-bound', 1, 'id:snap-down', 'Snap down into a quiet stance, then bound sideways and stick it.', { plane: 'frontal' }],
-  ['Pogo Hops into Broad Jump', 'pogo-broad', 1, 'id:pogo-hop', 'Three springy pogos, then turn the last one into a broad jump to stick.'],
-  ['Pogo Hops into Vertical Jump', 'pogo-vert', 1, 'id:pogo-hop', 'Three springy pogos, then turn the last one into a full jump to the ceiling.'],
-  ['Broad Jump to Lateral Bound', 'broad-bound', 2, 'id:broad-jump-to-stick', 'Broad jump, land, then bound sideways at once and stick it.'],
-  ['Lateral Bound to Vertical Jump', 'bound-vert', 2, 'id:lateral-bound-to-stick', 'Bound sideways, land on the outside leg, then jump straight up off both feet.'],
-  ['Lateral Hop to Vertical Jump', 'hop-vert', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line, land, and jump straight up toward the ceiling.'],
-  ['Drop Landing to Broad Jump', 'drop-broad', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then broad jump to the line and stick again.', { equipment: ['box'] }],
-  ['Drop Landing to Lateral Bound', 'drop-land-bound', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then bound sideways and stick again.', { equipment: ['box'], plane: 'frontal' }],
-  ['Drop Landing with Ball Catch', 'drop-catch', 1, 'id:drop-landing-from-low-box', 'Step off the low box as a partner tosses the ball; catch it and stick the landing.', { equipment: ['box', 'basketball'], sport: ['basketball', 'general'] }],
-  ['Single-Leg Drop Landing with Ball Catch', 'drop-catch-sl', 2, 'id:single-leg-drop-landing', 'Step off onto one leg as the ball arrives; catch it and stick it still.', { equipment: ['box', 'basketball'], laterality: 'unilateral', sport: ['basketball', 'general'] }],
-  ['Lateral Hop to Stick with Partner Push', 'hop-push', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line; a partner gives a light push as you land; stick it.', { laterality: 'unilateral', plane: 'frontal' }],
-  ['Jump to Stick with Partner Push', 'jump-push', 1, 'id:broad-jump-to-stick', 'Jump out to the line; a partner gives a light push as you land; stick it still.'],
-  ['Crossover Bound to Stick', 'cross-bound', 2, 'id:lateral-bound-to-stick', 'Bound across in front of the standing leg toward the line and stick it.', { laterality: 'unilateral', plane: 'frontal' }],
-  ['Split Jump to Vertical Jump', 'split-vert', 2, 'id:switch-split-jump', 'One switch split jump, land, then jump straight up off both feet.'],
-  // single-leg and line work
-  ['Single-Leg Zig-Zag Hops', 'sl-zigzag', 2, 'id:single-leg-hop-series', 'Hop forward and across the line on one leg, side to side, quiet each time.', { plane: 'multi', dosage: contacts(3, 8, 60) }],
-  ['Single-Leg Box Hop-Up', 'sl-box-hop', 2, 'id:single-leg-hop-to-stick', 'Hop up onto the low box on one leg and stick it on the same leg.', { equipment: ['box'] }],
-  ['Single-Leg Square Hops', 'sl-square', 2, 'id:single-leg-hop-series', 'Hop the four corners of a square on the floor on one leg, quiet each time.', { plane: 'multi', dosage: contacts(3, 8, 60) }],
-  ['Four-Square Line Hops', 'four-square', 1, 'id:forward-back-pogo', 'Pogo around four squares on the floor in order, quiet and quick.', { plane: 'multi', dosage: secs(3, 15, 45) }],
-  ['Single-Leg Four-Square Line Hops', 'four-square-sl', 2, 'id:forward-back-pogo', 'Hop the four squares on the floor on one leg, quiet and quick.', { plane: 'multi', laterality: 'unilateral', dosage: secs(3, 10, 45) }],
-  ['Diagonal Line Hops', 'line-diag', 1, 'id:forward-back-pogo', 'Pogo forward and across the line on the floor on the diagonal, quiet and quick.', { plane: 'multi', dosage: secs(3, 15, 45) }],
-  ['Hexagon Hops', 'hexagon', 1, 'id:forward-back-pogo', 'Hop out and back over each side of a hexagon on the floor, facing the same wall.', { plane: 'multi', dosage: reps(3, '2 laps', 60) }],
-  ['Single-Leg Hexagon Hops', 'hexagon-sl', 2, 'id:forward-back-pogo', 'One leg: hop out and back over each side of the hexagon on the floor.', { plane: 'multi', laterality: 'unilateral', dosage: reps(3, '1 lap each side', 60) }],
-  // skips
-  ['Lateral Power Skip', 'skip-lat', 1, 'id:power-skip', 'Skip sideways, driving off the floor for height with each push.', { plane: 'frontal' }],
-  ['Backward Skip', 'skip-back', 0, 'id:power-skip', 'Skip backward in a steady rhythm, eyes on the line ahead.'],
-  ['Crossover Skip', 'skip-cross', 1, 'id:power-skip', 'Skip sideways crossing the trail foot over in front, light on the floor.', { plane: 'frontal' }],
+type Row = readonly [string, string, number, string, string, Partial<Variant>?];
+/** The progressions, one family per kind of jump (so search's family diversity and the review list read them apart). */
+const PROGRESSIONS: readonly [string, readonly Row[]][] = [
+  ['vertical-jump-builds', [
+    ['Squat Jump from a Pause', 'squat-jump-pause', 1, 'id:squat-jump', 'Sit in the quarter squat for two seconds, then push the floor away hard with no dip.'],
+    ['Squat Jump, Hands on Hips', 'squat-jump-hips', 1, 'id:squat-jump', 'Hands stay on the belt line: the floor push does all the work.'],
+    ['Countermovement Jump, Hands on Hips', 'cmj-hips', 1, 'id:countermovement-jump', 'Hands stay on the belt line: dip and push the floor away in one fast motion.'],
+    ['Countermovement Jump to a Target Touch', 'cmj-target', 1, 'id:countermovement-jump', 'Dip, then reach one hand up to touch the target on the wall at the top.', { equipment: ['wall'] }],
+    ['Tuck Jump to Stick', 'tuck-stick', 1, 'id:tuck-jump', 'Knees up toward the ceiling at the top, then open and stick the landing still and silent.'],
+    ['Switch Split Jump to Stick', 'split-stick', 1, 'id:switch-split-jump', 'Switch the legs in the air and stick the split landing still and silent.'],
+    ['Split Squat Jump from a Pause', 'split-pause', 1, 'id:switch-split-jump', 'Hold the bottom of the split squat for two seconds, then push the floor away.'],
+    ['Single-Leg Vertical Jump to Stick', 'sl-vert-stick', 2, 'id:single-leg-vertical-jump', 'Push the floor away on one leg and stick the landing on the same one.'],
+    ['Single-Leg Vertical Jump to a Target Touch', 'sl-vert-target', 2, 'id:single-leg-vertical-jump', 'Push off one leg and reach a hand to the target on the wall at the top.', { equipment: ['wall'] }],
+    ['Repeated Single-Leg Vertical Jumps', 'sl-vert-repeat', 2, 'id:single-leg-vertical-jump', 'Leave the floor fast each time, on the same leg, quiet on every contact.', { dosage: contacts(3, 6, 60) }],
+  ]],
+  ['box-jump-builds', [
+    ['90° Rotational Box Jump', 'box-rot', 2, 'id:box-jump', 'Jump and turn a quarter in the air to land on the box, still and silent.', { equipment: ['box'] }],
+    ['Split-Stance Box Jump', 'box-split', 1, 'id:box-jump', 'Start in a split stance, then push the floor away and land on the box on both feet.', { equipment: ['box'] }],
+    ['Kneeling Jump to Box', 'box-kneel', 2, 'id:box-jump', 'From tall kneeling, swing and pop up onto the low box, landing quiet.', { equipment: ['box', 'mat'] }],
+    ['Box Jump from a Pause', 'box-pause', 1, 'id:box-jump', 'Hold the quarter squat for two seconds, then jump onto the box with no dip.', { equipment: ['box'] }],
+    ['Hands-on-Hips Box Jump', 'box-hips', 1, 'id:box-jump', 'Hands stay on the belt line: the floor push lifts you onto the box.', { equipment: ['box'] }],
+    ['Single-Leg Lateral Box Jump', 'box-sl-lat', 2, 'id:single-leg-box-jump', 'Push off one leg sideways onto the low box and stick it on the same leg.', { equipment: ['box'], plane: 'frontal' }],
+  ]],
+  ['broad-jump-builds', [
+    ['Single-Leg Broad Jump to Stick', 'broad-sl', 2, 'id:broad-jump-to-stick', 'Push off one leg out to the line and stick it on the same leg.', { laterality: 'unilateral' }],
+    ['Broad Jump to Vertical Jump', 'broad-vert', 2, 'id:broad-jump-to-stick', 'Broad jump to the line, then on landing jump straight up toward the ceiling.'],
+    ['Broad Jump from a Pause', 'broad-pause', 1, 'id:broad-jump-to-stick', 'Hold the quarter squat for two seconds, then jump out to the line with no dip.'],
+    ['Kneeling Broad Jump', 'broad-kneel', 2, 'id:broad-jump-to-stick', 'From tall kneeling, swing and pop up onto both feet as far out as you can land quiet.', { equipment: ['mat'] }],
+    ['Standing Triple Jump', 'triple', 2, 'id:broad-jump-to-stick', 'Hop, step, and jump to the line in three long contacts, then stick it.'],
+  ]],
+  ['hurdle-hops', [
+    ['Mini-Hurdle Jumps', 'hurdle-jumps', 1, '', 'Jump each hurdle with no extra bounce between, the floor hot.', { equipment: ['mini-hurdle'], dosage: contacts(3, 6, 60) }],
+    ['Mini-Hurdle Jump to Stick', 'hurdle-stick', 0, '', 'Jump one hurdle and stick the landing still and silent before the next.', { equipment: ['mini-hurdle'] }],
+    ['Lateral Mini-Hurdle Jumps', 'hurdle-lat', 1, '', 'Jump sideways over each hurdle with no extra bounce, the floor hot.', { equipment: ['mini-hurdle'], plane: 'frontal', dosage: contacts(3, 6, 60) }],
+    ['Single-Leg Mini-Hurdle Hops', 'hurdle-sl', 2, '', 'Hop each hurdle on one leg, quiet on every contact.', { equipment: ['mini-hurdle'], laterality: 'unilateral', dosage: contacts(3, 5, 60) }],
+    ['Lateral Single-Leg Mini-Hurdle Hops', 'hurdle-sl-lat', 2, '', 'Hop sideways over each hurdle on one leg, quiet on every contact.', { equipment: ['mini-hurdle'], laterality: 'unilateral', plane: 'frontal', dosage: contacts(3, 5, 60) }],
+    ['Mini-Hurdle Jumps to Sprint', 'hurdle-sprint', 2, '', 'Jump the last hurdle, land and sprint to a cone 5 metres ahead.', { equipment: ['mini-hurdle', 'cone'], goals: ['speed'] }],
+    ['Mini-Hurdle Stick-and-Go Jumps', 'hurdle-stick-jump', 1, '', 'Jump a hurdle, stick it for a two-count, then jump the next.', { equipment: ['mini-hurdle'] }],
+    ['180° Mini-Hurdle Jumps', 'hurdle-180', 2, '', 'Jump each hurdle turning half way in the air, then stick it.', { equipment: ['mini-hurdle'], plane: 'transverse' }],
+  ]],
+  ['approach-jump-builds', [
+    ['Four-Step Approach Jump', 'approach-4', 2, 'id:three-step-approach-jump', 'Four steps, the last two quick, then plant and lift off toward the target.'],
+    ['Five-Step Approach Jump', 'approach-5', 2, 'id:three-step-approach-jump', 'Five steps building speed, then a quick last two and lift toward the target.'],
+    ['Two-Foot Approach Jump to Rim Touch', 'approach-rim', 2, 'id:three-step-approach-jump', 'Gather on two feet under the target and reach up to touch the rim.', { equipment: ['hoop'] }],
+    ['One-Foot Approach Jump to Backboard Touch', 'approach-board', 2, 'id:one-foot-approach-jump', 'Take off the floor like a layup and touch as high on the backboard as you can.', { equipment: ['hoop'] }],
+    ['Approach Jump with Ball Reach', 'approach-ball', 2, 'id:three-step-approach-jump', 'Carry the ball high and reach it up toward the target at the top of the jump.', { equipment: ['basketball', 'hoop'] }],
+    ['Approach Jump off a Dribble', 'approach-dribble', 2, 'id:one-foot-approach-jump', 'Two hard dribbles, gather, and rise off the floor toward the target.', { equipment: ['basketball', 'hoop'], goals: ['finishing'] }],
+    ['Slide-Step Block Jump', 'block-slide', 1, '', 'Two slides along the line, then jump straight up with hands reaching to the ceiling.', { plane: 'frontal', sport: ['volleyball', 'basketball'] }],
+    ['Crossover-Step Block Jump', 'block-cross', 2, '', 'Crossover step along the line, plant square, and jump straight up, hands high.', { plane: 'frontal', sport: ['volleyball', 'basketball'] }],
+  ]],
+  ['drop-jump-builds', [
+    ['Single-Leg Drop Jump', 'drop-sl', 2, 'id:drop-jump-from-low-box', 'Step off the low box onto one leg and leave the floor fast, straight up.', { equipment: ['box'], laterality: 'unilateral', youthOk: false }],
+    ['Drop Jump to Lateral Bound', 'drop-lat-bound', 2, 'id:drop-jump-from-low-box', 'Step off, touch the floor and bound sideways at once, then stick it.', { equipment: ['box'], youthOk: false, plane: 'frontal' }],
+    ['Drop Jump to Sprint', 'drop-sprint', 2, 'id:drop-jump-from-low-box', 'Step off, touch the floor and sprint to the cone 5 metres ahead.', { equipment: ['box', 'cone'], youthOk: false, goals: ['speed'] }],
+    ['Drop Jump to a Target Touch', 'drop-target', 2, 'id:drop-jump-from-low-box', 'Step off, touch the floor and jump to touch the target on the wall.', { equipment: ['box', 'wall'], youthOk: false }],
+    ['Lateral Drop Jump', 'drop-lat', 2, 'id:drop-jump-from-low-box', 'Step sideways off the box, touch the floor and jump straight up, quiet.', { equipment: ['box'], youthOk: false, plane: 'frontal' }],
+    ['Drop Jump, Hands on Hips', 'drop-hips', 2, 'id:drop-jump-from-low-box', 'Hands on the belt line: touch the floor and leave it fast, straight up.', { equipment: ['box'], youthOk: false }],
+  ]],
+  ['jump-combos', [
+    ['Snap-Down to Vertical Jump', 'snap-vert', 1, 'id:snap-down', 'Snap down into a quiet stance, then jump straight up toward the ceiling at once.'],
+    ['Snap-Down to Lateral Bound', 'snap-bound', 1, 'id:snap-down', 'Snap down into a quiet stance, then bound sideways and stick it.', { plane: 'frontal' }],
+    ['Pogo Hops into Broad Jump', 'pogo-broad', 1, 'id:pogo-hop', 'Three springy pogos, then turn the last one into a broad jump to stick.'],
+    ['Pogo Hops into Vertical Jump', 'pogo-vert', 1, 'id:pogo-hop', 'Three springy pogos, then turn the last one into a full jump to the ceiling.'],
+    ['Broad Jump to Lateral Bound', 'broad-bound', 2, 'id:broad-jump-to-stick', 'Broad jump, land, then bound sideways at once and stick it.'],
+    ['Lateral Bound to Vertical Jump', 'bound-vert', 2, 'id:lateral-bound-to-stick', 'Bound sideways, land on the outside leg, then jump straight up off both feet.'],
+    ['Lateral Hop to Vertical Jump', 'hop-vert', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line, land, and jump straight up toward the ceiling.'],
+    ['Drop Landing to Broad Jump', 'drop-broad', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then broad jump to the line and stick again.', { equipment: ['box'] }],
+    ['Drop Landing to Lateral Bound', 'drop-land-bound', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then bound sideways and stick again.', { equipment: ['box'], plane: 'frontal' }],
+    ['Drop Landing with Ball Catch', 'drop-catch', 1, 'id:drop-landing-from-low-box', 'Step off the low box as a partner tosses the ball; catch it and stick the landing.', { equipment: ['box', 'basketball'], sport: ['basketball', 'general'] }],
+    ['Single-Leg Drop Landing with Ball Catch', 'drop-catch-sl', 2, 'id:single-leg-drop-landing', 'Step off onto one leg as the ball arrives; catch it and stick it still.', { equipment: ['box', 'basketball'], laterality: 'unilateral', sport: ['basketball', 'general'] }],
+    ['Lateral Hop to Stick with Partner Push', 'hop-push', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line; a partner gives a light push as you land; stick it.', { laterality: 'unilateral', plane: 'frontal' }],
+    ['Jump to Stick with Partner Push', 'jump-push', 1, 'id:broad-jump-to-stick', 'Jump out to the line; a partner gives a light push as you land; stick it still.'],
+    ['Crossover Bound to Stick', 'cross-bound', 2, 'id:lateral-bound-to-stick', 'Bound across in front of the standing leg toward the line and stick it.', { laterality: 'unilateral', plane: 'frontal' }],
+    ['Split Jump to Vertical Jump', 'split-vert', 2, 'id:switch-split-jump', 'One switch split jump, land, then jump straight up off both feet.'],
+  ]],
+  ['line-and-single-leg-hops', [
+    ['Single-Leg Zig-Zag Hops', 'sl-zigzag', 2, 'id:single-leg-hop-series', 'Hop forward and across the line on one leg, side to side, quiet each time.', { plane: 'multi', dosage: contacts(3, 8, 60) }],
+    ['Single-Leg Box Hop-Up', 'sl-box-hop', 2, 'id:single-leg-hop-to-stick', 'Hop up onto the low box on one leg and stick it on the same leg.', { equipment: ['box'] }],
+    ['Single-Leg Square Hops', 'sl-square', 2, 'id:single-leg-hop-series', 'Hop the four corners of a square on the floor on one leg, quiet each time.', { plane: 'multi', dosage: contacts(3, 8, 60) }],
+    ['Four-Square Line Hops', 'four-square', 1, 'id:forward-back-pogo', 'Pogo around four squares on the floor in order, quiet and quick.', { plane: 'multi', dosage: secs(3, 15, 45) }],
+    ['Single-Leg Four-Square Line Hops', 'four-square-sl', 2, 'id:forward-back-pogo', 'Hop the four squares on the floor on one leg, quiet and quick.', { plane: 'multi', laterality: 'unilateral', dosage: secs(3, 10, 45) }],
+    ['Diagonal Line Hops', 'line-diag', 1, 'id:forward-back-pogo', 'Pogo forward and across the line on the floor on the diagonal, quiet and quick.', { plane: 'multi', dosage: secs(3, 15, 45) }],
+    ['Hexagon Hops', 'hexagon', 1, 'id:forward-back-pogo', 'Hop out and back over each side of a hexagon on the floor, facing the same wall.', { plane: 'multi', dosage: reps(3, '2 laps', 60) }],
+    ['Single-Leg Hexagon Hops', 'hexagon-sl', 2, 'id:forward-back-pogo', 'One leg: hop out and back over each side of the hexagon on the floor.', { plane: 'multi', laterality: 'unilateral', dosage: reps(3, '1 lap each side', 60) }],
+  ]],
+  ['skip-builds', [
+    ['Lateral Power Skip', 'skip-lat', 1, 'id:power-skip', 'Skip sideways, driving off the floor for height with each push.', { plane: 'frontal' }],
+    ['Backward Skip', 'skip-back', 0, 'id:power-skip', 'Skip backward in a steady rhythm, eyes on the line ahead.'],
+    ['Crossover Skip', 'skip-cross', 1, 'id:power-skip', 'Skip sideways crossing the trail foot over in front, light on the floor.', { plane: 'frontal' }],
+  ]],
 ];
 
-function progressionVariants(): Variant[] {
-  return PROGRESSIONS.map(([name, v, l, base, cue, over]) => va(name, v, l, { cue, ...(base ? { base } : {}), ...(over ?? {}) }));
+function progressionVariants(rows: readonly Row[]): Variant[] {
+  return rows.map(([name, v, l, base, cue, over]) => va(name, v, l, { cue, ...(base ? { base } : {}), ...(over ?? {}) }));
 }
 
 // ── upper-body plyos and loaded jumps ─────────────────────────────────────────────────────────────────────────────
@@ -225,8 +236,8 @@ export const LATER_JUMPS: Family[] = [
     ],
     dosage: reps(3, '4', 45), variants: dropLandingVariants(),
   },
-  {
-    ...PLYO, family: 'jump-builds', block: 'plyometrics-2', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral',
+  ...PROGRESSIONS.map(([family, rows]): Family => ({
+    ...PLYO, family, block: 'plyometrics-2', pattern: 'locomotion', plane: 'sagittal', laterality: 'bilateral',
     primary: ['quads', 'glutes', 'calves'], secondary: ['hamstrings', 'foot'], goals: ['vertical', 'power', 'landing'], sport: ['general', 'basketball', 'volleyball', 'track'],
     lowLoad: ['back'], youthOk: true, equipment: [], clip: 'jump',
     setup: 'Stand tall, feet hip-width, arms ready to swing.',
@@ -236,8 +247,8 @@ export const LATER_JUMPS: Family[] = [
       { fault: 'Knees caving in on the take-off or landing', fix: 'Push the floor apart: the knees stay out over your laces.' },
       { fault: 'Slow, sticky contacts in a repeated set', fix: 'Touch the floor and leave it fast, like the floor is hot.' },
     ],
-    dosage: reps(3, '5', 60), variants: progressionVariants(),
-  },
+    dosage: reps(3, '5', 60), variants: progressionVariants(rows),
+  })),
   {
     ...PLYO, family: 'upper-body-power', block: 'plyometrics-2', category: 'plyometric', pattern: 'push', plane: 'sagittal', laterality: 'bilateral',
     primary: ['chest', 'triceps'], secondary: ['delts', 'serratus', 'deep-core'], goals: ['power'], sport: ['general', 'basketball', 'football'],

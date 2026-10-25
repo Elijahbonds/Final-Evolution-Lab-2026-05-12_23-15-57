@@ -24,12 +24,12 @@ function pallofVariants(): Variant[] {
     ['Overhead Press', 'overhead', 1, 'Press the handle out, then up toward the ceiling and back, the handle never drifting.'],
     ['Rotate-Out', 'rotate-out', 1, 'Press out, then turn away from the anchor and back to centre, slow.'],
   ];
-  const implements: [string, string, Variant['equipment']][] = [['Band', 'band', ['band']], ['Cable', 'cable', ['cable']]];
-  for (const [imp, ik, eq] of implements) for (const [st, sk, sl, setup] of stances) for (const [act, ak, al, cue] of actions) {
+  const kits: [string, string, Variant['equipment']][] = [['Band', 'band', ['band']], ['Cable', 'cable', ['cable']]];
+  for (const [imp, ik, eq] of kits) for (const [st, sk, sl, setup] of stances) for (const [act, ak, al, cue] of actions) {
     const name = `${imp} Pallof ${act}, ${st}`;
     const v = key(ik, ak, sk);
     const base = ik === 'cable' ? key('band', ak, sk) : undefined;
-    out.push(va(name, v, sl + al, { setup: setup.replace('anchor', ik === 'cable' ? 'cable' : 'band anchor'), cue, equipment: [...eq, ...(sk.includes('kneeling') ? ['mat' as const] : [])], ladder: ak, ...(base ? { base } : {}), ...(ak === 'hold' ? { dosage: secs(3, 20, 30) } : {}) }));
+    out.push(va(name, v, sl + al, { setup: setup.replace('anchor', ik === 'cable' ? 'cable' : 'band anchor'), cue, equipment: [...(eq ?? []), ...(sk.includes('kneeling') ? ['mat' as const] : [])], ladder: ak, ...(base ? { base } : {}), ...(ak === 'hold' ? { dosage: secs(3, 20, 30) } : {}) }));
   }
   return out;
 }

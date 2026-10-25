@@ -319,12 +319,7 @@ const DEF_DRILLS: readonly [string, string, number, string, ('partner' | 'hoop')
   ['Box-Out from Help Side', 'box-help', 1, 'On the shot, find the partner from help side, turn and hold them off the rim.'],
   ['Box-Out and Outlet', 'box-outlet', 1, 'Hold the box-out, chase the miss, then turn and throw the outlet to the sideline.'],
   ['Crash and Box Rebounding', 'crash-box', 1, 'Crash to the rim on the shot, find a body, and hold your spot to the ball.'],
-  ['Rebound Pursuit Drill', 'pursuit', 1, 'Chase every miss off the rim and catch it at its highest point.'],
   ['Box-Out Hold vs Push', 'box-hold', 0, 'Sit low and wide on the spot and hold it against the partner\'s push for the count.', 'partner'],
-  ['Free Throws, Make Two to Leave', 'ft-two', 1, 'Shoot two; leave only when both go in, then sprint to the far line and back.', 'hoop'],
-  ['Free Throws After a Sprint', 'ft-sprint', 1, 'Sprint to half court and back, then step to the line and run the same routine.', 'hoop'],
-  ['Free-Throw Routine, Five in a Row', 'ft-five', 0, 'Same routine every shot, eyes on the target, until five drop in a row.', 'hoop'],
-  ['Offensive Rebound Swim Move', 'swim', 1, 'Swim the arm over the partner\'s box-out and get a foot to the rim first.', 'partner'],
   ['Slide and Contest', 'slide-contest', 1, 'Slide with the drive to the cone, then stop and get a high hand up toward the ball.'],
   ['Closeout and Chase Over the Screen', 'chase-screen', 2, 'Close out, then chase the partner over the cone screen, staying on their hip.', 'partner'],
   ['Defensive Stance Hand Fighting', 'hand-fight', 1, 'Stay low and level while a partner reaches; keep a hand in the passing lane to the ball.', 'partner'],
@@ -420,6 +415,13 @@ const REBOUND: readonly [string, string, number, string][] = [
   ['Rebound and Outlet off the Glass', 'outlet-glass', 1, 'Toss the ball off the glass, rebound it high, and pivot to throw the outlet.'],
   ['Off-Hand Tip Drill', 'tip-off', 1, 'Tip the ball off the glass with the weaker hand, again and again, at the top.'],
   ['Crash and Tip-Out', 'tip-out', 1, 'Crash to the rim on the shot and tip the ball out toward the partner on the arc.'],
+  ['Offensive Rebound Swim Move', 'swim', 1, 'Swim the arm over the partner\'s box-out and get to the rim first.'],
+  ['Rebound Pursuit Drill', 'pursuit', 1, 'Chase every miss off the rim and catch it at its highest point.'],
+];
+const FREE_THROWS: readonly [string, string, number, string][] = [
+  ['Free Throws, Make Two to Leave', 'ft-two', 1, 'Shoot two; leave only when both go in, then sprint to the far line and back.'],
+  ['Free Throws After a Sprint', 'ft-sprint', 1, 'Sprint to half court and back, then step to the line and run the same routine.'],
+  ['Free-Throw Routine, Five in a Row', 'ft-five', 0, 'Same routine every shot, eyes on the target, until five drop in a row.'],
 ];
 
 // ── the families ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -591,5 +593,15 @@ export const LATER_BASKETBALL: Family[] = [
       { fault: 'Waiting for the ball to come down', fix: 'Go up and catch it at its highest point.' },
     ],
     dosage: reps(3, '8', 30), variants: REBOUND.map(([name, k, l, cue]) => va(name, k, l, { cue })),
+  },
+  {
+    ...BB, family: 'free-throws', block: 'basketball-shooting-2', category: 'sport-skill', pattern: 'push', plane: 'sagittal', laterality: 'unilateral', skillLayer: 'speed', braceMode: 'reflex',
+    primary: ['quads', 'triceps', 'delts'], secondary: ['calves', 'forearms'], goals: ['shooting'], lowLoad: ['back'], equipment: ['basketball', 'hoop'], clip: 'shoot',
+    setup: 'Stand at the free-throw line with the ball.',
+    cues: ['Same routine, same breath, every shot.', 'Eyes on the target from the set to the release.', 'Hold the follow-through until the ball lands.'],
+    faults: [
+      { fault: 'Rushing the routine when tired', fix: 'Same breath, same count, every shot, even after the sprint.' },
+    ],
+    dosage: reps(3, '10 shots', 30), variants: FREE_THROWS.map(([name, k, l, cue]) => va(name, k, l, { cue })),
   },
 ];

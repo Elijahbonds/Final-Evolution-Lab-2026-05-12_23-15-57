@@ -38,6 +38,9 @@ describe('text: plurals, suffixes, abbreviations', () => {
 });
 
 describe('synonyms', () => {
+  it('runs on the full library: 5,000+ entries (owner decision 2026-10-25)', () => {
+    expect(ALL.length).toBeGreaterThanOrEqual(5000);
+  });
   it('RDL = Romanian deadlift', () => {
     expect(names('rdl')[0]).toMatch(/romanian deadlift/i);
     expect(names('DB RDL')[0]).toBe('Dumbbell Romanian Deadlift');
@@ -59,6 +62,16 @@ describe('synonyms', () => {
   });
   it('vert = vertical jump', () => {
     expect(top('vert', {}, 5).filter((e) => e.goals.includes('vertical')).length).toBeGreaterThanOrEqual(4);
+  });
+  it('vert means the vertical-jump goal, not the word: "Vertical Swing" ranks below real vertical-jump work', () => {
+    const hits = top('vert', {}, 10);
+    const swing = hits.findIndex((e) => e.name === 'Vertical Swing');
+    expect(hits.slice(0, 5).every((e) => e.goals.includes('vertical'))).toBe(true);
+    expect(swing === -1 || swing >= 5).toBe(true);
+  });
+  it('"trap bar" is one implement, not the traps muscle plus a bar', () => {
+    expect(names('trap bar deadlift', {}, 1)[0]).toBe('Trap Bar Deadlift');
+    expect(top('trap bar', {}, 3).every((e) => e.equipment.includes('trap-bar'))).toBe(true);
   });
   it('lay up = layup, abs = trunk', () => {
     expect(names('lay up')[0]).toMatch(/layup/i);
@@ -105,6 +118,54 @@ describe('ranking', () => {
   it('plural queries find the singular entries', () => {
     expect(names('box jumps')[0]).toMatch(/box jump/i);
     expect(names('reverse lunges')[0]).toMatch(/reverse lunge/i);
+  });
+});
+
+describe('variants do not crowd the results (batches 2–4)', () => {
+  const groupOf = (e: LibraryExercise) => e.variantOf ?? e.id;
+  it('a base shows once, with its matching variants folded under it', () => {
+    const r = search(index, 'goblet squat', {}, opts);
+    expect(r.hits[0].entry.name).toBe('Goblet Squat');
+    expect(r.hits[0].variants.map((v) => v.name)).toEqual(expect.arrayContaining(['Paused Goblet Squat', 'Goblet Squat with 4-Second Lower']));
+    expect(r.hits[0].variants.every((v) => v.variantOf === 'goblet-squat')).toBe(true);
+  });
+  it('no two hits share a group, and no entry shows twice', () => {
+    for (const q of ['plyo', 'squat', 'layup', 'crossover', 'pogo', 'push up', 'romanian deadlift', 'closeout']) {
+      const r = search(index, q, {}, { drafts: true, limit: 30 });
+      const groups = r.hits.map((h) => groupOf(h.entry));
+      expect(new Set(groups).size, q).toBe(groups.length);
+      const ids = r.hits.flatMap((h) => [h.entry.id, ...h.variants.map((v) => v.id)]);
+      expect(new Set(ids).size, q).toBe(ids.length);
+      expect(r.groups, q).toBeLessThanOrEqual(r.total);
+    }
+  });
+  it('asking for the variant by name shows the variant first', () => {
+    expect(names('paused goblet squat', {}, 1)[0]).toBe('Paused Goblet Squat');
+  });
+  it('"plyo" no longer returns eight versions of one push-up', () => {
+    const hits = search(index, 'plyo', {}, opts).hits;
+    expect(hits.filter((h) => /plyo kettlebell pushups/i.test(h.entry.name)).length).toBeLessThanOrEqual(1);
+  });
+  it('paging walks groups: two pages never overlap', () => {
+    const a = search(index, 'squat', {}, { drafts: true, limit: 12 });
+    const b = search(index, 'squat', {}, { drafts: true, limit: 12, offset: 12 });
+    const ga = new Set(a.hits.map((h) => groupOf(h.entry)));
+    expect(b.hits.some((h) => ga.has(groupOf(h.entry)))).toBe(false);
+    expect(a.groups).toBeGreaterThan(24);
+  });
+  // broad queries only: a narrow one ("pogo") is rightly answered by one family, the penalty only breaks near-ties
+  it('the diversity penalty: on a broad query no family holds more than 4 of the top 10', () => {
+    for (const q of ['plyo', 'squat', 'layup', 'crossover', 'vert', 'lunge', 'closeout', 'stretch', 'ladder', 'jump']) {
+      const fam = new Map<string, number>();
+      for (const h of search(index, q, {}, opts).hits) fam.set(h.entry.family, (fam.get(h.entry.family) ?? 0) + 1);
+      expect(Math.max(...fam.values()), q).toBeLessThanOrEqual(4);
+    }
+  });
+  it('group: false is one hit per entry (the controls and the review screen)', () => {
+    const r = search(index, 'goblet squat', {}, { drafts: true, limit: 50, group: false });
+    expect(r.groups).toBe(r.total);
+    expect(r.hits.every((h) => h.variants.length === 0)).toBe(true);
+    expect(r.hits.filter((h) => groupOf(h.entry) === 'goblet-squat').length).toBeGreaterThan(1);
   });
 });
 

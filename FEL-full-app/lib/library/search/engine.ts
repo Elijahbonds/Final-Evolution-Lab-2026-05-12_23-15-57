@@ -173,14 +173,14 @@ export const GOAL_WORDS: Readonly<Record<string, string>> = Object.fromEntries([
 ].map(([w, g]) => [stem(w), g]));
 /** Query words that are a movement pattern ("lunges", "hinge", "squat"): entries of that pattern are lifted a little. */
 export const PATTERN_WORDS: Readonly<Record<string, string>> = Object.fromEntries(['squat', 'hinge', 'lunge', 'push', 'pull', 'carry', 'rotation'].map((p) => [stem(p), p]));
-export const PATTERN_LIFT = 1.25;
+export const PATTERN_LIFT = 1.4;
 export const GOAL_LIFT = 1.4;
 /** …and an entry that only has the word in its name or cues, not the goal, is damped. */
 export const GOAL_MISS = 0.8;
 /** A base keeps the group's place unless a variant scores this much better (then the variant is what was asked for). */
 export const REP_SHARE = 0.85;
 /** Each earlier top-10 group of the same family costs this share of the best score. */
-export const DIVERSITY = 0.1;
+export const DIVERSITY = 0.15;
 const DIVERSE_TOP = 10;
 
 /** Build the index once per library version (lib/library/server.ts caches it). */

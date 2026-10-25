@@ -375,7 +375,7 @@ export function ruleFailures(rule: ModifierRule, base: Pick<LibraryExercise, 'na
   // every modifier: one level deep (R5), never on a garbled or person-named seed name
   { const m = re(GLOBAL_NOT).exec(base.name); if (m) out.push(`name word "${m[0].replace(/^[^a-z0-9]/i, '')}" already names a modifier or a person (R5)`); }
   if (MESSY_NAME.some((r) => r.test(base.name))) out.push(`name "${base.name}" is punctuated in a way a modifier would garble`);
-  if (base.cues) { const k = kitMismatch(base); if (k) out.push(`its cues name ${k}, which it does not use (a variant would copy the wrong cue)`); }
+  if (base.cues) { const k = kitMismatch({ cues: base.cues, equipment: base.equipment }); if (k) out.push(`its cues name ${k}, which it does not use (a variant would copy the wrong cue)`); }
   if (!rule.categories.includes(base.category)) out.push(`category ${base.category} not in [${rule.categories.join(', ')}]`);
   if (rule.patterns && !rule.patterns.includes(base.pattern)) out.push(`pattern ${base.pattern} not in [${rule.patterns.join(', ')}]`);
   if (rule.laterality && !rule.laterality.includes(base.laterality)) out.push(`laterality ${base.laterality} not in [${rule.laterality.join(', ')}]`);
