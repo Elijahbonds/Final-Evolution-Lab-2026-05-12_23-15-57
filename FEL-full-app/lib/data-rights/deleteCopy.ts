@@ -57,6 +57,7 @@ export const DELETE_COPY = {
     rateLimited: 'Too many tries. Wait a few minutes, then try again.',
     signedOut: 'Sign in again to delete your account.',
     failed: 'Something went wrong and nothing was deleted. Try again.',
+    unsure: 'We couldn’t tell whether that went through. Try again: if it did, you’ll be signed out.',
   },
 } as const;
 
