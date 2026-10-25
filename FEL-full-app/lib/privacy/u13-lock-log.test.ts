@@ -75,10 +75,16 @@ const UA = 'AgeScreenTest/1.0';
 // COACH-READINESS (lane/coach-readiness, 2026-10-25) prisma/pending/2026-10-25-coach-readiness.sql (pending SQL only; schema.prisma
 // untouched; ReadinessJumpCheck + ReadinessRule + ReadinessAlert, additive) at 80954d8b, the lane commit carrying it on top of
 // every file above.
+// SIGNATURE-PROGRAMS (lane/signature-programs, 2026-10-25) prisma/pending/2026-10-25-signature-programs.sql (pending SQL only;
+// schema.prisma untouched; SignatureProgramReview + SignatureEnrollment, additive) at 3b1851c6, the lane commit carrying it on
+// top of every file above.
+// COMBINE-DAY (lane/combine-day, 2026-10-25) prisma/pending/2026-10-25-combine-day.sql (pending SQL only; schema.prisma
+// untouched; CombineEvent + CombineEntrant + CombineResult, additive) at f1954c91; with the signature programs' file it is
+// carried by the merge 0fba61f1, the first commit holding every file above.
 // COACH-PARITY (lane/coach-parity, 2026-10-26) prisma/pending/2026-10-26-coach-parity.sql (pending SQL only; schema.prisma
 // untouched; CoachCheckinForm + CoachCheckinAssign + CoachCheckinAnswer + CoachHabit + CoachHabitTick, additive) at f5e6bc63,
 // the lane commit carrying it on top of every file above.
-const PARENT = 'f5e6bc63cc53cdabe1e543a3b4c45d7b7b7e830b';
+const PARENT = '0fba61f116e8f34c2f20649ad828d9acaa6514cc';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
