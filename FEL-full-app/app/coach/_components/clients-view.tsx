@@ -8,6 +8,7 @@ import { InvitePanel } from '@/components/coach/invite-panel';
 import { AttentionPanel } from '@/components/coach/attention-panel';
 import { DraftsInbox } from '@/components/coach/drafts-inbox';
 import { TeamsPanel } from '@/components/groups/teams-panel';
+import { CombineEntry } from '@/components/combine/combine-entry';
 import { ScreenPrescriptions } from '@/components/coach/screen-prescriptions';
 import { ProgramBuilder, type BuilderCatalogueItem } from '@/components/coach/program-builder';
 import { CoverageLegend, CoverageStrip } from '@/components/coach/coverage-strip';
@@ -103,6 +104,8 @@ export function ClientsView() {
       <DraftsInbox />
       <FormReviewQueue />
       <TeamsPanel />
+      {/* COMBINE-DAY (2026-10-25): tryouts and testing days, run on this device (/coach/combine) */}
+      <CombineEntry />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
