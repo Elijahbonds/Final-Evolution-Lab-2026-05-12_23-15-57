@@ -27,6 +27,7 @@ import {
   ELBOWS_UP, STAND, HIGH_PLANK, UPPER, repOf, type Deg3, type ExKey, type Pair, type V3,
 } from './exerciseKit';
 import { MORE_BUILDERS } from './exerciseMore';
+import { FLOOR_BUILDERS } from './exerciseFloor';
 
 
 // ── lower body ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -405,6 +406,8 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   ['ex_arm_circles', buildExArmCircles], ['ex_quad_stretch', buildExQuadStretch], ['ex_breathe', buildExBreathe],
   // LIBRARY-ANATOMY-2: the one-arm, alternating and kneeling lifts (exerciseMore.ts)
   ...MORE_BUILDERS,
+  // LIBRARY-ANATOMY-2: the mobility positions and the flows made of them (exerciseFloor.ts)
+  ...FLOOR_BUILDERS,
 ];
 /** Build one exercise loop by name (authored/index.ts registers each name through this). */
 export function buildExerciseClip(name: string, scene: Scene, sk: Skeleton): AnimationGroup | null {

@@ -106,6 +106,7 @@ async function sheetJob(): Promise<void> {
   const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
   const names = args.length ? args : (await import('../../lib/babylon/anim/authored/exercise.ts')).EXERCISE_CLIPS as string[];
   const report: Record<string, unknown> = {};
+  const FRACS = (process.env.FRACS ?? '0,0.25,0.5,0.75').split(',').map(Number);   // the phases shot (a flow's moves sit between its holds)
   const shotsDir = join(OUT, 'clips'); mkdirSync(shotsDir, { recursive: true });
   const page = await browser.newPage({ viewport: { width: 420, height: 315 }, deviceScaleFactor: 1 }); await page.addInitScript(NAME_SHIM);
   const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
@@ -116,15 +117,15 @@ async function sheetJob(): Promise<void> {
     await page.evaluate((c) => (window as unknown as { __rigSetClip(c: string): void }).__rigSetClip(c), clip);
     await page.waitForTimeout(Number(process.env.SETTLE ?? 1800));   // the camera eases to the clip's framing
     const dur = await page.evaluate((c) => { const st = (window as unknown as { __FEL_LIBRARY_STAGE__?: { scene: { animationGroups: { name: string; from: number; to: number }[] } } }).__FEL_LIBRARY_STAGE__; const g = st?.scene.animationGroups.find((x) => x.name === c); return g ? (g.to - g.from) / 30 : null; }, clip);
-    if (dur) for (const f of [0, 0.25, 0.5, 0.75]) { await at(page, clip, dur * f); await page.screenshot({ path: join(shotsDir, `${clip}-${Math.round(f * 100)}.png`) }); }
+    if (dur) for (const f of FRACS) { await at(page, clip, dur * f); await page.screenshot({ path: join(shotsDir, `${clip}-${Math.round(f * 100)}.png`) }); }
     report[clip] = { dur, errors: errors.slice(before).filter((e) => !/favicon|404/.test(e)) };
     await page.evaluate((c) => { const st = (window as unknown as { __FEL_LIBRARY_STAGE__: { scene: { animationGroups: { name: string; play(loop: boolean): void }[] } } }).__FEL_LIBRARY_STAGE__; st.scene.animationGroups.find((x) => x.name === c)?.play(true); }, clip);
   }
   await page.close();
-  const sheet = await browser.newPage({ viewport: { width: 4 * 300 + 160, height: 6 * 225 }, deviceScaleFactor: 1 }); await sheet.addInitScript(NAME_SHIM);
+  const sheet = await browser.newPage({ viewport: { width: FRACS.length * 300 + 160, height: 6 * 225 }, deviceScaleFactor: 1 }); await sheet.addInitScript(NAME_SHIM);
   const prefix = process.env.SHEET ?? 'clips-sheet';
   for (let i = 0; i < names.length; i += 6) {
-    const rows = names.slice(i, i + 6).map((c) => `<div style="display:flex;align-items:center"><div style="width:160px;color:#fff;font:14px sans-serif;word-break:break-all">${c}</div>${[0, 25, 50, 75].map((f) => `<img src="file://${join(shotsDir, `${c}-${f}.png`)}" style="width:300px;height:225px">`).join('')}</div>`).join('');
+    const rows = names.slice(i, i + 6).map((c) => `<div style="display:flex;align-items:center"><div style="width:160px;color:#fff;font:14px sans-serif;word-break:break-all">${c}</div>${FRACS.map((x) => Math.round(x * 100)).map((f) => `<img src="file://${join(shotsDir, `${c}-${f}.png`)}" style="width:300px;height:225px">`).join('')}</div>`).join('');
     writeFileSync(join(OUT, 'sheet.html'), `<body style="margin:0;background:#111">${rows}</body>`);
     await sheet.goto(`file://${join(OUT, 'sheet.html')}`); await sheet.waitForTimeout(300);
     await sheet.screenshot({ path: join(OUT, `${prefix}-${String(i / 6 + 1).padStart(2, '0')}.png`), fullPage: true });

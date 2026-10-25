@@ -2,8 +2,11 @@
 // file shares (exercise.ts, exerciseMore.ts, exerciseFloor.ts). Moved here unchanged from exercise.ts — the same numbers, the
 // same solves — so a new loop file can use them without importing exercise.ts (which lists every file's loops).
 // Conventions: see exercise.ts's header (targets in the FINAL frame, `rel` from the posed shoulder, every loop closes).
-import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
-import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
+import { Vector3, type AnimationGroup, type Scene, type Skeleton, type TransformNode } from '@babylonjs/core';
+import { buildPoseClip, REF_HIP_JOINT_Y, REF_HIPS_Y, SMOOTH_FPS, type Deg3, type PoseKey } from '../poseClip';
+import { bindFrame } from '../bindFrame';
+import { boneNode } from '../boneLookup';
+import { smoothScalarKeys } from '../smoothKeys';
 
 export type { Deg3 };
 export type V3 = [number, number, number];
@@ -31,16 +34,20 @@ export interface ExKey {
   feet?: Pair;
   kneePoles?: Pair;
   hipsY?: number;
+  /** LIBRARY-ANATOMY-2: the hips shifted sideways (+ toward the body's right) and forward, body metres — a cossack sits over
+   *  one foot, a lateral lunge over the stepping one. Targets stay in the final frame (planted feet stay put). */
+  hipsX?: number;
+  hipsZ?: number;
   hold?: boolean;
 }
 
 /** An ExKey → the solver's key: hands and feet are solved with the hips at bind and THEN lowered by hipsY, so a final-
  *  frame target is raised by −hipsY here (basketball.ts feetAt is the same move). */
 export function k(e: ExKey): PoseKey {
-  const h = e.hipsY ?? 0;
+  const h = e.hipsY ?? 0, x = e.hipsX ?? 0, z = e.hipsZ ?? 0;
   const up = (p?: Pair): Pair | undefined => p && {
-    ...(p.Left ? { Left: [p.Left[0], p.Left[1] - h, p.Left[2]] as V3 } : {}),
-    ...(p.Right ? { Right: [p.Right[0], p.Right[1] - h, p.Right[2]] as V3 } : {}),
+    ...(p.Left ? { Left: [p.Left[0] - x, p.Left[1] - h, p.Left[2] - z] as V3 } : {}),
+    ...(p.Right ? { Right: [p.Right[0] - x, p.Right[1] - h, p.Right[2] - z] as V3 } : {}),
   };
   return {
     t: e.t, bones: e.bones, hands: up(e.hands), handsRel: e.rel, poles: e.poles, feet: up(e.feet), kneePoles: e.kneePoles,
@@ -67,17 +74,90 @@ export function mix(a: Omit<ExKey, 't'>, b: Omit<ExKey, 't'>, u: number): Omit<E
   return {
     bones, hands: pair(a.hands, b.hands), rel: pair(a.rel, b.rel), poles: u < 0.5 ? a.poles : b.poles, feet: pair(a.feet, b.feet),
     kneePoles: u < 0.5 ? a.kneePoles : b.kneePoles, hipsY: n(a.hipsY ?? 0, b.hipsY ?? 0),
+    ...(a.hipsX || b.hipsX ? { hipsX: n(a.hipsX ?? 0, b.hipsX ?? 0) } : {}), ...(a.hipsZ || b.hipsZ ? { hipsZ: n(a.hipsZ ?? 0, b.hipsZ ?? 0) } : {}),
   };
 }
 
 /** A loop: the keys at the given times, the last one a copy of the first at `duration`. A bone keyed on any key is keyed on
  *  every key (0 = its bind rotation where a key leaves it out) — a track keyed on two keys of five holds its value across
  *  the other three, and a foot pointed for the flight stayed pointed on the floor. */
-export function loop(scene: Scene, sk: Skeleton, name: string, duration: number, keys: ExKey[]): AnimationGroup | null {
-  const closed = [...keys, { ...keys[0], t: duration }];
+export function loop(scene: Scene, sk: Skeleton, name: string, duration: number, keys: ExKey[], opts: { pivot?: boolean } = {}): AnimationGroup | null {
+  let closed = [...keys, { ...keys[0], t: duration }];
+  if (opts.pivot) closed = pivotFix(sk, closed);
   const names = new Set(closed.flatMap((e) => Object.keys(e.bones ?? {})));
   const filled = closed.map((e) => ({ ...e, bones: Object.fromEntries([...names].map((b) => [b, e.bones?.[b] ?? [0, 0, 0]])) as Record<string, Deg3> }));
-  return buildPoseClip(scene, sk, name, duration, filled.map(k), { smooth: true, periodic: true });
+  const g = buildPoseClip(scene, sk, name, duration, filled.map(k), { smooth: true, periodic: true });
+  if (g && closed.some((e) => e.hipsX || e.hipsZ)) shiftHips(g, sk, closed, duration);
+  return g;
+}
+
+/**
+ * LIBRARY-ANATOMY-2: THE HIPS PIVOT. A hipsY is where the Hips BONE goes, and the bodies put that bone at different heights
+ * over the same hip joints (the female kit 3 cm above them, the forge hero 5 cm below — poseClip.ts sizes by the joints).
+ * Standing, that is nothing; pitched over onto the floor (the Hips at 90–130°) the hip joints swing round the bone, and the
+ * female body's sat 9 cm lower and 8 cm further forward than the hero's: its knees went through the floor in the child's
+ * pose. With `pivot`, each key's hipsY / hipsZ is corrected by the difference, so the hip JOINTS land where the reference
+ * body's do. (Zero on the hero; opt-in, so the first pass's loops are unchanged.)
+ */
+function pivotFix(sk: Skeleton, keys: ExKey[]): ExKey[] {
+  const bf = bindFrame(sk);
+  for (const [n, t] of bf.bind) { n.position.copyFrom(t.p); n.rotationQuaternion = t.q.clone(); }
+  const hips = boneNode(sk, 'Hips');
+  const top = (hips?.parent as TransformNode | null) ?? hips;
+  const walk = (n: TransformNode) => { n.computeWorldMatrix(true); for (const c of n.getChildTransformNodes(true)) walk(c); };
+  if (!hips || !top) return keys;
+  walk(top);
+  const legs = ['LeftUpLeg', 'RightUpLeg'].map((n) => boneNode(sk, n)).filter((n): n is TransformNode => !!n);
+  if (!legs.length) return keys;
+  const rootY = (hips.parent as TransformNode | null)?.getAbsolutePosition().y ?? 0;
+  const jointY = legs.reduce((a, n) => a + n.getAbsolutePosition().y, 0) / legs.length - rootY;
+  const scale = jointY / REF_HIP_JOINT_Y || 1;
+  const d = (jointY - (hips.getAbsolutePosition().y - rootY)) / scale - (REF_HIP_JOINT_Y - REF_HIPS_Y);   // this body's joint-below-bone vs the reference's
+  if (Math.abs(d) < 0.005) return keys;
+  return keys.map((e) => {
+    const th = (((e.bones?.Hips ?? [0, 0, 0]) as Deg3)[0] * Math.PI) / 180;
+    return { ...e, hipsY: (e.hipsY ?? 0) - (Math.cos(th) - 1) * d, hipsZ: (e.hipsZ ?? 0) - Math.sin(th) * d };
+  });
+}
+
+/**
+ * LIBRARY-ANATOMY-2: carry a key's hipsX / hipsZ on the Hips position track the clip already has (hipsY's), smoothed the
+ * way poseClip smooths hipsY (the same holds, periodic), in the body's frame read off the rig at bind (the hip line for
+ * right, the toes for front) and scaled by the body's hip height, as every target is. The limbs were solved with the
+ * targets moved back by the shift (k), so after it a planted foot is where it was authored.
+ */
+function shiftHips(g: AnimationGroup, sk: Skeleton, keys: ExKey[], duration: number): void {
+  const hips = boneNode(sk, 'Hips');
+  const ta = hips && g.targetedAnimations.find((x) => x.target === hips && x.animation.targetProperty === 'position');
+  const parent = hips?.parent as TransformNode | null;
+  if (!hips || !ta || !parent) return;
+  const at = (n: string) => { const b = boneNode(sk, n); b?.computeWorldMatrix(true); return b?.getAbsolutePosition().clone() ?? null; };
+  const lul = at('LeftUpLeg'), rul = at('RightUpLeg'), lf = at('LeftFoot'), lt = at('LeftToeBase');
+  if (!lul || !rul) return;
+  const right = rul.subtract(lul); right.y = 0; right.normalize();
+  let front = Vector3.Cross(Vector3.Up(), right).normalize();
+  if (lf && lt) { const toe = lt.subtract(lf); toe.y = 0; if (Vector3.Dot(toe, front) < 0) front = front.scale(-1); }
+  parent.computeWorldMatrix(true);
+  const rootY = parent.getAbsolutePosition().y;
+  const scale = ((lul.y + rul.y) / 2 - rootY) / REF_HIP_JOINT_Y || 1;
+  const inv = parent.getWorldMatrix().clone().invert();
+  const so = { fps: SMOOTH_FPS, duration, holds: keys.filter((e) => e.hold).map((e) => e.t), prefilter: 0, periodic: true };
+  const dense = (f: (e: ExKey) => number) => smoothScalarKeys(keys.map((e) => ({ t: e.t, v: f(e) })), so);
+  const xs = dense((e) => e.hipsX ?? 0), zs = dense((e) => e.hipsZ ?? 0);
+  const sample = (d: { t: number; v: number }[], t: number) => {
+    let i = 0;
+    while (i < d.length - 2 && d[i + 1].t < t) i++;
+    const a = d[i], b = d[Math.min(i + 1, d.length - 1)];
+    return b.t > a.t ? a.v + ((b.v - a.v) * (t - a.t)) / (b.t - a.t) : a.v;
+  };
+  for (const key of ta.animation.getKeys()) {
+    const t = key.frame / SMOOTH_FPS;
+    const w = right.scale(sample(xs, t) * scale).addInPlace(front.scale(sample(zs, t) * scale));
+    const len = w.length();
+    if (len < 1e-6) continue;
+    const local = Vector3.TransformNormal(w, inv).normalize().scale(len);
+    key.value = (key.value as Vector3).add(local);
+  }
 }
 
 /** A two-pose rep: A (start) → B (end range) → A, with the given seconds down, held, up and rested. The way down and the

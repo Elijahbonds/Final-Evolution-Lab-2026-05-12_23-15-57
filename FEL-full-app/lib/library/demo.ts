@@ -13,6 +13,7 @@
 // Pure. Client-safe.
 
 import { MUSCLES, type MovementPattern, type MuscleId } from './vocab';
+import { FLOW_CLIPS, FLOW_SEQS, flowClip } from '@/lib/babylon/anim/authored/exerciseFlows';   // (data only: no Babylon)
 
 export const CLIP_KEYS = [
   'idle', 'squat', 'hinge', 'lunge', 'push', 'pull', 'carry', 'rotate', 'brace', 'jump', 'hop', 'bound', 'sprint',
@@ -178,6 +179,8 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_row_alt', families: ['row'], bases: /^alternat-row$/ },
   { clip: 'ex_row_one', families: ['row'], bases: /^singl-arm-row$/ },
   { clip: 'ex_upright_row_one', families: ['upright-row-shrug'], bases: /^singl-arm-upright-row$/ },
+  // ── LIBRARY-ANATOMY-2: the mobility flows, each its own loop (exerciseFloor.ts, the positions in order) ──
+  { clip: (base) => { const seq = base.replace(/^flow3?-/, ''); return FLOW_SEQS.includes(seq) ? flowClip(seq) : null; }, families: ['mobility-flow'], bases: /^flow3?-[a-z-]+$/ },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -363,7 +366,11 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press']);
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press'].concat(
+  // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
+  ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm'].map((p) => `ex_pos_${p}`),
+  FLOW_CLIPS,
+));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
 export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
