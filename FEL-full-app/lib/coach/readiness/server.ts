@@ -93,7 +93,7 @@ const trendOf = (cs: readonly StoredCheck[]): TrendPoint[] => [...cs].sort((a, b
  */
 export async function checkContext(db: ReadinessDb, userId: string, canSave: boolean, day: string | null, now: Date = new Date()): Promise<Res> {
   const nowMs = now.getTime();
-  const coaches = (await coachRules(db, userId, nowMs)).map((c) => ({ ...c, ruleLine: ruleLine(c.rule) }));
+  const coaches = (await coachRules(db, userId, nowMs)).map((c) => ({ ...c, ruleLine: ruleLine(c.rule, { coachName: c.coachName }) }));
   const ready = await readinessReady(db, nowMs);
   const history = canSave && ready ? await checksFor(db, userId, new Date(nowMs - 2 * BASELINE_WINDOW_DAYS * DAY_MS), TREND_CHECKS * 2, nowMs) : null;
   const todays = day && history ? history.find((c) => c.day === day) ?? null : null;

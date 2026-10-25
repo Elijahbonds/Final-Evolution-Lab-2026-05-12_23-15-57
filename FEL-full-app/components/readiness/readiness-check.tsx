@@ -126,13 +126,13 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
   if (ctx && !ctx.ok) return null;
   return (
     <div className="space-y-4" data-readiness-check>
-      <div className="fel-card space-y-2 rounded-xl p-4">
+      <div className={`fel-card space-y-2 rounded-xl p-4 ${phase === 'live' || phase === 'starting' ? 'hidden' : ''}`}>
         <div className="text-[11px] uppercase tracking-wider text-white/40">Daily readiness · 30 seconds</div>
         <p className="text-sm text-white/75">{HOW_LINE}</p>
         <p className="text-xs text-white/45">{NOT_A_DIAGNOSIS}</p>
         {ctx && ctx.coaches.length > 0 && (
           <ul className="space-y-0.5 text-xs text-white/55" data-readiness-rules>
-            {ctx.coaches.map((c) => <li key={c.coachId}>{c.coachName}: {c.ruleLine}</li>)}
+            {ctx.coaches.map((c) => <li key={c.coachId}>{c.ruleLine}</li>)}
           </ul>
         )}
       </div>
@@ -144,7 +144,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
         </div>
       )}
 
-      {phase !== 'result' && !doneToday && (
+      {phase !== 'result' && phase !== 'live' && phase !== 'starting' && !doneToday && (
         <div className="fel-card space-y-2 rounded-xl p-4" data-readiness-feel>
           <div className="text-sm font-semibold text-white">How do you feel? <span className="font-normal text-white/45">(optional)</span></div>
           <div className="flex gap-2" role="radiogroup" aria-label="How do you feel, 1 to 5">
@@ -210,7 +210,7 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
         </div>
       )}
 
-      {trend.length > 1 && <ReadinessTrend points={trend} />}
+      {trend.length > 1 && phase !== 'live' && <ReadinessTrend points={trend} />}
       <p className="text-center text-xs text-white/40"><Link href="/train" className="underline">Back to Train</Link></p>
     </div>
   );

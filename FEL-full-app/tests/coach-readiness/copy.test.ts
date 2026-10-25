@@ -20,7 +20,7 @@ describe('readiness copy', () => {
       const l = coachedNextLine({ band, ease, coachName: 'Coach Dee', coachTold, shared }); if (l) all.push(l);
     }
   }
-  for (const kind of ['drop_pct', 'low_twice'] as const) for (const action of ['ease', 'tell'] as const) all.push(ruleLine({ kind, dropPct: 5, action, source: 'default' }));
+  for (const kind of ['drop_pct', 'low_twice'] as const) for (const action of ['ease', 'tell'] as const) { all.push(ruleLine({ kind, dropPct: 5, action, source: 'default' })); all.push(ruleLine({ kind, dropPct: 5, action }, { coachName: 'Coach Dee' })); }
 
   it('no line names a cause, a condition or a treatment', () => {
     expect(all.length).toBeGreaterThan(40);

@@ -55,8 +55,13 @@ export function coachAlertLine(o: { name: string; dropPct: number | null; reason
   return `${o.name}'s jump check read Low: ${what}. ${o.action === 'ease' ? 'Today\'s session eased automatically.' : 'Their plan is unchanged (your rule: tell me only).'}`;
 }
 
-/** The coach's rule, in words. */
-export function ruleLine(r: { kind: RuleKind; dropPct: number; action: RuleAction; source?: 'athlete' | 'team' | 'default' }): string {
+/** The coach's rule, in words: to the coach ("their normal … tell me"), or to the athlete about one coach ("your normal"). */
+export function ruleLine(r: { kind: RuleKind; dropPct: number; action: RuleAction; source?: 'athlete' | 'team' | 'default' }, athlete?: { coachName: string }): string {
+  if (athlete) {
+    const when = r.kind === 'drop_pct' ? `a drop of ${r.dropPct}% or more on your normal` : 'under your normal twice in a row';
+    const then = r.action === 'ease' ? `eases today's session and tells ${athlete.coachName}` : `tells ${athlete.coachName}; your plan stays as written`;
+    return `${athlete.coachName}'s rule: ${when} ${then}.`;
+  }
   const when = r.kind === 'drop_pct' ? `a drop of ${r.dropPct}% or more on their normal` : 'under their normal twice in a row';
   const then = r.action === 'ease' ? 'ease off today and tell me' : 'tell me only';
   return `When ${when}: ${then}.${r.source === 'default' ? ' (default)' : ''}`;

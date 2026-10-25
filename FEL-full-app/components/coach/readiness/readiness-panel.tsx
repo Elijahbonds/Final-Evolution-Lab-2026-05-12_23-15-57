@@ -79,7 +79,8 @@ export function ReadinessPanel({ api = COACH_READINESS_API }: { api?: string }) 
   useEffect(() => { load(); }, [load]);
   if (!board?.available) return null;
   const alerts = (board.alerts ?? []).filter((a) => !a.seenAt);
-  const fallback: Rule = board.defaultRule ?? { kind: 'drop_pct', dropPct: DROP_PCT.default, action: 'ease' };
+  const d = board.defaultRule;
+  const fallback: Rule = d ? { kind: d.kind, dropPct: d.dropPct, action: d.action } : { kind: 'drop_pct', dropPct: DROP_PCT.default, action: 'ease' };
   const see = async (id: string) => {
     setBoard((b) => b && { ...b, alerts: b.alerts?.map((a) => (a.id === id ? { ...a, seenAt: new Date().toISOString() } : a)) });
     await fetch(api, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) }).catch(() => null);
