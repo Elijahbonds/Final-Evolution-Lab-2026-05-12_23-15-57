@@ -16,6 +16,7 @@
 // the sheet still scrolls on a phone; a sideways drag turns the camera.
 import { useEffect, useRef, useState } from 'react';
 import type { AnatomyHandle } from '@/lib/babylon/library/anatomyLook';
+import type { DemoProp } from '@/lib/library/demo';
 
 export type StageView = 'demo' | 'muscles';
 export type StageSide = 'front' | 'back';
@@ -54,13 +55,13 @@ export default function ExerciseStage(props: ExerciseStageProps) {
     let cleanup: (() => void) | null = null;
     (async () => {
       try {
-        const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial } = await import('@babylonjs/core');
+        const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Mesh } = await import('@babylonjs/core');
         const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
         const { DEFAULT_HERO_URL } = await import('@/lib/babylon/core/athleteRoster');
         const { reducedMotion } = await import('@/lib/a11y/reducedMotion');
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
         const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
-        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS } = await import('@/lib/library/demo');
+        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS, PROP_SHAPES } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
         const mark = (k: string) => { if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now(); };
@@ -88,20 +89,25 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         floorMat.diffuseColor = new Color3(0.12, 0.13, 0.17); floorMat.specularColor = Color3.Black(); floorMat.alpha = 0.9;
         floor.material = floorMat;
 
-        // the bench a seated or lying loop needs (DEMO_PROPS): plain boxes, one material, hidden unless the clip asks
+        // the bench a seated or lying loop needs (DEMO_PROPS): plain boxes, one material, hidden unless the clip asks.
+        // LIBRARY-ANATOMY-2: every prop's boxes are data (demo.ts PROP_SHAPES), built the first time a loop asks for it
         const propMat = new StandardMaterial('libraryPropMat', scene);
         propMat.diffuseColor = new Color3(0.2, 0.21, 0.26); propMat.specularColor = new Color3(0.05, 0.05, 0.05);
-        const box = (name: string, w: number, h: number, d: number, x: number, y: number, z: number, rx = 0) => {
-          const m = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
-          m.position.set(x, y, z); m.rotation.x = rx; m.material = propMat; m.isPickable = false; m.setEnabled(false);
-          return m;
+        const props = new Map<string, InstanceType<typeof Mesh>[]>();
+        const propMeshes = (k: DemoProp) => {
+          let ms = props.get(k);
+          if (!ms) {
+            ms = PROP_SHAPES[k].map((b, i) => {
+              const m = MeshBuilder.CreateBox(`libraryProp_${k}_${i}`, { width: b.w, height: b.h, depth: b.d }, scene);
+              // (the body's +x is the stage's −x: the spawned root carries the importer's mirror — measured on the live rig)
+              m.position.set(-(b.x ?? 0), b.y, b.z); m.rotation.x = b.rx ?? 0; m.material = propMat; m.isPickable = false;
+              return m;
+            });
+            props.set(k, ms);
+          }
+          return ms;
         };
-        const props = {
-          seat: [box('benchSeat', 0.34, 0.44, 0.42, 0, 0.22, -0.02)],
-          bench: [box('benchFlat', 0.30, 0.44, 1.30, 0, 0.22, -0.52)],
-          incline: [box('benchInclineSeat', 0.34, 0.44, 0.42, 0, 0.22, 0.02), box('benchInclineBack', 0.34, 0.08, 0.95, 0, 0.79, -0.43, -Math.PI / 4)],
-        } as const;
-        const showProp = (clip: string | null) => { const want = clip ? DEMO_PROPS[clip] : undefined; for (const [k, ms] of Object.entries(props)) for (const m of ms) m.setEnabled(k === want); };
+        const showProp = (clip: string | null) => { const want = clip ? DEMO_PROPS[clip] : undefined; if (want) propMeshes(want); for (const [k, ms] of props) for (const m of ms) m.setEnabled(k === want); };
 
         const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
         if (disposed) { hero.dispose(); scene.dispose(); engine.dispose(); return; }
@@ -124,7 +130,14 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.6, y: 0.85 };
           const prop = p.clip ? DEMO_PROPS[p.clip] : undefined;
           if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.4, y: 0.62 };
-          if (prop === 'seat') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };
+          if (prop === 'seat' || prop === 'preacher') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };
+          // LIBRARY-ANATOMY-2: hanging from the bar, the body is high; on the dip bars, high too; on a box, a step up; lying on
+          // a bench or a pad, low and from the side
+          if (prop === 'pullbar') return { alpha: FRONT_ALPHA - 0.5, beta: 1.5, radius: 3.6, y: 1.5 };
+          if (prop === 'dipbars') return { alpha: FRONT_ALPHA - 0.7, beta: 1.45, radius: 3.0, y: 1.15 };
+          if (prop === 'wall') return { alpha: 0.05, beta: 1.36, radius: 3.0, y: 0.9 };
+          if (prop === 'box' || prop === 'boxside' || prop === 'stepbox' || prop === 'boxback' || prop === 'rearbench') return { alpha: 0.55, beta: 1.36, radius: 3.3, y: 1.0 };
+          if (prop) return { alpha: 0.45, beta: 1.22, radius: 2.6, y: 0.6 };
           return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
         };
         const play = (clip: string, hold: number | null | undefined) => {

@@ -29,6 +29,9 @@ export interface ExKey {
   hands?: Pair;
   /** wrists from the posed shoulder (rides the torso) */
   rel?: Pair;
+  /** LIBRARY-ANATOMY-2: a grip on a prop (a bar, a bench edge, a wall), in the body's own metres in the FINAL frame (poseClip
+   *  handsBody): not re-scaled by the arm's length the way `hands` is, so a long-armed body's hands meet the same bar */
+  handsAt?: Pair;
   poles?: Pair;
   /** ankle targets in the FINAL frame */
   feet?: Pair;
@@ -51,6 +54,7 @@ export function k(e: ExKey): PoseKey {
   };
   return {
     t: e.t, bones: e.bones, hands: up(e.hands), handsRel: e.rel, poles: e.poles, feet: up(e.feet), kneePoles: e.kneePoles,
+    ...(e.handsAt ? { handsBody: Object.fromEntries(Object.entries(e.handsAt).map(([s, v]) => [s, [v[0] - x, v[1], v[2] - z]])) as Pair } : {}),
     hipsY: e.hipsY, hold: e.hold,
   };
 }
@@ -72,7 +76,7 @@ export function mix(a: Omit<ExKey, 't'>, b: Omit<ExKey, 't'>, u: number): Omit<E
     bones[name] = [n(x[0], y[0]), n(x[1], y[1]), n(x[2], y[2])];
   }
   return {
-    bones, hands: pair(a.hands, b.hands), rel: pair(a.rel, b.rel), poles: u < 0.5 ? a.poles : b.poles, feet: pair(a.feet, b.feet),
+    bones, hands: pair(a.hands, b.hands), rel: pair(a.rel, b.rel), ...(a.handsAt || b.handsAt ? { handsAt: pair(a.handsAt, b.handsAt) } : {}), poles: u < 0.5 ? a.poles : b.poles, feet: pair(a.feet, b.feet),
     kneePoles: u < 0.5 ? a.kneePoles : b.kneePoles, hipsY: n(a.hipsY ?? 0, b.hipsY ?? 0),
     ...(a.hipsX || b.hipsX ? { hipsX: n(a.hipsX ?? 0, b.hipsX ?? 0) } : {}), ...(a.hipsZ || b.hipsZ ? { hipsZ: n(a.hipsZ ?? 0, b.hipsZ ?? 0) } : {}),
   };

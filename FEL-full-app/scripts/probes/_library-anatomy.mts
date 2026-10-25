@@ -160,7 +160,7 @@ async function uiJob(): Promise<void> {
     { name: 'sheet-demo', q: 'goblet squat', tab: 'demo' },
     { name: 'sheet-muscles', q: 'romanian deadlift', tab: 'muscles' },
     { name: 'sheet-cues', q: 'pogo', tab: 'cues' },
-    { name: 'sheet-demo-cuecard', q: 'preacher curl', tab: 'demo' },
+    { name: 'sheet-demo-cuecard', q: 'zottman preacher curl', tab: 'demo' },
   ];
   const results: Record<string, unknown> = {};
   let ok = true;

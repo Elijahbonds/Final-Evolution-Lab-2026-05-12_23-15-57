@@ -40,7 +40,10 @@ describe('the loop an entry plays (demoFor)', () => {
     expect(demoClipFor({ family: 'overhead-press', variation: 'shoulder-press', equipment: ['dumbbell'] })).toBe('ex_press');
     expect(demoClipFor({ family: 'overhead-press', variation: 'seat-press', equipment: ['dumbbell'] })).toBe('ex_seated_press');   // seated: its own loop, on a bench
     expect(demoClipFor({ family: 'overhead-press', variation: 'landmine', equipment: ['landmine'] })).toBeNull();   // a landmine press is neither
-    expect(demoClipFor({ family: 'curl', variation: 'preacher-curl', equipment: ['barbell'] })).toBeNull();
+    // LIBRARY-ANATOMY-2, test changed: this held a preacher curl to the cue card (no loop showed it). It now has its own loop,
+    // on the pad (exerciseProps.ts ex_preacher_curl); the intent — never the standing curl — is what the assertion keeps.
+    expect(demoClipFor({ family: 'curl', variation: 'preacher-curl', equipment: ['barbell'] })).toBe('ex_preacher_curl');
+    expect(demoClipFor({ family: 'curl', variation: 'zottman-preacher-curl', equipment: ['dumbbell'] })).toBeNull();   // the turn of the wrist is the exercise: no loop shows it
     expect(demoClipFor({ family: 'finish-series', variation: 'overhand-wing', equipment: ['basketball'] })).toBe('bball_layup_gather');
     expect(demoClipFor({ family: 'finish-series', variation: 'overhand-wing-weak', equipment: ['basketball'] })).toBe('bball_layup_gather_left');
     expect(demoClipFor({ family: 'machine-intervals', variation: 'bike-sprint', equipment: ['bike'] })).toBeNull();   // a bike is not a run

@@ -18,7 +18,7 @@ const sx = (s: Side, x: number) => (s === 'Left' ? -x : x);
 
 /** Keys at the given times, each move solved half-way too (a planted foot stays planted between two far-apart keys); a foot
  *  or hand that travels further than a step between two keys is lifted at the half-way key, not slid. */
-function dense(keys: ExKey[], dur: number): ExKey[] {
+export function dense(keys: ExKey[], dur: number): ExKey[] {
   const out: ExKey[] = [];
   keys.forEach((k, i) => {
     out.push(k);
@@ -36,8 +36,8 @@ function dense(keys: ExKey[], dur: number): ExKey[] {
   });
   return out;
 }
-const run = (scene: Scene, sk: Skeleton, name: string, dur: number, keys: ExKey[], pivot = false) => loop(scene, sk, name, dur, dense(keys, dur), { pivot });
-const at = (p: Pose, t: number, hold = false): ExKey => ({ ...p, t, ...(hold ? { hold: true } : {}) });
+export const run = (scene: Scene, sk: Skeleton, name: string, dur: number, keys: ExKey[], pivot = false) => loop(scene, sk, name, dur, dense(keys, dur), { pivot });
+export const at = (p: Omit<ExKey, 't'>, t: number, hold = false): ExKey => ({ ...p, t, ...(hold ? { hold: true } : {}) });
 
 // ── lunges to the side and behind, the sumo pull, single-leg hinges ───────────────────────────────────────────────────
 const CHEST_HANDS: Pair = { Left: [0.13, -0.24, 0.26], Right: [-0.13, -0.24, 0.26] };

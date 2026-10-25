@@ -30,7 +30,7 @@ export function sides(right: Pose, left: Pose): Pose {
   const bones: Record<string, Deg3> = {};
   for (const [n, v] of Object.entries(right.bones ?? {})) if (!n.startsWith('Left')) bones[n] = v;
   for (const [n, v] of Object.entries(left.bones ?? {})) if (n.startsWith('Left')) bones[n] = v;
-  return { ...right, bones, hands: pick(right.hands, left.hands), rel: pick(right.rel, left.rel), poles: pick(right.poles, left.poles) };
+  return { ...right, bones, hands: pick(right.hands, left.hands), rel: pick(right.rel, left.rel), handsAt: pick(right.handsAt, left.handsAt), poles: pick(right.poles, left.poles) };
 }
 
 /** The left arm hanging at the side (the start of a curl), whatever the lift's own start is. */

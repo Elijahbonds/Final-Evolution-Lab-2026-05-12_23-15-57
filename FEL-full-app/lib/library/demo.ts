@@ -14,6 +14,7 @@
 
 import { MUSCLES, type MovementPattern, type MuscleId } from './vocab';
 import { FLOW_CLIPS, FLOW_SEQS, flowClip } from '@/lib/babylon/anim/authored/exerciseFlows';   // (data only: no Babylon)
+import { PROPPED_LOOPS } from '@/lib/babylon/anim/authored/exerciseProps.data';   // (data only: which loop stands on what)
 
 export const CLIP_KEYS = [
   'idle', 'squat', 'hinge', 'lunge', 'push', 'pull', 'carry', 'rotate', 'brace', 'jump', 'hop', 'bound', 'sprint',
@@ -292,6 +293,28 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: (b) => ({ continuous: 'ex_lateral_bound', 'bound-stick': 'ex_lateral_bound' } as Record<string, string>)[b] ?? null, families: ['lateral-bound'], bases: /^(bound-stick|continuous)$/, emits: ['ex_lateral_bound'] },
   { clip: (b) => ({ alternate: 'ex_rope_alt', 'side-side': 'ex_rope_side', 'high-knee': 'ex_rope_highknee', 'single-leg': 'ex_rope_sl', 'double-under': 'ex_rope_double' } as Record<string, string>)[b] ?? null, families: ['jump-rope'], bases: /^(double-under|single-leg|alternate|side-side|high-knee)$/, emits: ['ex_rope_alt', 'ex_rope_side', 'ex_rope_highknee', 'ex_rope_sl', 'ex_rope_double'] },
   { clip: (b) => ({ 'fwd-back': 'ex_rope_fb', boxer: 'ex_rope_boxer', ski: 'ex_rope_side', scissor: 'ex_rope_scissor', 'wide-narrow': 'ex_rope_wide', running: 'ex_rope_alt' } as Record<string, string>)[b] ?? null, families: ['jump-rope-2'], bases: /^(wide-narrow|fwd-back|scissor|running|boxer|ski)$/, emits: ['ex_rope_fb', 'ex_rope_boxer', 'ex_rope_side', 'ex_rope_scissor', 'ex_rope_wide', 'ex_rope_alt'] },
+  // ── LIBRARY-ANATOMY-2: on a box, a bench, a bar, a pad — the stage draws it (anim/authored/exerciseProps.ts) ──
+  { clip: (b, eq) => (eq.includes('barbell')) ? null : ({ 'step-ups': 'ex_step_up', bw: 'ex_step_up', db: 'ex_step_up', 'low-bw': 'ex_step_up', 'knee-drive': 'ex_step_up_knee', 'lateral-bw': 'ex_step_up_lat', 'lateral-db': 'ex_step_up_lat' } as Record<string, string>)[b] ?? null, families: ['step-up'], bases: /^(knee-drive|lateral-bw|lateral-db|step-ups|low-bw|bw|db)$/, emits: ['ex_step_up', 'ex_step_up_knee', 'ex_step_up_lat'] },
+  { clip: (b) => ({ forward: 'ex_step_down', lateral: 'ex_step_down_lat', 'lateral-db': 'ex_step_down_lat' } as Record<string, string>)[b] ?? null, families: ['step-down'], bases: /^(lateral-db|forward|lateral)$/, emits: ['ex_step_down', 'ex_step_down_lat'] },
+  { clip: (b) => ({ 'lat-hold': 'ex_step_down_lat', 'fwd-high': 'ex_step_down' } as Record<string, string>)[b] ?? null, families: ['knee-capacity'], bases: /^(lat-hold|fwd-high)$/, emits: ['ex_step_down_lat', 'ex_step_down'] },
+  { clip: (b) => ({ 'box-high': 'ex_sl_box_squat', 'box-mid': 'ex_sl_box_squat', 'singl-leg-high-box-squat': 'ex_sl_box_squat', 'pistol-box': 'ex_sl_box_squat', pistol: 'ex_pistol', 'pistol-squat': 'ex_pistol_goblet', skater: 'ex_skater_squat', 'skater-pad': 'ex_skater_squat' } as Record<string, string>)[b] ?? null, families: ['single-leg-squat'], bases: /^(singl-leg-high-box-squat|pistol-squat|pistol-box|skater-pad|box-high|box-mid|pistol|skater)$/, emits: ['ex_sl_box_squat', 'ex_pistol', 'ex_pistol_goblet', 'ex_skater_squat'] },
+  { clip: (b) => ({ 'sl-box': 'ex_sl_box_squat' } as Record<string, string>)[b] ?? null, families: ['db-lower'], bases: /^(sl-box)$/, emits: ['ex_sl_box_squat'] },
+  { clip: (b) => ({ 'rfe-bw': 'ex_bulgarian', 'rfe-db': 'ex_bulgarian', 'rfe-bb': 'ex_bulgarian_bar' } as Record<string, string>)[b] ?? null, families: ['split-squat'], bases: /^(rfe-bw|rfe-db|rfe-bb)$/, emits: ['ex_bulgarian', 'ex_bulgarian_bar'] },
+  { clip: (b) => ({ 'lying-leg-curl': 'ex_lying_leg_curl', 'seat-leg-curl': 'ex_seated_leg_curl', 'seat-hamstr-curl': 'ex_seated_leg_curl', 'stand-leg-curl': 'ex_standing_leg_curl', 'platform-hamstr-slid': 'ex_slider_curl' } as Record<string, string>)[b] ?? null, families: ['leg-curl'], bases: /^(platform-hamstr-slid|seat-hamstr-curl|lying-leg-curl|stand-leg-curl|seat-leg-curl)$/, emits: ['ex_lying_leg_curl', 'ex_seated_leg_curl', 'ex_standing_leg_curl', 'ex_slider_curl'] },
+  { clip: (b) => ({ 'leg-extension': 'ex_leg_extension', 'singl-leg-leg-extension': 'ex_leg_extension_one' } as Record<string, string>)[b] ?? null, families: ['leg-extension'], bases: /^(singl-leg-leg-extension|leg-extension)$/, emits: ['ex_leg_extension', 'ex_leg_extension_one'] },
+  { clip: (b) => ({ 'seat-calf-rais': 'ex_seated_calf', 'seated-db': 'ex_seated_calf' } as Record<string, string>)[b] ?? null, families: ['calf-raise'], bases: /^(seat-calf-rais|seated-db)$/, emits: ['ex_seated_calf'] },
+  { clip: (b) => ({ slider: 'ex_slider_curl', nordic: 'ex_nordic', 'nordic-eccentric': 'ex_nordic', 'nordic-band': 'ex_nordic' } as Record<string, string>)[b] ?? null, families: ['hamstring-curl'], bases: /^(nordic-eccentric|nordic-band|slider|nordic)$/, emits: ['ex_slider_curl', 'ex_nordic'] },
+  { clip: (b) => ({ 'hip-thrust': 'ex_hip_thrust', 'singl-leg-glut-bridg': 'ex_bridge_sl' } as Record<string, string>)[b] ?? null, families: ['bridge-thrust'], bases: /^(singl-leg-glut-bridg|hip-thrust)$/, emits: ['ex_hip_thrust', 'ex_bridge_sl'] },
+  { clip: (b) => ({ 'thrust-db': 'ex_hip_thrust', 'thrust-sl': 'ex_hip_thrust_sl', march: 'ex_bridge_march', 'feet-up': 'ex_bridge_feetup' } as Record<string, string>)[b] ?? null, families: ['bridge'], bases: /^(thrust-db|thrust-sl|feet-up|march)$/, emits: ['ex_hip_thrust', 'ex_hip_thrust_sl', 'ex_bridge_march', 'ex_bridge_feetup'] },
+  { clip: (b) => ({ 'pull-up': 'ex_pullup', 'weight-pull-ups': 'ex_pullup', 'assist-pull-up': 'ex_pullup', 'v-bar-pull-up': 'ex_chinup', 'chin-up': 'ex_chinup', 'mix-grip-chin': 'ex_chinup', 'scapular-pull-up': 'ex_scap_pullup' } as Record<string, string>)[b] ?? null, families: ['pull-up'], bases: /^(scapular-pull-up|weight-pull-ups|assist-pull-up|v-bar-pull-up|mix-grip-chin|pull-up|chin-up)$/, emits: ['ex_pullup', 'ex_chinup', 'ex_scap_pullup'] },
+  { clip: (b) => ({ 'dead-hang': 'ex_dead_hang', 'active-hang': 'ex_dead_hang', weighted: 'ex_pullup', pulldown: 'ex_pulldown' } as Record<string, string>)[b] ?? null, families: ['vertical-pull'], bases: /^(active-hang|dead-hang|weighted|pulldown)$/, emits: ['ex_dead_hang', 'ex_pullup', 'ex_pulldown'] },
+  { clip: (b) => ({ 'wid-grip-lat-pulldown': 'ex_pulldown', 'full-rang-motion-lat-pulldown': 'ex_pulldown', 'clos-grip-front-lat-pulldown': 'ex_pulldown_close', 'underhand-pulldown': 'ex_pulldown_close', 'v-bar-pulldown': 'ex_pulldown_close', 'singl-arm-lat-pulldown': 'ex_pulldown_one', 'straight-arm-pulldown': 'ex_straight_arm_pulldown', 'rop-straight-arm-pulldown': 'ex_straight_arm_pulldown' } as Record<string, string>)[b] ?? null, families: ['pulldown'], bases: /^(full-rang-motion-lat-pulldown|clos-grip-front-lat-pulldown|rop-straight-arm-pulldown|singl-arm-lat-pulldown|wid-grip-lat-pulldown|straight-arm-pulldown|underhand-pulldown|v-bar-pulldown)$/, emits: ['ex_pulldown', 'ex_pulldown_close', 'ex_pulldown_one', 'ex_straight_arm_pulldown'] },
+  { clip: (b) => ({ 'invert-row': 'ex_inverted_row', 'invert-row-strap': 'ex_inverted_row', 'db-chest': 'ex_chest_row', 'inclin-row': 'ex_chest_row', 'inclin-bench-pull': 'ex_chest_row' } as Record<string, string>)[b] ?? null, families: ['row'], bases: /^(inclin-bench-pull|invert-row-strap|invert-row|inclin-row|db-chest)$/, emits: ['ex_inverted_row', 'ex_chest_row'] },
+  { clip: (b) => ({ 'dip-chest': 'ex_dip', 'dip-tricep': 'ex_dip', 'parallel-bar-dip': 'ex_dip', weighted: 'ex_dip', band: 'ex_dip', support: 'ex_dip_hold', 'bench-dip': 'ex_bench_dip', 'weight-bench-dip': 'ex_bench_dip', 'bench-bent': 'ex_bench_dip_bent' } as Record<string, string>)[b] ?? null, families: ['dip'], bases: /^(parallel-bar-dip|weight-bench-dip|dip-tricep|bench-bent|dip-chest|bench-dip|weighted|support|band)$/, emits: ['ex_dip', 'ex_dip_hold', 'ex_bench_dip', 'ex_bench_dip_bent'] },
+  { clip: (b, eq) => (eq.includes('kettlebell')) ? null : ({ 'inclin-push-up': 'ex_incline_pushup', 'inclin-push-up-clos-grip': 'ex_incline_pushup', 'inclin-push-up-medium': 'ex_incline_pushup', 'inclin-push-up-revers-grip': 'ex_incline_pushup', 'inclin-push-up-wid': 'ex_incline_pushup', 'declin-push-up': 'ex_decline_pushup', 'push-ups-feet-elevat': 'ex_decline_pushup', 'feet-up': 'ex_decline_pushup', wall: 'ex_wall_pushup', 'plyometric-push-up': 'ex_plyo_pushup', 'hand-release': 'ex_hand_release' } as Record<string, string>)[b] ?? null, families: ['push-up'], bases: /^(inclin-push-up-revers-grip|inclin-push-up-clos-grip|inclin-push-up-medium|push-ups-feet-elevat|inclin-push-up-wid|plyometric-push-up|inclin-push-up|declin-push-up|hand-release|feet-up|wall)$/, emits: ['ex_incline_pushup', 'ex_decline_pushup', 'ex_wall_pushup', 'ex_plyo_pushup', 'ex_hand_release'] },
+  { clip: (b) => ({ 'inclin-curl': 'ex_incline_curl', 'inclin-hammer-curl': 'ex_incline_curl', 'inclin-inner-bicep-curl': 'ex_incline_curl', 'flexor-inclin-curl': 'ex_incline_curl', 'alternat-inclin-curl': 'ex_incline_curl_alt', 'spider-curl': 'ex_spider_curl', 'pron-inclin-curl': 'ex_spider_curl', 'preacher-curl': 'ex_preacher_curl', 'two-arm-preacher-curl': 'ex_preacher_curl', 'preacher-hammer-curl': 'ex_preacher_curl', 'revers-preacher-curl': 'ex_preacher_curl', 'singl-arm-preacher-curl': 'ex_preacher_curl_one', 'concentration-curl': 'ex_concentration_curl' } as Record<string, string>)[b] ?? null, families: ['curl'], bases: /^(inclin-inner-bicep-curl|singl-arm-preacher-curl|two-arm-preacher-curl|alternat-inclin-curl|preacher-hammer-curl|revers-preacher-curl|inclin-hammer-curl|flexor-inclin-curl|concentration-curl|pron-inclin-curl|preacher-curl|inclin-curl|spider-curl)$/, emits: ['ex_incline_curl', 'ex_incline_curl_alt', 'ex_spider_curl', 'ex_preacher_curl', 'ex_preacher_curl_one', 'ex_concentration_curl'] },
+  { clip: (b) => ({ 'incline-y': 'ex_incline_y', 'incline-t': 'ex_incline_t', 'incline-w': 'ex_incline_w' } as Record<string, string>)[b] ?? null, families: ['scap-work'], bases: /^(incline-y|incline-t|incline-w)$/, emits: ['ex_incline_y', 'ex_incline_t', 'ex_incline_w'] },
+  { clip: (b) => ({ 'incline-y': 'ex_incline_y' } as Record<string, string>)[b] ?? null, families: ['db-upper'], bases: /^(incline-y)$/, emits: ['ex_incline_y'] },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -413,6 +436,8 @@ export const ISO_HOLD_SEC: Readonly<Record<string, number>> = {
   ex_row_one: 0.85, ex_upright_row_one: 0.85, ex_seated_press_one: 0.38, ex_seated_curl_one: 0.4, ex_seated_lateral_raise_one: 0.85, ex_seated_triceps_one: 0.4,
   ex_skull_crusher_one: 1.0, ex_incline_press_one: 1.1, ex_press_hk: 0.38, ex_press_hk_one: 0.38,
   ex_kickback: 0.75, ex_kickback_one: 0.75, ex_reverse_fly: 0.95, ex_pull_apart: 0.85, ex_face_pull: 0.85, ex_scaption: 0.85,
+  ex_pullup: 1.05, ex_chinup: 1.05, ex_inverted_row: 0.95, ex_bulgarian: 1.1, ex_hip_thrust: 1.0, ex_leg_extension: 1.05, ex_lying_leg_curl: 1.05, ex_pulldown: 0.95,
+  ex_chest_row: 0.85, ex_incline_y: 0.95, ex_incline_t: 0.95, ex_wall_pushup: 1.0, ex_incline_pushup: 1.0, ex_decline_pushup: 1.0, ex_dip: 1.0, ex_bench_dip: 1.0,
 };
 
 export interface DemoPick {
@@ -433,11 +458,11 @@ export const MODIFIER_LOOPS: Readonly<Record<string, Readonly<Record<string, str
     ex_triceps_overhead: 'ex_triceps_overhead_one', ex_pushdown: 'ex_pushdown_one', ex_row: 'ex_row_one', ex_upright_row: 'ex_upright_row_one',
     ex_seated_press: 'ex_seated_press_one', ex_seated_curl: 'ex_seated_curl_one', ex_seated_lateral_raise: 'ex_seated_lateral_raise_one',
     ex_seated_triceps: 'ex_seated_triceps_one', ex_skull_crusher: 'ex_skull_crusher_one', ex_fly: 'ex_fly_one', ex_incline_press: 'ex_incline_press_one',
-    ex_incline_fly: 'ex_incline_fly_one', ex_kickback: 'ex_kickback_one', ex_press_hk: 'ex_press_hk_one',
+    ex_incline_fly: 'ex_incline_fly_one', ex_kickback: 'ex_kickback_one', ex_press_hk: 'ex_press_hk_one', ex_preacher_curl: 'ex_preacher_curl_one', ex_pulldown: 'ex_pulldown_one',
   },
   alternating: {
     ex_curl: 'ex_curl_alt', ex_press: 'ex_press_alt', ex_lateral_raise: 'ex_lateral_raise_alt', ex_front_raise: 'ex_front_raise_alt', ex_row: 'ex_row_alt',
-    ex_seated_press: 'ex_seated_press_alt', ex_seated_curl: 'ex_seated_curl_alt', ex_incline_press: 'ex_incline_press_alt', ex_press_hk: 'ex_press_hk_alt',
+    ex_seated_press: 'ex_seated_press_alt', ex_seated_curl: 'ex_seated_curl_alt', ex_incline_press: 'ex_incline_press_alt', ex_press_hk: 'ex_press_hk_alt', ex_incline_curl: 'ex_incline_curl_alt',
   },
   // the kickstand: one foot back on its toes, the hinge on the front leg
   staggered: { ex_hinge: 'ex_kickstand_rdl' },
@@ -488,20 +513,50 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank'
     'side', 'openbook', 'clamshell', 'sideraise', 'sideer', 'superman'].map((p) => `ex_pos_${p}`),
   ['ex_reverse_crunch', 'ex_situp', 'ex_situp_34', 'ex_bicycle', 'ex_heel_touch', 'ex_flutter', 'ex_toe_touch', 'ex_vup', 'ex_hollow', 'ex_hollow_tuck', 'ex_hollow_rock', 'ex_dead_bug_heel',
     ...['forearm', 'high', 'bear'].flatMap((b) => ['leg', 'reach', 'knee'].map((a) => `ex_plank_${b}_${a}`)), 'ex_shoulder_tap', 'ex_bear_tap', 'ex_side_plank', 'ex_side_plank_leg',
-    'ex_bear_crawl', 'ex_leopard_crawl', 'ex_crab_walk', 'ex_crab_reach'],
+    'ex_bear_crawl', 'ex_leopard_crawl', 'ex_crab_walk', 'ex_crab_reach', 'ex_plyo_pushup', 'ex_hand_release', 'ex_bridge_march', 'ex_bridge_sl', 'ex_slider_curl'],
   FLOW_CLIPS,
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
 export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt',
-  'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip']);
+  'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
- *  lying down are framed from the side, like the floor loops. */
-export type DemoProp = 'seat' | 'bench' | 'incline';
+ *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
+ *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
+export type DemoProp = 'seat' | 'bench' | 'incline' | 'box' | 'boxside' | 'stepbox' | 'boxback' | 'rearbench' | 'handbench' | 'feetbench' | 'feetbenchfront' | 'thrust'
+  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall';
+/** A plain box (metres, the body's frame: +x its right, +y up, +z its front; rx tips it about x — negative raises its −z end).
+ *  (The stage puts the body's +x at its own −x: the spawned root carries the importer's mirror.) */
+export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number }
+/** Each prop's boxes. The first three are the first pass's own (exercise-stage.tsx drew them inline; same sizes). */
+export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
+  seat: [{ w: 0.34, h: 0.44, d: 0.42, y: 0.22, z: -0.02 }],
+  bench: [{ w: 0.30, h: 0.44, d: 1.30, y: 0.22, z: -0.52 }],
+  incline: [{ w: 0.34, h: 0.44, d: 0.42, y: 0.22, z: 0.02 }, { w: 0.34, h: 0.08, d: 0.95, y: 0.79, z: -0.43, rx: -Math.PI / 4 }],
+  box: [{ w: 0.55, h: 0.40, d: 0.45, y: 0.20, z: 0.42 }],
+  boxside: [{ w: 0.55, h: 0.40, d: 0.50, x: 0.45, y: 0.20, z: 0.04 }],
+  stepbox: [{ w: 0.50, h: 0.40, d: 0.40, y: 0.20, z: 0.0 }],
+  boxback: [{ w: 0.45, h: 0.45, d: 0.40, y: 0.225, z: -0.38 }],
+  rearbench: [{ w: 0.34, h: 0.44, d: 0.50, y: 0.22, z: -0.74 }],
+  handbench: [{ w: 0.95, h: 0.44, d: 0.34, y: 0.22, z: 0.58 }],
+  feetbench: [{ w: 0.70, h: 0.44, d: 0.34, y: 0.22, z: -0.94 }],
+  feetbenchfront: [{ w: 0.70, h: 0.44, d: 0.34, y: 0.22, z: 0.62 }],
+  thrust: [{ w: 1.00, h: 0.40, d: 0.34, y: 0.20, z: -0.64 }],
+  pullbar: [{ w: 1.30, h: 0.035, d: 0.035, y: 2.22, z: 0.02 }],
+  lowbar: [{ w: 1.30, h: 0.035, d: 0.035, y: 0.98, z: -0.36 }],
+  dipbars: [{ w: 0.04, h: 0.04, d: 0.80, x: -0.27, y: 1.12, z: 0.02 }, { w: 0.04, h: 0.04, d: 0.80, x: 0.27, y: 1.12, z: 0.02 }],
+  dipbench: [{ w: 0.90, h: 0.44, d: 0.34, y: 0.22, z: -0.42 }],
+  legcurl: [{ w: 0.30, h: 0.44, d: 1.35, y: 0.22, z: 0.30 }],
+  proneincline: [{ w: 0.34, h: 0.50, d: 0.30, y: 0.25, z: -0.28 }, { w: 0.34, h: 0.07, d: 0.90, y: 0.80, z: 0.02, rx: 0.66 }],
+  decline: [{ w: 0.30, h: 0.07, d: 1.05, y: 0.44, z: -0.50, rx: 0.25 }, { w: 0.30, h: 0.40, d: 0.30, y: 0.20, z: -0.20 }, { w: 0.40, h: 0.08, d: 0.10, y: 0.52, z: 0.40 }],
+  preacher: [{ w: 0.34, h: 0.44, d: 0.42, y: 0.22, z: -0.02 }, { w: 0.40, h: 0.05, d: 0.36, y: 0.86, z: 0.30, rx: -0.8 }],
+  wall: [{ w: 1.40, h: 2.10, d: 0.06, y: 1.05, z: 0.72 }],
+};
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',
   ex_bench_press: 'bench', ex_fly: 'bench', ex_skull_crusher: 'bench', ex_incline_press: 'incline', ex_incline_fly: 'incline',
   ex_seated_press_one: 'seat', ex_seated_press_alt: 'seat', ex_seated_curl_one: 'seat', ex_seated_curl_alt: 'seat', ex_seated_lateral_raise_one: 'seat',
   ex_seated_triceps_one: 'seat', ex_skull_crusher_one: 'bench', ex_fly_one: 'bench', ex_incline_press_one: 'incline', ex_incline_press_alt: 'incline', ex_incline_fly_one: 'incline',
+  ...(PROPPED_LOOPS as Readonly<Record<string, DemoProp>>),
 };
 /** Ball-handling and finishing loops: the stage draws no ball, and the card says so. */
 export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot');
