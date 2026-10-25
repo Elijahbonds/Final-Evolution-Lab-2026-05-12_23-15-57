@@ -63,22 +63,37 @@ export function calibrateTake(frames: readonly PoseFrame[], aspect = 4 / 3, maxS
 
 export function runCondition(c: Condition, reader: JumpReaderFn): ConditionResult {
   const seeds = c.seeds ?? 6;
-  const pairs: { truth: TrialTruth; read: ReadJump }[] = [];
-  let trials = 0, missed = 0, falseValid = 0, decoys = 0, calibRefused = 0;
-  const reasons: Record<string, number> = {};
+  const takes: BenchTake[] = [];
   for (let seed = 1; seed <= seeds; seed++) {
     const beats: Beat[] = [];
     c.trials.forEach((t, i) => { if (c.decoys?.[i]) beats.push(c.decoys[i]); beats.push({ trial: t }); });
     for (const d of c.decoys?.slice(c.trials.length) ?? []) beats.push(d);
     const take = buildTake(beats, { leadS: LEAD_S });
-    decoys += take.decoys;
     const { frames, truth } = filmTake(take, { fps: c.fps, seed, ...c.film });
-    trials += truth.length;
     // the live flow refuses a stand this jittery ("stand still"); the bench notes it and reads on with a loose sway
-    let calib = calibrateTake(frames);
-    if (!calib) { calibRefused++; calib = calibrateTake(frames, 4 / 3, 0.3); }
+    let calib = calibrateTake(frames), refused = false;
+    if (!calib) { refused = true; calib = calibrateTake(frames, 4 / 3, 0.3); }
+    takes.push({ frames, truth, calib, decoys: take.decoys, calibRefused: refused });
+  }
+  return scoreTakes(c.name, c.fps, takes, reader);
+}
+
+/** One filmed take as the scorer reads it (JUMP-PRO 2: the approach and drop takes come through here too). */
+export interface BenchTake { frames: PoseFrame[]; truth: TrialTruth[]; calib: Calibration | null; decoys?: number; calibRefused?: boolean }
+
+/** Score a reader over filmed takes: every truth matched to a read by its take-off (MATCH_MS), the rest counted. */
+export function scoreTakes(name: string, fps: number, takes: readonly BenchTake[], reader: JumpReaderFn): ConditionResult {
+  const c = { name, fps };
+  const pairs: { truth: TrialTruth; read: ReadJump }[] = [];
+  let trials = 0, missed = 0, falseValid = 0, decoys = 0, calibRefused = 0;
+  const reasons: Record<string, number> = {};
+  for (const tk of takes) {
+    const { frames, truth, calib } = tk;
+    decoys += tk.decoys ?? 0;
+    trials += truth.length;
+    if (tk.calibRefused) calibRefused++;
     if (!calib) { missed += truth.length; reasons['no calibration'] = (reasons['no calibration'] ?? 0) + truth.length; continue; }
-    const reads = reader(frames, calib, c.fps);
+    const reads = reader(frames, calib, fps);
     const used = new Set<ReadJump>();
     for (const tr of truth) {
       const r = reads.find((x) => !used.has(x) && Math.abs(x.takeoffT - tr.takeoffT) < MATCH_MS);

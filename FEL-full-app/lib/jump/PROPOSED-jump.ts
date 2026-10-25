@@ -31,6 +31,11 @@ export const JUMP = {
   'jump.outlierPct': e(15, 'lane-guess', 'With 3+ jumps, one this far (%) above the others\' median is an outlier: shown, never the verified best'),
   'jump.bioCvPct': e(3, 'benchmark-2026-10-24', 'The body\'s own jump-to-jump CV (%) a session\'s typical error never goes under (published CMJ test–retest ≈ 2.5–5 %)'),
   'jump.realChangeZ': e(1.645, 'lane-guess', 'z of the smallest real change between two sessions (1.645 = 90 % sure the change is not noise)'),
+  // JUMP-PRO 2 (2026-10-25): the touch height
+  'jump.fingertipOverLeg': e(0.11, 'lane-guess',
+    'The fingertip beyond MediaPipe\'s "index" point (the knuckle), as a share of the leg (hip → knee → ankle): the middle finger is ≈ 0.05 of stature and the leg ≈ 0.49 (Drillis–Contini segment table), so ≈ 0.10–0.11. Added to every standing reach. Unbenched (the bench body has no fingers): a real capture or a tape measure should replace it'),
+  'jump.legRulerSdPct': e(0.8, 'bench-2026-10-24',
+    'The leg in metres from an approach jump\'s own free fall: its ±1 SD (%), the scale of the reach in the touch height. Bench, side-on at 4.5 m: 0.6–0.7 % at 30–60 fps, 0.2–0.45 % at 240; a run angled 12° toward or away from the lens 0.75–1.6 % (lib/jump/reachBench.ts)'),
 } as const satisfies Record<string, JumpEntry>;
 
 export type JumpId = keyof typeof JUMP;
