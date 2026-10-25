@@ -4,8 +4,11 @@
 // the same server context (lib/coach/warmupServer.ts loadWarmupContext):
 //   · a standing intake RED FLAG → no session at all, with the intake's own words (RED_FLAG_COPY);
 //   · a pain check-in that said STOP and see someone (isHardStop) → only the calm work (Prep, Cool-down, breath and
-//     mobility) runs; everything else waits, and the athlete reads the check-in's own words (PAIN_DECISION_COPY) and the
-//     weekly draft's "check with a clinician" line (easeOffClientLine) — the existing "see a professional" wording;
+//     mobility) runs; everything else waits, and the athlete reads the check-in's own words (PAIN_DECISION_COPY: "check
+//     with a clinician", or "tell an adult" under 18) — the existing "see a professional" wording;
+//   · a pain check-in that asked for an easier version → the work eases, and the athlete reads the weekly draft's
+//     existing ease-off line (lib/coach/weeklyDraft/copy.ts easeOffClientLine: "…check with a clinician before you load
+//     it again"). assumption: its "tell your coach" stays word for word though a signature program has no coach;
 //   · JUMPS AND LANDINGS (every item with contacts) are swapped for their calm step-down when: a pain check-in asked for
 //     anything but "continue" (one step stricter than the drills page, which holds them on a stop only), the details could not be read, YOUTH RULES (under 18 or no birth year: a solo program has
 //     no coach to add them), or the protocol gate's jump gate is shut (no landing check yet …) — in that order, the
@@ -83,7 +86,7 @@ export interface ServedItem {
 }
 
 export interface HeldItem { key: string; name: string; line: string }
-export interface DayNote { id: 'red_flag' | 'pain_stop' | 'pain_ease' | 'readiness' | 'impact' | 'see_someone'; text: string; href?: string | null }
+export interface DayNote { id: 'red_flag' | 'pain_ease' | 'readiness' | 'impact' | 'see_someone'; text: string; href?: string | null }
 
 export interface ServedSession {
   id: string;
@@ -188,10 +191,9 @@ export function serveSession(s: PlanSession, g: DayGate, lookup: Lookup): Served
     items.push(out);
   });
 
-  if (hardPain) {
-    notes.push({ id: 'pain_stop', text: PAIN_DECISION_COPY[pain!] });
-    notes.push({ id: 'see_someone', text: easeOffClientLine(g.youth) });
-  } else if (why) {
+  // a stop: the check-in's own words, which already say who to see (a clinician; an adult under 18)
+  if (hardPain) notes.push({ id: 'see_someone', text: PAIN_DECISION_COPY[pain!] });
+  else if (why) {
     const href = why === 'jump_gate' ? (g.jumpGate.href === LANDING_CHECK_HREF ? LANDING_CHECK_ENTRY : g.jumpGate.href) : null;
     const text = why === 'jump_gate' ? `${IMPACT_LINES.jump_gate} ${g.jumpGate.why || JUMP_GATE_DEFAULT_WHY}` : IMPACT_LINES[why];
     if (s.items.some((p) => p.impact)) notes.push({ id: 'impact', text, href });

@@ -3,8 +3,8 @@
 // DRAFT PRODUCT COPY, NO MEDICAL WORDS. signature.test.ts screens every line here and every program's own text through
 // lib/coach/weeklyDraft/copy.ts MEDICAL_WORDS (no diagnosis, treatment, injury or condition words) — the one exception is
 // the prehab field's fixed PREHAB_NOTE ("General prehab, not treatment."), which the owner's brief asks for word for word.
-// The safety lines are NOT written here: a pain stop reads lib/health/painRule.ts PAIN_DECISION_COPY and the weekly
-// draft's easeOffClientLine ("check with a clinician"), the jump gate and the youth hold read the warm-up's NOTE_COPY,
+// The safety lines are NOT written here: a pain stop reads lib/health/painRule.ts PAIN_DECISION_COPY ("check with a
+// clinician"), an eased pain day the weekly draft's easeOffClientLine, the jump gate and the youth hold read the warm-up's NOTE_COPY,
 // and a red flag reads lib/health/intake.ts RED_FLAG_COPY: one voice for one rule.
 //
 // Pure. Client-safe.
@@ -44,7 +44,7 @@ export function decisionLine(o: {
     case 'red_flag': return "One of your health answers asks us to stop training features for now, so the plan doesn't move.";
     case 'no_numbers': return `No saved ${labels(o.reads)} numbers yet, so the plan runs on schedule.${next}`;
     case 'no_room': return `The plan already runs its longest, so it moves on.${next}`;
-    default: return `On schedule.${next}`;
+    default: return `The re-tests held, so the plan runs as written.${next}`;
   }
 }
 
@@ -68,6 +68,7 @@ export const DAILY_DRILL_LINE = "Warm up with today's daily drill: it is picked 
 // ── Premium ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export const FREE_WEEK_LINE = 'Week 1 is free. The rest of the program is part of FEL Pro.';
+export const PRO_INCLUDED_LINE = 'Every week is included with your FEL Pro.';
 export const PRO_FEATURE = 'Signature programs';
 export const PRO_FREE_LINE = "The first week of every signature program, the daily drill and the exercise library stay free.";
 export const PRO_LOCKED_LINE = 'This week is part of FEL Pro. Your first week, and everything you have done, stay yours.';

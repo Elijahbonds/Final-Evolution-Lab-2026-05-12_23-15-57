@@ -9,7 +9,7 @@
 // adults only), and `keep: 'device'` — the page keeps which sessions are done on the phone (lib/signature/deviceProgress.ts),
 // like the readiness and Mirror progress of an under-18.
 import { FREE_WEEKS, canSee, canStart, weekAccess, type ReviewStatus, type Viewer, type WeekAccess } from './access';
-import { DECISION_LABEL, FREE_WEEK_LINE, PRO_LOCKED_LINE, PRO_NOT_ON_SALE_LINE, YOUTH_PRO_LINE } from './copy';
+import { DECISION_LABEL, FREE_WEEK_LINE, PRO_INCLUDED_LINE, PRO_LOCKED_LINE, PRO_NOT_ON_SALE_LINE, YOUTH_PRO_LINE } from './copy';
 import { expandPlan, planRange, plannedWeeks, positionIn, type PlanWeek } from './plan';
 import { serveSession, type DayGate, type Lookup, type ServedSession } from './serve';
 import type { DecisionKind, Enrollment, RetestKind, SignatureId, SignatureProgram, SourceRef } from './types';
@@ -123,7 +123,7 @@ export function buildProgramView(i: BuildInput): ProgramView | null {
   const locked = ca === 'locked';
   const premium: PremiumView = {
     hasPro, freeWeeks: FREE_WEEKS, locked,
-    line: youth ? YOUTH_PRO_LINE : locked ? (i.purchasesOpen ? PRO_LOCKED_LINE : PRO_NOT_ON_SALE_LINE) : FREE_WEEK_LINE,
+    line: youth ? YOUTH_PRO_LINE : locked ? (i.purchasesOpen ? PRO_LOCKED_LINE : PRO_NOT_ON_SALE_LINE) : hasPro ? PRO_INCLUDED_LINE : FREE_WEEK_LINE,
     purchasesOpen: i.purchasesOpen && !youth,
     checkout: i.purchasesOpen && !youth ? { weekly: '/api/stripe/checkout?product=FEL_PRO', monthly: '/api/stripe/checkout?product=FEL_PRO_MONTHLY' } : null,
   };

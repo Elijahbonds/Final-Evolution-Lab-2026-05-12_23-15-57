@@ -71,10 +71,11 @@ describe('today\'s gates', () => {
       const out = serveSession(vjSession(3, 'A', youth), { ...OPEN, youth, painDecision: d }, lookup);
       for (const i of out.items) expect(['prep', 'cooldown']).toContain(i.section);
       expect(out.held.length).toBeGreaterThan(0);
-      expect(out.notes.map((n) => n.text)).toEqual([PAIN_DECISION_COPY[d], easeOffClientLine(youth)]);
+      expect(out.notes.map((n) => n.text)).toEqual([PAIN_DECISION_COPY[d]]);
       expect(out.contacts).toBe(0);
     }
-    expect(easeOffClientLine(false)).toMatch(/check with a clinician/);
+    expect(PAIN_DECISION_COPY.stop_see_clinician).toMatch(/check with a clinician/);
+    expect(PAIN_DECISION_COPY.stop_tell_adult).toMatch(/tell an adult/);
   });
 
   it('a pain check-in that asks for an easier version eases the work and routes to the existing "see a professional" wording', () => {
@@ -82,6 +83,8 @@ describe('today\'s gates', () => {
     expect(out.contacts).toBe(0);
     expect(out.items.some((i) => i.eased)).toBe(true);
     expect(out.notes.map((n) => n.id)).toEqual(['impact', 'pain_ease', 'see_someone']);
+    expect(out.notes[2].text).toBe(easeOffClientLine(false));
+    expect(out.notes[2].text).toMatch(/check with a clinician/);
   });
 
   it('a standing red flag: nothing runs, in the intake\'s own words', () => {
