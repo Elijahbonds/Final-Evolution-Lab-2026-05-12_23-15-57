@@ -51,6 +51,12 @@ describe('the loop an entry plays (demoFor)', () => {
     expect(demoFor({ family: 'squat', variation: 'goblet-squat+iso-hold', equipment: [] })).toEqual({ clip: 'ex_squat', hold: ISO_HOLD_SEC.ex_squat });
     expect(demoFor({ family: 'finish-series', variation: 'overhand-wing+iso-hold', equipment: [] })).toBeNull();   // no hold point for a layup
   });
+  it('LIBRARY-ANATOMY-2: every loop any entry plays is listed in DEMO_CLIPS, a real clip, inside the stage scope', () => {
+    const scope = scopeForMode('library');
+    const bad = new Set<string>();
+    for (const e of ALL) { const d = demoFor(e); if (d && (!DEMO_CLIPS.includes(d.clip) || !REAL_CLIPS.has(d.clip) || !scopeAllows(scope, d.clip))) bad.add(d.clip); }
+    expect([...bad]).toEqual([]);
+  });
   it('every rule matches at least one entry (a rule that matches nothing is a typo)', () => {
     const hits = new Map<number, number>();
     for (const e of ALL) {

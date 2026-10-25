@@ -90,11 +90,27 @@ interface DemoRule {
   families: readonly string[];
   /** the base variation must match (anchored) */
   bases: RegExp;
+  /** LIBRARY-ANATOMY-2: modifiers that change what THIS loop shows (an offset rack carry holds one bell low): the cue card */
+  notMods?: RegExp;
+  /** LIBRARY-ANATOMY-2: for a clip chosen by a function, every loop it can return (DEMO_CLIPS lists them) */
+  emits?: readonly string[];
 }
 
 const weak = (right: string, left: string) => (base: string) => (/-weak\b|-weak-/.test(`${base}-`) ? left : right);
 /** A barbell back squat holds the bar on the back; a goblet, front, dumbbell or bodyweight squat holds the load in front. */
 const squatClip = (base: string, eq: readonly string[]) => (eq.includes('barbell') && !/front|zercher|goblet/.test(base) ? 'ex_squat_bar' : 'ex_squat');
+
+
+// LIBRARY-ANATOMY-2: a "<action>-<stance>" variation → its loop, `ex_<action>_<stance>` (exerciseAthletic.ts STANCE_ACTIONS)
+const STANCE_SUFFIX: Readonly<Record<string, string>> = { standing: 'standing', 'half-kneeling': 'hk', 'tall-kneeling': 'tk', split: 'split', 'lateral-lunge': 'lateral', 'single-leg': 'single', 'step-in': 'stepin' };
+const PALLOF_ACTION: Readonly<Record<string, string>> = { press: 'pallofpress', hold: 'pallofhold', overhead: 'pallofoverhead', 'rotate-out': 'pallofrotate' };
+const THROW_ACTION: Readonly<Record<string, string>> = { chest: 'chest', overhead: 'overhead', scoop: 'scoop', 'shot-put': 'shotput', 'side-toss': 'sidetoss', underhand: 'underhand', 'single-push': 'singlepush', 'rot-overhead': 'rotoverhead' };
+function stanceClip(base: string, re: RegExp, actions: Readonly<Record<string, string>>): string | null {
+  const m = re.exec(base);
+  if (!m || !actions[m[1]] || !STANCE_SUFFIX[m[2]]) return null;
+  if (actions[m[1]] === 'singlepush' && m[2] === 'single-leg') return null;   // (no such loop: the library names none)
+  return `ex_${actions[m[1]]}_${STANCE_SUFFIX[m[2]]}`;
+}
 
 /** Every rule (first match wins). DEMO_CLIPS (below) is the set of loops these name; demo.test.ts holds the hoops ones
  *  equal to the stage scope's borrow list (clipScope LIBRARY_HOOPS_BORROW). */
@@ -171,7 +187,7 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_face_pull', families: ['rear-delt-face-pull'], bases: /^(fac-pull|rop-rear-shoulder-row)$/ },
   { clip: 'ex_face_pull', families: ['upper-back'], bases: /^face-pull-band$/ },
   { clip: 'ex_face_pull', families: ['pull-extra'], bases: /^strap-face-pull$/ },
-  { clip: (_b, eq) => (eq.includes('dumbbell') ? 'ex_triceps_overhead_one' : null), families: ['triceps'], bases: /^singl-arm-tricep-extension$/ },
+  { clip: (_b, eq) => (eq.includes('dumbbell') ? 'ex_triceps_overhead_one' : null), families: ['triceps'], bases: /^singl-arm-tricep-extension$/, emits: ['ex_triceps_overhead_one'] },
   { clip: 'ex_triceps_overhead_one', families: ['triceps'], bases: /^stand-singl-arm-tricep-extension$/ },
   { clip: 'ex_pushdown', families: ['triceps'], bases: /^(tricep-pushdown-rop-attachment|tricep-pushdown-v-bar-attachment)$/ },
   { clip: 'ex_kickback', families: ['triceps'], bases: /^(tricep-kickback|stand-bent-over-two-arm-tricep-extension)$/ },
@@ -180,7 +196,7 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_row_one', families: ['row'], bases: /^singl-arm-row$/ },
   { clip: 'ex_upright_row_one', families: ['upright-row-shrug'], bases: /^singl-arm-upright-row$/ },
   // ── LIBRARY-ANATOMY-2: the mobility flows, each its own loop (exerciseFloor.ts, the positions in order) ──
-  { clip: (base) => { const seq = base.replace(/^flow3?-/, ''); return FLOW_SEQS.includes(seq) ? flowClip(seq) : null; }, families: ['mobility-flow'], bases: /^flow3?-[a-z-]+$/ },
+  { clip: (base) => { const seq = base.replace(/^flow3?-/, ''); return FLOW_SEQS.includes(seq) ? flowClip(seq) : null; }, families: ['mobility-flow'], bases: /^flow3?-[a-z-]+$/, emits: FLOW_CLIPS },
   // ── LIBRARY-ANATOMY-2: single positions and stretches (exerciseFloor.ts POSITIONS: the position, breathing, or its small movement) ──
   { clip: 'ex_pos_child', families: ['stretch-upper'], bases: /^child-pos$/ },
   { clip: 'ex_pos_child', families: ['breathing-2'], bases: /^child$/ },
@@ -198,7 +214,7 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_pos_pigeon', families: ['hip-mobility'], bases: /^pigeon$/ },
   { clip: 'ex_pos_shinbox', families: ['hip-mobility'], bases: /^shin-box$/ },
   { clip: 'ex_pos_switch', families: ['hip-mobility'], bases: /^90-90-switch$/ },
-  { clip: (_b) => flowClip('fold-inchworm'), families: ['dynamic-flow', 'dynamic-warmup'], bases: /^inchworm$/ },
+  { clip: (_b) => flowClip('fold-inchworm'), families: ['dynamic-flow', 'dynamic-warmup'], bases: /^inchworm$/, emits: [flowClip('fold-inchworm')] },
   { clip: 'ex_pos_fold', families: ['posterior-chain-mobility'], bases: /^fold$/ },
   { clip: 'ex_pos_squat', families: ['goblet-cossack-flow'], bases: /^hold$/ },
   { clip: 'ex_pos_supine', families: ['breathing-2'], bases: /^supine-belly$/ },
@@ -224,6 +240,30 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_pos_clamshell', families: ['hip-stability'], bases: /^clamshell$/ },
   { clip: 'ex_pos_sideraise', families: ['hip-stability'], bases: /^side-raise$/ },
   { clip: 'ex_pos_sideer', families: ['shoulder-care'], bases: /^er-side-lying$/ },
+  // ── LIBRARY-ANATOMY-2: anti-rotation and med-ball throws, a stance under an arm action (anim/authored/exerciseAthletic.ts) ──
+  { clip: (b) => stanceClip(b, /^(?:band|cable)-(press|hold|overhead|rotate-out)-(standing|half-kneeling|tall-kneeling|split|lateral-lunge|single-leg)$/, PALLOF_ACTION), families: ['pallof-matrix'], bases: /^(band|cable)-/, emits: Object.values(PALLOF_ACTION).flatMap((a) => ['standing', 'hk', 'tk', 'split', 'lateral', 'single'].map((x) => `ex_${a}_${x}`)) },
+  { clip: (b) => ({ 'tall-kneel': 'ex_pallofpress_tk', 'half-kneel': 'ex_pallofpress_hk', standing: 'ex_pallofpress_standing', split: 'ex_pallofpress_split', chop: 'ex_chop_hk', lift: 'ex_lift_hk', 'band-chop': 'ex_chop_standing' } as Record<string, string>)[b] ?? null, families: ['anti-rotation'], bases: /^(tall-kneel|half-kneel|standing|split|chop|lift|band-chop)$/, emits: ['ex_pallofpress_tk', 'ex_pallofpress_hk', 'ex_pallofpress_standing', 'ex_pallofpress_split', 'ex_chop_hk', 'ex_lift_hk', 'ex_chop_standing'] },
+  { clip: (b) => stanceClip(b, /^(chest|overhead|scoop|shot-put|side-toss|underhand|single-push|rot-overhead)-(standing|half-kneeling|tall-kneeling|split|step-in|single-leg)$/, THROW_ACTION), families: ['med-ball-throw-matrix'], bases: /^[a-z-]+$/, emits: Object.values(THROW_ACTION).flatMap((a) => ['standing', 'hk', 'tk', 'split', 'stepin', 'single'].filter((x) => !(a === 'singlepush' && x === 'single')).map((x) => `ex_${a}_${x}`)) },
+  { clip: (b) => ({ 'medicin-ball-chest-pass': 'ex_chest_standing', 'stand-two-arm-overhead-throw': 'ex_overhead_standing', 'overhead-slam': 'ex_slam_standing', 'medicin-ball-scoop-throw': 'ex_underhand_standing', 'backward-medicin-ball-throw': 'ex_backtoss_standing' } as Record<string, string>)[b] ?? null, families: ['throw'], bases: /^(medicin-ball-chest-pass|stand-two-arm-overhead-throw|overhead-slam|medicin-ball-scoop-throw|backward-medicin-ball-throw)$/, emits: ['ex_chest_standing', 'ex_overhead_standing', 'ex_slam_standing', 'ex_underhand_standing', 'ex_backtoss_standing'] },
+  { clip: (b) => ({ 'scoop-forward': 'ex_underhand_standing', 'backward-toss': 'ex_backtoss_standing', slam: 'ex_slam_standing', 'squat-throw': 'ex_squatthrow_standing', 'kneeling-pass': 'ex_chest_tk' } as Record<string, string>)[b] ?? null, families: ['med-ball-power'], bases: /^(scoop-forward|backward-toss|slam|squat-throw|kneeling-pass)$/, emits: ['ex_underhand_standing', 'ex_backtoss_standing', 'ex_slam_standing', 'ex_squatthrow_standing', 'ex_chest_tk'] },
+  { clip: (b) => ({ overhead: 'ex_overhead_standing', 'kneeling-overhead': 'ex_overhead_tk', 'single-arm': 'ex_singlepush_standing', rotational: 'ex_sidetoss_standing' } as Record<string, string>)[b] ?? null, families: ['partner-throw'], bases: /^(overhead|kneeling-overhead|single-arm|rotational)$/, emits: ['ex_overhead_standing', 'ex_overhead_tk', 'ex_singlepush_standing', 'ex_sidetoss_standing'] },
+  { clip: (b) => ({ hk: 'ex_scoop_hk', scoop: 'ex_scoop_standing', 'shot-put': 'ex_shotput_standing' } as Record<string, string>)[b] ?? null, families: ['rotational-power'], bases: /^(hk|scoop|shot-put)$/, emits: ['ex_scoop_hk', 'ex_scoop_standing', 'ex_shotput_standing'] },
+  { clip: 'ex_chop_standing', families: ['rotation'], bases: /^stand-wood-chop$/ },
+  { clip: 'ex_lift_standing', families: ['rotation'], bases: /^stand-lift$/ },
+  { clip: (_b, eq) => (eq.includes('dumbbell') ? 'ex_side_bend' : null), families: ['rotation'], bases: /^sid-bend$/, emits: ['ex_side_bend'] },
+  { clip: 'ex_halo', families: ['get-up-windmill'], bases: /^halo$/ },
+  // ── carries, marches, swings, the rotator cuff, single-arm cable work ──
+  { clip: 'ex_carry_rack', families: ['carry'], bases: /^rack$/, notMods: /^offset$/ },
+  { clip: 'ex_carry_overhead', families: ['carry'], bases: /^overhead$/ },
+  { clip: 'ex_march_carry', families: ['march'], bases: /^suitcase$/ },
+  { clip: 'ex_march_rack', families: ['march'], bases: /^rack$/ },
+  { clip: 'ex_march_overhead', families: ['march'], bases: /^overhead$/ },
+  { clip: 'ex_kb_swing', families: ['kb-swing'], bases: /^two-hand$/ },
+  { clip: 'ex_kb_swing_one', families: ['kb-swing'], bases: /^singl-arm-swing$/ },
+  { clip: 'ex_kb_swing', families: ['db-hinge'], bases: /^swing$/ },
+  { clip: 'ex_kb_swing', families: ['kb-lower'], bases: /^double-swing$/ },
+  { clip: (b) => ({ 'er-side': 'ex_er_side', 'cable-er-side': 'ex_er_side', 'ir-side': 'ex_ir_side', 'cable-ir-side': 'ex_ir_side', 'er-90-standing': 'ex_er_90', 'cable-er-90-standing': 'ex_er_90', 'ir-90-standing': 'ex_ir_90', 'cable-ir-90-standing': 'ex_ir_90', 'er-90-kneeling': 'ex_er_90_hk', 'ir-90-kneeling': 'ex_ir_90_hk', 'er-split': 'ex_er_side_split', 'ir-split': 'ex_ir_side_split' } as Record<string, string>)[b] ?? null, families: ['shoulder-rotation'], bases: /^[a-z0-9-]+$/, emits: ['ex_er_side', 'ex_ir_side', 'ex_er_90', 'ex_ir_90', 'ex_er_90_hk', 'ex_ir_90_hk', 'ex_er_side_split', 'ex_ir_side_split'] },
+  { clip: (b) => (/press/.test(b) ? 'ex_cable_press_one' : 'ex_cable_row_one'), families: ['standing-cable'], bases: /^(press|row|band-press|band-row)$/, emits: ['ex_cable_press_one', 'ex_cable_row_one'] },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -385,6 +425,7 @@ export function demoFor(e: { family: string; variation: string; equipment: reado
   const iso = mods.includes('iso-hold');
   for (const r of RULES_BY_FAMILY.get(e.family) ?? []) {
     if (!r.bases.test(base)) continue;
+    if (r.notMods && mods.some((m) => r.notMods!.test(m))) return null;
     let clip = typeof r.clip === 'string' ? r.clip : r.clip(base, e.equipment);
     for (const m of mods) if (clip && m !== 'iso-hold' && SHAPE_MODIFIERS.has(m)) clip = MODIFIER_LOOPS[m]?.[clip] ?? null;
     if (!clip) return null;
@@ -402,6 +443,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
   const out = new Set<string>();
   for (const r of DEMO_RULES) {
     if (typeof r.clip === 'string') out.add(r.clip);
+    else if (r.emits) for (const c of r.emits) out.add(c);
     else for (const b of ['x', 'x-weak']) for (const eq of [[], ['barbell']]) { const c = r.clip(b, eq); if (c) out.add(c); }
   }
   for (const table of Object.values(MODIFIER_LOOPS)) for (const c of Object.values(table)) out.add(c);
