@@ -45,7 +45,10 @@
 // refuses an adult template for a client under youth rules, and a program that is not blank, and says why.
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, KeyRound, LayoutTemplate, Leaf, Plus, Scale, Timer, Trash2, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronUp, KeyRound, LayoutTemplate, Leaf, Plus, Scale, Search, Timer, Trash2, TriangleAlert, X } from 'lucide-react';
+// EXERCISE-LIBRARY (2026-10-25): "Use in program" straight from the shared library
+import { LibraryBrowser } from '@/components/library/library-browser';
+import type { LibraryCard } from '@/lib/library/server';
 import { ADULT_TEMPLATE_LINE, CLONE_LINE, TEMPLATES, dailyTargetLine, programIsBlank, templateShapeLine } from '@/lib/coach/templates/list';
 import { WAVE_LINE } from '@/lib/coach/templates/waves';
 import { CoachGateLine } from '@/components/coach/protocol-gate-line';
@@ -111,6 +114,8 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
   const [drafts, setDrafts] = useState<Record<string, ExerciseDraft>>({});
   const [adding, setAdding] = useState<Record<string, { exerciseId: string; section: SessionSection }>>({});
   const [busy, setBusy] = useState(false);
+  // EXERCISE-LIBRARY: the session (and section) a library pick lands in
+  const [libraryFor, setLibraryFor] = useState<{ sessionId: string; section: SessionSection } | null>(null);
 
   const call = async (body: Record<string, unknown>): Promise<boolean> => {
     setBusy(true);
@@ -124,6 +129,20 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
       toast.error(builderErrorText(null));
       return false;
     } finally { setBusy(false); }
+  };
+
+  /** A library pick: copy it into the catalogue (or find the copy), then add it to the session like any catalogue row. */
+  const pickFromLibrary = async (entry: LibraryCard) => {
+    if (!libraryFor) return;
+    const r = await fetch('/api/coach/programs/exercises/from-library', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ libraryId: entry.id }) });
+    const j = await r.json().catch(() => ({}));
+    const id = (j?.item as { id?: string } | undefined)?.id;
+    if (!r.ok || !id) { toast.error('Could not add that from the library. Try again.'); return; }
+    onCatalogueChange?.();
+    if (await call({ action: 'add', sessionId: libraryFor.sessionId, ...bodyFromDraft(emptyDraft(id, libraryFor.section, entry.pattern as MovementPattern)) })) {
+      toast.success(`${entry.name} added${j.already ? '' : ' (and to your catalogue)'}`);
+      setLibraryFor(null);
+    }
   };
 
   const edit = (e: TreeExercise) => {
@@ -175,6 +194,15 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
 
   return (
     <div className="space-y-3" data-testid="program-builder">
+      {libraryFor && (
+        <div className="fixed inset-0 z-[55] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Find in the library">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setLibraryFor(null)} />
+          <div className="relative max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0b0b0f] p-4 sm:max-w-xl sm:rounded-2xl">
+            <button onClick={() => setLibraryFor(null)} aria-label="Close" className="absolute right-3 top-3 text-white/40 hover:text-white"><X className="h-5 w-5" /></button>
+            <LibraryBrowser canAdd onUse={pickFromLibrary} title={<div className="pr-8 text-sm text-white">Find in the library</div>} />
+          </div>
+        </div>
+      )}
       {templatePicker}
       {tree.blocks.map((b) => {
         const balance = pullPushCheck(
@@ -264,6 +292,12 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                     className="shrink-0 rounded-lg border border-[#00E5FF]/40 text-[#00E5FF] px-2 py-1 disabled:opacity-30"
                     aria-label="Add exercise"
                   ><Plus className="h-3.5 w-3.5" /></button>
+                  <button
+                    disabled={busy}
+                    onClick={() => setLibraryFor({ sessionId: s.id, section: add.section })}
+                    className="shrink-0 rounded-lg border border-white/15 text-white/70 px-2 py-1 disabled:opacity-30"
+                    aria-label="Find in the library" title="Find in the library" data-library-pick
+                  ><Search className="h-3.5 w-3.5" /></button>
                 </div>
                 {/* MIRROR-COACH P6 FIX (2026-09-29): not where the off day would land ahead of a session the athlete
                    already did (Today would go back to it; the server refuses it too — offDayWouldRewind) */}

@@ -7,6 +7,8 @@ import { ExerciseDemo } from '@/components/coach/exercise-demo';
 import { CATALOGUE_ERROR_COPY, PATTERN_INFO, nameKey } from '@/lib/coach/catalogue';
 import type { BraceMode, MovementPattern } from '@/public/_prisma/client';
 import { MyCatalogue, TagRow } from './my-catalogue';
+// EXERCISE-LIBRARY (2026-10-25): the shared library, first on the tab for everyone
+import { LibraryBrowser } from '@/components/library/library-browser';
 
 interface Category { id: string; name: string }
 interface Exercise {
@@ -40,7 +42,7 @@ const LEVEL_COLORS: Record<string, string> = {
  * two libraries had no path between them, and the catalogue could not be filled from any served page at all).
  */
 export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
-  const [view, setView] = useState<'kb' | 'mine'>('kb');
+  const [view, setView] = useState<'library' | 'kb' | 'mine'>('library');
   const [mineKeys, setMineKeys] = useState<Set<string>>(new Set());   // names already in my catalogue, as nameKey()
   const [mineCount, setMineCount] = useState<number | null>(null);
   const [refreshMine, setRefreshMine] = useState(0);
@@ -105,14 +107,19 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
     return Array.from(map.entries()).sort((a, b) => a[0] - b[0]);
   }, [filtered]);
 
-  const switcher = coach && (
+  const views = [['library', 'Library'], ['kb', 'Knowledge base'], ...(coach ? [['mine', `My catalogue${mineCount !== null ? ` (${mineCount})` : ''}`]] : [])] as const;
+  const switcher = (
     <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-3 border border-white/6" role="tablist" aria-label="Exercise library">
-      {([['kb', 'Knowledge base'], ['mine', `My catalogue${mineCount !== null ? ` (${mineCount})` : ''}`]] as const).map(([k, label]) => (
-        <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)}
+      {(views as readonly (readonly [string, string])[]).map(([k, label]) => (
+        <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k as 'library' | 'kb' | 'mine')}
           className={`flex-1 rounded-lg py-2 text-xs font-medium ${view === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/40 hover:text-white/70'}`}>{label}</button>
       ))}
     </div>
   );
+
+  if (view === 'library') {
+    return <div>{switcher}<LibraryBrowser canAdd={coach} onAdded={() => { loadMine(); setRefreshMine((n) => n + 1); }} /></div>;
+  }
 
   if (coach && view === 'mine') {
     return <div>{switcher}<MyCatalogue refreshKey={refreshMine} onChange={takeMine} onBrowseKb={() => setView('kb')} /></div>;

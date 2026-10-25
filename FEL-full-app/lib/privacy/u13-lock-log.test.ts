@@ -67,7 +67,12 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; six additive tables) at 44680dbc. lane/coach-video-review landed first (#438): pinned at b4857b8d, this
 // lane's merge of lane/finish-release, the first commit carrying all three 2026-10-24/25 pending files.
 // Both landed: pinned at the merge of lane/finish-release into lane/teams-squads carrying teams-squads + coach-business SQL.
-const PARENT = '419c7ff49e115a9f94549c008bf78a127eaf1a57';
+// EXERCISE-LIBRARY (lane/exercise-library, 2026-10-25) prisma/pending/2026-10-25-exercise-library.sql (pending SQL only;
+// schema.prisma untouched; LibraryExercise + LibrarySubmission + ProgramExercise.libraryExerciseId, additive) at 8656ba16.
+// lane/coach-business landed first (#442): pinned at this lane's merge of lane/finish-release, the first commit carrying
+// all four 2026-10-24/25 pending files, ef5ed65f.
+// Teams + exercise library both landed: pinned at the merge of lane/finish-release into lane/teams-squads that carries every pending file above.
+const PARENT = 'MERGE_PENDING';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
