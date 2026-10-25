@@ -82,3 +82,6 @@ export const DRAFT_BADGE = 'Draft: only the owner can see this until it is appro
 export const NOT_READY_LINE = 'Signature programs open once their tables are applied and the owner approves them.';
 export const NONE_APPROVED_LINE = 'No signature program is open yet. They are with the owner for review.';
 export const YOUTH_DEVICE_LINE = 'Under 18, your progress stays on this phone. Jumps and landings wait: each one has a calm swap.';
+
+/** Train's signature card line (app/train/page.tsx): the same for everyone, so that page reads no age to draw it. */
+export const TRAIN_LINE_IDLE = "FEL's own programs from the owner's books: vertical jump, basketball skills, athletic foundation and pain-free prehab. Week 1 is free.";
