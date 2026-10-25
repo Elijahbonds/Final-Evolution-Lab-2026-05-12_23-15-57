@@ -6,8 +6,9 @@
 // auditHinge, pushupAudit.ts auditPushup) as PURE, BATCH grades — a whole capture in, one reading out (patterns.ts's
 // contract) — where the squat and the lunge read every camera frame (squat-audit.ts, LungeAudit). The batch audits are
 // tested, and their questions are rep-shaped (how far the hips travelled against the knee over the rep; how deep the
-// rep's bottom was), so this does not re-derive them per frame: it counts the rep live, keeps the frames since the last
-// rep ended, and when a rep closes hands exactly those frames to the pattern's own audit. A rep's faults are what the
+// rep's bottom was), so this does not re-derive them per frame: it counts the rep live, keeps the rep's own frames (from
+// its last frame at the top before it armed — MIRROR-FIXES 2026-10-25), and when a rep closes hands exactly those frames
+// to the pattern's own audit. A rep's faults are what the
 // tested audit said about that rep — nothing here grades.
 //
 // THE SHAPE (the squat's, per patterns.ts hingePattern/pushupPattern `reps: { checkReps: 3, workReps: 8 }`):
@@ -16,7 +17,9 @@
 //           a straight-arm plank for the push-up) for SETUP_HOLD_MS on the pose clock — a COUNTED hold (framing.ts
 //           FramingGate's counted mode): a frame that fails pauses it, it does not start it over, because landmark jitter
 //           alone dips a straight arm under the push-up's line a frame or two at a time (measured on the synth's default
-//           noise: the plank's top reads 169° ± 5°, under 165° on ~1 frame in 5, never more than 2 in a row). The near side — the leg and arm
+//           noise: the plank's top reads 169° ± 5°, under 165° on ~1 frame in 5, never more than 2 in a row). MIRROR-FIXES
+//           (2026-10-25): pausing still lost the first push-up rep on 4 of 6 jittered seeds with a 1.5 s hold, so a dip of
+//           the signal ALONE, shorter than SETUP_SIGNAL_GRACE_MS, now holds on instead of pausing. The near side — the leg and arm
 //           the rep is read from — is chosen here, once, by hingeAudit.ts pickNearSide over the setup frames, so a noisy
 //           frame cannot swap which leg a rep is "about". The turn line is said ONCE a stage after
 //           TURN_PROMPT_AFTER_FRAMES wrong-view frames (lungeStage.ts's own rule: one retry, then record it — never a loop).
@@ -48,6 +51,17 @@ export type SideRepStageName = 'setup' | 'check' | 'work' | 'review';
 
 /** The start position must hold this long, side-on, before the check begins (pose clock). TUNE(elijah) */
 export const SETUP_HOLD_MS = 1000;
+/**
+ * MIRROR-FIXES (2026-10-25): the setup hold's grace for the rep signal alone. While the body is side-on, readable and in
+ * the start position, a frame whose signal dips out of `up` (landmark jitter: a straight arm read a few degrees under the
+ * push-up's line) does not pause the hold if a passing frame follows within this long of the last one — the time across
+ * the dip counts. A longer dip still pauses it, and a frame that is not side-on, not readable or not in position pauses
+ * it at once, as before. Measured on the synth's default noise: the plank's elbow read under the line on ~1 frame in 4
+ * (up to 4 running), and with the builder's 1.5 s hold the first push-up rep was missed on 4 of 6 seeds (17 of 30);
+ * with this grace, 0 of 60. 120 ms bridges two dipped frames at 30 fps with room for the camera's timing jitter (67 ms
+ * still missed 1 of 60); a body at the top only 1 frame in 4 still never starts. TUNE(elijah) (new)
+ */
+export const SETUP_SIGNAL_GRACE_MS = 120;
 /** A rep must stay armed this many camera frames to count (~0.27 s at 30 fps): jitter across the line is not a rep. TUNE(elijah) */
 export const MIN_REP_FRAMES = 8;
 /** The frames kept for a rep's grade: at most the last ~8 s (30 fps) since the rep before it. TUNE(elijah) */
@@ -93,7 +107,7 @@ export interface SideRepState<F extends string> {
   /** A rep is under way, and for how many camera frames. */
   armed: boolean;
   armedFrames: number;
-  /** The frames since the last rep closed (setup: the setup frames), capped at REP_BUFFER_MAX_FRAMES. */
+  /** The rep under way's frames, from its last frame at the top (setup: the setup frames), capped at REP_BUFFER_MAX_FRAMES. */
   buffer: PoseFrame[];
   /** Wrong-view frames this stage, and whether its one turn line was said. */
   wrongView: number;
@@ -174,10 +188,15 @@ export function stepSideRep<F extends string>(
     // the near side, from what the camera has seen of the setup so far (re-voted each frame until it is locked)
     const near = present ? pickNearSide(buffer, MIN_VIS) : null;
     const sig = near ? spec.signal(f.image, near) : null;
-    const ready = present && sideOn && near !== null && sig !== null && spec.up(sig) && spec.inPosition(f.image, near);
-    if (!ready) lastOkMs = null;
-    else {
-      if (lastOkMs !== null) heldMs += input.nowMs - lastOkMs;
+    const placed = present && sideOn && near !== null && sig !== null && spec.inPosition(f.image, near);
+    const ready = placed && spec.up(sig);
+    if (!ready) {
+      // only the signal dipped, briefly, with the body still placed: hold on (see SETUP_SIGNAL_GRACE_MS); else pause
+      if (!(placed && lastOkMs !== null && input.nowMs - lastOkMs <= SETUP_SIGNAL_GRACE_MS)) lastOkMs = null;
+    } else {
+      // a passing frame: the time since the last passing one counts — always when that was the frame before (the old
+      // rule, whatever the camera's rate), and across a dip only within the grace
+      if (lastOkMs !== null && (prev.lastMs === lastOkMs || input.nowMs - lastOkMs <= SETUP_SIGNAL_GRACE_MS)) heldMs += input.nowMs - lastOkMs;
       lastOkMs = input.nowMs;
       if (heldMs >= SETUP_HOLD_MS) {
         stage = 'check'; reps = 0; side = near; heldMs = 0; lastOkMs = null;
@@ -190,6 +209,12 @@ export function stepSideRep<F extends string>(
     if (sig !== null) {
       if (!armed) {
         if (spec.down(sig) && spec.inPosition(f.image, side)) { armed = true; armedFrames = 0; }
+        // MIRROR-FIXES (2026-10-25): a rep is graded on ITS OWN frames — from the last frame at the top before it armed
+        // to the frame it closed. The buffer used to run from the frame the rep before it closed, which handed the end
+        // of a faulty rep (a head still poked, a plank still sagging at the top) to the next rep's grade: measured on
+        // jittered sets (tests/helpers/mirrorJitterSets.ts, 6 seeds), a false flag on the rep after every faulty one,
+        // 12 of 36 flags. Starting at the last top frame: 0 false, every injected fault still caught.
+        else if (spec.up(sig)) buffer = [f];
       } else {
         armedFrames += 1;
         if (spec.up(sig)) {
@@ -198,8 +223,9 @@ export function stepSideRep<F extends string>(
             reps += 1;
             if (stage === 'check') checkReps = [...checkReps, repClosed];
             else workReps = [...workReps, repClosed];
-            buffer = [f];
           }
+          // back at the top: the next rep's frames start here (after a blip of jitter under the line, dropped, too)
+          buffer = [f];
           armed = false; armedFrames = 0;
         }
       }
