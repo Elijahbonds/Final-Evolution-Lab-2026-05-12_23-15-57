@@ -45,6 +45,8 @@ export function CoachView() {
       <Link href="/coach/session" className="mb-4 flex min-h-12 items-center justify-center rounded-xl bg-[#FF2D95] px-4 text-base font-bold text-black">
         Court session
       </Link>
+      {/* COACH-BUSINESS: the coach's page, packages, payments and applications */}
+      {coach ? <Link href="/coach/business" className="mb-4 flex min-h-11 items-center justify-center rounded-xl border border-cyan-300/50 px-4 text-sm font-bold text-cyan-200">Your coaching business</Link> : null}
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-4 border border-white/6">
         {tabs.map((t) => {

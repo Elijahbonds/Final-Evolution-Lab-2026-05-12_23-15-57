@@ -63,7 +63,11 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; TrainingGroup + TrainingGroupMember + TrainingGroupAct, additive) at e0adbbd8, the lane commit carrying it on
 // top of every file above; lane/coach-video-review landed first (#438): pinned at the merge of lane/finish-release into
 // this lane (f123fb66), the first commit carrying all three 2026-10-24/25 pending files.
-const PARENT = 'f123fb66bcccba82742264eb4c93699f157ab48f';
+// COACH-BUSINESS (lane/coach-business, 2026-10-25) prisma/pending/2026-10-25-coach-business.sql (pending SQL only; schema.prisma
+// untouched; six additive tables) at 44680dbc. lane/coach-video-review landed first (#438): pinned at b4857b8d, this
+// lane's merge of lane/finish-release, the first commit carrying all three 2026-10-24/25 pending files.
+// Both landed: pinned at the merge of lane/finish-release into lane/teams-squads carrying teams-squads + coach-business SQL.
+const PARENT = 'MERGE_PENDING';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

@@ -19,6 +19,8 @@ import {
 } from '@/lib/stripe/basil-shapes';
 import { revokeForRefundedCharge } from '@/lib/stripe/refund-revoke';
 import { isWalletSession, walletCheckoutCompleted } from '@/lib/wallet/stripe-wallet-events';
+import { fulfilCoachConnect, isCoachConnectEvent } from '@/lib/coach-business/webhook';
+import { prismaConnectDeps } from '@/lib/coach-business/server';
 import type Stripe from 'stripe';
 
 /**
@@ -45,6 +47,20 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error('[stripe-webhook] Signature verification failed:', err.message);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+  }
+
+  // COACH-BUSINESS (2026-10-25): a coach's own sale through Stripe Connect (metadata.product COACH_CONNECT). Handled
+  // first, before the book refund path, whose event-id memory would answer a redelivered refund `deduped` before it got
+  // here. Status moves and FEL's 5% fee are booked by lib/coach-business/webhook.ts, idempotent per payment; a failure
+  // returns 500 so Stripe retries.
+  if (isCoachConnectEvent(event)) {
+    try {
+      const coachConnect = await fulfilCoachConnect(prismaConnectDeps(), event);
+      return NextResponse.json({ received: true, coachConnect });
+    } catch (err) {
+      console.error('[stripe-webhook] coach-connect failed', err instanceof Error ? err.message : err);
+      return NextResponse.json({ error: 'handler_failed' }, { status: 500 });
+    }
   }
 
   // Book sales (Final Evolution Press, PR #17). Handled before the coach-store and ledger dispatch: a guest book

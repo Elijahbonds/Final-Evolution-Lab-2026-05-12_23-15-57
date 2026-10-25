@@ -119,11 +119,11 @@ reader fed an 8×-stretched 240 fps capture (verified, lab-grade). No sideways s
 - **Motion blur** (indoor light, slow shutter) still reads −1 to −2 cm with SD 2–5 cm; such trials carry a wide ± and the
   tip asks for light. A brighter scene or the slow-mo file is the fix — hardware, not code.
 - **Live frame rate.** In-browser pose tops out at 60 Hz on capable phones (30 on most): ±1.4 cm SD live vs ±0.7 slow-mo.
-- **Approach jump and touch height: not built.** Measured reason: on the one recorded run-up
+- **Approach jump and touch height: built in JUMP-PRO 2 (§9).** Was: Measured reason: on the one recorded run-up
   (`lib/pose/__fixtures__/jump_one_foot_runup.json`, CMU capture), the finder places the take-off 110 ms early and the
   refiner 46 ms early (the planted-run floor logic assumes a stand before the jump); 45.5 / 44.7 cm vs 37.0 truth.
   Plan below.
-- **Drop jump: not built.** The step off the box is not a jump and the floor under it is the box. Plan below.
+- **Drop jump: built in JUMP-PRO 2 (§9.3).**
 - **BodyReader** (games, dunk contests → PRQ power) is not re-timed here (§7).
 
 ## 7. The games' reader (BodyReader), measured, not changed
@@ -164,6 +164,134 @@ session. Follow-up 6.
    not told "−0.5 in" for noise; changes one pinned line in `lib/screen/kid-path.test.tsx`. Owner call.
 8. **PR #424 wiring**: pass `jumpView.trust?.level` as `trustLevel` to the session card and to `verifyJump` once it lands;
    consider letting #424's "Low at 30 fps" use this lane's per-jump ± instead of the frame rate alone.
+
+## 9. JUMP-PRO 2 (lane `jump-pro-2`, 2026-10-25): approach + touch height, drop jump / RSI, power, saved verification
+
+Everything here is measured on the ground-truth bench, as in §2–§3: a physics body built every millisecond and filmed
+through the app's own virtual camera. It is not a force plate and not a person (§9.6 says what that hides). Run it:
+`npx tsx scripts/jump-accuracy.ts --approach | --reach | --drop`.
+
+### 9.1 Max approach vertical (`lib/jump/approach.ts`)
+
+Side-on, the run crossing the picture. A flight is both feet off the feet's own low envelope (no stand, no settle)
+with the **centre of mass** rising (`lib/jump/com.ts`, Winter/Dempster segments: the arms swing and a knee drives, so
+the hips do not fly a parabola). The take-off floor is a line through the **plant step's own stance**, read at the
+toe-off; the edges are re-timed by `refine.ts` from several half-frame starts (median kept); a run angled toward or away
+from the lens is read from the **legs' segment lengths** (thigh + shin lie in the picture's plane side-on) and each edge's
+leg is put back at the flight's own scale; the landing drop is taken out whole (an approach lands lower by nature, so it
+is never flagged "landed low"). A landing that reads *higher* than the take-off means the take-off was put on a bent leg
+of the plant: refused ("could not see your take-off foot").
+
+Before → after, bias / SD vs the force-plate height (cm), 12 jumps (45/60/75 cm) per cell, camera 4.5 m out:
+
+| condition | 30 fps | 60 fps | 120 fps | 240 fps |
+|---|---|---|---|---|
+| one-foot, 4 m/s, arm swing | refused (T5: "hands left your hips"); frame edges +8.5/2.7 → **+0.7/3.7** | → **+0.7/2.6** (frames +6.3/2.2) | → **+0.3/2.7** (+6.5/2.2) | → **+0.8/1.3** (+5.0/1.0) |
+| one-foot, fast 5.5 m/s | +5.4/1.8 → −1.2/2.5 | +6.5/3.1 → −0.6/4.7 | +6.6/1.8 → 0.0/2.0 | +6.2/2.0 → +0.5/1.2 |
+| one-foot, slow 2.5 m/s | +6.7/2.4 → −1.6/2.7 | +7.5/2.5 → +0.6/2.8 | +9.1/8.2 → −0.5/1.5 | +5.0/1.5 → −0.4/1.2 |
+| two-foot step-close | +4.9/4.9 → −0.8/2.3 | +4.8/2.6 → +0.6/2.5 | +3.9/1.2 → +0.1/2.3 | +2.4/1.5 → +0.2/0.9 |
+| no arm swing (T5 reads it) | T5 +6.4/4.9 → +0.5/3.7 | T5 +5.9/2.3 → +0.7/2.7 | T5 +5.8/2.2 → +0.3/2.6 | T5 +5.3/1.4 → +0.8/1.3 |
+| run angled 12° toward the lens | +5.9/2.7 → −1.0/4.1 | +6.1/3.1 → −1.0/4.1 (no rescale: +4.3) | +6.2/1.0 → −0.6/1.9 | +5.7/1.1 → −0.9/0.8 |
+| run angled 12° away from the lens | +6.8/5.6 → +1.8/4.8 | +8.4/5.5 → +1.1/3.9 (no rescale: +7.9) | +9.0/5.8 → +0.9/4.5 | +7.4/6.3 → +1.7/2.9 |
+| bent-knee landing | +14.4/6.7 → +0.6/3.8 | +10.3/1.4 → +0.6/2.6 | +10.0/2.7 → +0.3/2.6 | +8.7/2.0 → +0.8/1.3 |
+| motion blur | none read → −2.1/5.8 | none → +0.8/3.9 | none → −1.9/5.5 | none → +0.6/3.1 |
+
+"Before" for arm-swing run-ups: the jump check (T5) refuses every one ("your hands left your hips"); its finder's frame
+edges alone read +5 to +14 cm (a flight-time height of a body that lands lower). Missed after: 5 of 432 (all "could not
+see your take-off foot", blur or an angled run). No false jump. The recorded CMU run-up (front-facing, travel removed):
+take-off **33 ms early** (the finder 110, the refiner 46), 41.9 cm vs the flight truth 37.0.
+
+**Honest limits.** One side-on camera at 4.5 m: SD 2.3–3.7 cm live (30–60 fps), ~1.2 cm from a 240 fps slow-mo;
+the take-off edge is the weak point (the toe leaves slowly; SD 9–16 ms at 60 fps). Motion blur on a run (every foot
+moves > 6 px a frame) gives 4–6 cm SD: such jumps carry a wide ± and never verify. An approach rarely verifies live
+(its own SD is over `jump.verifiedSdCm` 1.75 cm): a slow-mo video is the verified path. A run angled toward / away from
+the lens is corrected to ±1–2 cm bias but its SD grows; the tip says "run across the picture".
+
+### 9.2 Standing reach and touch height (`lib/jump/reach.ts`, `reachStore.ts`)
+
+The check: facing the phone, stand, one arm straight up, hold (majority-smoothed over ±100 ms; the first and second
+half of the hold within 2 % of the leg). The reach is kept as a **share of the leg** (hip → knee → ankle), so no tape
+measure and no height are asked: every approach jump measures that leg in metres through its own free fall
+(`legPathM` = picture leg × gravity ruler), and touch = reach share × legPathM (+ the fingertip, `jump.fingertipOverLeg`
+0.11, lane-guess: MediaPipe's "index" point is the knuckle) + the vertical. The floor under a front-facing body is read
+from the ankles + the ankle's height (0.079 leg, Drillis–Contini): the toes and heels sit 8–20 cm nearer / further from
+the lens and moved the floor ±3–7 cm. Kept on the phone (one key, validated, "Forget" button): there is no per-user body
+calibration on the server.
+
+| | 30 fps | 60 fps | 120 fps | 240 fps |
+|---|---|---|---|---|
+| reach, 3 m, bias / SD (cm) | +1.1/0.2 | +1.1/0.2 | +1.0/0.2 | +1.0/0.1 |
+| reach, 4.5 m | +0.7/0.3 | +0.7/0.4 | +0.5/0.2 | +0.6/0.2 |
+| elbow bent 25° toward the lens (unseen) | −3.5/0.7 | −3.2/0.3 | −3.2/0.2 | −3.1/0.1 |
+| arm flicked up, no hold | refused 6/6 | refused | refused | refused |
+| leg ruler from free fall, bias / SD (%) | 0.0/0.65 | +0.3/0.64 | +0.1/0.50 | +0.15/0.25 |
+| touch (one-foot 4 m/s), bias / SD (cm) | +1.7/3.4 | +2.4/2.3 | +1.6/3.0 | +2.2/1.4 |
+
+Touch inside its own 95 % range: 83–100 % (67–75 % on an angled run). Against the highest index point the body actually
+reached in flight the convention reads 2–6 cm lower (the flight posture is not the standing one; a Vertec has the same
+gap). An elbow bent *toward* the lens cannot be seen facing it: that reach reads ~3 cm low (conservative).
+
+### 9.3 Drop jump / RSI (`lib/jump/drop.ts`)
+
+Side-on, 3 m. The box is where the feet stood first (≥ 0.1 body heights over the floor); the drop's touch-down is
+timed sub-frame from the falling foot (a line over its last 60 ms met with the contact's floor); the rebound is
+re-timed as the approach is; contact = rebound take-off − drop touch-down with both edges' ±; RSI and its 95 % range
+through `rebound.ts rsiWithRange`; the box read back through the rebound's gravity ruler. A contact over 600 ms is a
+stop: the jump is read, RSI is not. 24 drops per cell (30/38/45 cm boxes × 2 rebounds × 4 seeds):
+
+| condition | 30 fps | 60 fps | 120 fps | 240 fps |
+|---|---|---|---|---|
+| 200 ms contact: height bias/SD (cm) · contact bias/SD (ms) · RSI bias/SD (%) | −0.4/1.3 · +4.7/16.6 · −2.6/10.8 | +1.1/1.9 · −7.8/14.8 · +8.5/13.1 | +0.4/1.2 · −3.4/8.7 · +3.1/6.4 | +0.2/1.0 · −1.7/5.8 · +1.6/5.4 |
+| 150 ms contact | +0.7/1.6 · −2.3/15.3 · +4.9/13.8 | +0.6/1.5 · −6.5/14.8 · +7.9/14.4 | +0.1/1.7 · −3.2/13.4 · +3.6/14.1 | −0.3/1.2 · +0.4/8.4 · −1.0/9.1 |
+| 300 ms contact | −0.1/1.3 · +1.1/21.5 · −0.1/10.7 | +0.4/1.3 · −4.0/13.0 · +3.3/7.3 | +0.7/1.3 · −4.3/13.9 · +3.8/9.2 | +0.3/0.6 · −1.2/6.3 · +1.0/3.9 |
+| bent-knee landing | −0.9/1.5 · +4.4/16.5 · −4.0/10.9 | +1.1/2.8 · −7.8/15.2 · +9.1/16.9 | +0.2/1.4 · −3.8/8.8 · +2.7/7.3 | −0.1/0.9 · −1.7/5.7 · +0.6/5.1 |
+| motion blur | +0.1/2.2 · −1.1/31.9 · +4.7/23.2 | +0.4/3.9 · −0.5/35.8 · +6.4/33.6 | +0.7/2.5 · +5.0/18.9 · +0.8/15.4 | −0.2/2.2 · +13.3/18.2 · −6.0/13.7 |
+
+Before: the jump check reads **0 jumps and 0 RSI** from all 480 drop takes. Every drop found after (0 missed). Contacts
+inside their own 95 % range: 88–100 % (blur 67–88 %). Box height +1.4–1.7 cm (SD 0.3–0.9). **Limits:** live RSI is
+±13–15 % (1 SD) at 30–60 fps — an estimate, labelled so; ±5–9 % from a 240 fps slow-mo. The rebound's take-off edge is
+the weak point again.
+
+### 9.4 Power (`lib/jump/power.ts`, `components/jump/power-estimate.tsx`)
+
+No body-weight field exists anywhere in the app (the schema's only `weightKg` is a lifted load); none is added. An adult
+may type a weight (lb/kg) on the jump result: Sayers 1999 peak power (60.7·cm + 45.3·kg − 2055 W), ±(1.96 × 355 W SEE ⊕
+the jump's ±), "an estimate, not a force-plate reading". The weight lives in the component's state only — never saved,
+never sent. Renders nothing for anyone the page's age gate calls a kid (under 18 or "rather not say"), and the function
+refuses `adult: false` before it reads a weight.
+
+### 9.5 BodyReader re-timing: measured, then shelved (owner call)
+
+Built and benched (`lib/jump/bodyRetime.ts`, kept out of the tree; the diff is in the lane's scratchpad): each `land`
+event re-timed through `refine.ts` from the raw frames the reader holds. On the synthetic bench it fixed the bias
+(realistic noise 60/120/240 fps: −2.1/−2.9/−3.9 → −0.7/+0.2/−0.2 cm; bent-knee 120 fps +2.5 → +0.7). **But five
+existing guards went red on the recorded fixtures** (`lib/pose/BodyReader.test.ts` phase gate ×3, `lib/move/formRead.test.ts`
+"the owner's two-foot dunk ~0.9 m", `lib/drills/DrillRunner.test.ts` two-foot landing pairing). Measured directly
+(`refine.ts` started from the TRUE edges of the recorded CMU / DeepMotion fixtures): the re-timed flight is wrong by
+−113 ms on the owner's dunk (75.5 vs 98.9 cm), −99 ms on the 0.84 m CMU jump, ±20–50 ms on the others (−4 to +7 cm).
+Those fixtures go through the synth's room transform (travel removed, feet pulled in to 0.4 of the stride, a front view of
+a run), which may itself make hips and feet non-physical — or the refiner's leg-line model may not hold on real feet.
+Unresolved either way, so the reader is unchanged and the dunk numbers are as before. The same question applies to the
+jump check's re-timing (§4.1, merged in #437): it is validated on the synthetic bench, not on recorded jumps.
+
+### 9.6 Saved jumps can verify
+
+Found by teams-squads (#441): the saved assessment kept only height and flight per jump, so every stored jump read back
+through `seam.ts` as "framesOnly" and the verified-jump board was empty. The record (`lib/assess/prqWrite.ts`) now keeps
+`method`, `heightSdCm` and `quality {flags, clean}` in the JSON it already stores, validated as strictly as the rest. Who
+is stored is unchanged (a verified, opted-in adult; anyone else is refused and nothing is kept).
+`tests/jump-pro/verified-save.test.ts` posts through the real route and reads the row back as the same verified record.
+
+### 9.7 Still short
+
+- **No real-world validation of any of this**: the bench is a model. §9.5 shows the refiner disagreeing with recorded
+  motion; the PJF force-plate pilot (with an approach and a box) is what settles it.
+- **Approach SD live (2.5–3.7 cm)** is twice a standing jump's: the plant's toe-off is a slow edge and the camera is
+  1.5× further away. A slow-mo video is the lab-grade path (SD ~1.2 cm).
+- **Fingertip share** (`jump.fingertipOverLeg`) is anthropometry, unbenched; a tape-measured standing reach would pin it.
+- **MediaPipe's hip point** front-on (the reach check) vs side-on (the approach) is assumed to be the same joint.
+- **Seam**: `JumpRecord` types `approach` / `drop` are not produced yet (nothing reads them; the seam stays as #437 left it).
+- **Teens and the approach / drop / reach entries**: mounted for adults only, like the session card (owner call below).
 
 ## Appendix: the full bench (`npx tsx scripts/jump-accuracy.ts --reader frames,t5 --seeds 6`, 2026-10-24)
 
