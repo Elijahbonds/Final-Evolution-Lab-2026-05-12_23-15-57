@@ -15,6 +15,7 @@ import {
   GROUP_COLORS, MAX_MEMBERS, SQUAD_NAME_FIRST, SQUAD_NAME_SECOND,
   type AgeBand, type GroupColor, type GroupKind, type GroupRole, type MemberFacts,
 } from './types';
+import { passesScreen } from '@/lib/safety/textScreen';
 
 export type GroupAction =
   | 'view' | 'react' | 'nudge' | 'duo' | 'post_challenge' | 'leave' | 'share_measured'
@@ -73,6 +74,8 @@ export function checkGroupName(kind: GroupKind, raw: unknown): NameCheck {
   const name = raw.replace(/\s+/g, ' ').trim();
   if (kind === 'squad') return squadNames().includes(name) ? { ok: true, name } : { ok: false, error: 'name_invalid' };
   if (!TEAM_NAME_RE.test(name) || /(https?:|www\.|\.com\b|@)/i.test(name)) return { ok: false, error: 'name_invalid' };
+  // SAFETY (SAF-06, 2026-10-25): a typed team name passes the shared text screen (slurs, profanity, contact details)
+  if (!passesScreen(name)) return { ok: false, error: 'name_invalid' };
   return { ok: true, name };
 }
 

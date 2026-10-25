@@ -37,7 +37,12 @@
 //
 // Pure: no Prisma, no DOM, no network.
 
-export type FlagKind = 'condition' | 'treatment' | 'guarantee';
+import { screenAbuse } from '@/lib/safety/textScreen';
+
+// SAFETY (SAF-06, 2026-10-25): 'abuse' = the shared text screen (lib/safety/textScreen.ts) — slurs, strong profanity,
+// threats, self-harm baiting and sexual approaches. A trainer's own contact details are theirs to publish, so 'contact'
+// is not screened here.
+export type FlagKind = 'condition' | 'treatment' | 'guarantee' | 'abuse';
 
 export interface TextFlag {
   kind: FlagKind;
@@ -113,6 +118,7 @@ const FIXES: Record<FlagKind, string> = {
     + 'them to a clinician for anything medical.',
   guarantee:
     'Take out the guarantee. Say what the block is designed to change, which is what the outcome field is for.',
+  abuse: 'This can’t go on a public FEL page. Take it out.',
 };
 
 /** Word-boundary match that survives punctuation and possessives without firing inside longer words. */
@@ -156,6 +162,9 @@ export function screenText(text: string): TextFlag[] {
         flags.push({ kind: 'treatment', found: m[2], at, fix: FIXES.treatment });
       }
     }
+  }
+  for (const h of screenAbuse(text)) {
+    if (h.kind !== 'contact') flags.push({ kind: 'abuse', found: h.found, at: h.at, fix: FIXES.abuse });
   }
   // longest match first at the same spot, so "herniated disc" reports once rather than alongside "herniation"
   return flags
