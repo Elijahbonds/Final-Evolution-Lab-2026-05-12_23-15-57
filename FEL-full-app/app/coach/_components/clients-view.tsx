@@ -15,6 +15,7 @@ import type { ProgramTree } from '@/lib/coach/loop';
 // COACH-AI Phase 8 (2026-10-07): read markers (unread per program, "N new", "Seen") — nothing shows until the pending
 // SQL is applied (lib/coach/messageReads.ts) — and each athlete's availability (Full / Limited / Out).
 import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
+import { LiveSessionLink } from '@/components/coach/live/live-session-link';   // COACH-LIVE (2026-10-25): wiring only
 import { clearProgram, markReadIfNeeded, unreadBadge, unreadInThread, type ThreadMsg, type UnreadView } from '@/lib/coach/messageReadsView';
 import { AVAILABILITY_API, AvailabilityPicker } from '@/components/coach/availability-picker';
 import { availabilityLine, type AvailabilityView } from '@/lib/coach/availability';
@@ -194,7 +195,7 @@ export function ClientsView() {
       </div>
       {prog && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /></div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={prog.tree.id} role="coach" /></div>
           <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your client" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
