@@ -32,6 +32,8 @@ import { comOfV3 } from './com';
 import { G, SOURCE_HZ, type TrialTruth } from './ballistic';
 
 const THIGH = 0.43, SHIN = 0.44;
+/** The bench body's leg, hip → knee → ankle (m): the ruler the standing reach is kept in (lib/jump/reach.ts). */
+export const LEG_PATH_M = THIGH + SHIN;
 /** A leg is never quite straight (the knee does not lock): the longest hip-to-ankle it reaches. */
 const LEG_MAX = (THIGH + SHIN) * 0.997;
 const HIP_HALF = 0.09, HIP_DROP = 0.03, FOOT_X = 0.1, SHOULDER_X = 0.19, UPPER_ARM = 0.28, FOREARM = 0.25;
@@ -416,10 +418,12 @@ export interface ReachTruth {
  */
 export function buildReach(o: { standS?: number; holdS?: number; shrug?: number; elbowDeg?: number } = {}): { clip: JointClip; truth: ReachTruth } {
   const standS = o.standS ?? 1.5, holdS = o.holdS ?? 2.5, raise = 0.5;
-  const zTip = 0.12;
+  // the ankles under the hips (a body standing tall): the toe tip that far ahead of the ankle
+  const zTip = FLAT.tip[1];
   const base = (): Body => {
-    const pv = { py: 0.98, pz: 0 };
     const f = stance(zTip, P_FLAT);
+    // standing tall, the knee all but straight (never past the leg's own length: a stretched shin is a longer leg)
+    const pv = { py: HIP_DROP + f.a[0] + Math.sqrt((LEG_MAX * 0.999) ** 2 - f.a[1] ** 2), pz: 0 };
     return { ...pv, lean: 0, L: f, R: f, armL: { flex: rad(4), elbow: rad(8) }, armR: { flex: rad(4), elbow: rad(8) } };
   };
   const at = (x: number): Joints => {

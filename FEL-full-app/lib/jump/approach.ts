@@ -31,6 +31,7 @@ import { footLowY, worldHeight } from '@/lib/assess/geometry';
 import { th } from '@/lib/assess/thresholds';
 import { poseHz } from '@/lib/assess/scoring';
 import { comOf } from './com';
+import { legPathOf } from './reach';
 import { REFINE, refineFlight, type RefinedFlight } from './refine';
 import { CI95_Z, sessionStats, trialQuality, type JumpSession, type TrialQuality } from './session';
 
@@ -49,6 +50,8 @@ export const APPROACH = {
   /** A flight counts when it falls like a body: rise ÷ fall within this of 1, the parabola within this RMS (cm), and
    *  the free-fall ruler within this log-distance of the body's size (e^0.7 ≈ 2×). */
   fall: { riseFall: 0.5, rmsCm: 2.5, logRuler: 0.7 },
+  /** The re-timing starts this many half frames from the finder's take-off; the median take-off is kept. */
+  starts: [-3, -2, -1, 0, 1],
 } as const;
 
 export interface ApproachJump {
@@ -67,6 +70,15 @@ export interface ApproachJump {
   takeoffFoot: 'left' | 'right' | 'both' | null;
   /** Horizontal speed across the picture in the air (m/s), from the centre of mass and the free-fall ruler. */
   speedMps: number | null;
+  /** The jump's 95 % range (cm): approachPlusMinusCm. */
+  plusMinusCm: number;
+  /**
+   * The athlete's leg (hip → knee → ankle) in metres, measured by this jump's own free fall: the picture's leg × the
+   * gravity ruler. It scales the stored standing reach into the touch height (lib/jump/reach.ts touchHeight).
+   */
+  legPathM: number | null;
+  /** Its ±1 SD as a share; null = the bench's (jump.legRulerSdPct). */
+  legPathSdShare: number | null;
   quality: TrialQuality;
 }
 
@@ -150,7 +162,12 @@ export function readApproach(raw: readonly PoseFrame[], o: { aspect?: number; po
     const l = footAt(lowL), r = footAt(lowR);
     const takeoffFoot: ApproachJump['takeoffFoot'] = l && r ? 'both' : l ? 'left' : r ? 'right' : (lowL[c.a] > lowR[c.a] ? 'left' : 'right');
     const to0 = (g.t + fr[c.a + 1].t) / 2, td0 = (fr[c.b - 1].t + fr[c.b].t) / 2;
-    const rf: RefinedFlight | null = refineFlight(raw, front, to0, td0, { prevLandT: k > 0 ? fr[cands[k - 1].b].t : undefined, nextTakeoffT: cands[k + 1] ? fr[cands[k + 1].a].t : undefined }, { point: 'com', plantFloor: true, depthCue: 'legs', aspect, shrinkDrop: false });
+    // the re-timed take-off depends a little on where the search starts (the toe leaves slowly, so the leg line beside
+    // the edge is shallow): start it from each half frame around the finder's edge and keep the median take-off's read
+    const near = { prevLandT: k > 0 ? fr[cands[k - 1].b].t : undefined, nextTakeoffT: cands[k + 1] ? fr[cands[k + 1].a].t : undefined };
+    const step = 500 / hz;
+    const reads = APPROACH.starts.map((s) => refineFlight(raw, front, to0 + s * step, td0, near, { point: 'com', plantFloor: true, depthCue: 'legs', aspect, shrinkDrop: false, rescale: true })).filter((x): x is RefinedFlight => x !== null).sort((a, b) => a.takeoffT - b.takeoffT);
+    const rf: RefinedFlight | null = reads.length ? reads[(reads.length - 1) >> 1] : null;
     const flightMs = rf ? rf.flightMs : td0 - to0;
     const hFlight = ((9.81 * (flightMs / 1000) ** 2) / 8) * 100;
     const heightCm = rf ? rf.heightTovCm : hFlight;
@@ -162,6 +179,10 @@ export function readApproach(raw: readonly PoseFrame[], o: { aspect?: number; po
     // body's size (measured: every bench approach and recorded jump 0.75–1.15, 0.2–1.9 cm, 0.8–1.45; the false reads
     // after a landing 40, 5.0 — APPROACH.fall)
     else if (!(Math.abs(rf.riseFall - 1) <= APPROACH.fall.riseFall && rf.rmsCm <= APPROACH.fall.rmsCm && Math.abs(Math.log(rf.ruler / nominal)) <= APPROACH.fall.logRuler)) invalidWhy = 'it did not fall like a jump, so the camera lost you';
+    // an approach always lands lower than it left (the take-off is the whole body at full stretch on one toe): a landing
+    // that reads HIGHER means the take-off was put on a bent leg of the plant, a blurred foot's misread — the flight is
+    // too long to trust (bench: every such read was 30–85 ms early and 9–25 cm high)
+    else if (rf.dropSkipped === 'rose' || rf.dropSkipped === 'ruler') invalidWhy = 'the camera could not see your take-off foot clearly';
     // the speed across the picture: the centre of mass's x in the air, a line, through the ruler
     let speedMps: number | null = null;
     if (rf) {
@@ -172,13 +193,20 @@ export function readApproach(raw: readonly PoseFrame[], o: { aspect?: number; po
         speedMps = Math.round(Math.abs(sl * 1000 * rf.ruler) * 10) / 10;
       }
     }
+    // the leg in metres: its picture length around the flight (the parabola's own scale) × the free-fall ruler
+    let legPathM: number | null = null;
+    if (rf) {
+      const legs = raw.filter((f) => f.t >= rf.takeoffT - 200 && f.t <= rf.landT + 200).map((f) => legPathOf(f, aspect)).filter((x): x is number => x !== null);
+      if (legs.length >= 5) legPathM = Math.round(median(legs) * rf.ruler * 1000) / 1000;
+    }
+    const pm = approachPlusMinusCm({ heightSdCm: rf ? rf.heightTovSdCm : null, flightMs }, hz);
     jumps.push({
       index: k + 1, valid: !invalidWhy, ...(invalidWhy ? { invalidWhy } : {}),
       takeoffT: Math.round(rf ? rf.takeoffT : to0), landT: Math.round(rf ? rf.landT : td0), flightMs: Math.round(flightMs),
       heightCm: Math.round(heightCm * 10) / 10, heightSdCm: rf ? Math.round(rf.heightTovSdCm * 10) / 10 : null,
       heightFlightCm: Math.round((rf ? rf.heightFlightCm : hFlight) * 10) / 10,
       landDropCm: rf && rf.landDropCm !== null ? Math.round(rf.landDropCm * 10) / 10 : null,
-      method: rf ? 'refined' : 'frames', takeoffFoot, speedMps,
+      method: rf ? 'refined' : 'frames', takeoffFoot, speedMps, plusMinusCm: pm, legPathM, legPathSdShare: null,
       quality: trialQuality({ refined: rf, poseHz: hz, valid: !invalidWhy }),
     });
   });

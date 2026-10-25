@@ -83,6 +83,8 @@ export const REFINE = {
    * in the picture under a rolling foot is followed to where the toe leaves. Bench: a plant lasts 180–240 ms.
    */
   plantFromMs: 150, plantToMs: 12,
+  /** With `rescale`: past this change of scale over the jump (share) even the rescaled drop is not used. */
+  rescaleMax: 0.3,
 } as const;
 
 /** JUMP-PRO 2: what an approach read changes (every default is the standing jump's, unchanged). */
@@ -104,6 +106,10 @@ export interface RefineOpts {
    * floor): there the prior is wrong and the shrink reads high, so the drop is taken out whole.
    */
   shrinkDrop?: boolean;
+  /** With the legs' cue: read each edge's leg at the flight's own scale instead of refusing a drop past depthTol. */
+  rescale?: boolean;
+  /** Re-timing passes (default 3): each re-fits the floors and leg lines from the last pass's edges. */
+  passes?: number;
 }
 
 export interface RefinedFlight {
@@ -226,7 +232,7 @@ export function refineFlight(
   const postTo = (td: number) => Math.min(td + R.floorToMs, (near.nextTakeoffT ?? Infinity) - R.floorFromMs);
   const nominalRuler = (front.worldHeight ?? th('t5.nominalHeightM')) / front.bodyHeight;
   const s0 = R.legNoiseCm / 100 / nominalRuler;
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < (opts.passes ?? 3); pass++) {
     const air = raw.filter((f) => hipsOk(f) && f.t > to + R.parabolaMarginMs && f.t < td - R.parabolaMarginMs);
     if (air.length < R.minParabolaFrames) return null;
     t0 = (to + td) / 2;
@@ -310,11 +316,25 @@ export function refineFlight(
   const width = opts.depthCue === 'legs'
     ? (f: PoseFrame) => seg(f, 23, 25) + seg(f, 25, 27) + seg(f, 24, 26) + seg(f, 26, 28)
     : (f: PoseFrame) => Math.abs(f.image[11].x - f.image[12].x) + Math.abs(f.image[23].x - f.image[24].x);
-  const wPre = median(raw.filter((f) => feetOk(f) && f.t <= to - R.floorFromMs && f.t >= preFrom(to)).map(width));
-  const wPost = median(raw.filter((f) => feetOk(f) && f.t >= td + R.floorFromMs && f.t <= postTo(td)).map(width));
-  const depthRatio = Number.isFinite(wPre) && Number.isFinite(wPost) && wPre > 0 ? wPost / wPre : null;
-  const moved = depthRatio === null || Math.abs(depthRatio - 1) > R.depthTol;
-  const rawDrop = (Ltd - Lto) * ruler;
+  // the legs' cue reads its segments from the hips, knees and ankles: a blurred (unsure) foot still has them
+  const cueOk = opts.depthCue === 'legs' ? feetSeen : feetOk;
+  const wPre = median(raw.filter((f) => cueOk(f) && f.t <= to - R.floorFromMs && f.t >= preFrom(to)).map(width));
+  const wPost = median(raw.filter((f) => cueOk(f) && f.t >= td + R.floorFromMs && f.t <= postTo(td)).map(width));
+  let depthRatio = Number.isFinite(wPre) && Number.isFinite(wPost) && wPre > 0 ? wPost / wPre : null;
+  let moved = depthRatio === null || Math.abs(depthRatio - 1) > R.depthTol;
+  let rawDrop = (Ltd - Lto) * ruler;
+  if (opts.depthCue === 'legs' && opts.rescale) {
+    // side-on, the legs' segment lengths are the picture's scale through the whole jump: a line through them in time
+    // gives the scale at each edge, and each edge's leg is read at the flight's own scale (the parabola's), so a run
+    // angled toward or away from the lens no longer reads as a landing drop
+    const sc = fitLine(raw.filter((f) => cueOk(f) && f.t >= preFrom(to) && f.t <= postTo(td)).map((f) => ({ t: f.t, v: width(f) })), 0);
+    const sTo = sc?.at(to) ?? NaN, sTd = sc?.at(td) ?? NaN, sMid = sc?.at((to + td) / 2) ?? NaN;
+    if (sTo > 0 && sTd > 0 && sMid > 0) {
+      depthRatio = sTd / sTo;
+      moved = Math.abs(depthRatio - 1) > R.rescaleMax;
+      rawDrop = (Ltd * (sMid / sTd) - Lto * (sMid / sTo)) * ruler;
+    }
+  }
   const rose = rawDrop * 100 > R.riseTolCm;
   const dropSkipped: RefinedFlight['dropSkipped'] = !rulerOk ? 'ruler' : moved ? 'moved' : rose ? 'rose' : null;
   const dropM = dropSkipped ? null : Math.min(0, rawDrop);
