@@ -8,6 +8,7 @@ import { loadProfile, type ProfileDb } from '@/lib/profile-v2/load';
 import { canViewProfile, effectiveVisibility } from '@/lib/profile-v2/visibility';
 import { isValidSlug } from '@/lib/creator/card-core';
 import { redactForViewer } from '@/lib/profile-v2/viewer';
+import { areSquadmates, type RawDb } from '@/lib/groups/store';
 import { TabPage } from '@/components/shell/tab-page';
 import { ProgressHeader } from '@/components/profile-v2/progress-header';
 import { StatsSection } from '@/components/profile-v2/stats-section';
@@ -36,14 +37,16 @@ export default async function ViewProfilePage({ params }: { params: { slug: stri
   if (!card) notFound();
   const viewerId = (session?.user as { id?: string } | undefined)?.id ?? null;
 
-  const [owner, coachLink] = await Promise.all([
+  const [owner, coachLink, squadmate] = await Promise.all([
     prisma.user.findUnique({ where: { id: card.ownerId }, select: { dobYear: true } }).catch(() => null),
     viewerId ? prisma.coachClient.findFirst({ where: { coachId: viewerId, clientId: card.ownerId, endedAt: null }, select: { id: true } }).catch(() => null) : null,
+    // TEAMS-SQUADS: friends are squadmates (no separate friends graph); false until the pending SQL is applied
+    viewerId ? areSquadmates(prisma as unknown as RawDb, viewerId, card.ownerId).catch(() => false) : false,
   ]);
   if (!owner) notFound();
   const answer = canViewProfile({
     viewerId, ownerId: card.ownerId, ownerDobYear: owner.dobYear, ownerChosePublic: card.published,
-    viewerCoachesOwner: !!coachLink, viewerIsFriend: false,   // no friends list exists yet
+    viewerCoachesOwner: !!coachLink, viewerIsFriend: squadmate,
   });
   if (!answer.allowed) notFound();
   // The owner sees what others see: the public view when they chose public, otherwise what their coach sees.
