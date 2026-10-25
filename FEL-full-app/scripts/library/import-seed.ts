@@ -10,8 +10,8 @@
 // provenance, and body-part cues FEL's policy refuses) and the images (2,600+ files; each entry stores a pinned link to
 // its first still instead). Set-up lines, cues and faults come from scripts/library/seedFamilies.ts, in FEL's words.
 //
-// Every entry lands as a DRAFT in a per-category review batch ('seed-strength', …): nothing reaches a coach by default
-// until the owner approves it (the admin review page, /coach/admin/library).
+// Every entry lands APPROVED in a per-category batch ('seed-strength', …), by the owner's 2026-10-25 decision ("auto-approve
+// seed, review ours"); the FEL-authored batches (scripts/library/author.ts) stay drafts for the admin review page.
 //
 // Run (writes data/library/seed/):
 //   curl -sSo /tmp/exercises.json https://raw.githubusercontent.com/yuhonas/free-exercise-db/<sha>/dist/exercises.json
@@ -27,6 +27,9 @@ import { dupKey, semanticKey } from '../../lib/library/validate';
 import { PREHAB_NOTE, type CategoryId, type EquipmentId, type Laterality, type LevelId, type MovementPattern, type MuscleId, type Plane, type SportTag } from '../../lib/library/vocab';
 import { DATA, fillSetup, gate, writeEntries, writeFilesIndex } from './common';
 import { GENERAL_FAMILY, SEED_FAMILIES, type SeedFamily, type SeedRow } from './seedFamilies';
+
+/** The reviewer recorded on every seed entry: the owner's standing decision, not a person's click. */
+export const SEED_REVIEWER = 'owner:seed-auto-approve-2026-10-25';
 
 const REPO = 'https://github.com/yuhonas/free-exercise-db';
 export const SEED_LICENCE = 'Unlicense (public domain dedication) — free-exercise-db';
@@ -130,7 +133,9 @@ export function mapRow(r: SeedRow, sha: string): { entry: LibraryExercise; famil
     prehabNote: category === 'prehab' ? PREHAB_NOTE : null, dosage: { ...f.dosage },
     demo: { clipKey: f.clip ?? clipKeyFor(pattern, f.id), videoUrl: null, imageRef: r.images[0] ? `https://raw.githubusercontent.com/yuhonas/free-exercise-db/${sha}/exercises/${r.images[0]}` : null },
     source: { kind: 'seed', ref: r.id, url: `${REPO}/blob/${sha}/exercises/${r.id}.json`, licence: SEED_LICENCE },
-    review: { status: 'draft', reviewer: null, batch: `seed-${category}` },
+    // Owner decision 2026-10-25: "auto-approve seed, review ours" — the public-domain seed's facts (with FEL's own cue
+    // families) go live; FEL-authored batches stay drafts for the owner's review.
+    review: { status: 'approved', reviewer: SEED_REVIEWER, batch: `seed-${category}` },
   };
   return { entry, family: f.id };
 }

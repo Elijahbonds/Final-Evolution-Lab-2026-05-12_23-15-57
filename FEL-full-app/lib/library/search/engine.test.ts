@@ -136,7 +136,7 @@ describe('filters and facets', () => {
   it('approved only unless drafts are asked for; rejected never', () => {
     const approved: LibraryExercise = { ...ALL[0], id: 'approved-x', slug: 'approved-x', name: 'Approved Zebra Squat', review: { status: 'approved', reviewer: 'owner', batch: 'test' } };
     const rejected: LibraryExercise = { ...ALL[1], id: 'rejected-x', slug: 'rejected-x', name: 'Rejected Zebra Squat', review: { status: 'rejected', reviewer: 'owner', batch: 'test' } };
-    const idx = buildIndex([...ALL.slice(0, 50), approved, rejected]);
+    const idx = buildIndex([...ALL.filter((e) => e.review.status === 'draft').slice(0, 50), approved, rejected]);
     expect(search(idx, 'zebra', {}, {}).hits.map((h) => h.entry.id)).toEqual(['approved-x']);
     expect(search(idx, 'zebra', {}, { drafts: true }).hits.map((h) => h.entry.id)).toEqual(['approved-x']);
     expect(search(idx, '', {}, {}).total).toBe(1);

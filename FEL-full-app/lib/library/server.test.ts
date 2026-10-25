@@ -58,6 +58,8 @@ const server = await import('./server');
 const store = await import('./store');
 const { loadLibraryFiles } = await import('./files');
 const FILES = loadLibraryFiles();
+// The owner's 2026-10-25 decision approves the public-domain seed in the data files; FEL-authored batches stay drafts.
+const SEED_APPROVED = FILES.filter((e) => e.review.status === 'approved').length;
 const coach = { userId: 'coach-1', isAdmin: false, isCoach: true, youth: false };
 const athlete = { userId: 'athlete-1', isAdmin: false, isCoach: false, youth: false };
 const teen = { userId: 'teen-1', isAdmin: false, isCoach: false, youth: true };
@@ -69,12 +71,13 @@ beforeEach(() => {
 });
 
 describe('before the pending SQL (the seam)', () => {
-  it('searches the data files: coaches can see drafts, athletes see approved only (none yet)', async () => {
+  it('searches the data files: coaches can see drafts, athletes see approved only (the seed, by the owner\'s decision)', async () => {
     const forCoach = await server.searchLibrary(coach, new URLSearchParams('q=goblet squat&drafts=1'));
     expect(forCoach.total).toBeGreaterThan(0);
-    expect(forCoach.library).toMatchObject({ total: FILES.length, approved: 0, ready: false });
+    expect(forCoach.library).toMatchObject({ total: FILES.length, approved: SEED_APPROVED, ready: false });
     const forAthlete = await server.searchLibrary(athlete, new URLSearchParams('q=goblet squat&drafts=1'));
-    expect(forAthlete.total).toBe(0);
+    expect(forAthlete.hits.every((e) => e.review.status === 'approved')).toBe(true);
+    expect(forAthlete.hits.some((e) => e.review.batch.startsWith('authored-'))).toBe(false);
     expect(forAthlete.viewer.drafts).toBe(false);
   });
   it('every write answers library_not_ready; nothing throws', async () => {
@@ -101,8 +104,10 @@ describe('after the pending SQL', () => {
     expect(r).toMatchObject({ ok: true, written: n });
     const seen = await server.searchLibrary(athlete, new URLSearchParams('q=pogo'));
     expect(seen.total).toBeGreaterThan(0);
-    expect(seen.hits.every((e) => e.review.status === 'approved' && e.review.reviewer === 'owner')).toBe(true);
-    expect(seen.library.approved).toBe(n);
+    expect(seen.hits.every((e) => e.review.status === 'approved')).toBe(true);
+    expect(seen.hits.filter((e) => e.review.batch === batch).every((e) => e.review.reviewer === 'owner')).toBe(true);
+    expect(seen.hits.some((e) => e.review.batch === batch)).toBe(true);
+    expect(seen.library.approved).toBe(SEED_APPROVED + n);
   });
   it('a rejected entry is gone for everyone, coaches with drafts on included', async () => {
     await server.reviewAct('owner', { action: 'reject', ids: ['pogo-hop'] });
