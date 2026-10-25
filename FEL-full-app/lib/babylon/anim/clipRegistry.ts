@@ -33,6 +33,9 @@ export const REAL_CLIPS = new Set<string>([
   // imported GLB (generic fighter rig)
   'guard', 'high_kick', 'hook', 'jab', 'jumpshot', 'roundhouse', 'run', 'uppercut', 'walk',
   // authored/code-driven procedural clips (always safe)
+  // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops (anim/authored/exercise.ts; the opt-in 'exercise' suite — built
+  // on the library stage only, clipScope OPT_IN_SUITES)
+  'ex_squat', 'ex_squat_bar', 'ex_hinge', 'ex_good_morning', 'ex_split_squat', 'ex_lunge', 'ex_reverse_lunge', 'ex_calf_raise', 'ex_jump', 'ex_pogo', 'ex_jump_rope', 'ex_march', 'ex_carry', 'ex_jumping_jack', 'ex_press', 'ex_curl', 'ex_lateral_raise', 'ex_front_raise', 'ex_row', 'ex_upright_row', 'ex_shrug', 'ex_triceps_overhead', 'ex_pushdown', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_seated_press', 'ex_seated_curl', 'ex_seated_lateral_raise', 'ex_seated_triceps', 'ex_bench_press', 'ex_floor_press', 'ex_fly', 'ex_skull_crusher', 'ex_incline_press', 'ex_incline_fly', 'ex_arm_circles', 'ex_quad_stretch', 'ex_breathe',
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',
