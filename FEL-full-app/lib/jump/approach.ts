@@ -216,12 +216,22 @@ export function readApproach(raw: readonly PoseFrame[], o: { aspect?: number; po
       heightFlightCm: Math.round((rf ? rf.heightFlightCm : hFlight) * 10) / 10,
       landDropCm: rf && rf.landDropCm !== null ? Math.round(rf.landDropCm * 10) / 10 : null,
       method: rf ? 'refined' : 'frames', takeoffFoot, speedMps, plusMinusCm: pm, legPathM, legPathSdShare: null,
-      quality: trialQuality({ refined: rf, poseHz: hz, valid: !invalidWhy }),
+      quality: approachQuality(trialQuality({ refined: rf, poseHz: hz, valid: !invalidWhy }), !invalidWhy),
     });
   });
   const valid = jumps.filter((j) => j.valid);
   const best = valid.reduce<ApproachJump | null>((a, j) => (!a || j.heightCm > a.heightCm ? j : a), null);
   return { jumps, bestIndex: best?.index ?? null, bestHeightCm: best?.heightCm ?? null, poseFps: hz, session: sessionStats(valid) };
+}
+
+/**
+ * An approach's trial quality: never 'landedLow'. A standing jump should land tall, so a low landing marks a trial; an
+ * approach lands lower nearly every time (the arms come down, the legs reach for the floor), and the drop is taken out
+ * whole (bench: a bent-knee approach landing reads +0.4–0.7 cm, as a tall one does).
+ */
+function approachQuality(q: TrialQuality, valid: boolean): TrialQuality {
+  const flags = q.flags.filter((f) => f !== 'landedLow');
+  return { flags, clean: valid && flags.every((f) => f === 'frameRate') };
 }
 
 /** A jump's 95 % range (cm), never narrower than one frame's worth of flight time. */
