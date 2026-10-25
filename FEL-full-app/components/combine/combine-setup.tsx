@@ -134,13 +134,13 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
           ))}
         </ul>
         {stations.length < MAX_STATIONS && (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-[1fr_auto] gap-2">
             <select value={addKind} onChange={(e) => { const k = e.target.value as StationKind; setAddKind(k); setAddVariant(STATIONS[k].variants[0]?.id ?? ''); }} aria-label="Station"
-              className="min-h-11 rounded-xl border border-white/15 bg-black/60 px-2 text-sm text-white">
+              className="min-h-11 min-w-0 rounded-xl border border-white/15 bg-black/60 px-2 text-sm text-white">
               {STATION_KINDS.map((k) => <option key={k} value={k}>{STATIONS[k].label}</option>)}
             </select>
             {STATIONS[addKind].variants.length > 1 && (
-              <select value={addVariant} onChange={(e) => setAddVariant(e.target.value)} aria-label="Which one" className="min-h-11 min-w-0 flex-1 rounded-xl border border-white/15 bg-black/60 px-2 text-sm text-white">
+              <select value={addVariant} onChange={(e) => setAddVariant(e.target.value)} aria-label="Which one" className="col-span-2 row-start-2 min-h-11 w-full min-w-0 rounded-xl border border-white/15 bg-black/60 px-2 text-sm text-white">
                 {STATIONS[addKind].variants.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             )}

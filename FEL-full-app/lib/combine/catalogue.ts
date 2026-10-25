@@ -71,7 +71,7 @@ export const STATIONS: Record<StationKind, StationDef> = {
     kind: 'agility', label: 'Agility', method: 'hand', unit: 's', better: 'lower', decimals: 2,
     how: 'Hand-timed by the coach. The camera does not time this drill.',
     variants: [
-      { id: 'pro-agility', label: '5-10-5 (pro agility)' },
+      { id: 'pro-agility', label: '5-10-5 pro agility' },
       { id: 'three-cone', label: '3-cone (L-drill)' },
       { id: 'lateral-shuffle', label: 'Lateral shuffle' },
     ],

@@ -72,10 +72,13 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
   const progress = st ? stationProgress(ev, st.id) : { done: 0, total: 0 };
   useEffect(() => { setDrillOpen(false); }, [athleteId, stationIdx]);
 
+  // the athlete on screen stays on screen until the coach taps Next (or another name): pin them on the first record
+  const pin = useCallback((id: string) => { if (st && current[st.id] === undefined) setCurrent((c) => ({ ...c, [st.id]: id })); }, [current, st]);
   const record = useCallback((values: { value: number | null; touchCm?: number | null }[]) => {
     if (!athlete || !st) return;
+    pin(athlete.id);
     onChange(recordAttempts(ev, athlete.id, st.id, values));
-  }, [athlete, ev, onChange, st]);
+  }, [athlete, ev, onChange, pin, st]);
   const select = (id: string | null) => st && setCurrent((c) => ({ ...c, [st.id]: id }));
   const next = () => st && select(nextAthlete(ev, st.id, athlete?.id ?? null) ?? athlete?.id ?? null);
   const onDrill = useCallback((r: DrillResult) => { record([{ value: drillScore(r) }]); setDrillOpen(false); }, [record]);
@@ -140,7 +143,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
               {st.kind === 'cmj' && <JumpCamera key={athlete.id} jumps={left} athlete={athlete.name} onAttempts={record} />}
               {st.kind === 'approach' && (
                 <ApproachVideo key={athlete.id} left={left} reach={ev.reach[athlete.id] ?? null} onAttempts={record}
-                  onReach={(r) => onChange(setReach(ev, athlete.id, r))} />
+                  onReach={(r) => { pin(athlete.id); onChange(setReach(ev, athlete.id, r)); }} />
               )}
               {st.kind === 'skill' && drill && (drillOpen
                 ? <DrillLive drill={drill} onLeave={() => setDrillOpen(false)} onResult={onDrill} keptLine={SKILL_KEPT_LINE} />
@@ -150,7 +153,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
 
           <div className="grid grid-cols-3 gap-2">
             <button type="button" onClick={() => record([{ value: null }])} disabled={slot === null} data-combine-no-mark className="min-h-12 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30">No mark</button>
-            <button type="button" onClick={() => onChange(redoAttempt(ev, athlete.id, st.id))} disabled={slot === 0} data-combine-redo className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30"><RotateCcw className="h-4 w-4" /> Redo</button>
+            <button type="button" onClick={() => { pin(athlete.id); onChange(redoAttempt(ev, athlete.id, st.id)); }} disabled={slot === 0} data-combine-redo className="flex min-h-12 items-center justify-center gap-1 rounded-xl border border-white/20 text-sm font-bold text-white/80 disabled:opacity-30"><RotateCcw className="h-4 w-4" /> Redo</button>
             <button type="button" onClick={next} data-combine-next className={`flex min-h-12 items-center justify-center gap-1 rounded-xl text-sm font-black ${slot === null ? 'bg-white text-black' : 'border border-white/20 text-white/80'}`}>Next <ChevronRight className="h-4 w-4" /></button>
           </div>
         </section>

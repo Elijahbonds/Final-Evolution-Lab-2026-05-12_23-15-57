@@ -30,7 +30,7 @@ describe('the catalogue', () => {
 
   it('every hand-timed station says so in its name; the skill drills are the scored Mirror drills', () => {
     expect(stationName({ kind: 'sprint', variant: '40yd' })).toBe('Sprint · 40 yd (hand-timed)');
-    expect(stationName({ kind: 'agility', variant: 'pro-agility' })).toBe('Agility · 5-10-5 (pro agility) (hand-timed)');
+    expect(stationName({ kind: 'agility', variant: 'pro-agility' })).toBe('Agility · 5-10-5 pro agility (hand-timed)');
     expect(stationName({ kind: 'cmj', variant: 'standing' })).toBe('Vertical jump');
     expect(SKILL_DRILLS.length).toBeGreaterThan(3);
     expect(SKILL_DRILLS.map((d) => d.id)).toContain('t-drill');

@@ -46,7 +46,7 @@ describe('setup', () => {
     expect(html).not.toContain(HELD_LINES.guardian_consent_required.draft);
     // the testable athletes start picked; the default stations are jump, agility (hand-timed) and sprint (hand-timed)
     expect(html).toContain('data-combine-picked="3"');
-    expect(html).toContain('Agility · 5-10-5 (pro agility) (hand-timed)');
+    expect(html).toContain('Agility · 5-10-5 pro agility (hand-timed)');
     expect(html).toContain('Sprint · 40 yd (hand-timed)');
     expect(html).toContain('Varsity');
   });
