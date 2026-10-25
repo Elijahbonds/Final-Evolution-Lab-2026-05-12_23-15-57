@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { postLc } from '@/lib/ledger';
-import { erasePrqData, erasureReason } from '@/lib/prq-data-rights';
+import { erasePrqData, erasureReason, movementRowsErased } from '@/lib/prq-data-rights';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +19,8 @@ export async function POST() {
   // one transaction. A bought workout plan survives: WorkoutPlan.scanId is SetNull (lib/prq-data-rights.ts).
   const erased = await prisma.$transaction((tx) => erasePrqData(tx, userId));
 
-  if (erased.prqEntries > 0 || erased.movementHistory > 0) {
+  // DATA-RIGHTS-SWEEP: the movement count includes the readiness jump checks and filmed-set form reviews (pending tables)
+  if (erased.prqEntries > 0 || movementRowsErased(erased) > 0) {
     // Ledger the deletion as an event (wallet untouched)
     const walletView = await readWallet(prisma, userId);   // pass 5 phase 1
     await postLc(prisma, {
@@ -32,5 +33,5 @@ export async function POST() {
   }
 
   // `deleted` stays the PRQ entry count it always was; `history` is the movement-history rows
-  return NextResponse.json({ ok: true, deleted: erased.prqEntries, history: erased.movementHistory });
+  return NextResponse.json({ ok: true, deleted: erased.prqEntries, history: movementRowsErased(erased) });
 }
