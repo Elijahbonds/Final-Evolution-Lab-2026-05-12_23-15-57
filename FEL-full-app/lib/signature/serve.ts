@@ -6,8 +6,8 @@
 //   · a pain check-in that said STOP and see someone (isHardStop) → only the calm work (Prep, Cool-down, breath and
 //     mobility) runs; everything else waits, and the athlete reads the check-in's own words (PAIN_DECISION_COPY) and the
 //     weekly draft's "check with a clinician" line (easeOffClientLine) — the existing "see a professional" wording;
-//   · JUMPS AND LANDINGS (every item with contacts) are swapped for their calm step-down when: a pain check-in has not
-//     settled (isStopOutcome), the details could not be read, YOUTH RULES (under 18 or no birth year: a solo program has
+//   · JUMPS AND LANDINGS (every item with contacts) are swapped for their calm step-down when: a pain check-in asked for
+//     anything but "continue" (one step stricter than the drills page, which holds them on a stop only), the details could not be read, YOUTH RULES (under 18 or no birth year: a solo program has
 //     no coach to add them), or the protocol gate's jump gate is shut (no landing check yet …) — in that order, the
 //     drills page's;
 //   · an EASIER DAY — today's readiness check read Low (PR #447: the coach readiness lane's ease, lib/coach/readiness/
@@ -25,7 +25,7 @@ import { JUMP_GATE_DEFAULT_WHY } from '@/lib/coach/warmup';
 import { LANDING_CHECK_HREF } from '@/lib/coach/protocolGate';
 import { LANDING_CHECK_ENTRY } from '@/lib/drills/route';
 import { RED_FLAG_COPY } from '@/lib/health/intake';
-import { PAIN_DECISION_COPY, isHardStop, isStopOutcome, type PainDecision } from '@/lib/health/painRule';
+import { PAIN_DECISION_COPY, isHardStop, type PainDecision } from '@/lib/health/painRule';
 import { PAIN_EASE_LINE, readinessEaseLine } from './copy';
 import type { PlanItem, PlanSession } from './plan';
 import type { RetestKind } from './types';
@@ -103,15 +103,19 @@ export interface ServedSession {
 export type ImpactWhy = 'pain' | 'unavailable' | 'youth_impact' | 'jump_gate';
 
 export const IMPACT_LINES: Record<ImpactWhy, string> = {
-  pain: "A recent pain check-in hasn't settled, so today's jumps and landings are swapped for calm versions. Do what that check-in said.",
+  pain: "A recent pain check-in asked for easier work, so today's jumps and landings are swapped for calm versions. Do what that check-in said.",
   unavailable: "We couldn't load your details just now, so today takes the careful version: no jumps or landings. Reload to try again.",
   youth_impact: 'Jumps and landings are swapped for calm versions: under 18, or with no birth year on your account, they wait for a coach.',
   jump_gate: 'Jumps and landings are swapped for calm versions today.',
 };
 
-/** Why jumps and landings wait today, in the drills page's order (lib/drills/access.ts drillsAccess), or null. */
+/**
+ * Why jumps and landings wait today, in the drills page's order (lib/drills/access.ts drillsAccess), or null. One step
+ * stricter than the drills page on purpose: ANY pain decision but 'continue' holds them (the drills page holds them on a
+ * stop outcome only; an 'easier_variation' keeps its jumps there). A program day never jumps on an open pain flag.
+ */
 export function impactWhy(g: DayGate): ImpactWhy | null {
-  if (g.painDecision && isStopOutcome(g.painDecision)) return 'pain';
+  if (g.painDecision && g.painDecision !== 'continue') return 'pain';
   if (g.unavailable) return 'unavailable';
   if (g.youth) return 'youth_impact';
   if (g.jumpGate.closed) return 'jump_gate';
