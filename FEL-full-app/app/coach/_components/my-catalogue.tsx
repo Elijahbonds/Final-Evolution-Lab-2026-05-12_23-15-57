@@ -11,7 +11,7 @@
 // only draws them.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { BookOpen, Loader2, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react';
+import { BookOpen, Loader2, Pencil, Play, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import {
   BRACE_INFO, BRACE_MODES, CATALOGUE_CATEGORIES, CATALOGUE_ERROR_COPY, CATALOGUE_LIMITS, PATTERN_INFO, PATTERNS,
   type CommonFault,
@@ -88,6 +88,17 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
     toast.error(j.error === 'in_use' && j.count ? `${errorCopy('in_use')} (${j.count} ${j.count === 1 ? 'prescription' : 'prescriptions'})` : errorCopy(j.error));
   };
 
+  // EXERCISE-LIBRARY (2026-10-25): "Submit to library" — a snapshot of this row goes to the owner's moderation queue;
+  // the row stays private and the coach's own.
+  const submit = async (it: CatalogueItem) => {
+    const r = await fetch(`/api/coach/programs/exercises/${it.id}/submit`, { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 503) { toast.message('Submitting to the library opens once its review tables are set up.'); return; }
+    if (!r.ok) { toast.error(errorCopy(j.error)); return; }
+    toast.success(r.status === 201 ? `${it.name} sent to the library for review` : `${it.name} is already waiting for review`);
+    if (Array.isArray(j.notes) && j.notes.length) toast.warning('Heads-up: a cue reads as a body-part or medical cue, so the reviewer may ask for a reword.');
+  };
+
   if (!items) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const untagged = items.filter((i) => !i.pattern).length;
   const byId = new Map(items.map((i) => [i.id, i]));
@@ -155,6 +166,7 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button onClick={() => setEditing(it)} aria-label={`Edit ${it.name}`} className="rounded-lg p-1.5 text-white/40 hover:text-white"><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => void submit(it)} aria-label={`Submit ${it.name} to the library`} title="Submit to library" className="rounded-lg p-1.5 text-white/30 hover:text-[#00E5FF]"><Upload className="h-4 w-4" /></button>
                     <button onClick={() => void remove(it)} aria-label={`Delete ${it.name}`} className="rounded-lg p-1.5 text-white/30 hover:text-[#FF3366]"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>

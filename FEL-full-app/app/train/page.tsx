@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -72,6 +72,12 @@ export default async function TrainPage() {
       href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',
       line: coachLink?.coach?.name ? `Written by ${coachLink.coach.name}.` : programCount > 0 ? 'Your blocks and sessions.' : 'No coach yet — an invite link puts their programming here.',
       tag: programCount > 0 || coachLink ? 'Open' : 'How it works',
+    },
+    {
+      // EXERCISE-LIBRARY (2026-10-25): the shared library — search it or ask it; approved entries only for athletes
+      href: '/train/library', icon: Library, accent: '#00E5FF', title: 'Exercise library',
+      line: 'Search every exercise by name, muscle or goal, or ask in plain words. Cues and faults on every one.',
+      tag: 'Search',
     },
     {
       href: '/play/training', icon: Dumbbell, accent: '#FFD700', title: 'Iron Paradise',
