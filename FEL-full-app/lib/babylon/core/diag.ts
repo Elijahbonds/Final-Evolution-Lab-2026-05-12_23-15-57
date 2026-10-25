@@ -16,12 +16,19 @@ export type DiagKind = 'frame' | 'ident' | 'clip' | 'cam' | 'fps' | 'context' | 
 const WINDOW_MS = 10_000;
 const last = new Map<DiagKind, number>();
 let modeId = '';
+// SAFETY (SAF-04, 2026-10-25): the kind of the newest diagnostic this page raised, for "Report a problem"
+// (lib/safety/problemContext.ts). The kind only: never the detail, the mode or anything about the person.
+let lastKind: DiagKind | null = null;
+
+/** The kind of the newest diagnostic raised on this page (sent or rate-limited), or null. */
+export function lastDiagKind(): DiagKind | null { return lastKind; }
 
 /** The harness names the mode once per run; events carry it. */
 export function setDiagMode(id: string): void { modeId = id; }
 
 /** Report one diagnostic. Returns true if it was sent (not rate-limited). */
 export function reportDiag(kind: DiagKind, detail: string, now: number = Date.now()): boolean {
+  lastKind = kind;
   const prev = last.get(kind) ?? -Infinity;
   if (now - prev < WINDOW_MS) return false;
   last.set(kind, now);
@@ -32,4 +39,4 @@ export function reportDiag(kind: DiagKind, detail: string, now: number = Date.no
 }
 
 /** Tests only. */
-export function _resetDiag(): void { last.clear(); modeId = ''; }
+export function _resetDiag(): void { last.clear(); modeId = ''; lastKind = null; }

@@ -14,6 +14,7 @@ import { ProgressHeader } from '@/components/profile-v2/progress-header';
 import { StatsSection } from '@/components/profile-v2/stats-section';
 import { BadgesSection } from '@/components/profile-v2/badges-section';
 import { HighlightsSection } from '@/components/profile-v2/highlights-section';
+import { ReportButton } from '@/components/report/report-button';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -65,6 +66,7 @@ export default async function ViewProfilePage({ params }: { params: { slug: stri
       <StatsSection data={data} viewer />
       <BadgesSection data={data} viewer />
       <HighlightsSection data={data} viewer />
+      {!self && viewerId && <div className="mt-6"><ReportButton target="profile" refId={slug} label="Report this profile" /></div>}
     </TabPage>
   );
 }

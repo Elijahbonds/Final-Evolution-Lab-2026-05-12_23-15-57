@@ -4,12 +4,21 @@ import { PublicTopBar, PublicLegalFooter } from '@/components/public-chrome';
 import { BUSINESS_CONTACT_EMAIL } from '@/lib/legal/business';
 import Link from 'next/link';
 import { Mail, FileText, Shield, Award } from 'lucide-react';
+import { prisma } from '@/lib/db';
+import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
+import { ReportProblem } from '@/components/report/report-problem';
+import { MyStanding } from '@/components/report/my-standing';
 
 export const dynamic = 'force-dynamic';
 
 // Public route: legal pages must be reachable logged-out on every hostname (M12.8).
 export default async function SupportPage() {
   const session = await getServerSession(authOptions);
+  // SAFETY (SAF-04/05, 2026-10-25): typed text only from a verified adult (the server re-checks; a minor gets the
+  // context-only report and preset-only appeals). A read that fails reads as not adult.
+  const userId = (session?.user as { id?: string } | undefined)?.id ?? null;
+  const me = userId ? await prisma.user.findUnique({ where: { id: userId }, select: { dobYear: true } }).catch(() => null) : null;
+  const adult = verifiedAdult(me?.dobYear ?? null);
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       {session ? null : <PublicTopBar />}
@@ -39,6 +48,12 @@ export default async function SupportPage() {
             Include your account email and a description of the issue.
           </p>
         </div>
+
+        {/* SAFETY (SAF-04, 2026-10-25): Report a problem — the page, device, last diagnostic and time; nothing about you. */}
+        <div className="mt-6">
+          <ReportProblem allowText={adult} />
+        </div>
+        {userId && <MyStanding allowNote={adult} />}
 
         {/* HOTFIX (2026-09-24): a third card for the credits page. Support is the legal hub a signed-in player reaches
             from the Profile tab, so the licence notices belong here too. */}

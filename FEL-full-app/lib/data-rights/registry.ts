@@ -380,6 +380,23 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'reportedId', export: 'Reports about the person are not handed over: they would tell them who reported them.', erase: 'keep', why: 'A safety record about someone erasing their account stays for its 12 months (owner call: docs/DATA-RIGHTS.md).' },
     ],
   },
+  // SAFETY (lane/safety, 2026-10-25; prisma/pending/2026-10-25-user-reports.sql). ProblemReport holds no account id.
+  UserReport: {
+    subjects: [
+      { col: 'reporterId', export: true, erase: 'nullify', why: 'The report stays for review (retention: an owner call, docs/TEEN-SAFE-AUDIT.md), without who filed it.' },
+      { col: 'reportedId', export: 'Reports about the person are not handed over: they would tell them who reported them.', erase: 'keep', why: 'A safety record about someone erasing their account stays (retention: an owner call, docs/TEEN-SAFE-AUDIT.md).' },
+      { col: 'reviewerId', export: OTHERS, erase: 'nullify', why: "An admin's review; the report stays, unattributed." },
+    ],
+  },
+  UserModeration: {
+    subjects: [
+      { col: 'userId', export: true, exportOmit: ['reportId'], erase: 'keep', why: 'A safety record (warn, mute or ban, and its appeal) kept when the account is erased, so a ban is not undone by erasing and re-joining (owner call: docs/TEEN-SAFE-AUDIT.md).' },
+      { col: 'moderatorId', export: OTHERS, erase: 'keep', why: "The decision record stays; the admin's id points at their tombstone account, which has no name or email (audit)." },
+    ],
+  },
+  ModerationAudit: {
+    subjects: [{ col: 'actorId', export: "The moderation audit trail (who did what, preset fields only); the person's own reports and moderations are exported from UserReport and UserModeration.", erase: 'keep', why: 'Audit trail of moderation, kept; the id points at the tombstone account, which has no name or email.' }],
+  },
   SessionJoinLink: { subjects: [{ col: 'setById', export: true, erase: 'keep', why: "A session's join link, set by staff or a coach, is kept: attendees need it. It names nobody else." }] },
   CrmContact: {
     subjects: [

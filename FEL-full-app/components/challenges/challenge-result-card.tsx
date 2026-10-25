@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { Trophy, Swords, Equal } from 'lucide-react';
 import type { ChallengeOutcome } from '@/lib/social/challenge-terms';
 import { RematchButton } from './rematch-button';
+import { ReportButton } from '@/components/report/report-button';
 
 export type ResultViewer = 'signed-in' | 'guest' | 'local' | 'blocked';
 
@@ -67,6 +68,7 @@ export function ChallengeResultCard(p: ChallengeResultCardProps) {
 
       {p.carried && <p className="mt-3 text-xs text-[#00E5FF]">Saved to your account from your guest run.</p>}
       {p.viewer === 'local' && <p className="mt-3 text-xs text-white/50">This result stays on this phone. Nothing was sent.</p>}
+      {p.viewer === 'signed-in' && <div className="mt-3"><ReportButton target="challenge" refId={p.code} /></div>}
 
       <div className="mt-5 space-y-2.5">
         {p.viewer === 'signed-in' && (

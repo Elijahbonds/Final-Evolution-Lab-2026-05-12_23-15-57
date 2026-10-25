@@ -17,6 +17,7 @@ import { DAILY_DRILL_PATH } from '@/lib/daily-drill/copy';
 import { GroupInvite } from './group-invite';
 import { GroupManage } from './group-manage';
 import { TeamRollup } from './team-rollup';
+import { ReportButton } from '@/components/report/report-button';
 
 const card = 'rounded-2xl border border-white/10 bg-white/[0.03] p-4 sm:p-5';
 const h2 = 'fel-heading text-[13px] font-bold uppercase tracking-wide text-white';
@@ -190,6 +191,7 @@ export function GroupScreen({ initial }: { initial: GroupView }) {
       <section className={card} data-feed>
         <h2 className={h2}>{KIND_LABEL[g.kind]} feed</h2>
         <p className="mt-1 text-[11.5px] text-white/40">{TEEN_SAFE_LINE}</p>
+        <div className="mt-1"><ReportButton target="group" refId={g.id} label={`Report this ${KIND_LABEL[g.kind].toLowerCase()}`} /></div>
         {g.feed.length === 0 && <p className="mt-3 text-[13px] text-white/50">Quiet so far this week. A daily drill shows up here.</p>}
         <ul className="mt-3 space-y-2">
           {g.feed.map((f) => (
