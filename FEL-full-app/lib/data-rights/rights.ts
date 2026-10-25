@@ -232,3 +232,19 @@ export async function erasePrqMovement(db: RawDb, userId: string): Promise<Recor
   }
   return out;
 }
+
+// ── the erasure event on the ledger ──────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Record an erasure as a CreditLedger event row: amount 0, counts only, the wallet untouched. NOT postLc: postLc mirrors
+ * every row into the double-entry ledger, and postTransaction refuses a zero posting ('Posting amount must be
+ * non-zero', lib/ledger.ts) AFTER the CreditLedger row is written. Measured on a real Postgres (DATA-RIGHTS-SWEEP,
+ * 2026-10-25): /api/prq/delete called postLc with amount 0 after its erase had committed, so every real PRQ delete erased
+ * the data, left the event row and answered 500. A zero event moves no money, so it has no double-entry side.
+ */
+export async function recordErasureEvent(
+  db: { creditLedger: { create(args: { data: { userId: string; amount: number; reason: string; balanceAfter: number; dedupeKey: string } }): Promise<unknown> } },
+  e: { userId: string; reason: string; balanceAfter: number; dedupeKey: string },
+): Promise<void> {
+  await db.creditLedger.create({ data: { userId: e.userId, amount: 0, reason: e.reason, balanceAfter: e.balanceAfter, dedupeKey: e.dedupeKey } });
+}

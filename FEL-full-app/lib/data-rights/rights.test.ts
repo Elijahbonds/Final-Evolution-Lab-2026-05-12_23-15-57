@@ -3,7 +3,9 @@
 // skipped quietly, secrets never leave, the erase runs in phase order, a dry run changes nothing, the account id is
 // always the bound parameter.
 import { describe, expect, it } from 'vitest';
-import { collectTables, collectPrqMovement, eraseAccount, erasePrqMovement, erasureSummary, presentSchema, TOMBSTONE } from './rights';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { collectTables, collectPrqMovement, eraseAccount, erasePrqMovement, erasureSummary, presentSchema, recordErasureEvent, TOMBSTONE } from './rights';
 import { REGISTRY } from './registry';
 import { collectPrqExport, erasePrqData, erasureReason } from '@/lib/prq-data-rights';
 
@@ -164,5 +166,22 @@ describe('the PRQ export and erase carry the pending movement tables', () => {
   it('presentSchema groups columns by table', async () => {
     const s = await presentSchema(fakeRaw({ A: ['x', 'y'] }));
     expect([...s.get('A')!]).toEqual(['x', 'y']);
+  });
+});
+
+describe('the erasure event on the ledger', () => {
+  it('is one CreditLedger row of amount 0 (no double-entry mirror, which refuses a zero posting)', async () => {
+    const made: unknown[] = [];
+    await recordErasureEvent({ creditLedger: { create: async (a) => { made.push(a); return {}; } } }, { userId: 'u1', reason: 'PRQ data erasure: 1 entries', balanceAfter: 40, dedupeKey: 'prq-erase:u1:1' });
+    expect(made).toEqual([{ data: { userId: 'u1', amount: 0, reason: 'PRQ data erasure: 1 entries', balanceAfter: 40, dedupeKey: 'prq-erase:u1:1' } }]);
+  });
+
+  it('the PRQ delete route and the operator script record it that way, never through postLc (static)', () => {
+    const root = join(__dirname, '../..');
+    for (const f of ['app/api/prq/delete/route.ts', 'scripts/erase-account.ts']) {
+      const src = readFileSync(join(root, f), 'utf8');
+      expect(src, f).toMatch(/recordErasureEvent\(/);
+      expect(src, f).not.toMatch(/\bpostLc\s*\(|import[^;]*\bpostLc\b/);
+    }
   });
 });
