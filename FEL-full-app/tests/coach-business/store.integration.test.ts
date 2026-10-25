@@ -82,15 +82,24 @@ describe.skipIf(!RUN)('coach-business tables on a real Postgres', () => {
     const sale = (await prisma.$queryRawUnsafe(`SELECT "id" FROM "CoachSale" WHERE "coachId" = $1 AND "status" = 'PENDING' LIMIT 1`, COACH))[0].id;
     await store.attachCheckout(prisma, sale, `cs_${TAG}`);
     const ledger = fakeLedger();
-    const deps = { db: prisma, post: ledger.post };
+    // test changed (coach-fee-passthrough): recordConnectRefund takes the charge (with its application fee) and hands
+    // FEL's share back at Stripe, so the deps carry a fee-refund fake; the database assertions are unchanged.
+    let feeBack = 0;
+    const stripe: any = { applicationFees: {
+      retrieve: async () => ({ amount: 1_000_000, amount_refunded: feeBack }),
+      createRefund: async (_id: string, p: { amount: number }) => { feeBack += p.amount; return {}; },
+    } };
+    const deps = { db: prisma, post: ledger.post, stripe: () => stripe };
+    const charge = (refundedTotal: number) => ({ id: `ch_${TAG}`, refundedTotal, applicationFeeId: `fee_${TAG}` });
     const session: any = { id: `cs_${TAG}`, mode: 'payment', payment_status: 'paid', payment_intent: `pi_${TAG}`, metadata: { product: 'COACH_CONNECT', saleId: sale } };
     expect(await webhook.fulfilConnectCheckout(deps, session)).toBe('fulfilled');
     expect(await webhook.fulfilConnectCheckout(deps, session)).toBe('already');
-    expect(await webhook.recordConnectRefund(deps, sale, `ch_${TAG}`, 10_000)).toBe('refunded');
-    expect(await webhook.recordConnectRefund(deps, sale, `ch_${TAG}`, 10_000)).toBe('noop');
-    expect(await webhook.recordConnectRefund(deps, sale, `ch_${TAG}`, 20_000)).toBe('refunded');
+    expect(await webhook.recordConnectRefund(deps, sale, charge(10_000))).toBe('refunded');
+    expect(await webhook.recordConnectRefund(deps, sale, charge(10_000))).toBe('noop');
+    expect(await webhook.recordConnectRefund(deps, sale, charge(20_000))).toBe('refunded');
     const row = await store.saleById(prisma, sale);
     expect(row).toMatchObject({ status: 'REFUNDED', refundedCents: 20_000, feeRefundedCents: 1_000, paymentIntentId: `pi_${TAG}` });
+    expect(feeBack).toBe(1_000);
     expect(ledger.rows.map((r) => r.kind)).toEqual(['COACH_CONNECT_FEE', 'COACH_CONNECT_FEE_REFUND', 'COACH_CONNECT_FEE_REFUND']);
     expect((await store.salesForCoach(prisma, COACH)).find((s: any) => s.id === sale)).toMatchObject({ title: pkg.title, status: 'REFUNDED' });
   });
