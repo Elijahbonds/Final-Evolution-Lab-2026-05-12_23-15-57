@@ -19,6 +19,8 @@ import { AlertTriangle, ArrowUpRight, BatteryLow, CheckCircle2, Hourglass, Loade
 import { readinessDayLabel } from '@/lib/health/readiness';
 // COACH-LOOP P1 (2026-10-20): missed-session alerts and the alert email (lib/coach/alerts.ts)
 import { AlertsStrip } from './alerts-strip';
+// COACH-VIDEO-REVIEW (2026-10-24): filmed sets waiting, the flagged rep first (components/coach/form-review)
+import { FormReviewCount } from './form-review/review-count';
 import type { CoachAlert } from '@/lib/coach/alerts';
 
 interface Flag {
@@ -101,6 +103,7 @@ export function AttentionPanel() {
     <section className="mb-4 rounded-xl border border-white/6 bg-[#0f0f13] p-4" aria-labelledby="attention-heading">
       <h2 id="attention-heading" className="text-sm font-semibold text-white/80">Needs you today</h2>
       <p className="mt-0.5 text-xs text-white/45">{board.headline ?? board.triage.summary}</p>
+      <div className="mt-3 empty:hidden"><FormReviewCount /></div>
 
       {/* Someone waiting on programming is waiting on THIS coach, so they come first and are named. */}
       {waiting.length > 0 && (
