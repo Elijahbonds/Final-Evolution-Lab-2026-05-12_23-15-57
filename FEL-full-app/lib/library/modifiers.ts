@@ -64,7 +64,10 @@ export interface Modifier {
   rule: ModifierRule;
   name: (n: string) => string;
   cue: string;
-  level: 'same' | 'up';
+  /** 'down' makes an easier version: it links to its base as the HARDER step. */
+  level: 'same' | 'up' | 'down';
+  /** Base cues this modifier contradicts ("Pause at the top for a beat" under a 4-second lower): left out of the variant. */
+  dropCues?: RegExp;
   laterality?: LibraryExercise['laterality'];
   dosage?: (d: LibraryExercise['dosage']) => LibraryExercise['dosage'];
   equipment?: (eq: LibraryExercise['equipment']) => LibraryExercise['equipment'];
@@ -127,7 +130,7 @@ const wordsRe = (ws: readonly string[]): RegExp => new RegExp(`(?:^|[^a-z0-9.])(
 
 /** The slow-tempo modifiers fit single-joint lifts too (a paused curl, a slow-lower raise, a held curl, a 1.5-rep
  *  raise); each rule adds its own refusals on top. */
-const SLOW_ANY_NOT: readonly string[] = [...EXPLOSIVE_WORDS, ...MACHINE_NAMES, ...NOT_A_REP, ...SET_BOTTOM, ...ODD, 'step-up', 'step up', 'step-down', 'renegade', 'seesaw', 'see-saw', 'side to side', 'scapular', 'good morning', 'overhead squat', 'zercher', 'bent press', 'behind the back', 'crucifix', 'board press', 'kneeling squat'];
+const SLOW_ANY_NOT: readonly string[] = [...EXPLOSIVE_WORDS, ...MACHINE_NAMES, ...NOT_A_REP, ...SET_BOTTOM, ...ODD, 'step-up', 'step up', 'nordic', 'car deadlift', 'rickshaw', 'london', 'cable deadlift', 'iron cross', 'climb', 'clock', 'glute ham', 'glute-ham', 'renegade', 'seesaw', 'see-saw', 'side to side', 'scapular', 'good morning', 'overhead squat', 'zercher', 'bent press', 'behind the back', 'crucifix', 'board press', 'kneeling squat'];
 const LOADS: readonly EquipmentId[] = ['dumbbell', 'kettlebell', 'barbell', 'cable', 'landmine', 'trap-bar', 'ez-bar', 'machine', 'sandbag'];
 /** Kit a bodyweight exercise may still use. */
 const AMBIENT: readonly EquipmentId[] = ['wall', 'mat', 'towel', 'box', 'bench', 'step', 'pull-up-bar', 'dip-bars'];
@@ -136,24 +139,28 @@ export const MODIFIERS: readonly Modifier[] = [
   // ── strength: the slow-tempo family (R1), on compound lifts only ─────────────────────────────────────────────────
   {
     id: 'paused', batch: 4, label: 'Paused',
-    rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'deadlift', 'pull-through', 'back extension', 'hyperextension', 'pullover', 'crossover', 'cross over'], namePatternsNot: [TRANSITION, /\swith\s/i] },
+    rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'axle', 'pull-through', 'back extension', 'hyperextension', 'pullover', 'crossover', 'cross over'], namePatternsNot: [TRANSITION, /\swith\s/i] },
     name: (n) => `Paused ${n}`, cue: 'Stop dead at the hardest point of the rep for a two-count, then finish.', level: 'up', dosage: (d) => ({ ...d, tempo: '2-2-1-0' }),
+    dropCues: /pause|hold still|for a beat|\bcount\b/i,
   },
   {
     id: 'tempo', batch: 4, label: '4-second lower',
     rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'pull-through', 'conventional', 'sumo deadlift', 'trap bar deadlift', 'axle', 'shrug', 'kickback', 'crossover', 'cross over'], namePatternsNot: [TRANSITION, WITH_SUFFIX] },
     name: (n) => `${n} with 4-Second Lower`, cue: 'Lower on a slow four-count, then move at normal speed.', level: 'same', dosage: (d) => ({ ...d, tempo: '4-0-1-0' }),
+    dropCues: /-count|\bcount\b|slow|pause|for a beat/i,
   },
   {
     id: 'iso-hold', batch: 4, label: 'Isometric hold',
-    rule: { categories: ['strength'], patterns: ['squat', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'deadlift', 'pullover', 'crossover', 'cross over', 'shrug', 'kickback', 'fly', 'flye'], namePatternsNot: [TRANSITION, WITH_SUFFIX] },
+    rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], nameNot: [...SLOW_ANY_NOT, 'conventional', 'sumo deadlift', 'trap bar', 'axle', 'pull-through', 'pullover', 'crossover', 'cross over', 'shrug', 'kickback', 'fly', 'flye'], namePatternsNot: [TRANSITION, WITH_SUFFIX] },
     name: (n) => `${n} Isometric Hold`, cue: 'Stop at the hardest point of the range and hold still, breathing smoothly.', level: 'same',
     dosage: (d) => ({ sets: d.sets, seconds: 20, restSec: d.restSec }),
+    dropCues: /\b(lower|lowering|return|then|back out|back up|count|beat|pause|slow|swing|stand tall|step|drive|push .* back)\b/i,
   },
   {
     id: 'one-and-a-half', batch: 4, label: '1.5-rep',
-    rule: { categories: ['strength'], patterns: ['squat', 'lunge', 'push', 'pull'], equipmentAny: LOADS, nameNot: [...SLOW_ANY_NOT, 'deadlift', 'single-leg', 'pistol', 'pullover', 'shrug', 'kickback', 'upright', 'scaption', 'iron cross'], namePatternsNot: [TRANSITION] },
+    rule: { categories: ['strength'], patterns: ['squat', 'hinge', 'lunge', 'push', 'pull'], equipmentAny: LOADS, nameNot: [...SLOW_ANY_NOT, 'conventional', 'sumo deadlift', 'trap bar', 'axle', 'back extension', 'hyperextension', 'pull-through', 'single-leg', 'pistol', 'pullover', 'shrug', 'kickback', 'upright', 'scaption', 'iron cross'], namePatternsNot: [TRANSITION] },
     name: (n) => `1.5-Rep ${n}`, cue: 'All the way down, halfway up, back down, then all the way up: that is one rep.', level: 'up',
+    dosage: (d) => { const { tempo: _t, ...rest } = d; return rest; }, dropCues: /pause|for a beat|\bcount\b/i,
   },
   // ── strength: stance, grip and implement ─────────────────────────────────────────────────────────────────────────
   {
@@ -170,6 +177,7 @@ export const MODIFIERS: readonly Modifier[] = [
       namePatternsNot: [TRANSITION, /\swith\s/i],
     },
     name: (n) => `Single-Arm ${n}`, cue: 'Keep the shoulders square to the wall ahead while one side works.', level: 'up', laterality: 'unilateral',
+    dropCues: /together|apart|both|the dumbbells|the weights/i,
   },
   {
     id: 'offset', batch: 4, label: 'Offset load',
@@ -188,6 +196,7 @@ export const MODIFIERS: readonly Modifier[] = [
       nameNot: ['kneeling', 'standing', 'seated', 'bench', 'lying', 'floor', 'incline', 'decline', 'straight-arm', 'windmill', 'halo', 'to the side', 'walkout', 'split', 'stance', 'close-grip', ...ODD, ...EXPLOSIVE_WORDS, ...MACHINE_NAMES],
     },
     name: (n) => `Half-Kneeling ${n}`, cue: 'Tuck the belt buckle up and keep the down knee heavy on the floor the whole set.', level: 'same',
+    dropCues: /feet|stand|floor away|heels/i,
   },
   {
     id: 'deficit', batch: 4, label: 'Deficit',
@@ -267,6 +276,17 @@ export const MODIFIERS: readonly Modifier[] = [
       namePatternsNot: [TRANSITION, /\swith\s/i],
     },
     name: (n) => `Alternating ${n}`, cue: 'One side works while the other holds still at the start; switch every rep.', level: 'same', laterality: 'alternating',
+    dropCues: /together|both/i,
+  },
+  {
+    id: 'supported', batch: 4, label: 'Supported (easier)',
+    rule: {
+      categories: ['strength'], patterns: ['squat', 'lunge', 'hinge'], laterality: ['unilateral'], equipmentNot: ['barbell', 'trap-bar', 'machine', 'landmine'],
+      nameAny: ['split squat', 'single-leg', 'lunge', 'step-down', 'skater', 'cossack', 'curtsy', 'pistol'],
+      nameNot: ['supported', 'assisted', 'to box', 'to pad', 'counterweight', 'walking', 'jump', 'airplane', 'hip thrust', 'bridge', 'curl', 'back extension', 'calf', 'pistol', 'pass through', 'suspended', 'suspension', ...MACHINE_NAMES, ...EXPLOSIVE_WORDS],
+      namePatternsNot: [/\swith\s/i],
+    },
+    name: (n) => `Supported ${n}`, cue: 'Hold a post or the wall lightly with one hand: it steadies you, it does not lift you.', level: 'down',
   },
   // ── sport, speed, prehab, conditioning ───────────────────────────────────────────────────────────────────────────
   {
@@ -303,7 +323,7 @@ export const MODIFIERS: readonly Modifier[] = [
         'hold', 'stance', 'lying', 'clock', 'form', 'free throw', 'release', 'routine', 'wrap', 'figure', 'wall', 'two-ball', 'warm-up', 'fatigue', 'around the world',
         'spot-up', 'series', 'pivot', 'under the rim', 'under-rim', 'tip drill', 'toss', 'race', 'lines', 'jump', 'pound', 'stationary', 'spider', 'speed', 'triple threat',
         'combo', 'off a', 'off one', 'in transition', 'pull-up', 'catch-and-shoot', 'spin-out', 'partner', 'full-court', 'coast', 'sprint', 'dribble', 'shooting',
-        'ball mastery', 'battle', 'forearm pass', 'serve', 'split step', 'shadow', 'hurdle',
+        'ball mastery', 'battle', 'forearm pass', 'serve', 'split step', 'shadow', 'hurdle', 'juggling', 'wall pass', 'first touch', 'chip', 'approach', 'attack',
       ],
     },
     name: (n) => `${n} at Game Speed`, cue: 'Full game speed now: if it gets sloppy, drop back to the slower version.', level: 'up', pool: 'all',
@@ -312,7 +332,7 @@ export const MODIFIERS: readonly Modifier[] = [
     id: 'timed', batch: 3, label: 'Against the clock',
     rule: {
       categories: ['conditioning', 'speed-agility', 'plyometric'], equipmentNot: ['barbell', 'trap-bar', 'strongman', 'sled', 'dumbbell', 'kettlebell', 'box'],
-      nameAny: ['ladder', 'rope jump', 'jumping jack', 'seal jack', 'mountain climber', 'squat thrust', 'pogo', 'line hop', 'lateral shuffle', 'cone weave', 'carioca', 'box drill', 'ankle bounce', 'quick feet', 'dot drill'],
+      nameAny: ['ladder', 'rope jump', 'jumping jack', 'seal jack', 'mountain climber', 'squat thrust', 'pogo', 'line hop', 'lateral shuffle', 'cone weave', 'carioca', 'box drill', 'ankle bounce', 'quick feet', 'dot drill', 'cone taps', 'quick steps', 'hexagon', 'four-square'],
       nameNot: [
         'hold', 'march', 'sprint', 'depth', 'drop', 'max', 'broad', 'vertical', 'approach', 'tuck', 'bound', 'swing', 'throw', 'slam', 'toss', 'sled', 'shuttle', 'tempo',
         'interval', 'steady', 'ride', 'flying', 'build-up', 'heavy', 'deadlift', 'squat jump', 'clean', 'snatch', 'jerk', 'press', 'to stick', 'decel', 'single-leg',
@@ -335,11 +355,27 @@ const re = (ws: readonly string[]): RegExp => {
 };
 
 /** Why a modifier's rule refuses this base (empty = it applies). Each reason names the rule it breaks. */
-export function ruleFailures(rule: ModifierRule, base: Pick<LibraryExercise, 'name' | 'category' | 'pattern' | 'laterality' | 'equipment' | 'goals' | 'level'>): string[] {
+/** Implements a cue names, and the kit that makes the word fit ("the bar" on a cable press is a seed cue-family slip). */
+const KIT_WORDS: readonly [RegExp, readonly EquipmentId[]][] = [
+  [/\bthe bar\b|\bbend the bar\b/i, ['barbell', 'ez-bar', 'trap-bar', 'pull-up-bar', 'landmine', 'dip-bars', 'machine', 'cable', 'other']],
+  [/\bthe band\b/i, ['band', 'mini-band']],
+  [/\bthe dumbbells?\b/i, ['dumbbell']],
+  [/\bthe (?:kettle)?bell\b/i, ['kettlebell', 'dumbbell']],
+];
+function kitMismatch(base: Pick<LibraryExercise, 'cues' | 'equipment'>): string | null {
+  for (const [re, kit] of KIT_WORDS) {
+    const hit = base.cues.find((c) => re.test(c));
+    if (hit && !base.equipment.some((x) => kit.includes(x))) return `"${re.exec(hit)![0]}"`;
+  }
+  return null;
+}
+
+export function ruleFailures(rule: ModifierRule, base: Pick<LibraryExercise, 'name' | 'category' | 'pattern' | 'laterality' | 'equipment' | 'goals' | 'level'> & Partial<Pick<LibraryExercise, 'cues'>>): string[] {
   const out: string[] = [];
   // every modifier: one level deep (R5), never on a garbled or person-named seed name
   { const m = re(GLOBAL_NOT).exec(base.name); if (m) out.push(`name word "${m[0].replace(/^[^a-z0-9]/i, '')}" already names a modifier or a person (R5)`); }
   if (MESSY_NAME.some((r) => r.test(base.name))) out.push(`name "${base.name}" is punctuated in a way a modifier would garble`);
+  if (base.cues) { const k = kitMismatch(base); if (k) out.push(`its cues name ${k}, which it does not use (a variant would copy the wrong cue)`); }
   if (!rule.categories.includes(base.category)) out.push(`category ${base.category} not in [${rule.categories.join(', ')}]`);
   if (rule.patterns && !rule.patterns.includes(base.pattern)) out.push(`pattern ${base.pattern} not in [${rule.patterns.join(', ')}]`);
   if (rule.laterality && !rule.laterality.includes(base.laterality)) out.push(`laterality ${base.laterality} not in [${rule.laterality.join(', ')}]`);

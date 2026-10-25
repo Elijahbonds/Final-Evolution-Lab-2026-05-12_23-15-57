@@ -140,6 +140,11 @@ const PROGRESSIONS: readonly [string, string, number, string, string, Partial<Va
   ['Lateral Hop to Vertical Jump', 'hop-vert', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line, land, and jump straight up toward the ceiling.'],
   ['Drop Landing to Broad Jump', 'drop-broad', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then broad jump to the line and stick again.', { equipment: ['box'] }],
   ['Drop Landing to Lateral Bound', 'drop-land-bound', 2, 'id:drop-landing-from-low-box', 'Step off the low box, stick it, then bound sideways and stick again.', { equipment: ['box'], plane: 'frontal' }],
+  ['Drop Landing with Ball Catch', 'drop-catch', 1, 'id:drop-landing-from-low-box', 'Step off the low box as a partner tosses the ball; catch it and stick the landing.', { equipment: ['box', 'basketball'], sport: ['basketball', 'general'] }],
+  ['Single-Leg Drop Landing with Ball Catch', 'drop-catch-sl', 2, 'id:single-leg-drop-landing', 'Step off onto one leg as the ball arrives; catch it and stick it still.', { equipment: ['box', 'basketball'], laterality: 'unilateral', sport: ['basketball', 'general'] }],
+  ['Lateral Hop to Stick with Partner Push', 'hop-push', 2, 'id:lateral-hop-to-stick', 'Hop sideways over the line; a partner gives a light push as you land; stick it.', { laterality: 'unilateral', plane: 'frontal' }],
+  ['Jump to Stick with Partner Push', 'jump-push', 1, 'id:broad-jump-to-stick', 'Jump out to the line; a partner gives a light push as you land; stick it still.'],
+  ['Crossover Bound to Stick', 'cross-bound', 2, 'id:lateral-bound-to-stick', 'Bound across in front of the standing leg toward the line and stick it.', { laterality: 'unilateral', plane: 'frontal' }],
   ['Split Jump to Vertical Jump', 'split-vert', 2, 'id:switch-split-jump', 'One switch split jump, land, then jump straight up off both feet.'],
   // single-leg and line work
   ['Single-Leg Zig-Zag Hops', 'sl-zigzag', 2, 'id:single-leg-hop-series', 'Hop forward and across the line on one leg, side to side, quiet each time.', { plane: 'multi', dosage: contacts(3, 8, 60) }],
@@ -190,6 +195,8 @@ const ROPE: readonly [string, string, number, string][] = [
   ['Rope Jump with 180° Turns', 'turns', 2, 'Turn half way every four jumps without missing a turn of the rope.'],
   ['Single-Leg Side-to-Side Rope Jump', 'sl-side', 2, 'One foot: jump the rope side to side over a line on the floor.'],
   ['Heel-Toe Rope Jump', 'heel-toe', 1, 'Tap heel then toe out front on alternate turns, light on the floor.'],
+  ['Running Rope Jump', 'running', 1, 'Run forward along the floor turning the rope, one light step per turn.'],
+  ['Crossover-Step Rope Jump', 'crossover-step', 2, 'Cross one foot over the other on each turn, light on the floor.'],
 ];
 
 export const LATER_JUMPS: Family[] = [

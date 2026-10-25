@@ -9,6 +9,8 @@ const BATCH = 3 as const;
 // ── flows ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 interface Pos { k: string; n: string; cue: string; level: number; equipment?: Variant['equipment'] }
+/** Positions done one side at a time: a flow through any of them is dosed per side. */
+const SIDED = new Set(['cossack', 'spider', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'pigeon', 'shinbox', 'thread', 'lizard', 'couch']);
 const P: readonly Pos[] = [
   { k: 'squat', n: 'Deep Squat', cue: 'Sit down between the heels, the floor flat under the feet.', level: 0 },
   { k: 'cossack', n: 'Cossack Shift', cue: 'Shift side to side along the floor, one leg long, heels down.', level: 1 },
@@ -26,12 +28,20 @@ const P: readonly Pos[] = [
   { k: 'catcamel', n: 'Cat-Camel', cue: 'Round up toward the ceiling, then sag toward the floor, slowly, like a wave.', level: 0, equipment: ['mat'] },
   { k: 'thread', n: 'Thread the Needle', cue: 'Slide one hand under along the floor, then open it up toward the ceiling.', level: 0, equipment: ['mat'] },
   { k: 'frog', n: 'Frog Rock', cue: 'Knees wide on the floor, rock back toward the wall behind and forward again.', level: 0, equipment: ['mat'] },
+  { k: 'bear', n: 'Bear Hold', cue: 'Hands and toes on the floor, knees hovering an inch up, the back long and still.', level: 0 },
+  { k: 'cobra', n: 'Cobra Reach', cue: 'Lie face-down and push the floor away until the chest lifts, the belt line staying down.', level: 0, equipment: ['mat'] },
+  { k: 'lizard', n: 'Lizard Lunge', cue: 'Step the foot outside the hand and sink low toward the floor, forearms down if they reach.', level: 1 },
+  { k: 'couch', n: 'Couch Stretch', cue: 'Back knee against the wall, tuck the belt buckle up and rise tall.', level: 1, equipment: ['wall', 'mat'] },
+  { k: 'butterfly', n: 'Butterfly Sit', cue: 'Sit tall with the soles together and let the knees sink toward the floor.', level: 0, equipment: ['mat'] },
 ];
 const EDGES: readonly [string, string][] = [
   ['squat', 'cossack'], ['squat', 'fold'], ['squat', 'spider'], ['squat', 'frog'], ['fold', 'inchworm'], ['fold', 'dog'], ['inchworm', 'dog'], ['inchworm', 'spider'],
   ['dog', 'spider'], ['dog', 'child'], ['dog', 'pigeon'], ['dog', 'halfsplit'], ['spider', 'halfsplit'], ['spider', 'lowlunge'], ['halfsplit', 'kneel'], ['halfsplit', 'lowlunge'],
   ['kneel', 'lowlunge'], ['kneel', 'ninety'], ['ninety', 'pigeon'], ['ninety', 'shinbox'], ['pigeon', 'child'], ['child', 'catcamel'], ['child', 'thread'], ['child', 'frog'],
   ['catcamel', 'thread'], ['catcamel', 'frog'], ['thread', 'frog'],
+  ['bear', 'dog'], ['bear', 'child'], ['bear', 'inchworm'], ['cobra', 'dog'], ['cobra', 'child'], ['lizard', 'spider'], ['lizard', 'halfsplit'], ['lizard', 'dog'],
+  ['butterfly', 'ninety'], ['butterfly', 'frog'], ['couch', 'kneel'], ['couch', 'halfsplit'], ['couch', 'lowlunge'],
+  ['pigeon', 'lizard'], ['squat', 'butterfly'],
 ];
 const pos = (k: string): Pos => P.find((p) => p.k === k)!;
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -43,7 +53,9 @@ function flowVariants(): Variant[] {
   const eq = (...ps: Pos[]) => [...new Set(ps.flatMap((p) => p.equipment ?? []))];
   for (const [a, b] of EDGES) {
     const A = pos(a), B = pos(b);
+    const sided = SIDED.has(a) || SIDED.has(b);
     out.push(va(`${A.n} to ${B.n} Flow`, key('flow', a, b), Math.max(A.level, B.level), {
+      dosage: reps(2, sided ? '5 slow rounds each side' : '6 slow rounds', 20),
       equipment: eq(A, B), cues: [A.cue, `Then flow on the floor into the ${B.n.toLowerCase()}: ${lowerFirst(B.cue)}`, 'Breathe out as you sink into each position; move on the breath in.'], ladder: a,
     }));
   }
@@ -52,7 +64,7 @@ function flowVariants(): Variant[] {
     const [a, c] = [list[i], list[j]].sort();
     const A = pos(a), B = pos(b), C = pos(c);
     out.push(va(`${A.n}, ${B.n} and ${C.n} Flow`, key('flow3', a, b, c), Math.max(1, A.level, B.level, C.level), {
-      equipment: eq(A, B, C), ladder: b, dosage: reps(2, '4 slow rounds each side', 30),
+      equipment: eq(A, B, C), ladder: b, dosage: reps(2, [a, b, c].some((x) => SIDED.has(x)) ? '4 slow rounds each side' : '5 slow rounds', 30),
       cues: [`On the floor, flow from the ${A.n.toLowerCase()} through the ${B.n.toLowerCase()} to the ${C.n.toLowerCase()}.`, B.cue, 'Breathe out as you sink into each position; move on the breath in.'],
     }));
   }
@@ -105,6 +117,12 @@ const STRETCHES: readonly [string, string, number, string, string, Partial<Varia
   ['Quadruped Rock-Back', 'quad-rock', 0, 'On hands and knees on a mat.', 'Rock back toward the wall behind you and forward again, a long back the whole way.', { equipment: ['mat'], goals: ['hip'] }],
   ['Elevated Pigeon Stretch', 'pigeon-bench', 0, 'Front shin across a bench, back leg long behind.', 'Square the belt line to the bench and hinge forward toward it.', { equipment: ['bench'], goals: ['hip'] }],
   ['Supine Hamstring Stretch with a Strap, Leg Across', 'ham-across', 1, 'Lie face-up with a strap around one foot.', 'Draw the long leg across the body toward the floor on the far side, the hips flat.', { equipment: ['mat', 'towel'] }],
+  ['Half-Kneeling Hip Flexor Stretch with Side Reach', 'hf-side', 1, 'Half-kneeling on a mat, front foot planted.', 'Tuck the belt buckle up, then reach the hand on the kneeling side over toward the far wall.', { equipment: ['mat'], goals: ['hip'] }],
+  ['Standing Hamstring Sweep', 'ham-sweep', 0, 'Stand tall, one heel a small step ahead, toes up.', 'Hinge and sweep both hands down past the front shin toward the floor, then stand.', {}],
+  ['Seated Spinal Twist', 'seated-twist', 0, 'Sit tall on the floor, one knee bent across the long leg.', 'Turn toward the bent knee, the hand behind you pressing the floor, and grow tall.', { equipment: ['mat'], goals: ['posture'] }],
+  ['Straight-Arm Wall Chest Stretch', 'chest-straight', 0, 'Stand side-on to a wall, the straight arm on it at shoulder height behind you.', 'Turn away from the wall until the front of the chest opens.', { equipment: ['wall'], goals: ['shoulder'] }],
+  ['Kneeling Adductor Stretch, Leg Out', 'add-kneel', 0, 'Kneel on one knee on a mat, the other leg long out to the side.', 'Sit back toward the wall behind you until the inside of the long leg opens.', { equipment: ['mat'] }],
+  ['Standing Calf Stretch on a Step', 'calf-standing-step', 0, 'Toes of one foot up on a step, heel on the floor.', 'Lean the body toward the step until the back of the lower leg opens.', { equipment: ['step'], goals: ['ankle'] }],
 ];
 const DYNAMIC: readonly [string, string, number, string][] = [
   ['Walking Spiderman with Overhead Reach', 'spider-reach', 0, 'Step into a spiderman lunge, reach the inside hand up toward the ceiling, then step through.'],
@@ -112,7 +130,6 @@ const DYNAMIC: readonly [string, string, number, string][] = [
   ['Walking Lunge with Rotation', 'lunge-rot', 0, 'Lunge forward, turn toward the wall on the front-leg side, then step through.'],
   ['Reverse Lunge with Overhead Reach', 'rev-lunge-reach', 0, 'Step back into the lunge and reach both hands up toward the ceiling.'],
   ['Straight-Leg Kick Walk', 'kick-walk', 0, 'Kick a straight leg up toward the ceiling and the opposite hand, tall, then step through.'],
-  ['Inchworm to Spiderman', 'inch-spider', 1, 'Walk the hands out along the floor, step up into a spiderman lunge, then walk back.'],
   ['Lunge to Half-Split Walk', 'lunge-halfsplit', 1, 'Lunge, rock back into a half split with the toes up toward the ceiling, then step through.'],
   ['Lateral Squat Walk', 'lat-squat-walk', 0, 'Stay low and step sideways along the floor, heels down, chest tall.'],
   ['Knee Hug to Lunge', 'hug-lunge', 0, 'Hug one knee up off the floor, then step it forward into a lunge.'],
@@ -133,6 +150,30 @@ const BREATH: readonly [string, string, number, string, string, Partial<Variant>
   ['Walking Nasal Breathing', 'walk-nasal', 0, 'Walk at an easy pace.', 'Breathe in and out through the nose only, matching the breath to your steps.', { pattern: 'locomotion' }],
   ['Prone Breathing', 'prone', 0, 'Lie face-down, forehead on the hands.', 'Breathe in so the belly pushes into the floor; long, slow exhales.', { equipment: ['mat'] }],
   ['Supine Breathing with Feet on a Wall', 'feet-wall', 0, 'Lie face-up, feet flat on a wall, knees and hips bent to right angles.', 'Press the heels lightly into the wall and breathe out long and slow.', { equipment: ['wall', 'mat'] }],
+];
+
+const ACTIVE: readonly [string, string, number, string, string, Partial<Variant>?][] = [
+  ['Seated Straight-Leg Lift-Off', 'sl-liftoff', 1, 'Sit tall on the floor, legs long, hands beside the knees.', 'Lift one heel an inch off the floor and hold, the knee straight, then lower slow.', { equipment: ['mat'] }],
+  ['90/90 Back-Leg Lift-Off', 'ninety-liftoff', 1, 'Sit tall in a 90/90 on the floor.', 'Lift the back shin an inch off the floor and hold, then lower slow.', { equipment: ['mat'], goals: ['hip'] }],
+  ['Pigeon Back-Knee Lift-Off', 'pigeon-liftoff', 2, 'Settle into pigeon on the floor.', 'Lift the back knee an inch off the floor and hold, then lower slow.', { equipment: ['mat'], goals: ['hip'] }],
+  ['Half-Kneeling Front-Knee Lift-Off', 'kneel-liftoff', 1, 'Half-kneel tall on a mat.', 'Lift the front foot an inch off the floor without leaning back, hold, then lower.', { equipment: ['mat'], goals: ['hip'] }],
+  ['Standing Knee-Lift Hold', 'knee-hold', 0, 'Stand tall beside a wall, one hand on it.', 'Lift the knee as high toward the ceiling as it goes and hold it there, still.', { equipment: ['wall'], goals: ['hip', 'balance'] }],
+  ['Prone Arm Lift-Off', 'arm-liftoff', 0, 'Lie face-down, arms overhead on the floor, forehead on a towel.', 'Lift both hands an inch off the floor and hold, then lower slow.', { equipment: ['mat', 'towel'], goals: ['shoulder'] }],
+  ['Wall Arm Lift-Off', 'wall-liftoff', 0, 'Face a wall, forearms on it, a step back.', 'Lift the forearms an inch off the wall without leaning back, hold, then lower.', { equipment: ['wall'], goals: ['shoulder'] }],
+  ['Couch Stretch Knee Lift-Off', 'couch-liftoff', 2, 'Set up in the couch stretch against the wall.', 'Lift the back knee off the floor a little toward the wall and hold, then lower slow.', { equipment: ['wall', 'mat'], goals: ['hip'] }],
+  ['Seated Hip Rotation Lift-Off', 'hip-rot-liftoff', 1, 'Sit tall on a bench, one shin turned out.', 'Lift the foot an inch toward the far wall while the knee stays still, hold, lower.', { equipment: ['bench'], goals: ['hip'] }],
+  ['Ankle Rock Hold at End Range', 'ankle-endrange', 0, 'Half-kneel facing a wall, front toes a hand from it.', 'Drive the knee toward the wall to the end of the range and hold still there.', { equipment: ['wall'], goals: ['ankle'] }],
+  ['Side-Lying Top-Leg Reach Hold', 'side-reach', 0, 'Lie on your side, the top leg long.', 'Reach the top heel long toward the wall and lift it a little, hold, lower.', { equipment: ['mat'], goals: ['hip'] }],
+];
+const LOADED_MOB: readonly [string, string, number, string, string, Variant['equipment']][] = [
+  ['Kettlebell Arm Bar', 'arm-bar', 1, 'Lie on your side, a light kettlebell pressed up toward the ceiling.', 'Keep the bell stacked over the shoulder as you roll the chest toward the floor, slow.', ['kettlebell', 'mat']],
+  ['Goblet Deep Squat Hold with Reach', 'goblet-reach', 0, 'Hold a light bell at the chest and sit into a deep squat.', 'Hold the bottom, then press the bell out toward the wall ahead and back, the heels down.', ['kettlebell']],
+  ['Dowel Overhead Squat Hold', 'dowel-ohs', 1, 'Hold a dowel wide overhead and sit into a deep squat.', 'Keep the dowel over the middle of the feet as you sink and hold, the heels on the floor.', ['dowel']],
+  ['Banded Shoulder Distraction Stretch', 'band-shoulder', 0, 'Band around a post at head height, the hand through the loop.', 'Walk back until the band pulls, then sink the chest toward the floor and breathe.', ['band']],
+  ['Banded Hip Distraction Stretch', 'band-hip', 0, 'Band from a post around the top of the front thigh, half-kneeling.', 'Let the band pull back as you shift forward into the stretch and breathe.', ['band', 'mat']],
+  ['Slider Lateral Lunge Stretch', 'slider-lateral', 0, 'Stand with one foot on a slider.', 'Slide the foot out along the floor into a side lunge and hold, then slide back; the slider sets the pace.', ['slider']],
+  ['Weighted Seated Straddle Lean', 'straddle-weight', 1, 'Sit in a straddle on the floor, a light plate in the hands.', 'Lean forward with the plate toward the floor ahead, slow, and hold.', ['plate', 'mat']],
+  ['Kettlebell Halo', 'halo', 0, 'Hold a light kettlebell upside down by the horns at the chest.', 'Circle the bell around the head close and slow, both ways, the belt line still.', ['kettlebell']],
 ];
 
 const MOB = { category: 'mobility' as const, braceMode: 'none' as const, batch: BATCH, youthOk: true };
@@ -194,5 +235,27 @@ export const LATER_MOBILITY: Family[] = [
       { fault: 'Breathing fast and high in the chest', fix: 'Slow it down: in through the nose, then a longer breath out.' },
     ],
     dosage: secs(1, 120, 0), variants: BREATH.map(([name, k, l, setup, cue, over]) => va(name, k, l, { setup, cue, ...(over ?? {}) })),
+  },
+  {
+    ...MOB, family: 'active-mobility', block: 'mobility-stretches', pattern: 'mobility', plane: 'multi', laterality: 'unilateral', skillLayer: 'joints',
+    primary: ['hip-flexors', 'hamstrings'], secondary: ['glutes', 'delts'], goals: ['mobility'], sport: ['general', 'basketball'],
+    lowLoad: ['knee', 'back'], equipment: [], clip: 'stretch',
+    setup: 'Take the position named.',
+    cues: ['Lift only an inch: small and still beats big and shaky.', 'Hold still at the end for the count, breathing smoothly.', 'Lower slow.'],
+    faults: [
+      { fault: 'Leaning to make the lift bigger', fix: 'Stay tall and keep the lift small and clean.' },
+    ],
+    dosage: reps(2, '5 each side, 5-second holds', 30), variants: ACTIVE.map(([name, k, l, setup, cue, over]) => va(name, k, l, { setup, cue, ...(over ?? {}) })),
+  },
+  {
+    ...MOB, family: 'loaded-mobility', block: 'mobility-stretches', pattern: 'mobility', plane: 'multi', laterality: 'bilateral', skillLayer: 'joints',
+    primary: ['adductors', 'delts', 'hip-flexors'], secondary: ['rotator-cuff', 'glutes'], goals: ['mobility'], sport: ['general', 'basketball'],
+    lowLoad: ['knee'], equipment: [], clip: 'stretch',
+    setup: 'Take the position named with a light load.',
+    cues: ['Light load, slow movement, long breaths out.', 'Go only as far as stays smooth.', 'Let the load ease you deeper, never force it.'],
+    faults: [
+      { fault: 'A load too heavy to move slowly', fix: 'Go lighter until the whole range stays smooth.' },
+    ],
+    dosage: reps(2, '5 slow reps', 30), variants: LOADED_MOB.map(([name, k, l, setup, cue, equipment]) => va(name, k, l, { setup, cue, equipment, ...(k === 'slider-lateral' ? { cues: [cue, 'Go only as far as stays smooth.', 'Long breaths out at the end of the range.'] } : {}) })),
   },
 ];

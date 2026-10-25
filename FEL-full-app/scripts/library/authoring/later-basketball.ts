@@ -13,6 +13,7 @@ const LOW = 'Pound the ball into the floor hard, below the knee.';
 
 interface Move { k: string; label: string; cue: string; lvl: number }
 const MOVES: readonly Move[] = [
+  { k: 'pound', label: 'Pound', cue: 'pound the ball hard into the floor twice, below the knee', lvl: 0 },
   { k: 'cross', label: 'Crossover', cue: 'rip the ball low across the body to the other hand', lvl: 0 },
   { k: 'between', label: 'Between-the-Legs', cue: 'bounce the ball hard between the feet on the floor', lvl: 1 },
   { k: 'behind', label: 'Behind-the-Back', cue: 'wrap the ball behind the belt line to the other side', lvl: 1 },
@@ -22,7 +23,7 @@ const MOVES: readonly Move[] = [
   { k: 'spin', label: 'Spin', cue: 'pull the ball tight through the spin and come out low', lvl: 2 },
 ];
 /** Pairs batch 1 already wrote as its own combos: the settings below point at them as their base. */
-const EXISTING_PAIR: Record<string, string> = { 'cross>between': 'crossover-between-combo', 'between>behind': 'between-behind-combo' };
+const EXISTING_PAIR: Record<string, string> = { 'pound>cross': 'pound-crossover-combo', 'cross>between': 'crossover-between-combo', 'between>behind': 'between-behind-combo' };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function comboVariants(): Variant[] {
@@ -68,6 +69,14 @@ function comboVariants(): Variant[] {
           base: v, ladder: v, equipment: ['basketball', 'cone'], setup: 'Cones in a line down the floor, 5 metres apart, ball in one hand.',
           cue: 'Run the whole chain at each cone, then push the ball ahead to the next one.', dosage: meters(3, 25, 40), goals: ['handles', 'footwork'],
         }));
+        out.push(va(`${name}, Finish at the Rim`, key(v, 'finish'), 2, {
+          base: v, ladder: v, equipment: ['basketball', 'cone', 'hoop'], setup: 'Start at the wing three-point line with a cone at the elbow.',
+          cue: 'Run the chain at the cone, then attack the rim and finish off the glass.', dosage: reps(3, '4 each side', 30), goals: ['handles', 'finishing'],
+        }));
+        out.push(va(`${name} vs Pad Pressure`, key(v, 'pressure'), 2, {
+          base: v, ladder: v, equipment: ['basketball'], setup: 'A partner stands in front with a pad, bumping and reaching for the ball.',
+          cue: 'Keep the ball low and on the side away from the pad through the whole chain.', dosage: secs(3, 30, 30),
+        }));
       }
     }
   }
@@ -102,6 +111,8 @@ const TWO_BALL: readonly [string, string, string][] = [
   ['Two-Ball Rhythm Change', 'rhythm', 'Four together, four alternating: change the beat on the floor without losing a ball.'],
   ['Two-Ball Retreat Dribble', 'retreat', 'Two hard dribbles back with both balls, then two forward, eyes up.'],
   ['Two-Ball Cross and Pound', 'cross-pound', 'One ball crosses low in front while the other pounds at the side.'],
+  ['Two-Ball Between-and-Pound', 'between-pound', 'One ball goes between the feet on the floor while the other pounds at the side.'],
+  ['Two-Ball Behind-and-Pound', 'behind-pound', 'One ball wraps behind the belt line while the other pounds at the side.'],
 ];
 function twoBallVariants(): Variant[] {
   return TWO_BALL.flatMap(([name, v, cue]) => [
@@ -122,22 +133,24 @@ const APPROACH: Record<string, { label: string; setup: string }> = {
   crossDrive: { label: 'off a Crossover Drive', setup: 'Start at the top with a cone at the elbow; cross over at the cone and attack the lane.' },
   hesiDrive: { label: 'off a Hesitation Drive', setup: 'Start at the wing with a cone at the elbow; hesitate at the cone, then attack the rim.' },
   spinDrive: { label: 'off a Spin Dribble', setup: 'Start at the wing; drive at a cone in the lane and spin off it toward the rim.' },
+  rip: { label: 'off a Rip-Through', setup: 'Catch at the wing in triple threat, rip the ball low past a cone, and attack the rim.' },
 };
 interface Finish { k: string; label: string; cue: string; lvl: number; from: string[]; contact: boolean }
 const FINISHES: readonly Finish[] = [
-  { k: 'overhand', label: 'Overhand Layup', cue: 'Drive the high knee up toward the target and lay the ball soft off the glass.', lvl: 0, from: ['wing', 'baseline', 'middle', 'cut', 'transition', 'top', 'crossDrive', 'hesiDrive', 'spinDrive'], contact: true },
-  { k: 'reverse', label: 'Reverse Layup', cue: 'Carry the ball under the rim and finish on the far side, away from the reach.', lvl: 1, from: ['baseline', 'middle', 'transition', 'cut', 'crossDrive', 'spinDrive'], contact: true },
+  { k: 'overhand', label: 'Overhand Layup', cue: 'Drive the high knee up toward the target and lay the ball soft off the glass.', lvl: 0, from: ['wing', 'baseline', 'middle', 'cut', 'transition', 'top', 'crossDrive', 'hesiDrive', 'spinDrive', 'rip'], contact: true },
+  { k: 'reverse', label: 'Reverse Layup', cue: 'Carry the ball under the rim and finish on the far side, away from the reach.', lvl: 1, from: ['baseline', 'middle', 'transition', 'cut', 'crossDrive', 'spinDrive', 'rip'], contact: true },
   { k: 'floater', label: 'Floater', cue: 'Release early and high: a soft arc over the outstretched reach.', lvl: 1, from: ['middle', 'top', 'transition', 'wing', 'crossDrive', 'hesiDrive', 'spinDrive'], contact: false },
   { k: 'runner', label: 'One-Foot Runner', cue: 'Keep running through the release: a soft, high shot off the floor in stride.', lvl: 1, from: ['middle', 'top', 'transition', 'baseline', 'crossDrive', 'hesiDrive'], contact: false },
   { k: 'euro', label: 'Euro Step Layup', cue: 'Long first step one way, the second across, the ball moving with you.', lvl: 2, from: ['wing', 'top', 'transition', 'middle', 'crossDrive', 'hesiDrive'], contact: true },
   { k: 'fingerroll', label: 'Finger Roll', cue: 'Roll the ball off the fingertips up over the rim, soft and high.', lvl: 1, from: ['wing', 'transition', 'cut', 'top', 'hesiDrive'], contact: true },
   { k: 'scoop', label: 'Scoop Layup', cue: 'Scoop the ball underhand up around the reach, a soft touch off the glass.', lvl: 1, from: ['middle', 'transition', 'baseline', 'crossDrive', 'spinDrive'], contact: false },
-  { k: 'power', label: 'Two-Foot Power Finish', cue: 'Jump stop on two feet, ball high at the forehead, and go up strong to the rim.', lvl: 1, from: ['baseline', 'wing', 'cut', 'middle', 'crossDrive', 'spinDrive'], contact: true },
-  { k: 'inside', label: 'Inside-Hand Layup', cue: 'Finish with the hand nearer the middle of the floor, the ball away from the shot-blocker.', lvl: 2, from: ['baseline', 'middle', 'wing', 'crossDrive'], contact: true },
+  { k: 'power', label: 'Two-Foot Power Finish', cue: 'Jump stop on two feet, ball high at the forehead, and go up strong to the rim.', lvl: 1, from: ['baseline', 'wing', 'cut', 'middle', 'crossDrive', 'spinDrive', 'rip'], contact: true },
+  { k: 'inside', label: 'Inside-Hand Layup', cue: 'Finish with the hand nearer the middle of the floor, the ball away from the shot-blocker.', lvl: 2, from: ['baseline', 'middle', 'wing', 'crossDrive', 'rip'], contact: true },
   { k: 'prohop', label: 'Pro-Hop Layup', cue: 'Hop off one foot onto both, quiet and balanced, then rise to the rim.', lvl: 2, from: ['wing', 'top', 'transition', 'crossDrive', 'hesiDrive'], contact: true },
   { k: 'babyhook', label: 'Baby Hook Finish', cue: 'Shoulder to the rim, ball high, a soft one-hand hook over the reach.', lvl: 1, from: ['middle', 'baseline'], contact: false },
   { k: 'jumpstop', label: 'Jump-Stop Pivot Finish', cue: 'Jump stop on two feet, pivot away from the cone, and finish off the glass.', lvl: 1, from: ['middle', 'top', 'baseline', 'crossDrive'], contact: true },
   { k: 'spin', label: 'Spin-Back Finish', cue: 'Spin off the cone, the ball tight through the turn, and finish on the far side.', lvl: 2, from: ['middle', 'baseline'], contact: false },
+  { k: 'twofloater', label: 'Two-Foot Floater', cue: 'Jump stop quiet on the floor, then lift a soft, high floater over the reach.', lvl: 1, from: ['middle', 'top', 'crossDrive', 'hesiDrive'], contact: false },
   { k: 'upunder', label: 'Shot-Fake Step-Through Finish', cue: 'Ball fake up toward the target, then step through under the fake and finish.', lvl: 2, from: ['baseline', 'middle'], contact: true },
 ];
 function finishVariants(): Variant[] {
@@ -173,8 +186,10 @@ const PULL_UPS: readonly [string, string, number, string][] = [
   ['In-and-Out Pull-Up', 'inout', 2, 'Fake the cross with the ball, push it back out, and rise off the stop.'],
   ['Step-Back Jumper', 'step-back', 2, 'Push the floor away from the cone, land balanced and square, then rise.'],
   ['Side-Step Jumper', 'side-step', 2, 'Hop sideways off the drive, land quiet on the floor square to the target, and rise.'],
+  ['Spin Pull-Up', 'spin', 2, 'Spin off the cone with the ball tight, stop square to the target, and rise.'],
+  ['Snatch-Back Pull-Up', 'snatch-back', 2, 'Push the ball out, snatch it back to the hip in one hard bounce, then rise.'],
 ];
-const SPOTS: readonly [string, string, boolean][] = [['Wing', 'wing', true], ['Top', 'top', true], ['Slot', 'slot', true], ['Elbow', 'elbow', false], ['Baseline', 'baseline', false]];
+const SPOTS: readonly [string, string, boolean][] = [['Wing', 'wing', true], ['Top', 'top', true], ['Slot', 'slot', true], ['Elbow', 'elbow', false], ['Baseline', 'baseline', false], ['Free-Throw Line', 'ft-line', false]];
 function pullUpVariants(): Variant[] {
   const out: Variant[] = [];
   for (const [label, k, l, cue] of PULL_UPS) for (const [spot, sk, three] of SPOTS) {
@@ -186,18 +201,22 @@ function pullUpVariants(): Variant[] {
       setup: `Start a step beyond the ${spot.toLowerCase()} spot inside the arc, ball in triple threat.`,
     }));
     if (three) out.push(va(`${label}, ${spot} Three`, key(v, 'three'), l + 1, { base: v, ladder: k, cue, setup: `Start a step beyond the three-point line at the ${spot.toLowerCase()}, ball in triple threat.`, goals: ['shooting'] }));
+    if (three) out.push(va(`${label}, ${spot} Three, Toward the Weak Hand`, key(v, 'three-weak'), l + 2, {
+      base: v, ladder: k, cue: 'Go toward your weaker hand from beyond the arc: the ball low and tight, same stop, same rise.', setup: `Start a step beyond the three-point line at the ${spot.toLowerCase()}, ball in triple threat.`,
+    }));
   }
   return out;
 }
 const CUTS: readonly [string, string, string, [string, string, boolean][]][] = [
   ['off a V-Cut', 'v-cut', 'Walk the cone in, then push the floor away and pop out to the spot with hands ready.', [['Wing', 'wing', true]]],
   ['off an L-Cut', 'l-cut', 'Walk up the lane, then cut flat out to the spot with hands ready for the ball.', [['Wing', 'wing', true], ['Elbow', 'elbow', false]]],
-  ['off a Flare Cut', 'flare', 'Fade away from the ball off the cone, feet set before the catch.', [['Wing', 'wing', true]]],
+  ['off a Flare Cut', 'flare', 'Fade away from the ball off the cone, feet set before the catch.', [['Wing', 'wing', true], ['Corner', 'corner', true]]],
   ['off a Curl Cut', 'curl', 'Curl tight around the cone toward the ball, then stop square to the rim.', [['Elbow', 'elbow', false]]],
   ['off a Fade to the Corner', 'fade', 'Drift to the corner as the drive goes the other way, set on the spot for the catch.', [['Corner', 'corner', true]]],
   ['off a Lift from the Corner', 'lift', 'Lift from the corner to the wing as the ball moves, hands ready on the catch.', [['Wing', 'wing', true]]],
   ['after a Relocation', 'relocate', 'Pass, then move one spot along the arc and catch it back, feet set.', [['Corner', 'corner', true], ['Wing', 'wing', true]]],
   ['off a Screen Pop', 'pop', 'Set the screen on the cone, then pop out to the spot with hands ready.', [['Top', 'top', true], ['Wing', 'wing', true]]],
+  ['off a Dribble Hand-Off', 'handoff', 'Run past the partner, take the ball from their hands, and rise off the hand-off.', [['Top', 'top', true], ['Wing', 'wing', true]]],
 ];
 function catchAndShootVariants(): Variant[] {
   const out: Variant[] = [];
@@ -258,12 +277,16 @@ const CLOSE_FROM: readonly [string, string, string][] = [
   ['from Help Side', 'help', 'Start in help-side stance on the far block, a partner with the ball at the wing.'],
   ['from the Paint', 'paint', 'Start in the middle of the paint, a partner with the ball at the wing.'],
   ['from the Baseline', 'baseline', 'Start under the rim, a partner with the ball in the corner.'],
+  ['from the Opposite Elbow', 'elbow', 'Start at the far elbow, a partner with the ball at the top of the key.'],
+  ['from the Nail', 'nail', 'Start at the middle of the free-throw line, a partner with the ball at the wing.'],
+  ['from the Opposite Wing', 'opp-wing', 'Start on the far wing, a partner with the ball in the near corner.'],
 ];
 const CLOSE_TO: readonly [string, string, string][] = [
   ['to Contest', 'contest', 'Sprint, then chop the feet short and get a high hand up toward the ball.'],
   ['to Cut Off the Drive', 'cut-off', 'Chop the feet, then slide to beat the partner to the spot, chest square.'],
   ['to Drop Step and Slide', 'drop-slide', 'Chop short steps on the floor, then open on a drop step and slide with the drive.'],
   ['to Box-Out', 'box-out', 'Contest the shot, then turn, find the partner and hold them off the rim.'],
+  ['to Retreat Slide', 'retreat', 'Chop short steps on the floor, then retreat-slide two steps to stay in front of the drive.'],
 ];
 function closeoutVariants(): Variant[] {
   const out: Variant[] = [];
@@ -272,7 +295,7 @@ function closeoutVariants(): Variant[] {
   }
   return out;
 }
-const DEF_DRILLS: readonly [string, string, number, string, string?][] = [
+const DEF_DRILLS: readonly [string, string, number, string, ('partner' | 'hoop')?][] = [
   ['Lane Line Slides', 'lane-slides', 0, 'Slide lane line to lane line, touching each line on the floor, low and level.'],
   ['Slide, Drop Step, Slide', 'slide-drop-slide', 1, 'Three slides, open on a drop step at the cone, three slides back the other way.'],
   ['Slide to Sprint Recovery', 'slide-sprint', 1, 'Slide until the cone, then turn and sprint to the next cone to beat the ball there.'],
@@ -298,7 +321,16 @@ const DEF_DRILLS: readonly [string, string, number, string, string?][] = [
   ['Crash and Box Rebounding', 'crash-box', 1, 'Crash to the rim on the shot, find a body, and hold your spot to the ball.'],
   ['Rebound Pursuit Drill', 'pursuit', 1, 'Chase every miss off the rim and catch it at its highest point.'],
   ['Box-Out Hold vs Push', 'box-hold', 0, 'Sit low and wide on the spot and hold it against the partner\'s push for the count.', 'partner'],
+  ['Free Throws, Make Two to Leave', 'ft-two', 1, 'Shoot two; leave only when both go in, then sprint to the far line and back.', 'hoop'],
+  ['Free Throws After a Sprint', 'ft-sprint', 1, 'Sprint to half court and back, then step to the line and run the same routine.', 'hoop'],
+  ['Free-Throw Routine, Five in a Row', 'ft-five', 0, 'Same routine every shot, eyes on the target, until five drop in a row.', 'hoop'],
   ['Offensive Rebound Swim Move', 'swim', 1, 'Swim the arm over the partner\'s box-out and get a foot to the rim first.', 'partner'],
+  ['Slide and Contest', 'slide-contest', 1, 'Slide with the drive to the cone, then stop and get a high hand up toward the ball.'],
+  ['Closeout and Chase Over the Screen', 'chase-screen', 2, 'Close out, then chase the partner over the cone screen, staying on their hip.', 'partner'],
+  ['Defensive Stance Hand Fighting', 'hand-fight', 1, 'Stay low and level while a partner reaches; keep a hand in the passing lane to the ball.', 'partner'],
+  ['Weak-Side Help Rotation Drill', 'weak-help', 1, 'From the weak-side block, rotate to the cone on the drive, square and still, then recover.'],
+  ['Defensive Wall Slides', 'wall-slides-def', 0, 'Back to the wall, sit into the stance and slide along the wall, low and level.'],
+  ['Transition Defense Get-Back Sprint', 'get-back', 0, 'On the call, sprint back past half court, turn and find the ball in a stance.'],
 ];
 
 // ── passing: pass × context ───────────────────────────────────────────────────────────────────────────────────────
@@ -315,6 +347,9 @@ const PASSES: readonly [string, string, number, string, ('partner' | 'move' | 'd
   ['Lob Pass', 'lob', 1, 'Loft the ball high to the target over the reach of the cone, soft on the catch.', ['partner', 'dribble']],
   ['Hook Pass', 'hook', 2, 'Shoulder to the cone, swing the ball high over the top to the partner.', ['partner', 'move']],
   ['Kick-Out Pass', 'kick-out', 1, 'Drive two dribbles at the cone, then pass out to the partner on the arc, on a line.', ['dribble']],
+  ['Pass-Fake Pass', 'fake', 1, 'Fake the pass one way with the ball, then step and pass to the partner the other way.', ['partner', 'move']],
+  ['Jump-Stop Pass', 'jump-stop', 1, 'Jump stop on two feet at the cone, pivot, and pass to the partner on a line.', ['dribble']],
+  ['Two-Ball Partner Pass', 'two-ball', 2, 'Pass one ball as the partner passes the other: chest to bounce, on the count.', ['partner']],
 ];
 function passingVariants(): Variant[] {
   const out: Variant[] = [];
@@ -338,6 +373,7 @@ const SPOT_SHOTS: readonly [string, string, boolean, boolean][] = [
   // spot, key, has sides, has a three
   ['Corner', 'corner', true, true], ['Wing', 'wing', true, true], ['Slot', 'slot', true, true], ['Top', 'top', false, true],
   ['Elbow', 'elbow', true, false], ['Short Corner', 'short-corner', true, false], ['Block Bank Shot', 'block', true, false],
+  ['Free-Throw Line', 'ft-line', false, false],
 ];
 function spotShootingVariants(): Variant[] {
   const out: Variant[] = [];
@@ -352,6 +388,9 @@ function spotShootingVariants(): Variant[] {
       }));
       out.push(va(`Catch-and-Shoot from a Pass, ${label}`, key(v, 'pass'), rk === 'three' ? 1 : 0, {
         base: v, ladder: sk, cue: 'Hands ready as a target, catch square to the target, and rise in one motion.', setup: `Stand at the ${label.toLowerCase()} spot; a partner passes from the top or the paint.`,
+      }));
+      if (rk === 'three') out.push(va(`Shot Fake and One-Dribble Jumper, ${label}`, key(v, 'fake'), 2, {
+        base: v, ladder: sk, cue: 'Ball fake up toward the target, one hard dribble inside the arc, stop square and rise.', setup: `Stand at the ${label.toLowerCase()} spot; a partner passes and closes out.`,
       }));
     }
   }
@@ -499,7 +538,7 @@ export const LATER_BASKETBALL: Family[] = [
       { fault: 'Bouncing up and down', fix: 'Stay low and level, like under a low ceiling.' },
     ],
     dosage: reps(3, '4', 30),
-    variants: DEF_DRILLS.map(([name, v, l, cue, partner]) => va(name, v, l, { cue, ...(partner ? { equipment: ['basketball', 'cone'] } : {}) })),
+    variants: DEF_DRILLS.map(([name, v, l, cue, kit]) => va(name, v, l, { cue, ...(kit === 'partner' ? { equipment: ['basketball', 'cone'] } : kit === 'hoop' ? { equipment: ['basketball', 'hoop'], goals: ['shooting'] } : {}) })),
   },
   {
     ...BB, family: 'passing-2', block: 'basketball-passing-2', category: 'sport-skill', pattern: 'push', plane: 'sagittal', laterality: 'bilateral', skillLayer: 'speed', braceMode: 'reflex',

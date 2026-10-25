@@ -92,7 +92,7 @@ function calfVariants(): Variant[] {
   ];
   for (const [kn, kk, kl] of knees) for (const [st, sk, sl] of stances) for (const [r, rk, rl, cue, equipment] of ranges) {
     const name = rk === 'iso' ? `${kn} ${st} Calf Raise ${r}` : `${kn} ${st} Calf Raise ${r}`;
-    out.push(va(name, key(kk, sk, rk), kl + sl + rl, { cue, equipment, laterality: sk === 'single' ? 'unilateral' : 'bilateral', ladder: key(kk, rk), ...(rk === 'iso' ? { dosage: secs(4, 30, 45) } : {}) }));
+    out.push(va(name, key(kk, sk, rk), kl + sl + rl, { cue, equipment, laterality: sk === 'single' ? 'unilateral' : 'bilateral', ladder: key(kk, rk), ...(rk === 'iso' ? { dosage: secs(4, 30, 45) } : {}), ...(sk === 'single' ? { goals: ['balance'] } : {}) }));
   }
   return out;
 }
@@ -106,6 +106,11 @@ const FOOT: readonly [string, string, number, string, Variant['equipment'], Part
   ['Single-Leg Balance, Reach and Touch', 'balance-reach', 1, 'Stand on one leg and reach down to touch a cone in front, then stand tall.', ['cone'], { goals: ['balance'] }],
   ['Single-Leg Balance, Band Pull', 'balance-band', 2, 'Stand on one leg while a partner pulls a band at the hips from the side; stay still.', ['band'], { goals: ['balance'] }],
   ['Single-Leg Balance on a Folded Mat, Head Turns', 'balance-mat-turns', 2, 'On a folded mat, turn the eyes slowly from wall to wall, the foot quiet.', ['mat'], { goals: ['balance'] }],
+  ['Single-Leg Hinge Reach to a Cone', 'hinge-cone', 1, 'Stand on one leg, hinge and touch the cone on the floor ahead, then stand tall.', ['cone'], { goals: ['balance'] }],
+  ['Calf Raise, Toes Turned In', 'calf-in', 0, 'Toes turned in a little, rise straight up over the big toe and lower slow.', ['wall']],
+  ['Calf Raise, Toes Turned Out', 'calf-out', 0, 'Toes turned out a little, rise straight up over the big toe and lower slow.', ['wall']],
+  ['Short-Foot Single-Leg Balance', 'short-foot-sl', 1, 'Lift the arch without curling the toes, then stand on that leg and hold still on the floor.', [], { goals: ['balance'] }],
+  ['Band Toe Splay', 'toe-splay', 0, 'A small band around the toes: spread them wide against it on the floor, hold, release.', ['mini-band']],
 ];
 const HIP: readonly [string, string, number, string, Variant['equipment'], Partial<Variant>?][] = [
   ['Copenhagen Hold, Knee on Bench', 'cph-knee', 0, 'Side plank with the top knee on a bench and hold still, the bottom leg tucked.', ['bench']],
@@ -123,6 +128,9 @@ const HIP: readonly [string, string, number, string, Variant['equipment'], Parti
   ['Standing Band Hip Flexion March', 'flex-march', 0, 'Band around the feet, lift one knee up toward the ceiling against it, slow.', ['mini-band']],
   ['Hip Airplane, Supported', 'airplane-sup', 1, 'Stand on one leg holding a wall, hinge, then turn the belt line open and closed, slow.', ['wall'], { goals: ['balance'] }],
   ['Side-Lying Hip Abduction Hold', 'abd-hold', 0, 'Lie on your side and hold the top leg up toward the ceiling, still, for the count.', ['mat']],
+  ['Lateral Band Walk, Low Squat', 'band-walk-low', 1, 'Mini band at the ankles: sit into a low squat and step sideways along the floor, low and level.', ['mini-band']],
+  ['Backward Band Monster Walk', 'monster-back', 1, 'Mini band at the ankles: walk backward on the diagonal, the band staying tight.', ['mini-band']],
+  ['Hip Airplane to Cone Touch', 'airplane-cone', 2, 'On one leg, hinge, turn the belt line open and closed, then touch the cone on the floor.', ['cone'], { goals: ['balance'] }],
 ];
 const SMALL: readonly [string, string, number, string, Variant['equipment'], Partial<Variant>?][] = [
   ['Dumbbell Wrist Flexion', 'wrist-flex', 0, 'Forearm on a bench, palm up, curl the light weight up and lower it slow.', ['dumbbell', 'bench'], { goals: ['grip'] }],
@@ -148,14 +156,16 @@ const FORMATS: readonly [string, string, number, number, number, number, string]
   ['60/60 Repeats', '60-60', 1, 6, 60, 60, 'One minute strong, one minute easy: steady breathing on the easy minute.'],
   ['3-Minute Repeats', '3-min', 1, 4, 180, 90, 'Three minutes at a pace you could talk in short phrases.'],
   ['Pyramid Intervals', 'pyramid', 2, 1, 600, 0, 'Fifteen, thirty, forty-five, sixty seconds on with the same off, then back down.'],
+  ['4-Minute Tempo Repeats', '4-min', 1, 4, 240, 120, 'Four minutes at a steady, strong pace you could hold for twenty, then two easy.'],
 ];
 const MODES: readonly [string, string, string, Variant['equipment'], string[], string][] = [
   // label, key, base id, equipment, formats, setup
-  ['Bike', 'bike', 'bike-sprint-intervals', ['bike'], ['10-20', '15-15', '20-40', '30-30', '20-10', '60-60', '3-min', 'pyramid'], 'Set the seat so the knee stays a little bent at the bottom of the pedal.'],
-  ['Rower', 'rower', 'rower-intervals', ['rower'], ['15-15', '20-40', '30-30', '20-10', '60-60', '3-min', 'pyramid'], 'Feet strapped in, handle at the finish, the chain level.'],
-  ['Treadmill', 'treadmill', '', ['treadmill'], ['15-15', '30-30', '60-60', '3-min'], 'Straddle the belt to start and stop; hop on once it is up to speed.'],
-  ['Court Sprint', 'court', 'court-shuttle-run', [], ['10-20', '15-15', '20-40', '30-30'], 'Sprint baseline to baseline on a court or between two lines 25 metres apart.'],
-  ['Jump Rope', 'rope', 'basic-rope-jump', ['jump-rope'], ['30-30', '60-60', '20-10'], 'Rope behind the heels, handles at the hips.'],
+  ['Bike', 'bike', 'bike-sprint-intervals', ['bike'], ['10-20', '15-15', '20-40', '30-30', '20-10', '60-60', '3-min', 'pyramid', '4-min'], 'Set the seat so the knee stays a little bent at the bottom of the pedal.'],
+  ['Rower', 'rower', 'rower-intervals', ['rower'], ['10-20', '15-15', '20-40', '30-30', '20-10', '60-60', '3-min', 'pyramid', '4-min'], 'Feet strapped in, handle at the finish, the chain level.'],
+  ['Treadmill', 'treadmill', '', ['treadmill'], ['15-15', '20-40', '30-30', '60-60', '3-min', '4-min'], 'Straddle the belt to start and stop; hop on once it is up to speed.'],
+  ['Court Sprint', 'court', 'court-shuttle-run', [], ['10-20', '15-15', '20-40', '30-30', '60-60'], 'Sprint baseline to baseline on a court or between two lines 25 metres apart.'],
+  ['Jump Rope', 'rope', 'basic-rope-jump', ['jump-rope'], ['15-15', '30-30', '60-60', '20-10'], 'Rope behind the heels, handles at the hips.'],
+  ['Sled Push', 'sled', 'light-sled-push', ['sled'], ['20-40', '30-30', '60-60'], 'Load the sled light enough to keep moving at a run.'],
   ['Defensive Slide', 'slide', '', ['cone'], ['15-15', '20-40', '30-30'], 'Two cones 4 metres apart; slide between them in a low stance.'],
   ['Stair Climb', 'stairs', '', ['step'], ['30-30', '60-60'], 'A flight of stairs or a long step; walk or run back down easy.'],
 ];
@@ -184,6 +194,40 @@ const COURT: readonly [string, string, number, string, Variant['equipment']][] =
   ['Burpee Intervals', 'burpee-int', 1, 'Twenty seconds of smooth burpees, forty easy: every rep lands quiet on the floor.', []],
   ['Bear Crawl Intervals', 'crawl-int', 1, 'Bear crawl along the floor for twenty seconds, forty easy, the knees low.', []],
   ['Shuttle Run Pyramid', 'shuttle-pyramid', 2, 'Shuttle to the 5, 10, 15 and 20 metre lines and back, then down again.', ['cone']],
+];
+
+const ISO_HOLDS: readonly [string, string, number, string, Variant['equipment'], Partial<Variant>?][] = [
+  ['Hamstring Heel-Dig Hold, Knee Bent', 'ham-dig-bent', 0, 'Lie face-up, heel on a box with the knee bent; dig the heel down into the box and hold, the hips up.', ['box', 'mat'], { goals: ['knee'], primary: ['hamstrings'] }],
+  ['Hamstring Heel-Dig Hold, Knee Long', 'ham-dig-long', 1, 'Lie face-up, heel on a box with the knee nearly straight; dig the heel down into the box and hold.', ['box', 'mat'], { goals: ['knee'], primary: ['hamstrings'] }],
+  ['Single-Leg Heel-Dig Bridge Hold', 'ham-dig-sl', 2, 'One heel on the box, the other leg lifted: dig the heel into the box and hold the hips up.', ['box', 'mat'], { goals: ['knee'], primary: ['hamstrings'] }],
+  ['Adductor Ball Squeeze, Knees Bent', 'squeeze-bent', 0, 'Lie face-up, knees bent, a ball between the knees; squeeze the ball and hold.', ['medicine-ball', 'mat'], { goals: ['hip'], primary: ['adductors'] }],
+  ['Adductor Ball Squeeze, Legs Long', 'squeeze-long', 1, 'Lie face-up, legs long, a ball between the ankles; squeeze the ball and hold.', ['medicine-ball', 'mat'], { goals: ['hip'], primary: ['adductors'] }],
+  ['Adductor Ball Squeeze, Bridge', 'squeeze-bridge', 1, 'Bridge up with a ball between the knees; squeeze the ball and hold the hips up.', ['medicine-ball', 'mat'], { goals: ['hip'], primary: ['adductors'] }],
+  ['Doorway External Rotation Hold', 'door-er', 0, 'Stand in a doorway, elbow bent at your side, the back of the hand against the frame; push into the frame and hold.', [], { goals: ['shoulder'], primary: ['rotator-cuff'] }],
+  ['Doorway Internal Rotation Hold', 'door-ir', 0, 'Stand in a doorway, elbow bent at your side, the palm against the frame; push into the frame and hold.', [], { goals: ['shoulder'], primary: ['rotator-cuff'] }],
+  ['Prone External Rotation at 90 on a Bench', 'prone-er', 1, 'Lie face-down on a bench, upper arm out level with the shoulder; rotate the light weight up toward the ceiling, slow.', ['bench', 'dumbbell'], { goals: ['shoulder'], primary: ['rotator-cuff'] }],
+  ['Side-Lying Internal Rotation', 'side-ir', 0, 'Lie on your side, elbow bent on the floor; rotate the light weight up toward the ceiling, slow.', ['dumbbell', 'mat'], { goals: ['shoulder'], primary: ['rotator-cuff'] }],
+  ['Band Ankle Turn-Out Hold', 'ankle-out-hold', 0, 'Seated, band around the forefoot from the side; hold the foot turned out against it.', ['band', 'mat'], { goals: ['ankle'], primary: ['calves'] }],
+  ['Band Ankle Turn-In Hold', 'ankle-in-hold', 0, 'Seated, band around the forefoot from the side; hold the foot turned in against it.', ['band', 'mat'], { goals: ['ankle'], primary: ['tibialis'] }],
+  ['Wall Tibialis Hold', 'tib-hold', 0, 'Lean back against a wall, heels out a step; lift the toes toward the ceiling and hold.', ['wall'], { goals: ['ankle'], primary: ['tibialis'] }],
+  ['Isometric Glute Bridge, Single Leg', 'bridge-sl-hold', 1, 'Bridge up on one leg and hold still, the belt line level.', ['mat'], { goals: ['hip'], primary: ['glutes'] }],
+  ['Side Plank Hip Hold, Top Leg Up', 'side-top-hold', 1, 'Short side plank on the knees with the top leg lifted toward the ceiling; hold still.', ['mat'], { goals: ['hip'], primary: ['glute-med'] }],
+  ['Isometric Split Squat, Back Knee Hover', 'split-hover', 1, 'Sink until the back knee hovers an inch off the floor and hold still.', [], { goals: ['knee'], primary: ['quads'] }],
+  ['Isometric Calf Raise on a Step, Single Leg', 'calf-step-hold', 1, 'On one leg on a step, rise to halfway and hold still, a rail for balance.', ['step'], { goals: ['ankle'], primary: ['calves'] }],
+  ['Wrist Plank Rock', 'wrist-rock', 0, 'High plank on the floor: rock forward over the hands and back, slow.', ['mat'], { goals: ['grip'], primary: ['forearms'] }],
+  ['Wall Press External Rotation Hold, Arm Raised', 'wall-er-raised', 1, 'Stand side-on to a wall, upper arm level with the shoulder, the back of the hand on the wall; press and hold.', ['wall'], { goals: ['shoulder'], primary: ['rotator-cuff'] }],
+  ['Isometric Calf Hold, Bent Knee', 'calf-bent-hold', 0, 'Sit on a bench, a weight on the knees; rise onto the toes and hold still.', ['bench', 'dumbbell'], { goals: ['ankle'], primary: ['soleus'] }],
+  ['Wall Sit, Single-Leg Lift', 'wall-sit-lift', 2, 'In a wall sit, lift one foot an inch off the floor and hold still.', ['wall'], { goals: ['knee'], primary: ['quads'] }],
+  ['Band Scap Retraction Hold', 'scap-hold', 0, 'Hold a band at chest height, arms long; pull it apart a little and hold still.', ['band'], { goals: ['shoulder', 'posture'], primary: ['mid-back'] }],
+  ['Chin Tuck Hold Against the Floor', 'chin-floor', 0, 'Lie face-up, head on the floor; nod the chin a little and press the back of the head gently into the floor, hold.', ['mat'], { goals: ['posture'], primary: ['neck'] }],
+];
+const CARRIES: readonly [string, string, number, string, Variant['equipment']][] = [
+  ['Farmer Carry Intervals', 'farmer-int', 1, 'Carry for 30 seconds tall and quick, then set the weights down and rest 30.', ['kettlebell']],
+  ['Sandbag Carry Intervals', 'sandbag-int', 1, 'Bear-hug the bag and walk for 30 seconds, then set it down and rest 30.', ['sandbag']],
+  ['Sled Push Intervals', 'sled-int', 1, 'Push the sled 20 metres, rest while a partner goes, repeat.', ['sled']],
+  ['Sled Drag Intervals', 'sled-drag-int', 0, 'Drag the sled backward 20 metres, rest 40 seconds, repeat.', ['sled']],
+  ['Med Ball Slam Intervals', 'slam-int', 1, 'Twenty seconds of hard slams into the floor, forty easy.', ['slam-ball']],
+  ['Shuffle-Sprint Box Intervals', 'shuffle-box-int', 1, 'Shuffle, sprint, backpedal, shuffle around four cones for 20 seconds, 40 easy.', ['cone']],
 ];
 
 export const LATER_PREHAB: Family[] = [
@@ -244,7 +288,7 @@ export const LATER_PREHAB: Family[] = [
     faults: [
       { fault: 'The foot rolling onto its edge', fix: 'Press the big-toe joint back down into the floor.' },
     ],
-    dosage: reps(3, '10', 30), variants: FOOT.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(over ?? {}) })),
+    dosage: reps(3, '10', 30), variants: FOOT.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(/balance|hold/i.test(name) ? { dosage: secs(3, 30, 15) } : {}), ...(over ?? {}) })),
   },
   {
     ...PRE, family: 'hip-capacity', block: 'prehab-hip-2', pattern: 'other', plane: 'frontal', laterality: 'unilateral', skillLayer: 'strength',
@@ -255,7 +299,7 @@ export const LATER_PREHAB: Family[] = [
     faults: [
       { fault: 'Rolling back to make the lift bigger', fix: 'Stack the belt line level and keep the lift small and clean.' },
     ],
-    dosage: reps(3, '10 each side', 30), variants: HIP.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(over ?? {}) })),
+    dosage: reps(3, '10 each side', 30), variants: HIP.map(([name, k, l, cue, equipment, over]) => va(name, k, l, { cue, equipment, ...(/hold/i.test(name) ? { dosage: secs(3, 20, 30) } : {}), ...(over ?? {}) })),
   },
   {
     ...PRE, family: 'wrist-and-neck', block: 'prehab-shoulder-2', pattern: 'other', plane: 'multi', laterality: 'unilateral', skillLayer: 'joints',
@@ -291,5 +335,28 @@ export const LATER_PREHAB: Family[] = [
       { fault: 'Standing tall into the turns', fix: 'Lower before the line, then push the floor away from it.' },
     ],
     dosage: reps(6, '1', 60), variants: COURT.map(([name, k, l, cue, equipment]) => va(name, k, l, { cue, equipment })),
+  },
+  {
+    ...PRE, family: 'isometric-capacity', block: 'prehab-hip-2', pattern: 'other', plane: 'multi', laterality: 'bilateral', skillLayer: 'strength',
+    primary: ['hamstrings'], secondary: [], goals: ['knee'], sport: ['general', 'basketball', 'soccer', 'volleyball'],
+    lowLoad: ['back', 'wrist'], equipment: [], clip: 'brace',
+    setup: 'Take the position named.',
+    cues: ['Push steadily into the resistance and hold still.', 'Smooth breathing the whole hold.', 'Build the push slowly over the first few seconds.'],
+    faults: [
+      { fault: 'Holding the breath', fix: 'Breathe out slowly through the mouth the whole hold.' },
+      { fault: 'Jerking into the push', fix: 'Build the push slowly over the first few seconds.' },
+    ],
+    dosage: secs(3, 30, 30), variants: ISO_HOLDS.map(([name, k, l, setup, equipment, over]) => va(name, k, l, { setup, equipment, ...(over ?? {}) })),
+  },
+  {
+    family: 'loaded-conditioning', block: 'conditioning-2', batch: BATCH, category: 'conditioning', pattern: 'carry', plane: 'sagittal', laterality: 'bilateral', skillLayer: null, braceMode: 'set',
+    primary: ['forearms', 'quads', 'glutes'], secondary: ['traps', 'deep-core', 'calves'], goals: ['conditioning'], sport: ['general', 'basketball', 'football'],
+    lowLoad: ['knee'], youthOk: true, equipment: [], clip: 'carry',
+    setup: 'Set up the load and the distance before you start the clock.',
+    cues: ['Tall and quick, the load quiet.', 'Set the load down under control at the end.', 'Same pace on every round.'],
+    faults: [
+      { fault: 'Leaning or twisting under the load', fix: 'Grow tall toward the ceiling; lighten the load if it pulls you over.' },
+    ],
+    dosage: secs(6, 30, 30), variants: CARRIES.map(([name, k, l, cue, equipment]) => va(name, k, l, { cue, equipment, pattern: k.startsWith('farmer') || k.startsWith('sandbag') ? 'carry' : k === 'slam-int' ? 'other' : 'locomotion' })),
   },
 ];

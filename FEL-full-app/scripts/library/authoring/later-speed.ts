@@ -31,6 +31,9 @@ function startVariants(): Variant[] {
     out.push(va(`${label}, 10 m Sprint`, key(k, '10'), l, { setup, cue, dosage: meters(5, 10, 60), ladder: k }));
     out.push(va(`${label}, 5 m Sprint`, key(k, '5'), l, { base: key(k, '10'), setup, cue, dosage: meters(6, 5, 45), ladder: k }));
     out.push(va(`${label}, 20 m Sprint`, key(k, '20'), l + 1, { base: key(k, '10'), setup, cue: `${cue.replace(/\.$/, '')}, then rise tall as the speed builds.`, dosage: meters(4, 20, 90), ladder: k }));
+    out.push(va(`Band-Resisted ${label}, 10 m Sprint`, key(k, 'band'), l + 1, {
+      base: key(k, '10'), setup: `${setup} A partner holds a band around the hips from behind.`, cue: `${cue.replace(/\.$/, '')} against the band.`, equipment: ['cone', 'band'], dosage: meters(5, 10, 60), ladder: k,
+    }));
   }
   for (const [id, label] of EXISTING_STARTS) {
     out.push(va(`${label}, 5 m Sprint`, key(id, '5'), 0, { base: `id:${id}`, cue: 'Drive the first three steps low, pushing the floor back behind you.', dosage: meters(6, 5, 45) }));
@@ -63,7 +66,21 @@ const DEVELOP: readonly [string, string, number, string, Partial<Variant>][] = [
   ['Fast-Leg Drill', 'fast-leg', 1, 'Every third step, cycle the leg fast and strike the floor right under you.', { dosage: meters(3, 20, 45) }],
   ['Straight-Leg Run', 'straight-leg-run', 1, 'Run with stiff legs, striking the floor under the hips with quick, short pulls.', { dosage: meters(3, 20, 30) }],
   ['Skip to Sprint', 'skip-sprint', 1, 'A-skip for 10 metres, then go straight into a sprint to the cone.', { base: 'id:a-skip', equipment: ['cone'], dosage: meters(4, 20, 60) }],
+  ['Hill Sprint, 20 m', 'hill-20', 1, 'Drive up the hill 20 metres, the steps short and powerful, then walk down.', { base: 'id:hill-sprint', dosage: meters(6, 20, 90) }],
+  ['Hill Sprint, 40 m', 'hill-40', 2, 'Drive up the hill 40 metres, tall as the speed builds, then walk down.', { base: 'id:hill-sprint', dosage: meters(4, 40, 150) }],
+  ['Sled-Resisted Sprint, 20 m', 'sled-20', 1, 'Lean into the harness and drive the sled 20 metres, the floor pushed back.', { equipment: ['sled'], base: 'id:sled-resisted-sprint', dosage: meters(4, 20, 120) }],
+  ['Band-Resisted Sprint, 5 m', 'band-5', 0, 'Drive out 5 metres against the band, three hard steps and stop.', { equipment: ['band'], base: 'id:band-resisted-sprint', dosage: meters(6, 5, 45) }],
+  ['Mini-Hurdle A-Run', 'hurdle-a-run', 1, 'Run over the mini hurdles with the knee driving up and the floor struck right under you.', { equipment: ['mini-hurdle'], dosage: reps(3, '2 runs', 45) }],
+  ['Mini-Hurdle Lateral Run', 'hurdle-lat-run', 1, 'Side-on, run over each mini hurdle quick and light on the floor, never touching a hurdle.', { equipment: ['mini-hurdle'], plane: 'frontal', dosage: reps(3, '2 runs', 45) }],
+  ['Mini-Hurdle High-Knee Run', 'hurdle-high-knee', 0, 'One quick step between each mini hurdle, tall, the floor hit under you.', { equipment: ['mini-hurdle'], dosage: reps(3, '2 runs', 45) }],
   ['Build-Up Strides', 'strides', 0, 'Build smoothly to about 80 percent over the distance, tall and smooth.', { base: 'id:build-up-run', dosage: meters(4, 60, 60) }],
+  ['Partner-Chase Start', 'chase', 1, 'Start a metre behind the partner; when they go, chase and try to tag them before the cone.', { equipment: ['cone'], dosage: meters(5, 15, 60) }],
+  ['Partner Tag Escape Sprint', 'escape', 1, 'A partner starts a metre behind you; go on their move and beat them to the cone.', { equipment: ['cone'], dosage: meters(5, 15, 60) }],
+  ['5-10-5 Shuttle with a Dribble', 'pro-dribble', 1, 'Run the 5-10-5 dribbling, the ball on the outside hand at each touch.', { equipment: ['cone', 'basketball'], base: 'id:5-10-5-shuttle', sport: ['basketball'], goals: ['agility', 'handles'], dosage: reps(4, '1', 60) }],
+  ['T-Drill with a Dribble', 't-dribble', 2, 'Run the T dribbling: sprint, shuffle, shuffle, backpedal, the ball low.', { equipment: ['cone', 'basketball'], base: 'id:t-drill', sport: ['basketball'], goals: ['agility', 'handles'], dosage: reps(4, '1', 60) }],
+  ['Three-Cone L-Drill with a Dribble', 'l-dribble', 2, 'Run the L dribbling, changing to the outside hand around each cone.', { equipment: ['cone', 'basketball'], base: 'id:three-cone-l-drill', sport: ['basketball'], goals: ['agility', 'handles'], dosage: reps(4, '1', 60) }],
+  ['Tempo Run, 100 m', 'tempo-100', 0, 'Run 100 metres at about 70 percent, smooth and tall, then walk back.', { base: 'id:tempo-run', dosage: meters(8, 100, 60) }],
+  ['Tempo Run, 200 m', 'tempo-200', 1, 'Run 200 metres at about 70 percent, smooth and tall, then walk 100.', { base: 'id:tempo-run', dosage: meters(5, 200, 90) }],
 ];
 
 // ── cuts × entry ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -128,6 +145,9 @@ const DECEL: readonly [string, string, number, string, string?][] = [
   ['Backpedal to Stick', 'backpedal', 1, 'Backpedal 10 metres, then stop at the line, low and still.', 'id:decel-to-backpedal'],
   ['Sprint-Stop-Sprint', 'stop-go', 1, 'Sprint to the cone, stop dead in three steps, then sprint to the next cone.', 'id:decel-to-stick'],
   ['Lateral Bound Decel', 'lat-bound', 2, 'Bound sideways and stop the slide on the outside leg at the line.', 'id:lateral-shuffle-decel'],
+  ['Decel to Lateral Shuffle', 'to-shuffle', 1, 'Sprint, stop in three steps at the line, then shuffle out to the side cone.', 'id:decel-to-stick'],
+  ['Decel to Jump Stop', 'jump-stop', 1, 'Sprint, then stop on two feet at the line in a quiet jump stop.', 'id:decel-to-stick'],
+  ['Curved-Run Decel', 'curve-decel', 2, 'Run the curve to the cone and stop square and still at the line.', 'id:decel-to-stick'],
 ];
 const SHUFFLE: readonly [string, string, number, string, string?][] = [
   ['Lateral Shuffle, Three Steps and Stick', 'shuffle-3-stick', 0, 'Shuffle three steps, then stop square and still at the line.', 'id:lateral-shuffle'],
@@ -139,6 +159,10 @@ const SHUFFLE: readonly [string, string, number, string, string?][] = [
   ['Backpedal to Turn and Run', 'backpedal-turn', 1, 'Backpedal, then turn on the call and sprint back past the cone.', 'id:backpedal-to-sprint'],
   ['Carioca to Sprint', 'carioca-sprint', 1, 'Carioca along the line to the cone, then open and sprint.', 'id:carioca'],
   ['High-Knee Carioca', 'carioca-high', 1, 'Carioca with the back knee driving high across the front, quick on the floor.', 'id:carioca'],
+  ['Shuffle-Crossover-Shuffle', 'shuffle-cross-shuffle', 1, 'Shuffle two steps, crossover run two, shuffle two, along the line on the floor.', 'id:lateral-shuffle'],
+  ['Backpedal-Shuffle-Sprint Box', 'box-combo', 1, 'Backpedal, shuffle, sprint and shuffle around four cones, sharp at each one.', 'id:backpedal'],
+  ['Lateral Shuffle to Backpedal', 'shuffle-backpedal', 1, 'Shuffle to the cone, then drop and backpedal to the next one.', 'id:lateral-shuffle'],
+  ['Partner Mirror Backpedal', 'mirror-backpedal', 1, 'Mirror the partner forward and back along the line, staying square to them.', 'id:mirror-drill'],
 ];
 const LADDER: readonly [string, string, number, string, Variant['plane']][] = [
   ['Ladder Lateral One In', 'lat-one-in', 0, 'Side-on to the ladder: one quick, light step in each square on the floor.', 'frontal'],

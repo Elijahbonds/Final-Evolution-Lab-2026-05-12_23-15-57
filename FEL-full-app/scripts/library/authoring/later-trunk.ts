@@ -41,6 +41,8 @@ const PLANKS: readonly [string, string, number, string][] = [
   ['High Plank', 'high', 0, 'Hands under the shoulders, body in one long line.'],
   ['Side Plank', 'side', 1, 'On one forearm, feet stacked, body in one long line.'],
   ['Bear Plank', 'bear', 0, 'Hands and toes on the floor, knees hovering an inch up.'],
+  ['Long-Lever Forearm Plank', 'long-lever', 1, 'Forearms on the floor a little ahead of the shoulders, body in one long line.'],
+  ['Reverse Plank', 'reverse', 1, 'Face-up, hands under the shoulders, heels on the floor, body in one long line.'],
 ];
 const CHALLENGES: readonly [string, string, number, string, Partial<Variant>?][] = [
   ['with Leg Lift', 'leg-lift', 1, 'Lift one foot an inch off the floor and hold, the body still.'],
@@ -48,11 +50,16 @@ const CHALLENGES: readonly [string, string, number, string, Partial<Variant>?][]
   ['with Band Row', 'band-row', 2, 'Row the band toward the floor beside you with one hand, the body still.', { equipment: ['band'] }],
   ['with Knee-to-Elbow', 'knee-elbow', 1, 'Draw one knee in off the floor toward the same-side elbow and back, slow, the line still.'],
   ['with Partner Push', 'partner-push', 2, 'A partner gives light pushes from the sides; stay still, like a table.'],
+  ['with Plate Drag', 'plate-drag', 2, 'Reach under and drag a light plate across the floor to the other side, the body still.', { equipment: ['plate'] }],
 ];
 function plankVariants(): Variant[] {
   const out: Variant[] = [];
   for (const [p, pk, pl, setup] of PLANKS) for (const [c, ck, cl, cue, over] of CHALLENGES) {
     if (pk === 'side' && ck === 'knee-elbow') continue; // the side-plank crunch is its own drill
+    // face-up, a forearm plank and a side plank cannot reach under for a row or a plate; a reverse plank keeps to lifts and pushes
+    if (pk === 'reverse' && !['leg-lift', 'partner-push'].includes(ck)) continue;
+    if (ck === 'plate-drag' && !['high', 'bear'].includes(pk)) continue;
+    if (ck === 'band-row' && ['side', 'forearm', 'long-lever'].includes(pk)) continue;
     out.push(va(`${p} ${c}`, key(pk, ck), pl + cl, { setup, cue, ladder: pk, ...(over ?? {}) }));
   }
   return out;
@@ -67,6 +74,8 @@ const ROLLOUTS: readonly [string, string, number, string, Variant['equipment']][
   ['Stability Ball Knee Tuck', 'ball-tuck', 1, 'High plank, shins on the ball: roll the ball in toward the chest and out.', ['stability-ball']],
   ['Suspension Trainer Fallout', 'trx-fallout', 1, 'Lean into the straps and reach them up toward the ceiling, slow, then back.', ['suspension-trainer']],
   ['Suspension Trainer Pike', 'trx-pike', 2, 'Feet in the straps, high plank: lift the hips toward the ceiling, slow.', ['suspension-trainer']],
+  ['Side Plank Hip Dip', 'side-dip', 1, 'In a side plank, lower the hips toward the floor and lift them back to the line, slow.', ['mat']],
+  ['Side Plank Reach-Through', 'side-reach', 2, 'In a side plank, reach the top hand under the body toward the wall behind, then open up.', ['mat']],
 ];
 
 // ── med-ball throws: throw × stance ───────────────────────────────────────────────────────────────────────────────
@@ -77,8 +86,12 @@ const THROWS: readonly [string, string, number, string, Variant['pattern']][] = 
   ['Rotational Scoop Toss', 'scoop', 1, 'Load the back hip, then turn and scoop the ball into the wall, fast.', 'rotation'],
   ['Rotational Shot Put', 'shot-put', 1, 'Ball at the shoulder, turn and push it into the wall like a shot put.', 'rotation'],
   ['Side Toss', 'side-toss', 1, 'Swing the ball across the body and let it fly into the wall beside you.', 'rotation'],
+  ['Underhand Scoop Throw', 'underhand', 0, 'Swing the ball low between the knees, then drive the floor away and throw it up the wall.', 'hinge'],
+  ['Single-Arm Push Throw', 'single-push', 1, 'Ball in one hand at the shoulder, step and push it into the wall fast.', 'push'],
+  ['Rotational Overhead Throw', 'rot-overhead', 2, 'Ball overhead, turn and throw it down across the body into the wall.', 'rotation'],
 ];
 const THROW_STANCES: readonly [string, string, number, string][] = [
+  ['Standing', 'standing', 0, 'Stand square or side-on a step from the wall, feet hip-width, ball at the chest.'],
   ['Tall-Kneeling', 'tall-kneeling', 0, 'Tall-kneel on a mat facing the wall, ball at the chest.'],
   ['Half-Kneeling', 'half-kneeling', 0, 'Half-kneel on a mat, side-on or facing the wall, ball at the chest.'],
   ['Split-Stance', 'split', 0, 'Split stance a step from the wall, ball at the chest.'],
@@ -93,6 +106,17 @@ function throwVariants(): Variant[] {
   return out;
 }
 
+const DEAD_BUG: readonly [string, string, number, string, Variant['equipment']][] = [
+  ['Dead Bug with Ball Squeeze', 'ball', 0, 'Squeeze a ball between the hands and knees, then reach one arm and the opposite leg long toward the floor.', ['stability-ball', 'mat']],
+  ['Dead Bug with Plate Hold', 'plate', 1, 'Hold a light plate up toward the ceiling while the legs take turns reaching toward the floor.', ['plate', 'mat']],
+  ['Dead Bug with Kettlebell Press', 'kb', 1, 'Press a light bell up toward the ceiling with one hand; the opposite leg reaches toward the floor.', ['kettlebell', 'mat']],
+  ['Dead Bug, Wall Press', 'wall', 0, 'Hands press into a wall behind the head while the legs take turns reaching toward the floor.', ['wall', 'mat']],
+  ['Dead Bug, Legs Only', 'legs', 0, 'Arms on the floor; the legs take turns reaching long toward the floor, slow.', ['mat']],
+  ['Bird Dog with Band Row', 'bird-band', 1, 'On hands and knees, reach the opposite leg long toward the wall behind while one hand rows a band.', ['band', 'mat']],
+  ['Plank Bird Dog', 'bird-plank', 2, 'From a high plank, reach one hand toward the wall ahead and the opposite foot toward the wall behind.', ['mat']],
+  ['Bird Dog Hold, Knee Hover', 'bird-hover', 1, 'Knees hovering an inch off the floor, reach the opposite arm and leg long and hold.', ['mat']],
+];
+
 const TRUNK = { category: 'core' as const, batch: BATCH, youthOk: true };
 
 export const LATER_TRUNK: Family[] = [
@@ -101,7 +125,7 @@ export const LATER_TRUNK: Family[] = [
     primary: ['obliques', 'deep-core'], secondary: ['abs', 'glutes'], goals: ['trunk'], sport: ['general', 'basketball', 'football', 'tennis'],
     lowLoad: ['knee', 'back', 'ankle'], equipment: ['band'], clip: 'brace',
     setup: 'Side-on to the anchor, the handle at the chest.',
-    cues: ['The handle travels on a straight line; the band never pulls it off.', 'Stand tall and still, like a post planted in the floor.', 'Breathe out slowly as you press.'],
+    cues: ['The handle travels on a straight line; the pull never drags it off.', 'Tall and still, like a post planted in the floor.', 'Breathe out slowly as you press.'],
     faults: [
       { fault: 'Turning toward the anchor', fix: 'Keep the handle on a straight line out from the chest; stay square to the wall ahead.' },
       { fault: 'Leaning away from the band', fix: 'Stand tall and still, like a post planted in the floor.' },
@@ -142,5 +166,16 @@ export const LATER_TRUNK: Family[] = [
       { fault: 'Slowing down over the set', fix: 'Stop the set when the ball stops hitting the wall hard.' },
     ],
     dosage: reps(3, '6', 45), variants: throwVariants(),
+  },
+  {
+    ...TRUNK, family: 'dead-bug-bird-dog', block: 'trunk-2', pattern: 'other', plane: 'sagittal', laterality: 'alternating', skillLayer: 'cylinder', braceMode: 'set',
+    primary: ['abs', 'deep-core'], secondary: ['obliques', 'glutes', 'hip-flexors'], goals: ['trunk'], sport: ['general', 'basketball'],
+    lowLoad: ['knee', 'back', 'ankle'], equipment: ['mat'], clip: 'brace',
+    setup: 'Take the position named on a mat.',
+    cues: ['Reach long and slow, the rest of you still on the floor.', 'Breathe out as you reach long toward the floor.', 'Smaller and still beats bigger and wobbly.'],
+    faults: [
+      { fault: 'The low back arching off the floor', fix: 'Shorten the reach until the back stays heavy on the floor.' },
+    ],
+    dosage: reps(3, '8 each side', 30), variants: DEAD_BUG.map(([name, k, l, cue, equipment]) => va(name, k, l, { cue, equipment })),
   },
 ];

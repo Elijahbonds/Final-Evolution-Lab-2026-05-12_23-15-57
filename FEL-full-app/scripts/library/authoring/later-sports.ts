@@ -20,6 +20,15 @@ const VOLLEY: readonly [string, string, number, string, Partial<Variant>?][] = [
   ['Float Serve to Target', 'float-serve', 1, 'Toss low in front, step, and push through the middle of the ball to the target zone.', { equipment: ['cone'] }],
   ['Blocking Swing Footwork', 'block-swing', 2, 'Swing-step along the line, plant square, and jump, reaching up and over the line toward the ball.', {}],
   ['Three-Step Block Move', 'block-three', 2, 'Three steps along the line, plant square, and jump straight up toward the ceiling, reaching high and firm.', {}],
+  ['Partner Pepper', 'pepper', 1, 'Pass, set, hit back and forth with a partner, moving to every ball.', {}],
+  ['Overhead Pass on the Move', 'set-move', 2, 'Shuffle under the ball, stop square, and set it to the target.', { equipment: ['cone'] }],
+  ['Sprawl Dig Drill', 'sprawl', 2, 'Sprint, then dive-slide low along the floor to dig the ball up, and recover fast.', { equipment: ['mat'] }],
+  ['Jump Serve Toss Drill', 'jump-toss', 1, 'Toss the ball high and out in front, then step into the approach without hitting it.', {}],
+  ['Free-Ball Shuffle and Pass', 'free-ball', 1, 'Shuffle to the free ball, stop square to the target, and pass it high to the setter spot.', { equipment: ['cone'] }],
+  ['Transition Footwork, Block to Approach', 'block-approach', 2, 'Land from the block, open off the line, and step into a full approach.', {}],
+  ['Back-Row Attack Approach', 'back-row', 2, 'Approach from behind the line on the floor and jump forward to hit.', {}],
+  ['Setter Footwork to Target', 'setter', 1, 'Run to the target spot, stop square to the left antenna line on the floor, and shadow the set.', { equipment: ['cone'] }],
+  ['Libero Shuffle-Dig Pattern', 'libero', 2, 'Shuffle to each cone in turn, drop low, and shadow a dig, then recover to the middle.', { equipment: ['cone'] }],
 ];
 const SOCCER_TOUCHES: readonly [string, string, number, string][] = [
   ['Toe Taps', 'toe-taps', 0, 'Tap the top of the ball with alternate soles, light and quick.'],
@@ -32,6 +41,15 @@ const SOCCER_TOUCHES: readonly [string, string, number, string][] = [
   ['Inside Hook Turn', 'inside-hook', 1, 'Hook the ball back across with the inside of the foot and go the other way.'],
   ['Outside Hook Turn', 'outside-hook', 1, 'Hook the ball back with the outside of the foot and accelerate away.'],
   ['Scissor Feint', 'scissor', 2, 'Swing a foot around the front of the ball, plant, and push it away the other way.'],
+  ['V Pull-Back', 'v-pull', 1, 'Pull the ball back with the sole and push it away on the angle with the inside of the same foot.'],
+  ['Roll and Stop', 'roll-stop', 0, 'Roll the ball across with the sole, then stop it dead with the other sole.'],
+  ['Inside Cut', 'inside-cut', 1, 'Cut the ball back across the body with the inside of the foot and go.'],
+  ['Outside Cut', 'outside-cut', 1, 'Cut the ball away with the outside of the foot and accelerate the other way.'],
+  ['Sole Stop and Go', 'sole-stop', 0, 'Stop the ball under the sole, pause, then push it ahead and go.'],
+  ['Double Touch', 'double-touch', 2, 'Touch the ball across with the inside of one foot and on with the inside of the other.'],
+  ['Laces Push and Stop', 'laces-stop', 0, 'Push the ball ahead with the laces, then stop it dead under the sole.'],
+  ['Outside-Foot Taps', 'outside-taps', 1, 'Tap the ball along with the outside of the same foot, small and quick.'],
+  ['Sole Pull and Turn', 'sole-turn', 1, 'Pull the ball back under the sole and turn the other way in one move.'],
 ];
 function soccerVariants(): Variant[] {
   const out: Variant[] = [];
@@ -49,6 +67,11 @@ function soccerVariants(): Variant[] {
     ['Weaker-Foot Wall Passing', 'weak-wall', 1, 'Pass every ball into the wall with the weaker side: clean beats hard.', { equipment: ['wall'] }],
     ['Foot Juggling', 'juggle-foot', 1, 'Keep the ball up with the laces, a soft touch, the ball below the knee.', {}],
     ['Thigh-and-Foot Juggling', 'juggle-thigh', 2, 'Keep the ball up with a thigh, then a foot, alternating, soft touches.', {}],
+    ['Driven Wall Pass with the Laces', 'wall-laces', 1, 'Strike through the middle of the ball with the laces so it drives low into the wall.', { equipment: ['wall'] }],
+    ['Chip onto a Target', 'chip', 2, 'Stab under the ball so it lifts and drops onto the cone target.', { equipment: ['cone'] }],
+    ['Cross-Body First Touch', 'cross-touch', 1, 'Take the pass across the body with the far foot into the space beside the cone.', { equipment: ['wall', 'cone'] }],
+    ['Receive on the Half-Turn', 'half-turn', 2, 'Open up side-on to the wall and take the pass forward toward the cone in one touch.', { equipment: ['wall', 'cone'] }],
+    ['Dribble Speed Gates', 'speed-gates', 1, 'Dribble through two gates at full speed, the ball pushed out ahead.', { equipment: ['cone'], dosage: meters(4, 20, 45) }],
   ];
   for (const [name, k, l, cue, over] of more) out.push(va(name, k, l, { cue, ...(over ?? {}) }));
   return out;
@@ -64,6 +87,15 @@ const RACKET: readonly [string, string, number, string][] = [
   ['Drop-Step Overhead Footwork', 'overhead', 2, 'Turn side-on, drop-step back to the cone, and reach high for the overhead.'],
   ['Side Shuffle Recovery to Centre', 'shuffle-centre', 0, 'Shuffle back to the centre mark after each shadow swing, low and quick.'],
   ['Wide-Ball Slide and Recover', 'wide-slide', 2, 'Slide wide to the far cone, plant low, and push the floor away back to the centre.'],
+  ['Shadow Approach and Split', 'approach-split', 1, 'Run forward to the service-line cone, split step on the point, and move to it.'],
+  ['Short-Ball Sprint and Recover', 'short-ball', 1, 'Sprint forward to the cone, shadow the shot, and backpedal to the centre mark.'],
+  ['Closed-Stance Step-In Footwork', 'closed-stance', 1, 'Step across toward the cone side-on, shadow the swing, and recover.'],
+  ['Two-Ball Feed Recovery Drill', 'two-ball-feed', 2, 'A partner points left and right in turn; shadow each and recover to the mark.'],
+  ['Baseline Shuffle Rally Footwork', 'baseline-shuffle', 0, 'Shuffle along the baseline between two cones, shadowing a shot at each one.'],
+  ['Net Approach Split and Volley', 'net-approach', 2, 'Run in to the cone, split step on the point, and step across to shadow the volley.'],
+  ['Cross-Court Recovery Run', 'cross-recovery', 1, 'Shadow a wide shot at the far cone, then crossover and run back to the centre mark.'],
+  ['Forehand Inside-Out Footwork', 'inside-out', 2, 'Step around to the backhand-side cone and shadow a forehand, then recover to the mark.'],
+  ['Serve and First-Step Footwork', 'serve-first', 1, 'Shadow the serve, land inside the line on the floor, and split step for the return.'],
 ];
 const GRIDIRON: readonly [string, string, number, string, Partial<Variant>?][] = [
   ['Backpedal and Break at 45°', 'break-45', 1, 'Backpedal to the cone, plant, and drive forward on the 45-degree line.'],
@@ -76,6 +108,15 @@ const GRIDIRON: readonly [string, string, number, string, Partial<Variant>?][] =
   ['Over-the-Hurdle Shuffle', 'hurdle-shuffle', 1, 'Shuffle over each mini hurdle without touching it, eyes up on the cone ahead.', { equipment: ['mini-hurdle'] }],
   ['Ball-Security Cone Weave', 'ball-security', 0, 'Weave the cones with the football high and tight, switching arms at each cone.', { equipment: ['cone'] }],
   ['Three-Point Stance Get-Off to 10 m', 'stance-10', 1, 'From the three-point stance, explode out on the call and sprint to the cone.'],
+  ['Backpedal Weave', 'backpedal-weave', 1, 'Backpedal and weave left and right on the partner\'s point, eyes on the partner.'],
+  ['Comeback Route Footwork', 'comeback', 1, 'Sprint to the cone, sink, and come back toward the line in two quick steps.'],
+  ['Slant Route Footwork', 'slant', 0, 'Three hard steps up the field, plant, and cut inside on the slant line.'],
+  ['Lateral Mirror Drill, Pass Rush', 'mirror-rush', 1, 'Mirror the partner along the line, then on the call rush past the cone.'],
+  ['Out-Route Footwork', 'out-route', 1, 'Sprint to the cone, sink in three steps, and break flat to the sideline.'],
+  ['Pedal and Drive Footwork', 'pedal-drive', 1, 'Backpedal three steps, plant, and drive forward to the cone on the call.'],
+  ['Zone Drop Footwork', 'zone-drop', 1, 'Open and drop back to the zone cone, eyes on the partner, then break on the point.'],
+  ['Running Back Cut Footwork', 'rb-cut', 1, 'Press the line toward the cone, plant, and cut back the other way in one step.'],
+  ['Hand-Fighting Stance Drill', 'hand-fight', 1, 'Low stance on the line, quick strikes at the partner\'s pads, the stance still on the floor.'],
 ];
 
 const SPORT = { category: 'sport-skill' as const, batch: BATCH, youthOk: true };

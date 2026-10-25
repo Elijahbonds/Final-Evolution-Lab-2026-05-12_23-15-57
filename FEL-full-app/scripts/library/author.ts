@@ -62,11 +62,23 @@ function entryOf(f: Family, v: Variant, batch: number): LibraryExercise {
     cautions: [...new Set([...(f.cautions ?? []), ...(v.cautions ?? [])])].slice(0, 4),
     lowLoad: v.lowLoad ?? f.lowLoad, youthOk: v.youthOk ?? f.youthOk,
     prehabNote: f.category === 'prehab' ? PREHAB_NOTE : null,
-    dosage: { ...f.dosage, ...(v.dosage ?? {}) },
+    dosage: dosageOf(f, v, batch),
     demo: { clipKey: v.clip ?? (v.pattern ? clipKeyFor(v.pattern, f.family) : f.clip ?? clipKeyFor(f.pattern, f.family)), videoUrl: null, imageRef: null },
     source: { kind: 'authored', ref: `${f.block}/${f.family}/${v.v}`, url: null, licence: AUTHORED_LICENCE },
     review: { status: 'draft', reviewer: null, batch: `authored-b${batch}-${f.block}` },
   };
+}
+
+/**
+ * A variant's dose over its family's. From batch 2 on, a variant that names its own measure (reps, seconds, contacts or
+ * metres) replaces the family's measure instead of sitting beside it ("3 × 30 s" and "25 m" on one entry). Batch 1
+ * keeps its original merge so its reviewed files stay byte-identical.
+ */
+function dosageOf(f: Family, v: Variant, batch: number): LibraryExercise['dosage'] {
+  const d = v.dosage ?? {};
+  if (batch === 1 || !(['reps', 'seconds', 'contacts', 'meters'] as const).some((k) => d[k] !== undefined)) return { ...f.dosage, ...d };
+  const { reps: _r, seconds: _s, contacts: _c, meters: _m, ...rest } = f.dosage;
+  return { ...rest, ...d } as LibraryExercise['dosage'];
 }
 
 /** What every earlier entry already claims: its name key and its semantic key → its id. */
@@ -151,12 +163,14 @@ export function buildModifierBatch(base: readonly LibraryExercise[], batch: numb
       const id = slugify(name);
       claim(nk, id);
       claim(sk, id);
-      const level = m.level === 'up' ? LEVEL_IDS[Math.min(LEVEL_IDS.length - 1, levelRank(b.level) + 1)] : b.level;
+      const level = m.level === 'up' ? LEVEL_IDS[Math.min(LEVEL_IDS.length - 1, levelRank(b.level) + 1)]
+        : m.level === 'down' ? LEVEL_IDS[Math.max(0, levelRank(b.level) - 1)] : b.level;
       out.push({
         ...b, id, slug: id, name, aliases: [], variation: `${b.variation}+${m.id}`, level,
-        laterality: m.laterality ?? b.laterality, equipment, cues: [m.cue, ...b.cues.filter((c) => c !== m.cue)].slice(0, 3),
+        laterality: m.laterality ?? b.laterality, equipment, cues: [m.cue, ...b.cues.filter((c) => c !== m.cue && !(m.dropCues?.test(c)))].slice(0, 3),
         dosage: m.dosage ? m.dosage(b.dosage) : { ...b.dosage }, youthOk: b.youthOk && (m.youthOk ?? true),
-        regressionId: b.id, progressionId: null, variantOf: b.id,
+        // an easier (down) modifier is the step BELOW its base; every other one is the step above
+        regressionId: m.level === 'down' ? null : b.id, progressionId: m.level === 'down' ? b.id : null, variantOf: b.id,
         demo: { ...b.demo, imageRef: null },
         source: { kind: 'authored', ref: `${b.id}+${m.id}`, url: null, licence: AUTHORED_LICENCE },
         review: { status: 'draft', reviewer: null, batch: `authored-b${batch}-${b.review.batch.replace(/^(authored-b\d+|seed)-/, '')}` },
