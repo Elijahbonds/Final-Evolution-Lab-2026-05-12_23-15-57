@@ -13,6 +13,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { registerPerfTarget } from '../core/perfGuard';
 import type { PerfLevel } from '../core/PerfGovernor';
+import { streamWhileLoading } from '../core/loadPlan';   // PERF-LOAD PRF-04: a planned load holds the onlookers for after READY
 
 interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean; resting: boolean; age: number }
 
@@ -82,8 +83,11 @@ export class Onlookers {
     chosen.forEach((p, i) => {
       const seed = SEEDS[(i + tint.length) % SEEDS.length];
       const yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z);   // face the action
-      void CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
+      // PERF-LOAD PRF-04 (2026-10-25): inside a planned load the onlookers are held for after READY (core/loadPlan.ts), so the
+      // player's own body and the venue come first; null = the mount went before they ran. Elsewhere they spawn at once, as before.
+      void streamWhileLoading('onlooker', () => (this.disposed ? null : CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })), null)
         .then((char) => {
+          if (!char) return;
           if (this.disposed) { char.dispose(); return; }
           // A9.9: past ~14 m from the camera, no ink hull and no cast shadow. Best-effort: a scene the LOD cannot watch must not
           // lose the body (integration-2: the crowd's headless suites build on a bare scene and lost every body here)

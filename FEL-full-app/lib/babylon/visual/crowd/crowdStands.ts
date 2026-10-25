@@ -27,6 +27,7 @@ import { SEAT_TOP_M } from './crowdClips';
 import { layoutSeats, splitSeats, crowdTierOf, type CrowdVenue, type Seat, type CrowdTierName } from './crowdLayout';
 import { CrowdDirector, type ClipChange, type ReactionKind } from './crowdReact';
 import { loopOffset, startOffset, type CrowdClipName } from './crowdVat';
+import { planStreams } from '../../core/loadPlan';   // PERF-LOAD PRF-05: a planned mode's phone crowd is built with the venue
 
 export interface CrowdOptions {
   /** 'mobile' | 'desktop' | 'high' (scene.metadata.felTier when omitted). */
@@ -341,7 +342,13 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
   const ready = (async (): Promise<boolean> => {
     // NOT DURING THE MODE'S LOAD: the harness gives load() a watchdog, and five GLBs, the bake and the card snapshot are
     // the crowd's business, not the venue's — they start once the scene has drawn `deferFrames` frames of play
-    if ((opts.deferFrames ?? DEFER_FRAMES) > 0) await afterFrames(scene, opts.deferFrames ?? DEFER_FRAMES);
+    // PERF-LOAD PRF-05 (2026-10-25): on a phone the stands are benches and painted cards only (no bake, no GLB) — cheap to build
+    // with the venue — and built 20 frames in, their two PBR programs compiled in play (the tennis rig: bleachers + cards, up to
+    // 1.5 s on SwiftShader). A planned mode (every non-hoops mode: core/loadPlan.ts) builds them at mount, so the phone's shader
+    // pre-warm compiles them; desktop and high keep the deferral (their crowd is the bake), and so do the hoops modes.
+    const modeId = (scene.metadata as { felModeId?: string } | null)?.felModeId;
+    const deferFrames = opts.deferFrames ?? (tier === 'mobile' && !!modeId && planStreams(modeId) ? 0 : DEFER_FRAMES);
+    if (deferFrames > 0) await afterFrames(scene, deferFrames);
     if (disposed) return false;
     buildBenches();
     if (tier !== 'mobile' && fans.length + cards.length > 0) {

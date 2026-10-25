@@ -19,7 +19,7 @@ import { surfaceBootError } from './boot-error';
 import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { BoostGauge } from './boost-hud';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
-import { MODES } from '@/lib/babylon/modes/registry';
+import { MODES } from '@/lib/babylon/modes/lazyRegistry';   // PERF-LOAD PRF-05: this host's mode alone, imported at mount
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { gameResultFromSession } from '@/lib/sessions/gameResultFromSession';
 import { hnode, hnum } from './hud-format';

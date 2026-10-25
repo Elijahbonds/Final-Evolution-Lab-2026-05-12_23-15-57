@@ -3,6 +3,8 @@
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
+// PERF-LOAD PRF-07: this host sends game_diag (ttfp at its first screen, `load` if its chunk fails), as harness modes do
+import { withHostDiag } from '@/lib/babylon/core/hostDiag';
 
 const spinner = () => (
   <div className="flex h-[80vh] items-center justify-center bg-[#050505]">
@@ -10,7 +12,7 @@ const spinner = () => (
   </div>
 );
 
-const IrlGame = dynamic(() => import('@/components/games/irl-game'), { ssr: false, loading: spinner });
+const IrlGame = dynamic(() => withHostDiag('irl', import('@/components/games/irl-game')), { ssr: false, loading: spinner });
 
 export function IrlLoader() {
   // See the acting loader: this was bare too. IRL is device-motion driven, so it

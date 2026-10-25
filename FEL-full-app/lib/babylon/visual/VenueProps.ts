@@ -11,6 +11,7 @@ import type { AbstractMesh, ISceneLoaderAsyncResult, Mesh, Scene } from '@babylo
 import '@babylonjs/loaders/glTF';
 import { VENUE_PROP_SETS, type PropPlacement } from './venuePropSets';
 import { MESHY_DIR } from './meshyProps';
+import { streamWhileLoading } from '../core/loadPlan';   // PERF-LOAD PRF-04: a planned load holds the prop set for after READY
 
 export interface VenuePropsHandle { root: TransformNode; count: number; dispose(): void }
 
@@ -153,7 +154,19 @@ export interface MountPropsOptions {
 }
 
 /** Mount the prop set for `venueKey` under a fresh root. Resolves after every model loaded (failures skip the prop). */
-export async function mountVenueProps(scene: Scene, venueKey: string, parent?: TransformNode, opts: MountPropsOptions = {}): Promise<VenuePropsHandle | null> {
+/**
+ * PERF-LOAD PRF-04 (2026-10-25): a planned mode's load holds its prop set for after READY (core/loadPlan.ts) — the venue, the
+ * player and the ball come first, the CC0 dressing streams in once the game is playable. Every caller already mounts this with
+ * `void … .then(h => …)`, so a later start changes when the props arrive, never what they are. Outside a planned load (the
+ * hoops modes, the studio, a test, any call after READY) it mounts at once, as before. Resolves null when the mount the props
+ * were held for has gone (or their parent has).
+ */
+export function mountVenueProps(scene: Scene, venueKey: string, parent?: TransformNode, opts: MountPropsOptions = {}): Promise<VenuePropsHandle | null> {
+  if (!VENUE_PROP_SETS[venueKey]?.length) return Promise.resolve(null);
+  return streamWhileLoading(`props ${venueKey}`, () => (scene.isDisposed || parent?.isDisposed() ? null : mountVenuePropsNow(scene, venueKey, parent, opts)), null);
+}
+
+async function mountVenuePropsNow(scene: Scene, venueKey: string, parent?: TransformNode, opts: MountPropsOptions = {}): Promise<VenuePropsHandle | null> {
   const set = VENUE_PROP_SETS[venueKey];
   if (!set || !set.length) return null;
   const root = new TransformNode(`venue_props_${venueKey}`, scene);

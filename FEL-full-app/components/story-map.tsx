@@ -25,6 +25,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Award, ChevronRight, Lock, Play, Star, Trophy, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CampaignStatus, NodeStatus, ZoneStatus } from '@/lib/progression';
+import { hostDiag } from '@/lib/babylon/core/hostDiag';
 
 // ---------------------------------------------------------------------------
 
@@ -40,6 +41,10 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
 
+  // PERF-LOAD PRF-07: the story map sends game_diag like a harness mode — ttfp when the map's data is in, `load` if it never is
+  const diag = useMemo(() => hostDiag('story'), []);
+  useEffect(() => { if (data) diag.ready(); }, [data, diag]);
+
   useEffect(() => {
     if (initialData) return;
     let cancelled = false;
@@ -54,12 +59,13 @@ export default function StoryMap({ initialData, className }: StoryMapProps) {
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Story load failed');
+          diag.fail(err);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [initialData]);
+  }, [initialData, diag]);
 
   const selectedZone = useMemo(
     () => data?.zones.find((z) => z.id === selectedZoneId) ?? null,

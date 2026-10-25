@@ -12,7 +12,7 @@ import { useBabylonPlaytestBridge } from './use-babylon-playtest-bridge';
 import { bootErrorRequiresPageReload, surfaceBootError } from './boot-error';
 import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
-import { MODES } from '@/lib/babylon/modes/registry';
+import { MODES } from '@/lib/babylon/modes/lazyRegistry';   // PERF-LOAD PRF-05: this host's mode alone, imported at mount
 import { hnode } from './hud-format';
 import { HudBanner, HudChip, HudFrame, HudPlate, HudText, ScoreCell, ScoreValue, Scorebug, hudColor, hudType, type HudTone } from './tv-hud';
 import { PausedLayer, BodyReadyLine } from './paused-layer';

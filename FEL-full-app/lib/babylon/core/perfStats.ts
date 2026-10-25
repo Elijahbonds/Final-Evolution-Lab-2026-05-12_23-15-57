@@ -21,6 +21,7 @@
 import type { AbstractEngine } from '@babylonjs/core';
 import { reportDiag } from './diag';
 import { classifyGpu } from '../scene/QualityTier';
+import { osClass } from './osClass';
 
 /** The two report windows, in ms of live play: [start, end). */
 export const FPS_WINDOWS: ReadonlyArray<readonly [number, number]> = [[0, 30_000], [90_000, 120_000]];
@@ -66,12 +67,8 @@ export function summarizeFrames(intervals: ArrayLike<number>, works: ArrayLike<n
   };
 }
 
-/** Pure: the device class, from what the browser says. iPadOS reports a Mac, so a Mac with touch is iOS. */
-export function osClass(ua: string, maxTouchPoints: number): 'ios' | 'android' | 'other' {
-  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && maxTouchPoints > 1)) return 'ios';
-  if (/Android/.test(ua)) return 'android';
-  return 'other';
-}
+/** Pure: the device class, from what the browser says (osClass.ts since PERF-LOAD PRF-07: hostDiag reads it too). */
+export { osClass };
 
 export interface DeviceClass { os: string; gl: number; tier: string; dpr: number; px: string; gpu: string }
 

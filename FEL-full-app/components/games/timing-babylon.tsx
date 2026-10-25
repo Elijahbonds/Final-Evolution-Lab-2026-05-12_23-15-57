@@ -16,7 +16,7 @@ import { surfaceBootError } from './boot-error';
 import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
 import type { ModeDefinition } from '@/lib/babylon/core/ModeHarness';
-import { MODES } from '@/lib/babylon/modes/registry';
+import { MODES } from '@/lib/babylon/modes/lazyRegistry';   // PERF-LOAD PRF-05: this host's mode alone, imported at mount
 import { baseballHeadline } from '@/lib/babylon/modes/baseballGame';   // BASEBALL-3INN: the card line read off the posted score
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { hnode } from './hud-format';

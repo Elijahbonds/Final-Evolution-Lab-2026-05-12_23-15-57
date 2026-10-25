@@ -12,7 +12,7 @@ import { BootSplash } from './boot-splash';
 import { surfaceBootError } from './boot-error';
 import { useBabylonBootRetry } from './use-babylon-boot-retry';
 import { runMode, InputBus, type ModePhase, type SessionResult, type HudValue } from '@/lib/babylon';
-import { MODES } from '@/lib/babylon/modes/registry';
+import { MODES } from '@/lib/babylon/modes/lazyRegistry';   // PERF-LOAD PRF-05: this host's mode alone, imported at mount
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';   // CONTROLLER-UNIVERSAL-MULTI: pass-the-pad nights name each controller
 import { hnode } from './hud-format';

@@ -7,6 +7,8 @@ import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { GameShell } from '@/components/games/game-shell';
+// PERF-LOAD PRF-07: this host sends game_diag (ttfp at its first screen, `load` if its chunk fails), as harness modes do
+import { withHostDiag } from '@/lib/babylon/core/hostDiag';
 import {
   SPEND_REFUSED, SPEND_UNREACHABLE, newSpendNonce, ownedReadFromResponse, skuForSpend, spendResultFromStatus,
   type ReadOwnedKits, type ShardSpend,
@@ -19,7 +21,7 @@ const spinner = () => (
   </div>
 );
 
-const StudioMode = dynamic(() => import('@/lib/babylon/music/StudioMode'), { ssr: false, loading: spinner });
+const StudioMode = dynamic(() => withHostDiag('music', import('@/lib/babylon/music/StudioMode')), { ssr: false, loading: spinner });
 
 /** MUSIC-SUITE P3 (2026-09-25): `playerId` = the signed-in player's id from the server page (the owned-kits cache key). */
 export function MusicLoader({ playerId = null }: { playerId?: string | null } = {}) {

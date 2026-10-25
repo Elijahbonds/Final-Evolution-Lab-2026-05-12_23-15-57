@@ -42,7 +42,8 @@ import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
-import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
+import { installLoadProgress, LoadStallClock } from './loadProgress';
+import { LoadPlan, planStreams, type StreamJob } from './loadPlan';   // PERF-LOAD PRF-04: play sooner, stream the rest   // FIRST-DUNK-BUDGET: the load watchdog watches the download
 import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';
@@ -187,6 +188,10 @@ export interface ModeContext {
   seatCount?(): number;
   /** COUCH: true in a couch room. No seat has a body there: no camera frame reaches the harness, and onBody never runs. */
   couch?: boolean;
+  /** PERF-LOAD PRF-04 (2026-10-25): hand the harness an extra that no rule or score reads (props, crowd, dressing). It runs
+   *  after READY's first frame, one job a frame (loadPlan.ts). Absent for the hoops modes (hoops-round2 adopts it) and in a
+   *  test's fake context: call it through loadPlan.streamExtra, which runs the job at once when there is no plan. */
+  stream?(label: string, job: StreamJob): void;
 }
 
 export interface ModeDefinition {
@@ -253,6 +258,13 @@ export interface ModeDefinition {
   onBody?(ctx: ModeContext, ev: BodyEvent, view: BodyView): boolean | void;
 }
 
+/** PERF-LOAD PRF-05 (2026-10-25): a mode definition not imported yet — lazyRegistry.ts's `MODES.<key>`. Calling it imports that one
+ *  mode's file (once) and resolves to the registry's own definition object. runMode() takes one in place of a definition. */
+export interface ModeRef {
+  (): Promise<ModeDefinition>;
+  readonly modeKey: string;
+}
+
 export interface HarnessOpts {
   canvas: HTMLCanvasElement;
   // detail is the countdown number during 'countdown', or an error message string during 'error'
@@ -317,7 +329,18 @@ function viewOf(p: BodyPacket): BodyView {
   return { read: p.read, channels: p.channels, arrivedAt: p.arrivedAt, lagMs: p.arrivedAt - p.read.t };
 }
 
-export async function runMode(def: ModeDefinition, opts: HarnessOpts): Promise<() => void> {
+/** PRF-05: lazy definitions resolve in the order runMode was called, so mounts still land in call order (the note below). */
+let refChain: Promise<unknown> = Promise.resolve();
+function resolveInOrder(ref: ModeRef): Promise<ModeDefinition> {
+  const p = refChain.then(() => ref());
+  refChain = p.catch(() => undefined);
+  return p;
+}
+
+export async function runMode(defOrRef: ModeDefinition | ModeRef, opts: HarnessOpts): Promise<() => void> {
+  // PERF-LOAD PRF-05 (2026-10-25): a lazy registry entry (lazyRegistry.ts) is imported here, the first thing the mount does, so a
+  // route's first download carries its own mode and not all 30. A definition passed directly mounts exactly as before.
+  let def = typeof defOrRef === 'function' ? await resolveInOrder(defOrRef) : defOrRef;
   // MOVEMENT PLAY P3 (2026-09-24): THE BODY SEAM (plan §4.4), built by bodySeamFor — the one place a mode's row, whether
   // the body drives it (the only thing that lets losing the body pause it), its floor and its session are decided, and
   // the place bodySeam.test holds to the table. The evidence counter keeps the run's "input the game received" (owner
@@ -560,6 +583,17 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const objectiveRef: MutableRef<Vector3> = { current: null };
 
   const agentHooks: ModeContext['agent'] = {};   // M69: filled by a mode's load() if it opts in
+  // PERF-LOAD PRF-04: this mount's load plan (loadPlan.ts). Extras held during load() run after READY's first frame.
+  const streams = planStreams(def.modeId);
+  const newPlan = (): LoadPlan => new LoadPlan({
+    now: () => performance.now(),
+    nextFrame: () => new Promise<void>((r) => { if (scene.isDisposed) return; scene.onAfterRenderObservable.addOnce(() => r()); }),
+    mark: () => scene.meshes.length,
+    // the job's new meshes start their shaders now (a parallel compile on a phone that has it), not on the frame they first draw
+    warm: (before) => { for (const m of scene.meshes.slice(before)) { try { if (m.isEnabled()) m.isReady(true); } catch { /* compiled on first draw, as before */ } } },
+    log: (m) => console.info(m),
+  });
+  let plan = newPlan();
   const ctx: ModeContext = {
     location: opts.location,
     prqBand: opts.prqBand ?? null,
@@ -605,6 +639,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     body() { const p = input.body(); return p ? viewOf(p) : null; },
     seatCount: () => seatCountOf(opts),
     couch,
+    ...(streams ? { stream: (label: string, job: StreamJob) => { void plan.defer(label, job).catch(() => undefined); } } : {}),
   };
   // COUCH (FN-0): no seat has a body, so a mode that asks for one is told there is no body source
   if (couch) ctx.body = () => null;
@@ -635,6 +670,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // THE MIC (2026-09-24): the audio graph, so a probe can record what the game actually sounds like (the MC on the PA, the
     // crowd ducking under him) instead of trusting that a cue that was logged was also heard
     audio: () => SoundKit.graph(),
+    // PERF-LOAD PRF-04: the load plan — what was held for after READY, and when the last of it landed (the rig's "full" time)
+    stream: () => ({ planned: streams, ...plan.state() }),
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
@@ -660,6 +697,40 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   // fires (error screen). A player can never see an eternal spinner again.
   // FIRST-DUNK-BUDGET (2026-10-17): the watchdog fires after 20 s with NOTHING arriving — no bytes, no finished file, no
   // loader step (loadProgress.ts) — not 20 s after load() began, so a slow download that is still moving is never failed.
+  // (PERF-LOAD PRF-05: defined before the load, so the load can mount the ring before the phone's shader pre-warm)
+  // PLAYER RING (owner, 2026-09-17: "a player indicator with their icon in all modes like we did for 1v1"). The seven
+  // modes that mount their own ring (mountPlayerRing without `harness`) keep it; everywhere else the harness rides the
+  // hero reference every mode already sets for the frame guard. A reference that is not a body — a ball in flight, a
+  // scene anchor in a quiz — keeps the ring where it was, so the indicator never points at the wrong thing.
+  const RING_SKIP = new Set(['brainbrawl', 'who_scene_it']);
+  let ringRoot: TransformNode | null = null;
+  const bodyLike = (n: TransformNode | null): n is TransformNode => !!n && !n.isDisposed() && n.getChildMeshes(false).some((m) => m.getTotalVertices() > 0);
+  const ringFollow = () => {
+    if (RING_SKIP.has(def.modeId) || modeOwnsPlayerRing(scene)) return;
+    const root = heroRef.current;
+    if (root === ringRoot || !bodyLike(root)) return;
+    ring?.dispose(); ringRoot = root;
+    const card = cachedIdentity()?.card;
+    // (a trail / effect plane wider than 4 m is not the footprint and is skipped)
+    // (the footprint is the UNSKINNED part: a chassis, a deck — never the person, nor the driver sitting in the kart)
+    // the ring fits the hero's FOOTPRINT: a body takes the default 0.62 m, a kart (1.3 x 2 m, root at axle height) a
+    // 1.1 m ring at its wheels — measured in root space so the ring rides whatever the root does
+    root.computeWorldMatrix(true);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity;
+    const inv = root.getWorldMatrix().clone().invert();
+    for (const m of root.getChildMeshes(false)) { if (m.getTotalVertices() === 0 || !m.isVisible || !m.isEnabled() || m.skeleton) continue; const bi = m.getBoundingInfo(); if (bi.boundingSphere.radiusWorld > 4) continue; const bb = bi.boundingBox; for (const v of bb.vectorsWorld) { const p = Vector3.TransformCoordinates(v, inv); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); minY = Math.min(minY, p.y); } }
+    const span = Math.max(maxX - minX, maxZ - minZ);
+    const radius = isFinite(span) && span > 1.3 ? Math.min(1.3, span * 0.5) : 0.62;   // a person (or a rider on a deck) keeps the default; a vehicle gets its own
+    // the ring sits on the SURFACE under the root, not at the root: a kart's root is its axle (0.44 m up), and its
+    // lowest child box (measured −0.8) is not its wheels either. A ray down from the root finds the ground it rides;
+    // a root already on its surface (a body, a board rider) keeps 0.
+    void minY;
+    const at = root.getAbsolutePosition();
+    const hit = scene.pickWithRay(new Ray(new Vector3(at.x, at.y + 0.3, at.z), Vector3.Down(), 6), (m) => m.isEnabled() && m.isVisible && m.getTotalVertices() > 0 && !m.isDescendantOf(root) && !/^player_/.test(m.name));   // NOT isPickable: the kart's road is unpickable and sits above the pickable venue ground
+    const y = hit?.hit && hit.distance > 0.4 ? -(hit.distance - 0.3) : at.y > 0.15 && at.y < 0.9 ? -at.y : 0;
+    ring = mountPlayerRing(scene, root, { color: card?.accent ?? '#22d3ee', icon: readPlayerIcon(), harness: true, radius, y });
+    ring.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
+  };
   let renderWatchdog: RenderWatchdog | null = null;
   const attemptLoad = async (): Promise<boolean> => {
     setPhase('loading');
@@ -675,9 +746,12 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       reportDiag('load', `${def.modeId} load timed out after ${LOAD_WATCHDOG_MS} ms`);
       setPhase('error', 'Load timed out — check your connection and retry.');
     }, LOAD_STALL_LOOK_MS);
+    // PERF-LOAD PRF-04: a retry starts a fresh plan (whatever the failed attempt held goes with it)
+    if (plan.state().held > 0 || plan.isOpen) { plan.dispose(); plan = newPlan(); }
     try {
       replayTrack.length = 0;
-      await def.load(ctx);
+      if (streams) plan.enterLoad();               // shared visual code reaches the plan while load() runs (streamWhileLoading)
+      try { await def.load(ctx); } finally { plan.exitLoad(); }
       clearTimeout(watchdog);
       if (timedOut) return false;                  // late resolve after watchdog: stay on error
       liftBlackMaterials(scene);                   // rescue anything venue-load added
@@ -700,6 +774,11 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // SHADER PRE-WARM (lane/owner-1016, 2026-10-16; owner: "pre-warm shaders on phones at load"). Behind the boot splash — the
       // phase is still 'loading' — and AFTER the 20 s watchdog above is cleared, so it cannot trip it; it has its own cap
       // (shaderPrewarm.ts) and READY comes either way. Phone tier only; dev keeps warmAll after READY (below).
+      // PERF-LOAD PRF-05 (2026-10-25): the player ring is mounted by the render loop's first frame, which is AFTER the pre-warm,
+      // so its shaders compiled in READY or in play on every phone (the rig's tennis and baseball runs: player_ring and
+      // player_tag, 26–500 ms). Mounted here, the pre-warm compiles them; the loop's ringFollow then finds it in place.
+      // Planned modes only: the hoops loads stay exactly as they were (hoops-round2 owns their first frame).
+      if (streams && prewarmWanted(tier)) ringFollow();
       if (prewarmWanted(tier)) {
         console.info('[FEL-PERF] shader pre-warm start');
         const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });
@@ -708,6 +787,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
         else console.info(`[FEL-PERF] shader pre-warm ${warm.ready ? 'ready' : 'skipped'} in ${Math.round(warm.ms)} ms, ${Math.round(warm.readyMs)} of them to first ready (${warm.polls} polls, ${warm.frames} frames)`);
       }
       setPhase('ready');
+      // PERF-LOAD PRF-04: READY is the first playable frame; once it is drawn, the held extras start (one a frame)
+      { const p = plan; scene.onAfterRenderObservable.addOnce(() => p.start()); }
       // M67: pre-warm every material now, on the loading→ready boundary, so a
       // first-visibility shader compile never hitches mid-play. Dev-only work.
       if (DEV) void perf.warmAll();
@@ -932,39 +1013,6 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     }
     if (best && best !== qaTop) { qaTop = best; qa.anim(best); }
   }
-  // PLAYER RING (owner, 2026-09-17: "a player indicator with their icon in all modes like we did for 1v1"). The seven
-  // modes that mount their own ring (mountPlayerRing without `harness`) keep it; everywhere else the harness rides the
-  // hero reference every mode already sets for the frame guard. A reference that is not a body — a ball in flight, a
-  // scene anchor in a quiz — keeps the ring where it was, so the indicator never points at the wrong thing.
-  const RING_SKIP = new Set(['brainbrawl', 'who_scene_it']);
-  let ringRoot: TransformNode | null = null;
-  const bodyLike = (n: TransformNode | null): n is TransformNode => !!n && !n.isDisposed() && n.getChildMeshes(false).some((m) => m.getTotalVertices() > 0);
-  const ringFollow = () => {
-    if (RING_SKIP.has(def.modeId) || modeOwnsPlayerRing(scene)) return;
-    const root = heroRef.current;
-    if (root === ringRoot || !bodyLike(root)) return;
-    ring?.dispose(); ringRoot = root;
-    const card = cachedIdentity()?.card;
-    // (a trail / effect plane wider than 4 m is not the footprint and is skipped)
-    // (the footprint is the UNSKINNED part: a chassis, a deck — never the person, nor the driver sitting in the kart)
-    // the ring fits the hero's FOOTPRINT: a body takes the default 0.62 m, a kart (1.3 x 2 m, root at axle height) a
-    // 1.1 m ring at its wheels — measured in root space so the ring rides whatever the root does
-    root.computeWorldMatrix(true);
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, minY = Infinity;
-    const inv = root.getWorldMatrix().clone().invert();
-    for (const m of root.getChildMeshes(false)) { if (m.getTotalVertices() === 0 || !m.isVisible || !m.isEnabled() || m.skeleton) continue; const bi = m.getBoundingInfo(); if (bi.boundingSphere.radiusWorld > 4) continue; const bb = bi.boundingBox; for (const v of bb.vectorsWorld) { const p = Vector3.TransformCoordinates(v, inv); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); minY = Math.min(minY, p.y); } }
-    const span = Math.max(maxX - minX, maxZ - minZ);
-    const radius = isFinite(span) && span > 1.3 ? Math.min(1.3, span * 0.5) : 0.62;   // a person (or a rider on a deck) keeps the default; a vehicle gets its own
-    // the ring sits on the SURFACE under the root, not at the root: a kart's root is its axle (0.44 m up), and its
-    // lowest child box (measured −0.8) is not its wheels either. A ray down from the root finds the ground it rides;
-    // a root already on its surface (a body, a board rider) keeps 0.
-    void minY;
-    const at = root.getAbsolutePosition();
-    const hit = scene.pickWithRay(new Ray(new Vector3(at.x, at.y + 0.3, at.z), Vector3.Down(), 6), (m) => m.isEnabled() && m.isVisible && m.getTotalVertices() > 0 && !m.isDescendantOf(root) && !/^player_/.test(m.name));   // NOT isPickable: the kart's road is unpickable and sits above the pickable venue ground
-    const y = hit?.hit && hit.distance > 0.4 ? -(hit.distance - 0.3) : at.y > 0.15 && at.y < 0.9 ? -at.y : 0;
-    ring = mountPlayerRing(scene, root, { color: card?.accent ?? '#22d3ee', icon: readPlayerIcon(), harness: true, radius, y });
-    ring.setPlayVisible(!def.hideRingInPlay || phase !== 'playing');
-  };
   let lastPausedRender = Number.NEGATIVE_INFINITY;   // IMPROVE (2026-10-06, 3PT #18): see core/pausedRender
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
@@ -1042,6 +1090,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     shaker.dispose();
     groundLock.dispose();
     ring?.dispose(); ring = null; ringRoot = null;   // PLAYER RING
+    plan.dispose();       // PERF-LOAD PRF-04: nothing held runs after the mode is gone
     def.dispose?.();
     perf.dispose();       // M67
     guard.dispose();      // PERF-GUARD
