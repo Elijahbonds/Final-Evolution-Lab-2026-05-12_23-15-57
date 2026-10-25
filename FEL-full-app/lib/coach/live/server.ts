@@ -24,11 +24,7 @@ import { verifiedAdult } from '@/lib/privacy/verifiedAdult';
 import { decideLiveRoom, roomIdOf, type LiveGate, type LiveRole, type LiveRoomRef } from './gate';
 import { parseSummary, summaryText } from './session';
 
-/** The switch. Ships OFF: NEXT_PUBLIC_COACH_LIVE_ENABLED=1 (read on the server and in the browser bundle) opens it. */
-export function coachLiveEnabled(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
-  const v = (env.NEXT_PUBLIC_COACH_LIVE_ENABLED ?? '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'on' || v === 'yes';
-}
+export { coachLiveEnabled } from './flag';
 
 export type LiveDb = Pick<PrismaClient, 'coachingProgram' | 'coachClient' | 'booking' | 'user' | 'programMessage'> & TeenGateDb;
 

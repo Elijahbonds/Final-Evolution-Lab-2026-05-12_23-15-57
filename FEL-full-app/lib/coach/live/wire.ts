@@ -110,7 +110,7 @@ export function fromBase64(s: string): ArrayBuffer | null {
 export interface WireRep { n: number; faults: string[]; sides: Record<string, FaultSide>; read: boolean }
 
 export type Ctl =
-  | { t: 'hello'; role: 'coach' | 'client'; video: boolean }
+  | { t: 'hello'; role: 'coach' | 'client'; video: boolean; aspect?: number }
   | { t: 'ping'; a: number }
   | { t: 'pong'; a: number; b: number }
   | { t: 'exercise'; movement: LiveMovement }
@@ -161,7 +161,8 @@ export function parseCtl(raw: unknown): Ctl | null {
   const m = v as Record<string, unknown>;
   switch (m.t) {
     case 'hello':
-      return (m.role === 'coach' || m.role === 'client') && typeof m.video === 'boolean' ? { t: 'hello', role: m.role, video: m.video } : null;
+      if ((m.role !== 'coach' && m.role !== 'client') || typeof m.video !== 'boolean') return null;
+      return num(m.aspect) && m.aspect >= 0.3 && m.aspect <= 3 ? { t: 'hello', role: m.role, video: m.video, aspect: m.aspect } : { t: 'hello', role: m.role, video: m.video };
     case 'ping': return num(m.a) ? { t: 'ping', a: m.a } : null;
     case 'pong': return num(m.a) && num(m.b) ? { t: 'pong', a: m.a, b: m.b } : null;
     case 'exercise': return isLiveMovement(m.movement) ? { t: 'exercise', movement: m.movement } : null;
