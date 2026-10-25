@@ -38,6 +38,8 @@ const ask = (q: string): Step => async (p) => {
 };
 const SCENES: { name: string; hash: string; steps: Step[]; expect: string[] }[] = [
   { name: 'coach-search-typo', hash: 'coach-search', steps: [drafts, typeSearch('goblet sqaut')], expect: ['[data-testid="library-card"]', '[data-testid="library-recovery"]', '[data-testid="draft-badge"]'] },
+  // batches 2–4: a base shows once with "+N variants"; opening it lists them
+  { name: 'coach-search-variants', hash: 'coach-search', steps: [drafts, typeSearch('goblet squat'), async (p) => { await p.locator('[data-testid="variants-toggle"]').first().click(); await p.waitForTimeout(200); }], expect: ['[data-testid="variants-toggle"]', '[data-testid="variants-list"]'] },
   { name: 'coach-filters', hash: 'coach-search', steps: [drafts, typeSearch('rdl'), async (p) => { await p.getByRole('button', { name: /Filters/ }).click(); await p.waitForTimeout(200); }], expect: ['[data-testid="library-facets"]', '[data-testid="library-card"]'] },
   { name: 'coach-sheet', hash: 'coach-search', steps: [drafts, typeSearch('pogo hop'), async (p) => { await p.locator('[data-testid="library-card"]').first().click(); await p.waitForSelector('[data-testid="library-sheet"]'); }], expect: ['[data-testid="library-sheet"]', '[data-testid="add-to-catalogue"]', '[data-testid="muscle-map"]'] },
   { name: 'coach-zero-relax', hash: 'coach-search', steps: [drafts, typeSearch('pistol squat sled')], expect: ['[data-testid="library-results"]'] },
