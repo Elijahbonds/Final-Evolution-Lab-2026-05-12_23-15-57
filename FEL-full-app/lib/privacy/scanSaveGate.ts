@@ -104,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l' | '1m';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l' | '1m' | '1n';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -145,4 +145,7 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   // athlete, never a frame. Kept per athlete only for a verified adult with the live opt-in (lib/combine/gate.ts
   // canKeepOnServer, decided on the server from fresh rows); anyone else's camera numbers stay on the coach's phone.
   { id: '1m', file: 'app/api/coach/combine/[id]/route.ts', handler: 'PUT', writes: 'CombineResult camera/video rows (jump, approach, skill drill; pending SQL 2026-10-25-combine-day.sql), per athlete through profileGates canSaveScan; hand-timed rows are not movement data', status: 'gated', holder: null, via: ['lib/combine/server.ts', 'lib/combine/store.ts'] },
+  // VBT (2026-10-25): a tracked set's bar-speed NUMBERS (speeds, reps, velocity loss, a warm-up's band), never a frame.
+  // Verified adults who opted in; an adult who has not keeps sets on the phone; a teen's are kept nowhere (lib/vbt/gate.ts).
+  { id: '1n', file: 'app/api/vbt/sets/route.ts', handler: 'POST', writes: 'VbtSet (a set\'s bar-speed numbers; pending SQL 2026-10-26-vbt.sql)', status: 'gated', holder: null, via: ['lib/vbt/server.ts', 'lib/vbt/store.ts'] },
 ];
