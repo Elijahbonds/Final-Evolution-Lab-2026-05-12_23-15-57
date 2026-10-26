@@ -68,7 +68,7 @@ export interface PlayScales {
   reachScale: 1;
 }
 
-/** The context a scene's metadata describes — the stamps ModeHarness writes (`felModeId`; `felRanked`, which nothing sets yet). */
+/** The context a scene's metadata describes — the stamps ModeHarness writes (`felModeId`; `felRanked` since NEX-03, below). */
 export function playContextOf(metadata: unknown): PlayContext {
   const md = (metadata ?? {}) as { felModeId?: unknown; felRanked?: unknown };
   return { modeId: typeof md.felModeId === 'string' ? md.felModeId : null, ranked: md.felRanked === true };
@@ -115,4 +115,49 @@ export function toPlayFrame(point: V3, root: V3, s: Pick<PlayScales, 'heightScal
     y: root.y + (point.y - root.y) / m.y,
     z: root.z + (point.z - root.z) / m.z,
   };
+}
+
+// ── THE COMPETITIVE-CONTEXT STAMP (NEX-03, round 8; docs/NEXUS-ROADMAP.md §1.2(d), §3.1) ──────────────────────────────────────
+//
+// Owner (NEXUS, 2026-10-20): "competitive = only owner-published venues, look only". Before this, nothing said a run was
+// competitive: the arena, challenge, async-challenge and ladder params were read only inside GameShell, and `felRanked` above was
+// reserved. Now ONE pure function decides it from the page's query — the same keys GameShell reads (`?arena=`, `?c=`, `?mp=`,
+// `?signature=`) plus the live-play keys the feel panel already treats as "other people are playing" (`?net=`, `?party=`) and the
+// reserved `?ranked=` — and ModeHarness stamps the answer on the scene once, before the mode loads (`felCompetitive`, `felRanked`).
+// Every Studio gate reads that stamp (lib/nexus-studio/runtime.ts): in a competitive run a Studio venue is the LOOK only — no
+// scripts, no camera actions (intro, replay angles, scripted shots), no cast.
+//
+// A key that is present counts, even empty (fail closed — lib/feel-panel/sessionGate.ts does the same).
+//
+// assumption: "ranked" (every body on the standard frame, above) is the arena's staked duel, the Signature ladder and the
+// reserved `?ranked=`; a challenge link, an async challenge and live play are competitive but not ranked. Owner call in the
+// round-8 report.
+
+/** The query keys that make a run competitive. */
+export const COMPETITIVE_PARAMS: readonly string[] = ['arena', 'c', 'mp', 'signature', 'net', 'party', 'ranked'];
+/** The query keys that make a run ranked (a subset of the competitive ones). */
+export const RANKED_PARAMS: readonly string[] = ['arena', 'signature', 'ranked'];
+
+/** What ModeHarness stamps on `scene.metadata`. */
+export interface PlayStamp { felCompetitive: boolean; felRanked: boolean }
+
+/** The stamp for a page's query (`location.search`, with or without the `?`). Pure. */
+export function playStampFor(search: string | URLSearchParams | null | undefined): PlayStamp {
+  let q: URLSearchParams;
+  try { q = search instanceof URLSearchParams ? search : new URLSearchParams(search ?? ''); } catch { q = new URLSearchParams(); }
+  const ranked = RANKED_PARAMS.some((k) => q.has(k));
+  return { felCompetitive: ranked || COMPETITIVE_PARAMS.some((k) => q.has(k)), felRanked: ranked };
+}
+
+/** The page's own stamp (the browser's query; none outside a browser). */
+export function pagePlayStamp(): PlayStamp {
+  let search = '';
+  try { search = typeof window !== 'undefined' ? window.location.search : ''; } catch { search = ''; }
+  return playStampFor(search);
+}
+
+/** Is the run this scene belongs to competitive? Reads the stamp; a scene with no stamp is not. */
+export function isCompetitive(metadata: unknown): boolean {
+  const md = (metadata ?? {}) as { felCompetitive?: unknown; felRanked?: unknown };
+  return md.felCompetitive === true || md.felRanked === true;
 }

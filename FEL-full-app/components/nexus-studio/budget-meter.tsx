@@ -4,13 +4,13 @@
 // the stage is drawing (lib/nexus-studio/budget.ts), and the target mode's measured phone row for reference. The switch
 // re-mounts the stage on the other tier, so the phone's numbers are the phone scene's, not a guess.
 
-import { Gauge, Smartphone, Monitor } from 'lucide-react';
+import { Gauge, Smartphone, Monitor, Upload } from 'lucide-react';
 import { meterRows, modeRow, worst, PHONE_BODIES, type BudgetSample, type Level } from '@/lib/nexus-studio/budget';
 import { C } from './ui';
 
 const TONE: Record<Level, string> = { ok: C.emerald, near: C.gold, over: C.crimson };
 
-export function BudgetMeter({ sample, budgetKey, phone, onPhone }: { sample: BudgetSample | null; budgetKey: string; phone: boolean; onPhone(v: boolean): void }) {
+export function BudgetMeter({ sample, budgetKey, phone, onPhone, onPublish, publishing }: { sample: BudgetSample | null; budgetKey: string; phone: boolean; onPhone(v: boolean): void; onPublish?(): void; publishing?: boolean }) {
   const rows = sample ? meterRows(sample) : [];
   const head = worst(rows);
   const ref = modeRow(budgetKey);
@@ -33,6 +33,7 @@ export function BudgetMeter({ sample, budgetKey, phone, onPhone }: { sample: Bud
       <span className="ml-auto flex items-center gap-1">
         <button type="button" onClick={() => onPhone(false)} aria-pressed={!phone} title="Measure the desktop scene" className="flex items-center gap-1 rounded px-1.5 py-0.5" style={{ color: !phone ? C.cyan : C.dim, background: !phone ? 'rgba(0,229,255,0.12)' : 'transparent' }}><Monitor className="h-3.5 w-3.5" /> Desktop</button>
         <button type="button" onClick={() => onPhone(true)} aria-pressed={phone} title="Re-mount on the phone tier and measure that scene" className="flex items-center gap-1 rounded px-1.5 py-0.5" style={{ color: phone ? C.cyan : C.dim, background: phone ? 'rgba(0,229,255,0.12)' : 'transparent' }}><Smartphone className="h-3.5 w-3.5" /> Phone</button>
+        {onPublish && <button type="button" onClick={onPublish} aria-pressed={!!publishing} title="Check the publish gate and download the venue for the repo" className="ml-1 flex items-center gap-1 rounded px-1.5 py-0.5" style={{ color: publishing ? C.cyan : C.text, background: publishing ? 'rgba(0,229,255,0.12)' : 'transparent' }}><Upload className="h-3.5 w-3.5" /> Publish</button>}
       </span>
     </div>
   );

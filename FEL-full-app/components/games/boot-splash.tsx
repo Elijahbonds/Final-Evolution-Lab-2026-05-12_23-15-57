@@ -35,6 +35,7 @@ import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type Com
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
 import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
+import { restorePlace } from '@/lib/nexus-studio/published';   // NEX-02: Restore the shipped place over a published Studio venue
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import { headToHeadRun } from '@/lib/babylon/modes/onevoneRules';
 import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
@@ -291,6 +292,7 @@ export function SplashCard(props: BootSplashProps) {
   const placeList = looksFor(props.modeId);
   const [placeId, setPlaceId] = useState<string>('home');
   useEffect(() => { if (placeList.length) setPlaceId(readPlaceLook(props.modeId)?.id ?? 'home'); }, [placeList.length, props.modeId]);
+  const restore = restorePlace(placeList, placeId);
   const pickPlace = (id: string) => {
     if (id === placeId) return;
     writePlaceLook(props.modeId, id);
@@ -538,6 +540,13 @@ export function SplashCard(props: BootSplashProps) {
               ))}
             </div>
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{placeList.find((l) => l.id === placeId)?.sub ?? ''}</p>
+            {/* NEX-02 (owner 2026-10-20): a venue the owner published from Nexus Studio is the default place; one tap puts the shipped one back */}
+            {restore && (
+              <button type="button" onClick={() => pickPlace(restore.id)} data-testid="place-restore"
+                className="rounded-full border border-white/25 px-3 py-1 text-[9px] font-black tracking-[0.2em] text-white/70 transition hover:bg-white/10">
+                RESTORE {restore.name.toUpperCase()}
+              </button>
+            )}
           </div>
         )}
 
