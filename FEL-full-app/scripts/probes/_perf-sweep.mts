@@ -136,10 +136,12 @@ const SNAPSHOT = `(() => {
   const cache = engine._internalTexturesCache || [];
   const RT = new Set([5, 6, 12, 14]);
   let texB = 0, rtB = 0;
+  const texTop = [];   // PERF-LOAD: the biggest textures by the same estimate (url or name, MB), for a mode over its texture ceiling
   for (const t of cache) {
     const b = t.width * t.height * 4 * (t.generateMipMaps ? 1.33 : 1) * (t.isCube ? 6 : 1) * (t.is3D ? Math.max(1, t.depth) : 1);
-    if (RT.has(t.source)) rtB += b; else texB += b;
+    if (RT.has(t.source)) rtB += b; else { texB += b; texTop.push([String(t.url || t.label || t.source).split('/').pop().slice(0, 60) + ' ' + t.width + 'x' + t.height, Math.round(b / 104857.6) / 10]); }
   }
+  texTop.sort((a, b) => b[1] - a[1]); texTop.length = Math.min(texTop.length, 20);
   const shadows = [];
   for (const l of scene.lights) {
     const sg = l.getShadowGenerator && l.getShadowGenerator();
@@ -160,7 +162,7 @@ const SNAPSHOT = `(() => {
   return {
     tier: scene.metadata && scene.metadata.felTier, backing: w + 'x' + h, backingPx: w * h, hwScale: engine.getHardwareScalingLevel(),
     texMb: texB / 1048576, rtMb: rtB / 1048576, shadows, postPasses: pps, customRT: scene.customRenderTargets.length,
-    bodies, bodyKinds, skeletons: scene.skeletons.length, meshesTotal: scene.meshes.length, materials: scene.materials.length,
+    bodies, bodyKinds, texTop, skeletons: scene.skeletons.length, meshesTotal: scene.meshes.length, materials: scene.materials.length,
     animGroups: scene.animationGroups.filter((g) => g.isPlaying).length,
     beforeRenderObs: scene.onBeforeRenderObservable.observers.length, afterAnimObs: scene.onAfterAnimationsObservable.observers.length,
     gov: window.__FEL_PERF__ ? window.__FEL_PERF__.state() : null,

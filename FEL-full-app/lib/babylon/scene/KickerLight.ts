@@ -52,6 +52,11 @@ export interface KickerHandle {
   light: DirectionalLight;
   /** The meshes it lights (players only). */
   readonly meshes: readonly AbstractMesh[];
+  /** PERF-LOAD PRF-05 (2026-10-25): take in every player mesh now (not at the next frame) and switch the light on. The harness
+   *  calls it before the phone's shader pre-warm: a load renders no frame, so the pre-warm compiled every body for TWO lights,
+   *  its first warm frame then added this third one, and every body material compiled again (1v1 on the rig: 14 PBR programs
+   *  after READY, each +[LIGHTCOUNT 3, DIRLIGHT2]). Idempotent. */
+  sync(): void;
   dispose(): void;
 }
 
@@ -96,6 +101,7 @@ export function mountKickerLight(scene: Scene, mood: VenueMood): KickerHandle {
   return {
     light,
     get meshes() { return meshes; },
+    sync() { for (const m of scene.meshes) consider(m); apply(); },
     dispose() {
       scene.onNewMeshAddedObservable.remove(added);
       scene.onMeshRemovedObservable.remove(removed);

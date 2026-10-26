@@ -783,6 +783,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       // player_tag, 26–500 ms). Mounted here, the pre-warm compiles them; the loop's ringFollow then finds it in place.
       // Planned modes only: the hoops loads stay exactly as they were (hoops-round2 owns their first frame).
       if (streams && prewarmWanted(tier)) ringFollow();
+      // PERF-LOAD PRF-05: the kicker (LightRig's player rim light) takes in the bodies before the pre-warm, so each body material
+      // compiles once, for the lights it is drawn with (it took them in at the first frame: every body compiled twice). Planned
+      // modes only, like the ring: the hoops loads stay as they were (the same line is hoops-round2's to switch on).
+      if (streams && prewarmWanted(tier)) lights.kicker?.sync();
       if (prewarmWanted(tier)) {
         console.info('[FEL-PERF] shader pre-warm start');
         const warm = await prewarmScene(scene, { renderFrame: () => { engine.beginFrame(); scene.render(); engine.endFrame(); }, effectsReady: () => engine.areAllEffectsReady() });

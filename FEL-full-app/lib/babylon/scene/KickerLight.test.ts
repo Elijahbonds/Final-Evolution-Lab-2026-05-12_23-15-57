@@ -133,3 +133,30 @@ describe('the ink decision', () => {
     expect(hero.renderOutline).toBe(false);
   });
 });
+
+describe('sync(): the kicker takes in the players before the pre-warm (PERF-LOAD PRF-05)', () => {
+  it('a body loaded with no frame drawn is lit at once — so the pre-warm compiles it for the lights it is drawn with', async () => {
+    const e = new NullEngine(); const s = new Scene(e);
+    new TargetCamera('cam', new Vector3(0, 2, -6), s);
+    const k = mountKickerLight(s, 'goldenHour');
+    const body = player(s);
+    await new Promise((r) => setTimeout(r, 5));        // the mesh is announced (no frame rendered: a load draws none)
+    expect(k.light.isEnabled()).toBe(false);            // before: off until the first frame takes the body in
+    k.sync();
+    expect(k.light.isEnabled()).toBe(true);
+    expect([...k.light.includedOnlyMeshes].length).toBe(1);
+    expect(k.light.includedOnlyMeshes[0]).toBe(body);
+    k.sync();                                           // idempotent
+    expect(k.meshes.length).toBe(1);
+    await tick(s);                                      // the first frame changes nothing more
+    expect([...k.light.includedOnlyMeshes].length).toBe(1);
+    k.dispose(); s.dispose(); e.dispose();
+  });
+  it('the harness syncs it before the phone pre-warm, for planned modes (the hoops loads unchanged)', async () => {
+    const fs = await import('node:fs'); const path = await import('node:path');
+    const src = fs.readFileSync(path.join(__dirname, '../core/ModeHarness.ts'), 'utf8');
+    const sync = src.indexOf('if (streams && prewarmWanted(tier)) lights.kicker?.sync();');
+    expect(sync).toBeGreaterThan(0);
+    expect(src.indexOf('await prewarmScene(scene', sync)).toBeGreaterThan(sync);
+  });
+});
