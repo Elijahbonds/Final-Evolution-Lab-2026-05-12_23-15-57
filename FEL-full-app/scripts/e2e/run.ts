@@ -114,6 +114,9 @@ export async function gateMain(gate: string, checks: Flow[], summary: string): P
   const i = process.argv.indexOf('--only');
   const only = i >= 0 ? (process.argv[i + 1] ?? '').split(',').filter(Boolean) : undefined;
   if (process.argv.includes('--list')) { for (const c of checks) console.log(`${c.name}\t${c.title}`); return; }
+  // once the owner adds the dedicated browser-gates CI job (docs/QUALITY-GATES-PROPOSAL.md §2), the headless-suites step
+  // sets this so the same checks do not run twice; the job itself does not set it. Unset (today): the gates run here.
+  if (process.env.FEL_SKIP_BROWSER_GATES === '1') { console.log(`${gate}: skipped here — the browser-gates CI job runs it (FEL_SKIP_BROWSER_GATES=1)`); return; }
   const t0 = Date.now();
   const { results, red, lines } = await runGate({ gate, checks, only });
   console.log(`${gate}: ${summary}`);

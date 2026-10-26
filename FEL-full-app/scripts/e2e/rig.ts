@@ -61,10 +61,11 @@ export async function bundle(entry: string, env: Record<string, string> = {}): P
   const hit = bundles.get(key);
   if (hit) return hit;
   const procEnv = { NODE_ENV: 'production', NEXTAUTH_URL: ORIGIN, ...env };
+  // a page may ask for the development build (the mode rig does: the harness publishes its probe handle only there)
   const r = await build({
     entryPoints: [join(ROOT, entry)], bundle: true, write: false, format: 'iife', platform: 'browser', target: 'es2020',
     jsx: 'automatic', tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: false,
-    define: { 'process.env.NODE_ENV': '"production"' },
+    define: { 'process.env.NODE_ENV': JSON.stringify(procEnv.NODE_ENV) },
     banner: { js: `var process = { env: ${JSON.stringify(procEnv)}, browser: true, nextTick: (f, ...a) => Promise.resolve().then(() => f(...a)) };` },
     loader: { '.png': 'file', '.jpg': 'file', '.svg': 'file', '.woff2': 'file', '.glb': 'file', '.wav': 'file', '.mp3': 'file' },
     publicPath: '/__rig/asset', assetNames: '[name]-[hash]', outdir: join(tmpdir(), 'fel-rig-out'),
@@ -141,6 +142,8 @@ export class Session {
   readonly errors: string[] = [];
   readonly consoleErrors: string[] = [];
   readonly blocked: string[] = [];
+  /** requests that failed below the rig's routing (a worker's fetch, a socket): each one is a hole in the hermetic seal */
+  readonly failed: string[] = [];
   ctx!: BrowserContext;
   page!: Page;
   constructor(private browser: Browser, private o: SessionOptions) {}
@@ -158,10 +161,11 @@ export class Session {
     if (this.o.permissions?.length) await this.ctx.grantPermissions(this.o.permissions, { origin: ORIGIN });
     if (this.o.init) await this.ctx.addInitScript({ content: this.o.init });
     await this.ctx.route('**/*', (route, req) => this.route(route, req));
+    this.ctx.on('requestfailed', (r) => { if (r.failure()?.errorText !== 'net::ERR_BLOCKED_BY_CLIENT') this.failed.push(`${r.url().slice(0, 160)} ${r.failure()?.errorText ?? ''}`); });
     this.page = await this.ctx.newPage();
     this.page.setDefaultTimeout(20_000);
     this.page.on('pageerror', (e) => this.errors.push(String(e?.stack ?? e).slice(0, 600)));
-    this.page.on('console', (m) => { if (m.type() === 'error') this.consoleErrors.push(m.text().slice(0, 300)); });
+    this.page.on('console', (m) => { if (m.type() === 'error') this.consoleErrors.push(`${m.text().slice(0, 300)}${m.location()?.url ? ` @ ${m.location().url.slice(0, 160)}` : ''}`); });
     await this.page.goto(ORIGIN + path, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     return this.page;
   }
@@ -236,7 +240,7 @@ export class Session {
 
 function shell(key: string, def: PageDef): string {
   return `<!doctype html><html lang="en" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/__rig/app.css"></head><body class="bg-[#050505] text-white antialiased"><div id="root"></div>
+<link rel="icon" href="data:,"><link rel="stylesheet" href="/__rig/app.css"></head><body class="bg-[#050505] text-white antialiased"><div id="root"></div>
 <script>window.__RIG = ${JSON.stringify({ page: key, ...(def.rig ?? {}) }).replace(/</g, '\\u003c')};</script>
 <script src="/__rig/page/${encodeURIComponent(key)}.js"></script></body></html>`;
 }
