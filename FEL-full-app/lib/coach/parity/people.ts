@@ -73,11 +73,16 @@ export type Who =
   | { ok: true; band: 'adult' | 'teen'; adult: boolean; healthShown: boolean; healthConsent: boolean }
   | { ok: false; error: TeenGateRefusal; body: ReturnType<typeof teenGateBody> };
 
+/** The health-write age check (lib/privacy/healthWriteGate.ts canWriteHealthData). A WRITE route passes its own
+ *  `() => canWriteHealthData(prisma, userId)` so the check sits in the route file, where HEALTH_WRITE_ROUTES g and h
+ *  find it (COACH-DELIVERY, 2026-10-27); a read uses the same call made here. Asked only for an adult band, as before. */
+export type HealthGate = () => Promise<boolean>;
+
 /** The athlete under the gates (see the header). `healthEnabled` is the switch. */
-export async function whoIs(db: PeopleDb, athleteId: string, healthEnabled: boolean, now: Date = new Date()): Promise<Who> {
+export async function whoIs(db: PeopleDb, athleteId: string, healthEnabled: boolean, now: Date = new Date(), healthGate?: HealthGate): Promise<Who> {
   const g = await readTeenGate(db, athleteId, now);
   if (!g.ok) return { ok: false, error: g.error, body: teenGateBody(g.error) };
-  const adult = g.band === 'adult' && (await canWriteHealthData(db as unknown as GateDb, athleteId));
+  const adult = g.band === 'adult' && (await (healthGate ? healthGate() : canWriteHealthData(db as unknown as GateDb, athleteId)));
   let healthConsent = false;
   if (adult && healthEnabled) {
     const rows = await soft(db.healthConsent.findMany({ where: { userId: athleteId, scope: 'health_data' }, select: { scope: true, coachId: true, grantedAt: true, revokedAt: true } }), []);
