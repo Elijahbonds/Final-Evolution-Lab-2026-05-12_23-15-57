@@ -17,7 +17,7 @@ workflow change, and the workflow change that makes them better is written out h
 | Gate | File | What fails it | CI time (measured) |
 |---|---|---|---|
 | E2E, the five key flows | `scripts/e2e-tests.ts` | a flow step, a page error, a request leaving the rig | 109 s |
-| Visual, 7 key screens + 1 mode frame | `scripts/visual-tests.ts` | more than 1.5% of a screen changed (8% for a 3D frame) | see §6 |
+| Visual, 7 key screens + 1 mode frame | `scripts/visual-tests.ts` | more than 0.4% of a screen changed after a light blur (8% for a 3D frame) | see §6 |
 | Phone perf, the sentinel mode | `scripts/perf-gate-tests.ts` | any of the five counts over the mode's `mobileBudget.json` row | see §6 |
 | File size | `scripts/file-size-guard-tests.ts` | a >1,000-line file grew, or a new file crossed 1,000 | 1 s |
 | Security: routes | `tests/security/route-guard.test.ts` | a route not in the review's inventory; a write route with no check | vitest |

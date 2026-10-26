@@ -11,6 +11,7 @@ import { raster } from '../e2e/pixels';
 
 export const COMPARE_WIDTH = 256;
 export const PIXEL_TOLERANCE = 40;
+export const BLUR = 1.2;
 
 export interface Diff { changed: number; mean: number; width: number; height: number }
 
@@ -22,8 +23,12 @@ export async function toBaseline(png: Buffer): Promise<Buffer> {
 
 /** Compare a full-size screenshot with a stored baseline; writes a diff image (changed pixels in magenta) to diffPath. */
 export async function compare(current: Buffer, baselinePath: string, diffPath?: string): Promise<Diff> {
-  const base = await raster(readFileSync(baselinePath));
-  const cur = await raster(current, { width: base.width, height: base.height });
+  // a light blur on both sides first: two Chromium builds place a glyph's anti-aliasing a pixel apart, which on a
+  // text-heavy screen is 2% of "changed" pixels (measured: this box vs the GitHub runner's Chrome, coach-book, 1.96%);
+  // a moved block, a new colour or a missing element is far larger than the blur
+  const plain = await raster(readFileSync(baselinePath));
+  const base = await raster(readFileSync(baselinePath), { width: plain.width, height: plain.height }, BLUR);
+  const cur = await raster(current, { width: base.width, height: base.height }, BLUR);
   let changed = 0, sum = 0;
   const out = Buffer.alloc(base.width * base.height * 3);
   for (let i = 0, px = 0; i < base.data.length; i += base.channels, px++) {

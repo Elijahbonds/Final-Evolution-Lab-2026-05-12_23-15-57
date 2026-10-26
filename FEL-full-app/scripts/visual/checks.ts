@@ -15,13 +15,15 @@ import { join } from 'node:path';
 import type { Page } from 'playwright-core';
 import { ROOT, assert, type ApiHandler, type PageDef } from '../e2e/rig';
 import type { Flow, FlowContext } from '../e2e/flow';
+import { TAIL } from '../e2e/run';
 import { advanceFrames, openMode } from '../e2e/mode';
 import { FakeAuth } from '../../tests/e2e/fakes/auth';
 import { compare, hasBaseline, toBaseline } from './compare';
 
 export const BASELINES = join(ROOT, 'scripts/visual/baselines');
-/** Screens are deterministic DOM: 1.5% of the (downscaled) screen may move. Mode frames are 3D on software GL: 8%. */
-export const SCREEN_THRESHOLD = 0.015;
+/** Screens are deterministic DOM: 0.4% of the (downscaled, lightly blurred) screen may move — a heading turned red on
+ *  /whats-new is 0.8%, one Chromium build against another 0.00% after the blur. Mode frames are 3D on software GL: 8%. */
+export const SCREEN_THRESHOLD = 0.004;
 export const MODE_THRESHOLD = 0.08;
 export const SENTINEL_MODES = ['golf'];
 
@@ -140,9 +142,14 @@ export function asFlow(s: Shot, update: boolean): Flow {
       const d = await compare(png, file, join(ctx.out, 'diff.png'));
       const line = `${(d.changed * 100).toFixed(2)}% of the screen changed (limit ${(s.threshold * 100).toFixed(1)}%), mean channel difference ${d.mean.toFixed(1)}`;
       ctx.log(line);
-      // on a CI runner, a failing check prints its photo (scaled as the baseline is) so the run's log alone shows what
-      // the runner saw, and a baseline taken there can be restored from it: VISUAL-CURRENT <name> <base64 png>
-      if (d.changed > s.threshold && process.env.CI) console.log(`VISUAL-CURRENT ${s.name} ${(await toBaseline(png)).toString('base64')}`);
+      // on a CI runner, a failing check prints its photo (scaled as the baseline is) after the summary, in 3,000-character
+      // lines (the log mangles longer ones), so the run's log alone shows what the runner saw and a baseline can be
+      // restored from it: VISUAL-CURRENT <name> <k>/<n> <base64 png part>
+      if (d.changed > s.threshold && process.env.CI) {
+        const b64 = (await toBaseline(png)).toString('base64');
+        const parts = b64.match(/.{1,3000}/g) ?? [];
+        parts.forEach((p, i) => TAIL.push(`VISUAL-CURRENT ${s.name} ${i + 1}/${parts.length} ${p}`));
+      }
       assert(d.changed <= s.threshold, `${s.name}: ${line}. Look at ${join(ctx.out, 'diff.png')} (magenta = changed) and current.png. If the change is intended: npx tsx scripts/visual-tests.ts --update --only ${s.name}`);
     },
   };

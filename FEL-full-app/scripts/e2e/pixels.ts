@@ -5,9 +5,10 @@ import sharp from 'sharp';
 export interface Raster { data: Buffer; width: number; height: number; channels: number }
 
 /** Decode an image to raw RGB, optionally resized to width x height (fit: fill — every pixel of the source counts). */
-export async function raster(img: Buffer, size?: { width: number; height: number }): Promise<Raster> {
+export async function raster(img: Buffer, size?: { width: number; height: number }, blur = 0): Promise<Raster> {
   let p = sharp(img).removeAlpha();
   if (size) p = p.resize(size.width, size.height, { fit: 'fill', kernel: 'lanczos3' });
+  if (blur > 0) p = p.blur(blur);
   const { data, info } = await p.raw().toBuffer({ resolveWithObject: true });
   return { data, width: info.width, height: info.height, channels: info.channels };
 }

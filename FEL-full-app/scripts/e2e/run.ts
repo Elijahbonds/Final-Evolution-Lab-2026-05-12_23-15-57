@@ -8,7 +8,7 @@
 //     just cannot turn the gate red. A row with no reason, or for a check that no longer exists, fails the gate — so
 //     the list cannot rot into a blanket exemption. A quarantined check that passes is printed as "can come out".
 //   * Evidence: each attempt's screenshots land in OUT/<gate>/<check>/attempt-<n>/ (OUT = $E2E_OUT, else the OS temp).
-import { mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Browser } from 'playwright-core';
@@ -16,6 +16,8 @@ import { ROOT, launch, type Session } from './rig';
 import { hygiene, makeContext, type Flow } from './flow';
 
 export const RETRIES = 1;
+/** Lines a check wants printed after the summary (the visual gate's photos, in chunks), so the verdict reads first. */
+export const TAIL: string[] = [];
 export const RETRY_BUDGET = 2;
 export const QUARANTINE_FILE = 'tests/e2e/quarantine.json';
 
@@ -123,5 +125,13 @@ export async function gateMain(gate: string, checks: Flow[], summary: string): P
   for (const l of lines) console.log(l);
   const n = (o: Outcome) => results.filter((r) => r.outcome === o).length;
   console.log(`${gate}: ${n('pass')} passed, ${n('flaky')} flaky, ${n('fail')} failed of ${results.length} in ${((Date.now() - t0) / 1000).toFixed(0)} s — ${red ? 'RED' : 'GREEN'}`);
-  process.exit(red ? 1 : 0);
+  for (const l of TAIL) console.log(l);
+  // on GitHub Actions, the gate's table also goes to the job's summary page, so a green run shows its numbers too
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    const md = [`### ${gate} gate — ${red ? 'RED' : 'green'}`, '', '| Check | Result | Time | Detail |', '|---|---|---|---|',
+      ...results.map((r) => `| ${r.check}${r.quarantined ? ' (quarantined)' : ''} | ${r.outcome} | ${(r.ms / 1000).toFixed(0)} s | ${[...r.logs, ...r.errors.map((e) => e.split('\n')[0])].join('<br>').replace(/\|/g, '\\|').slice(0, 600)} |`), ''];
+    try { appendFileSync(process.env.GITHUB_STEP_SUMMARY, md.join('\n') + '\n'); } catch { /* a summary is a convenience */ }
+  }
+  // exitCode, not exit(): a piped stdout is flushed before the process ends (the CI log once lost the summary)
+  process.exitCode = red ? 1 : 0;
 }
