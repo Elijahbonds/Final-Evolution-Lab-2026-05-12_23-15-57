@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    sheet, problems: parsed.problems, duplicates: parsed.duplicates,
+    sheet, problems: parsed.problems, duplicates: parsed.duplicates, format: parsed.format ?? null,
     email: { requested: wantSend, on: mailReady() && !!origin },
   }, { status: 201 });
 }

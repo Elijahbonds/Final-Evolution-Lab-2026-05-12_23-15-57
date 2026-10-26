@@ -9,11 +9,11 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Copy, FileUp, Loader2, Mail, Printer, Users } from 'lucide-react';
-import { IMPORT_PROBLEM_COPY, type ImportProblem } from '@/lib/coach/bulkImport';
+import { IMPORT_PROBLEM_COPY, importFormatLine, type ImportFormat, type ImportProblem } from '@/lib/coach/bulkImport';
 import { JOIN_BY_CODE_PATH } from '@/lib/coach/inviteCode';
 
 interface SheetRow { line: number; name: string | null; email: string | null; code: string; path: string; emailed: 'sent' | 'off' | 'failed' | 'none' }
-interface Result { sheet: SheetRow[]; problems: { line: number; problem: ImportProblem }[]; duplicates: number; email: { requested: boolean; on: boolean } }
+interface Result { sheet: SheetRow[]; problems: { line: number; problem: ImportProblem }[]; duplicates: number; email: { requested: boolean; on: boolean }; format?: ImportFormat | null }
 
 const EMAILED_COPY: Record<SheetRow['emailed'], string> = { sent: 'emailed', off: 'not emailed', failed: 'email failed', none: '—' };
 
@@ -79,7 +79,7 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
 
       <div>
         <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><Users className="h-3.5 w-3.5" /> Add a team</div>
-        <p className="mt-1 text-xs text-white/45">Paste one athlete per line (name, email — or just a name), or upload a CSV. Everyone gets their own code.</p>
+        <p className="mt-1 text-xs text-white/45">Paste one athlete per line (name, email — or just a name), or upload a CSV — a TeamSnap, SportsEngine or LeagueApps roster export works as it is. Everyone gets their own code.</p>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder={'Sam Lee, sam@email.com\nRia Khan\nName,Email (a CSV header works too)'}
           className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 font-mono text-xs text-white" data-bulk-text />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -102,6 +102,8 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
             </span>
           </div>
           <p className="mt-1 text-[11px] text-white/40">Athletes type their code at {JOIN_BY_CODE_PATH}, or open their own link.</p>
+          {/* COACH-DELIVERY COA-07: which team app's export it was read as (player columns only) */}
+          {importFormatLine(result.format ?? undefined) && <p className="mt-1 text-[11px] text-white/55" data-import-format={result.format ?? ''}>{importFormatLine(result.format ?? undefined)}</p>}
           <ul className="mt-2 space-y-1">
             {result.sheet.map((s) => (
               <li key={s.code} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
