@@ -2,6 +2,7 @@
 // Clients — the coach's side of the loop (lane 1 C1/C3): programs I coach with the builder (prescribe exercises per
 // session), the inbox of completed sessions with logs and videos to comment, and the thread per program.
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Loader2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
@@ -31,6 +32,8 @@ import { FormReviewQueue } from '@/components/coach/form-review/review-queue';
 import { CheckinsPanel } from '@/components/coach/parity/checkins-panel';
 import { HabitsPanel } from '@/components/coach/parity/habits-panel';
 import { ImportProgram } from '@/components/coach/parity/import-panel';
+// COACH-DELIVERY (2026-10-26): automations, the calendar, the first-block draft, branding (wiring only)
+import { AutomationsPanel } from '@/components/coach/automations-panel';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -108,8 +111,12 @@ export function ClientsView() {
       <DraftsInbox />
       <FormReviewQueue />
       <TeamsPanel />
+      {/* VBT (docs/VBT.md §7.2; wired by coach-delivery 2026-10-27): the coach's bar-speed view */}
+      <Link href="/coach/velocity" className="fel-card block rounded-xl p-4 text-sm text-white/80" data-coach-velocity-door>Bar speed: clients' reps, speed loss and target zones →</Link>
       <CheckinsPanel />
       <HabitsPanel />
+      {/* COACH-DELIVERY (2026-10-26): automations (COA-01) — wiring only; coming soon until the pending SQL */}
+      <AutomationsPanel />
       {/* COMBINE-DAY (2026-10-25): tryouts and testing days, run on this device (/coach/combine) */}
       <CombineEntry />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}

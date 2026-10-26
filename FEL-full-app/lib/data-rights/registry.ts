@@ -366,6 +366,36 @@ export const REGISTRY: Record<string, TableRights> = {
   },
   CoachHabitTick: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own ticks (the FK cascades the same way)." }] },
 
+  // COACH-DELIVERY (lane/coach-delivery, prisma/pending/2026-10-26-coach-delivery.sql): automations, the readiness survey,
+  // branding, roster sessions and the calendar feed, client reviews. Retention choices are owner calls (docs/COACH-DELIVERY.md).
+  CoachAutomation: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own automations; their audit rows cascade (the messages they posted stay in the program threads, as any coach message does)." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'An automation a coach aimed at this one athlete is about them; it goes with them.' },
+    ],
+  },
+  CoachAutomationRun: {
+    subjects: [
+      { col: 'athleteId', export: true, erase: 'delete', why: 'The audit of what an automation posted to this athlete, and when (the FK cascades the same way).' },
+      { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's automation audit: it cascades with the coach's automations." },
+    ],
+  },
+  ReadinessSurvey: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own readiness answers (health data). The feature's own delete (DELETE /api/readiness/survey) does the same." }] },
+  CoachBranding: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own logo path and accent colour; the logo file in the public bucket is the coach's to delete with it (owner call)." }] },
+  CoachRosterSession: {
+    subjects: [
+      { col: 'coachId', export: true, erase: 'delete', why: "The coach's own calendar sessions." },
+      { col: 'scopeId', where: `"scope" = 'athlete' AND "scopeId" = $1`, export: OTHERS, erase: 'delete', why: 'A session a coach set for this one athlete is about them; it goes with them.' },
+    ],
+  },
+  CoachCalendarFeed: { omit: ['nonce'], subjects: [{ col: 'userId', export: true, erase: 'delete', why: 'The calendar-feed link key; deleting it kills every copy of the link.' }] },
+  CoachReview: {
+    subjects: [
+      { col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own review of a coach: their words, so they go with them." },
+      { col: 'coachId', export: OTHERS, erase: 'delete', why: "Reviews of an erased coach: the page they were shown on is gone, so they go too (owner call: docs/COACH-DELIVERY.md)." },
+    ],
+  },
+
   // ── camp / facilitator ────────────────────────────────────────────────────────────────────────────────────────────
   FacilitatorProfile: {
     subjects: [{

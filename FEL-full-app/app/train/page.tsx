@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -68,6 +68,13 @@ export default async function TrainPage() {
       href: '/train/readiness', icon: Activity, accent: '#00FF9D', title: 'Readiness check',
       line: 'Three jumps a day against your own normal: ready, normal or low. A low day eases your coached session and your coach is told. 18 and over.',
       tag: 'Check in',
+    },
+    {
+      // VBT (2026-10-25; wired by coach-delivery 2026-10-27, docs/VBT.md §7.1): camera bar speed (13+; a teen sees technique
+      // speed only; the page says so)
+      href: '/train/velocity', icon: Gauge, accent: '#00E5FF', title: 'Bar speed',
+      line: 'Rep speed from your camera: zones, speed loss, your load-velocity line. Estimates, not lab numbers.',
+      tag: 'Track a set',
     },
     {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
