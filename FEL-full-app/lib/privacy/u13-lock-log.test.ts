@@ -85,7 +85,9 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; CoachCheckinForm + CoachCheckinAssign + CoachCheckinAnswer + CoachHabit + CoachHabitTick, additive) at f5e6bc63,
 // the lane commit carrying it on top of every file above. Signature programs and combine day landed first (#451, #453):
 // pinned at e7769157, this lane's merge of lane/finish-release, the first commit carrying every pending file above.
-const PARENT = 'e77691575c433468078159a6249664d0f3c51bea';
+// NEXUS-PUBLISH (lane/nexus-publish, NEX-06, 2026-10-26) prisma/pending/2026-10-26-studio-share.sql (pending SQL only; schema.prisma
+// untouched) at b610726c, the lane's commit carrying it (re-pinned again at the lane's merge of lane/finish-release).
+const PARENT = 'b610726cb4dc798133b84eb569109a70aa9fcc5a';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
