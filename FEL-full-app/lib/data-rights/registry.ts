@@ -294,6 +294,9 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's inbox." },
     ],
   },
+  // VBT (lane vbt, prisma/pending/2026-10-26-vbt.sql)
+  VbtSet: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own bar-speed numbers (speeds, reps, velocity loss; never video). The feature's own delete (DELETE /api/vbt/sets) does the same." }] },
+  VbtZoneTarget: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own velocity-zone targets on their program slots; the athlete's program stays as written." }] },
   // COACH-BUSINESS (#442, #445)
   CoachConnectAccount: { subjects: [{ col: 'userId', export: true, erase: 'keep', why: 'The Stripe Connect account that CoachSale money records name. ' + MONEY }] },
   CoachPackage: { subjects: [{ col: 'coachId', export: true, erase: { scrub: { active: 'false' } }, why: 'Sales point at it (CoachSale.packageId Restrict): it stays, off sale.' }] },
