@@ -293,6 +293,111 @@ is stored is unchanged (a verified, opted-in adult; anyone else is refused and n
 - **Seam**: `JumpRecord` types `approach` / `drop` are not produced yet (nothing reads them; the seam stays as #437 left it).
 - **Teens and the approach / drop / reach entries**: mounted for adults only, like the session card (owner call below).
 
+## 10. JUMP-TESTS (lane `jump-tests`, 2026-10-25): the standard test set, history CSV, manual frames, the pilot kit, velocity and power
+
+Everything here was measured on the same synthetic bench as §2 and §9, not on people. **No accuracy is claimed** until
+the force-plate pilot is done (`docs/JUMP-PILOT-PROTOCOL.md`).
+
+### 10.1 The tests (`lib/jump/protocols.ts`, `components/jump/jump-tests.tsx`)
+
+The jump tests sit on the adult jump result, under "More jump tests". Each test has its own setup cue. It is filmed
+with the phone, or picked from the phone's videos, and read on the phone by the slow-mo reader's pipeline: gravity
+gives the clock, `gradeT5` finds the flights and applies its refusals, and `refine.ts` re-times them. Then the test's
+own rules are applied. A jump that is not that test gets a reason beside it, in the same `invalidWhy` every refusal
+uses.
+
+| test | the rule (register entries, all new and TUNE) | refused with |
+|---|---|---|
+| Squat jump | a held squat: the centre of mass still (`jump.sjStillCm` 3) for `jump.sjHoldMs` 1000 ms, hips ≥ `jump.sjMinDepthCm` 12 under standing, then no drop of more than `jump.sjDipCm` 3 cm before take-off | "you dipped before you jumped…", "no still squat…", "it did not start from a squat…" |
+| Jump, hands on hips | each wrist within `jump.hipsWristShare` 0.35 torso of its hip and each elbow bent ≤ `jump.hipsElbowDeg` 140° (arms hanging at the sides are straight), with no more than `jump.hipsOffPct` 25 % of frames failing, from the dip to the landing | "your hands left your hips" |
+| Jump with arm swing | T5's "hands left your hips" is lifted. A wrist must rise over the shoulder line (`t5.armSwingWrist`, T5's own line) | "your arms did not swing…" |
+| Single-leg, left / right | one foot held ≥ `jump.slFreeFootShare` 0.04 body heights over the other on ≥ `jump.slFreeFootPct` 90 % of frames, from 500 ms before take-off to 300 ms after landing. The side is the one the athlete picked, because a front camera's video may be mirrored. Asymmetry % is shown with its noise band (z·√(TE_L² + TE_R²), the `realChange` gate) and says "no clear difference" inside it | "your other foot came down…" |
+| 10-5 rebound jumps | rebounds under 400 ms (`rebound.ts`). A rebound counts if its contact is ≤ `jump.rjMaxContactMs` 250 ms. RSI = flight ÷ contact, mean of the best five | "on the floor too long between jumps", "fewer than five quick rebounds…" |
+
+The arm-swing height is read through the hips like every standing jump. A real arm swing moves the centre of mass
+against the hips, and the bench does not model that (its hips fly the parabola), so the arm-swing height is unvalidated
+beyond what the pilot measures. The protocol bench (`lib/jump/protocolBench.ts`, `scripts/jump-tests-bench.ts`, 6 seeds)
+measures which jumps are counted and which refused:
+
+| test | fps | honest: counted / jumps | refused take: refused / jumps | height bias/SD (cm) | v0 bias/SD (m/s) | push-off bias/SD (cm) | time to take-off bias/SD (ms) |
+|---|---|---|---|---|---|---|---|
+| sj | 30 | 18 / 18 | 18 / 18 | -0.66/1.14 | -0.02/0.04 | -1.99/1.84 | — |
+| sj | 60 | 18 / 18 | 18 / 18 | -0.20/1.26 | -0.01/0.05 | -2.01/1.37 | — |
+| sj | 120 | 18 / 18 | 18 / 18 | -0.31/0.81 | -0.01/0.03 | -1.41/0.77 | — |
+| sj | 240 | 18 / 18 | 18 / 18 | +0.05/0.41 | +0.00/0.01 | -1.40/0.42 | — |
+| cmjArms | 30 | 18 / 18 | 18 / 18 | -0.66/1.44 | — | — | — |
+| cmjArms | 60 | 18 / 18 | 18 / 18 | +0.06/0.87 | — | — | — |
+| cmjArms | 120 | 18 / 18 | 18 / 18 | +0.28/0.97 | — | — | — |
+| cmjArms | 240 | 18 / 18 | 18 / 18 | +0.04/0.49 | — | — | — |
+| cmjHips | 30 | 18 / 18 | 18 / 18 | -0.26/1.30 | -0.01/0.04 | -3.37/2.05 | -20.06/20.67 |
+| cmjHips | 60 | 18 / 18 | 18 / 18 | -0.53/1.44 | -0.02/0.05 | -1.66/1.62 | -31.39/9.62 |
+| cmjHips | 120 | 18 / 18 | 18 / 18 | -0.01/0.92 | -0.00/0.03 | -1.90/0.86 | -42.39/5.38 |
+| cmjHips | 240 | 18 / 18 | 18 / 18 | -0.07/0.48 | -0.00/0.02 | -1.38/0.62 | -44.72/3.36 |
+| singleLeft | 30 | 18 / 18 | 18 / 18 | +0.69/2.09 | — | — | — |
+| singleLeft | 60 | 18 / 18 | 18 / 18 | -0.87/1.51 | — | — | — |
+| singleLeft | 120 | 18 / 18 | 18 / 18 | -0.16/1.50 | — | — | — |
+| singleLeft | 240 | 18 / 18 | 18 / 18 | -0.22/0.74 | — | — | — |
+| singleRight | 30 | 18 / 18 | 18 / 18 | -0.51/1.59 | — | — | — |
+| singleRight | 60 | 18 / 18 | 18 / 18 | -1.07/1.68 | — | — | — |
+| singleRight | 120 | 18 / 18 | 18 / 18 | +0.08/0.84 | — | — | — |
+| singleRight | 240 | 18 / 18 | 18 / 18 | +0.11/0.68 | — | — | — |
+| rj105 | 30 | 60 / 60 | 54 / 54 rebounds | -0.47/1.45 | — | — | — |
+| rj105 | 60 | 60 / 60 | 54 / 54 rebounds | -0.33/1.39 | — | — | — |
+| rj105 | 120 | 60 / 60 | 54 / 54 rebounds | -0.12/1.01 | — | — | — |
+| rj105 | 240 | 60 / 60 | 54 / 54 rebounds | -0.07/0.64 | — | — | — |
+
+v0 is checked against √(2·g·truth). The push-off is checked against the hips' true rise (35.2 cm). Time to take-off is
+checked against the bench's 650 ms from the start of the dip. It reads 20–45 ms short because onset is read 1.5 cm into
+the dip (`jump.onsetCm`), a little later than a plate's body weight − 5 SD.
+
+### 10.2 History and CSV (`lib/jump/historyStore.ts`, `components/jump/jump-history.tsx`, `lib/csv/csv.ts`)
+
+Jump numbers are stored as they are today. The jump check's landing record still goes to the server only for a
+verified, opted-in adult (`lib/privacy/scanSaveGate.ts`, unchanged). The new tests, the slow-mo read and the day's
+live check are kept **on this phone**, the way the standing reach and the readiness history are kept: one
+localStorage key, numbers only, adults only (`keepJump` refuses anything but `adult: true`), kept on a tap, and
+forgotten with "Forget all". No table, no route and no Prisma were added. The CSV is made on the phone and
+formula-safe: a string that starts like a formula gets a `'`. A number is never prefixed, unlike combine-day's
+`csvCell`, which turns −1.5 into text.
+
+### 10.3 Manual frames (`lib/jump/manualFrames.ts`, `components/jump/frame-review.tsx`)
+
+"Check the frames" appears in the slow-mo reader and in every test except the 10-5. It steps through the video frame by
+frame, with the pose drawn over it. Take-off is the first frame with both feet off the floor. Landing is the first
+frame with a foot back on it. The height is worked out again as g·T²/8, and its ± is one frame of timing. If the frames
+were moved, the jump is marked "manual frames" in the result and in the history. **assumption (owner call): a
+manual-frame jump is never verified** (`verifyJump` block `manual`). The app cannot check a frame a person chose, and
+"verified" means the app's own read.
+
+### 10.4 Velocity and power (`lib/jump/velocity.ts`; owner scope addition 2026-10-25)
+
+Every value is labelled an estimate. The values are: take-off velocity √(2·g·h) with its ±; push-off (the hips' rise
+from the bottom of the dip, on video); time to take-off and RSI-mod (height ÷ time to take-off, countermovement jumps
+only); Sayers peak power; Samozino mean propulsive force and power; and a Samozino force-velocity profile (F0, V0 and
+Pmax, per kg) when the athlete reads jumps at two or more loads. Power needs a body weight. The weight is typed on the
+page by an adult and kept nowhere, and kids and teens never see the panel or the question. **assumption (owner
+call):** without a weight, no power is shown in any form, W/kg included. The live check keeps no frames, so it shows
+only the take-off velocity.
+
+### 10.5 The pilot kit
+
+`docs/JUMP-PILOT-PROTOCOL.md` (the study), `lib/jump/pilot.ts` with `components/jump/pilot-capture.tsx` (capture mode,
+**off** unless the build sets `NEXT_PUBLIC_JUMP_PILOT_CAPTURE=1`), and `scripts/jump-pilot/analyze.ts` with
+`lib/jump/pilotStats.ts` (Bland-Altman, ICC(2,1), TE, CV, MDC95 and the pass bar, unit-tested with known answers
+including Shrout & Fleiss's own example).
+
+### 10.6 Copy
+
+User-facing copy no longer says "lab-grade". The slow-mo button reads "Read a slow-motion video". A verified slow-mo
+jump says "Verified jump". The frame-rate tip says a slow-motion video "times the jump in finer steps". The claim guard
+(`tests/helpers/claimFree.ts`) now covers the screen's copy and every string in `components/jump`.
+
+### 10.7 Phone rig
+
+`npx tsx scripts/probes/_jump-tests-phone.mts <outDir>` drives 12 scenes at 390 px: the menu, a squat jump, a squat jump
+with a dip, an arm swing, single-leg left and right, the 10-5, the frame review, history and CSV, force-velocity, pilot
+capture, the slow-mo review, and a kid (nothing shown).
+
 ## Appendix: the full bench (`npx tsx scripts/jump-accuracy.ts --reader frames,t5 --seeds 6`, 2026-10-24)
 
 Columns: trials, matched valid reads, missed (refused or not found), valid reads with no real jump under them (/ decoys
