@@ -27,6 +27,10 @@ import { AssignProgram } from '@/components/coach/assign-program';
 import { GUARDIAN_REPORT_API, GuardianReportButton } from '@/components/coach/guardian-report-button';
 // COACH-VIDEO-REVIEW (2026-10-24): filmed sets, the camera's flagged rep first (components/coach/form-review)
 import { FormReviewQueue } from '@/components/coach/form-review/review-queue';
+// COACH-PARITY (2026-10-26): check-in forms, habits, and "paste a program" (wiring only; coming soon until the pending SQL)
+import { CheckinsPanel } from '@/components/coach/parity/checkins-panel';
+import { HabitsPanel } from '@/components/coach/parity/habits-panel';
+import { ImportProgram } from '@/components/coach/parity/import-panel';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -104,6 +108,8 @@ export function ClientsView() {
       <DraftsInbox />
       <FormReviewQueue />
       <TeamsPanel />
+      <CheckinsPanel />
+      <HabitsPanel />
       {/* COMBINE-DAY (2026-10-25): tryouts and testing days, run on this device (/coach/combine) */}
       <CombineEntry />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
@@ -171,6 +177,13 @@ export function ClientsView() {
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
         <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
         {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
+        {prog && (
+          <ImportProgram
+            program={{ id: prog.tree.id, name: prog.tree.name, clientName: prog.clientName }}
+            blank={!prog.completedSessionIds.length && prog.tree.blocks.every((b) => b.sessions.every((x) => x.exercises.length === 0))}
+            onTree={(tree) => { setPrograms((ps) => ps?.map((p) => p.tree.id === tree.id ? { ...p, tree } : p) ?? null); void fetch('/api/coach/programs/exercises').then((r) => r.json()).then((c) => setCatalogue(Array.isArray(c) ? c : [])).catch(() => {}); }}
+          />
+        )}
         {/* The screen's correctives, offered before the blank builder below them: the coach came here to write
             work for this athlete, and the athlete's own screen already says what the work should be. */}
         {prog?.clientId && (
