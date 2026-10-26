@@ -9,6 +9,7 @@
 import { STATIONS, UNIT_LABEL, stationName } from './catalogue';
 import { compositeTable, stationTable } from './score';
 import type { CombineEvent } from './types';
+import { timedBy } from '@/lib/sprint/cameraSprint';
 
 export function csvCell(v: string | number | null | undefined): string {
   if (v === null || v === undefined) return '';
@@ -30,6 +31,7 @@ export function combineCsv(ev: CombineEvent): string {
     header.push(`${name} best (${UNIT_LABEL[def.unit]})`);
     if (def.unit === 'cm') header.push(`${name} best (in)`);
     if (s.kind === 'approach') header.push(`${name} touch (cm)`);
+    if (s.timing === 'camera') header.push(`${name} timed by`);
     header.push(`${name} rank`, `${name} percentile`);
     for (let i = 1; i <= s.attempts; i++) header.push(`${name} attempt ${i}`);
   }
@@ -43,6 +45,8 @@ export function combineCsv(ev: CombineEvent): string {
       cells.push(r?.value != null ? round(r.value) : null);
       if (def.unit === 'cm') cells.push(r?.value != null ? r1(r.value / 2.54) : null);
       if (s.kind === 'approach') cells.push(r?.touchCm != null ? r1(r.touchCm) : null);
+      // SPRINT-SPEED: a camera station says how each athlete's attempts were timed ("camera", "hand-timed" or both)
+      if (s.timing === 'camera') cells.push(r ? timedBy(r.slots) : null);
       cells.push(r?.rank ?? null, r?.pct ?? null);
       for (let i = 0; i < s.attempts; i++) {
         const a = r?.slots[i];
