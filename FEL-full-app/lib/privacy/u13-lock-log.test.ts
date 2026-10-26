@@ -93,7 +93,8 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; CoachConnectAccount.requirementsDue + CoachSaleDispute, additive) at 8f79c9cb; combine-day landed first (#453):
 // pinned at this lane's merge of lane/finish-release (d754d041), the first commit carrying both files.
 // MERGE 5418784a: the first commit carrying every pending file above.
-const PARENT = '5418784a2fcfcc390d42af5fa599e6f0a7130906';
+// MERGE 0fe07e1f: the first commit carrying every pending file above.
+const PARENT = '0fe07e1f6e704a95a0b48dbbe233f3f9ef0872aa';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
