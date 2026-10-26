@@ -196,7 +196,7 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
   const closet = useClosetEdit(studio);
   const crowd = venue?.cast?.crowd ?? [];
   return (
-    <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6" data-testid="characters-track">
+    <div className="flex min-h-0 min-w-0 flex-1 justify-center overflow-y-auto p-2 md:p-6" data-testid="characters-track">
       <div className="w-full max-w-3xl rounded-xl border" style={{ borderColor: C.line, background: C.surface }}>
         <PanelTitle right={<span className="text-[11px]" style={{ color: C.dim }}>Closet share codes · {doc.characters.length}</span>}>Characters</PanelTitle>
         <p className="px-3 text-[12px]" style={{ color: C.dim }}>A character is a Closet look. Cast one as a venue’s player: the viewport stands it on the hero’s spot on the real rig, and Play-test dresses the mode’s hero in it. Seat up to {CROWD_CAST_MAX} among the fans (visual only). Edit the look itself in the Closet.</p>
@@ -213,7 +213,7 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
             const crowdFull = !inCrowd && crowd.length >= CROWD_CAST_MAX;
             return (
               <li key={c.id} data-testid="character-row">
-              <div className="flex items-center gap-2 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2 px-3 py-2">
                 <UserRound className="h-4 w-4 shrink-0" style={{ color: cast ? C.gold : C.dim }} aria-hidden />
                 <span className="w-44"><TextField label={`Name of ${c.name}`} value={c.name} onChange={(n) => run(renameCharacter(c.id, n))} onDone={seal} /></span>
                 <span className="min-w-0 flex-1 truncate font-mono text-[10px]" style={{ color: C.dim }} title={c.lookCode}>{c.lookCode?.slice(0, 18)}…</span>
