@@ -108,9 +108,12 @@ import { AVAILABILITY_API } from '@/components/coach/availability-picker';
 // of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
 import { lastTimeLine } from '@/lib/coach/loop';
 import { ReadinessTodayLine } from '@/components/readiness/readiness-today-line';   // COACH-READINESS (2026-10-25): wiring only
+// COACH-PARITY (2026-10-26): the coach's habits and check-ins (wiring only; nothing shows until the pending SQL is applied)
+import { HabitsToday, MY_HABITS_API } from '@/components/coach/parity/habits-today';
+import { CheckinCard, MY_CHECKINS_API } from '@/components/coach/parity/checkin-card';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check' };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -239,9 +242,17 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       <button type="button" onClick={() => setFinished(null)} className="px-1 text-xs text-white/45" data-finished-close>Close</button>
     </div>
   ) : null;
+  // COACH-PARITY: habits and check-ins come from the coach, not the program, so they show with or without one
+  const parity = (
+    <>
+      {api.habits && <HabitsToday api={api.habits} />}
+      {api.checkins && <CheckinCard api={api.checkins} />}
+    </>
+  );
   if (!data.program || !data.today) return (
     <div className="space-y-4">
       {finishedCard}
+      {parity}
       <div className="fel-card rounded-xl p-6 text-center">
         <p className="text-white/70 text-sm">{data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'}</p>
       </div>
@@ -266,6 +277,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
+      {parity}
       <ReadinessTodayLine note={today.readiness} api={api.readiness} />
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
