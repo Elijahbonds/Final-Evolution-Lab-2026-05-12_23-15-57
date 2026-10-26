@@ -28,7 +28,7 @@ export function downloadCsv(ev: CombineEvent, doc: Document = document): void {
 
 const pctBar = (p: number | null) => (
   <span className="block h-1.5 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
-    <span className="block h-full rounded-full bg-[#00E5FF]" style={{ width: `${p ?? 0}%` }} />
+    <span className="block h-full rounded-full bg-fel-cyan" style={{ width: `${p ?? 0}%` }} />
   </span>
 );
 
@@ -70,24 +70,24 @@ export function CombineReport({ ev, onChange, onBack }: { ev: CombineEvent; onCh
       <section className="fel-card rounded-xl p-4" data-combine-composite>
         <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-white">Composite</h3>
         <table className="w-full text-sm">
-          <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/40"><th className="w-10 py-1">#</th><th>Athlete</th><th className="text-right">Score</th><th className="w-14 text-right">Done</th></tr></thead>
+          <thead><tr className="text-left text-[11px] uppercase tracking-wider text-fel-dim"><th className="w-10 py-1">#</th><th>Athlete</th><th className="text-right">Score</th><th className="w-14 text-right">Done</th></tr></thead>
           <tbody>
             {board.map((r) => (
               <tr key={r.id} className="border-t border-white/5" data-combine-row={r.id}>
                 <td className="py-2 font-black text-white">{r.rank ?? '–'}</td>
                 <td className="py-2 font-bold text-white">{r.name}{!r.complete && r.composite !== null && <span className="ml-1.5 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold text-white/60">incomplete</span>}</td>
-                <td className="py-2 text-right font-mono font-bold tabular-nums text-[#00E5FF]">{r.composite ?? '—'}</td>
+                <td className="py-2 text-right font-mono font-bold tabular-nums text-fel-cyan">{r.composite ?? '—'}</td>
                 <td className="py-2 text-right text-xs text-white/50">{r.done}/{r.of}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="mt-2 text-[11px] text-white/40">Score = the weighted average of each athlete’s percentile within this group (100 = best here). An athlete missing a station is shown, not ranked.</p>
+        <p className="mt-2 text-[11px] text-fel-dim">Score = the weighted average of each athlete’s percentile within this group (100 = best here). An athlete missing a station is shown, not ranked.</p>
       </section>
 
       {ev.stations.map((s) => (
         <section key={s.id} className="fel-card rounded-xl p-4 print:break-inside-avoid" data-combine-table={s.id}>
-          <h3 className="mb-2 text-sm font-bold text-white">{stationName(s)} <span className="font-normal text-white/45">· best of {s.attempts}</span></h3>
+          <h3 className="mb-2 text-sm font-bold text-white">{stationName(s)} <span className="font-normal text-fel-dim">· best of {s.attempts}</span></h3>
           <table className="w-full text-sm">
             <tbody>
               {tables.get(s.id)!.map((r) => (
@@ -95,7 +95,7 @@ export function CombineReport({ ev, onChange, onBack }: { ev: CombineEvent; onCh
                   <td className="w-10 py-1.5 font-black text-white">{r.rank ?? '–'}</td>
                   <td className="py-1.5 text-white/90">{r.name}</td>
                   <td className="py-1.5 text-right font-mono font-bold tabular-nums text-white">{formatValue(s.kind, r.value)}{r.touchCm != null && <span className="block text-[10px] font-normal text-white/50">touch {formatValue('approach', r.touchCm)}</span>}</td>
-                  <td className="hidden w-32 py-1.5 pl-3 text-right font-mono text-[11px] text-white/45 sm:table-cell">{r.slots.map((x) => (x ? (x.value === null ? 'X' : formatValue(s.kind, x.value).replace(/ (in|s)$/, '')) : '·')).join(' / ')}</td>
+                  <td className="hidden w-32 py-1.5 pl-3 text-right font-mono text-[11px] text-fel-dim sm:table-cell">{r.slots.map((x) => (x ? (x.value === null ? 'X' : formatValue(s.kind, x.value).replace(/ (in|s)$/, '')) : '·')).join(' / ')}</td>
                 </tr>
               ))}
             </tbody>
@@ -131,8 +131,8 @@ export function CombineReport({ ev, onChange, onBack }: { ev: CombineEvent; onCh
         </div>
       </section>
 
-      <p className="text-[11px] text-white/40">{NO_ACCURACY_LINE} {ev.stations.some((s) => STATIONS[s.kind].method === 'hand') ? 'Sprint and agility times are hand-timed by the coach.' : ''}</p>
-      {who && <p className="text-[11px] text-white/40" data-combine-who>{who}</p>}
+      <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE} {ev.stations.some((s) => STATIONS[s.kind].method === 'hand') ? 'Sprint and agility times are hand-timed by the coach.' : ''}</p>
+      {who && <p className="text-[11px] text-fel-dim" data-combine-who>{who}</p>}
     </div>
   );
 }

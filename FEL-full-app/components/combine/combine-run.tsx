@@ -38,7 +38,7 @@ function Slots({ ev, athleteId, st }: { ev: CombineEvent; athleteId: string; st:
         const s = slots[i] ?? null;
         return (
           <li key={i} className={`min-w-[84px] rounded-lg border px-2 py-1.5 text-center ${s ? 'border-white/20 bg-white/[0.06]' : 'border-dashed border-white/15'}`} data-slot={i + 1}>
-            <span className="block text-[10px] uppercase tracking-wider text-white/40">Try {i + 1}</span>
+            <span className="block text-[10px] uppercase tracking-wider text-fel-dim">Try {i + 1}</span>
             <span className="block font-mono text-sm font-bold tabular-nums text-white">{s ? (s.value === null ? 'No mark' : formatValue(st.kind, s.value)) : '—'}</span>
             {s?.touchCm != null && <span className="block text-[10px] text-white/50">touch {formatValue('approach', s.touchCm)}</span>}
           </li>
@@ -105,9 +105,9 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
           const p = stationProgress(ev, s.id);
           return (
             <button key={s.id} type="button" onClick={() => setStationIdx(i)} aria-current={i === stationIdx} data-combine-tab={s.id}
-              className={`shrink-0 rounded-xl border px-3 py-2 text-left ${i === stationIdx ? 'border-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10'}`}>
+              className={`shrink-0 rounded-xl border px-3 py-2 text-left ${i === stationIdx ? 'border-fel-cyan bg-fel-cyan/10' : 'border-white/10'}`}>
               <span className="block max-w-[150px] truncate text-xs font-bold text-white">{stationName(s)}</span>
-              <span className="block text-[10px] text-white/45">{p.done}/{p.total}{p.total > 0 && p.done >= p.total ? ' · done' : ''}</span>
+              <span className="block text-[10px] text-fel-dim">{p.done}/{p.total}{p.total > 0 && p.done >= p.total ? ' · done' : ''}</span>
             </button>
           );
         })}
@@ -116,7 +116,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
       <section className="fel-card space-y-1 rounded-xl p-3">
         <h2 className="text-base font-black text-white">{stationName(st)}</h2>
         <p className="text-xs text-white/50">{def.how}</p>
-        {status && <p className="text-[11px] text-white/40" data-combine-status>{status}</p>}
+        {status && <p className="text-[11px] text-fel-dim" data-combine-status>{status}</p>}
       </section>
 
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" data-combine-line>
@@ -125,7 +125,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
           const done = !held && nextSlot(ev, a.id, st.id) === null;
           return (
             <button key={a.id} type="button" onClick={() => select(a.id)} aria-current={a.id === athlete?.id} data-held-today={held || undefined}
-              className={`flex min-h-10 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-bold ${a.id === athlete?.id ? 'border-white bg-white text-black' : done || held ? 'border-white/10 text-white/35' : 'border-white/20 text-white/80'} ${held ? 'line-through' : ''}`}>
+              className={`flex min-h-10 shrink-0 items-center gap-1 rounded-full border px-3 text-xs font-bold ${a.id === athlete?.id ? 'border-white bg-white text-black' : done || held ? 'border-white/10 text-fel-quiet' : 'border-white/20 text-white/80'} ${held ? 'line-through' : ''}`}>
               {done && <Check className="h-3 w-3" />}{a.name}
             </button>
           );
@@ -136,7 +136,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
         <section className="space-y-4 rounded-2xl border border-white/12 bg-white/[0.03] p-4" data-combine-current={athlete.id}>
           <div>
             <div className="text-3xl font-black leading-tight text-white" data-combine-current-name>{athlete.name}</div>
-            <div className="text-sm font-bold text-[#00E5FF]" data-combine-attempt>{isHeld ? say(HELD_TODAY_LINE) : slot === null ? `All ${st.attempts} attempts taken` : `Attempt ${slot + 1} of ${st.attempts}`}</div>
+            <div className="text-sm font-bold text-fel-cyan" data-combine-attempt>{isHeld ? say(HELD_TODAY_LINE) : slot === null ? `All ${st.attempts} attempts taken` : `Attempt ${slot + 1} of ${st.attempts}`}</div>
           </div>
           {isHeld && <p className="rounded-lg border border-[#FFB020]/30 bg-[#FFB020]/[0.06] px-3 py-2 text-sm font-bold text-[#FFB020]" data-combine-held-today>{say(HELD_TODAY_LINE)}: no attempts at this station today.</p>}
           <Slots ev={ev} athleteId={athlete.id} st={st} />
@@ -152,7 +152,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
               )}
               {st.kind === 'skill' && drill && (drillOpen
                 ? <DrillLive drill={drill} onLeave={() => setDrillOpen(false)} onResult={onDrill} keptLine={SKILL_KEPT_LINE} />
-                : <button type="button" onClick={() => setDrillOpen(true)} data-combine-run-drill className="min-h-12 w-full rounded-xl bg-[#00E5FF] font-black text-black">Run {drill.name}</button>)}
+                : <button type="button" onClick={() => setDrillOpen(true)} data-combine-run-drill className="min-h-12 w-full rounded-xl bg-fel-cyan font-black text-black">Run {drill.name}</button>)}
             </div>
           )}
 
@@ -169,8 +169,8 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
       {stationDone && (
         <div className="flex gap-2" data-combine-station-done>
           {stationIdx < ev.stations.length - 1
-            ? <button type="button" onClick={() => setStationIdx(stationIdx + 1)} className="min-h-12 flex-1 rounded-xl bg-[#00FF9D] font-black text-black">Station done: next station</button>
-            : <button type="button" onClick={onReport} className="min-h-12 flex-1 rounded-xl bg-[#00FF9D] font-black text-black">All done: see the report</button>}
+            ? <button type="button" onClick={() => setStationIdx(stationIdx + 1)} className="min-h-12 flex-1 rounded-xl bg-fel-emerald font-black text-black">Station done: next station</button>
+            : <button type="button" onClick={onReport} className="min-h-12 flex-1 rounded-xl bg-fel-emerald font-black text-black">All done: see the report</button>}
         </div>
       )}
 
@@ -184,7 +184,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
             className="flex min-h-11 items-center gap-1 rounded-xl border border-white/20 px-3 text-sm font-bold text-white/80 disabled:opacity-40"><UserPlus className="h-4 w-4" /> Add</button>
         </div>
       )}
-      {def.method !== 'hand' && <p className="text-[11px] text-white/40">{NO_ACCURACY_LINE}</p>}
+      {def.method !== 'hand' && <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE}</p>}
     </div>
   );
 }

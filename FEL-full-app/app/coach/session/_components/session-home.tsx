@@ -83,7 +83,7 @@ export function SessionHome({ serverVerified, optedIn }: { serverVerified: boole
           <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl bg-[#FF2D95] px-4 text-2xl font-black text-black">
             Dunk session
           </button>
-          <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl bg-[#00E5FF] px-4 text-2xl font-black text-black">
+          <button type="button" onClick={() => setMode('roster')} className="min-h-16 rounded-2xl bg-fel-cyan px-4 text-2xl font-black text-black">
             Training session
           </button>
         </div>
@@ -152,12 +152,12 @@ export function SessionHome({ serverVerified, optedIn }: { serverVerified: boole
               </div>
             ))}
           </div>
-          {blocked && <p className="mt-3 text-base text-[#FF3366]">Under 13 can&apos;t be added.</p>}
+          {blocked && <p className="mt-3 text-base text-fel-crimson">Under 13 can&apos;t be added.</p>}
           <div className="mt-4 grid gap-3">
             <button type="button" disabled={!ready} onClick={beginDunk} className="min-h-14 rounded-xl bg-[#FF2D95] text-xl font-black text-black disabled:opacity-40">
               Start dunk session
             </button>
-            <button type="button" disabled={!ready} onClick={beginTrain} className="min-h-14 rounded-xl bg-[#00E5FF] text-xl font-black text-black disabled:opacity-40">
+            <button type="button" disabled={!ready} onClick={beginTrain} className="min-h-14 rounded-xl bg-fel-cyan text-xl font-black text-black disabled:opacity-40">
               Start training
             </button>
             <button type="button" onClick={() => setMode('home')} className="min-h-12 text-base text-white/70">Back</button>
@@ -209,7 +209,7 @@ export function SessionHome({ serverVerified, optedIn }: { serverVerified: boole
                 </p>
               )}
               {startedAt == null && (
-                <button type="button" className="mt-4 min-h-14 w-full rounded-xl bg-[#00FF9D] text-xl font-black text-black" onClick={() => { setStartedAt(Date.now()); setNow(Date.now()); }}>
+                <button type="button" className="mt-4 min-h-14 w-full rounded-xl bg-fel-emerald text-xl font-black text-black" onClick={() => { setStartedAt(Date.now()); setNow(Date.now()); }}>
                   Start drill
                 </button>
               )}

@@ -42,9 +42,9 @@ function RuleEditor({ scope, scopeId, name, rule, fallback, api, onSaved, note }
     <li className="space-y-2 rounded-lg bg-white/4 p-3" data-readiness-rule={`${scope}:${scopeId}`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold text-white">{name}</span>
-        <span className="text-[11px] text-white/40">{rule ? (scope === 'team' ? 'team rule' : 'own rule') : 'default'}</span>
+        <span className="text-[11px] text-fel-dim">{rule ? (scope === 'team' ? 'team rule' : 'own rule') : 'default'}</span>
       </div>
-      {note && <p className="text-xs text-white/45">{note}</p>}
+      {note && <p className="text-xs text-fel-dim">{note}</p>}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <select aria-label={`When, for ${name}`} value={r.kind} onChange={(e) => setR({ ...r, kind: e.target.value as RuleKind })} className="min-h-10 rounded-lg border border-white/15 bg-[#0b0d12] px-2 text-white">
           <option value="drop_pct">a drop of</option>
@@ -62,7 +62,7 @@ function RuleEditor({ scope, scopeId, name, rule, fallback, api, onSaved, note }
         </select>
       </div>
       <div className="flex items-center gap-2">
-        <button type="button" disabled={busy} onClick={() => void put(r as unknown as Record<string, unknown>)} className="min-h-10 rounded-lg border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-3 text-sm font-semibold text-[#00E5FF] disabled:opacity-50">Save</button>
+        <button type="button" disabled={busy} onClick={() => void put(r as unknown as Record<string, unknown>)} className="min-h-10 rounded-lg border border-fel-cyan/50 bg-fel-cyan/10 px-3 text-sm font-semibold text-fel-cyan disabled:opacity-50">Save</button>
         {rule && <button type="button" disabled={busy} onClick={() => void put({ clear: true })} className="min-h-10 rounded-lg border border-white/15 px-3 text-sm text-white/70">Use the default</button>}
         {msg && <span className="text-xs text-white/55">{msg}</span>}
       </div>
@@ -87,7 +87,7 @@ export function ReadinessPanel({ api = COACH_READINESS_API }: { api?: string }) 
   };
   return (
     <div className="mt-3 space-y-2" data-readiness-panel>
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><BatteryLow className="h-3.5 w-3.5" /> Daily jump check</div>
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><BatteryLow className="h-3.5 w-3.5" /> Daily jump check</div>
       {alerts.length > 0 && (
         <ul className="space-y-1.5" data-readiness-alerts>
           {alerts.map((a) => (
@@ -105,8 +105,8 @@ export function ReadinessPanel({ api = COACH_READINESS_API }: { api?: string }) 
           ))}
         </ul>
       )}
-      {alerts.length === 0 && (board.latest ?? []).length === 0 && <p className="text-xs text-white/45">No check has read Low today. Athletes appear here once they share readiness with you and save their jump numbers.</p>}
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1 text-xs font-semibold text-[#00E5FF]" data-readiness-rules-toggle>
+      {alerts.length === 0 && (board.latest ?? []).length === 0 && <p className="text-xs text-fel-dim">No check has read Low today. Athletes appear here once they share readiness with you and save their jump numbers.</p>}
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex items-center gap-1 text-xs font-semibold text-fel-cyan" data-readiness-rules-toggle>
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} /> Your readiness rules
       </button>
       {open && (

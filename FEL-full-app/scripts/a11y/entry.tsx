@@ -4,7 +4,7 @@
 // server component in the tree it returns, and renders the result between the real StatusRail and TabBar, as
 // app/layout.tsx does. So the audit reads the markup the app ships, not a copy of it.
 //
-// Scenes (location.hash):  landing login signup play train profile learn education playbook account
+// Scenes (location.hash):  landing login signup play train profile learn education playbook account, and coach combine squads
 import { Fragment, cloneElement, createElement as h, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StatusRail } from '@/components/shell/status-rail';
@@ -24,6 +24,10 @@ const SCENES: Record<string, { path: string; signedIn: boolean; load: () => Prom
   education: { path: '/education', signedIn: true, load: () => import('@/app/education/page') },
   playbook: { path: '/education/playbook', signedIn: true, load: () => import('@/app/education/playbook/page') },
   account: { path: '/account', signedIn: true, load: () => import('@/app/account/page') },
+  // the coach, combine-day and squads pages (A11-06's sweep after coach-parity #456 and combine-day #453 merged)
+  coach: { path: '/coach', signedIn: true, load: () => import('@/app/coach/page') },
+  combine: { path: '/coach/combine', signedIn: true, load: () => import('@/app/coach/combine/page') },
+  squads: { path: '/squads', signedIn: true, load: () => import('@/app/squads/page') },
 };
 
 const w = window as unknown as Window & { __PATH: string; __SESSION: unknown; __SCENE: string };

@@ -31,12 +31,12 @@ export function JoinLanding({ token, kind, name, color, signedIn, loginHref }: {
         {kind === 'team' ? 'Joining puts you on this coach’s roster and on the team.' : 'Train together: daily drills, a weekly league and reactions. No messages.'}
       </p>
       {signedIn
-        ? <button onClick={join} disabled={busy} className="mt-4 min-h-[48px] rounded-lg bg-white px-5 text-[14px] font-bold text-[#050505] disabled:opacity-50">Join {KIND_LABEL[kind].toLowerCase()}</button>
-        : <Link href={loginHref} className="mt-4 inline-flex min-h-[48px] items-center rounded-lg bg-white px-5 text-[14px] font-bold text-[#050505]">Sign in to join</Link>}
+        ? <button onClick={join} disabled={busy} className="mt-4 min-h-[48px] rounded-lg bg-white px-5 text-[14px] font-bold text-fel-bg disabled:opacity-50">Join {KIND_LABEL[kind].toLowerCase()}</button>
+        : <Link href={loginHref} className="mt-4 inline-flex min-h-[48px] items-center rounded-lg bg-white px-5 text-[14px] font-bold text-fel-bg">Sign in to join</Link>}
       {refusal && (
         <div className="mt-3 text-[13px] text-amber-100/90" data-join-refusal>
           {refusal.message}
-          {refusal.href && <> <Link href={refusal.href} className="font-bold text-[#00E5FF] underline-offset-2 hover:underline">Continue →</Link></>}
+          {refusal.href && <> <Link href={refusal.href} className="font-bold text-fel-cyan underline-offset-2 hover:underline">Continue →</Link></>}
         </div>
       )}
     </section>

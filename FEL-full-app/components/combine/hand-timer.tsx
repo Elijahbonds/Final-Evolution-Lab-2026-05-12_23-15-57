@@ -41,7 +41,7 @@ export function HandTimer({ kind, onTime, now = () => performance.now() }: { kin
   return (
     <div className="space-y-3" data-combine-timer={running ? 'running' : stopped !== null ? 'stopped' : 'ready'}>
       <button type="button" onClick={tap} data-combine-stopwatch
-        className={`flex min-h-[112px] w-full flex-col items-center justify-center rounded-2xl text-black ${running ? 'bg-[#FF4D8D]' : 'bg-[#00FF9D]'}`}>
+        className={`flex min-h-[112px] w-full flex-col items-center justify-center rounded-2xl text-black ${running ? 'bg-[#FF4D8D]' : 'bg-fel-emerald'}`}>
         <span className="font-mono text-5xl font-black tabular-nums" aria-live="off">{fmt(shown)}</span>
         <span className="mt-1 text-sm font-black uppercase tracking-wider">{running ? 'Tap to stop' : stopped !== null ? 'Tap to time again' : 'Tap to start'}</span>
       </button>
@@ -57,7 +57,7 @@ export function HandTimer({ kind, onTime, now = () => performance.now() }: { kin
         <button type="submit" disabled={!typed.trim()} className="min-h-12 rounded-xl border border-white/25 px-4 font-bold text-white disabled:opacity-40">Record</button>
       </form>
       {why && <p role="alert" className="text-sm text-[#FFB020]">{why}</p>}
-      <p className="flex items-center gap-1.5 text-[11px] text-white/45"><Timer className="h-3.5 w-3.5" /> {HAND_TIMED_LINE}</p>
+      <p className="flex items-center gap-1.5 text-[11px] text-fel-dim"><Timer className="h-3.5 w-3.5" /> {HAND_TIMED_LINE}</p>
     </div>
   );
 }

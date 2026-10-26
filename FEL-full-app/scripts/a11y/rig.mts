@@ -61,7 +61,7 @@ mkdirSync(BUILD, { recursive: true });
 const common = {
   bundle: true, format: 'iife' as const, platform: 'browser' as const, jsx: 'automatic' as const, logLevel: 'error' as const,
   define: { 'process.env.NODE_ENV': '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), plugins: [stubs],
-  banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "development" } };' },
+  banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "development" } }; var __dirname = "/";' },
   loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.wasm': 'empty', '.glb': 'empty' } as Record<string, 'empty'>,
   external: ['@mediapipe/tasks-vision', '@babylonjs/*'],
 };

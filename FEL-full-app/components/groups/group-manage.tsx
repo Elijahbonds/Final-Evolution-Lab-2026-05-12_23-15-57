@@ -36,7 +36,7 @@ export function GroupManage({ view: g, onChanged }: { view: GroupView; onChanged
         {g.members.map((m) => (
           <li key={m.userId} className="flex min-h-[48px] flex-wrap items-center gap-2 py-1 text-[13.5px]" data-member={m.userId}>
             <span className="min-w-0 flex-1 truncate text-white">{m.name}{m.you ? ' (you)' : ''}</span>
-            <span className="font-mono text-[10.5px] uppercase tracking-wider text-white/45">{ROLE_LABEL[m.role]}</span>
+            <span className="font-mono text-[10.5px] uppercase tracking-wider text-fel-dim">{ROLE_LABEL[m.role]}</span>
             {!m.you && g.can.setRole && m.role !== 'owner' && (
               <button disabled={busy} onClick={() => member({ action: 'role', userId: m.userId, role: m.role === 'coach' ? 'member' : 'coach' })}
                 className="min-h-[40px] rounded-lg border border-white/15 px-2.5 text-[11.5px] text-white/75">{m.role === 'coach' ? 'Make member' : 'Make coach'}</button>
@@ -52,7 +52,7 @@ export function GroupManage({ view: g, onChanged }: { view: GroupView; onChanged
       {g.can.edit && (
         <div className="mt-4 space-y-3" data-group-settings>
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Colour</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim">Colour</p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {(Object.keys(GROUP_COLORS) as GroupColor[]).map((c) => (
                 <button key={c} aria-label={c} aria-pressed={g.color === c} disabled={busy} onClick={() => call('PATCH', '', { color: c }).then((ok) => ok && onChanged())}
@@ -61,7 +61,7 @@ export function GroupManage({ view: g, onChanged }: { view: GroupView; onChanged
             </div>
           </div>
           <label className="block">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">Home court</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim">Home court</span>
             <select value={g.homeCourt?.ref ?? ''} disabled={busy} onChange={(e) => call('PATCH', '', { homeCourt: e.target.value || null }).then((ok) => ok && onChanged())}
               className="mt-1.5 block min-h-[44px] w-full rounded-lg border border-white/15 bg-black/40 px-2 text-[13px] text-white">
               <option value="">None</option>
@@ -78,9 +78,9 @@ export function GroupManage({ view: g, onChanged }: { view: GroupView; onChanged
         )}
         {g.can.delete && (confirmDelete ? (
           <button disabled={busy} onClick={() => call('DELETE', '').then((ok) => ok && router.push(SQUADS_PATH))}
-            className="min-h-[44px] rounded-lg bg-[#FF3366] px-3 text-[12.5px] font-bold text-white">Delete for everyone</button>
+            className="min-h-[44px] rounded-lg bg-fel-crimson px-3 text-[12.5px] font-bold text-white">Delete for everyone</button>
         ) : (
-          <button onClick={() => setConfirmDelete(true)} className="min-h-[44px] rounded-lg border border-[#FF3366]/40 px-3 text-[12.5px] font-bold text-[#FF6688]">Delete…</button>
+          <button onClick={() => setConfirmDelete(true)} className="min-h-[44px] rounded-lg border border-fel-crimson/40 px-3 text-[12.5px] font-bold text-[#FF6688]">Delete…</button>
         ))}
       </div>
     </section>
