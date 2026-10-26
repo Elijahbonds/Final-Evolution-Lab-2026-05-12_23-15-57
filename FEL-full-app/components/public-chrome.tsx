@@ -31,6 +31,7 @@ export function PublicLegalFooter() {
         <Link href="/terms" className="hover:text-white/70">Terms</Link>
         <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
         <Link href="/support" className="hover:text-white/70">Support</Link>
+        <Link href="/whats-new" className="hover:text-white/70">What&apos;s new</Link>
         {/* HOTFIX (2026-09-24): the licence notices live beside the other legal pages. Not just "Credits": that is
             also what the app calls its currency, so the link would read as the wallet. */}
         <Link href="/credits" className="hover:text-white/70">Credits &amp; licences</Link>
