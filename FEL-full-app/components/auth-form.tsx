@@ -331,6 +331,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           <input
             type="email"
             required
+            aria-label="Email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e?.target?.value ?? '')}
@@ -340,6 +341,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             type="password"
             required
             minLength={6}
+            aria-label="Password"
             placeholder="Password (6+ characters)"
             value={password}
             onChange={(e) => setPassword(e?.target?.value ?? '')}

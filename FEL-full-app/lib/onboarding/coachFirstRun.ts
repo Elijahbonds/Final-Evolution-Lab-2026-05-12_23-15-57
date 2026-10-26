@@ -63,7 +63,7 @@ const sampleAthlete = (n: string): CombineAthlete => ({
 
 /** (new) The sample numbers: vertical jump (cm), 20 yd sprint (s), 5-10-5 (s). Plausible, different, made up. */
 export const SAMPLE_RESULTS: Record<'A' | 'B' | 'C', { cmj: number[]; sprint: number[]; agility: number[] }> = {
-  A: { cmj: [48.2, 51.0, 49.6], sprint: [3.12, 3.05], agility: [4.71, 4.64] },
+  A: { cmj: [48.2, 51.0, 49.6], sprint: [3.12, 3.06], agility: [4.71, 4.64] },
   B: { cmj: [41.5, 43.8, 44.1], sprint: [2.98, 3.01], agility: [4.52, 4.58] },
   C: { cmj: [55.3, 53.9, 56.4], sprint: [3.24, 3.19], agility: [4.89, 4.80] },
 };
