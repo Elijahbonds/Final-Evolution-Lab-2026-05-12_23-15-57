@@ -85,7 +85,11 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; CoachCheckinForm + CoachCheckinAssign + CoachCheckinAnswer + CoachHabit + CoachHabitTick, additive) at f5e6bc63,
 // the lane commit carrying it on top of every file above. Signature programs and combine day landed first (#451, #453):
 // pinned at e7769157, this lane's merge of lane/finish-release, the first commit carrying every pending file above.
-const PARENT = 'e77691575c433468078159a6249664d0f3c51bea';
+// VBT (lane/vbt, 2026-10-25) prisma/pending/2026-10-26-vbt.sql (pending SQL only; schema.prisma untouched; VbtSet +
+// VbtZoneTarget, additive) at e9125b4b; with signature programs and combine day landed first (#451, #453), pinned at
+// c1cf9937, this lane's merge of lane/finish-release; coach parity landed next (#456): re-pinned at 0732f397, this lane's
+// second merge of lane/finish-release, the first commit carrying every pending file above.
+const PARENT = '0732f39728dbf73bae882014eb7665de82689270';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
