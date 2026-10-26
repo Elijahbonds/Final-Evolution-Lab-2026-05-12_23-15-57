@@ -31,6 +31,13 @@ export class DroppedError extends Error {
   constructor(label: string) { super(`stream "${label}" dropped: the mount went first`); this.name = 'DroppedError'; }
 }
 
+/**
+ * Frames of play the plan waits before it runs (or goes on running) its extras (new, 2026-10-25). READY is the first playable
+ * frame and the extras start there, while the player reads the start card; the START press would otherwise land the next job's
+ * main-thread work (a GLB parse, a body's spawn) in the countdown or the first frame of play. Half a second at 60 fps.
+ */
+export const STREAM_HOLD_FRAMES = 30;
+
 /** Modes whose loads stay as they were (hoops-round2 adopts the plan for them; the dunk streams its own contest set). */
 export const HOOPS_LATER: ReadonlySet<string> = new Set(['dunk', 'dunkduel', 'onevone', 'threepoint', 'threevthree', 'carnival']);
 
@@ -65,6 +72,7 @@ export class LoadPlan {
   private queue: Array<{ label: string; job: StreamJob; resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
   private running = false;
   private open = false;
+  private holdLeft = 0;
   private disposed = false;
   private s: StreamState = { held: 0, done: 0, failed: 0, startedAt: null, doneAt: null, labels: [] };
 
@@ -90,11 +98,17 @@ export class LoadPlan {
 
   get isOpen(): boolean { return this.open; }
 
+  /** Run nothing new for the next `frames` rendered frames (a job already running finishes). The harness holds the plan as
+   *  play begins (STREAM_HOLD_FRAMES), so the first frames of play are the game's alone. A later hold restarts the count. */
+  hold(frames: number): void { this.holdLeft = Math.max(0, Math.floor(frames)); }
+
   private async pump(): Promise<void> {
     if (this.running) return;
     this.running = true;
     try {
       while (this.queue.length && !this.disposed) {
+        while (this.holdLeft > 0 && !this.disposed) { this.holdLeft--; await this.deps.nextFrame(); }
+        if (this.disposed || !this.queue.length) break;
         const item = this.queue.shift()!;
         if (this.s.startedAt === null) this.s.startedAt = this.deps.now();
         const before = this.deps.mark?.() ?? 0;

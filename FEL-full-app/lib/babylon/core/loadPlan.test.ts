@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DroppedError, HOOPS_LATER, LoadPlan, planStreams, streamExtra, streamWhileLoading, _activePlan } from './loadPlan';
+import { DroppedError, HOOPS_LATER, LoadPlan, planStreams, STREAM_HOLD_FRAMES, streamExtra, streamWhileLoading, _activePlan } from './loadPlan';
 import { stripComments } from '@/lib/testing/sourceScan';
 
 const ROOT = path.resolve(__dirname, '../../..');
@@ -39,6 +39,25 @@ describe('LoadPlan', () => {
     expect(await b).toBe(2);
     expect(plan.state()).toMatchObject({ held: 2, done: 2, failed: 0, startedAt: 1000, doneAt: 1016 });
     expect(log.at(-1)).toMatch(/streamed 2 extras after READY in 16 ms/);
+  });
+
+  it('hold(n): nothing new runs for the next n frames (play begins), then the held jobs go on', async () => {
+    const { plan, frame, settle } = rig();
+    const ran: string[] = [];
+    plan.defer('props', () => { ran.push('props'); });
+    plan.hold(STREAM_HOLD_FRAMES);
+    plan.start();
+    for (let i = 0; i < STREAM_HOLD_FRAMES - 1; i++) { await frame(); await settle(); }
+    expect(ran).toEqual([]);
+    await frame(); await settle();
+    expect(ran).toEqual(['props']);
+    expect(STREAM_HOLD_FRAMES).toBe(30);
+  });
+
+  it('the harness holds the plan as play begins (the countdown, or straight into play)', () => {
+    const h = stripComments(fs.readFileSync(path.join(ROOT, 'lib/babylon/core/ModeHarness.ts'), 'utf8'));
+    expect(h).toMatch(/streamPhase = \(p\) => \{ if \(p === 'countdown' \|\| p === 'playing'\) plan\.hold\(STREAM_HOLD_FRAMES\); \};/);
+    expect(h).toMatch(/phase = p;\s*streamPhase\?\.\(p\);/);
   });
 
   it('a job deferred after start() runs after the ones already held', async () => {

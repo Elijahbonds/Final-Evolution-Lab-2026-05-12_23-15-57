@@ -151,11 +151,16 @@ const SNAPSHOT = `(() => {
   const cam = scene.activeCamera;
   const pps = cam && cam._postProcesses ? cam._postProcesses.filter(Boolean).length : 0;
   const bodies = scene.skeletons.filter((sk) => scene.meshes.some((m) => m.skeleton === sk && m.isEnabled() && m.isVisible)).length;
+  // PERF-LOAD (2026-10-25): WHO the counted bodies are (the top node over each counted skeleton's first drawn mesh), so a mode
+  // over the 16-body ceiling says which bodies it is carrying
+  const topOf = (n) => { let x = n; while (x && x.parent) x = x.parent; return x ? x.name : '?'; };
+  const bodyRoots = scene.skeletons.map((sk) => scene.meshes.find((m) => m.skeleton === sk && m.isEnabled() && m.isVisible)).filter(Boolean).map((m) => topOf(m).replace(/[0-9]+/g, '#'));
+  const bodyKinds = bodyRoots.reduce((o, k) => { o[k] = (o[k] || 0) + 1; return o; }, {});
   const w = engine.getRenderWidth(), h = engine.getRenderHeight();
   return {
     tier: scene.metadata && scene.metadata.felTier, backing: w + 'x' + h, backingPx: w * h, hwScale: engine.getHardwareScalingLevel(),
     texMb: texB / 1048576, rtMb: rtB / 1048576, shadows, postPasses: pps, customRT: scene.customRenderTargets.length,
-    bodies, skeletons: scene.skeletons.length, meshesTotal: scene.meshes.length, materials: scene.materials.length,
+    bodies, bodyKinds, skeletons: scene.skeletons.length, meshesTotal: scene.meshes.length, materials: scene.materials.length,
     animGroups: scene.animationGroups.filter((g) => g.isPlaying).length,
     beforeRenderObs: scene.onBeforeRenderObservable.observers.length, afterAnimObs: scene.onAfterAnimationsObservable.observers.length,
     gov: window.__FEL_PERF__ ? window.__FEL_PERF__.state() : null,

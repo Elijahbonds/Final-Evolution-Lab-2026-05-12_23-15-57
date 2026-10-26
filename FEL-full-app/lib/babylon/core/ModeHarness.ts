@@ -42,8 +42,8 @@ import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
-import { installLoadProgress, LoadStallClock } from './loadProgress';
-import { LoadPlan, planStreams, type StreamJob } from './loadPlan';   // PERF-LOAD PRF-04: play sooner, stream the rest   // FIRST-DUNK-BUDGET: the load watchdog watches the download
+import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
+import { LoadPlan, planStreams, STREAM_HOLD_FRAMES, type StreamJob } from './loadPlan';   // PERF-LOAD PRF-04: play sooner, stream the rest
 import { setSignedOutVisitor } from './visitor';   // FIRST-DUNK-BUDGET: a known guest is not asked for what a guest is refused
 import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev frame-budget monitor
 import { mountPerfGuard } from './perfGuard';
@@ -441,8 +441,10 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
   let replayHold = false;                     // a replay is on screen: the mode's update() waits
+  let streamPhase: ((p: ModePhase) => void) | null = null;   // PERF-LOAD PRF-04: the load plan hears the phase (set below)
   const setPhase = (p: ModePhase, detail?: number | string) => {
     phase = p;
+    streamPhase?.(p);
     // M37: hero-off-screen watchdog runs only during live play.
     if (p === 'playing') frameGuard?.start(); else frameGuard?.stop();
     // M67: a shader compile is a defect only while gameplay is actually running.
@@ -594,6 +596,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     log: (m) => console.info(m),
   });
   let plan = newPlan();
+  // play begins (the countdown, or straight into play): the plan holds its extras for the first frames of play
+  streamPhase = (p) => { if (p === 'countdown' || p === 'playing') plan.hold(STREAM_HOLD_FRAMES); };
   const ctx: ModeContext = {
     location: opts.location,
     prqBand: opts.prqBand ?? null,
