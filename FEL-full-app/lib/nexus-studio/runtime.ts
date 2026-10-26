@@ -10,8 +10,10 @@
 //   weather   → premium/WeatherFx over core/WeatherKit.fromPick
 //   intro     → the mode's `intro` getter + a director stepper (a mode with a fixed camera never steps the director)
 //
-// TWO SOURCES (NEX-02, round 8):
+// THREE SOURCES (NEX-02, NEX-06, round 8):
 //   dev        `?venue=` (a play-test hand-off): outside a production build only, and never in a competitive run.
+//   shared     `?share=<id>`: a share link's venue its landing handed over in this tab (shareHandoff.ts) — practice only, never
+//              in a competitive run; GameShell starts the run unpaid.
 //   published  a venue the owner published (published.ts: committed, reviewed JSON), when the player's place pick for the mode
 //              names it — which it does by default, since a published venue is first in the mode's place list.
 // With neither, `studioVenueFor` answers null and a mode that reads it behaves exactly as it shipped.
@@ -26,6 +28,7 @@ import { readPlaceLook, type PlaceLook } from '../babylon/nexus/placeLooks';
 import { propSetFor } from '../babylon/visual/VenueProps';
 import { isCompetitive, playStampFor } from '../babylon/core/playFrame';
 import { exportPlaceLook, publishedByPlace, publishedPlaceLook, type PublishedVenue } from './published';
+import { readShareHandoff } from './shareHandoff';
 import { spawnMeshyProp, type MeshyPropKey } from '../babylon/visual/meshyProps';
 import { mountGroundDecals, decalCap } from '../babylon/visual/GroundDecals';
 import { mountModeCrowd } from '../babylon/visual/crowd/modeCrowd';
@@ -56,7 +59,7 @@ export function studioLoadAllowed(env: string | undefined = process.env.NODE_ENV
 let cache: { key: string; exp: StudioVenueExport | null } | null = null;
 
 /** Where a mode's Studio venue came from, and whether the run is competitive (then it is the look only). */
-export interface StudioPick { exp: StudioVenueExport; source: 'dev' | 'published'; competitive: boolean; published?: PublishedVenue }
+export interface StudioPick { exp: StudioVenueExport; source: 'dev' | 'shared' | 'published'; competitive: boolean; published?: PublishedVenue }
 
 const pageSearch = (): string => { try { return typeof window !== 'undefined' ? window.location.search : ''; } catch { return ''; } };
 
@@ -81,11 +84,18 @@ export function studioPickFor(modeKey: string, o: { search?: string; kv?: KV | n
     const dev = devVenueFor(modeKey, q, o.kv, o.search !== undefined || o.kv !== undefined);
     if (dev) return { exp: dev, source: 'dev', competitive: false };
   }
-  // the published venue the player's place pick names (the mode's default place when one is published)
+  // NEX-06: a share link's venue, handed over by its landing in this tab (practice only: never in a competitive run)
+  if (!competitive) {
+    const shared = readShareHandoff(new URLSearchParams(q).get('share'), sessionStore());
+    if (shared && shared.target === modeKey) return { exp: shared, source: 'shared', competitive: false };
+  }
+    // the published venue the player's place pick names (the mode's default place when one is published)
   const pub = publishedByPlace(modeKey, placePick(modeKey, q), o.files);
   if (!pub) return null;
   return { exp: competitive ? lookOnly(pub.venue) : pub.venue, source: 'published', competitive, published: pub };
 }
+
+const sessionStore = (): Pick<Storage, 'getItem'> | null => { try { return typeof window !== 'undefined' ? window.sessionStorage ?? null : null; } catch { return null; } };
 
 /** The player's place pick for a mode on this page (`?place=`, then the remembered pick, then the list's first). */
 function placePick(modeKey: string, search: string): string | null {

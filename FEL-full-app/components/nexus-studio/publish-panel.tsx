@@ -6,7 +6,7 @@
 // place, with Restore on the splash (lib/nexus-studio/published.ts). Nothing is sent anywhere from here.
 
 import { useMemo, useState } from 'react';
-import { Upload, X, Check, AlertTriangle, Smartphone } from 'lucide-react';
+import { Upload, X, Check, AlertTriangle, Smartphone, Link2 } from 'lucide-react';
 import type { StudioProject, StudioVenue } from '@/lib/nexus-studio/doc';
 import { exportVenue } from '@/lib/nexus-studio/exportVenue';
 import { scriptsForVenue } from '@/lib/nexus-studio/scripts';
@@ -32,6 +32,16 @@ export function PublishPanel({ venue, project, phoneSample, onMeasurePhone, onCl
   const modes = useMemo(() => publishModesFor(venue.base.target), [venue.base.target]);
   const [mode, setMode] = useState(modes[0]?.mode ?? venue.base.target);
   const [out, setOut] = useState<PublishOutcome | null>(null);
+  // NEX-06: a share link (practice only, signed-in players open it; lib/nexus-studio/share.ts) — the server re-runs every check
+  const [share, setShare] = useState<{ state: 'idle' | 'making' } | { state: 'made'; url: string } | { state: 'refused'; lines: string[] }>({ state: 'idle' });
+  const makeLink = async () => {
+    setShare({ state: 'making' });
+    const exp = exportVenue(venue, null, scriptsForVenue(project.scripts, venue.id));
+    const r = await fetch('/api/studio/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue: exp, phone: phoneSample }) }).catch(() => null);
+    const j = (await r?.json().catch(() => null)) as { url?: string; problems?: string[]; message?: string; error?: string } | null;
+    if (r?.ok && j?.url) { setShare({ state: 'made', url: new URL(j.url, window.location.origin).toString() }); return; }
+    setShare({ state: 'refused', lines: j?.problems ?? [j?.message ?? (r?.status === 503 ? 'Share links are not open yet.' : r?.status === 404 ? 'Share links are not switched on.' : 'Could not make a link.')] });
+  };
 
   const run = () => {
     const r = publishVenue(venue, project, mode, phoneSample);
@@ -61,6 +71,9 @@ export function PublishPanel({ venue, project, phoneSample, onMeasurePhone, onCl
         <button type="button" onClick={run} className="ml-auto flex items-center gap-1.5 rounded-md px-3 py-1 font-semibold" style={{ background: C.cyan, color: '#050505' }}>
           <Upload className="h-3.5 w-3.5" aria-hidden /> Check and download
         </button>
+        <button type="button" onClick={() => { void makeLink(); }} disabled={share.state === 'making'} className="flex items-center gap-1.5 rounded-md border px-3 py-1" style={{ borderColor: C.line, color: C.text }} data-testid="share-make">
+          <Link2 className="h-3.5 w-3.5" aria-hidden /> Make a share link
+        </button>
         <button type="button" onClick={onClose} aria-label="Close publish" className="rounded p-1" style={{ color: C.dim }}><X className="h-3.5 w-3.5" /></button>
       </div>
       <p className="mt-1" style={{ color: C.dim }}>
@@ -72,6 +85,14 @@ export function PublishPanel({ venue, project, phoneSample, onMeasurePhone, onCl
             <li key={i} className="flex items-start gap-1.5" style={{ color: C.ember }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> {p.message}</li>
           ))}
         </ul>
+      )}
+      {share.state === 'made' && (
+        <p className="mt-2 flex flex-wrap items-center gap-1.5" style={{ color: C.emerald }} data-testid="share-made">
+          <Check className="h-3.5 w-3.5" aria-hidden /> Link made — anyone signed in can play it, as practice. It is shown once: <code className="break-all">{share.url}</code>
+        </p>
+      )}
+      {share.state === 'refused' && (
+        <ul className="mt-2 space-y-1" data-testid="share-refused">{share.lines.map((l, i) => <li key={i} style={{ color: C.ember }}>{l}</li>)}</ul>
       )}
       {out?.ok && (
         <p className="mt-2 flex items-start gap-1.5" style={{ color: C.emerald }} data-testid="publish-ok">
