@@ -70,7 +70,8 @@ describe('the free starter week vs FEL Pro', () => {
     expect(v.current).toMatchObject({ week: 2, access: 'locked', sessions: [] });
     expect(v.premium).toMatchObject({ locked: true, line: PRO_NOT_ON_SALE_LINE, purchasesOpen: false, checkout: null });
     const open = view({ enrollment: week1Done, purchasesOpen: true })!;
-    expect(open.premium.checkout?.monthly).toBe('/api/stripe/checkout?product=FEL_PRO_MONTHLY');
+    // test changed (payments-ready): the link was a GET to the POST-only checkout route (405); it opens the /pro buy page now
+    expect(open.premium.checkout?.monthly).toBe('/pro?plan=monthly');
   });
 
   it('a FEL Pro athlete gets week 2 served', () => {
