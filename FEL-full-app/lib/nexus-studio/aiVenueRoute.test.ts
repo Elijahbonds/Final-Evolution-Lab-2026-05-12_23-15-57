@@ -3,9 +3,13 @@
 // (stubbed: good, hostile, prose) comes back sanitised, never as text.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const m = vi.hoisted(() => ({ session: { user: { id: 'adult-1' } } as unknown, dobYear: 1980 as number | null | undefined }));
+// test changed (NEX-01, owner 2026-10-20 "owner first (admin)"): the route now re-reads the account's ROLE from the database
+// (lib/nexus-studio/audience.ts), so the stand-in user row carries one — 'admin' by default, the Studio's audience — and
+// NEXUS_STUDIO_ENABLED is on in every test below unless a test turns it off. Nothing these tests asserted was loosened: every
+// earlier case runs as the owner, and 'the Studio audience' below adds the refusals.
+const m = vi.hoisted(() => ({ session: { user: { id: 'adult-1' } } as unknown, dobYear: 1980 as number | null | undefined, role: 'admin' as string | null }));
 const getServerSession = vi.hoisted(() => ({ spy: vi.fn(async () => m.session) }));
-const prisma = vi.hoisted(() => ({ models: { user: { findUnique: vi.fn(async () => (m.dobYear === undefined ? null : { dobYear: m.dobYear })) } } }));
+const prisma = vi.hoisted(() => ({ models: { user: { findUnique: vi.fn(async () => (m.dobYear === undefined ? (m.role ? { role: m.role } : null) : { dobYear: m.dobYear, role: m.role })) } } }));
 
 vi.mock('next-auth', () => ({ getServerSession: getServerSession.spy }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
@@ -23,7 +27,7 @@ import { POST } from '@/app/api/cell/venue/route';
 import { newVenue } from './doc';
 import { EXPLAIN_ANSWER, GOOD_ANSWER, HOSTILE_ANSWER, HOSTILE_STAMP_ANSWER, NIGHT_BEACH_PROMPT, PROSE_ANSWER, RALLY_PROMPT, SCRIPT_CAST_ANSWER, STAMP_ANSWER, STAMP_PROMPT, completionBody } from '@/tests/helpers/aiVenue';
 
-const saved = { flag: process.env.ABACUS_ENABLED, key: process.env.ABACUSAI_API_KEY };
+const saved = { flag: process.env.ABACUS_ENABLED, key: process.env.ABACUSAI_API_KEY, studio: process.env.NEXUS_STUDIO_ENABLED };
 let fetchSpy: ReturnType<typeof vi.fn>;
 let answer = GOOD_ANSWER;
 let users = 0;
@@ -42,6 +46,8 @@ beforeEach(() => {
   process.env.ABACUSAI_API_KEY = 'test-key-not-real';
   m.session = { user: { id: `adult-${++users}` } };
   m.dobYear = 1980;
+  m.role = 'admin';
+  process.env.NEXUS_STUDIO_ENABLED = '1';
   bodyReads = 0;
   answer = GOOD_ANSWER;
   fetchSpy = vi.fn(async () => completionBody(answer));
@@ -52,6 +58,7 @@ beforeEach(() => {
 afterEach(() => {
   if (saved.flag === undefined) delete process.env.ABACUS_ENABLED; else process.env.ABACUS_ENABLED = saved.flag;
   if (saved.key === undefined) delete process.env.ABACUSAI_API_KEY; else process.env.ABACUSAI_API_KEY = saved.key;
+  if (saved.studio === undefined) delete process.env.NEXUS_STUDIO_ENABLED; else process.env.NEXUS_STUDIO_ENABLED = saved.studio;
   vi.unstubAllGlobals();
 });
 
@@ -113,6 +120,45 @@ describe('ABACUS_ENABLED=true', () => {
     }
     expect(bodyReads).toBe(0);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  describe('the Studio audience (NEX-01: founder and admin, the role read from the database on every request)', () => {
+    it('any other role, or none, gets the 404 /studio gives them — before the rate limit, the age, the body or the model', async () => {
+      for (const role of ['user', 'mod', 'coach', 'owner', 'Admin', '', null]) {
+        m.session = { user: { id: `role-${++users}`, role: 'admin' } };   // a session that CLAIMS admin is not believed
+        m.role = role;
+        const res = await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }));
+        expect(res.status, `role ${role}`).toBe(404);
+        expect(await res.json()).toEqual({ error: 'not_found' });
+      }
+      expect(bodyReads).toBe(0);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+    it('founder and admin are answered', async () => {
+      for (const role of ['founder', 'admin']) {
+        m.session = { user: { id: `owner-${++users}` } };
+        m.role = role;
+        expect((await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }))).status, role).toBe(200);
+      }
+    });
+    it('a role taken away in the database closes the route on the NEXT request (the session is unchanged)', async () => {
+      m.session = { user: { id: `demoted-${++users}`, role: 'admin' } };
+      m.role = 'admin';
+      expect((await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }))).status).toBe(200);
+      m.role = 'user';
+      expect((await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }))).status).toBe(404);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+    it('NEXUS_STUDIO_ENABLED off: a 404 even for the owner', async () => {
+      delete process.env.NEXUS_STUDIO_ENABLED;
+      expect((await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }))).status).toBe(404);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+    it('a database error is a refusal (fail closed)', async () => {
+      prisma.models.user.findUnique.mockImplementationOnce(async () => { throw new Error('db down'); });
+      expect((await POST(req({ prompt: NIGHT_BEACH_PROMPT, venue: venue() }))).status).toBe(404);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('who may ask (owner 2026-10-14: teens too)', () => {

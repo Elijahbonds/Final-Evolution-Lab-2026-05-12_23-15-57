@@ -9,6 +9,7 @@ import { readDobYear, type GateDb } from '@/lib/privacy/scanSaveGate';
 import { AI_BUILDER_AGE_REFUSED, aiBuilderAllowed } from '@/lib/nexus-studio/aiAccess';
 import { AI_LIMITS, aiExplainSystem, aiExplainUser, aiVenueSystem, aiVenueUser, sanitizeAiEdits, sanitizeSummary } from '@/lib/nexus-studio/aiEdits';
 import { sanitizeVenue } from '@/lib/nexus-studio/doc';
+import { studioAudienceOk, studioNotFound } from '@/lib/nexus-studio/audience';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,9 @@ const VENUE_AI_MAX_BODY = 400_000;
  *
  * NEXUS STUDIO track 2 (docs/NEXUS-STUDIO.md §3): CELL answers a creator's venue request with Studio EDITS, not files —
  * the browser compiles them into one command on the Studio's undo stack (lib/nexus-studio/aiEdits.ts). In order, before
- * anything leaves: 1. the ABACUS kill switch (first, before the session or the body); 2. signed in; 3. a rate limit per
+ * anything leaves: 1. the ABACUS kill switch (first, before the session or the body); 2. signed in; 2b. NEX-01: the Studio's
+ * audience — NEXUS_STUDIO_ENABLED on and the account's role, read from the database on this request, founder or admin
+ * (lib/nexus-studio/audience.ts); anyone else gets the 404 /studio gives them; 3. a rate limit per
  * account; 4. TEENS (13–17) AND ADULTS (owner, 2026-10-14: "Teens too") from the database's User.dobYear — under 13 and an
  * unknown age are refused (lib/nexus-studio/aiAccess.ts has the rule and why); 5. the body: a capped prompt and a venue run
  * through the import sanitiser.
@@ -41,6 +44,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as { id?: string } | undefined)?.id;
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!(await studioAudienceOk(prisma, userId))) return studioNotFound();
 
     for (const [name, w] of [['minute', VENUE_AI_RATE.minute], ['day', VENUE_AI_RATE.day]] as const) {
       const rl = rateLimit(`cell-venue:${name}:${userId}`, w.limit, w.windowMs);
