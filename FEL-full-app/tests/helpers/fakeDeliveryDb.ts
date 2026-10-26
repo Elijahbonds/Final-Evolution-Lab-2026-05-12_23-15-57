@@ -6,6 +6,7 @@
 // `tables: false` is production today: the probe finds nothing and every statement throws "relation does not exist".
 import { fakeParityDb, type FakeParityDb } from './fakeParityDb';
 import { SQL as AUTO } from '@/lib/coach/automations/store';
+import { SQL as SURVEY } from '@/lib/coach/readiness/surveyStore';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -124,4 +125,35 @@ export function program(db: FakeDeliveryDb, id: string, coachId: string, clientI
   const weeks = o.weeks ?? 4;
   const start = new Date(db.clock - (o.startedDaysAgo ?? 14) * 86_400_000);
   db.programs.push({ id, coachId, clientId, isActive: true, startDate: start, durationWeeks: weeks, createdAt: start, sessionKinds: Array.from({ length: weeks * (o.trainingPerWeek ?? 3) }, () => 'training') });
+}
+
+/**
+ * Give any raw-SQL fake (e.g. tests/helpers/fakeVbtDb.ts, which carries the readiness and VBT tables) the lane's probe and
+ * the ReadinessSurvey table. Returns the rows array; `tables.on = false` is production today.
+ */
+export function withSurveys(db: { clock: number; $queryRawUnsafe: (q: string, ...v: unknown[]) => Promise<any>; $executeRawUnsafe: (q: string, ...v: unknown[]) => Promise<number> }): { rows: Row[]; tables: { on: boolean } } { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const rows: Row[] = [];
+  const tables = { on: true };
+  const q0 = db.$queryRawUnsafe.bind(db), e0 = db.$executeRawUnsafe.bind(db);
+  db.$queryRawUnsafe = async (q: string, ...v: unknown[]) => {
+    if (q.includes('information_schema') && q.includes("'CoachReview'")) return tables.on ? [{ ok: 1 }] : [];
+    if (q === SURVEY.forUser || q === SURVEY.forUsers) {
+      if (!tables.on) throw missing();
+      const who = (r: Row) => (q === SURVEY.forUser ? r.userId === v[0] : (v[0] as string[]).includes(r.userId));
+      return rows.filter((r) => who(r) && r.day >= (v[1] as string)).sort((a, b) => (a.day < b.day ? 1 : -1)).map((r) => ({ ...r }));
+    }
+    return q0(q, ...v);
+  };
+  db.$executeRawUnsafe = async (q: string, ...v: unknown[]) => {
+    if (q === SURVEY.insert) {
+      if (!tables.on) throw missing();
+      const [id, userId, day, sleep, soreness, energy, mood, ready, lowItems, band] = v;
+      if (rows.some((r) => r.userId === userId && r.day === day)) return 0;
+      rows.push({ id, userId, day, sleep, soreness, energy, mood, ready, lowItems, band, createdAt: new Date(db.clock) });
+      return 1;
+    }
+    if (q === SURVEY.deleteAll) { if (!tables.on) throw missing(); const n = rows.length; rows.splice(0, rows.length, ...rows.filter((r) => r.userId !== v[0])); return n - rows.length; }
+    return e0(q, ...v);
+  };
+  return { rows, tables };
 }

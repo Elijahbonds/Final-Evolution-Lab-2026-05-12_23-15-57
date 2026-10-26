@@ -380,7 +380,7 @@ export const REGISTRY: Record<string, TableRights> = {
       { col: 'coachId', export: OTHERS, erase: 'delete', why: "An erased coach's automation audit: it cascades with the coach's automations." },
     ],
   },
-  ReadinessSurvey: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own readiness answers (health data). The feature's own delete (DELETE /api/readiness/survey) does the same." }] },
+  ReadinessSurvey: { subjects: [{ col: 'userId', export: true, erase: 'delete', why: "The athlete's own readiness answers (health data). The feature's own delete (DELETE /api/coach/me/readiness-survey) does the same." }] },
   CoachBranding: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own logo path and accent colour; the logo file in the public bucket is the coach's to delete with it (owner call)." }] },
   CoachRosterSession: {
     subjects: [

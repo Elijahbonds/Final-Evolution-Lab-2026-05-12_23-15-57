@@ -111,11 +111,12 @@ describe('the refusal and the table', () => {
     expect(HEALTH_WRITE_REFUSED).toEqual({ error: 'health_data_adults_only', saved: false });
   });
 
-  // test changed (COACH-DELIVERY, 2026-10-27): g and h are the coach-parity check-in and habit routes (#456), added
-  it('HEALTH_WRITE_ROUTES names a–h once each; each gated file imports the gate, each routed one names its holder', async () => {
+  // test changed (COACH-DELIVERY, 2026-10-26): g and h are the coach-parity check-in and habit routes (#456), i the readiness
+  // survey (COA-03), added
+  it('HEALTH_WRITE_ROUTES names a–i once each; each gated file imports the gate, each routed one names its holder', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
-    expect(HEALTH_WRITE_ROUTES.map((r) => r.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+    expect(HEALTH_WRITE_ROUTES.map((r) => r.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i']);
     for (const r of HEALTH_WRITE_ROUTES) {
       const src = readFileSync(join(__dirname, '../..', r.file), 'utf8');
       // both ways: a file that calls the gate is marked gated (TEEN-WRITE-BLOCK-2 flipped d and e)

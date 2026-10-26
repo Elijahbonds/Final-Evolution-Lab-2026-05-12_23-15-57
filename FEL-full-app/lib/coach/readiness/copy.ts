@@ -7,28 +7,38 @@
 //
 // Pure, client-safe.
 
-import type { ReadinessBand, ReadinessReason, RuleAction, RuleKind } from './types';
+import type { ReadinessBand, ReadinessReason, ReadinessSource, RuleAction, RuleKind } from './types';
 import { BASELINE_MIN_CHECKS } from './thresholds';
 
 export const BAND_LABEL: Record<ReadinessBand, string> = { ready: 'Ready', normal: 'Normal', low: 'Low', building: 'Building your normal' };
 
 const pct = (x: number | null) => `${Math.abs(Math.round((x ?? 0) * 10) / 10)}%`;
 
-/** The athlete's one-line reason. */
-export function reasonLine(o: { reason: ReadinessReason; dropPct: number | null; feel: number | null; baselineN: number; priorChecks: number; ruleDropPct: number }): string {
+/** COACH-DELIVERY: what each source reads, in the athlete's line and the coach's alert. */
+const WHAT: Record<ReadinessSource, { athlete: string; coach: string }> = {
+  jump: { athlete: 'Your jump', coach: 'jump check' },
+  bar_speed: { athlete: 'Your warm-up bar speed', coach: 'warm-up bar speed' },
+  survey: { athlete: 'Your check-in', coach: 'readiness survey' },
+};
+
+/** The athlete's one-line reason. `source` (COACH-DELIVERY) names what was read; absent = the jump check, as before. */
+export function reasonLine(o: { reason: ReadinessReason; dropPct: number | null; feel: number | null; baselineN: number; priorChecks: number; ruleDropPct: number; source?: ReadinessSource }): string {
+  const what = WHAT[o.source ?? 'jump'].athlete;
   switch (o.reason) {
     case 'building': {
       const left = Math.max(1, BASELINE_MIN_CHECKS - o.priorChecks);
       return `Building your normal: ${left} more check${left === 1 ? '' : 's'} on other days and this compares you with yourself.`;
     }
-    case 'up': return `Your jump is up ${pct(o.dropPct)} on your normal, past the camera's noise. A good day to train.`;
-    case 'steady': return 'Your jump is right on your normal.';
+    case 'up': return `${what} is up ${pct(o.dropPct)} on your normal, past the camera's noise. A good day to train.`;
+    case 'steady': return `${what} is right on your normal.`;
     case 'dip_noise': return `A touch under your normal (${pct(o.dropPct)}), but inside the camera's own noise, so it is not a drop.`;
     case 'dip_small': return `Down ${pct(o.dropPct)} on your normal: a real dip, under the ${o.ruleDropPct}% line your plan uses.`;
-    case 'feel_caps': return `Your jump is up on your normal, and you said you feel ${o.feel} of 5, so today reads Normal.`;
+    case 'feel_caps': return `${what} is up on your normal, and you said you feel ${o.feel} of 5, so today reads Normal.`;
     case 'low_drop': return `Down ${pct(o.dropPct)} on your normal of the last ${o.baselineN} checks, past the ${o.ruleDropPct}% line your plan uses.`;
     case 'low_drop_feel': return `Down ${pct(o.dropPct)} on your normal, and you said you feel ${o.feel} of 5.`;
-    case 'low_twice': return `Under your normal for the second check in a row (${pct(o.dropPct)} today).`;
+    case 'low_twice': return o.source === 'survey' ? 'Your check-in read low for the second time in a row.' : `Under your normal for the second check in a row (${pct(o.dropPct)} today).`;
+    case 'survey_ok': return 'Your check-in reads normal today.';
+    case 'survey_low': return 'Your check-in reads low today.';
   }
 }
 
@@ -50,9 +60,11 @@ export function soloLine(band: ReadinessBand): string | null {
 }
 
 /** The coach's alert line on the board. */
-export function coachAlertLine(o: { name: string; dropPct: number | null; reason: ReadinessReason; action: RuleAction }): string {
-  const what = o.reason === 'low_twice' ? `under their normal for the second check in a row (${pct(o.dropPct)})` : `down ${pct(o.dropPct)} on their normal`;
-  return `${o.name}'s jump check read Low: ${what}. ${o.action === 'ease' ? 'Today\'s session eased automatically.' : 'Their plan is unchanged (your rule: tell me only).'}`;
+export function coachAlertLine(o: { name: string; dropPct: number | null; reason: ReadinessReason; action: RuleAction; source?: ReadinessSource }): string {
+  const what = o.reason === 'survey_low' ? 'their answers read low today'
+    : o.reason === 'low_twice' ? (o.source === 'survey' ? 'low for the second check in a row' : `under their normal for the second check in a row (${pct(o.dropPct)})`)
+      : `down ${pct(o.dropPct)} on their normal`;
+  return `${o.name}'s ${WHAT[o.source ?? 'jump'].coach} read Low: ${what}. ${o.action === 'ease' ? 'Today\'s session eased automatically.' : 'Their plan is unchanged (your rule: tell me only).'}`;
 }
 
 /** The coach's rule, in words: to the coach ("their normal … tell me"), or to the athlete about one coach ("your normal"). */

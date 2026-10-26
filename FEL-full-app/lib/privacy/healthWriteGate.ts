@@ -29,7 +29,7 @@ export function refuseHealthWrite(): NextResponse {
   return NextResponse.json({ ...HEALTH_WRITE_REFUSED }, { status: 403 });
 }
 
-export type HealthWriteRouteId = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h';
+export type HealthWriteRouteId = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i';
 
 export interface HealthWriteRoute {
   id: HealthWriteRouteId;
@@ -57,4 +57,6 @@ export const HEALTH_WRITE_ROUTES: readonly HealthWriteRoute[] = [
   // The check moved from lib/coach/parity/people.ts whoIs into each route (passed in as healthGate); behaviour unchanged.
   { id: 'g', file: 'app/api/coach/me/checkins/route.ts', handler: 'POST (health answers)', writes: 'CoachCheckinAnswer.health', status: 'gated', holder: null },
   { id: 'h', file: 'app/api/coach/me/habits/route.ts', handler: 'POST (a health habit tick)', writes: 'CoachHabitTick on a health habit', status: 'gated', holder: null },
+  // COACH-DELIVERY COA-03 (2026-10-26): the five-question readiness survey beside the jump check.
+  { id: 'i', file: 'app/api/coach/me/readiness-survey/route.ts', handler: 'POST', writes: 'ReadinessSurvey', status: 'gated', holder: null },
 ];
