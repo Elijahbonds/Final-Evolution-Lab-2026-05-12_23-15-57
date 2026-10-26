@@ -592,7 +592,7 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank'
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
 export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt',
-  'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip']);
+  'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip', 'ex_seated_kickback', 'ex_seated_kickback_one', 'ex_seated_row', 'ex_seated_row_one']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
