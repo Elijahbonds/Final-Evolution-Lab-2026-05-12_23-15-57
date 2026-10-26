@@ -90,8 +90,9 @@ const UA = 'AgeScreenTest/1.0';
 // c1cf9937, this lane's merge of lane/finish-release; coach parity landed next (#456): re-pinned at 0732f397, this lane's
 // second merge of lane/finish-release, the first commit carrying every pending file above.
 // NEXUS-PUBLISH (lane/nexus-publish, NEX-06, 2026-10-26) prisma/pending/2026-10-26-studio-share.sql (pending SQL only; schema.prisma
-// untouched) at b610726c, the lane's commit carrying it ; re-pinned at the lane's merge of lane/finish-release that carries it with lane/vbt's (below).
-const PARENT = '0732f39728dbf73bae882014eb7665de82689270';
+// untouched) at b610726c, the lane's commit carrying it; VBT landed first (#458): pinned at c6c5100a, this lane's merge of
+// lane/finish-release, the first commit carrying every pending file above.
+const PARENT = 'c6c5100a876bf52f09532b419b16755a23888c60';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
