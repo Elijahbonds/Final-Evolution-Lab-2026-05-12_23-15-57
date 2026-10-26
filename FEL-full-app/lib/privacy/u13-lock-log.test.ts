@@ -81,7 +81,20 @@ const UA = 'AgeScreenTest/1.0';
 // COMBINE-DAY (lane/combine-day, 2026-10-25) prisma/pending/2026-10-25-combine-day.sql (pending SQL only; schema.prisma
 // untouched; CombineEvent + CombineEntrant + CombineResult, additive) at f1954c91; with the signature programs' file it is
 // carried by the merge 0fba61f1, the first commit holding every file above.
-const PARENT = '0fba61f116e8f34c2f20649ad828d9acaa6514cc';
+// COACH-PARITY (lane/coach-parity, 2026-10-26) prisma/pending/2026-10-26-coach-parity.sql (pending SQL only; schema.prisma
+// untouched; CoachCheckinForm + CoachCheckinAssign + CoachCheckinAnswer + CoachHabit + CoachHabitTick, additive) at f5e6bc63,
+// the lane commit carrying it on top of every file above. Signature programs and combine day landed first (#451, #453):
+// pinned at e7769157, this lane's merge of lane/finish-release, the first commit carrying every pending file above.
+// VBT (lane/vbt, 2026-10-25) prisma/pending/2026-10-26-vbt.sql (pending SQL only; schema.prisma untouched; VbtSet +
+// VbtZoneTarget, additive) at e9125b4b; with signature programs and combine day landed first (#451, #453), pinned at
+// c1cf9937, this lane's merge of lane/finish-release; coach parity landed next (#456): re-pinned at 0732f397, this lane's
+// second merge of lane/finish-release, the first commit carrying every pending file above.
+// PAYMENTS-READY (lane/payments-ready, 2026-10-26) prisma/pending/2026-10-26-payments-ready.sql (pending SQL only; schema.prisma
+// untouched; CoachConnectAccount.requirementsDue + CoachSaleDispute, additive) at 8f79c9cb; combine-day landed first (#453):
+// pinned at this lane's merge of lane/finish-release (d754d041), the first commit carrying both files.
+// MERGE 5418784a: the first commit carrying every pending file above.
+// MERGE 0fe07e1f: the first commit carrying every pending file above.
+const PARENT = '0fe07e1f6e704a95a0b48dbbe233f3f9ef0872aa';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

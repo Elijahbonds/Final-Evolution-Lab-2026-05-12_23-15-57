@@ -185,7 +185,7 @@ describe('the refusal', () => {
 
 describe('SCAN_SAVE_ROUTES is GAP 1\'s table', () => {
   it('names 1a–1h once each, every file exists, and a routed row names its holder', () => {
-    expect(SCAN_SAVE_ROUTES.map((r) => r.id)).toEqual(['1a', '1b', '1c', '1d', '1e', '1f', '1g', '1h', '1i', '1j', '1k', '1l', '1m']);
+    expect(SCAN_SAVE_ROUTES.map((r) => r.id)).toEqual(['1a', '1b', '1c', '1d', '1e', '1f', '1g', '1h', '1i', '1j', '1k', '1l', '1m', '1n']);
     for (const r of SCAN_SAVE_ROUTES) {
       expect(() => readFileSync(join(__dirname, '../..', r.file)), r.file).not.toThrow();
       if (r.status === 'routed') expect(r.holder, r.id).toBeTruthy();

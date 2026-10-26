@@ -47,10 +47,12 @@ beforeEach(() => {
 });
 
 describe('every money route is closed by default — and touches nothing', () => {
+  // test changed (payments-ready): POST /connect now takes the request (it reads the coach's terms tick from the body),
+  // so it is called with one; the assertion is unchanged.
   const routes: [string, () => Promise<Response>][] = [
     ['checkout', () => checkout(req({ packageId: 'pkg-1' }))],
     ['verify', () => verify(req({ sessionId: 'cs_test_0123456789ab' }))],
-    ['connect POST', () => connectPost()],
+    ['connect POST', () => connectPost(req({}))],
     ['connect GET', () => connectGet()],
     ['connect dashboard', () => dashboard()],
     ['refund', () => refund(req({}), { params: { id: 'sale-1' } })],

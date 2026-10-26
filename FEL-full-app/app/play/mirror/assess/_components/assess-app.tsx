@@ -456,8 +456,9 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
           pass jumpView.trust?.level as trustLevel once PR #424 lands (its Low hides the number, and this card with it). */}
       {phase === 'jumpResult' && jumpView && !jumpView.kid ? <JumpSessionCard t5={carryRef.current?.t5 ?? null} trustLevel={null} /> : null}
       {phase === 'jumpResult' && jumpView && !jumpView.kid ? <SlowMoUpload /> : null}
-      {/* JUMP-PRO 2: the approach (touch height), the drop jump (RSI), the standing reach and power — adults only. */}
-      {phase === 'jumpResult' && jumpView && !jumpView.kid ? <JumpMore adult bestHeightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} /> : null}
+      {/* JUMP-PRO 2: the approach (touch height), the drop jump (RSI), the standing reach and power — adults only.
+          JUMP-TESTS: the jump tests, the history kept on the device (CSV) and the take-off speed read the live check's t5. */}
+      {phase === 'jumpResult' && jumpView && !jumpView.kid ? <JumpMore adult bestHeightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} t5={carryRef.current?.t5 ?? null} /> : null}
 
       {live ? (
         <div data-step={phase === 'device' ? 'camera' : view?.step ?? 'running'} className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black" style={{ aspectRatio: aspect, maxHeight: 'min(72vh, 100dvh - 12rem)' }}>

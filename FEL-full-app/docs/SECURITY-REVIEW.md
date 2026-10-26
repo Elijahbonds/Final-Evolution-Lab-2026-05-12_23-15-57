@@ -9,7 +9,7 @@ Anything that needs a dependency change or legal text goes to the owner." (quali
 
 ## How it was done
 
-- **Every route, by machine.** `tests/security/routeScan.ts` reads all 295 `route.ts` files and records what each one
+- **Every route, by machine.** `tests/security/routeScan.ts` reads all 303 `route.ts` files (295 at the review's base, 303 after merging `36593d3a`) and records what each one
   calls: a session read, an admin gate, a role check, a shared secret, a webhook signature, a dev-only 404, a rate limit,
   a schema parse, an age or consent gate, an upload. The table at the end of this file is its output, one row a route.
 - **The risky ones, by hand.** Every route the scan found with no check at all (26), every write among them (10), every
@@ -66,7 +66,7 @@ dev-only routes.
 
 ### Every API route's checks
 
-The table at the end lists all 295 route files. Of the 285 under `/api`: every route that writes has a session, admin,
+The table at the end lists all 303 route files. Of the 292 under `/api`: every route that writes has a session, admin,
 secret, signature or dev-only check in its file, except the 10 reviewed by hand and listed in
 `REVIEWED_PUBLIC_WRITES` (`tests/security/routeScan.ts`), each with what stands in for a session:
 
@@ -80,6 +80,11 @@ secret, signature or dev-only check in its file, except the 10 reviewed by hand 
 | `/api/telemetry/crash` | one bounded log line, nothing stored (S-08) |
 | `/api/controller-link/rooms`, `/signal` | room-scoped signalling, 6-character codes, 2 h TTL (S-06) |
 | `/api/coach-store/unlock/redeem`, `/status` | the 72-bit code bound to one device is the credential; stored hashed |
+
+The merge of `36593d3a` (payments-ready, sprint-speed, vbt, app-feel, coach-parity) added 8 route files: coach
+check-ins, habits and CSV import, the client's check-ins and habits, the coach's VBT zones, `/api/vbt/sets` and
+`/app.webmanifest`. Each API one reads the session in its own file; `/api/vbt/sets` also calls the adult opt-in gate,
+and `/api/coach/import` hands the caller's role to the library viewer. Read, no finding.
 
 Ownership on `[id]` routes was checked by hand on a sample: coach-store rows, receipts and call signals answer 404
 unless the session user is the booking's client or coach; coach programs go through `accessRole`; form reviews through
@@ -224,7 +229,7 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 
 <!-- route-inventory:start (generated: npx tsx tests/security/inventory.ts --write) -->
 
-295 route files (285 under /api). Columns are what the route FILE calls (tests/security/routeScan.ts); a check made inside a lib helper the route calls is not seen here, which is why the findings above were read by hand.
+303 route files (292 under /api). Columns are what the route FILE calls (tests/security/routeScan.ts); a check made inside a lib helper the route calls is not seen here, which is why the findings above were read by hand.
 
 | Route | Methods | Auth | Age/consent gate | Rate limit | Validation | Upload |
 |---|---|---|---|---|---|---|
@@ -316,6 +321,7 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 | `/api/coach/categories` | GET POST | session + admin + role | · | · | · | · |
 | `/api/coach/chat/consent` | GET POST | session | · | yes | · | · |
 | `/api/coach/chat` | POST | session | yes | yes | · | · |
+| `/api/coach/checkins` | GET POST | session | · | · | · | · |
 | `/api/coach/combine/[id]` | GET PUT DELETE | session | yes | yes | · | · |
 | `/api/coach/combine` | GET POST | session | · | yes | · | · |
 | `/api/coach/drafts/approve-safe` | POST | session | · | yes | · | · |
@@ -326,6 +332,8 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 | `/api/coach/form-reviews/[id]` | GET DELETE | session | · | · | · | · |
 | `/api/coach/form-reviews` | GET POST | session | yes | · | · | · |
 | `/api/coach/guardian-report` | GET POST | session | · | yes | · | · |
+| `/api/coach/habits` | GET POST | session | · | · | · | · |
+| `/api/coach/import` | POST | session + role | · | · | · | · |
 | `/api/coach/inbox` | GET | session | · | · | · | · |
 | `/api/coach/invite/[token]` | GET POST DELETE | session | yes | · | · | · |
 | `/api/coach/invite/bulk` | POST | session | · | yes | · | · |
@@ -334,7 +342,9 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 | `/api/coach/live` | GET | session + role | · | yes | · | · |
 | `/api/coach/live/signal` | GET POST | session + role | · | yes | · | · |
 | `/api/coach/live/summary` | POST | session | · | yes | · | · |
+| `/api/coach/me/checkins` | GET POST | session | · | · | · | · |
 | `/api/coach/me/cooldown` | POST | session | yes | · | · | · |
+| `/api/coach/me/habits` | GET POST | session | · | · | · | · |
 | `/api/coach/me/log` | POST | session | yes | · | · | · |
 | `/api/coach/me/plan-updates` | GET | session | · | · | · | · |
 | `/api/coach/me/today` | GET | session | · | · | · | · |
@@ -356,6 +366,7 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 | `/api/coach/readiness` | GET PUT PATCH | session | · | · | · | · |
 | `/api/coach/review` | POST | session | · | · | yes | · |
 | `/api/coach/roster` | GET | session | · | · | · | · |
+| `/api/coach/vbt` | GET PUT | session | · | · | · | · |
 | `/api/combine/mine` | GET | session | · | · | · | · |
 | `/api/competition/config` | GET | public read | · | · | · | · |
 | `/api/competition/create` | POST | session | · | · | yes | · |
@@ -506,6 +517,7 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 | `/api/v1/wallet/stripe-webhook` | POST | secret + signature | · | · | · | · |
 | `/api/v1/workout/plan` | POST GET | session | · | · | · | · |
 | `/api/v1/workout/scan` | POST GET DELETE | session | yes | · | · | · |
+| `/api/vbt/sets` | GET POST DELETE | session | yes | · | · | · |
 | `/api/wallet/balance` | GET | session | · | · | · | · |
 | `/api/wallet/deposit` | POST | session | · | · | · | · |
 | `/api/wallet/earn` | POST | session | · | yes | · | · |
@@ -513,6 +525,7 @@ lanes add the most). Add pass 2's findings as S-15 onward.
 | `/api/wallet` | GET | session | · | · | · | · |
 | `/api/wallet/spend` | POST | session | · | · | · | · |
 | `/api/wallet/withdraw` | POST | session | · | · | · | · |
+| `/app.webmanifest` | GET | public read | · | · | · | · |
 | `/books` | GET | public read | · | · | · | · |
 | `/dev/coach-catalogue/api` | GET POST PUT DELETE | dev-only | · | · | · | · |
 | `/dev/coach-loop/api` | GET POST | dev-only | · | · | · | · |
