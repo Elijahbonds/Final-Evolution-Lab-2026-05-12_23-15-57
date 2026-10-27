@@ -141,6 +141,8 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (prop === 'calfstep') return { alpha: 0.6, beta: 1.4, radius: 2.7, y: 0.85 };
           if (prop) return { alpha: 0.45, beta: 1.22, radius: 2.6, y: 0.6 };
           // sitting on the floor (the Z press): low, the arms going overhead
+          // DEMO-LOOPS: the overhead squat's hands are high; the box jump lands high
+          if (p.clip === 'ex_overhead_squat') return { alpha: FRONT_ALPHA - 0.5, beta: 1.42, radius: 3.0, y: 1.0 };
           if (p.clip?.startsWith('ex_z_press')) return { alpha: FRONT_ALPHA - 0.6, beta: 1.32, radius: 2.5, y: 0.55 };
           return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
         };

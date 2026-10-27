@@ -384,6 +384,40 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_knee_to_wall', families: ['ankle-mobility'], bases: /^knee-to-wall$/ },
   { clip: 'ex_wall_march', families: ['sprint-mechanics'], bases: /^wall-march$/ },
   { clip: 'ex_wall_drive', families: ['sprint-mechanics'], bases: /^wall-switch$/ },
+  // ── DEMO-LOOPS (2026-10-27): the signature programs' exercises (anim/authored/exerciseSignature.ts; the rest borrowed as noted) ──
+  { clip: 'ex_def_stance', families: ['defense'], bases: /^stance$/ },
+  { clip: 'ex_sl_balance', families: ['balance'], bases: /^basic$/ },
+  { clip: 'ex_sl_balance_head', families: ['balance'], bases: /^head-turns$/ },
+  { clip: 'ex_seated_breathe', families: ['breathing-2'], bases: /^seated-exhale$/ },
+  // assumption: the ball between the knees is not drawn; the knees squeezing in are the movement
+  { clip: 'ex_adductor_squeeze', families: ['hip-stability'], bases: /^adductor-squeeze$/ },
+  { clip: 'ex_lateral_walk', families: ['hip-stability'], bases: /^lateral-walk$/ },
+  { clip: 'ex_band_row', families: ['row'], bases: /^band$/ },
+  { clip: 'ex_tke', families: ['knee-capacity'], bases: /^tke$/ },
+  { clip: 'ex_back_wall_arm_raise', families: ['scap-work'], bases: /^wall-raise$/ },
+  { clip: 'ex_incline_scap_push_up', families: ['scap-work'], bases: /^incline-scap$/ },
+  // assumption: palms up is the grip, not drawn; the arms' path is the pull-apart's
+  { clip: 'ex_pull_apart', families: ['scap-work'], bases: /^pull-apart-up$/ },
+  { clip: 'ex_wall_chin_tuck', families: ['neck-care'], bases: /^wall$/ },
+  { clip: 'ex_wall_slide_liftoff', families: ['shoulder-care'], bases: /^wall-lift$/ },
+  { clip: 'ex_prone_t', families: ['shoulder-care'], bases: /^prone-t$/ },
+  { clip: 'ex_box_jump', families: ['box-jump'], bases: /^mid$/ },
+  { clip: 'ex_broad_jump_stick', families: ['broad-jump'], bases: /^stick$/ },
+  { clip: 'ex_sl_hop_stick', families: ['broad-jump'], bases: /^single-leg-stick$/ },
+  { clip: 'ex_lateral_hop_stick', families: ['lateral-bound'], bases: /^hop-stick$/ },
+  { clip: 'ex_drop_landing', families: ['landing'], bases: /^drop-low$/ },
+  { clip: 'ex_snap_down', families: ['landing'], bases: /^snap-down$/ },
+  { clip: 'ex_supported_sl_rdl', families: ['single-leg-hinge'], bases: /^supported$/ },
+  { clip: 'ex_hip_airplane', families: ['hip-capacity'], bases: /^airplane-sup$/ },
+  { clip: 'ex_two_point_start', families: ['acceleration'], bases: /^two-point$/ },
+  { clip: 'ex_arm_swing', families: ['sprint-development'], bases: /^arm-standing$/ },
+  { clip: 'ex_pallofpress_standing', families: ['plank'], bases: /^pallof-press$/ },
+  { clip: 'ex_calf_raise_sl', families: ['foot-strength'], bases: /^sl-flat$/ },
+  // the bridge held at its top: the heels on the bench, and the heels far out on the floor (the slider curl's long position)
+  { clip: 'ex_bridge_feetup', families: ['hamstring-iso'], bases: /^bench-hold$/, hold: 1.0 },
+  { clip: 'ex_slider_curl', families: ['hamstring-iso'], bases: /^long-lever$/, hold: 1.2 },
+  // assumption: recover and contest is the closeout the court plays (sprint, chop the feet, the hand up)
+  { clip: 'bball_closeout', families: ['court-movement'], bases: /^recover-contest$/ },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -592,7 +626,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup'].concat(
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze'].concat(
   // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
   ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm',
     'supine', 'supine9090', 'legsup', 'kneehug', 'oneknee', 'happybaby', 'kneerock', 'figure4', 'lyinghams', 'prone', 'pike', 'straddle', 'switch', 'rockback', 'childside', 'dogpedal',
@@ -604,12 +638,14 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank'
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
 export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt',
-  'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip', 'ex_seated_kickback', 'ex_seated_kickback_one', 'ex_seated_row', 'ex_seated_row_one']);
+  'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip', 'ex_seated_kickback', 'ex_seated_kickback_one', 'ex_seated_row', 'ex_seated_row_one',
+  // DEMO-LOOPS: read from the side
+  'ex_sl_squat_partial', 'ex_supported_sl_rdl', 'ex_hip_airplane', 'ex_two_point_start', 'ex_arm_swing', 'ex_broad_jump_stick', 'ex_sl_hop_stick', 'ex_snap_down', 'ex_cmj_dip']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
 export type DemoProp = 'seat' | 'bench' | 'incline' | 'box' | 'boxside' | 'stepbox' | 'boxback' | 'rearbench' | 'handbench' | 'feetbench' | 'feetbenchfront' | 'thrust'
-  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat';
+  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat' | 'dowel';
 /** A plain box (metres, the body's frame: +x its right, +y up, +z its front; rx tips it about x — negative raises its −z end).
  *  (The stage puts the body's +x at its own −x: the spawned root carries the importer's mirror.) */
 export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number }
@@ -644,6 +680,8 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   wallback: [{ w: 1.40, h: 2.10, d: 0.06, y: 1.05, z: -0.15 }],
   // the cable row's low seat and its foot plate
   rowseat: [{ w: 0.34, h: 0.30, d: 0.70, y: 0.15, z: -0.12 }, { w: 0.44, h: 0.36, d: 0.05, y: 0.18, z: 0.84 }],
+  // DEMO-LOOPS: a dowel planted beside the body (a single-leg hinge's support)
+  dowel: [{ w: 0.03, h: 1.10, d: 0.03, x: 0.42, y: 0.55, z: 0.20 }],
 };
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',
