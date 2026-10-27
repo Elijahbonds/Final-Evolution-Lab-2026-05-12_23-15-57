@@ -19,7 +19,8 @@ import { BulkInvite } from './bulk-invite';
 
 interface Invite { token: string; use: 'once' | 'many'; expiresAt: string; joined: number }
 
-export function InvitePanel() {
+/** `bulk` false: the team import lives in the Clients tab's Setup group instead (COACH-DELIVERY phase 2, the premium rule). */
+export function InvitePanel({ bulk = true }: { bulk?: boolean } = {}) {
   const [invites, setInvites] = useState<Invite[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<{ token: string; data: string } | null>(null);
@@ -130,7 +131,7 @@ export function InvitePanel() {
       {invites?.some((i) => codeOfToken(i.token)) && (
         <p className="mt-2 text-[11px] text-fel-dim">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
       )}
-      <BulkInvite onDone={() => void load()} />
+      {bulk && <BulkInvite onDone={() => void load()} />}
     </section>
   );
 }
