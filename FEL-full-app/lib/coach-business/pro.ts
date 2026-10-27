@@ -9,15 +9,18 @@
 // The fence: COACH_PRO_ENABLED off → 409 pro_off; no key → payments_not_set_up; a LIVE key
 // while COACH_CONNECT_LIVE is off → live_mode_off (one live switch for the whole coach business); no NEXTAUTH_URL →
 // site_url_not_set. All 409 store_closed, before any Stripe call.
+// PAYMENTS-READY: a LIVE key with COACH_CONNECT_LIVE on still answers coach_terms_unsigned while the coach terms are not
+// signed (lib/payments/terms.ts): the coach business has one live switch, and it waits for the coach terms.
 import type Stripe from 'stripe';
+import { coachTermsSigned } from '@/lib/payments/terms';
 import { isLiveKey, isTestKey } from '@/lib/coach-store/stripeMode';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import { coachProPriceCents, isCoachConnectLive, isCoachProEnabled } from './config';
 
-export type ProClosedReason = 'pro_off' | 'payments_not_set_up' | 'live_mode_off' | 'site_url_not_set';
+export type ProClosedReason = 'pro_off' | 'payments_not_set_up' | 'live_mode_off' | 'site_url_not_set' | 'coach_terms_unsigned';
 export type ProGate = { ok: true; priceCents: number; origin: string; live: boolean } | { ok: false; reason: ProClosedReason };
 
-export function proGate(env: NodeJS.ProcessEnv = process.env): ProGate {
+export function proGate(env: NodeJS.ProcessEnv = process.env, coachTermsVersion?: string | null): ProGate {
   if (!isCoachProEnabled(env)) return { ok: false, reason: 'pro_off' };
   const priceCents = coachProPriceCents(env);
   const key = (env.STRIPE_SECRET_KEY ?? '').trim();
@@ -25,6 +28,7 @@ export function proGate(env: NodeJS.ProcessEnv = process.env): ProGate {
   if (isTestKey(key)) live = false;
   else if (isLiveKey(key)) {
     if (!isCoachConnectLive(env)) return { ok: false, reason: 'live_mode_off' };
+    if (!coachTermsSigned(coachTermsVersion)) return { ok: false, reason: 'coach_terms_unsigned' };
     live = true;
   } else return { ok: false, reason: 'payments_not_set_up' };
   const origin = siteOrigin(env);

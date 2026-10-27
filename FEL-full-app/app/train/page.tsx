@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -70,6 +70,12 @@ export default async function TrainPage() {
       tag: 'Check in',
     },
     {
+      // SPRINT-SPEED (2026-10-25): sprint and agility timed by the phone's camera (verified adults; the page says so to anyone else)
+      href: '/train/speed', icon: Gauge, accent: '#00FF9D', title: 'Sprint speed',
+      line: 'Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.',
+      tag: 'Time a run',
+    },
+    {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
       // camera (/play/drills). The page reads the age and today's checks itself and holds back the jumps they say to;
       // this card reads nothing, so it is the same for every account.
@@ -122,6 +128,17 @@ export default async function TrainPage() {
       href: '/coach', icon: Users, accent: '#A855F7', title: 'Your roster',
       line: 'The athletes you coach, what they have done this fortnight, and who is drifting.',
       tag: 'Coach',
+    }] : []),
+    // COMBINE-DAY (2026-10-25): a coach's tryout / testing day; a coached athlete's own combine numbers
+    ...(coachesAnyone ? [{
+      href: '/coach/combine', icon: Timer, accent: '#00E5FF', title: 'Combine day',
+      line: 'Run a tryout: jump, agility, sprint and a skill drill, station by station, then a ranked report.',
+      tag: 'Run a combine',
+    }] : []),
+    ...(coachLink ? [{
+      href: '/train/combine', icon: Timer, accent: '#00E5FF', title: 'Your combines',
+      line: 'Your numbers from your coach’s combines, and where you placed.',
+      tag: 'See results',
     }] : []),
     {
       href: '/profile', icon: Activity, accent: '#7B61FF', title: 'Where you stand',

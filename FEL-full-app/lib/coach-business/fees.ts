@@ -19,7 +19,15 @@
 // its own pocket. The coach's transfer is reversed by the refund, and FEL hands back the same share of F as of P
 // (feeReturnedCents), as an application-fee refund of exactly that amount. After a full refund: buyer −X, coach 0, FEL
 // X − S (0 or 1¢).
-import { CONNECT_FEE_BPS, STRIPE_CARD_FEE_BPS, STRIPE_CARD_FEE_FIXED_CENTS } from './config';
+//
+// PAYMENTS-READY (2026-10-26): the two owner calls are settings (config.ts), defaults unchanged.
+//   · FEL's share is platformFee(policy, plan, price, fees so far this month): PLATFORM_FEE_BPS_FREE / _PRO by the coach's
+//     plan, capped by PLATFORM_FEE_CAP_CENTS_MONTHLY. With the defaults it is floor(P × 5%), exactly as before.
+//   · REFUND_PROCESSING_FEE on: a refund of part R of the price also returns the same share of X to the buyer
+//     (processingShareCents), and FEL hands the coach back that share of X with its share of F, so the coach ends where
+//     they end today and FEL absorbs Stripe's fee. Off (the default): exactly today's refund.
+import { CONNECT_FEE_BPS, STRIPE_CARD_FEE_BPS, STRIPE_CARD_FEE_FIXED_CENTS, type FeePolicy } from './config';
+import type { CoachPlan } from './plan';
 
 function assertCents(n: number, what: string): void {
   if (!Number.isSafeInteger(n) || n < 0) throw new Error(`${what} must be whole, non-negative cents`);
@@ -81,8 +89,11 @@ export interface SaleSplit {
   coachNetCents: number;
 }
 
-export function saleSplit(priceCents: number, rate: StripeRate = STRIPE_CARD_RATE): SaleSplit {
-  const fel = felShareCents(priceCents);
+/** `felShare` defaults to today's 5%; the checkout passes platformFee(...)'s share (plan and monthly cap). */
+export function saleSplit(priceCents: number, rate: StripeRate = STRIPE_CARD_RATE, felShare: number = felShareCents(priceCents)): SaleSplit {
+  assertCents(felShare, 'FEL share');
+  if (felShare > priceCents) throw new Error('FEL share above the price');
+  const fel = felShare;
   const total = grossUpCents(priceCents, rate);
   const processing = total - priceCents;
   return {
@@ -98,6 +109,58 @@ export function saleSplit(priceCents: number, rate: StripeRate = STRIPE_CARD_RAT
 /** What FEL keeps of a split once Stripe has taken its fee (`rounding` models how Stripe rounds). */
 export function felNetCents(split: SaleSplit, rate: StripeRate = STRIPE_CARD_RATE, rounding: Rounding = 'nearest'): number {
   return split.applicationFeeCents - stripeFeeCents(split.totalCents, rate, rounding);
+}
+
+// ── the platform fee (PAYMENTS-READY) ─────────────────────────────────────────────────────────────────────────────
+
+export interface PlatformFee {
+  /** FEL's share of this sale, in cents. */
+  felShareCents: number;
+  /** The rate that applied (by plan). */
+  bps: number;
+  /** True when the monthly cap lowered the share. */
+  capped: boolean;
+}
+
+/**
+ * FEL's share of a sale at `priceCents` for a coach on `plan`, who has already paid `feesThisMonthCents` this month.
+ * The plan picks the rate; the cap (when set) lowers the share to what is left of it, never below 0.
+ */
+export function platformFee(policy: FeePolicy, plan: CoachPlan, priceCents: number, feesThisMonthCents: number = 0): PlatformFee {
+  assertCents(priceCents, 'price');
+  const bps = plan === 'pro' ? policy.bpsPro : policy.bpsFree;
+  const share = felShareCents(priceCents, bps);
+  if (policy.capCentsMonthly === null) return { felShareCents: share, bps, capped: false };
+  const room = Math.max(0, policy.capCentsMonthly - Math.max(0, Math.floor(feesThisMonthCents)));
+  return share > room ? { felShareCents: room, bps, capped: true } : { felShareCents: share, bps, capped: false };
+}
+
+/** `500` → "5%", `250` → "2.5%", `0` → "0%". */
+export function bpsLabel(bps: number): string {
+  return `${Number((bps / 100).toFixed(2))}%`;
+}
+
+/** FEL's fee for a coach on `plan`, as the dashboard says it: "5%", or "5%, at most $50.00 a month" under a cap. */
+export function platformFeeLabel(policy: FeePolicy, plan: CoachPlan): string {
+  const rate = bpsLabel(plan === 'pro' ? policy.bpsPro : policy.bpsFree);
+  return policy.capCentsMonthly === null ? rate : `${rate}, at most $${(policy.capCentsMonthly / 100).toFixed(2)} a month`;
+}
+
+/** Does the policy need the coach's fees so far this month? Only with a cap. */
+export function needsMonthToDate(policy: FeePolicy): boolean {
+  return policy.capCentsMonthly !== null;
+}
+
+/** The first instant of `now`'s calendar month, UTC (the cap's month). assumption: UTC months. */
+export function monthStartUtc(now: Date): Date {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
+/** The same split with a lower (capped) FEL share: the buyer's total and processing fee do not change. */
+export function withFelShare(split: SaleSplit, felShare: number): SaleSplit {
+  assertCents(felShare, 'FEL share');
+  const fel = Math.min(felShare, split.felShareCents);
+  return { ...split, felShareCents: fel, applicationFeeCents: fel + split.processingFeeCents, coachNetCents: split.priceCents - fel };
 }
 
 // ── monthly coaching ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -165,6 +228,39 @@ export function feeRefundDue(targetCents: number, alreadyCents: number): number 
   assertCents(targetCents, 'target');
   assertCents(alreadyCents, 'already refunded');
   return Math.max(0, targetCents - alreadyCents);
+}
+
+// ── refunding the processing fee (REFUND_PROCESSING_FEE on) ──────────────────────────────────────────────────────
+
+/** The buyer's share of the processing fee `processingCents` returned once `refundedPriceCents` of the price
+ *  `priceCents` is refunded. Rounded down; a FULL refund returns the whole fee. */
+export function processingShareCents(processingCents: number, priceCents: number, refundedPriceCents: number): number {
+  return feeReturnedCents(processingCents, priceCents, refundedPriceCents);
+}
+
+/** What the CHARGE has refunded in all once `refundedPriceCents` of the price is refunded: the price part, plus the
+ *  processing fee's share when that is refunded too. */
+export function chargeRefundCents(split: { priceCents: number; processingFeeCents: number }, refundedPriceCents: number, refundFee: boolean): number {
+  const r = Math.min(Math.max(0, refundedPriceCents), split.priceCents);
+  return r + (refundFee ? processingShareCents(split.processingFeeCents, split.priceCents, r) : 0);
+}
+
+/**
+ * The inverse: the part of the PRICE refunded when the charge has refunded `chargeRefundedCents` in all. With the fee
+ * not refunded it is today's min(refunded, price). With it refunded, the largest R whose chargeRefundCents is at most
+ * the amount (so a refund made from the Stripe Dashboard of any size maps to a price share, and a full refund of the
+ * whole charge to the whole price).
+ */
+export function priceRefundedFromCharge(split: { priceCents: number; processingFeeCents: number }, chargeRefundedCents: number, refundFee: boolean): number {
+  const c = Math.max(0, Math.floor(chargeRefundedCents));
+  if (!refundFee) return Math.min(c, split.priceCents);
+  const total = split.priceCents + split.processingFeeCents;
+  if (c >= total) return split.priceCents;
+  if (total === 0) return 0;
+  let r = Math.min(split.priceCents, Math.floor((c * split.priceCents) / total));
+  while (r < split.priceCents && chargeRefundCents(split, r + 1, true) <= c) r += 1;
+  while (r > 0 && chargeRefundCents(split, r, true) > c) r -= 1;
+  return r;
 }
 
 // ── ledger ───────────────────────────────────────────────────────────────────────────────────────────────────────────
