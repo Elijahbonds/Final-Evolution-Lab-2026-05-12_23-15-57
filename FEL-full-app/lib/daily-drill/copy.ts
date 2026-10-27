@@ -18,7 +18,9 @@ export const DAILY_EYEBROW = "Today's drill";
 export const SAME_ALL_DAY_LINE = 'The same drill all day, on every device. A new one tomorrow.';
 export const START_CTA = "Start today's drill";
 export const DONE_TITLE = 'Done for today';
-export const STOPPED_LINE = "Today's drill is paused until you've checked with a clinician and cleared it from the Mirror. This isn't a diagnosis — it's just a pause.";
+// TODAY-DRILL (2026-10-27): reworded so no line names a medical word (lib/coach/weeklyDraft/copy.ts MEDICAL_WORDS caught
+// "diagnosis"); the meaning is unchanged: a pause until a clinician has been seen and the Mirror cleared it.
+export const STOPPED_LINE = "Today's drill is on pause. Check with a clinician first, then clear it from the Mirror. It's a pause, not a verdict.";
 /** Said on the result card instead of the drills page's "nothing is saved": here one fact is kept. */
 export const KEPT_LINE = 'Only the fact that you finished today’s drill is kept, for your streak and Lab Credits. Nothing the camera read is sent.';
 export const PREP_LINE = 'Four calm minutes of the Wake-Up first, then the drill.';

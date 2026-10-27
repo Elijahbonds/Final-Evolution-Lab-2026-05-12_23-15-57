@@ -87,7 +87,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
               </span>
 
               <span
-                className="shrink-0 font-mono text-[11px] font-bold tabular-nums transition-colors"
+                className="shrink-0 font-sans text-[12px] font-semibold tabular-nums transition-colors"
                 style={{ color: isOpen ? f.accent : COLOR.textQuiet }}
               >
                 {modes.length}
@@ -136,7 +136,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                             <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
                             <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-white/50">{m.desc}</span>
                             {m.venue && venueDistinguishes && (
-                              <span className="mt-1.5 block truncate font-mono text-[11px] uppercase tracking-wider text-fel-quiet">
+                              <span className="mt-1.5 block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
                                 {m.venue}
                               </span>
                             )}
