@@ -141,3 +141,42 @@ Gate run on `abc1571b` (all through the shared CPU slots):
 - The dunk-related headless suites (`capture-dunk`, `controller-link`, `dunk-animation`, `dunk-balance`, `dunk-depth`,
   `dunk-feel`, `dunk-system`, `dunkduel-depth`, `feel`, `hoops-to-75`, `juice-parity`, `verb-key-alignment`): 12 / 12 green.
 - The full ci-suite and the full vitest are left to the PR's CI: the machine's CPU slots are shared.
+
+## 7. Phase 3 — the alley-oop lob and the catch ring: results (lane/dunk-flagship-p3)
+
+Before = `36593d3a` (the shipped oop: a pass thrown after the take-off). After = this phase's code. Phone tier, 320×180 (the
+strips at 480×270), virtual clock, one attempt per piece. Contact sheet: `round9/dunk-flagship/shots/phase3-lobs.jpg`
+(the ball-height chart, the on-time lob's frames, the early take-off's frames).
+
+| Run | Flight (game s) | Top over the catch | Caught | Ring / shadow on screen | Ball speed at the hand |
+|---|---|---|---|---|---|
+| before · oop r0, r1 | 0.55 | −0.34 m (still rising) | yes | no ring | 11.8 m/s |
+| oop r0 / r1 / r3 / r9 (on the run) | 1.13 / 1.13 / 1.15 / 1.15 | 0.55 / 0.54 / 0.58 / 0.58 m | 4 / 4 | 0.99 / 0.99 of the lob | 4.7 m/s |
+| oop from standing (RT) | 1.17 | 0.57 m | yes | 0.99 | 4.7 m/s |
+| A early (first cut: the old fallback) | 0.57 | −0.13 m | yes | 0.97 | 13.3 m/s |
+| RT let go early (first cut) | 0.57 | −0.16 m | yes | 0.97 | 14.0 m/s |
+| A early (fixed) | EARLY_A | EARLY_A_TOP | EARLY_A_C | EARLY_A_R | EARLY_A_V |
+| RT let go early (fixed) | EARLY_R | EARLY_R_TOP | EARLY_R_C | EARLY_R_R | EARLY_R_V |
+| A early, knob `dunk.oopLateCatchClipT` 0.95 | EARLY_95 | EARLY_95_TOP | EARLY_95_C | EARLY_95_R | EARLY_95_V |
+
+("Ring / shadow" is the share of the lob's frames where the catch ring and the ball's floor shadow are both drawn; the
+missing 1–3 % is the release frame. The ring is gone by the frame after the catch: 0 lingering frames on every run.)
+
+What changed:
+- **The passer winds up.** The run-time throw left on the toss clip's first frame, from his hip. The toss (`jumpshot`, arms
+  overhead at 0.5 s) now starts `OOP_WINDUP_SEC` (0.5 s, new) before the release, and the ball rides his hand up.
+- **The throw is heard and read.** A whoosh at the release and the banner "ALLEY-OOP — GO GET IT".
+- **An early take-off still gets a lob.** The varied runs found it: leaving the floor before the passer's throw was due
+  (A early, RT let go early) fell back to the old 0.35 s bullet thrown at 0.9 × the rise. The passer now lets go on the
+  take-off frame, aimed at the hang beat (clip 0.8, the off-glass lob's measured catch beat). Knob `dunk.oopLateCatchClipT`
+  (new, default 0.8). Nothing thrown after the take-off can fly the on-time lob's arc: only ~0.8 s of clip remains before
+  the slam window. EARLY_NOTE
+- **The on-time lob** (thrown on the run, Phase 1's early piece `b1`): the launch re-aims it onto the exact catch beat
+  (2.3 m from the catch with 0.59 s left), a velocity kink of ~0.2 m/s.
+
+Gate run on the phase's head (all through the shared CPU slots): tsc 0 errors · eslint 0 warnings on the changed files ·
+mode-list-check 32 modes · vitest (dunk mode and core, `reducedMotionGates`, `LobMarker`, `veniceBoardwalk`,
+`lib/feel-panel`, `tests/probes`) 59 files, 726 tests, all green · the 12 dunk-related headless suites 12 / 12 green.
+
+Still open, carried: foot skate on the run-up (Phase 1 gate, not met at the default stride; re-checked in Phase 4). Not
+started: the landing-absorb re-author (an owner card, waiting for approval).
