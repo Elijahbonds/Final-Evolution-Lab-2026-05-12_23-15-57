@@ -86,6 +86,17 @@ async function possLoop() {
   for (let k = 0; k < POSS * 2; k++) {
     const side = k % 2 === 0 ? 'def' : 'off';
     await ev(() => { window.__hg.bot.on = false; });
+    // a trip to the line (an and-one, a shooting foul) is a dead ball the seams do not cancel, and the bot does not shoot free throws:
+    // shoot them out (press, let go at the line meter's green) before the next possession, or every later possession is a statue
+    for (let n = 0; n < 6; n++) {
+      const ftOpen = await ev((t) => { const L = (window.__LOG || []).filter((l) => new RegExp('\\[' + t + '-FT\\]').test(l.m)); if (!L.length) return false; const last = L[L.length - 1].m; return !/done:|ended the game/.test(last); }, tag);
+      if (!ftOpen) break;
+      await waitGame(900);
+      await ev(() => window.__hg.press('X')); await waitGame(450);
+      for (let w = 0; w < 30; w++) { const m = await ev(() => window.__hg.meterNow()); if (m.t >= m.c || m.t === 0) break; await waitGame(50); }
+      await ev(() => window.__hg.release('X')); await waitGame(1800);
+      say('poss: shot a free throw out');
+    }
     await ev((a) => { const s = window.__FEL_DEV__.scene.metadata[a[0]]; if (a[1] === 'def') s.defend(); else s.offense(); }, [MODE, side]);
     await waitGame(side === 'def' ? 200 : 600);
     const f0 = await ev(() => window.__hg.frame); const t0 = await gameNow();
