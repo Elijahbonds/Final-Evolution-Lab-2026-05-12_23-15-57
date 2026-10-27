@@ -147,8 +147,8 @@ describe('the hip hinge, live', () => {
     expect(html).toMatch(/side-on/i);
     expect(html).toMatch(/hip height/);
     expect(html).toMatch(/Bodyweight only/);
-    expect(html).toMatch(/stop the set if anything hurts/);
-    expect(text(m)).toContain('Hip Hinge');
+    expect(html).toMatch(/If anything hurts, stop and tell your coach/);   // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — same meaning (the pain line now routes to a person)
+    expect(text(m)).toContain('Hip hinge');   // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — same meaning
     m.unmount();
   });
 
@@ -158,16 +158,16 @@ describe('the hip hinge, live', () => {
     expect(ofType(m, SideRepFraming)).toHaveLength(0);         // the framing card is for before Start
     await feed(adapterFromPose(hingeSet({ reps: 11, rep: () => SQUATTY }), 1000), 10);
     const card = HINGE_CUES.find((c) => c.faultId === 'hingeRatio')!;
-    expect(rig.spoken).toContain('Good. 3 slow reps first — the check.');
-    expect(rig.spoken).toContain('Now the work set: 8 reps. I will cue between reps.');
+    expect(rig.spoken).toContain('Good. First, 3 slow reps so I can watch.');   // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — same meaning
+    expect(rig.spoken).toContain('Now 8 reps. I will coach you between reps.');
     expect(rig.spoken).toContain(card.cue);
     expect(rig.spoken).toContain(card.reply);
     expect(rig.spoken.indexOf(card.cue)).toBeLessThan(rig.spoken.indexOf(card.reply!));
     const review = ofType(m, SideRepReviewCard);
     expect(review).toHaveLength(1);
     const html = renderToStaticMarkup(SideRepReviewCard(review[0].props as Parameters<typeof SideRepReviewCard>[0]));
-    expect(html).toMatch(/Still showing in the last 3 reps/);
-    expect(html).toMatch(/Knees doing the work/);
+    expect(html).toMatch(/Still there on your last 3 reps/);   // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — same meaning
+    expect(html).toMatch(/knees bend too much/i);
     expect(html).toMatch(/estimated/);
     expect(html).not.toMatch(/diagnos|injur|pain/i);
     button(tree(m), /^End session$/).props.onClick();

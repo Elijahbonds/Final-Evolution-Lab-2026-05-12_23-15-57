@@ -221,7 +221,8 @@ export const STATION_THRESHOLDS = {
   /** What a posted grade may carry (regradeFromSummary) and how long a result's detail line may be (screen.ts keeps 200). */
   limits: { stationIdChars: 32, detailChars: 200 },
   /** How the card prints a value (decimals per unit). */
-  display: { ratio: 2, deg: 0, pxNorm: 2, sec: 0 },
+  // CUE-REWRITE: percent / halfWidthPercent turn a ratio into the share of a width a person can picture (display only)
+  display: { ratio: 2, deg: 0, pxNorm: 2, sec: 0, percent: 100, halfWidthPercent: 50 },
   /** Shoulders level (front). A flag at 0.08 of a shoulder width is ~3 cm on a 40 cm span (a 4.6° tilt of the
    *  shoulder line) — over twice the ~2° body lean the read is left with, and about three times the synth's per-frame
    *  jitter (the median over a hold is steadier still: its uncertainty read 0.003). The synth: level 0.00, one shoulder
@@ -829,16 +830,16 @@ export function unreadableLine(checkId: GraderId, reason: UnreadableReason, m?: 
     wrongView: `this check reads you from the ${VIEW_WORD[GRADER_VIEW[checkId]]}, and the camera saw a different view`,
     noBody: 'the camera lost you for most of it',
     outOfFrame: 'part of you was outside the shot',
-    lowVisibility: 'the points it reads were not clear enough (light, or something in front of you)',
-    notUpright: 'you read tilted in the shot — the phone may be crooked',
+    lowVisibility: 'the camera could not see clearly (light, or something in front of you)',
+    notUpright: 'you looked tilted in the shot, so the phone may be crooked',
     tooSmall: 'you were too small in the shot to read this',
-    tooFewFrames: `too few clear frames (${m?.readableFrames ?? 0} of the ${need} it needs)`,
-    tooNoisy: 'the tracking wobbled more than the thing this check looks for',
+    tooFewFrames: `the camera got too few clear looks (${m?.readableFrames ?? 0} of the ${need} it needs)`,
+    tooNoisy: 'the tracking wobbled too much to tell',
     notStarted: 'the camera never saw your free foot come up and stay up',
     tooShort: `the camera saw ${fmt(m?.stanceSec ?? 0, STATION_THRESHOLDS.display.sec)} s on one leg and needs ${STATION_THRESHOLDS.singleLeg.minStanceSec}`,
     wrongLeg: 'the camera saw the other foot up — you stood on the other leg',
-    lowRate: 'the phone read you too few times a second to follow this one',
-    feetTurned: 'one foot was turned in or out more than the other, which moves the heel point from behind',
+    lowRate: 'the phone could not keep up with your movement',
+    feetTurned: 'one foot was turned more than the other, which hides the heel from behind',
     cameraMoved: 'the phone turned during the count',
     faceFeetUnseen: 'your face or your feet were outside the shot, so the camera could not tell which way you were facing',
   };
@@ -897,24 +898,33 @@ export function formatGradeValue(g: Pick<StationGrade, 'checkId' | 'value' | 'by
   // a side is named only when the number shown is not zero ("0.00 …, left higher" read as a finding: the P3 live card)
   const shown = (v: number, dp: number) => Number(fmt(Math.abs(v), dp)) !== 0;
   const inOut = (v: number) => (shown(v, D.ratio) ? `${fmt(Math.abs(v), D.ratio)} ${v > 0 ? 'in' : 'out'}` : fmt(0, D.ratio));
+  // CUE-REWRITE (2026-10-27): every number with its meaning in plain words — a share of a body width people can picture,
+  // degrees for a tilt, seconds for a hold — never "hip half-widths" or "torso lengths a second". Same values, same
+  // thresholds; the before/after is in docs/CUE-AUDIT.md.
+  const pct = (v: number, scale: number = D.percent) => `${Math.round(Math.abs(v) * scale)}%`;
   switch (g.checkId) {
     case 'shoulderLevel':
     case 'hipLevel':
-      return shown(g.value, D.ratio)
-        ? `${fmt(Math.abs(g.value), D.ratio)} of a shoulder width, ${g.value > 0 ? 'left' : 'right'} higher · estimated`
-        : `${fmt(0, D.ratio)} of a shoulder width apart in height · estimated`;
-    case 'kneeWindow':
-      return `knee against its hip–ankle line, in hip half-widths: L ${inOut(g.bySide?.left ?? g.value)} · R ${inOut(g.bySide?.right ?? g.value)} · estimated`;
+      return Math.round(Math.abs(g.value) * D.percent) > 0
+        ? `${g.value > 0 ? 'left' : 'right'} side higher by about ${pct(g.value)} of your shoulder width · estimated`
+        : 'level · estimated';
+    case 'kneeWindow': {
+      const knee = (v: number) => (Math.round(Math.abs(v) * D.halfWidthPercent) > 0 ? `about ${pct(v, D.halfWidthPercent)} of your hip width ${v > 0 ? 'inside' : 'outside'} the line` : 'on the line');
+      return `left knee ${knee(g.bySide?.left ?? g.value)}, right knee ${knee(g.bySide?.right ?? g.value)} · estimated`;
+    }
     case 'headFloat':
-      return `ear ${fmt(Math.abs(g.value), D.ratio)} torso lengths ${g.value >= 0 ? 'ahead of' : 'behind'} the shoulder · estimated`;
-    case 'heelLine':
-      return `heel lines L ${fmt(g.bySide?.left ?? g.value, D.deg)}° · R ${fmt(g.bySide?.right ?? g.value, D.deg)}° from vertical (+ = heel outside the ankle) · estimated`;
+      return `ear ${g.value >= 0 ? 'in front of' : 'behind'} the shoulder by about ${pct(g.value)} of your upper-body length · estimated`;
+    case 'heelLine': {
+      const heel = (v: number) => `${fmt(Math.abs(v), D.deg)}°${Number(fmt(v, D.deg)) === 0 ? '' : v > 0 ? ' outward' : ' inward'}`;
+      return `left heel tilts ${heel(g.bySide?.left ?? g.value)}, right heel ${heel(g.bySide?.right ?? g.value)} · estimated`;
+    }
     case 'singleLeg':
-      return `sway ${fmt(g.value, D.pxNorm)} torso lengths a second, ${g.touchDowns ?? 0} touch-down${g.touchDowns === 1 ? '' : 's'}, ${fmt(g.stanceSec ?? 0, D.sec)} s on one leg · estimated`;
+      return `${fmt(g.stanceSec ?? 0, D.sec)} s on one leg, free foot down ${g.touchDowns ?? 0} time${g.touchDowns === 1 ? '' : 's'}, `
+        + `${g.value >= STATION_THRESHOLDS.singleLeg.swayFlagAt ? 'a lot of sway' : 'little sway'} · estimated`;
   }
 }
 
-const FLAG_TAIL = 'Flagged for a closer look.';
+const FLAG_TAIL = 'Worth working on.';
 
 /**
  * THE DECISION, shared by the client (after measuring) and the server (regradeFromSummary): the thresholds are applied
@@ -952,12 +962,12 @@ export function decideGrade(m: Measured): StationGrade {
     // and reads the whole station 'tooNoisy' (m.reason, above) when the foot-height signal's jitter could cross the
     // hysteresis band — so a count that reaches here was made by a foot, not by the tracker.
     if ((m.touchDowns ?? 0) >= T1.touchDownsFlagAt) {
-      return out('flag', `${leg}the free foot came down ${m.touchDowns} time${m.touchDowns === 1 ? '' : 's'} (${said}). ${FLAG_TAIL}`);
+      return out('flag', `${leg}your free foot came down ${m.touchDowns} time${m.touchDowns === 1 ? '' : 's'} (${said}). ${FLAG_TAIL}`);
     }
     if (m.uncertainty === null || !Number.isFinite(m.uncertainty) || m.uncertainty * T1.jitterMargin >= T1.swayFlagAt) return unreadable('tooNoisy');
     if ((m.stanceSec ?? 0) < T1.minStanceSec) return unreadable('tooShort');
-    if (m.value >= T1.swayFlagAt) return out('flag', `${leg}the hips swayed clearly while you held it (${said}). ${FLAG_TAIL}`);
-    return out('pass', `${leg}held steady (${said}).`);
+    if (m.value >= T1.swayFlagAt) return out('flag', `${leg}your hips swayed a lot while you held it (${said}). ${FLAG_TAIL}`);
+    return out('pass', `${leg}you held steady (${said}).`);
   }
 
   const t = STATION_THRESHOLDS[m.checkId] as T['shoulderLevel'] | T['kneeWindow'] | T['headFloat'] | T['heelLine'];
@@ -976,10 +986,10 @@ export function decideGrade(m: Measured): StationGrade {
       const what = m.checkId === 'shoulderLevel' ? 'shoulder' : 'hip';
       if (over(Math.abs(m.value), t.flagAt)) {
         const side = m.value > 0 ? 'left' : 'right';
-        return out('flag', `Your ${side} ${what} read higher (${said}). ${FLAG_TAIL}`, { side });
+        return out('flag', `Your ${side} ${what} sat higher (${said}). ${FLAG_TAIL}`, { side });
       }
       if (atLine(Math.abs(m.value), t.flagAt)) return unreadable('tooNoisy');
-      return out('pass', `${what === 'shoulder' ? 'Shoulders' : 'Hips'} read level (${said}).`);
+      return out('pass', `${what === 'shoulder' ? 'Shoulders' : 'Hips'} level (${said}).`);
     }
     case 'kneeWindow': {
       const b = m.bySide;
@@ -987,16 +997,16 @@ export function decideGrade(m: Measured): StationGrade {
       const flagged = (['left', 'right'] as const).filter((s) => over(b[s], t.flagAt));
       if (flagged.length) {
         const which = flagged.length === 1 ? `Your ${flagged[0]} knee` : 'Both knees';
-        return out('flag', `${which} read inside the line from hip to ankle (${said}). ${FLAG_TAIL}`,
+        return out('flag', `${which} sat inside the line from hip to ankle (${said}). ${FLAG_TAIL}`,
           flagged.length === 1 ? { side: flagged[0] } : {});
       }
       if (atLine(b.left, t.flagAt) || atLine(b.right, t.flagAt)) return unreadable('tooNoisy');
-      return out('pass', `Knees read over the line from hip to ankle (${said}).`);
+      return out('pass', `Knees over the line from hip to ankle (${said}).`);
     }
     case 'headFloat':
-      if (over(m.value, t.flagAt)) return out('flag', `Your ear read well ahead of your shoulder (${said}). ${FLAG_TAIL}`);
+      if (over(m.value, t.flagAt)) return out('flag', `Your ear sat well in front of your shoulder (${said}). ${FLAG_TAIL}`);
       if (atLine(m.value, t.flagAt)) return unreadable('tooNoisy');
-      return out('pass', `Ear read over the shoulder (${said}).`);
+      return out('pass', `Ear over the shoulder (${said}).`);
     case 'heelLine': {
       const b = m.bySide;
       if (!b) return unreadable('tooFewFrames');
@@ -1006,9 +1016,9 @@ export function decideGrade(m: Measured): StationGrade {
       // left-minus-right difference carries both sides' uncertainty (√2 of one).
       const diff = Math.abs(b.left - b.right), diffBand = band * Math.SQRT2;
       if (over(b[worse], th.flagAt) && diff - th.asymmetryAt >= diffBand) {
-        return out('flag', `Your ${worse} heel line read tilted and the other did not (${said}). ${FLAG_TAIL}`, { side: worse });
+        return out('flag', `Your ${worse} heel tilted and the other did not (${said}). ${FLAG_TAIL}`, { side: worse });
       }
-      if (b[worse] - th.flagAt <= -band || diff - th.asymmetryAt <= -diffBand) return out('pass', `Heel lines read alike (${said}).`);
+      if (b[worse] - th.flagAt <= -band || diff - th.asymmetryAt <= -diffBand) return out('pass', `Heels alike (${said}).`);
       return unreadable('tooNoisy');
     }
   }

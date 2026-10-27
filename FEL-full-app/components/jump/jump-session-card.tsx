@@ -43,6 +43,11 @@ export const BLOCK_WORDS: Record<VerifyBlock, string> = {
   manual: 'its take-off and landing frames were picked by hand',
 };
 
+/** CUE-REWRITE: the card's one next step. */
+export const JUMP_NEXT_VERIFIED = 'Next: keep this in your history, and test again on a rested day to compare.';
+export const JUMP_NEXT_TIP = 'Next: try the tip above on your next jump.';
+export const JUMP_NEXT_UNVERIFIED = 'Next: film again with your whole body in the shot and good light.';
+
 export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5: T5Extra | null; trustLevel?: TrustLevelHook | null; source?: 'live' | 'slowmo' }) {
   if (!t5 || trustLevel === 'low') return null;
   const valid = t5.jumps.filter((j) => j.valid);
@@ -75,7 +80,7 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
       </ul>
       {s && s.n >= 2 && s.meanCm !== null && s.sdCm !== null ? (
         <p data-jump-mean className="mt-3 text-[16px] text-white/80">
-          Average {inch(s.meanCm)} ± {pmIn(s.sdCm)} in{s.cvPct !== null ? ` · ${s.cvPct.toFixed(1)}% spread` : ''}
+          Average {inch(s.meanCm)} ± {pmIn(s.sdCm)} in{s.cvPct !== null ? ` · your jumps were within about ${s.cvPct.toFixed(1)}% of each other` : ''}
         </p>
       ) : null}
       {s?.realChangeCm ? (
@@ -85,8 +90,8 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
       ) : null}
       {t5.rebounds?.bestRsi != null ? (
         <p data-jump-rebound className="mt-1 text-[16px] text-white/80">
-          Rebound: {(t5.rebounds.bestContactMs! / 1000).toFixed(2)} s on the ground, RSI {t5.rebounds.bestRsi.toFixed(2)}
-          {t5.rebounds.best5Rsi !== null ? ` · best-5 RSI ${t5.rebounds.best5Rsi.toFixed(2)}` : ''}{source === 'live' && t5.poseFps < 120 ? ' (estimate)' : ''}
+          Rebound: {(t5.rebounds.bestContactMs! / 1000).toFixed(2)} s on the ground, bounce score (RSI: time in the air ÷ time on the ground) {t5.rebounds.bestRsi.toFixed(2)}
+          {t5.rebounds.best5Rsi !== null ? ` · best 5: ${t5.rebounds.best5Rsi.toFixed(2)}` : ''}{source === 'live' && t5.poseFps < 120 ? ' (estimate)' : ''}
         </p>
       ) : null}
       <p data-jump-verified={v.verified || !!vc?.verified} className="mt-3 flex items-start gap-1.5 text-[16px] font-bold" style={{ color: v.verified || vc?.verified ? '#00FF9D' : 'rgba(255,255,255,0.7)' }}>
@@ -94,6 +99,10 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
         <span>{v.verified ? 'Verified jump' : vc?.verified && clean ? `Verified best: ${inch(clean.heightCm)} in (jump ${clean.index})` : `Not verified: ${BLOCK_WORDS[v.blocks[0]]}`}</span>
       </p>
       {tip ? <p data-jump-tip className="mt-2 text-[16px] leading-snug text-white/80">{tip}</p> : null}
+      {/* CUE-REWRITE (2026-10-27): every result ends with one next step (docs/CUE-STYLE.md) */}
+      <p data-jump-next className="mt-2 text-[16px] leading-snug text-white/80">
+        {v.verified || vc?.verified ? JUMP_NEXT_VERIFIED : tip ? JUMP_NEXT_TIP : JUMP_NEXT_UNVERIFIED}
+      </p>
     </section>
   );
 }

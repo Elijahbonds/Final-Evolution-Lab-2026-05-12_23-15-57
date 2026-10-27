@@ -11,12 +11,12 @@ export interface Rejection {
 
 const SAY: Record<RejectReason, string> = {
   outOfFrame: 'You stepped out of the shot.',
-  tooFast: 'That was too fast — slow down a little.',
+  tooFast: 'Too fast. Slow down a little.',
   lowConfidence: 'The camera lost you for a moment.',
   heelUp: 'Keep your heel flat on the floor.',
   handsOff: 'Keep your hands on your hips.',
   noLanding: 'The camera never saw you land.',
-  tooHigh: 'The jump read too high — the camera lost your feet.',
+  tooHigh: 'The camera lost your feet on that jump. Once more.',
   shallow: 'Go a little deeper on the next one.',
   other: 'That one did not count.',
 };

@@ -44,7 +44,7 @@ export const PROTOCOL: readonly ProtocolTest[] = [
     setup: `Feet about shoulder-width, arms straight overhead. Squat as deep as you can, ${countWord(th('t1.reps'))} times, at your own pace.`,
   },
   {
-    id: 'T2', name: 'Ankle dorsiflexion (knee to wall)', short: 'Ankle range', view: 'side', sided: true, reps: th('t2.reps'),
+    id: 'T2', name: 'Ankle bend (knee to wall)', short: 'Ankle bend', view: 'side', sided: true, reps: th('t2.reps'),
     modes: ['quick', 'full'], notBuilt: false, specSection: '§4 T2',
     setup: `Step one foot forward, heel flat. Drive that knee forward as far as it goes with the heel down, then back. ${cap(countWord(th('t2.reps')))} times.`,
   },
@@ -56,10 +56,10 @@ export const PROTOCOL: readonly ProtocolTest[] = [
   {
     id: 'T4', name: 'Hip hinge', short: 'Hip hinge', view: 'side', sided: false, reps: 5,
     modes: ['full'], notBuilt: true, specSection: '§4 T4',
-    setup: 'Hinge at the hips, soft knees, five times.',
+    setup: 'Push your hips back, knees soft, back flat. Five times.',
   },
   {
-    id: 'T5', name: 'Countermovement jump', short: 'Jump', view: 'front', sided: false, reps: th('t5.reps'),
+    id: 'T5', name: 'Jump (hands on hips)', short: 'Jump', view: 'front', sided: false, reps: th('t5.reps'),
     modes: ['quick', 'full'], notBuilt: false, specSection: '§4 T5',
     // OWNER DEFAULT Q3: hands on hips, the standard; the arm-swing variant is not built
     setup: `Hands on your hips the whole time. Dip and jump as high as you can, land, and stand still. ${cap(countWord(th('t5.reps')))} jumps.`,
