@@ -30,6 +30,7 @@ vi.mock('@/lib/move/bodyPlay', () => ({ bodyPlay: { confirmGrownUp: async () => 
 import { TodayDrillRun } from '@/app/train/today-drill/_components/today-drill-run';
 import { DrillResultView, DrillRunning, HurtPanel } from '@/app/train/today-drill/_components/today-drill-live';
 import { DrillLive } from '@/app/play/drills/_components/drill-live';
+import { DrillDemo } from '@/app/play/drills/_components/drill-demo';
 import { drive, findAll, textOf } from '@/tests/helpers/driveRender';
 import { LIVE_IDLE, type LiveDrillView } from '@/lib/drills/liveDrill';
 import { DrillRunner, type DrillResult } from '@/lib/drills/DrillRunner';
@@ -68,17 +69,18 @@ describe('before: purpose first, then what to do', () => {
       expect((out.match(/data-daily-start=/g) ?? []).length).toBe(1);
       expect(out).toMatch(/data-daily-start-bar[^>]*|class="fixed[^"]*"[^>]*data-daily-start-bar/);
       expect(out).toContain('bottom-[calc(4rem+env(safe-area-inset-bottom))]');   // above the phone's tab bar
-      expect(out).not.toContain('data-drill-demo-watch');                          // no "watch" tap: it plays by itself
+      expect(out).not.toContain('Watch the 3D demo');                              // no "watch" tap: it plays by itself
     }
     expect(intro(viewFrom('u1', hooper(), OPEN, NOW))).not.toContain('New to the daily drill?');
   });
 
-  it('the demo is the shared library stage with the drill\'s loop (never the old one-clip avatar canvas)', () => {
-    const out = intro(viewFrom('u1', { ...jumper(), recentDrills: 0 }, OPEN, NOW));
-    expect(out).toContain('data-daily-demo="ex_pogo"');
-    expect(out).not.toContain('data-drill-demo-watch');
-    // the Wake-Up has no single loop: the cue card, never a wrong movement
-    expect(intro(viewFrom('u1', newAdult(), OPEN, NOW))).toContain('data-daily-demo="cues"');
+  it('the demo is the shared DrillDemo (#462: the library stage, autoplay), for the day\'s drill', () => {
+    const v = viewFrom('u1', { ...jumper(), recentDrills: 0 }, OPEN, NOW);
+    const { tree } = drive(() => TodayDrillRun({ view: v, dobYear: 1994 }) as ReactElement);
+    const demos = findAll(tree, (el) => el.type === DrillDemo);
+    expect(demos).toHaveLength(1);
+    expect(demos[0].props.drill.id).toBe('pogo-bilateral');
+    expect(demos[0].props.initiallyOpen).toBeUndefined();   // it opens itself on scroll into view: no tap
   });
 
   it('Start opens the camera screen with today\'s own running and result screens', () => {

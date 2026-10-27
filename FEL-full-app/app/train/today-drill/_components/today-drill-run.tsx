@@ -27,7 +27,8 @@ import {
 import type { DailyDrillView } from '@/lib/daily-drill/load';
 import type { DrillResult } from '@/lib/drills/DrillRunner';
 import { DrillLive } from '@/app/play/drills/_components/drill-live';
-import { DrillDemoLoop } from './drill-demo-loop';
+import { DrillDemo } from '@/app/play/drills/_components/drill-demo';
+import { drillById } from '@/lib/drills/drills';
 import { DrillResultView, DrillRunning, HurtPanel, type Claim } from './today-drill-live';
 
 /** POST the claim; the server's answer, or null when it failed. Exported for the tests. */
@@ -55,6 +56,7 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   const plan = view.plan!;
   const drill = useMemo(() => composeDailyDrill(plan), [plan]);
   const guide = guideFor(plan.drillId);
+  const main = drillById(plan.drillId);
   const steps = useMemo(() => stepsFor(plan.drillId, plan.phases), [plan]);
   const [stage, setStage] = useState<'intro' | 'live' | 'hurt'>('intro');
   const hurt = useRef(false);
@@ -102,7 +104,9 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   );
   const how = (
     <div className="space-y-5">
-      <Section title={DEMO_TITLE} id="demo"><DrillDemoLoop clip={guide.demoClip} cues={guide.cues} noneLine={guide.demoNone} /></Section>
+      {/* the shared drill demo (lane/library-anatomy-2, #462): the library stage, the drill's own loop or the still start
+          position, opening by itself as it scrolls into view — no "watch" tap, never a T-pose */}
+      {main && <Section title={DEMO_TITLE} id="demo"><DrillDemo drill={main} /></Section>}
       <Section title={STEPS_TITLE} id="steps">
         <ol className="space-y-2" data-daily-steps={steps.length}>
           {steps.map((s, i) => (

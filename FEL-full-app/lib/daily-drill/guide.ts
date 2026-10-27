@@ -36,12 +36,6 @@ export interface DrillGuide {
   unit: string;
   /** Jumps or lands: nothing overhead, shoes with grip. */
   jumps: boolean;
-  /** The shared library stage's loop for this movement (components/library/exercise-stage.tsx). The same choice as
-   *  lane/library-anatomy-2's lib/library/surfaceDemo.ts DRILL_DEMO_LOOPS (a loop only where one IS the movement).
-   *  null: no loop shows it faithfully, so the page shows the cue card with `demoNone`, never another movement. */
-  demoClip: string | null;
-  /** The cue card's line when there is no loop. */
-  demoNone?: string;
   /** Plain words for each phase of the drill (and of the warm-up), by phase id. */
   phases: Record<string, PhaseWords>;
 }
@@ -66,7 +60,6 @@ export const GUIDES: Record<GuideDrillId, DrillGuide> = {
     cues: ['Stay on the balls of your feet.', 'Keep your knees almost straight.', 'Quick and quiet, like the floor is hot.'],
     unit: 'hops',
     jumps: true,
-    demoClip: 'ex_pogo',
     phases: {
       ...WARMUP_WORDS,
       'set-1': { name: 'Hops: set 1', cue: 'Quick, quiet hops. Light feet.' },
@@ -83,10 +76,6 @@ export const GUIDES: Record<GuideDrillId, DrillGuide> = {
     cues: ['Sit your hips back, like reaching for a chair.', 'Knees point the same way as your toes.', 'Heels stay down the whole time.'],
     unit: 'squats',
     jumps: false,
-    // the library's squat loop goes all the way down; this drill is the quarter dip before a jump, held (surfaceDemo.ts
-    // makes the same call): the cues, not a wrong depth
-    demoClip: null,
-    demoNone: 'No 3D loop shows this exact dip yet. Follow the cues.',
     phases: {
       ...WARMUP_WORDS,
       geometry: { name: 'Slow squats', cue: 'Sink slowly. Hold for 3. Rise slowly. No jump.' },
@@ -99,7 +88,6 @@ export const GUIDES: Record<GuideDrillId, DrillGuide> = {
     cues: ['Land on both feet at the same time.', 'Bend your knees and hips to soak it up.', 'Freeze and count to 3.'],
     unit: 'landings',
     jumps: true,
-    demoClip: 'ex_jump',
     phases: {
       ...WARMUP_WORDS,
       landings: { name: 'Soft landings', cue: 'Small hop. Land on both feet, soft, and freeze for 3.' },
@@ -112,9 +100,6 @@ export const GUIDES: Record<GuideDrillId, DrillGuide> = {
     cues: ['Move slowly and smoothly.', 'Breathe out as you move.', 'Go only as far as feels easy.'],
     unit: 'moves',
     jumps: false,
-    // no one loop shows six different phases faithfully: the page shows the cues instead of a wrong movement
-    demoClip: null,
-    demoNone: 'This one changes every minute, so follow the screen. It shows each move as you go.',
     phases: { ...WARMUP_WORDS },
   },
 };
@@ -148,8 +133,6 @@ export const NEEDS_TITLE = 'Before you start';
 export const DEMO_TITLE = 'Watch it first';
 export const START_LABEL = 'Start';
 export const START_AGAIN_LABEL = 'Do it again';
-export const DEMO_STILL_LINE = 'The 3D demo is off on this device. Follow the steps and cues.';
-export const DEMO_NONE_LINE = 'No 3D loop for this one yet. Follow the cues.';
 
 /** What you need: space, shoes, the phone. Distances match body play's own setup hint (SETUP_HINT, 3.5 to 4.5 m). */
 export function needsLines(jumps: boolean): { id: string; text: string }[] {
@@ -337,12 +320,12 @@ export function tomorrowLine(today: Focus, tomorrow: Focus, tomorrowDrillId: str
 /** Every fixed line this file can show (the reading-level and word tests read this list). */
 export function allFixedLines(): string[] {
   const out = [
-    FIRST_TIME_TITLE, ...FIRST_TIME_LINES, STEPS_TITLE, CUES_TITLE, NEEDS_TITLE, DEMO_TITLE, DEMO_STILL_LINE, DEMO_NONE_LINE,
+    FIRST_TIME_TITLE, ...FIRST_TIME_LINES, STEPS_TITLE, CUES_TITLE, NEEDS_TITLE, DEMO_TITLE,
     HURT_TITLE, HURT_LINE, HURT_SKIP_LINE, REST_WORDS.cue,
     ...needsLines(true).map((x) => x.text), ...needsLines(false).map((x) => x.text),
   ];
   for (const g of Object.values(GUIDES)) {
-    out.push(g.improves, ...g.cues, ...(g.demoNone ? [g.demoNone] : []));
+    out.push(g.improves, ...g.cues);
     for (const w of Object.values(g.phases)) out.push(w.cue);
   }
   for (const m of Object.values(MEANS)) out.push(...m);

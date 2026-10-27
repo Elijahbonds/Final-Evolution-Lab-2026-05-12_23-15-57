@@ -143,7 +143,7 @@ they are doing it, **what** to do, and **how they did**. The pick, the gates, th
 | First-timer | Nothing | A two-line explainer of what the daily drill is, on the card and the page |
 | Everyone | Start under eight phase cards, so the hop drill needed a scroll | Owner, 2026-10-27: "It should play automatically, don't make the platform confusing or hard to use." Nothing is folded away (the demo, the numbered steps, the 2–3 key cues and the setup are always shown, and the demo plays by itself). The next action is one big **Start**, fixed at the bottom above the phone's tab bar, so it is never scrolled to |
 | Steps | One card per chart phase, in the book's words ("Pressurize the System · 1 min", "Set 1 · 0.3 min") | 3–4 short numbered steps read from the chart the day runs ("Warm up for 4 minutes: …", "3 sets of 20 hops.", "Rest 1 minute between sets.") |
-| Demo | "Watch the 3D demo", which opened the drills page's `DrillDemo`: the one-clip `exercise-avatar-canvas` stand-in, where the owner saw the T-pose | The shared library stage (`components/library/exercise-stage.tsx`) looping the drill's own `ex_*` clip (`ex_pogo` for hops, `ex_jump` for landings: the same choice as lane/library-anatomy-2's `surfaceDemo.ts`). It loads once the box is near the screen. The slow squat check (a quarter dip, which the full-squat loop does not show) and the Wake-Up (six different phases) show a cue card, never a wrong movement |
+| Demo | "Watch the 3D demo", which opened the drills page's `DrillDemo` with the one-clip `exercise-avatar-canvas` stand-in, where the owner saw the T-pose (on this rig the head was off the canvas: `shots/before/demo-jump-*.png`) | The shared `DrillDemo`, as fixed by lane/library-anatomy-2 (#462, merged into this lane). It is the library stage, with the drill's own loop (`ex_pogo` for hops, `ex_jump` for landings) or, with no loop, the still start position labelled "Demo coming". It opens by itself when it scrolls into view, with no tap. This lane builds no demo of its own |
 | Setup | Only inside body play's space check | Phone on its side about chest high, 3.5 to 4.5 m (body play's own `SETUP_HINT`, pinned by a test), 2 m of floor, nothing overhead for jumps, shoes, and "the camera checks your framing before the clock starts" |
 | During | Phase name, time left, the cue lane, the book's line, the Coach's caption, and "End the drill" | "Step 4 of 8" with a progress bar and time left. A big step name ("Hops: set 1") and a rep counter ("7 of 20", the chart's own beat). ONE cue (the Coach's caption, else the step's plain cue, else the book's timed line where a phase changes sides). "Next: Rest". A big Rest panel with its countdown. **Pause**, **Stop** and **This hurts: stop** are fixed at the bottom |
 | Pause | Only by hiding the tab | A Pause button. It is the hidden-tab pause exactly (`liveDrill.pause()`): the camera goes off, the clock stops where it was, and the camera never restarts by itself. Camera back, the space check, then RESUME |
@@ -160,7 +160,7 @@ nothing. A failed or missing count is treated as a returning player. assumption:
 ## Files
 
 New: `lib/daily-drill/guide.ts` (+ test), `app/train/today-drill/_components/today-drill-live.tsx` (running, result, hurt),
-`app/train/today-drill/_components/drill-demo-loop.tsx` (mounts the shared stage), `tests/daily-drill/today-drill-flow.test.tsx`,
+`tests/daily-drill/today-drill-flow.test.tsx`,
 `tests/helpers/readingLevel.ts` (Flesch–Kincaid estimate, test-only).
 
 Shared files, additive only (flagged):
@@ -236,11 +236,7 @@ on origin when this lane ran. When it lands, `guide.ts` is the one file to re-re
    not a gate.
 3. **The shooting → landings link:** "Steady landings are the base of a good jump shot." It is the existing mapping's
    reasoning (`plan.ts`), now said out loud.
-4. **The demo:** the T-pose was the drills page's old `DrillDemo` (`exercise-avatar-canvas`, one unrelated clip; on this
-   rig the head was off the canvas, `shots/before/demo-jump-*.png`). This page mounts the shared library stage instead.
-   lane/library-anatomy-2 (pushed, not yet merged) adds `components/library/avatar-demo.tsx` with a bind-pose guard and
-   the "Demo coming" still. Once it lands, `drill-demo-loop.tsx` should become `<AvatarDemo clip={drillDemoLoop(id)} />`,
-   a one-line swap. It is not done here, because that file is not on this lane's base. The slow squat check and the
-   Wake-Up show the cue card.
+4. **The demo:** the page uses the shared `DrillDemo` (#462). The slow squat check and the Wake-Up have no loop yet, so
+   they show the still "Demo coming". The page's cues and steps carry them.
 5. **assumption:** "the 10/day cap" in the brief could not be found as a rule in this code (searched `lib/`, `app/`,
    `docs/`). This lane changes no cap, gate, youth rule, claim or economy number, so whatever it names is untouched.
