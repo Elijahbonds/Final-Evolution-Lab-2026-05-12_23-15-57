@@ -167,7 +167,6 @@ import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP
 import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/hoops-round2 HOP-03: the switch on a screen and the double team
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
 import { mountContactPoses } from '../hoops/contactPoses';   // lane/hoops-round2 HOP-04: forearm on hip, arm bar, chest in (drawn only)
-import { warmFirstFrame } from '../hoops/firstFrame';   // lane/hoops-round2 HOP-06
 import { SoundKit } from '../audio/SoundKit';
 import { EffectsKit, applyTrail, type TrailLevel, type AmbientHandle } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
@@ -1173,7 +1172,6 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         // IMPROVE (2026-10-06) #7: no ~380-character control string here any more — the hint is one line for the state you are in
         // (tickHint); the full lists are on the pause screen (threevthreeRules CONTROLS_*, the CONTROLS panel's OFFENSE / DEFENSE groups)
       });
-      warmFirstFrame(ctx.scene, '3V3');   // lane/hoops-round2 HOP-06: the crane's first look at the venue, prepared at load (hoops/firstFrame)
     },
 
     onInput(ctx: ModeContext, e: FelInput) {
