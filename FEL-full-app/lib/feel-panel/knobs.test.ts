@@ -44,7 +44,7 @@ import { CHEST_LEAN_DEG } from '@/lib/babylon/hoops/contactPoses';
 import * as P2B from '@/lib/babylon/hoops/blocks';   // hoops-p02
 import * as P2C from '@/lib/babylon/hoops/contest';   // hoops-p02
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
-import { ONBALL_CUSHION_M } from '@/lib/babylon/hoops/pressure';   // hoops-p02
+import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -199,6 +199,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.stripShieldM')).toBe(STRIP_SHIELD_M);
     expect(def('hoops.stripBallMaxY')).toBe(STRIP_BALL_MAX_Y);
     expect(def('hoops.onBallCushionM')).toBe(ONBALL_CUSHION_M);
+    expect(def('hoops.onBallCushionPerMps')).toBe(ONBALL_CUSHION_PER_MPS);
     expect(def('hoops.bodySepOn')).toBe(BODY_SEP_ON ? 1 : 0);
     expect(def('hoops.capsuleRadius1v1M')).toBe(ONEVONE_CAPSULE_RADIUS);
     expect(def('hoops.bodyHardGapM')).toBe(BODY_HARD_GAP);

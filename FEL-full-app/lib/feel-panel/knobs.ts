@@ -603,6 +603,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/pressure.ts ONBALL_CUSHION_M',
     hint: 'The on-ball defender\'s cushion on a dribbler is capped at this. 0 = today\'s contain lever, uncapped.',
   },
+  {
+    id: 'hoops.onBallCushionPerMps', label: 'On-ball: more room per m/s of the handler', def: 0.3, min: 0, max: 0.8, step: 0.01, unit: 's', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pressure.ts ONBALL_CUSHION_PER_MPS',
+    hint: 'The cushion grows by this × his speed: a sprint at the defender gets room to give ground in, a probing dribble gets pressure.',
+  },
   // ── lane/hoops-def-tell (#273 T-C): two bodies never stand inside each other, and never pop apart (core/BodySeparation) ──
   {
     id: 'hoops.bodySepOn', label: 'Body separation on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',

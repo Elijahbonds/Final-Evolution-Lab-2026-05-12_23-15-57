@@ -937,7 +937,7 @@ export class DefenderBrain implements AIBehavior {
     if (onBall && !beaten && !press && handlerSpeed < 0.9) {
       const armLever = DefenderBrain.ARMS_LENGTH / Math.max(0.5, Vector3.Distance(anchor, hoop));
       if (lever > armLever) denyPoint = Vector3.Lerp(anchor, hoop, armLever);
-    } else if (onBall && !beaten && !press) denyPoint = Vector3.Lerp(anchor, hoop, cushionLever(lever, distXZ(anchor, hoop)));   // hoops-p02: on a MOVING handler, at most a cushion off him (hoops/pressure)
+    } else if (onBall && !beaten && !press) denyPoint = Vector3.Lerp(anchor, hoop, cushionLever(lever, distXZ(anchor, hoop), handlerSpeed));   // hoops-p02: on a MOVING handler, at most a cushion off him (hoops/pressure)
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
 

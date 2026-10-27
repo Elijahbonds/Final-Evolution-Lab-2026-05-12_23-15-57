@@ -337,7 +337,8 @@ felt none of these yet — every default is flagged in the lane report):
 - Group "Hoops · defense" (`hoops/steals.ts`, `hoops/pressure.ts`), **TUNED (new behaviour)**: `hoops.stealDiceOn` 0 (1 = today's strip
   rolls: 0.22 a reach, 0.6 on the bump, 0.18 a bump strip); `hoops.stripReachM` 0.95 m, `hoops.stripShieldM` 0.25 m,
   `hoops.stripBallMaxY` 0.85 m (the strip lands when his hand can get to the ball: in reach, not behind the handler's body, off the
-  palm); `hoops.onBallCushionM` 1.35 m (the on-ball man's most room on a moving handler; 0 = today's contain lever, uncapped).
+  palm); `hoops.onBallCushionM` 1.35 m and `hoops.onBallCushionPerMps` 0.3 s (the on-ball man's most room on a moving handler: 1.35 m + 0.3 s ×
+  his speed — about today's room against a 6 m/s sprint, pressure on a probing dribble; 0 = today's contain lever, uncapped).
 
 **assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the rig and the headless sim (lane report),
 not owner numbers. A ranked, staked or head-to-head run reads every default above.
