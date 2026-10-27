@@ -65,7 +65,7 @@ export const HINGE_CUE_TABLE = cueTableFor(HINGE_CUES, HINGE_FAULTS);
 /** Before Start: how to set the phone up, and the safety line. Said on the tab, not spoken. */
 export const HINGE_FRAMING = [
   'Stand side-on to the phone, 2 to 3 m away, phone at hip height.',
-  'Hip hinge: push your hips back, back flat. Bodyweight only. If anything hurts, stop.',
+  'Hip hinge: push your hips back, back flat. Bodyweight only. If anything hurts, stop and tell your coach.',
 ] as const;
 
 /** During setup: what to do before the first rep counts. */

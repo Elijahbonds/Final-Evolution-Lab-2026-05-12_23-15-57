@@ -209,3 +209,24 @@ export function resultCorpus(): ResultEntry[] {
   add('quick-screen', 'card:jump', 'app/play/mirror/assess/_components/results-view.tsx', result('Your best jump: about 17 in.', JUMP_BEST_MEANS, JUMP_BEST_NEXT));
   return out;
 }
+
+/**
+ * The exercise library's words (data/library/**, read through lib/library/files.ts): every unique cue (card), fault (label),
+ * fix (card), set-up (setup) and caution (card). Unique strings, each once: ~3,500 lines across 5,020 entries.
+ */
+export function libraryCorpus(entries: readonly { setup: string; cues: string[]; faults: { fault: string; fix: string }[]; cautions: string[] }[]): StyleEntry[] {
+  const seen = new Set<string>();
+  const out: StyleEntry[] = [];
+  const add = (kind: string, text: string, tier: CueTier) => {
+    if (!text || seen.has(`${kind}|${text}`)) return;
+    seen.add(`${kind}|${text}`);
+    out.push({ id: `library:${kind}:${out.length}`, text, tier, surface: 'library', file: 'data/library' });
+  };
+  for (const e of entries) {
+    add('setup', e.setup, 'setup');
+    for (const c of e.cues) add('cue', c, 'card');
+    for (const f of e.faults) { add('fault', f.fault, 'label'); add('fix', f.fix, 'card'); }
+    for (const c of e.cautions) add('caution', c, 'card');
+  }
+  return out;
+}

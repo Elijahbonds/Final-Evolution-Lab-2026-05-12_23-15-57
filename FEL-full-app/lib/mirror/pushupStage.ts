@@ -74,7 +74,7 @@ export const PUSHUP_CUE_TABLE = cueTableFor(PUSHUP_CUES, PUSHUP_FAULTS);
 /** Before Start: how to set the phone up. Said on the tab, not spoken. */
 export const PUSHUP_FRAMING = [
   'Phone on the floor, side-on, about 2 m away, so it sees you head to heels.',
-  'Push-ups from your knees count too. If anything hurts, stop.',
+  'Push-ups from your knees count too. If anything hurts, stop and tell your coach.',
 ] as const;
 
 /** During setup: what to do before the first rep counts. */
