@@ -75,7 +75,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
+import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, Video } from 'lucide-react';
 import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 // COACH-VIDEO-REVIEW (2026-10-24): film a set of a readable exercise; the camera counts and flags (components/coach/form-review)
@@ -386,7 +386,6 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
   lastTime?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
-  const [demo, setDemo] = useState(false);
   // MIRROR-COACH P7 FIX: a timer on this card was started this visit (the set is under way), and the Dial-Up is running
   const [timerUsed, setTimerUsed] = useState(false);
   const [rampBusy, setRampBusy] = useState(false);
@@ -447,16 +446,12 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
       {c.easier && <div className="text-xs text-white/60" data-easier>{easierLine(c.easier.name)}</div>}
       {c.demo && (
         <div data-demo={c.demo.kind}>
+          {/* COACH-DELIVERY COA-09: never an embed. A YouTube demo is a labelled outbound link; FEL's own video autoplays
+              (muted, looped, inline: the premium rule — no tap to start) */}
           {c.demo.kind === 'link' ? (
-            <a href={c.demo.href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-xs text-fel-cyan"><ExternalLink className="h-3.5 w-3.5" /> Watch the demo</a>
-          ) : !demo ? (
-            <button type="button" onClick={() => setDemo(true)} className="inline-flex items-center gap-1 text-xs text-fel-cyan"><PlayCircle className="h-3.5 w-3.5" /> Watch the demo</button>
-          ) : c.demo.kind === 'youtube' ? (
-            <div className="aspect-video w-full overflow-hidden rounded-lg border border-white/10 bg-black">
-              <iframe src={c.demo.src} title={`${e.name} demo`} className="h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
-            </div>
+            <a href={c.demo.href} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-1 text-xs text-fel-cyan"><ExternalLink className="h-3.5 w-3.5" /> {c.demo.site === 'youtube' ? 'Demo on YouTube (opens outside FEL)' : 'Watch the demo'}</a>
           ) : (
-            <video src={c.demo.src} controls playsInline preload="metadata" className="w-full rounded-lg border border-white/10 bg-black" />
+            <video src={c.demo.src} autoPlay muted loop playsInline preload="metadata" aria-label={`${e.name} demo`} className="w-full rounded-lg border border-white/10 bg-black" />
           )}
         </div>
       )}
