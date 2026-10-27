@@ -25,7 +25,7 @@ export function AthleteStage({ avatarKey, cosmeticAssetId, name, accent, allow3d
     );
   }
   return (
-    <div className="fel-surface relative flex h-[172px] w-full items-center justify-center overflow-hidden lg:h-[300px]">
+    <div className="fel-surface relative flex h-[172px] w-full items-center justify-center overflow-hidden p-4 lg:h-[300px]">
       <div aria-hidden className="absolute inset-x-6 bottom-3 h-6 rounded-[50%]" style={{ background: `radial-gradient(closest-side, ${accent}33, transparent)` }} />
       <div className="relative lg:scale-[1.8]" role="img" aria-label={`${name}'s athlete`}>
         <AvatarFigure avatar={avatar} size={104} cosmeticAssetId={cosmeticAssetId} />

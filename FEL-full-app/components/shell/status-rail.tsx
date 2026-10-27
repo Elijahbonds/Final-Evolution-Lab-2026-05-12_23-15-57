@@ -76,30 +76,31 @@ export function StatusRail() {
         <div className="flex-1 md:hidden" />
 
         <div className="flex shrink-0 items-center gap-2">
-          {data ? (
-            <>
+          {/* P10 (2026-10-27): the PRQ ring and the wallet are always there — a dash and an empty track until the profile
+              answers — so nothing swaps in and the cluster never shifts (the rig measured 0.006 CLS from the old skeleton swap) */}
+          <>
               {/* PRQ as a mini ring (premium-ui P3): how full at a glance, the number beside it. The colour is the grade's
                   band (meaning, not decoration); the word stays for a screen reader and wider screens. */}
               <Link
                 href="/profile"
-                title={data.prq.badge}
+                title={data?.prq.badge}
                 className="fel-press inline-flex min-h-10 items-center gap-2 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.04] py-1 pl-1 pr-3 font-sans text-[14px] font-semibold tabular-nums text-white"
               >
                 <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden className="-rotate-90">
                   <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="4" />
-                  {data.prq.score !== null && (
+                  {data && data.prq.score !== null && (
                     <circle cx="14" cy="14" r="11" fill="none" stroke={data.prq.color} strokeWidth="4" strokeLinecap="round"
                       strokeDasharray={ring!.c} strokeDashoffset={ring!.offset}
                       className="fel-ring-arc" style={{ ['--fel-ring-c' as string]: `${ring!.c}` }} />
                   )}
                 </svg>
-                {data.prq.score === null ? '—' : Math.round(data.prq.score)}
-                <span className="hidden text-fel-dim sm:inline">{data.prq.status}</span>
+                {!data || data.prq.score === null ? '—' : Math.round(data.prq.score)}
+                {data && <span className="hidden text-fel-dim sm:inline">{data.prq.status}</span>}
               </Link>
               <Link href="/store" aria-label={t('shell.rail.openStore')} className="transition-transform active:scale-95">
                 <DualWalletChip />
               </Link>
-              {data.isAdmin && (
+              {data?.isAdmin && (
                 <>
                   <Link
                     href="/admin/metrics"
@@ -117,10 +118,7 @@ export function StatusRail() {
                   </Link>
                 </>
               )}
-            </>
-          ) : (
-            <span aria-hidden className="fel-skeleton block h-10 w-24 !rounded-full" />
-          )}
+          </>
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
             aria-label={t('shell.rail.signOut')}

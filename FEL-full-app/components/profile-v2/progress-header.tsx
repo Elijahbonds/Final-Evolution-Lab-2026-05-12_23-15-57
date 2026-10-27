@@ -19,7 +19,7 @@ export function ProgressHeader({ data, viewer = false }: { data: ProfileV2Data; 
         <AthleteStage avatarKey={identity.avatarKey} cosmeticAssetId={identity.cosmeticAssetId} name={identity.name} accent={prq.color} allow3d={!viewer} />
         {/* PRQ as a ring (premium-ui P4, the Whoop read): how full at a glance, the grade's band colour, the status under the
             number; nothing measured is an empty track and a dash, never a number. */}
-        <div className="fel-surface flex w-[150px] flex-col items-center justify-center gap-2 p-3 text-center lg:w-auto lg:flex-row lg:justify-start lg:gap-5 lg:p-5 lg:text-left">
+        <div className="fel-surface flex w-[150px] flex-col items-center justify-center gap-2 p-4 text-center lg:w-auto lg:flex-row lg:justify-start lg:gap-5 lg:p-5 lg:text-left">
           <StatRing value={prq.score} label="PRQ grade" sub={prq.status} color={prq.color} size={112} />
           <div className="flex flex-col gap-1">
             <p className={`${TYPE.label} hidden text-fel-dim lg:block`}>PRQ grade</p>
