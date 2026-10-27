@@ -99,7 +99,7 @@ if (SCEN === 'game') {
   const T = (name, arg) => ev(([n, a]) => window.__hg.test[n](a), [name, arg]);
   // hoops-p01: a big play (an ankle break) cuts to a REPLAY on the next dead ball, and a press made during it has no game to land in
   // (the before run lost two jog flicks to one) — wait it out before a press
-  const noReplay = async () => { for (let i = 0; i < 20; i++) { const busy = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; return L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 200); }); if (!busy) return; await waitGame(500); } };
+  const noReplay = async () => { for (let i = 0; i < 20; i++) { const busy = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; return L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 360); }); if (!busy) return; await waitGame(500); } };
   const R = result.tests = { stick: [], stickTurbo: [], shot: [], flickStand: [], flickJog: [], pass: [], poke: [], block: [] };
   // hoops-p01: TESTS=stick,stop,shot,buffer,flick,pass,poke,block (default: all) — the shared lock is the scarce thing
   const ON = new Set((process.env.TESTS ?? 'stick,stop,shot,buffer,flick,pass,poke,block').split(','));
