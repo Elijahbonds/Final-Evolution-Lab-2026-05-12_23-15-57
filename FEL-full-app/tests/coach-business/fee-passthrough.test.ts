@@ -284,7 +284,9 @@ describe('every switch off: no Stripe call', () => {
     seedCoach(fake.state, { priceCents: 1_500 });
     const made: any[] = [];
     const stripe = { checkout: { sessions: { create: async (p: any) => { made.push(p); return { id: 'cs_test_0123456789abc', url: 'u' }; } } } };
-    const r = await startPackageCheckout({ db: fake.db as any, stripe: () => stripe as any, env, now: NOW, isAdult: async () => true, plan: async () => 'pro', ensureCustomer: async () => 'cus', coachSlug: async () => 'c' }, 'b', 'pkg-1', { termsAccepted: true, termsVersion: STORE_TERMS_VERSION });
+    // test changed (owner-approvals, 2026-10-27): the coach was on 'pro'; Pro's default share is 0% now (owner, "0% on
+    // Pro"), so the 5% split this test holds is a Free coach's. The assertions are unchanged.
+    const r = await startPackageCheckout({ db: fake.db as any, stripe: () => stripe as any, env, now: NOW, isAdult: async () => true, plan: async () => 'free', ensureCustomer: async () => 'cus', coachSlug: async () => 'c' }, 'b', 'pkg-1', { termsAccepted: true, termsVersion: STORE_TERMS_VERSION });
     expect(r).toMatchObject({ ok: true });
     expect(made[0].payment_intent_data.application_fee_amount).toBe(75 + 76);
     expect(made[0].line_items.map((l: any) => l.price_data.unit_amount)).toEqual([1_500, 76]);

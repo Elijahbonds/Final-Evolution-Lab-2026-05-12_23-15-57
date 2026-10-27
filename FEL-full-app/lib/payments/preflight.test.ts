@@ -50,7 +50,9 @@ describe('today\'s config (every switch off) is clean', () => {
     for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_CONNECT_WEBHOOK_SECRET', 'VIRTUAL_PURCHASES_ENABLED', 'PURCHASES_ALLOWLIST',
       'COACH_CONNECT_PAYMENTS_ENABLED', 'COACH_CONNECT_LIVE', 'COACH_TERMS_VERSION (code)', 'PLATFORM_FEE_BPS_FREE', 'PLATFORM_FEE_BPS_PRO',
       'PLATFORM_FEE_CAP_CENTS_MONTHLY', 'REFUND_PROCESSING_FEE', 'REAL_MONEY_COMPETITION', 'PAYOUTS_ENABLED']) expect(names).toContain(k);
-    expect(messages({})).toContain('info: Coach fee: Free 5%, Pro 5%, no monthly cap; refunds keep the processing fee.');
+    // test changed (owner-approvals, 2026-10-27; TUNED money defaults, owner "5% on free, 0% on Pro" and "refund in
+    // full"): was 'Free 5%, Pro 5% … refunds keep the processing fee'. The line still reads back the defaults in force.
+    expect(messages({})).toContain('info: Coach fee: Free 5%, Pro 0%, no monthly cap; refunds return the processing fee.');
   });
 });
 
@@ -107,14 +109,19 @@ describe('missing and inconsistent', () => {
   });
 
   it('the owner\'s fee choices read back', () => {
-    expect(messages({ PLATFORM_FEE_BPS_PRO: '0' })).toContain('info: Coach fee: Free 5%, Pro 0%, no monthly cap; refunds keep the processing fee.');
-    expect(messages({ PLATFORM_FEE_CAP_CENTS_MONTHLY: '5000', REFUND_PROCESSING_FEE: '1' })).toContain('info: Coach fee: Free 5%, Pro 5%, capped at $50.00 a month; refunds return the processing fee.');
+    // test changed (owner-approvals, 2026-10-27): the defaults moved (Pro 0%, refunds return the fee), so each read-back
+    // now sets the value it reads back; the old rule is one env value away and still reads back exactly.
+    expect(messages({ PLATFORM_FEE_BPS_PRO: '0', REFUND_PROCESSING_FEE: '0' })).toContain('info: Coach fee: Free 5%, Pro 0%, no monthly cap; refunds keep the processing fee.');
+    expect(messages({ PLATFORM_FEE_BPS_PRO: '500', PLATFORM_FEE_CAP_CENTS_MONTHLY: '5000', REFUND_PROCESSING_FEE: '1' })).toContain('info: Coach fee: Free 5%, Pro 5%, capped at $50.00 a month; refunds return the processing fee.');
+    expect(messages({ PLATFORM_FEE_BPS_PRO: '500', REFUND_PROCESSING_FEE: 'off' })).toContain('info: Coach fee: Free 5%, Pro 5%, no monthly cap; refunds keep the processing fee.');
   });
 
   it('coach payments on with the processing fee kept: the store-terms conflict is flagged for the owner', () => {
     const env = { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: 'whsec_x', NEXTAUTH_URL: 'https://fel.test', COACH_CONNECT_PAYMENTS_ENABLED: '1' };
-    expect(messages(env).some((x) => /^warn: REFUND_PROCESSING_FEE is off/.test(x))).toBe(true);
+    // test changed (owner-approvals, 2026-10-27): the refund switch is on by default now, so the conflict needs it set off
+    expect(messages({ ...env, REFUND_PROCESSING_FEE: '0' }).some((x) => /^warn: REFUND_PROCESSING_FEE is off/.test(x))).toBe(true);
     expect(messages({ ...env, REFUND_PROCESSING_FEE: '1' }).some((x) => /REFUND_PROCESSING_FEE is off/.test(x))).toBe(false);
+    expect(messages(env).some((x) => /REFUND_PROCESSING_FEE is off/.test(x))).toBe(false);   // the default: no conflict
   });
 
   it('what stays off', () => {

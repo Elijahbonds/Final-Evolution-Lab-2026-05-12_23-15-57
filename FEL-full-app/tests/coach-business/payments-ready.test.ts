@@ -172,30 +172,44 @@ describe('live coach payments wait for the signed coach terms', () => {
 
 // ── 5. the platform fee ─────────────────────────────────────────────────────────────────────────────────────────────
 describe('the platform fee: (plan, price, month so far) → FEL\'s share', () => {
-  it('MONEY defaults are today\'s: 5% for Free and Pro, no cap, processing fee not refunded', () => {
-    expect([PLATFORM_FEE_BPS_FREE_DEFAULT, PLATFORM_FEE_BPS_PRO_DEFAULT, PLATFORM_FEE_CAP_CENTS_MONTHLY_DEFAULT, REFUND_PROCESSING_FEE_DEFAULT]).toEqual([500, 500, null, false]);
-    expect(platformFeePolicy({} as NodeJS.ProcessEnv)).toEqual({ bpsFree: 500, bpsPro: 500, capCentsMonthly: null });
-    expect(refundProcessingFee({} as NodeJS.ProcessEnv)).toBe(false);
+  // test changed (owner-approvals, 2026-10-27; TUNED money defaults, owner in chat: "5% on free, 0% on Pro" and "refund in
+  // full"): this was "MONEY defaults are today's: 5% for Free and Pro, no cap, processing fee not refunded" with
+  // [500, 500, null, false]. The defaults are now [500, 0, null, true]; the not-understood-value rule is unchanged (it
+  // falls back to the default, whatever the default is), and the old 5% rule is still exact at every price under
+  // PLATFORM_FEE_BPS_PRO=500.
+  it('MONEY defaults are the owner\'s (2026-10-27): 5% on Free, 0% on Pro, no cap, processing fee refunded', () => {
+    expect([PLATFORM_FEE_BPS_FREE_DEFAULT, PLATFORM_FEE_BPS_PRO_DEFAULT, PLATFORM_FEE_CAP_CENTS_MONTHLY_DEFAULT, REFUND_PROCESSING_FEE_DEFAULT]).toEqual([500, 0, null, true]);
+    expect(platformFeePolicy({} as NodeJS.ProcessEnv)).toEqual({ bpsFree: 500, bpsPro: 0, capCentsMonthly: null });
+    expect(refundProcessingFee({} as NodeJS.ProcessEnv)).toBe(true);
     // a value that is not understood is the default, never a different fee
-    expect(platformFeePolicy({ PLATFORM_FEE_BPS_PRO: '5%', PLATFORM_FEE_BPS_FREE: '10001', PLATFORM_FEE_CAP_CENTS_MONTHLY: '-5' } as never)).toEqual({ bpsFree: 500, bpsPro: 500, capCentsMonthly: null });
-    expect(refundProcessingFee({ REFUND_PROCESSING_FEE: 'maybe' } as never)).toBe(false);
-    // with the defaults the share is exactly the old floor(P × 5%) at every price
+    expect(platformFeePolicy({ PLATFORM_FEE_BPS_PRO: '5%', PLATFORM_FEE_BPS_FREE: '10001', PLATFORM_FEE_CAP_CENTS_MONTHLY: '-5' } as never)).toEqual({ bpsFree: 500, bpsPro: 0, capCentsMonthly: null });
+    expect(refundProcessingFee({ REFUND_PROCESSING_FEE: 'maybe' } as never)).toBe(true);
+    // the off words turn the refund of the fee off; the on words keep it on
+    for (const v of ['0', 'false', 'off', 'no', ' OFF ']) expect(refundProcessingFee({ REFUND_PROCESSING_FEE: v } as never), v).toBe(false);
+    for (const v of ['1', 'true', 'on', 'yes', '']) expect(refundProcessingFee({ REFUND_PROCESSING_FEE: v } as never), v).toBe(true);
+    // the defaults: floor(P × 5%) on Free, 0 on Pro, at every price; PLATFORM_FEE_BPS_PRO=500 is still exactly the old rule
+    const old = platformFeePolicy({ PLATFORM_FEE_BPS_PRO: '500' } as never);
     for (let p = 100; p <= 50_000; p += 37) {
       expect(platformFee(platformFeePolicy({} as never), 'free', p).felShareCents).toBe(Math.floor(p * 0.05));
-      expect(platformFee(platformFeePolicy({} as never), 'pro', p, 999_999).felShareCents).toBe(Math.floor(p * 0.05));
-      expect(saleSplit(p, STRIPE_CARD_RATE, platformFee(platformFeePolicy({} as never), 'pro', p).felShareCents)).toEqual(saleSplit(p));
+      expect(platformFee(platformFeePolicy({} as never), 'pro', p, 999_999).felShareCents).toBe(0);
+      expect(platformFee(old, 'pro', p, 999_999).felShareCents).toBe(Math.floor(p * 0.05));
+      expect(saleSplit(p, STRIPE_CARD_RATE, platformFee(old, 'pro', p).felShareCents)).toEqual(saleSplit(p));
     }
   });
 
-  it('option A, keep 5% (no env): a Pro coach\'s checkout is today\'s', async () => {
-    const s = setup({ plan: 'pro' });
+  // test changed (owner-approvals, 2026-10-27): "keep 5%" was the no-env default; it is PLATFORM_FEE_BPS_PRO=500 now.
+  // The assertions are unchanged.
+  it('option A, keep 5% (PLATFORM_FEE_BPS_PRO=500): a Pro coach\'s checkout is the 5% one', async () => {
+    const s = setup({ plan: 'pro', env: env({ PLATFORM_FEE_BPS_PRO: '500' }) });
     await startPackageCheckout(s.deps, 'buyer-1', 'pkg-1', TICK);
     expect(s.stripe.calls[0].params.payment_intent_data.application_fee_amount).toBe(999 + 629);
     expect([...s.fake.state.sales.values()][0]).toMatchObject({ feeCents: 999 });
   });
 
+  // test changed (owner-approvals, 2026-10-27): the refund at the end holds the price-only refund, which is now
+  // REFUND_PROCESSING_FEE=0 (the default refunds the fee too); the env names it. Assertions unchanged.
   it('option B, 0% on Pro (PLATFORM_FEE_BPS_PRO=0): a Pro coach pays no share; a Free coach still 5%; the buyer pays the same', async () => {
-    const e = env({ PLATFORM_FEE_BPS_PRO: '0' });
+    const e = env({ PLATFORM_FEE_BPS_PRO: '0', REFUND_PROCESSING_FEE: '0' });
     const pro = setup({ env: e, plan: 'pro' });
     const sale = await buy(pro);
     expect(pro.stripe.calls[0].params.payment_intent_data.application_fee_amount).toBe(629);          // the processing fee only
@@ -285,6 +299,46 @@ describe('the platform fee: (plan, price, month so far) → FEL\'s share', () =>
   });
 });
 
+// ── OWNER-APPROVALS (2026-10-27): the owner's choice with NO env, at several prices ─────────────────────────────────
+// Owner, in chat: "You do it. I approve." — cards "coach-fee" (5% on Free, 0% on Pro) and "refund-fee" (refund in full).
+// TUNED (money). Every price from Stripe-small to the package cap: the buyer pays the same grossed-up total on either plan,
+// FEL keeps floor(P × 5%) from a Free coach and nothing from a Pro coach, and a full refund returns every cent the buyer
+// paid while the coach ends at 0 and FEL absorbs only Stripe's own fee.
+describe("the owner's coach fee and refund, defaults only (no fee env)", () => {
+  const PRICES = [100, 999, 1_500, 4_900, 15_000, 19_999, 50_000, 1_000_000];
+  for (const plan of ['free', 'pro'] as const) {
+    for (const price of PRICES) {
+      it(`${plan}, $${(price / 100).toFixed(2)}: the split at checkout, then a full refund`, async () => {
+        const s = setup({ plan, priceCents: price });
+        const sale = await buy(s);
+        const want = saleSplit(price, STRIPE_CARD_RATE, plan === 'pro' ? 0 : Math.floor(price * 0.05));
+        expect(sale).toMatchObject({ price, felShare: want.felShareCents, processing: want.processingFeeCents, total: want.totalCents, app: want.applicationFeeCents });
+        expect(sale.total).toBe(saleSplit(price).totalCents);                       // the buyer pays the same on either plan
+        expect(sale.felShare).toBe(plan === 'pro' ? 0 : Math.floor(price * 0.05));
+        expect(s.fake.state.sales.get(sale.saleId)).toMatchObject({ feeCents: sale.felShare });
+        // refund in full (no REFUND_PROCESSING_FEE set)
+        const r = await refundSale(s.refundDeps, 'coach-1', sale.saleId, null);
+        expect(r).toMatchObject({ ok: true, refundedCents: price, status: 'REFUNDED' });
+        const m = s.stripe.money();
+        expect(m.buyerRefunded).toBe(sale.total);                                   // every cent, the processing fee included
+        const coach = sale.total - sale.app - m.coachReversed + m.feeReturned;
+        expect(coach).toBe(0);                                                       // the coach ends at 0
+        const fel = sale.app - stripeFeeCents(sale.total, STRIPE_CARD_RATE, 'nearest') - m.feeReturned;
+        expect(fel).toBe(-stripeFeeCents(sale.total, STRIPE_CARD_RATE, 'nearest')); // FEL absorbs Stripe's fee, nothing more
+      });
+    }
+  }
+
+  it('a partial refund (a third of the price) returns the same third of the processing fee, on either plan', async () => {
+    for (const plan of ['free', 'pro'] as const) {
+      const s = setup({ plan, priceCents: 15_000 });
+      const sale = await buy(s);
+      expect(await refundSale(s.refundDeps, 'coach-1', sale.saleId, 5_000)).toMatchObject({ ok: true, refundedCents: 5_000, status: 'PARTIALLY_REFUNDED' });
+      expect(s.stripe.money().buyerRefunded).toBe(5_000 + Math.floor((sale.processing * 5_000) / 15_000));
+    }
+  });
+});
+
 // ── 4. refunding the processing fee ─────────────────────────────────────────────────────────────────────────────────
 describe('REFUND_PROCESSING_FEE: the owner\'s one-line flip', () => {
   it('the math: charge refund ↔ price refund is exact both ways at every cent of a sale', () => {
@@ -304,9 +358,15 @@ describe('REFUND_PROCESSING_FEE: the owner\'s one-line flip', () => {
     }
   });
 
-  for (const flag of [false, true]) {
-    describe(flag ? 'ON (refund the fee; FEL absorbs it)' : 'OFF (default: today)', () => {
-      const e = env(flag ? { REFUND_PROCESSING_FEE: '1' } : {});
+  // test changed (owner-approvals, 2026-10-27): OFF was the unset default; the default is ON now (owner, "refund in
+  // full"). OFF is REFUND_PROCESSING_FEE=0, and every ON assertion also runs with the variable unset (the default).
+  for (const [flag, name, set] of [
+    [false, 'OFF (REFUND_PROCESSING_FEE=0: the price-only rule)', { REFUND_PROCESSING_FEE: '0' }],
+    [true, 'ON (refund the fee; FEL absorbs it)', { REFUND_PROCESSING_FEE: '1' }],
+    [true, 'DEFAULT, unset (= ON since 2026-10-27)', {}],
+  ] as const) {
+    describe(name, () => {
+      const e = env(set);
 
       it('full refund by the coach: where every cent ends', async () => {
         const s = setup({ env: e });

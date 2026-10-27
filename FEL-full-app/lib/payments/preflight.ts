@@ -97,7 +97,7 @@ export function preflight(env: Env, opts: PreflightOptions = {}): Preflight {
     { group: 'Money settings', name: 'PLATFORM_FEE_BPS_FREE', state: `${policy.bpsFree} (${bpsLabel(policy.bpsFree)})${has(env, 'PLATFORM_FEE_BPS_FREE') ? '' : ' default'}` },
     { group: 'Money settings', name: 'PLATFORM_FEE_BPS_PRO', state: `${policy.bpsPro} (${bpsLabel(policy.bpsPro)})${has(env, 'PLATFORM_FEE_BPS_PRO') ? '' : ' default'}` },
     { group: 'Money settings', name: 'PLATFORM_FEE_CAP_CENTS_MONTHLY', state: policy.capCentsMonthly === null ? 'no cap' : `${policy.capCentsMonthly} ($${(policy.capCentsMonthly / 100).toFixed(2)} a month)` },
-    { group: 'Money settings', name: 'REFUND_PROCESSING_FEE', state: refundFee ? 'on (buyer gets the processing fee back; FEL absorbs it)' : 'off (processing fee kept on refunds; default)' },
+    { group: 'Money settings', name: 'REFUND_PROCESSING_FEE', state: `${refundFee ? 'on (buyer gets the processing fee back; FEL absorbs it)' : 'off (processing fee kept on refunds)'}${has(env, 'REFUND_PROCESSING_FEE') ? '' : ' default'}` },
     { group: 'Stays off', name: 'PAYOUTS_ENABLED', state: sw(env, 'PAYOUTS_ENABLED') },
     { group: 'Stays off', name: 'REAL_MONEY_COMPETITION', state: sw(env, 'REAL_MONEY_COMPETITION') },
   ];
@@ -162,7 +162,7 @@ export function preflight(env: Env, opts: PreflightOptions = {}): Preflight {
   if (connectPay) {
     add('info', 'Coach payments need prisma/pending/2026-10-25-coach-business.sql applied (else 503 coach_business_not_ready); disputes and the Stripe-setup flag also need 2026-10-26-payments-ready.sql. This check cannot see the database.');
     if (!has(env, 'STRIPE_CONNECT_WEBHOOK_SECRET')) add('warn', 'STRIPE_CONNECT_WEBHOOK_SECRET is missing: account.updated never arrives, so a coach\'s Stripe status refreshes only when they come back from onboarding.');
-    if (!refundFee) add('warn', 'REFUND_PROCESSING_FEE is off: a coach-sale refund keeps the processing fee, which the store terms (§2.6) say FEL refunds. Owner call: change the setting or the terms.');
+    if (!refundFee) add('warn', 'REFUND_PROCESSING_FEE is off: a coach-sale refund keeps the processing fee, which the store terms (§2.6) and the owner (2026-10-27, "refund in full") say FEL refunds. Unset it to refund in full.');
   }
   if (has(env, 'COACH_PRO_PRICE_USD_CENTS') && coachProPriceCents(env as NodeJS.ProcessEnv) !== Number((env.COACH_PRO_PRICE_USD_CENTS ?? '').trim())) add('warn', 'COACH_PRO_PRICE_USD_CENTS is not a whole number of cents from 100 to 1000000: the default applies.');
   if (has(env, 'COACH_FREE_CLIENT_LIMIT') && coachFreeClientLimit(env as NodeJS.ProcessEnv) !== Number((env.COACH_FREE_CLIENT_LIMIT ?? '').trim())) add('warn', 'COACH_FREE_CLIENT_LIMIT is not a whole number up to 1000: the default applies.');

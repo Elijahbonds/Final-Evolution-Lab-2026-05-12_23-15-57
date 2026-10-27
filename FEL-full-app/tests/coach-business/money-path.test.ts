@@ -15,7 +15,10 @@ import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 // payments-ready.test.ts covers the refusal without the tick.
 const TICK = { termsAccepted: true, termsVersion: STORE_TERMS_VERSION };
 
-const ON = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_abc', NEXTAUTH_URL: 'https://fel.test' } as unknown as NodeJS.ProcessEnv;
+// test changed (owner-approvals, 2026-10-27): REFUND_PROCESSING_FEE defaults ON now (owner, "refund in full"). The refund
+// tests below hold the price-only refund rule (the processing fee kept), so this env names that rule; the assertions are
+// unchanged. The refund-in-full default is held in tests/owner-approvals/coach-fee-refund.test.ts and payments-ready.test.ts.
+const ON = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_abc', NEXTAUTH_URL: 'https://fel.test', REFUND_PROCESSING_FEE: '0' } as unknown as NodeJS.ProcessEnv;
 const NOW = new Date('2026-10-25T18:00:00Z');
 
 /** Anything touched throws: proof a closed path never reached it. */
@@ -179,7 +182,8 @@ async function paidSale(kind = 'session_pack', priceCents = 19_999) {
   const r = await startPackageCheckout(d, 'buyer-1', 'pkg-1', TICK);
   if (!r.ok) throw new Error('setup');
   const ledger = fakeLedger();
-  const cdeps: ConnectDeps = { db: fake.db as any, post: ledger.post, stripe: () => stripe.api };
+  // test changed (owner-approvals): the webhook's deps carry ON (the price-only refund rule), as the checkout's do
+  const cdeps: ConnectDeps = { db: fake.db as any, post: ledger.post, stripe: () => stripe.api, env: ON };
   const meta = { product: 'COACH_CONNECT', saleId: r.saleId, buyerId: 'buyer-1' };
   return { fake, ledger, cdeps, saleId: r.saleId, meta, stripe, d };
 }
