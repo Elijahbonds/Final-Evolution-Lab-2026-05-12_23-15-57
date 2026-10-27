@@ -798,6 +798,16 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/DunkFlagship.ts OOP_LOB_FLIGHT_SEC',
     hint: 'How long the passer\'s lob hangs, release to the catch. Longer = a higher, slower arc thrown earlier in your run.',
   },
+  {
+    id: 'dunk.slamHitStopBigMs', label: 'Slam: freeze on a perfect flush', def: 100, min: 70, max: 160, step: 5, unit: 'ms', group: 'Dunk · slam',
+    source: 'lib/babylon/core/DunkFlagship.ts SLAM_HITSTOP_BIG_MS',
+    hint: 'How long the game holds on the iron for a perfect slam. An ordinary make stays at 70 ms; cleaner slams grow toward this.',
+  },
+  {
+    id: 'dunk.slamShakeBig', label: 'Slam: shake on a perfect flush', def: 0.18, min: 0.12, max: 0.3, step: 0.01, unit: '', group: 'Dunk · slam',
+    source: 'lib/babylon/core/DunkFlagship.ts SLAM_SHAKE_BIG',
+    hint: 'Camera shake for a perfect slam. An ordinary make stays at 0.12. Reduced motion turns shake off.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

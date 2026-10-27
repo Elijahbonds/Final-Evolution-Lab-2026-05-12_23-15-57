@@ -86,7 +86,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -4149,9 +4149,12 @@ export const DunkMode: ModeDefinition = (() => {
   function contactPunch(ctx: ModeContext): void {
     if (contactLatch) return;
     contactLatch = true;
-    ctx.juice.hitStop(70, { gameplay: true });   // HOTFIX (2026-09-24): paired with the gameplay freeze below — reduced motion keeps both 70 ms, so the limbs never move while the root and ball hold
-    feelHitStop(70);   // DUNK-HANDS-RIM H3: the mode's clock stops on the iron too (the ball on the ring, the body) — one beat, composed; never a second slow-mo
-    ctx.juice.shake(0.12, 140);
+    // DUNK-FLAGSHIP (c): the beat by the size of the slam (core/DunkFlagship.slamImpact) — an ordinary make keeps 70 ms / 0.12 / 140 ms
+    const sb = slamImpact(qteAccuracy, aHeld, { hitStopMs: feel('dunk.slamHitStopBigMs', SLAM_HITSTOP_BIG_MS), shake: feel('dunk.slamShakeBig', SLAM_SHAKE_BIG) });
+    ctx.juice.hitStop(sb.hitStopMs, { gameplay: true });   // HOTFIX (2026-09-24): paired with the gameplay freeze below — reduced motion keeps both, so the limbs never move while the root and ball hold
+    feelHitStop(sb.hitStopMs);   // DUNK-HANDS-RIM H3: the mode's clock stops on the iron too (the ball on the ring, the body) — one beat, composed; never a second slow-mo
+    ctx.juice.shake(sb.shake, sb.shakeMs);
+    console.info(`[DUNK-IMPACT] slam ${qteAccuracy.toFixed(2)}${aHeld ? ' + hang' : ''}: hit-stop ${sb.hitStopMs} ms, shake ${sb.shake.toFixed(3)} for ${sb.shakeMs} ms`);
     ctx.juice.flash('#fff6dd', 120);
     ctx.camDirector.pulse(0.9, 0.32);   // DUNK-BODY-MID: the CONTACT is a camera beat too — a short hard push onto the iron under the hit-stop, so the punch reads from behind (the flight had a push-in at the hang rise and nothing at the rim)
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 }); console.info('[JUICE-SFX] impact slam');   // A+ P2: the ONE slam thud of the attempt

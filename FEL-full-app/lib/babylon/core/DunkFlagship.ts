@@ -29,3 +29,31 @@ export function lobApexOver(y0: number, y1: number, tf: number, g = 9.81): numbe
   const top = y0 + (vy * vy) / (2 * g);
   return vy > 0 ? top - Math.max(y0, y1) : 0;
 }
+
+// ── (c) THE IRON ANSWERS HOW HARD IT WAS HIT ──────────────────────────────────────────────────────────────────────────
+// Measured before: every make froze 70 ms and shook 0.12 for 140 ms whatever the slam was — a timid flush and a perfect one hit
+// the iron the same (owner decision 2026-10-1x, the impact kit: "hit-stop, shake by size"). Now an ordinary make (accuracy at or
+// under SLAM_BIG_FROM) keeps exactly those numbers, and a clean one grows toward the BIG numbers. Reduced motion is the juice
+// kit's own business (it drops the shake; the hit-stop is gameplay and stays).
+/** The make's beat as shipped (DunkMode contactPunch). */
+export const SLAM_HITSTOP_MS = 70;
+export const SLAM_SHAKE = 0.12;
+export const SLAM_SHAKE_MS = 140;
+/** TUNED (new): a perfect slam's beat (was the same 70 ms / 0.12 / 140 ms as every make). */
+export const SLAM_HITSTOP_BIG_MS = 100;
+export const SLAM_SHAKE_BIG = 0.18;
+export const SLAM_SHAKE_BIG_MS = 180;
+/** (new) Slam accuracy (0–1, the card's execution read) from which the beat starts to grow. */
+export const SLAM_BIG_FROM = 0.5;
+
+export interface SlamImpact { hitStopMs: number; shake: number; shakeMs: number }
+/** The make's hit-stop and shake for a slam of accuracy `acc01` (and a rim hang adds a touch: the body hits the iron too). */
+export function slamImpact(acc01: number, hang: boolean, big = { hitStopMs: SLAM_HITSTOP_BIG_MS, shake: SLAM_SHAKE_BIG }, from = SLAM_BIG_FROM): SlamImpact {
+  const a = Number.isFinite(acc01) ? Math.min(1, Math.max(0, acc01)) : 0;
+  const k = Math.min(1, Math.max(0, (a - from) / Math.max(1e-6, 1 - from)) + (hang ? 0.15 : 0));
+  return {
+    hitStopMs: Math.round(SLAM_HITSTOP_MS + (big.hitStopMs - SLAM_HITSTOP_MS) * k),
+    shake: SLAM_SHAKE + (big.shake - SLAM_SHAKE) * k,
+    shakeMs: Math.round(SLAM_SHAKE_MS + (SLAM_SHAKE_BIG_MS - SLAM_SHAKE_MS) * k),
+  };
+}
