@@ -106,13 +106,6 @@ export const QUEUE_PRESETS: Record<'pain' | 'red_flag' | 'missed' | 'checkin' | 
   join: [{ id: 'join:welcome', text: 'Welcome aboard! Your first plan is on the way.' }],
 };
 
-/** The words for a preset id, looked up — a request names a preset, the words come from here. */
-export function queuePresetText(id: unknown): string | null {
-  if (typeof id !== 'string') return null;
-  for (const list of Object.values(QUEUE_PRESETS)) { const p = list.find((x) => x.id === id); if (p) return p.text; }
-  return null;
-}
-
 const DAY = 86_400_000;
 const ms = (iso: string | null | undefined, fallback: number) => { const t = iso ? Date.parse(iso) : NaN; return Number.isFinite(t) ? t : fallback; };
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

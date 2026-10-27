@@ -34,7 +34,7 @@ export interface QueueReaders {
 export interface RosterStripRow {
   id: string;
   name: string;
-  /** The last seven days, oldest first: 1 = a coached session completed that day. Empty for anyone the gate closes. */
+  /** The last seven days, oldest first: 1 = a coached session completed that day. */
   days: number[];
   programId: string | null;
 }
@@ -146,10 +146,10 @@ export async function coachQueueFor(db: QueueDb, coachId: string, readers: Queue
   const items = gateQueue(buildQueue(src, { now: nowMs, programOf: who.programOf, adult: (id) => band(id) === 'adult' }), band);
 
   const today0 = Math.floor(nowMs / DAY) * DAY;
-  const roster: RosterStripRow[] = who.ids.map((id) => {
-    const open = !!band(id);
-    const done = open ? sessions.filter((s) => s.clientId === id && s.completedAt).map((s) => Math.floor((s.completedAt!.getTime() - today0) / DAY)) : [];
-    return { id, name: who.nameOf(id), days: open ? Array.from({ length: 7 }, (_, i) => (done.includes(i - 6) ? 1 : 0)) : [], programId: who.programOf(id) };
+  // the strip passes the same gate: an athlete it closes is not on this screen at all (teens fail closed until OWN-03)
+  const roster: RosterStripRow[] = who.ids.filter((id) => !!band(id)).map((id) => {
+    const done = sessions.filter((s) => s.clientId === id && s.completedAt).map((s) => Math.floor((s.completedAt!.getTime() - today0) / DAY));
+    return { id, name: who.nameOf(id), days: Array.from({ length: 7 }, (_, i) => (done.includes(i - 6) ? 1 : 0)), programId: who.programOf(id) };
   }).sort((a, b) => a.name.localeCompare(b.name));
 
   return { items, dark, roster };
