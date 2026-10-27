@@ -117,10 +117,17 @@ These are facts from the release source; section 3 puts numbers on what they cau
 (SwiftShader renders on the CPU, so the absolute frame time is not a phone's; the update and animation milliseconds, the draw
 count and the long-frame pattern are the comparable parts.)
 
-### 3b. This audit's rig run [R]
+### 3b. This audit's rig run [R] — not yet taken
 
-See section 3b-numbers below; the run queue is shared by every lane (one browser at a time), so this section is filled
-by the commit that lands the run's JSON.
+The instrument is built and committed (`scripts/probes/hoops-gap/`), and the bundles were built from `36593d3a`. The runs
+did not get a turn: the shared gate lock (one browser across all lanes, `round9/resource-rules.md`) was held or queued by
+five other lanes from 04:30 to 05:10 UTC, and on this box the rig plays about 1/60 of real time (hoops-round2's 3v3 run:
+~6 s of game per 400 s of wall time). The runs stay queued (`scratchpad/round9/hoops-audit/logs/run-all.log`, output in
+`out/`): 1v1 and 3v3 `game` (40 s / 30 s at 128×72) and `input` (320×180, with strips).
+
+What that means for the plan: every "today" a gate cites from [R] is read by **that phase's own before-run** on the same
+instrument and seed (each brief says how), so no phase starts without its baseline. The numbers that already exist
+([H2], [C], [M]) are enough to rank the gaps.
 
 ## 4. Ranked gaps
 
