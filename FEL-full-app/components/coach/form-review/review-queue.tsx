@@ -3,7 +3,7 @@
 // FormReviewQueue — the coach's side of camera-assisted review (COACH-VIDEO-REVIEW, 2026-10-24).
 //
 // TrueCoach, ATG and CoachNow make a coach watch every client video by hand. Here the camera already counted the reps and
-// found the bad one, so the queue opens on THE FLAGGED REP: the reason in words ("Left knee caves on rep 4"), the set's
+// found the bad one, so the queue opens on THE FLAGGED REP: the reason in words ("Left knee caves in on rep 4"), the set's
 // score, and the trend for that movement, before anything is opened. Opening a set replays the flagged rep as a skeleton
 // beside the athlete's own best rep (no video exists to watch: lib/coach/formReview/payload.ts). The coach answers with
 // a preset cue from the catalogue and a short note, posted to the program's thread, or marks it reviewed.

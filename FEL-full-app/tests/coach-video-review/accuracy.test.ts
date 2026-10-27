@@ -1,3 +1,4 @@
+// test changed: copy rewrite (cue-rewrite lane) - knee flag reads "caves in" (canonical name "Knees cave in"); same side and rep.
 // COACH-VIDEO-REVIEW (2026-10-24): rep counting and flag accuracy on the Mirror's pose fixtures.
 //
 // The labelled sets are tests/helpers/formReviewSets.ts: the stored one-rep fixtures chained (noise-free), whole sets
@@ -72,10 +73,10 @@ describe('flag accuracy on labelled sets', () => {
     }
   });
 
-  it('the knee flag names its side: "Left knee caves on rep 3", "Both knees cave on rep 5", "Right knee caves on rep 6"', () => {
+  it('the knee flag names its side: "Left knee caves in on rep 3", "Both knees cave in on rep 5", "Right knee caves in on rep 6"', () => {
     const s = SETS.find((x) => x.name.startsWith('stored squat'))!;
     const flags = flagsFor('squat', scoreReps('squat', readSet('squat', s.frames)));
-    expect(flags.map((f) => f.reason).sort()).toEqual(['Both knees cave on rep 5', 'Left knee caves on rep 3', 'Right knee caves on rep 6']);
+    expect(flags.map((f) => f.reason).sort()).toEqual(['Both knees cave in on rep 5', 'Left knee caves in on rep 3', 'Right knee caves in on rep 6']);
   });
 });
 

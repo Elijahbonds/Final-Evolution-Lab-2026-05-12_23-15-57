@@ -1,7 +1,9 @@
 // lib/coach/formReview/view.ts — COACH-VIDEO-REVIEW (2026-10-24): what the two screens draw from a scored set, kept
 // pure so a test reads exactly what the client and the coach are shown. No React here.
 
-import { faultPhrase, type FaultSide, type ReviewMovement } from './movements';
+import { cueFor, faultPhrase, MOVEMENT_SPECS, type FaultSide, type ReviewMovement } from './movements';
+import { FAULT_MEANS, FAULT_NAMES, type FaultName } from '@/lib/cue-style/names';
+import { result, type ResultLine } from '@/lib/cue-style/result';
 import type { RepFlag, ScoredRep } from './score';
 
 export interface RepChip {
@@ -54,4 +56,16 @@ export function ageLabel(iso: string, now: number = Date.now()): string {
   if (h < 1) return 'just now';
   if (h < 24) return `${h} h ago`;
   return `${Math.floor(h / 24)} d ago`;
+}
+
+/**
+ * CUE-REWRITE (2026-10-27): a flag as a result line — what we saw ("Left knee caves in on rep 4"), what it means, and the
+ * one thing to do next set (the Mirror's own live cue for it). The flag line used to stop at what was seen.
+ */
+export function flagResult(movement: ReviewMovement, flag: { rep: number; fault: string; reason: string }): ResultLine {
+  const label = MOVEMENT_SPECS[movement].label_of[flag.fault];
+  const key = (Object.keys(FAULT_NAMES) as FaultName[]).find((k) => FAULT_NAMES[k] === label);
+  const means = (key && FAULT_MEANS[key]) || 'Worth a look with your coach.';
+  const cue = cueFor(movement, flag.fault)?.cue;
+  return result(`${flag.reason}.`, means, cue ? `Next set, think: "${cue}".` : 'Film one more set and send it to your coach.');
 }

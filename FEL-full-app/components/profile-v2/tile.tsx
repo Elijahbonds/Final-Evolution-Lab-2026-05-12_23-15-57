@@ -13,7 +13,7 @@ export function TileView({ tile, accent }: { tile: ProgressTile; accent: string 
   const Arrow = tile.compare?.direction === 'up' ? ArrowUpRight : tile.compare?.direction === 'down' ? ArrowDownRight : Minus;
   return (
     <div data-tile={tile.key} className="flex min-h-[124px] flex-col lg:min-h-[172px] rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-3.5">
-      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: accent }}>{tile.label}</p>
+      <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: accent }}>{tile.label}</p>
       {tile.value !== null ? (
         <>
           <p className="mt-1.5 flex items-baseline gap-1.5">

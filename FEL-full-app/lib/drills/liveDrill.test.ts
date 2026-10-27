@@ -308,6 +308,46 @@ describe('a drill on the camera: the space check, START, the owner\'s recorded j
   });
 });
 
+describe('TODAY-DRILL (2026-10-27): a Pause tap is the hidden-tab pause', () => {
+  it('mid-drill: the camera off, the drill paused where it was, nothing restarts by itself; camera back, the check, RESUME', async () => {
+    const r = rig();
+    const GO = 5200;
+    const s = jumpSession(GO);
+    const all = packetsOf([...s.stand, ...s.rec]);
+    await r.live.open(s.chart);
+    r.play({ check: checkFrames(0), packets: all, until: GO - TICK, from: 0 });
+    r.play({ calls: [{ at: GO, run: () => r.live.go() }], until: GO + 1 });
+    const H = s.offs[1] - 300;
+    r.play({ packets: all.filter((x) => x.packet.arrivedAt > GO && x.frame.t < H), until: H });
+    r.live.pause();
+    const at = r.live.view().run!.phaseSec;   // the view as the pause published it (a plain frame is HUD_HZ-limited)
+    expect(r.live.view().phase).toBe('paused');
+    expect(sessionStore.view().phase).toBe('paused');
+    expect(r.calls.filter((c) => c === 'camera.stop')).toHaveLength(1);
+    expect(r.calls).toContain('voice.stop');
+    await settle();
+    expect(r.wakeWorld.live()).toBe(0);
+    // time passes with the camera off: the drill's clock does not move, and the camera does not come back by itself
+    r.play({ until: H + 20_000, from: H });
+    expect(r.calls.filter((c) => c === 'camera.start')).toHaveLength(1);
+    expect(r.live.view().phase).toBe('paused');
+    expect(r.live.view().run!.phaseSec).toBeCloseTo(at, 3);
+    await r.live.cameraBack();
+    expect(r.calls.filter((c) => c === 'camera.start')).toHaveLength(2);
+    const R = H + 30_000;
+    r.play({ check: checkFrames(H + 20_000), from: H + 20_000, until: R - TICK });
+    expect(r.bodyPlay.view().stage).toBe('set');
+    r.live.go();
+    expect(r.live.view().phase).toBe('playing');
+  });
+  it('a pause outside a run (idle, done) does nothing', async () => {
+    const r = rig();
+    r.live.pause();
+    expect(r.live.view().phase).toBe('idle');
+    expect(r.calls).not.toContain('camera.stop');
+  });
+});
+
 // ── START, the space check, the screen ───────────────────────────────────────────────────────────────────────────────
 
 /** Hand-made packets: a calibrated body standing, both hands up from `upFrom` (capture ms), 30 fps. */

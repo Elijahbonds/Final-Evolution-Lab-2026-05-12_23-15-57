@@ -108,31 +108,33 @@ export const RETEST_AFTER = 4;
 //   · The three titles the Movement Screen maps to (screenCorrectives.ts CORRECTIVE_BLOCK) and their movements are
 //     unchanged except the rib reset's name and the bridge's, so the screen's card and the coach's draft read as before.
 
+// CUE-REWRITE (2026-10-27): plain titles and movement names ("Ask the scapula to set and stay" → "Set your shoulder
+// blades"; "Prone Y-raise" → "Face-down Y-raise, arms up in a Y"). Same blocks, same doses; before/after in docs/CUE-AUDIT.md.
 const PLAYBOOK: Record<ZoneId, Record<BlockKind, { title: string; movements: string[]; minutes: number }>> = {
   rib_thoracic: {
-    release: { title: 'Open the ribcage', minutes: 6, movements: ['Foam roller across the mid-back, 8 slow passes', 'Side-lying open book, 6 per side', 'Long-exhale rib resets, 10 breaths'] },
-    activate: { title: 'Ask the mid-back to hold', minutes: 8, movements: ['Wall slides with an exhale, 3 x 8', 'Prone Y-raise, 3 x 10', 'Half-kneeling overhead reach, 3 x 6 per side'] },
-    pattern: { title: 'Keep the ribs stacked under load', minutes: 10, movements: ['Split-stance press with a slow exhale, 4 x 6 per side', 'Tall-kneeling press, 3 x 8'] },
+    release: { title: 'Loosen the upper back', minutes: 6, movements: ['Foam roller across the mid-back, 8 slow passes', 'Open book: lie on your side and open your top arm, 6 per side', 'Long-exhale rib resets, 10 breaths'] },
+    activate: { title: 'Hold a tall upper back', minutes: 8, movements: ['Wall slides with an exhale, 3 x 8', 'Face-down Y-raise, arms up in a Y, 3 x 10', 'Half-kneeling overhead reach, 3 x 6 per side'] },
+    pattern: { title: 'Stay tall while you press', minutes: 10, movements: ['Split-stance press with a slow exhale, 4 x 6 per side', 'Tall-kneeling press, 3 x 8'] },
   },
   lumbo_pelvic: {
-    release: { title: 'Settle the hips', minutes: 6, movements: ['90/90 transitions, 8 per side', 'Deep squat rock and hold: 8 small rocks, then a 20s hold', 'Long-exhale rib resets, 6 breaths'] },
-    activate: { title: 'Ask the pelvis to stay level', minutes: 8, movements: ['Dead bug with a long exhale, 3 x 6 per side', 'Bridge with a 3s hold at the top, 3 x 10', 'Side plank with a reach, 3 x 20s per side'] },
-    pattern: { title: 'Hold the stack through a hinge', minutes: 10, movements: ['Hip hinge to a dowel, 4 x 8', 'Split-stance row, 3 x 8 per side'] },
+    release: { title: 'Loosen the hips', minutes: 6, movements: ['Seated knee switches: both knees bent, tip them side to side, 8 per side', 'Deep squat rock and hold: 8 small rocks, then a 20s hold', 'Long-exhale rib resets, 6 breaths'] },
+    activate: { title: 'Keep your hips level', minutes: 8, movements: ['Dead bug: on your back, lower one arm and the other leg, breathing out, 3 x 6 per side', 'Bridge with a 3s hold at the top, 3 x 10', 'Side plank with a reach, 3 x 20s per side'] },
+    pattern: { title: 'Stay tall as you bend at the hips', minutes: 10, movements: ['Hip hinge (hips back, back flat) with a stick along your back, 4 x 8', 'Split-stance row, 3 x 8 per side'] },
   },
   upper_traps: {
-    release: { title: 'Let the shoulders down', minutes: 5, movements: ['Ball on a wall where the neck meets the shoulder, pinned 40s per side', 'Neck side-bend with a long exhale, 30s per side'] },
-    activate: { title: 'Ask the lower shoulder to work', minutes: 8, movements: ['Prone T-raise, 3 x 10', 'Scapular pull-up, 3 x 6', 'Bottoms-up carry, 3 x 20s per side'] },
-    pattern: { title: 'Press without the shrug', minutes: 9, movements: ['Half-kneeling press at a slow tempo, 4 x 6 per side', 'Landmine press, 3 x 8 per side'] },
+    release: { title: 'Let your shoulders drop', minutes: 5, movements: ['Ball on a wall where the neck meets the shoulder, pinned 40s per side', 'Neck side-bend with a long exhale, 30s per side'] },
+    activate: { title: 'Keep your shoulders down', minutes: 8, movements: ['Face-down T-raise, arms out in a T, 3 x 10', 'Hang from a bar and pull your shoulders down, 3 x 6', 'Carry a kettlebell upside down, 3 x 20s per side'] },
+    pattern: { title: 'Press without shrugging', minutes: 9, movements: ['Half-kneeling press at a slow tempo, 4 x 6 per side', 'Landmine press (one end of a bar in a corner), 3 x 8 per side'] },
   },
   lat_rhomboid: {
-    release: { title: 'Free the reach overhead', minutes: 5, movements: ['Roller under the side of the ribcage below the armpit, pinned 45s per side', 'Overhead hang with a full exhale, 3 x 20s'] },
-    activate: { title: 'Ask the scapula to set and stay', minutes: 8, movements: ['Band pull-apart, 3 x 15', 'Prone W-raise, 3 x 10', 'Half-kneeling row with a 2s hold, 3 x 8 per side'] },
-    pattern: { title: 'Row from a set shoulder', minutes: 9, movements: ['Split-stance row, 4 x 8 per side', 'Chest-supported row, 3 x 10'] },
+    release: { title: 'Free up your overhead reach', minutes: 5, movements: ['Roller under the side of the ribcage below the armpit, pinned 45s per side', 'Overhead hang with a full exhale, 3 x 20s'] },
+    activate: { title: 'Set your shoulder blades', minutes: 8, movements: ['Band pull-apart, 3 x 15', 'Face-down W-raise, elbows bent in a W, 3 x 10', 'Half-kneeling row with a 2s hold, 3 x 8 per side'] },
+    pattern: { title: 'Row with your shoulders set', minutes: 9, movements: ['Split-stance row, 4 x 8 per side', 'Chest-supported row, 3 x 10'] },
   },
   posterior_chain: {
-    release: { title: 'Free the back of the leg', minutes: 6, movements: ['Seated on a ball under the back of the thigh, pinned 45s per side', 'Calf and sole release, 40s per side', 'Slow leg lower, 8 per side'] },
-    activate: { title: 'Ask the hips to lead the hinge', minutes: 8, movements: ['Hip hinge to a wall, 3 x 10', 'Single-leg bridge, 3 x 8 per side', 'Slow Romanian deadlift with a dowel, 3 x 8'] },
-    pattern: { title: 'Hinge without folding forward', minutes: 10, movements: ['Hinge to a target with a band at the hips, 4 x 8', 'Split-stance press from a hinge, 3 x 6 per side'] },
+    release: { title: 'Loosen the back of your legs', minutes: 6, movements: ['Seated on a ball under the back of the thigh, pinned 45s per side', 'Calf and sole release, 40s per side', 'Slow leg lower, 8 per side'] },
+    activate: { title: 'Lead with your hips', minutes: 8, movements: ['Hip hinge: push your hips back to touch a wall, 3 x 10', 'Single-leg bridge, 3 x 8 per side', 'Slow Romanian deadlift: hips back, a stick down your legs, 3 x 8'] },
+    pattern: { title: 'Bend at the hips, back flat', minutes: 10, movements: ['Push your hips back to a target, a band around your hips, 4 x 8', 'Split-stance press, bent at the hips with a flat back, 3 x 6 per side'] },
   },
 };
 
@@ -220,8 +222,8 @@ export function buildProgram(history: readonly SessionFinding[]): MirrorProgram 
       sessions: usableCount,
       blocks: [],
       headline: usableCount < 2
-        ? 'Scan a couple more times and a program will build itself from what shows up.'
-        : 'Nothing showed up often enough to program for — keep moving the way you are.',
+        ? 'Do a couple more sets with the camera, and a plan will build from what it sees.'
+        : 'Nothing showed up often enough to need a plan. Keep moving the way you are.',
       disclaimer: PROGRAM_DISCLAIMER,
       retestAfterSessions: RETEST_AFTER,
     };
@@ -324,8 +326,8 @@ const usableChronological = (history: readonly SessionFinding[]) =>
 /** The line the schedule says: when the retest is, or that it is next. */
 export function retestLine(sessionsToRetest: number): string {
   if (sessionsToRetest <= 0) return '';
-  if (sessionsToRetest === 1) return 'Your next press/row set in the Mirror is the retest: it shows whether these turned up less often.';
-  return `Retest in ${sessionsToRetest} press/row sets in the Mirror. The program stays the same until then.`;
+  if (sessionsToRetest === 1) return 'Your next press and row set in the Mirror is the check-up: it shows if these happen less often.';
+  return `Check-up in ${sessionsToRetest} press and row sets in the Mirror. The plan stays the same until then.`;
 }
 
 /** Where this athlete is in the program: which program is in force, how far to the retest, and what the last one said. */

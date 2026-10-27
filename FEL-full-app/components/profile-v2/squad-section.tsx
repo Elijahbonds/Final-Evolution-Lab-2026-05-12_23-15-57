@@ -15,7 +15,7 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
         <Card>
           {rival ? (
             <>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#C79BFF]">Your rival</p>
+              <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-[#C79BFF]">Your rival</p>
               <div className="mt-1.5 flex items-center justify-between gap-3">
                 <p className="fel-heading truncate text-[20px] font-black text-white">{rival.name}</p>
                 <p className="fel-heading shrink-0 text-[20px] font-black tabular-nums"><span className="text-fel-emerald">{rival.wins}</span><span className="text-fel-quiet"> – </span><span className="text-fel-ember">{rival.losses}</span>{rival.draws > 0 && <span className="text-fel-dim"> – {rival.draws}</span>}</p>
@@ -30,7 +30,7 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
               {opponents.filter((o) => o !== rival).slice(0, 5).map((o) => (
                 <li key={o.name + o.lastAt} className="flex items-center justify-between gap-3 py-2 text-[12.5px]">
                   <span className="min-w-0 truncate text-white/75">{o.name}</span>
-                  <span className="shrink-0 font-mono tabular-nums text-white/60">{o.wins}W {o.losses}L{o.draws ? ` ${o.draws}D` : ''}</span>
+                  <span className="shrink-0 font-sans tabular-nums tabular-nums text-white/60">{o.wins}W {o.losses}L{o.draws ? ` ${o.draws}D` : ''}</span>
                 </li>
               ))}
             </ul>
@@ -38,7 +38,7 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
           {matchesPlayed > 0 && <p className="mt-2 text-[10.5px] text-fel-quiet">{matchesPlayed} duel{matchesPlayed === 1 ? '' : 's'} settled</p>}
         </Card>
         <Card>
-          <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-cyan"><Link2 className="h-3.5 w-3.5" aria-hidden />Your challenge links</p>
+          <p className="flex items-center gap-1.5 font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-cyan"><Link2 className="h-3.5 w-3.5" aria-hidden />Your challenge links</p>
           {links.count > 0 ? (
             <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
               {[['Opened', links.opened], ['Tried', links.attempted], ['Beat you', links.beaten]].map(([k, v]) => (

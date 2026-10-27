@@ -10,7 +10,7 @@
 //   · every read rep under FLAG_BELOW_SCORE, and
 //   · the worst read rep of the set when anything was found at all (so a set with one minor fault still names its rep).
 // A clean set flags nothing. A rep the camera could not read is never flagged and never scored (null), and never called
-// clean. Each flag names its rep and its reason the way a coach would say it — "Left knee caves on rep 4" — with the
+// clean. Each flag names its rep and its reason the way a coach would say it — "Left knee caves in on rep 4" — with the
 // Mirror's own cue for that fault.
 //
 // THE NUMBERS BELOW ARE NEW (TUNE(elijah), owner call): nothing in the app scored a single rep before. They are not
@@ -45,7 +45,7 @@ export interface RepFlag {
   score: number;
   /** The rep's first fault in coaching order (empty when a worst rep has none — never happens: a 100 is not flagged). */
   fault: string;
-  /** "Left knee caves on rep 4". */
+  /** "Left knee caves in on rep 4". */
   reason: string;
   /** The Mirror's own cue for that fault, or null. */
   cue: string | null;
@@ -87,7 +87,7 @@ export function scoreReps(movement: ReviewMovement, reps: readonly { n: number; 
   });
 }
 
-/** "Left knee caves on rep 4". */
+/** "Left knee caves in on rep 4". */
 export function flagReason(movement: ReviewMovement, rep: Pick<ScoredRep, 'n' | 'faults' | 'sides'>): string {
   const f = rep.faults[0];
   return `${faultPhrase(movement, f, rep.sides[f])} on rep ${rep.n}`;

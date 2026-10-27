@@ -87,3 +87,34 @@ describe('--fel-font-display is defined once, from the next/font variables', () 
     }
   });
 });
+
+describe('FONTS-FIX (premium-ui P2, 2026-10-27): a missing font variable means the system sans, never the browser serif', () => {
+  // `font-family: var(--font-sans), system-ui, sans-serif` with --font-sans unset is invalid at computed-value time, so
+  // the element inherits the browser default — Times. Production sets the variables on <html> and never showed it; the
+  // probe rigs (no next/font) and the root crash screen (its own <html>) did. The fallback goes INSIDE the var().
+  const TAILWIND = noComments(read('tailwind.config.ts'));
+  const GLOBALS = noComments(read('app/globals.css'));
+
+  it('every Tailwind face reads its variable with a fallback inside the var()', () => {
+    const block = /fontFamily:\s*\{([\s\S]*?)\n\s*\}/.exec(TAILWIND)?.[1] ?? '';
+    const faces = [...block.matchAll(/(\w+):\s*\[([^\]]*)\]/g)].map((m) => ({ face: m[1], stack: m[2] }));
+    expect(faces.map((f) => f.face).sort()).toEqual(['display', 'mono', 'sans']);
+    for (const { face, stack } of faces) {
+      expect(stack, face).not.toMatch(/var\(--font-[a-z]+\)/);
+      expect(stack, face).toMatch(/var\(--font-[a-z]+, /);
+    }
+  });
+
+  it('the app\'s own stylesheets never read a font variable bare (the HUD token above is pinned separately)', () => {
+    const decls = [...(GLOBALS + THEME).matchAll(/(font-family|--fel-font-[a-z]+)\s*:\s*([^;]+);/g)]
+      .filter((m) => m[1] !== '--fel-font-display');
+    expect(decls.length).toBeGreaterThan(0);
+    for (const m of decls) expect(m[2], m[0]).not.toMatch(/var\(--(fel-)?font-[a-z]+\)/);
+  });
+
+  it('the text token is the loaded text face, not a family nothing loads', () => {
+    const body = /--fel-font-body\s*:\s*([^;]+);/.exec(THEME)?.[1] ?? '';
+    expect(body).toMatch(/var\(--font-sans, /);
+    expect(body).not.toMatch(/Inter/);
+  });
+});

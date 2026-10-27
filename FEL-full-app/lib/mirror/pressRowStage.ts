@@ -30,6 +30,7 @@
 // HONESTY. The engine reads the RIGHT arm only (v1: kinematic-engine.ts "right side used as the working arm proxy"), so
 // the labels say "working elbow" and "working shoulder", never both. Every read is a 2-D estimate; the labels are the
 // review's words, not a measurement claim. Nothing here is saved or sent: the fault list lives in this tab.
+import { FAULT_NAMES } from '@/lib/cue-style/names';
 import type { ZoneId } from '@/lib/babylon/nexus/neuro-mirror/patterns/split-stance-press-row';
 import type { ZoneState } from '@/lib/babylon/nexus/neuro-mirror/rules/config';
 import type { FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
@@ -51,10 +52,11 @@ export const PRESS_ROW_FAULT_ZONE: Readonly<Record<PressRowFault, ZoneId>> = {
 export const PRESS_ROW_PERSIST_FRAMES = 3;
 
 /** What each fault is called in the review — what the camera read, for the one arm it reads. */
+// CUE-REWRITE (2026-10-27): the canonical names (lib/cue-style/names.ts).
 export const PRESS_ROW_FAULT_LABEL: Readonly<Record<PressRowFault, string>> = {
-  elbowFlare: 'Working elbow rising toward shoulder height',
-  shrug: 'Working shoulder riding up on the pull',
-  trunkOffset: 'Shoulders drifting sideways off the hips',
+  elbowFlare: FAULT_NAMES.workingElbowRises,
+  shrug: FAULT_NAMES.workingShrug,
+  trunkOffset: FAULT_NAMES.shoulderShift,
 };
 
 /**

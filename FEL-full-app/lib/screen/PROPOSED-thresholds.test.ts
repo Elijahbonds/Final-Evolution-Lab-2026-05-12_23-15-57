@@ -125,7 +125,7 @@ describe('what is never a grade', () => {
   it('the landing weight shift is hidden in v1: kept as data only, never graded', () => {
     const w = SCREEN_CHECKS.find((c) => c.id === 'jump.landingWeightShift')!;
     expect(w).toMatchObject({ map: 'HIDDEN', status: 'hidden-v1', thresholdId: null });
-    expect(w.draftOnly?.cue).toBe('Single-leg hops and sticks');
+    expect(w.draftOnly?.cue).toBe('Small one-leg hops: land, then hold still.');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
     expect(GRADED_CHECKS.map((c) => c.id)).not.toContain('jump.landingWeightShift');
   });
 

@@ -103,7 +103,7 @@ export const PROTOCOLS: Record<ProtocolId, ProtocolDef> = {
 export const PROTOCOL_WHY = {
   sjNoHold: 'no still squat before it: hold the squat for two seconds, then jump',
   sjShallow: 'it did not start from a squat: bend your knees to about 90° and hold',
-  sjDip: 'you dipped before you jumped, so it was a countermovement jump',
+  sjDip: 'you dipped before you jumped: jump straight up from the held squat',
   handsOff: 'your hands left your hips',
   noSwing: 'your arms did not swing: swing them back, then up as you jump',
   otherFoot: 'your other foot came down: keep it up the whole time',

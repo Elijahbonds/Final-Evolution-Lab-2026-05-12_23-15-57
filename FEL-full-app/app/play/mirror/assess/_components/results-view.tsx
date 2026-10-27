@@ -21,8 +21,9 @@ import { cueOf, checkById, GRADED_CHECKS, type BandWord, type CheckId } from '@/
 import { isKid, type AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import {
-  DISCLAIMER, DONE_CLEAR, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK, PRIVACY_LINK, SCREENSHOT_LINE,
-  SCREEN_TEST_NAMES, WIN_LINE,
+  CHECK_MEANING, DISCLAIMER, DONE_CLEAR, GREEN_MEANING, GREEN_NEXT, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK,
+  PRIVACY_LINK, SCREENSHOT_LINE, SCREEN_TEST_NAMES, TRY_THIS, UNREAD_MEANING, UNREAD_NEXT, WIN_LINE,
+  JUMP_BEST_MEANS, JUMP_BEST_NEXT,
 } from '@/lib/screen/copy';
 import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR } from './screen-ui';
 import { KidResults } from './kid-results';
@@ -105,9 +106,16 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
                       {rowName(row.id)}
                     </p>
                     {row.sides ? <SideRow left={row.sides.left} right={row.sides.right} /> : null}
-                    <p data-cue className={`mt-1 leading-snug ${cueText}`}>Try this: {cueOf(row.id)}<EarlyTag /></p>
+                    {/* CUE-REWRITE (2026-10-27): what it means, then the one next step (docs/CUE-STYLE.md) */}
+                    <p data-means className={`mt-1 leading-snug ${cueText}`}>{CHECK_MEANING[row.id]}</p>
+                    <p data-cue className={`mt-1 leading-snug ${cueText}`}><b>{TRY_THIS}</b> {cueOf(row.id)}<EarlyTag /></p>
                   </>
-                ) : null}
+                ) : (
+                  <>
+                    <p data-means className={`mt-1 leading-snug ${cueText}`}>{band === 'green' ? GREEN_MEANING : UNREAD_MEANING}</p>
+                    <p data-next className={`mt-1 leading-snug ${cueText}`}>{band === 'green' ? GREEN_NEXT : UNREAD_NEXT}</p>
+                  </>
+                )}
                 {top && idx === 0 ? (() => {   // the replay: the TOP-RANKED card only (first in sort order; a tie goes to the first)
                   const rep = pickReplay(replay, row);
                   return rep ? <FaultReplay rep={rep} /> : null;
@@ -126,7 +134,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
       {s.jumpBestIn !== null ? (
         <section data-personal-best className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
           <p className="text-[16px] text-white/80">Your best jump: <b className="text-[18px] text-white">{aboutInches(s.jumpBestIn)}</b></p>
-          <p className="text-[16px] text-white/55">A personal best to beat next time.</p>
+          <p data-means className="text-[16px] text-white/70">{JUMP_BEST_MEANS}</p>
+          <p data-next className="text-[16px] text-white/55">{JUMP_BEST_NEXT}</p>
         </section>
       ) : null}
 
