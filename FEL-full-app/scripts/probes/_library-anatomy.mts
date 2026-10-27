@@ -8,6 +8,8 @@
 //   perf            the phone profile (390×844, DPR 3, 4× CPU throttle): frame time and FPS, JS heap, draw calls, with
 //                   the Muscles tab open and with the Demo tab playing, after the body has loaded
 //   chunks          the lazy chunk sizes (esbuild, minified, code-split the way next/dynamic splits them)
+//   ttfc            LIBRARY-ANATOMY-2: time to first useful content on the phone (390 px, 4× CPU throttle): from the tap on a
+//                   card's Demo / Muscles link to the cue card or muscle list in the stage's box, and to the 3D ready
 //   OUT=<dir> npx tsx scripts/probes/_library-anatomy.mts <job> [args]
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
@@ -23,14 +25,16 @@ const OUT = process.env.OUT ?? join(ROOT, '.library-anatomy-rig');
 const job = process.argv[2] ?? 'clips';
 const args = process.argv.slice(3);
 mkdirSync(OUT, { recursive: true });
-const SITE = join(OUT, 'site');
+const PROD = process.env.PROD === '1';
+const SITE = join(OUT, PROD ? 'site-prod' : 'site');
 mkdirSync(SITE, { recursive: true });
 
 async function bundle(): Promise<void> {
   await build({
     entryPoints: [join(ROOT, 'scripts/probes/_library-anatomy-entry.tsx')], bundle: true, outdir: SITE, entryNames: 'rig', format: 'esm', splitting: true, platform: 'browser',
-    jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: false,
-    banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "development" } };' },
+    // PROD=1 (T-POSE, 2026-10-27): a release build's bundle — NODE_ENV production, minified — as the phone loads it
+    jsx: 'automatic', define: { 'process.env.NODE_ENV': PROD ? '"production"' : '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: PROD,
+    banner: { js: `var process = globalThis.process || { env: { NODE_ENV: "${PROD ? 'production' : 'development'}" } };` },
     loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.glb': 'empty', '.wasm': 'empty' },
   });
   const css = join(SITE, 'rig.css');
@@ -99,6 +103,41 @@ async function clipsJob(): Promise<void> {
   console.log(JSON.stringify(report, null, 1));
 }
 
+/** LIBRARY-ANATOMY-2: the clips job on ONE loaded stage — the clip is swapped in place (the stage's own prop change, as the
+ *  sheet's Easier / Harder swap does), so a sheet of 60 loops pays for one spawn, not 60. Same shots, same sheets. */
+async function sheetJob(): Promise<void> {
+  const { url, close } = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const names = args.length ? args : (await import('../../lib/babylon/anim/authored/exercise.ts')).EXERCISE_CLIPS as string[];
+  const report: Record<string, unknown> = {};
+  const FRACS = (process.env.FRACS ?? '0,0.25,0.5,0.75').split(',').map(Number);   // the phases shot (a flow's moves sit between its holds)
+  const shotsDir = join(OUT, 'clips'); mkdirSync(shotsDir, { recursive: true });
+  const page = await browser.newPage({ viewport: { width: 420, height: 315 }, deviceScaleFactor: 1 }); await page.addInitScript(NAME_SHIM);
+  const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
+  await page.goto(`${url}/#stage:idle_stand`);
+  await stageReady(page);
+  for (const clip of names) {
+    const before = errors.length;
+    await page.evaluate((c) => (window as unknown as { __rigSetClip(c: string): void }).__rigSetClip(c), clip);
+    await page.waitForTimeout(Number(process.env.SETTLE ?? 1800));   // the camera eases to the clip's framing
+    const dur = await page.evaluate((c) => { const st = (window as unknown as { __FEL_LIBRARY_STAGE__?: { scene: { animationGroups: { name: string; from: number; to: number }[] } } }).__FEL_LIBRARY_STAGE__; const g = st?.scene.animationGroups.find((x) => x.name === c); return g ? (g.to - g.from) / 30 : null; }, clip);
+    if (dur) for (const f of FRACS) { await at(page, clip, dur * f); await page.screenshot({ path: join(shotsDir, `${clip}-${Math.round(f * 100)}.png`) }); }
+    report[clip] = { dur, errors: errors.slice(before).filter((e) => !/favicon|404/.test(e)) };
+    await page.evaluate((c) => { const st = (window as unknown as { __FEL_LIBRARY_STAGE__: { scene: { animationGroups: { name: string; play(loop: boolean): void }[] } } }).__FEL_LIBRARY_STAGE__; st.scene.animationGroups.find((x) => x.name === c)?.play(true); }, clip);
+  }
+  await page.close();
+  const sheet = await browser.newPage({ viewport: { width: FRACS.length * 300 + 160, height: 6 * 225 }, deviceScaleFactor: 1 }); await sheet.addInitScript(NAME_SHIM);
+  const prefix = process.env.SHEET ?? 'clips-sheet';
+  for (let i = 0; i < names.length; i += 6) {
+    const rows = names.slice(i, i + 6).map((c) => `<div style="display:flex;align-items:center"><div style="width:160px;color:#fff;font:14px sans-serif;word-break:break-all">${c}</div>${FRACS.map((x) => Math.round(x * 100)).map((f) => `<img src="file://${join(shotsDir, `${c}-${f}.png`)}" style="width:300px;height:225px">`).join('')}</div>`).join('');
+    writeFileSync(join(OUT, 'sheet.html'), `<body style="margin:0;background:#111">${rows}</body>`);
+    await sheet.goto(`file://${join(OUT, 'sheet.html')}`); await sheet.waitForTimeout(300);
+    await sheet.screenshot({ path: join(OUT, `${prefix}-${String(i / 6 + 1).padStart(2, '0')}.png`), fullPage: true });
+  }
+  await browser.close(); close();
+  console.log(JSON.stringify(report));
+}
+
 async function musclesJob(): Promise<void> {
   const { url, close } = await serve();
   const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
@@ -125,7 +164,7 @@ async function uiJob(): Promise<void> {
     { name: 'sheet-demo', q: 'goblet squat', tab: 'demo' },
     { name: 'sheet-muscles', q: 'romanian deadlift', tab: 'muscles' },
     { name: 'sheet-cues', q: 'pogo', tab: 'cues' },
-    { name: 'sheet-demo-cuecard', q: 'preacher curl', tab: 'demo' },
+    { name: 'sheet-demo-cuecard', q: 'zottman preacher curl', tab: 'demo' },
   ];
   const results: Record<string, unknown> = {};
   let ok = true;
@@ -203,6 +242,81 @@ async function perfJob(): Promise<void> {
   console.log(JSON.stringify(out, null, 1));
 }
 
+async function ttfcJob(): Promise<void> {
+  const { url, close } = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const out: Record<string, unknown> = {};
+  const CASES: [string, string, 'demo' | 'muscles'][] = [['demo-goblet', 'goblet squat', 'demo'], ['muscles-rdl', 'romanian deadlift', 'muscles'], ['demo-wall-sit', 'wall sit thighs level', 'demo']];
+  for (const [name, q, tab] of CASES) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage(); await page.addInitScript(NAME_SHIM);
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await page.goto(`${url}/#ui`);
+    await page.waitForSelector('[data-testid="library-browser"]', { timeout: 120_000 });
+    await page.fill('input[aria-label="Search the exercise library"]', q); await page.waitForTimeout(1500);
+    // the times are read in the page, from the tap: every DOM change is checked for the preview and the ready stage
+    await page.evaluate(() => {
+      const w = window as unknown as { __ttfc: Record<string, number> };
+      w.__ttfc = {};
+      const check = () => {
+        const now = performance.now();
+        const p = document.querySelector('[data-testid="stage-preview"]');
+        if (p && p.getAttribute('data-shown') === 'true' && w.__ttfc.preview == null) w.__ttfc.preview = now;
+        if (document.querySelector('[data-testid="demo-cue-card"]') && w.__ttfc.cueCard == null) w.__ttfc.cueCard = now;
+        if (document.querySelector('[data-testid="exercise-stage"]')?.getAttribute('data-state') === 'ready' && w.__ttfc.ready == null) w.__ttfc.ready = now;
+      };
+      new MutationObserver(check).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-state', 'data-shown'] });
+      document.addEventListener('pointerdown', () => { w.__ttfc.tap = performance.now(); }, { capture: true, once: true });
+    });
+    await page.locator('[data-testid="library-card"]').first().locator(`[data-testid="card-link-${tab}"]`).click();
+    await page.waitForFunction(() => (window as unknown as { __ttfc: Record<string, number> }).__ttfc.preview != null || (window as unknown as { __ttfc: Record<string, number> }).__ttfc.cueCard != null, undefined, { timeout: 60_000 });
+    await page.screenshot({ path: join(OUT, `ttfc-${name}-preview.png`) });
+    await stageReady(page, 600_000).catch(() => undefined);
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: join(OUT, `ttfc-${name}-ready.png`) });
+    const t = await page.evaluate(() => (window as unknown as { __ttfc: Record<string, number> }).__ttfc);
+    const first = Math.min(t.preview ?? Infinity, t.cueCard ?? Infinity);
+    out[name] = { firstUsefulMs: Math.round(first - t.tap), stageReadyMs: t.ready != null ? Math.round(t.ready - t.tap) : null };
+    await ctx.close();
+  }
+  await browser.close(); close();
+  console.log(JSON.stringify(out, null, 1));
+}
+
+/** T-POSE (owner playtest 2026-10-27): the library stage on each body a player can wear (?body=, the dev identity override:
+ *  the guest's male kit, the female kit, the owner's scan), playing each clip at 390 px — is the body in its bind pose? */
+async function tposeJob(): Promise<void> {
+  const { url, close } = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const clips = (process.env.CLIPS ?? 'idle_stand,ex_squat,ex_pushup,ex_wall_sit').split(',');
+  const bodies = (process.env.BODIES ?? 'male,female,scan').split(',');
+  const out: Record<string, unknown> = {};
+  for (const body of bodies) for (const clip of clips) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); await page.addInitScript(NAME_SHIM);
+    const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error' || /T-?pose|bind pose|FEL-ANIM/i.test(m.text())) errors.push(m.text().slice(0, 240)); });
+    await page.goto(`${url}/?w=358&h=268&body=${body}#${/^(muscles|avatar)\./.test(clip) ? clip.replace(/\./g, ':') : `stage:${clip}`}`);   // muscles.<entry>.<side>: the anatomy view
+    try { await stageReady(page, 300_000); } catch (e) { errors.push(String(e).slice(0, 200)); }
+    const state = await page.evaluate(() => document.querySelector('[data-testid="exercise-stage"]')?.getAttribute('data-state') ?? null);
+    await page.waitForTimeout(1500);
+    const sample = () => page.evaluate(() => {
+      const st = (window as unknown as { __FEL_LIBRARY_STAGE__?: { hero: { skeleton: { bones: { name: string; getTransformNode(): { getAbsolutePosition(): { x: number; y: number; z: number }; computeWorldMatrix(f: boolean): void } | null }[] } }; scene: { animationGroups: { name: string; isPlaying: boolean }[] } } }).__FEL_LIBRARY_STAGE__;
+      if (!st) return null;
+      const p = (n: string) => { const b = st.hero.skeleton.bones.find((x) => x.name.replace(/_c\d+$/, '').endsWith(n)); const t = b?.getTransformNode(); t?.computeWorldMatrix(true); return t?.getAbsolutePosition() ?? null; };
+      const a = p('LeftArm'), e = p('LeftForeArm'), h = p('LeftHand'), hips = p('Hips');
+      const arm = a && e ? (Math.acos(Math.max(-1, Math.min(1, (a.y - e.y) / Math.hypot(e.x - a.x, e.y - a.y, e.z - a.z)))) * 180) / Math.PI : null;
+      return { armFromDownDeg: arm, hand: h ? [h.x, h.y, h.z] : null, hipsY: hips?.y ?? null, playing: st.scene.animationGroups.filter((g) => g.isPlaying).map((g) => g.name) };
+    });
+    const s1 = await sample(); await page.waitForTimeout(700); const s2 = await sample();
+    const moved = s1?.hand && s2?.hand ? Math.hypot(s1.hand[0] - s2.hand[0], s1.hand[1] - s2.hand[1], s1.hand[2] - s2.hand[2]) : null;
+    await page.screenshot({ path: join(OUT, `tpose-${body}-${clip}.png`) });
+    out[`${body}:${clip}`] = { state, armFromDownDeg: s1?.armFromDownDeg != null ? Math.round(s1.armFromDownDeg) : null, handMovedCm: moved != null ? Math.round(moved * 100) : null, hipsY: s1?.hipsY, playing: s1?.playing, errors: errors.slice(0, 6) };
+    await page.close();
+  }
+  await browser.close(); close();
+  console.log(JSON.stringify(out, null, 1));
+}
+
 async function chunksJob(): Promise<void> {
   // the same split next/dynamic makes: the library page's own code, then the stage (Babylon, the body pipeline) only when
   // a 3D tab opens. Minified, so the numbers are a release build's, not the rig's dev bundle.
@@ -244,7 +358,10 @@ async function measureJob(): Promise<void> {
 await bundle();
 if (job === 'measure') await measureJob();
 if (job === 'clips') await clipsJob();
+else if (job === 'sheet') await sheetJob();
 else if (job === 'muscles') await musclesJob();
 else if (job === 'ui') await uiJob();
 else if (job === 'perf') await perfJob();
 else if (job === 'chunks') await chunksJob();
+else if (job === 'ttfc') await ttfcJob();
+else if (job === 'tpose') await tposeJob();
