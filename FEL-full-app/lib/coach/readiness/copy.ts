@@ -1,6 +1,9 @@
 // lib/coach/readiness/copy.ts — COACH-READINESS (2026-10-25): every line the readiness check says.
 //
-// DRAFT PRODUCT COPY, FOR THE OWNER'S EYE (flagged in docs/COACH-READINESS.md). No legal or medical copy: nothing here
+// PRODUCT COPY, OWNER-APPROVED (owner, in chat, 2026-10-27: "You do it. I approve." — Owner Inbox card C15, approved as
+// written). Noted on the card, left as it is: the history line says "saving your movement numbers" while the consent
+// sentence it points to says "jump numbers" (lib/privacy/scanSaveConsent.ts); both name the same Profile switch.
+// No legal or medical copy: nothing here
 // names a cause, a condition or a diagnosis, and nothing promises safety. A low day "reads lower than your normal" and
 // offers an easier day — the existing readiness check-in's own stance (lib/health/readiness.ts: "running low today").
 // copy.test.ts holds every line to lib/coach/weeklyDraft/copy.ts MEDICAL_WORDS.

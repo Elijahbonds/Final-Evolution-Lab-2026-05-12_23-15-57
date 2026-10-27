@@ -1,5 +1,8 @@
-// TEAMS-SQUADS: the product lines the group screens show. Plain product copy for the owner's review
-// (docs/TEAMS-SQUADS.md), not policy text: the guardian's wording for squads is a DRAFT in that doc, not here.
+// TEAMS-SQUADS: the product lines the group screens show. Plain product copy, not policy text.
+// OWNER-APPROVED (owner, in chat, 2026-10-27: "You do it. I approve." — Owner Inbox card C09, approved as written, the
+// league points included).
+// The guardian's wording for teens in squads (card C08, approved the same day) is lib/consent/guardianGate.ts
+// squadsConsentWords: approved, not live until its go-live steps ship (docs/TEAMS-SQUADS.md §3).
 import { LEAGUE_CAPS, LEAGUE_POINTS } from './activity';
 import type { GroupKind } from './types';
 
