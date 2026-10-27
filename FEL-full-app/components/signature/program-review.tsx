@@ -140,7 +140,7 @@ export function ProgramReview({ initial }: { initial?: Overview | null }) {
     <div data-testid="signature-review" className="mx-auto max-w-[860px] px-5 pt-8">
       <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.22em] text-[#FFD700]"><ShieldCheck className="mr-1 inline h-3.5 w-3.5" />Owner review</p>
       <h1 className="fel-heading mt-2 text-[28px] font-black text-white">Signature programs</h1>
-      <p className="mt-2 max-w-xl text-[13px] text-white/50">Every program ships as a draft. Only an approved program is shown to athletes. Edit any exercise (a library id) or dose; the checks run before anything saves.</p>
+      <p className="mt-2 max-w-xl text-[13px] text-white/50">The owner approved all four programs as drafted (2026-10-27), so each one is approved until you reject it or send it back to draft here. Only an approved program is shown to athletes. Edit any exercise (a library id) or dose; the checks run before anything saves.</p>
       {data && !data.ready && <p data-not-ready className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[12.5px] text-white/60">The review tables are not applied yet (prisma/pending/2026-10-25-signature-programs.sql): you can read every program and its checks; approving and editing open once they are.</p>}
       {!data ? <p className="mt-6 text-white/50">Loading…</p> : (
         <ul className="mt-5 grid gap-4">{data.programs.map((p) => <ProgramCardReview key={p.id} row={p} onSaved={setData} />)}</ul>

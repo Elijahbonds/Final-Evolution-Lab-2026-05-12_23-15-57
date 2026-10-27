@@ -245,6 +245,18 @@ lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by 
 (`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
 only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
 **assumption:** the bounds (0.05 to 0.35) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · lobs"), new numbers, default as shipped by that lane: `dunk.oopLobFlightSec` 1.0 s
+(`DunkFlagship.ts` `OOP_LOB_FLIGHT_SEC`: the ALLEY-OOP passer lobs the ball while the dunker is still running, this long
+before the catch beat; it was a 0.35 s pass thrown after the take-off). It moves only when the pass leaves and how high it
+arcs; the catch, the slam window and the card are unchanged. **assumption:** the bounds (0.5 to 1.6 s) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · run-up"), new, default unchanged: `dunk.runwayStrideScale` 1 (`DunkFlagship.ts`
+`RUNWAY_STRIDE_SCALE`): the run-up's leg pace reference (3.6 ÷ 1.1 m/s, as shipped) × this. Re-paced to 3.95 m/s on the rig,
+the run-up skated less at a sprint and more at 2.5–5 m/s, no overall gain, so the shipped pace stays and this is the owner's
+dial. **assumption:** the bounds (0.8 to 1.4) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · slam"), TUNED, flagged: `dunk.slamHitStopBigMs` 100 ms and `dunk.slamShakeBig` 0.18
+(`DunkFlagship.ts` `SLAM_HITSTOP_BIG_MS`, `SLAM_SHAKE_BIG`): a perfect slam's hit-stop and shake. Every make froze 70 ms and
+shook 0.12 before; an ordinary make (accuracy ≤ 0.5) still does, and cleaner ones grow toward these (`slamImpact`).
+**assumption:** the bounds (70–160 ms, 0.12–0.30) are safe, not tuned.
 
 lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, the owner has felt none of them yet):
 

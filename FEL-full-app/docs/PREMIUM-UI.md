@@ -115,6 +115,51 @@ area behind it. `e36e304e` removes the glow under a hero.
 - **Train CLS 0.024** (from 0.064). It is chased in P10.
 - **Profile card looks 8.** The athlete stage moved onto the one card material in P10.
 
+### After P10, post-merge (`35104ffd` bundle `p10`, phone)
+
+These numbers are after the merge of `origin/lane/finish-release` `6183deed`, which brings today-drill #464. FCP is
+noisy in this run, because the machine was at a load average of 31 on 4 CPUs. Compare FCP only within the same run.
+
+| Screen | words | sizes (fold/page) | btn | card | empty | img | cls | a11y |
+|---|---|---|---|---|---|---|---|---|
+| Landing | 46 → **25** | 5/5 → **4/4** | 1 → 2 | 2 → 1 | 77 → **6 %** | 0 → 1 | 0.001 → 0 | 0/0/1 (baseline landmark) |
+| Play | 133 → **42** | 11/12 → **6/6** | 10 → 7 | 3 → 3 | 49 → 26 % | 0 → 1 | 0.015 → 0.025 † | 0 |
+| Train | 141 → 83 ‡ | 10/10 → **5/6** | 7 → 4 | 2 → 3 | 53 → 33 % | 0 → 1 | 0.064 → 0.024 † | 0 |
+| Profile | 104 → 67 | 11/17 → **5/8** | 7 → 7 | 7 → 8 § | 59 → **20 %** | 0 → 1 | 0.004 → 0.006 | 0 |
+| Learn | 106 → 94 | 7 → 5 | 6 → 6 | 0 | 56 → 53 % | 0 | 0.006 → 0.04 | 0 |
+| Playbook | 164 → **90** | 11 | 5 | 2 | 51 → **28 %** | 1 → 1 | 0.091 → **0.006** | 0 |
+| Coach | 29 → 33 | 6 → 4 | 4 | 2 → 3 | 75 → 68 % | 0 | 0.004 → 0.006 | 0 |
+| End screen (win) | 75 → 65 | 11 | 4 | 2 → 1 | 51 → 60 % | 1 | 0.236 → 0 | 0/0/2 |
+| Today's drill (routed) | 153 → 86 | 8 → 9 | 3 | 2 → 1 | 56 → 58 % | 0 | 0.004 → 0.019 | 0/2/3 → 0/1/2 |
+
+Notes on the marked cells:
+
+- **† The hero CLS.** The shift sources are the hero's text column: it re-flows when the display face arrives. On the
+  rig the fonts load with no size-adjusted fallback, which production's next/font provides.
+  - assumption: production's hero shift is smaller.
+  - The rail's 0.006 shift was real, and is fixed in `35104ffd`.
+- **‡ Train.** The 83 words are mostly today-drill's new card for a first-timer. Its own budget is 110 words or fewer.
+- **§ Profile card looks.** `35104ffd` gives the PRQ box and the athlete stage the surfaces' padding, so they count as
+  the same card look as the tiles. That is not re-measured yet.
+
+**P9: the accessibility re-audit, 22 rooms** (the ten key pages and 12 more):
+
+| Severity | Count | Notes |
+|---|---|---|
+| Critical | 0 | |
+| Serious | 1 | `/modes`, the family count in its accent at 11 px (4.27:1). Fixed after this run. |
+| Moderate | 4 | The baseline `landmark` on landing and signup; two rig-stub pages (library, guidance) whose stubbed APIs error. |
+
+Before P9's fixes, `/modes` had 33 serious findings and `/profile/week` had 2.
+
+**P9: a11y-deep, 13 scenes:**
+
+- **Reduced motion** (device setting, and the app's own `?motion=reduce`): 0 premium animations left running.
+- **200 % zoom:** no sideways scroll. Clipped text: 0, except 4 on `/dev/ui`.
+- **1.4.12 text spacing:** 0 newly clipped.
+- **Focus order:** 0 findings, except the end screen's Next teaser, which shows no change on Tab: its ring is
+  pre-lit by the pad focus. Fixed after this run.
+
 ## Swaps routed to the running lanes, not made here
 
 These are one-line changes that put these screens on the system. Make each one in the lane that owns the file, when it
