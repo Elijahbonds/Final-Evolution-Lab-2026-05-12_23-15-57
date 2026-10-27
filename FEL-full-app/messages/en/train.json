@@ -1,0 +1,89 @@
+{
+  "eyebrow": "Train",
+  "title": "The work between games",
+  "lede": "Screen it, program it, eat for it. This is the loop the games are the proof of.",
+  "cards": {
+    "mirror": {
+      "title": "The Mirror",
+      "line": "A squat coach and a movement screen on your own camera. It cues what it can see, and every number it shows is an estimate.",
+      "tag": "Start a screen"
+    },
+    "quickScreen": {
+      "title": "Quick Screen",
+      "line": "A free movement check on this camera: your jump in about a minute, or the full screen in about five. Nothing is sent.",
+      "tag": "Check it"
+    },
+    "readiness": {
+      "title": "Readiness check",
+      "line": "Three jumps a day against your own normal: ready, normal or low. A low day eases your coached session and your coach is told. 18 and over.",
+      "tag": "Check in"
+    },
+    "drills": {
+      "title": "Drills",
+      "line": "The Playbook's wake-up and jump-and-land drills, on your camera. Follow the targets; nothing is sent.",
+      "tag": "Run a drill"
+    },
+    "programming": {
+      "title": "Your programming",
+      "lineCoach": "Written by {name}.",
+      "lineBlocks": "Your blocks and sessions.",
+      "lineNone": "No coach yet — an invite link puts their programming here.",
+      "tagOpen": "Open",
+      "tagHow": "How it works"
+    },
+    "signature": {
+      "title": "Signature programs",
+      "tag": "Browse"
+    },
+    "library": {
+      "title": "Exercise library",
+      "line": "Search every exercise by name, muscle or goal, or ask in plain words. Cues and faults on every one.",
+      "tag": "Search"
+    },
+    "iron": {
+      "title": "Iron Paradise",
+      "line": "The gym floor. Lift, jump, and put a number on it.",
+      "tag": "Train"
+    },
+    "playbook": {
+      "title": "The Playbook",
+      "line": "Ten chapters on how the body actually moves, from the book. Every drill is one you can run tonight.",
+      "tag": "Learn"
+    },
+    "fuel": {
+      "title": "Fuel",
+      "line": "Meals keyed to the numbers you enter, and the kitchens behind it.",
+      "tag": "Eat"
+    },
+    "squads": {
+      "title": "Squads and teams",
+      "line": "Train with friends: a group streak on the daily drill, a weekly league, reactions. No messages.",
+      "tag": "Train together"
+    },
+    "roster": {
+      "title": "Your roster",
+      "line": "The athletes you coach, what they have done this fortnight, and who is drifting.",
+      "tag": "Coach"
+    },
+    "combine": {
+      "title": "Combine day",
+      "line": "Run a tryout: jump, agility, sprint and a skill drill, station by station, then a ranked report.",
+      "tag": "Run a combine"
+    },
+    "combines": {
+      "title": "Your combines",
+      "line": "Your numbers from your coach’s combines, and where you placed.",
+      "tag": "See results"
+    },
+    "standing": {
+      "title": "Where you stand",
+      "line": "PRQ, your grade, and what has moved since the last screen.",
+      "tag": "Read"
+    },
+    "sprint": {
+      "title": "Sprint speed",
+      "line": "Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.",
+      "tag": "Time a run"
+    }
+  }
+}

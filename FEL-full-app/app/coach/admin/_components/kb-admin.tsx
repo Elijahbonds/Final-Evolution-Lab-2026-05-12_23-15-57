@@ -92,12 +92,12 @@ export function KBAdmin() {
     setExercises(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
   };
 
-  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#00E5FF]" /></div>;
+  if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-fel-cyan" /></div>;
 
   return (
     <main className="mx-auto max-w-[1100px] px-4 py-6">
       <div className="flex items-center gap-3">
-        <BookOpen className="h-7 w-7 text-[#A855F7]" />
+        <BookOpen className="h-7 w-7 text-fel-violet" />
         <div>
           <h1 className="fel-heading text-3xl font-bold text-white">EXERCISE KNOWLEDGE BASE</h1>
           <p className="text-sm text-white/50">Author exercises for the Bonds Bounce Blueprint curriculum.</p>
@@ -108,8 +108,8 @@ export function KBAdmin() {
       <div className="mt-4 flex flex-wrap gap-4 rounded-xl bg-white/5 px-4 py-3">
         <span className="font-mono text-xs text-white/60">{cats.length} categories</span>
         <span className="font-mono text-xs text-white/60">{exercises.length} exercises</span>
-        <span className="font-mono text-xs text-[#00FF9D]">{exercises.filter(e => e.published).length} published</span>
-        <span className="font-mono text-xs text-white/40">{exercises.filter(e => e.videoUrl).length} with video</span>
+        <span className="font-mono text-xs text-fel-emerald">{exercises.filter(e => e.published).length} published</span>
+        <span className="font-mono text-xs text-fel-dim">{exercises.filter(e => e.videoUrl).length} with video</span>
       </div>
 
       {/* Add Category */}
@@ -119,9 +119,9 @@ export function KBAdmin() {
           onChange={e => setNewCatName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addCategory()}
           placeholder="New category name…"
-          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-[#A855F7]/50 focus:outline-none"
+          className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:border-fel-violet/50 focus:outline-none"
         />
-        <button onClick={addCategory} className="flex items-center gap-1.5 rounded-lg bg-[#A855F7] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#A855F7]/80">
+        <button onClick={addCategory} className="flex items-center gap-1.5 rounded-lg bg-fel-violet px-4 py-2 text-sm font-bold text-white transition hover:bg-fel-violet/80">
           <FolderPlus className="h-4 w-4" /> Add Category
         </button>
       </div>
@@ -134,9 +134,9 @@ export function KBAdmin() {
             <div className="flex items-center justify-between rounded-t-xl border border-white/10 bg-white/5 px-4 py-3">
               <div>
                 <h2 className="fel-heading text-lg font-bold text-white">{cat.name}</h2>
-                <p className="text-xs text-white/40">{catExercises.length} exercises · {cat.description || 'No description'}</p>
+                <p className="text-xs text-fel-dim">{catExercises.length} exercises · {cat.description || 'No description'}</p>
               </div>
-              <button onClick={() => addExercise(cat.id)} className="flex items-center gap-1 rounded-md border border-white/15 px-3 py-1.5 text-xs font-bold text-white/70 transition hover:border-[#00E5FF]/50 hover:text-[#00E5FF]">
+              <button onClick={() => addExercise(cat.id)} className="flex items-center gap-1 rounded-md border border-white/15 px-3 py-1.5 text-xs font-bold text-white/70 transition hover:border-fel-cyan/50 hover:text-fel-cyan">
                 <Plus className="h-3.5 w-3.5" /> Exercise
               </button>
             </div>
@@ -148,11 +148,11 @@ export function KBAdmin() {
                   <div key={ex.id} className="border border-t-0 border-white/10 bg-[#0a0a0a]">
                     <button onClick={() => setOpenEx(isOpen ? null : ex.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/5">
                       {isOpen ? <ChevronDown className="h-4 w-4 text-white/50" /> : <ChevronRight className="h-4 w-4 text-white/50" />}
-                      <Dumbbell className="h-4 w-4 text-[#00E5FF]" />
+                      <Dumbbell className="h-4 w-4 text-fel-cyan" />
                       <span className="flex-1 text-sm font-medium text-white/85">{ex.name || 'Untitled'}</span>
-                      {ex.videoUrl && <Video className="h-3.5 w-3.5 text-[#FFD700]" />}
-                      {ex.published ? <Eye className="h-3.5 w-3.5 text-[#00FF9D]" /> : <EyeOff className="h-3.5 w-3.5 text-white/30" />}
-                      <span className="font-mono text-[10px] text-white/30">Ph{ex.phase} Ch{ex.chapter}</span>
+                      {ex.videoUrl && <Video className="h-3.5 w-3.5 text-fel-gold" />}
+                      {ex.published ? <Eye className="h-3.5 w-3.5 text-fel-emerald" /> : <EyeOff className="h-3.5 w-3.5 text-fel-quiet" />}
+                      <span className="font-mono text-[10px] text-fel-quiet">Ph{ex.phase} Ch{ex.chapter}</span>
                     </button>
 
                     {isOpen && (
@@ -191,16 +191,16 @@ export function KBAdmin() {
                         )}
                         <div className="flex items-center gap-4">
                           <label className="flex items-center gap-2 text-sm text-white/70">
-                            <input type="checkbox" checked={ex.published} onChange={e => updateLocal(ex.id, 'published', e.target.checked)} className="accent-[#00FF9D]" />
+                            <input type="checkbox" checked={ex.published} onChange={e => updateLocal(ex.id, 'published', e.target.checked)} className="accent-fel-emerald" />
                             Published (visible to learners)
                           </label>
                           <Field label="Sort Order" value={String(ex.sortOrder)} onChange={v => updateLocal(ex.id, 'sortOrder', v)} className="w-24" />
                         </div>
                         <div className="flex gap-2 pt-2">
-                          <button onClick={() => saveExercise(ex)} disabled={saving === ex.id} className="flex items-center gap-1.5 rounded-md bg-[#00E5FF] px-4 py-2 text-sm font-bold text-black transition hover:bg-[#00E5FF]/80 disabled:opacity-50">
+                          <button onClick={() => saveExercise(ex)} disabled={saving === ex.id} className="flex items-center gap-1.5 rounded-md bg-fel-cyan px-4 py-2 text-sm font-bold text-black transition hover:bg-fel-cyan/80 disabled:opacity-50">
                             {saving === ex.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save
                           </button>
-                          <button onClick={() => deleteExercise(ex.id)} className="flex items-center gap-1.5 rounded-md border border-[#FF3366]/40 px-4 py-2 text-sm font-bold text-[#FF3366] transition hover:bg-[#FF3366]/10">
+                          <button onClick={() => deleteExercise(ex.id)} className="flex items-center gap-1.5 rounded-md border border-fel-crimson/40 px-4 py-2 text-sm font-bold text-fel-crimson transition hover:bg-fel-crimson/10">
                             <Trash2 className="h-4 w-4" /> Delete
                           </button>
                         </div>
@@ -215,7 +215,7 @@ export function KBAdmin() {
       })}
 
       {cats.length === 0 && (
-        <p className="mt-12 text-center text-white/40">No categories yet. Create one above to start building the exercise catalogue.</p>
+        <p className="mt-12 text-center text-fel-dim">No categories yet. Create one above to start building the exercise catalogue.</p>
       )}
     </main>
   );
@@ -225,24 +225,24 @@ export function KBAdmin() {
 function Field({ label, value, onChange, placeholder, className }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <div className={className}>
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-white/40">{label}</label>
-      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder:text-white/25 focus:border-[#00E5FF]/50 focus:outline-none" />
+      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder:text-white/25 focus:border-fel-cyan/50 focus:outline-none" />
     </div>
   );
 }
 function TextArea({ label, value, onChange, rows }: { label: string; value: string; onChange: (v: string) => void; rows: number }) {
   return (
     <div>
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-white/40">{label}</label>
-      <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:border-[#00E5FF]/50 focus:outline-none" />
+      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
+      <textarea value={value} onChange={e => onChange(e.target.value)} rows={rows} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/25 focus:border-fel-cyan/50 focus:outline-none" />
     </div>
   );
 }
 function Select({ label, value, options, onChange }: { label: string; value: string; options: { v: string; l: string }[]; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-white/40">{label}</label>
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white focus:border-[#00E5FF]/50 focus:outline-none">
+      <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-fel-dim">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)} className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white focus:border-fel-cyan/50 focus:outline-none">
         {options.map(o => <option key={o.v} value={o.v} className="bg-[#111]">{o.l}</option>)}
       </select>
     </div>

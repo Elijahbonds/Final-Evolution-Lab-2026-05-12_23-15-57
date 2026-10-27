@@ -125,7 +125,7 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
     if (r?.ok) setCtx((c) => (c ? { ...c, events: c.events.filter((e) => e.id !== id) } : c));
   };
 
-  if (!ctx) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (!ctx) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const ev = view.kind === 'run' || view.kind === 'report' ? drafts.find((d) => d.localId === view.id) ?? null : null;
   const numbersOnly = say(NUMBERS_ONLY_LINE);
   const status = !ctx.available ? COMING_SOON_LINE
@@ -146,28 +146,28 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
   const savedOnly = ctx.events.filter((e) => !drafts.some((d) => d.serverId === e.id));
   return (
     <div className="space-y-4" data-combine-home>
-      <button type="button" onClick={() => setView({ kind: 'setup' })} data-combine-new className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#00E5FF] text-lg font-black text-black">
+      <button type="button" onClick={() => setView({ kind: 'setup' })} data-combine-new className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-fel-cyan text-lg font-black text-black">
         <Plus className="h-5 w-5" /> New combine
       </button>
       {!ctx.available && <p className="text-xs text-white/50" data-combine-coming-soon>{COMING_SOON_LINE}</p>}
-      {numbersOnly && <p className="text-xs text-white/45">{numbersOnly}</p>}
+      {numbersOnly && <p className="text-xs text-fel-dim">{numbersOnly}</p>}
       {drafts.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-[11px] uppercase tracking-wider text-white/40">On this phone</h2>
+          <h2 className="text-[11px] uppercase tracking-wider text-fel-dim">On this phone</h2>
           <ul className="space-y-2">
             {drafts.map((d) => {
               const p = d.stations.reduce((t, s) => { const x = stationProgress(d, s.id); return { done: t.done + x.done, total: t.total + x.total }; }, { done: 0, total: 0 });
               return (
                 <li key={d.localId} className="fel-card flex items-center gap-3 rounded-xl p-3" data-combine-draft={d.localId}>
-                  <ClipboardList className="h-5 w-5 shrink-0 text-[#00E5FF]" />
+                  <ClipboardList className="h-5 w-5 shrink-0 text-fel-cyan" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-bold text-white">{d.name}</span>
-                    <span className="block text-xs text-white/45">{new Date(d.createdAt).toLocaleDateString()} · {d.athletes.length} athletes · {p.done}/{p.total} attempts{d.serverId ? ' · saved' : ''}</span>
+                    <span className="block text-xs text-fel-dim">{new Date(d.createdAt).toLocaleDateString()} · {d.athletes.length} athletes · {p.done}/{p.total} attempts{d.serverId ? ' · saved' : ''}</span>
                   </span>
                   <button type="button" onClick={() => setView({ kind: 'run', id: d.localId })} className="min-h-10 rounded-lg border border-white/20 px-3 text-xs font-bold text-white/85">Run</button>
                   <button type="button" onClick={() => setView({ kind: 'report', id: d.localId })} className="min-h-10 rounded-lg border border-white/20 px-3 text-xs font-bold text-white/85">Report</button>
                   <button type="button" aria-label={`Remove ${d.name} from this phone`} onClick={() => { if (window.confirm(d.serverId ? 'Remove this combine from this phone? The saved copy on your account stays.' : 'Delete this combine? It is only on this phone.')) { dropDraft(d.localId); setDrafts((x) => x.filter((y) => y.localId !== d.localId)); } }}
-                    className="grid h-10 w-10 place-items-center rounded-lg text-white/45"><Trash2 className="h-4 w-4" /></button>
+                    className="grid h-10 w-10 place-items-center rounded-lg text-fel-dim"><Trash2 className="h-4 w-4" /></button>
                 </li>
               );
             })}
@@ -176,16 +176,16 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
       )}
       {savedOnly.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-[11px] uppercase tracking-wider text-white/40">On your account</h2>
+          <h2 className="text-[11px] uppercase tracking-wider text-fel-dim">On your account</h2>
           <ul className="space-y-2">
             {savedOnly.map((e) => (
               <li key={e.id} className="fel-card flex items-center gap-3 rounded-xl p-3">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-bold text-white">{e.name}</span>
-                  <span className="block text-xs text-white/45">{new Date(e.createdAt).toLocaleDateString()} · {e.athletes} athletes</span>
+                  <span className="block text-xs text-fel-dim">{new Date(e.createdAt).toLocaleDateString()} · {e.athletes} athletes</span>
                 </span>
                 <button type="button" onClick={() => void openSaved(e.id)} className="min-h-10 rounded-lg border border-white/20 px-3 text-xs font-bold text-white/85">Open</button>
-                <button type="button" aria-label={`Delete ${e.name}`} onClick={() => void deleteSaved(e.id)} className="grid h-10 w-10 place-items-center rounded-lg text-white/45"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" aria-label={`Delete ${e.name}`} onClick={() => void deleteSaved(e.id)} className="grid h-10 w-10 place-items-center rounded-lg text-fel-dim"><Trash2 className="h-4 w-4" /></button>
               </li>
             ))}
           </ul>

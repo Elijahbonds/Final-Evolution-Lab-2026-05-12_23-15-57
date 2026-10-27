@@ -23,7 +23,7 @@ export default async function MyCombinesPage() {
   const r = await myCombines(prisma as unknown as CombineDb, userId).catch(() => ({ status: 200, body: { available: false, events: [] } }));
   const body = r.body as { available?: boolean; events?: MyCombine[] };
   return (
-    <main className="mx-auto min-h-screen max-w-xl bg-[#050505] px-4 py-6 pb-24">
+    <main className="mx-auto min-h-screen max-w-xl bg-fel-bg px-4 py-6 pb-24">
       <Link href="/train" className="text-[13px] text-white/50 hover:text-white">← Train</Link>
       <h1 className="mb-4 mt-2 text-3xl font-black text-white">Your combines</h1>
       <MyCombines available={body.available === true} events={body.events ?? []} />

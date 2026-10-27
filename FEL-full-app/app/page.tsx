@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { authOptions } from '@/lib/auth';
 import { GuestLandingHero } from '@/components/guest-landing-hero';
 import { VerifyCheckoutParams } from '@/components/stripe/verify-checkout-params';
+import { SocialProof } from '@/components/social-proof/social-proof';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,8 @@ export default async function HomePage({ searchParams }: { searchParams: { sessi
         <VerifyCheckoutParams signedIn={!!session} />
       </Suspense>
       {!session && <GuestLandingHero />}
+      {/* ONB-06: coach and parent quotes, each with consent; renders nothing until the owner adds one (OWN-17) */}
+      {!session && <SocialProof />}
     </div>
   );
 }

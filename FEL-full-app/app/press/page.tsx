@@ -7,6 +7,8 @@ import { PressFrame } from '@/components/press/press-frame';
 import { BookCover } from '@/components/press/book-cover';
 import { CatalogCard, KindleLink, OfferCard } from '@/components/press/offer-card';
 import { JoinForm } from '@/components/press/join-form';
+import { OwnerCopy } from '@/components/public-copy/owner-copy';
+import { PUBLIC_PAGE_COPY } from '@/lib/creator/creatorCatalog';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Press — Final Evolution Lab' };
@@ -27,6 +29,11 @@ export default async function PressPage() {
 
   return (
     <PressFrame signedIn={session}>
+      {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
+      <section className="mt-8" data-press-about>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">About Final Evolution Lab</h2>
+        <OwnerCopy parts={PUBLIC_PAGE_COPY.press.body} className="mt-2 max-w-2xl text-sm leading-relaxed text-white/75" />
+      </section>
       <section className="mt-8">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">Featured</h2>
         <div className="mt-3 grid gap-6 rounded-2xl border border-white/10 bg-[#101010] p-4 md:grid-cols-[220px_1fr] md:p-6">

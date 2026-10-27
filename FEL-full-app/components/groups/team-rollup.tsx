@@ -57,19 +57,19 @@ export function TeamRollup({ groupId, rollup, onChanged }: { groupId: string; ro
             <span className="font-mono text-[12px] text-white/70">{r.drillDays}/7 drills</span>
             <span className="font-mono text-[12px] text-white/50">{r.runsThisWeek} games</span>
             <span aria-label={r.trend ?? 'no activity'} className="w-4">
-              {r.trend === 'up' ? <ArrowUp className="h-4 w-4 text-[#00FF9D]" /> : r.trend === 'down' ? <ArrowDown className="h-4 w-4 text-[#FF7A2F]" /> : r.trend === 'same' ? <Minus className="h-4 w-4 text-white/40" /> : null}
+              {r.trend === 'up' ? <ArrowUp className="h-4 w-4 text-fel-emerald" /> : r.trend === 'down' ? <ArrowDown className="h-4 w-4 text-fel-ember" /> : r.trend === 'same' ? <Minus className="h-4 w-4 text-fel-dim" /> : null}
             </span>
           </li>
         ))}
-        {rollup.rows.length === 0 && <li className="py-2 text-[13px] text-white/45">No athletes yet. Share the team code below.</li>}
+        {rollup.rows.length === 0 && <li className="py-2 text-[13px] text-fel-dim">No athletes yet. Share the team code below.</li>}
       </ul>
       <label className="mt-3 flex min-h-[44px] items-center gap-3 text-[13px] text-white/80">
-        <input type="checkbox" className="h-5 w-5 accent-[#00FF9D]" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} />
+        <input type="checkbox" className="h-5 w-5 accent-fel-emerald" checked={rollup.drillAssigned} disabled={busy} onChange={(e) => setDrill(e.target.checked)} />
         Assign the daily drill to the whole team
       </label>
       {ids.length > 0 && (programs === null
         ? (
-          <button onClick={openAssign} className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-bold text-[#00E5FF]">
+          <button onClick={openAssign} className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 text-[13px] font-bold text-fel-cyan">
             <CopyPlus className="h-4 w-4" /> Assign a program to the team
           </button>
         ) : programs.length === 0 ? (
@@ -79,7 +79,7 @@ export function TeamRollup({ groupId, rollup, onChanged }: { groupId: string; ro
             <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Program" className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-white/15 bg-black/40 px-2 text-[13px] text-white">
               {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={assign} disabled={busy} className="min-h-[44px] rounded-lg bg-[#00E5FF] px-4 text-[13px] font-bold text-[#050505] disabled:opacity-50">Assign to {ids.length}</button>
+            <button onClick={assign} disabled={busy} className="min-h-[44px] rounded-lg bg-fel-cyan px-4 text-[13px] font-bold text-fel-bg disabled:opacity-50">Assign to {ids.length}</button>
           </div>
         ))}
     </section>

@@ -72,9 +72,9 @@ export function RampStopLine() {
 /** The offer on the key set's card. Presentational. */
 export function RampOffer({ onOpen }: { onOpen: () => void }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/5 px-2.5 py-1.5" data-ramp="offer">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-fel-gold/20 bg-fel-gold/5 px-2.5 py-1.5" data-ramp="offer">
       <div className="min-w-0 text-xs text-white/70"><span className="font-medium text-white/90">{RAMP_NAME}</span> · {RAMP_OFFER}</div>
-      <button type="button" onClick={onOpen} data-ramp-open className="inline-flex items-center gap-1 rounded-md border border-[#FFD700]/40 px-2 py-1 text-xs font-medium text-[#FFD700]">
+      <button type="button" onClick={onOpen} data-ramp-open className="inline-flex items-center gap-1 rounded-md border border-fel-gold/40 px-2 py-1 text-xs font-medium text-fel-gold">
         <Wind className="h-3.5 w-3.5" aria-hidden="true" /> {RAMP_OFFER_BUTTON}
       </button>
     </div>
@@ -84,7 +84,7 @@ export function RampOffer({ onOpen }: { onOpen: () => void }) {
 /** The one-screen explanation, with the stop line and Start / Not today. Presentational. */
 export function RampExplain({ usesLeft, busy = false, onStart, onSkip }: { usesLeft: number; busy?: boolean; onStart: () => void; onSkip: () => void }) {
   return (
-    <div className="rounded-lg border border-[#FFD700]/30 bg-black/30 p-3 space-y-2" data-ramp="explain" role="group" aria-label={RAMP_NAME}>
+    <div className="rounded-lg border border-fel-gold/30 bg-black/30 p-3 space-y-2" data-ramp="explain" role="group" aria-label={RAMP_NAME}>
       <div className="text-sm font-semibold text-white">{RAMP_NAME}</div>
       <ul className="space-y-1">
         {rampExplainLines(usesLeft).map((l) => <li key={l.id} data-ramp-line={l.id} className="text-xs text-white/75">{l.text}</li>)}
@@ -92,7 +92,7 @@ export function RampExplain({ usesLeft, busy = false, onStart, onSkip }: { usesL
       <RampStopLine />
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={onStart} disabled={busy} data-ramp-start
-          className="rounded-lg bg-[#FFD700]/15 border border-[#FFD700]/40 px-3 py-1.5 text-sm font-medium text-[#FFD700] disabled:opacity-50">{RAMP_START_BUTTON}</button>
+          className="rounded-lg bg-fel-gold/15 border border-fel-gold/40 px-3 py-1.5 text-sm font-medium text-fel-gold disabled:opacity-50">{RAMP_START_BUTTON}</button>
         <button type="button" onClick={onSkip} disabled={busy} data-ramp-skip className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-white/70">{RAMP_SKIP_BUTTON}</button>
       </div>
     </div>
@@ -102,13 +102,13 @@ export function RampExplain({ usesLeft, busy = false, onStart, onSkip }: { usesL
 /** The breath running: the ring, what to do now, the stop line, Stop. Presentational (the host owns the clock). */
 export function RampRun({ spec, sec, onStop }: { spec: PacerSpec; sec: number; onStop: () => void }) {
   return (
-    <div className="rounded-lg border border-[#FFD700]/30 bg-black/30 p-3 space-y-2" data-ramp="running">
+    <div className="rounded-lg border border-fel-gold/30 bg-black/30 p-3 space-y-2" data-ramp="running">
       <div className="flex items-center gap-3">
         {/* the ring shows which breath (its parts are 1 s: a seconds count would read 1 throughout); the host line below
             is the one live region */}
         <BreathPacer spec={spec} elapsedSec={sec} size="sm" id="ramp" count="breath" />
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="text-[11px] uppercase tracking-wider text-white/40">{RAMP_NAME}</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">{RAMP_NAME}</div>
           <div className="text-sm text-white" aria-live="polite" data-ramp-now>{rampLineAt(spec, sec)}</div>
           <button type="button" onClick={onStop} data-ramp-stop className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-xs text-white/80">
             <Square className="h-3 w-3" aria-hidden="true" /> Stop
