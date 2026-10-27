@@ -90,3 +90,20 @@ export function timeToFloor(heightM: number, vyDown: number, g = 9.81): number {
   const v = Math.max(0, vyDown);
   return (-v + Math.sqrt(v * v + 2 * g * heightM)) / g;
 }
+
+// ── Phase 4: A WHIFF ALWAYS SAYS WHY ───────────────────────────────────────────────────────────────────────────────────────
+// A lob the hand never met ended as "LOST THE SELF-LOB — MISSED": the lob was named, the reason was not (the iron and the glass
+// said theirs: OFF THE IRON, OVER THE GLASS). The flight now keeps the ball's nearest pass by the hand, and the loss names the
+// side it went by — the one thing the player can change next time (when to throw, how far out to leave).
+export type WhiffWhy = 'TOO HIGH' | 'TOO LOW' | 'OUT AHEAD' | 'BEHIND YOU' | 'WIDE' | 'NEVER IN REACH';
+/** Where the ball went by the hand: `d` is ball − hand at their nearest (m), `fwd` the run's direction toward the rim (any
+ *  length, horizontal). The largest of the three offsets names it; no sample at all → NEVER IN REACH. */
+export function whiffWhy(d: { x: number; y: number; z: number } | null, fwd: { x: number; z: number }): WhiffWhy {
+  if (!d || ![d.x, d.y, d.z].every(Number.isFinite)) return 'NEVER IN REACH';
+  const n = Math.hypot(fwd.x, fwd.z) || 1, fx = fwd.x / n, fz = fwd.z / n;
+  const along = d.x * fx + d.z * fz, side = Math.abs(d.x * -fz + d.z * fx), up = d.y;
+  const m = Math.max(Math.abs(up), Math.abs(along), side);
+  if (m === Math.abs(up)) return up > 0 ? 'TOO HIGH' : 'TOO LOW';
+  if (m === Math.abs(along)) return along > 0 ? 'OUT AHEAD' : 'BEHIND YOU';
+  return 'WIDE';
+}

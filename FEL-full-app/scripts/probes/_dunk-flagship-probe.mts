@@ -20,6 +20,11 @@
 //     oop / oopglass / oopbounce (the ?prop= page), selflob (Y standing, then run), runlob (Y on the run), tricks (every air
 //     trick), show (one make recorded through the replay and the card: the camera). PROP=<id> loads the page with ?prop=.
 //   STRIP=1 photographs a frame strip of the first attempt of each scenario (pauses the clock on the frame, so it is exact).
+//   Phase 4 (lobs II): selflobrun / glass / bounce (the prop's own throw on the run), glassstand / bouncestand (Y standing with
+//     that prop, then the run); SWEEP=1 varies the run's timing by rep (the walk before the run, the stick's depth, the wait
+//     after a standing throw); FAST=1 skips the GPU's draw calls (the NullEngine's own no-ops: every update, animation, camera
+//     and matrix still runs; only pixels are not drawn — validated against a drawn run of the same seed); PER_PAGE=n attempts
+//     per page boot (default 4). Each frame records `inf`: the ball's centre inside the camera's view (projected).
 import { chromium, type Page, type Browser } from 'playwright-core';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -35,6 +40,7 @@ const STRIP = process.env.STRIP === '1';
 const SEED = Number(process.env.SEED ?? 7);
 const W = Number(process.env.VW ?? 480), H = Number(process.env.VH ?? 270);
 const SCALE = Number(process.env.HWSCALE ?? 2);
+const FAST = process.env.FAST === '1', SWEEP = process.env.SWEEP === '1', PER_PAGE = Number(process.env.PER_PAGE ?? 4);
 fs.mkdirSync(OUT, { recursive: true });
 const VCLOCK_JS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '_vclock-page.js'), 'utf8');
 
@@ -49,7 +55,7 @@ const BTN_I: Record<Btn, number> = { A: 0, B: 1, X: 2, Y: 3 }, DPAD_I: Record<Di
 const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head'];
 const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
 
-interface Frame { lv?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
+interface Frame { lv?: number; inf?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
 interface Rec { scen: string; rep: number; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; pressAt: number | null; t0: number; hud: string[]; err?: string }
 
 const PAD_INIT = `(() => {
@@ -98,7 +104,9 @@ const RECORDER = `(() => {
     const f = window.__vc ? window.__vc.C.frames : 0;
     const ringM = scene.getMeshByName('lob_catch_ring'), shadowM = scene.getMeshByName('lob_ball_shadow');
     const lv = (ringM && ringM.isVisible && ringM.isEnabled() ? 1 : 0) + (shadowM && shadowM.isVisible && shadowM.isEnabled() ? 2 : 0);
-    R.frames.push({ t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
+    let inf = 0; if (b) { const a = b.getAbsolutePosition(), M = scene.getTransformMatrix().m; const w = a.x * M[3] + a.y * M[7] + a.z * M[11] + M[15];
+      if (w > 0) { const nx = (a.x * M[0] + a.y * M[4] + a.z * M[8] + M[12]) / w, ny = (a.x * M[1] + a.y * M[5] + a.z * M[9] + M[13]) / w; inf = Math.abs(nx) <= 1 && Math.abs(ny) <= 1 ? 1 : 0; } }
+    R.frames.push({ inf, t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
     if (R.frames.length > 4000) R.frames.shift();
     // the frame strip: pause the clock ON this frame so node photographs exactly it
     if (R.strip && R.strip.length && (f - R.f0) >= R.strip[0]) { R.strip.shift(); R.stripN++; R.stripWait = true; window.__vc.pause(); }
@@ -140,7 +148,7 @@ async function startInPage(settleMs: number): Promise<{ playing: boolean; frames
 }
 
 interface AttemptCfg { scen: string; seed: number; standMs: number; walkMs: number; walkY: number; holdMs: number; takeoff: 'auto' | 'press' | 'release'; pressAfterMs: number;
-  preY: boolean; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'none'; recMs: number; strip: number[] | null }
+  preY: boolean; postYMs?: number; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'none'; recMs: number; strip: number[] | null }
 type AttemptOut = { err: string } | { t0: number; pressAt: number | null; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; hud: string[] };
 
 /** One attempt in the page, on the virtual clock. */
@@ -165,7 +173,7 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
     const R = w.__rec; R.frames = []; R.f0 = w.__vc.C.frames; R.strip = c.strip ? c.strip.slice() : null; R.on = true; const t0 = now();
     const launchedAt = (): number | null => { const m = w.__smp.marks.find((x) => x.t >= t0 && /\[DUNK-LAUNCH\]/.test(x.msg)); return m ? m.t : null; };
     await sleep(c.standMs);
-    if (c.preY) { await tap(3, 60); await sleep(150); }
+    if (c.preY) { await tap(3, 60); await sleep(c.postYMs ?? 150); }
     if (c.walkMs > 0) { pad.axes[1] = c.walkY; pad.timestamp = now(); await sleep(c.walkMs); }
     pad.axes[1] = -1; setB(7, true);
     let pressAt: number | null = null; let launch: number | null = null; const hold0 = now(); let ranY = false;
@@ -207,6 +215,9 @@ async function boot(b: Browser, prop: string | null): Promise<{ p: Page; errors:
   await p.evaluate(`window.__VC_CFG = ${JSON.stringify({ dt: 1000 / 60, seed: SEED })}`);
   await p.evaluate(VCLOCK_JS);
   await p.evaluate(RECORDER);
+  // FAST (Phase 4 sweeps): the NullEngine's own no-op draws — the frame's update, animation, skinning matrices, camera and the
+  // recorder all still run; nothing is rasterised (SwiftShader's pixels were most of an attempt's wall time)
+  if (FAST) await p.evaluate(() => { const e = (window as unknown as { __FEL_DEV__: { scene: { getEngine(): Record<string, unknown> } } }).__FEL_DEV__.scene.getEngine(); e.drawElementsType = () => {}; e.drawArraysType = () => {}; });
   const st = await p.evaluate(startInPage, 2500);
   console.log(`[boot] ${url} start ${JSON.stringify(st)}`);
   return { p, errors };
@@ -216,13 +227,20 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
   const base: AttemptCfg = { scen, seed: SEED * 1000 + rep * 17 + scen.length, standMs: 300, walkMs: 700, walkY: -0.5, holdMs: 0, takeoff: 'auto', pressAfterMs: 0,
     preY: false, runY: false, air: null, slam: 'beat', recMs: 3200, strip: null };
   const jit = [0, 120, 260, 400, 60, 200][rep % 6];   // reps vary the run so the lob timing is not one sample
+  // SWEEP (Phase 4): the run's timing over a grid — the walk before RT (0–0.9 s), the stick's depth on that walk, the wait between a
+  // standing throw and the run (0.15–0.95 s) — rep k is one cell, so a sweep of n reps covers it evenly
+  const sw = { walk: [0, 150, 300, 450, 600, 750, 900][rep % 7], walkY: [-0.5, -0.3, -0.8][Math.floor(rep / 7) % 3], postY: [150, 350, 550, 750, 950][rep % 5] };
+  const run = (b: AttemptCfg): AttemptCfg => SWEEP ? { ...b, walkMs: sw.walk, walkY: sw.walkY } : b;
+  const stand = (b: AttemptCfg): AttemptCfg => SWEEP ? { ...b, postYMs: sw.postY, standMs: 300 + (rep % 3) * 150 } : b;
   switch (scen) {
+    case 'selflobrun': case 'glass': case 'bounce': return run({ ...base, walkMs: 300 + jit });
+    case 'glassstand': case 'bouncestand': return stand({ ...base, walkMs: 0, standMs: 300 + jit, preY: true });
     case 'approach': return { ...base, walkMs: 700 + jit };
     case 'press': return { ...base, takeoff: 'press', pressAfterMs: 650 + jit };
     case 'release': return { ...base, takeoff: 'release', pressAfterMs: 650 + jit };
-    case 'selflob': return { ...base, walkMs: 0, standMs: 300 + jit, preY: true };
+    case 'selflob': return stand({ ...base, walkMs: 0, standMs: 300 + jit, preY: true });
     case 'runlob': return { ...base, runY: true, walkMs: 300 + jit };
-    case 'oop': case 'oopglass': case 'oopbounce': return { ...base, walkMs: 500 + jit };
+    case 'oop': case 'oopglass': case 'oopbounce': return run({ ...base, walkMs: 500 + jit });
     case 'oopstand': return { ...base, walkMs: 0, standMs: 300 + jit };                                  // RT from standing
     case 'ooppress': return { ...base, walkMs: 400, takeoff: 'press', pressAfterMs: 500 + jit };          // A early on the run
     case 'ooprelease': return { ...base, walkMs: 400, takeoff: 'release', pressAfterMs: 450 + jit };      // RT let go early
@@ -233,12 +251,13 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
 }
 
 async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
-  const prop = scen === 'oop' || scen === 'oopstand' || scen === 'ooppress' || scen === 'ooprelease' ? 'alleyoop' : scen === 'oopglass' || scen === 'oopbounce' ? scen : (process.env.PROP ?? null);
+  const prop = scen === 'oop' || scen === 'oopstand' || scen === 'ooppress' || scen === 'ooprelease' ? 'alleyoop' : scen === 'oopglass' || scen === 'oopbounce' ? scen
+    : scen === 'selflobrun' ? 'selflob' : scen === 'glass' || scen === 'glassstand' ? 'offglass' : scen === 'bounce' || scen === 'bouncestand' ? 'bounce' : (process.env.PROP ?? null);
   const list = scen === 'tricks' ? Object.keys(AIR).map((k) => `trick:${k}`) : Array.from({ length: reps }, () => scen);
   const out: Rec[] = [];
   let pg: { p: Page; errors: string[] } | null = null; let used = 0;
   for (let i = 0; i < list.length; i++) {
-    if (!pg || used >= 4) { if (pg) await pg.p.context().close(); pg = await boot(b, prop); used = 0; }
+    if (!pg || used >= PER_PAGE) { if (pg) await pg.p.context().close(); pg = await boot(b, prop); used = 0; }
     const s = list[i]; const rep = scen === 'tricks' ? 0 : i + Number(process.env.REP0 ?? 0);   // REP0: a piece's first rep (one attempt per piece on a loaded rig)
     const cfg = cfgFor(s, rep);
     const stripOn = STRIP && i === 0;
@@ -417,10 +436,12 @@ function lobMetrics(r: Rec) {
   const last = fl.slice(-3); const vIn = last.length >= 2 && last[0].ball && last[last.length - 1].ball ? Math.hypot(...[0, 1, 2].map((k) => last[last.length - 1].ball![k] - last[0].ball![k])) / ((last.length - 1) * DT) : NaN;
   const to = /to \(([-\d.]+),([-\d.]+),([-\d.]+)\)/.exec(thrown.msg); const catchY = to ? Number(to[2]) : NaN;
   const ringShare = fl.filter((f) => ((f.lv ?? 0) & 1) === 1).length / Math.max(1, fl.length), shadowShare = fl.filter((f) => ((f.lv ?? 0) & 2) === 2).length / Math.max(1, fl.length);
+  const withInf = fl.filter((f) => f.inf != null); const inFrameShare = withInf.length ? withInf.filter((f) => f.inf === 1).length / withInf.length : NaN;
+  const missLine = r.hud.find((h) => /MISSED|LOST THE|OFF THE IRON|OVER THE GLASS/.test(h)) ?? null;
   const ringAfter = r.frames.slice(i1 + 25, i1 + 60).filter((f) => ((f.lv ?? 0) & 1) === 1).length;   // still up 0.4–1 s after the catch?
   return { catchY: rnd(catchY), apexOverCatchM: rnd(Math.max(...ys) - catchY), ringShare: rnd(ringShare), shadowShare: rnd(shadowShare), ringLingerFrames: ringAfter, onRun: r.marks.some((m) => /lobs it on the run/.test(m.msg)),
     label: /\[LOB\] ([A-Z-' ]+?) (from|at|OFF)/.exec(thrown.msg)?.[1] ?? thrown.msg.slice(6, 30), caught: !!caught, lost: !!lost, flightMs: rnd(fl.length * 1000 / 60, 0), apexM: rnd(Math.max(...ys)),
-    catchClipT: catchClip, gapMinM: rnd(Math.min(...gaps)), gapAtEndM: rnd(gaps[gaps.length - 1]), arriveMps: rnd(vIn, 1), reaimed: r.marks.some((m) => /re-aimed/.test(m.msg)) };
+    inFrameShare: rnd(inFrameShare), missLine, catchClipT: catchClip, gapMinM: rnd(Math.min(...gaps)), gapAtEndM: rnd(gaps[gaps.length - 1]), arriveMps: rnd(vIn, 1), reaimed: r.marks.some((m) => /re-aimed/.test(m.msg)) };
 }
 
 /** What the slam made the player perceive (the QA trace) and the camera's cuts. */

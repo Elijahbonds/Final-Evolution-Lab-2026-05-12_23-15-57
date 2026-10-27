@@ -87,7 +87,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -403,7 +403,8 @@ export const DunkMode: ModeDefinition = (() => {
   let feet: { L: TransformNode | null; R: TransformNode | null } = { L: null, R: null };   // the clear test reads the FEET
   let win: Win = 'run';                       // the anim window in charge of the body
   // ── the lob (self-lob / kick-up / cartwheel toss / the alley-oop pass): one real arc, one fair catch ──
-  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, due: 0, runCueAt: -1, runCued: false };
+  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, due: 0, why: '' as string, runCueAt: -1, runCued: false };
+  let whiffGap = Infinity; const whiffD = new Vector3(), whiffFwd = new Vector3();   // Phase 4: the ball's nearest pass by the hand
   // DUNK-GLASS-BOUNCE: the backboard's front face (read off the venue's board mesh at load; the regulation fallback) and the
   // iron as twelve small colliders — the lob is swept against both every step
   const glass = { z: CFG.rimZ - HOOP.BOARD_FACE_TO_RIM_CENTRE_M, xMin: -HOOP.BOARD_W / 2, xMax: HOOP.BOARD_W / 2, yMin: CFG.rimHeight - HOOP.BOARD_BOTTOM_BELOW_RIM_M, yMax: CFG.rimHeight + HOOP.BOARD_TOP_ABOVE_RIM_M, found: false };
@@ -2053,7 +2054,12 @@ export const DunkMode: ModeDefinition = (() => {
           const hand = ballHandNode();
           if (hand && clipTime >= 0.12) {   // through the slam window too: a late catch leaves less time to slam, and that is the trade
             hand.computeWorldMatrix(true);
-            if (canCatch(hand.getAbsolutePosition(), ball.position)) catchLob(ctx);
+            const hp = hand.getAbsolutePosition();
+            if (canCatch(hp, ball.position)) catchLob(ctx);
+            else {   // Phase 4: the nearest pass, for the whiff's reason
+              const g = Vector3.Distance(hp, ball.position);
+              if (g < whiffGap) { whiffGap = g; ball.position.subtractToRef(hp, whiffD); whiffFwd.set(rim.x - player.root.position.x, 0, rim.z - player.root.position.z); }
+            }
           }
         }
         // ── hand-offs: the eastbay's under-the-leg pass (the SIG style) and the lost-and-found's behind-the-back one ──
@@ -3120,7 +3126,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
   function missWhy(): string {
     if (obstacleClipped) return `CAUGHT THE ${obstacle?.spec.label ?? 'PROP'}`;   // the prop ended it, whatever the toss was doing
-    if (lob.live || lob.lost) return lob.clanked ? `${lob.label} OFF THE IRON` : lob.over ? `${lob.label} OVER THE GLASS` : `LOST THE ${lob.label}`;
+    if (lob.live || lob.lost) return lob.clanked ? `${lob.label} OFF THE IRON` : lob.over ? `${lob.label} OVER THE GLASS` : `LOST THE ${lob.label}${lob.why ? ` · ${lob.why}` : ''}`;   // Phase 4: and where it went
     // Every press inside the accepted window (the buffer's edge through the close) is a MAKE, so a miss with a press on
     // the record is a press that came in front of it — say that, not "off the iron": it is the one thing the player can fix.
     const named = namedTricks();
@@ -3752,7 +3758,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
-  function resetLob(): void { lobMarker?.clear(); oopWound = false; lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.due = 0; lob.runCueAt = -1; lob.runCued = false; }
+  function resetLob(): void { lobMarker?.clear(); oopWound = false; whiffGap = Infinity; lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.due = 0; lob.why = ''; lob.runCueAt = -1; lob.runCued = false; }
   function resetRunway(): void { teachHint = ''; pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; launchQueued = false; airTrick = null; runwayToken++; }
   /** A runway beat owns the body until it ends (the per-frame run / idle loops stand aside); the run keeps going under it. */
   function startRunwayBeat(ctx: ModeContext, rt: RunwayTrick): void {
@@ -4048,7 +4054,8 @@ export const DunkMode: ModeDefinition = (() => {
   function lostLob(ctx: ModeContext): void {
     if (!lob.live) return;
     lob.lost = true;
-    console.info(`[LOB] LOST ${lob.label} @${clipTime.toFixed(2)}`); lobMarker?.end(false);
+    lob.why = whiffWhy(Number.isFinite(whiffGap) ? whiffD : null, whiffFwd);
+    console.info(`[LOB] LOST ${lob.label} @${clipTime.toFixed(2)} — ${lob.why}${Number.isFinite(whiffGap) ? ` (nearest ${whiffGap.toFixed(2)} m)` : ''}`); lobMarker?.end(false);
     SoundKit.play('crowdGroan', { volume: 0.6 });
     ctx.feel?.impact?.(0.3);
     resolveDunk(ctx);   // no ball in hand → the miss path (its LOST THE … — MISSED line); the lob keeps bouncing

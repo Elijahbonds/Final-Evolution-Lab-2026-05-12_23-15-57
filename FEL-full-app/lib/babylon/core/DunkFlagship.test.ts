@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, OOP_WINDUP_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
+import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, OOP_WINDUP_SEC, lobApexOver, oopThrowDue, slamImpact, whiffWhy, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
 import { LOB_CATCH_CLIP_T } from './DunkLob';
 
 describe('DunkFlagship (b) — the alley-oop is a lob', () => {
@@ -56,5 +56,21 @@ describe('DunkFlagship Phase 3 — the passer winds up, then lobs', () => {
       if (throwDue) expect(windupDue).toBe(true);   // never a release before its wind-up
     }
     expect(OOP_WINDUP_SEC).toBe(0.5);               // the toss clip's arms-overhead key
+  });
+});
+
+describe('DunkFlagship Phase 4 — a whiff always says why', () => {
+  const toRim = { x: 0, z: -1 };   // the run goes toward −z
+  it('names the side the ball went by the hand (the largest offset)', () => {
+    expect(whiffWhy({ x: 0.1, y: 0.9, z: -0.2 }, toRim)).toBe('TOO HIGH');
+    expect(whiffWhy({ x: 0, y: -0.8, z: 0.3 }, toRim)).toBe('TOO LOW');
+    expect(whiffWhy({ x: 0.2, y: 0.3, z: -1.1 }, toRim)).toBe('OUT AHEAD');     // nearer the rim than the hand
+    expect(whiffWhy({ x: -0.1, y: 0.2, z: 0.9 }, toRim)).toBe('BEHIND YOU');
+    expect(whiffWhy({ x: 1.0, y: 0.2, z: 0.1 }, toRim)).toBe('WIDE');
+  });
+  it('reads the run\'s own direction (a run from the wing), and says NEVER IN REACH with no sample', () => {
+    expect(whiffWhy({ x: -0.7, y: 0, z: -0.7 }, { x: -1, z: -1 })).toBe('OUT AHEAD');
+    expect(whiffWhy(null, toRim)).toBe('NEVER IN REACH');
+    expect(whiffWhy({ x: Number.NaN, y: 0, z: 0 }, toRim)).toBe('NEVER IN REACH');
   });
 });
