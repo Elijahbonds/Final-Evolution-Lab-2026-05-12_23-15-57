@@ -44,11 +44,35 @@ mode's own log lines and the harness's QA trace (`?agent=1`: hit-stop, shake, sl
 
 ## 2. Baseline (36593d3a, origin/lane/finish-release)
 
-_(filled from the rig runs below)_
+Plain one-foot attempt: stand, stick walk, RT run to the line, take-off, slam on the beat (`slamBeat` 'beat'). Phone tier
+(`tier=mobile`), 320×180, the virtual clock, seeded. Everything below is the first rep (r0); later reps are in §5.
+
+| Measure | Baseline |
+|---|---|
+| Root speed into push 1-2 | 7.0 → **5.98** m/s in one frame (`gather stride at 1.11 m … x2.00`: the fit's rate clamped) |
+| Take-off frame | 2.42 → 2.11 → **4.18** → 2.24 m/s (two steps in one frame) |
+| Largest one-frame speed change before the plant | **2.08 m/s** (3 frames over 0.6) |
+| Root jerk, RMS / max | 528 / 3715 m/s³ |
+| Foot skate, carrying foot at ≥ 2.5 m/s | **1.11 m/s** (run 0.89, sprint 1.66, the start from standing 2.81) |
+| Hips one-frame pops · bone pops (≥ 600°/s, ≥ 3.5× neighbours) | 12 · 31 (arms 21) |
+| Launch → feet off · hang (feet off → on) · the hips' rise · within 10 cm of the top | 100 ms · 2150 ms · 1.94 m · 467 ms |
+| Slam (QA trace) | hit-stop 1 (70 ms), shake 2, slow-mo 2 (the hang's and the iron's), flash 1, impact 1, cheer 1; iron at +1517 ms |
+| Camera through the flight | 1 cut (the rim cut, +917 ms) |
+| Alley-oop | thrown after the take-off: 0.35 s from 3.5 m (~10 m/s; its top 0.20 m over the catch) |
+| First runway of the night | the Venice storefronts between the camera and the dunker (see e1) |
 
 ## 3. Gaps, ranked against the lock and the owner's words
 
-_(filled after the baseline)_
+1. **The run-up is not smooth** (owner: "smoother movement"): two one-frame speed breaks (into push 1-2 and on the take-off
+   frame), and the run-up's feet cycle faster than the ground. → Phase 1.
+2. **The alley-oop is a bullet, and no lob says where it is going** (owner: "better lobs"). → Phases 3–4.
+3. **Every slam hits the iron the same** (the owner's impact kit: "shake by size"). → Phase 5.
+4. Take-off and landing: a 3 cm root drop at the take-off (the runway stands the root at 0.03); the start from standing skates
+   (2.81 m/s in the walk band) while the idle blends into the run. → Phase 2.
+5. Distinctness of the 16 air tricks: not yet measured on the fixed rig. → Phase 6.
+6. Presentation is broad already (four replay angles, the poster, the five-judge reveal, phone flashes, the MC); its quality is
+   judged on screen. → Phase 8.
+7. Progression: unlocks come from won nights and challenges only; the verified vertical is not read. → Phase 9.
 
 ## 4. What this pass changed
 
