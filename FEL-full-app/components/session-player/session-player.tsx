@@ -108,7 +108,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
 
   return (
     <div className={LOOK.shell + quiet} data-session-player data-phase={state.phase} data-step={state.step} data-set={state.set} data-paused={state.paused ? '1' : '0'}
-      data-mode={mode} data-clip={step.clip ?? 'still'} data-step-opened={openedAt} data-sets-total={totalSets(session)} role="dialog" aria-modal="true" aria-label={session.title}>
+      data-mode={mode} data-clip={step.clip ?? 'still'} data-step-opened={openedAt} data-sets-total={totalSets(session)} data-left={state.leftMs === null ? '' : Math.ceil(state.leftMs / 1000)} role="dialog" aria-modal="true" aria-label={session.title}>
       <style>{SHEET_KEYFRAMES}</style>
       <div className={LOOK.demo + (step.clip ? ` ${LOOK.demoQuiet}` : '')} data-player-demo>
         <AvatarDemo clip={step.clip} />

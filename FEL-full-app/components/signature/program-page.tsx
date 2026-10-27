@@ -99,7 +99,6 @@ function Weeks({ weeks, current }: { weeks: WeekView[]; current: number | null }
 export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; clips?: Readonly<Record<string, string | null>> }) {
   const [view, setView] = useState(initial);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [device, setDevice] = useState<DeviceProgram | null>(null);
   const [playing, setPlaying] = useState<{ session: Session; sessionId: string; mode: PlayMode } | null>(null);
   const enrolling = useRef<Promise<boolean> | null>(null);
@@ -134,7 +133,6 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
   /** Start: ONE tap from this page to the first set running (the player counts in by itself). */
   const start = () => {
     if (!today || !play) return;
-    setMsg(null);
     if (play.mode === 'device' && !device) setDevice(startDeviceProgram(deviceStorage(), view.id));
     if (play.mode === 'save' && play.enroll) enrolling.current = send({ action: 'start' }).then((r) => r.ok);
     setPlaying({ session: fromSignature(today, { title: `${view.title} · ${today.label}`, clips }), sessionId: today.id, mode: play.mode });
@@ -213,7 +211,6 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
         {view.premium.locked && view.premium.checkout && (
           <a href={view.premium.checkout.monthly} data-checkout className="mt-2 inline-flex min-h-[44px] items-center text-[13px] font-bold text-[#00E5FF]">Get FEL Pro →</a>
         )}
-        {msg && <p role="status" data-msg className="mt-2 text-[12.5px] text-[#00FF9D]">{msg}</p>}
       </section>
 
       {today && !today.blocked && !view.premium.locked && <TodayList s={today} />}
