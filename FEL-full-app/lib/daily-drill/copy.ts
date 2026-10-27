@@ -1,7 +1,7 @@
 // DAILY-DRILL — the card's and the page's words, in one place so a test reads what the page says. Product copy for the
 // owner's review (docs/DAILY-DRILL.md, owner calls); none of it is legal or policy text. Pure and client-safe.
 import { SCREEN_HOME } from '@/lib/screen/routes';
-import { MEASURE_VERTICAL } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the one front door
+import { JUMP_CHECK } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the hands-on-hips jump check
 import type { Focus } from './plan';
 import type { SkillReading } from './skills';
 
@@ -54,7 +54,7 @@ export interface Nudge { text: string; href: string; cta: string }
  * (profile v2's: an opted-in verified adult's numbers are on the account; nobody else's are).
  */
 export function measureNudge(g: { adult: boolean; canSaveScan: boolean }): Nudge {
-  if (g.canSaveScan) return { text: 'Do a one-minute jump check, and tomorrow’s drill is picked from your numbers.', href: JUMP_CHECK_HREF, cta: MEASURE_VERTICAL };
+  if (g.canSaveScan) return { text: 'Do a one-minute jump check, and tomorrow’s drill is picked from your numbers.', href: JUMP_CHECK_HREF, cta: JUMP_CHECK };
   if (g.adult) return { text: 'Turn on saving your jump numbers, and your drill is picked from them.', href: ACCOUNT_HREF, cta: 'Account settings' };
   return { text: 'Under 18, your numbers stay on your phone, so your daily drill is the all-round one. You can still check your jump any time.', href: SCREEN_HOME, cta: 'Check your jump' };
 }

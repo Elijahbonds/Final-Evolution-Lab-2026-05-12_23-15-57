@@ -24,10 +24,12 @@ export const HISTORY_KEY = 'fel.jump.history.v1';
 /** The most results kept; the oldest go first. */
 export const HISTORY_MAX = 200;
 
-export type HistoryTest = 'check' | 'slowmo' | ProtocolId;
-export const HISTORY_TESTS: readonly HistoryTest[] = ['check', 'slowmo', ...PROTOCOL_IDS];
+// VERTICAL-EASY (2026-10-27, owner: "allow arm swing"): 'vertical' is "Measure my vertical", a natural jump with the arms
+// free — its own series, never compared with the hands-on-hips 'check' (lib/vertical/series.ts).
+export type HistoryTest = 'check' | 'vertical' | 'slowmo' | ProtocolId;
+export const HISTORY_TESTS: readonly HistoryTest[] = ['check', 'vertical', 'slowmo', ...PROTOCOL_IDS];
 export const HISTORY_TEST_NAMES: Record<HistoryTest, string> = {
-  check: 'Jump check (live)', slowmo: 'Slow-motion jump',
+  check: 'Jump check (live)', vertical: 'Vertical, with arm swing (live)', slowmo: 'Slow-motion jump',
   ...(Object.fromEntries(PROTOCOL_IDS.map((id) => [id, PROTOCOLS[id].name])) as Record<ProtocolId, string>),
 };
 

@@ -161,8 +161,10 @@ the live flow):
    of day.* One primary, **Done**; a quiet **Jump again**; everything else under **More detail** (units, the estimate line,
    the full screen, the dunk program, Brain Brawl, and for adults the session card, slow-mo and the jump tests).
 
-Not changed: the reader (`t5-cmj.ts`, `refine.ts`), every T5 threshold, the 3-jump protocol, hands on hips, every
-under-18 rule (no camera under 18; the age question on every new Start), the pain questions before and after, nothing
+8. **Arms free on the front door** (owner, 2026-10-27: *allow arm swing*) — §7.
+
+Not changed: the reader (`t5-cmj.ts`, `refine.ts`), every T5 threshold, the 3-jump protocol, hands on hips for the jump
+check, the full screen and the readiness check, every under-18 rule (no camera under 18; the age question on every new Start), the pain questions before and after, nothing
 sent, the video never leaves the device.
 
 ---
@@ -177,12 +179,114 @@ sent, the video never leaves the device.
 | Setup words on the live card | 18 (eyebrow + "Prop your device at hip height, 2–3 m away, portrait or landscape." + the fix) | **1 big word** + a picture (the sentence under it only while something needs fixing) |
 | Taps during the jumps | 0 | 0 |
 | Taps after the jumps | 1 (pain check) | 1 (pain check — unchanged, owner call 2) |
-| Camera on → number, realistic noise (bench, mean / max) | 31.0 / 43.9 s at 30 fps · 55.0 / 108.3 s at 60 fps | see §6 |
-| Runs reaching a number (bench, 28 cells × 6) | 108 / 168 | see §6 |
-| Auto-detect rate (bench) | 324 / 396 = 82 % | see §6 |
+| Camera on → number, realistic noise (bench, mean / max) | 31.0 / 43.9 s at 30 fps · 55.0 / 108.3 s at 60 fps | **24.1 / 24.1 s · 24.0 / 24.2 s** |
+| First tap → number, a first-timer (estimate, below) | ≈ 55 s at 30 fps · ≈ 79 s at 60 fps | **≈ 40 s** |
+| Runs reaching a number (bench; the 11 conditions an athlete can complete without moving the phone × 2 rates × 6) | 108 / 132 | **132 / 132** |
+| … with arm swing (6 attempts each) | 0 / 12 | 0 / 12 (owner call 1) |
+| Auto-detect, jumps counted ÷ jumps graded (all 14 conditions) | 324 / 396 = 82 % | 396 / 468 = 85 % — **100 % of every jump that kept hands on hips**, both before and after; the remainder is arm swing |
+| The owner's recorded jumps (live flow) | low: 4 of 4 · high: 0 of 3 | identical (the reader is unchanged): low 4 of 4 · high 0 of 3 (arm swing, travel toward the lens) |
 | Retry paths covered (a reason + a fix) | 1 of 3 jump refusals; calibration jitter: none; blink: none | 3 of 3; jitter: fallback; blink: skipped |
-| Validation bias / SD (cm) | unchanged — see §6 | unchanged |
+| Validation bias / SD (cm), the jump bench `scripts/jump-accuracy.ts --reader t5 --seeds 6` | realistic: −0.44/1.38 (30 fps), −0.67/1.42 (60) | **byte-identical tables** at 30 and 60 fps, every condition (§6.2) |
+| Live-flow bias / SD vs force-plate truth of the best jump (cm) | realistic: −0.38/1.10 (30), −0.33/1.01 (60) | **identical** in every condition that read before; heavy noise and 10 % drops now read: −0.65/2.71, −1.82/3.04; −0.47/1.32, +0.40/1.03 |
+
+**The first-timer estimate** (assumption: about 3 s to read and tap each screen before the camera, 2 s for the browser's
+camera prompt, 3 s for the pose model to load on a phone, 1.4 s for the device check — 0.9 s held at ≥ 12 Hz plus its 0.5 s
+read). Before: 6 taps × 3 s + 2 + 3 + 1.4 + 31.0 (30 fps) or 55.0 (60 fps) ≈ 55 / 79 s. After: 3 taps × 3 s + 2 + 3 + 1.4 +
+24.1 ≈ 40 s. The camera-on part is measured; the rest is the assumption. The owner's phone check measures it for real.
 
 ## 6. Bench numbers
 
-Filled in by the final run (`scripts/vertical-easy-bench.ts`), §6.1–6.3 below.
+### 6.1 The live flow, before → after (`npx tsx scripts/vertical-easy-bench.ts --seeds 6 --fps 30,60`)
+
+Camera on → number (s, mean / max) and best-jump bias / SD vs truth (cm). "Runs" = runs that reached a number, of 6.
+
+| condition | fps | runs before → after | camera → number before → after | bias / SD before → after |
+|---|---|---|---|---|
+| clean | 30 | 6 → 6 | 24.2 → 24.2 | +0.10/0.00 → +0.10/0.00 |
+| realistic noise | 30 | 6 → 6 | 31.0 / 43.9 → **24.1 / 24.1** | −0.38/1.10 → −0.38/1.10 |
+| heavy noise (2×) | 30 | **0 → 6** | – → 27.1 / 27.1 | – → −0.65/2.71 |
+| drops 10 % | 30 | **0 → 6** | – → 24.2 / 24.3 | – → −0.47/1.32 |
+| bent-knee landing | 30 | 6 → 6 | 31.1 / 43.9 → 24.1 / 24.5 | +0.77/3.40 → +0.77/3.40 |
+| motion blur (dim room) | 30 | 6 → 6 | 31.0 / 43.9 → 24.1 / 24.1 | −2.20/3.86 → −2.20/3.86 |
+| quick re-jump (0.3 s rest) | 30 | 6 → 6 | 29.9 / 42.4 → 22.9 / 23.0 | −0.18/1.25 → −0.18/1.25 |
+| arm swing | 30 | 0 → 0 | 42.8 / 55.8 → 35.9 / 36.0 (to "No jump counted") | – |
+| clean | 60 | 6 → 6 | 24.0 → 24.0 | 0.00/0.00 → 0.00/0.00 |
+| realistic noise | 60 | 6 → 6 | 55.0 / 108.3 → **24.0 / 24.2** | −0.33/1.01 → −0.33/1.01 |
+| heavy noise (2×) | 60 | **0 → 6** | – → 27.0 / 27.3 | – → −1.82/3.04 |
+| drops 10 % | 60 | **0 → 6** | – → 23.9 / 24.2 | – → +0.40/1.03 |
+| bent-knee landing | 60 | 6 → 6 | 55.2 / 108.8 → 24.3 / 24.3 | +0.68/1.48 → +0.68/1.48 |
+| motion blur (dim room) | 60 | 6 → 6 | 55.2 / 108.8 → 24.3 / 24.3 | −1.32/2.07 → −1.32/2.07 |
+| arm swing | 60 | 0 → 0 | 66.4 / 120.0 → 35.5 / 35.5 | – |
+
+Flat-foot, tucked, occlusion and no-rest read the same before and after (bias/SD identical; the time to the number drops
+as for realistic noise). The phone at 2 m and at 4.5 m stays at the framing step with "Feet in the shot." / "Come closer." —
+the bench's athlete never moves, so those two rows measure only that the guidance is right.
+
+Heavy noise reads with a wider spread (SD 2.7–3.0 cm, the bench's own −0.34/2.80 and −0.90/2.83 at 30/60 fps): those jumps
+carry their wide ± on the result and are never verified (lib/jump/session.ts, unchanged).
+
+### 6.2 The validation bench, before → after (`npx tsx scripts/jump-accuracy.ts --reader t5 --seeds 6 --fps 30|60`)
+
+Run on this lane's base and on this lane: the two tables are **identical, byte for byte**, at 30 and at 60 fps (every
+condition, every column). The reader (`t5-cmj.ts`, `refine.ts`) and every T5 threshold are untouched; the bench grades a
+take offline, so the runner's setup changes cannot reach it. Realistic noise: −0.44/1.38 (30), −0.67/1.42 (60); decoys:
+0 of 24 valid at both.
+
+### 6.3 The owner's recorded jumps (`npx tsx scripts/vertical-easy-bench.ts --recorded`)
+
+Before and after are identical: `jump_two_foot_low` 4 of 4 counted (best 28.4 cm vs 32.0 cm flight truth — rebounds with
+0.13 s contacts, not the protocol; `t5-cmj.test.ts` pins its mean error ≤ 6 cm), `jump_two_foot_high` 0 of 3 (arm swing,
+travel toward the lens, a landing out of the clip). The repo holds no other recorded standing jumps; the CMU run-up and the
+dunk takes are approaches, read by the approach reader (§9 of docs/JUMP-PRO.md), which this lane did not touch.
+
+---
+
+## 7. Arm swing on "Measure my vertical" (owner decision, 2026-10-27)
+
+*"Allow arm swing."* The front door reads a natural jump, arms free, and its result says **"Your vertical, with arm swing"**.
+The daily readiness check keeps hands on hips (a repeatable test), and so do the hands-on-hips jump check and the full
+screen. The two results are **separate series, never compared**.
+
+**How** (`lib/vertical/armsFree.ts`): the jump check's own read with one refusal lifted — T5's "your hands left your
+hips", the last thing the grader checks, so a jump it refuses for anything else stays refused — and the set summed again
+with JUMP-TESTS' `resummarise` (as its `cmjArms` test does). The runner takes `armsFree` (`lib/assess/runner.ts`), and its
+setup line and on-screen picture say "arms free". Routes: `?run=vertical` is the front door; `?run=jump` stays the
+hands-on-hips check.
+
+**Two series.**
+| Series | Where it is read | Where it is kept | Compared with |
+|---|---|---|---|
+| Arm swing (`vertical`) | "Measure my vertical" | this device, adults only (`lib/vertical/series.ts` → `lib/jump/historyStore.ts`, wipeable) | its own last result only |
+| Hands on hips (`check`) | the jump check (`?run=jump`), the full screen, the readiness check | the server for a verified adult who opted in (the landing record), as before | its own history only |
+
+The profile tile, the daily drill, challenges, verified jumps and PRQ power read the server's hands-on-hips rows, so their
+links now point at the hands-on-hips check under one name, **"Jump check, hands on hips"** (they had pointed at
+`?run=jump` before; only the label changed). A server home for the arm-swing series needs a schema or an allow-list
+change — owner call 1.
+
+**Accuracy proof.**
+- *Does the read key on the hands?* No. The flight finder reads the feet (`footLowY`), a scoring frame needs the hips,
+  knees and feet only (`SCORING_POINTS` 23–26 + feet), the re-timing fits the hips (`refine.ts` points 23/24) and checks
+  movement on shoulder and hip width. The wrists are read in one place: the refusal lifted here. Measured: the same 36
+  bench jumps filmed with and without an arm swing (30 and 60 fps, 6 seeds) read **identical heights, to 0.0 cm**
+  (`tests/vertical-easy/arms-free.test.ts`).
+- *Accepted on the bench, live:* see §7.1 — arm-swing jumps went from 0 % counted to 100 %.
+- *Honest limit* (`lib/jump/protocols.ts`): an arm swing moves the centre of mass against the hips, and the bench's hips
+  fly the parabola, so that error is not modelled. Flight-time height is what is read, the same way for both series; the
+  force-plate pilot is what would put a number on the difference.
+
+**One guard the hands rule had been hiding** (TUNED, new: `vertical.standDrift` 0.08 body heights). The owner's recorded
+take `jump_two_foot_high` travels 40 cm. Read live from a stand where it ended, its first jump came back **62.5 cm for
+30.5 cm of truth** — refused before only because the hands left the hips. Lifting that rule would have shown it. So an
+arms-free jump whose feet, just before take-off, sit more than 0.08 body heights off the stand's floor line is refused:
+*"You moved from your spot. Go back to where you stood and jump again."* The bench's own jumps never pass 0.021 (360 jumps,
+every condition); a 25 cm step toward the lens reads 0.072 (kept, and read right: 39.6 cm for 40); the owner's travelled
+take 0.148–0.161 (refused). It applies to the front door only; the hands-on-hips check is unchanged (owner call 6).
+
+### 7.1 The front door on the live bench (`scripts/vertical-easy-bench.ts`, rows "FRONT DOOR")
+
+FRONT_DOOR_TABLE
+
+### 7.2 The owner's recorded jump (`jump_two_foot_high`), its number
+
+RECORDED_TABLE

@@ -12,7 +12,7 @@ import { AgeStep, PainStep, StartStep, TakeoffStep } from '@/app/play/mirror/ass
 import { ScreenFrame } from '@/app/play/mirror/assess/_components/screen-ui';
 import { LiveHud } from '@/app/play/mirror/assess/_components/live-hud';
 import { JumpResult } from '@/app/play/mirror/assess/_components/jump-result';
-import { drawSkeleton } from '@/app/play/mirror/assess/_components/skeleton';
+import { drawSkeleton, fitToBox } from '@/app/play/mirror/assess/_components/skeleton';
 import { JumpSessionCard } from '@/components/jump/jump-session-card';
 import { GuestLandingHero } from '@/components/guest-landing-hero';
 import { simulateLiveJump } from '@/lib/vertical/sim';
@@ -30,7 +30,8 @@ const W = window as unknown as { __READY__?: boolean; __META__?: unknown };
 function viewOf(pick: (v: RunnerView) => boolean, o: Partial<Parameters<typeof simulateLiveJump>[0]> = {}): { v: RunnerView; f: PoseFrame } | null {
   let got: { v: RunnerView; f: PoseFrame } | null = null;
   simulateLiveJump({
-    fps: 30, seed: 2, trials: [0.38, 0.42, 0.45].map((m) => ({ heightM: m })), limitMs: 40_000, ...o,
+    // after: the front door reads arms free (owner, 2026-10-27); before: the hands-on-hips check was the only jump run
+    fps: 30, seed: 2, trials: [0.38, 0.42, 0.45].map((m) => ({ heightM: m })), limitMs: 40_000, ...(__VER__ === 'after' ? { armsFree: true } : {}), ...o,
     onView: (v, f) => { if (!got && pick(v)) got = { v: { ...v }, f }; },
   });
   return got;
@@ -41,13 +42,14 @@ function Stage({ v, f, voiceOn = true }: { v: RunnerView; f: PoseFrame; voiceOn?
   useEffect(() => {
     const c = ref.current, ctx = c?.getContext('2d');
     if (!c || !ctx) return;
-    c.width = 640; c.height = 480;
-    const g = ctx.createLinearGradient(0, 0, 0, 480); g.addColorStop(0, '#2a2f38'); g.addColorStop(1, '#14161b');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, 640, 480);
-    ctx.fillStyle = '#3a3f48'; ctx.fillRect(0, 400, 640, 80);
-    if (f.present && f.image.length >= 33) drawSkeleton(ctx, f.image, { colour: '#FFFFFF', minVisibility: 0.3 });
+    // assumption: a phone held portrait gives a 3:4 picture (480×640); the synthetic body is re-framed into it
+    c.width = 480; c.height = 640;
+    const g = ctx.createLinearGradient(0, 0, 0, 640); g.addColorStop(0, '#2a2f38'); g.addColorStop(1, '#14161b');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 480, 640);
+    ctx.fillStyle = '#3a3f48'; ctx.fillRect(0, 560, 480, 80);
+    if (f.present && f.image.length >= 33) drawSkeleton(ctx, fitToBox(f.image, 4 / 3, 480, 640, 0.14), { colour: '#FFFFFF', minVisibility: 0.3 });
   }, [f]);
-  return h('div', { className: 'relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black', style: { aspectRatio: '640 / 480', maxHeight: 'min(72vh, 100dvh - 12rem)' } },
+  return h('div', { className: 'relative w-full overflow-hidden rounded-3xl border border-white/10 bg-black', style: { aspectRatio: '480 / 640', maxHeight: 'min(72vh, 100dvh - 12rem)' } },
     h('div', { className: 'absolute inset-0', style: { transform: 'scaleX(-1)' } }, h('canvas', { ref, className: 'absolute inset-0 h-full w-full' })),
     h(LiveHud, { view: v, voiceOn, onPain: () => {}, onTakeoff: () => {}, onStop: () => {} }));
 }
@@ -59,7 +61,7 @@ function result(): ReactNode {
   const t5 = gradeT5(frames, { calibration: cal, aspect: cal.aspect }).t5;
   const props = { heightCm: t5.bestHeightCm, plusMinusCm: t5.heightPlusMinusCm, attempts: t5.jumps.length, counted: t5.jumps.filter((j) => j.valid).length, kid: false, jumpIn: null, lastIn: null, onFull: () => {}, onAgain: () => {} };
   const card = h(JumpSessionCard, { t5 });
-  return __VER__ === 'before' ? h('div', { className: 'space-y-3' }, h(JumpResult, props), card) : h(JumpResult, { ...props, more: card });
+  return __VER__ === 'before' ? h('div', { className: 'space-y-3' }, h(JumpResult, props), card) : h(JumpResult, { ...props, armSwing: true, more: card });
 }
 
 function App() {
@@ -80,7 +82,10 @@ function App() {
     case 'position': body = live((v) => v.step === 'position' && v.setupReady); break;
     case 'countdown': body = live((v) => v.step === 'countdown' && v.countdown === 2); break;
     case 'go': body = live((v) => v.step === 'active' && v.flash === 'start'); break;
-    case 'refusal': body = live((v) => !!v.rejection, { style: { armSwing: true } }, false); break;
+    // before: a natural arm swing, refused; after: arm swing is read, so the refusal shown is the step away from the stand
+    case 'refusal': body = __VER__ === 'before'
+      ? live((v) => !!v.rejection, { style: { armSwing: true } }, false)
+      : live((v) => !!v.rejection, { beats: [{ trial: { heightM: 0.4 } }, { rest: 0.6 }, { decoy: { kind: 'step', dz: 0.6 } }, { rest: 0.8 }, { trial: { heightM: 0.42 } }], style: { armSwing: true } }, false); break;
     case 'pain-check': body = live((v) => v.step === 'painCheck'); break;
     case 'result': body = result(); break;
   }

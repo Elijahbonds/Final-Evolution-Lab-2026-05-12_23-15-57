@@ -44,9 +44,20 @@ describe('the live jump-only flow', () => {
     expect(r.said.filter((s) => /Hold still for a moment/.test(s.text)).length).toBeLessThanOrEqual(2);
   }, 60_000);
 
-  it('arm swing: still refused (hands on hips is the protocol), each time with the reason and the fix', () => {
+  it('arm swing on the hands-on-hips check (and the readiness check): still refused, with the reason and the fix', () => {
     const r = simulateLiveJump({ fps: 30, seed: 1, trials: TRIALS, style: { armSwing: true }, limitMs: 60_000 });
     expect(r.counted).toBe(0);
     expect(r.said.some((s) => s.text === 'Your hands left your hips. Keep them there and jump again.')).toBe(true);
   }, 90_000);
+
+  it('arm swing on "Measure my vertical" (owner, 2026-10-27: allow arm swing): three counted, the height within 1.5 cm of the truth', () => {
+    for (const fps of [30, 60]) {
+      const r = simulateLiveJump({ fps, seed: 1, trials: TRIALS, style: { armSwing: true }, armsFree: true });
+      expect(r.done, `${fps}`).toBe(true);
+      expect(r.counted).toBe(3);
+      expect(Math.abs(r.bestCm! - r.truthBestCm!), `${fps}`).toBeLessThan(1.5);
+      expect(r.said.some((s) => /hands left your hips/.test(s.text))).toBe(false);
+      expect(r.said.some((s) => /arms free/.test(s.text))).toBe(true);           // the setup line says so
+    }
+  }, 120_000);
 });

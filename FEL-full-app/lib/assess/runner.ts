@@ -47,6 +47,8 @@ import { rejectionForPart, type Rejection } from './rejection';
 import { AUTO_ADVANCE_MS, type FlashKind } from '@/lib/screen/realtime-cues';
 import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
+import { liftArms, liftArmsTest } from '@/lib/vertical/armsFree';
+import { ARMS_FREE_SETUP } from '@/lib/vertical/copy';
 
 const STILL_MS = 900;
 /**
@@ -236,6 +238,8 @@ export interface RunnerView {
   retryMessage: string | null;
   /** Hands-free: no tap prompts in the runner. */
   handsFree: boolean;
+  /** VERTICAL-EASY: the jump is read arms free ("Measure my vertical"). */
+  armsFree: boolean;
   /**
    * Reading quality over the frames of the current step while a test is set up or running: 'clear' when the mean share of
    * landmarks at scoring visibility (gate.visibilityScoring) is at least gate.minConfidence, else 'partial'. Null
@@ -308,6 +312,12 @@ export interface RunnerOptions {
   /** Tests already graded this run (the jump), used when this pass has no capture for them. */
   priorTests?: Partial<Record<TestId, TestResult>>;
   cameraFps?: () => number | null;
+  /**
+   * VERTICAL-EASY (owner, 2026-10-27: "allow arm swing"): "Measure my vertical" reads a natural jump, arms free — T5's
+   * hands-on-hips refusal is lifted (lib/vertical/armsFree.ts) and the setup line says so. The hands-on-hips jump check,
+   * the full screen and the readiness check leave it unset.
+   */
+  armsFree?: boolean;
 }
 
 export class AssessRunner {
@@ -647,9 +657,17 @@ export class AssessRunner {
     this.lostFrames = 0;
     this.go('position', now);
     // SCREEN A: dim is said here, before the countdown — never mid-rep (activeOk keeps it a warning only).
-    this.say(def.setup, true);
+    this.say(this.setupOf(def), true);
     if (this.lastFraming?.issues.includes('dim')) this.say(FRAMING_FIX_LINES.dim, true);
   }
+
+  /** VERTICAL-EASY: the arms-free read of a T5 result (any other test, or a hands-on-hips run, unchanged). */
+  private armsFreeT5<T extends TestResult>(t: T): T {
+    return this.o.armsFree ? liftArmsTest(t, { frames: this.captures.T5 ?? [], front: this.calib.front }) : t;
+  }
+
+  /** The part's setup line: the arms-free jump says its own (VERTICAL-EASY). */
+  private setupOf(def: PartDef): string { return this.o.armsFree && def.test === 'T5' ? ARMS_FREE_SETUP : def.setup; }
 
   private resetPart(): void {
     const p = this.part!;
@@ -769,7 +787,7 @@ export class AssessRunner {
     const last = flights[flights.length - 1];
     if ((p.frames[p.frames.length - 1]?.t ?? 0) - last.landT < th('ui.timing').jumpSettleMs) return;   // let the landing settle first
     const res = gradeT5(p.frames, { calibration: this.calib, aspect: this.o.aspect });
-    const jumps = res.t5.jumps;
+    const jumps = (this.o.armsFree ? liftArms(res.t5, { frames: p.frames, front }) : res.t5).jumps;
     for (let k = p.lastFlightCount; k < jumps.length; k++) {
       const j = jumps[k];
       p.attempts++;
@@ -814,7 +832,7 @@ export class AssessRunner {
     const t = d.test === 'T1' ? gradeT1(this.captures.T1, ctx)
       : d.test === 'T2' ? gradeT2(this.captures.T2, ctx)
       : d.test === 'T3' ? gradeT3(this.captures.T3, ctx)
-      : gradeT5(this.captures.T5 ?? [], { ...ctx, cameraFps: this.o.cameraFps?.() ?? null });
+      : this.armsFreeT5(gradeT5(this.captures.T5 ?? [], { ...ctx, cameraFps: this.o.cameraFps?.() ?? null }));
     this.graded.push(t);
     this.mini = { test: t.id, text: doneLine(t) };
     this.say(`${lastCount}${this.mini.text}`, true);
@@ -835,6 +853,7 @@ export class AssessRunner {
       T3: Object.keys(this.captures.T3).length ? this.captures.T3 : undefined,
       T5: this.captures.T5 ?? undefined, painAfter: this.painAfter, takeoffLeg: this.takeoff, cameraFps: this.o.cameraFps?.() ?? null,
     }, this.o.priorTests);
+    if (this.o.armsFree) this.result = { ...this.result, tests: this.result.tests.map((x) => this.armsFreeT5(x)) };
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
     this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
@@ -896,6 +915,7 @@ export class AssessRunner {
       dimWarning: this.dimWarning,
       retryMessage: this.retryMessage,
       handsFree: this.handsFree,
+      armsFree: !!this.o.armsFree,
       readQuality: READ_STEPS.has(this.step) && this.readStep === this.step && this.readShares.length
         ? (this.readShares.reduce((a, b) => a + b, 0) / this.readShares.length >= th('gate.minConfidence') ? 'clear' : 'partial') : null,
     };
@@ -910,9 +930,9 @@ export class AssessRunner {
       case 'calibrate': return this.calWhy ?? 'Stand still facing the camera, arms by your sides.';
       case 'calibrateSide': return this.calWhy ?? 'Stand still side-on, left side to the camera.';
       case 'position': return this.lastFraming && !this.lastFraming.ok
-        ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def?.setup ?? '';
+        ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def ? this.setupOf(def) : '';
       case 'countdown': return 'Get ready.';
-      case 'active': return def?.setup ?? '';
+      case 'active': return def ? this.setupOf(def) : '';
       case 'paused': return `${this.pauseLine(this.lastFraming)} ${this.lastFraming?.instruction ?? ''}`.trim();
       case 'partDone': return 'Done.';
       case 'miniResult': return this.mini?.text ?? '';

@@ -32,6 +32,12 @@ export const CONDITIONS: Cond[] = [
   { name: 'arm swing', o: { trials: six(), style: { armSwing: true } } },
   { name: 'phone close (2 m)', o: { trials: six(), film: { distance: 2.0 } } },
   { name: 'phone far (4.5 m)', o: { trials: six(), film: { distance: 4.5 } } },
+  // VERTICAL-EASY (owner, 2026-10-27: "allow arm swing"): the front door reads arms free
+  { name: 'FRONT DOOR arm swing', o: { trials: six(), style: { armSwing: true }, armsFree: true } },
+  { name: 'FRONT DOOR hands on hips', o: { trials: six(), armsFree: true } },
+  { name: 'FRONT DOOR arm swing, bent-knee landing', o: { trials: six({ landKnee: 0.2 }), style: { armSwing: true }, armsFree: true } },
+  { name: 'FRONT DOOR arm swing, motion blur', o: { trials: six(), film: { blur: true }, style: { armSwing: true }, armsFree: true } },
+  { name: 'FRONT DOOR arm swing, heavy noise (2x)', o: { trials: six(), film: { noise: 2 }, style: { armSwing: true }, armsFree: true } },
 ];
 
 const mean = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN);
@@ -68,15 +74,18 @@ export function benchTable(rows: readonly Row[]): string {
 
 /** The owner's recorded jump streams (lib/pose/__fixtures__), through the live flow. The stand is the take's own last
  *  frame held (the athlete standing after the last landing), so the calibration's floor is the take's own floor. */
-export function recordedRuns(): { name: string; jumps: number; counted: number; numberMs: number | null; best: number | null; truthBest: number; reasons: string[] }[] {
+export function recordedRuns(): { name: string; jumps: number; counted: number; numberMs: number | null; best: number | null; truthBest: number; heights: string[]; truth: number[]; reasons: string[] }[] {
   const out = [];
   for (const name of ['jump_two_foot_low', 'jump_two_foot_high']) {
     const fx = JSON.parse(readFileSync(`${__dirname}/../lib/pose/__fixtures__/${name}.json`, 'utf8')) as { frames: PoseFrame[]; gt: { jumps: { heightFlightM: number }[] } };
     const last = fx.frames[fx.frames.length - 1];
     const stand = Array.from({ length: 90 }, () => last);
     const truthCm = fx.gt.jumps.map((g) => g.heightFlightM * 100);
-    const r = simulateLiveJump({ fps: 30, trials: [], clip: { stand, jump: fx.frames, truthCm } });
-    out.push({ name, jumps: truthCm.length, counted: r.counted, numberMs: r.numberMs, best: r.bestCm, truthBest: Math.max(...truthCm), reasons: r.graded.filter((g) => !g.valid).map((g) => g.why ?? 'not read') });
+    for (const armsFree of [false, true]) {
+      const r = simulateLiveJump({ fps: 30, trials: [], clip: { stand, jump: fx.frames, truthCm }, armsFree });
+      out.push({ name: `${name}${armsFree ? ' (front door, arms free)' : ' (hands-on-hips check)'}`, jumps: truthCm.length, counted: r.counted, numberMs: r.numberMs, best: r.bestCm, truthBest: Math.max(...truthCm),
+        heights: r.graded.map((g) => `${g.heightCm}${g.valid ? '' : ' (refused)'}`), truth: truthCm.map((x) => Math.round(x * 10) / 10), reasons: r.graded.filter((g) => !g.valid).map((g) => g.why ?? 'not read') });
+    }
   }
   return out;
 }

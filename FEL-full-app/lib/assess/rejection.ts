@@ -2,7 +2,7 @@
 import type { PartId } from './runner';
 import type { Rep } from './reps';
 
-export type RejectReason = 'outOfFrame' | 'tooFast' | 'lowConfidence' | 'heelUp' | 'handsOff' | 'noLanding' | 'tooHigh' | 'shallow' | 'other';
+export type RejectReason = 'moved' | 'outOfFrame' | 'tooFast' | 'lowConfidence' | 'heelUp' | 'handsOff' | 'noLanding' | 'tooHigh' | 'shallow' | 'other';
 
 export interface Rejection {
   reason: RejectReason;
@@ -10,6 +10,7 @@ export interface Rejection {
 }
 
 const SAY: Record<RejectReason, string> = {
+  moved: 'You moved from your spot. Go back to where you stood and jump again.',
   outOfFrame: 'You stepped out of the shot.',
   tooFast: 'Too fast. Slow down a little.',
   lowConfidence: 'The camera lost you for a moment.',
@@ -25,6 +26,7 @@ const SAY: Record<RejectReason, string> = {
 
 export function rejectionFromInvalidWhy(why: string | null | undefined): Rejection {
   const w = (why ?? '').toLowerCase();
+  if (w.includes('stood')) return { reason: 'moved', text: SAY.moved };   // VERTICAL-EASY (lib/vertical/armsFree.ts)
   if (w.includes('land')) return { reason: 'noLanding', text: SAY.noLanding };
   if (w.includes('hand')) return { reason: 'handsOff', text: SAY.handsOff };
   if (w.includes('130') || w.includes('feet')) return { reason: 'tooHigh', text: SAY.tooHigh };

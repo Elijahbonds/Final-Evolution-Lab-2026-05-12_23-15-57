@@ -23,18 +23,19 @@ import { inches } from '@/lib/assess/why';
 import { PRIVACY_PATH, programPath } from '@/lib/screen/routes';
 import { tabStorage } from '@/lib/screen/store';
 import {
-  RESULT_AGAIN, RESULT_DONE, RESULT_LABEL, RESULT_MORE, RESULT_NEXT, RESULT_NONE_MEANS, RESULT_NONE_NEXT, RESULT_NONE_SAW,
+  RESULT_AGAIN, RESULT_DONE, RESULT_LABEL, RESULT_LABEL_SWING, RESULT_MORE, RESULT_NEXT, RESULT_NONE_MEANS, RESULT_NONE_NEXT, RESULT_NONE_SAW,
   resultMeans, resultSaw,
 } from '@/lib/vertical/copy';
-import { changeOf, lastKeptCheckCm } from '@/lib/vertical/result';
+import { changeOf } from '@/lib/vertical/result';
 import { primaryBtn, quietBtn } from './screen-ui';
 
-const safeLocal = (): Pick<Storage, 'getItem'> | null => { try { return window.localStorage; } catch { return null; } };
+/** The one quiet look on this screen besides the primary: a text button (premium rule: ≤ 3 button looks with the back arrow). */
+const LINK = 'fel-press inline-flex min-h-12 w-full items-center justify-center text-[16px] font-bold text-white/80 underline underline-offset-4';
 
 /** Where "Done" goes: the app's front door (signed in it opens Play; signed out, the landing). */
 export const RESULT_DONE_HREF = '/';
 
-export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, kid, jumpIn, lastIn, onFull, onAgain, lastCm = null, more = null }: {
+export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, kid, jumpIn, lastIn, onFull, onAgain, lastCm = null, armSwing = false, more = null }: {
   heightCm: number | null;
   /** Jumps that counted (default: every attempt). */
   counted?: number;
@@ -46,17 +47,17 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
   lastIn: number | null;
   onFull: () => void;
   onAgain: () => void;
-  /** An adult's last kept live check on this device (lib/jump/historyStore.ts), for "what it means". Read, never written. */
+  /** An adult's last result IN THE SAME SERIES on this device (lib/vertical/series.ts), for "what it means". */
   lastCm?: number | null;
+  /** "Measure my vertical": read arms free, labelled "with arm swing" — never compared with a hands-on-hips number. */
+  armSwing?: boolean;
   /** An adult's detail cards (session card, slow-mo, more tests), shown under "More detail". */
   more?: ReactNode;
 }) {
   const [unit, setUnit] = useState<JumpUnit>(() => readJumpUnit(tabStorage()));
-  // an adult's last kept check on this device, read once (never for a kid: their last number is page memory, lastIn)
-  const [keptCm] = useState<number | null>(() => (kid || lastCm !== null || typeof window === 'undefined' ? lastCm : lastKeptCheckCm(safeLocal())));
   const pick = (u: JumpUnit) => { setUnit(u); writeJumpUnit(tabStorage(), u); };
   void jumpIn;                                                   // the kid's number is heightCm; lastIn is their last one here
-  const change = heightCm === null ? null : changeOf(heightCm, kid ? (lastIn === null ? null : lastIn * 2.54) : keptCm, unit);
+  const change = heightCm === null ? null : changeOf(heightCm, kid ? (lastIn === null ? null : lastIn * 2.54) : lastCm, unit);
   const v = heightCm === null ? null : unit === 'cm' ? heightCm : inches(heightCm);
   const pm = heightCm === null || plusMinusCm === null || !Number.isFinite(plusMinusCm) ? null
     : Math.max(1, Math.round(unit === 'cm' ? plusMinusCm : inches(plusMinusCm)));
@@ -65,7 +66,7 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
   return (
     <div data-jump-result={kid ? 'kid' : 'adult'} className="space-y-4">
       <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
-        <p className="text-[16px] font-bold uppercase tracking-[0.16em] text-white/60">{RESULT_LABEL}</p>
+        <p data-jump-label={armSwing ? 'arm-swing' : 'hands-on-hips'} className="text-[16px] font-bold uppercase tracking-[0.16em] text-white/60">{armSwing ? RESULT_LABEL_SWING : RESULT_LABEL}</p>
         {v !== null ? (
           <p data-jump-number aria-label={estimate} className="mt-2 flex items-baseline justify-center gap-2 font-black leading-none text-white">
             <span className="sr-only">about </span>
@@ -96,10 +97,10 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
       <Link href={RESULT_DONE_HREF} prefetch={false} data-primary data-done className={primaryBtn}>
         <Check aria-hidden className="mr-2 h-5 w-5" strokeWidth={3} />{RESULT_DONE}
       </Link>
-      <button type="button" data-run-again onClick={onAgain} className={quietBtn}>{RESULT_AGAIN}</button>
+      <button type="button" data-run-again onClick={onAgain} className={LINK}>{RESULT_AGAIN}</button>
 
-      <details data-jump-more className="rounded-3xl border border-white/10 bg-white/[0.02] p-4 [&_summary::-webkit-details-marker]:hidden">
-        <summary className="flex min-h-12 cursor-pointer list-none items-center justify-center text-[16px] font-bold text-white/80 underline underline-offset-4">{RESULT_MORE}</summary>
+      <details data-jump-more className="[&_summary::-webkit-details-marker]:hidden">
+        <summary className={`${LINK} cursor-pointer list-none`}>{RESULT_MORE}</summary>
         <div className="mt-3 space-y-3 text-left">
           {v !== null ? <p data-jump-estimate className="text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE} Today: {estimate}.</p> : null}
           <p data-jump-attempts className="text-[16px] text-white/75">{attempts} jumps, best one shown</p>
@@ -121,7 +122,7 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
       <div className="space-y-1 text-center text-[16px] text-white/60">
         <p data-disclaimer>{DISCLAIMER}</p>
         <p data-stop-line>{STOP_LINE}</p>
-        <p><Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link></p>
+        <p><Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className={LINK}>{PRIVACY_LINK}</Link></p>
       </div>
     </div>
   );

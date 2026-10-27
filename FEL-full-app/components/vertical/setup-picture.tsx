@@ -31,3 +31,14 @@ export function HandsOnHips({ className = 'h-16 w-auto' }: { className?: string 
     </svg>
   );
 }
+
+/** "Measure my vertical": arms free — a figure mid-swing, arms up (VERTICAL-EASY, owner 2026-10-27: allow arm swing). */
+export function ArmSwing({ className = 'h-16 w-auto' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 40 64" className={className} aria-hidden data-arm-swing fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="20" cy="12" r="5" stroke="#fff" strokeWidth="2" />
+      <path d="M20 18 V40 M20 40 L15 61 M20 40 L25 61 M20 22 L11 6 M20 22 L29 6" stroke="#fff" strokeWidth="2.2" />
+      <path d="M6 14 Q4 8 8 3 M34 14 Q36 8 32 3" stroke="#00E5FF" strokeWidth="1.6" />
+    </svg>
+  );
+}

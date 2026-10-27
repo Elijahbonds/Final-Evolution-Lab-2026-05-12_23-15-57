@@ -57,7 +57,8 @@ describe('(d) /screen: one stable QR address', () => {
     expect(t.indexOf('Measure my vertical (about 1 min)')).toBeGreaterThan(-1);
     expect(t.indexOf('Measure my vertical (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
     expect(t.indexOf('Measure my vertical (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
-    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=jump"/);
+    // test changed (VERTICAL-EASY, 2026-10-27): the start card's first button is "Measure my vertical", the arms-free run
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=vertical"/);
     expect(h).toMatch(/href="\/play\/mirror\/assess\?run=full"/);
     expect(h).not.toMatch(/[?&amp;]src=/);
     expect(h).not.toMatch(/NEXT_REDIRECT|pose|wasm|mediapipe/i);

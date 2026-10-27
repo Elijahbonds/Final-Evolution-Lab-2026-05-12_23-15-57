@@ -6,6 +6,11 @@ import type { FramingCheck, FramingIssue } from '@/lib/mirror/framing';
 
 /** The one front door's name, everywhere it is linked (label tier). */
 export const MEASURE_VERTICAL = 'Measure my vertical';
+/**
+ * The hands-on-hips jump check's one name (the links whose number is the server's jump series: the profile tile, the
+ * daily drill, the signature card, a challenge). Owner, 2026-10-27: the two series are never compared.
+ */
+export const JUMP_CHECK = 'Jump check, hands on hips';
 /** The line under it on a list row (card tier). */
 export const MEASURE_VERTICAL_LINE = 'Prop your phone up, jump three times. About a minute.';
 
@@ -37,15 +42,20 @@ export function setupHeadline(f: FramingCheck | null, ready: boolean): { word: s
 }
 export const SETUP_HEADLINES: readonly string[] = Object.values(HEADLINE);
 
-/** The jump's own instruction, shown with the hands-on-hips picture before the countdown (card tier). */
-export const JUMP_HOW = 'Hands on hips. Dip, jump as high as you can, land tall.';
+/** The hands-on-hips jump check's instruction, with its picture before the countdown (card tier). */
+export const JUMP_HOW = 'Hands on hips. Dip and jump as high as you can.';
+/** "Measure my vertical": a natural jump, arms free (owner, 2026-10-27) — on screen before the countdown (card tier). */
+export const JUMP_HOW_FREE = 'Swing your arms and jump as high as you can.';
+/** …and said as the part's setup line (set-up tier). */
+export const ARMS_FREE_SETUP = 'Jump as high as you can, arms free. Land, then stand still. Three jumps.';
 /** Flashed big when the countdown ends (live tier). */
 export const JUMP_GO = 'Jump!';
 
 // ── the result: three parts (docs/CUE-STYLE.md §4) ──
 
-/** The number's label. */
+/** The number's label: the hands-on-hips check, and the front door's arm-swing series (never compared). */
 export const RESULT_LABEL = 'Your vertical';
+export const RESULT_LABEL_SWING = 'Your vertical, with arm swing';
 /** What we saw: the best of the jumps that counted. */
 export const resultSaw = (counted: number, number: string): string =>
   counted >= 3 ? `Best of your 3 jumps: about ${number}.` : counted === 2 ? `Best of your 2 jumps: about ${number}.` : `Your one jump that counted: about ${number}.`;

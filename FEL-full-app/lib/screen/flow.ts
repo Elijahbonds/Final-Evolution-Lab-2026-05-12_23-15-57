@@ -20,8 +20,14 @@ import { needsGrownUp, type AgeBand } from './age';
 
 export type PreStep = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'camera';
 
-/** Jump-only runs T5. Full runs T1–T3 and T5. A start with no kind is the full screen. */
-export type ScreenKind = 'jump' | 'full';
+/**
+ * Jump-only runs T5. Full runs T1–T3 and T5. A start with no kind is the full screen. VERTICAL-EASY (owner, 2026-10-27):
+ * 'vertical' is "Measure my vertical" — T5 read arms free, its own series on the device (lib/vertical/series.ts); 'jump'
+ * stays the hands-on-hips jump check whose number the server's jump rows hold.
+ */
+export type ScreenKind = 'jump' | 'vertical' | 'full';
+/** The runs that measure the jump alone (no take-off foot asked). */
+export const isJumpOnly = (k: ScreenKind): boolean => k === 'jump' || k === 'vertical';
 
 export interface PreState {
   step: PreStep;
@@ -57,7 +63,7 @@ export function backStep(s: PreState): PreState {
     case 'age': case 'grownUp': case 'painStop': return PRE_START;
     case 'pain': return s.age && needsGrownUp(s.age) ? { step: 'grownUp', age: s.age, gate: null, kind: s.kind } : PRE_START;
     case 'takeoff': return { ...s, step: 'pain' };
-    case 'cameraInfo': return { ...s, step: s.kind === 'jump' ? 'pain' : 'takeoff' };
+    case 'cameraInfo': return { ...s, step: isJumpOnly(s.kind) ? 'pain' : 'takeoff' };
     case 'camera': return { ...s, step: 'cameraInfo' };
   }
 }
@@ -82,7 +88,7 @@ export function preStep(s: PreState, e: PreEvent, now: Date = new Date()): PreSt
       // VERTICAL-EASY (2026-10-27): the jump alone never asks the take-off foot. It labels the sided checks only (the
       // full screen's), and the jump's own number does not use it; "Do the full screen" asks it then (assess-app.tsx).
       if (e.hurts) return { step: 'painStop', age: s.age, gate: null, kind: s.kind };
-      return s.kind === 'jump' ? { ...s, step: 'cameraInfo' } : { ...s, step: 'takeoff' };
+      return isJumpOnly(s.kind) ? { ...s, step: 'cameraInfo' } : { ...s, step: 'takeoff' };
     case 'takeoff':
       if (s.step !== 'takeoff' || !s.gate) return s;
       return { ...s, step: 'cameraInfo' };

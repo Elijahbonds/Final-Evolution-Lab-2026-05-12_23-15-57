@@ -37,6 +37,10 @@ export interface LiveSimOptions {
    * shifted to start on "Go"); `truthCm` is the recording's ground truth per jump (lib/pose/__fixtures__ gt).
    */
   clip?: { stand: readonly PoseFrame[]; jump: readonly PoseFrame[]; truthCm: number[] };
+  /** The take's beats instead of `trials` (rests and decoys between them: lib/jump/ballistic.ts Beat). */
+  beats?: Beat[];
+  /** Read arms free, as "Measure my vertical" does (lib/vertical/armsFree.ts). Default: the hands-on-hips check. */
+  armsFree?: boolean;
   /** Every view the runner returns, with its frame (the rig's screenshots pick theirs from here). */
   onView?: (v: RunnerView, f: PoseFrame) => void;
 }
@@ -79,7 +83,7 @@ export function simulateLiveJump(o: LiveSimOptions): LiveSimResult {
   const limit = o.limitMs ?? 150_000;
   const stand = o.clip ? retime(o.clip.stand, o.fps) : standFrames(o.fps, seed, o.film, o.style);
   const runner = new AssessRunner({
-    aspect: 4 / 3, painAsked: true, handsFree: true, parts: JUMP_PARTS, cameraFps: () => o.fps,
+    aspect: 4 / 3, painAsked: true, handsFree: true, parts: JUMP_PARTS, cameraFps: () => o.fps, ...(o.armsFree ? { armsFree: true } : {}),
     ...(o.takeoffLeg !== undefined ? { takeoffLeg: o.takeoffLeg } : { takeoffLeg: null }),
   });
   const at: LiveSimResult['at'] = {};
@@ -108,8 +112,8 @@ export function simulateLiveJump(o: LiveSimOptions): LiveSimResult {
         jumpFrames = o.clip.jump.map((x) => ({ ...x, t: x.t - t0 })); jumpStart = f.t + dt; j = 0;
         jumpTruth = o.clip.truthCm;
       } else {
-        const beats: Beat[] = [];
-        o.trials.forEach((tr, k) => { if (k) beats.push({ rest: o.restS ?? 1.0 }); beats.push({ trial: tr }); });
+        const beats: Beat[] = o.beats ? [...o.beats] : [];
+        if (!o.beats) o.trials.forEach((tr, k) => { if (k) beats.push({ rest: o.restS ?? 1.0 }); beats.push({ trial: tr }); });
         const take = buildTake(beats, { leadS: o.reactS ?? 0.8, ...(o.style ? { style: o.style } : {}) });
         const filmed = filmTake(take, { fps: o.fps, seed: seed + 100, ...o.film });
         jumpFrames = filmed.frames; jumpStart = f.t + dt; j = 0;

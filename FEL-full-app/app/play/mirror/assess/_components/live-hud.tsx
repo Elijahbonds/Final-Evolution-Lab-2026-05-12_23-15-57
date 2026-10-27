@@ -15,8 +15,8 @@ import { testDef, type Side } from '@/lib/assess/protocol';
 import { FRAMING_IN_FRAME, JUMP_LAND_TALL, READ_CLEAR, READ_PARTIAL, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
 import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { cuesDue, cueFlash, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
-import { JUMP_GO, JUMP_HOW, SETUP_EYEBROW, SETUP_PLACE, SETUP_READY_LINE, setupHeadline } from '@/lib/vertical/copy';
-import { HandsOnHips, SetupPicture } from '@/components/vertical/setup-picture';
+import { JUMP_GO, JUMP_HOW, JUMP_HOW_FREE, SETUP_EYEBROW, SETUP_PLACE, SETUP_READY_LINE, setupHeadline } from '@/lib/vertical/copy';
+import { ArmSwing, HandsOnHips, SetupPicture } from '@/components/vertical/setup-picture';
 
 /** SCREEN A: a rep is up on these steps — voice and colour only, no reading. */
 const NO_READING: ReadonlySet<RunnerView['step']> = new Set(['calibrate', 'calibrateSide', 'countdown', 'active', 'paused']);
@@ -50,13 +50,14 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
       ) : null}
 
       {/* move header: readable from ~3 m — never while a rep is up (SCREEN A) */}
-      {v.move && !noReading ? (
+      {/* VERTICAL-EASY: a run of one move (the jump alone) has no "Move 1 of 1" header — the how-to card below says it */}
+      {v.move && !noReading && v.move.total > 1 ? (
         <div className="absolute inset-x-2 top-2 z-[6] text-center">
           <p className="text-[16px] font-bold uppercase tracking-[0.2em] text-white/70">Move {v.move.index} of {v.move.total}</p>
           <p className="mt-0.5 text-[clamp(28px,8vw,44px)] font-black leading-none text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{v.test && v.test in SCREEN_TEST_NAMES ? SCREEN_TEST_NAMES[v.test as keyof typeof SCREEN_TEST_NAMES] : v.move.name}</p>
           <p className="mt-1 text-[clamp(16px,4.5vw,22px)] font-bold leading-snug text-[#00E5FF]">{v.move.cue}</p>
         </div>
-      ) : !noReading && (v.test || v.label) ? (
+      ) : !noReading && (v.test || v.label) && !(v.move && v.move.total === 1) ? (
         <div className="absolute left-3 top-3 flex flex-col gap-1.5 z-[6]">
           {v.test ? <span className="rounded-full bg-black/60 px-3 py-1 text-[16px] font-bold text-white/85">{v.test in SCREEN_TEST_NAMES ? SCREEN_TEST_NAMES[v.test as keyof typeof SCREEN_TEST_NAMES] : testDef(v.test).short}</span> : null}
           {v.label ? <span className="rounded-full bg-[#00E5FF] px-3 py-1 text-[16px] font-black tracking-wide text-black">{v.label}</span> : null}
@@ -64,7 +65,8 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
       ) : null}
 
       {/* SCREEN A: one big rep number instead of the dots, centre-top, at least 30% of the stage tall */}
-      {inTest && v.reps.target ? (
+      {/* VERTICAL-EASY: nothing counted yet while the athlete gets set — the big "0 / 3" waits for the countdown */}
+      {inTest && v.reps.target && !(v.step === 'position' && v.reps.count === 0) ? (
         <div data-rep-counter aria-label={`${v.reps.count} of ${v.reps.target} counted`}
           className={`pointer-events-none absolute inset-x-0 top-1 z-[6] text-center font-black leading-none drop-shadow-[0_4px_24px_rgba(0,0,0,0.85)] text-[clamp(160px,40vh,320px)] ${counted ? 'text-[#00FF9D]' : 'text-white'}`}>
           {v.reps.count}<span className="text-white/50"> / </span>{v.reps.target}
@@ -129,12 +131,12 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
       {v.test === 'T5' && !noReading ? (
         <p data-jump-land-tall className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{JUMP_LAND_TALL}</p>
       ) : null}
-      {/* VERTICAL-EASY: the jump's one rule as a picture, before the countdown — hands that leave the hips are the refusal
-          the owner's own recorded jump hit first */}
+      {/* VERTICAL-EASY: the jump's one rule as a picture, before the countdown: hands on hips for the jump check, arms
+          free for "Measure my vertical" (owner, 2026-10-27: allow arm swing) */}
       {v.test === 'T5' && v.step === 'position' ? (
-        <div data-jump-how className="absolute inset-x-3 top-[13rem] z-[6] flex items-center justify-center gap-3 rounded-2xl bg-black/60 px-3 py-2">
-          <HandsOnHips className="h-14 w-auto shrink-0" />
-          <p className="text-[16px] font-bold leading-snug text-white">{JUMP_HOW}</p>
+        <div data-jump-how={v.armsFree ? 'arms-free' : 'hands-on-hips'} className="absolute inset-x-3 top-[13rem] z-[6] flex items-center justify-center gap-3 rounded-2xl bg-black/60 px-3 py-2">
+          {v.armsFree ? <ArmSwing className="h-14 w-auto shrink-0" /> : <HandsOnHips className="h-14 w-auto shrink-0" />}
+          <p className="text-[16px] font-bold leading-snug text-white">{v.armsFree ? JUMP_HOW_FREE : JUMP_HOW}</p>
         </div>
       ) : null}
       {/* VERTICAL-EASY: "3, 2, 1, Jump!" — the word, big, for the moment the countdown ends */}

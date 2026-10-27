@@ -16,7 +16,7 @@
 
 import { MODE_INFO, canonicalModeKey } from '@/lib/game-data';
 import type { ChallengeExtra } from './challenge-link-core';
-import { MEASURE_VERTICAL } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the one front door
+import { JUMP_CHECK } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the hands-on-hips jump check
 
 /** A challenge is open for 48 hours (owner, 2026-10-22). */
 export const CHALLENGE_TTL_MS = 48 * 60 * 60 * 1000;
@@ -46,7 +46,7 @@ export const REP_METRICS: Record<RepMetric, RepMetricSpec> = {
     label: 'Jump',
     format: (n) => `${(n / 10).toFixed(1)} in`,
     measureHref: '/play/mirror/assess?run=jump',
-    measureLabel: MEASURE_VERTICAL,
+    measureLabel: JUMP_CHECK,
   },
   form: {
     label: 'Form',

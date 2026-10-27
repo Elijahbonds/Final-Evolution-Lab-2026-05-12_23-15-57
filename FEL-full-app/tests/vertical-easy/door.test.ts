@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
-import { MEASURE_VERTICAL, MEASURE_VERTICAL_LINE } from '@/lib/vertical/copy';
+import { JUMP_CHECK_HREF, MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
+import { JUMP_CHECK, MEASURE_VERTICAL, MEASURE_VERTICAL_LINE } from '@/lib/vertical/copy';
 import { EN } from '@/lib/i18n';
 import { JUMP_CHECK_HREF as DRILL_HREF } from '@/lib/daily-drill/copy';
 import { JUMP_CHECK_HREF as TILE_HREF } from '@/lib/profile-v2/tiles';
@@ -16,11 +16,17 @@ const ROOT = join(__dirname, '../..');
 const src = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 describe('one front door', () => {
-  it('is the Quick Screen\'s jump-only run (its own age question first; nothing sent)', () => {
-    expect(MEASURE_VERTICAL_HREF).toBe(`${ASSESS_PATH}?run=jump`);
-    expect(DRILL_HREF).toBe(MEASURE_VERTICAL_HREF);
-    expect(TILE_HREF).toBe(MEASURE_VERTICAL_HREF);
-    expect(Object.values(REP_METRICS).filter((m) => m.measureHref.includes('run=jump')).every((m) => m.measureLabel === MEASURE_VERTICAL)).toBe(true);
+  it('is the Quick Screen\'s arms-free jump run; the links that read the server\'s jump rows keep the hands-on-hips check', () => {
+    expect(MEASURE_VERTICAL_HREF).toBe(`${ASSESS_PATH}?run=vertical`);
+    expect(JUMP_CHECK_HREF).toBe(`${ASSESS_PATH}?run=jump`);
+    // the profile tile, the daily drill and a challenge read the hands-on-hips series: they link its check, by one name
+    expect(DRILL_HREF).toBe(JUMP_CHECK_HREF);
+    expect(TILE_HREF).toBe(JUMP_CHECK_HREF);
+    const jumpMetrics = Object.values(REP_METRICS).filter((m) => m.measureHref === JUMP_CHECK_HREF);
+    expect(jumpMetrics.length).toBeGreaterThan(0);
+    expect(jumpMetrics.every((m) => m.measureLabel === JUMP_CHECK)).toBe(true);
+    expect(src('app/play/mirror/assess/page.tsx')).toContain("raw === 'vertical'");
+    expect(src('app/screen/screen-start.tsx')).toContain('?run=vertical');
   });
 
   it('is one tap from Play, the landing and Train, under one name', () => {
@@ -38,7 +44,8 @@ describe('one front door', () => {
 
   it('every jump CTA in the app says the same name', () => {
     for (const f of ['lib/profile-v2/tiles.ts', 'lib/daily-drill/copy.ts', 'lib/signature/copy.ts', 'components/profile-v2/stats-section.tsx']) {
-      expect(src(f), f).not.toMatch(/Do a Mirror jump check|Do a jump check'|Do the jump check'/);
+      expect(src(f), f).not.toMatch(/Do a Mirror jump check|Do a jump check'|Do the jump check'|MEASURE_VERTICAL/);
+      expect(src(f), f).toContain('JUMP_CHECK');
     }
   });
 });
@@ -47,6 +54,7 @@ describe('the steps before the camera', () => {
   const run = (events: PreEvent[]) => events.reduce((s, e) => preStep(s, e), PRE_START);
   it('the jump alone: age, pain, then the camera — two taps; the full screen still asks the take-off foot', () => {
     expect(run([{ type: 'start', kind: 'jump' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('cameraInfo');
+    expect(run([{ type: 'start', kind: 'vertical' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('cameraInfo');
     expect(run([{ type: 'start', kind: 'full' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('takeoff');
   });
   it('under 18 is unchanged: the grown-up step, and never the camera (cameraAllowed, assess-app.tsx)', () => {
