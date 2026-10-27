@@ -400,13 +400,14 @@ function trickPath(r: Rec): number[] | null {
   return out;
 }
 
-const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
+let browser: Browser | null = null;   // launched on first use: a FROM_REC re-measure opens no browser
+const getBrowser = async (): Promise<Browser> => (browser ??= await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] }));
 const summary: Record<string, unknown> = { base: BASE, page: PAGE, seed: SEED, at: new Date().toISOString() };
 try {
   for (const scen of SCEN) {
     console.log(`[${scen}]`);
     const recFile = path.join(OUT, `rec-${scen}.json`);
-    const recs: Rec[] = process.env.FROM_REC === '1' && fs.existsSync(recFile) ? JSON.parse(fs.readFileSync(recFile, 'utf8')) : await runScen(b, scen, REPS);
+    const recs: Rec[] = process.env.FROM_REC === '1' && fs.existsSync(recFile) ? JSON.parse(fs.readFileSync(recFile, 'utf8')) : await runScen(await getBrowser(), scen, REPS);
     fs.writeFileSync(path.join(OUT, `rec-${scen}.json`), JSON.stringify(recs));
     const rows = recs.map((r) => r.err ? { scen: r.scen, rep: r.rep, err: r.err } : { scen: r.scen, rep: r.rep, approach: approachMetrics(r), flight: flightMetrics(r), lob: lobMetrics(r), show: showMetrics(r), hud: r.hud.slice(0, 30) });
     if (scen === 'tricks') {
@@ -416,7 +417,8 @@ try {
       summary.tricks = nn.sort((x, y) => (x.rmsM ?? 0) - (y.rmsM ?? 0));
     }
     summary[scen] = rows;
+    fs.writeFileSync(path.join(OUT, `summary-${scen}.json`), JSON.stringify({ [scen]: rows, ...(scen === 'tricks' ? { tricks: summary.tricks } : {}) }, null, 1));   // one per scenario: a later run of another one keeps it
     fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summary, null, 1));
   }
-} finally { await b.close(); }
+} finally { if (browser) await browser.close(); }
 console.log(`[done] ${OUT}/summary.json`);
