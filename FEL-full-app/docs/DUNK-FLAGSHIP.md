@@ -151,16 +151,20 @@ strips at 480×270), virtual clock, one attempt per piece. Contact sheet: `round
 | Run | Flight (game s) | Top over the catch | Caught | Ring / shadow on screen | Ball speed at the hand |
 |---|---|---|---|---|---|
 | before · oop r0, r1 | 0.55 | −0.34 m (still rising) | yes | no ring | 11.8 m/s |
-| oop r0 / r1 / r3 / r9 (on the run) | 1.13 / 1.13 / 1.15 / 1.15 | 0.55 / 0.54 / 0.58 / 0.58 m | 4 / 4 | 0.99 / 0.99 of the lob | 4.7 m/s |
+| oop r0 / r1 / r3 / r9 (on the run) | 1.13 / 1.13 / 1.15 / 1.15 | 0.55 / 0.54 / 0.58 / 0.58 m | yes (4 / 4) | 0.99 of the lob, both | 4.7 m/s |
 | oop from standing (RT) | 1.17 | 0.57 m | yes | 0.99 | 4.7 m/s |
 | A early (first cut: the old fallback) | 0.57 | −0.13 m | yes | 0.97 | 13.3 m/s |
 | RT let go early (first cut) | 0.57 | −0.16 m | yes | 0.97 | 14.0 m/s |
-| A early (fixed) | EARLY_A | EARLY_A_TOP | EARLY_A_C | EARLY_A_R | EARLY_A_V |
-| RT let go early (fixed) | EARLY_R | EARLY_R_TOP | EARLY_R_C | EARLY_R_R | EARLY_R_V |
-| A early, knob `dunk.oopLateCatchClipT` 0.95 | EARLY_95 | EARLY_95_TOP | EARLY_95_C | EARLY_95_R | EARLY_95_V |
+| A early (fixed: the take-off throw) | 0.98 | −0.04 m (meets the hand at its crest) | yes | 0.98 | 4.9 m/s |
+| RT let go early (fixed) | 0.98 | −0.04 m | yes | 0.98 | 4.9 m/s |
+| A early, knob `dunk.oopLateCatchClipT` 0.95 | 1.13 | 0.08 m | yes | 0.99 | 4.1 m/s |
+| A early just after the throw (r9 jitter, first cut: the 0.62 re-aim) | 0.88 | 0.09 m | yes | 0.98 | 6.0 m/s |
+| A early just after the throw (fixed: the re-aim keeps the throw's timing) | 1.07 | 0.47 m | yes | 0.98 | 4.8 m/s |
+| oop on the run after the re-aim change (regression, r0) | 1.13 | 0.55 m | yes | 0.99 | 4.7 m/s (identical to before the change) |
 
 ("Ring / shadow" is the share of the lob's frames where the catch ring and the ball's floor shadow are both drawn; the
-missing 1–3 % is the release frame. The ring is gone by the frame after the catch: 0 lingering frames on every run.)
+missing 1–3 % is the release frame. The ring is gone by the frame after the catch: 0 lingering frames on every run. The
+slam after every catch, early or late beat, was CLEAN at 0.85–0.93 with the same impact as before.)
 
 What changed:
 - **The passer winds up.** The run-time throw left on the toss clip's first frame, from his hip. The toss (`jumpshot`, arms
@@ -170,7 +174,15 @@ What changed:
   (A early, RT let go early) fell back to the old 0.35 s bullet thrown at 0.9 × the rise. The passer now lets go on the
   take-off frame, aimed at the hang beat (clip 0.8, the off-glass lob's measured catch beat). Knob `dunk.oopLateCatchClipT`
   (new, default 0.8). Nothing thrown after the take-off can fly the on-time lob's arc: only ~0.8 s of clip remains before
-  the slam window. EARLY_NOTE
+  the slam window.
+  A take-off before the throw is due measures 0.98 s with the ball meeting the hand at its crest (−0.04 m): the passer has
+  had no time to wind up, so it leaves from his hip (0.95 m), and a 0.5 m drop from there needs ~1.1 s, inside the slam
+  window. The knob at 0.95 gives 1.13 s and 0.08 m with the slam still CLEAN (one attempt); the default stays at 0.8, the
+  beat measured across the off-glass runs. That is the owner's feel-check.
+- **The launch re-aim keeps the throw's own timing.** A take-off 6 frames after the passer let go (the jittered A-early run)
+  re-aimed a 0.99 s lob onto the 0.62 beat: a second, flatter throw (0.88 s, top 0.09 m). The lob now records its planned
+  flight, and the re-aim takes whichever catch beat is nearer the flight the throw still had left. The on-time run arrives
+  with 0.62 s left, so it is unchanged (re-measured, identical numbers); the early one catches on the hang beat.
 - **The on-time lob** (thrown on the run, Phase 1's early piece `b1`): the launch re-aims it onto the exact catch beat
   (2.3 m from the catch with 0.59 s left), a velocity kink of ~0.2 m/s.
 
