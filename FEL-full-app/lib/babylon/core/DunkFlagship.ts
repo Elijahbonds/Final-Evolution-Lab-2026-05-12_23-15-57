@@ -98,8 +98,10 @@ export function timeToFloor(heightM: number, vyDown: number, g = 9.81): number {
 export type WhiffWhy = 'TOO HIGH' | 'TOO LOW' | 'OUT AHEAD' | 'BEHIND YOU' | 'WIDE' | 'NEVER IN REACH';
 /** Where the ball went by the hand: `d` is ball − hand at their nearest (m), `fwd` the run's direction toward the rim (any
  *  length, horizontal). The largest of the three offsets names it; no sample at all → NEVER IN REACH. */
+/** (new) A nearest pass farther than this from the hand (m) was never a catch to miss: NEVER IN REACH. */
+export const WHIFF_REACH_M = 1.5;
 export function whiffWhy(d: { x: number; y: number; z: number } | null, fwd: { x: number; z: number }): WhiffWhy {
-  if (!d || ![d.x, d.y, d.z].every(Number.isFinite)) return 'NEVER IN REACH';
+  if (!d || ![d.x, d.y, d.z].every(Number.isFinite) || Math.hypot(d.x, d.y, d.z) > WHIFF_REACH_M) return 'NEVER IN REACH';
   const n = Math.hypot(fwd.x, fwd.z) || 1, fx = fwd.x / n, fz = fwd.z / n;
   const along = d.x * fx + d.z * fz, side = Math.abs(d.x * -fz + d.z * fx), up = d.y;
   const m = Math.max(Math.abs(up), Math.abs(along), side);
@@ -148,3 +150,18 @@ export function glassMirrorX(from: { x: number; z: number }, to: { x: number; z:
   const a = Math.abs(from.z - boardZ), b = Math.abs(to.z - boardZ);
   return from.x + (to.x - from.x) * (a / Math.max(1e-6, a + b));
 }
+
+// ── Phase 4: THE PASSER'S BOUNCE OOP ─────────────────────────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep): 0 of 6 caught — thrown during the rise on the STANDING solve, a bounce-BOUNCE with a 3.1 s flight
+// (LOST: NEVER IN REACH, 2.9 m from the hand). He now throws it on the run, one bounce, timed like the plain oop.
+/** (new) The bounce oop's flight, release to the catch (s): at least this, or the bounce's own shortest flight plus a margin. */
+export const OOP_BOUNCE_FLIGHT_SEC = 1.1;
+
+// ── Phase 4: THE LOB STAYS IN THE PICTURE ───────────────────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep): the standing self-lob thrown from the top of the runway tops out ~6.4 m up; the runway camera
+// (runner + the rim as its objective, aimed ~2.4 m up) had it out of frame for half its flight — in frame 59–64 % of it.
+/** (new) While a lob is in the air on the runway, the camera's objective (the rim) rises by this share of the ball's height over
+ *  the rim — the camera's own capped bias then tilts the frame up with it. */
+export const LOB_FRAME_LIFT = 1.0;
+/** (new) …eased in and out over this time constant (s): no step when the lob leaves the hand or is caught. */
+export const LOB_FRAME_TAU = 0.2;

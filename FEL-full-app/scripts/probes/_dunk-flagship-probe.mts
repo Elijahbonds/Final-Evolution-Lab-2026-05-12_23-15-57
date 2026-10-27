@@ -445,12 +445,14 @@ function lobMetrics(r: Rec) {
   const last = fl.slice(-3); const vIn = last.length >= 2 && last[0].ball && last[last.length - 1].ball ? Math.hypot(...[0, 1, 2].map((k) => last[last.length - 1].ball![k] - last[0].ball![k])) / ((last.length - 1) * DT) : NaN;
   const to = /to \(([-\d.]+),([-\d.]+),([-\d.]+)\)/.exec(thrown.msg); const catchY = to ? Number(to[2]) : NaN;
   const ringShare = fl.filter((f) => ((f.lv ?? 0) & 1) === 1).length / Math.max(1, fl.length), shadowShare = fl.filter((f) => ((f.lv ?? 0) & 2) === 2).length / Math.max(1, fl.length);
+  const fm = /from \(([-\d.]+),([-\d.]+),([-\d.]+)\)/.exec(thrown.msg); const rp0 = r.frames[i0]?.rp;
+  const fromDunkerM = fm && rp0 ? Math.hypot(Number(fm[1]) - rp0[0], Number(fm[3]) - rp0[2]) : NaN;   // an oop thrown from the DUNKER's hand reads ~0
   const withInf = fl.filter((f) => f.inf != null); const inFrameShare = withInf.length ? withInf.filter((f) => f.inf === 1).length / withInf.length : NaN;
   const missLine = r.hud.find((h) => /MISSED|LOST THE|OFF THE IRON|OVER THE GLASS/.test(h)) ?? null;
   const ringAfter = r.frames.slice(i1 + 25, i1 + 60).filter((f) => ((f.lv ?? 0) & 1) === 1).length;   // still up 0.4–1 s after the catch?
   return { catchY: rnd(catchY), apexOverCatchM: rnd(Math.max(...ys) - catchY), ringShare: rnd(ringShare), shadowShare: rnd(shadowShare), ringLingerFrames: ringAfter, onRun: r.marks.some((m) => /lobs it on the run/.test(m.msg)),
     label: /\[LOB\] ([A-Z-' ]+?) (from|at|OFF)/.exec(thrown.msg)?.[1] ?? thrown.msg.slice(6, 30), caught: !!caught, lost: !!lost, flightMs: rnd(fl.length * 1000 / 60, 0), apexM: rnd(Math.max(...ys)),
-    inFrameShare: rnd(inFrameShare), missLine, catchClipT: catchClip, gapMinM: rnd(Math.min(...gaps)), gapAtEndM: rnd(gaps[gaps.length - 1]), arriveMps: rnd(vIn, 1), reaimed: r.marks.some((m) => /re-aimed/.test(m.msg)) };
+    inFrameShare: rnd(inFrameShare), fromDunkerM: rnd(fromDunkerM), missLine, catchClipT: catchClip, gapMinM: rnd(Math.min(...gaps)), gapAtEndM: rnd(gaps[gaps.length - 1]), arriveMps: rnd(vIn, 1), reaimed: r.marks.some((m) => /re-aimed/.test(m.msg)) };
 }
 
 /** What the slam made the player perceive (the QA trace) and the camera's cuts. */
@@ -486,7 +488,9 @@ try {
   for (const scen of SCEN) {
     console.log(`[${scen}]`);
     const recFile = path.join(OUT, `rec-${scen}.json`);
-    const recs: Rec[] = process.env.FROM_REC === '1' && fs.existsSync(recFile) ? JSON.parse(fs.readFileSync(recFile, 'utf8')) : await runScen(await getBrowser(), scen, REPS);
+    // FROM_REC re-measures a recording and never opens a browser (a missing file is an error: a browser here would run outside the gate lock)
+    if (process.env.FROM_REC === '1' && !fs.existsSync(recFile)) throw new Error(`FROM_REC: no ${recFile}`);
+    const recs: Rec[] = process.env.FROM_REC === '1' ? JSON.parse(fs.readFileSync(recFile, 'utf8')) : await runScen(await getBrowser(), scen, REPS);
     fs.writeFileSync(path.join(OUT, `rec-${scen}.json`), JSON.stringify(recs));
     const rows = recs.map((r) => r.err ? { scen: r.scen, rep: r.rep, err: r.err } : { scen: r.scen, rep: r.rep, approach: approachMetrics(r), flight: flightMetrics(r), lob: lobMetrics(r), show: showMetrics(r), hud: r.hud.slice(0, 30) });
     if (scen === 'tricks') {

@@ -71,6 +71,7 @@ describe('DunkFlagship Phase 4 — a whiff always says why', () => {
   it('reads the run\'s own direction (a run from the wing), and says NEVER IN REACH with no sample', () => {
     expect(whiffWhy({ x: -0.7, y: 0, z: -0.7 }, { x: -1, z: -1 })).toBe('OUT AHEAD');
     expect(whiffWhy(null, toRim)).toBe('NEVER IN REACH');
+    expect(whiffWhy({ x: 2.6, y: 1.2, z: 0.4 }, toRim)).toBe('NEVER IN REACH');   // 2.9 m away at its nearest: the passer's bounce-bounce (rig)
     expect(whiffWhy({ x: Number.NaN, y: 0, z: 0 }, toRim)).toBe('NEVER IN REACH');
   });
 });
