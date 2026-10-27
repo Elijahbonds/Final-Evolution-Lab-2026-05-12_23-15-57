@@ -63,7 +63,7 @@ describe('steps, from the chart the day runs', () => {
   });
   it('a landing counts with its hop: 10 landings, not 20', () => {
     const p = planFor('shot', OPEN)!;
-    expect(stepsFor(p.drillId, p.phases)[1]).toMatch(/^10 landings: /);
+    expect(stepsFor(p.drillId, p.phases)[1]).toMatch(/^10 landings\. Small hop\./);
   });
 });
 
@@ -117,7 +117,7 @@ describe('after: what we saw / what it means / what is next', () => {
   it('tomorrow: the same pick run with tomorrow\'s date, said as likely', () => {
     const v = view();
     expect(v.tomorrow.focus).toBe('shot');
-    expect(v.tomorrow.line).toBe('Tomorrow will likely work on soft, balanced landings again, while shooting is your lowest number. A new score can change that.');
+    expect(v.tomorrow.line).toBe('Tomorrow will likely work on soft, balanced landings again, while your shooting is your lowest number. A new score can change that.');
     expect(tomorrowLine('starter', 'starter', 'wake-up', null)).toContain('full-body wake-up');
     expect(tomorrowLine('jump', 'form', 'countermovement-geometry', { key: 'jump', label: 'Jump', standing: 1, display: '', trend: null, source: 'account', latestAt: 0 })).toBe('Tomorrow will likely work on slow, steady squats.');
   });

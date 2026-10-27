@@ -194,7 +194,7 @@ export function stepsFor(drillId: string, refs: readonly PhaseRef[]): string[] {
     out.push(`${work.length} sets of ${same ? reps[0] : `${Math.min(...reps)} to ${Math.max(...reps)}`} ${g.unit}.`);
     if (restSec) out.push(`Rest ${restSec >= 60 ? `${Math.round(restSec / 60)} minute${restSec >= 120 ? 's' : ''}` : `${restSec} seconds`} between sets. The screen counts it down.`);
   } else if (work.length === 1) {
-    out.push(`${phaseReps(work[0].p)} ${g.unit}: ${phaseWords(drillId, work[0].p).cue}`);
+    out.push(`${phaseReps(work[0].p)} ${g.unit}. ${phaseWords(drillId, work[0].p).cue}`);
   }
   out.push('See how you did, and what comes next.');
   return out;
@@ -324,7 +324,7 @@ export function readResult(drillId: string, r: DrillResult, refs: readonly Phase
 export function tomorrowLine(today: Focus, tomorrow: Focus, tomorrowDrillId: string | null, skill: SkillReading | null): string {
   if (today === 'starter' || !skill) return 'Tomorrow: the full-body wake-up again, until we have one of your numbers.';
   const works = tomorrowDrillId ? guideFor(tomorrowDrillId).works : 'your next lowest number';
-  if (tomorrow === today) return `Tomorrow will likely work on ${works} again, while ${FOCUS_LABEL[today]} is your lowest number. A new score can change that.`;
+  if (tomorrow === today) return `Tomorrow will likely work on ${works} again, while your ${FOCUS_LABEL[today]} is your lowest number. A new score can change that.`;
   return `Tomorrow will likely work on ${works}.`;
 }
 
