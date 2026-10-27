@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The breath station's answer card and the coach's stations (MIRROR-COACH P3, 2026-09-25). A server render is the
 // card's first paint — the state an athlete sees when the screen ends — and the save plan is pure, so both are pinned
 // here without a DOM.
@@ -21,15 +23,15 @@ describe('first paint', () => {
     expect(html).not.toContain('aria-pressed="true"');
     expect((html.match(/aria-pressed="false"/g) ?? []).length).toBe(SELF_REPORT_QUESTIONS.length * 3);
     expect(text(html)).toContain(SELF_REPORT_NOTE);
-    expect(text(html)).toContain('Rib angle and breath: your answers');
+    expect(text(html)).toContain('Breathing: your answers');
   });
 
   it('the modified screen names no coach checks; the full one says "Your coach checks this" for both of its', () => {
     expect(render('modified')).not.toContain('Checked by your coach');
     const full = text(render('full'));
     expect(full).toContain('Checked by your coach');
-    expect(full).toContain('Pelvic tilt (hands on the hip points)');
-    expect(full).toContain('Seated rotation, each side');
+    expect(full).toContain('Pelvis tilt (a coach checks by hand)');
+    expect(full).toContain('Seated turn, each side');
     expect(full.split(COACH_CHECK_LINE).length - 1).toBe(2);
   });
 
@@ -83,7 +85,7 @@ describe('the breath station not held (End before it)', () => {
     for (const q of SELF_REPORT_QUESTIONS) expect(text(html)).not.toContain(q.text);
     expect(html).not.toContain('<button');
     expect(text(html)).toContain(SELF_REPORT_NOT_REACHED);
-    expect(text(html)).toContain('Rib angle and breath');
+    expect(text(html)).toContain('Breathing');
   });
   it('a full screen still names its coach checks', () => {
     const full = text(unasked('full'));

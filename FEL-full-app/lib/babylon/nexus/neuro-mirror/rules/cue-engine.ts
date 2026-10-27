@@ -82,20 +82,20 @@ const CUES: Record<FaultId, CueCard> = {
     cue: 'Knees out over toes',
     escalate: 'Slow down. Knees out.',
     regress: 'Stop. Squat slowly to a chair, knees over toes. Five reps.',
-    reply: 'Push your knees wide',
+    reply: 'Knees wide',
   },
   heelRise: {
-    cue: 'Heels down',
+    cue: 'Keep your heels down',
     escalate: 'Slow down. Heels down.',
     regress: 'Stop. Rock one knee toward a wall, ten each side, then squat again.',
-    reply: 'Whole foot on the floor',
+    reply: 'Heels down',
   },
   // armFall is the shoulder midpoint drifting SIDEWAYS (a front camera reads x — squat-audit.ts).
   armFall: {
     cue: 'Stay in the middle',
     escalate: 'Slower. Stay in the middle.',
     regress: 'Stop. Reset your feet. Squat only as low as you stay in the middle.',
-    reply: 'Shoulders over your feet',
+    reply: 'Stay centred',
   },
   lateralShift: {
     cue: 'Weight even on both feet',
@@ -111,10 +111,10 @@ const CUES: Record<FaultId, CueCard> = {
   },
   // elbowFlare is the working (right) elbow rising toward or above the shoulder line, on the press or the row.
   elbowFlare: {
-    cue: 'Handle to your pocket',
+    cue: 'Row the handle low',
     escalate: 'Slower. Handle stays low.',
     regress: 'Use a lighter handle at half speed. Row it to your back pocket.',
-    reply: 'Keep the handle low',
+    reply: 'Back pocket',
   },
   // shrug is the working shoulder riding up above the shoulder line during the PULL.
   shrug: {
@@ -128,7 +128,7 @@ const CUES: Record<FaultId, CueCard> = {
     cue: 'Shoulders over hips',
     escalate: 'Slower. Stand tall.',
     regress: 'Stop. Take three slow breaths, stand tall, then start again.',
-    reply: 'Stand tall and even',
+    reply: 'Stand tall',
   },
 };
 

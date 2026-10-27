@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // POST + PATCH /api/mirror/screen, GET /api/coach/prescribe and GET /api/prq/export, run for real (MIRROR-COACH P1
 // review, 2026-09-25; the server's re-check and the answers, MIRROR-COACH P3, 2026-09-25). Only the session, the
 // database and the wallet's grant are stand-ins.
@@ -159,7 +161,7 @@ describe('POST: the server re-decides every grade (MIRROR-COACH P3)', () => {
     const { status, json } = await post({ screenId: 'fx-1', screen: 'modified', checks });
     expect(status).toBe(200);
     expect(json).toMatchObject({ graded: true, provisional: false, readableCameraChecks: 6, paid: true, awarded: 25, screenId: 'fx-1' });
-    expect(json.summary).toMatchObject({ score: 100, movementFlags: 0, triage: 'proceed', ranAll: true, notScored: ['Rib angle and breath'] });
+    expect(json.summary).toMatchObject({ score: 100, movementFlags: 0, triage: 'proceed', ranAll: true, notScored: ['Breathing'] });
     const row = stored()[0].metrics;
     expect(row).toMatchObject({ gradedBy: 'server', graded: true, provisional: false });
     expect(row.camera).toHaveLength(7);
@@ -190,12 +192,12 @@ describe('POST: the server re-decides every grade (MIRROR-COACH P3)', () => {
     expect(status).toBe(200);
     expect(json.summary).toMatchObject({ graded: true, movementFlags: 1, asymmetries: 1, ranAll: true, triage: 'addressFirst' });
     // +0.12 = the LEFT hip higher (stationGraders' sign); the posted 'right' is not what gets stored
-    expect(json.summary.headline).toBe('Hip level was flagged for a closer look: the left hip read higher.');
+    expect(json.summary.headline).toBe('Hip level: worth working on. Your left hip sat higher.');
     const row = stored()[0].metrics;
     expect(row.results.find((r: Row) => r.checkId === 'hipLevel')).toMatchObject({ grade: 'fail', side: 'left', source: 'camera' });
     const hip = row.camera.find((c: Row) => c.checkId === 'hipLevel');
     expect(hip).toMatchObject({ status: 'flag', claimed: 'flag', side: 'left', value: 0.12 });
-    expect(hip.note).toMatch(/^Your left hip read higher/);
+    expect(hip.note).toMatch(/^Your left hip sat higher/);
     expect(isServerGradedScreen(row)).toBe(true);
     expect(json.paid).toBe(true);
   });
@@ -232,11 +234,11 @@ describe('POST: the server re-decides every grade (MIRROR-COACH P3)', () => {
       .toEqual([{ checkId: 'headFloat', claimed: 'pass', expected: 'unreadable', reason: 'status_does_not_follow' }]);
     const { status, json } = await post({ screenId: 's-4b', screen: 'modified', checks: allClaims({ headFloat: { ...fromFront, status: 'unreadable' } }) });
     expect(status).toBe(200);
-    expect(json.summary.notMeasured).toEqual(['Head float']);
+    expect(json.summary.notMeasured).toEqual(['Head position']);
     // CHANGED ON PURPOSE in the MIRROR-COACH P3 follow-up (2026-09-28), owner decision #31: this pinned `score` null
     // ("partial: a camera check was not read"). The server now scores over the checks it read — 5 of 6, none flagged —
     // and says so; the head float is listed as not read, and the screen is still partial, never clear.
-    expect(json.summary).toMatchObject({ score: 100, readCount: 5, totalCount: 6, notRead: ['Head float'], triage: 'partial' });
+    expect(json.summary).toMatchObject({ score: 100, readCount: 5, totalCount: 6, notRead: ['Head position'], triage: 'partial' });
     expect(json.readableCameraChecks).toBe(json.summary.readCount);
     expect(stored()[0].metrics.camera.find((c: Row) => c.checkId === 'headFloat')).toMatchObject({ status: 'unreadable', value: null, claimed: 'unreadable' });
   });
@@ -248,7 +250,7 @@ describe('POST: the server re-decides every grade (MIRROR-COACH P3)', () => {
     expect(knee).toMatchObject({ status: 'unreadable', claimed: 'unreadable', value: null });
     expect(knee).not.toHaveProperty('bySide');
     expect(stored()[0].metrics.results.map((r: Row) => r.checkId)).not.toContain('kneeWindow');
-    expect(json.summary.notMeasured).toEqual(['Knee window']);
+    expect(json.summary.notMeasured).toEqual(['Knees from the front']);
   });
 });
 
@@ -259,7 +261,7 @@ describe('POST: provisional under three readable camera checks, and only camera 
     expect(a.status).toBe(200);
     expect(a.json).toMatchObject({ graded: true, provisional: true, readableCameraChecks: 2, paid: false, awarded: 0 });
     // P3 review (2026-09-26): what was read and why the rest was not — never "step back and run it again"
-    expect(a.json.message).toBe('The camera read 2 checks (Hip level, Shoulder height), all at one station — not enough to count as a screen, so it pays nothing this time. Most of the rest: too few clear frames (3 of the 180 it needs). Hold still in the shot for the whole count.');
+    expect(a.json.message).toBe('The camera read 2 checks (Hip level, Shoulder level), all at one station — not enough to count as a screen, so it pays nothing this time. Most of the rest: the camera got too few clear looks (3 of the 180 it needs). Hold still in the shot for the whole count.');
     expect(a.json.message).not.toMatch(/step back/i);
     expect(stored()[0].metrics).toMatchObject({ provisional: true, gradedBy: 'server' });
     expect(m.grants).toEqual([]);
@@ -293,7 +295,7 @@ describe('POST: provisional under three readable camera checks, and only camera 
     const { json } = await post({ screenId: 'p-0', screen: 'modified', checks: KEYS.map(unreadable) });
     expect(json).toMatchObject({ graded: false, paid: false });
     // P3 review: the camera tried — "Not graded yet" (a grader to come) is for a screen with no grades at all
-    expect(json.message).toMatch(/^The camera could not read any of this screen's checks, so it does not count and pays nothing\. Most of the rest: too few clear frames/);
+    expect(json.message).toMatch(/^The camera could not read any of this screen's checks, so it does not count and pays nothing\. Most of the rest: the camera got too few clear looks/);
     expect(json.message).not.toMatch(/step back|not graded yet/i);
     expect(json.summary.headline).toBe(NOT_READ_LINE);
     expect(stored()[0].metrics).toMatchObject({ graded: false, results: [], provisional: true });
@@ -322,7 +324,7 @@ describe('POST: provisional under three readable camera checks, and only camera 
     const coach = { checkId: 'pelvicTilt', status: 'pass', value: 0, unit: 'ratio', frames: 300, readableFrames: 300, view: 'side' };
     const { json } = await post({ screenId: 'c-1', screen: 'full', checks: [claim('hipLevel'), claim('shoulderLevel'), coach] });
     expect(json).toMatchObject({ readableCameraChecks: 2, paid: false, dropped: 1 });
-    expect(json.summary.notScored).toEqual(['Rib angle and breath', 'Pelvic tilt (hands on the hip points)', 'Seated rotation, each side']);
+    expect(json.summary.notScored).toEqual(['Breathing', 'Pelvis tilt (a coach checks by hand)', 'Seated turn, each side']);
   });
 });
 
@@ -513,7 +515,7 @@ describe('GET /api/coach/prescribe on the rows the screen route stores', () => {
     expect(draft.prescriptions.length).toBeGreaterThan(0);
     expect(draft.prescriptions[0].findingId).toBe('kneeWindow');
     expect(draft.reason).toBeUndefined();
-    expect(draft.headline).toMatch(/Knee window was flagged for a closer look on the left knee/);
+    expect(draft.headline).toMatch(/Knees from the front: worth working on, on the left knee/);
     expect(draft.complete).toBe(true);
   });
 
@@ -622,7 +624,7 @@ describe('GET /api/coach/prescribe — the review\'s cases', () => {
     m.db.user = [{ id: 'athlete-1', dobYear: 1990 }];
     const adult = (await asCoach()).json;
     expect(adult.youth).toBeUndefined();
-    expect(adult.prescriptions.find((p: Row) => p.findingId === 'hipLevel').block).toMatchObject({ title: 'Trunk and hip hold' });
+    expect(adult.prescriptions.find((p: Row) => p.findingId === 'hipLevel').block).toMatchObject({ title: 'Hip and middle hold' });
   });
 
   it('a run the camera tried and read nothing of says why ("unread_screen"); a run with no grades stays "ungraded_screen"', async () => {
@@ -630,7 +632,7 @@ describe('GET /api/coach/prescribe — the review\'s cases', () => {
     asAthlete();
     await post({ screenId: 'un-1', screen: 'modified', checks: KEYS.map(unreadable) });
     const { json } = await asCoach();
-    expect(json).toMatchObject({ prescriptions: [], reason: 'unread_screen', unread: { why: expect.stringMatching(/^too few clear frames/), hint: 'Hold still in the shot for the whole count.' } });
+    expect(json).toMatchObject({ prescriptions: [], reason: 'unread_screen', unread: { why: expect.stringMatching(/^the camera got too few clear looks/), hint: 'Hold still in the shot for the whole count.' } });
     m.db.workoutScan = [];
     asAthlete();
     await post({ screenId: 'un-2', screen: 'modified', checks: [] });
@@ -663,10 +665,10 @@ describe('GET /api/coach/prescribe — the draft from real results (P3)', () => 
     expect(d.prescriptions).toHaveLength(1);
     expect(d.prescriptions[0]).toMatchObject({
       findingId: 'hipLevel', side: 'right', section: 'prep', matchedBy: 'tags', exercise: { id: 'pe-split' },
-      value: '0.12 of a shoulder width, right higher · estimated',
-      block: { title: 'Trunk and hip hold', kind: 'activate' },
+      value: 'right side higher by about 12% of your shoulder width · estimated',
+      block: { title: 'Hip and middle hold', kind: 'activate' },
     });
-    expect(d.prescriptions[0].fix).toMatch(/^Single-leg hip work on the low side/);
+    expect(d.prescriptions[0].fix).toMatch(/^One-leg exercises on the lower side/);
     expect(d).toMatchObject({ serverGraded: true, provisional: false, complete: true, retests: 0 });
     expect(d.reason).toBeUndefined();
   });

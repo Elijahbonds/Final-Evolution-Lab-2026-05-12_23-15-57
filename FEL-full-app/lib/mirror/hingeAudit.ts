@@ -308,7 +308,7 @@ export const HINGE_CUES: readonly CueRule[] = [
     cue: 'Hips back, knees soft',
     escalate: 'Slower. Hips back first.',
     regress: 'Hands on a wall. Push your hips back only as far as is comfortable.',
-    reply: 'Hips to the wall behind',
+    reply: 'Hips back',
   },
   {
     faultId: 'dowelLine',

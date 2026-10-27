@@ -263,14 +263,14 @@ export const LUNGE_CUES: readonly CueRule[] = [
     cue: 'Front knee over toes',
     escalate: 'Slow down. Knee out.',
     regress: 'Lunge only as deep as your knee stays over your toes.',
-    reply: 'Push the knee out',
+    reply: 'Knee out',
   },
   {
     faultId: 'hipDrop',
-    cue: 'Hips level',
+    cue: 'Keep your hips level',
     escalate: 'Slower. Hips level.',
     regress: 'Hold the top for two seconds, hips level, then go down.',
-    reply: 'Belt level, like a tray',
+    reply: 'Hips level',
   },
   {
     faultId: 'torsoDrift',
@@ -291,7 +291,7 @@ export const LUNGE_CUES: readonly CueRule[] = [
     cue: 'Whole front foot down',
     escalate: 'Slow down. Foot still.',
     regress: 'Hold a wall lightly for balance while you learn the position.',
-    reply: 'Foot flat on the floor',
+    reply: 'Foot flat',
   },
 ];
 

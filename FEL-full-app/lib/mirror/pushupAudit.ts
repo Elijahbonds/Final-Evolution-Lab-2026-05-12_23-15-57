@@ -107,10 +107,10 @@ export const PUSHUP_CUES: readonly CueRule[] = [
     escalate: 'Slower. Eyes on the floor.',
     regress: 'Pause at the top. Set your head in line, then start.',
     reply: 'Eyes on the floor' },
-  { faultId: 'handSetup', cue: 'Hands under shoulders',
+  { faultId: 'handSetup', cue: 'Hands right under your shoulders',
     escalate: 'Reset. Hands under shoulders.',
     regress: 'From your knees: hands under shoulders, hold two seconds, then go.',
-    reply: 'Hands below your shoulders' },
+    reply: 'Hands under shoulders' },
 ];
 
 const vis = (l: Lm | undefined, t: number): l is Lm => !!l && l.v >= t;

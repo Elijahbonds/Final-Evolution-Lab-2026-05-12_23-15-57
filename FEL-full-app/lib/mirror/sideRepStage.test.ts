@@ -129,7 +129,7 @@ describe('the hinge, live — whole synthetic sets', () => {
     expect(reps[3]).toEqual({ faults: [], read: false });
     const review = sideRepReview(HINGE_LIVE, { checkReps: reps.slice(0, 3), workReps: reps.slice(3) }, (f) => HINGE_FAULT_LABEL[f]);
     expect(review.work).toEqual({ reps: 1, unread: 1, faultReps: [] });
-    expect(review.verdict).toMatch(/Too few work-set reps were read/);
+    expect(review.verdict).toMatch(/Too few reps were read in the main set/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 });
 
@@ -225,10 +225,10 @@ describe('the hinge\'s coach (applySideRepFrame — the harness\'s own wiring)',
     const { state, cues, said, fade } = coach(HINGE_LIVE, { clearByRep: true, table: HINGE_CUE_TABLE }, hingeSet({ reps: 11, seed: 2, setup: 75 }));
     expect(state.stage).toBe('review');
     expect(cues).toEqual([]);
-    expect(said.map((x) => x.line)).toEqual(['Good. 3 slow reps first — the check.', 'Now the work set: 8 reps. I will cue between reps.']);
+    expect(said.map((x) => x.line)).toEqual(['Good. First, 3 slow reps so I can watch.', 'Now 8 reps. I will coach you between reps.']); // test changed: copy rewrite (CUE-REWRITE) — same meaning
     expect(said.every((x) => x.protect)).toBe(true);
     expect(fade).toEqual([]);
-    expect(sideRepReview(HINGE_LIVE, state, (f) => HINGE_FAULT_LABEL[f]).verdict).toMatch(/^The last 3 reps read clean\.$/);
+    expect(sideRepReview(HINGE_LIVE, state, (f) => HINGE_FAULT_LABEL[f]).verdict).toMatch(/^Your last 3 reps were clean\. Nothing needed fixing/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('a knee-dominant set: nothing during the check; cued from the first work rep, the reply on the 3rd, then "Still …"', () => {
@@ -242,7 +242,7 @@ describe('the hinge\'s coach (applySideRepFrame — the harness\'s own wiring)',
     expect(cues[1].evt).toEqual({ fault: 'hingeRatio', text: card.reply, level: 'reply' });
     expect(cues[1].reps).toBe(3);
     expect(cues[2].evt.level).toBe('escalate');
-    expect(sideRepReview(HINGE_LIVE, state, (f) => HINGE_FAULT_LABEL[f]).verdict).toMatch(/^Still showing in the last 3 reps: /);
+    expect(sideRepReview(HINGE_LIVE, state, (f) => HINGE_FAULT_LABEL[f]).verdict).toMatch(/^Still there on your last 3 reps: /);
   });
 
   it('safety first: a broken dowel line AND a knee-dominant rep — the line is cued first', () => {

@@ -251,8 +251,9 @@ describe('end to end: the real kinematic engine\'s reads become the coach\'s cue
     expect(s1b.spoken).toEqual([{ fault: 'elbowFlare', text: 'There it is. Own it.', level: 'confirm' }]);
     const report = ce2.endSet();
     expect(report.faults.find((f) => f.fault === 'elbowFlare')).toMatchObject({ landed: true, next: 'everyThird' });
+    // test changed: copy rewrite (CUE-REWRITE) — same meaning: the elbow fix held, fewer cues next set
     expect(fadeReviewLines(report, (f) => PRESS_ROW_FAULT_LABEL[f as PressRowFault] ?? f))
-      .toEqual(['Fixed and kept: working elbow rising toward shoulder height stayed away for the last 3+ reps. Next set it gets a cue every third time it shows.']);
+      .toEqual(['Fixed: working elbow rises too high did not show on your last 3+ reps. Next set, fewer reminders.']);
     // set 2: one flared rep is the first to show it at every third — the coach lets it go
     ce2.reset();
     const s2 = filmSet({ flare: true }, 1, ce2, null, s1b.endMs + 30_000);

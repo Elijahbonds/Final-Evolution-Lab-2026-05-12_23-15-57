@@ -37,6 +37,9 @@ export const FAULT_NAMES = {
   headOffLine: 'Head pokes forward',
   elbowRises: 'Elbow rises too high',
   shrug: 'Shoulder shrugs up',
+  /** The press/row reads ONE arm (the working arm), so its names say which. */
+  workingElbowRises: 'Working elbow rises too high',
+  workingShrug: 'Working shoulder shrugs up',
   shrugBoth: 'Shoulders shrug up',
   notAllTheWayUp: 'Arms stop short of the top',
   handsUneven: 'Hands at different heights',

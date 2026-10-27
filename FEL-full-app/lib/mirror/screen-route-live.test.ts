@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The P3 live proof's own screen, through the real route (MIRROR-COACH P3 live proof, 2026-09-26).
 //
 // WHY. The live proof ran a Modified screen in the served harness on the lane's dev server (:3131). That server's
@@ -125,12 +127,12 @@ describe('POST /api/mirror/screen on the live body (the server\'s score)', () =>
     // The server now scores over the checks it read — 100 − 22 for the one-sided knee flag — and says it over 5 of 6,
     // the same 5 as readableCameraChecks; the head float is listed as not read. Triage, headline and pay are unchanged.
     expect(json.summary).toMatchObject({
-      score: 78, readCount: 5, totalCount: 6, notRead: ['Head float'],
-      ranAll: false, movementFlags: 1, asymmetries: 1, triage: 'addressFirst', notMeasured: ['Head float'],
-      headline: 'Knee window was flagged for a closer look on the left knee. One side off and one side fine matters more than both being mildly off.',
+      score: 78, readCount: 5, totalCount: 6, notRead: ['Head position'],
+      ranAll: false, movementFlags: 1, asymmetries: 1, triage: 'addressFirst', notMeasured: ['Head position'],
+      headline: 'Knees from the front: worth working on, on the left knee. One side off matters more than both a little off.',
     });
     expect(scoreLine(json.summary)).toBe('Score 78 · from 5 of 6 checks read');
-    expect(notReadLines(json.summary)).toEqual(['Head float · not read']);
+    expect(notReadLines(json.summary)).toEqual(['Head position · not read']);
     expect(json.summary.readCount).toBe(json.readableCameraChecks);
     expect(json.message).toBe('Screen logged. Shards are in your wallet.');
     const row = stored()[0].metrics;
@@ -147,7 +149,7 @@ describe('POST /api/mirror/screen on the live body (the server\'s score)', () =>
   it('the provisional rule: the same body cut to TWO readable checks (heel line + knee window, two stations) is stored, provisional, not paid', async () => {
     const two = await post({ ...LIVE, screenId: 'live-two', grades: only(['heelLine', 'kneeWindow']) });
     expect(two.json).toMatchObject({ graded: true, provisional: true, readableCameraChecks: 2, paid: false, awarded: 0 });
-    expect(two.json.message).toBe('The camera read 2 checks (Heel line, Knee window) — not enough to count as a screen, so it pays nothing this time.');
+    expect(two.json.message).toBe('The camera read 2 checks (Heels from behind, Knees from the front) — not enough to count as a screen, so it pays nothing this time.');
     expect(stored()[0].metrics).toMatchObject({ provisional: true, gradedBy: 'server' });
     expect(m.grants).toEqual([]);
     // three readable from two stations is a screen; three from the front stack alone is not
@@ -205,7 +207,7 @@ describe('PATCH + the coach\'s draft on the live screen', () => {
     const cam = Object.fromEntries(d.review.camera.map((r: Row) => [`${r.checkId}${r.side ? `:${r.side}` : ''}`, r.status]));
     expect(cam).toMatchObject({ heelLine: 'pass', 'kneeWindow:left': 'flag', hipLevel: 'pass', shoulderLevel: 'pass', headFloat: 'retest' });
     const knee = d.review.camera.find((r: Row) => r.checkId === 'kneeWindow');
-    expect(knee.fix).toMatch(/^Hip external-rotation work and banded side steps/);   // P9 fix: no muscle named (cueLint rule 1)
+    expect(knee.fix).toMatch(/^Side steps with a band, then slow squats/);   // test changed: copy rewrite (CUE-REWRITE) — the same hip work, plain words   // P9 fix: no muscle named (cueLint rule 1)
     expect(knee.block).toMatchObject({ title: 'Ask the hips to lead the hinge' });
     expect(d.review.answers.map((a: Row) => a.said)).toEqual([ANSWERS_WITHHELD, ANSWERS_WITHHELD]);
     expect(d.review.coachChecks).toEqual([]);

@@ -72,7 +72,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -90,7 +90,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -153,7 +153,7 @@
             "atFrame": 49,
             "fault": "kneeValgus",
             "level": "cue",
-            "text": "Press the floor apart with your feet — knees travel out over your second toes."
+            "text": "Knees out over toes"
           }
         ]
       },
@@ -181,7 +181,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -199,7 +199,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -262,7 +262,7 @@
             "atFrame": 49,
             "fault": "kneeValgus",
             "level": "cue",
-            "text": "Press the floor apart with your feet — knees travel out over your second toes."
+            "text": "Knees out over toes"
           }
         ]
       },
@@ -294,7 +294,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -312,7 +312,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -375,7 +375,7 @@
             "atFrame": 49,
             "fault": "kneeValgus",
             "level": "cue",
-            "text": "Press the floor apart with your feet — knees travel out over your second toes."
+            "text": "Knees out over toes"
           }
         ]
       },
@@ -407,7 +407,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -425,7 +425,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -501,7 +501,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -519,7 +519,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -595,7 +595,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -613,7 +613,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -689,7 +689,7 @@
           "worst": {
             "tooFar": 8
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.59
         },
         "side": {
@@ -707,7 +707,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.59
         }
       }
@@ -775,7 +775,7 @@
           "ok": 120,
           "frames": 120,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.6
         },
         "side": {
@@ -793,7 +793,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.6
         }
       }
@@ -850,7 +850,7 @@
             "atFrame": 49,
             "fault": "kneeValgus",
             "level": "cue",
-            "text": "Press the floor apart with your feet — knees travel out over your second toes."
+            "text": "Knees out over toes"
           }
         ]
       },
@@ -880,7 +880,7 @@
           "ok": 120,
           "frames": 120,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.6
         },
         "side": {
@@ -898,7 +898,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.6
         }
       }
@@ -953,7 +953,7 @@
           "worst": {
             "turned": 132
           },
-          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "say": "Face the camera straight on.",
           "bodyFill": 0.61
         },
         "side": {
@@ -962,7 +962,7 @@
           "worst": {
             "tooFar": 34
           },
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.61
         },
         "back": {
@@ -971,7 +971,7 @@
           "worst": {
             "turned": 132
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.61
         }
       }
@@ -1035,7 +1035,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "say": "Face the camera straight on.",
           "bodyFill": 0.18
         },
         "side": {
@@ -1044,7 +1044,7 @@
           "worst": {
             "tooFar": 120
           },
-          "say": "Come forward a little — you are far enough away that I am guessing.",
+          "say": "Come a little closer.",
           "bodyFill": 0.18
         },
         "back": {
@@ -1053,7 +1053,7 @@
           "worst": {
             "turned": 120
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.18
         }
       }
@@ -1104,7 +1104,7 @@
           "ok": 30,
           "frames": 30,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.62
         },
         "side": {
@@ -1122,7 +1122,7 @@
           "worst": {
             "turned": 30
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.62
         }
       }
@@ -1173,7 +1173,7 @@
           "worst": {
             "turned": 30
           },
-          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "say": "Face the camera straight on.",
           "bodyFill": 0.61
         },
         "side": {
@@ -1189,7 +1189,7 @@
           "ok": 30,
           "frames": 30,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.61
         }
       }
@@ -1241,14 +1241,14 @@
           "worst": {
             "turned": 30
           },
-          "say": "Turn and face the camera square-on — I read your knees from the front.",
+          "say": "Face the camera straight on.",
           "bodyFill": 0.63
         },
         "side": {
           "ok": 30,
           "frames": 30,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.63
         },
         "back": {
@@ -1257,7 +1257,7 @@
           "worst": {
             "turned": 30
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.63
         }
       }
@@ -1308,7 +1308,7 @@
           "ok": 30,
           "frames": 30,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.62
         },
         "side": {
@@ -1326,7 +1326,7 @@
           "worst": {
             "turned": 30
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.62
         }
       }
@@ -1377,7 +1377,7 @@
           "ok": 30,
           "frames": 30,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.62
         },
         "side": {
@@ -1395,7 +1395,7 @@
           "worst": {
             "turned": 30
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.62
         }
       }
@@ -1444,7 +1444,7 @@
           "ok": 195,
           "frames": 195,
           "worst": {},
-          "say": "Good shot — start when you are ready.",
+          "say": "Good. Start when you are ready.",
           "bodyFill": 0.49
         },
         "side": {
@@ -1462,7 +1462,7 @@
           "worst": {
             "turned": 195
           },
-          "say": "Turn all the way around — I read the heel line from behind.",
+          "say": "Turn around, back to the camera.",
           "bodyFill": 0.49
         }
       }
@@ -1482,7 +1482,7 @@
           "seconds": 12,
           "positioningFrames": 0,
           "holdingFrames": 360,
-          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width, toes pointing straight ahead. Look straight ahead.",
+          "firstSay": "Turn around, back to the camera. Feet hip-width, toes straight ahead. Look ahead.",
           "heldBy": null
         },
         {
@@ -1492,7 +1492,7 @@
           "seconds": 13.97,
           "positioningFrames": 0,
           "holdingFrames": 419,
-          "firstSay": "Turn and face the camera. Same stance — do not fix anything.",
+          "firstSay": "Turn and face the camera. Stand the same way. Do not fix anything.",
           "heldBy": null
         },
         {
@@ -1502,7 +1502,7 @@
           "seconds": 7.97,
           "positioningFrames": 0,
           "holdingFrames": 239,
-          "firstSay": "Stay facing me. Hands on the sides of your lower ribs, and take one easy breath in and out. Two quick questions about it at the end.",
+          "firstSay": "Hands on the sides of your lower ribs. Take one easy breath in and out. Two questions come at the end.",
           "heldBy": null
         },
         {
@@ -1512,7 +1512,7 @@
           "seconds": 9.97,
           "positioningFrames": 0,
           "holdingFrames": 299,
-          "firstSay": "Turn side-on — left shoulder to the camera. Look straight ahead.",
+          "firstSay": "Turn side-on, left shoulder to the camera. Look straight ahead.",
           "heldBy": null
         },
         {
@@ -1522,7 +1522,7 @@
           "seconds": 29.97,
           "positioningFrames": 0,
           "holdingFrames": 899,
-          "firstSay": "Face me. Stand on your LEFT leg, other knee up to hip height, arms by your sides.",
+          "firstSay": "Face me. Stand on your LEFT leg, other knee up to hip height, arms down.",
           "heldBy": null
         },
         {
@@ -1532,7 +1532,7 @@
           "seconds": 29.97,
           "positioningFrames": 0,
           "holdingFrames": 899,
-          "firstSay": "Now the RIGHT leg. Same thing — thirty seconds.",
+          "firstSay": "Now the RIGHT leg. Same thing, thirty seconds.",
           "heldBy": null
         }
       ],
@@ -1547,16 +1547,16 @@
           "asymmetries": 0,
           "score": 100,
           "triage": "proceed",
-          "headline": "Nothing flagged. That is a platform you can load.",
+          "headline": "Nothing to work on. You are ready to train harder.",
           "meaning": [],
           "suggestions": [],
           "programming": [
-            "Train normally.",
-            "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
+            "Train as normal.",
+            "Run this screen again each month, or after a growth spurt, a long break, or a big jump in training."
           ],
           "notMeasured": [],
           "notScored": [
-            "Rib angle and breath"
+            "Breathing"
           ],
           "ranAll": true,
           "readCount": 6,
@@ -1572,45 +1572,45 @@
               "checkId": "heelLine",
               "grade": "stable",
               "source": "camera",
-              "detail": "heel lines L 1° · R 1° from vertical (+ = heel outside the ankle) · estimated"
+              "detail": "left heel tilts 1° outward, right heel 1° outward · estimated"
             },
             {
               "checkId": "kneeWindow",
               "grade": "stable",
               "source": "camera",
-              "detail": "knee against its hip–ankle line, in hip half-widths: L 0.01 out · R 0.01 out · estimated"
+              "detail": "left knee on the line, right knee on the line · estimated"
             },
             {
               "checkId": "hipLevel",
               "grade": "stable",
               "source": "camera",
-              "detail": "0.00 of a shoulder width apart in height · estimated"
+              "detail": "level · estimated"
             },
             {
               "checkId": "shoulderLevel",
               "grade": "stable",
               "source": "camera",
-              "detail": "0.00 of a shoulder width apart in height · estimated"
+              "detail": "level · estimated"
             },
             {
               "checkId": "headFloat",
               "grade": "stable",
               "source": "camera",
-              "detail": "ear 0.01 torso lengths ahead of the shoulder · estimated"
+              "detail": "ear in front of the shoulder by about 1% of your upper-body length · estimated"
             },
             {
               "checkId": "singleLeg",
               "grade": "stable",
               "source": "camera",
               "side": "left",
-              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+              "detail": "30 s on one leg, free foot down 0 times, little sway · estimated"
             },
             {
               "checkId": "singleLeg",
               "grade": "stable",
               "source": "camera",
               "side": "right",
-              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+              "detail": "30 s on one leg, free foot down 0 times, little sway · estimated"
             }
           ],
           "summary": {
@@ -1621,16 +1621,16 @@
             "asymmetries": 0,
             "score": 100,
             "triage": "proceed",
-            "headline": "Nothing flagged. That is a platform you can load.",
+            "headline": "Nothing to work on. You are ready to train harder.",
             "meaning": [],
             "suggestions": [],
             "programming": [
-              "Train normally.",
-              "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
+              "Train as normal.",
+              "Run this screen again each month, or after a growth spurt, a long break, or a big jump in training."
             ],
             "notMeasured": [],
             "notScored": [
-              "Rib angle and breath"
+              "Breathing"
             ],
             "ranAll": true,
             "readCount": 6,
@@ -1661,7 +1661,7 @@
           "seconds": 12,
           "positioningFrames": 0,
           "holdingFrames": 360,
-          "firstSay": "Turn all the way around, back to the camera. Feet about hip-width, toes pointing straight ahead. Look straight ahead.",
+          "firstSay": "Turn around, back to the camera. Feet hip-width, toes straight ahead. Look ahead.",
           "heldBy": null
         },
         {
@@ -1671,7 +1671,7 @@
           "seconds": 13.97,
           "positioningFrames": 0,
           "holdingFrames": 419,
-          "firstSay": "Turn and face the camera. Same stance — do not fix anything.",
+          "firstSay": "Turn and face the camera. Stand the same way. Do not fix anything.",
           "heldBy": null
         },
         {
@@ -1681,7 +1681,7 @@
           "seconds": 7.97,
           "positioningFrames": 0,
           "holdingFrames": 239,
-          "firstSay": "Stay facing me. Hands on the sides of your lower ribs, and take one easy breath in and out. Two quick questions about it at the end.",
+          "firstSay": "Hands on the sides of your lower ribs. Take one easy breath in and out. Two questions come at the end.",
           "heldBy": null
         },
         {
@@ -1691,7 +1691,7 @@
           "seconds": 9.97,
           "positioningFrames": 0,
           "holdingFrames": 299,
-          "firstSay": "Turn side-on — left shoulder to the camera. Look straight ahead.",
+          "firstSay": "Turn side-on, left shoulder to the camera. Look straight ahead.",
           "heldBy": null
         },
         {
@@ -1701,7 +1701,7 @@
           "seconds": 11.97,
           "positioningFrames": 0,
           "holdingFrames": 359,
-          "firstSay": "Stay side-on. If a coach is with you, they can check the pelvis now.",
+          "firstSay": "Stay side-on. If a coach is with you, they can check your hips now.",
           "heldBy": null
         },
         {
@@ -1711,7 +1711,7 @@
           "seconds": 19.97,
           "positioningFrames": 0,
           "holdingFrames": 599,
-          "firstSay": "Sit tall and rotate to each side as far as is comfortable.",
+          "firstSay": "Sit tall and turn to each side as far as is comfortable.",
           "heldBy": null
         },
         {
@@ -1721,7 +1721,7 @@
           "seconds": 29.97,
           "positioningFrames": 0,
           "holdingFrames": 899,
-          "firstSay": "Face me. Stand on your LEFT leg, other knee up to hip height, arms by your sides.",
+          "firstSay": "Face me. Stand on your LEFT leg, other knee up to hip height, arms down.",
           "heldBy": null
         },
         {
@@ -1731,7 +1731,7 @@
           "seconds": 29.97,
           "positioningFrames": 0,
           "holdingFrames": 899,
-          "firstSay": "Now the RIGHT leg. Same thing — thirty seconds.",
+          "firstSay": "Now the RIGHT leg. Same thing, thirty seconds.",
           "heldBy": null
         }
       ],
@@ -1746,18 +1746,18 @@
           "asymmetries": 0,
           "score": 100,
           "triage": "proceed",
-          "headline": "Nothing flagged. That is a platform you can load.",
+          "headline": "Nothing to work on. You are ready to train harder.",
           "meaning": [],
           "suggestions": [],
           "programming": [
-            "Train normally.",
-            "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
+            "Train as normal.",
+            "Run this screen again each month, or after a growth spurt, a long break, or a big jump in training."
           ],
           "notMeasured": [],
           "notScored": [
-            "Rib angle and breath",
-            "Pelvic tilt (hands on the hip points)",
-            "Seated rotation, each side"
+            "Breathing",
+            "Pelvis tilt (a coach checks by hand)",
+            "Seated turn, each side"
           ],
           "ranAll": true,
           "readCount": 6,
@@ -1773,45 +1773,45 @@
               "checkId": "heelLine",
               "grade": "stable",
               "source": "camera",
-              "detail": "heel lines L 1° · R 1° from vertical (+ = heel outside the ankle) · estimated"
+              "detail": "left heel tilts 1° outward, right heel 1° outward · estimated"
             },
             {
               "checkId": "kneeWindow",
               "grade": "stable",
               "source": "camera",
-              "detail": "knee against its hip–ankle line, in hip half-widths: L 0.01 out · R 0.01 out · estimated"
+              "detail": "left knee on the line, right knee on the line · estimated"
             },
             {
               "checkId": "hipLevel",
               "grade": "stable",
               "source": "camera",
-              "detail": "0.00 of a shoulder width apart in height · estimated"
+              "detail": "level · estimated"
             },
             {
               "checkId": "shoulderLevel",
               "grade": "stable",
               "source": "camera",
-              "detail": "0.00 of a shoulder width apart in height · estimated"
+              "detail": "level · estimated"
             },
             {
               "checkId": "headFloat",
               "grade": "stable",
               "source": "camera",
-              "detail": "ear 0.01 torso lengths ahead of the shoulder · estimated"
+              "detail": "ear in front of the shoulder by about 1% of your upper-body length · estimated"
             },
             {
               "checkId": "singleLeg",
               "grade": "stable",
               "source": "camera",
               "side": "left",
-              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+              "detail": "30 s on one leg, free foot down 0 times, little sway · estimated"
             },
             {
               "checkId": "singleLeg",
               "grade": "stable",
               "source": "camera",
               "side": "right",
-              "detail": "sway 0.00 torso lengths a second, 0 touch-downs, 30 s on one leg · estimated"
+              "detail": "30 s on one leg, free foot down 0 times, little sway · estimated"
             }
           ],
           "summary": {
@@ -1822,18 +1822,18 @@
             "asymmetries": 0,
             "score": 100,
             "triage": "proceed",
-            "headline": "Nothing flagged. That is a platform you can load.",
+            "headline": "Nothing to work on. You are ready to train harder.",
             "meaning": [],
             "suggestions": [],
             "programming": [
-              "Train normally.",
-              "Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload."
+              "Train as normal.",
+              "Run this screen again each month, or after a growth spurt, a long break, or a big jump in training."
             ],
             "notMeasured": [],
             "notScored": [
-              "Rib angle and breath",
-              "Pelvic tilt (hands on the hip points)",
-              "Seated rotation, each side"
+              "Breathing",
+              "Pelvis tilt (a coach checks by hand)",
+              "Seated turn, each side"
             ],
             "ranAll": true,
             "readCount": 6,

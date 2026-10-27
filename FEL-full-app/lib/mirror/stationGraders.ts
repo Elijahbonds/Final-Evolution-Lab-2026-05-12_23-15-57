@@ -221,7 +221,8 @@ export const STATION_THRESHOLDS = {
   /** What a posted grade may carry (regradeFromSummary) and how long a result's detail line may be (screen.ts keeps 200). */
   limits: { stationIdChars: 32, detailChars: 200 },
   /** How the card prints a value (decimals per unit). */
-  display: { ratio: 2, deg: 0, pxNorm: 2, sec: 0 },
+  // CUE-REWRITE: percent / halfWidthPercent turn a ratio into the share of a width a person can picture (display only)
+  display: { ratio: 2, deg: 0, pxNorm: 2, sec: 0, percent: 100, halfWidthPercent: 50 },
   /** Shoulders level (front). A flag at 0.08 of a shoulder width is ~3 cm on a 40 cm span (a 4.6° tilt of the
    *  shoulder line) — over twice the ~2° body lean the read is left with, and about three times the synth's per-frame
    *  jitter (the median over a hold is steadier still: its uncertainty read 0.003). The synth: level 0.00, one shoulder
@@ -900,26 +901,26 @@ export function formatGradeValue(g: Pick<StationGrade, 'checkId' | 'value' | 'by
   // CUE-REWRITE (2026-10-27): every number with its meaning in plain words — a share of a body width people can picture,
   // degrees for a tilt, seconds for a hold — never "hip half-widths" or "torso lengths a second". Same values, same
   // thresholds; the before/after is in docs/CUE-AUDIT.md.
-  const pct = (v: number, scale = 100) => `${Math.round(Math.abs(v) * scale)}%`;
+  const pct = (v: number, scale: number = D.percent) => `${Math.round(Math.abs(v) * scale)}%`;
   switch (g.checkId) {
     case 'shoulderLevel':
     case 'hipLevel':
-      return shown(g.value, D.ratio)
-        ? `${g.value > 0 ? 'left' : 'right'} side higher by about ${pct(g.value)} of your shoulder width · estimate`
-        : 'level · estimate';
+      return Math.round(Math.abs(g.value) * D.percent) > 0
+        ? `${g.value > 0 ? 'left' : 'right'} side higher by about ${pct(g.value)} of your shoulder width · estimated`
+        : 'level · estimated';
     case 'kneeWindow': {
-      const knee = (v: number) => (shown(v, D.ratio) ? `about ${pct(v, 50)} of your hip width ${v > 0 ? 'inside' : 'outside'} the line` : 'on the line');
-      return `left knee ${knee(g.bySide?.left ?? g.value)}, right knee ${knee(g.bySide?.right ?? g.value)} · estimate`;
+      const knee = (v: number) => (Math.round(Math.abs(v) * D.halfWidthPercent) > 0 ? `about ${pct(v, D.halfWidthPercent)} of your hip width ${v > 0 ? 'inside' : 'outside'} the line` : 'on the line');
+      return `left knee ${knee(g.bySide?.left ?? g.value)}, right knee ${knee(g.bySide?.right ?? g.value)} · estimated`;
     }
     case 'headFloat':
-      return `ear ${g.value >= 0 ? 'in front of' : 'behind'} the shoulder by about ${pct(g.value)} of your upper-body length · estimate`;
+      return `ear ${g.value >= 0 ? 'in front of' : 'behind'} the shoulder by about ${pct(g.value)} of your upper-body length · estimated`;
     case 'heelLine': {
       const heel = (v: number) => `${fmt(Math.abs(v), D.deg)}°${Number(fmt(v, D.deg)) === 0 ? '' : v > 0 ? ' outward' : ' inward'}`;
-      return `left heel tilts ${heel(g.bySide?.left ?? g.value)}, right heel ${heel(g.bySide?.right ?? g.value)} · estimate`;
+      return `left heel tilts ${heel(g.bySide?.left ?? g.value)}, right heel ${heel(g.bySide?.right ?? g.value)} · estimated`;
     }
     case 'singleLeg':
       return `${fmt(g.stanceSec ?? 0, D.sec)} s on one leg, free foot down ${g.touchDowns ?? 0} time${g.touchDowns === 1 ? '' : 's'}, `
-        + `${g.value >= STATION_THRESHOLDS.singleLeg.swayFlagAt ? 'a lot of sway' : 'little sway'} · estimate`;
+        + `${g.value >= STATION_THRESHOLDS.singleLeg.swayFlagAt ? 'a lot of sway' : 'little sway'} · estimated`;
   }
 }
 

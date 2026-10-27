@@ -601,7 +601,8 @@ export function scoreScreen(screen: ScreenId, rawResults: readonly CheckResult[]
     // to stop ("Hold off on heavy load and high-volume jumping until this is looked at in person" read as a risk)
     ? ['Keep practising your skills at an easy to medium effort.',
        'Add the work above to every session, and have a coach look at these in person.',
-       'If anything hurts, swells or goes numb, stop and see a health professional.']
+       // the not-clearance sentence is a disclaimer (kept word for word: legal/policy copy is out of this lane's scope)
+       'This is not medical clearance. If anything hurts, swells or goes numb, stop and see a health professional.']
     : triage === 'addressFirst'
       ? ['Keep training.', 'Do the work above before you train harder, not instead of training.',
          'Run this screen again in two weeks and compare your sides.']
@@ -625,7 +626,7 @@ export function scoreScreen(screen: ScreenId, rawResults: readonly CheckResult[]
   // MIRROR-COACH P3 follow-up (2026-09-28): the partial line counts checks the way the panel and the server do
   // (cameraChecksRead — "1 of 6", not "1 of 7" slots beside a "1 of 6" figure) and names what was not read — and, since
   // its review, says a missing leg beside the count (readPhrase: "6 of 6 camera checks read, one leg not read")
-  const counted = `${readPhrase({ readCount, totalCount, legsNotRead }, 'camera checks')}${legsNotRead > 0 ? ',' : ''}`;
+  const counted = `${readPhrase({ readCount, totalCount, legsNotRead }, 'camera checks')}`;
   const otherLeg = (side: 'left' | 'right') => (side === 'left' ? 'right' : 'left');
   const headline = triage === 'partial'
     ? `Partly read: ${counted}, nothing to work on. Not read: ${notRead.join(', ')}. So this is not a full screen yet.`

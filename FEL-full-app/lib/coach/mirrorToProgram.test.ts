@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The coach's draft from a REAL screen (MIRROR-COACH P3, 2026-09-26): each flagged camera check maps to its FIX line,
 // its corrective block and a catalogue exercise matched on the P2 TAGS; a check the camera could not read is a retest
 // and never clear; a pass prescribes nothing; the coach reads camera / answers / hands-on checks in three groups; the
@@ -77,13 +79,13 @@ const drafted = (over: Over, catalogue = CAT) => coachDraft([{ metrics: row(over
 
 describe('each FLAGGED camera check maps to its FIX line, its block and a catalogue exercise — with what the camera read', () => {
   const expected: Record<Key, { exercise: string; block: string | null; value: RegExp }> = {
-    heelLine: { exercise: 'tripod', block: null, value: /^heel lines L 14° · R 2° from vertical .* · estimated$/ },
-    kneeWindow: { exercise: 'hip9090', block: 'Ask the hips to lead the hinge', value: /^knee against its hip–ankle line, in hip half-widths: L 0\.70 in · R 0\.05 in · estimated$/ },
-    hipLevel: { exercise: 'split', block: 'Trunk and hip hold', value: /^0\.12 of a shoulder width, right higher · estimated$/ },
-    shoulderLevel: { exercise: 'd360', block: 'Open the ribcage', value: /^0\.10 of a shoulder width, left higher · estimated$/ },
-    headFloat: { exercise: 'tspine', block: 'Ask the mid-back to hold', value: /^ear 0\.20 torso lengths ahead of the shoulder · estimated$/ },
-    singleLegL: { exercise: 'tripod', block: 'Trunk and hip hold', value: /^sway 0\.03 torso lengths a second, 2 touch-downs, 28 s on one leg · estimated$/ },
-    singleLegR: { exercise: 'tripod', block: 'Trunk and hip hold', value: /^sway 0\.20 torso lengths a second, 0 touch-downs, 28 s on one leg · estimated$/ },
+    heelLine: { exercise: 'tripod', block: null, value: /^left heel tilts 14° outward, right heel 2° outward · estimated$/ },
+    kneeWindow: { exercise: 'hip9090', block: 'Ask the hips to lead the hinge', value: /^left knee about 35% of your hip width inside the line, right knee about [23]% of your hip width inside the line · estimated$/ },
+    hipLevel: { exercise: 'split', block: 'Hip and middle hold', value: /^right side higher by about 12% of your shoulder width · estimated$/ },
+    shoulderLevel: { exercise: 'd360', block: 'Open the ribcage', value: /^left side higher by about 10% of your shoulder width · estimated$/ },
+    headFloat: { exercise: 'tspine', block: 'Ask the mid-back to hold', value: /^ear in front of the shoulder by about 20% of your upper-body length · estimated$/ },
+    singleLegL: { exercise: 'tripod', block: 'Hip and middle hold', value: /^28 s on one leg, free foot down 2 times, little sway · estimated$/ },
+    singleLegR: { exercise: 'tripod', block: 'Hip and middle hold', value: /^28 s on one leg, free foot down 0 times, a lot of sway · estimated$/ },
   };
   for (const k of KEYS) {
     it(k, () => {
@@ -111,7 +113,7 @@ describe('each FLAGGED camera check maps to its FIX line, its block and a catalo
     const p = drafted({ hipLevel: FLAG.hipLevel }).prescriptions[0];
     // the brief's "2.1 cm-est" needs a body size the camera does not know (stationGraders.ts GradeUnit 'cm-est' is
     // reserved), so the value is the grader's own ratio, estimated
-    expect(p.because).toBe('From the screen: Hip level, right hip higher was flagged for a closer look (0.12 of a shoulder width, right higher · estimated).');
+    expect(p.because).toBe('From the screen: Hip level, right hip higher was flagged for a closer look (right side higher by about 12% of your shoulder width · estimated).');
     expect(p.fix).toMatch(/Here the low side is the left\.$/);
   });
 });
@@ -205,7 +207,7 @@ describe('ranking and bounds', () => {
       { checkId: 'kneeWindow', grade: 'fail', side: 'left' },
     ] }, CAT);
     expect(out.map((p) => p.findingId)).toEqual(['kneeWindow', 'hipLevel', 'heelLine']);
-    expect(out[2].because).toBe('From the screen: Heel line came back borderline.');
+    expect(out[2].because).toBe('From the screen: Heels from behind came back borderline.');
     expect(prescribeFromScreen({ meaning: [], suggestions: [], findings: [{ checkId: 'hipLevel', grade: 'stable' }] }, CAT)).toEqual([]);
   });
 });

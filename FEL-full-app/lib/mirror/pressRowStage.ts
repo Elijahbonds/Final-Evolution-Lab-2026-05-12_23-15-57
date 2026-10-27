@@ -54,8 +54,8 @@ export const PRESS_ROW_PERSIST_FRAMES = 3;
 /** What each fault is called in the review — what the camera read, for the one arm it reads. */
 // CUE-REWRITE (2026-10-27): the canonical names (lib/cue-style/names.ts).
 export const PRESS_ROW_FAULT_LABEL: Readonly<Record<PressRowFault, string>> = {
-  elbowFlare: FAULT_NAMES.elbowRises,
-  shrug: FAULT_NAMES.shrug,
+  elbowFlare: FAULT_NAMES.workingElbowRises,
+  shrug: FAULT_NAMES.workingShrug,
   trunkOffset: FAULT_NAMES.shoulderShift,
 };
 

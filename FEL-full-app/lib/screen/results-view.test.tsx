@@ -163,7 +163,8 @@ describe('A2-5: hidden and TODO checks leave nothing behind', () => {
   it('the jump is a personal best for an adult, never a band word', () => {
     const h = html(CLEAN);
     const pb = h.slice(h.indexOf('data-personal-best')).split('</section>')[0];
-    expect(text(pb)).toMatch(/Your best jump: about \d+ in A personal best to beat next time\./);
+    // test changed: copy rewrite (CUE-REWRITE) — the card now says what it means and what to do next (the result shape)
+    expect(text(pb)).toMatch(/Your best jump: about \d+ in Your best of today's jumps, estimated from video\. Run the screen again in a few weeks and try to beat it\./);
     expect(pb).not.toMatch(/data-band|Good to go|Worth working on|Priority to work on/);
   });
 });
@@ -312,7 +313,7 @@ describe('the lane page (A3-4, A4-3; S-7, S-9, Cyber 3)', () => {
     expect(h).not.toContain('data-coming-soon');
     const t = text(h);
     expect(t).toContain('Your top flag: knees cave in (overhead squat), so start with Correctives.');
-    expect(t).toContain('Band lateral walks, clamshells, goblet squat with knees pushed out');
+    expect(t).toContain('Slow squats to a chair, pushing your knees out over your toes.');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
     expect(h.slice(at('data-sample-drill')).split('</section>')[0]).toContain(EARLY_VERSION);
     expect(t).not.toMatch(/coming soon/i);
     expect(t).toContain('Back to my results');
