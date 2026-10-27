@@ -17,7 +17,8 @@ export const dynamic = 'force-dynamic';
  * /train/programs/:id — SIGNATURE-PROGRAMS (2026-10-25): one program — the overview, today's session under today's gates,
  * and the week view. 404 for a program this viewer may not see (a draft, to anyone but the admin).
  * PLAT-P01 (2026-10-27): the page also hands the session player each exercise's loop (lib/session-player/clips.ts, read
- * here because the library is server-only), so Start plays the demo with no further request.
+ * here because the library is server-only), so Start plays the demo with no further request. The tagline moved from the
+ * header into "About this program": above the fold the page is today's session and Start.
  */
 export default async function SignatureProgramPage({ params }: { params: { id: string } }) {
   if (!isSignatureId(params.id)) notFound();
@@ -31,7 +32,7 @@ export default async function SignatureProgramPage({ params }: { params: { id: s
   const { index } = await libraryState().catch(() => ({ index: null }));
   const clips = index ? clipsFor(signatureExerciseIds(signatureProgram(params.id)!), (x) => index.docs[index.byId.get(x) ?? -1] ?? null) : {};
   return (
-    <TabPage eyebrow="Signature program" title={view.title} lede={view.tagline} accent="#00FF9D"
+    <TabPage eyebrow="Signature program" title={view.title} accent="#00FF9D"
       aside={<Link href="/train/programs" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← All programs</Link>}>
       <ProgramPage initial={view} clips={clips} />
     </TabPage>

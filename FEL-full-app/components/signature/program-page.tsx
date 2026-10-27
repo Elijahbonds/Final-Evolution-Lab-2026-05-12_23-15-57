@@ -13,7 +13,7 @@
 // again from GET /api/signature-programs/:id after every action, so the page always draws what the server decided (today's gates,
 // the checkpoint decisions, the Premium lock). Under youth rules (`keep: 'device'`) the done marks live on this phone
 // (lib/signature/deviceProgress.ts) and nothing is sent.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import { CalendarDays, ChevronDown, Dumbbell, Lock, Play, PlayCircle, Target } from 'lucide-react';
 import type { ProgramView, WeekView } from '@/lib/signature/view';
@@ -34,16 +34,32 @@ const SessionPlayer = dynamic(() => import('@/components/session-player/session-
 export const START_LABEL = "Start today's session";
 export const RETEST_FIRST = 'Re-test first';
 export const TODAY_LIST = "Today's exercises";
+export const THE_WEEKS = 'The weeks';
+export const ABOUT = 'About this program';
+
+/** One collapsed row below Start (Today's exercises, The weeks, About this program): the page above the fold is the day. */
+function Fold({ label, count, testid, children }: { label: string; count?: number; testid: string; children: ReactNode }) {
+  return (
+    <details data-testid={testid} className="group mt-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4">
+      <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-2 text-[13.5px] font-bold text-white [&::-webkit-details-marker]:hidden">
+        <span>{label}{count !== undefined && <span className="font-normal text-fel-soft"> · {count}</span>}</span>
+        <ChevronDown aria-hidden className="h-4 w-4 text-fel-soft motion-safe:transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="pb-3">{children}</div>
+    </details>
+  );
+}
 
 /** Today's exercises: one line each (name and dose). The cue moved into the player. Collapsed by default. */
 function TodayList({ s }: { s: ServedSession }) {
   return (
-    <details data-testid="today-list" className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] px-4">
-      <summary className="flex min-h-[48px] cursor-pointer items-center justify-between gap-2 text-[13.5px] font-bold text-white">
-        <span>{TODAY_LIST} <span className="font-normal text-fel-soft">· {s.items.length}</span></span>
-        <ChevronDown aria-hidden className="h-4 w-4 text-fel-soft" />
-      </summary>
-      <ul className="pb-2">
+    <Fold label={TODAY_LIST} count={s.items.length} testid="today-list">
+      {!s.blocked && (
+        <a href={DAILY_DRILL_PATH} data-daily-drill-link className="flex min-h-[44px] items-center gap-2 text-[13.5px] text-fel-soft hover:text-white">
+          <PlayCircle aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" /> {DAILY_DRILL_LINE}
+        </a>
+      )}
+      <ul>
         {s.items.map((it) => (
           <li key={it.key} data-item={it.key} data-ex={it.ex} data-section={it.section} data-impact={it.impact ? '1' : '0'}
             data-swapped={it.swappedFrom ? '1' : undefined} data-eased={it.eased ? '1' : undefined} className={SIG_LOOK.row}>
@@ -55,17 +71,17 @@ function TodayList({ s }: { s: ServedSession }) {
       {s.held.length > 0 && (
         <ul data-held className="grid gap-1 border-t border-white/[0.06] py-2.5">{s.held.map((h) => <li key={h.key} className="text-[13.5px] text-fel-soft">{h.line}</li>)}</ul>
       )}
-    </details>
+    </Fold>
   );
 }
 
-function Weeks({ weeks, current }: { weeks: WeekView[]; current: number | null }) {
+function Weeks({ weeks, current, premiumLine }: { weeks: WeekView[]; current: number | null; premiumLine: string | null }) {
   const [open, setOpen] = useState(false);
   const shown = open ? weeks : weeks.filter((w) => current === null || Math.abs(w.n - current) <= 1);
   return (
-    <section data-testid="week-view" className="mt-6">
-      <h2 className="fel-heading flex items-center gap-2 text-[17px] font-black text-white"><CalendarDays className="h-4 w-4 text-[#00E5FF]" /> The weeks</h2>
-      <ol className="mt-3 grid gap-2">
+    <Fold label={THE_WEEKS} count={weeks.length} testid="week-view">
+      {premiumLine && <p className="mb-2 flex items-center gap-2 text-[13.5px] text-fel-soft" data-premium-line><CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-[#00E5FF]" />{premiumLine}</p>}
+      <ol className="grid gap-2">
         {shown.map((w) => (
           <li key={w.n} data-week={w.n} data-access={w.access} data-current={w.n === current ? '1' : '0'}
             className={`rounded-xl border p-3 ${w.n === current ? 'border-[#00E5FF]/40 bg-[#00E5FF]/[0.05]' : 'border-white/8 bg-white/[0.02]'}`}>
@@ -92,7 +108,7 @@ function Weeks({ weeks, current }: { weeks: WeekView[]; current: number | null }
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /> {open ? 'Show fewer weeks' : `Show all ${weeks.length} weeks`}
         </button>
       ) : null}
-    </section>
+    </Fold>
   );
 }
 
@@ -170,7 +186,7 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
 
   return (
     <div data-testid="signature-program" data-program={view.id} data-keep={view.keep} data-status={view.status} className="mx-auto max-w-[720px]">
-      {view.draft && <p data-draft className="mb-3 text-[13.5px] font-bold text-[#FFD700]">{view.status === 'rejected' ? 'Rejected. ' : ''}{DRAFT_BADGE}</p>}
+      {view.draft && <p className="mb-3"><span data-draft title={DRAFT_BADGE} aria-label={`${view.status === 'rejected' ? 'Rejected. ' : ''}${DRAFT_BADGE}`} className={SIG_LOOK.chip}>{view.status === 'rejected' ? 'Rejected' : 'Draft'}</span></p>}
       {view.prehabNote && <p data-prehab-note className="mb-3 text-[13.5px] font-bold text-amber-100">{view.prehabNote}</p>}
 
       <section data-testid="today-session" data-session={today?.id} data-blocked={today?.blocked ? '1' : '0'} className={SIG_LOOK.today}>
@@ -207,22 +223,17 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
         ) : (
           <p className={SIG_LOOK.body} data-preview>Programs open once the owner approves them.</p>
         )}
-        {!view.premium.locked && <p className={`mt-3 text-[12px] text-fel-soft`} data-premium-line>{view.premium.line}</p>}
         {view.premium.locked && view.premium.checkout && (
           <a href={view.premium.checkout.monthly} data-checkout className="mt-2 inline-flex min-h-[44px] items-center text-[13px] font-bold text-[#00E5FF]">Get FEL Pro →</a>
         )}
       </section>
 
       {today && !today.blocked && !view.premium.locked && <TodayList s={today} />}
-      {today && !today.blocked && (
-        <a href={DAILY_DRILL_PATH} data-daily-drill-link className="mt-2 flex min-h-[44px] items-center gap-2 text-[13.5px] text-fel-soft hover:text-white">
-          <PlayCircle aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" /> {DAILY_DRILL_LINE}
-        </a>
-      )}
 
-      <Weeks weeks={weeks} current={deviceMode ? 1 : view.current?.week ?? null} />
+      <Weeks weeks={weeks} current={deviceMode ? 1 : view.current?.week ?? null} premiumLine={view.premium.locked ? null : view.premium.line} />
 
-      <section data-testid="overview" className="mt-8">
+      <Fold label={ABOUT} testid="overview">
+        <p className={`mb-2 ${SIG_LOOK.body} text-white`}>{view.tagline}</p>
         <p className={SIG_LOOK.meta}>
           {view.range.planned} weeks{view.range.min !== view.range.max ? ` (adapts ${view.range.min}–${view.range.max})` : ''} · {view.daysPerWeek} days a week
         </p>
@@ -247,7 +258,7 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
             <ul className="grid list-disc gap-1 pb-2 pl-4">{view.gaps.map((g) => <li key={g}>{g}</li>)}</ul>
           </details>
         )}
-      </section>
+      </Fold>
 
       {playing && (
         <SessionPlayer session={playing.session} mode={playing.mode} onFinish={finish} onClose={() => setPlaying(null)} />

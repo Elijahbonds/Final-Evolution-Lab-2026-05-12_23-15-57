@@ -34,6 +34,8 @@ export const LOOK = {
   bottom: 'mt-auto px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-3',
   button: 'fel-heading flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-5 text-[16px] font-black uppercase tracking-[0.08em] text-black shadow-[0_0_28px_rgba(0,255,157,0.28)] motion-safe:transition-transform motion-safe:duration-100 active:scale-[0.97] disabled:opacity-50',
   buttonRest: 'fel-heading flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00E5FF] px-5 text-[16px] font-black uppercase tracking-[0.08em] text-black shadow-[0_0_28px_rgba(0,229,255,0.28)] motion-safe:transition-transform motion-safe:duration-100 active:scale-[0.97] disabled:opacity-50',
+  // the one quiet button (End, in the end-the-session question): the primary's shape, outlined
+  buttonQuiet: 'fel-heading flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl border border-white/25 px-5 text-[16px] font-black uppercase tracking-[0.08em] text-white motion-safe:transition-transform motion-safe:duration-100 active:scale-[0.97]',
   setupBtn: 'grid h-11 w-11 shrink-0 place-items-center rounded-full text-fel-soft motion-safe:transition-transform active:scale-90',
   sheet: 'absolute inset-x-0 bottom-0 z-20 max-h-[70%] overflow-y-auto rounded-t-3xl border-t border-white/10 bg-fel-surface-2/95 px-5 pb-6 pt-4 shadow-[0_-12px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl motion-safe:animate-[felSheetUp_220ms_cubic-bezier(0.16,0.8,0.3,1)]',
   sheetText: 'mt-2 text-[16px] leading-relaxed text-fel-soft',

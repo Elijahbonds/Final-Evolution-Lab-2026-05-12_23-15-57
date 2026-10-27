@@ -135,9 +135,9 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
             {askEnd ? (
               <div className="flex flex-col items-center gap-4 px-6 text-center">
                 <p className={LOOK.name}>{T.endAsk}</p>
-                <div className="flex gap-3">
-                  <button type="button" data-fel-press data-player-end className="min-h-[48px] rounded-2xl border border-white/25 px-6 text-[16px] font-bold text-white active:scale-[0.97]" onClick={onClose}>{T.end}</button>
-                  <button type="button" data-fel-press data-player-keep className="min-h-[48px] rounded-2xl bg-white px-6 text-[16px] font-bold text-black active:scale-[0.97]" onClick={() => { setAskEnd(false); p.resume(); }}>{T.keepGoing}</button>
+                <div className="grid w-full max-w-[20rem] gap-3">
+                  <button type="button" data-fel-press data-player-keep className={LOOK.button} onClick={() => { setAskEnd(false); p.resume(); }}>{T.keepGoing}</button>
+                  <button type="button" data-fel-press data-player-end className={LOOK.buttonQuiet} onClick={onClose}>{T.end}</button>
                 </div>
               </div>
             ) : <p className={LOOK.label}>{T.paused}</p>}
