@@ -84,11 +84,11 @@ describe('WarmupPrep', () => {
     expect(m).toContain(NOTE_COPY.pain);
   });
 
-  it("the coach's own Prime section is today's primer; their JUMP work there lets a youth athlete keep the Wake-Up's jumps", () => {
+  it("the coach's own Prime section is today's primer; their JUMP work there lets a youth athlete keep the Wake-Up's jumps, but never the adults-only Build the Rhythm", () => {
     const withPrime = [ex('p1', 0, 'prime', 'locomotion', false, true), ...SQUAT_DAY];
     const m = text(html({ exercises: withPrime, contextUrl: null, initialContext: { ...ADULT_HEEL, isYouth: true } }));
     expect(m).not.toContain('data-kind="primer"');
-    expect(m).toContain('data-step="build-the-rhythm"');
+    expect(m).not.toContain('data-step="build-the-rhythm"');
     expect(m).toContain(NOTE_COPY.coach_prime);
     expect(m).toContain(NOTE_COPY.coach_impact);
     // a walk (locomotion, not jump work) in the same Prime keeps a youth athlete's jumps off (the P6 review's blocker)
