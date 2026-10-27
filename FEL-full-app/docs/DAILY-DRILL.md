@@ -136,19 +136,31 @@ they are doing it, **what** to do, and **how they did**. The pick, the gates, th
 
 ## What changed
 
+Then two owner calls on 2026-10-27 shaped the after column. First: "It should play automatically, don't make the
+platform confusing or hard to use." Second: the app feels cheap partly from "too much text", with a dark premium
+athletic look benchmarked on Nike/Apple Fitness+, Whoop/Oura, NBA 2K and Strava. So big numbers, icon chips and the
+demo carry the meaning, and the words are budgeted. `today-drill-flow.test.tsx` holds the budgets:
+
+- a first-timer reads 110 words or fewer before Start;
+- a returning player reads 40 or fewer;
+- there are at most 3 steps, each 6 words or fewer;
+- there are 2 cues;
+- each result row is 12 words or fewer.
+
 | Where | Before | After |
 |---|---|---|
-| Train card | The book's name ("Safe Landing Check") and "Picked from your lowest number: shooting, 40% of 30 shots made." | A plain name ("Soft landings"), why today in a sentence ("Your shooting is your lowest number right now (40% of 30 shots made), so today's drill works on soft, balanced landings."), what it improves, the reward. A first-timer also gets "Each day we pick one short drill from your lowest number." |
-| Drill page, top | The book's name, the old why-line, "The same drill all day…" | Plain name (the book's name small under it), why today, what it improves, and chips for minutes, floor and shoes, and phone distance |
-| First-timer | Nothing | A two-line explainer of what the daily drill is, on the card and the page |
-| Everyone | Start under eight phase cards, so the hop drill needed a scroll | Owner, 2026-10-27: "It should play automatically, don't make the platform confusing or hard to use." Nothing is folded away (the demo, the numbered steps, the 2–3 key cues and the setup are always shown, and the demo plays by itself). The next action is one big **Start**, fixed at the bottom above the phone's tab bar, so it is never scrolled to |
-| Steps | One card per chart phase, in the book's words ("Pressurize the System · 1 min", "Set 1 · 0.3 min") | 3–4 short numbered steps read from the chart the day runs ("Warm up for 4 minutes: …", "3 sets of 20 hops.", "Rest 1 minute between sets.") |
-| Demo | "Watch the 3D demo", which opened the drills page's `DrillDemo` with the one-clip `exercise-avatar-canvas` stand-in, where the owner saw the T-pose (on this rig the head was off the canvas: `shots/before/demo-jump-*.png`) | The shared `DrillDemo`, as fixed by lane/library-anatomy-2 (#462, merged into this lane). It is the library stage, with the drill's own loop (`ex_pogo` for hops, `ex_jump` for landings) or, with no loop, the still start position labelled "Demo coming". It opens by itself when it scrolls into view, with no tap. This lane builds no demo of its own |
-| Setup | Only inside body play's space check | Phone on its side about chest high, 3.5 to 4.5 m (body play's own `SETUP_HINT`, pinned by a test), 2 m of floor, nothing overhead for jumps, shoes, and "the camera checks your framing before the clock starts" |
-| During | Phase name, time left, the cue lane, the book's line, the Coach's caption, and "End the drill" | "Step 4 of 8" with a progress bar and time left. A big step name ("Hops: set 1") and a rep counter ("7 of 20", the chart's own beat). ONE cue (the Coach's caption, else the step's plain cue, else the book's timed line where a phase changes sides). "Next: Rest". A big Rest panel with its countdown. **Pause**, **Stop** and **This hurts: stop** are fixed at the bottom |
+| Train card | The book's name ("Safe Landing Check") and "Picked from your lowest number: shooting, 40% of 30 shots made." | The plain name ("Soft landings"), why today in one short line ("Shooting is your lowest score (40%). Today: soft landings."), one phrase on what it improves, and "+10 Lab Credits · Day 4 streak". A first-timer also gets "New: one short drill a day, from your lowest score." |
+| Drill page, top | The book's name, the old why-line, "The same drill all day…" | The book's name as a small label, then the plain name, big. The short why-line follows. A first-timer also sees one phrase on what it improves ("Steady landings on every jump."). Icon chips show time, phone distance (the label reads "Phone 4 m away, whole body in the picture"; body play's own 3.5–4.5 m), 2 m floor, and for jumps, shoes on and clear above. The reward shows as credits plus a streak flame |
+| First-timer | Nothing | The one-line explainer, the improves phrase, and the numbered steps |
+| Returning player | The same long page as everyone | No explainer, steps or improves line. The why-line, the chips, the demo, the 2 cues and Start remain |
+| Steps | One card per chart phase, in the book's words ("Pressurize the System · 1 min", "Set 1 · 0.3 min") | At most 3, each 6 words or fewer, with counts read from the chart the day runs: "Warm up, 4 min." / "3 sets of 20 hops." / "Rest 1 min between." |
+| Cues | Every phase's book line | 2 big chips ("Both feet at once", "Freeze for 3") |
+| Demo | "Watch the 3D demo", which opened the drills page's `DrillDemo` with the one-clip `exercise-avatar-canvas` stand-in, where the owner saw the T-pose (on this rig the head was off the canvas: `shots/before/demo-jump-*.png`) | lane/library-anatomy-2's shared pieces (#462, merged into this lane): `AvatarDemo`, `useAutoOpen` and `drillDemoLoop`. This is the library stage, with the drill's own loop (`ex_pogo` for hops, `ex_jump` for landings) or, where there is no loop, the still start position labelled "Demo coming". It plays by itself when it scrolls into view, with no tap. `DrillDemo`'s long note line is left off. This lane builds no demo of its own |
+| Start | Under eight phase cards, so the hop drill needed a scroll | One big **Start**, fixed at the bottom above the phone's tab bar. Nothing is folded behind a tap |
+| During | Phase name, time left, the cue lane, the book's line, the Coach's caption, and "End the drill" | A progress ring with the step number inside ("4/8"), the step name, time left, and a big rep counter ("7 / 20", the chart's own beat). ONE cue (the Coach's caption, else the step's plain cue, else the book's timed line where a phase changes sides). "Next: Rest". A big Rest countdown. **Pause**, **Stop** and **This hurts** are fixed above the tab bar |
 | Pause | Only by hiding the tab | A Pause button. It is the hidden-tab pause exactly (`liveDrill.pause()`): the camera goes off, the clock stops where it was, and the camera never restarts by itself. Camera back, the space check, then RESUME |
-| Pain | None on the page | "This hurts: stop" turns the camera off and opens the **existing** pain check-in (`PainCheckInChip`, kind `during` → `POST /api/health/pain` → `lib/health/painRule.ts`), already open. Its decision is shown verbatim and feeds the drills page's gates as before. There is no second pain path |
-| After | "<drill>: done", per-phase beat counts, "Timing overall: 75%" | **What we saw** ("The camera saw 15 of 20 hops and landings on time, and 9 of 10 holds kept still."), **What it means** (three bands per drill, encouraging and never shaming), **What's next** (tomorrow's likely focus), the claim line, the estimate line and the kept line. Back to Train, or Do it again |
+| Pain | None on the page | "This hurts" turns the camera off and opens the **existing** pain check-in (`PainCheckInChip`, kind `during` → `POST /api/health/pain` → `lib/health/painRule.ts`), already open, under "Stopped. Rest now." The check-in's decision is shown verbatim and feeds the drills page's gates as before. There is no second pain path |
+| After | "<drill>: done", per-phase beat counts, "Timing overall: 75%" | Three rows of 12 words or fewer. **What we saw**: "Camera saw 17 of 20 on time, 9 of 10 held still." **What it means**: three bands per drill, encouraging and never shaming. **What's next**: "Tomorrow: likely soft landings again." Then the claim line, the estimate line and the kept line, with Back to Train or Do it again |
 
 Tomorrow's focus is the same pick (`pickFocus`) over the same readings with tomorrow's date. It reads nothing new and
 keeps nothing, and the line says "likely", because a reading taken today can still change it.
@@ -168,6 +180,9 @@ Shared files, additive only (flagged):
   page is unchanged. The space check, the grown-up step and the camera-off pause stay DrillLive's.
 - `lib/drills/liveDrill.ts`: `pause()`, which is `bodyPlay.end()` plus the hidden-tab handler. Tested in `liveDrill.test.ts`.
 - `components/coach/pain-checkin.tsx`: `initiallyOpen` on `PainCheckInChip`. The default is unchanged.
+
+Reads, does not edit: #462's `components/library/avatar-demo.tsx`, `components/library/use-auto-open.ts` and
+`lib/library/surfaceDemo.ts`.
 
 ## Measured (esbuild + Playwright rig, Chromium, 390×844, DPR 3, 4× CPU throttle)
 
@@ -216,30 +231,31 @@ page error on any shot. The rig's paused shot shows the space-check stand-in, be
 
 | # | Question | Before | After |
 |---|---|---|---|
-| 1 | Why am I doing this drill today? | Partly. "Picked from your lowest number: jump, 26 in best jump." does not say how the drill helps that number | Yes. "Your jump is your lowest number right now (26 in best jump), so today's drill works on quick, springy hops." (`drill-jump.png`) |
-| 2 | What will it do for me? | No | Yes. "Builds springy ankles for a quicker first step and a higher jump." |
-| 3 | What exactly do I do, and for how long? | Partly. Eight cards in the book's words ("Pressurize the System", "Wake Up the Tripod", "Set 1 · 0.3 min"), and the demo was behind a tap and T-posed | Yes. 4 numbered steps, the minutes, 3 key cues, and a looping demo of the move |
-| 4 | Where do I put my phone, and what do I need? | No. It was only inside the space check, after Start | Yes. "Before you start": phone, distance, floor, shoes, and the framing check |
-| 5 | How did I do, and what's next? | Partly. Beat counts and "Timing overall", no meaning, nothing about tomorrow | Yes. What we saw / what it means / what's next, plus the credits and streak (`live-jump-done.png`) |
+| 1 | Why am I doing this drill today? | Partly. "Picked from your lowest number: jump, 26 in best jump." does not say what the drill does about it | Yes. "Jump is your lowest score (26 in). Today: springy hops." (`drill-jump.png`) |
+| 2 | What will it do for me? | No | Yes, for a first-timer: "Quicker first step, higher jump." |
+| 3 | What exactly do I do, and for how long? | Partly. Eight cards in the book's words ("Pressurize the System", "Wake Up the Tripod", "Set 1 · 0.3 min"), and the demo was behind a tap and T-posed | Yes. "Warm up, 4 min. / 3 sets of 20 hops. / Rest 1 min between.", the 7 min chip, 2 cue chips, and the demo playing by itself |
+| 4 | Where do I put my phone, and what do I need? | No. It was only inside the space check, after Start | Yes, as chips: 4 m away (phone icon), 2 m floor, shoes on, clear above. The space check then checks the framing |
+| 5 | How did I do, and what's next? | Partly. Beat counts and "Timing overall", with no meaning and nothing about tomorrow | Yes. What we saw / what it means / what's next, plus credits and streak (`live-jump-done.png`) |
 
 ## Copy style
 
 Every fixed line in `guide.ts` is screened in `guide.test.ts`. None contains a word from `MEDICAL_WORDS`. Every line of
-5 or more words reads at Flesch–Kincaid grade 8 or below, and the set averages 6 or below (measured: mean 1.2, max 7.6
-over 74 lines; short cues score low on this formula). The low-score meanings are checked for blame words. This also
+5 or more words reads at Flesch–Kincaid grade 8 or below, and the set averages 6 or below (measured: mean 0.4, max 7.6
+over 49 lines; short cues score low on this formula). The low-score meanings are checked for blame words. This also
 caught the old `STOPPED_LINE`'s "diagnosis", which is reworded: "Today's drill is on pause. Check with a clinician
 first, then clear it from the Mirror. It's a pause, not a verdict." The cue-rewrite lane's `docs/CUE-STYLE.md` was not
 on origin when this lane ran. When it lands, `guide.ts` is the one file to re-read against it.
 
 ## Owner calls
 
-1. **Copy for review (product copy):** every line in `guide.ts` (plain names, why-today, improves, cues, steps, the
-   during words, the three result bands, the hurt panel's two lines) and the reworded `STOPPED_LINE`.
-2. **First-timer page length:** a first-timer who reads everything reads for about a minute or more (see the table).
-   Following the owner's 2026-10-27 call, nothing is folded away. Start is always on screen, so reading is a choice,
-   not a gate.
-3. **The shooting → landings link:** "Steady landings are the base of a good jump shot." It is the existing mapping's
-   reasoning (`plan.ts`), now said out loud.
+1. **Copy for review (product copy):** every line in `guide.ts`: the plain names, the why-line, the improves phrases,
+   the cues, the steps, the during words, the three result bands and the hurt panel's lines. Also the reworded
+   `STOPPED_LINE`. The why-line now says "score" where the old card said "number".
+2. **What a returning player sees:** to stay within 40 words, a returning player gets no steps or improves line. They
+   have done it before; the demo, the chips and the 2 cues remain, and the running screen still shows each step. The
+   alternative is the first-timer page for everyone, at about 60–70 words.
+3. **The shooting → landings link:** the why-line no longer explains it ("Shooting is your lowest score (40%). Today:
+   soft landings."). The result's "That is the base of every jump" carries it.
 4. **The demo:** the page uses the shared `DrillDemo` (#462). The slow squat check and the Wake-Up have no loop yet, so
    they show the still "Demo coming". The page's cues and steps carry them.
 5. **assumption:** "the 10/day cap" in the brief could not be found as a rule in this code (searched `lib/`, `app/`,
