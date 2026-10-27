@@ -319,8 +319,10 @@ felt none of these yet — every default is flagged in the lane report):
   back exactly: `aiBlockChance`, `checkBlock`'s window, `jumpSwats`, goaltending with no touch); `hoops.blkShoulderM` 1.55 m and
   `hoops.blkArmM` 0.85 m (the reach: a sphere of the arm around the shoulder, the shoulder riding the contest jump — 2.40 m standing);
   `hoops.blkContactM` 0.14 m (the ball's centre this close to the reach is a touch); `hoops.blkLookSec` 0.25 s (how much of a release's
-  flight is read); `hoops.aiBlockLeadSec` 0.15 s (the AI leaves the floor this long before the release it expects — today's number —
-  never before its tier's reaction); `hoops.blkDeflectMps` 2.4 m/s and `hoops.blkDeflectUpMps` 1.4 m/s (the ball off the hand, along
+  flight is read); `hoops.aiBlockLeadSec` **TUNED 0.15 → 0.25 s** (the AI leaves the floor this long before the release it expects, so the
+  top of his jump meets the ball — never before his tier's reaction); `hoops.blkReleaseJumperM` 2.45 m and `hoops.blkReleaseLayupM`
+  2.5 m (the block reads the ball from where it leaves the hand, above the court: the release fires before the clip's arms are up,
+  the rig read their layups leaving from 1.65–1.74 m, and from the chest any jump reached them); `hoops.blkDeflectMps` 2.4 m/s and `hoops.blkDeflectUpMps` 1.4 m/s (the ball off the hand, along
   the line it was hit).
 - Group "Hoops · contest" (`hoops/contest.ts`), **TUNED (new behaviour)**: `hoops.oneContestOn` 1 (0 = each shooter's old formula);
   `hoops.contestRangeM` 2.6 m (the distance term's zero; was 2.2 on my jumper, 3.0 on theirs and my mates'); `hoops.contestDistW` 1;

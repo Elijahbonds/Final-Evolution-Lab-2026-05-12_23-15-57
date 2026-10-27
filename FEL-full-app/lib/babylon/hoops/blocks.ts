@@ -45,12 +45,21 @@ export const LOOK_SEC = 0.25;
 /** The contest jump both modes play (OneVOneMode JUMP_SEC / JUMP_VY 3.0 m/s; ThreeVThreeMode JUMP_SEC / JUMP_APEX): s and m. */
 export const JUMP_SEC = 0.75;
 export const JUMP_RISE_M = 0.46;
-/** The AI leaves the floor this long before the release it expects (the green's centre). Today's 0.15 s. Knob `hoops.aiBlockLeadSec`. */
-export const AI_BLOCK_LEAD_SEC = 0.15;
+/** The AI leaves the floor this long before the release it expects (the green's centre), so the top of its jump meets the ball. TUNED
+ *  0.15 → 0.25 s (today's 0.15 left its hand 0.27 m up at the release, still rising; calibrated on the headless sim so the
+ *  AI's block rate on my shots stays near the dice's). Knob `hoops.aiBlockLeadSec`. */
+export const AI_BLOCK_LEAD_SEC = 0.25;
 /** The blocked ball's planar speed off the hand, and its lift off a rising / a falling hand (m/s). Knobs `hoops.blkDeflectMps`, `hoops.blkDeflectUpMps`. */
 export const DEFLECT_MPS = 2.4;
 export const DEFLECT_UP_MPS = 1.4;
 
+/** Where a shot leaves the hand, above the court (m; the modes pass feet 0 for every shooter — the 3v3 rival's clip hops while his root
+ *  stays on the floor, so the root is not his feet for every body): the release is decided before the clip's arms are up (the rig read the
+ *  3v3 rival's layups "released" at 1.65–1.74 m, the ball still at his chest), and from the chest any jump reaches it — the hand
+ *  would carry the ball up here before it leaves. The block reads the ball from the higher of the two. Knobs `hoops.blkReleaseJumperM`,
+ *  `hoops.blkReleaseLayupM`. */
+export const RELEASE_JUMPER_M = 2.45;
+export const RELEASE_LAYUP_M = 2.5;
 export const blockDiceOn = (): boolean => feel('hoops.blockDiceOn', BLOCK_DICE_ON ? 1 : 0) >= 0.5;
 const shoulderM = (): number => feel('hoops.blkShoulderM', SHOULDER_M);
 const armM = (): number => feel('hoops.blkArmM', ARM_M);
@@ -66,6 +75,13 @@ export interface Blocker { x: number; z: number; jumpAge: number; handsUp: boole
 export function jumpRise(age: number, jumpSec = JUMP_SEC, rise = JUMP_RISE_M): number {
   if (!Number.isFinite(age) || age < 0 || age >= jumpSec) return 0;
   return Math.sin((age / jumpSec) * Math.PI) * rise;
+}
+
+const LAYUP_LIKE = new Set<ShotStyle>(['layup', 'reverse', 'scoop', 'spinLayup', 'hangLayup', 'fingerRoll', 'mikan', 'upAndUnder']);
+/** The ball as it leaves the hand: the drawn ball, lifted to the release height over the shooter's feet when it is still below it. */
+export function releaseFrom(ball: P3, shooterFeetY: number, style: ShotStyle): P3 {
+  const h = LAYUP_LIKE.has(style) ? feel('hoops.blkReleaseLayupM', RELEASE_LAYUP_M) : feel('hoops.blkReleaseJumperM', RELEASE_JUMPER_M);
+  return { x: ball.x, y: Math.max(ball.y, (Number.isFinite(shooterFeetY) ? Math.max(0, shooterFeetY) : 0) + h), z: ball.z };
 }
 
 /** The top of his reach right now (m): the shoulder on the jump, plus the arm straight up. */

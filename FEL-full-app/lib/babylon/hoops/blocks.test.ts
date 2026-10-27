@@ -1,6 +1,6 @@
 // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball — geometry, never a roll.
 import { describe, expect, it } from 'vitest';
-import { jumpRise, reachTop, reachGap, handOnBall, meetsRelease, deflect, aiBlockJumpAtSec, ballOnArc, SHOULDER_M, ARM_M, CONTACT_M, JUMP_SEC, JUMP_RISE_M, AI_BLOCK_LEAD_SEC, BLOCK_DICE_ON, type Blocker } from './blocks';
+import { releaseFrom, RELEASE_JUMPER_M, RELEASE_LAYUP_M, jumpRise, reachTop, reachGap, handOnBall, meetsRelease, deflect, aiBlockJumpAtSec, ballOnArc, SHOULDER_M, ARM_M, CONTACT_M, JUMP_SEC, JUMP_RISE_M, AI_BLOCK_LEAD_SEC, BLOCK_DICE_ON, type Blocker } from './blocks';
 import { shotArcShape } from '../core/BasketballCore';
 
 const RIM = { x: 0, y: 3.05, z: -0.6 };
@@ -74,6 +74,16 @@ describe('hoops/blocks — the hand meets the ball', () => {
     expect(aiBlockJumpAtSec(0.1, 0)).toBeCloseTo(0.05, 6);
   });
 
+  it('the ball is read from where it leaves the hand: a chest-high "release" is lifted to the release height over his feet', () => {
+    expect(releaseFrom({ x: 1, y: 1.7, z: 2 }, 0, 'layup')).toEqual({ x: 1, y: RELEASE_LAYUP_M, z: 2 });
+    expect(releaseFrom({ x: 1, y: 1.7, z: 2 }, 0.3, 'jumper').y).toBeCloseTo(0.3 + RELEASE_JUMPER_M, 6);
+    expect(releaseFrom({ x: 1, y: 3.1, z: 2 }, 0, 'jumper').y).toBe(3.1);   // already higher: as drawn
+  });
+  it('a late jump does not reach a ball leaving from the release height; one on the gather does', () => {
+    const from = releaseFrom({ x: 0, y: 1.7, z: 4.75 }, 0, 'layup');
+    expect(meetsRelease(at(0, 3.9, 0.12), from, RIM, 'layup').hit).toBe(false);   // the rig bot: 0.12 s into his jump
+    expect(meetsRelease(at(0, 3.9, 0.33), from, RIM, 'layup').hit).toBe(true);    // jumped on the gather
+  });
   it('no dice: the same geometry gives the same answer every time', () => {
     const r = () => meetsRelease(at(0.2, defZ, 0.3), ball, RIM, 'layup').hit;
     const first = r(); for (let i = 0; i < 20; i++) expect(r()).toBe(first);

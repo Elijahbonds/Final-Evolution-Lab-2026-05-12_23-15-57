@@ -166,7 +166,7 @@ import { scramSwitch } from '../core/Matchups';
 import { driveStrip } from '../hoops/steals';   // lane/hoops-round2 HOP-01: my poke on their driver reads like 1v1's (no coin)
 import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP-02: their defenders react late by tier (420 / 220 / 120 ms)
 import { aiReactMs } from '../hoops/reaction';   // hoops-p02: the AI's block jump is never before it could have read my shot
-import { blockDiceOn, meetsRelease, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
+import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, contestOn, closingSpeed, type ContestBody } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
 import { TeamDefense, type TeamDEvent } from '../hoops/teamDefense';   // lane/hoops-round2 HOP-03: the switch on a screen and the double team
@@ -2594,7 +2594,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const blockChance = near ? aiBlockChance(currentShot?.style ?? 'jumper', nearDist, nearUp, near.vel.length() < 1.0) : 0;
     // hoops-p02: HIS HAND MEETS MY BALL (hoops/blocks) — my release's own arc against the contesting body's reach on his timed jump;
     // no roll (the old chance is logged: what the dice would have charged), the roll behind hoops.blockDiceOn
-    const aiRead = blockDiceOn() || !near ? null : meetsRelease(bodyBlocker(near, foeHandUp === near || near === armed), ballWorld().clone(), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
+    const aiRead = blockDiceOn() || !near ? null : meetsRelease(bodyBlocker(near, foeHandUp === near || near === armed), releaseFrom(ballWorld(), 0, currentShot?.style ?? 'jumper'), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
     console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} fatigue ${meFatigue01.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade} dist ${nearDist.toFixed(2)} oldContest ${oldContest.toFixed(2)}${aiRead ? ` geo ${aiRead.hit ? 'HIT' : 'miss'} gap ${aiRead.gap.toFixed(2)} at ${aiRead.t.toFixed(2)} s ball y ${aiRead.at.y.toFixed(2)} reach ${aiRead.reachTop.toFixed(2)} jumpAge ${near!.jumpAge === Infinity ? 'none' : near!.jumpAge.toFixed(2)}` : ''}`);
     if (aiRead ? aiRead.hit : blockChance > 0 && roll() < blockChance) { blockedShot(ctx, near!, aiRead ? vec3(deflect(bodyBlocker(near!, true), aiRead.at, aiRead.t)) : null); return; }
     releaseBall(ball);
@@ -4323,7 +4323,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // THE BLOCK — a timed jump in range at this exact release moment
     // hoops-p02: MY HAND MEETS HIS BALL (hoops/blocks) — the ball's own arc over its first frames against my reach on my jump; the old
     // window ("jumped ≤ 0.4 s ago, within 1.5 m") stays behind hoops.blockDiceOn
-    const myRead = blockDiceOn() ? null : meetsRelease(meBlocker(), ballWorld().clone(), RIM, finishStyle);
+    const myRead = blockDiceOn() ? null : meetsRelease(meBlocker(), releaseFrom(ballWorld(), 0, finishStyle), RIM, finishStyle);   // from where it leaves his hand (blocks.releaseFrom)
     if (myRead) console.info(`[3V3-DEF] my block read on his ${finishStyle}: ${myRead.hit ? 'HIT' : 'miss'} gap ${myRead.gap.toFixed(2)} at ${myRead.t.toFixed(2)} s ball y ${myRead.at.y.toFixed(2)} reach ${myRead.reachTop.toFixed(2)} dist ${distXZ(me.char.root.position, shooter.char.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);
     if (myRead ? myRead.hit : checkBlock(me.char.root.position, shooter.char.root.position, myJumpAge)) {
       foeShotBlocked = true; box.blocks++;   // IMPROVE (2026-10-06) #9

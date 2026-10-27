@@ -514,12 +514,22 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'The ball centre this close to the reach is a touch (the ball radius and a fingertip).',
   },
   {
+    id: 'hoops.blkReleaseJumperM', label: 'Blocks: a jumper leaves the hand at', def: 2.45, min: 1.8, max: 3.2, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts RELEASE_JUMPER_M',
+    hint: 'Above the shooter\'s feet. The block reads the ball from here when the drawn ball is still lower (the release fires before the arms are up).',
+  },
+  {
+    id: 'hoops.blkReleaseLayupM', label: 'Blocks: a layup leaves the hand at', def: 2.5, min: 1.8, max: 3.3, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts RELEASE_LAYUP_M',
+    hint: 'Above the shooter\'s feet, for a layup / reverse / scoop and the other finishes at the rim.',
+  },
+  {
     id: 'hoops.blkLookSec', label: 'Blocks: release flight a hand can meet', def: 0.25, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
     source: 'lib/babylon/hoops/blocks.ts LOOK_SEC',
     hint: 'How much of a released shot\'s flight is read for a block.',
   },
   {
-    id: 'hoops.aiBlockLeadSec', label: 'AI block: leaves the floor before the release', def: 0.15, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
+    id: 'hoops.aiBlockLeadSec', label: 'AI block: leaves the floor before the release', def: 0.25, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
     source: 'lib/babylon/hoops/blocks.ts AI_BLOCK_LEAD_SEC',
     hint: 'The AI times its jump this long before the release it expects (the green). Never before its reaction lets it.',
   },

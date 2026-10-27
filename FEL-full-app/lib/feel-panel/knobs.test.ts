@@ -182,6 +182,8 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.blkArmM')).toBe(P2B.ARM_M);
     expect(def('hoops.blkContactM')).toBe(P2B.CONTACT_M);
     expect(def('hoops.blkLookSec')).toBe(P2B.LOOK_SEC);
+    expect(def('hoops.blkReleaseJumperM')).toBe(P2B.RELEASE_JUMPER_M);
+    expect(def('hoops.blkReleaseLayupM')).toBe(P2B.RELEASE_LAYUP_M);
     expect(def('hoops.aiBlockLeadSec')).toBe(P2B.AI_BLOCK_LEAD_SEC);
     expect(def('hoops.blkDeflectMps')).toBe(P2B.DEFLECT_MPS);
     expect(def('hoops.blkDeflectUpMps')).toBe(P2B.DEFLECT_UP_MPS);

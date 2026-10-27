@@ -236,7 +236,7 @@ import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // la
 import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA #259/#262: the OPPONENT pick, PRO on a staked / head-to-head run (every mode reads runTier)
 import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP-02: the rival defender reacts late by tier (420 / 220 / 120 ms)
 import { aiReactMs } from '../hoops/reaction';   // hoops-p02: the AI's block jump is never before it could have read my shot
-import { blockDiceOn, meetsRelease, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
+import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
 import { HandCheckPlay } from '../hoops/handCheck';   // lane/hoops-round2 HOP-04: hand-checks, too many = a foul
@@ -2561,7 +2561,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     // from the shooter is what made a well-timed jumper block fail (see checkBlock).
     // hoops-p02: MY HAND MEETS HIS BALL (hoops/blocks) — the ball's own arc over its first frames against my reach on my jump; the old
     // window ("jumped ≤ 0.4 s ago, within range") stays behind hoops.blockDiceOn
-    const myRead = blockDiceOn() ? null : meetsRelease(meBlocker(), ballWorld().clone(), RIM, style);
+    const myRead = blockDiceOn() ? null : meetsRelease(meBlocker(), releaseFrom(ballWorld(), 0, style), RIM, style);   // from where it leaves his hand (blocks.releaseFrom)
     if (myRead) console.info(`[1V1-DEF] my block read on his ${style}: ${myRead.hit ? 'HIT' : 'miss'} gap ${myRead.gap.toFixed(2)} at ${myRead.t.toFixed(2)} s ball y ${myRead.at.y.toFixed(2)} reach ${myRead.reachTop.toFixed(2)} dist ${distXZ(me.root.position, foe.root.position).toFixed(2)} jumpAge ${myJumpAge === Infinity ? 'none' : myJumpAge.toFixed(2)}`);
     if (myRead ? myRead.hit : checkBlock(me.root.position, foe.root.position, myJumpAge) && distXZ(me.root.position, foe.root.position) <= blockRange) {
       SoundKit.play('impact', { pitch: 0.7, volume: 0.6 });
@@ -3399,7 +3399,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     const blockChance = foeStunSec > 0 || foeFloored ? 0 : aiBlockChance(currentShot?.style ?? 'jumper', foeDist, foeUp, foeVelLast.length() < 1.0);
     // hoops-p02: HIS HAND MEETS MY BALL (hoops/blocks): my release's own arc against his reach on his timed jump — no roll. The old
     // chance is still computed and logged (what the dice would have charged this release), the roll behind hoops.blockDiceOn.
-    const aiRead = blockDiceOn() || foeStunSec > 0 || foeFloored ? null : meetsRelease(foeBlocker(), ballWorld().clone(), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
+    const aiRead = blockDiceOn() || foeStunSec > 0 || foeFloored ? null : meetsRelease(foeBlocker(), releaseFrom(ballWorld(), 0, currentShot?.style ?? 'jumper'), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
     console.info(`[1V1-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} fatigue ${meFatigue01.toFixed(2)} handUp ${foeHandUp} jump ${foeBlockJumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.root.position, RIM_FLOOR).toFixed(2)} q ${quality} pct ${pct.toFixed(2)} made ${made} dist ${foeDist.toFixed(2)} oldContest ${oldContest.toFixed(2)}${aiRead ? ` geo ${aiRead.hit ? 'HIT' : 'miss'} gap ${aiRead.gap.toFixed(2)} at ${aiRead.t.toFixed(2)} s ball y ${aiRead.at.y.toFixed(2)} reach ${aiRead.reachTop.toFixed(2)} jumpAge ${foeBlockJumpAge === Infinity ? 'none' : foeBlockJumpAge.toFixed(2)}` : ''}`);
     if (aiRead ? aiRead.hit : blockChance > 0 && roll() < blockChance) { blockedShot(ctx, aiRead ? v3(deflect(foeBlocker(), aiRead.at, aiRead.t)) : null); return; }
     releaseBall(ball);
