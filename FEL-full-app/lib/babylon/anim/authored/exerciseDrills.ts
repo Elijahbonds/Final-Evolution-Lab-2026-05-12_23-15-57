@@ -121,7 +121,7 @@ function decelThree(scene: Scene, sk: Skeleton): AnimationGroup | null {
     };
   };
   const steps = (t0: number): ExKey[] => [0, 1, 2, 3].map((i) => at(fast(i % 2 ? 'Right' : 'Left'), t0 + i * 0.16));
-  return run(scene, sk, 'ex_decel_three', 3.2, [...steps(0), at(plant('Right'), 0.7, true), at(plant('Right'), 1.45, true), ...steps(1.6), at(plant('Left'), 2.3, true), at(plant('Left'), 3.05, true)]);
+  return run(scene, sk, 'ex_decel_three', 3.2, [...steps(0), at(plant('Right'), 0.7, true), at(plant('Right'), 1.45, true), ...steps(1.6), at(plant('Left'), 2.3, true), at(plant('Left'), 3.06, true)]);
 }
 
 // ── travelling a few steps (the T in two metres, the approach's two steps) ──────────────────────────────────────────
