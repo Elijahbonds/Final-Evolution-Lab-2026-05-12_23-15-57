@@ -327,6 +327,26 @@ const copenhagenKnee = (scene: Scene, sk: Skeleton) => run(scene, sk, 'ex_copenh
 /** ex_copenhagen_raise_knee — the short-lever Copenhagen raise: the hips lower toward the floor and drive back up. */
 const copenhagenRaise = (scene: Scene, sk: Skeleton) => run(scene, sk, 'ex_copenhagen_raise_knee', 2.4, [at(turnP(cph(0)), 0, true), at(turnP(cph(1)), 0.9, true), at(turnP(cph(1)), 1.1, true)], true);
 
+// ── on the foam roller (demo.ts PROP_SHAPES roller, rollerseat) ───────────────────────────────────────────────────
+/** ex_calf_smr — sitting, the hands on the floor behind, the hips lifted: both calves on the roller, the body slides
+ *  forward and back so the roller travels from the ankles to below the knees. */
+function calfSmr(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const p = (u: number): Pose => ({
+    bones: { Hips: [-52, 0, 0], Spine: [12, 0, 0], Neck: [20, 0, 0], LeftFoot: [-4, 0, 0], RightFoot: [-4, 0, 0] },
+    feet: both(0.11, 0.21, 0.86 + u * 0.14), kneePoles: bothDir(0, 1, 0.2), handsAt: both(0.22, 0.06, -0.30 + u * 0.14), poles: bothDir(0.3, 0, -1), hipsY: -0.72, hipsZ: u * 0.14,
+  });
+  return run(scene, sk, 'ex_calf_smr', 3.0, [at(p(0), 0, true), at(p(1), 1.4, true)], true);
+}
+/** ex_piriformis_smr — sitting on the roller, the hands on the floor behind, the right ankle crossed over the left knee (a
+ *  figure four), leaning a little onto the right hip: small rolls forward and back. */
+function piriformisSmr(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const p = (u: number): Pose => ({
+    bones: { Hips: [-40, 0, -6], Spine: [10, 0, 0], Neck: [16, 0, 0], RightFoot: [0, 0, 0] },
+    feet: { Left: [-0.14, ANKLE, 0.46 + u * 0.06], Right: [-0.06, 0.53, 0.36 + u * 0.06] }, kneePoles: { Left: [-0.1, 1, 0.4], Right: [1, 0.3, 0.2] }, handsAt: both(0.24, 0.06, -0.34 + u * 0.06), poles: bothDir(0.3, 0, -1), hipsY: -0.70, hipsZ: u * 0.06,
+  });
+  return run(scene, sk, 'ex_piriformis_smr', 2.4, [at(p(0), 0, true), at(p(1), 1.2, true)], true);
+}
+
 export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_def_stance', defStance], ['ex_sl_balance', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance', false)], ['ex_sl_balance_head', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance_head', true)],
   ['ex_seated_breathe', seatedBreathe], ['ex_adductor_squeeze', adductorSqueeze],
@@ -336,4 +356,5 @@ export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_prone_t', proneT], ['ex_incline_scap_push_up', inclineScapPushup],
   ['ex_decel_stick', decelStick], ['ex_jump_stop', jumpStop], ['ex_lateral_skip', lateralSkip],
   ['ex_copenhagen_knee', copenhagenKnee], ['ex_copenhagen_raise_knee', copenhagenRaise],
+  ['ex_calf_smr', calfSmr], ['ex_piriformis_smr', piriformisSmr],
 ];

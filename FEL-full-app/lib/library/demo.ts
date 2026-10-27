@@ -424,6 +424,8 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_copenhagen_knee', families: ['hip-capacity'], bases: /^cph-knee$/ },
   { clip: 'ex_copenhagen_knee', families: ['side-plank'], bases: /^copenhagen-short$/ },
   { clip: 'ex_copenhagen_raise_knee', families: ['hip-capacity'], bases: /^cph-raise-knee$/ },
+  { clip: 'ex_calf_smr', families: ['roll'], bases: /^calf-smr$/ },
+  { clip: 'ex_piriformis_smr', families: ['roll'], bases: /^piriformis-smr$/ },
   // assumption: recover and contest is the closeout the court plays (sprint, chop the feet, the hand up)
   { clip: 'bball_closeout', families: ['court-movement'], bases: /^recover-contest$/ },
   // ── trunk ──
@@ -634,7 +636,7 @@ export const DEMO_CLIPS: readonly string[] = (() => {
 })();
 
 /** Floor loops: the stage frames these from the side, low (a push-up seen from the front is a head). */
-export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee'].concat(
+export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_floor_press', 'ex_spiderman_pushup', 'ex_archer_pushup', 'ex_prone_t', 'ex_adductor_squeeze', 'ex_copenhagen_knee', 'ex_copenhagen_raise_knee', 'ex_calf_smr', 'ex_piriformis_smr'].concat(
   // LIBRARY-ANATOMY-2: the floor positions and every flow (a flow spends most of its time on the floor)
   ['dog', 'child', 'pigeon', 'halfsplit', 'lowlunge', 'kneel', 'ninety', 'shinbox', 'catcamel', 'thread', 'bear', 'cobra', 'lizard', 'butterfly', 'couch', 'frog', 'spider', 'inchworm',
     'supine', 'supine9090', 'legsup', 'kneehug', 'oneknee', 'happybaby', 'kneerock', 'figure4', 'lyinghams', 'prone', 'pike', 'straddle', 'switch', 'rockback', 'childside', 'dogpedal',
@@ -654,10 +656,10 @@ export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_mor
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
 export type DemoProp = 'seat' | 'bench' | 'incline' | 'box' | 'boxside' | 'stepbox' | 'boxback' | 'rearbench' | 'handbench' | 'feetbench' | 'feetbenchfront' | 'thrust'
-  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat' | 'dowel' | 'cphbench';
+  | 'pullbar' | 'lowbar' | 'dipbars' | 'dipbench' | 'legcurl' | 'proneincline' | 'decline' | 'preacher' | 'wall' | 'calfstep' | 'wallback' | 'rowseat' | 'dowel' | 'cphbench' | 'roller' | 'rollerseat';
 /** A plain box (metres, the body's frame: +x its right, +y up, +z its front; rx tips it about x — negative raises its −z end).
  *  (The stage puts the body's +x at its own −x: the spawned root carries the importer's mirror.) */
-export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number }
+export interface PropBox { w: number; h: number; d: number; x?: number; y: number; z: number; rx?: number; /** DEMO-LOOPS: a roller — a cylinder across the body, `w` long, `h` across */ cyl?: true }
 /** Each prop's boxes. The first three are the first pass's own (exercise-stage.tsx drew them inline; same sizes). */
 export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   seat: [{ w: 0.34, h: 0.44, d: 0.42, y: 0.22, z: -0.02 }],
@@ -693,6 +695,9 @@ export const PROP_SHAPES: Readonly<Record<DemoProp, readonly PropBox[]>> = {
   dowel: [{ w: 0.03, h: 1.10, d: 0.03, x: 0.42, y: 0.55, z: 0.20 }],
   // the Copenhagen's bench: under the top knee, the shin hanging past its far edge (exerciseSignature.ts cph)
   cphbench: [{ w: 0.50, h: 0.46, d: 0.30, y: 0.23, z: -0.31 }],
+  // foam rollers (exerciseSignature.ts): under the calves, and under the seat
+  roller: [{ w: 0.55, h: 0.14, d: 0.14, y: 0.07, z: 0.56, cyl: true }],
+  rollerseat: [{ w: 0.55, h: 0.14, d: 0.14, y: 0.07, z: -0.04, cyl: true }],
 };
 export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ex_seated_press: 'seat', ex_seated_curl: 'seat', ex_seated_lateral_raise: 'seat', ex_seated_triceps: 'seat',

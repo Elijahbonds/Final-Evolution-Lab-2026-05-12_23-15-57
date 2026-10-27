@@ -99,9 +99,12 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           let ms = props.get(k);
           if (!ms) {
             ms = PROP_SHAPES[k].map((b, i) => {
-              const m = MeshBuilder.CreateBox(`libraryProp_${k}_${i}`, { width: b.w, height: b.h, depth: b.d }, scene);
+              // DEMO-LOOPS: a roller is a cylinder laid across the body (its axis along x)
+              const m = b.cyl
+                ? MeshBuilder.CreateCylinder(`libraryProp_${k}_${i}`, { height: b.w, diameter: b.h, tessellation: 20 }, scene)
+                : MeshBuilder.CreateBox(`libraryProp_${k}_${i}`, { width: b.w, height: b.h, depth: b.d }, scene);
               // (the body's +x is the stage's −x: the spawned root carries the importer's mirror — measured on the live rig)
-              m.position.set(-(b.x ?? 0), b.y, b.z); m.rotation.x = b.rx ?? 0; m.material = propMat; m.isPickable = false;
+              m.position.set(-(b.x ?? 0), b.y, b.z); m.rotation.x = b.rx ?? 0; if (b.cyl) m.rotation.z = Math.PI / 2; m.material = propMat; m.isPickable = false;
               return m;
             });
             props.set(k, ms);
