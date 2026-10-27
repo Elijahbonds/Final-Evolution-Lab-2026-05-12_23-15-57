@@ -33,6 +33,10 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
   }
   const one = /^\/api\/library\/([^/]+)$/.exec(u.pathname);
   if (one) { const e = byId(decodeURIComponent(one[1])); return e ? Response.json({ entry: card(e) }) : Response.json({ error: 'not_found' }, { status: 404 }); }
+  // T-POSE (2026-10-27): ?body=scan|female|male answers the hero-body read as the server would for that account (a release
+  // bundle has no dev identity override); without it, the guest's 401
+  const body = new URLSearchParams(location.search).get('body');
+  if (u.pathname === '/api/v1/hero-body' && body) return Response.json({ body: body === 'scan' ? 'scan' : body === 'female' ? 'kit-female' : 'kit-male', frame: null, palette: null, scanOwned: body === 'scan' });
   if (u.pathname.startsWith('/api/')) return Response.json({ error: 'unauthorized' }, { status: 401 });
   return realFetch(input, init);
 };

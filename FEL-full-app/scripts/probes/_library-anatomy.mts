@@ -25,14 +25,16 @@ const OUT = process.env.OUT ?? join(ROOT, '.library-anatomy-rig');
 const job = process.argv[2] ?? 'clips';
 const args = process.argv.slice(3);
 mkdirSync(OUT, { recursive: true });
-const SITE = join(OUT, 'site');
+const PROD = process.env.PROD === '1';
+const SITE = join(OUT, PROD ? 'site-prod' : 'site');
 mkdirSync(SITE, { recursive: true });
 
 async function bundle(): Promise<void> {
   await build({
     entryPoints: [join(ROOT, 'scripts/probes/_library-anatomy-entry.tsx')], bundle: true, outdir: SITE, entryNames: 'rig', format: 'esm', splitting: true, platform: 'browser',
-    jsx: 'automatic', define: { 'process.env.NODE_ENV': '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: false,
-    banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "development" } };' },
+    // PROD=1 (T-POSE, 2026-10-27): a release build's bundle — NODE_ENV production, minified — as the phone loads it
+    jsx: 'automatic', define: { 'process.env.NODE_ENV': PROD ? '"production"' : '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: PROD,
+    banner: { js: `var process = globalThis.process || { env: { NODE_ENV: "${PROD ? 'production' : 'development'}" } };` },
     loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.glb': 'empty', '.wasm': 'empty' },
   });
   const css = join(SITE, 'rig.css');
@@ -293,7 +295,7 @@ async function tposeJob(): Promise<void> {
   for (const body of bodies) for (const clip of clips) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); await page.addInitScript(NAME_SHIM);
     const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error' || /T-?pose|bind pose|FEL-ANIM/i.test(m.text())) errors.push(m.text().slice(0, 240)); });
-    await page.goto(`${url}/?w=358&h=268&body=${body}#stage:${clip}`);
+    await page.goto(`${url}/?w=358&h=268&body=${body}#${clip.startsWith('muscles') ? clip.replace(/\./g, ':') : `stage:${clip}`}`);   // muscles.<entry>.<side>: the anatomy view
     try { await stageReady(page, 300_000); } catch (e) { errors.push(String(e).slice(0, 200)); }
     await page.waitForTimeout(1500);
     const sample = () => page.evaluate(() => {
