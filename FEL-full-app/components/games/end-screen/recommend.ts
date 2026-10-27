@@ -99,7 +99,7 @@ export function recommendNext(i: RecommendInput): NextPick | null {
     const pick = SIGNATURE_MODES.find((m) => m !== i.mode && !i.playedToday.has(m)) ?? SIGNATURE_MODES.find((m) => m !== i.mode) ?? SIGNATURE_MODES[0];
     const sig = signatureFor(pick, week);
     return {
-      kind: 'signature', modeKey: sig.mode, title: `Signature: ${sig.modeLabel}`, href: '/signature',
+      kind: 'signature', modeKey: sig.mode, title: `Weekly challenge: ${sig.modeLabel}`, href: '/signature',
       reason: "This week's Signature · today's attempt is open",
       detail: `${sig.modifier.name} · beat ${sig.targetScore}`,
     };

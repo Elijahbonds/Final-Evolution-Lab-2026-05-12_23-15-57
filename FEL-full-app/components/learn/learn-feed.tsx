@@ -337,10 +337,10 @@ export function LearnFeed() {
           <span className="font-black tracking-wide md:text-lg">Learn</span>
           <span className="mx-1 h-4 w-px bg-white/15" />
           <Flame className="h-4 w-4 text-orange-400" />
-          <span className="font-mono text-sm font-bold tabular-nums" data-learn-streak>{streak}</span>
+          <span className="font-display text-[16px] font-extrabold tabular-nums" data-learn-streak>{streak}</span>
           <span className="ml-1 flex items-center gap-1">
             <GoalRing done={done} size={22} />
-            <span className="font-mono text-sm font-bold tabular-nums" data-learn-goal>{Math.min(done, DAILY_GOAL)}/{DAILY_GOAL}</span>
+            <span className="font-display text-[16px] font-extrabold tabular-nums" data-learn-goal>{Math.min(done, DAILY_GOAL)}/{DAILY_GOAL}</span>
           </span>
         </div>
         <div className="pointer-events-auto flex gap-2">

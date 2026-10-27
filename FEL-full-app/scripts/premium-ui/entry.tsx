@@ -3,7 +3,7 @@
 // the other): each scene calls the REAL page module with the server stubbed (scripts/a11y/rig.mts), awaits any async
 // server component in the tree, and renders it between the real StatusRail and TabBar, as app/layout.tsx does.
 //
-// Scenes (location.hash): landing play train profile learn coach todaydrill screenresults devui endscreen endloss
+// Scenes (location.hash): landing play train profile learn coach todaydrill screenresults devui endscreen endloss playbook education
 import { Fragment, cloneElement, createElement as h, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StatusRail } from '@/components/shell/status-rail';
@@ -38,6 +38,8 @@ const SCENES: Record<string, { path: string; signedIn: boolean; load: () => Prom
   train: { path: '/train', signedIn: true, load: () => import('@/app/train/page') },
   profile: { path: '/profile', signedIn: true, load: () => import('@/app/profile/page') },
   learn: { path: '/learn', signedIn: true, load: () => import('@/app/learn/page') },
+  playbook: { path: '/education/playbook', signedIn: true, load: () => import('@/app/education/playbook/page') },
+  education: { path: '/education', signedIn: true, load: () => import('@/app/education/page') },
   coach: { path: '/coach', signedIn: true, load: () => import('@/app/coach/page') },
   todaydrill: { path: '/train/today-drill', signedIn: true, load: () => import('@/app/train/today-drill/page') },
   screenresults: { path: '/play/mirror/assess/results', signedIn: false, load: screenResults },
