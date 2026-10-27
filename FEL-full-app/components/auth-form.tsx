@@ -392,7 +392,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
         </p>
         {/* M12.7 — legal links reachable from the login view, mirroring signup. */}
         {mode === 'login' && (
-          <p className="mt-4 text-center text-xs text-white/35">
+          <p className="mt-4 text-center text-xs text-fel-quiet">
             <a href="/terms" target="_blank" className="hover:text-[#00E5FF] hover:underline">Terms</a>
             <span className="mx-2">·</span>
             <a href="/privacy" target="_blank" className="hover:text-[#00E5FF] hover:underline">Privacy</a>
