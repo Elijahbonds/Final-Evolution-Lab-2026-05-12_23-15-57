@@ -46,7 +46,8 @@ briefs, ready to run, are in the coordinator's scratchpad under `round9/hoops-ph
   `Math.random` seeded) with a scripted, imperfect human through the real `InputBus`; `analyze.mjs` prints the numbers;
   `perf.mjs` is the phone profile (390×844, DPR 3, 4× CPU throttle, SwiftShader); `run-all.sh` runs them one at a time under
   `flock /home/user/wt/gate-queue.lock`.
-- **Before and after on the same seed** (`SEED=7`, `TIER=pro`, `GAME_S=120`), plus one ROOKIE and one ELITE game when the
+- **Before and after on the same seed** (`SEED=7`, `TIER=pro`; metric games `GAME_S=40 VIEW=128x72`, input tests and strips
+  `VIEW=320x180` — the shared box runs the rig at roughly 1/30–1/60 of real time), plus one ROOKIE and one ELITE game when the
   phase touches the AI. A gate is read on the mean of the runs the brief names, never on one lucky run.
 - **Frame strips** come from the page's own canvas (`HG.strip`), every 3rd–4th rendered frame, saved under
   `<out>/shots/strip-<mode>-<name>/`; screenshots every GAME_S/8 of a game. Each phase saves its strips to
