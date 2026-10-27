@@ -7,7 +7,7 @@
 //      the drills use). The picture is shown to the athlete as a self-view and goes nowhere else.
 //   2. Each frame goes through lib/coach/formReview/reader.ts: the reps are counted live, and each closed rep is graded
 //      by the movement's tested audit.
-//   3. Stop: every rep scored, the worst rep and any rep under the line flagged with its reason ("Left knee caves on rep
+//   3. Stop: every rep scored, the worst rep and any rep under the line flagged with its reason ("Left knee caves in on rep
 //      4") and the Mirror's own cue for it — on the phone, at once, before anything is sent. The flagged rep replays as a
 //      skeleton beside the best one.
 //   4. Send: the POSE DATA ONLY (lib/coach/formReview/payload.ts) goes to the coach's queue, if the gates allow it
