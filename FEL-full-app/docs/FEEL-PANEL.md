@@ -325,7 +325,8 @@ felt none of these yet — every default is flagged in the lane report):
   `hoops.blkArmM` 0.85 m (the reach: a sphere of the arm around the shoulder, the shoulder riding the contest jump — 2.40 m standing);
   `hoops.blkContactM` 0.14 m (the ball's centre this close to the reach is a touch); `hoops.blkLookSec` 0.25 s (how much of a release's
   flight is read); `hoops.aiBlockLeadSec` **TUNED 0.15 → 0.25 s** (the AI leaves the floor this long before the release it expects, so the
-  top of his jump meets the ball — never before his tier's reaction); `hoops.blkReleaseJumperM` 2.45 m and `hoops.blkReleaseLayupM`
+  top of his jump meets the ball); `hoops.aiBlockReactOn` 0 (1 = his jump also waits out his tier's reaction after my gather: measured,
+  a PRO jump then never reached a quick finish); `hoops.blkReleaseJumperM` 2.45 m and `hoops.blkReleaseLayupM`
   2.5 m (the block reads the ball from where it leaves the hand, above the court: the release fires before the clip's arms are up,
   the rig read their layups leaving from 1.65–1.74 m, and from the chest any jump reached them); `hoops.blkDeflectMps` 2.4 m/s and `hoops.blkDeflectUpMps` 1.4 m/s (the ball off the hand, along
   the line it was hit).

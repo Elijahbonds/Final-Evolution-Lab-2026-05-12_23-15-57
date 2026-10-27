@@ -529,6 +529,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How much of a released shot\'s flight is read for a block.',
   },
   {
+    id: 'hoops.aiBlockReactOn', label: 'AI block: wait out its reaction (1) / jump off the read (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts AI_BLOCK_REACT_ON',
+    hint: '1: the AI\'s block jump never leaves before its tier\'s reaction (420 / 220 / 120 ms) after my gather — it then misses quick finishes.',
+  },
+  {
     id: 'hoops.aiBlockLeadSec', label: 'AI block: leaves the floor before the release', def: 0.25, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
     source: 'lib/babylon/hoops/blocks.ts AI_BLOCK_LEAD_SEC',
     hint: 'The AI times its jump this long before the release it expects (the green). Never before its reaction lets it.',

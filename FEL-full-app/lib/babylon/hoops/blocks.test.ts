@@ -68,9 +68,9 @@ describe('hoops/blocks — the hand meets the ball', () => {
     expect(deflect(at(0, 0, 0.1), { x: 0.5, y: 2.8, z: 0 }).x).toBeGreaterThan(0);
   });
 
-  it('the AI times its jump to the release it expects, never before its reaction', () => {
+  it('the AI times its jump to the release it expects', () => {
     expect(aiBlockJumpAtSec(0.6, 0.22)).toBeCloseTo(0.6 - AI_BLOCK_LEAD_SEC, 6);
-    expect(aiBlockJumpAtSec(0.5, 0.42)).toBeCloseTo(0.42, 6);   // a ROOKIE cannot leave before he has read the shot
+    expect(aiBlockJumpAtSec(0.5, 0.42)).toBeCloseTo(0.5 - AI_BLOCK_LEAD_SEC, 6);   // timed off his read at the gather (the reaction wait is the A/B knob, off)
     expect(aiBlockJumpAtSec(0.1, 0)).toBeCloseTo(0.05, 6);
   });
 

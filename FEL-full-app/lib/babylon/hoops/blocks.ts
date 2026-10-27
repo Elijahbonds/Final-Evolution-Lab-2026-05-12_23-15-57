@@ -157,11 +157,17 @@ export function deflect(b: Blocker, at: P3, ahead = 0, carry: { x: number; z: nu
   return { x: dx * sp + carry.x * 0.2, y: rising || !Number.isFinite(age) ? up : -up * 0.4, z: dz * sp + carry.z * 0.2 };
 }
 
+/** 1 = the AI's block jump also waits out its tier's reaction (hoops/reaction) after the gather; 0 = timed off the read at the gather
+ *  (today's). The rig: with the wait on, a PRO defender's jump was pinned at 0.22 s while my finishes released 0.32–0.39 s into the
+ *  meter — 0.10–0.17 s into his jump, never at the ball (0 blocks in 9 releases, the dice's expectation 0.54). Knob `hoops.aiBlockReactOn`. */
+export const AI_BLOCK_REACT_ON = false;
+
 /**
  * THE AI TIMES ITS JUMP. Seconds into my shot meter at which the AI leaves the floor: AI_BLOCK_LEAD_SEC before the release it expects
- * (the green's centre), and never before it could have seen the shot go up (`reactSec`, its tier's reaction — hoops/reaction). The
- * release that comes early or late is the one his jump misses.
+ * (the green's centre) — his read at my gather, as today. With `hoops.aiBlockReactOn` 1, never before his tier's reaction (`reactSec`).
+ * The release that comes early or late is the one his jump misses.
  */
 export function aiBlockJumpAtSec(expectedReleaseSec: number, reactSec: number): number {
-  return Math.max(0.05, reactSec, expectedReleaseSec - aiBlockLeadSec());
+  const wait = feel('hoops.aiBlockReactOn', AI_BLOCK_REACT_ON ? 1 : 0) >= 0.5 ? reactSec : 0;
+  return Math.max(0.05, wait, expectedReleaseSec - aiBlockLeadSec());
 }
