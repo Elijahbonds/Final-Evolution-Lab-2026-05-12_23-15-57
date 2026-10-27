@@ -129,7 +129,7 @@ function NextTeaser({ pick, focused, onPress }: { pick: NextPick; focused: boole
       data-focused={focused}
       data-next-kind={pick.kind}
       onClick={(e) => { e.stopPropagation(); onPress(); }}
-      className="group relative flex min-w-0 flex-1 items-center gap-[0.7em] overflow-hidden rounded-xl border bg-black/40 px-[0.8em] py-[0.5em] text-left outline-none transition-[transform,box-shadow] duration-150 data-[focused=true]:scale-[1.03] data-[focused=true]:ring-4 data-[focused=true]:ring-offset-2 data-[focused=true]:ring-offset-black"
+      className="group relative flex min-w-0 flex-1 items-center gap-[0.7em] overflow-hidden rounded-xl border bg-black/40 px-[0.8em] py-[0.5em] text-left outline-none transition-[transform,box-shadow] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white data-[focused=true]:scale-[1.03] data-[focused=true]:ring-4 data-[focused=true]:ring-offset-2 data-[focused=true]:ring-offset-black"
       style={{ borderColor: `${color}66`, boxShadow: `inset 0 0 40px ${color}1f`, ['--tw-ring-color' as string]: color }}
     >
       <span className="grid h-[2.3em] w-[2.3em] shrink-0 place-items-center rounded-lg" style={{ background: `${color}22`, color }}>
