@@ -6,8 +6,8 @@
 //
 //   1. at once: the picture of your athlete this device kept the last time the 3D drew it (lib/profile-v2/athletePoster.ts,
 //      posterStore.ts), if it still matches your look; otherwise the athlete's silhouette with the loading shimmer;
-//   2. once the stage is near the screen (components/library/use-auto-open, the demos' autoplay) and the page has painted
-//      and gone idle, the live 3D (athlete-3d.tsx, its own lazy chunk) loads underneath and fades in over the picture: it
+//   2. once the stage is near the screen (components/library/use-auto-open, the demos' autoplay) and the page has painted,
+//      gone a second without a tap or scroll, and gone idle, the live 3D (athlete-3d.tsx, its own lazy chunk) loads underneath and fades in over the picture: it
 //      idles, turns slowly, and a sideways drag turns it;
 //   3. the 3D's first sure frame becomes the kept picture for next time (only when the look changed or none was kept).
 //
@@ -27,16 +27,30 @@ const Athlete3D = dynamic(() => import('./athlete-3d'), { ssr: false, loading: (
 const BOX = 'fel-surface relative h-[208px] w-full overflow-hidden lg:h-[300px]';
 const FADE = { transitionDuration: 'var(--fel-dur-slow)' } as const;
 
-/** After the first paint, when the page next goes idle (Safari has no requestIdleCallback: a short timeout instead). */
-function afterPaintIdle(): Promise<void> {
-  return new Promise((resolve) => {
-    const idle = () => {
-      const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
-      if (ric) ric(() => resolve(), { timeout: 2000 }); else setTimeout(resolve, 300);
-    };
-    const painted = () => requestAnimationFrame(() => setTimeout(idle, 0));
-    if (document.readyState === 'complete') painted(); else window.addEventListener('load', painted, { once: true });
-  });
+const INPUTS = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'] as const;
+/** How long the page must go without a tap, key or scroll before the 3D starts loading (its load has long tasks a tap
+ *  would wait behind; a person reading the profile gives it this gap within a second or two). */
+const QUIET_MS = 1000;
+
+/**
+ * After the first paint, once nobody has touched the page for QUIET_MS, when the page next goes idle (Safari has no
+ * requestIdleCallback: a short timeout instead). `cancel` stops it and removes its listeners.
+ */
+function whenQuiet(start: () => void): () => void {
+  let last = performance.now();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let done = false;
+  const touched = () => { last = performance.now(); };
+  const stop = () => { done = true; if (timer) clearTimeout(timer); for (const e of INPUTS) window.removeEventListener(e, touched, true); };
+  for (const e of INPUTS) window.addEventListener(e, touched, { capture: true, passive: true });
+  const idle = () => {
+    const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const go = () => { if (done) return; const wait = last + QUIET_MS - performance.now(); if (wait > 0) { timer = setTimeout(idle, wait); return; } stop(); start(); };
+    if (ric) ric(go, { timeout: 2000 }); else timer = setTimeout(go, 300);
+  };
+  const painted = () => requestAnimationFrame(() => { timer = setTimeout(idle, 0); });
+  if (document.readyState === 'complete') painted(); else window.addEventListener('load', painted, { once: true });
+  return stop;
 }
 
 function deviceLook(): string | null {
@@ -84,12 +98,10 @@ function OwnStage({ name, accent, poster }: { name: string; accent: string; post
     return () => { alive = false; if (url) URL.revokeObjectURL(url); };
   }, [owner, stamp]);
 
-  // 2. the live 3D: near the screen, after the first paint, when the page is idle
+  // 2. the live 3D: near the screen, after the first paint, a quiet second, and idle
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    void afterPaintIdle().then(() => { if (!cancelled) setMount3d(true); });
-    return () => { cancelled = true; };
+    return whenQuiet(() => setMount3d(true));
   }, [open]);
 
   const live = three === 'live';

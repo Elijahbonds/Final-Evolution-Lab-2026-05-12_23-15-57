@@ -71,11 +71,32 @@ shows a placeholder number.
 | Reaction | **Nothing saves a reaction time today.** Beach Sprint shows the start reaction on its finish card and keeps nothing | "Not tracked yet", which links to Beach Sprint. This is an owner call; see section 5 |
 | Streak | `PlayerProfile.streakDays`, plus the days played this week vs last week (`GameSession` times only, no scores) | "Play or train today to start a streak" |
 
-The 3D athlete loads only when the player taps **See in 3D** (`components/profile-v2/athlete-3d.tsx`). Until then the
-stage shows a static SVG poster (`AvatarFigure`), so the poster costs no script, no download and no GPU. The 3D view
-spawns the same body every mode spawns (`CharacterLibrary.spawn`, the default hero, role `player`). On it, the device
-pixel ratio is capped at 2, the render loop stops while the page is hidden, and with reduced motion on the athlete does
-not turn by itself.
+**The athlete stage** (lane/profile-character, owner 2026-10-27: "Make the profile show your actual character, not some
+stick figure"). Your own profile shows your real athlete — the body, saved look, hair and clothes every mode plays — by
+itself, with no button (`components/profile-v2/athlete-stage.tsx`):
+
+1. **First paint.** The picture of your athlete this device kept the last time the 3D drew it, if it still matches your
+   look. Otherwise the athlete's silhouette with the kit's loading shimmer (`athlete-silhouette.tsx`). Never the SVG
+   `AvatarFigure`.
+2. **The live 3D** (`athlete-3d.tsx`, its own lazy chunk) opens once the stage is near the screen
+   (`components/library/use-auto-open`, the demos' autoplay) and the page has painted and gone idle, then fades in over
+   the picture. It spawns the same body every mode spawns (`CharacterLibrary.spawn`, the default hero, role `player`),
+   idles, turns slowly (not with reduced motion on), and a sideways drag turns it; a vertical swipe still scrolls. It is
+   shown only once measured off its bind pose (never a T-pose). Phone care: the heavy steps yield to the page between
+   them, the device pixel ratio is capped at 2, the render loop stops while the page is hidden or the stage is
+   off-screen, and everything (the GL context too) is disposed on unmount.
+3. **The kept picture** (`lib/profile-v2/athletePoster.ts`, `posterStore.ts`). The 3D's first sure frame, a 2:3 crop
+   at up to 400×600, webp (PNG on Safari), in IndexedDB on this device only. It is keyed by a hash of the account id and
+   valid only for the same look: the `AvatarLook` and `AthleteBuild` rows' `updatedAt` (read beside the profile in
+   `app/profile/page.tsx`; every Closet, Creator, slot and card-skin save moves one, on any device), the device's own
+   copy of the look (a teen's look lives only on the device), and a version. It is re-taken when the identity the 3D
+   actually wore differs. Every read and write is wrapped and time-boxed; a browser that will not keep it just gets the
+   silhouette and the 3D, as on a first visit.
+
+**Someone else's profile** (`/u/[slug]`) shows the athlete's silhouette, still. The 3D would draw the signed-in
+*visitor's* own body (`resolveIdentity` reads the visitor's closet), and no public render of another account's body
+exists: `/api/v1/hero-body` and `/api/v1/closet` answer only for the session's own account. Showing another person's
+athlete needs a new public read (or a picture the owner chooses to publish), which is an owner call (section 5).
 
 **Large screens.** At `lg` and up, the athlete and the PRQ grade sit in a left column beside the four tiles, and every
 section turns into two columns. The phone layout fits 390 px with no horizontal overflow.
@@ -137,7 +158,12 @@ section turns into two columns. The phone layout fits 390 px with no horizontal 
    - "Accounts under 18 never get a public page."
    - "On this phone only. Under-18 bests are never kept on the server."
    - "Jump numbers are saved for adults who opt in."
-4. **Assumptions to check by eye.**
+4. **Another person's athlete on their profile (lane/profile-character).** Today a viewer sees a neutral silhouette.
+   Showing the real athlete needs either (a) the owner of the profile publishing a picture of their athlete with their
+   public card (adults who chose public only; teens never, as for the page itself), or (b) a public read of another
+   account's look. Recommendation: (a) — it reuses the picture this device already keeps, it is opt-in per adult, and it
+   exposes nothing the owner did not choose to show. Not built without the owner's OK.
+5. **Assumptions to check by eye.**
    - Weeks are rolling 7-day windows.
    - Jump is shown in inches.
    - A jump within ±0.5 in of last week reads "same" (new).
@@ -156,7 +182,7 @@ server-rendered and only the islands hydrate, so the after numbers are conservat
 |---|---|---|
 | Client requests after load | 8 (`/api/profile` ×2 …) | 1 (the status rail's `/api/profile`, chrome on every page) |
 | Database calls for one profile view | 49 across 9 handlers (35 without the rail) | 17 in one parallel batch, plus the rail's 14 |
-| Page JS beyond the chrome, minified / gzipped | 69.3 kB / 20.5 kB | 30.2 kB / 11.3 kB (3D: a lazy chunk, loaded only on tap) |
+| Page JS beyond the chrome, minified / gzipped | 69.3 kB / 20.5 kB | 30.2 kB / 11.3 kB (3D: a lazy chunk; since lane/profile-character it loads by itself after the first paint, on idle) |
 | Animation library on the page | framer-motion | none |
 | `backdrop-filter` elements on the page body | 0 | 0 (no blur stacks; the shell's chrome is perf-lag's) |
 

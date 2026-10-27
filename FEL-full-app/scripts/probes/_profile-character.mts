@@ -8,7 +8,7 @@
 //   flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/probes/_profile-character.mts run <outDir> <label>…
 //
 // `run`, per label, on the phone profile (390×844, DPR 3, CPU throttled 4×), each label in a FRESH browser context:
-//   first   the first visit to /profile: FCP, the long tasks, the tap response (five taps from FCP+0.5 s, each timed
+//   first   the first visit to /profile: FCP, the long tasks, the tap response (six taps 2.5 s apart from FCP+0.5 s, each timed
 //           with the Event Timing API), when the real character shows, the JS heap once settled
 //   repeat  the same context reloads /profile (what the device kept is still there): the same numbers
 //   viewer  /u/jordan seen by another account: FCP and the stage
@@ -127,31 +127,45 @@ const RECORDER = `(() => {
   requestAnimationFrame(tick);
 })()`;
 
-interface Visit { fcp: number | null; marks: Record<string, number>; longCount: number; longTotal: number; longMax: number; tbtAfterFcp: number; longBeforeFcp: number; taps: { maxMs: number; maxDelay: number; all: number[] }; heapMB: number; error?: string }
+interface Visit { fcp: number | null; marks: Record<string, number>; steps: Record<string, number>; long: [number, number][]; longCount: number; longTotal: number; longMax: number; tbtAfterFcp: number; longBeforeFcp: number; taps: { maxMs: number; maxDelay: number; all: number[] }; heapMB: number; error?: string }
 
-async function visit(ctx: BrowserContext, page: Page, url: string, shot: string, opts: { liveTimeout: number; taps: boolean; before: boolean }): Promise<Visit> {
+async function visit(ctx: BrowserContext, page: Page, url: string, shot: string, opts: { liveTimeout: number; taps: boolean; before: boolean; tap3d?: boolean }): Promise<Visit> {
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
   await cdp.send('Performance.enable');
   await page.goto(url, { waitUntil: 'commit' });
   await page.waitForFunction(() => (window as unknown as { __M?: { fcp: number | null } }).__M?.fcp != null, undefined, { timeout: 60_000 });
   await page.screenshot({ path: `${shot}-paint.jpg`, type: 'jpeg', quality: 80 });
+  // the kept picture, the moment it is up (a repeat visit), before the live 3D replaces it — watched beside the taps
+  const posterShot = opts.before ? Promise.resolve() : page.waitForFunction(() => document.querySelector('[data-athlete-state]')?.getAttribute('data-athlete-state') === 'poster', undefined, { timeout: 6000 })
+    .then(() => page.screenshot({ path: `${shot}-poster.jpg`, type: 'jpeg', quality: 80 })).then(() => {}, () => {});
+  if (opts.tap3d) {
+    // the control: the same 3D, the old way — opened by its button
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: /See in 3D/ }).click();
+  }
   if (opts.taps) {
-    // five taps on the "This week" heading (or the page title): a tap the stage's load must not hold up
-    for (let i = 0; i < 5; i++) {
-      await page.waitForTimeout(i === 0 ? 500 : 900);
+    // six taps on the page's first heading, 2.5 s apart from FCP+0.5 s (the stage waits for a quiet second, so taps this
+    // far apart also land while the 3D loads): a tap the stage's load must not hold up
+    for (let i = 0; i < 6; i++) {
+      await page.waitForTimeout(i === 0 ? 500 : 2500);
       const t = page.locator('h2, h1').first();
       const box = await t.boundingBox().catch(() => null);
       if (box) await page.mouse.click(box.x + 8, box.y + 6);
     }
   }
+  await posterShot;
   const t0 = Date.now();
+  if (opts.tap3d) {
+    await page.waitForFunction(() => !!document.querySelector('canvas') && !/Loading your athlete/.test(document.body.innerText), undefined, { timeout: opts.liveTimeout }).catch(() => {});
+  }
   if (!opts.before) {
     await page.waitForFunction(() => { const v = document.querySelector('[data-athlete-state]')?.getAttribute('data-athlete-state'); return v === 'live' || v === 'failed' || v === 'viewer'; }, undefined, { timeout: opts.liveTimeout }).catch(() => {});
   }
   await page.waitForTimeout(Math.max(0, 2500 - (Date.now() - t0)));
   await page.screenshot({ path: `${shot}-settled.jpg`, type: 'jpeg', quality: 80 });
   const m = await page.evaluate(() => (window as unknown as { __M: { fcp: number; long: [number, number][]; events: [string, number, number, number][]; marks: Record<string, number> } }).__M);
+  const steps = await page.evaluate(() => Object.fromEntries(performance.getEntriesByType('mark').filter((e) => e.name.startsWith('fel-athlete:')).map((e) => [e.name.slice(12), Math.round(e.startTime)])));
   const err = await page.evaluate(() => document.body.dataset.rigError ?? null);
   const metrics = (await cdp.send('Performance.getMetrics')).metrics as { name: string; value: number }[];
   const heap = metrics.find((x) => x.name === 'JSHeapUsedSize')?.value ?? 0;
@@ -159,7 +173,7 @@ async function visit(ctx: BrowserContext, page: Page, url: string, shot: string,
   const long = m.long;
   const taps = m.events.filter((e) => e[0] === 'pointerdown' || e[0] === 'click');
   return {
-    fcp: fcp != null ? Math.round(fcp) : null, marks: m.marks,
+    fcp: fcp != null ? Math.round(fcp) : null, marks: m.marks, steps, long,
     longCount: long.length, longTotal: long.reduce((a, l) => a + l[1], 0), longMax: long.reduce((a, l) => Math.max(a, l[1]), 0),
     longBeforeFcp: long.filter((l) => l[0] < (fcp ?? 0)).reduce((a, l) => a + l[1], 0),
     tbtAfterFcp: long.filter((l) => l[0] >= (fcp ?? 0)).reduce((a, l) => a + Math.max(0, l[1] - 50), 0),
@@ -195,6 +209,16 @@ async function run(label: string): Promise<void> {
     out.viewer = await visit(ctx, page3, `${url}/#viewer`, join(dir, 'viewer'), { liveTimeout: 20_000, taps: false, before });
     console.log(label, 'viewer', JSON.stringify(out.viewer));
     await ctx.close();
+    if (before) {
+      // the control: the old stage's "See in 3D", tapped half a second after first paint, in a fresh context
+      const c2 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+      await c2.addInitScript(NAME_SHIM);
+      await c2.addInitScript(RECORDER);
+      const p4 = await c2.newPage();
+      out.tapped3d = await visit(c2, p4, `${url}/#own`, join(dir, 'own-tapped3d'), { liveTimeout: 240_000, taps: true, before, tap3d: true });
+      console.log(label, 'tapped3d', JSON.stringify(out.tapped3d));
+      await c2.close();
+    }
   } finally {
     await browser.close();
     close();

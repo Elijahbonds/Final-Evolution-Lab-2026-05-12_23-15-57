@@ -33,7 +33,13 @@ const PROFILE_CAM = { alpha: FRONT_ALPHA - 0.38, beta: 1.42, radius: 2.75, y: 0.
 /** The slow turn, in radians a second (≈ one turn in 18 s, the speed the profile's 3D always turned at). */
 const TURN_RAD_S = 0.35;
 
-const yieldToPage = () => new Promise<void>((r) => setTimeout(r, 0));
+/** Between the heavy steps: give the page back until it is idle, so a pending tap is handled first. */
+const yieldToPage = () => new Promise<void>((r) => {
+  const ric = (window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (ric) ric(() => r(), { timeout: 500 }); else setTimeout(r, 16);
+});
+/** User Timing marks for each step (scripts/probes/_profile-character.mts reads them to place the long tasks). */
+const mark = (step: string) => { try { performance.mark(`fel-athlete:${step}`); } catch { /* no User Timing */ } };
 const toBlob = (c: HTMLCanvasElement, type: string, q?: number) => new Promise<Blob | null>((r) => { try { c.toBlob((b) => r(b), type, q); } catch { r(null); } });
 
 export default function Athlete3D(props: Athlete3DProps) {
@@ -45,7 +51,9 @@ export default function Athlete3D(props: Athlete3DProps) {
     let cleanup: (() => void) | null = null;
     (async () => {
       try {
+        mark('start');
         const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color4, Color3 } = await import('@babylonjs/core');
+        mark('babylon');
         await yieldToPage();
         const [{ CharacterLibrary }, { DEFAULT_HERO_URL }, { resolveIdentity }, { atBindPose }, { reducedMotion }] = await Promise.all([
           import('@/lib/babylon/core/CharacterLibrary'),
@@ -54,6 +62,7 @@ export default function Athlete3D(props: Athlete3DProps) {
           import('@/lib/babylon/library/poseGuard'),
           import('@/lib/a11y/reducedMotion'),
         ]);
+        mark('modules');
         await yieldToPage();
         const canvas = ref.current;
         if (disposed || !canvas) return;
@@ -72,14 +81,17 @@ export default function Athlete3D(props: Athlete3DProps) {
         cam.attachControl(canvas, true);
         const fill = new HemisphericLight('fill', new Vector3(0, 1, 0), scene); fill.intensity = 0.9; fill.groundColor = new Color3(0.25, 0.25, 0.3);
         const key = new DirectionalLight('key', new Vector3(-0.4, -0.8, -0.5), scene); key.intensity = 1.05; key.diffuse = new Color3(1, 0.95, 0.88);
+        mark(`engine:psc=${engine.getCaps().parallelShaderCompile ? 1 : 0}`);
         await yieldToPage();
         if (disposed) { scene.dispose(); engine.dispose(); return; }
 
         const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
         const dispose = () => { engine.stopRenderLoop(); hero.dispose(); scene.dispose(); engine.dispose(); };
+        mark('spawned');
         if (disposed) { dispose(); return; }
         await yieldToPage();
         await scene.whenReadyAsync();
+        mark('ready');
         if (disposed) { dispose(); return; }
 
         // T-POSE guard (owner playtest 2026-10-27): the athlete is shown only once measured off its bind pose; one retry
@@ -98,6 +110,7 @@ export default function Athlete3D(props: Athlete3DProps) {
 
         // THE PICTURE (athletePoster.ts): this frame, the camera at its start, a 2:3 column at up to 400×600. Drawn in the
         // same task as the render (the WebGL buffer is still there before the page composites), so no preserveDrawingBuffer.
+        mark('posed');
         let shot: HTMLCanvasElement | null = null;
         let shotSize = { w: 0, h: 0 };
         if (cb.current.wantSnapshot?.(idHash)) {
@@ -140,11 +153,13 @@ export default function Athlete3D(props: Athlete3DProps) {
           io?.disconnect();
           dispose();
         };
+        mark('live');
         cb.current.onLive(idHash);
 
         if (shot) {
           // webp where the browser encodes it; Safari answers a PNG for the same call, which keeps the transparency too
           const blob = await toBlob(shot, 'image/webp', 0.86);
+          mark('snapshot');
           if (blob && blob.size > 0 && !disposed) cb.current.onSnapshot?.({ blob, ...shotSize, idHash });
         }
       } catch (e) {
