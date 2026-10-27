@@ -40,7 +40,8 @@ describe('/pro', () => {
     expect(html).toContain('$9.99 / month');
     expect(html).toMatch(/<input[^>]*checked=""[^>]*value="weekly"|<input[^>]*value="weekly"[^>]*checked=""/);
     expect(html).not.toMatch(/<input[^>]*checked=""[^>]*value="monthly"|<input[^>]*value="monthly"[^>]*checked=""/);
-    expect(html).toContain('href="/store-terms"');
+    // test changed (owner-approvals, 2026-10-27, card C28): FEL Pro buyers tick the Purchase Terms now, not the coach store's
+    expect(html).toContain('href="/purchase-terms"');
     expect(html).toMatch(/disabled=""[^>]*data-action="buy-pro"/);
     expect(STORE_TERMS_VERSION).toBeTruthy();
   });
