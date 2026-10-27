@@ -83,22 +83,22 @@ export function ImportProgram({ program, blank, onTree, api = IMPORT_API }: { pr
   };
 
   if (!open) return (
-    <button type="button" onClick={() => setOpen(true)} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#00E5FF]/40 text-sm text-[#00E5FF]" data-import-open>
+    <button type="button" onClick={() => setOpen(true)} className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-fel-cyan/40 text-sm text-fel-cyan" data-import-open>
       <ClipboardPaste className="h-4 w-4" /> Paste a program
     </button>
   );
   const flagged = weeks.flatMap((w) => w.days.flatMap((d) => d.rows)).filter((r) => r.pick !== 'skip' && (r.match.confidence === 'low' || r.match.confidence === 'none') && r.pick === pickValue(r.match, r.name)).length;
   return (
     <section className="space-y-3 rounded-lg border border-white/10 p-3" data-import-panel>
-      <div className="text-[11px] uppercase tracking-wider text-white/40">Paste a program into {program.name} · {program.clientName}</div>
+      <div className="text-[11px] uppercase tracking-wider text-fel-dim">Paste a program into {program.name} · {program.clientName}</div>
       {!preview && (
         <>
           <textarea aria-label="Program text" value={text} onChange={(e) => { setText(e.target.value); setCsv(false); }} rows={8} placeholder={'Week 1\nMon: Back squat 5x5 @ 75%\nRDL 3x8 @ RPE 7\nWed - Upper\nBench press 4x6, rest 2 min\n…or paste straight from a spreadsheet'} className="w-full rounded-lg border border-white/10 bg-white/5 p-2 font-mono text-xs text-white" data-import-text />
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy || !text.trim()} onClick={() => void read()} className="flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg bg-[#00E5FF]/15 px-3 text-sm font-semibold text-[#00E5FF] disabled:opacity-40" data-import-read>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Read it</button>
+            <button type="button" disabled={busy || !text.trim()} onClick={() => void read()} className="flex min-h-10 flex-1 items-center justify-center gap-1 rounded-lg bg-fel-cyan/15 px-3 text-sm font-semibold text-fel-cyan disabled:opacity-40" data-import-read>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Read it</button>
             <label className="flex min-h-10 cursor-pointer items-center gap-1 rounded-lg border border-white/15 px-3 text-sm text-white/70"><Upload className="h-4 w-4" /> CSV<input type="file" accept=".csv,.tsv,text/csv,text/plain" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} data-import-file /></label>
-            {aiOffered && <button type="button" disabled={busy} onClick={() => void read(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-[#A855F7]/50 px-3 text-sm text-[#C084FC]" data-import-ai><Sparkles className="h-4 w-4" /> Try the AI reader</button>}
-            <button type="button" onClick={() => setOpen(false)} className="min-h-10 rounded-lg px-2 text-sm text-white/45">Close</button>
+            {aiOffered && <button type="button" disabled={busy} onClick={() => void read(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-fel-violet/50 px-3 text-sm text-[#C084FC]" data-import-ai><Sparkles className="h-4 w-4" /> Try the AI reader</button>}
+            <button type="button" onClick={() => setOpen(false)} className="min-h-10 rounded-lg px-2 text-sm text-fel-dim">Close</button>
           </div>
           {csv && <p className="text-xs text-white/50">Read as a CSV file.</p>}
         </>
@@ -117,13 +117,13 @@ export function ImportProgram({ program, blank, onTree, api = IMPORT_API }: { pr
               <div className="text-xs font-semibold text-white/80">{w.label}</div>
               {w.days.map((d, di) => (
                 <div key={di} className="space-y-1.5 rounded-lg bg-white/[0.03] p-2" data-import-day={`${wi}.${di}`}>
-                  <div className="text-[11px] uppercase tracking-wider text-white/45">{d.label}</div>
+                  <div className="text-[11px] uppercase tracking-wider text-fel-dim">{d.label}</div>
                   {d.rows.map((r, ri) => {
                     const doubt = (r.match.confidence === 'low' || r.match.confidence === 'none') && r.pick === pickValue(r.match, r.name);
                     return (
                       <div key={ri} className={`space-y-1 rounded-md border p-1.5 ${doubt ? 'border-[#FFB020]/50' : 'border-white/5'} ${r.pick === 'skip' ? 'opacity-40' : ''}`} data-import-row={r.match.confidence}>
-                        <div className="flex items-center gap-1 text-[11px] text-white/45">
-                          {r.superset && <span className="text-[#00E5FF]">{r.superset}</span>}
+                        <div className="flex items-center gap-1 text-[11px] text-fel-dim">
+                          {r.superset && <span className="text-fel-cyan">{r.superset}</span>}
                           <span className="truncate">“{r.name}”</span>
                           {doubt && <span className="ml-auto flex shrink-0 items-center gap-0.5 text-[#FFB020]" data-import-flag><AlertTriangle className="h-3 w-3" /> Check</span>}
                         </div>
@@ -138,7 +138,7 @@ export function ImportProgram({ program, blank, onTree, api = IMPORT_API }: { pr
                           <input aria-label="Reps" value={r.reps} onChange={(e) => put(wi, di, ri, { reps: e.target.value.slice(0, 24), work: null })} placeholder="reps" className={cell} />
                           <input aria-label="Load" value={r.load} onChange={(e) => put(wi, di, ri, { load: e.target.value.slice(0, 24) })} placeholder="load" className={cell} />
                         </div>
-                        {(r.warnings.length > 0 || r.note) && <div className="text-[10px] text-white/40">{[...r.warnings.map((x) => WARN[x]), r.note].filter(Boolean).join(' · ')}</div>}
+                        {(r.warnings.length > 0 || r.note) && <div className="text-[10px] text-fel-dim">{[...r.warnings.map((x) => WARN[x]), r.note].filter(Boolean).join(' · ')}</div>}
                       </div>
                     );
                   })}
@@ -150,12 +150,12 @@ export function ImportProgram({ program, blank, onTree, api = IMPORT_API }: { pr
             <select aria-label="Repeat" value={repeat} onChange={(e) => setRepeat(Number(e.target.value))} className="min-h-10 rounded-lg border border-white/10 bg-[#0b0d12] px-2 text-sm text-white" data-import-repeat>
               {Array.from({ length: Math.max(1, Math.floor(12 / Math.max(1, weeks.length))) }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n === 1 ? 'once' : `× ${n}`}</option>)}
             </select>
-            <span className="text-xs text-white/45">= {weeks.length * repeat} weeks</span>
+            <span className="text-xs text-fel-dim">= {weeks.length * repeat} weeks</span>
           </label>
           {!blank && <p className="text-xs text-[#FFB020]" data-import-not-blank>This program already has work in it. Import into a blank program.</p>}
-          <p className="text-[11px] text-white/40">The first exercise of each day is marked as the key set. Change anything after in the builder.</p>
+          <p className="text-[11px] text-fel-dim">The first exercise of each day is marked as the key set. Change anything after in the builder.</p>
           <div className="flex gap-2">
-            <button type="button" disabled={busy || !blank} onClick={() => void confirm()} className="min-h-10 flex-1 rounded-lg bg-[#00E5FF]/15 text-sm font-semibold text-[#00E5FF] disabled:opacity-40" data-import-confirm>Add to {program.name}</button>
+            <button type="button" disabled={busy || !blank} onClick={() => void confirm()} className="min-h-10 flex-1 rounded-lg bg-fel-cyan/15 text-sm font-semibold text-fel-cyan disabled:opacity-40" data-import-confirm>Add to {program.name}</button>
             <button type="button" onClick={() => { setPreview(null); setMsg(null); }} className="min-h-10 rounded-lg border border-white/10 px-3 text-sm text-white/60">Back</button>
           </div>
         </div>

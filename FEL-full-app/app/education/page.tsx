@@ -12,7 +12,7 @@ export default async function EducationPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/education'));
   return (
-    <div className="min-h-screen bg-[#050505] pb-20">
+    <div className="min-h-screen bg-fel-bg pb-20">
       <PlaybookCard />
       <EducationView />
     </div>

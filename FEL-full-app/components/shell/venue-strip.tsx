@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import { VENUES } from '@/lib/game-data';
 import { playableGameVenues } from '@/lib/venueModes';
+import { t } from '@/lib/i18n';
 
 /**
  * The way into the venues, from Play, in one row instead of nine hundred pixels.
@@ -27,7 +28,7 @@ export function VenueStrip() {
         {withArt.map((v, i) => (
           <span
             key={v.key}
-            className="relative h-14 w-14 overflow-hidden rounded-xl border-2 border-[#0a0a0e] transition-transform duration-300 group-hover:translate-x-0"
+            className="relative h-14 w-14 overflow-hidden rounded-xl border-2 border-fel-bg transition-transform duration-300 group-hover:translate-x-0"
             style={{ zIndex: withArt.length - i, transform: `rotate(${(i - 1.5) * 2.5}deg)` }}
           >
             <Image src={v.image!} alt="" fill sizes="56px" className="object-cover opacity-80" />
@@ -36,13 +37,13 @@ export function VenueStrip() {
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="fel-heading block text-[16px] font-bold leading-tight text-white">Browse by venue</span>
-        <span className="mt-1 block truncate text-[12.5px] text-white/45">
-          {playable.length} places — the court, the dojo, the slope, the break.
+        <span className="fel-heading block text-[16px] font-bold leading-tight text-white">{t('shell.venues.browse')}</span>
+        <span className="mt-1 block truncate text-[12.5px] text-fel-dim">
+          {t('shell.venues.browseLine', { count: playable.length })}
         </span>
       </span>
 
-      <ArrowRight className="h-4 w-4 shrink-0 text-white/30 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white/70" />
+      <ArrowRight className="h-4 w-4 shrink-0 text-fel-quiet transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-white/70" />
     </Link>
   );
 }

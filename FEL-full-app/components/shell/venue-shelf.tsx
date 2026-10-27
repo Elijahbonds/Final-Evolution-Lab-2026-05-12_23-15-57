@@ -19,8 +19,9 @@ import { VENUES } from '@/lib/game-data';
 import { playableGameVenues, venueCardModes } from '@/lib/venueModes';
 import { modeKeyForHref } from '@/lib/mode-routes';
 import { MasteryBadge } from '@/components/mastery-badge';
+import { t } from '@/lib/i18n';
 
-export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } = {}) {
+export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: string | null } = {}) {
   const [mastery, setMastery] = useState<Record<string, { tierIndex: number }>>({});
 
   useEffect(() => {
@@ -41,13 +42,13 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
       {heading ? (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="fel-heading text-[19px] font-bold text-white">{heading}</h2>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
-            {live} live
+          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-fel-quiet">
+            {t('shell.venues.live', { count: live })}
           </span>
         </div>
       ) : (
-        <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.16em] text-white/30">
-          {live} live
+        <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.16em] text-fel-quiet">
+          {t('shell.venues.live', { count: live })}
         </p>
       )}
 
@@ -60,11 +61,11 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
               className={`group relative overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.02]
                           transition-all duration-500 ${venue.playable ? 'hover:border-white/20' : ''}`}
             >
-              <div className="relative aspect-video bg-[#0B0B0F]">
+              <div className="relative aspect-video bg-fel-surface">
                 {venue.image ? (
                   <Image
                     src={venue.image}
-                    alt={`${venue.name} venue artwork`}
+                    alt={t('shell.venues.artwork', { name: venue.name })}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     className="object-cover opacity-75 transition-all duration-700 group-hover:scale-[1.04] group-hover:opacity-95"
@@ -79,11 +80,11 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
                     </div>
                   </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-fel-bg via-fel-bg/20 to-transparent" />
                 {venue.playable && (
                   <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-0.5
-                                   font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-[#00FF9D] ring-1 ring-[#00FF9D]/40">
-                    <Play className="h-2.5 w-2.5" /> Live
+                                   font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-fel-emerald ring-1 ring-fel-emerald/40">
+                    <Play className="h-2.5 w-2.5" /> {t('shell.venues.liveBadge')}
                   </span>
                 )}
               </div>
@@ -91,7 +92,7 @@ export function VenueShelf({ heading = 'Venues' }: { heading?: string | null } =
                 <div className="min-w-0">
                   <h3 className="fel-heading text-[17px] font-bold leading-tight text-white">{venue.name}</h3>
                   {/* QA P1-28: the live modes whose venue this is (lib/venueModes), not a hand list that drifts */}
-                  <p className="mt-1 line-clamp-2 text-[12px] text-white/35">{venueCardModes(venue).join(' · ')}</p>
+                  <p className="mt-1 line-clamp-2 text-[12px] text-fel-quiet">{venueCardModes(venue).join(' · ')}</p>
                 </div>
                 {tier ? <MasteryBadge tierIndex={tier} className="ml-auto shrink-0" /> : null}
               </div>

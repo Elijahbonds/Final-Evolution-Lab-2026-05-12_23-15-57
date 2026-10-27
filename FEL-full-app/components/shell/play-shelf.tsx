@@ -18,6 +18,7 @@ import { MODE_INFO } from '@/lib/game-data';
 import { modeMenuMetaFor } from '@/lib/mode-menu';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
 import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: "2 PLAYERS" on the games friends can play together
+import { COLOR } from '@/lib/design/tokens';
 
 type ModeRow = { key: string; name: string; venue: string; href: string; desc: string; color: string; Icon: LucideIcon };
 
@@ -80,27 +81,31 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                     530px of the page and told you nothing you could act on, directly above a venue grid that shows
                     fourteen places with artwork. Listing the modes makes the shelf worth reading at rest; the
                     family's own line takes over once it is open and the modes are on screen underneath anyway. */}
-                <span className="min-w-0 truncate text-[12px] leading-none text-white/35">
+                <span className="min-w-0 truncate text-[12px] leading-none text-fel-quiet">
                   {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
                 </span>
               </span>
 
               <span
                 className="shrink-0 font-mono text-[11px] font-bold tabular-nums transition-colors"
-                style={{ color: isOpen ? f.accent : 'rgba(255,255,255,0.3)' }}
+                style={{ color: isOpen ? f.accent : COLOR.textQuiet }}
               >
                 {modes.length}
               </span>
               <ChevronRight
                 className="h-4 w-4 shrink-0 transition-transform duration-300"
-                style={{ color: isOpen ? f.accent : 'rgba(255,255,255,0.25)', transform: isOpen ? 'rotate(90deg)' : 'none' }}
+                style={{ color: isOpen ? f.accent : COLOR.textQuiet, transform: isOpen ? 'rotate(90deg)' : 'none' }}
               />
             </button>
 
-            {/* opens in place — a grid that appears under the bubble you pressed */}
+            {/* opens in place — a grid that appears under the bubble you pressed. CLOSED IS INERT (A11-01, 2026-10-25): the
+                collapsed grid is 0 px tall and transparent, but its links were still in the tab order — the audit's Tab
+                pass walked into 16 invisible games on /play, and a pad or remote would too. `inert` takes a closed family
+                out of focus and out of the accessibility tree; opening it puts them back. */}
             <div
               className="grid overflow-hidden transition-all duration-300 ease-out"
               style={{ gridTemplateRows: isOpen ? '1fr' : '0fr', opacity: isOpen ? 1 : 0 }}
+              {...(isOpen ? {} : { inert: '' })}
             >
               <div className="min-h-0">
                 <ul className="mt-2 grid gap-2 pl-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -131,7 +136,7 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                             <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
                             <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-white/50">{m.desc}</span>
                             {m.venue && venueDistinguishes && (
-                              <span className="mt-1.5 block truncate font-mono text-[10.5px] uppercase tracking-wider text-white/35">
+                              <span className="mt-1.5 block truncate font-mono text-[11px] uppercase tracking-wider text-fel-quiet">
                                 {m.venue}
                               </span>
                             )}

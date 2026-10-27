@@ -92,7 +92,7 @@ export function PoseReplay({ tracks, aspect, rep, best }: { tracks: readonly Pos
             onChange={(e) => { setPlaying(false); setI(Number(e.target.value)); }} className="min-h-11 min-w-0 flex-1" />
         </div>
       ) : null}
-      <figcaption className="mt-1 text-center text-[11px] text-white/45">Skeleton from the camera&apos;s pose estimate — no video was sent.</figcaption>
+      <figcaption className="mt-1 text-center text-[11px] text-fel-dim">Skeleton from the camera&apos;s pose estimate — no video was sent.</figcaption>
     </figure>
   );
 }

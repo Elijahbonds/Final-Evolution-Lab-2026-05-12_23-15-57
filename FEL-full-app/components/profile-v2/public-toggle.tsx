@@ -24,8 +24,8 @@ export function PublicToggle({ initial }: { initial: boolean }) {
     <div className="flex items-center justify-between gap-4">
       <div>
         <p className="text-[13px] font-bold text-white">{on ? 'Public' : 'Friends only'}</p>
-        <p className="text-[11.5px] text-white/45">{on ? 'Anyone with your link can see your profile and card.' : 'Only you and your coaches can see it.'}</p>
-        {err && <p role="alert" className="mt-1 text-[11.5px] text-[#FF7A2F]">{err}</p>}
+        <p className="text-[11.5px] text-fel-dim">{on ? 'Anyone with your link can see your profile and card.' : 'Only you and your coaches can see it.'}</p>
+        {err && <p role="alert" className="mt-1 text-[11.5px] text-fel-ember">{err}</p>}
       </div>
       <Switch checked={on} disabled={busy} onCheckedChange={change} aria-label="Make my profile public" />
     </div>

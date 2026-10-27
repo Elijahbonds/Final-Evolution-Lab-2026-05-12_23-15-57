@@ -287,7 +287,7 @@ export function CoachLive({ room, join, summaryApi = '/api/coach/live/summary', 
                 {current ? `Stop set ${current.id}` : `Start set ${session.nextId} · ${LIVE_SPECS[movement].label}`}
               </button>
               <div className="space-y-1">
-                <div className="text-[11px] uppercase tracking-wider text-white/40">Send a cue to their screen</div>
+                <div className="text-[11px] uppercase tracking-wider text-fel-dim">Send a cue to their screen</div>
                 <div className="flex flex-wrap gap-2">
                   {cuePresets(movement).map((c) => (
                     <button key={c.key} type="button" data-cue-btn={c.key} onClick={() => cue(c.key, c.text)}
@@ -303,7 +303,7 @@ export function CoachLive({ room, join, summaryApi = '/api/coach/live/summary', 
             </>
           )}
           <div className="fel-card rounded-xl p-3">
-            <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">Sets</div>
+            <div className="mb-1 text-[11px] uppercase tracking-wider text-fel-dim">Sets</div>
             {session.sets.length === 0 ? <p className="text-sm text-white/50">None yet.</p> : (
               <ul className="space-y-1 text-sm">
                 {session.sets.map((s) => (
@@ -315,7 +315,7 @@ export function CoachLive({ room, join, summaryApi = '/api/coach/live/summary', 
             )}
           </div>
           {stats && (
-            <p className="text-[11px] text-white/45" data-live-numbers>
+            <p className="text-[11px] text-fel-dim" data-live-numbers>
               {MODE_WORDS[stats.mode]}{stats.path ? ` (${stats.path})` : ''} · pose {stats.poseHz} Hz, {stats.poseKbps} kbps{stats.latencyP50 !== null ? `, ${stats.latencyP50} ms old` : ''}{stats.videoFps ? ` · video ${Math.round(stats.videoFps)} fps` : ''}
             </p>
           )}
@@ -326,7 +326,7 @@ export function CoachLive({ room, join, summaryApi = '/api/coach/live/summary', 
           )}
           {summary && (
             <div className="fel-card space-y-1 rounded-xl p-3" data-summary data-summary-posted={summary.posted ? '1' : '0'}>
-              <div className="text-[11px] uppercase tracking-wider text-white/40">{summary.posted ? 'Posted to your thread' : 'Not posted'}</div>
+              <div className="text-[11px] uppercase tracking-wider text-fel-dim">{summary.posted ? 'Posted to your thread' : 'Not posted'}</div>
               <pre className="whitespace-pre-wrap font-sans text-sm text-white/85">{summary.text}</pre>
             </div>
           )}

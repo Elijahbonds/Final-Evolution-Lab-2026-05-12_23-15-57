@@ -25,6 +25,11 @@
   --fel-line: #232c38;
   --fel-text: #f2f5f9;
   --fel-text-dim: #8b97a5;
+  /* THE TEXT LADDER (A11-06, 2026-10-25): text > soft > dim > quiet, every step at least 4.5:1 on --fel-bg, --fel-surface
+     and --fel-surface-2 (lib/design/tokens.test.ts measures it). The pages' ad-hoc text-white/30..45 was 2.5:1 to 4.46:1
+     on the ink, under the WCAG 1.4.3 floor; those runs move onto these. Soft and quiet are new; text and dim unchanged. */
+  --fel-text-soft: #c3cad3;
+  --fel-text-quiet: #7d8794;
 
   /* Brand accents */
   --fel-cyan: #00E5FF;      /* primary actions, focus */
@@ -41,6 +46,14 @@
      is illegal had no colour cue. Defined here as the names those call sites use for the colours beside them. */
   --fel-red: #FF3366;
   --fel-purple: #A855F7;
+
+  /* The TV HUD's two reads the theme had no name for (components/games/tv-hud/tokens.ts HUD_RGB.them / .info), so every
+     HUD tone has a theme token: one set (A11-06). Values unchanged. */
+  --fel-them: #facc15;
+  --fel-info: #9ad7ff;
+
+  /* Keyboard, pad and remote focus (A11-01 / A11-02): one ring everywhere (app/globals.css draws it). */
+  --fel-focus: #00E5FF;
 
   /* Rarity ladder (cards, wearables) */
   --fel-rarity-common: #9aa7b4;

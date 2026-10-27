@@ -11,8 +11,8 @@ import { coverageLine, type CoverageState, type CoverageStrip as Strip } from '@
 const LOOK: Record<CoverageState, string> = {
   done: 'border-[#7BD389]/60 bg-[#7BD389]/15 text-[#7BD389]',
   open: 'border-white/25 text-white/70',
-  notProgrammed: 'border-dashed border-white/15 text-white/30',
-  untagged: 'border-white/10 text-white/40',
+  notProgrammed: 'border-dashed border-white/15 text-fel-quiet',
+  untagged: 'border-white/10 text-fel-dim',
 };
 
 export function CoverageStrip({ strip }: { strip: Strip }) {
@@ -33,7 +33,7 @@ export function CoverageStrip({ strip }: { strip: Strip }) {
           </li>
         ))}
       </ul>
-      <div className="text-[10px] text-white/40">{coverageLine(strip)}</div>
+      <div className="text-[10px] text-fel-dim">{coverageLine(strip)}</div>
     </div>
   );
 }
@@ -46,7 +46,7 @@ export function CoverageLegend() {
     </span>
   );
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-white/45" data-testid="coverage-legend">
+    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-fel-dim" data-testid="coverage-legend">
       {item('done', 'done in the last 7 days')}{item('open', 'in the program, not yet')}{item('notProgrammed', 'not in the program')}{item('untagged', '? untagged')}
     </div>
   );

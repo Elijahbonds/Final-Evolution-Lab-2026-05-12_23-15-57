@@ -20,7 +20,7 @@ export function MyCombines({ available, events }: { available: boolean; events: 
         <section key={e.id} className="fel-card space-y-3 rounded-xl p-4" data-my-combine={e.id}>
           <header>
             <h2 className="text-lg font-black text-white">{e.name}</h2>
-            <p className="text-xs text-white/45">{new Date(e.createdAt).toLocaleDateString()}</p>
+            <p className="text-xs text-fel-dim">{new Date(e.createdAt).toLocaleDateString()}</p>
           </header>
           <ul className="space-y-2">
             {e.stations.map((s) => (
@@ -38,7 +38,7 @@ export function MyCombines({ available, events }: { available: boolean; events: 
           </ul>
         </section>
       ))}
-      <p className="text-[11px] text-white/40">{NO_ACCURACY_LINE}</p>
+      <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE}</p>
     </div>
   );
 }
