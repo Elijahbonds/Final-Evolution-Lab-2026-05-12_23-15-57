@@ -24,7 +24,8 @@ import { CORRECTIVES_PATH, screenCorrectiveFor } from '@/lib/mirror/correctives'
 import { athletePlan, outcomesFromGrades, type GradeLike, type YouthGate } from '@/lib/mirror/screenCorrectives';
 // SCREEN-SHIP (2026-09-29), label only: the grades and cues here rest on unsigned thresholds (listed in
 // lib/screen/PROPOSED-thresholds.ts MOVEMENT_SCREEN_REGISTER), so the card says so. No grading logic or value changed.
-import { PREVIEW_LINE, PROVISIONAL_LABEL } from '@/lib/screen/PROPOSED-thresholds';
+import { PREVIEW_LINE } from '@/lib/screen/PROPOSED-thresholds';
+import { EARLY_VERSION, EARLY_VERSION_LINE } from '@/lib/screen/copy';
 
 export interface ScreenNextStepsProps {
   /** The variant that ran (the runner's). */
@@ -43,8 +44,10 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
   return (
     <section aria-labelledby="screen-next-steps-heading" className="mt-4 rounded-2xl border border-white/8 bg-white/[0.02] p-5" data-next-steps>
       <h2 id="screen-next-steps-heading" className="fel-heading text-[15px] font-bold text-white/80">What to work on · estimated</h2>
+      {/* CUE-REWRITE (2026-10-27): the Quick Screen's plain words for the preview label ("Early version"), not the
+          sign-off sheet's ("PROPOSED · preview · Scoring thresholds are proposed and pending coach approval") */}
       <p className="mt-1 text-[11.5px] text-[#FFB020]/85" data-preview-label title={PREVIEW_LINE}>
-        <span className="font-bold uppercase tracking-[0.08em]">{PROVISIONAL_LABEL}</span> · {PREVIEW_LINE}.
+        <span className="font-bold uppercase tracking-[0.08em]">{EARLY_VERSION}</span> · {EARLY_VERSION_LINE}.
       </p>
       <p className="mt-1 text-[13px] leading-relaxed text-white/70">{plan.headline}</p>
 
@@ -110,10 +113,10 @@ function WrittenCorrective({ checkId, side, youth }: { checkId: string | undefin
   const parts = [c.release ? `${c.drill ? 'release first' : 'release'}: ${c.release.tissue.toLowerCase()}` : null, c.drill ? `band drill: ${c.drill.title}` : null].filter(Boolean);
   return (
     <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/60" data-written-corrective={checkId}>
-      <span className="font-bold text-white/75">Written corrective: </span>
+      <span className="font-bold text-white/75">Extra drill: </span>
       {parts.join(' · ')}.{' '}
       {c.drill && <span data-screen-setup>{c.drill.setup}{' '}</span>}
-      <Link href={c.href} className="font-semibold text-[#00E5FF] hover:underline">In Correctives →</Link>
+      <Link href={c.href} className="font-semibold text-[#00E5FF] hover:underline">See the drill →</Link>
     </p>
   );
 }

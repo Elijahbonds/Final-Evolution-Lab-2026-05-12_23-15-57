@@ -102,7 +102,7 @@ describe('P9: the written corrective under a flag', () => {
   it('an adult: the shoulder flag names its release and band drill and links to them', () => {
     const html = render(grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }) }));
     const t = text(html);
-    expect(t).toContain('Written corrective: release first: where the neck meets the shoulder · band drill: Band-up shoulder hold.');
+    expect(t).toContain('Extra drill: release first: where the neck meets the shoulder · band drill: Band-up shoulder hold.');
     expect(html).toContain('href="/play/mirror/correctives#band-drills"');
     expect(html).toContain('data-written-corrective="shoulderLevel"');
     // MIRROR-COACH P9 fix: the screen's own set-up — standing, no rowing handle, and the side the screen read higher
@@ -125,7 +125,7 @@ describe('P9: the written corrective under a flag', () => {
   it('the knee flag links to the release; a check with none (the head float) shows no line', () => {
     const knee = render(grades({ kneeWindow: g('kneeWindow', { value: 0.7, bySide: { left: 0.7, right: 0.05 } }) }));
     // MIRROR-COACH P9 fix: "release first:" with no drill after it read as cut off — the knee has a release only
-    expect(text(knee)).toContain('Written corrective: release: the back of the hip — the fleshy part you sit on.');
+    expect(text(knee)).toContain('Extra drill: release: the back of the hip — the fleshy part you sit on.');
     expect(text(knee)).not.toContain('release first');
     expect(knee).toContain('href="/play/mirror/correctives#release"');
     const head = render(grades({ headFloat: g('headFloat', { value: 0.2 }) }));
