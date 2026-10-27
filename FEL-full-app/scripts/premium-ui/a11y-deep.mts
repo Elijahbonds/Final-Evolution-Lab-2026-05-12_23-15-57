@@ -60,8 +60,8 @@ const CLIPPED = `(() => { let clipped = 0, ellipsis = 0; const where = [];
   return { clipped, ellipsis, where }; })()`;
 const SPACING = `(() => { const s = document.createElement('style'); s.textContent = '* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }'; document.head.appendChild(s); })()`;
 
-async function open(page: Page, scene: string) {
-  await page.goto(`${ORIGIN}/index.html#${scene}`);
+async function open(page: Page, scene: string, query = '') {
+  await page.goto(`${ORIGIN}/index.html${query}#${scene}`);
   await page.waitForFunction('document.body.dataset.a11yReady || document.body.dataset.a11yError', null, { timeout: 60000 });
   await page.waitForTimeout(700);
 }
@@ -84,9 +84,10 @@ for (const label of LABELS) {
     // reduced motion, from the app's own setting (the device says nothing)
     {
       const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'no-preference' });
+      // ?motion=reduce is the app's own setting in force (lib/a11y/reducedMotion.ts motionUrlOverride: a link can always
+      // calm); useMotionAttr (the rail) carries it onto <html>. The rig clears localStorage, so the stored choice can't.
       const page = await ctx.newPage();
-      await page.addInitScript(`document.documentElement.setAttribute('data-fel-motion', 'reduce')`);
-      await open(page, s);
+      await open(page, s, '?motion=reduce');
       row.reducedApp = await page.evaluate(RUNNING); await ctx.close();
     }
     // 200 % zoom of the 1280 × 800 desktop
@@ -115,12 +116,12 @@ for (const label of LABELS) {
         stops.push(st);
       }
       const v = await page.evaluate(`window.__a11y.judgeFocus(${JSON.stringify(stops)})`) as { rule: string; severity: string }[];
-      row.focus = { stops: stops.length, violations: v.length, rules: [...new Set(v.map((x) => x.rule))] };
+      row.focus = { stops: stops.length, violations: v.length, rules: [...new Set(v.map((x) => x.rule))], targets: (v as unknown as { target: string }[]).slice(0, 3).map((x) => x.target) };
       await ctx.close();
     }
     report[s] = row;
     const r = row as { reducedOs: number; reducedApp: number; zoom200: { sideScroll: boolean; clipped: number }; textSpacing: { newlyClipped: number; where: string[] }; focus: { stops: number; violations: number; rules: string[] } };
-    console.log(`${s.padEnd(13)} reduced os/app ${r.reducedOs}/${r.reducedApp}  zoom200 ${r.zoom200.sideScroll ? 'SIDE-SCROLL' : 'ok'} clipped ${r.zoom200.clipped}  spacing +${r.textSpacing.newlyClipped}  focus ${r.focus.stops} stops ${r.focus.violations} ${r.focus.rules.join(',')}${r.textSpacing.newlyClipped ? `  ${r.textSpacing.where.join(' | ')}` : ''}`);
+    console.log(`${s.padEnd(13)} reduced os/app ${r.reducedOs}/${r.reducedApp}  zoom200 ${r.zoom200.sideScroll ? 'SIDE-SCROLL' : 'ok'} clipped ${r.zoom200.clipped}  spacing +${r.textSpacing.newlyClipped}  focus ${r.focus.stops} stops ${r.focus.violations} ${r.focus.rules.join(',')}${r.focus.violations ? ` [${(r.focus as unknown as { targets: string[] }).targets.join(' | ')}]` : ''}${r.textSpacing.newlyClipped ? `  ${r.textSpacing.where.join(' | ')}` : ''}`);
   }
   writeFileSync(join(OUT, 'deep.json'), JSON.stringify({ label, when: new Date().toISOString(), scenes: report }, null, 1));
 }
