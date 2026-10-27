@@ -59,8 +59,8 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
   return (
     <section className="fel-card space-y-3 rounded-xl p-4" data-habits-panel>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><ListChecks className="h-3.5 w-3.5" /> Habits</div>
-        {!adding && <button type="button" onClick={() => setAdding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-[#00E5FF]/50 px-3 text-sm text-[#00E5FF]" data-habit-new><Plus className="h-4 w-4" /> New</button>}
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ListChecks className="h-3.5 w-3.5" /> Habits</div>
+        {!adding && <button type="button" onClick={() => setAdding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-fel-cyan/50 px-3 text-sm text-fel-cyan" data-habit-new><Plus className="h-4 w-4" /> New</button>}
       </div>
       {msg && <p className="text-xs text-white/60" data-habit-msg>{msg}</p>}
       {adding && (
@@ -72,7 +72,7 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
           <input aria-label="Name" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="What to do" className={input} maxLength={60} />
           {preset === 'custom' && (
             <div className="flex gap-2">
-              {(['check', 'count'] as const).map((k) => <button key={k} type="button" onClick={() => setKind(k)} className={`min-h-10 flex-1 rounded-lg border text-sm ${kind === k ? 'border-[#00E5FF]/50 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>{k === 'check' ? 'Tick off' : 'A number'}</button>)}
+              {(['check', 'count'] as const).map((k) => <button key={k} type="button" onClick={() => setKind(k)} className={`min-h-10 flex-1 rounded-lg border text-sm ${kind === k ? 'border-fel-cyan/50 text-fel-cyan' : 'border-white/10 text-white/60'}`}>{k === 'check' ? 'Tick off' : 'A number'}</button>)}
             </div>
           )}
           {kind === 'count' && (
@@ -90,9 +90,9 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
             {(board.teams ?? []).map((t) => <option key={t.id} value={`team:${t.id}`}>Team: {t.name} ({t.members})</option>)}
             {(board.roster ?? []).filter((r) => !isHealth || r.adult).map((r) => <option key={r.id} value={`athlete:${r.id}`}>{r.name}</option>)}
           </select>
-          {isHealth && <p className="text-xs text-white/45">{board.lines?.health}</p>}
+          {isHealth && <p className="text-xs text-fel-dim">{board.lines?.health}</p>}
           <div className="flex gap-2">
-            <button type="button" onClick={() => void save()} className="min-h-10 flex-1 rounded-lg bg-[#00E5FF]/15 text-sm font-semibold text-[#00E5FF]" data-habit-save>Add habit</button>
+            <button type="button" onClick={() => void save()} className="min-h-10 flex-1 rounded-lg bg-fel-cyan/15 text-sm font-semibold text-fel-cyan" data-habit-save>Add habit</button>
             <button type="button" onClick={() => setAdding(false)} className="min-h-10 rounded-lg border border-white/10 px-3 text-sm text-white/60">Cancel</button>
           </div>
         </div>
@@ -102,8 +102,8 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
         {(board.habits ?? []).map((h) => (
           <li key={h.id} className="space-y-1 rounded-lg bg-white/[0.03] p-3" data-habit={h.id}>
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0"><div className="truncate text-sm font-semibold text-white">{h.label}</div><div className="text-xs text-white/45">{h.line} · {h.scope === 'team' ? `Team: ${h.assignedTo}` : h.assignedTo}</div></div>
-              <button type="button" onClick={() => void fetch(api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'archive', id: h.id }) }).then(() => load())} className="shrink-0 text-[11px] text-white/35">Archive</button>
+              <div className="min-w-0"><div className="truncate text-sm font-semibold text-white">{h.label}</div><div className="text-xs text-fel-dim">{h.line} · {h.scope === 'team' ? `Team: ${h.assignedTo}` : h.assignedTo}</div></div>
+              <button type="button" onClick={() => void fetch(api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'archive', id: h.id }) }).then(() => load())} className="shrink-0 text-[11px] text-fel-quiet">Archive</button>
             </div>
             <ul className="space-y-1">
               {h.athletes.map((a) => (
@@ -111,14 +111,14 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
                   <span className="truncate text-white/80">{a.name}</span>
                   {a.shared && a.compliance ? (
                     <span className="flex shrink-0 items-center gap-2 text-white/60">
-                      <span className="inline-block h-1.5 w-16 overflow-hidden rounded bg-white/10"><span className="block h-full bg-[#00E5FF]" style={{ width: `${a.compliance.pct}%` }} /></span>
+                      <span className="inline-block h-1.5 w-16 overflow-hidden rounded bg-white/10"><span className="block h-full bg-fel-cyan" style={{ width: `${a.compliance.pct}%` }} /></span>
                       {a.compliance.done}/{a.compliance.expected}
                       {!!a.streak && <span className="flex items-center gap-0.5 text-[#FFB020]"><Flame className="h-3 w-3" />{a.streak}{a.streakUnit === 'week' ? 'w' : 'd'}</span>}
                     </span>
-                  ) : <span className="shrink-0 text-white/35">not shared</span>}
+                  ) : <span className="shrink-0 text-fel-quiet">not shared</span>}
                 </li>
               ))}
-              {!h.athletes.length && <li className="text-xs text-white/40">Nobody on it yet.</li>}
+              {!h.athletes.length && <li className="text-xs text-fel-dim">Nobody on it yet.</li>}
             </ul>
           </li>
         ))}

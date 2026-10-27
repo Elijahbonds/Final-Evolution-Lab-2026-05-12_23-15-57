@@ -20,7 +20,7 @@ export default async function FormReviewPage({ searchParams }: { searchParams: {
   const ctx = await recordContext(prisma as unknown as FormReviewDb, userId, { slot: searchParams.slot ?? null, program: searchParams.program ?? null, movement: searchParams.movement ?? null }, await canSaveScanNumbers(prisma, userId));
   if (!ctx) notFound();
   return (
-    <main className="mx-auto min-h-screen max-w-xl bg-[#050505] px-4 py-6 pb-20">
+    <main className="mx-auto min-h-screen max-w-xl bg-fel-bg px-4 py-6 pb-20">
       <RecordSet ctx={ctx} />
     </main>
   );

@@ -141,7 +141,7 @@ export function CoachChat() {
   if (gate === 'adults_only') {
     return (
       <div className="flex flex-col h-[calc(100vh-220px)] min-h-[400px] items-center justify-center text-center px-4" data-ai-adults-only>
-        <Sparkles className="h-8 w-8 text-[#00E5FF] mb-3" />
+        <Sparkles className="h-8 w-8 text-fel-cyan mb-3" />
         <p className="text-white/70 text-sm max-w-md">{chatRefusal(403, 'ai_coach_adults_only').text}</p>
       </div>
     );
@@ -156,8 +156,8 @@ export function CoachChat() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1 scroll-smooth">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00E5FF]/20 to-[#A855F7]/20 flex items-center justify-center mb-4 border border-[#00E5FF]/20">
-              <Sparkles className="h-8 w-8 text-[#00E5FF]" />
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-fel-cyan/20 to-fel-violet/20 flex items-center justify-center mb-4 border border-fel-cyan/20">
+              <Sparkles className="h-8 w-8 text-fel-cyan" />
             </div>
             <h3 className="fel-heading text-xl text-white mb-2">Coach Elijah Bonds</h3>
             <p className="text-white/50 text-sm max-w-md mb-6">
@@ -171,7 +171,7 @@ export function CoachChat() {
                   data-test-ignore="sends-chat-message"
                   onClick={() => sendMessage(s)}
                   disabled={ai !== 'available'}
-                  className="text-left p-3 rounded-xl bg-[#16161a] border border-white/6 text-white/60 text-sm hover:border-[#00E5FF]/30 hover:text-white/80 transition-all"
+                  className="text-left p-3 rounded-xl bg-[#16161a] border border-white/6 text-white/60 text-sm hover:border-fel-cyan/30 hover:text-white/80 transition-all"
                 >
                   {s}
                 </button>
@@ -184,12 +184,12 @@ export function CoachChat() {
               <div
                 className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === 'user'
-                    ? 'bg-[#00E5FF]/15 text-white border border-[#00E5FF]/20'
+                    ? 'bg-fel-cyan/15 text-white border border-fel-cyan/20'
                     : 'bg-[#16161a] text-white/90 border border-white/6'
                 }`}
               >
                 {msg.role === 'assistant' && !msg.content && streaming && i === messages.length - 1 ? (
-                  <div className="flex items-center gap-2 text-white/40">
+                  <div className="flex items-center gap-2 text-fel-dim">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Coach is thinking...
                   </div>
@@ -212,20 +212,20 @@ export function CoachChat() {
       {/* Input area */}
       <div className="mt-3 flex-shrink-0">
         {gate && (
-          <div className="mb-3 rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/5 p-3 text-sm text-white/80 space-y-2" data-ai-share-consent>
+          <div className="mb-3 rounded-xl border border-fel-cyan/30 bg-fel-cyan/5 p-3 text-sm text-white/80 space-y-2" data-ai-share-consent>
             <p>{AI_SHARE_COPY}</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => { setInput(gate.consent); setGate(null); }} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60">Not now</button>
-              <button onClick={agreeAndSend} disabled={consentBusy} className="rounded-lg bg-[#00E5FF] px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40">I agree, send it</button>
+              <button onClick={agreeAndSend} disabled={consentBusy} className="rounded-lg bg-fel-cyan px-3 py-1.5 text-xs font-medium text-black disabled:opacity-40">I agree, send it</button>
             </div>
           </div>
         )}
         {messages.length > 0 && (
           <div className="flex justify-between mb-2">
-            <button onClick={withdrawSharing} className="text-xs text-white/30 hover:text-white/60 transition-colors">Stop sharing with the AI coach</button>
+            <button onClick={withdrawSharing} className="text-xs text-fel-quiet hover:text-white/60 transition-colors">Stop sharing with the AI coach</button>
             <button
               onClick={resetChat}
-              className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors"
+              className="flex items-center gap-1.5 text-xs text-fel-quiet hover:text-white/60 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
               New conversation
@@ -241,14 +241,14 @@ export function CoachChat() {
             placeholder="Ask Coach Bonds anything..."
             rows={1}
             maxLength={AI_CHAT_MAX_CHARS}
-            className="flex-1 resize-none rounded-xl bg-[#16161a] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00E5FF]/40 transition-colors"
+            className="flex-1 resize-none rounded-xl bg-[#16161a] border border-white/10 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-fel-cyan/40 transition-colors"
             style={{ maxHeight: '120px' }}
             disabled={streaming || ai !== 'available'}
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || streaming || ai !== 'available'}
-            className="rounded-xl bg-[#00E5FF] px-4 py-3 text-black font-medium text-sm hover:bg-[#00E5FF]/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex-shrink-0"
+            className="rounded-xl bg-fel-cyan px-4 py-3 text-black font-medium text-sm hover:bg-fel-cyan/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex-shrink-0"
           >
             {streaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </button>

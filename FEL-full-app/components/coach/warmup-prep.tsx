@@ -128,7 +128,7 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
     <section className="space-y-2" data-section="prep" data-warmup aria-label={PREP.label}>
       <div className="px-1">
         <div className="text-[11px] uppercase tracking-wider text-white/50">{PREP.label}</div>
-        <div className="text-[11px] text-white/35">{PREP.meaning}</div>
+        <div className="text-[11px] text-fel-quiet">{PREP.meaning}</div>
       </div>
       <div className="fel-card rounded-xl p-4 space-y-3" data-testid="warmup">
         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -136,19 +136,19 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
             <div className="text-white font-medium" data-warmup-title>
               {WARMUP_TITLE}{plan ? ` · ${Math.round(plan.totalSec / 60)} min` : ''}{pattern ? ` · for today's ${pattern}` : ''}
             </div>
-            <div className="text-[11px] text-white/45">{WARMUP_MEANING}</div>
+            <div className="text-[11px] text-fel-dim">{WARMUP_MEANING}</div>
           </div>
           <div className="flex gap-1" role="group" aria-label="Warm-up length">
             {WARMUP_MINUTES.map((m) => (
               <button key={m} type="button" disabled={!!run && !at?.done} onClick={() => setPicked(m)} aria-pressed={m === minutes} data-minutes={m}
-                className={`rounded-md border px-2 py-1 text-xs disabled:opacity-40 ${m === minutes ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/70'}`}>
+                className={`rounded-md border px-2 py-1 text-xs disabled:opacity-40 ${m === minutes ? 'border-fel-cyan/50 bg-fel-cyan/10 text-fel-cyan' : 'border-white/10 text-white/70'}`}>
                 {m} min
               </button>
             ))}
           </div>
         </div>
 
-        {!plan ? <div className="text-xs text-white/40" data-warmup-loading>Building today&apos;s warm-up…</div> : (
+        {!plan ? <div className="text-xs text-fel-dim" data-warmup-loading>Building today&apos;s warm-up…</div> : (
           <>
             {plan.notes.length > 0 && (
               <ul className="space-y-1" data-warmup-notes>
@@ -159,16 +159,16 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
             {at && !at.done && at.step ? (
               <RunPanel plan={plan} at={at} paused={!!run && run.pausedAt !== null} onPause={togglePause} onNext={next} onStop={() => setRun(null)} />
             ) : at?.done ? (
-              <div className="rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/5 p-3 text-sm text-white/85" data-warmup-done>
+              <div className="rounded-lg border border-fel-cyan/30 bg-fel-cyan/5 p-3 text-sm text-white/85" data-warmup-done>
                 Warm-up done. On to the session.
-                <button type="button" onClick={() => setRun(null)} className="ml-2 text-xs text-[#00E5FF]">Close</button>
+                <button type="button" onClick={() => setRun(null)} className="ml-2 text-xs text-fel-cyan">Close</button>
               </div>
             ) : null}
 
             <ol className="space-y-2" data-warmup-steps>
               {plan.steps.map((s, i) => (
                 <li key={`${s.kind}-${s.id}`} data-step={s.id} data-kind={s.kind} data-impact={s.impact ? 'true' : undefined}
-                  className={`rounded-lg border px-3 py-2 ${at && !at.done && at.index === i ? 'border-[#00E5FF]/50 bg-[#00E5FF]/5' : 'border-white/8 bg-white/[0.02]'}`}>
+                  className={`rounded-lg border px-3 py-2 ${at && !at.done && at.index === i ? 'border-fel-cyan/50 bg-fel-cyan/5' : 'border-white/8 bg-white/[0.02]'}`}>
                   <div className="flex items-baseline justify-between gap-2">
                     <div className="min-w-0">
                       <span className="mr-1.5 rounded bg-white/10 px-1 text-[10px] font-semibold uppercase tracking-wide text-white/60">{KIND_LABEL[s.kind]}</span>
@@ -176,19 +176,19 @@ export function WarmupPrep({ exercises, contextUrl, readiness = null, initialCon
                     </div>
                     <span className="shrink-0 font-mono text-xs tabular-nums text-white/50">{formatClock(s.seconds)}</span>
                   </div>
-                  {s.dose && <div className="text-[11px] text-white/45">{s.dose}</div>}
+                  {s.dose && <div className="text-[11px] text-fel-dim">{s.dose}</div>}
                   <div className="text-xs text-white/75">{s.cue}</div>
                 </li>
               ))}
             </ol>
 
-            {heldBackLines(plan).map((l) => <div key={l} className="text-[11px] text-white/40" data-held>{l}</div>)}
-            <div className="text-[11px] text-white/30">{WAKE_UP_SOURCE_LINE}</div>
+            {heldBackLines(plan).map((l) => <div key={l} className="text-[11px] text-fel-dim" data-held>{l}</div>)}
+            <div className="text-[11px] text-fel-quiet">{WAKE_UP_SOURCE_LINE}</div>
 
             {!run && plan.steps.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={start} data-warmup-start
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#00E5FF]/15 border border-[#00E5FF]/40 px-3 py-2 text-sm font-medium text-[#00E5FF]">
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-fel-cyan/15 border border-fel-cyan/40 px-3 py-2 text-sm font-medium text-fel-cyan">
                   <Play className="h-4 w-4" aria-hidden="true" /> Start the warm-up
                 </button>
                 {WAKE_UP_CAMERA_HREF && (
@@ -212,15 +212,15 @@ function RunPanel({ plan, at, paused, onPause, onNext, onStop }: {
   const s = at.step!;
   const fraction = s.seconds ? Math.min(1, at.stepSec / s.seconds) : 1;
   return (
-    <div className="rounded-lg border border-[#00E5FF]/30 bg-black/30 p-3 space-y-2" data-warmup-run data-run-step={s.id}>
+    <div className="rounded-lg border border-fel-cyan/30 bg-black/30 p-3 space-y-2" data-warmup-run data-run-step={s.id}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wider text-white/40">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
           <div className="text-white font-medium truncate">{s.name}</div>
         </div>
         <div className="font-mono text-2xl tabular-nums text-white" aria-live="off">{formatClock(at.remainingSec)}</div>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#00E5FF]" style={{ width: `${Math.round(fraction * 100)}%` }} /></div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-fel-cyan" style={{ width: `${Math.round(fraction * 100)}%` }} /></div>
       <div className="text-sm text-white/85" aria-live="polite" data-run-line>{at.line}</div>
       {s.pacer && (
         <div className="flex justify-center py-1" data-run-breath={at.breath?.phase ?? 'off'}>
