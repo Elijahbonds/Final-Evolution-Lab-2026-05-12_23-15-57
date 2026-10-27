@@ -282,6 +282,38 @@ async function ttfcJob(): Promise<void> {
   console.log(JSON.stringify(out, null, 1));
 }
 
+/** T-POSE (owner playtest 2026-10-27): the library stage on each body a player can wear (?body=, the dev identity override:
+ *  the guest's male kit, the female kit, the owner's scan), playing each clip at 390 px — is the body in its bind pose? */
+async function tposeJob(): Promise<void> {
+  const { url, close } = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const clips = (process.env.CLIPS ?? 'idle_stand,ex_squat,ex_pushup,ex_wall_sit').split(',');
+  const bodies = (process.env.BODIES ?? 'male,female,scan').split(',');
+  const out: Record<string, unknown> = {};
+  for (const body of bodies) for (const clip of clips) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); await page.addInitScript(NAME_SHIM);
+    const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error' || /T-?pose|bind pose|FEL-ANIM/i.test(m.text())) errors.push(m.text().slice(0, 240)); });
+    await page.goto(`${url}/?w=358&h=268&body=${body}#stage:${clip}`);
+    try { await stageReady(page, 300_000); } catch (e) { errors.push(String(e).slice(0, 200)); }
+    await page.waitForTimeout(1500);
+    const sample = () => page.evaluate(() => {
+      const st = (window as unknown as { __FEL_LIBRARY_STAGE__?: { hero: { skeleton: { bones: { name: string; getTransformNode(): { getAbsolutePosition(): { x: number; y: number; z: number }; computeWorldMatrix(f: boolean): void } | null }[] } }; scene: { animationGroups: { name: string; isPlaying: boolean }[] } } }).__FEL_LIBRARY_STAGE__;
+      if (!st) return null;
+      const p = (n: string) => { const b = st.hero.skeleton.bones.find((x) => x.name.replace(/_c\d+$/, '').endsWith(n)); const t = b?.getTransformNode(); t?.computeWorldMatrix(true); return t?.getAbsolutePosition() ?? null; };
+      const a = p('LeftArm'), e = p('LeftForeArm'), h = p('LeftHand'), hips = p('Hips');
+      const arm = a && e ? (Math.acos(Math.max(-1, Math.min(1, (a.y - e.y) / Math.hypot(e.x - a.x, e.y - a.y, e.z - a.z)))) * 180) / Math.PI : null;
+      return { armFromDownDeg: arm, hand: h ? [h.x, h.y, h.z] : null, hipsY: hips?.y ?? null, playing: st.scene.animationGroups.filter((g) => g.isPlaying).map((g) => g.name) };
+    });
+    const s1 = await sample(); await page.waitForTimeout(700); const s2 = await sample();
+    const moved = s1?.hand && s2?.hand ? Math.hypot(s1.hand[0] - s2.hand[0], s1.hand[1] - s2.hand[1], s1.hand[2] - s2.hand[2]) : null;
+    await page.screenshot({ path: join(OUT, `tpose-${body}-${clip}.png`) });
+    out[`${body}:${clip}`] = { armFromDownDeg: s1?.armFromDownDeg != null ? Math.round(s1.armFromDownDeg) : null, handMovedCm: moved != null ? Math.round(moved * 100) : null, hipsY: s1?.hipsY, playing: s1?.playing, errors: errors.slice(0, 6) };
+    await page.close();
+  }
+  await browser.close(); close();
+  console.log(JSON.stringify(out, null, 1));
+}
+
 async function chunksJob(): Promise<void> {
   // the same split next/dynamic makes: the library page's own code, then the stage (Babylon, the body pipeline) only when
   // a 3D tab opens. Minified, so the numbers are a release build's, not the rig's dev bundle.
@@ -329,3 +361,4 @@ else if (job === 'ui') await uiJob();
 else if (job === 'perf') await perfJob();
 else if (job === 'chunks') await chunksJob();
 else if (job === 'ttfc') await ttfcJob();
+else if (job === 'tpose') await tposeJob();
