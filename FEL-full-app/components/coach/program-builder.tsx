@@ -168,8 +168,8 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
     }
   };
   const templatePicker = blank && (
-    <div className="space-y-1.5 rounded-lg border border-[#00E5FF]/20 bg-[#00E5FF]/[0.04] p-3" data-testid="template-picker">
-      <div className="flex items-center gap-1.5 text-xs font-medium text-white"><LayoutTemplate className="h-3.5 w-3.5 text-[#00E5FF]/80" aria-hidden="true" /> Start from a FEL template</div>
+    <div className="space-y-1.5 rounded-lg border border-fel-cyan/20 bg-fel-cyan/[0.04] p-3" data-testid="template-picker">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-white"><LayoutTemplate className="h-3.5 w-3.5 text-fel-cyan/80" aria-hidden="true" /> Start from a FEL template</div>
       <select aria-label="FEL template" value={picked.id} onChange={(ev) => setTemplateId(ev.target.value)} className={`w-full ${input}`}>
         <optgroup label="Adults">
           {TEMPLATES.filter((t) => t.audience === 'adult').map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -183,8 +183,8 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
       {picked.kind === 'program' && <div className="text-[11px] text-white/50" data-template-wave>{WAVE_LINE}</div>}
       {picked.audience === 'adult' && <div className="text-[11px] text-white/50" data-template-adult>{ADULT_TEMPLATE_LINE}</div>}
       {picked.dailyTargetMinutes != null && <div className="text-[11px] text-white/50" data-template-target>{dailyTargetLine(picked.dailyTargetMinutes)}</div>}
-      <div className="text-[11px] text-white/40">{CLONE_LINE}</div>
-      <button disabled={busy} onClick={() => void cloneTemplate()} className="rounded-lg border border-[#00E5FF]/40 px-2.5 py-1 text-xs text-[#00E5FF] disabled:opacity-30" data-clone-template>
+      <div className="text-[11px] text-fel-dim">{CLONE_LINE}</div>
+      <button disabled={busy} onClick={() => void cloneTemplate()} className="rounded-lg border border-fel-cyan/40 px-2.5 py-1 text-xs text-fel-cyan disabled:opacity-30" data-clone-template>
         Use this template
       </button>
     </div>
@@ -198,7 +198,7 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
         <div className="fixed inset-0 z-[55] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label="Find in the library">
           <div className="absolute inset-0 bg-black/70" onClick={() => setLibraryFor(null)} />
           <div className="relative max-h-[90vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0b0b0f] p-4 sm:max-w-xl sm:rounded-2xl">
-            <button onClick={() => setLibraryFor(null)} aria-label="Close" className="absolute right-3 top-3 text-white/40 hover:text-white"><X className="h-5 w-5" /></button>
+            <button onClick={() => setLibraryFor(null)} aria-label="Close" className="absolute right-3 top-3 text-fel-dim hover:text-white"><X className="h-5 w-5" /></button>
             <LibraryBrowser canAdd onUse={pickFromLibrary} title={<div className="pr-8 text-sm text-white">Find in the library</div>} />
           </div>
         </div>
@@ -213,8 +213,8 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
         <div key={b.id} className="space-y-2">
           <div className="text-sm text-white/70 font-medium">{b.label}</div>
           {balance && (
-            <div className="flex items-start gap-1.5 rounded-md border border-[#00E5FF]/15 bg-[#00E5FF]/[0.04] px-2 py-1.5 text-[11px] text-white/70" data-testid="pull-push" data-sure={balance.sure ? '1' : '0'}>
-              <Scale className="mt-0.5 h-3 w-3 shrink-0 text-[#00E5FF]/70" aria-hidden="true" /> <span>{balance.text}</span>
+            <div className="flex items-start gap-1.5 rounded-md border border-fel-cyan/15 bg-fel-cyan/[0.04] px-2 py-1.5 text-[11px] text-white/70" data-testid="pull-push" data-sure={balance.sure ? '1' : '0'}>
+              <Scale className="mt-0.5 h-3 w-3 shrink-0 text-fel-cyan/70" aria-hidden="true" /> <span>{balance.text}</span>
             </div>
           )}
           {b.sessions.map((s) => {
@@ -228,38 +228,38 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                   <div className="min-w-0 text-xs text-white">
                     {s.kind === 'recovery' && <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-[#7BD389]/15 px-1 text-[10px] font-semibold text-[#7BD389]" data-off-day-badge><Leaf className="h-2.5 w-2.5" aria-hidden="true" />OFF DAY</span>}
                     {s.label} {done && <span className="text-[#7BD389]">· done</span>}
-                    {s.kind === 'recovery' && <div className="mt-0.5 text-[11px] text-white/45">{OFF_DAY_LINE}</div>}
+                    {s.kind === 'recovery' && <div className="mt-0.5 text-[11px] text-fel-dim">{OFF_DAY_LINE}</div>}
                   </div>
                   {s.kind === 'recovery' && !done && (
-                    <button disabled={busy} onClick={() => void call({ action: 'remove_off_day', sessionId: s.id })} className="shrink-0 text-white/30 hover:text-[#FF3366] disabled:opacity-30" aria-label="Remove this off day" data-remove-off-day>
+                    <button disabled={busy} onClick={() => void call({ action: 'remove_off_day', sessionId: s.id })} className="shrink-0 text-fel-quiet hover:text-fel-crimson disabled:opacity-30" aria-label="Remove this off day" data-remove-off-day>
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
                 {warnings.map((w) => (
-                  <div key={`${w.kind}-${'group' in w ? w.group : ''}`} className="flex items-center gap-1.5 text-[11px] text-[#FFD700]/85">
+                  <div key={`${w.kind}-${'group' in w ? w.group : ''}`} className="flex items-center gap-1.5 text-[11px] text-fel-gold/85">
                     <TriangleAlert className="h-3 w-3 shrink-0" aria-hidden="true" /> {warningText(w)}
                   </div>
                 ))}
-                {s.exercises.length === 0 && <div className="text-xs text-white/40">Nothing prescribed yet.</div>}
+                {s.exercises.length === 0 && <div className="text-xs text-fel-dim">Nothing prescribed yet.</div>}
                 {groupBySection(s.exercises).map((g) => (
                   <div key={g.section} className="space-y-1" data-section={g.section}>
-                    <div className="text-[10px] uppercase tracking-wider text-white/40">{g.label}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-fel-dim">{g.label}</div>
                     {g.items.map((e, i) => (
                       <div key={e.id} className="rounded-md border border-white/6 bg-black/20">
                         <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-white/80">
                           <button onClick={() => edit(e)} className="min-w-0 text-left flex-1" aria-expanded={open === e.id}>
-                            {labels[e.id] && <span className="mr-1.5 rounded bg-[#00E5FF]/15 px-1 text-[10px] font-semibold text-[#00E5FF]">{labels[e.id]}</span>}
-                            {e.isKeySet && <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-[#FFD700]/15 px-1 text-[10px] font-semibold text-[#FFD700]"><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY</span>}
+                            {labels[e.id] && <span className="mr-1.5 rounded bg-fel-cyan/15 px-1 text-[10px] font-semibold text-fel-cyan">{labels[e.id]}</span>}
+                            {e.isKeySet && <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-fel-gold/15 px-1 text-[10px] font-semibold text-fel-gold"><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY</span>}
                             <span className="text-white">{e.name}</span>
                             <span className="text-white/50"> — {doseLine(e)}</span>
-                            {e.setupCues.length > 0 && <span className="text-white/35"> · {e.setupCues.length} cue{e.setupCues.length > 1 ? 's' : ''}</span>}
+                            {e.setupCues.length > 0 && <span className="text-fel-quiet"> · {e.setupCues.length} cue{e.setupCues.length > 1 ? 's' : ''}</span>}
                           </button>
                           <span className="flex shrink-0 items-center gap-1">
-                            <button disabled={busy || i === 0} onClick={() => void call({ action: 'move', sessionExerciseId: e.id, direction: 'up' })} className="text-white/35 hover:text-white disabled:opacity-20" aria-label={`Move ${e.name} up`}><ArrowUp className="h-3.5 w-3.5" /></button>
-                            <button disabled={busy || i === g.items.length - 1} onClick={() => void call({ action: 'move', sessionExerciseId: e.id, direction: 'down' })} className="text-white/35 hover:text-white disabled:opacity-20" aria-label={`Move ${e.name} down`}><ArrowDown className="h-3.5 w-3.5" /></button>
-                            <button onClick={() => edit(e)} className="text-white/35 hover:text-white" aria-label={`Edit ${e.name}`}>{open === e.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}</button>
-                            <button disabled={busy} onClick={() => void call({ action: 'remove', sessionExerciseId: e.id })} className="text-white/30 hover:text-[#FF3366]" aria-label={`Remove ${e.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                            <button disabled={busy || i === 0} onClick={() => void call({ action: 'move', sessionExerciseId: e.id, direction: 'up' })} className="text-fel-quiet hover:text-white disabled:opacity-20" aria-label={`Move ${e.name} up`}><ArrowUp className="h-3.5 w-3.5" /></button>
+                            <button disabled={busy || i === g.items.length - 1} onClick={() => void call({ action: 'move', sessionExerciseId: e.id, direction: 'down' })} className="text-fel-quiet hover:text-white disabled:opacity-20" aria-label={`Move ${e.name} down`}><ArrowDown className="h-3.5 w-3.5" /></button>
+                            <button onClick={() => edit(e)} className="text-fel-quiet hover:text-white" aria-label={`Edit ${e.name}`}>{open === e.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}</button>
+                            <button disabled={busy} onClick={() => void call({ action: 'remove', sessionExerciseId: e.id })} className="text-fel-quiet hover:text-fel-crimson" aria-label={`Remove ${e.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                           </span>
                         </div>
                         {/* MIRROR-COACH P8: what the protocol gate does with this item on the client's Today, and why */}
@@ -289,7 +289,7 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                   <button
                     disabled={busy || !add.exerciseId}
                     onClick={() => void call({ action: 'add', sessionId: s.id, ...bodyFromDraft(emptyDraft(add.exerciseId, add.section, patternOf(add.exerciseId))) })}
-                    className="shrink-0 rounded-lg border border-[#00E5FF]/40 text-[#00E5FF] px-2 py-1 disabled:opacity-30"
+                    className="shrink-0 rounded-lg border border-fel-cyan/40 text-fel-cyan px-2 py-1 disabled:opacity-30"
                     aria-label="Add exercise"
                   ><Plus className="h-3.5 w-3.5" /></button>
                   <button
@@ -334,7 +334,7 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
   const suggestion = suggestedBand(d);
   // MIRROR-COACH P2 review (2026-09-26): a load RPE that reads as another band than the one picked (Today shows the band)
   const mismatch = bandMismatchLine(d);
-  const label = 'text-[10px] uppercase tracking-wider text-white/40';
+  const label = 'text-[10px] uppercase tracking-wider text-fel-dim';
   return (
     <div className="space-y-3 border-t border-white/6 px-2 py-2.5 text-xs" data-testid="exercise-editor">
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
@@ -343,7 +343,7 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
           <select value={d.section} onChange={(e) => onChange(withSection(d, e.target.value as SessionSection))} className={`w-full ${input}`}>
             {SESSION_SECTIONS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
-          {section && <span className="block text-[11px] text-white/40">{section.meaning}</span>}
+          {section && <span className="block text-[11px] text-fel-dim">{section.meaning}</span>}
         </label>
         <label className="space-y-1">
           <span className={label}>Superset</span>
@@ -351,11 +351,11 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
             <option value="">On its own</option>
             {SUPERSET_LETTERS.map((l) => <option key={l} value={l}>Superset {l}</option>)}
           </select>
-          <span className="block text-[11px] text-white/40">Same letter = done back to back, set for set.</span>
+          <span className="block text-[11px] text-fel-dim">Same letter = done back to back, set for set.</span>
         </label>
         <label className={`flex items-start gap-2 pt-4 ${d.section === 'key' ? '' : 'opacity-40'}`}>
           <input type="checkbox" checked={d.isKeySet} disabled={d.section !== 'key'} onChange={(e) => set({ isKeySet: e.target.checked })} className="mt-0.5" />
-          <span><span className="text-white">Key set</span><span className="block text-[11px] text-white/40">The one set this session is built around. {d.section === 'key' ? '' : 'Only in the Key section.'}</span></span>
+          <span><span className="text-white">Key set</span><span className="block text-[11px] text-fel-dim">The one set this session is built around. {d.section === 'key' ? '' : 'Only in the Key section.'}</span></span>
         </label>
       </div>
 
@@ -377,7 +377,7 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
             be seen or restored — and changing the timer erased it. It is edited here, and survives a new timer. */}
         {d.timed && <label className="space-y-1"><span className={label}>Each set</span><input value={timedSuffixOf(d)} onChange={(e) => onChange(withTimedSuffix(d, e.target.value))} placeholder="e.g. each side" maxLength={16} className={`w-28 ${input}`} /></label>}
         <label className="space-y-1"><span className={label}>Hold s</span><input value={d.holdSeconds} onChange={(e) => set({ holdSeconds: e.target.value })} inputMode="numeric" placeholder="none" className={`w-16 ${input}`} /></label>
-        <span className="pb-1 text-[11px] text-white/40">A hold is the pause at the end of each rep or set.</span>
+        <span className="pb-1 text-[11px] text-fel-dim">A hold is the pause at the end of each rep or set.</span>
       </div>
 
       <fieldset className="space-y-1">
@@ -386,21 +386,21 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
           <button type="button" role="radio" aria-checked={!d.effortBand} onClick={() => set({ effortBand: '' })} className={`rounded-lg border px-2 py-1 ${!d.effortBand ? 'border-white/40 text-white' : 'border-white/10 text-white/50'}`}>Not set</button>
           {EFFORT_BANDS.map((b) => (
             <button key={b.id} type="button" role="radio" aria-checked={d.effortBand === b.id} onClick={() => set({ effortBand: b.id })} title={b.meaning}
-              className={`rounded-lg border px-2 py-1 ${d.effortBand === b.id ? 'border-[#00E5FF]/60 bg-[#00E5FF]/10 text-[#00E5FF]' : suggestion === b.id ? 'border-[#00E5FF]/30 text-white/80' : 'border-white/10 text-white/60'}`}>
-              {b.label} <span className="text-white/35">RPE {b.rpe[0] === b.rpe[1] ? b.rpe[0] : `${b.rpe[0]}–${b.rpe[1]}`}</span>
+              className={`rounded-lg border px-2 py-1 ${d.effortBand === b.id ? 'border-fel-cyan/60 bg-fel-cyan/10 text-fel-cyan' : suggestion === b.id ? 'border-fel-cyan/30 text-white/80' : 'border-white/10 text-white/60'}`}>
+              {b.label} <span className="text-fel-quiet">RPE {b.rpe[0] === b.rpe[1] ? b.rpe[0] : `${b.rpe[0]}–${b.rpe[1]}`}</span>
             </button>
           ))}
         </div>
         <p className="text-[11px] text-white/50">
-          {band ? <>{band.label}: {band.meaning} {!band.youthAllowed && <span className="text-[#FFD700]/80">Adults only.</span>}</>
+          {band ? <>{band.label}: {band.meaning} {!band.youthAllowed && <span className="text-fel-gold/80">Adults only.</span>}</>
             : suggestion ? <>Your load says {d.load.trim()}, which reads as {effortBand(suggestion)?.label}. Tap it to use it.</>
             : 'How hard the set should feel, and how much brace to build.'}
         </p>
-        {mismatch && <p className="text-[11px] text-[#FFD700]/80" role="status">{mismatch}</p>}
+        {mismatch && <p className="text-[11px] text-fel-gold/80" role="status">{mismatch}</p>}
       </fieldset>
 
       <fieldset className="space-y-1">
-        <legend className={label}>Set-up cues <span className="normal-case tracking-normal text-white/30">({d.setupCues.length}/{MAX_SETUP_CUES})</span></legend>
+        <legend className={label}>Set-up cues <span className="normal-case tracking-normal text-fel-quiet">({d.setupCues.length}/{MAX_SETUP_CUES})</span></legend>
         <div className="flex flex-wrap gap-1.5">
           {setupCuesFor(pattern).map((c) => {
             const on = d.setupCues.includes(c.id);
@@ -413,7 +413,7 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
             );
           })}
         </div>
-        {d.setupCues.length > 0 && <p className="text-[11px] text-white/40">Read before the first rep: {d.setupCues.map((id) => setupCue(id)?.text).filter(Boolean).join(' ')}</p>}
+        {d.setupCues.length > 0 && <p className="text-[11px] text-fel-dim">Read before the first rep: {d.setupCues.map((id) => setupCue(id)?.text).filter(Boolean).join(' ')}</p>}
       </fieldset>
 
       <label className="block space-y-1">
@@ -422,7 +422,7 @@ export function ExerciseEditor({ draft: d, pattern, busy, onChange, onSave, onCa
       </label>
 
       <div className="flex gap-2">
-        <button disabled={busy} onClick={onSave} className="rounded-lg border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-3 py-1 text-[#00E5FF] disabled:opacity-40">Save</button>
+        <button disabled={busy} onClick={onSave} className="rounded-lg border border-fel-cyan/50 bg-fel-cyan/10 px-3 py-1 text-fel-cyan disabled:opacity-40">Save</button>
         <button onClick={onCancel} className="rounded-lg border border-white/10 px-3 py-1 text-white/60">Cancel</button>
       </div>
     </div>

@@ -14,7 +14,7 @@ export default async function LibraryReviewPage() {
   // the same admin check /coach/admin uses (lib/admin/requireAdmin.ts)
   if (!(await requireAdmin())) notFound();
   return (
-    <div className="min-h-screen bg-[#050505] pb-20">
+    <div className="min-h-screen bg-fel-bg pb-20">
       <LibraryReview />
     </div>
   );

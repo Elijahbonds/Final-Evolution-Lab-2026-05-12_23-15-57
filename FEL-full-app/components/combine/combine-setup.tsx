@@ -69,7 +69,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
   return (
     <div className="space-y-5" data-combine-setup>
       <section className="fel-card space-y-2 rounded-xl p-4">
-        <label htmlFor="combine-name" className="text-[11px] uppercase tracking-wider text-white/45">Combine name</label>
+        <label htmlFor="combine-name" className="text-[11px] uppercase tracking-wider text-fel-dim">Combine name</label>
         <input id="combine-name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} data-combine-name
           className="min-h-12 w-full rounded-xl border border-white/15 bg-black/40 px-3 text-lg font-bold text-white" />
       </section>
@@ -83,7 +83,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Team">
             {[{ id: null as string | null, name: 'Whole roster' }, ...ctx.teams].map((t) => (
               <button key={t.id ?? 'all'} type="button" role="radio" aria-checked={team === t.id} onClick={() => pickTeam(t.id)}
-                className={`min-h-11 rounded-full border px-4 text-sm font-bold ${team === t.id ? 'border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{t.name}</button>
+                className={`min-h-11 rounded-full border px-4 text-sm font-bold ${team === t.id ? 'border-fel-cyan bg-fel-cyan/15 text-fel-cyan' : 'border-white/15 text-white/70'}`}>{t.name}</button>
             ))}
           </div>
         )}
@@ -93,10 +93,10 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
             const note = athleteNote(a);
             return (
               <li key={a.id} className="flex min-h-12 items-center gap-3 py-2" data-combine-athlete={a.id} data-held={a.access.held ?? undefined}>
-                <input type="checkbox" className="h-5 w-5 accent-[#00E5FF]" checked={a.access.testable && picked.has(a.id)} disabled={!a.access.testable} onChange={() => toggle(a.id)} aria-label={a.name} />
+                <input type="checkbox" className="h-5 w-5 accent-fel-cyan" checked={a.access.testable && picked.has(a.id)} disabled={!a.access.testable} onChange={() => toggle(a.id)} aria-label={a.name} />
                 <span className="min-w-0 flex-1">
-                  <span className={`block truncate font-bold ${a.access.testable ? 'text-white' : 'text-white/40'}`}>{a.name}</span>
-                  {note && <span className="block text-xs text-white/45">{note}</span>}
+                  <span className={`block truncate font-bold ${a.access.testable ? 'text-white' : 'text-fel-dim'}`}>{a.name}</span>
+                  {note && <span className="block text-xs text-fel-dim">{note}</span>}
                 </span>
               </li>
             );
@@ -105,8 +105,8 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
             <li key={a.id} className="flex min-h-12 items-center gap-3 py-2" data-combine-athlete={a.id} data-held={a.access.held ?? undefined}>
               <button type="button" onClick={() => setAdhoc(adhoc.filter((x) => x.id !== a.id))} aria-label={`Remove ${a.name}`} className="grid h-8 w-8 place-items-center rounded-full border border-white/15 text-white/60"><X className="h-4 w-4" /></button>
               <span className="min-w-0 flex-1">
-                <span className="block truncate font-bold text-white/40">{a.name}</span>
-                <span className="block text-xs text-white/45">{athleteNote(a)}</span>
+                <span className="block truncate font-bold text-fel-dim">{a.name}</span>
+                <span className="block text-xs text-fel-dim">{athleteNote(a)}</span>
               </span>
             </li>
           ))}
@@ -125,7 +125,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
             <li key={s.id} className="flex items-center gap-2 rounded-xl border border-white/8 bg-black/20 p-3" data-combine-station={s.id}>
               <span className="min-w-0 flex-1">
                 <span className="block font-bold text-white">{stationName(s)}</span>
-                <span className="block text-xs text-white/45">{s.timing === 'camera' ? CAMERA_STATION_HOW : STATIONS[s.kind].how}</span>
+                <span className="block text-xs text-fel-dim">{s.timing === 'camera' ? CAMERA_STATION_HOW : STATIONS[s.kind].how}</span>
                 {/* SPRINT-SPEED (2026-10-25): the coach picks hand or camera for a sprint or 5-10-5 station */}
                 {(s.kind === 'sprint' || s.kind === 'agility') && timingChoices(s.kind, s.variant).includes('camera') && (
                   <button type="button" onClick={() => setTiming(s.id)} data-combine-timing={s.timing ?? 'hand'}
@@ -161,7 +161,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
 
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} className="min-h-12 rounded-xl border border-white/20 px-4 font-bold text-white/70">Cancel</button>
-        <button type="button" onClick={start} disabled={!ready} data-combine-begin className="min-h-12 flex-1 rounded-xl bg-[#00E5FF] px-4 font-black text-black disabled:opacity-40">Start the combine</button>
+        <button type="button" onClick={start} disabled={!ready} data-combine-begin className="min-h-12 flex-1 rounded-xl bg-fel-cyan px-4 font-black text-black disabled:opacity-40">Start the combine</button>
       </div>
     </div>
   );

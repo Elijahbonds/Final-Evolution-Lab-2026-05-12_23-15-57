@@ -5,6 +5,7 @@ import { DOORS } from './doors';
 import { TABS } from '../../components/shell/tab-bar';
 import { FAMILIES, OFF_SHELF } from './families';
 import { MODE_INFO } from '../game-data';
+import { t } from '@/lib/i18n';
 
 /**
  * The orphan test.
@@ -264,7 +265,10 @@ describe('the doors', () => {
     const partyDoor = DOORS.find((d) => d.href === '/party');
 
     expect(playPage).toContain('href="/play/party"');
-    expect(playPage).toContain('Couch multiplayer');
+    // TEST CHANGED (A11-07, lane/a11y-design, 2026-10-25): the Play tab's words moved to messages/en/play.json (i18n). The
+    // label is still held: the page reads the key, and the key says "Couch multiplayer".
+    expect(playPage).toContain("t('play.couch')");
+    expect(t('play.couch')).toBe('Couch multiplayer');
     expect(playPage).not.toContain('Play with friends');
     expect(partyDoor?.label).toBe('Party chat');
   });

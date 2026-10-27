@@ -8,7 +8,7 @@
 // PRESENTATION ONLY: every number is the host's (from the mode's HUD); the meter only clamps it to its own box. Fractions
 // are 0..1 along the bar; `value` is on 0..max.
 import type { CSSProperties, ReactNode } from 'react';
-import { HUD_TEXT_ALPHA, clamp01, hudColor, hudType, meterPct, type HudSize, type HudTone } from './tokens';
+import { HUD_TEXT_ALPHA, clamp01, hudColor, hudCueShape, hudType, meterPct, type HudSize, type HudTone } from './tokens';
 
 export interface MeterSegment { from: number; to: number; tone?: HudTone; alpha?: number; label?: ReactNode; labelTone?: HudTone; edge?: boolean }
 export interface MeterTick { at: number; major?: boolean; label?: ReactNode; labelTone?: HudTone; labelAlpha?: number; line?: boolean }
@@ -77,7 +77,7 @@ export function HudMeter({
       }}
     >
       {segments?.map((s, i) => (
-        <div key={`s${i}`} className="absolute inset-y-0" style={{ left: pc(s.from), width: pc(clamp01(s.to) - clamp01(s.from)), background: s.tone ? hudColor(s.tone, s.alpha ?? 0.5) : `rgba(255,255,255,${s.alpha ?? 0.06})` }}>
+        <div key={`s${i}`} data-hud-band={s.tone ?? 'plain'} className="absolute inset-y-0" style={{ left: pc(s.from), width: pc(clamp01(s.to) - clamp01(s.from)), ...hudCueShape(s.tone, s.tone ? hudColor(s.tone, s.alpha ?? 0.5) : `rgba(255,255,255,${s.alpha ?? 0.06})`) }}>
           {s.label != null && s.label !== '' && (
             <span className="absolute bottom-full left-1/2 mb-[2px] -translate-x-1/2 whitespace-nowrap" style={{ ...hudType('caption'), color: s.labelTone ? hudColor(s.labelTone) : hudColor('text', 0.7) }}>{s.label}</span>
           )}

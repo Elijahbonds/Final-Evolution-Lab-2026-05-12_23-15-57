@@ -38,7 +38,7 @@ export function AlertsStrip({ alerts, shownIds }: { alerts: readonly CoachAlert[
         <ul className="space-y-1.5">
           {missed.map((a) => (
             <li key={a.clientId} className="flex items-start gap-2 rounded-lg bg-white/4 px-3 py-2 text-sm" data-alert={a.kind}>
-              <CalendarX2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
+              <CalendarX2 className="mt-0.5 h-4 w-4 shrink-0 text-fel-gold" aria-hidden="true" />
               <span className="min-w-0 break-words"><span className="font-medium text-white/90">{a.name}</span>{' '}<span className="text-white/55">{a.line}</span></span>
             </li>
           ))}

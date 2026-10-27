@@ -56,7 +56,7 @@ export function toggleAnswer(a: ReadinessAnswers, id: ReadinessItemId, n: number
 const answeredCount = (a: ReadinessAnswers) => READINESS_ITEMS.filter((i) => typeof a[i.id] === 'number').length;
 
 const pill = (active: boolean) =>
-  `h-8 min-w-8 flex-1 rounded-md text-xs font-medium border ${active ? 'bg-[#00E5FF]/20 border-[#00E5FF]/50 text-[#00E5FF]' : 'border-white/10 text-white/60'}`;
+  `h-8 min-w-8 flex-1 rounded-md text-xs font-medium border ${active ? 'bg-fel-cyan/20 border-fel-cyan/50 text-fel-cyan' : 'border-white/10 text-white/60'}`;
 
 /** The four scales. Presentational (no fetch, no storage), so a server render of it is a real first paint. */
 export function ReadinessScales({ answers, onPick, disabled = false }: { answers: ReadinessAnswers; onPick: (id: ReadinessItemId, n: number) => void; disabled?: boolean }) {
@@ -74,7 +74,7 @@ export function ReadinessScales({ answers, onPick, disabled = false }: { answers
               >{n}</button>
             ))}
           </div>
-          <div className="mt-0.5 flex justify-between text-[10px] text-white/35"><span>{item.anchors[1]}</span><span>{item.anchors[5]}</span></div>
+          <div className="mt-0.5 flex justify-between text-[10px] text-fel-quiet"><span>{item.anchors[1]}</span><span>{item.anchors[5]}</span></div>
         </div>
       ))}
     </div>
@@ -83,7 +83,7 @@ export function ReadinessScales({ answers, onPick, disabled = false }: { answers
 
 /** After a save: the server's level, said for what today's warm-up really is (no minutes — see the header's P6 fix). */
 export function ReadinessResult({ read, warmup }: { read: ReadinessRead; warmup: ReadinessWarmupKind }) {
-  const tone = read.level === 'low' ? 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#00FF9D]/30 bg-[#00FF9D]/8 text-[#00FF9D]';
+  const tone = read.level === 'low' ? 'border-fel-gold/40 bg-fel-gold/10 text-fel-gold' : 'border-fel-emerald/30 bg-fel-emerald/8 text-fel-emerald';
   return (
     <div className={`rounded-lg border px-3 py-2 text-xs ${tone}`} role="status" data-readiness-level={read.level} data-warmup-kind={warmup}>
       <span className="leading-snug">{readinessSuggestion(read.level, warmup)}</span>
@@ -162,7 +162,7 @@ export function ReadinessCheckInCard({ endpoint = READINESS_API, onRead, warmup 
   if (phase === 'loading') return null;
 
   if (phase === 'skipped') return (
-    <div className="flex items-center justify-between text-[11px] text-white/40 px-1" data-testid="readiness-skipped">
+    <div className="flex items-center justify-between text-[11px] text-fel-dim px-1" data-testid="readiness-skipped">
       <span>Check-in skipped today.</span>
       <button type="button" onClick={unskip} className="underline underline-offset-2 hover:text-white/60">Answer anyway</button>
     </div>
@@ -174,10 +174,10 @@ export function ReadinessCheckInCard({ endpoint = READINESS_API, onRead, warmup 
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-white/90">Quick check-in</div>
-          <div className="text-[11px] text-white/45">About 20 seconds. Every question is optional.</div>
+          <div className="text-[11px] text-fel-dim">About 20 seconds. Every question is optional.</div>
         </div>
         {phase === 'done' && (
-          <button type="button" onClick={() => setPhase('ask')} className="flex items-center gap-1 text-[11px] text-white/45 hover:text-white/70">
+          <button type="button" onClick={() => setPhase('ask')} className="flex items-center gap-1 text-[11px] text-fel-dim hover:text-white/70">
             <SlidersHorizontal className="h-3 w-3" aria-hidden="true" /> Change
           </button>
         )}
@@ -206,11 +206,11 @@ export function ReadinessCheckInCard({ endpoint = READINESS_API, onRead, warmup 
               <button type="button" disabled={busy} onClick={() => { setAnswers(savedAnswers); setPhase('done'); }} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/55">Cancel</button>
             )}
           </div>
-          {error && <p className="text-[11px] text-[#FF3366]">That didn’t save. Your session below isn’t affected.</p>}
+          {error && <p className="text-[11px] text-fel-crimson">That didn’t save. Your session below isn’t affected.</p>}
         </>
       )}
 
-      <p className="text-[10px] text-white/35">{READINESS_NOT_SCORED_LINE}</p>
+      <p className="text-[10px] text-fel-quiet">{READINESS_NOT_SCORED_LINE}</p>
     </div>
   );
 }

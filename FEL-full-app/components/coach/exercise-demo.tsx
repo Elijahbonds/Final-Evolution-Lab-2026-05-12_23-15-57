@@ -14,7 +14,7 @@ import { Play, User, Dumbbell } from 'lucide-react';
 const ExerciseAvatarCanvas = dynamic(() => import('./exercise-avatar-canvas'), {
   ssr: false,
   loading: () => (
-    <div className="aspect-video w-full flex items-center justify-center bg-[#07070d] text-white/40 text-xs">
+    <div className="aspect-video w-full flex items-center justify-center bg-[#07070d] text-fel-dim text-xs">
       Loading your avatar…
     </div>
   ),
@@ -69,7 +69,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-2 text-[11px] font-bold tracking-widest transition-colors ${
-                tab === t ? 'bg-white/[0.06] text-[#00E5FF]' : 'text-white/40 hover:text-white/70'
+                tab === t ? 'bg-white/[0.06] text-fel-cyan' : 'text-fel-dim hover:text-white/70'
               }`}
             >
               <span className="inline-flex items-center gap-1.5">
@@ -85,7 +85,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {tab === 'avatar' && hasAvatar && (
         <div className="relative">
           <ExerciseAvatarCanvas stat={exercise.targetPrqStat || ''} clip={exercise.clip ?? undefined} />
-          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
+          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-fel-cyan">
             YOUR AVATAR
           </span>
         </div>
@@ -106,10 +106,10 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
         ) : (
           <button
             onClick={() => setShowVideo(true)}
-            className="w-full aspect-video bg-[#16161a] border-b border-white/6 flex flex-col items-center justify-center gap-2 hover:border-[#FF3366]/30 transition-all group"
+            className="w-full aspect-video bg-[#16161a] border-b border-white/6 flex flex-col items-center justify-center gap-2 hover:border-fel-crimson/30 transition-all group"
           >
-            <div className="w-12 h-12 rounded-full bg-[#FF3366]/20 flex items-center justify-center group-hover:bg-[#FF3366]/30 transition-colors">
-              <Play className="h-6 w-6 text-[#FF3366]" />
+            <div className="w-12 h-12 rounded-full bg-fel-crimson/20 flex items-center justify-center group-hover:bg-fel-crimson/30 transition-colors">
+              <Play className="h-6 w-6 text-fel-crimson" />
             </div>
             <span className="text-sm text-white/50">Watch Coach Bonds Demo</span>
           </button>
@@ -120,10 +120,10 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {((tab === 'video' && !hasVideo) || (tab === 'avatar' && !hasAvatar)) && (
         <div className="p-5">
           <div className="fel-cuecard flex aspect-video w-full items-center justify-center rounded-xl bg-[#16161a]">
-            <Dumbbell className="h-10 w-10 text-white/30" />
+            <Dumbbell className="h-10 w-10 text-fel-quiet" />
           </div>
           {!hasVideo && (
-            <p className="mt-3 text-center text-[11px] text-white/40">
+            <p className="mt-3 text-center text-[11px] text-fel-dim">
               Follow the cues below.
             </p>
           )}
