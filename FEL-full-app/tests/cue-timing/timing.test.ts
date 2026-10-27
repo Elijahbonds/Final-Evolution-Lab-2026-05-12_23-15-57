@@ -4,8 +4,9 @@
 // MEASURED BEFORE THE FIX (same feeds, this lane's first run; docs/CUE-AUDIT.md "Timing"):
 //   · the hinge's and the push-up's first correction started 3.0–3.5 s into the ~4 s stage line ("Now the work set…"):
 //     1 overlap per set, gap −33 ms (hinge) and −600 ms (push-up) — two lines at once;
-//   · the rep that closed the set was still cued on the frame the review opened ("Slower. Stay straight." after the last
-//     push-up, the regress after the last hinge rep).
+//   · LATENT, found while measuring the first fix: the rep that closes a side-on set was still cued, on the frame the
+//     review opened. On the base timing no feed here happened to land a cue on that frame; once the first cue waited for
+//     the stage line, two did ("Slower. Stay straight." after the last push-up; the reset after the last hinge rep).
 // The fixes change WHEN a line is said, not what is detected: CueEngine.holdFor (the coach waits while a line is being
 // said; lib/cue-style/speech.ts) and no live cue once the set is over (sideRepStage.ts applySideRepFrame).
 import { describe, expect, it } from 'vitest';

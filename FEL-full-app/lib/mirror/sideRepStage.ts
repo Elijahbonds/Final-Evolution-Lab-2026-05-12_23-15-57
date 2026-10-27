@@ -344,8 +344,8 @@ export function applySideRepFrame<F extends string>(
   const say = (line: string, protect?: boolean) => { fx.say(line, protect); engine.holdFor(frame.t, speechMs(line)); };
   if (step.turnPrompt) say(SIDE_TURNED, true);
   // CUE-REWRITE (2026-10-27): NOTHING MID-REP IS SAID AFTER THE SET IS OVER. Measured on the rig's synthetic feeds: the
-  // rep that closed the set was still cued, on the frame the review opened — "Slower. Stay straight." to someone who had
-  // already stopped. The closing rep's faults still reach the engine's book (endRep, below) and the review card.
+  // rep that closed the set could still be cued, on the frame the review opened — "Slower. Stay straight." to someone who
+  // had already stopped (latent on the base timing; it showed once the first cue waited for the stage line). The closing rep's faults still reach the engine's book (endRep, below) and the review card.
   if (step.cueFaults && step.state.stage !== 'review') {
     const evt = engine.decide(frame.t, step.cueFaults);
     if (evt) fx.cue(evt);
