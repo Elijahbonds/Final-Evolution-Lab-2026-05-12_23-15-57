@@ -1402,7 +1402,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const cb = carrierId !== 'foeTeam' && !shooting && !dunking && !gather && !finish && !passFlight.active && !arc.active && !mateArc.active && !board ? carrierBody() : null;
         const onBallFoe = cb ? foes[marks.indexOf(cb === me ? 0 : cb === mates[0] ? 1 : 2)] ?? null : null;
         const aiOn = !!cb && !!onBallFoe && onBallFoe.stunSec === 0 && !onBallFoe.floored && !!carries.get(cb)?.active;
-        const meOn = !aiOn && carrierId === 'foeTeam' && !!driver && driverHasBall() && !driveStolen && driveK > 0 && driveK < 1 - GATHER_TELL_SEC / driveSec && meStunSec === 0 && !meFloored && myJumpAge === Infinity;
+        const meOn = !aiOn && carrierId === 'foeTeam' && driverHasBall() && !driveStolen && !!driver && driveK > 0 && driveK < 1 - GATHER_TELL_SEC / driveSec && meStunSec === 0 && !meFloored && myJumpAge === Infinity;
         const h = aiOn ? cb! : meOn ? driver! : null, d = aiOn ? onBallFoe! : meOn ? me : null;
         const hc = h ? carries.get(h) : undefined;
         const foul = handChecks.step(dt, { who: aiOn ? 'ai' : meOn ? 'me' : null, handler: h?.char ?? null, defender: d?.char ?? null, gap: h && d ? distXZ(h.char.root.position, d.char.root.position) : Infinity, ballRig: hc && hc.active && !hc.move ? hc.side : null, token: possessionToken });
