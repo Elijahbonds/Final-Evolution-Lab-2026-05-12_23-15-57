@@ -17,11 +17,11 @@ export function WeekCardEntry({ now = new Date() }: { now?: Date }) {
         <TrendingUp className="h-5 w-5 text-fel-cyan" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-mono text-[11px] uppercase tracking-[0.14em] text-fel-dim">Your week · {weekLabel({ window: windowAt(now) })}</span>
+        <span className="block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-dim">Your week · {weekLabel({ window: windowAt(now) })}</span>
         <span className="fel-heading mt-1 block text-[16px] font-bold leading-tight text-white">What moved this week</span>
         <span className="mt-1 block text-[13px] text-white/55">Your numbers against last week, and a card to share.</span>
       </span>
-      <span className="shrink-0 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-fel-cyan">See it →</span>
+      <span className="shrink-0 font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-cyan">See it →</span>
     </Link>
   );
 }

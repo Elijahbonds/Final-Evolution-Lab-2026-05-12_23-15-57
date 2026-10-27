@@ -125,11 +125,11 @@ describe('the knee cue, switched on: what it says and what it never says', () =>
   it('what it says is the action, never a band, a muscle or a cause', () => {
     const c = CUES.kneeValgus;
     for (const l of [c.cue, c.escalate, c.regress]) expect(l).not.toMatch(/\bband\b|glute|muscle|weak|tight|injur|pain/i);
-    // MIRROR-COACH P9 (2026-09-30): was toMatch(/knees out/i). The cue now LEADS with the floor ("Press the floor apart
-    // with your feet — knees travel out over your second toes", lib/coach/cueLint.ts's external-focus policy), so "knees
-    // out" is no longer a contiguous phrase. Not relaxed: the knee direction is still asserted, and the floor lead is new.
-    expect(c.cue).toMatch(/knees (travel )?out/i);
-    expect(c.cue).toMatch(/^Press the floor apart/);
+    // test changed: copy rewrite (CUE-REWRITE 2026-10-27). P9 made the cue lead with the floor ("Press the floor apart with
+    // your feet — knees travel out over your second toes", 13 words, said mid-rep). The style guide's live cue is 2–5 words
+    // and the brief's own example is "Knees out": the knee direction is still asserted, and the length is now asserted too.
+    expect(c.cue).toMatch(/^Knees out/i);
+    expect(c.cue.split(/\s+/).length).toBeLessThanOrEqual(5);
   });
 });
 
@@ -203,7 +203,8 @@ describe('the faded schedule: every rep → every third → summary only, reset 
     const lines = fadeReviewLines(s3.report, (f) => f);
     // MIRROR-COACH P9 fix: the words are about what the reps showed ("you had been holding it" was said even when the
     // fault showed on half the set — that case now steps back up, tested below)
-    expect(lines).toEqual(['heelRise: 2 of 8 reps. Left for this summary: it had stayed away at the end of your earlier sets.']);
+    // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — same meaning: not said during the set, because it had been fixed
+    expect(lines).toEqual(['heelRise: 2 of 8 reps. Not said during the set, because you had fixed it in earlier sets.']);
   });
 
   it('the fault coming back (two reps in a row) resets it to every rep at once, and the coach speaks on the rep that brought it back', () => {
@@ -217,7 +218,8 @@ describe('the faded schedule: every rep → every third → summary only, reset 
     expect(s.spoken.every((x) => x.rep >= 4)).toBe(true);
     expect(s.report.faults[0]).toMatchObject({ level: 'everyRep', next: 'everyRep', faultReps: 4, returned: true, landed: false });
     expect(ce.levelOf('heelRise')).toBe('everyRep');
-    expect(fadeReviewLines(s.report, (f) => f)[0]).toBe('heelRise came back on 4 of 8 reps, so the cues for it started again.');
+    // test changed: copy rewrite (CUE-REWRITE) — same meaning: it came back, so it is cued every rep again
+    expect(fadeReviewLines(s.report, (f) => f)[0]).toBe('heelRise: back on 4 of 8 reps, so the coach reminds you every rep again.');
   });
 
   it('the reset happens mid-set: the level is back to every rep the moment the second rep in a row ends', () => {
@@ -236,7 +238,8 @@ describe('the faded schedule: every rep → every third → summary only, reset 
     const s = runSet(ce, 'armFall', [2, 7], 100_000);
     expect(s.spoken).toEqual([]);
     expect(s.report.faults[0]).toMatchObject({ level: 'everyThird', faultReps: 2, returned: false });
-    expect(fadeReviewLines(s.report, (f) => f)).toEqual(['armFall: 2 of 8 reps, cued every third time it showed.']);
+    // test changed: copy rewrite (CUE-REWRITE) — same meaning
+    expect(fadeReviewLines(s.report, (f) => f)).toEqual(['armFall: 2 of 8 reps, with a reminder every third time.']);
   });
 
   it('a cue lands only if the fault is clear for LANDED_CLEAR_REPS reps at the END of the set', () => {
@@ -291,12 +294,13 @@ describe('the faded schedule: every rep → every third → summary only, reset 
       { fault: 'heelRise', level: 'everyRep', next: 'everyThird', faultReps: 1, spoken: 1, landed: true, returned: false, slipped: false },
       { fault: 'armFall', level: 'everyThird', next: 'summaryOnly', faultReps: 0, spoken: 0, landed: true, returned: false, slipped: false },
     ] };
-    const lines = fadeReviewLines(report, (f) => (f === 'heelRise' ? 'Heels lifting on the descent' : 'Shoulders drifting sideways off the start line'));
+    const lines = fadeReviewLines(report, (f) => (f === 'heelRise' ? 'Heels lift' : 'Shoulders shift to one side'));
     // MIRROR-COACH P9 fix (code review): these said "Heels lifting on the descent held." — the FAULT held, read plainly,
     // the opposite of what landed means. Now the fix is what held.
+    // test changed: copy rewrite (CUE-REWRITE) — same meaning: the fix held for the last 3+ reps, and what the coach does next
     expect(lines).toEqual([
-      'Fixed and kept: heels lifting on the descent stayed away for the last 3+ reps. Next set it gets a cue every third time it shows.',
-      'Fixed and kept again: shoulders drifting sideways off the start line stayed away for the last 3+ reps. Next set it is saved for the end of the set.',
+      'Fixed: heels lift did not show on your last 3+ reps. Next set, fewer reminders.',
+      'Fixed again: shoulders shift to one side did not show on your last 3+ reps. Next set, the coach saves it for the end.',
     ]);
     for (const l of lines) expect(l).not.toMatch(/\bheld\b/);
     for (const l of lines) expect(l).not.toMatch(/injur|prevent|risk|pain|diagnos|\bribs?\b/i);
@@ -445,7 +449,8 @@ describe('P9 fix: a faded fault that keeps showing steps back up (it never could
     expect(s.report.faults[0]).toMatchObject({ level: 'summaryOnly', next: 'everyThird', faultReps: 4, landed: false, returned: false, slipped: true });
     expect(ce.levelOf('heelRise')).toBe('everyThird');
     const lines = fadeReviewLines(s.report, (f) => f);
-    expect(lines).toEqual(['heelRise: 4 of 8 reps, not cued during the set. That is too often to leave it, so next set it gets a cue every third time it shows again.']);
+    // test changed: copy rewrite (CUE-REWRITE) — same meaning: too often to leave, so next set it is cued every third time
+    expect(lines).toEqual(['heelRise: 4 of 8 reps, not said during the set. Next set, a reminder every third time.']);
     expect(lines.join(' ')).not.toMatch(/holding it|stayed away/);
     // …and the next set it IS cued (every third), where before it was silent for good
     t = s.end + 10_000;
@@ -460,7 +465,8 @@ describe('P9 fix: a faded fault that keeps showing steps back up (it never could
     const s = set(ce, 'heelRise', [1, 3, 5, 7], 50_000);
     expect(s.report.faults[0]).toMatchObject({ level: 'everyThird', next: 'everyRep', slipped: true });
     expect(ce.levelOf('heelRise')).toBe('everyRep');
-    expect(fadeReviewLines(s.report, (f) => f)[0]).toMatch(/too often to leave it, so next set it gets a cue every time it shows again\.$/);
+    // test changed: copy rewrite (CUE-REWRITE) — same meaning
+    expect(fadeReviewLines(s.report, (f) => f)[0]).toMatch(/Next set, a reminder every time\.$/);
     const ce2 = new CueEngine({ clearByRep: true });
     set(ce2, 'heelRise', [1], 0);
     const two = set(ce2, 'heelRise', [2, 6], 50_000);

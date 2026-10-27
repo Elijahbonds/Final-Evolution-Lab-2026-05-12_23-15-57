@@ -39,6 +39,8 @@
 // Pure, like squatStage.ts and lungeStage.ts: the harness calls stepSideRep once per camera frame and applies what it
 // returns once; the same (prev, input) gives the same step and prev is not touched (sideRepStage.test.ts holds that).
 // Nothing here is saved or sent.
+import { result, resultText, type ResultLine } from '@/lib/cue-style/result';
+import { speechMs } from '@/lib/cue-style/speech';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
 import { SIDE_TURNED, SIDE_WIDTH_MAX, sideWidth } from './framing';
 import { pickNearSide } from './hingeAudit';
@@ -242,7 +244,7 @@ export function stepSideRep<F extends string>(
     state: { stage, reps, side, heldMs, lastOkMs, armed, armedFrames, buffer, wrongView, turnPromptSaid, checkReps, workReps, lastMs: input.nowMs },
     stageChanged: stage !== prev.stage,
     repClosed,
-    // the coach answers work-set reps only; a rep that closes the set is still cued (its faults are this set's)
+    // the coach answers work-set reps only; a rep that closes the set reports its faults (CUE-REWRITE: applySideRepFrame no longer SAYS them — the set is over)
     cueFaults: wasWork && present ? (repClosed ? repClosed.faults : []) : null,
     turnPrompt,
   };
@@ -253,8 +255,8 @@ export function stepSideRep<F extends string>(
  * for the review — the squat's rule: the coach stops talking when the set is over, and the card says the rest.
  */
 export function sideRepStageLine(spec: Pick<SideRepSpec<string>, 'checkReps' | 'workReps'>, stage: SideRepStageName): string | null {
-  if (stage === 'check') return `Good. ${spec.checkReps} slow reps first — the check.`;
-  if (stage === 'work') return `Now the work set: ${spec.workReps} reps. I will cue between reps.`;
+  if (stage === 'check') return `Good. First, ${spec.checkReps} slow reps so I can watch.`;
+  if (stage === 'work') return `Now ${spec.workReps} reps. I will coach you between reps.`;
   return null;
 }
 
@@ -274,8 +276,10 @@ export interface SideRepStageReview<F extends string> {
 export interface SideRepReview<F extends string> {
   check: SideRepStageReview<F>;
   work: SideRepStageReview<F>;
-  /** One line on whether what the check found was still showing at the end of the work set. */
+  /** One line on whether what the check found was still showing at the end of the work set (the result's text). */
   verdict: string;
+  /** CUE-REWRITE: the verdict in the three-part result shape. */
+  result: ResultLine;
 }
 
 function stageReview<F extends string>(spec: SideRepSpec<F>, reps: readonly SideRep<F>[]): SideRepStageReview<F> {
@@ -296,21 +300,23 @@ export function sideRepReview<F extends string>(spec: SideRepSpec<F>, state: Pic
   const work = stageReview(spec, state.workReps);
   const readWork = state.workReps.filter((r) => r.read);
   const tail = readWork.slice(-VERDICT_TAIL_REPS);
-  let verdict: string;
-  if (check.reps + work.reps === 0) verdict = 'No reps were read — the set ended before the first one.';
-  else if (readWork.length < VERDICT_TAIL_REPS) verdict = 'Too few work-set reps were read to say whether anything held.';
+  let r: ResultLine;
+  if (check.reps + work.reps === 0) r = result('No reps were read.', 'The set ended before the first rep.', 'Start again, and hold still at the top so I can begin.');
+  else if (readWork.length < VERDICT_TAIL_REPS) r = result('Too few reps were read in the main set.', 'So we cannot tell yet if anything changed.', 'Do one more set with your whole body in the shot.');
   else {
     const found = check.faultReps.map((x) => x.fault);
     const still = spec.faults.filter((f) => tail.some((r) => r.faults.includes(f)));
     if (still.length === 0) {
-      verdict = found.length
-        ? `The last ${VERDICT_TAIL_REPS} reps read clean — what the check found (${found.map((f) => label(f).toLowerCase()).join(', ')}) did not show.`
-        : `The last ${VERDICT_TAIL_REPS} reps read clean.`;
+      r = found.length
+        ? result(`Your last ${VERDICT_TAIL_REPS} reps were clean. What the first reps showed (${found.map((f) => label(f).toLowerCase()).join(', ')}) was gone.`,
+          'The coaching worked in this set.', 'Next time, start the set the way you finished it.')
+        : result(`Your last ${VERDICT_TAIL_REPS} reps were clean.`, 'Nothing needed fixing in this set.', 'Next time, add a few reps or slow the lowering down.');
     } else {
-      verdict = `Still showing in the last ${VERDICT_TAIL_REPS} reps: ${still.map((f) => label(f).toLowerCase()).join(', ')}.`;
+      r = result(`Still there on your last ${VERDICT_TAIL_REPS} reps: ${still.map((f) => label(f).toLowerCase()).join(', ')}.`,
+        'It often takes a few sets to fix.', 'Next set, go slower and listen for the coach\'s reminder.');
     }
   }
-  return { check, work, verdict };
+  return { check, work, verdict: resultText(r), result: r };
 }
 
 // ── the harness's wiring, here so the tests drive the same code (MIRROR-MOVES P2) ─────────────────────────────────────
@@ -334,14 +340,19 @@ export function applySideRepFrame<F extends string>(
   const step = stepSideRep(spec, ref.current, { nowMs: frame.t, frame });
   ref.current = step.state;
   if (step.repClosed || step.stageChanged || step.turnPrompt) fx.state(step.state);
-  if (step.turnPrompt) fx.say(SIDE_TURNED, true);
-  if (step.cueFaults) {
+  // CUE-REWRITE (2026-10-27): every line said here holds the coach quiet until it has been said (CueEngine.holdFor)
+  const say = (line: string, protect?: boolean) => { fx.say(line, protect); engine.holdFor(frame.t, speechMs(line)); };
+  if (step.turnPrompt) say(SIDE_TURNED, true);
+  // CUE-REWRITE (2026-10-27): NOTHING MID-REP IS SAID AFTER THE SET IS OVER. Measured on the rig's synthetic feeds: the
+  // rep that closed the set could still be cued, on the frame the review opened — "Slower. Stay straight." to someone who
+  // had already stopped (latent on the base timing; it showed once the first cue waited for the stage line). The closing rep's faults still reach the engine's book (endRep, below) and the review card.
+  if (step.cueFaults && step.state.stage !== 'review') {
     const evt = engine.decide(frame.t, step.cueFaults);
     if (evt) fx.cue(evt);
   }
   if (was === 'work' && step.repClosed) engine.endRep(step.repClosed.faults, frame.t);
   if (step.stageChanged) {
     if (step.state.stage === 'review') fx.review(fadeReviewLines(engine.endSet(), label));
-    else { const line = sideRepStageLine(spec, step.state.stage); if (line) fx.say(line, true); }
+    else { const line = sideRepStageLine(spec, step.state.stage); if (line) say(line, true); }
   }
 }

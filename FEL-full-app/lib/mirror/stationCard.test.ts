@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The per-station result card's words (MIRROR-COACH P3, 2026-09-26): value + unit + pass / flagged for a closer look /
 // not read, one FIX line under a flag and only there, and the one retest said honestly.
 import { describe, expect, it } from 'vitest';
@@ -19,19 +21,19 @@ describe('the per-station card', () => {
   it('a pass shows its value with the unit, labelled estimated, and no fix line', () => {
     const pass = g({ checkId: 'shoulderLevel', status: 'pass', value: 0.03 });
     const card = stationCard('modified', rec(1, [pass]))!;
-    expect(card.title).toBe('Station 2 of 6 · Knee window, Hip level, Shoulder height');
-    expect(card.rows[0]).toMatchObject({ label: 'Shoulder height', statusLabel: 'Pass', fix: null, retest: null });
+    expect(card.title).toBe('Station 2 of 6 · Knees from the front, Hip level, Shoulder level');
+    expect(card.rows[0]).toMatchObject({ label: 'Shoulder level', statusLabel: 'Looks good', fix: null, retest: null });
     expect(card.rows[0].value).toBe(formatGradeValue(pass));
-    expect(card.rows[0].value).toMatch(/0\.03 of a shoulder width.*estimated/);
+    expect(card.rows[0].value).toMatch(/higher by about 3% of your shoulder width · estimated$/);
   });
 
   it('a flag is "flagged for a closer look" with exactly one FIX line', () => {
     const flag = g({ checkId: 'kneeWindow', status: 'flag', value: 0.66, bySide: { left: 0.66, right: 0.01 }, side: 'left' });
     const row = stationCard('modified', rec(1, [flag]))!.rows[0];
-    expect(row.statusLabel).toBe('Flagged for a closer look');
+    expect(row.statusLabel).toBe('Worth working on');
     expect(row.fix).toBe(fixLine('kneeWindow'));
     expect(row.fix).toBeTruthy();
-    expect(row.value).toMatch(/hip half-widths: L 0\.66 in · R 0\.01 in · estimated/);
+    expect(row.value).toMatch(/left knee about 33% of your hip width inside the line, right knee about 1% of your hip width inside the line · estimated/);
   });
 
   // MIRROR-COACH P3 review (2026-09-26): the card's hip FIX said "on the low side" beside a grade whose side is the HIGHER hip
@@ -46,21 +48,21 @@ describe('the per-station card', () => {
     const pending = stationCard('modified', rec(0, [un], { retesting: true }))!.rows[0];
     expect(pending).toMatchObject({ statusLabel: 'Not read', retest: RETEST_OFFER, fix: null });
     expect(pending.value).toMatch(/^Not read:/);
-    expect(pending.retest).toMatch(/retest this station/i);
+    expect(pending.retest).toMatch(/try this one once more/i);
     expect(stationCard('modified', rec(0, [un], { attempts: 2 }))!.rows[0].retest).toBe(NOT_READ_AFTER_RETEST);
     expect(stationCard('modified', rec(0, [un], { attempts: 1 }))!.rows[0].retest).toBe(NOT_READ_SKIPPED);
-    for (const l of [NOT_READ_AFTER_RETEST, NOT_READ_SKIPPED]) expect(l).toMatch(/never as a pass/);
+    for (const l of [NOT_READ_AFTER_RETEST, NOT_READ_SKIPPED]) expect(l).toMatch(/has no result/);   // same meaning: kept as not read, never a pass
   });
 
   it('a one-leg station names its leg; a station the camera does not grade has no card', () => {
     const leg = g({ checkId: 'singleLeg', status: 'pass', side: 'right', touchDowns: 0, stanceSec: 29 });
-    expect(stationCard('modified', rec(5, [leg]))!.title).toMatch(/Single-leg stance.*· right leg$/);
+    expect(stationCard('modified', rec(5, [leg]))!.title).toMatch(/One-leg balance.*· right leg$/);
     expect(stationCard('modified', rec(2, []))).toBeNull();          // the breath station: answered, never graded
     expect(stationCards('full', [rec(4, []), rec(5, []), rec(0, [g({ checkId: 'heelLine', status: 'pass' })])])).toHaveLength(1);
   });
 
   it('the status words are the contract\'s three, and no card line breaks the copy rules', () => {
-    expect(Object.values(STATUS_LABEL)).toEqual(['Pass', 'Flagged for a closer look', 'Not read']);
+    expect(Object.values(STATUS_LABEL)).toEqual(['Looks good', 'Worth working on', 'Not read']);   // the Quick Screen's band words
     const lines = [RETEST_OFFER, NOT_READ_AFTER_RETEST, NOT_READ_SKIPPED, ...Object.values(STATUS_LABEL)];
     for (const id of ['heelLine', 'kneeWindow', 'hipLevel', 'shoulderLevel', 'headFloat', 'singleLeg']) lines.push(fixLine(id)!);
     for (const l of lines) {

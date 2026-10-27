@@ -35,7 +35,7 @@ export function sideRepChip(stage: SideRepStageName = 'setup'): string {
   return stage === 'setup' ? 'Get side-on' : stage;
 }
 
-const JUMP: Record<string, string> = { ready: 'Jump when ready', airborne: 'Airborne', calibrating: 'Stand still' };
+const JUMP: Record<string, string> = { ready: 'Jump when ready', airborne: 'In the air', calibrating: 'Stand still' };
 
 /**
  * A check's label cut to the chip: up to its first comma or bracket ("Single-leg stance, 30 seconds a side" →

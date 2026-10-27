@@ -79,15 +79,15 @@ describe('pickLane', () => {
 
 describe('the lane page\'s sample drill: the trigger\'s own draft cue, else the lane\'s default draft cue', () => {
   it('a knee cave → the draft\'s OHS knee-cave cue', () => {
-    expect(sampleDrill('correctives', 'ohs.kneeCave').cue).toBe('Band lateral walks, clamshells, goblet squat with knees pushed out');
+    expect(sampleDrill('correctives', 'ohs.kneeCave').cue).toBe('Slow squats to a chair, pushing your knees out over your toes.');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
   });
   it('a hip drop → the draft\'s side-plank cue', () => {
-    expect(sampleDrill('posture', 'sls.hipDrop').cue).toBe('Side planks, single-leg glute bridge');
+    expect(sampleDrill('posture', 'sls.hipDrop').cue).toBe('Side planks and one-leg bridges, keeping your hips level.');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
   });
   it('lateral shift has no draft cue → the posture lane\'s wall-slides cue', () => {
-    expect(sampleDrill('posture', 'ohs.lateralShift').cue).toBe('Wall slides, lat stretch, foam roll upper back');
+    expect(sampleDrill('posture', 'ohs.lateralShift').cue).toBe('Wall slides: back flat on a wall, slide your arms slowly up and down.');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
   });
   it('a clean screen → the dunking lane\'s snap-down cue', () => {
-    expect(sampleDrill('dunking', null).cue).toBe('Snap-down landings, drop-and-stick holds');
+    expect(sampleDrill('dunking', null).cue).toBe('Practice landings: small jumps, land with knees over toes, and hold.');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
   });
 });

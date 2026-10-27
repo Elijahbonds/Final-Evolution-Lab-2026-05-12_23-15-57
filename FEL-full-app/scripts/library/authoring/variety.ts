@@ -20,13 +20,13 @@ export const VARIETY: Family[] = [
       { name: 'Help-Side Stance Hold', v: 'help-side', level: 'beginner', cues: ['Sit low and level, pointing at the ball and at your player.', 'Hold still and ready, weight on the balls of the feet.', 'Breathe smoothly for the count.'], dosage: secs(3, 20, 20) },
       { name: 'Shell Slide to Closeout', v: 'shell-closeout', level: 'intermediate', cue: 'Slide to the help spot, then close out to the cone with short, choppy steps.' },
       { name: 'Wall Slide Defensive Hold', v: 'wall-stance', level: 'beginner', equipment: ['wall'], setup: 'Back against a wall in a low defensive stance.', cues: ['Sit low against the wall with the arms wide and active.', 'Hold still and breathe.', 'Push the floor away evenly through both feet.'], dosage: secs(3, 30, 30) },
-      { name: 'Deny Step Slide', v: 'deny', level: 'intermediate', cue: 'Slide along the line of cones with one hand up in the passing lane to the target.' },
-      { name: 'Recover and Contest', v: 'recover-contest', level: 'advanced', cue: 'Sprint back to the cone, chop the feet, and jump with a hand up to the target.', goals: ['defense', 'vertical'] },
-      { name: 'Two-Cone Slide Race', v: 'slide-race', level: 'beginner', cue: 'Slide between two cones and touch each cone with the outside hand, as many as you can.', goals: ['defense', 'conditioning'] },
+      { name: 'Deny Step Slide', v: 'deny', level: 'intermediate', cue: 'Slide along the cone line with one hand up in the passing lane.' },
+      { name: 'Recover and Contest', v: 'recover-contest', level: 'advanced', cue: 'Sprint back to the cone, quick feet, and jump with a hand up to the target.', goals: ['defense', 'vertical'] },
+      { name: 'Two-Cone Slide Race', v: 'slide-race', level: 'beginner', cue: 'Slide between two cones and touch each cone with your outside hand, as many as you can.', goals: ['defense', 'conditioning'] },
       { name: 'Lateral Shuffle to Sprint', v: 'shuffle-sprint', level: 'intermediate', cue: 'Shuffle three steps, then open the hips and sprint to the far cone.', goals: ['speed', 'agility'] },
       { name: 'Backpedal Closeout', v: 'backpedal-closeout', level: 'intermediate', cue: 'Backpedal to the cone, then plant and close out forward with short steps.' },
       { name: 'Catch and Square-Up', v: 'catch-square', level: 'beginner', equipment: ['basketball', 'cone'], cue: 'Catch the ball off a cut, pivot to face the basket, and sit in triple threat.', goals: ['footwork'] },
-      { name: 'Inside Pivot Turn', v: 'inside-pivot', level: 'intermediate', equipment: ['basketball', 'cone'], cue: 'Catch the ball, pivot on the inside foot to face the target, ball tight at the hip.', goals: ['footwork'] },
+      { name: 'Inside Pivot Turn', v: 'inside-pivot', level: 'intermediate', equipment: ['basketball', 'cone'], cue: 'Catch, pivot on the inside foot to face the target, ball tight at the hip.', goals: ['footwork'] },
     ],
   },
   {
@@ -90,7 +90,7 @@ export const VARIETY: Family[] = [
     cues: ['Crush the handle.', 'Grow tall toward the ceiling and hold still.', 'Set the weight down before the grip gives out.'],
     faults: [
       { fault: 'Shoulders rolling forward', fix: 'Grow tall toward the ceiling, the weight hanging long.' },
-      { fault: 'Dropping the weight', fix: 'Set it down with a hinge before the grip fails.' },
+      { fault: 'Dropping the weight', fix: 'Set the weight on the floor, hips back, before your grip gives out.' },
     ],
     dosage: secs(3, 30, 60),
     variants: [

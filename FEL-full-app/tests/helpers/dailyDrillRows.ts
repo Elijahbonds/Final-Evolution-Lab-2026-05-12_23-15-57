@@ -25,6 +25,8 @@ const OPT_IN = { scope: 'jump_numbers', granted: true, revokedAt: null };
 export const blank = (): DrillRows => ({
   user: { dobYear: 1994 }, optIn: null, profile: { streakDays: 3, lastStreakAt: ago(1.2), lastActiveAt: ago(1.2) },
   claim: null, credit: 10, jumpScans: [], shotScans: [], mirrorSessions: [], prqEntries: [],
+  // TODAY-DRILL: a returning player (drills on 3 of the 28 days before today)
+  recentDrills: 3,
 });
 
 /**
@@ -52,7 +54,7 @@ export function teen(now: Date = NOW): DrillRows {
 
 /** A brand-new adult: nothing measured. */
 export function newAdult(): DrillRows {
-  return { ...blank(), user: { dobYear: 1999 }, profile: null };
+  return { ...blank(), user: { dobYear: 1999 }, profile: null, recentDrills: 0 };
 }
 
 /** The drills page's access for an adult with every check open (no youth, no pain, the jump gate open). */
