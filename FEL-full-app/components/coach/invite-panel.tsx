@@ -19,7 +19,9 @@ import { BulkInvite } from './bulk-invite';
 
 interface Invite { token: string; use: 'once' | 'many'; expiresAt: string; joined: number }
 
-export function InvitePanel() {
+/** The team import is off by default: it lives in the Clients tab's Setup group (COACH-DELIVERY phase 2, the premium rule).
+ *  `bulk` puts it back inside the panel for a page that has no Setup group. */
+export function InvitePanel({ bulk = false }: { bulk?: boolean } = {}) {
   const [invites, setInvites] = useState<Invite[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<{ token: string; data: string } | null>(null);
@@ -73,8 +75,8 @@ export function InvitePanel() {
         <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">Add an athlete</h2>
       </header>
       <p className="mt-2 text-xs leading-relaxed text-white/50">
-        Send a link, show the QR, or write the code on the board. They sign up, land on your roster, and you can program
-        for them straight away.
+        {/* COACH-DELIVERY phase 2 (premium rule: fewer words, no paragraph over 24): was 25 words. DRAFT copy. */}
+        Send a link, show the QR or share the code. They join your roster.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -130,7 +132,7 @@ export function InvitePanel() {
       {invites?.some((i) => codeOfToken(i.token)) && (
         <p className="mt-2 text-[11px] text-fel-dim">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
       )}
-      <BulkInvite onDone={() => void load()} />
+      {bulk && <BulkInvite onDone={() => void load()} />}
     </section>
   );
 }

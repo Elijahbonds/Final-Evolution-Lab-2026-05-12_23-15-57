@@ -58,7 +58,22 @@ const stubs: Plugin = {
 
 /** PREMIUM-UI (2026-10-27): other rigs reuse this one. `entry` swaps the page bundle (default: the a11y scenes);
  *  `fontBase` serves the font files from an http origin instead of file:// (a rig served over http cannot read file://). */
-export interface RigOptions { entry?: string; fontBase?: string; /** leave next/font's variables unset, as a probe rig does (the P2 fonts check) */ noFontVars?: boolean }
+export interface RigOptions {
+  entry?: string; fontBase?: string;
+  /** leave next/font's variables unset, as a probe rig does (the P2 fonts check) */
+  noFontVars?: boolean;
+  /** load the faces the way production does (premium-ui P10, for layout-shift numbers): font-display swap, behind
+   *  next/font's own size-adjusted Arial fallbacks — the overrides are copied from the live CSS (2026-10-27) */
+  prodFonts?: boolean;
+}
+
+// next/font/local's generated fallbacks, as served by final-evolution-lab.web.app on 2026-10-27 (deterministic per font file)
+const PROD_FALLBACK: Record<string, string> = {
+  'FEL Barlow': 'ascent-override:126.37%;descent-override:25.27%;line-gap-override:0.00%;size-adjust:79.13%',
+  'FEL Plex': 'ascent-override:101.35%;descent-override:27.19%;line-gap-override:0.00%;size-adjust:101.13%',
+  'FEL Mono': 'ascent-override:77.57%;descent-override:22.82%;line-gap-override:0.00%;size-adjust:131.49%',
+  'FEL Chakra': 'ascent-override:96.30%;descent-override:29.90%;line-gap-override:0.00%;size-adjust:103.01%',
+};
 
 export async function buildRig(BUILD: string, opts: RigOptions = {}): Promise<{ html: string }> {
 mkdirSync(BUILD, { recursive: true });
@@ -74,13 +89,16 @@ await build({ ...common, entryPoints: [join(ROOT, 'scripts/a11y/inpage.ts')], ou
   const cssFile = join(BUILD, 'app.css');
 execFileSync(join(ROOT, 'node_modules/.bin/tailwindcss'), ['-c', join(ROOT, 'tailwind.config.ts'), '-i', join(ROOT, 'app/globals.css'), '-o', cssFile], { cwd: ROOT, stdio: 'ignore' });
 // app/layout.tsx's next/font faces, as plain @font-face rules over the same files, under the same variables
-const face = (fam: string, file: string, weight: string) => `@font-face{font-family:'${fam}';src:url('${opts.fontBase ? `${opts.fontBase}/${file}` : `file://${join(ROOT, 'app/fonts', file)}`}') format('woff2');font-weight:${weight};font-display:block}`;
+const face = (fam: string, file: string, weight: string) => `@font-face{font-family:'${fam}';src:url('${opts.fontBase ? `${opts.fontBase}/${file}` : `file://${join(ROOT, 'app/fonts', file)}`}') format('woff2');font-weight:${weight};font-display:${opts.prodFonts ? 'swap' : 'block'}}`;
 const FONTS = [
   ...['500', '600', '700', '800'].map((wt) => face('FEL Barlow', `barlow-condensed-latin-${wt}.woff2`, wt)),
   face('FEL Plex', 'ibm-plex-sans-latin-variable.woff2', '400 700'),
   face('FEL Mono', 'jetbrains-mono-latin-variable.woff2', '100 800'),
   ...['400', '500', '600', '700'].map((wt) => face('FEL Chakra', `chakra-petch-latin-${wt}.woff2`, wt)),
-  opts.noFontVars ? '' : `:root{--font-display:'FEL Barlow';--font-sans:'FEL Plex';--font-mono:'FEL Mono';--font-chakra:'FEL Chakra'}`,
+  ...(opts.prodFonts ? Object.entries(PROD_FALLBACK).map(([fam, o]) => `@font-face{font-family:'${fam} Fallback';src:local("Arial"),local("Liberation Sans");${o}}`) : []),
+  opts.noFontVars ? '' : opts.prodFonts
+    ? `:root{--font-display:'FEL Barlow','FEL Barlow Fallback';--font-sans:'FEL Plex','FEL Plex Fallback';--font-mono:'FEL Mono','FEL Mono Fallback';--font-chakra:'FEL Chakra','FEL Chakra Fallback'}`
+    : `:root{--font-display:'FEL Barlow';--font-sans:'FEL Plex';--font-mono:'FEL Mono';--font-chakra:'FEL Chakra'}`,
 ].join('\n');
 const css = FONTS + '\n' + readFileSync(cssFile, 'utf8') + '\n' + readFileSync(join(ROOT, 'app/theme.css'), 'utf8');
 const html = join(BUILD, 'index.html');

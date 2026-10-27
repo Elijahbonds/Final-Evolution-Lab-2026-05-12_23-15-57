@@ -277,7 +277,14 @@ function PackagesCard({ d, api, onSaved, onNote }: CardProps) {
               <p className="font-bold">{k.title}</p>
               <p className="text-xs text-white/50">{PACKAGE_KIND_LABELS[k.kind]} · {packagePriceLabel(k.priceCents, k.kind)}{k.capacity !== null ? ` · ${k.spotsLeft} of ${k.capacity} open` : ''}{k.active ? '' : ' · off your page'}</p>
             </div>
-            <button type="button" className={ghost} onClick={() => setActive(k.id, !k.active)}>{k.active ? 'Take off page' : 'Put back'}</button>
+            <div className="flex flex-wrap gap-2">
+              {/* COACH-DELIVERY COA-12: a team fee goes to the roster's program threads (adults; the server says who) */}
+              {k.kind === 'team_fee' && k.active ? <button type="button" className={ghost} data-team-fee-send onClick={async () => {
+                const r = await call(`${api}/team-fee`, 'POST', { packageId: k.id, scope: 'roster' });
+                onNote(r.ok ? `Sent to ${r.json.sent ?? 0} athlete${r.json.sent === 1 ? '' : 's'}${r.json.skippedMinor ? `; ${r.json.skippedMinor} under 18 skipped (a parent pays from the link)` : ''}.` : said(r.json, 'Not sent.'));
+              }}>Send to roster</button> : null}
+              <button type="button" className={ghost} onClick={() => setActive(k.id, !k.active)}>{k.kind === 'team_fee' ? (k.active ? 'Close' : 'Reopen') : k.active ? 'Take off page' : 'Put back'}</button>
+            </div>
           </li>
         ))}
       </ul>
@@ -325,6 +332,20 @@ function SalesCard({ d, api, onSaved, onNote }: CardProps) {
                 <p className="text-xs text-white/50">{money(s.amountCents)} · FEL fee {money(s.feeCents)}{s.refundedCents ? ` · refunded ${money(s.refundedCents)}` : ''} · you {money(Math.max(0, net))} · {s.status.toLowerCase().replace('_', ' ')}</p>
               </div>
               {refundable || cancellable ? <button type="button" className={ghost} disabled={busy === s.id} onClick={() => refund(s.id)}>{cancellable ? 'Cancel' : 'Refund'}</button> : null}
+              {/* COACH-DELIVERY COA-11: move running monthly coaching to another monthly package (upgrade prorated; downgrade at renewal) */}
+              {cancellable && d.packages.some((k) => k.kind === 'monthly' && k.active && k.id !== s.packageId) ? (
+                <select aria-label="Change package" className={`${input} max-w-[12rem]`} value="" disabled={busy === s.id} data-sale-change onChange={async (e) => {
+                  if (!e.target.value) return;
+                  setBusy(s.id);
+                  const r = await call(`${api}/sales/${s.id}/change`, 'POST', { packageId: e.target.value });
+                  setBusy(null);
+                  onNote(r.ok ? (r.json.prorated ? 'Changed. The difference for this month is on the next invoice.' : 'Changed. The new price starts at the next renewal.') : said(r.json, 'The change did not go through.'));
+                  await onSaved?.();
+                }}>
+                  <option value="">Change package…</option>
+                  {d.packages.filter((k) => k.kind === 'monthly' && k.active && k.id !== s.packageId).map((k) => <option key={k.id} value={k.id}>{k.title} · {packagePriceLabel(k.priceCents, k.kind)}</option>)}
+                </select>
+              ) : null}
             </li>
           );
         })}

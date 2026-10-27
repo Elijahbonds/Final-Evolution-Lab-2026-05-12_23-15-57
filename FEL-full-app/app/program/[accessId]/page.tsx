@@ -27,7 +27,8 @@ function ProductVideos({ title, videos }: { title: string; videos: ProgramLibrar
       <ul className="mt-2 text-sm">
         {videos.map((v) => (
           <li key={v.videoId} className="mt-1">
-            <a className="underline" href={`https://youtu.be/${v.videoId}`} target="_blank" rel="noreferrer">{v.videoTitle}</a>
+            {/* COACH-DELIVERY COA-09: a plain outbound link, labelled — never an embed or a player on FEL */}
+            <a className="underline" href={`https://youtu.be/${v.videoId}`} target="_blank" rel="noreferrer noopener">{v.videoTitle}</a> <span className="text-white/50">(YouTube, opens outside FEL)</span>
           </li>
         ))}
       </ul>

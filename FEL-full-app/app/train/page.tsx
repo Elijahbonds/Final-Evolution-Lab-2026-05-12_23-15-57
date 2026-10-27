@@ -80,6 +80,12 @@ export default async function TrainPage() {
       line: t('train.cards.sprint.line'),
     },
     {
+      // VBT (2026-10-25; wired by coach-delivery 2026-10-27, docs/VBT.md §7.1): camera bar speed (13+; a teen sees technique
+      // speed only; the page says so)
+      href: '/train/velocity', group: 'measure' as Group, icon: Dumbbell, accent: PALETTE.cyan, title: t('train.cards.velocity.title'),
+      line: t('train.cards.velocity.line'),
+    },
+    {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
       // camera (/play/drills). The page reads the age and today's checks itself and holds back the jumps they say to;
       // this card reads nothing, so it is the same for every account.

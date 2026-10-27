@@ -30,6 +30,8 @@ export interface ImportRow {
 export type ImportProblem = 'bad_email' | 'empty' | 'too_many';
 
 export interface ImportResult {
+  /** Which export the header was read as (COACH-DELIVERY COA-07): a named team app, a generic header, or none. */
+  format?: ImportFormat;
   rows: ImportRow[];
   problems: { line: number; problem: ImportProblem }[];
   /** Rows dropped because the same email was already in the list. */
@@ -107,19 +109,82 @@ function readLoose(cells: string[]): { name: string | null; email: string | null
   return { name: cleanName(nameParts.join(' ')), email, badEmail };
 }
 
+// ── named team-app exports (COACH-DELIVERY COA-07, 2026-10-27) ─────────────────────────────────────────────────────
+//
+// TeamSnap, SportsEngine and LeagueApps roster exports name their columns their own way, and every one of them carries
+// a PARENT or GUARDIAN's email beside (or instead of) the player's. The generic header reader would miss the player
+// columns ("Player First Name", "Email Address 1") and could pick up a guardian's address as the athlete's. So each app
+// has a named map: its marker header, its first/last name and the PLAYER's email column — never a guardian column, which
+// is read as nothing at all (an invite is the athlete's own; a guardian is asked through /consent/guardian, not here).
+// A row whose only email is a guardian's gets a code on the handout sheet, not an email.
+//
+// assumption: the column names below are each app's documented/common export headers as of 2026-10; exports vary by
+// account settings, so each map takes a few spellings, and tests/fixtures/{teamsnap,sportsengine,leagueapps}-roster.csv
+// pin them. A real export from the owner should be added as a fixture when one is to hand.
+
+export type ImportFormat = 'teamsnap' | 'sportsengine' | 'leagueapps' | 'generic' | 'list';
+
+export interface TeamAppMap {
+  id: Exclude<ImportFormat, 'generic' | 'list'>;
+  label: string;
+  /** The header only this app's export has. */
+  marker: RegExp;
+  first: RegExp;
+  last: RegExp;
+  /** The PLAYER's own email. */
+  email: RegExp;
+  /** Columns that hold someone else's email (a parent, a guardian, a contact): never read. */
+  guardian: RegExp;
+}
+
+export const TEAM_APP_MAPS: readonly TeamAppMap[] = [
+  {
+    id: 'leagueapps', label: 'LeagueApps',
+    marker: /^player\s*first\s*name$/i,
+    first: /^player\s*first\s*name$/i, last: /^player\s*last\s*name$/i, email: /^player\s*e-?mail(\s*address)?$/i,
+    guardian: /^(parent|guardian)\s*\d*\s*.*e-?mail/i,
+  },
+  {
+    id: 'sportsengine', label: 'SportsEngine',
+    marker: /^participant\s*:?\s*first\s*name$/i,
+    first: /^participant\s*:?\s*first\s*name$/i, last: /^participant\s*:?\s*last\s*name$/i, email: /^participant\s*:?\s*e-?mail(\s*address)?$/i,
+    guardian: /^((primary\s*)?(parent|guardian|contact)\s*\d*\s*:?\s*.*e-?mail|primary\s*contact\s*e-?mail)/i,
+  },
+  {
+    id: 'teamsnap', label: 'TeamSnap',
+    marker: /^(e-?mail\s*address\s*1|jersey\s*number)$/i,
+    first: /^first(\s*name)?$/i, last: /^last(\s*name)?$/i, email: /^e-?mail\s*address\s*1$/i,
+    // TeamSnap lists a member's contacts as "Email Address 2…n" and "Contact … Email": a parent's, so not read
+    guardian: /^(e-?mail\s*address\s*([2-9]|\d{2,})|contact.*e-?mail|parent.*e-?mail|guardian.*e-?mail)$/i,
+  },
+];
+
+/** The named team app whose export this header is, or null. Matched on the marker AND the columns the map reads. */
+export function teamAppOf(head: readonly string[]): TeamAppMap | null {
+  for (const m of TEAM_APP_MAPS) {
+    if (!head.some((h) => m.marker.test(h))) continue;
+    if (head.some((h) => m.first.test(h)) || head.some((h) => m.email.test(h))) return m;
+  }
+  return null;
+}
+
 export function parseRosterImport(text: string, max: number = MAX_IMPORT_ROWS): ImportResult {
   const src = String(text ?? '').replace(/^﻿/, '').slice(0, MAX_TEXT);
   const records = parseCsv(src, detectDelimiter(src)).filter((r) => r.cells.some((c) => c.trim()));
   const result: ImportResult = { rows: [], problems: [], duplicates: 0 };
   if (!records.length) return result;
 
+
   // A header row names its columns; without one, each line is read loosely.
   const head = records[0].cells.map((c) => c.trim());
-  const nameCol = head.findIndex((c) => NAME_HEADER.test(c));
-  const lastCol = head.findIndex((c) => LAST_HEADER.test(c));
-  const emailCol = head.findIndex((c) => EMAIL_HEADER.test(c));
-  const hasHeader = nameCol >= 0 || emailCol >= 0;
+  const app = teamAppOf(head);
+  const nameCol = app ? head.findIndex((c) => app.first.test(c)) : head.findIndex((c) => NAME_HEADER.test(c));
+  const lastCol = app ? head.findIndex((c) => app.last.test(c)) : head.findIndex((c) => LAST_HEADER.test(c));
+  // a team app's player email only; a guardian column is never a candidate, even if the generic rule would match it
+  const emailCol = app ? head.findIndex((c) => app.email.test(c) && !app.guardian.test(c)) : head.findIndex((c) => EMAIL_HEADER.test(c));
+  const hasHeader = !!app || nameCol >= 0 || emailCol >= 0;
   const body = hasHeader ? records.slice(1) : records;
+  result.format = app ? app.id : hasHeader ? 'generic' : 'list';
 
   const seen = new Set<string>();
   for (const r of body) {
@@ -144,6 +209,12 @@ export function parseRosterImport(text: string, max: number = MAX_IMPORT_ROWS): 
     result.rows.push({ line: r.line, name, email });
   }
   return result;
+}
+
+/** The line the coach reads under the import: which export it was read as. */
+export function importFormatLine(f: ImportFormat | undefined): string | null {
+  const app = TEAM_APP_MAPS.find((m) => m.id === f);
+  return app ? `Read as a ${app.label} export: player names and player emails only. Parent and guardian emails were left out.` : null;
 }
 
 /** One line per problem, for the coach. */

@@ -249,8 +249,11 @@ describe('wiring that needs a whole mode to exercise', () => {
 
   it('the dunk contact punch pairs a gameplay juice freeze with the equal mode-clock freeze (both dunk modes)', () => {
     // reduced motion would otherwise free the limbs at 30 ms while feelHitStop(70) still holds the root and the ball
+    // (test changed, lane/dunk-flagship: DunkMode's slam sizes its hit-stop by the slam — core/DunkFlagship.slamImpact — so the pair
+    // is matched by an EQUAL argument (a backreference), not the literal 70; the invariant is the same: one value, both clocks)
     for (const f of ['lib/babylon/modes/DunkMode.ts', 'lib/babylon/modes/DunkDuelMode.ts']) {
-      expect(src(f)).toMatch(/ctx\.juice\.hitStop\(70, \{ gameplay: true \}\);[^\n]*\n\s*feelHitStop\(70\);/);
+      expect(src(f)).toMatch(/ctx\.juice\.hitStop\(([^,()]+), \{ gameplay: true \}\);[^\n]*\n\s*feelHitStop\(\1\);/);
     }
+    expect(src('lib/babylon/modes/DunkDuelMode.ts')).toMatch(/ctx\.juice\.hitStop\(70, \{ gameplay: true \}\)/);   // the duel keeps its 70
   });
 });

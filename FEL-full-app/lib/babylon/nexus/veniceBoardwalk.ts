@@ -505,7 +505,12 @@ export function shareFarFrondMaterial(lod1Frond: Mesh, lod2Frond: Mesh): void {
  */
 export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNode): Promise<VeniceDressingHandle | null> {
   const files = [...VENICE_PALM_LODS.files, 'venice_boardwalk_kit.glb', 'venice_crowd_cards.glb'];
-  const settled = await Promise.allSettled(files.map((f) => SceneLoader.ImportMeshAsync('', VENICE_ENV2_DIR, f, scene)));
+  // DUNK-FLAGSHIP (2026-10-27): each file is HIDDEN the moment it lands. An import goes into the scene at the world origin, and the
+  // dressing waits for all five files before it places anything — so the files that arrived first stood at the origin, the
+  // boardwalk's single-sided fronts facing +Z, between the run-up camera (z 8) and the dunker at the start of the runway (z −1.2):
+  // measured on the rig, a ray from the camera to the hero hit facade_taco, facade_tattoo and the hero palm, and the first runway
+  // of the night was shot through a taco stand. They are shown again below, in the same task that places them (no frame between).
+  const settled = await Promise.allSettled(files.map((f) => SceneLoader.ImportMeshAsync('', VENICE_ENV2_DIR, f, scene).then((r) => { r.meshes[0]?.setEnabled(false); return r; })));
   const all = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
   // one missing file drops the whole dressing (a palm without its LODs, a crowd without its row) and nothing it loaded stays
   if (all.length < files.length || holder.isDisposed() || scene.isDisposed) {
@@ -514,7 +519,7 @@ export async function mountVeniceDunkDressing(scene: Scene, holder: TransformNod
     return null;
   }
   const lods = all.slice(0, 3), [kit, crowd] = all.slice(3);
-  for (const r of all) for (const m of r.meshes) m.isPickable = false;
+  for (const r of all) { r.meshes[0]?.setEnabled(true); for (const m of r.meshes) m.isPickable = false; }   // (placed before the next frame: no await from here)
 
   // the palms
   const part = (r: (typeof lods)[number], mat: string) => r.meshes.find((m) => m.material?.name === mat) as Mesh | undefined;

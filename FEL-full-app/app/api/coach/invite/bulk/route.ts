@@ -8,6 +8,9 @@ import { createCodedInvite } from '@/lib/coach/inviteServer';
 import { JOIN_BY_CODE_PATH, formatCode } from '@/lib/coach/inviteCode';
 import { inviteEmail } from '@/lib/coach/inviteEmail';
 import { parseRosterImport } from '@/lib/coach/bulkImport';
+import { brandSignOff } from '@/lib/coach/branding';
+import { brandingFor } from '@/lib/coach/brandingServer';
+import type { RawDb } from '@/lib/coach/pendingSchema';
 import { mailLinkOrigin, mailReady, sendMail } from '@/lib/mail';
 import { rateLimit } from '@/lib/rate-limit';
 
@@ -49,6 +52,8 @@ export async function POST(req: NextRequest) {
   const origin = mailLinkOrigin();
   const canSend = wantSend && mailReady() && !!origin;
   const coach = canSend ? await prisma.user.findUnique({ where: { id: coachId }, select: { name: true } }) : null;
+  // COACH-DELIVERY COA-04: the coach's brand signs the (plain-text) email, when they have one
+  const signOff = canSend ? brandSignOff((await brandingFor(prisma as unknown as RawDb, [coachId])).get(coachId) ?? null, coach?.name ?? '') : null;
 
   const sheet: { line: number; name: string | null; email: string | null; code: string; path: string; emailed: 'sent' | 'off' | 'failed' | 'none' }[] = [];
   for (const row of parsed.rows) {
@@ -58,7 +63,7 @@ export async function POST(req: NextRequest) {
       if (!rateLimit(`invite-email:${coachId}`, EMAILS_PER_DAY, 24 * 60 * 60 * 1000).ok) {
         emailed = 'off';
       } else {
-        const msg = inviteEmail({ coachName: coach?.name ?? '', athleteName: row.name, link: inviteUrl(origin!, inv.token), code: inv.code, codeUrl: `${origin}${JOIN_BY_CODE_PATH}`, expiresAt: inv.expiresAt });
+        const msg = inviteEmail({ coachName: coach?.name ?? '', athleteName: row.name, link: inviteUrl(origin!, inv.token), code: inv.code, codeUrl: `${origin}${JOIN_BY_CODE_PATH}`, expiresAt: inv.expiresAt, signOff });
         const r = await sendMail({ to: row.email, ...msg });
         emailed = r.status === 'sent' ? 'sent' : r.status === 'disabled' ? 'off' : 'failed';
       }
@@ -67,7 +72,7 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    sheet, problems: parsed.problems, duplicates: parsed.duplicates,
+    sheet, problems: parsed.problems, duplicates: parsed.duplicates, format: parsed.format ?? null,
     email: { requested: wantSend, on: mailReady() && !!origin },
   }, { status: 201 });
 }
