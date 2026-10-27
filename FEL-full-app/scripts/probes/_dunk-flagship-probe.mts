@@ -367,6 +367,18 @@ function flightMetrics(r: Rec) {
   }
   const nearApex = r.frames.slice(feetOff >= 0 ? feetOff : L, feetOn >= 0 ? feetOn : r.frames.length).filter((f) => (f.j[0]?.[1] ?? 0) >= apexY - 0.1).length;
   const ms = (i: number) => i >= 0 ? rnd((r.frames[i].t - (r.pressAt ?? tL!)), 0) : null;
+  // THE LANDING (Phase 2): touchdown − 12 frames … + 48: clips arriving at ≥ 0.6 weight in one frame (hard cuts), the hips' one-frame
+  // pops (the approach's rule), bone pops; and the root's height step on the take-off frame
+  const land = { hardCuts: 0, cutNames: [] as string[], hipPops: 0, bonePops: 0 };
+  if (feetOn > 0) {
+    const a = Math.max(1, feetOn - 12), b2 = Math.min(r.frames.length - 1, feetOn + 48), W2 = r.frames.slice(a - 1, b2 + 1);
+    for (let i = 1; i < W2.length; i++) { const prev = new Map(W2[i - 1].clips); for (const [n, wv] of W2[i].clips) if (!prev.has(n) && wv >= 0.6) { land.hardCuts++; land.cutNames.push(n); } }
+    const acc: number[] = []; for (let i = 1; i < W2.length - 1; i++) { const p0 = W2[i - 1].j[0], p1 = W2[i].j[0], p2 = W2[i + 1].j[0]; acc.push(p0 && p1 && p2 ? Math.hypot(p2[0] - 2 * p1[0] + p0[0], p2[1] - 2 * p1[1] + p0[1], p2[2] - 2 * p1[2] + p0[2]) / (DT * DT) : 0); }
+    for (let i = 3; i < acc.length - 3; i++) { const nb = [...acc.slice(i - 3, i), ...acc.slice(i + 1, i + 4)]; if (acc[i] > 40 && acc[i] > 3.5 * Math.max(pct(nb, 0.5), 4)) land.hipPops++; }
+    for (let bI = 0; bI < QN.length; bI++) { const w: number[] = []; for (let i = 1; i < W2.length; i++) w.push(qAngDeg(W2[i].q.slice(bI * 4, bI * 4 + 4), W2[i - 1].q.slice(bI * 4, bI * 4 + 4)) / DT); for (let i = 3; i < w.length - 3; i++) { const nb = [...w.slice(i - 3, i), ...w.slice(i + 1, i + 4)]; if (w[i] >= 600 && w[i] >= 3.5 * Math.max(pct(nb, 0.5), 30)) land.bonePops++; } }
+  }
+  const rootStepCm = L > 0 ? rnd(Math.abs(r.frames[L].rp[1] - r.frames[L - 1].rp[1]) * 100, 1) : null;
+  const hipsStepCm = L > 0 && r.frames[L].j[0] && r.frames[L - 1].j[0] ? rnd(Math.abs(r.frames[L].j[0]![1] - r.frames[L - 1].j[0]![1]) * 100, 1) : null;
   return {
     pressToLaunchMs: r.pressAt != null ? rnd(tL! - r.pressAt, 0) : null,
     pressToHipsUpMs: r.pressAt != null ? ms(hipsUp) : null, pressToFeetOffMs: r.pressAt != null ? ms(feetOff) : null,
@@ -375,6 +387,7 @@ function flightMetrics(r: Rec) {
     apexOverRunwayM: rnd(apexY - hip0), nearApexMs: rnd(nearApex * 1000 / 60, 0),
     apexMsAfterOff: feetOff >= 0 ? rnd(r.frames[apexI].t - r.frames[feetOff].t, 0) : null,
     timeScaleMin: rnd(Math.min(...r.frames.slice(L).map((f) => f.ts)), 2),
+    land: { ...land, cutNames: [...new Set(land.cutNames)] }, takeoffRootStepCm: rootStepCm, takeoffHipsStepCm: hipsStepCm,
   };
 }
 

@@ -64,3 +64,17 @@ export function slamImpact(acc01: number, hang: boolean, big = { hitStopMs: SLAM
     shakeMs: Math.round(SLAM_SHAKE_MS + (SLAM_SHAKE_BIG_MS - SLAM_SHAKE_MS) * k),
   };
 }
+
+// ── Phase 2: THE LANDING ARRIVES WITH ITS FALL ─────────────────────────────────────────────────────────────────────────
+// Measured before (rig, a plain make): the absorb clip started ON the touchdown frame and faded in over 0.15 s, so for ~6 frames the
+// flush pose held the hips while the root stood on the floor — the hips fell at −5.2 m/s and stopped dead in one frame (−4.39 →
+// +0.03 m/s). The absorb now fades in over the last LAND_LEAD_SEC of the fall (the legs reach for the floor, as a body does), so it
+// is fully in at touchdown.
+/** (new) How long before touchdown the landing absorb starts to fade in (s). */
+export const LAND_LEAD_SEC = 0.1;
+/** Seconds until a body `heightM` up, falling at `vyDown` m/s (positive down) under gravity, reaches the floor. */
+export function timeToFloor(heightM: number, vyDown: number, g = 9.81): number {
+  if (heightM <= 0) return 0;
+  const v = Math.max(0, vyDown);
+  return (-v + Math.sqrt(v * v + 2 * g * heightM)) / g;
+}

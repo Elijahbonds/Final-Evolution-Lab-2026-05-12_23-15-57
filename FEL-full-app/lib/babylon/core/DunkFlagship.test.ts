@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OOP_LOB_FLIGHT_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from './DunkFlagship';
+import { OOP_LOB_FLIGHT_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
 import { LOB_CATCH_CLIP_T } from './DunkLob';
 
 describe('DunkFlagship (b) — the alley-oop is a lob', () => {
@@ -27,5 +27,14 @@ describe('DunkFlagship (c) — the iron answers how hard it was hit', () => {
     expect(slamImpact(1, false)).toEqual({ hitStopMs: SLAM_HITSTOP_BIG_MS, shake: SLAM_SHAKE_BIG, shakeMs: 180 });
     expect(slamImpact(1, true).hitStopMs).toBe(SLAM_HITSTOP_BIG_MS);
     expect(slamImpact(0.6, true).hitStopMs).toBeGreaterThan(slamImpact(0.6, false).hitStopMs);   // a hang hits the iron with the body too
+  });
+});
+
+describe('DunkFlagship Phase 2 — the landing arrives with its fall', () => {
+  it('times the floor under gravity from a height and a downward speed', () => {
+    expect(timeToFloor(0, 3)).toBe(0);
+    expect(timeToFloor(1.2263, 0)).toBeCloseTo(0.5, 3);            // ½ g t² = 1.2263 at t 0.5
+    expect(timeToFloor(0.5, 5)).toBeLessThan(0.5 / 5);             // still accelerating: sooner than at a constant 5 m/s
+    expect(timeToFloor(0.5, 5)).toBeGreaterThan(0.08);
   });
 });

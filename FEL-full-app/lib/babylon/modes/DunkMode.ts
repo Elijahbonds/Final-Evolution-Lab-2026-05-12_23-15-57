@@ -87,7 +87,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -2407,6 +2407,8 @@ export const DunkMode: ModeDefinition = (() => {
         // DUNK MOTION phase 11: the drop FALLS (from rest at the iron, gravity) — a constant 2.6 m/s floated a 1.2 m drop down over 0.46 s
         dropVy = Math.min(FALL_SPEED_MAX, dropVy + GRAVITY * dt);
         player.root.position.y = Math.max(0, player.root.position.y - dropVy * dt);
+        // DUNK-FLAGSHIP Phase 2: the absorb fades in over the fall's last LAND_LEAD_SEC (core/DunkFlagship) — fully in at touchdown
+        if (airHeld && player.root.position.y > 0) { const tf = dropVy >= FALL_SPEED_MAX - 1e-6 ? player.root.position.y / dropVy : timeToFloor(player.root.position.y, dropVy, GRAVITY);   // (at the fall's speed cap it no longer accelerates) if (tf <= feel('dunk.landLeadSec', LAND_LEAD_SEC)) landNow(Math.max(0.04, tf)); }
         if (player.root.position.y <= 0) { dropToFloor = false; dropVy = 0; }
       }
       if (liveLandAt >= 0 && landDriftVz !== 0 && !replaying) {
@@ -3716,11 +3718,11 @@ export const DunkMode: ModeDefinition = (() => {
     return style === 'power' && MOCAP_DUNK && launchFoot === 'one' ? 'dunk_take_off_one' : STYLE_CLIP[style];
   }
   /** H5: feet-down — the land clip, then the idle loop. Once per attempt. */
-  function landNow(): void {
+  function landNow(fadeSec?: number): void {
     if (!airHeld) return;
     airHeld = false; setWin('land');
-    console.info(`[HANDS] land ${landingClip}`);
-    playClip(landingClip, { onEnd: () => { playClip(SPORT_CLIP.idle, { loop: true }); setWin('run'); } });
+    console.info(`[HANDS] land ${landingClip}${fadeSec !== undefined ? ` (fading in ${Math.round(fadeSec * 1000)} ms before touchdown)` : ''}`);
+    playClip(landingClip, { ...(fadeSec !== undefined ? { fadeSec } : {}), onEnd: () => { playClip(SPORT_CLIP.idle, { loop: true }); setWin('run'); } });
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
