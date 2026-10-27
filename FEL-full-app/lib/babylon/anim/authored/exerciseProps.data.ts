@@ -16,6 +16,6 @@ export const PROPPED_LOOPS = {
   // exerciseDrills.ts (DEMO-LOOPS)
   ex_knee_to_wall: 'wall', ex_wall_drive: 'wall', ex_wall_march: 'wall',
   ex_back_wall_arm_raise: 'wallback', ex_wall_chin_tuck: 'wallback', ex_wall_slide_liftoff: 'wall', ex_box_jump: 'box', ex_drop_landing: 'stepbox',
-  ex_seated_breathe: 'seat', ex_incline_scap_push_up: 'handbench', ex_supported_sl_rdl: 'dowel', ex_hip_airplane: 'dowel',
+  ex_seated_breathe: 'seat', ex_incline_scap_push_up: 'handbench', ex_supported_sl_rdl: 'dowel', ex_hip_airplane: 'dowel', ex_copenhagen_knee: 'cphbench', ex_copenhagen_raise_knee: 'cphbench',
   ex_decline_press: 'decline', ex_decline_fly: 'decline', ex_decline_fly_one: 'decline', ex_decline_skull: 'decline', ex_decline_skull_one: 'decline',
 } as const satisfies Record<string, string>;

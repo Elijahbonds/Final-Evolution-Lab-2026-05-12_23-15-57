@@ -304,6 +304,29 @@ function lateralSkip(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return run(scene, sk, 'ex_lateral_skip', t + 0.2, keys);
 }
 
+// ── the Copenhagen, on the bench ──────────────────────────────────────────────────────────────────────────────────
+/** The Copenhagen side plank, short lever (authored as exerciseBody's side plank: on the right forearm, the head toward
+ *  −z, then turned to face the floor camera): the top (left) leg's knee on the bench (demo.ts PROP_SHAPES cphbench), its
+ *  shin hanging past the edge; the bottom leg hanging free under it; the hips up in one line with the shoulders. `drop`
+ *  lowers the hips toward the floor (the raise's bottom). */
+function cph(drop: number): Pose {
+  const hipsY = -0.50 - drop * 0.26;
+  return {
+    bones: { Hips: [0, -90, 90], Spine: [0, 0, -12 + drop * 10], Spine1: [0, 0, -8], Neck: [0, 0, -4], LeftFoot: [10, 0, 0], RightFoot: [-6, 0, 0] },
+    feet: { Left: [-0.02, 0.16, 0.54], Right: [0.04, 0.10, 0.86 - drop * 0.06] }, kneePoles: { Left: [0.2, 1, 1], Right: [1, 0, 0] },
+    hands: { Right: [0.24, 0.07, -0.50], Left: [0.04, 0.50 - drop * 0.12, 0.10] }, poles: { Right: [0, -1, 0.1], Left: [1, 0, 0] }, hipsY,
+  };
+}
+const turnP = (p: Pose): Pose => {
+  const pair = (q?: Pair): Pair | undefined => q && Object.fromEntries(Object.entries(q).map(([k, v]) => [k, [-v[0], v[1], -v[2]]])) as Pair;
+  const hips = (p.bones?.Hips ?? [0, 0, 0]) as Deg3;
+  return { ...p, bones: { ...p.bones, Hips: [hips[0], -hips[1], hips[2]] }, hands: pair(p.hands), rel: pair(p.rel), poles: pair(p.poles), feet: pair(p.feet), kneePoles: pair(p.kneePoles) };
+};
+/** ex_copenhagen_knee — the short-lever Copenhagen held, breathing. */
+const copenhagenKnee = (scene: Scene, sk: Skeleton) => run(scene, sk, 'ex_copenhagen_knee', 3.0, [at(turnP(cph(0)), 0, true), at(turnP({ ...cph(0), hipsY: -0.47 }), 1.5, true)], true);
+/** ex_copenhagen_raise_knee — the short-lever Copenhagen raise: the hips lower toward the floor and drive back up. */
+const copenhagenRaise = (scene: Scene, sk: Skeleton) => run(scene, sk, 'ex_copenhagen_raise_knee', 2.4, [at(turnP(cph(0)), 0, true), at(turnP(cph(1)), 0.9, true), at(turnP(cph(1)), 1.1, true)], true);
+
 export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_def_stance', defStance], ['ex_sl_balance', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance', false)], ['ex_sl_balance_head', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance_head', true)],
   ['ex_seated_breathe', seatedBreathe], ['ex_adductor_squeeze', adductorSqueeze],
@@ -312,4 +335,5 @@ export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_supported_sl_rdl', supportedSlRdl], ['ex_hip_airplane', hipAirplane], ['ex_two_point_start', twoPointStart], ['ex_arm_swing', armSwing],
   ['ex_prone_t', proneT], ['ex_incline_scap_push_up', inclineScapPushup],
   ['ex_decel_stick', decelStick], ['ex_jump_stop', jumpStop], ['ex_lateral_skip', lateralSkip],
+  ['ex_copenhagen_knee', copenhagenKnee], ['ex_copenhagen_raise_knee', copenhagenRaise],
 ];

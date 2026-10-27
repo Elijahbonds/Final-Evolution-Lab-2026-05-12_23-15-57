@@ -867,6 +867,8 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_decel_stick', () => buildExerciseClip('ex_decel_stick', scene, skeleton)],
     ['ex_jump_stop', () => buildExerciseClip('ex_jump_stop', scene, skeleton)],
     ['ex_lateral_skip', () => buildExerciseClip('ex_lateral_skip', scene, skeleton)],
+    ['ex_copenhagen_knee', () => buildExerciseClip('ex_copenhagen_knee', scene, skeleton)],
+    ['ex_copenhagen_raise_knee', () => buildExerciseClip('ex_copenhagen_raise_knee', scene, skeleton)],
   ];
 }
 
