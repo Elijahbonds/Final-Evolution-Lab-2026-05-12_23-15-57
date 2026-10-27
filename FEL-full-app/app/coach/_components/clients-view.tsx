@@ -154,6 +154,8 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
   return (
     // COACH-DELIVERY COA-06: the 44 px tap floor for everything here (./look.ts)
     <div className={TAP} data-coach-clients>
+      {/* the home stays mounted under a sheet (the queue keeps its state) but is not on screen, for a reader or a finger */}
+      <div hidden={!!sheet || !!screen}>
       <header className={LOOK.header}>
         <h1 className={LOOK.title}>Coach</h1>
         <button type="button" className={LOOK.outline} onClick={() => setScreen('setup')} data-coach-setup-open><Settings className="h-4 w-4" aria-hidden />Setup</button>
@@ -172,14 +174,15 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
         </>
       )}
 
-      {/* the coach's tools: plain rows, under the work */}
-      <nav aria-label="Coach tools" className="mt-2" data-coach-tools>
+      {/* the coach's tools: plain rows, under the work — only once the queue has answered, so nothing jumps down the page */}
+      {queue && <nav aria-label="Coach tools" className="mt-2" data-coach-tools>
         <Link href="/coach/session" className={LOOK.row}><span>Court session</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
         {(['attention', 'reviews', 'drafts', 'send', 'exercises', 'form', 'today', ...(chatOn ? ['chat' as const] : [])] as Screen[]).map((s) => (
           <button key={s} type="button" className={LOOK.row} onClick={() => setScreen(s)} data-coach-tool={s}><span>{SCREEN_TITLE[s]}</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></button>
         ))}
         <Link href="/coach/business" className={LOOK.row}><span>Your coaching business</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
-      </nav>
+      </nav>}
+      </div>
 
       {sheet && (
         <AthleteSheet name={sheetName} initial={sheet.tab} onClose={() => setSheet(null)}>

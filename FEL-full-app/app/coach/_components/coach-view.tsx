@@ -30,8 +30,10 @@ type Tab = typeof TABS[number]['key'];
 export function CoachView() {
   const [tab, setTab] = useState<Tab>('today');
   const [coach, setCoach] = useState(false);   // the coach home shows only for a certified coach or an existing coach of programs
+  // until the server has said which, the client view is laid out but not shown: a coach never sees it flash and jump away
+  const [known, setKnown] = useState(false);
   const [me, setMe] = useState<SharedBy | null>(null);
-  useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}); }, []);
+  useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}).finally(() => setKnown(true)); }, []);
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
   useEffect(() => { fetch('/api/share/me').then((r) => r.ok ? r.json() : null).then((j) => j && setMe(j)).catch(() => {}); }, []);
@@ -49,7 +51,7 @@ export function CoachView() {
   }
 
   return (
-    <main className="fel-fade mx-auto max-w-[900px] px-5 pb-28 pt-8 md:pb-10">
+    <main className={`fel-fade mx-auto max-w-[900px] px-5 pb-28 pt-8 md:pb-10 ${known ? '' : 'invisible'}`}>
       {/* PREMIUM-UI P8 (2026-10-27): the page says where you are (it was a screen-reader-only heading), Court session is the
           ONE primary — the one-accent pill, docked on a phone (was a fourth accent, pink) */}
       <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
