@@ -295,8 +295,9 @@ async function tposeJob(): Promise<void> {
   for (const body of bodies) for (const clip of clips) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }); await page.addInitScript(NAME_SHIM);
     const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error' || /T-?pose|bind pose|FEL-ANIM/i.test(m.text())) errors.push(m.text().slice(0, 240)); });
-    await page.goto(`${url}/?w=358&h=268&body=${body}#${clip.startsWith('muscles') ? clip.replace(/\./g, ':') : `stage:${clip}`}`);   // muscles.<entry>.<side>: the anatomy view
+    await page.goto(`${url}/?w=358&h=268&body=${body}#${/^(muscles|avatar)\./.test(clip) ? clip.replace(/\./g, ':') : `stage:${clip}`}`);   // muscles.<entry>.<side>: the anatomy view
     try { await stageReady(page, 300_000); } catch (e) { errors.push(String(e).slice(0, 200)); }
+    const state = await page.evaluate(() => document.querySelector('[data-testid="exercise-stage"]')?.getAttribute('data-state') ?? null);
     await page.waitForTimeout(1500);
     const sample = () => page.evaluate(() => {
       const st = (window as unknown as { __FEL_LIBRARY_STAGE__?: { hero: { skeleton: { bones: { name: string; getTransformNode(): { getAbsolutePosition(): { x: number; y: number; z: number }; computeWorldMatrix(f: boolean): void } | null }[] } }; scene: { animationGroups: { name: string; isPlaying: boolean }[] } } }).__FEL_LIBRARY_STAGE__;
@@ -309,7 +310,7 @@ async function tposeJob(): Promise<void> {
     const s1 = await sample(); await page.waitForTimeout(700); const s2 = await sample();
     const moved = s1?.hand && s2?.hand ? Math.hypot(s1.hand[0] - s2.hand[0], s1.hand[1] - s2.hand[1], s1.hand[2] - s2.hand[2]) : null;
     await page.screenshot({ path: join(OUT, `tpose-${body}-${clip}.png`) });
-    out[`${body}:${clip}`] = { armFromDownDeg: s1?.armFromDownDeg != null ? Math.round(s1.armFromDownDeg) : null, handMovedCm: moved != null ? Math.round(moved * 100) : null, hipsY: s1?.hipsY, playing: s1?.playing, errors: errors.slice(0, 6) };
+    out[`${body}:${clip}`] = { state, armFromDownDeg: s1?.armFromDownDeg != null ? Math.round(s1.armFromDownDeg) : null, handMovedCm: moved != null ? Math.round(moved * 100) : null, hipsY: s1?.hipsY, playing: s1?.playing, errors: errors.slice(0, 6) };
     await page.close();
   }
   await browser.close(); close();

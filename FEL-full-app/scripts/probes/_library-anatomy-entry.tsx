@@ -11,6 +11,7 @@ import { createElement, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import ExerciseStage from '@/components/library/exercise-stage';
 import { LibraryBrowser } from '@/components/library/library-browser';
+import { AvatarDemo } from '@/components/library/avatar-demo';
 import { demoFor, muscleMap } from '@/lib/library/demo';
 import { loadLibraryFiles } from '@/lib/library/files';
 import { buildIndex, search } from '@/lib/library/search/engine';
@@ -62,7 +63,10 @@ function Ui() {
 }
 
 const root = createRoot(document.getElementById('root')!);
-if (mode === 'stage' || mode === 'muscles') {
+if (mode === 'avatar') {
+  // T-POSE (2026-10-27): the drill surfaces' demo (AvatarDemo), as their drill-demo.tsx mounts it: #avatar:<clip|still>
+  root.render(createElement('div', { style: { width: '358px', background: '#0c0c11' } }, createElement(AvatarDemo, { clip: a && a !== 'still' ? a : null })));
+} else if (mode === 'stage' || mode === 'muscles') {
   // ?w=&h= sizes the stage like the sheet does on a phone (358×268 at 390 px); default: the whole window
   const q = new URLSearchParams(location.search);
   const size = q.get('w') ? { width: `${q.get('w')}px`, height: `${q.get('h')}px` } : { width: '100vw', height: '100vh' };
