@@ -185,7 +185,7 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
       </div>
 
       {sheet && (
-        <AthleteSheet name={sheetName} initial={sheet.tab} onClose={() => setSheet(null)}>
+        <AthleteSheet name={sheetName} initial={sheet.tab} onClose={() => setSheet(null)} className={TAP}>
           {(tab) => !programs || !inbox ? <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div> : (
             <>
               {theirs.length > 1 && (tab === 'thread' || tab === 'program') && (
@@ -280,7 +280,7 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
       )}
 
       {screen && (
-        <FullScreen title={screen === 'builder' && prog ? prog.tree.name : SCREEN_TITLE[screen]} onClose={() => setScreen(null)} testId={screen}>
+        <FullScreen title={screen === 'builder' && prog ? prog.tree.name : SCREEN_TITLE[screen]} onClose={() => setScreen(null)} testId={screen} className={TAP}>
           {screen === 'setup' && <SetupScreen />}
           {screen === 'drafts' && <DraftsInbox />}
           {screen === 'reviews' && <FormReviewQueue />}

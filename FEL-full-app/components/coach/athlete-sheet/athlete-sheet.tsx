@@ -3,14 +3,25 @@
 // queue card: this week, their numbers, the thread and the program. The shell only; the sections are the coach's
 // existing panels, handed in by the Clients view (app/coach/_components/clients-view.tsx), so nothing is rebuilt here.
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft } from 'lucide-react';
 import { LOOK, initials } from '../coach-queue/look';
 
 export type SheetTab = 'week' | 'numbers' | 'thread' | 'program';
+/**
+ * A sheet is rendered on <body>, not where it is declared: the page around it animates in (fel-fade), and an animated
+ * ancestor is a stacking context that would keep the sheet UNDER the status rail and the tab bar whatever its z-index.
+ */
+export function OnBody({ children }: { children: ReactNode }) {
+  return typeof document === 'undefined' ? <>{children}</> : createPortal(children, document.body);
+}
+
 const TABS: { key: SheetTab; label: string }[] = [{ key: 'week', label: 'Week' }, { key: 'numbers', label: 'Numbers' }, { key: 'thread', label: 'Thread' }, { key: 'program', label: 'Program' }];
 
-export function AthleteSheet({ name, line, initial = 'week', onClose, children }: {
+export function AthleteSheet({ name, line, initial = 'week', onClose, children, className = '' }: {
   name: string;
+  /** e.g. the coach screens' 44 px tap floor (app/coach/_components/look.ts TAP), which a portal leaves behind */
+  className?: string;
   line?: string | null;
   initial?: SheetTab;
   onClose: () => void;
@@ -25,7 +36,8 @@ export function AthleteSheet({ name, line, initial = 'week', onClose, children }
     return () => { window.removeEventListener('keydown', esc); document.documentElement.style.overflow = ''; };
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label={name} className={LOOK.sheet} data-athlete-sheet>
+    <OnBody>
+    <div role="dialog" aria-modal="true" aria-label={name} className={`${LOOK.sheet} ${className}`} data-athlete-sheet>
       <div className={LOOK.sheetInner}>
         <div className={LOOK.sheetHead}>
           <button type="button" className={LOOK.outline} onClick={onClose} aria-label="Back"><ArrowLeft className="h-5 w-5" aria-hidden /></button>
@@ -44,11 +56,12 @@ export function AthleteSheet({ name, line, initial = 'week', onClose, children }
         <div className="space-y-4" data-sheet-body={tab}>{children(tab)}</div>
       </div>
     </div>
+    </OnBody>
   );
 }
 
 /** A full-screen page over the coach home: Setup, the builder, or one of the coach's tools. */
-export function FullScreen({ title, onClose, children, testId }: { title: string; onClose: () => void; children: ReactNode; testId?: string }) {
+export function FullScreen({ title, onClose, children, testId, className = '' }: { title: string; onClose: () => void; children: ReactNode; testId?: string; className?: string }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', esc);
@@ -56,7 +69,8 @@ export function FullScreen({ title, onClose, children, testId }: { title: string
     return () => { window.removeEventListener('keydown', esc); document.documentElement.style.overflow = ''; };
   }, [onClose]);
   return (
-    <div role="dialog" aria-modal="true" aria-label={title} className={LOOK.sheet} data-full-screen={testId ?? title}>
+    <OnBody>
+    <div role="dialog" aria-modal="true" aria-label={title} className={`${LOOK.sheet} ${className}`} data-full-screen={testId ?? title}>
       <div className={LOOK.sheetInner}>
         <div className={LOOK.sheetHead}>
           <button type="button" className={LOOK.outline} onClick={onClose} aria-label="Back"><ArrowLeft className="h-5 w-5" aria-hidden /></button>
@@ -65,5 +79,6 @@ export function FullScreen({ title, onClose, children, testId }: { title: string
         {children}
       </div>
     </div>
+    </OnBody>
   );
 }

@@ -10,6 +10,7 @@ import type { QueueAction, QueueCard, QueuePreset, QueueSourceKey } from '@/lib/
 import { SOURCE_LABEL } from '@/lib/coach/queue';
 import { LOOK } from './look';
 import { markDone, readDone } from './done';
+import { OnBody } from '../athlete-sheet/athlete-sheet';
 
 const LABEL: Record<QueueAction, string> = { approve: 'Approve', reply: 'Reply', cue: 'Reply', looks_good: 'Looks good', nudge: 'Nudge', open: 'Open', done: 'Done' };
 
@@ -113,7 +114,7 @@ function ReplySheet({ card, busy, onClose, onPick, onText }: {
 }) {
   const [text, setText] = useState('');
   return (
-    <>
+    <OnBody>
       <div className={LOOK.scrim} onClick={onClose} aria-hidden />
       <div role="dialog" aria-modal="true" aria-label={`Reply to ${card.name}`} className={LOOK.replySheet} data-reply-sheet>
         <div className={`${LOOK.sectionHead} mb-2`}><span>Reply to {card.name.split(/\s+/)[0]}</span>
@@ -132,6 +133,6 @@ function ReplySheet({ card, busy, onClose, onPick, onText }: {
           </form>
         )}
       </div>
-    </>
+    </OnBody>
   );
 }
