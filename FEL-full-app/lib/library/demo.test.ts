@@ -71,8 +71,8 @@ describe('the loop an entry plays (demoFor)', () => {
   });
   it('coverage over the whole library (reported, and held from falling)', () => {
     const shown = ALL.filter((e) => demoFor(e)).length;
-    // LIBRARY-ANATOMY-2: 21.5% at the first pass → 45.6%; DEMO-LOOPS: 46.4%. The floor follows (0.18 → 0.45 → 0.46)
-    expect(shown / ALL.length).toBeGreaterThan(0.46);
+    // LIBRARY-ANATOMY-2: 21.5% at the first pass → 45.6%; DEMO-LOOPS: 46.8%. The floor follows (0.18 → 0.45 → 0.465)
+    expect(shown / ALL.length).toBeGreaterThan(0.465);
   });
 });
 
