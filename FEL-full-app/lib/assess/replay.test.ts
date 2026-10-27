@@ -92,9 +92,10 @@ describe('the route imports nothing from Babylon', () => {
   });
 
   // T-POSE FIX (2026-10-27, owner playtest: the drill avatar T-posed). The Quick Screen's drill demo now plays the real
-  // authored loop on the library stage (Babylon) instead of the old one-clip three.js canvas. Same contract as before:
-  // TAP TO OPEN — nothing 3D loads until the person taps "watch" (components/library/avatar-demo.tsx mounts the stage
-  // through next/dynamic, ssr:false, only after the tap). That ONE lazy import is excused BY NAME; the test below proves
+  // authored loop on the library stage (Babylon) instead of the old one-clip three.js canvas. Owner decision (2026-10-27):
+  // "It should play automatically" — the demo opens itself when its box scrolls into view (components/library/
+  // use-auto-open.ts), and avatar-demo.tsx mounts the stage through next/dynamic, ssr:false, so the results page paints
+  // first and the 3D loads after. That ONE lazy import is excused BY NAME (approved by the owner); the test below proves
   // it stays lazy, and every other path from the route must still never reach @babylonjs/*.
   const ON_TAP_ONLY = new Map([['components/library/avatar-demo.tsx', './exercise-stage']]);
   it('the stage is reached only through the on-tap dynamic import (ssr:false), never a static import', () => {

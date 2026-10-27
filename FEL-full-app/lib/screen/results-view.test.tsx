@@ -128,7 +128,7 @@ describe('the priorities and the win card (A4-4)', () => {
       expect(card).toMatch(/data-early-tag[^>]*>Early version</);
       // test changed (EDU-LINKS, 2026-10-07): the slot said "Demo coming"; owner decision "drill demos: reuse the 3D
       // ExerciseDemo" filled it — a tap opens the demo (drill-demo.tsx), so the first paint is the button, not a placeholder
-      expect(card).toMatch(/data-demo-slot[^>]*>[\s\S]*data-demo-watch[^>]*>[\s\S]*Watch the demo/);
+      expect(card).toMatch(/data-demo-slot[^>]*>[\s\S]*data-demo-watch/);   // autoplay box (owner 2026-10-27), no tap
       expect(card).not.toMatch(/Demo coming/);
     }
     expect(h).not.toContain('data-win-card');

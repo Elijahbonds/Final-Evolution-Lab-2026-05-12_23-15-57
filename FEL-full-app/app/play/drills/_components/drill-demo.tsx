@@ -16,10 +16,10 @@
 // the demo is your avatar moving, a motion cue — the drill itself is the chart's own lines and the Playbook's words,
 // which the page shows beside it.
 
-import { useState } from 'react';
-import { Dumbbell, Play } from 'lucide-react';
+import { Dumbbell } from 'lucide-react';
 import type { Drill } from '@/lib/drills/chart';
 import { AvatarDemo } from '@/components/library/avatar-demo';
+import { useAutoOpen } from '@/components/library/use-auto-open';
 import { drillDemoLoop } from '@/lib/library/surfaceDemo';
 
 const threeDisabled = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
@@ -29,16 +29,10 @@ export const DEMO_NOTE_LINE = 'Your avatar doing the drill where there is a loop
 
 
 export function DrillDemo({ drill, initiallyOpen = false }: { drill: Drill; initiallyOpen?: boolean }) {
-  const [open, setOpen] = useState(initiallyOpen);
+  const { ref, open } = useAutoOpen<HTMLDivElement>(initiallyOpen);
   if (!open) {
-    return (
-      <button
-        type="button" data-drill-demo-watch onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-left text-[14px] font-bold text-white/80 hover:border-white/30"
-      >
-        <Play aria-hidden className="h-4 w-4 shrink-0" /> {DEMO_WATCH_LABEL}
-      </button>
-    );
+    // Autoplay: an empty stage box that opens itself when it scrolls into view (components/library/use-auto-open.ts).
+    return <div ref={ref} data-drill-demo-watch aria-hidden className="flex aspect-video w-full items-center justify-center rounded-xl border border-white/10 bg-[#0c0c11]" />;
   }
   return (
     <div data-drill-demo-open={drill.id}>

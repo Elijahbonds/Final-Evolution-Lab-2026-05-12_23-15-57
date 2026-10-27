@@ -7,13 +7,15 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DrillDemo } from '@/app/play/mirror/assess/_components/drill-demo';
 import { SCREEN_DEMO_LOOPS } from '@/lib/library/surfaceDemo';
-import { DEMO_NOTE, DEMO_WATCH, SCREEN_TEST_NAMES } from './copy';
+import { DEMO_NOTE, SCREEN_TEST_NAMES } from './copy';
 
 describe('the drill demo', () => {
-  it('first paint: one "Watch the demo" button, nothing 3D loaded yet', () => {
+  // AUTOPLAY (owner, 2026-10-27: "It should play automatically, don't make the platform confusing"): no "watch" tap. The
+  // first paint is an empty stage box that opens itself when it scrolls into view; nothing 3D is loaded on the server.
+  it('first paint: an autoplay stage box (no button), nothing 3D loaded yet', () => {
     const h = renderToStaticMarkup(createElement(DrillDemo, { test: 'T1', drill: 'Knees out over the toes' }));
-    expect(h).toMatch(/^<button type="button" data-demo-watch/);
-    expect(h).toContain(DEMO_WATCH);
+    expect(h).toMatch(/^<div data-demo-watch="true" aria-hidden="true"/);
+    expect(h).not.toContain('<button');
     expect(h).not.toContain('data-demo-open');
   });
 

@@ -16,10 +16,10 @@
 // Quick Screen may load from off-site (lib/screen/offsite.test.ts, Cyber F3) — the guard caught the first version of
 // this file importing it. The model is same-origin (/models/elijah.glb), so nothing new leaves the device.
 
-import { useState } from 'react';
-import { Dumbbell, Play } from 'lucide-react';
-import { DEMO_NOTE, DEMO_WATCH, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
+import { Dumbbell } from 'lucide-react';
+import { DEMO_NOTE, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
 import { AvatarDemo } from '@/components/library/avatar-demo';
+import { useAutoOpen } from '@/components/library/use-auto-open';
 import { SCREEN_DEMO_LOOPS } from '@/lib/library/surfaceDemo';
 
 /** ExerciseDemo's own switch: with 3D off, a still cue card instead of the canvas (never a blank box). */
@@ -29,16 +29,10 @@ type TestId = keyof typeof SCREEN_TEST_NAMES;
 
 
 export function DrillDemo({ test, drill, initiallyOpen = false }: { test: TestId; drill: string; initiallyOpen?: boolean }) {
-  const [open, setOpen] = useState(initiallyOpen);
+  const { ref, open } = useAutoOpen<HTMLDivElement>(initiallyOpen);
   if (!open) {
-    return (
-      <button
-        type="button" data-demo-watch onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-xl border border-white/20 px-3 py-2 text-left text-[16px] font-bold text-white/85"
-      >
-        <Play aria-hidden className="h-4 w-4 shrink-0" /> {DEMO_WATCH}
-      </button>
-    );
+    // Autoplay: an empty stage box that opens itself when it scrolls into view (components/library/use-auto-open.ts).
+    return <div ref={ref} data-demo-watch aria-hidden className="flex aspect-video w-full items-center justify-center rounded-xl border border-white/10 bg-[#0c0c11]" />;
   }
   return (
     <div data-demo-open={test}>
