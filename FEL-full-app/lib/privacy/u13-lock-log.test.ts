@@ -94,7 +94,11 @@ const UA = 'AgeScreenTest/1.0';
 // pinned at this lane's merge of lane/finish-release (d754d041), the first commit carrying both files.
 // MERGE 5418784a: the first commit carrying every pending file above.
 // MERGE 0fe07e1f: the first commit carrying every pending file above.
-const PARENT = '0fe07e1f6e704a95a0b48dbbe233f3f9ef0872aa';
+// OFFLINE-PUSH (lane/offline-push, 2026-10-26) prisma/pending/2026-10-26-offline-plays.sql and 2026-10-26-push-subscriptions.sql
+// (pending SQL only; schema.prisma untouched; OfflinePlay + NotificationPref + PushSubscription + PushSendLog, additive) at
+// ff3eee90; payments-ready landed first (#457): pinned at this lane's merge of lane/finish-release (b88325b8), the first
+// commit carrying every pending file above.
+const PARENT = 'b88325b871b1430aed39b0009e165b23b95c0602';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
