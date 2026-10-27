@@ -94,13 +94,13 @@ function summaryLine(faults: PatternFaultReading[]): string {
   const by = (id: SetupFaultId) => faults.find((f) => f.id === id)!;
   const hip = by('hipHeight'), bar = by('barLine'), head = by('headLine');
   if (hip.status === 'fault') return hip.value < SETUP_THRESHOLDS.hipHeightLow
-    ? 'Hips are riding high — sit them down toward the bar, knees add the bend.'
-    : 'Hips are low for a pull — this reads as a squat stance. Hips up a touch, chest over the bar.';
-  if (bar.status === 'fault') return 'Shoulders are behind the bar — bring your chest over it a touch.';
-  if (head.status === 'fault') return 'Set your head in line first — one long line from your ears to your hips.';
-  if (hip.status === 'unreadable') return 'Can\'t see your hips and knees well enough to check your set-up — square up in frame.';
-  if (bar.status === 'unreadable') return 'Can\'t see the bar hand well enough to check your set-up — bring it into frame.';
-  if (head.status === 'unreadable') return 'Can\'t see your head and shoulders well enough to check your set-up — square up in frame.';
+    ? 'Hips too high. Sit them down toward the bar and bend your knees more.'
+    : 'Hips too low for a lift from the floor. Raise them a little, chest over the bar.';
+  if (bar.status === 'fault') return 'Shoulders behind the bar. Bring your chest over it a little.';
+  if (head.status === 'fault') return 'Head out of line. Keep one long line from your ears to your hips.';
+  if (hip.status === 'unreadable') return 'I can\'t see your hips and knees. Turn side-on and get your whole body in the shot.';
+  if (bar.status === 'unreadable') return 'I can\'t see the hand on the bar. Bring it into the shot.';
+  if (head.status === 'unreadable') return 'I can\'t see your head and shoulders. Get your whole body in the shot.';
   return 'Set-up looks ready.';
 }
 
@@ -121,7 +121,7 @@ export function auditSetup(
 
   const side = ctx.side ?? pickNearSide(present, t.minVis);
   if (!side) {
-    return { faults: ALL_IDS.map((id) => unreadable(id, undefined)), readableFrames: 0, note: 'Too little of you in view to tell which side is toward the camera.' };
+    return { faults: ALL_IDS.map((id) => unreadable(id, undefined)), readableFrames: 0, note: 'Step back so your whole body is in the shot.' };
   }
 
   let sideOnVotes = 0, viewVotes = 0;

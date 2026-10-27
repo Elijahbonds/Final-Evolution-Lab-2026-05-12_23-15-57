@@ -80,7 +80,7 @@ const CLEAN: ProgressHeadline = {
   format: (n) => `${Math.round(n * 100)}%`,
 };
 const PER_REP: ProgressHeadline = {
-  id: 'faultsPerRep', direction: 'lowerIsBetter', sameBand: FAULTS_PER_REP_SAME_BAND, label: 'Zone faults per rep',
+  id: 'faultsPerRep', direction: 'lowerIsBetter', sameBand: FAULTS_PER_REP_SAME_BAND, label: 'Things to fix per rep',
   format: (n) => n.toFixed(1),
 };
 export const HEADLINE: Readonly<Record<ProgressMovement, ProgressHeadline>> = {
@@ -189,16 +189,16 @@ export interface ProgressView {
 }
 
 export const WHERE_SERVER = 'From your saved sessions.';
-export const WHERE_DEVICE = 'Kept on this phone only — never sent. Forget it any time.';
-export const TOO_FEW_LINE = `Too few reps were read to compare — ${PROGRESS_MIN_REPS} or more counts.`;
-export const FIRST_LINE = 'First one on record — your next set is compared with this one.';
-export const SERVER_UNAVAILABLE_LINE = 'Your saved sessions could not be read just now — no comparison this time.';
-export const DEVICE_UNAVAILABLE_LINE = 'This phone is not keeping a history (private browsing or blocked storage), so there is nothing to compare.';
+export const WHERE_DEVICE = 'Kept on this phone only, never sent. You can delete it any time.';
+export const TOO_FEW_LINE = `Too few reps were read to compare. Do ${PROGRESS_MIN_REPS} or more next time.`;
+export const FIRST_LINE = 'Your first set on record. Next time, we compare with this one.';
+export const SERVER_UNAVAILABLE_LINE = 'Your saved sessions could not be loaded just now, so no comparison this time.';
+export const DEVICE_UNAVAILABLE_LINE = 'This phone is not keeping a history (private browsing, or storage is off), so there is nothing to compare.';
 
 const STATUS_LINE: Record<'better' | 'same' | 'worse', (n: number) => string> = {
-  better: (n) => `Better than your last ${n === 1 ? 'set' : n}.`,
-  same: (n) => `About the same as your last ${n === 1 ? 'set' : n}.`,
-  worse: (n) => `Not as clean as your last ${n === 1 ? 'set' : n}.`,
+  better: (n) => `Better than your last ${n === 1 ? 'set' : n}. Keep doing what you did.`,
+  same: (n) => `About the same as your last ${n === 1 ? 'set' : n}. Keep at it.`,
+  worse: (n) => `Not as clean as your last ${n === 1 ? 'set' : n}. Next set, go a little slower.`,
 };
 
 /** The review's "vs your last 3" block, from a comparison (null: the set was too short to read, or there is no history to read). */

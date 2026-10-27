@@ -184,7 +184,7 @@ export function auditCarry(frames: readonly PoseFrame[], ctx: MirrorPatternConte
     return {
       faults: (['trunkSideLean', 'hipHike', 'shoulderShrug', 'rhythm'] as const).map((id) => unreadable(id)),
       readableFrames: bodies.length,
-      note: bodies.length === 0 ? 'turn to face the camera — the carry reads from the front' : 'hold the carry a little longer so the camera can get a steady read',
+      note: bodies.length === 0 ? 'Turn to face the camera. The carry is read from the front.' : 'Hold the carry a little longer so the camera gets a steady look.',
     };
   }
 
@@ -225,9 +225,9 @@ export function auditCarry(frames: readonly PoseFrame[], ctx: MirrorPatternConte
       }
     : unreadable('rhythm');
 
-  const faultWords = [lean.status === 'fault' && 'trunk lean', hike.status === 'fault' && 'hip hike', shrug.status === 'fault' && 'shoulder shrug']
+  const faultWords = [lean.status === 'fault' && 'leaning to one side', hike.status === 'fault' && 'hip hiking up', shrug.status === 'fault' && 'shoulder shrugging up']
     .filter((v): v is string => !!v);
-  const note = faultWords.length ? `what the camera saw: ${faultWords.join(', ')}` : 'what the camera saw: level through the march';
+  const note = faultWords.length ? `What the camera saw: ${faultWords.join(', ')}.` : 'What the camera saw: level the whole way.';
 
   return { faults: [hike, shrug, lean, rhythm], readableFrames: bodies.length, note };
 }

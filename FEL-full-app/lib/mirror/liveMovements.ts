@@ -31,32 +31,32 @@ export const MIRROR_PATH = '/play/mirror';
 
 export const MIRROR_LIVE_MOVEMENTS: readonly LiveMovement[] = [
   {
-    id: 'squat', tab: 'Squat', title: 'Corrective Squat',
-    reads: 'Breathe first, then a movement check and a work set. Knees, heels, shoulders and weight are read every rep, and the coach cues as you go.',
+    id: 'squat', tab: 'Squat', title: 'Squat',
+    reads: 'Breathe first, then a few slow squats and a full set. The camera watches your knees, heels and balance, and the coach talks you through it.',
   },
   {
     id: 'lunge', tab: 'Lunge', title: 'Lunge',
-    reads: 'Each leg forward in turn, read the same five ways, with spoken cues as you go, and the two sides compared in the review.',
+    reads: 'Each leg forward in turn, checked five ways, with spoken cues. At the end you see how your two sides compare.',
   },
   {
-    id: 'hinge', tab: 'Hinge', title: 'Hip Hinge',
-    reads: 'Side-on: a short check, then a work set. Each rep is read for the head-to-hips line, how far the hips travel back against the knee, and the shin, with spoken cues between reps.',
+    id: 'hinge', tab: 'Hinge', title: 'Hip hinge',
+    reads: 'Push your hips back and bend at the hips, back flat. Stand side-on. The camera watches your back, hips and shins, and the coach talks between reps.',
   },
   {
     id: 'pushup', tab: 'Push-up', title: 'Push-up',
-    reads: 'Phone on the floor, side-on: a short check, then a work set. Each rep is read for the body line, the hands, the head and the depth, with spoken cues between reps.',
+    reads: 'Phone on the floor, side-on. The camera watches your body line, hands, head and depth, and the coach talks between reps.',
   },
   {
-    id: 'pressRow', tab: 'Press / Row', title: 'Split-Stance Press / Row',
-    reads: 'Elbow flare, shrug and trunk read on every rep, with spoken cues, and estimated engagement for five zones.',
+    id: 'pressRow', tab: 'Press / Row', title: 'Press and row',
+    reads: 'One foot forward, pressing and rowing a handle. The camera watches your elbow, shoulder and balance on every rep, and the coach talks you through it.',
   },
   {
     id: 'jump', tab: 'Jump', title: 'Vertical Jump',
-    reads: 'Your jump, estimated from flight time, and your best to beat.',
+    reads: 'Your jump height, estimated from your time in the air, and your best to beat.',
   },
   {
     id: 'screen', tab: 'Screen', title: 'Movement Screen',
-    reads: 'A guided screen: six stations in about two minutes, each read as it finishes, then what to work on.',
+    reads: 'Six quick stations in about two minutes, then what to work on.',
   },
 ];
 

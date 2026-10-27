@@ -151,7 +151,7 @@ export const RETEST_PAUSE_MS = 4000;
 export function retestLine(grades: readonly StationGrade[], opts: { fix?: string } = {}): string {
   const first = grades.find((g) => g.status === 'unreadable');
   const hint = !first ? '' : opts.fix || retestHintFor(first);
-  return `I couldn't read that one — once more.${hint ? ` ${hint}` : ''}`;
+  return `I couldn't see that one. Once more.${hint ? ` ${hint}` : ''}`;
 }
 
 /** Leaving a station whose checks were all read. */

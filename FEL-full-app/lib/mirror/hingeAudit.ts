@@ -206,7 +206,7 @@ export function auditHinge(
   if (!side) {
     return {
       faults: (['hingeRatio', 'dowelLine', 'shinAngle'] as HingeFaultId[]).map((id) => unreadable(id, undefined)),
-      readableFrames: 0, note: 'Too little of you in view to tell which side is toward the camera.',
+      readableFrames: 0, note: 'Step back so your whole body is in the shot.',
     };
   }
 
@@ -288,8 +288,9 @@ export function auditHinge(
   // whichever phase-4/5 lane wires up the per-athlete store, and this reading calibrates fresh from its own frames.
   void ctx.baseline;
   const note = hr.status === 'unreadable'
-    ? 'Estimated: not enough hip travel in this clip to read a hinge ratio.'
-    : `Estimated: hinge ratio ${hr.value.toFixed(2)} (hip:knee) · dowel line ${faults[1].status === 'unreadable' ? 'not read' : `${faults[1].value.toFixed(0)}° off`} · shin ${faults[2].status === 'unreadable' ? 'not read' : `${faults[2].value.toFixed(0)}°`}`;
+    ? 'Your hips did not move back enough in this clip to read. Push them back further next time.'
+    // CUE-REWRITE: each number with what it is ("hinge ratio 1.40 (hip:knee)" → how much more the hips bent than the knees)
+    : `Estimated: your hips bent about ${hr.value.toFixed(1)} times as much as your knees · back line ${faults[1].status === 'unreadable' ? 'not read' : `about ${faults[1].value.toFixed(0)}° off straight`} · shins ${faults[2].status === 'unreadable' ? 'not read' : `tipped about ${faults[2].value.toFixed(0)}°`}`;
 
   return { faults, readableFrames, note };
 }
