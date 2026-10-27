@@ -17,7 +17,7 @@ import { ArrowUpToLine, Camera, CheckCircle2, Clock, Flame, Footprints, Maximize
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { composeDailyDrill } from '@/lib/daily-drill/compose';
 import { DAILY_DRILL_CLAIM_PATH, KEPT_LINE } from '@/lib/daily-drill/copy';
-import { FIRST_TIME_LINE, START_AGAIN_LABEL, START_LABEL, guideFor, needChips, rewardParts, stepsFor } from '@/lib/daily-drill/guide';
+import { FIRST_TIME_LINE, START_AGAIN_LABEL, START_LABEL, guideFor, needChips, rewardParts, stepsFor, whyNumber } from '@/lib/daily-drill/guide';
 import type { DailyDrillView } from '@/lib/daily-drill/load';
 import type { DrillResult } from '@/lib/drills/DrillRunner';
 import { DrillLive } from '@/app/play/drills/_components/drill-live';
@@ -110,7 +110,7 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
       <header className="space-y-2">
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-white/40" data-daily-book>{plan.name}</p>
         <h1 className="text-[36px] font-black leading-[1.02] tracking-tight text-white">{guide.title}</h1>
-        <p className="text-[17px] font-semibold leading-snug text-white/90" data-daily-why>{view.whyToday}</p>
+        <p className="text-[17px] font-semibold leading-snug text-white/90" data-daily-why>{whyNumber(view.focus, view.skill)}</p>
         {newcomer && (
           <p className="flex items-center gap-2 text-[15px] text-white/70" data-daily-improves>
             <Sparkles aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" />{guide.improves}

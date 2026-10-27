@@ -93,7 +93,7 @@ export const GUIDES: Record<GuideDrillId, DrillGuide> = {
     title: 'Soft landings',
     works: 'soft landings',
     improves: 'Steady landings on every jump.',
-    cues: ['Both feet at once', 'Freeze for 3'],
+    cues: ['Both feet together', 'Freeze for 3'],
     unit: 'landings',
     workStep: 'hops, land and freeze',
     jumps: true,
@@ -172,6 +172,12 @@ export function whyToday(focus: Focus, skill: SkillReading | null, _tied: boolea
   const g = guideFor(drillId);
   if (!skill || focus === 'starter') return `No scores yet. Today: ${g.works}.`;
   return `${FOCUS_LABEL[focus]} is your lowest score (${shortValue(skill)}). Today: ${g.works}.`;
+}
+
+/** The page's why: the number alone — its title already says what today works on ("Shooting is your lowest score (40%)."). */
+export function whyNumber(focus: Focus, skill: SkillReading | null): string {
+  if (!skill || focus === 'starter') return 'No scores yet.';
+  return `${FOCUS_LABEL[focus]} is your lowest score (${shortValue(skill)}).`;
 }
 
 /** Up to 3 numbered steps of ≤ 6 words, from the chart the day runs: the warm-up, the work, the rest. */

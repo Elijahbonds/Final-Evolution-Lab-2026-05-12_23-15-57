@@ -12,7 +12,7 @@ import { FOCUS_DRILLS, planFor } from './plan';
 import { composeDailyDrill, phaseOf } from './compose';
 import { viewFrom } from './load';
 import {
-  GUIDES, allFixedLines, needChips, phaseReps, readResult, rewardChip, runStep, shortValue, stepsFor, tomorrowLine, whyToday,
+  GUIDES, allFixedLines, needChips, phaseReps, readResult, rewardChip, runStep, shortValue, stepsFor, tomorrowLine, whyNumber, whyToday,
 } from './guide';
 
 const view = (rows = hooper(), acc = OPEN) => viewFrom('u1', rows, acc, NOW);
@@ -23,6 +23,10 @@ describe('why today: one short line from the real number', () => {
     expect(view(jumper(), OPEN).whyToday).toBe('Jump is your lowest score (26 in). Today: springy hops.');
     expect(view(jumper(), GATE_SHUT).whyToday).toBe('Jump is your lowest score (26 in). Today: slow squats.');
     expect(view(newAdult()).whyToday).toBe('No scores yet. Today: a full-body wake-up.');
+  });
+  it('the page\'s why is the number alone (its title says the drill)', () => {
+    expect(whyNumber('shot', view().skill)).toBe('Shooting is your lowest score (40%).');
+    expect(whyNumber('starter', null)).toBe('No scores yet.');
   });
   it('every why-line is one short line (≤ 10 words)', () => {
     for (const v of [view(), view(jumper()), view(jumper(), GATE_SHUT), view(newAdult()), view(teen(), YOUTH)]) {

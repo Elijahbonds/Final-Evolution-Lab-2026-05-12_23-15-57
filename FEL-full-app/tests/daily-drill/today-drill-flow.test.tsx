@@ -56,7 +56,7 @@ describe('before: purpose first, then what to do', () => {
     expect(out).toContain('New: one short drill a day, from your lowest score.');
     expect(out).toMatch(/<h1[^>]*>Soft landings<\/h1>/);
     expect(out).toContain('Safe Landing Check');                                       // the book name, a small label
-    expect(out).toContain('Shooting is your lowest score (40%). Today: soft landings.');
+    expect(out).toContain('Shooting is your lowest score (40%).');   // the title above it says what today works on
     expect(out).toContain('Steady landings on every jump.');
     for (const c of ['time', 'phone', 'floor', 'shoes', 'above']) expect(out).toContain(`data-daily-need="${c}"`);
     expect(out).toContain('6 min');
