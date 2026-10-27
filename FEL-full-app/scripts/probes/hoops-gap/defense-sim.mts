@@ -56,7 +56,7 @@ function aiBlock(H: number, style: 'jumper' | 'layup') {
     const foe = { x: me.x + dir.x * d, z: me.z + dir.z * d };
     const read = aiShotRead(d, 0.9, true, rnd);
     if (read !== 'none' && read !== 'pending') reads++;
-    const green = 0.55, release = green + gauss() * 0.05;
+    const green = Number(process.env.GREEN ?? 0.55), release = green + gauss() * 0.05;
     let jumpAge = Infinity;
     if (read === 'block') { const at = aiBlockJumpAtSec(green, 0.22); jumpAge = release - at; if (jumpAge >= JUMP_SEC) jumpAge = Infinity; }
     const handUp = read === 'handUp';
