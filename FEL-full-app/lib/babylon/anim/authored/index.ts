@@ -54,6 +54,15 @@ import {
   buildExDeadBug, buildExBirdDog, buildExCrunch, buildExArmCircles, buildExQuadStretch, buildExBreathe,
   buildExSeatedPress, buildExSeatedCurl, buildExSeatedLateralRaise, buildExSeatedTriceps, buildExBenchPress, buildExFloorPress, buildExFly, buildExSkullCrusher, buildExInclinePress, buildExInclineFly,
 } from './exercise';   // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops — opt-in suite, built on the library stage only
+import { EXERCISE_BATCH_C2_BUILDERS } from './exerciseBatchC2';   // FITNESS-TPOSE batchC2 (2026-10-26)
+import { EXERCISE_BATCH_C1_BUILDERS } from './exerciseBatchC1';   // FITNESS-TPOSE batchC1 (2026-10-26)
+import { EXERCISE_BATCH_B6_BUILDERS } from './exerciseBatchB6';   // FITNESS-TPOSE batchB6 (2026-10-26)
+import { EXERCISE_BATCH_B5_BUILDERS } from './exerciseBatchB5';   // FITNESS-TPOSE batchB5 (2026-10-26)
+import { EXERCISE_BATCH_B4_BUILDERS } from './exerciseBatchB4';   // FITNESS-TPOSE batchB4 (2026-10-26)
+import { EXERCISE_BATCH_B3_BUILDERS } from './exerciseBatchB3';   // FITNESS-TPOSE batchB3 (2026-10-26)
+import { EXERCISE_BATCH_B2_BUILDERS } from './exerciseBatchB2';   // FITNESS-TPOSE batchB2 (2026-10-26)
+import { EXERCISE_BATCH_B1_BUILDERS } from './exerciseBatchB1';   // FITNESS-TPOSE batchB1 (2026-10-26)
+import { EXERCISE_BATCH_A_BUILDERS } from './exerciseBatchA';   // FITNESS-TPOSE batchA (2026-10-26)
 
 /** Every authored clip as [name, builder] for this skeleton (the table registerAuthoredClips walks). */
 function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => AnimationGroup | null][] {
@@ -343,6 +352,16 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_arm_circles', () => buildExArmCircles(scene, skeleton)],
     ['ex_quad_stretch', () => buildExQuadStretch(scene, skeleton)],
     ['ex_breathe', () => buildExBreathe(scene, skeleton)],
+    // FITNESS-TPOSE batches (2026-10-26)
+    ...EXERCISE_BATCH_C2_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_C1_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_B6_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_B5_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_B4_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_B3_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_B2_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_B1_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
+    ...EXERCISE_BATCH_A_BUILDERS.map(([n, build]): [string, () => AnimationGroup | null] => [n, () => build(scene, skeleton)]),
   ];
 }
 

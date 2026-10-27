@@ -23,6 +23,15 @@
 // library stage, felModeId 'library') builds these, so no mode and no unscoped preview pays for 30 extra builds at spawn.
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
 import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
+import { EXERCISE_BATCH_C2_BUILDERS } from './exerciseBatchC2';   // FITNESS-TPOSE batchC2 (2026-10-26)
+import { EXERCISE_BATCH_C1_BUILDERS } from './exerciseBatchC1';   // FITNESS-TPOSE batchC1 (2026-10-26)
+import { EXERCISE_BATCH_B6_BUILDERS } from './exerciseBatchB6';   // FITNESS-TPOSE batchB6 (2026-10-26)
+import { EXERCISE_BATCH_B5_BUILDERS } from './exerciseBatchB5';   // FITNESS-TPOSE batchB5 (2026-10-26)
+import { EXERCISE_BATCH_B4_BUILDERS } from './exerciseBatchB4';   // FITNESS-TPOSE batchB4 (2026-10-26)
+import { EXERCISE_BATCH_B3_BUILDERS } from './exerciseBatchB3';   // FITNESS-TPOSE batchB3 (2026-10-26)
+import { EXERCISE_BATCH_B2_BUILDERS } from './exerciseBatchB2';   // FITNESS-TPOSE batchB2 (2026-10-26)
+import { EXERCISE_BATCH_B1_BUILDERS } from './exerciseBatchB1';   // FITNESS-TPOSE batchB1 (2026-10-26)
+import { EXERCISE_BATCH_A_BUILDERS } from './exerciseBatchA';   // FITNESS-TPOSE batchA (2026-10-26)
 
 type V3 = [number, number, number];
 interface Pair { Left?: V3; Right?: V3 }
@@ -574,5 +583,15 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   ['ex_seated_triceps', buildExSeatedTriceps], ['ex_bench_press', buildExBenchPress], ['ex_floor_press', buildExFloorPress], ['ex_fly', buildExFly],
   ['ex_skull_crusher', buildExSkullCrusher], ['ex_incline_press', buildExInclinePress], ['ex_incline_fly', buildExInclineFly],
   ['ex_arm_circles', buildExArmCircles], ['ex_quad_stretch', buildExQuadStretch], ['ex_breathe', buildExBreathe],
+  // FITNESS-TPOSE batches (2026-10-26)
+  ...EXERCISE_BATCH_C2_BUILDERS,
+  ...EXERCISE_BATCH_C1_BUILDERS,
+  ...EXERCISE_BATCH_B6_BUILDERS,
+  ...EXERCISE_BATCH_B5_BUILDERS,
+  ...EXERCISE_BATCH_B4_BUILDERS,
+  ...EXERCISE_BATCH_B3_BUILDERS,
+  ...EXERCISE_BATCH_B2_BUILDERS,
+  ...EXERCISE_BATCH_B1_BUILDERS,
+  ...EXERCISE_BATCH_A_BUILDERS,
 ];
 export const EXERCISE_CLIPS: readonly string[] = EXERCISE_BUILDERS.map(([n]) => n);

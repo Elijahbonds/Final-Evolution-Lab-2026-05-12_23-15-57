@@ -58,13 +58,14 @@ export default function ExerciseStage(props: ExerciseStageProps) {
     let cleanup: (() => void) | null = null;
     (async () => {
       try {
-        const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial } = await import('@babylonjs/core');
+        const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial, TransformNode } = await import('@babylonjs/core');
+        const { boneNode } = await import('@/lib/babylon/anim/boneLookup');
         const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
         const { DEFAULT_HERO_URL } = await import('@/lib/babylon/core/athleteRoster');
         const { reducedMotion } = await import('@/lib/a11y/reducedMotion');
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
         const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
-        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS } = await import('@/lib/library/demo');
+        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS, DEMO_ARROWS } = await import('@/lib/library/demo');
         const { fitCanvas } = await import('@/lib/babylon/core/canvasFit');
         const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
         const canvas = canvasRef.current;
@@ -115,6 +116,38 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         if (disposed) { hero.dispose(); scene.dispose(); engine.dispose(); return; }
         mark('spawned');
 
+        // the way a ball-sport loop travels (demo.ts DEMO_ARROWS), flat on the floor in the FEL volt: the loop stays on its
+        // spot, so the arrow is the drive, the closeout, the pass. Laid out in the athlete's own frame (x to their right, z
+        // ahead), read off the hips once at spawn. FITNESS-TPOSE batchC1 (2026-10-26)
+        const arrowMat = new StandardMaterial('libraryArrowMat', scene);
+        arrowMat.emissiveColor = Color3.FromHexString('#FFE600'); arrowMat.diffuseColor = Color3.Black(); arrowMat.specularColor = Color3.Black(); arrowMat.disableLighting = true;
+        const hipL = boneNode(hero.skeleton, 'LeftUpLeg'), hipR = boneNode(hero.skeleton, 'RightUpLeg');
+        hipL?.computeWorldMatrix(true); hipR?.computeWorldMatrix(true);
+        const across = hipL && hipR ? hipR.getAbsolutePosition().subtract(hipL.getAbsolutePosition()) : new Vector3(1, 0, 0);
+        const centre = hipL && hipR ? hipR.getAbsolutePosition().add(hipL.getAbsolutePosition()).scale(0.5) : Vector3.Zero();
+        across.y = 0; if (across.lengthSquared() < 1e-6) across.set(1, 0, 0); across.normalize();
+        const ahead = new Vector3(across.z, 0, -across.x);
+        let arrows: InstanceType<typeof TransformNode>[] = [];
+        const showArrows = (clip: string | null) => {
+          for (const a of arrows) a.dispose();
+          arrows = [];
+          (clip ? DEMO_ARROWS[clip] ?? [] : []).forEach((a, i) => {
+            const len = a.len ?? 0.4;
+            const d = across.scale(a.dx).addInPlace(ahead.scale(a.dz)).normalize();
+            const node = new TransformNode(`libraryArrow${i}`, scene);
+            node.position = across.scale(a.x).addInPlace(ahead.scale(a.z)).addInPlace(new Vector3(centre.x, 0, centre.z));
+            node.position.y = 0.006;
+            node.rotation.y = Math.atan2(-d.z, d.x);
+            const shaft = MeshBuilder.CreateBox(`libraryArrowShaft${i}`, { width: len, height: 0.004, depth: 0.04 }, scene);
+            shaft.position.x = len / 2;
+            const head = MeshBuilder.CreateDisc(`libraryArrowHead${i}`, { radius: 0.08, tessellation: 3, sideOrientation: 2 }, scene);
+            head.rotation.x = Math.PI / 2; head.position.x = len;
+            for (const m of [shaft, head]) { m.parent = node; m.material = arrowMat; m.isPickable = false; }
+            arrows.push(node);
+          });
+        };
+
+
         const still = reducedMotion();
         let anatomy: AnatomyHandle | null = null;
         let anatomyFailed = false;
@@ -159,6 +192,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
             if (p.view === 'muscles') {
               play('idle_stand', null);
               showProp(null);
+              showArrows(null);
               if (!anatomy && !anatomyFailed) {
                 const t0 = performance.now();
                 anatomy = applyAnatomy(scene, hero, p.muscles); anatomyFailed = !anatomy; shownMuscles = musclesKey;
@@ -168,6 +202,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
               anatomy?.restore(); anatomy = null;
               loopFailed = !play(p.clip ?? 'idle_stand', p.clip ? p.hold : null);
               showProp(p.clip);
+              showArrows(p.clip);
               if (ready) setState(loopFailed ? 'failed' : 'ready');
             }
           }

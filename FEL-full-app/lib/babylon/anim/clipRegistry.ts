@@ -36,6 +36,24 @@ export const REAL_CLIPS = new Set<string>([
   // LIBRARY-ANATOMY (2026-10-25): the exercise library's demo loops (anim/authored/exercise.ts; the opt-in 'exercise' suite — built
   // on the library stage only, clipScope OPT_IN_SUITES)
   'ex_squat', 'ex_squat_bar', 'ex_hinge', 'ex_good_morning', 'ex_split_squat', 'ex_lunge', 'ex_reverse_lunge', 'ex_calf_raise', 'ex_jump', 'ex_pogo', 'ex_jump_rope', 'ex_march', 'ex_carry', 'ex_jumping_jack', 'ex_press', 'ex_curl', 'ex_lateral_raise', 'ex_front_raise', 'ex_row', 'ex_upright_row', 'ex_shrug', 'ex_triceps_overhead', 'ex_pushdown', 'ex_pushup', 'ex_plank', 'ex_plank_high', 'ex_mountain_climber', 'ex_bridge', 'ex_dead_bug', 'ex_bird_dog', 'ex_crunch', 'ex_seated_press', 'ex_seated_curl', 'ex_seated_lateral_raise', 'ex_seated_triceps', 'ex_bench_press', 'ex_floor_press', 'ex_fly', 'ex_skull_crusher', 'ex_incline_press', 'ex_incline_fly', 'ex_arm_circles', 'ex_quad_stretch', 'ex_breathe',
+  // FITNESS-TPOSE batchC2
+  'ex_bball_closeout', 'ex_bball_triple_threat', 'ex_bball_pass', 'ex_soccer_touches', 'ex_volleyball',
+  // FITNESS-TPOSE batchC1
+  'ex_bball_pullup', 'ex_bball_handle_combo', 'ex_bball_catch_shoot', 'ex_bball_drive_finish', 'ex_bball_v_dribble',
+  // FITNESS-TPOSE batchB6
+  'ex_foam_roll', 'ex_curl_alt', 'ex_pullover', 'ex_face_pull', 'ex_triceps_kickback', 'ex_lunge_walking', 'ex_calf_raise_single', 'ex_neck', 'ex_curl_hammer', 'ex_pushdown_variants', 'ex_burpee', 'ex_calf_raise_seated', 'ex_tib_raise',
+  // FITNESS-TPOSE batchB5
+  'ex_row_seated_cable', 'ex_carry_strongman', 'ex_jump_rope_variants', 'ex_throw_overhead', 'ex_leg_press', 'ex_straight_arm_pulldown', 'ex_leg_raise', 'ex_side_plank', 'ex_sled_push', 'ex_kb_swing',
+  // FITNESS-TPOSE batchB4
+  'ex_hip_thrust', 'ex_row_single', 'ex_cable_crossover', 'ex_good_morning_var', 'ex_dynamic_warmup', 'ex_squat_var', 'ex_rotator_cuff', 'ex_leg_curl_slider', 'ex_grip_wrist', 'ex_step_up',
+  // FITNESS-TPOSE batchB3
+  'ex_ladder', 'ex_row_chest_supported', 'ex_lateral_raise_bent', 'ex_triceps_single_overhead', 'ex_crunch_variants', 'ex_plank_reach', 'ex_row_inverted', 'ex_throw_rotational', 'ex_dip', 'ex_sl_rdl',
+  // FITNESS-TPOSE batchB2
+  'ex_pallof', 'ex_iso_capacity', 'ex_lunge_lateral', 'ex_press_alt', 'ex_machine_cardio', 'ex_curl_incline', 'ex_pulldown', 'ex_pullup', 'ex_triceps_lying', 'ex_bench_variants',
+  // FITNESS-TPOSE batchB1
+  'ex_jump_stick', 'ex_flow_squat_lunge', 'ex_cut', 'ex_stretch_hold', 'ex_pushup_variants', 'ex_sprint_start', 'ex_raise_overhead', 'ex_curl_supported', 'ex_sprint_drill', 'ex_olympic_lift',
+  // FITNESS-TPOSE batchA
+  'ex_idle_ready', 'ex_rotate', 'ex_bound', 'ex_throw', 'ex_crawl', 'ex_t_drill', 'ex_knee_to_wall', 'ex_single_leg_squat', 'ex_breathe_prone', 'ex_breathe_legs_up_wall', 'ex_ankle_circles', 'ex_hip_circles_9090', 'ex_pogo_single', 'ex_bridge_single_pulse', 'ex_press_oscillation', 'ex_throw_vertical', 'ex_box_out',
   'idle_stand', 'strafe_left', 'strafe_right', 'jump_up', 'jump_land',
   'dunk_charge_gather', 'dunk_launch', 'dunk_mocap', 'dunk_360_eastbay', 'dunk_score_hang', 'dunk_land_crouch', 'dunk_land_absorb',
   'dunk_finish_windmill', 'dunk_finish_tomahawk', 'dunk_finish_blown', 'dunk_celebrate_big',

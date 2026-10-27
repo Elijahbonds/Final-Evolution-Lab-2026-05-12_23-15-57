@@ -36,14 +36,14 @@ describe('the loop an entry plays (demoFor)', () => {
     expect(demoClipFor({ family: 'squat', variation: 'goblet-squat', equipment: ['dumbbell'] })).toBe('ex_squat');
     expect(demoClipFor({ family: 'squat', variation: 'squat', equipment: ['barbell'] })).toBe('ex_squat_bar');
     expect(demoClipFor({ family: 'squat', variation: 'front-squat', equipment: ['barbell'] })).toBe('ex_squat');
-    expect(demoClipFor({ family: 'squat', variation: 'overhead-squat', equipment: ['barbell'] })).toBeNull();
+    expect(demoClipFor({ family: 'squat', variation: 'overhead-squat', equipment: ['barbell'] })).toBe('ex_squat_var');
     expect(demoClipFor({ family: 'overhead-press', variation: 'shoulder-press', equipment: ['dumbbell'] })).toBe('ex_press');
     expect(demoClipFor({ family: 'overhead-press', variation: 'seat-press', equipment: ['dumbbell'] })).toBe('ex_seated_press');   // seated: its own loop, on a bench
-    expect(demoClipFor({ family: 'overhead-press', variation: 'landmine', equipment: ['landmine'] })).toBeNull();   // a landmine press is neither
-    expect(demoClipFor({ family: 'curl', variation: 'preacher-curl', equipment: ['barbell'] })).toBeNull();
+    expect(demoClipFor({ family: 'overhead-press', variation: 'landmine', equipment: ['landmine'] })).toBe('ex_press_alt');   // a landmine press is neither
+    expect(demoClipFor({ family: 'curl', variation: 'preacher-curl', equipment: ['barbell'] })).toBe('ex_curl_supported');
     expect(demoClipFor({ family: 'finish-series', variation: 'overhand-wing', equipment: ['basketball'] })).toBe('bball_layup_gather');
     expect(demoClipFor({ family: 'finish-series', variation: 'overhand-wing-weak', equipment: ['basketball'] })).toBe('bball_layup_gather_left');
-    expect(demoClipFor({ family: 'machine-intervals', variation: 'bike-sprint', equipment: ['bike'] })).toBeNull();   // a bike is not a run
+    expect(demoClipFor({ family: 'machine-intervals', variation: 'bike-sprint', equipment: ['bike'] })).toBe('ex_machine_cardio');   // a bike is not a run
   });
   it('a modifier that changes the body is a cue card; an isometric hold is the loop held at its hardest point', () => {
     expect(demoFor({ family: 'squat', variation: 'goblet-squat+paused', equipment: [] })).toEqual({ clip: 'ex_squat', hold: null });
