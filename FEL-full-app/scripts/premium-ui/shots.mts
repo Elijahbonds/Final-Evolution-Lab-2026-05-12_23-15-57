@@ -42,7 +42,8 @@ let BUILD = join(OUT_ROOT, `.build-${LABEL}`);
 const BUILD_ONLY = args.includes('--build-only');
 const REBUILD = args.includes('--rebuild') || BUILD_ONLY;
 
-export const SCENES = ['landing', 'play', 'train', 'profile', 'learn', 'coach', 'todaydrill', 'screenresults', 'devui', 'endscreen', 'endloss', 'playbook', 'education'] as const;
+import { SCENES } from './scenes.mts';
+export { SCENES };
 /** --scenes-<label>=a,b for one label, --scenes=a,b for all, else every scene */
 const scenesFor = (label: string) => ((flag(`scenes-${label}`) ?? flag('scenes'))?.split(',') ?? [...SCENES]).filter(Boolean);
 const WIDTHS = [{ w: 390, h: 844, name: 'phone' }, { w: 1280, h: 800, name: 'desktop' }];
