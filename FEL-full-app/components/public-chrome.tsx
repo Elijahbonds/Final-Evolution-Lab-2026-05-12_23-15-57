@@ -30,6 +30,10 @@ export function PublicLegalFooter() {
       <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-white/40">
         <Link href="/terms" className="hover:text-white/70">Terms</Link>
         <Link href="/privacy" className="hover:text-white/70">Privacy</Link>
+        {/* OWNER-APPROVALS (2026-10-27, cards C28/C12): the two new legal texts, beside the other legal pages; the buy and
+            coach-onboarding ticks also link them (lib/payments/terms.ts). */}
+        <Link href="/purchase-terms" className="hover:text-white/70">Purchase terms</Link>
+        <Link href="/coach-terms" className="hover:text-white/70">Coach terms</Link>
         <Link href="/support" className="hover:text-white/70">Support</Link>
         {/* HOTFIX (2026-09-24): the licence notices live beside the other legal pages. Not just "Credits": that is
             also what the app calls its currency, so the link would read as the wallet. */}

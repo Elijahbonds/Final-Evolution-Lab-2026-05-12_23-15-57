@@ -14,18 +14,20 @@
 // stripeFee() here rounds the percentage UP to the cent, the most Stripe could charge, so X ≥ S under any rounding Stripe
 // uses: FEL nets F, or F + 1¢ when Stripe rounds down. Never less than F, never negative, at any price.
 //
-// REFUNDS (decided here, docs/COACH-BUSINESS.md "Refunds"). A refund returns part or all of the LISTED PRICE. The processing
+// REFUNDS, THE PRICE-ONLY RULE (REFUND_PROCESSING_FEE=0 since 2026-10-27; it was the default until then, docs/COACH-BUSINESS.md
+// "Refunds"). A refund returns part or all of the LISTED PRICE. The processing
 // fee is not refunded: Stripe keeps its fee on a refunded charge, so returning X would leave FEL paying Stripe's fee out of
 // its own pocket. The coach's transfer is reversed by the refund, and FEL hands back the same share of F as of P
 // (feeReturnedCents), as an application-fee refund of exactly that amount. After a full refund: buyer −X, coach 0, FEL
 // X − S (0 or 1¢).
 //
-// PAYMENTS-READY (2026-10-26): the two owner calls are settings (config.ts), defaults unchanged.
+// PAYMENTS-READY (2026-10-26): the two owner calls are settings (config.ts). TUNED (MONEY) 2026-10-27, owner in chat:
+// 5% on Free, 0% on Pro, and refunds return the processing fee by default.
 //   · FEL's share is platformFee(policy, plan, price, fees so far this month): PLATFORM_FEE_BPS_FREE / _PRO by the coach's
-//     plan, capped by PLATFORM_FEE_CAP_CENTS_MONTHLY. With the defaults it is floor(P × 5%), exactly as before.
+//     plan, capped by PLATFORM_FEE_CAP_CENTS_MONTHLY. With the defaults it is floor(P × 5%) on Free and 0 on Pro.
 //   · REFUND_PROCESSING_FEE on: a refund of part R of the price also returns the same share of X to the buyer
 //     (processingShareCents), and FEL hands the coach back that share of X with its share of F, so the coach ends where
-//     they end today and FEL absorbs Stripe's fee. Off (the default): exactly today's refund.
+//     they end today and FEL absorbs Stripe's fee. On by default (owner, 2026-10-27, "refund in full"); off: the price-only refund.
 import { CONNECT_FEE_BPS, STRIPE_CARD_FEE_BPS, STRIPE_CARD_FEE_FIXED_CENTS, type FeePolicy } from './config';
 import type { CoachPlan } from './plan';
 

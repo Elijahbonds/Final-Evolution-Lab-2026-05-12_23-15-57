@@ -40,6 +40,7 @@ function deps(): SignatureDeps {
 }
 const viewer = (id: string, role?: string) => signatureViewer(id, role, deps());
 const approve = (id: string) => db.reviews.set(id, { programId: id, status: 'approved', reviewerId: 'owner', note: null, edits: {}, updatedAt: NOW });
+const setRow = (id: string, status: string) => db.reviews.set(id, { programId: id, status, reviewerId: 'owner', note: null, edits: {}, updatedAt: NOW });
 
 beforeEach(() => {
   db = fakeSignatureDb(true);
@@ -69,7 +70,11 @@ describe('before the pending SQL is applied', () => {
 });
 
 describe('draft vs approved', () => {
+  // test changed (owner-approvals, 2026-10-27): the owner approved all four as drafted (lib/signature/access.ts
+  // OWNER_APPROVED), so a program with no review row is approved now. To keep testing that a DRAFT stays away from
+  // athletes, the other three carry an explicit 'draft' row (the review page's "Back to draft"); the assertions are unchanged.
   it('only approved programs reach athletes; a draft 404s for them and cannot be started', async () => {
+    for (const id of ['vertical-jump', 'basketball-skills', 'athletic-foundation']) setRow(id, 'draft');
     approve('pain-free');
     const a = await programsOverview(await viewer('adult'), deps(), NOW);
     expect(a.programs.map((p) => p.id)).toEqual(['pain-free']);
@@ -90,6 +95,40 @@ describe('draft vs approved', () => {
     expect(view!.current!.sessions[0].items.find((i) => i.isKeySet)!.sets).toBe(4);
     expect((await reviewAct('owner', { action: 'reject', id: 'vertical-jump' }, deps(), NOW)).body.status).toBe('rejected');
     expect(await programPage(await viewer('adult'), 'vertical-jump', deps(), NOW)).toBeNull();
+  });
+});
+
+describe("the owner's approval (in chat, 2026-10-27): all four approved as drafted", () => {
+  it('with the tables applied and no review row, every athlete sees and can start all four', async () => {
+    const a = await programsOverview(await viewer('adult'), deps(), NOW);
+    expect(a.ready).toBe(true);
+    expect(a.programs.map((p) => [p.id, p.status, p.draft])).toEqual([
+      ['vertical-jump', 'approved', false], ['basketball-skills', 'approved', false], ['athletic-foundation', 'approved', false], ['pain-free', 'approved', false],
+    ]);
+    const page = await programPage(await viewer('adult'), 'basketball-skills', deps(), NOW);
+    expect(page).toMatchObject({ status: 'approved', draft: false, canStart: true, gaps: null });
+    expect((await startProgram(await viewer('adult'), 'athletic-foundation', deps(), NOW)).body).toMatchObject({ ok: true, keep: 'server' });
+    expect((await reviewOverview(deps(), NOW)).programs.every((p) => p.status === 'approved')).toBe(true);
+  });
+
+  it('a review row still overrides: rejected or sent back to draft hides it again', async () => {
+    expect((await reviewAct('owner', { action: 'reject', id: 'pain-free' }, deps(), NOW)).body).toMatchObject({ status: 'rejected' });
+    expect((await reviewAct('owner', { action: 'draft', id: 'vertical-jump' }, deps(), NOW)).body).toMatchObject({ status: 'draft' });
+    const a = await programsOverview(await viewer('adult'), deps(), NOW);
+    expect(a.programs.map((p) => p.id)).toEqual(['basketball-skills', 'athletic-foundation']);
+    expect(await programPage(await viewer('adult'), 'pain-free', deps(), NOW)).toBeNull();
+    expect((await startProgram(await viewer('adult'), 'vertical-jump', deps(), NOW)).status).toBe(404);
+  });
+
+  it("saving edits on an approved-by-default program keeps it approved (an edit never hides a program)", async () => {
+    const r = await reviewAct('owner', { action: 'edit', id: 'vertical-jump', edits: { 'base/A/3': { sets: 4 } } }, deps(), NOW);
+    expect(r.body).toMatchObject({ ok: true, status: 'approved' });
+    expect(db.reviews.get('vertical-jump')!.status).toBe('approved');
+    const view = await programPage(await viewer('adult'), 'vertical-jump', deps(), NOW);
+    expect(view!.current!.sessions[0].items.find((i) => i.isKeySet)!.sets).toBe(4);
+    // and an edit on a program the owner sent back to draft keeps it a draft
+    setRow('pain-free', 'draft');
+    expect((await reviewAct('owner', { action: 'edit', id: 'pain-free', edits: {} }, deps(), NOW)).body).toMatchObject({ status: 'draft' });
   });
 });
 

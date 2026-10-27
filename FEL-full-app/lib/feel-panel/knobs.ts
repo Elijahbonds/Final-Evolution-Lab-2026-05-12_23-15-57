@@ -805,6 +805,26 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'tennis.portraitHeroMargin', label: 'Upright: keep the player this far in', def: 0.15, min: 0.05, max: 0.35, step: 0.01, unit: '', group: 'Tennis · camera',
     source: 'lib/babylon/modes/netPortraitCam.ts PORTRAIT_HERO_MARGIN',
     hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
+  },  // ── dunk-flagship (owner playtest 2026-10-27: "smoother movement, better lobs") ──
+  {
+    id: 'dunk.runwayStrideScale', label: 'Run-up: stride length', def: 1, min: 0.8, max: 1.4, step: 0.01, unit: '×', group: 'Dunk · run-up',
+    source: 'lib/babylon/core/DunkFlagship.ts RUNWAY_STRIDE_SCALE',
+    hint: 'The run-up\'s legs are paced to the run at 1 (as shipped). Higher = slower, longer steps for the same speed (feet slide forward); lower = quicker steps (feet slide back).',
+  },
+  {
+    id: 'dunk.oopLobFlightSec', label: 'Alley-oop: lob time in the air', def: 1.0, min: 0.5, max: 1.6, step: 0.05, unit: 's', group: 'Dunk · lobs',
+    source: 'lib/babylon/core/DunkFlagship.ts OOP_LOB_FLIGHT_SEC',
+    hint: 'How long the passer\'s lob hangs, release to the catch. Longer = a higher, slower arc thrown earlier in your run.',
+  },
+  {
+    id: 'dunk.slamHitStopBigMs', label: 'Slam: freeze on a perfect flush', def: 100, min: 70, max: 160, step: 5, unit: 'ms', group: 'Dunk · slam',
+    source: 'lib/babylon/core/DunkFlagship.ts SLAM_HITSTOP_BIG_MS',
+    hint: 'How long the game holds on the iron for a perfect slam. An ordinary make stays at 70 ms; cleaner slams grow toward this.',
+  },
+  {
+    id: 'dunk.slamShakeBig', label: 'Slam: shake on a perfect flush', def: 0.18, min: 0.12, max: 0.3, step: 0.01, unit: '', group: 'Dunk · slam',
+    source: 'lib/babylon/core/DunkFlagship.ts SLAM_SHAKE_BIG',
+    hint: 'Camera shake for a perfect slam. An ordinary make stays at 0.12. Reduced motion turns shake off.',
   },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
   {
     id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',

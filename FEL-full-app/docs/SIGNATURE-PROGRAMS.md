@@ -2,7 +2,7 @@
 
 Owner decisions (2026-10-25, priority #3 of the round): **all four programs, first**. They are vertical jump,
 basketball skills, athletic foundation and pain-free / prehab. They are built from the owner's books plus the exercise
-library. Each runs 8–12 weeks and adapts to retests. Each ships as a draft for the owner to review. All four are
+library. Each runs 8–12 weeks and adapts to retests. Each shipped as a draft for the owner to review; **the owner approved all four as drafted on 2026-10-27** (in chat, "You do it. I approve.", cards C20/C21 — see §7). All four are
 included in the athlete Premium subscription, with one free starter week. Prices and payments are the owner's call.
 
 ## 1. The programs
@@ -93,7 +93,12 @@ additive, and they are guarded by the shared pending probe (`lib/signature/store
 
 Until the SQL is applied:
 
-- Every program reads as a draft, so athletes see none.
+- Every program reads as a draft, so athletes see none. This still holds after the owner's approval (2026-10-27):
+  the approval is a default in `lib/signature/access.ts` (`OWNER_APPROVED`) that applies only when the review table is
+  readable and holds no row for a program. Without the tables the list says "Signature programs are coming soon"
+  (`NOT_READY_LINE`), and every route answers 404/503, never 500 (`tests/signature-programs/owner-approved-seam.test.ts`).
+  Once the SQL is applied, all four open to athletes within ~5 minutes (the probe), with no deploy. A review row still
+  wins: rejecting a program, or "Back to draft", hides it again; saving edits keeps its status.
 - The admin can preview the programs and read their checks.
 - Start, approve and edit answer 503.
 

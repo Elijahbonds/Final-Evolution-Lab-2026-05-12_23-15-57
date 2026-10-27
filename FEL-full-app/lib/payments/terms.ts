@@ -6,32 +6,37 @@
 // object's metadata (`terms_version`, `terms_accepted_at`), so a refund or a dispute can say which text was agreed and
 // when. No new column: the money record at Stripe is the record, as for the coach store.
 //
-// WHICH TERMS.
-//   · Buyers (a coach's package through Connect, and FEL Pro): the store terms, STORE_TERMS_VERSION, at /store-terms.
-//     assumption: they are the buyer terms for these products until the owner points BUYER_TERMS at a version that
-//     names them (docs/LAUNCH-SALES.md §9 lists the store-terms text FEL Pro still needs; that text is the owner's).
-//   · Coaches (Stripe Connect onboarding, and the coach business's live switch): the coach terms and payout terms. They
-//     are NOT WRITTEN YET (docs/COACH-BUSINESS.md "Live mode stays off until the coach terms and payout terms are
-//     signed"), so COACH_TERMS_VERSION is null. While it is null:
+// WHICH TERMS (OWNER-APPROVALS, 2026-10-27; owner, in chat: "You do it. I approve." — cards C12 and C28. Both texts:
+// drafted by Claude 2026-10-27 on owner approval; not lawyer-reviewed).
+//   · Buyers (a coach's package through Connect, and FEL Pro): the Purchase Terms and Refund Policy,
+//     PURCHASE_TERMS_VERSION, at /purchase-terms (lib/purchase-terms.ts, card C28). They name both products: FEL Pro as
+//     FEL's own sale, a coach's package as the coach's, with FEL's refund minimum. Until 2026-10-27 both ticked the coach
+//     store's terms (/store-terms), which name neither; those stay the coach store's and the audiobooks' terms.
+//   · Coaches (Stripe Connect onboarding, and the coach business's live switch): the Coach Terms and Payout Terms,
+//     COACH_TERMS_VERSION, at /coach-terms (lib/coach-terms.ts, card C12). Setting it lifts the live-mode refusal
+//     (coach_terms_unsigned): live coach payments still need the owner's COACH_CONNECT_LIVE and a live key.
+//     Before 2026-10-27 the terms were not written and COACH_TERMS_VERSION was null. While it is null:
 //       – test mode still runs end to end: the coach ticks the box and the account records the placeholder version
 //         COACH_TERMS_TEST_PLACEHOLDER, which no live account can carry;
 //       – LIVE mode refuses to start: COACH_CONNECT_LIVE with a live key answers 409 store_closed coach_terms_unsigned
 //         (lib/coach-business/connect.ts connectGate, lib/coach-business/pro.ts proGate), and the preflight says so.
 //     When the owner has signed text, set COACH_TERMS_VERSION to its version and COACH_TERMS_HREF to its page. This file
 //     never holds terms text.
-import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+import { COACH_TERMS_DOC_VERSION, COACH_TERMS_PAGE_HREF } from '@/lib/coach-terms';
+import { PURCHASE_TERMS_HREF, PURCHASE_TERMS_VERSION } from '@/lib/purchase-terms';
 
-/** The coach terms + payout terms version. null = not written yet (owner): live coach payments refuse to start. */
-export const COACH_TERMS_VERSION: string | null = null;
+/** The coach terms + payout terms version. null = not written yet: live coach payments refuse to start. Written
+ *  2026-10-27 on the owner's approval (card C12). */
+export const COACH_TERMS_VERSION: string | null = COACH_TERMS_DOC_VERSION;
 /** Where the coach terms are read. null while they do not exist (the box says they are not published yet). */
-export const COACH_TERMS_HREF: string | null = null;
+export const COACH_TERMS_HREF: string | null = COACH_TERMS_PAGE_HREF;
 /** The version a TEST-mode account records while COACH_TERMS_VERSION is null. Never accepted in live mode. */
 export const COACH_TERMS_TEST_PLACEHOLDER = 'coach-terms-unsigned-test-mode';
 
-/** The buyer-side terms, per product that asks. Both are the store terms today (assumption above). */
+/** The buyer-side terms, per product that asks: the Purchase Terms and Refund Policy (card C28) for both. */
 export const BUYER_TERMS = {
-  coach_package: { version: STORE_TERMS_VERSION, href: '/store-terms' },
-  fel_pro: { version: STORE_TERMS_VERSION, href: '/store-terms' },
+  coach_package: { version: PURCHASE_TERMS_VERSION, href: PURCHASE_TERMS_HREF },
+  fel_pro: { version: PURCHASE_TERMS_VERSION, href: PURCHASE_TERMS_HREF },
 } as const;
 export type BuyerTermsProduct = keyof typeof BUYER_TERMS;
 
