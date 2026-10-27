@@ -7,6 +7,7 @@
 import { simulateLiveJump, type LiveSimOptions } from '../lib/vertical/sim';
 import type { TrialSpec } from '../lib/jump/ballistic';
 import type { PoseFrame } from '../lib/pose/landmarks';
+import { readFileSync } from 'node:fs';
 
 const arg = (k: string) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : undefined; };
 const seeds = Number(arg('seeds') ?? 6);
@@ -68,8 +69,6 @@ export function benchTable(rows: readonly Row[]): string {
 /** The owner's recorded jump streams (lib/pose/__fixtures__), through the live flow. The stand is the take's own last
  *  frame held (the athlete standing after the last landing), so the calibration's floor is the take's own floor. */
 export function recordedRuns(): { name: string; jumps: number; counted: number; numberMs: number | null; best: number | null; truthBest: number; reasons: string[] }[] {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { readFileSync } = require('node:fs') as typeof import('node:fs');
   const out = [];
   for (const name of ['jump_two_foot_low', 'jump_two_foot_high']) {
     const fx = JSON.parse(readFileSync(`${__dirname}/../lib/pose/__fixtures__/${name}.json`, 'utf8')) as { frames: PoseFrame[]; gt: { jumps: { heightFlightM: number }[] } };
