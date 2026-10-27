@@ -7,7 +7,7 @@ import { AccountSettings } from '@/components/account/account-settings';
 import Link from 'next/link';
 import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
-import { MotionSetting } from '@/components/settings/motion-setting';
+import { AccessibilitySettings } from '@/components/settings/accessibility-settings';
 import { PrqDataRights, HealthDataSection } from '@/components/profile-view';
 
 export const dynamic = 'force-dynamic';
@@ -29,8 +29,9 @@ export default async function AccountPage() {
       {/* PROFILE V2 (2026-10-24): the settings that lived on the profile — motion, PRQ data rights, health data */}
       <PrqDataRights />
       <HealthDataSection />
-      {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
-      <div className="mt-8"><MotionSetting /></div>
+      {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways.
+          A11-03 / A11-05 (2026-10-25): with it, colour vision for the game HUD and the big-screen menus. */}
+      <div className="mt-8"><AccessibilitySettings /></div>
       <p className="mt-4 text-sm"><Link href="/account/coaching">Coaching</Link></p>
     </TabPage>
   );

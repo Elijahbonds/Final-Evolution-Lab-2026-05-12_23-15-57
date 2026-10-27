@@ -112,12 +112,12 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
       <div className="px-1">
         {lead && <div className="text-sm font-medium text-white" data-cooldown-lead>{lead}</div>}
         <div className="text-[11px] uppercase tracking-wider text-white/50">{COOLDOWN.label}</div>
-        <div className="text-[11px] text-white/35">{COOLDOWN.meaning}</div>
+        <div className="text-[11px] text-fel-quiet">{COOLDOWN.meaning}</div>
       </div>
       <div className="fel-card rounded-xl p-4 space-y-3" data-testid="cooldown">
         <div className="min-w-0">
           <div className="text-white font-medium" data-cooldown-title>{COOLDOWN_TITLE} · {plan.minutes} min</div>
-          <div className="text-[11px] text-white/45">{cooldownMeaning(plan.minutes)}</div>
+          <div className="text-[11px] text-fel-dim">{cooldownMeaning(plan.minutes)}</div>
         </div>
 
         <ul className="space-y-1" data-cooldown-notes>
@@ -127,7 +127,7 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
         {at && !at.done && at.step ? (
           <RunPanel plan={plan} at={at} paused={!!run && run.pausedAt !== null} onPause={togglePause} onNext={next} onStop={() => setRun(null)} />
         ) : at?.done && !done ? (
-          <div className="rounded-lg border border-[#00E5FF]/30 bg-[#00E5FF]/5 p-3 text-sm text-white/85" data-cooldown-finished>
+          <div className="rounded-lg border border-fel-cyan/30 bg-fel-cyan/5 p-3 text-sm text-white/85" data-cooldown-finished>
             That&apos;s the cool-down. Tap below to log it.
           </div>
         ) : null}
@@ -135,7 +135,7 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
         <ol className="space-y-2" data-cooldown-steps>
           {plan.steps.map((s, i) => (
             <li key={`${s.kind}-${s.id}`} data-step={s.id} data-kind={s.kind} data-pattern={s.pattern ?? undefined}
-              className={`rounded-lg border px-3 py-2 ${at && !at.done && at.index === i ? 'border-[#00E5FF]/50 bg-[#00E5FF]/5' : 'border-white/8 bg-white/[0.02]'}`}>
+              className={`rounded-lg border px-3 py-2 ${at && !at.done && at.index === i ? 'border-fel-cyan/50 bg-fel-cyan/5' : 'border-white/8 bg-white/[0.02]'}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <div className="min-w-0">
                   <span className="mr-1.5 rounded bg-white/10 px-1 text-[10px] font-semibold uppercase tracking-wide text-white/60">{KIND_LABEL[s.kind]}</span>
@@ -143,12 +143,12 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
                 </div>
                 <span className="shrink-0 font-mono text-xs tabular-nums text-white/50">{formatClock(s.seconds)}</span>
               </div>
-              <div className="text-[11px] text-white/45">{s.dose}</div>
+              <div className="text-[11px] text-fel-dim">{s.dose}</div>
               <div className="text-xs text-white/75">{s.cue}</div>
             </li>
           ))}
         </ol>
-        <div className="text-[11px] text-white/30">{BREATH_SOURCE_LINE}</div>
+        <div className="text-[11px] text-fel-quiet">{BREATH_SOURCE_LINE}</div>
 
         {done ? (
           <div className="flex items-center gap-1.5 text-sm text-[#7BD389]" data-cooldown-done role="status">
@@ -163,12 +163,12 @@ export function CooldownCard({ exercises, kind = null, programId, sessionId, end
               </button>
             )}
             <button type="button" onClick={() => void tapDone()} disabled={busy} data-cooldown-done-tap
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#00E5FF]/15 border border-[#00E5FF]/40 px-3 py-2 text-sm font-medium text-[#00E5FF] disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 rounded-lg bg-fel-cyan/15 border border-fel-cyan/40 px-3 py-2 text-sm font-medium text-fel-cyan disabled:opacity-50">
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> {DONE_BUTTON}
             </button>
           </div>
         )}
-        {error && <div className="text-xs text-[#FF3366]" role="alert" data-cooldown-error>{error}</div>}
+        {error && <div className="text-xs text-fel-crimson" role="alert" data-cooldown-error>{error}</div>}
       </div>
     </section>
   );
@@ -181,15 +181,15 @@ function RunPanel({ plan, at, paused, onPause, onNext, onStop }: {
   const s = at.step!;
   const fraction = s.seconds ? Math.min(1, at.stepSec / s.seconds) : 1;
   return (
-    <div className="rounded-lg border border-[#00E5FF]/30 bg-black/30 p-3 space-y-2" data-cooldown-run data-run-step={s.id}>
+    <div className="rounded-lg border border-fel-cyan/30 bg-black/30 p-3 space-y-2" data-cooldown-run data-run-step={s.id}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wider text-white/40">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">{KIND_LABEL[s.kind]} · step {at.index + 1} of {plan.steps.length}{paused ? ' · paused' : ''}</div>
           <div className="text-white font-medium truncate">{s.name}</div>
         </div>
         <div className="font-mono text-2xl tabular-nums text-white" aria-live="off">{formatClock(at.remainingSec)}</div>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#00E5FF]" style={{ width: `${Math.round(fraction * 100)}%` }} /></div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-fel-cyan" style={{ width: `${Math.round(fraction * 100)}%` }} /></div>
       <div className="text-sm text-white/85" aria-live="polite" data-run-line>{at.line}</div>
       {at.breath && s.breath && (
         <div className="flex justify-center py-1" data-run-breath={at.breath.phase}>

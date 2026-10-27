@@ -91,7 +91,7 @@ export function AttentionPanel() {
   if (failed) return null;
   if (!board) {
     return (
-      <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/6 bg-[#0f0f13] p-4 text-sm text-white/40">
+      <div className="mb-4 flex items-center gap-2 rounded-xl border border-white/6 bg-[#0f0f13] p-4 text-sm text-fel-dim">
         <Loader2 className="h-4 w-4 animate-spin" /> Reading your roster…
       </div>
     );
@@ -104,7 +104,7 @@ export function AttentionPanel() {
   return (
     <section className="mb-4 rounded-xl border border-white/6 bg-[#0f0f13] p-4" aria-labelledby="attention-heading">
       <h2 id="attention-heading" className="text-sm font-semibold text-white/80">Needs you today</h2>
-      <p className="mt-0.5 text-xs text-white/45">{board.headline ?? board.triage.summary}</p>
+      <p className="mt-0.5 text-xs text-fel-dim">{board.headline ?? board.triage.summary}</p>
       <div className="mt-3 empty:hidden"><FormReviewCount /></div>
       <div className="empty:hidden"><ReadinessPanel /></div>
 
@@ -112,8 +112,8 @@ export function AttentionPanel() {
       {waiting.length > 0 && (
         <ul className="mt-3 space-y-1.5">
           {waiting.map((d) => (
-            <li key={d.clientId} className="flex items-start gap-2 rounded-lg bg-[#FFD700]/8 px-3 py-2 text-sm">
-              <Timer className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
+            <li key={d.clientId} className="flex items-start gap-2 rounded-lg bg-fel-gold/8 px-3 py-2 text-sm">
+              <Timer className="mt-0.5 h-4 w-4 shrink-0 text-fel-gold" aria-hidden="true" />
               <span><span className="font-medium text-white/90">{d.name}</span>{' '}
                 <span className="text-white/55">{d.note}</span></span>
             </li>
@@ -128,9 +128,9 @@ export function AttentionPanel() {
             return (
               <li
                 key={`${f.clientId}:${f.kind}`}
-                className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${f.positive ? 'bg-[#00FF9D]/8' : 'bg-white/4'}`}
+                className={`flex items-start gap-2 rounded-lg px-3 py-2 text-sm ${f.positive ? 'bg-fel-emerald/8' : 'bg-white/4'}`}
               >
-                <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${f.positive ? 'text-[#00FF9D]' : 'text-[#FF3366]'}`} aria-hidden="true" />
+                <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${f.positive ? 'text-fel-emerald' : 'text-fel-crimson'}`} aria-hidden="true" />
                 <span>
                   <span className="font-medium text-white/90">{f.displayName}</span>{' '}
                   <span className="text-white/55">{f.observed}</span>{' '}
@@ -148,7 +148,7 @@ export function AttentionPanel() {
             const Icon = d.state === 'stalled' ? Hourglass : TrendingDown;
             return (
               <li key={d.clientId} className="flex items-start gap-2 rounded-lg bg-white/4 px-3 py-2 text-sm">
-                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
+                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-fel-gold" aria-hidden="true" />
                 <span><span className="font-medium text-white/90">{d.name}</span>{' '}
                   <span className="text-white/55">{d.note}</span></span>
               </li>
@@ -164,9 +164,9 @@ export function AttentionPanel() {
       {painFlags.length > 0 && (
         <ul className="mt-3 space-y-1.5" data-testid="pain-flags">
           {painFlags.map((p) => (
-            <li key={p.clientId} className="rounded-lg bg-[#FF3366]/8 px-3 py-2 text-sm" data-pain-flag={p.clientId} data-detailed={p.view.detailed}>
+            <li key={p.clientId} className="rounded-lg bg-fel-crimson/8 px-3 py-2 text-sm" data-pain-flag={p.clientId} data-detailed={p.view.detailed}>
               <div className="flex items-start gap-2">
-                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#FF3366]" aria-hidden="true" />
+                <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-fel-crimson" aria-hidden="true" />
                 <span><span className="font-medium text-white/90">{p.name}</span>{' '}<span className="text-white/70">{p.view.label}</span></span>
               </div>
               {p.view.detailed && p.view.items && (
@@ -187,17 +187,17 @@ export function AttentionPanel() {
          today's — and no longer shows a "warm-up N min" formula as if it were the warm-up the athlete got. */}
       {readiness.length > 0 && (
         <div className="mt-3" data-testid="readiness-checkins">
-          <div className="text-[11px] uppercase tracking-wider text-white/35">Check-ins shared with you</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-quiet">Check-ins shared with you</div>
           <ul className="mt-1 space-y-1.5">
             {readiness.map((r) => {
               const Icon = r.view.level === 'low' ? BatteryLow : SunMedium;
               return (
                 <li key={r.clientId} className="flex items-start gap-2 rounded-lg bg-white/4 px-3 py-2 text-sm" data-readiness={r.clientId} data-level={r.view.level}>
-                  <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${r.view.level === 'low' ? 'text-[#FFD700]' : 'text-[#00FF9D]'}`} aria-hidden="true" />
+                  <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${r.view.level === 'low' ? 'text-fel-gold' : 'text-fel-emerald'}`} aria-hidden="true" />
                   <span>
                     <span className="font-medium text-white/90">{r.name}</span>{' '}
                     <span className="text-white/70">{r.view.label}.</span>{' '}
-                    <span className="text-white/45" data-readiness-day={r.view.date}>{readinessDayLabel(r.view.date)} · {r.view.summary}</span>
+                    <span className="text-fel-dim" data-readiness-day={r.view.date}>{readinessDayLabel(r.view.date)} · {r.view.summary}</span>
                   </span>
                 </li>
               );
@@ -208,7 +208,7 @@ export function AttentionPanel() {
 
       {flags.length === 0 && waiting.length === 0 && drifting.length === 0 && painFlags.length === 0 && !(board.alerts?.length) && (
         <p className="mt-3 flex items-center gap-2 text-sm text-white/55">
-          <CheckCircle2 className="h-4 w-4 text-[#00FF9D]" aria-hidden="true" />
+          <CheckCircle2 className="h-4 w-4 text-fel-emerald" aria-hidden="true" />
           {board.triage.clear > 0 ? `All ${board.triage.clear} training normally.` : 'Nothing to read yet.'}
         </p>
       )}

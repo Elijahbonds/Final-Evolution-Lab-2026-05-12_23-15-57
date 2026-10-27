@@ -8,6 +8,7 @@ import { TabPage } from '@/components/shell/tab-page';
 import { ChapterReader } from '@/components/education/chapter-reader';
 import { CHAPTERS, chapterByNumber } from '@/lib/education/course';
 import films from '@/lib/education/films.json';
+import { PALETTE } from '@/lib/design/palette';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export default async function ChapterPage({ params }: { params: { chapter: strin
       eyebrow={`Chapter ${chapter.number}`}
       title={chapter.title}
       lede={chapter.subtitle}
-      accent="#00FF9D"
+      accent={PALETTE.emerald}
       aside={
         <Link
           href="/education/playbook"

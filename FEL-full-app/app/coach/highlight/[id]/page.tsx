@@ -14,7 +14,7 @@ export default async function HighlightConsentPage({ params }: { params: { id: s
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath(`/coach/highlight/${encodeURIComponent(id)}`));
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <div className="min-h-screen bg-fel-bg">
       <HighlightConsent id={id} />
     </div>
   );

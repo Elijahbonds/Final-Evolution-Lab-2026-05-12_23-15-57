@@ -55,7 +55,7 @@ export function ApproachVideo({ left, reach, onAttempts, onReach, decode }: {
   };
 
   const pick = (what: 'jump' | 'reach', label: string, primary: boolean) => (
-    <label className={`flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 font-bold ${primary ? 'bg-[#00E5FF] text-black' : 'border border-white/20 text-white/85'}`}>
+    <label className={`flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 font-bold ${primary ? 'bg-fel-cyan text-black' : 'border border-white/20 text-white/85'}`}>
       {what === 'jump' ? <Film className="h-4 w-4" /> : <Hand className="h-4 w-4" />} {label}
       <input data-combine-file={what} type="file" accept="video/*" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) void read(f, what); e.target.value = ''; }} />
     </label>
@@ -65,7 +65,7 @@ export function ApproachVideo({ left, reach, onAttempts, onReach, decode }: {
     return (
       <div className="space-y-2" data-combine-reading={phase.what}>
         <p className="flex items-center gap-2 text-sm text-white/80"><Loader2 className="h-4 w-4 animate-spin" /> Reading the video on this phone{phase.total ? `: ${phase.done} of ${phase.total}` : '…'}</p>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full bg-[#00FF9D]" style={{ width: `${phase.total ? Math.round((phase.done / phase.total) * 100) : 3}%` }} /></div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10"><div className="h-full bg-fel-emerald" style={{ width: `${phase.total ? Math.round((phase.done / phase.total) * 100) : 3}%` }} /></div>
         <button type="button" onClick={() => abort.current?.abort()} className="min-h-11 text-sm font-bold text-white/70 underline">Stop</button>
       </div>
     );

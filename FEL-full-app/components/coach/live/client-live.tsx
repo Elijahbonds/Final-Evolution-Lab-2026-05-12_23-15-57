@@ -205,7 +205,7 @@ export function ClientLive({ room, join, signalApi = '/api/coach/live/signal' }:
               {movement ? <><div className="font-semibold">{LIVE_SPECS[movement].label}</div><div className="text-white/60">{setupLine(movement)}</div></> : 'Your coach picks the exercise.'}
             </div>
           </div>
-          <p className="text-[11px] text-white/45" data-live-sending>
+          <p className="text-[11px] text-fel-dim" data-live-sending>
             Sending: {[sending.pose ? 'pose' : null, sending.video ? 'video' : null, sending.voice ? 'voice' : null].filter(Boolean).join(', ') || 'nothing yet'}. {NOT_RECORDED}
           </p>
           {phase === 'ended'
