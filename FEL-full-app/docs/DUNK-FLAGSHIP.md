@@ -107,3 +107,37 @@ passed, 1 failed (`controller-link-tests` E10: a 260 ms wall-clock window at loa
 skipped · vitest on `lib/babylon/{modes,core,nexus,visual}`, `lib/feel-panel`, `tests/probes`: 499 files, 5,771 tests, 1 failed
 (`reducedMotionGates` — the scan this lane's slam sizing broke; fixed as a test change, re-run green with the lane's new tests,
 27 / 27).
+
+## 6. Phase 2 — take-off and landing flow: results (lane/dunk-flagship-p2)
+
+Before = `36593d3a`; after = the phase's final code (`abc1571b`). One attempt per piece, phone tier, virtual clock. Contact sheet:
+`round9/dunk-flagship/shots/phase2-before-after.jpg`.
+
+| Gate | Before | After | |
+|---|---|---|---|
+| Press → feet off, A on the run | 67 ms (press → launch 17 ms) | 67 ms (17 ms) | met (≤ 150) |
+| Press → feet off, RT let go | — | 67 ms (17 ms) | met (≤ 150) |
+| Root height step on the take-off frame | 2.8 cm (hips 1.8) | **0.2 cm** (hips 0.8) | met (≤ 2) |
+| Hard cuts on landing (touchdown −12 … +48 frames) | 0 | 0 | met |
+| Hip pops on landing | 2 | 1 | not above |
+| Foot skate, carrying foot ≥ 2.5 m/s (carried from Phase 1) | 1.03–1.11 m/s | default stride 1.03; **stride knob 1.10: 0.86** (one attempt) | not met at the default; the knob is promising |
+
+What changed:
+- **The take-off step.** The night's first run stands the root at 0.028 m. That height is set at spawn; YTRAP found no writer during
+  the attempt, and a reset stands the root at 0 from the second dunk on. The take-off frame then set it to the arc's 0, a 2.8 cm
+  one-frame drop. It is now eased out over the plant. **Open question:** which of 0.028 and 0 is this body's true floor (the
+  landing ends at 0).
+- **The landing lead, tried and shipped off.** The absorb faded in over the fall's last 0.10 s, but the hips arrived faster
+  (−6.2 vs −5.2 m/s) into the same shallow crouch, and landing hip pops went 2 → 4. Knob `dunk.landLeadSec`, default 0 (as
+  shipped).
+- **The landing's real gap (for Phase 6/7, RIG-ADJACENT).** The hips fall about 5 m/s and stop within a frame at touchdown. The
+  authored `dunk_land_absorb` sinks only about 0.12 m over 0.25 s, about 0.5 m/s. A deeper and faster absorb (the knees taking
+  ~0.25 m in ~0.12 s) is an authored-clip change: GATE 0, the rig and the owner's sign-off.
+
+Gate run on `abc1571b` (all through the shared CPU slots):
+- tsc 0 errors · lint 0 warnings · mode-list-check 32 modes.
+- vitest on the dunk mode and core suites, `reducedMotionGates`, `LobMarker`, `veniceBoardwalk`, `lib/feel-panel` and
+  `tests/probes`: 59 files, 724 tests, all green.
+- The dunk-related headless suites (`capture-dunk`, `controller-link`, `dunk-animation`, `dunk-balance`, `dunk-depth`,
+  `dunk-feel`, `dunk-system`, `dunkduel-depth`, `feel`, `hoops-to-75`, `juice-parity`, `verb-key-alignment`): 12 / 12 green.
+- The full ci-suite and the full vitest are left to the PR's CI: the machine's CPU slots are shared.
