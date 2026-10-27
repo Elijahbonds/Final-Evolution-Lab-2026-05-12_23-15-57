@@ -237,6 +237,36 @@ from a sprint 400 ms / 1.41 m → 233 ms / 0.73 m; the velocity flips on a strai
 at defaults) → 250 ms (H3a), and the retreat then runs at 3.05 m/s (the cap); a 90° cut settled 250 → 167 ms; the largest one-frame speed jump 1.13 → 0.57 m/s. These are #311's own
 numbers, reproduced exactly (the retreat cap aside: it came after #311). **assumption:** the bounds are safe, not tuned.
 
+lane/hoops-p01-controls (1v1 / 3v3 ten-phase pass, phase 1 "controls that answer"; group "Hoops · movement"). The 1v1 / 3v3
+ball handler (every DribbleController body) now runs on its own gears, `GEARS_HANDLER` (`core/CourtMovement.ts`); `GEARS_HOOPS` stays
+release, so the dunk approach (DunkMode) is unchanged unless a knob is dialled. Five rows' **defaults changed** to H3a's own numbers (the
+owner's #311 set), only where a phase-1 gate needed them, and three rows are **new**:
+
+| Knob | Release | Now (default) | Why (the gate) |
+|---|---|---|---|
+| `hoops.jogTau` (TUNED) | 0.17 s | 0.10 s (H3a) | 90 % of the jog's pace ≤ 0.25 s (release 0.45 s) |
+| `hoops.jogAccel` (TUNED) | 15 m/s² | 22 m/s² (H3a) | same |
+| `hoops.loadScale` (TUNED) | 0.45 | 0.7 (H3a) | same, and the onset |
+| `hoops.stopDecelLow` (TUNED) | 22 m/s² | 32 m/s² (H3a) | stop from a jog ≤ 0.25 s / ≤ 0.6 m |
+| `hoops.stopDecelHigh` (TUNED) | 11 m/s² | 26 m/s² (H3a) | stop from a sprint ≤ 0.35 s / ≤ 1.0 m (release slid 0.42 s / 1.40 m) |
+| `hoops.firstStepMps` (TUNED, new) | 0 | 0.3 m/s | the root moves 2 cm ≤ 2 frames after the press (release 4, H3a 3): the press is answered on its own frame |
+| `hoops.reversePlantHold` (TUNED, new) | 1 | 0 | a reversal at pace ≤ 0.22 s to half the pace the new way: release's plant held 2.7 m/s the OLD way for 0.1 s first |
+| `hoops.reverseLaunchSec` (TUNED, new) | 0 | 0.2 s | same: the push-off out of a reversal is a launch (no loaded step), as a move's explode is |
+
+The step-back's committed hop still glides on the release stop (22 / 11) by name, whatever these say. The H3a preset now also carries the
+three new knobs at their release values, so it still plays #311 exactly. **Everything is one paste from release**
+(`RELEASE_STICK_PRESET` in `HoopsStick.ts`):
+
+```json
+{ "hoops.jogTau": 0.17, "hoops.jogAccel": 15, "hoops.loadScale": 0.45, "hoops.stopDecelLow": 22, "hoops.stopDecelHigh": 11,
+  "hoops.firstStepMps": 0, "hoops.reversePlantHold": 1, "hoops.reverseLaunchSec": 0 }
+```
+
+Measured (the real DribbleController at 60 fps), release → now: onset 4 → 2 frames; jog to 90 % 450 → 250 ms; stop from a jog 250 ms /
+0.53 m → 150 ms / 0.29 m; from a sprint 417 ms / 1.40 m → 233 ms / 0.69 m; a jog reversal to half pace the new way 450 → 183 ms. The
+browser rig's numbers are in the lane's report. **assumption:** the gates' bands are the hoops-audit's proposal, not owner numbers; the
+three new values are the least that meet them, not felt yet.
+
 lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30 s (`threevthreeOvertime.ts` `OVERTIME_3V3_SEC`, PR #268's
 number): a 3v3 tied at the horn plays sudden-death overtime on this clock, and level again when it runs out is another overtime.
 It moves only how long an overtime lasts, never who wins it or what a bucket is worth. **assumption:** the bounds (10–90 s) are

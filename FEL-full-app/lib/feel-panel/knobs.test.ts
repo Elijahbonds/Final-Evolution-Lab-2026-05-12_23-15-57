@@ -32,6 +32,8 @@ import {
   HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
   HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL,
   HOOPS_RETREAT_SPEED_K,
+  HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH, HANDLER_FIRST_STEP_MPS,
+  HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC,
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
 import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
@@ -195,15 +197,16 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.blkFoulLateMarginMs')).toBe(BLK.FOUL_LATE_MARGIN_MS);
     expect(def('hoops.blkFoulLatePct')).toBe(BLK.FOUL_LATE_PCT);
     expect([BLK.FOUL_BAD_ANGLE_PCT, BLK.FOUL_HARD_GAP_PCT, BLK.FOUL_STANDOFF_PCT, BLK.FOUL_LATE_PCT]).toEqual([0.25, 0.5, 0.15, 0.35]);
-    // hoops-reverse (group "Hoops · movement"): #311's H3a stick, every default the release value
-    expect(def('hoops.jogTau')).toBe(HOOPS_JOG_TAU);
+    // hoops-reverse (group "Hoops · movement"): #311's H3a stick, every default the release value — test changed (hoops-p01): five rows'
+    // defaults are now the 1v1 / 3v3 handler's TUNED values (H3a's own), pinned below; the release constants stay (the dunk approach's)
+    expect(def('hoops.jogTau')).toBe(HANDLER_JOG_TAU);
     expect(def('hoops.sprintTau')).toBe(HOOPS_SPRINT_TAU);
-    expect(def('hoops.jogAccel')).toBe(HOOPS_JOG_ACCEL);
+    expect(def('hoops.jogAccel')).toBe(HANDLER_JOG_ACCEL);
     expect(def('hoops.sprintAccel')).toBe(HOOPS_SPRINT_ACCEL);
-    expect(def('hoops.loadScale')).toBe(HOOPS_LOAD_SCALE);
+    expect(def('hoops.loadScale')).toBe(HANDLER_LOAD_SCALE);
     expect(def('hoops.gearDownDecel')).toBe(HOOPS_GEAR_DOWN_DECEL);
-    expect(def('hoops.stopDecelLow')).toBe(HOOPS_STOP_DECEL_LOW);
-    expect(def('hoops.stopDecelHigh')).toBe(HOOPS_STOP_DECEL_HIGH);
+    expect(def('hoops.stopDecelLow')).toBe(HANDLER_STOP_DECEL_LOW);
+    expect(def('hoops.stopDecelHigh')).toBe(HANDLER_STOP_DECEL_HIGH);
     expect(def('hoops.plantDecel')).toBe(HOOPS_PLANT_DECEL);
     expect(def('hoops.handlerTurnDeg')).toBe(HOOPS_HANDLER_TURN_DEG);
     expect(def('hoops.turnTrueArc')).toBe(HOOPS_TURN_TRUE_ARC);
@@ -215,6 +218,12 @@ describe('the feel knob catalogue', () => {
     expect([HOOPS_JOG_TAU, HOOPS_SPRINT_TAU, HOOPS_JOG_ACCEL, HOOPS_SPRINT_ACCEL, HOOPS_LOAD_SCALE, HOOPS_GEAR_DOWN_DECEL, HOOPS_STOP_DECEL_LOW, HOOPS_STOP_DECEL_HIGH,
       HOOPS_PLANT_DECEL, HOOPS_HANDLER_TURN_DEG, HOOPS_TURN_TRUE_ARC, HOOPS_KICK_SEC, HOOPS_CUT_SEC, HOOPS_JERK, HOOPS_REVERSE_DEG, HOOPS_REVERSE_DECEL])
       .toEqual([0.17, 0.15, 15, 24, 0.45, 9, 22, 11, 47.6, 540, 0, 0, 0, 0, 135, 47.6]);
+    // hoops-p01: the handler's TUNED stop / launch (H3a's) and the three new answers
+    expect([HANDLER_JOG_TAU, HANDLER_JOG_ACCEL, HANDLER_LOAD_SCALE, HANDLER_STOP_DECEL_LOW, HANDLER_STOP_DECEL_HIGH]).toEqual([0.1, 22, 0.7, 32, 26]);
+    expect(def('hoops.firstStepMps')).toBe(HANDLER_FIRST_STEP_MPS);
+    expect(def('hoops.reversePlantHold')).toBe(HANDLER_REVERSE_PLANT_HOLD);
+    expect(def('hoops.reverseLaunchSec')).toBe(HANDLER_REVERSE_LAUNCH_SEC);
+    expect([HANDLER_FIRST_STEP_MPS, HANDLER_REVERSE_PLANT_HOLD, HANDLER_REVERSE_LAUNCH_SEC]).toEqual([0.3, 0, 0.2]);
     expect(def('hoops.retreatSpeedK')).toBe(HOOPS_RETREAT_SPEED_K);   // TUNED (new), owner 2026-10-24
     expect(HOOPS_RETREAT_SPEED_K).toBe(0.7);
     // hoops-overtime (new: PR #268's 30 s)
