@@ -82,3 +82,45 @@ not a missing typeface. It is the mix: four faces, mono labels and 11 sizes.
 ## After
 
 The per-phase numbers, shots and contact sheets are in the sections below.
+
+## Swaps routed to the running lanes, not made here
+
+These are one-line changes that put these screens on the system. Make each one in the lane that owns the file, when it
+next touches it. The kit is `components/ui/fel` and the scale is `lib/design/type.ts`.
+
+### `today-drill`
+
+**`app/train/today-drill/page.tsx`**
+
+- Replace `bg-[#050505]` with `bg-fel-bg [background-image:var(--fel-page-glow)]`.
+- For the header, either:
+  - use `<TabPage eyebrow={DAILY_EYEBROW} title={view.plan?.name ?? 'Paused today'} lede={view.why}>`; or
+  - keep the header and set the title in `TYPE.title`, the eyebrow in `TYPE.label`, and the lede in `TYPE.small`.
+- The "Start with the camera" button becomes `<PrimaryCta docked …>`, the screen's one primary.
+
+**`components/daily-drill/daily-drill-card.tsx`**
+
+- The outer section becomes `fel-surface p-4`.
+- The `font-mono text-[10px] … text-white/45` eyebrow becomes `${TYPE.label} text-fel-dim`. The current one is
+  4.35:1 on a lit area, and `text-fel-dim` holds 4.5:1 on every surface.
+- The START link becomes `<PrimaryCta href={DAILY_DRILL_PATH}>` (not docked). The green fill is a second accent.
+- The card's copy cut (first-timer ≤ 110 words, returning ≤ 40) is already in flight in that lane. It closes most of
+  Train's words-above-the-fold gap. Re-measure Train after it merges.
+
+### `cue-rewrite` (results copy)
+
+- **The Quick Screen results:** nothing to swap. The frame, step cards and buttons come from `screen-ui.tsx`, which P6
+  restyled.
+- **`results-view.tsx`:** the per-check cards may move to `fel-surface` when its copy pass lands. The band chips keep
+  the icon, the word and the colour.
+
+### `hoops-round2` / `dunk-flagship`
+
+The game overlays set `fontFamily: 'var(--font-display), sans-serif'` inline, in:
+
+- `one-v-one-3d.tsx`, `three-v-three-3d.tsx`, `basketball-3d.tsx`, `dunk-game-3d.tsx`;
+- `three-point-3d.tsx`, `karate-3d.tsx`, `golf-3d.tsx`, `baseball-3d.tsx`, `karate-versus-3d.tsx`, `soccer-3d.tsx`;
+- `prq-float.tsx`.
+
+Each should become `var(--font-display, ui-sans-serif), ui-sans-serif, sans-serif`, so a missing variable is never
+serif (the P2 fonts fix).
