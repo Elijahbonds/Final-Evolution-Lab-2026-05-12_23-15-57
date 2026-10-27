@@ -178,16 +178,12 @@ export function KBAdmin() {
                           <Field label="Dosage (sets × reps, timing)" value={ex.dosage} onChange={v => updateLocal(ex.id, 'dosage', v)} />
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <Field label="Video URL" value={ex.videoUrl} onChange={v => updateLocal(ex.id, 'videoUrl', v)} placeholder="https://youtu.be/..." />
+                          <Field label="Video URL" value={ex.videoUrl} onChange={v => updateLocal(ex.id, 'videoUrl', v)} placeholder="https://… (FEL video file, or a link)" />
                           <Field label="Thumbnail URL" value={ex.thumbnailUrl} onChange={v => updateLocal(ex.id, 'thumbnailUrl', v)} placeholder="https://img.magnific.com/free-vector/flat-abstract-sport-youtube-thumbnail_23-2148902659.jpg?semt=ais_hybrid&w=740&q=80" />
                         </div>
+                        {/* COACH-DELIVERY COA-09: no YouTube embed; the URL opens outside FEL */}
                         {ex.videoUrl && isYouTube(ex.videoUrl) && (
-                          <div className="aspect-video w-full max-w-md overflow-hidden rounded-lg border border-white/10">
-                            <iframe
-                              src={`https://www.youtube.com/embed/${extractYTId(ex.videoUrl)}`}
-                              className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
-                            />
-                          </div>
+                          <a href={ex.videoUrl} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center text-sm text-fel-cyan underline">YouTube link (opens outside FEL; never embedded)</a>
                         )}
                         <div className="flex items-center gap-4">
                           <label className="flex items-center gap-2 text-sm text-white/70">
@@ -250,7 +246,3 @@ function Select({ label, value, options, onChange }: { label: string; value: str
 }
 
 function isYouTube(url: string) { return /youtu\.?be/i.test(url); }
-function extractYTId(url: string): string {
-  const m = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
-  return m?.[1] ?? '';
-}

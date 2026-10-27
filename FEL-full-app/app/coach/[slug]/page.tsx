@@ -13,6 +13,11 @@ import { profileDescription, profileJsonLd, type PublicProfile } from '@/lib/coa
 import { loadBusinessSection } from '@/lib/coach-business/profileServer';
 import { rawDb } from '@/lib/coach-business/server';
 import { CoachProfileView, type StoreListingCard } from '@/components/coach-business/coach-profile-view';
+// COACH-DELIVERY (2026-10-26): the coach's brand (COA-04) above the page, and their clients' reviews (COA-10) below it
+import { brandingFor } from '@/lib/coach/brandingServer';
+import { BrandMark } from '@/components/coach/brand-bar';
+import { publicReviews } from '@/lib/coach-business/reviews';
+import { ReviewForm, Stars } from '@/components/coach/reviews';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,11 +100,16 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
       };
     }
     const business = await loadBusinessSection(rawDb(), instructor.userId);
+    const brand = (await brandingFor(rawDb(), [instructor.userId]).catch(() => new Map())).get(instructor.userId) ?? null;
+    const reviews = await publicReviews(rawDb(), instructor.userId).catch(() => ({ summary: null, items: [] }));
     const profile = toProfile(instructor);
     const jsonLd = profileJsonLd(profile, (business?.packages ?? []).filter((k) => k.action !== null), `${SITE_ORIGIN}/coach/${instructor.slug}`);
     return (
       <>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        {brand && (brand.name || brand.logoUrl) && (
+          <div className="mx-auto max-w-3xl px-4 pt-4" style={brand.accent ? { borderTop: `3px solid ${brand.accent}` } : undefined} data-coach-brand><BrandMark b={brand} size={40} /></div>
+        )}
         <CoachProfileView
           profile={profile}
           sports={business?.sports ?? []}
@@ -112,6 +122,13 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
           acceptingClients={business?.acceptingClients ?? true}
           marketOn={marketOn && !!business}
         />
+        {reviews.summary && (
+          <section className="mx-auto mt-6 max-w-3xl px-4 text-white" data-coach-reviews-public>
+            <h2 className="flex flex-wrap items-center gap-2 text-sm font-bold">Client reviews <Stars n={reviews.summary.avg} /> <span className="font-normal text-white/60">{reviews.summary.avg} · {reviews.summary.count} review{reviews.summary.count === 1 ? '' : 's'}</span></h2>
+            <ul className="mt-2 space-y-1 text-sm">{reviews.items.map((r, k) => <li key={k} className="text-white/70"><Stars n={r.stars} size={12} /> <span className="text-white/40">{r.at}</span>{r.text ? ` · ${r.text}` : ''}</li>)}</ul>
+          </section>
+        )}
+        <ReviewForm slug={instructor.slug} />
       </>
     );
   } catch (err) {

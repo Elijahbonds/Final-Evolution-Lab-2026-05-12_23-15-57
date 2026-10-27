@@ -11,6 +11,10 @@ import { reviewUrgency } from '@/lib/coach-store/reviews';
 import { reviewHref, reviewStudioOpen } from '@/lib/coach-store/reviewLink';
 import { PAIN_LINE } from '@/lib/coach-store/constants';
 import { SyncWithStripe } from '@/components/coach-store/sync-stripe';
+import { platformFeePolicy } from '@/lib/coach-business/config';
+import { platformFeeLabel } from '@/lib/coach-business/fees';
+import { readCoachPlan } from '@/lib/coach-business/planServer';
+import { planDb } from '@/lib/coach-business/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +33,7 @@ export default async function DashboardPage() {
     logStoreUnavailable();
     return <main className="px-4 py-8 text-white">Coach store is not set up yet.</main>;
   }
+  const feeLabel = platformFeeLabel(platformFeePolicy(), await readCoachPlan(planDb(), userId).catch(() => 'free' as const));
   const earned = bookings.filter((b) => b.status === 'PAID').reduce((n, b) => n + (b.priceCents - b.platformFeeCents - b.stripeFeeCents), 0);
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 text-white">
@@ -37,7 +42,9 @@ export default async function DashboardPage() {
       <p className="mt-2 text-sm"><Link className="underline" href="/coach/dashboard/settings">Hours and days off</Link></p>
       <p className="mt-2"><SyncWithStripe /></p>
       <p className="mt-2 text-sm">Balance (accrued) ${(earned / 100).toFixed(2)}. Payouts are manual for now.</p>
-      <p className="mt-1 text-sm text-white/60">FEL keeps 15%. Stripe&apos;s card fee comes out of your share.</p>
+      {/* owner call 5 (2026-10-27): the fee is read from the coach-business fee config (lib/coach-business/config.ts
+          platformFeePolicy, the coach's plan) — the business dashboard's own "FEL keeps {fee}" — never a typed number */}
+      <p className="mt-1 text-sm text-white/60">FEL keeps {feeLabel}. Stripe&apos;s card fee comes out of your share.</p>
       <ul className="mt-4 space-y-2 text-sm">
         {bookings.map((b) => (
           <li key={b.id} className="rounded-xl border border-white/10 p-3">

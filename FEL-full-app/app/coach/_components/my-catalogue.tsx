@@ -208,10 +208,40 @@ function Field({ label, hint, error, group, children }: { label: string; hint?: 
 
 const input = 'w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-fel-cyan/40';
 
+const COACH_VIDEO_API = '/api/coach/catalogue/video';
+
+/** COACH-DELIVERY COA-08: pick a clip → a signed, size-bound PUT straight to FEL's own storage → its URL in the demo field. */
+function CoachVideoUpload({ on, onUploaded }: { on: boolean; onUploaded: (url: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  if (!on) return null;
+  const upload = async (f: File | undefined) => {
+    if (!f) return;
+    setBusy(true);
+    try {
+      const r = await fetch(COACH_VIDEO_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contentType: f.type, bytes: f.size }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(j.error === 'video_size' ? 'Clips can be up to 60 MB.' : j.error === 'video_type' ? 'An MP4, WebM or MOV, please.' : 'Uploads are not on yet.'); return; }
+      const put = await fetch(j.put.url, { method: 'PUT', headers: j.put.headers, body: f });
+      if (!put.ok) { toast.error('The upload did not finish. Try again.'); return; }
+      onUploaded(j.url);
+      toast.success('Uploaded. Save the exercise to keep it.');
+    } finally { setBusy(false); }
+  };
+  return (
+    <label className="mt-1.5 inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 px-3 text-xs text-white/75">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Upload a clip
+      <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" disabled={busy} onChange={(e) => void upload(e.target.files?.[0])} />
+    </label>
+  );
+}
+
 function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: CatalogueItem | null; others: CatalogueItem[]; onCancel: () => void; onSaved: () => void }) {
   const [d, setD] = useState<Draft>(() => (initial ? toDraft(initial) : EMPTY));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ field?: string; message: string } | null>(null);
+  // COACH-DELIVERY COA-08: is the own-storage upload on? (no button until the owner sets the bucket and switch, OWN-16)
+  const [videoOn, setVideoOn] = useState(false);
+  useEffect(() => { fetch(COACH_VIDEO_API).then((r) => (r.ok ? r.json() : null)).then((j) => setVideoOn(!!j?.on)).catch(() => {}); }, []);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
   const fieldErr = (f: string) => (err?.field === f ? err.message : null);
 
@@ -314,8 +344,10 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Demo video link" error={fieldErr('demoVideoUrl')} hint="A YouTube or cloud link, starting https://">
+        {/* COACH-DELIVERY COA-08/09: own-storage video (upload, when the owner has switched it on) — no YouTube ask */}
+        <Field label="Demo video" error={fieldErr('demoVideoUrl')} hint={videoOn ? 'Upload a short clip, or paste a link.' : 'A video file link, starting https://'}>
           <input value={d.demoVideoUrl} onChange={(e) => set('demoVideoUrl', e.target.value)} placeholder="https://..." className={input} />
+          <CoachVideoUpload on={videoOn} onUploaded={(url) => set('demoVideoUrl', url)} />
         </Field>
         <Field label="Equipment" error={fieldErr('equipment')} hint="Comma-separated, e.g. kettlebell, box">
           <input value={d.equipment} onChange={(e) => set('equipment', e.target.value)} className={input} />

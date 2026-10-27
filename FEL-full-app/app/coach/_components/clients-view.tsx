@@ -2,6 +2,7 @@
 // Clients — the coach's side of the loop (lane 1 C1/C3): programs I coach with the builder (prescribe exercises per
 // session), the inbox of completed sessions with logs and videos to comment, and the thread per program.
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Loader2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
@@ -31,6 +32,15 @@ import { FormReviewQueue } from '@/components/coach/form-review/review-queue';
 import { CheckinsPanel } from '@/components/coach/parity/checkins-panel';
 import { HabitsPanel } from '@/components/coach/parity/habits-panel';
 import { ImportProgram } from '@/components/coach/parity/import-panel';
+// COACH-DELIVERY (2026-10-26): automations, the calendar, the first-block draft, branding (wiring only)
+import { AutomationsPanel } from '@/components/coach/automations-panel';
+import { BulkInvite } from '@/components/coach/bulk-invite';
+import { TAP } from './look';
+import { CoachCalendar } from '@/components/coach/calendar';
+import { BrandingPanel } from '@/components/coach/branding-panel';
+import { CoachReviewsPanel } from '@/components/coach/reviews';
+import { FirstClientChecklist } from '@/components/coach/first-client';
+import { FirstBlockDraft } from '@/components/coach/first-block';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -53,6 +63,8 @@ export function ClientsView() {
   const [availability, setAvailability] = useState<Record<string, AvailabilityView> | null>(null);
   const [linked, setLinked] = useState<string[]>([]);
   const [guardian, setGuardian] = useState<{ eligible: string[]; email: boolean }>({ eligible: [], email: false });
+  const [openInvites, setOpenInvites] = useState(0);
+  useEffect(() => { fetch('/api/coach/invite').then((r) => (r.ok ? r.json() : null)).then((j) => setOpenInvites(Array.isArray(j?.invites) ? j.invites.length : 0)).catch(() => {}); }, []);
 
   const load = useCallback(async () => {
     const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
@@ -96,10 +108,13 @@ export function ClientsView() {
   if (!programs || !inbox) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const prog = programs.find((p) => p.tree.id === selected) ?? null;
   return (
-    <div className="space-y-4">
+    // COACH-DELIVERY COA-06: the 44 px tap floor for everything in the tab (./look.ts)
+    <div className={`space-y-4 ${TAP}`} data-coach-clients>
       {/* ADD AN ATHLETE comes first, because until 2026-09-19 there was no way to do it at all and a coach with an
           empty roster has nothing else on this screen to do. */}
-      <InvitePanel />
+      {/* COACH-DELIVERY (round 8 item b): the first-client checklist while the roster is empty */}
+      {roster.length === 0 && <FirstClientChecklist state={{ invited: openInvites > 0 }} />}
+      <div id="coach-invite"><InvitePanel /></div>
       {/* NEEDS YOU TODAY, above the roster: fifty rows is not an answer to "who needs me", and the reading the
           coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
           the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}
@@ -108,6 +123,8 @@ export function ClientsView() {
       <DraftsInbox />
       <FormReviewQueue />
       <TeamsPanel />
+      {/* VBT (docs/VBT.md §7.2; wired by coach-delivery 2026-10-27): the coach's bar-speed view */}
+      <Link href="/coach/velocity" className="fel-card block rounded-xl p-4 text-sm text-white/80" data-coach-velocity-door>Bar speed: clients' reps, speed loss and target zones →</Link>
       <CheckinsPanel />
       <HabitsPanel />
       {/* COMBINE-DAY (2026-10-25): tryouts and testing days, run on this device (/coach/combine) */}
@@ -177,6 +194,12 @@ export function ClientsView() {
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
         <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-fel-cyan/50 text-fel-cyan bg-fel-cyan/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
         {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
+        {/* COACH-DELIVERY COA-02: draft the first block from their goal, the coach's answers and their Mirror screen */}
+        {prog?.clientId && !prog.completedSessionIds.length && (
+          <FirstBlockDraft key={prog.tree.id} program={{ id: prog.tree.id, name: prog.tree.name }}
+            blank={prog.tree.blocks.every((b) => b.sessions.every((x) => x.exercises.length === 0))}
+            onTree={(tree) => { setPrograms((ps) => ps?.map((p) => p.tree.id === tree.id ? { ...p, tree } : p) ?? null); void fetch('/api/coach/programs/exercises').then((r) => r.json()).then((c) => setCatalogue(Array.isArray(c) ? c : [])).catch(() => {}); }} />
+        )}
         {prog && (
           <ImportProgram
             program={{ id: prog.tree.id, name: prog.tree.name, clientName: prog.clientName }}
@@ -218,6 +241,20 @@ export function ClientsView() {
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your client" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
       )}
+      {/* COACH-DELIVERY phase 2 (premium rule): the settings this lane added sit in ONE collapsed Setup group at the bottom,
+          never on the first screen — team import, automations (COA-01), calendar (COA-05), brand (COA-04), reviews (COA-10),
+          and the team-fee entry (COA-12, on the business page) */}
+      <details className="fel-card rounded-xl p-4" data-coach-setup>
+        <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-white/80">Setup</summary>
+        <div className="mt-3 space-y-4">
+          <BulkInvite onDone={() => { void load(); }} />
+          <AutomationsPanel />
+          <CoachCalendar />
+          <BrandingPanel />
+          <CoachReviewsPanel />
+          <Link href="/coach/business" className="flex min-h-11 items-center text-sm text-fel-cyan underline" data-team-fee-entry>Team fees and packages</Link>
+        </div>
+      </details>
     </div>
   );
 }

@@ -67,6 +67,10 @@
     "sprint": {
       "title": "Sprint speed",
       "line": "Camera-timed sprints and top speed, each with its ±. 18 and over."
+    },
+    "velocity": {
+      "title": "Bar speed",
+      "line": "Rep speed from your camera. Estimates, not lab numbers."
     }
   },
   "section": {

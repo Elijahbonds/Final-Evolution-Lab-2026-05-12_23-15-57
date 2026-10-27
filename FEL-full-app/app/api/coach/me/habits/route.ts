@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
+import { canWriteHealthData } from '@/lib/privacy/healthWriteGate';
 import { myHabits, tickHabit, type HabitDb } from '@/lib/coach/habits/server';
 
 /**
@@ -23,6 +24,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
-  const r = await tickHabit(db(), userId, await req.json().catch(() => null));
+  // HEALTH_WRITE_ROUTES h (lib/privacy/healthWriteGate.ts): the verified-adult check for a health answer runs here, lazily —
+  // only for an adult band and only when the athlete's gates are read, exactly as before it moved out of whoIs
+  const r = await tickHabit(db(), userId, await req.json().catch(() => null), new Date(), process.env, () => canWriteHealthData(prisma, userId));
   return NextResponse.json(r.body, { status: r.status });
 }

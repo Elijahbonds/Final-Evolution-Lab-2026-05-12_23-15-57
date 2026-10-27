@@ -21,6 +21,7 @@ import { nameKey, validateCatalogueCreate, type CleanCatalogueItem } from '../ca
 import { validateExerciseSpec, type CleanExerciseSpec } from '../loop';
 import { PIN_EXERCISE, youthRules } from '../taxonomy';
 import { programIsBlank } from '../templates';
+import { catalogueCreateInput, templateExercise } from '../templateCatalogue';
 import { TREE_INCLUDE } from '../server';
 import type { BuilderDb } from '../builderServer';
 import { LIMITS } from './parse';
@@ -40,6 +41,7 @@ function cleanPick(p: unknown): Pick | null {
   if (o.kind === 'skip') return { kind: 'skip' };
   if ((o.kind === 'catalogue' || o.kind === 'library') && typeof o.id === 'string' && o.id && o.id.length <= 120) return { kind: o.kind, id: o.id };
   if (o.kind === 'new' && str(o.name, 80)) return { kind: 'new', name: str(o.name, 80) };
+  if (o.kind === 'template' && typeof o.key === 'string' && templateExercise(o.key)) return { kind: 'template', key: o.key };
   return null;
 }
 
@@ -71,6 +73,8 @@ export function cleanImport(body: Record<string, unknown>): { ok: true; plan: Cl
           exerciseId: 'import', sets: it.sets ?? undefined, reps: it.reps ?? undefined, load: it.load ?? '', tempo: it.tempo ?? undefined,
           restSeconds: it.restSeconds ?? undefined, workSeconds: it.workSeconds ?? null, supersetGroup: it.superset ?? null,
           section: it.section ?? undefined, isKeySet, coachNote: it.note ?? null,
+          ...(it.effortBand ? { effortBand: it.effortBand } : {}), ...(it.holdSeconds ? { holdSeconds: it.holdSeconds } : {}),
+          ...(Array.isArray(it.setupCues) && it.setupCues.length ? { setupCues: it.setupCues } : {}),
         });
         if (!v.ok) return fail(400, `import_line_${v.error}`, at);
         lines.push({ pick, spec: v.spec });
@@ -131,7 +135,7 @@ export async function applyImport(db: BuilderDb, coachId: string, program: { id:
   const toCreate = new Map<string, { item: CleanCatalogueItem; libraryId: string | null }>();
   const rowFor = new Map<string, string>();   // pick key → existing row id, or 'new:<nameKey>'
   let index: LibraryIndex | null = null;
-  const pickKey = (p: CleanLine['pick']) => (p.kind === 'new' ? `new:${p.name.toLowerCase()}` : `${p.kind}:${p.id}`);
+  const pickKey = (p: CleanLine['pick']) => (p.kind === 'new' ? `new:${p.name.toLowerCase()}` : p.kind === 'template' ? `template:${p.key}` : `${p.kind}:${p.id}`);
   for (const [wi, w] of c.plan.weeks.entries()) {
     for (const [di, d] of w.days.entries()) {
       for (const [li, l] of d.lines.entries()) {
@@ -155,6 +159,11 @@ export async function applyImport(db: BuilderDb, coachId: string, program: { id:
           const v = libraryToCatalogue(e);
           if (!v.ok) return fail(422, `library_${v.error}`, at);
           item = v.item; libraryId = e.id;
+        } else if (l.pick.kind === 'template') {
+          // COACH-DELIVERY COA-02: a FEL template exercise, with the template catalogue's cues and faults (the clone's seed)
+          const v = validateCatalogueCreate(catalogueCreateInput(l.pick.key));
+          if (!v.ok) return fail(422, `template_${v.error}`, at);
+          item = v.item;
         } else {
           const v = validateCatalogueCreate({ name: l.pick.name });
           if (!v.ok) return fail(400, `new_${v.error}`, at);
