@@ -1,6 +1,12 @@
 // lib/signature/copy.ts — SIGNATURE-PROGRAMS (2026-10-25): every line the programs say that is not the owner's content.
 //
-// DRAFT PRODUCT COPY, NO MEDICAL WORDS. signature.test.ts screens every line here and every program's own text through
+// PRODUCT COPY, OWNER-APPROVED (owner, in chat, 2026-10-27: "You do it. I approve." — Owner Inbox card C20, "Approve
+// wording: signature programs", approved as written; the card's one thing to weigh, the name "pain-free prehab", was
+// left as it is). The two review lines below (NOT_READY_LINE, NONE_APPROVED_LINE) no longer say the programs are with
+// the owner: they are approved (./access.ts OWNER_APPROVED), and the lines now show only when the tables are not applied
+// ("coming soon") or the owner has since rejected every program.
+//
+// NO MEDICAL WORDS. signature.test.ts screens every line here and every program's own text through
 // lib/coach/weeklyDraft/copy.ts MEDICAL_WORDS (no diagnosis, treatment, injury or condition words) — the one exception is
 // the prehab field's fixed PREHAB_NOTE ("General prehab, not treatment."), which the owner's brief asks for word for word.
 // The safety lines are NOT written here: a pain stop reads lib/health/painRule.ts PAIN_DECISION_COPY ("check with a
@@ -79,8 +85,10 @@ export const YOUTH_PRO_LINE = 'FEL Pro is for 18 and over, so under 18 the first
 // ── review and visibility ─────────────────────────────────────────────────────────────────────────────────────────
 
 export const DRAFT_BADGE = 'Draft: only the owner can see this until it is approved.';
-export const NOT_READY_LINE = 'Signature programs open once their tables are applied and the owner approves them.';
-export const NONE_APPROVED_LINE = 'No signature program is open yet. They are with the owner for review.';
+/** The tables are not applied (lib/coach/pendingSchema.ts seam): every athlete reads "coming soon". */
+export const NOT_READY_LINE = 'Signature programs are coming soon. The daily drill and the exercise library are open in the meantime.';
+/** The tables are there but no program is open to athletes (only if the owner rejects or un-approves all four). */
+export const NONE_APPROVED_LINE = 'No signature program is open right now.';
 export const YOUTH_DEVICE_LINE = 'Under 18, your progress stays on this phone. Jumps and landings wait: each one has a calm swap.';
 
 /** Train's signature card line (app/train/page.tsx): the same for everyone, so that page reads no age to draw it. */
