@@ -799,6 +799,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long the passer\'s lob hangs, release to the catch. Longer = a higher, slower arc thrown earlier in your run.',
   },
   {
+    id: 'dunk.oopLateCatchClipT', label: 'Alley-oop: catch beat when you jump early', def: 0.8, min: 0.6, max: 1.0, step: 0.05, unit: 's', group: 'Dunk · lobs',
+    source: 'lib/babylon/core/DunkFlagship.ts OOP_LATE_CATCH_CLIP_T',
+    hint: 'If you leave the floor before the passer has thrown, he lobs it as you jump and you catch it this far into your flight. Later = a higher drop into your hand, less time before the slam.',
+  },
+  {
     id: 'dunk.slamHitStopBigMs', label: 'Slam: freeze on a perfect flush', def: 100, min: 70, max: 160, step: 5, unit: 'ms', group: 'Dunk · slam',
     source: 'lib/babylon/core/DunkFlagship.ts SLAM_HITSTOP_BIG_MS',
     hint: 'How long the game holds on the iron for a perfect slam. An ordinary make stays at 70 ms; cleaner slams grow toward this.',

@@ -27,6 +27,11 @@ export const OOP_LOB_FLIGHT_SEC = 1.0;
  *  `jumpshot` (clipRegistry's teammateToss), whose release is its arms-overhead key at 0.5 s (baseClips; the CMU 124_05 capture
  *  that replaces it on a hoops rig tops out at 0.5–0.55 s) — so the ball leaves from overhead, not from his hip mid-crouch. */
 export const OOP_WINDUP_SEC = 0.5;
+/** (new, Phase 3) The plain oop's catch beat (flight clip time) when the dunker leaves the floor BEFORE the passer's run-throw
+ *  was due (A early, RT let go early): the passer lets go on the take-off frame and aims here. 0.8 is the hang beat the
+ *  off-glass lob already catches on (DunkMode GLASS_CATCH_CLIP_T, measured reachable). Later = a longer, higher drop into the
+ *  hand but less time between the catch and the slam window (it opens at 1.05). Before: a 0.35 s bullet at 0.9 × the rise. */
+export const OOP_LATE_CATCH_CLIP_T = 0.8;
 
 /** Throw now? `runToLaunchSec` is the run left to the take-off line, `catchClipT` the flight's catch beat. A run that starts
  *  inside the lob's time throws at once (a shorter, flatter lob — still on the catch beat). */

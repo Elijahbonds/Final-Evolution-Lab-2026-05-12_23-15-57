@@ -87,7 +87,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -2194,6 +2194,15 @@ export const DunkMode: ModeDefinition = (() => {
           if (clipTime >= 0.02) teammate.animator.play(SPORT_CLIP.teammateToss, {});   // the passer winds up as the dunker leaves the floor
           if (prop === 'oopcorner' && clipTime >= 0.02) {   // DUNK PARKOUR: the billboard oop leaves at once — the bank needs the whole rise
             throwCornerLob(ctx, ball.getAbsolutePosition().clone(), Math.max(0.45, CORNER_CATCH_CLIP_T - clipTime));
+          } else if (prop === 'alleyoop' && clipTime >= 0.02) {
+            // DUNK-FLAGSHIP Phase 3: THE EARLY TAKE-OFF STILL GETS A LOB. A take-off before the run-throw was due (A early, RT let go
+            // early) used to wait for 90 % of the rise and fire a 0.35 s bullet (measured 13–14 m/s at the hand, the top BELOW the
+            // catch). The passer lets go on the take-off frame instead, aimed at the hang beat (OOP_LATE_CATCH_CLIP_T, the off-glass
+            // lob's measured-reachable beat) — the whole rise to fly, so it drops into the hand from above
+            const lateT = feel('dunk.oopLateCatchClipT', OOP_LATE_CATCH_CLIP_T);
+            throwLob(ctx, ball.getAbsolutePosition().clone(), 'ALLEY-OOP', Math.max(LOB_REAIM_MIN_SEC, lateT - clipTime), lateT);
+            SoundKit.play('whoosh', { pitch: 1.05, volume: 0.5 });
+            console.info(`[LOB] the dunker left early — the passer lobs it on the take-off, catch beat ${lateT.toFixed(2)}`);
           } else if (clipTime >= EASTBAY_TIMING.rise * 0.9) {
             // the passer can throw everything the self-lob can, and the SAME solvers run it — a lob off the glass is a
             // lob off the glass whoever let go of it
@@ -3835,10 +3844,10 @@ export const DunkMode: ModeDefinition = (() => {
   }
   let ctx0: ModeContext | null = null;   // the mode context for the beat-end path (the harness hands it to every hook)
   /** The toss: a real arc from `from` to the catch point, timed to arrive with the ball hand. */
-  function throwLob(ctx: ModeContext, from: Vector3, label: string, tf: number): void {
+  function throwLob(ctx: ModeContext, from: Vector3, label: string, tf: number, catchT = LOB_CATCH_CLIP_T): void {
     const line = phase === 'cinematic' ? launchZ : gatherLine();
-    const carry = carryU(LOB_CATCH_CLIP_T, EASTBAY_TIMING.extend);
-    const kh = arcHeight(LOB_CATCH_CLIP_T, EASTBAY_TIMING.extend);
+    const carry = carryU(catchT, EASTBAY_TIMING.extend);
+    const kh = arcHeight(catchT, EASTBAY_TIMING.extend);
     const off = CATCH_HAND_OFFSET[style];
     const to = new Vector3(rim.x + off.x, kh * (phase === 'cinematic' ? apexFor() : apexPredicted()) + off.y, line + (rim.z + FLUSH_Z_AHEAD - line) * carry + off.z);
     const v = lobVelocity(from, to, tf);
