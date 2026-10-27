@@ -11,7 +11,8 @@
 // claims. No biomechanical statistics are fabricated — the only numbers shown
 // are the ones the engine actually computes for this session.
 
-import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';   // CUE-REWRITE: the review cards' words
+import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';
+import { MOVEMENT_NAMES } from '@/lib/cue-style/names';   // CUE-REWRITE: the review cards' words
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
@@ -1018,12 +1019,13 @@ export function MirrorHarness({
   // MIRROR-COACH P4 lane 1: the squat and the lunge read their full title straight from MIRROR_PATTERNS (the
   // registry's own label, entry one and two) — pressRow/jump/screen are not pattern-audit entries and keep their own.
   const PATTERN_TITLE: Record<Pattern, string> = {
-    pressRow: 'Split-Stance Press / Row',
+    // CUE-REWRITE (2026-10-27): the canonical movement names (lib/cue-style/names.ts)
+    pressRow: MOVEMENT_NAMES.pressRow,
     squat: SQUAT_PATTERN.label,
     lunge: LUNGE_PATTERN.label,
-    hinge: 'Hip Hinge',
-    pushup: 'Push-up',
-    jump: 'Vertical Jump',
+    hinge: MOVEMENT_NAMES.hinge,
+    pushup: MOVEMENT_NAMES.pushup,
+    jump: MOVEMENT_NAMES.jump,
     screen: 'Movement Screen',
   };
   const live = status === 'live';
@@ -1417,16 +1419,16 @@ export function MirrorHarness({
         {pattern === 'squat' && live && (
           <p className="mt-4 text-[13px] leading-relaxed text-white/55">
             {squatStage === 'breathe' && (
-              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} The breath is the bedrock — everything else builds on it.</>
+              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} A calm breath first makes the rest easier.</>
             )}
             {squatStage === 'check' && (
-              <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees (face the camera square-on)' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
+              <><span className="font-bold text-white">First, {SQUAT_CHECK_REPS} slow squats.</span> The camera watches your heels, balance{VALGUS_CUE_VERIFIED ? ' and knees (face it straight on)' : ' (knees watched, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
             )}
             {squatStage === 'work' && (
-              <><span className="font-bold text-white">The work set.</span> {SQUAT_WORK_REPS} squats — cued from what the camera measures. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
+              <><span className="font-bold text-white">Now {SQUAT_WORK_REPS} squats.</span> The coach talks you through what the camera sees. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
             )}
             {squatStage === 'review' && (
-              <><span className="font-bold text-white">Review.</span> What faulted, what was cued, and whether the correction held.</>
+              <><span className="font-bold text-white">Your set.</span> What the camera saw, what the coach said, and whether the fix stuck.</>
             )}
           </p>
         )}

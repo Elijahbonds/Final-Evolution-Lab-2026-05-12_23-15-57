@@ -303,7 +303,7 @@ export const LUNGE_CUES: readonly CueRule[] = [
  */
 export const lungePattern: MirrorPattern = {
   id: 'lunge',
-  label: 'Split-Stance Lunge',
+  label: 'Lunge',   // CUE-REWRITE: the canonical name (lib/cue-style/names.ts)
   view: 'front',
   reps: { checkReps: 3, workReps: 8 },
   audit: auditLunge,
