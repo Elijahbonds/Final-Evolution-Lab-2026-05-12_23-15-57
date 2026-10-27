@@ -809,9 +809,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Camera shake for a perfect slam. An ordinary make stays at 0.12. Reduced motion turns shake off.',
   },
   {
-    id: 'dunk.landLeadSec', label: 'Landing: absorb starts before touchdown', def: 0.1, min: 0, max: 0.25, step: 0.01, unit: 's', group: 'Dunk · landing',
+    id: 'dunk.landLeadSec', label: 'Landing: absorb starts before touchdown', def: 0, min: 0, max: 0.25, step: 0.01, unit: 's', group: 'Dunk · landing',
     source: 'lib/babylon/core/DunkFlagship.ts LAND_LEAD_SEC',
-    hint: 'How early the landing crouch fades in while you fall, so the knees take the landing. 0 = it starts on touchdown (the old way).',
+    hint: 'How early the landing crouch fades in while you fall. 0 = on touchdown (as shipped). Measured: earlier makes the hips arrive faster into the same short crouch.',
   },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
   {
     id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',

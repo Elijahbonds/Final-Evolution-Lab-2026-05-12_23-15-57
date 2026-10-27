@@ -69,9 +69,12 @@ export function slamImpact(acc01: number, hang: boolean, big = { hitStopMs: SLAM
 // Measured before (rig, a plain make): the absorb clip started ON the touchdown frame and faded in over 0.15 s, so for ~6 frames the
 // flush pose held the hips while the root stood on the floor — the hips fell at −5.2 m/s and stopped dead in one frame (−4.39 →
 // +0.03 m/s). The absorb now fades in over the last LAND_LEAD_SEC of the fall (the legs reach for the floor, as a body does), so it
-// is fully in at touchdown.
-/** (new) How long before touchdown the landing absorb starts to fade in (s). */
-export const LAND_LEAD_SEC = 0.1;
+// is fully in at touchdown. MEASURED WORSE (rig, matched mid-run take-offs): with a 0.10 s lead the hips arrived faster (−6.2 vs −5.2
+// m/s: the absorb's first pose reaches the legs down through the fall) and still stopped dead, because the authored absorb only sinks
+// ~0.5 m/s — landing hip pops 2 → 4. So the default is 0 (the old way, exactly) and the lead stays a knob; the real fix is a deeper,
+// faster absorb (an authored clip — RIG-ADJACENT, GATE 0, the owner's sign-off), written up in docs/DUNK-FLAGSHIP.md.
+/** (new knob, default unchanged) How long before touchdown the landing absorb starts to fade in (s); 0 = on touchdown. */
+export const LAND_LEAD_SEC = 0;
 /** Seconds until a body `heightM` up, falling at `vyDown` m/s (positive down) under gravity, reaches the floor. */
 export function timeToFloor(heightM: number, vyDown: number, g = 9.81): number {
   if (heightM <= 0) return 0;
