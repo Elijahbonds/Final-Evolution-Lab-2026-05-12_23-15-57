@@ -4,7 +4,7 @@
 // lock (held while playing; let go on pause, the finish and close), the "How to set up" sheet (opens by itself before the
 // first set of an exercise this device has never run, closes by itself when the set starts) and the finish callback.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { READY_SECONDS, READY_SETUP_SECONDS, back as backOf, pause as pauseOf, primary as primaryOf, resume as resumeOf, startState, tick, type Effect, type Out, type PlayerState } from '@/lib/session-player/machine';
+import { READY_HOLD_MAX_SECONDS, READY_SECONDS, READY_SETUP_SECONDS, back as backOf, pause as pauseOf, primary as primaryOf, resume as resumeOf, startState, tick, type Effect, type Out, type PlayerState } from '@/lib/session-player/machine';
 import type { Session } from '@/lib/session-player/model';
 import { markSeen, playerStorage, readSeen } from '@/lib/session-player/seen';
 import { browserVoice } from '@/lib/session-player/speaker';
@@ -19,6 +19,8 @@ export interface PlayerOptions {
   clock?: Clock;
   /** Stand-ins for the browser's voice (tests). */
   voice?: VoiceOut;
+  /** The demo is already showing (tests; a page with no 3D): the ready count does not wait for it. */
+  demoSettled?: boolean;
 }
 
 export function useSessionPlayer(session: Session, o: PlayerOptions = {}) {
@@ -78,8 +80,17 @@ export function useSessionPlayer(session: Session, o: PlayerOptions = {}) {
     return () => { voice.stop(); };
   }, []);   // once, on open
 
+  // the demo: until it shows (or fails), the ready count waits for it — at most READY_HOLD_MAX_SECONDS
+  const demoSettled = useRef(o.demoSettled ?? false);
+  const held = useRef(0);
+  const settleDemo = useCallback(() => { demoSettled.current = true; }, []);
+
   // the clock
-  useEffect(() => startTicker((dt) => apply(tick(session, ref.current, dt)), o.clock ?? realClock), [apply, session, o.clock]);
+  useEffect(() => startTicker((dt) => {
+    const hold = !demoSettled.current && held.current < READY_HOLD_MAX_SECONDS * 1000;
+    if (hold && ref.current.phase === 'ready' && !ref.current.paused) held.current += dt;
+    apply(tick(session, ref.current, dt, { holdReady: hold }));
+  }, o.clock ?? realClock), [apply, session, o.clock]);
 
   // the screen stays on while playing
   const playing = state.phase !== 'finish' && !state.paused;
@@ -87,7 +98,7 @@ export function useSessionPlayer(session: Session, o: PlayerOptions = {}) {
   useEffect(() => () => lock.dispose(), [lock]);
 
   return {
-    state, seen, sheet, muted,
+    state, seen, sheet, muted, settleDemo,
     primary: () => apply(ref.current.paused ? { state: resumeOf(ref.current), effects: [] } : primaryOf(session, ref.current)),
     back: () => apply(backOf(session, ref.current)),
     pause: () => apply({ state: pauseOf(ref.current), effects: [] }),

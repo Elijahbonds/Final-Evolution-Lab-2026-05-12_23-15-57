@@ -64,6 +64,19 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
   const [openedAt, setOpenedAt] = useState(0);
   useEffect(() => { setOpenedAt(Math.round(typeof performance !== 'undefined' ? performance.now() : 0)); }, [state.step]);
 
+  // the demo's own state (AvatarDemo's data-avatar-state): once it shows or fails, the ready count stops waiting for it
+  const demoRef = useRef<HTMLDivElement>(null);
+  const settle = p.settleDemo;
+  useEffect(() => {
+    const el = demoRef.current;
+    if (!el || typeof MutationObserver === 'undefined') { settle(); return; }
+    const check = () => { const st = el.querySelector('[data-avatar-state]')?.getAttribute('data-avatar-state'); if (st === 'ready' || st === 'failed') settle(); };
+    const mo = new MutationObserver(check);
+    mo.observe(el, { subtree: true, attributes: true, attributeFilter: ['data-avatar-state'], childList: true });
+    check();
+    return () => mo.disconnect();
+  }, [settle]);
+
   // no page scroll under the player
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -111,7 +124,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
     <div className={LOOK.shell + quiet} data-session-player data-phase={state.phase} data-step={state.step} data-set={state.set} data-paused={state.paused ? '1' : '0'}
       data-mode={mode} data-clip={step.clip ?? 'still'} data-step-opened={openedAt} data-sets-total={totalSets(session)} data-left={state.leftMs === null ? '' : Math.ceil(state.leftMs / 1000)} role="dialog" aria-modal="true" aria-label={session.title}>
       <style>{SHEET_KEYFRAMES}</style>
-      <div className={LOOK.demo + (step.clip ? ` ${LOOK.demoQuiet}` : '')} data-player-demo>
+      <div ref={demoRef} className={`${LOOK.demo} ${step.clip ? LOOK.demoQuiet : LOOK.demoBadge}`} data-player-demo>
         <AvatarDemo clip={step.clip} />
         <div className={LOOK.topBar}>
           <button type="button" aria-label={T.close} className={LOOK.iconBtn} data-player-close onClick={() => { p.pause(); setAskEnd(true); }}><X className="h-5 w-5" /></button>

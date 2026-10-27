@@ -33,7 +33,7 @@ export default async function SignatureProgramPage({ params }: { params: { id: s
   const clips = index ? clipsFor(signatureExerciseIds(signatureProgram(params.id)!), (x) => index.docs[index.byId.get(x) ?? -1] ?? null) : {};
   return (
     <TabPage eyebrow="Signature program" title={view.title} accent="#00FF9D"
-      aside={<Link href="/train/programs" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← All programs</Link>}>
+      aside={<Link href="/train/programs" className="inline-flex min-h-[44px] items-center font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-soft hover:text-white">← All programs</Link>}>
       <ProgramPage initial={view} clips={clips} />
     </TabPage>
   );

@@ -69,7 +69,7 @@ async function startAndPlay(initial: NonNullable<ReturnType<typeof buildProgramV
   const { session, mode, onFinish } = player!.props as { session: Session; mode: PlayMode; onFinish: () => Promise<FinishResult> };
   let api!: ReturnType<typeof useSessionPlayer>;
   let finished = 0;
-  const run = mount(() => { api = useSessionPlayer(session, { clock, voice: { say: () => {}, tick: () => {}, cancel: () => {} }, onFinish: () => { finished++; } }); return null; });
+  const run = mount(() => { api = useSessionPlayer(session, { clock, voice: { say: () => {}, tick: () => {}, cancel: () => {} }, demoSettled: true, onFinish: () => { finished++; } }); return null; });
   await flush();
   let taps = 0; let guard = 0;
   while (api.state.phase !== 'finish' && guard++ < 20_000) {

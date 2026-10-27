@@ -27,6 +27,13 @@ describe('the session player machine', () => {
     expect(startState(S, 12).state).toMatchObject({ phase: 'ready', leftMs: 12_000, fullMs: 12_000 });
   });
 
+  it('holdReady keeps the ready count (the demo is loading) and nothing else', () => {
+    const r = startState(S).state;
+    expect(tick(S, r, 1000, { holdReady: true }).state).toBe(r);
+    const rest = setDone(S, primary(S, r).state).state;
+    expect(tick(S, rest, 1000, { holdReady: true }).state.leftMs).toBe(29_000);
+  });
+
   it('an empty session goes straight to the finish', () => {
     expect(startState({ id: 'x', title: 'x', steps: [] }).state.phase).toBe('finish');
   });

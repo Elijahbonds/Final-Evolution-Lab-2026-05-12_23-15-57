@@ -15,6 +15,8 @@ export const LOOK = {
   demo: 'relative h-[55dvh] min-h-[220px] w-full shrink-0 overflow-hidden bg-[#08080d] [&_[data-avatar-demo]]:h-full [&_[data-avatar-demo]]:!aspect-auto',
   // the demo's "YOUR ATHLETE" label says nothing during a set; the still's "DEMO COMING" stays
   demoQuiet: '[&_[data-avatar-badge]]:hidden',
+  // the still's "DEMO COMING" label sits at the demo's foot, clear of the top bar
+  demoBadge: '[&_[data-avatar-badge]]:!top-auto [&_[data-avatar-badge]]:bottom-3 [&_[data-avatar-badge]]:left-3',
   topBar: 'absolute inset-x-0 top-0 z-10 flex items-center gap-2 bg-gradient-to-b from-black/70 to-transparent px-3 pb-6 pt-[max(10px,env(safe-area-inset-top))]',
   iconBtn: 'grid h-11 w-11 shrink-0 place-items-center rounded-full bg-black/45 text-white/90 backdrop-blur-sm motion-safe:transition-transform active:scale-90',
   progressWrap: 'min-w-0 flex-1',

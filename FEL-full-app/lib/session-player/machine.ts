@@ -19,6 +19,9 @@ export const READY_SECONDS = 5;
 /** The count before the first set when its "How to set up" sheet opens by itself (an exercise this device has never run):
  *  time to read the set-up and get into position, with no tap. (new) */
 export const READY_SETUP_SECONDS = 12;
+/** The longest the ready count waits for the demo to show before it runs anyway (a slow phone's 3D cold start; a demo
+ *  that never loads must not stop the session). (new) */
+export const READY_HOLD_MAX_SECONDS = 20;
 /** The least time between two exercises, when the source gives the set no rest: enough to walk to the next one. (new) */
 export const CHANGE_SECONDS = 5;
 /** Rest ticks in its last seconds (owner brief: "the last 3 s get a tick"). */
@@ -96,9 +99,11 @@ function completeSet(session: Session, s: PlayerState): Out {
   };
 }
 
-/** Time passes. Countdowns run (unless paused) and end by themselves. */
-export function tick(session: Session, s: PlayerState, dtMs: number): Out {
+/** Time passes. Countdowns run (unless paused) and end by themselves. `holdReady`: the demo is still loading, so the
+ *  ready count waits for it (the caller caps the wait at READY_HOLD_MAX_SECONDS); nothing else holds. */
+export function tick(session: Session, s: PlayerState, dtMs: number, o: { holdReady?: boolean } = {}): Out {
   if (s.paused || s.phase === 'finish' || !(dtMs > 0)) return keep(s);
+  if (o.holdReady && s.phase === 'ready') return keep(s);
   const elapsed = { ...s, elapsedMs: s.elapsedMs + dtMs };
   if (s.leftMs === null) return keep(elapsed);
   const left = s.leftMs - dtMs;

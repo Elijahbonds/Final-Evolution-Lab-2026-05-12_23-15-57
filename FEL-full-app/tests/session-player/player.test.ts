@@ -12,7 +12,7 @@ import { useSessionPlayer } from '@/components/session-player/use-session-player
 import type { Clock } from '@/lib/session-player/ticker';
 import type { Session } from '@/lib/session-player/model';
 import { SEEN_KEY } from '@/lib/session-player/seen';
-import { READY_SECONDS, READY_SETUP_SECONDS } from '@/lib/session-player/machine';
+import { READY_HOLD_MAX_SECONDS, READY_SECONDS, READY_SETUP_SECONDS } from '@/lib/session-player/machine';
 
 const SESSION: Session = { id: 'w1:A', title: 'Vertical Jump · A', steps: [
   { exId: 'goblet', name: 'Goblet Squat to Box', sets: 2, reps: '8', workSeconds: null, restSeconds: 30, setup: 'A box behind you.', cue: 'Sit back to the box', clip: 'ex_squat' },
@@ -36,11 +36,11 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
-function start(onFinish = vi.fn()) {
+function start(onFinish = vi.fn(), demoSettled = true) {
   const said: string[] = [];
   const voice = { say: (x: string) => { said.push(x); }, tick: vi.fn(), cancel: vi.fn() };
   let api!: ReturnType<typeof useSessionPlayer>;
-  const m = mount(() => { api = useSessionPlayer(SESSION, { clock, voice, onFinish }); return null; });
+  const m = mount(() => { api = useSessionPlayer(SESSION, { clock, voice, onFinish, demoSettled }); return null; });
   return { m, api: () => api, said, voice, onFinish };
 }
 const held = () => requests.filter((r) => !r.released).length;
@@ -114,6 +114,23 @@ describe('the session player, mounted', () => {
     expect(p.said.length).toBe(n);
     p.m.unmount();
     expect(start().api().muted).toBe(true);
+  });
+
+  it('the ready count waits for the demo to show (a slow phone\'s 3D cold start), then runs; never longer than the cap', async () => {
+    const p = start(vi.fn(), false);
+    await flush();
+    await advance(10_000);
+    expect(p.api().state).toMatchObject({ phase: 'ready', leftMs: READY_SETUP_SECONDS * 1000 });   // held: the demo is loading
+    p.api().settleDemo();                                                                          // the demo shows
+    await advance(READY_SETUP_SECONDS * 1000);
+    expect(p.api().state.phase).toBe('work');
+    p.m.unmount();
+    // a demo that never loads holds the count READY_HOLD_MAX_SECONDS at most: the session still plays itself
+    const q = start(vi.fn(), false);
+    await flush();
+    await advance(READY_HOLD_MAX_SECONDS * 1000 + READY_SETUP_SECONDS * 1000 + 500);
+    expect(q.api().state.phase).toBe('work');
+    q.m.unmount();
   });
 
   it('Back takes a mistaken Set done back', async () => {
