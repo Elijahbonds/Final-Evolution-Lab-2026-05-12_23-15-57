@@ -263,7 +263,7 @@ export async function recordConnectRefund(deps: ConnectDeps, saleId: string, cha
   const sale = await loadSale(deps, saleId);
   if (!sale) return 'unknown_sale';
   // PAYMENTS-READY: with REFUND_PROCESSING_FEE on, the charge's refunded total is the price share PLUS the processing
-  // fee's share; map it back to the price. Off (the default): today's min(refunded, price).
+  // fee's share; map it back to the price (on by default since 2026-10-27, owner: "refund in full"). Off: min(refunded, price).
   const refundFee = refundProcessingFee(depsEnv(deps));
   const processing = refundFee ? processingFeeOf(sale, charge) : 0;
   const shape = { priceCents: sale.amountCents, processingFeeCents: processing };

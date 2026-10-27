@@ -44,7 +44,7 @@ export function ClaimBar({ lines, ready, focused, instant, canPress, onClaim }: 
                 initial={instant ? false : { y: 10, opacity: 0, scale: 0.8 }}
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 transition={{ type: 'spring', damping: 12, stiffness: 240, delay: instant ? 0 : 0.12 + i * 0.09 }}
-                className="rounded-full border border-[#FFD700]/40 bg-black/30 px-[0.7em] py-[0.15em] font-mono text-[0.9em] font-bold text-white"
+                className="rounded-full border border-[#FFD700]/40 bg-black/30 px-[0.7em] py-[0.15em] font-display tabular-nums text-[0.9em] font-bold text-white"
               >
                 {l.amount} <span className="font-normal text-white/65">{l.label}</span>
               </motion.li>

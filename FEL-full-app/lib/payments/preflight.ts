@@ -97,7 +97,7 @@ export function preflight(env: Env, opts: PreflightOptions = {}): Preflight {
     { group: 'Money settings', name: 'PLATFORM_FEE_BPS_FREE', state: `${policy.bpsFree} (${bpsLabel(policy.bpsFree)})${has(env, 'PLATFORM_FEE_BPS_FREE') ? '' : ' default'}` },
     { group: 'Money settings', name: 'PLATFORM_FEE_BPS_PRO', state: `${policy.bpsPro} (${bpsLabel(policy.bpsPro)})${has(env, 'PLATFORM_FEE_BPS_PRO') ? '' : ' default'}` },
     { group: 'Money settings', name: 'PLATFORM_FEE_CAP_CENTS_MONTHLY', state: policy.capCentsMonthly === null ? 'no cap' : `${policy.capCentsMonthly} ($${(policy.capCentsMonthly / 100).toFixed(2)} a month)` },
-    { group: 'Money settings', name: 'REFUND_PROCESSING_FEE', state: refundFee ? 'on (buyer gets the processing fee back; FEL absorbs it)' : 'off (processing fee kept on refunds; default)' },
+    { group: 'Money settings', name: 'REFUND_PROCESSING_FEE', state: `${refundFee ? 'on (buyer gets the processing fee back; FEL absorbs it)' : 'off (processing fee kept on refunds)'}${has(env, 'REFUND_PROCESSING_FEE') ? '' : ' default'}` },
     { group: 'Stays off', name: 'PAYOUTS_ENABLED', state: sw(env, 'PAYOUTS_ENABLED') },
     { group: 'Stays off', name: 'REAL_MONEY_COMPETITION', state: sw(env, 'REAL_MONEY_COMPETITION') },
   ];
@@ -142,7 +142,7 @@ export function preflight(env: Env, opts: PreflightOptions = {}): Preflight {
   for (const e of unknownAllowlistEntries(env)) add('error', `PURCHASES_ALLOWLIST has "${e}", which is not a product id: it opens nothing.`);
   if (allow && !virtual) add('warn', 'PURCHASES_ALLOWLIST is set but VIRTUAL_PURCHASES_ENABLED is off: nothing on it sells.');
   if (virtual && !allow) add('warn', 'VIRTUAL_PURCHASES_ENABLED is on with no PURCHASES_ALLOWLIST: every product opens at once, including FEL Coach, FEL Facility, shard packs and studio credits (docs/LAUNCH-SALES.md §8.1).');
-  if (products.includes('fel_pro')) add('info', `FEL Pro buyers tick the store terms (${BUYER_TERMS.fel_pro.version}). assumption to confirm: that text covers FEL Pro (docs/LAUNCH-SALES.md §9).`);
+  if (products.includes('fel_pro')) add('info', `FEL Pro buyers tick the Purchase Terms (${BUYER_TERMS.fel_pro.version}, ${BUYER_TERMS.fel_pro.href}). Cancelling is by email until the billing portal is linked from the account page (lib/purchase-terms.ts).`);
   if (on(env, 'SEASON_PASS_PURCHASE')) {
     if (!has(env, 'SEASON_PASS_PRO_PRICE_USD_CENTS')) add('error', 'SEASON_PASS_PURCHASE is on but SEASON_PASS_PRO_PRICE_USD_CENTS is unset: the season checkout answers 409 price_not_set.');
     if (!products.includes('season_pass')) add('warn', 'SEASON_PASS_PURCHASE is on but the season pass is not open (VIRTUAL_PURCHASES_ENABLED off, or not on PURCHASES_ALLOWLIST).');
@@ -162,7 +162,7 @@ export function preflight(env: Env, opts: PreflightOptions = {}): Preflight {
   if (connectPay) {
     add('info', 'Coach payments need prisma/pending/2026-10-25-coach-business.sql applied (else 503 coach_business_not_ready); disputes and the Stripe-setup flag also need 2026-10-26-payments-ready.sql. This check cannot see the database.');
     if (!has(env, 'STRIPE_CONNECT_WEBHOOK_SECRET')) add('warn', 'STRIPE_CONNECT_WEBHOOK_SECRET is missing: account.updated never arrives, so a coach\'s Stripe status refreshes only when they come back from onboarding.');
-    if (!refundFee) add('warn', 'REFUND_PROCESSING_FEE is off: a coach-sale refund keeps the processing fee, which the store terms (§2.6) say FEL refunds. Owner call: change the setting or the terms.');
+    if (!refundFee) add('warn', 'REFUND_PROCESSING_FEE is off: a coach-sale refund keeps the processing fee, which the store terms (§2.6) and the owner (2026-10-27, "refund in full") say FEL refunds. Unset it to refund in full.');
   }
   if (has(env, 'COACH_PRO_PRICE_USD_CENTS') && coachProPriceCents(env as NodeJS.ProcessEnv) !== Number((env.COACH_PRO_PRICE_USD_CENTS ?? '').trim())) add('warn', 'COACH_PRO_PRICE_USD_CENTS is not a whole number of cents from 100 to 1000000: the default applies.');
   if (has(env, 'COACH_FREE_CLIENT_LIMIT') && coachFreeClientLimit(env as NodeJS.ProcessEnv) !== Number((env.COACH_FREE_CLIENT_LIMIT ?? '').trim())) add('warn', 'COACH_FREE_CLIENT_LIMIT is not a whole number up to 1000: the default applies.');

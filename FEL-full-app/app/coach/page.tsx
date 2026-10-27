@@ -11,8 +11,7 @@ export default async function CoachPage() {
   if (!session) redirect(loginPath('/coach'));
   return (
     <div className="min-h-screen bg-fel-bg pb-20">
-      {/* A11-01 (2026-10-25): the page's heading for a screen reader (WCAG 1.3.1 / 2.4.6); the tabs below are its sections */}
-      <h1 className="sr-only">Coach</h1>
+      {/* A11-01's heading is now the visible one in CoachView (premium-ui P8): one h1, seen and read */}
       <CoachView />
     </div>
   );
