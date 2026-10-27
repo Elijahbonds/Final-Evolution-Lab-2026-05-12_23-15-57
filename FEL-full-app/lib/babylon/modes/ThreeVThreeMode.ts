@@ -47,7 +47,7 @@
 //      1.6 m connects; a set defender I bump strips me on his roll, the ball loose, no warp); X HELD is a grounded hand-up
 //      that contests the driver's release (and the AI's contests mine), the contest biting the make chance and altering the arc.
 import { nerve, standingOf } from '../core/Nerve';
-import { InputBuffer } from '../core/gameFeel';
+import { PressBuffer } from '../hoops/response/pressBuffer';   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Vector3, StandardMaterial, Color3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -277,8 +277,9 @@ export const ThreeVThreeMode: ModeDefinition = (() => {
   // The same squeeze buffer 1v1 got (2026-09-20): a shot press made during a spin, a dunk or a finish waits 400 ms
   // for the body to free up instead of being dropped on the frame it arrived. 3v3 needs it more, not less — there is
   // a defender on you and two teammates moving, so the window where you are NOT mid-animation is smaller.
-  const SHOT_BUFFER_MS = 400;
-  const shotBuffer = new InputBuffer(SHOT_BUFFER_MS);
+  // hoops-p01 (measured): a flat 400 ms died inside a spin (a tap 0.1 s in waits ~0.55 s) — the buffer now lives through the lock, then
+  // 220 ms after it clears (BUFFER_AFTER_CLEAR_MS, the right stick's rule; hoops/response/pressBuffer)
+  const shotBuffer = new PressBuffer();
   let threeVenue: VenueHandle | null = null;  // M74
   let ctx0: ModeContext | null = null;        // O2: the HUD from the box-out helper
   let me: Body;
@@ -2302,7 +2303,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
-        if (iAmCarrier && meIntent.actionHeld > 0.02 && (shooting || dunking || finish || spin)) shotBuffer.press('shot');
+        shotBuffer.tick(shooting || dunking || finish || spin, performance.now());   // hoops-p01: the lock the buffered squeeze waits out
+        if (iAmCarrier && meIntent.actionHeld > 0.02 && (shooting || dunking || finish || spin)) shotBuffer.press(performance.now());
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP (see 1v1)
           const held = meIntent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
           if (edge && iAmCarrier && !dunking && !posting && hopOnDoubleTap(tapRead())) {
@@ -2311,7 +2313,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
             if (startFootwork(ctx, wish.x, -wish.z, nearestLiveFoe()?.char.root.position ?? null, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[3V3-MOVE] hop step on the double tap'); }
           }
         }
-        if (iAmCarrier && !shooting && !dunking && !finish && !spin && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && (meIntent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20)
+        if (iAmCarrier && !shooting && !dunking && !finish && !spin && !arc.active && !(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased && (meIntent.actionHeld > 0.02 || shotBuffer.consume() || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20)
         const nearestFoePos = foes.reduce<Vector3 | null>((best, f) =>
           !best || Vector3.Distance(f.char.root.position, me.char.root.position) < Vector3.Distance(best, me.char.root.position)
             ? f.char.root.position : best, null);

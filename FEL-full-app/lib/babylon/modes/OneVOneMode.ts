@@ -85,7 +85,7 @@
 // timer; make-it-take-it both ways; the board is a race on both ends; the loose ball always steps.
 
 import { nerve, standingOf } from '../core/Nerve';
-import { InputBuffer } from '../core/gameFeel';
+import { PressBuffer } from '../hoops/response/pressBuffer';   // hoops-p01: the shot press waits out the move (was gameFeel's InputBuffer)
 import { tickScuff, scuffPuffScale, scuffVolume, SCUFF_IDLE, type ScuffState } from '../core/ScuffFx';
 import { MeshBuilder, Quaternion, TransformNode as BABYLON_TransformNode, Vector3 } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
@@ -338,8 +338,9 @@ export const OneVOneMode: ModeDefinition = (() => {
   // 400 ms rather than the class default of 140, for the reason the strike queue is 400: the wait has to outlive the
   // thing it waits for. A spin or a dunk approach runs several hundred milliseconds, and a window that expires first
   // only ever serves presses that were nearly free anyway.
-  const SHOT_BUFFER_MS = 400;
-  const shotBuffer = new InputBuffer(SHOT_BUFFER_MS);
+  // hoops-p01 (measured): a flat 400 ms died inside a spin (a tap 0.1 s in waits ~0.55 s) — the buffer now lives through the lock, then
+  // 220 ms after it clears (BUFFER_AFTER_CLEAR_MS, the right stick's rule; hoops/response/pressBuffer)
+  const shotBuffer = new PressBuffer();
   let me: SpawnedCharacter, foe: SpawnedCharacter, ball: AbstractMesh, ballSim: BallSim;
   let onevoneVenue: VenueHandle | null = null;  // M74
   let meSlot: PlayerSlot, foeSlot: PlayerSlot, localSource: LocalInputSource;
@@ -437,7 +438,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const rStick = new StickHandleReader(); let stickGestures: StickGesture[] = []; let pausedDribble = false; let pausedAt = 0; let stickLockClearAt: number | null = null; let keyBus: { keyRStick: boolean } | null = null;   // H1 H-03/H-04/H-19
   let lastStickMoveAt = -Infinity, sizeUpN = 0, stepbackWindow = 0;   // THE 2K PRO STICK (2026-09-18)
   // HOOPS-10PHASE-2 phase 5: the size-up chain's OWN eaten-press fault — the shot button had exactly this bug
-  // (see SHOT_BUFFER_MS above) and the fix is the same tool. A flick thrown mid-gather/mid-finish/mid-spin used
+  // (see shotBuffer above) and the fix is the same tool. A flick thrown mid-gather/mid-finish/mid-spin used
   // to just vanish (stickGestures cleared with nothing read); now the last one is held long enough to outlive a
   // short lock, so a size-up chain or an escape thrown a beat early still lands instead of reading as a drop.
   const STICK_MOVE_BUFFER_MS = 220;
@@ -1931,7 +1932,8 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
-        if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press('shot');
+        shotBuffer.tick(shooting || dunking || spin, performance.now());   // hoops-p01: the lock the buffered squeeze waits out
+        if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press(performance.now());
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP — a second Square inside HOP_TAP_SEC of the first, on a drive, turns the
           // gather that press started (or the pump its quick release made) into the hop step (core/FinishFootwork)
           const held = meSlot.intent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;
@@ -1941,7 +1943,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (startFootwork(ctx, mx, my, foeFloored ? null : foe.root.position, { hopVel: squeezeVel.clone() })) { squeezeAt = -1; hopRelease = 'armed'; console.info('[1V1-MOVE] hop step on the double tap'); }
           }
         }
-        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume('shot') || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
+        if (!shooting && !dunking && !spin && carrying && (meSlot.intent.actionHeld > 0.02 || shotBuffer.consume() || (posting && stickShot !== null && !stickShot.started && shimmyLeft <= 0))) {   // POST HOOK (2K20): the stick starts it too
           const defenderPos = foeStunSec > 0 ? null : foe.root.position;
           squeezeAt = performance.now() / 1000; squeezeVel.copyFrom(meDribble.vel); tapRelease = null; hopRelease = null;   // H2e: the double tap reads this press
           // A+ P0: the gate measures a 3-D distance and the rim sits 3.05 m up — against RIM itself a floor-bound body can

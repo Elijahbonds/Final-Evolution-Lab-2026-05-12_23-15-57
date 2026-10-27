@@ -71,6 +71,9 @@ const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`)
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
 
 const result = { mode: MODE, scen: SCEN, tier: TIER, seed: SEED, view: `${VW}x${VH}`, loadWallS };
+const outFile = path.join(OUT, `${SCEN}-${MODE}-${TIER}-s${SEED}${process.env.TAG ? '-' + process.env.TAG : ''}.json`);
+// hoops-p01: the input run writes what it has after every test group (a timeout on the shared box keeps the finished groups)
+const checkpoint = async (what) => { try { result.partial = what; result.log = await ev(() => window.__LOG); result.wallS = (Date.now() - T0) / 1000; fs.writeFileSync(outFile, JSON.stringify(result)); say('checkpoint ' + what); } catch (e) { say('checkpoint failed ' + e); } };
 if (SCEN === 'game') {
   await waitGame(800);
   await ev(() => { window.__hg.start(); window.__hg.bot.on = true; });
@@ -94,6 +97,9 @@ if (SCEN === 'game') {
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);
   const setDef = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.defend(); }, MODE);
   const T = (name, arg) => ev(([n, a]) => window.__hg.test[n](a), [name, arg]);
+  // hoops-p01: a big play (an ankle break) cuts to a REPLAY on the next dead ball, and a press made during it has no game to land in
+  // (the before run lost two jog flicks to one) — wait it out before a press
+  const noReplay = async () => { for (let i = 0; i < 20; i++) { const busy = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; return L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 200); }); if (!busy) return; await waitGame(500); } };
   const R = result.tests = { stick: [], stickTurbo: [], shot: [], flickStand: [], flickJog: [], pass: [], poke: [], block: [] };
   // hoops-p01: TESTS=stick,stop,shot,buffer,flick,pass,poke,block (default: all) — the shared lock is the scarce thing
   const ON = new Set((process.env.TESTS ?? 'stick,stop,shot,buffer,flick,pass,poke,block').split(','));
@@ -101,23 +107,26 @@ if (SCEN === 'game') {
   // hoops-p01: the first of each takes a strip from the stop's first frame (stop-jog / stop-sprint)
   if (ON.has('stick')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stick.push(await T('stick', false)); }
   if (ON.has('stick')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stickTurbo.push(await T('stick', true)); }
+  if (ON.has('stick')) await checkpoint('stick');
   R.stopJog = []; R.stopSprint = [];
   if (ON.has('stop')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stopJog.push(await T('stopLine', { turbo: false, strip: k === 0 ? 'stop-jog' : null })); if (k === 0) { await waitGame(300); await saveStrip('stop-jog'); } }
   if (ON.has('stop')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stopSprint.push(await T('stopLine', { turbo: true, sec: 1.1, strip: k === 0 ? 'stop-sprint' : null })); if (k === 0) { await waitGame(300); await saveStrip('stop-sprint'); } }
   if (ON.has('shot')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
+  if (ON.has('stop') || ON.has('shot')) await checkpoint('stop+shot');
   // hoops-p01: the input buffer — Square tapped mid-spin and mid-crossover
   R.buffer = [];
   if (ON.has('buffer')) for (const kind of ['spin', 'spin', 'cross', 'cross']) { await setOff(); await waitGame(1200); R.buffer.push(await T('buffer', kind)); await waitGame(2500); }
+  if (ON.has('buffer')) await checkpoint('buffer');
   const REPS = Number(process.env.REPS ?? 1);
   const dirs = ['left', 'right', 'up', 'down', 'upleft', 'upright', 'downleft', 'downright'];
   if (ON.has('flick')) for (const d of dirs) for (let k = 0; k < REPS; k++) {
-    await setOff(); await waitGame(1200);
+    await setOff(); await waitGame(1200); await noReplay();
     if (d === 'left' && k === 0) ev(() => window.__hg.strip('crossover-stand', 16, 3));
     R.flickStand.push(await T('flick', d));
     if (d === 'left' && k === 0) await saveStrip('crossover-stand');
   }
   if (ON.has('flick')) for (const d of dirs) for (let k = 0; k < REPS; k++) {
-    await setOff(); await waitGame(900);
+    await setOff(); await waitGame(900); await noReplay(); await setOff(); await waitGame(400);
     await ev(() => { const h = window.__hg; const me = window.__FEL_DEV__.hero(); let r = me; while (r.parent) r = r.parent; const p = r.getAbsolutePosition(); h.steer(0 - p.x, -0.6 - p.z, 0.7); });
     await waitGame(500);
     if (d === 'right' && k === 0) ev(() => window.__hg.strip('crossover-jog', 16, 3));
@@ -125,6 +134,7 @@ if (SCEN === 'game') {
     if (d === 'right' && k === 0) await saveStrip('crossover-jog');
     await ev(() => window.__hg.stick(0, 0));
   }
+  if (ON.has('flick')) await checkpoint('flick');
   if (MODE === 'threevthree' && ON.has('pass')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.pass.push(await T('pass')); await waitGame(1500); }
   if (ON.has('poke')) for (let k = 0; k < 3; k++) {
     await setDef(); await waitGame(1400 + k * 250);
@@ -146,8 +156,7 @@ if (SCEN === 'game') {
 }
 result.pageErrors = pageErrs.slice(0, 10); result.hgErrors = await ev(() => window.__hg.errors).catch(() => []);
 result.wallS = (Date.now() - T0) / 1000;
-result.feel = process.env.FEEL ? JSON.parse(process.env.FEEL) : null;
-const outFile = path.join(OUT, `${SCEN}-${MODE}-${TIER}-s${SEED}${process.env.TAG ? '-' + process.env.TAG : ''}.json`);
+result.feel = process.env.FEEL ? JSON.parse(process.env.FEEL) : null; delete result.partial;
 fs.writeFileSync(outFile, JSON.stringify(result));
 say('wrote ' + outFile + ' wall ' + result.wallS.toFixed(0) + ' s');
 await browser.close();
