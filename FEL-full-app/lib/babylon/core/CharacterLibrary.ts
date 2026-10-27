@@ -154,13 +154,18 @@ function splitUrl(url: string): { rootUrl: string; filename: string } {
   return { rootUrl: url.slice(0, i + 1), filename: url.slice(i + 1) };
 }
 
+/** DEMO-SPEED (2026-10-27): a User Timing mark (the GLB's load and parse, on a phone's profile); never throws. */
+function userMark(name: string, url: string): void { try { performance.mark(name, { detail: url }); } catch { /* no User Timing */ } }
+
 async function loadContainer(scene: Scene, url: string): Promise<AssetContainer> {
   const cache = containersFor(scene);
   let p = cache.get(url);
   if (!p) {
     const { rootUrl, filename } = splitUrl(url);
+    userMark('fel-char:load', url);
     p = SceneLoader.LoadAssetContainerAsync(rootUrl, filename, scene)
       .then((container) => {
+        userMark('fel-char:loaded', url);
         // GATE 0: normalize mixamorig-prefixed bones + reject non-conformant
         // rigs AT LOAD, before any spawn can freeze at bind pose. Runs once
         // per cached container; unprefixed rigs pass through untouched.

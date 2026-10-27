@@ -10,6 +10,7 @@
 //   chunks          the lazy chunk sizes (esbuild, minified, code-split the way next/dynamic splits them)
 //   ttfc            LIBRARY-ANATOMY-2: time to first useful content on the phone (390 px, 4× CPU throttle): from the tap on a
 //                   card's Demo / Muscles link to the cue card or muscle list in the stage's box, and to the 3D ready
+//   speed           DEMO-SPEED: the drill surfaces' demo, mount to first moving frame, cold / warm / remount (speedJob)
 //   OUT=<dir> npx tsx scripts/probes/_library-anatomy.mts <job> [args]
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
@@ -318,6 +319,64 @@ async function tposeJob(): Promise<void> {
   console.log(JSON.stringify(out, null, 1));
 }
 
+/** DEMO-SPEED (2026-10-27): the drill surfaces' demo (AvatarDemo, #avatar:<clip>) from mount to its first moving frame, on
+ *  the phone profile (PROFILES: rig = 390×844, DPR 3, 4× CPU; none = the same page unthrottled), per body (BODIES: scan =
+ *  the owner's scan, male = the guest's kit). Three visits a context: cold (an empty HTTP cache), warm (a new page load,
+ *  the HTTP cache warm) and remount (the demo unmounted and mounted again in the same page: a route change and back).
+ *  Reads the stage's User Timing marks (fel-stage:*, fel-char:*), the resource timings and the bytes on the wire (CDP). */
+async function speedJob(): Promise<void> {
+  const { url, close } = await serve();
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const clip = process.env.CLIP ?? 'ex_squat';
+  const out: Record<string, unknown> = {};
+  for (const prof of (process.env.PROFILES ?? 'rig,none').split(',')) for (const body of (process.env.BODIES ?? 'scan,male').split(',')) {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const page = await ctx.newPage(); await page.addInitScript(NAME_SHIM);
+    const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 200))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
+    const cdp = await ctx.newCDPSession(page);
+    if (prof === 'rig') await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await cdp.send('Network.enable');
+    const reqs = new Map<string, string>();
+    let wire: Record<string, number> = {};
+    cdp.on('Network.requestWillBeSent', (e: { requestId: string; request: { url: string } }) => { reqs.set(e.requestId, e.request.url); });
+    cdp.on('Network.loadingFinished', (e: { requestId: string; encodedDataLength: number }) => { const u = reqs.get(e.requestId) ?? '?'; const k = /\.glb$/.test(u) ? u.replace(/^.*\/models\//, 'models/') : /\.js$/.test(u) ? 'js' : /\/api\//.test(u) ? 'api' : 'other'; wire[k] = (wire[k] ?? 0) + e.encodedDataLength; });
+    const runs: Record<string, unknown> = {};
+    for (const visit of ['cold', 'warm', 'remount'] as const) {
+      wire = {};
+      const t0 = Date.now();
+      if (visit === 'remount') await page.evaluate(() => (window as unknown as { __rigRemount(): void }).__rigRemount());
+      else { await page.goto('about:blank'); await page.goto(`${url}/?body=${body}&v=${visit}#avatar:${clip}`); }
+      await page.waitForFunction((v) => {
+        const mounts = performance.getEntriesByName('rig:mount');
+        const ready = performance.getEntriesByName('fel-stage:ready');
+        const st = document.querySelector('[data-avatar-state]')?.getAttribute('data-avatar-state');
+        return (v !== 'remount' || mounts.length > 1) && (st === 'failed' || (ready.length > 0 && ready[ready.length - 1].startTime > mounts[mounts.length - 1].startTime));
+      }, visit, { timeout: 600_000, polling: 100 });
+      const wallMs = Date.now() - t0;
+      await page.waitForTimeout(500);
+      const r = await page.evaluate(() => {
+        const mounts = performance.getEntriesByName('rig:mount');
+        const m0 = mounts[mounts.length - 1].startTime;
+        const marks: Record<string, number> = {};
+        for (const e of performance.getEntriesByType('mark')) if (e.startTime >= m0 && /^fel-/.test(e.name)) { const k = e.name.replace(/^fel-(stage|char):/, ''); if (marks[k] == null) marks[k] = Math.round(e.startTime - m0); }
+        const res = (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter((e) => e.startTime >= m0 - 5);
+        const glb = res.filter((e) => /\.glb$/.test(e.name)).map((e) => ({ file: e.name.replace(/^.*\/models\//, ''), start: Math.round(e.startTime - m0), end: Math.round(e.responseEnd - m0), transferKB: Math.round(e.transferSize / 1024), bodyKB: Math.round(e.encodedBodySize / 1024) }));
+        const js = res.filter((e) => /\.js$/.test(e.name));
+        const jsEnd = js.length ? Math.round(Math.max(...js.map((e) => e.responseEnd)) - m0) : null;
+        return { marks, glb, jsChunks: js.length, jsLastByteMs: jsEnd, state: document.querySelector('[data-avatar-state]')?.getAttribute('data-avatar-state'), sinceNavMs: Math.round(m0) };
+      });
+      const kb = Object.fromEntries(Object.entries(wire).map(([k, v]) => [k, Math.round(v / 1024)]));
+      runs[visit] = { ...r, wallMs, wireKB: kb, wireTotalKB: Object.values(kb).reduce((x, y) => x + y, 0) };
+      if (process.env.SHOTS === '1') await page.screenshot({ path: join(OUT, `speed-${prof}-${body}-${visit}.jpg`), type: 'jpeg', quality: 70 });
+    }
+    out[`${prof}:${body}`] = { ...runs, errors: errors.filter((e) => !/favicon|404/.test(e)).slice(0, 6) };
+    console.error(`[speed] ${prof}:${body} done`);
+    await ctx.close();
+  }
+  await browser.close(); close();
+  console.log(JSON.stringify(out, null, 1));
+}
+
 async function chunksJob(): Promise<void> {
   // the same split next/dynamic makes: the library page's own code, then the stage (Babylon, the body pipeline) only when
   // a 3D tab opens. Minified, so the numbers are a release build's, not the rig's dev bundle.
@@ -366,3 +425,4 @@ else if (job === 'perf') await perfJob();
 else if (job === 'chunks') await chunksJob();
 else if (job === 'ttfc') await ttfcJob();
 else if (job === 'tpose') await tposeJob();
+else if (job === 'speed') await speedJob();

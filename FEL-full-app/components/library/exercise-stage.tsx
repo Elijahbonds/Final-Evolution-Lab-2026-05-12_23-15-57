@@ -53,6 +53,13 @@ export default function ExerciseStage(props: ExerciseStageProps) {
   useEffect(() => {
     let disposed = false;
     let cleanup: (() => void) | null = null;
+    // DEMO-SPEED (2026-10-27): the stage's load, as User Timing marks (`fel-stage:<step>`), in every build — a phone's
+    // profile shows where its first moving frame went (the rig, scripts/probes/_library-anatomy.mts `speed`, reads them)
+    const mark = (k: string) => {
+      try { performance.mark(`fel-stage:${k}`); } catch { /* no User Timing */ }
+      if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now();
+    };
+    mark('start');
     (async () => {
       try {
         const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Mesh } = await import('@babylonjs/core');
@@ -65,7 +72,6 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const { FLOOR_CLIPS, SIDE_CLIPS, TRAVEL_CLIPS, DEMO_PROPS, PROP_SHAPES } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
-        const mark = (k: string) => { if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now(); };
         mark('imported');
 
         const engine = new Engine(canvas, true, { alpha: true, adaptToDeviceRatio: false, powerPreference: 'low-power', stencil: false, doNotHandleTouchAction: true, preserveDrawingBuffer: process.env.NODE_ENV === 'development' });
@@ -113,6 +119,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         };
         const showProp = (clip: string | null) => { const want = clip ? DEMO_PROPS[clip] : undefined; if (want) propMeshes(want); for (const [k, ms] of props) for (const m of ms) m.setEnabled(k === want); };
 
+        mark('scene');
         const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
         if (disposed) { hero.dispose(); scene.dispose(); engine.dispose(); return; }
         mark('spawned');
@@ -197,7 +204,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           poseTimer = null;
           if (disposed) return;
           scene.render();
-          if (!atBindPose(hero.skeleton)) { retried = false; setState('ready'); return; }
+          if (!atBindPose(hero.skeleton)) { retried = false; mark('ready'); setState('ready'); return; }
           console.error('[FEL-LIBRARY] the body is at its bind pose', { clip: shownClip, view: shownView, deg: bindPoseDeviationDeg(hero.skeleton) });
           if (!retried) { retried = true; play('idle_stand', null); poseTimer = setTimeout(checkPose, 400); return; }
           setState('failed');
@@ -205,6 +212,13 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const recheck = (ms: number) => { if (poseTimer) clearTimeout(poseTimer); poseTimer = setTimeout(checkPose, ms); };
         live.current = { setView: (p) => { const before = `${shownView}|${shownClip}|${shownHold}`; setView(p); if (`${shownView}|${shownClip}|${shownHold}` !== before) recheck(450); } };
         setView(latest.current);
+        mark('clip');
+        // DEMO-SPEED: the first frame drawn (shaders compile here), and the first with every body mesh ready to draw
+        let drawn = false, firstFrame = true;
+        const onDrawn = scene.onAfterRenderObservable.add(() => {
+          if (firstFrame) { firstFrame = false; mark('first-frame'); }
+          if (!drawn && hero.meshes.every((m) => !m.isEnabled() || m.isReady(true))) { drawn = true; mark('drawn'); scene.onAfterRenderObservable.remove(onDrawn); }
+        });
         // the camera eases to its framing (a tab, side or clip change) — until the player turns it themselves; with reduced
         // motion it jumps there instead of moving by itself
         scene.onBeforeRenderObservable.add(() => {
