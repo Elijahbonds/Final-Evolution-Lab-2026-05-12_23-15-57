@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { DEMO_STAT, DrillDemo } from '@/app/play/mirror/assess/_components/drill-demo';
+import { DrillDemo } from '@/app/play/mirror/assess/_components/drill-demo';
+import { SCREEN_DEMO_LOOPS } from '@/lib/library/surfaceDemo';
 import { DEMO_NOTE, DEMO_WATCH, SCREEN_TEST_NAMES } from './copy';
 
 describe('the drill demo', () => {
@@ -26,14 +27,18 @@ describe('the drill demo', () => {
     expect(h).not.toMatch(/Demo coming/);
   });
 
-  it('every check has a demo motion, and the jump is shown as power', () => {
-    for (const t of Object.keys(SCREEN_TEST_NAMES)) expect(DEMO_STAT[t as keyof typeof DEMO_STAT], t).toBeTruthy();
-    expect(DEMO_STAT.T5).toBe('power');
+  // T-POSE (owner playtest 2026-10-27) — TEST CHANGED: these two asserted the demo reused exercise-avatar-canvas.tsx and
+  // picked its motion by a stat. That canvas played elijah.glb's one unrelated capture for every check (measured: the
+  // arms swinging 12°–171° off hanging, the head off the canvas) — the T-pose the owner saw. The demo is the library
+  // stage now (AvatarDemo): the check's own loop or, without one, the start position still, "Demo coming".
+  it('every check names its loop, or none (the still) — never another movement', () => {
+    for (const t of Object.keys(SCREEN_TEST_NAMES)) expect(t in SCREEN_DEMO_LOOPS, t).toBe(true);
   });
 
-  it('reuses ExerciseDemo’s 3D canvas (components/coach/exercise-avatar-canvas.tsx) rather than a new asset', () => {
+  it('plays through the library stage (components/library/avatar-demo.tsx), not the one-clip canvas or ExerciseDemo', () => {
     const src = readFileSync('app/play/mirror/assess/_components/drill-demo.tsx', 'utf8');
-    expect(src).toMatch(/import\('@\/components\/coach\/exercise-avatar-canvas'\)/);
+    expect(src).toMatch(/from '@\/components\/library\/avatar-demo'/);
+    expect(src).not.toMatch(/import\('@\/components\/coach\/exercise-avatar-canvas'\)/);
     expect(src).not.toMatch(/components\/coach\/exercise-demo'/);   // its YouTube tab would break the off-site guard
   });
 });

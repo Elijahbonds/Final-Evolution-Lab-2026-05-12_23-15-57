@@ -60,6 +60,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const { DEFAULT_HERO_URL } = await import('@/lib/babylon/core/athleteRoster');
         const { reducedMotion } = await import('@/lib/a11y/reducedMotion');
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
+        const { atBindPose, bindPoseDeviationDeg } = await import('@/lib/babylon/library/poseGuard');
         const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
         const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS, PROP_SHAPES } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
@@ -176,7 +177,23 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (p.view !== shownView || p.side !== shownSide || p.clip !== shownClip) { target = frame(p); userTurned = false; }
           shownView = p.view; shownClip = p.clip; shownHold = p.hold; shownSide = p.side;
         };
-        live.current = { setView };
+        // T-POSE (owner playtest 2026-10-27): the 3D is shown only once the body is measured OFF its bind pose (poseGuard),
+        // and is measured again after every clip change. A body at bind (a clip that did not bind, did not build, or nothing
+        // driving the bones) gets the idle once; still at bind, the stage reports 'failed' and the switcher keeps the cue
+        // card up. A T-pose is never what the player is left looking at.
+        let retried = false;
+        let poseTimer: ReturnType<typeof setTimeout> | null = null;
+        const checkPose = () => {
+          poseTimer = null;
+          if (disposed) return;
+          scene.render();
+          if (!atBindPose(hero.skeleton)) { retried = false; setState('ready'); return; }
+          console.error('[FEL-LIBRARY] the body is at its bind pose', { clip: shownClip, view: shownView, deg: bindPoseDeviationDeg(hero.skeleton) });
+          if (!retried) { retried = true; play('idle_stand', null); poseTimer = setTimeout(checkPose, 400); return; }
+          setState('failed');
+        };
+        const recheck = (ms: number) => { if (poseTimer) clearTimeout(poseTimer); poseTimer = setTimeout(checkPose, ms); };
+        live.current = { setView: (p) => { const before = `${shownView}|${shownClip}|${shownHold}`; setView(p); if (`${shownView}|${shownClip}|${shownHold}` !== before) recheck(450); } };
         setView(latest.current);
         // the camera eases to its framing (a tab, side or clip change) — until the player turns it themselves; with reduced
         // motion it jumps there instead of moving by itself
@@ -201,9 +218,10 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('resize', onResize);
         sync();
-        setState('ready');
+        recheck(350);
         if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_LIBRARY_STAGE__?: unknown }).__FEL_LIBRARY_STAGE__ = { engine, scene, hero, cam, anatomy: () => anatomy };
         cleanup = () => {
+          if (poseTimer) clearTimeout(poseTimer);
           document.removeEventListener('visibilitychange', onVis);
           window.removeEventListener('resize', onResize);
           io?.disconnect();

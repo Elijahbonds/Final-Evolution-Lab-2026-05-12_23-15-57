@@ -9,9 +9,9 @@ import ExerciseAvatarCanvas from '@/components/coach/exercise-avatar-canvas';
 // the rig reads the avatar's joints: every mixer's root is kept (the Avatar builds one per body)
 const roots: THREE.Object3D[] = [];
 const clipAction = THREE.AnimationMixer.prototype.clipAction;
-THREE.AnimationMixer.prototype.clipAction = function (this: THREE.AnimationMixer, ...a: Parameters<typeof clipAction>) {
+(THREE.AnimationMixer.prototype as unknown as { clipAction: (...a: unknown[]) => unknown }).clipAction = function (this: THREE.AnimationMixer, ...a: unknown[]) {
   const r = this.getRoot() as THREE.Object3D; if (!roots.includes(r)) roots.push(r);
-  return clipAction.apply(this, a);
+  return (clipAction as (...x: unknown[]) => unknown).apply(this, a);
 };
 (window as unknown as { __rigJoints: () => unknown }).__rigJoints = () => {
   const r = roots[roots.length - 1]; if (!r) return null;
