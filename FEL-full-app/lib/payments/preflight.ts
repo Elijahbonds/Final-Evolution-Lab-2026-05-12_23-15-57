@@ -142,7 +142,7 @@ export function preflight(env: Env, opts: PreflightOptions = {}): Preflight {
   for (const e of unknownAllowlistEntries(env)) add('error', `PURCHASES_ALLOWLIST has "${e}", which is not a product id: it opens nothing.`);
   if (allow && !virtual) add('warn', 'PURCHASES_ALLOWLIST is set but VIRTUAL_PURCHASES_ENABLED is off: nothing on it sells.');
   if (virtual && !allow) add('warn', 'VIRTUAL_PURCHASES_ENABLED is on with no PURCHASES_ALLOWLIST: every product opens at once, including FEL Coach, FEL Facility, shard packs and studio credits (docs/LAUNCH-SALES.md §8.1).');
-  if (products.includes('fel_pro')) add('info', `FEL Pro buyers tick the store terms (${BUYER_TERMS.fel_pro.version}). assumption to confirm: that text covers FEL Pro (docs/LAUNCH-SALES.md §9).`);
+  if (products.includes('fel_pro')) add('info', `FEL Pro buyers tick the Purchase Terms (${BUYER_TERMS.fel_pro.version}, ${BUYER_TERMS.fel_pro.href}). Cancelling is by email until the billing portal is linked from the account page (lib/purchase-terms.ts).`);
   if (on(env, 'SEASON_PASS_PURCHASE')) {
     if (!has(env, 'SEASON_PASS_PRO_PRICE_USD_CENTS')) add('error', 'SEASON_PASS_PURCHASE is on but SEASON_PASS_PRO_PRICE_USD_CENTS is unset: the season checkout answers 409 price_not_set.');
     if (!products.includes('season_pass')) add('warn', 'SEASON_PASS_PURCHASE is on but the season pass is not open (VIRTUAL_PURCHASES_ENABLED off, or not on PURCHASES_ALLOWLIST).');

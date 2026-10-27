@@ -8,12 +8,16 @@ import { checkoutParams, connectGate } from '@/lib/coach-business/connect';
 import { saleSplit } from '@/lib/coach-business/fees';
 import { coachConnectMeta, fulfilCoachConnect, fulfilConnectCheckout, type ConnectDeps } from '@/lib/coach-business/webhook';
 import { fakeCoachBusinessDb, fakeLedger, seedCoach } from '@/tests/helpers/fakeCoachBusinessDb';
-import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+// test changed (owner-approvals, 2026-10-27, card C28): buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS → /purchase-terms), not the coach store's terms, so the tick's version is read from BUYER_TERMS. The
+// assertions are unchanged.
+import { BUYER_TERMS } from '@/lib/payments/terms';
+const BUYER_TERMS_VERSION = BUYER_TERMS.coach_package.version;
 
 // test changed (payments-ready): a package checkout now needs the buyer's store-terms tick before Stripe is called
 // (lib/payments/terms.ts), so every call passes it. No assertion here changed for it; tests/coach-business/
 // payments-ready.test.ts covers the refusal without the tick.
-const TICK = { termsAccepted: true, termsVersion: STORE_TERMS_VERSION };
+const TICK = { termsAccepted: true, termsVersion: BUYER_TERMS_VERSION };
 
 // test changed (owner-approvals, 2026-10-27): REFUND_PROCESSING_FEE defaults ON now (owner, "refund in full"). The refund
 // tests below hold the price-only refund rule (the processing fee kept), so this env names that rule; the assertions are
@@ -81,7 +85,9 @@ describe('the switch: flag off means no charge path at all', () => {
     expect(r).toMatchObject({ status: 409, reason: 'live_mode_off' });
     // test changed (payments-ready): with COACH_CONNECT_LIVE on, live mode now also waits for the signed coach terms
     // (COACH_TERMS_VERSION is null until the owner signs them); with a signed version it opens as before.
-    expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
+    // test changed (owner-approvals, 2026-10-27, card C12): the coach terms are written now, so "unsigned" is passed as null
+    expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv, null)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
+    expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv)).toMatchObject({ ok: true, live: true });
     expect(connectGate({ ...env, COACH_CONNECT_LIVE: '1' } as NodeJS.ProcessEnv, 'coach-terms-2026-11-01')).toMatchObject({ ok: true, live: true });
   });
 

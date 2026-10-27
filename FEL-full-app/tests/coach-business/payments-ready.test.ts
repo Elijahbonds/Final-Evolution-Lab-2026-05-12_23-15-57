@@ -7,7 +7,11 @@
 // Stripe does on a destination charge, so each test checks where every cent ended up. No network, no keys.
 import { beforeEach, describe, expect, it } from 'vitest';
 import type Stripe from 'stripe';
-import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+// test changed (owner-approvals, 2026-10-27, card C28): buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS → /purchase-terms), not the coach store's terms, so the tick's version is read from BUYER_TERMS. The
+// assertions are unchanged.
+import { BUYER_TERMS } from '@/lib/payments/terms';
+const BUYER_TERMS_VERSION = BUYER_TERMS.coach_package.version;
 import { resetBusinessProbe } from '@/lib/coach-business/store';
 import { refundSale, startPackageCheckout, type CheckoutDeps } from '@/lib/coach-business/service';
 import { connectGate, createExpressAccount, needsStripeSetup, recordCoachTerms } from '@/lib/coach-business/connect';
@@ -24,7 +28,7 @@ import { vi } from 'vitest';
 
 const NOW = new Date('2026-10-26T18:00:00Z');
 const ON = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_abc', NEXTAUTH_URL: 'https://fel.test' } as unknown as NodeJS.ProcessEnv;
-const TICK = { termsAccepted: true, termsVersion: STORE_TERMS_VERSION };
+const TICK = { termsAccepted: true, termsVersion: BUYER_TERMS_VERSION };
 const env = (o: Record<string, string> = {}) => ({ ...ON, ...o }) as unknown as NodeJS.ProcessEnv;
 
 /**
@@ -124,12 +128,12 @@ beforeEach(() => resetBusinessProbe());
 describe('the buyer ticks the terms before Stripe is called', () => {
   it.each([
     ['no tick', undefined],
-    ['the box unticked', { termsAccepted: false, termsVersion: STORE_TERMS_VERSION }],
+    ['the box unticked', { termsAccepted: false, termsVersion: BUYER_TERMS_VERSION }],
     ['an old version', { termsAccepted: true, termsVersion: 'store-terms-2026-10-04' }],
   ])('%s: 409 terms_required with the current version; no spot held, nothing at Stripe', async (_n, body) => {
     const s = setup();
     const r = await startPackageCheckout(s.deps, 'buyer-1', 'pkg-1', body as never);
-    expect(r).toEqual({ ok: false, status: 409, error: 'terms_required', version: STORE_TERMS_VERSION });
+    expect(r).toEqual({ ok: false, status: 409, error: 'terms_required', version: BUYER_TERMS_VERSION });
     expect(s.fake.state.sales.size).toBe(0);
     expect(s.stripe.calls).toEqual([]);
   });
@@ -138,20 +142,32 @@ describe('the buyer ticks the terms before Stripe is called', () => {
     const s = setup();
     await startPackageCheckout(s.deps, 'buyer-1', 'pkg-1', TICK);
     const p = s.stripe.calls.find((c) => c.op === 'checkout.create')!.params;
-    for (const m of [p.metadata, p.payment_intent_data.metadata]) expect(m).toMatchObject({ terms_version: STORE_TERMS_VERSION, terms_accepted_at: NOW.toISOString(), product: 'COACH_CONNECT' });
+    for (const m of [p.metadata, p.payment_intent_data.metadata]) expect(m).toMatchObject({ terms_version: BUYER_TERMS_VERSION, terms_accepted_at: NOW.toISOString(), product: 'COACH_CONNECT' });
     const sm = setup({ kind: 'monthly', priceCents: 12_000 });
     await startPackageCheckout(sm.deps, 'buyer-1', 'pkg-1', TICK);
-    expect(sm.stripe.calls.find((c) => c.op === 'checkout.create')!.params.subscription_data.metadata).toMatchObject({ terms_version: STORE_TERMS_VERSION, terms_accepted_at: NOW.toISOString() });
+    expect(sm.stripe.calls.find((c) => c.op === 'checkout.create')!.params.subscription_data.metadata).toMatchObject({ terms_version: BUYER_TERMS_VERSION, terms_accepted_at: NOW.toISOString() });
   });
 });
 
 describe('live coach payments wait for the signed coach terms', () => {
   const live = { COACH_CONNECT_PAYMENTS_ENABLED: '1', COACH_CONNECT_LIVE: '1', STRIPE_SECRET_KEY: 'rk_live_x', NEXTAUTH_URL: 'https://fel.test', COACH_PRO_ENABLED: '1' } as unknown as NodeJS.ProcessEnv;
+  // test changed (owner-approvals, 2026-10-27, card C12): COACH_TERMS_VERSION is the written coach terms now, so "null" is
+  // passed explicitly to the gates; the checkout (which reads the code's own version) now opens in live mode, and the
+  // refusal it held is held through the gates. Live mode still needs the owner's COACH_CONNECT_LIVE and a live key.
   it('COACH_TERMS_VERSION null: Connect and Coach Pro refuse to start in live mode, with the reason', async () => {
-    expect(connectGate(live)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
-    expect(proGate(live)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
+    expect(connectGate(live, null)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
+    expect(proGate(live, null)).toEqual({ ok: false, reason: 'coach_terms_unsigned' });
+  });
+
+  it('the written coach terms (2026-10-27): live mode opens only with COACH_CONNECT_LIVE and a live key', async () => {
+    expect(connectGate(live)).toMatchObject({ ok: true, live: true });
+    expect(proGate(live)).toMatchObject({ ok: true, live: true });
+    expect(connectGate({ ...live, COACH_CONNECT_LIVE: '' } as NodeJS.ProcessEnv)).toEqual({ ok: false, reason: 'live_mode_off' });
+    // the checkout gets past the live gate now: it stops at the seeded coach's TEST-mode account, not at the terms
     const s = setup({ env: live });
-    expect(await startPackageCheckout(s.deps, 'buyer-1', 'pkg-1', TICK)).toEqual({ ok: false, status: 409, error: 'store_closed', reason: 'coach_terms_unsigned' });
+    const r = await startPackageCheckout(s.deps, 'buyer-1', 'pkg-1', TICK);
+    expect(r).toMatchObject({ ok: false, status: 409, error: 'coach_not_ready' });
+    expect(r).not.toMatchObject({ reason: 'coach_terms_unsigned' });
     expect(s.stripe.calls).toEqual([]);
   });
   it('test mode is unaffected; once signed, live opens', () => {

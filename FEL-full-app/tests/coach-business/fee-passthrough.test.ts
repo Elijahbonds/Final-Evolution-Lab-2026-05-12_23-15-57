@@ -2,7 +2,11 @@
 // The split of a coach's sale across every price from $1 to $500, its rounding under every way Stripe could round,
 // refunds (partial and full), monthly coaching (the first invoice's true-up and each renewal's exact fee), the closed
 // switches (no Stripe call), and the one Coach Pro price behind every place it shows.
-import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+// test changed (owner-approvals, 2026-10-27, card C28): buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS → /purchase-terms), not the coach store's terms, so the tick's version is read from BUYER_TERMS. The
+// assertions are unchanged.
+import { BUYER_TERMS } from '@/lib/payments/terms';
+const BUYER_TERMS_VERSION = BUYER_TERMS.coach_package.version;
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type Stripe from 'stripe';
@@ -286,7 +290,7 @@ describe('every switch off: no Stripe call', () => {
     const stripe = { checkout: { sessions: { create: async (p: any) => { made.push(p); return { id: 'cs_test_0123456789abc', url: 'u' }; } } } };
     // test changed (owner-approvals, 2026-10-27): the coach was on 'pro'; Pro's default share is 0% now (owner, "0% on
     // Pro"), so the 5% split this test holds is a Free coach's. The assertions are unchanged.
-    const r = await startPackageCheckout({ db: fake.db as any, stripe: () => stripe as any, env, now: NOW, isAdult: async () => true, plan: async () => 'free', ensureCustomer: async () => 'cus', coachSlug: async () => 'c' }, 'b', 'pkg-1', { termsAccepted: true, termsVersion: STORE_TERMS_VERSION });
+    const r = await startPackageCheckout({ db: fake.db as any, stripe: () => stripe as any, env, now: NOW, isAdult: async () => true, plan: async () => 'free', ensureCustomer: async () => 'cus', coachSlug: async () => 'c' }, 'b', 'pkg-1', { termsAccepted: true, termsVersion: BUYER_TERMS_VERSION });
     expect(r).toMatchObject({ ok: true });
     expect(made[0].payment_intent_data.application_fee_amount).toBe(75 + 76);
     expect(made[0].line_items.map((l: any) => l.price_data.unit_amount)).toEqual([1_500, 76]);

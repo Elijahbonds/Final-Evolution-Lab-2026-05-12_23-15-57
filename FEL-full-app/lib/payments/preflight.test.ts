@@ -65,12 +65,16 @@ describe('missing and inconsistent', () => {
     expect(m.some((x) => /^warn: STRIPE_CONNECT_WEBHOOK_SECRET is missing/.test(x))).toBe(true);
   });
 
+  // test changed (owner-approvals, 2026-10-27, card C12): the coach terms are written now (COACH_TERMS_VERSION is set), so
+  // the "no signed terms" case passes coachTermsVersion: null explicitly; the code's default is the written version.
   it('COACH_CONNECT_LIVE without signed coach terms is an error; with them it is not', () => {
     const env = { STRIPE_SECRET_KEY: 'sk_live_x', STRIPE_WEBHOOK_SECRET: 'whsec_x', NEXTAUTH_URL: 'https://fel.test', COACH_CONNECT_PAYMENTS_ENABLED: '1', COACH_CONNECT_LIVE: '1' };
-    expect(messages(env).some((x) => /^error: COACH_CONNECT_LIVE is on but COACH_TERMS_VERSION is null/.test(x))).toBe(true);
+    expect(messages(env, { coachTermsVersion: null }).some((x) => /^error: COACH_CONNECT_LIVE is on but COACH_TERMS_VERSION is null/.test(x))).toBe(true);
     expect(messages(env, { coachTermsVersion: 'coach-terms-2026-11-01' }).some((x) => /COACH_TERMS_VERSION is null/.test(x))).toBe(false);
     // also with a test key: the switch says "live" before the terms exist
-    expect(messages({ ...env, STRIPE_SECRET_KEY: 'sk_test_x' }).some((x) => /^error: COACH_CONNECT_LIVE is on but COACH_TERMS_VERSION is null/.test(x))).toBe(true);
+    expect(messages({ ...env, STRIPE_SECRET_KEY: 'sk_test_x' }, { coachTermsVersion: null }).some((x) => /^error: COACH_CONNECT_LIVE is on but COACH_TERMS_VERSION is null/.test(x))).toBe(true);
+    // the code's own default now: the written coach terms, so no such error
+    expect(messages(env).some((x) => /COACH_TERMS_VERSION is null/.test(x))).toBe(false);
   });
 
   it('a live secret key with a test publishable key; a live key always asks to confirm the webhook secrets\' mode', () => {
@@ -134,7 +138,10 @@ describe('the script', () => {
   it('--env-file reads only that file, prints no secret, exits 1 on an error and 0 when clean', () => {
     const dir = mkdtempSync(join(tmpdir(), 'preflight-'));
     const bad = join(dir, 'bad.env');
-    writeFileSync(bad, Object.entries({ ...SECRETS, COACH_CONNECT_PAYMENTS_ENABLED: '1', COACH_CONNECT_LIVE: '1' }).map(([k, v]) => `${k}="${v}"`).join('\n'));
+    // test changed (owner-approvals, 2026-10-27): the error this file provoked (live mode with no coach terms) is gone now
+    // that the coach terms are written, so it provokes one that stays an error (REAL_MONEY_COMPETITION on). Same checks:
+    // exit 1 on an error, and no secret printed.
+    writeFileSync(bad, Object.entries({ ...SECRETS, COACH_CONNECT_PAYMENTS_ENABLED: '1', COACH_CONNECT_LIVE: '1', REAL_MONEY_COMPETITION: '1' }).map(([k, v]) => `${k}="${v}"`).join('\n'));
     let out = '';
     let code = 0;
     try {
@@ -145,7 +152,7 @@ describe('the script', () => {
       out = err.stdout;
     }
     expect(code).toBe(1);
-    expect(out).toMatch(/COACH_CONNECT_LIVE is on but COACH_TERMS_VERSION is null/);
+    expect(out).toMatch(/REAL_MONEY_COMPETITION is on/);
     for (const v of Object.values(SECRETS)) expect(out).not.toContain(v);
 
     const clean = join(dir, 'clean.env');

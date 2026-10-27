@@ -190,9 +190,13 @@ The SQL is in `prisma/pending/2026-10-25-coach-business.sql`. It is additive onl
 
    Live mode stays off until:
 
-   - the coach terms and payout terms are signed (see the drafts the lane left for the owner);
-   - the business address is set;
-   - refund and dispute ownership is decided.
+   - ~~the coach terms and payout terms are signed~~ — **written 2026-10-27** on the owner's approval (`/coach-terms`,
+     `lib/coach-terms.ts`, card C12; not lawyer-reviewed). `COACH_TERMS_VERSION` is set, so live mode no longer refuses
+     with `coach_terms_unsigned`: it now waits only on `COACH_CONNECT_LIVE` and the live key, which are the owner's;
+   - the business address is set (it is: `lib/legal/business.ts`);
+   - ~~refund and dispute ownership is decided~~ — **decided 2026-10-27**: refunds in full (`REFUND_PROCESSING_FEE` on);
+     the coach bears a dispute's fee and loss, and FEL may recover it and a negative balance from future payouts (the
+     coach terms §7). **Not built:** that recovery. The terms give FEL the right, but no code takes it yet.
 
 ## Payments-ready (lane `lane/payments-ready`, 2026-10-26)
 
@@ -204,10 +208,10 @@ switch-on (it prints no secret).
   version and time ride on the Checkout Session, payment and subscription metadata (`terms_version`,
   `terms_accepted_at`), the store terms' own pattern. The coach ticks the coach terms before Connect onboarding; the
   acceptance is kept on the Express account's metadata (`coach_terms_version`, `coach_terms_accepted_at`).
-  **The coach and payout terms are not written:** `COACH_TERMS_VERSION` in `lib/payments/terms.ts` is `null`. While it
-  is null, test mode records a placeholder version and **live mode refuses to start**: with a live key and
-  `COACH_CONNECT_LIVE` on, Connect and Coach Pro answer 409 `store_closed` `coach_terms_unsigned`. When the owner signs
-  them, set `COACH_TERMS_VERSION` and `COACH_TERMS_HREF` (one code change; no text lives there).
+  **The coach and payout terms are written (2026-10-27, card C12):** `COACH_TERMS_VERSION` = `coach-terms-2026-10-27`,
+  `COACH_TERMS_HREF` = `/coach-terms` (the text is `lib/coach-terms.ts`). Buyers of a coach's package tick the Purchase
+  Terms (`/purchase-terms`, card C28) instead of the coach store's terms. Were the version ever `null` again, test mode
+  would record a placeholder version and live mode would refuse to start (409 `store_closed` `coach_terms_unsigned`).
 - **`account.updated`** (Connect endpoint) re-reads the coach's account from Stripe and keeps charges, payouts,
   details and, once `2026-10-26-payments-ready.sql` is applied, `requirementsDue`. `/coach/business` shows "Finish your
   Stripe setup" until all are done.

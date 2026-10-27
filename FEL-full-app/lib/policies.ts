@@ -84,7 +84,27 @@ const WRITE_TO = isMailingAddressSet(REAL_MAILING_ADDRESS) ? `, or write to ${BU
 // nothing reads User.policyVersion back, so a bump re-labels /privacy and /terms and changes what new signups store, and this
 // edit adds a disclosure of what the Service already did (the Studio is held behind NEXUS_STUDIO_ENABLED, off) rather than
 // widening what it collects or who sees it. 2026-10-14b is the text without these two bullets.
-export const CURRENT_POLICY_VERSION = '2026-10-16';
+// OWNER-APPROVALS (2026-10-27; owner, in chat: "You do it. I approve." — Owner Inbox cards C11 "privacy and terms for
+// teens on a coach roster", C28 "refund policy and store terms", and C03's recommended 90-day replay line).
+// Drafted by Claude 2026-10-27 on owner approval; not lawyer-reviewed.
+// One combined bump, as the cards asked. What changed:
+//   · Terms §1: names the Purchase Terms (/purchase-terms, lib/purchase-terms.ts) for FEL's own sales and coaches'
+//     packages, and the Coach Terms (/coach-terms, lib/coach-terms.ts) for coaches;
+//   · Terms §2: 13–17 on a coach's roster only with a parent or guardian's consent to coached training (C11);
+//   · Privacy §1: training logs (13–17 only after a guardian's yes), form reviews (rep data + a skeleton replay kept 90
+//     days, never video), and the guardian's name and email (C11, C03);
+//   · Privacy §2: who sees them — the athlete's coach; the guardian's training report (C11, C03);
+//   · Privacy §5: one new paragraph — training logs are not health data; what a guardian's yes unlocks and never does
+//     (C11). No existing under-18 rule was changed;
+//   · Privacy §7: Stripe processes payments for every product, not only the coach store, and other purchases follow
+//     the Purchase Terms (C28). §10 is unchanged: it is the approved store text, pinned verbatim by policies.test.ts.
+// Every new line was read from the code it describes (lib/coach/coachConsent.ts, lib/coach/teenGate.ts,
+// lib/coach/guardianReport*.ts, lib/coach/formReview/store.ts TRACKS_KEEP_DAYS, lib/consent/guardianGate.ts).
+// RE-CONSENT: none is prompted. Nothing reads User.policyVersion back (the same as every bump above), so this bump
+// re-labels /privacy and /terms and changes what new signups store; nobody is asked to accept again. (Card C11 said
+// the bump "asks every signed-in person to accept again": there is no such prompt in the code, and this change adds none.)
+// 2026-10-16 is the text without these lines.
+export const CURRENT_POLICY_VERSION = '2026-10-27';
 
 export const TERMS_CONTENT = `
 # Terms of Service
@@ -96,11 +116,15 @@ export const TERMS_CONTENT = `
 By creating an account on Final Evolution Lab (“the Service”), you agree to
 these Terms of Service and our Privacy Policy.
 
+When you buy FEL Pro, the season pass, coin packs or a coach's package on FEL, the Purchase Terms and Refund Policy at /purchase-terms also apply. If you coach on FEL, the Coach Terms and Payout Terms at /coach-terms also apply. Purchases in the Final Evolution coach store, including audiobooks, are covered by the store terms at /store-terms.
+
 ## 2. Account & Eligibility
 
 You must be 18 or older to buy anything, book coaching or a review, or agree to the store terms. Store purchases are for verified adults (18+) only.
 
 If you are 13 to 17, you may use the Service only with a parent or legal guardian’s consent, and any paid access for you is bought by your parent or guardian.
+
+If you are 13 to 17, you can join a coach’s roster on FEL and train with that coach here only after a parent or legal guardian has said yes to coached training. Your coach can invite you only through FEL’s own invite code or link.
 
 We can’t create an account for anyone under 13. A child under 13 may use the free movement screen only with an adult present, and nothing from it is saved.
 
@@ -173,6 +197,9 @@ export const PRIVACY_CONTENT = `
 - **Game session data:** mode, score, duration, win/loss.
 - **Coach chat inputs:** messages sent to the AI coach.
 - **Studio AI builder requests:** if you use the AI builder in Studio, the request you type and the venue it applies to (the venue's settings and what is placed where). Nothing else is sent with them: never your account, age, birth year, character or health data.
+- **Training logs:** if you train on a coach’s program or one of FEL’s programs, the sets you log (exercises, reps, weights and effort), the sessions you complete, the goals you set and how far through each program you are. For a 13- to 17-year-old on a coach’s roster, we save these only after a parent or guardian has said yes to coached training.
+- **Form reviews:** if you send a filmed set to your coach for a form review, the rep data worked out on your phone and a skeleton replay (the positions of points on your body, never the video). Your video stays on your phone and is never recorded to a file. We keep the skeleton replay for 90 days, then delete it. The rep numbers and flags stay with your training history.
+- **A parent or guardian’s details:** when a parent or guardian gives consent for a 13- to 17-year-old, we keep the name and email they give with that consent.
 - **Work-with-us inquiries:** if you send an inquiry through Work with us, we store your name, email and message, with the brand, budget range, dates and what you need that you tell us, only to reply to you. We keep it for 12 months, then delete it. We do not store your IP address.
 
 ## 2. How We Use Your Data
@@ -180,6 +207,7 @@ export const PRIVACY_CONTENT = `
 - To operate and improve the Service.
 - To compute your Player Readiness Quotient (PRQ).
 - Coach chat inputs are processed by AI models to generate responses.
+- **Coached training.** Your coach sees the training you log on their programs, and any form review you send them. For a 13- to 17-year-old, that needs a parent or guardian’s yes to coached training first. The parent or guardian can get a training report by email: sessions and sets done, nothing measured about the body. We use their email only for that report and for the consent itself.
 - Studio AI builder requests are sent to an AI model to work out changes to your venue. The builder is available to signed-in users aged 13 and over, and requests are rate-limited.
 - **Parties.** When you join a party, the other members see the party name you choose (never your account name or email) and what you are playing. Party messages, quick chat, emotes and voice go live between the members and are never recorded or stored — not by us, and not on your device beyond the open page. Voice is peer-to-peer and only between verified adults (18+); accounts under 18, or whose age we don't know, can use preset quick chat and emotes only, and their parties are invite-only. If you block someone, we remember that on your device. If you report someone, we keep the report — who reported whom, in which party, when and why — but no conversation, because none is kept. We keep a report for 12 months, then delete it.
 
@@ -208,6 +236,8 @@ PRQ attributes (e.g. vertical, balance, recovery) are fitness metrics. We do not
 
 **Consumer health data laws.** Some places have a law specifically for data like this, beyond ordinary privacy law — for example Washington State's My Health My Data Act. Rather than work out where each law applies, we extend the same protections everywhere, to everyone: a specific opt-in kept separate from the rest of this Policy, no sale of this data under any circumstance, no use of it or of your location to target advertising, and the same view, export, deletion and consent-withdrawal rights described above, honored the same way regardless of where you are.
 
+**Training logs are not health data.** The sets, sessions, goals and program progress you log are training data, not the data this section covers. For a 13- to 17-year-old, a parent or guardian’s yes to coached training lets FEL save that training and lets the coach see it. That yes never unlocks the intake, pain check-ins, daily check-ins, the Dial-Up Breath or any other health data: those are saved only for players 18 and over, with or without it.
+
 None of the above is medical advice, and nothing in this section changes §3's AI-Generated Content notice or the Mirror's own on-screen wording: camera-based reads are labelled estimates, they do not diagnose or name a condition, and they describe what a movement builds capacity for, never what it prevents or reduces the risk of.
 
 ## 6. Camera and Body Tracking
@@ -224,7 +254,7 @@ The tracking model files are downloaded to your device when a camera feature fir
 
 ## 7. Third Parties
 
-We do not sell personal data. Payment processing (when enabled) uses Stripe, governed by Stripe’s privacy policy. Google Cloud hosts the site, our database and stored files as our processor/host. See §10 for the store.
+We do not sell personal data. Stripe processes the payments for everything sold on FEL — FEL Pro, the season pass, coin packs, the coach store and coaches’ packages — under Stripe’s own privacy policy. Stripe collects your card details directly, and we never see or store your full card number. Google Cloud hosts the site, our database and stored files as our processor/host. See §10 for the coach store; other purchases follow the Purchase Terms at /purchase-terms.
 
 ## 8. Your Rights
 
