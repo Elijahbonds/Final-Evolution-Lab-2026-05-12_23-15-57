@@ -1,0 +1,404 @@
+{
+ "items": [
+  {
+   "kind": "pain",
+   "athleteId": "a1",
+   "name": "Ada Lovelace",
+   "line": "Client paused an exercise",
+   "at": 1793113200000,
+   "programId": "p-a1",
+   "ref": null,
+   "actions": [
+    "reply",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "pain:how",
+     "text": "How is it feeling today?"
+    },
+    {
+     "id": "pain:swap",
+     "text": "Let's swap that one. I'll update your plan."
+    }
+   ],
+   "freeText": true,
+   "key": "pain:a1:Client paused an exercise"
+  },
+  {
+   "kind": "red_flag",
+   "athleteId": "a2",
+   "name": "Ben Ortiz",
+   "line": "Running low today",
+   "at": 1793059200000,
+   "programId": "p-a2",
+   "ref": null,
+   "actions": [
+    "reply",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "red:easy",
+     "text": "Take it easy today. Lighter is fine."
+    },
+    {
+     "id": "red:sleep",
+     "text": "Thanks for checking in. How did you sleep?"
+    }
+   ],
+   "freeText": true,
+   "key": "red_flag:a2:2026-10-27"
+  },
+  {
+   "kind": "draft",
+   "athleteId": "a3",
+   "name": "Cara Diaz",
+   "line": "2 changes to approve",
+   "at": 1793113200000,
+   "programId": "p-a3",
+   "ref": "d-a3",
+   "actions": [
+    "approve",
+    "open"
+   ],
+   "presets": [],
+   "freeText": false,
+   "key": "draft:a3:d-a3:2"
+  },
+  {
+   "kind": "review",
+   "athleteId": "a4",
+   "name": "Dev Patel",
+   "line": "Goblet squat: 2 flagged reps",
+   "at": 1793041200000,
+   "programId": "p-a4",
+   "ref": "fr-a4",
+   "actions": [
+    "cue",
+    "looks_good"
+   ],
+   "presets": [
+    {
+     "id": "fault:knee_valgus:cue",
+     "text": "Push your knees out over your toes."
+    },
+    {
+     "id": "setup:brace",
+     "text": "Big breath and brace before you go down."
+    }
+   ],
+   "freeText": false,
+   "key": "review:a4:fr-a4"
+  },
+  {
+   "kind": "missed",
+   "athleteId": "a5",
+   "name": "Eli Brooks",
+   "line": "Missed 2 sessions this week",
+   "at": 1793113200000,
+   "programId": "p-a5",
+   "ref": null,
+   "actions": [
+    "nudge",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "missed:fit",
+     "text": "Missed you this week. Can you fit a session in?"
+    }
+   ],
+   "freeText": true,
+   "key": "missed:a5:missed:20753"
+  },
+  {
+   "kind": "missed",
+   "athleteId": "a6",
+   "name": "Fay Nguyen",
+   "line": "No session in a while",
+   "at": 1793113200000,
+   "programId": "p-a6",
+   "ref": null,
+   "actions": [
+    "nudge",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "missed:fit",
+     "text": "Missed you this week. Can you fit a session in?"
+    }
+   ],
+   "freeText": true,
+   "key": "missed:a6:stalled:20753"
+  },
+  {
+   "kind": "checkin",
+   "athleteId": "a7",
+   "name": "Gus Moreau",
+   "line": "Answered Weekly check-in",
+   "at": 1793005200000,
+   "programId": "p-a7",
+   "ref": null,
+   "actions": [
+    "reply",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "checkin:thanks",
+     "text": "Thanks, got it."
+    },
+    {
+     "id": "checkin:talk",
+     "text": "Thanks. Let's talk at your next session."
+    }
+   ],
+   "freeText": true,
+   "key": "checkin:a7:2026-10-26T09:00:00.000Z"
+  },
+  {
+   "kind": "message",
+   "athleteId": "a8",
+   "name": "Hana Ito",
+   "line": "2 new messages",
+   "at": 1793091600000,
+   "programId": "p-a8",
+   "ref": null,
+   "actions": [
+    "reply",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "message:got",
+     "text": "Got it, thanks!"
+    },
+    {
+     "id": "message:soon",
+     "text": "On it. I'll reply properly soon."
+    }
+   ],
+   "freeText": true,
+   "key": "message:a8:p-a8:1793091600000"
+  },
+  {
+   "kind": "message",
+   "athleteId": "a9",
+   "name": "Ivan Petrov",
+   "line": "1 new message",
+   "at": 1793106000000,
+   "programId": "p-a9",
+   "ref": null,
+   "actions": [
+    "reply",
+    "open"
+   ],
+   "presets": [
+    {
+     "id": "message:got",
+     "text": "Got it, thanks!"
+    },
+    {
+     "id": "message:soon",
+     "text": "On it. I'll reply properly soon."
+    }
+   ],
+   "freeText": true,
+   "key": "message:a9:p-a9:1793106000000"
+  },
+  {
+   "kind": "join",
+   "athleteId": "a10",
+   "name": "Jay Kim",
+   "line": "Joined: needs a program",
+   "at": 1793019600000,
+   "programId": null,
+   "ref": null,
+   "actions": [
+    "open",
+    "done"
+   ],
+   "presets": [
+    {
+     "id": "join:welcome",
+     "text": "Welcome aboard! Your first plan is on the way."
+    }
+   ],
+   "freeText": true,
+   "key": "join:a10:1793019600000"
+  }
+ ],
+ "dark": [],
+ "roster": [
+  {
+   "id": "a1",
+   "name": "Ada Lovelace",
+   "days": [
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1
+   ],
+   "programId": "p-a1"
+  },
+  {
+   "id": "a2",
+   "name": "Ben Ortiz",
+   "days": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0
+   ],
+   "programId": "p-a2"
+  },
+  {
+   "id": "a3",
+   "name": "Cara Diaz",
+   "days": [
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "programId": "p-a3"
+  },
+  {
+   "id": "a4",
+   "name": "Dev Patel",
+   "days": [
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1
+   ],
+   "programId": "p-a4"
+  },
+  {
+   "id": "a5",
+   "name": "Eli Brooks",
+   "days": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0
+   ],
+   "programId": "p-a5"
+  },
+  {
+   "id": "a6",
+   "name": "Fay Nguyen",
+   "days": [
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "programId": "p-a6"
+  },
+  {
+   "id": "a7",
+   "name": "Gus Moreau",
+   "days": [
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1
+   ],
+   "programId": "p-a7"
+  },
+  {
+   "id": "a8",
+   "name": "Hana Ito",
+   "days": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0
+   ],
+   "programId": "p-a8"
+  },
+  {
+   "id": "a9",
+   "name": "Ivan Petrov",
+   "days": [
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "programId": "p-a9"
+  },
+  {
+   "id": "a10",
+   "name": "Jay Kim",
+   "days": [
+    1,
+    0,
+    0,
+    1,
+    0,
+    0,
+    1
+   ],
+   "programId": null
+  },
+  {
+   "id": "a11",
+   "name": "Kai Lee",
+   "days": [
+    0,
+    0,
+    1,
+    0,
+    0,
+    1,
+    0
+   ],
+   "programId": "p-a11"
+  },
+  {
+   "id": "a12",
+   "name": "Lia Park",
+   "days": [
+    0,
+    1,
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "programId": "p-a12"
+  }
+ ]
+}
