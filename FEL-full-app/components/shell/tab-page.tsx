@@ -23,7 +23,7 @@ export function TabPage({
       <main data-couch-scale className="relative mx-auto max-w-[1080px] px-5 pt-8 md:pt-6">
         <header className="mb-7 flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <p className="font-mono text-[11px] font-bold uppercase tracking-[0.22em]" style={{ color: accent }}>
+            <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: accent }}>
               {eyebrow}
             </p>
             <h1 className="fel-heading mt-2 text-[30px] font-black leading-none tracking-tight text-white md:text-[38px]">

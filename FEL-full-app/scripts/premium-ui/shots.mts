@@ -14,6 +14,7 @@
 //   cls / fcp  layout shift over the load, and first contentful paint on the phone with the CPU throttled 4x
 //
 //   npx tsx scripts/premium-ui/shots.mts <outDir> <label> --build-only        bundle now (no browser, no lock needed)
+//   ... --no-font-vars   bundle without next/font's variables, as a probe rig has none (counts serif text: P2)
 //   flock /home/user/wt/gate-queue.lock npx tsx scripts/premium-ui/shots.mts <outDir> <label> [--scenes=play,train]
 // The bundle lives in <outDir>/.build-<label>, so a "before" frozen with --build-only is shot later unchanged, however
 // long the gate queue is and whatever the tree looks like by then; an existing bundle is reused (--rebuild to redo it).
@@ -60,7 +61,7 @@ const server = createServer((req, res) => {
 // fonts are served from a fixed path on whichever port the shoot gets, so a bundle built earlier still finds them
 const FONT_BASE = '/__fonts';
 if (REBUILD || !existsSync(join(BUILD, 'index.html'))) {
-  await buildRig(BUILD, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE });
+  await buildRig(BUILD, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE, noFontVars: args.includes('--no-font-vars') });
   writeFileSync(join(BUILD, 'built.txt'), new Date().toISOString());
 }
 if (BUILD_ONLY) { console.log(`built → ${BUILD}`); process.exit(0); }
@@ -73,13 +74,14 @@ const MEASURE = `(() => {
   const shown = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) { const cs = getComputedStyle(e);
     if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false; if (e.getAttribute('aria-hidden') === 'true' && e.tagName !== 'svg') {} }
     const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
-  const words = { fold: 0, all: 0 }; const sizesFold = new Set(), sizesAll = new Set(), fams = new Set();
+  const words = { fold: 0, all: 0 }; const sizesFold = new Set(), sizesAll = new Set(), fams = new Set(); let serif = 0;
   const tw = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {
     const t = n.textContent.trim(); const el = n.parentElement; if (!t || !el || el.closest('script,style,noscript')) continue;
     if (!shown(el)) continue;
     const rg = document.createRange(); rg.selectNodeContents(n); const r = rg.getBoundingClientRect(); if (!r.width || !r.height) continue;
     const cs = getComputedStyle(el); const c = t.split(/\\s+/).filter((x) => /[A-Za-z0-9]/.test(x)).length;
+    if (/^(serif|"?Times)/i.test(cs.fontFamily.trim())) serif++;
     words.all += c; sizesAll.add(cs.fontSize); fams.add(cs.fontFamily.split(',')[0].replace(/["']/g, '').trim());
     if (r.top < vh && r.bottom > 0) { words.fold += c; sizesFold.add(cs.fontSize); }
   }
@@ -114,7 +116,7 @@ const MEASURE = `(() => {
   for (const el of document.querySelectorAll('[data-fel-press], .fel-press')) press++;
   const faces = [...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family.replace(/["']/g, '') + ' ' + f.weight);
   const shift = (window.__cls || 0); const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null;
-  return { words, sizesFold: [...sizesFold].sort(), sizesAll: [...sizesAll].sort(), families: [...fams], faces,
+  return { serif, words, sizesFold: [...sizesFold].sort(), sizesAll: [...sizesAll].sort(), families: [...fams], faces,
     buttons: { n: btnN, styles: btnSig.size }, cards: { n: cardN, styles: cardSig.size }, imagery: { n: imgN, pct: Math.round(100 * imgArea / (vw * vh)) },
     motion: { animating: anim, transitions: trans, press }, cls: Math.round(shift * 1000) / 1000, fcp: fcp && Math.round(fcp), longTasks: window.__long || 0 };
 })()`;
@@ -163,8 +165,8 @@ for (const s of scenes) {
     const a11y = scan ? { critical: scan.violations.filter((v) => v.severity === 'critical').length, serious: scan.violations.filter((v) => v.severity === 'serious').length, total: scan.violations.length, rules: [...new Set(scan.violations.map((v) => v.rule))] } : null;
     report[s][vp.name] = { ...m, a11y, empty: await emptyPct(fold), errors };
     await ctx.close();
-    const mm = m as { words: { fold: number }; sizesFold: string[]; sizesAll: string[]; buttons: { styles: number }; cards: { styles: number }; imagery: { n: number; pct: number }; motion: { animating: number }; fcp: number; cls: number };
-    console.log(`${s.padEnd(13)} ${vp.name.padEnd(7)} words ${String(mm.words.fold).padStart(3)}  sizes ${mm.sizesFold.length}/${mm.sizesAll.length}  btn ${mm.buttons.styles}  card ${mm.cards.styles}  empty ${String((report[s][vp.name] as { empty: number }).empty).padStart(2)}%  img ${mm.imagery.n}/${mm.imagery.pct}%  anim ${mm.motion.animating}  fcp ${mm.fcp}  cls ${mm.cls}  a11y ${a11y ? `${a11y.critical}c/${a11y.serious}s/${a11y.total}` : '-'}${errors.length ? `  ERR ${errors[0].slice(0, 90)}` : ''}`);
+    const mm = m as { serif: number; words: { fold: number }; sizesFold: string[]; sizesAll: string[]; buttons: { styles: number }; cards: { styles: number }; imagery: { n: number; pct: number }; motion: { animating: number }; fcp: number; cls: number };
+    console.log(`${s.padEnd(13)} ${vp.name.padEnd(7)} words ${String(mm.words.fold).padStart(3)}  sizes ${mm.sizesFold.length}/${mm.sizesAll.length}  btn ${mm.buttons.styles}  card ${mm.cards.styles}  empty ${String((report[s][vp.name] as { empty: number }).empty).padStart(2)}%  img ${mm.imagery.n}/${mm.imagery.pct}%  anim ${mm.motion.animating}  fcp ${mm.fcp}  cls ${mm.cls}  serif ${mm.serif}  a11y ${a11y ? `${a11y.critical}c/${a11y.serious}s/${a11y.total}` : '-'}${errors.length ? `  ERR ${errors[0].slice(0, 90)}` : ''}`);
   }
 }
 await browser.close();

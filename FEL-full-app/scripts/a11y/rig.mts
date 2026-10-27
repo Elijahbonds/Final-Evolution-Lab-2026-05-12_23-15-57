@@ -58,7 +58,7 @@ const stubs: Plugin = {
 
 /** PREMIUM-UI (2026-10-27): other rigs reuse this one. `entry` swaps the page bundle (default: the a11y scenes);
  *  `fontBase` serves the font files from an http origin instead of file:// (a rig served over http cannot read file://). */
-export interface RigOptions { entry?: string; fontBase?: string }
+export interface RigOptions { entry?: string; fontBase?: string; /** leave next/font's variables unset, as a probe rig does (the P2 fonts check) */ noFontVars?: boolean }
 
 export async function buildRig(BUILD: string, opts: RigOptions = {}): Promise<{ html: string }> {
 mkdirSync(BUILD, { recursive: true });
@@ -80,7 +80,7 @@ const FONTS = [
   face('FEL Plex', 'ibm-plex-sans-latin-variable.woff2', '400 700'),
   face('FEL Mono', 'jetbrains-mono-latin-variable.woff2', '100 800'),
   ...['400', '500', '600', '700'].map((wt) => face('FEL Chakra', `chakra-petch-latin-${wt}.woff2`, wt)),
-  `:root{--font-display:'FEL Barlow';--font-sans:'FEL Plex';--font-mono:'FEL Mono';--font-chakra:'FEL Chakra'}`,
+  opts.noFontVars ? '' : `:root{--font-display:'FEL Barlow';--font-sans:'FEL Plex';--font-mono:'FEL Mono';--font-chakra:'FEL Chakra'}`,
 ].join('\n');
 const css = FONTS + '\n' + readFileSync(cssFile, 'utf8') + '\n' + readFileSync(join(ROOT, 'app/theme.css'), 'utf8');
 const html = join(BUILD, 'index.html');

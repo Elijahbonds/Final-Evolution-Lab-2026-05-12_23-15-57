@@ -10,7 +10,9 @@
      variables are missing (the root crash screen renders its own <html>), the whole token is unset and each consumer's
      own var() fallback (ui-monospace) applies. */
   --fel-font-display: var(--font-chakra), var(--font-mono), ui-monospace, monospace;
-  --fel-font-body: 'Inter', system-ui, sans-serif;
+  /* The text face (P2 fonts fix, 2026-10-27): this named 'Inter', which the app never loads, so anything reading the token
+     drew in the system face. It is IBM Plex Sans, the face the body already uses. */
+  --fel-font-body: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
 
   /* Core palette.
      THE TOKENS NOW HOLD THE COLOURS THE APP ACTUALLY USES (2026-09-20). This block described a palette the
@@ -90,7 +92,7 @@
 }
 
 .fel-cta {                   /* primary action button */
-  font-family: var(--fel-font-display);
+  font-family: var(--fel-font-display, ui-monospace, monospace);
   font-weight: 900;
   letter-spacing: 0.06em;
   color: #05060a;
@@ -104,7 +106,7 @@
 .fel-cta--gold { background: var(--fel-gold); box-shadow: var(--fel-glow-gold); }
 
 .fel-stat {                  /* big HUD numbers (score, timer, PRQ) */
-  font-family: var(--fel-font-display);
+  font-family: var(--fel-font-display, ui-monospace, monospace);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   color: var(--fel-text);
@@ -114,7 +116,7 @@
 .fel-stat--danger { color: var(--fel-crimson); }
 
 .fel-chip {                  /* labels: LIVE, SPONSORED, style names */
-  font-family: var(--fel-font-display);
+  font-family: var(--fel-font-display, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.18em;

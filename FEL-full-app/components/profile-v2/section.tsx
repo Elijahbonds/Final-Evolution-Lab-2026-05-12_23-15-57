@@ -30,7 +30,7 @@ export function Coming({ title, text, href, cta }: { title: string; text: string
     <div className="rounded-2xl border border-dashed border-white/[0.12] p-4">
       <p className="flex items-center gap-2 text-[13px] font-bold text-white/75">
         {title}
-        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-fel-dim">Coming</span>
+        <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim">Coming</span>
       </p>
       <p className="mt-1 text-[12px] leading-snug text-fel-dim">{text}</p>
       {href && cta && <a href={href} className="mt-2 inline-block text-[12px] font-bold text-fel-cyan underline-offset-2 hover:underline">{cta} →</a>}
