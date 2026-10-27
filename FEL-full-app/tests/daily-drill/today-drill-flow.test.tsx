@@ -45,7 +45,7 @@ const live = (v: Partial<LiveDrillView>) => { h.view = { ...LIVE_IDLE, ...v }; }
 beforeEach(() => { h.calls = []; live({ phase: 'setup' }); });
 
 describe('before: purpose first, then what to do', () => {
-  it('a first-timer: the two-line explainer, then demo, steps, cues and setup open, and Start after them', () => {
+  it('a first-timer: the two-line explainer, then the demo, steps, cues and setup, all shown', () => {
     const out = intro(viewFrom('u1', { ...hooper(), recentDrills: 0 }, OPEN, NOW));
     expect(out).toContain('data-daily-newcomer="1"');
     expect(out).toContain('New to the daily drill?');
@@ -58,17 +58,19 @@ describe('before: purpose first, then what to do', () => {
     for (const s of ['demo', 'steps', 'cues', 'needs']) expect(out).toContain(`data-daily-section="${s}"`);
     expect(out).toContain('data-daily-cues="3"');
     expect(out).toContain('3.5 to 4.5 m');
-    expect(out).not.toContain('data-daily-how');
-    expect(out.indexOf('data-daily-start')).toBeGreaterThan(out.indexOf('data-daily-section="needs"'));
   });
 
-  it('a returning player: Start before the steps, which are one tap away (closed)', () => {
-    const out = intro(viewFrom('u1', hooper(), OPEN, NOW));
-    expect(out).toContain('data-daily-newcomer="0"');
-    expect(out).not.toContain('New to the daily drill?');
-    expect(out).toContain('data-daily-how');
-    expect(out).not.toMatch(/<details[^>]*open/);
-    expect(out.indexOf('data-daily-start')).toBeLessThan(out.indexOf('data-daily-how'));
+  it('owner 2026-10-27: nothing folded away for anyone, and the next action is ONE big button, always on screen', () => {
+    for (const rows of [hooper(), { ...hooper(), recentDrills: 0 }]) {
+      const out = intro(viewFrom('u1', rows, OPEN, NOW));
+      expect(out).not.toContain('<details');
+      for (const s of ['demo', 'steps', 'cues', 'needs']) expect(out).toContain(`data-daily-section="${s}"`);
+      expect((out.match(/data-daily-start=/g) ?? []).length).toBe(1);
+      expect(out).toMatch(/data-daily-start-bar[^>]*|class="fixed[^"]*"[^>]*data-daily-start-bar/);
+      expect(out).toContain('bottom-[calc(4rem+env(safe-area-inset-bottom))]');   // above the phone's tab bar
+      expect(out).not.toContain('data-drill-demo-watch');                          // no "watch" tap: it plays by itself
+    }
+    expect(intro(viewFrom('u1', hooper(), OPEN, NOW))).not.toContain('New to the daily drill?');
   });
 
   it('the demo is the shared library stage with the drill\'s loop (never the old one-clip avatar canvas)', () => {

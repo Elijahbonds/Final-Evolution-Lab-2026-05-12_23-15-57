@@ -7,9 +7,9 @@
 //
 // TODAY-DRILL (owner playtest 2026-10-27: "clearer instructions and better purpose"): before the camera, the page says
 // WHY today (the person's own lowest number), WHAT it improves, how long and what you need, then the numbered steps, the
-// looping demo and the 2–3 key cues (lib/daily-drill/guide.ts). A first-timer (no drill in four weeks) gets the
-// two-line explainer and everything open, Start at the end; a returning player gets Start near the top and the steps one
-// tap away. During the run and after it, today-drill-live.tsx draws the screens; "This hurts: stop" opens the existing
+// looping demo and the 2–3 key cues (lib/daily-drill/guide.ts). A first-timer (no drill in four weeks) also gets the
+// two-line explainer. Owner (2026-10-27): demos play by themselves and instructions are never folded away, and the next
+// action is one big button: Start is fixed at the bottom, above the tab bar, for everyone. During the run and after it, today-drill-live.tsx draws the screens; "This hurts: stop" opens the existing
 // pain check-in, never a second pain path.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,7 +21,7 @@ import {
   DAILY_DRILL_CLAIM_PATH, DAILY_EYEBROW, DONE_TITLE, KEPT_LINE, doneLine, rewardLine,
 } from '@/lib/daily-drill/copy';
 import {
-  CUES_TITLE, DEMO_TITLE, FIRST_TIME_LINES, FIRST_TIME_TITLE, HOW_TITLE, NEEDS_TITLE, START_AGAIN_LABEL, START_LABEL, STEPS_TITLE,
+  CUES_TITLE, DEMO_TITLE, FIRST_TIME_LINES, FIRST_TIME_TITLE, NEEDS_TITLE, START_AGAIN_LABEL, START_LABEL, STEPS_TITLE,
   guideFor, needsLines, stepsFor,
 } from '@/lib/daily-drill/guide';
 import type { DailyDrillView } from '@/lib/daily-drill/load';
@@ -88,11 +88,17 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   }
 
   const done = claim.state === 'done';
+  // owner (2026-10-27): "It should play automatically, don't make the platform confusing or hard to use." The one next
+  // action is one big button, always on screen (above the phone's tab bar), and nothing is folded away.
   const startButton = (
-    <button type="button" onClick={() => setStage('live')} data-daily-start
-      className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-6 text-[17px] font-black text-black">
-      <Camera aria-hidden className="h-5 w-5" /> {done ? START_AGAIN_LABEL : START_LABEL}
-    </button>
+    <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-[#050505]/95 px-4 py-3 md:bottom-0" data-daily-start-bar>
+      <div className="mx-auto max-w-3xl">
+        <button type="button" onClick={() => setStage('live')} data-daily-start
+          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-6 text-[17px] font-black text-black">
+          <Camera aria-hidden className="h-5 w-5" /> {done ? START_AGAIN_LABEL : START_LABEL}
+        </button>
+      </div>
+    </div>
   );
   const how = (
     <div className="space-y-5">
@@ -121,7 +127,7 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   );
 
   return (
-    <div className="space-y-5" data-daily-page={plan.key} data-daily-newcomer={view.newcomer ? '1' : '0'}>
+    <div className="space-y-5 pb-28" data-daily-page={plan.key} data-daily-newcomer={view.newcomer ? '1' : '0'}>
       <header className="space-y-2">
         <p className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">{DAILY_EYEBROW}</p>
         <h1 className="text-[32px] font-black leading-[1.05] text-white">{guide.title}</h1>
@@ -156,19 +162,8 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
         ? <p className="rounded-xl border border-[#00FF9D]/35 bg-[#00FF9D]/[0.07] px-3 py-2.5 text-[14px] text-white" data-daily-claim="done"><span className="font-bold">{DONE_TITLE}.</span> {doneLine(claim.amount, claim.streakDays)}</p>
         : <p className="text-[14px] text-white/65" data-daily-reward>{rewardLine(view.credit, view.streak.opensToday, view.streak.nextDays)}</p>}
 
-      {view.newcomer ? (
-        <>{how}{startButton}</>
-      ) : (
-        <>
-          {startButton}
-          <details className="group rounded-2xl border border-white/10 px-4 py-3" data-daily-how>
-            <summary className="flex min-h-[40px] cursor-pointer list-none items-center justify-between text-[15px] font-bold text-white">
-              {HOW_TITLE}<span aria-hidden className="text-white/50 group-open:rotate-180">⌄</span>
-            </summary>
-            <div className="pt-3">{how}</div>
-          </details>
-        </>
-      )}
+      {how}
+      {startButton}
       <Link href="/play/drills" className="inline-block text-[13px] text-white/50 underline-offset-2 hover:underline">All drills</Link>
     </div>
   );

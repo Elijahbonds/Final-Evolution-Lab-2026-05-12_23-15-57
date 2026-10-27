@@ -34,7 +34,7 @@ export function DrillRunning({ slot, drillId, onHurt }: { slot: DrillRunningSlot
   const wait = run?.status === 'positioning' ? STEP_IN_LINE : run?.status === 'paused' ? STEP_BACK_LINE : null;
   const cue = view.caption ?? step?.cue ?? null;
   return (
-    <section className="space-y-3 pb-24" data-drill-running={run?.status ?? 'starting'} data-daily-run={step ? `${step.index}/${step.count}` : 'starting'}>
+    <section className="space-y-3 pb-28" data-drill-running={run?.status ?? 'starting'} data-daily-run={step ? `${step.index}/${step.count}` : 'starting'}>
       <div className="space-y-1.5">
         <div className="flex items-baseline justify-between gap-3 font-mono text-[12px] uppercase tracking-[0.12em] text-white/55">
           <span data-daily-step-of>{step ? `Step ${step.index} of ${step.count}` : 'Starting'}</span>
@@ -80,7 +80,7 @@ export function DrillRunning({ slot, drillId, onHurt }: { slot: DrillRunningSlot
       {phase?.pacer && run && <BreathPacer spec={{ ...phase.pacer, restSec: 0 }} elapsedSec={run.phaseSec} size="sm" id="daily-drill" />}
 
       {/* always on screen: pause, stop, and the pain stop (the existing pain check-in) */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#050505]/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3" data-daily-controls>
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-[#050505]/95 px-4 py-3 md:bottom-0" data-daily-controls>
         <div className="mx-auto flex max-w-3xl gap-2">
           <button type="button" onClick={slot.pause} data-daily-pause className="flex min-h-[48px] flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/25 text-[15px] font-bold text-white">
             <Pause aria-hidden className="h-4 w-4" /> {PAUSE_LABEL}

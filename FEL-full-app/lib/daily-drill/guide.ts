@@ -146,7 +146,6 @@ export const STEPS_TITLE = 'What you will do';
 export const CUES_TITLE = 'Remember';
 export const NEEDS_TITLE = 'Before you start';
 export const DEMO_TITLE = 'Watch it first';
-export const HOW_TITLE = 'Steps, cues and setup';
 export const START_LABEL = 'Start';
 export const START_AGAIN_LABEL = 'Do it again';
 export const DEMO_STILL_LINE = 'The 3D demo is off on this device. Follow the steps and cues.';
@@ -338,7 +337,7 @@ export function tomorrowLine(today: Focus, tomorrow: Focus, tomorrowDrillId: str
 /** Every fixed line this file can show (the reading-level and word tests read this list). */
 export function allFixedLines(): string[] {
   const out = [
-    FIRST_TIME_TITLE, ...FIRST_TIME_LINES, STEPS_TITLE, CUES_TITLE, NEEDS_TITLE, DEMO_TITLE, HOW_TITLE, DEMO_STILL_LINE, DEMO_NONE_LINE,
+    FIRST_TIME_TITLE, ...FIRST_TIME_LINES, STEPS_TITLE, CUES_TITLE, NEEDS_TITLE, DEMO_TITLE, DEMO_STILL_LINE, DEMO_NONE_LINE,
     HURT_TITLE, HURT_LINE, HURT_SKIP_LINE, REST_WORDS.cue,
     ...needsLines(true).map((x) => x.text), ...needsLines(false).map((x) => x.text),
   ];
