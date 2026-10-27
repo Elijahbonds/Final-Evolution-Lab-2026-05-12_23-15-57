@@ -99,22 +99,27 @@ const band = (good: number, poor: number, fault: number | null, faultOp: Band['f
 const b3 = (green: [Cmp, number], red: [Cmp, number], words: [string, string, string], cue: string, cueSource: ThresholdSource = 'research-advisor-draft-2026-09-28'): Bands3 =>
   ({ green: { op: green[0], at: green[1] }, red: { op: red[0], at: red[1] }, words: { green: words[0], yellow: words[1], red: words[2] }, cue, cueSource });
 
-// ── the draft's drill cues, verbatim (one per check) ──
+// ── the drill cues (one per check) ──
+// CUE-REWRITE (2026-10-27, owner playtest: "It needs to be clear… People need to be able to understand… what they are
+// doing"): the Research & Advisor draft's lists of drill names ("Band lateral walks, clamshells, goblet squat with knees
+// pushed out") are now ONE plain action each, which is what the result card's "Try this:" needs. Same drill families,
+// same intent, still no dose (owner default Q7) and still PROPOSED until Elijah approves (the cueSource stays the draft's:
+// the drills are the draft's, the words are the style guide's). The draft's wording is in docs/CUE-AUDIT.md.
 export const DRAFT_CUES = {
-  ohsKneeCave: 'Band lateral walks, clamshells, goblet squat with knees pushed out',
-  ohsForwardLean: 'Calf and hip flexor stretch, goblet squat to a box',
-  ohsArmsForward: 'Wall slides, lat stretch, foam roll upper back',
-  ohsHeelLift: 'Ankle mobility (see knee-to-wall drills)',
-  ohsDepth: 'Box squats, lowering the box over time',
-  kneeWallShin: 'Knee-to-wall rocks, banded ankle mobilization, calf stretch',
-  kneeWallGap: 'Extra sets on the tighter side',
-  slsKneeCave: 'Step-downs with knee over the middle toes, banded glute work',
-  slsHipDrop: 'Side planks, single-leg glute bridge',
-  slsTrunkLean: 'Single-leg balance holds, split squats',
-  slsGap: 'Lead with the weaker side',
-  jumpLandingKneeCave: 'Snap-down landings, drop-and-stick holds',
-  jumpStiffLanding: '"Land quiet" drills, box landings',
-  jumpWeightShift: 'Single-leg hops and sticks',
+  ohsKneeCave: 'Slow squats to a chair, pushing your knees out over your toes.',
+  ohsForwardLean: 'Stretch your calves, then squat to a box holding a weight at your chest.',
+  ohsArmsForward: 'Wall slides: back flat on a wall, slide your arms slowly up and down.',
+  ohsHeelLift: 'Knee-to-wall rocks: push your knee toward a wall with your heel down.',
+  ohsDepth: 'Squat to a box, and use a lower box as it gets easy.',
+  kneeWallShin: 'Knee-to-wall rocks and a calf stretch on each side.',
+  kneeWallGap: 'Do one extra set of knee-to-wall rocks on the stiffer side.',
+  slsKneeCave: 'Slow step-downs from a low step, knee over your middle toes.',
+  slsHipDrop: 'Side planks and one-leg bridges, keeping your hips level.',
+  slsTrunkLean: 'Balance on one leg standing tall, then slow split squats.',
+  slsGap: 'Start each set with the side that found it harder.',
+  jumpLandingKneeCave: 'Practice landings: small jumps, land with knees over toes, and hold.',
+  jumpStiffLanding: 'Land quietly: small jumps with bent knees and no thud.',
+  jumpWeightShift: 'Small one-leg hops: land, then hold still.',
 } as const;
 
 /**
@@ -126,15 +131,16 @@ export interface DrillHint { label: string; drill: string; placeholder: true }
 // MIRROR-NO-PLACEHOLDER (2026-10-13): the on-screen tag is gone — the drill shows by name; `placeholder` stays in data.
 const drill = (name: string): DrillHint => ({ label: name, drill: name, placeholder: true });
 export const PR20_DRILLS = {
-  ankle: [drill('Knee-to-wall rocks'), drill('Slant-board calf raises')],
-  arms: [drill('Wall slides with exhale'), drill('Half-kneeling thoracic rotation')],
-  squatPattern: [drill('Goblet squat hold'), drill('Heel-elevated tempo squat')],
-  knee: [drill('Banded lateral walks'), drill('Step-down from a low box')],
-  pelvis: [drill('Single-leg RDL to target'), drill('Side plank')],
-  balance: [drill('Single-leg stance with reach')],
-  landing: [drill('Snap-downs'), drill('Box drop-to-stick')],
-  landingSides: [drill('Single-leg hop-to-stick')],
-  shift: [drill('Split squat, slow tempo')],
+  // CUE-REWRITE (2026-10-27): the same drills in plain words ("Single-leg RDL to target" → "One-leg reach to a target").
+  ankle: [drill('Knee-to-wall rocks'), drill('Calf raises on a slope')],
+  arms: [drill('Wall slides, breathing out'), drill('Kneeling upper-back turns')],
+  squatPattern: [drill('Squat hold with a weight at your chest'), drill('Slow squats with heels raised')],
+  knee: [drill('Side steps with a band'), drill('Step-downs from a low box')],
+  pelvis: [drill('One-leg reach to a target'), drill('Side plank')],
+  balance: [drill('One-leg balance with a reach')],
+  landing: [drill('Quick drop into a landing'), drill('Step off a box and stick it')],
+  landingSides: [drill('One-leg hop and stick')],
+  shift: [drill('Slow split squats')],
 } as const;
 
 /**
@@ -351,17 +357,17 @@ const w1 = THRESHOLDS['t1.weights'].value, w3 = THRESHOLDS['t3.weights'].value, 
 /** In CHECK ORDER (A3-3): T1, then T2, then T3, then T5. */
 export const SCREEN_CHECKS: readonly ScreenCheck[] = [
   { id: 'ohs.kneeCave', test: 'T1', name: 'Knees cave in (overhead squat)', draftRow: 'Knees cave in (knee angle from the front)', map: 'MAPPED', status: 'graded', thresholdId: 't1.valgus', metrics: ['valgusLeft', 'valgusRight'], sided: true, weight: w1.valgusLeft + w1.valgusRight, note: 'Screening Squad cutoffs in hip half-widths; each knee graded, the worse one counts' },
-  { id: 'ohs.forwardLean', test: 'T1', name: 'Forward lean (overhead squat)', draftRow: 'Forward lean (chest compared with shin angle)', map: 'MAPPED', status: 'graded', thresholdId: 't1.trunkTibia', metrics: ['trunkTibia'], sided: false, weight: w1.trunkTibia },
-  { id: 'ohs.armsForward', test: 'T1', name: 'Arms fall forward (overhead squat)', draftRow: 'Arms fall forward (compared with torso line)', map: 'MAPPED', status: 'graded', thresholdId: 't1.shoulderFlex', metrics: ['shoulderFlex'], sided: false, weight: w1.shoulderFlex, note: 'geometry.shoulderFlexion is ∠(hip, shoulder, wrist): the arm against the torso line (proved in lib/screen/checks.test.ts)' },
+  { id: 'ohs.forwardLean', test: 'T1', name: 'Chest drops forward (overhead squat)', draftRow: 'Forward lean (chest compared with shin angle)', map: 'MAPPED', status: 'graded', thresholdId: 't1.trunkTibia', metrics: ['trunkTibia'], sided: false, weight: w1.trunkTibia },
+  { id: 'ohs.armsForward', test: 'T1', name: 'Arms drop forward (overhead squat)', draftRow: 'Arms fall forward (compared with torso line)', map: 'MAPPED', status: 'graded', thresholdId: 't1.shoulderFlex', metrics: ['shoulderFlex'], sided: false, weight: w1.shoulderFlex, note: 'geometry.shoulderFlexion is ∠(hip, shoulder, wrist): the arm against the torso line (proved in lib/screen/checks.test.ts)' },
   { id: 'ohs.heelLift', test: 'T1', name: 'Heels lift (overhead squat)', draftRow: 'Heels lift', map: 'MAPPED', status: 'graded', thresholdId: 't1.heelRiseReps', metrics: ['heelRise'], sided: false, weight: w1.heelRise },
   { id: 'ohs.depth', test: 'T1', name: 'Squat depth (overhead squat)', draftRow: 'Depth', map: 'LABELS ONLY', status: 'graded', thresholdId: 't1.depthKneeFlex', metrics: ['depthKneeFlex'], sided: false, weight: w1.depthKneeFlex, note: 'PR #20\'s knee-flexion band with the draft\'s words; the hip-crease line (t1.hipCrease) stays PR #20 detail' },
   { id: 'ohs.lateralShift', test: 'T1', name: 'Weight shifts to one side (overhead squat)', draftRow: '(not in the draft: PR #20 scores it)', map: 'LABELS ONLY', status: 'graded', thresholdId: 't1.lateralShift', metrics: ['lateralShift'], sided: false, weight: w1.lateralShift, note: 'the draft is silent: PR #20\'s band and its placeholder cue' },
-  { id: 'ktw.shinAngle', test: 'T2', name: 'Ankle range (knee to wall)', draftRow: 'Shin angle', map: 'MAPPED', status: 'graded', thresholdId: 't2.tibia', metrics: ['tibia'], sided: true, weight: 100 },
-  { id: 'ktw.lrGap', test: 'T2', name: 'Left vs right ankle gap (knee to wall)', draftRow: 'Left vs right gap', map: 'MAPPED', status: 'graded', thresholdId: 't2.lrDiff', metrics: ['lrDiff'], sided: false, weight: 0 },
+  { id: 'ktw.shinAngle', test: 'T2', name: 'Ankle bend (knee to wall)', draftRow: 'Shin angle', map: 'MAPPED', status: 'graded', thresholdId: 't2.tibia', metrics: ['tibia'], sided: true, weight: 100 },
+  { id: 'ktw.lrGap', test: 'T2', name: 'Left and right ankles differ (knee to wall)', draftRow: 'Left vs right gap', map: 'MAPPED', status: 'graded', thresholdId: 't2.lrDiff', metrics: ['lrDiff'], sided: false, weight: 0 },
   { id: 'sls.kneeCave', test: 'T3', name: 'Knee caves in (single-leg squat)', draftRow: 'Knee caves in', map: 'MAPPED', status: 'graded', thresholdId: 't3.fppa', metrics: ['fppa'], sided: true, weight: w3.fppa },
   { id: 'sls.hipDrop', test: 'T3', name: 'Hip drops (single-leg squat)', draftRow: 'Hip drops on the free-leg side', map: 'MAPPED', status: 'graded', thresholdId: 't3.pelvicDrop', metrics: ['pelvicDrop'], sided: true, weight: w3.pelvicDrop },
-  { id: 'sls.trunkLean', test: 'T3', name: 'Trunk leans sideways (single-leg squat)', draftRow: 'Trunk leans sideways', map: 'MAPPED', status: 'graded', thresholdId: 't3.trunkLean', metrics: ['trunkLean'], sided: true, weight: w3.trunkLean },
-  { id: 'sls.lrGap', test: 'T3', name: 'Left vs right gap (single-leg squat)', draftRow: 'Left vs right gap on any check', map: 'MAPPED', status: 'graded', thresholdId: 't3.lrGap', metrics: ['fppa', 'pelvicDrop', 'trunkLean'], sided: false, weight: 0, note: 'computed on the device: the worst |L − R| of the three per-side medians, all degrees' },
+  { id: 'sls.trunkLean', test: 'T3', name: 'Leans to one side (single-leg squat)', draftRow: 'Trunk leans sideways', map: 'MAPPED', status: 'graded', thresholdId: 't3.trunkLean', metrics: ['trunkLean'], sided: true, weight: w3.trunkLean },
+  { id: 'sls.lrGap', test: 'T3', name: 'Left and right legs differ (single-leg squat)', draftRow: 'Left vs right gap on any check', map: 'MAPPED', status: 'graded', thresholdId: 't3.lrGap', metrics: ['fppa', 'pelvicDrop', 'trunkLean'], sided: false, weight: 0, note: 'computed on the device: the worst |L − R| of the three per-side medians, all degrees' },
   { id: 'jump.landingKneeCave', test: 'T5', name: 'Knees cave in on landing (jump)', draftRow: 'Landing knees cave in', map: 'MAPPED', status: 'graded', thresholdId: 't5.landingValgus', metrics: ['landingValgusLeft', 'landingValgusRight'], sided: true, weight: w5.landingValgusLeft + w5.landingValgusRight },
   { id: 'jump.stiffLanding', test: 'T5', name: 'Stiff landing (jump)', draftRow: 'Stiff landing (little knee bend on landing)', map: 'LABELS ONLY', status: 'graded', thresholdId: 't5.landingFlex', metrics: ['landingFlex'], sided: false, weight: w5.landingFlex, note: 'PR #20\'s hip-drop proxy band with the draft\'s words' },
   { id: 'jump.landingWeightShift', test: 'T5', name: 'Landing weight shift (jump)', draftRow: 'Landing left vs right weight shift', map: 'HIDDEN', status: 'hidden-v1', thresholdId: null, metrics: [], sided: false, weight: 0,

@@ -4,6 +4,7 @@
 // Start, the stage caption, the checks as the last rep read them, and the review. The session is lib/mirror/sideRepStage.ts;
 // the harness steps it and hands these the state. Same copy rules as every Mirror panel: what the camera read, estimated,
 // never a diagnosis; a check the camera could not read says so, never "clean".
+import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';   // CUE-REWRITE: the review cards' words
 import type { CueEvent } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { sideRepReview, type SideRepSpec, type SideRepState } from '@/lib/mirror/sideRepStage';
@@ -87,13 +88,13 @@ export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog
         {s.reps}<span className="ml-1.5 font-mono text-[12px] uppercase tracking-[0.14em] text-white/35">reps</span>
       </p>
       {s.faultReps.length === 0 ? (
-        <p className="mt-2 text-[13px] text-white/60">{s.reps === 0 ? 'Not reached.' : s.unread === s.reps ? 'Not read — the camera did not have a side-on view.' : 'No faults measured.'}</p>
+        <p className="mt-2 text-[13px] text-white/60">{s.reps === 0 ? REVIEW_COPY.notDone : s.unread === s.reps ? REVIEW_COPY.notSideOn : REVIEW_COPY.nothingToFix}</p>
       ) : (
         <ul className="mt-2 space-y-1.5">
           {s.faultReps.map((x) => (
             <li key={x.fault} className="flex gap-2 text-[13px] text-white/70">
               <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[#FF3366]" />
-              {label(x.fault)} — {x.reps} of {s.reps - s.unread} reps read
+              {repsLine(label(x.fault), x.reps, s.reps - s.unread)}
             </li>
           ))}
         </ul>
@@ -105,19 +106,19 @@ export function SideRepReviewCard<F extends string>({ spec, state, label, cueLog
   );
   return (
     <section data-side-review className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-      <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured · estimated</h2>
+      <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
       <div className="mt-3 grid gap-5 sm:grid-cols-3">
-        {stage('The check', r.check)}
-        {stage('The work set', r.work)}
+        {stage(REVIEW_COPY.checkStage, r.check)}
+        {stage(REVIEW_COPY.workStage, r.work)}
         <div>
-          <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">What was cued</p>
+          <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.coachSaid}</p>
           {cueLog.length === 0 ? (
-            <p className="mt-2 text-[13px] text-white/60">No corrections were cued during the work set.</p>
+            <p className="mt-2 text-[13px] text-white/60">{REVIEW_COPY.coachSaidNothing}</p>
           ) : (
             <ul className="mt-2 space-y-1.5">
               {cueLog.map((c, i) => (
                 <li key={i} className="text-[13px] text-white/70">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
                 </li>
               ))}
             </ul>

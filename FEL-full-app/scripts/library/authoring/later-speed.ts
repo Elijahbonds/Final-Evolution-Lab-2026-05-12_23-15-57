@@ -20,7 +20,7 @@ const NEW_STARTS: readonly [string, string, number, string, string][] = [
   ['Split-Stance Start', 'split', 0, 'Stand in a split stance behind the line, front foot at the line.', 'Push the floor back off the front foot and drive the first steps low.'],
   ['Pogo-and-Go Start', 'pogo-go', 1, 'Stand tall behind the line on the balls of the feet.', 'Three quick pogos on the floor, then fall forward and sprint out low.'],
   ['Lateral Shuffle Start', 'shuffle-go', 1, 'Stand side-on behind the line in an athletic stance.', 'Two shuffles along the line, then open and sprint out low toward the cone.'],
-  ['Med Ball Toss Start', 'toss-go', 1, 'Stand behind the line holding a light medicine ball at the hips.', 'Scoop the ball forward along the floor, then chase it, driving the first steps low.'],
+  ['Med Ball Toss Start', 'toss-go', 1, 'Stand behind the line holding a light med ball at the hips.', 'Scoop the ball forward along the floor, then chase it, driving the first steps low.'],
   ['Backpedal-Turn Start', 'backpedal-go', 1, 'Stand facing away from the cone, a step behind the line.', 'Backpedal two steps, turn, and push the floor back to sprint toward the cone.'],
 ];
 const EXISTING_STARTS: readonly [string, string][] = [
@@ -72,12 +72,12 @@ const DEVELOP: readonly [string, string, number, string, Partial<Variant>][] = [
   ['Hill Sprint, 40 m', 'hill-40', 2, 'Drive up the hill 40 metres, tall as the speed builds, then walk down.', { base: 'id:hill-sprint', dosage: meters(4, 40, 150) }],
   ['Sled-Resisted Sprint, 20 m', 'sled-20', 1, 'Lean into the harness and drive the sled 20 metres, the floor pushed back.', { equipment: ['sled'], base: 'id:sled-resisted-sprint', dosage: meters(4, 20, 120) }],
   ['Band-Resisted Sprint, 5 m', 'band-5', 0, 'Drive out 5 metres against the band, three hard steps and stop.', { equipment: ['band'], base: 'id:band-resisted-sprint', dosage: meters(6, 5, 45) }],
-  ['Mini-Hurdle A-Run', 'hurdle-a-run', 1, 'Run over the mini hurdles with the knee driving up and the floor struck right under you.', { equipment: ['mini-hurdle'], dosage: reps(3, '2 runs', 45) }],
+  ['Mini-Hurdle A-Run', 'hurdle-a-run', 1, 'Run over the mini hurdles, knee driving up, feet striking the floor right under you.', { equipment: ['mini-hurdle'], dosage: reps(3, '2 runs', 45) }],
   ['Mini-Hurdle Lateral Run', 'hurdle-lat-run', 1, 'Side-on, run over each mini hurdle quick and light on the floor, never touching a hurdle.', { equipment: ['mini-hurdle'], plane: 'frontal', dosage: reps(3, '2 runs', 45) }],
   ['Mini-Hurdle High-Knee Run', 'hurdle-high-knee', 0, 'One quick step between each mini hurdle, tall, the floor hit under you.', { equipment: ['mini-hurdle'], dosage: reps(3, '2 runs', 45) }],
   ['Build-Up Strides', 'strides', 0, 'Build smoothly to about 80 percent over the distance, tall and smooth.', { base: 'id:build-up-run', dosage: meters(4, 60, 60) }],
-  ['Partner-Chase Start', 'chase', 1, 'Start a metre behind the partner; when they go, chase and try to tag them before the cone.', { equipment: ['cone'], dosage: meters(5, 15, 60) }],
-  ['Partner Tag Escape Sprint', 'escape', 1, 'A partner starts a metre behind you; go on their move and beat them to the cone.', { equipment: ['cone'], dosage: meters(5, 15, 60) }],
+  ['Partner-Chase Start', 'chase', 1, 'Start a metre behind the partner. When they go, chase and tag them before the cone.', { equipment: ['cone'], dosage: meters(5, 15, 60) }],
+  ['Partner Tag Escape Sprint', 'escape', 1, 'A partner starts a metre behind you. Go when they move and beat them to the cone.', { equipment: ['cone'], dosage: meters(5, 15, 60) }],
   ['5-10-5 Shuttle with a Dribble', 'pro-dribble', 1, 'Run the 5-10-5 dribbling, the ball on the outside hand at each touch.', { equipment: ['cone', 'basketball'], base: 'id:5-10-5-shuttle', sport: ['basketball'], goals: ['agility', 'handles'], dosage: reps(4, '1', 60) }],
   ['T-Drill with a Dribble', 't-dribble', 2, 'Run the T dribbling: sprint, shuffle, shuffle, backpedal, the ball low.', { equipment: ['cone', 'basketball'], base: 'id:t-drill', sport: ['basketball'], goals: ['agility', 'handles'], dosage: reps(4, '1', 60) }],
   ['Three-Cone L-Drill with a Dribble', 'l-dribble', 2, 'Run the L dribbling, changing to the outside hand around each cone.', { equipment: ['cone', 'basketball'], base: 'id:three-cone-l-drill', sport: ['basketball'], goals: ['agility', 'handles'], dosage: reps(4, '1', 60) }],
@@ -91,7 +91,7 @@ const CUTS: readonly [string, string, number, string][] = [
   ['45° Cut', '45', 1, 'Plant outside the hips and push the floor away on the angle to the next cone.'],
   ['90° Cut', '90', 1, 'Lower the hips into the plant, then push the floor away square to the new line.'],
   ['180° Turn', '180', 1, 'Sink and plant side-on, touch the line, and push the floor away back the way you came.'],
-  ['Crossover Cut', 'crossover', 1, 'Plant, then cross over toward the cone and drive out on the new line along the floor.'],
+  ['Crossover Cut', 'crossover', 1, 'Plant, cross over toward the cone, and drive out on the new line.'],
   ['Side-Step Cut', 'side-step', 1, 'Plant wide and push the floor away to the opposite side in one sharp step.'],
   ['Jump-Stop Cut', 'jump-stop', 1, 'Jump stop on two feet at the cone, quiet, then push off on the new line.'],
   ['Speed Turn', 'speed-turn', 2, 'Round the cone in a tight arc without slowing, the steps short and quick.'],
@@ -127,8 +127,8 @@ const PATTERNS: readonly [string, string, number, string, string][] = [
   ['Arrowhead Drill', 'arrowhead', 2, 'Cones in an arrowhead: a start, a middle, a tip and a side cone.', 'Sprint, cut around the side cone, sprint to the tip and back.'],
   ['N-Drill', 'n-drill', 1, 'Four cones in an N shape, 5 metres apart.', 'Sprint up, shuffle across the diagonal, and sprint up again.'],
   ['Hourglass Drill', 'hourglass', 1, 'Four cones in an hourglass, 5 metres apart.', 'Sprint the diagonals and shuffle the ends, low and sharp at each cone.'],
-  ['Triangle Drill', 'triangle', 0, 'Three cones in a triangle, 5 metres apart.', 'Sprint, shuffle and backpedal around the triangle, quick at every cone.'],
-  ['Four-Cone Square Drill', 'square', 0, 'Four cones in a square, 5 metres apart.', 'Sprint, shuffle, backpedal, shuffle around the square, quick at every cone.'],
+  ['Triangle Drill', 'triangle', 0, 'Three cones in a triangle, 5 metres apart.', 'Sprint, shuffle and run backward around the triangle, quick at each cone.'],
+  ['Four-Cone Square Drill', 'square', 0, 'Four cones in a square, 5 metres apart.', 'Sprint, shuffle, backpedal and shuffle around the square, quick at every cone.'],
 ];
 function patternVariants(): Variant[] {
   return PATTERNS.flatMap(([name, k, l, setup, cue]) => [

@@ -26,6 +26,8 @@
 // Frames read wrong-view are not silently graded — they never add to a side's rep count or findings, and the turn
 // line is said ONCE per side after TURN_PROMPT_AFTER_FRAMES wrong, then never repeated (P1's lesson, carried forward
 // from the Movement Screen and the squat's own square-up line: one retry, then record it and move on — never a loop).
+import { FAULT_NAMES } from '@/lib/cue-style/names';
+import { result, resultText, type ResultLine } from '@/lib/cue-style/result';
 import { LUNGE_CUES, type LungeFault, type LungePhase, type LungeSide } from './lungeAudit';
 import type { MovementPhase } from '@/lib/babylon/nexus/neuro-mirror/rules/kinematic-engine';
 import { cueTableFor } from './patternCues';
@@ -223,12 +225,13 @@ export function lungePhaseToMovement(phase: LungePhase): MovementPhase {
 
 /** What each fault is called in the review — movement words only, no cause the camera cannot see (the same rule
  *  squatStage.ts SQUAT_FAULT_LABEL follows). */
+// CUE-REWRITE (2026-10-27): the canonical names (lib/cue-style/names.ts).
 export const LUNGE_FAULT_LABEL: Record<LungeFault, string> = {
-  kneeIn: 'Front knee drifting in off the midline',
-  hipDrop: 'Hips tipping to one side',
-  torsoDrift: 'Torso drifting off the start line',
-  shallow: 'Shallow depth',
-  wobble: 'Front knee wobbling side to side',
+  kneeIn: FAULT_NAMES.frontKneeCave,
+  hipDrop: FAULT_NAMES.hipTip,
+  torsoDrift: FAULT_NAMES.upperBodyDrift,
+  shallow: FAULT_NAMES.notDeep,
+  wobble: FAULT_NAMES.kneeWobble,
 };
 
 export interface LungeSideResult {
@@ -238,6 +241,8 @@ export interface LungeSideResult {
   /** How many of this side's finished reps carried each fault at least once. */
   faultRepCounts: Partial<Record<LungeFault, number>>;
   line: string;
+  /** CUE-REWRITE: the side's result in the three-part shape; `line` is its text. */
+  result: ResultLine;
 }
 
 /** The per-side result the review card reads (MIRROR-COACH P4: "the review card, and the per-side result"). */
@@ -247,14 +252,15 @@ export function lungeSideResult(state: LungeSessionState, side: LungeSide): Lung
   const faultRepCounts: Partial<Record<LungeFault, number>> = {};
   for (const rep of state.workReps[side]) for (const f of new Set(rep)) faultRepCounts[f] = (faultRepCounts[f] ?? 0) + 1;
   const label = side === 'left' ? 'Left leg forward' : 'Right leg forward';
-  let line: string;
-  if (reps === 0) line = `${label}: not reached.`;
-  else if (unreadable) line = `${label}: not square to the camera through this set — not read.`;
+  let r: ResultLine;
+  if (reps === 0) r = result(`${label}: not done.`, 'The set ended before this side.', 'Do this side next time.');
+  else if (unreadable) r = result(`${label}: not checked.`, 'You were turned away from the camera for this set.', 'Next time, face the camera straight on.');
   else {
     const entries = Object.entries(faultRepCounts) as [LungeFault, number][];
-    line = entries.length === 0
-      ? `${label}: ${reps} reps, no faults measured.`
-      : `${label}: ${reps} reps — ${entries.map(([f, n]) => `${LUNGE_FAULT_LABEL[f].toLowerCase()} on ${n}`).join(', ')}.`;
+    r = entries.length === 0
+      ? result(`${label}: ${reps} reps, nothing to fix.`, 'This side held its shape on every rep.', 'Keep this side the same next time.')
+      : result(`${label}: ${reps} reps. ${entries.map(([f, n]) => `${LUNGE_FAULT_LABEL[f]} on ${n} of ${reps}`).join('; ')}.`,
+        'This is the side to work on.', `Next set, start with this side and listen for the coach's reminder.`);
   }
-  return { side, reps, unreadable, faultRepCounts, line };
+  return { side, reps, unreadable, faultRepCounts, line: resultText(r), result: r };
 }
