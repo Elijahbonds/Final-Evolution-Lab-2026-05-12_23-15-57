@@ -2,12 +2,17 @@
 // be improved still … smoother movement, better lobs"). Pure; DunkMode reads every number through feel() so the owner can tune
 // them on a playtest run (lib/feel-panel; never in ranked, staked or paid play). docs/DUNK-FLAGSHIP.md has the measurements.
 
-// ── (a) THE RUNWAY'S FEET MATCH THE GROUND ─────────────────────────────────────────────────────────────────────────────
-/** TUNED (was the authored HOOPS_STRIDE.run 3.6 m/s ÷ RUNWAY_PIN 1.1 = 3.27 effective): the ground speed the runway's dribble-run
- *  capture (bball_mc_dribble_run, CMU 78_06) covers at rate 1 ON THE DUNKER. Measured on the rig from the planted foot: paced at
- *  3.27 the feet read a capture of ~4.1 m/s (they cycled fast, sliding back); paced at StrideMatch's 4.57 (scaled to its reference
- *  leg, not this body's) they read ~3.76 (too slow, sliding forward). 3.95 sits between the two reads. */
-export const RUNWAY_STRIDE_MPS = 3.95;
+// ── (a) THE RUN-UP'S STRIDE, A KNOB AT ITS SHIPPED PACE ─────────────────────────────────────────────────────────────────
+/** The ground speed the runway paces its dribble-run loop against (rate = speed ÷ this, inside RUNWAY_RATE_MIN … MAX). Default = the
+ *  shipped pace exactly: HOOPS_STRIDE.run 3.6 ÷ RUNWAY_PIN 1.1 (the loop's own 0.66 s cycle played as 0.6 s), with the shipped
+ *  strideRate bounds 0.7 … 1.6 × 1.1. Measured on the rig, two attempts each: paced at 3.95 the run-up skated MORE at 2.5–5 m/s
+ *  (1.13 / 1.28 m/s against 0.89 / 0.72) and less at a sprint (0.72 / 0.93 against 1.66 / 1.60, ~3 frames a sample) — no overall
+ *  gain (0.91 / 1.16 against 1.11 / 1.03), so the default stays; the knob (dunk.runwayStrideScale) lets the owner try another on a playtest run. */
+export const RUNWAY_STRIDE_MPS = 3.6 / 1.1;
+export const RUNWAY_RATE_MIN = 0.7 * 1.1;
+export const RUNWAY_RATE_MAX = 1.6 * 1.1;
+/** (new knob, default unchanged) The reference above × this: 1 = the shipped pace; above 1 slower steps, below 1 quicker. */
+export const RUNWAY_STRIDE_SCALE = 1;
 
 // ── (b) THE ALLEY-OOP IS A LOB ──────────────────────────────────────────────────────────────────────────────────────────
 // Measured before (esbuild rig, the ALLEY-OOP prop): the passer threw after the take-off, at 0.9 × the rise beat, to arrive on

@@ -55,7 +55,7 @@ import { LEGS, legPose, easeLegPose, cloneLegPose, arcHeight, arcTopT, carryU, s
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { TAKE_OFF_ONE_CATCH } from '../anim/authored/dunkTakeoff';   // DUNK MOTION phase 7
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
-import { HOOPS_STRIDE, RATE_MIN, RATE_MAX } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
+import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, anatomicalElbowPole, type ArmChain } from '../anim/HandIK';
 import type { LimbDrag } from '../anim/LimbDrag';      // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
 import { MotionLayers } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the drag, the wrists and the hinged arm are built there (lifted from here, unchanged)
@@ -87,7 +87,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -3652,14 +3652,11 @@ export const DunkMode: ModeDefinition = (() => {
     const owned = player.animator.clipNames;
     return owned.has(RUNWAY_LOOP) || owned.has('bball_mc_dribble_run') ? RUNWAY_LOOP : SPORT_CLIP.moveLoop;
   }
-  /** DUNK-FLAGSHIP (a): the runway loop's pace for a run at `mps`. The capture (bball_mc_dribble_run, CMU 78_06) covers
-   *  HOOPS_STRIDE_CAPTURE.sprint (4.57 m/s) at rate 1, but the runway paced it against the authored reference (HOOPS_STRIDE.run 3.6)
-   *  times RUNWAY_PIN (1.1) — its feet cycled 1.27 × 1.1 = 1.40× faster than the ground under them at every pace (a skate). It is
-   *  paced against the capture's own stride now (dunk.runwayStrideMps), inside StrideMatch's rate bounds; a body that plays the
-   *  authored loop keeps the authored reference. */
+  /** DUNK-FLAGSHIP (a): the runway loop's pace for a run at `mps` — the shipped pace (strideRate × RUNWAY_PIN for the capture) as one
+   *  reference, so the owner can try another through the feel panel (dunk.runwayStrideScale; core/DunkFlagship has the measurement). */
   function runwayRate(mps: number): number {
     if (!player.animator.clipNames.has('bball_mc_dribble_run')) return strideRate(mps) * runwayPin(runLoop());
-    return Math.min(RATE_MAX, Math.max(RATE_MIN, mps / feel('dunk.runwayStrideMps', RUNWAY_STRIDE_MPS)));
+    return Math.min(RUNWAY_RATE_MAX, Math.max(RUNWAY_RATE_MIN, mps / (RUNWAY_STRIDE_MPS * feel('dunk.runwayStrideScale', RUNWAY_STRIDE_SCALE))));
   }
   /** RUNWAY_PIN when `name` is the runway loop and the body plays its capture (the authored clip keeps its own pace). */
   function runwayPin(name: string): number {

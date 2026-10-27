@@ -38,7 +38,7 @@ written up here as a diff. Before/after numbers are taken on the rig for every c
   - pre-take-off bone pops not above baseline (31);
   - frame strip of the run-up from behind and from the side.
 - **Files:** `modes/DunkMode.ts`, `core/DunkGatherRun.ts`, `core/DunkFlagship.ts`, `lib/feel-panel/knobs.ts` (+ test, `FEEL-PANEL.md`); shared, flagged: `nexus/veniceBoardwalk.ts` (the storefronts hidden until placed).
-- **Risk:** MEDIUM (approach timing; the run-up's leg pace is **TUNED** 3.6 × 1.1 → 4.57 m/s, knob `dunk.runwayStrideMps`).
+- **Risk:** MEDIUM (approach timing). The run-up's leg pace stays as shipped (a re-pace to 3.95 m/s measured no overall skate gain); it is a knob, `dunk.runwayStrideScale` (default 1 = shipped).
 - **Owner feel-check:** hold RUN from a walk and watch the feet from behind: no moonwalk, no brake-pop into the last two steps, no hitch on the take-off frame. The first runway of the night shows the dunker, not a taco stand.
 
 ### Phase 2 — Take-off and landing flow (movement II)
