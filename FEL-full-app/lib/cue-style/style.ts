@@ -135,6 +135,12 @@ export function longWords(text: string): string[] {
   return wordsOf(text).filter((w) => syllables(w) >= 4 && !LONG_WORDS_OK.test(w.replace(/[’']s$/, '')));
 }
 
+/**
+ * A movement whose NAME is a technical term people meet everywhere ("Hip hinge") may keep it as its label; its card says
+ * what it is the first time (names.ts HINGE_GLOSS). Nothing else gets this.
+ */
+export const NAMED_TERMS = /\bhip hinge\b/gi;
+
 // ── the lint ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export type StyleRule = 'length' | 'too-short' | 'number' | 'term' | 'gloss' | 'medical' | 'shame' | 'body-image' | 'grade' | 'long-words';
@@ -147,7 +153,7 @@ export function lintStyle(text: string, tier: CueTier): StyleFinding[] {
   if (n > MAX_WORDS[tier]) out.push({ rule: 'length', detail: `${n} words > ${MAX_WORDS[tier]} (${tier})` });
   if (tier === 'live' && n < LIVE_MIN_WORDS) out.push({ rule: 'too-short', detail: `${n} word` });
   if (tier === 'live' && /\d/.test(text)) out.push({ rule: 'number', detail: 'a number in a live cue' });
-  if (tier === 'live' || tier === 'label') { const t = terms(text); if (t.length) out.push({ rule: 'term', detail: t.join(', ') }); }
+  if (tier === 'live' || tier === 'label') { const t = terms(text.replace(NAMED_TERMS, '')); if (t.length) out.push({ rule: 'term', detail: t.join(', ') }); }
   else { const u = unglossed(text); if (u.length) out.push({ rule: 'gloss', detail: u.join(', ') }); }
   if (isMedical(text)) out.push({ rule: 'medical', detail: (MEDICAL_WORDS.exec(text) ?? MEDICAL_EXTRA.exec(text))![0] });
   const sh = SHAME_WORDS.exec(text); if (sh) out.push({ rule: 'shame', detail: sh[0] });

@@ -30,7 +30,7 @@ describe('first paint', () => {
     expect(render('modified')).not.toContain('Checked by your coach');
     const full = text(render('full'));
     expect(full).toContain('Checked by your coach');
-    expect(full).toContain('Pelvis tilt (a coach checks by hand)');
+    expect(full).toContain('Pelvis tilt (coach checks)');
     expect(full).toContain('Seated turn, each side');
     expect(full.split(COACH_CHECK_LINE).length - 1).toBe(2);
   });

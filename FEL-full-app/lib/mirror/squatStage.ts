@@ -85,7 +85,7 @@ export const BREATH_CYCLE_MS = pacerCycleSec(SQUAT_BREATH_PACER) * 1000;
 
 /** The breathe stage's direction under the picture, from the spec (the harness renders it after "Breathe first."). */
 export const squatBreathLine = (s: PacerSpec = SQUAT_BREATH_PACER): string =>
-  `Breathe in through your nose for ${s.inSec} seconds${s.holdSec > 0 ? `, hold for ${s.holdSec}` : ''}, then out slowly for ${s.outSec}. ${s.rounds} times.`;
+  `In through your nose for ${s.inSec}${s.holdSec > 0 ? `, hold ${s.holdSec}` : ''}, out slowly for ${s.outSec}. ${s.rounds} times.`;
 
 /** Seconds into the breathe stage on the pose clock at `nowMs` (0 before its first frame). */
 export function breathElapsedSec(state: Pick<SquatSessionState, 'breatheStartMs'>, nowMs: number): number {
@@ -163,7 +163,7 @@ export const SHALLOW_MIN_FRAMES = 4;
  * Said once a session, on the first shallow descent (which is not counted). An action in movement words: what the
  * camera measures (the hips going down), nothing about why they did not. After it, shallow reps count and are marked.
  */
-export const DEEPER_LINE = 'Sit a bit deeper so I can count it. Shallow ones count from now on.';
+export const DEEPER_LINE = 'Sit a bit deeper so I can count it. Shallow ones count from now.';
 
 export interface SquatStep {
   state: SquatSessionState;

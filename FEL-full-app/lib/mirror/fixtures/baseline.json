@@ -1756,7 +1756,7 @@
           "notMeasured": [],
           "notScored": [
             "Breathing",
-            "Pelvis tilt (a coach checks by hand)",
+            "Pelvis tilt (coach checks)",
             "Seated turn, each side"
           ],
           "ranAll": true,
@@ -1832,7 +1832,7 @@
             "notMeasured": [],
             "notScored": [
               "Breathing",
-              "Pelvis tilt (a coach checks by hand)",
+              "Pelvis tilt (coach checks)",
               "Seated turn, each side"
             ],
             "ranAll": true,

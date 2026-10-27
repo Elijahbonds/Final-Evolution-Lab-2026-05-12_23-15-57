@@ -324,7 +324,7 @@ describe('POST: provisional under three readable camera checks, and only camera 
     const coach = { checkId: 'pelvicTilt', status: 'pass', value: 0, unit: 'ratio', frames: 300, readableFrames: 300, view: 'side' };
     const { json } = await post({ screenId: 'c-1', screen: 'full', checks: [claim('hipLevel'), claim('shoulderLevel'), coach] });
     expect(json).toMatchObject({ readableCameraChecks: 2, paid: false, dropped: 1 });
-    expect(json.summary.notScored).toEqual(['Breathing', 'Pelvis tilt (a coach checks by hand)', 'Seated turn, each side']);
+    expect(json.summary.notScored).toEqual(['Breathing', 'Pelvis tilt (coach checks)', 'Seated turn, each side']);
   });
 });
 
@@ -668,7 +668,7 @@ describe('GET /api/coach/prescribe — the draft from real results (P3)', () => 
       value: 'right side higher by about 12% of your shoulder width · estimated',
       block: { title: 'Hip and middle hold', kind: 'activate' },
     });
-    expect(d.prescriptions[0].fix).toMatch(/^One-leg exercises on the lower side/);
+    expect(d.prescriptions[0].fix).toMatch(/^Do one-leg moves on the lower side/);
     expect(d).toMatchObject({ serverGraded: true, provisional: false, complete: true, retests: 0 });
     expect(d.reason).toBeUndefined();
   });

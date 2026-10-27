@@ -99,7 +99,7 @@ describe('the screen protocol', () => {
     const r = scoreScreen('full', [res('heelLine', 'stable')]);
     // MIRROR-COACH P3 (2026-09-25): named as NOT SCORED (the athlete's answers and the coach's checks), not as "not
     // measured" camera checks — they were listed as missing on every screen, so no screen could ever be complete
-    expect(r.notScored).toEqual(['Breathing', 'Pelvis tilt (a coach checks by hand)', 'Seated turn, each side']);
+    expect(r.notScored).toEqual(['Breathing', 'Pelvis tilt (coach checks)', 'Seated turn, each side']);
     expect(r.notMeasured.join(' ')).not.toMatch(/breathing|pelvis tilt|seated turn/i);
     expect(r.ranAll).toBe(false);
   });
@@ -344,7 +344,7 @@ describe('the variant a screen is stored as', () => {
     const full = scoreScreen('full', all), mod = scoreScreen('modified', all);
     expect({ ...full, screen: 'x', notScored: [] }).toEqual({ ...mod, screen: 'x', notScored: [] });
     expect(full.triage).toBe('proceed');
-    expect(full.notScored).toEqual(['Breathing', 'Pelvis tilt (a coach checks by hand)', 'Seated turn, each side']);
+    expect(full.notScored).toEqual(['Breathing', 'Pelvis tilt (coach checks)', 'Seated turn, each side']);
     expect(mod.notScored).toEqual(['Breathing']);
   });
 });

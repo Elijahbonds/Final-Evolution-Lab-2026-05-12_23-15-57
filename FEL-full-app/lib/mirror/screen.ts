@@ -102,10 +102,10 @@ const WOBBLE: ScreenCheck = {
   id: 'singleLeg', label: 'One-leg balance, 30 seconds a side', source: 'camera', sided: true, grader: 'singleLeg',
   // P3: what the grader reads (the free foot's touch-downs, the hips' sway). It was "…without the pelvis dropping or the
   // knee caving", neither of which it measures.
-  flag: 'Over thirty seconds on one leg, the free foot came down or the hips swayed a lot.',
+  flag: 'On one leg, the free foot came down or the hips swayed a lot.',
 };
 const PELVIC_TILT: ScreenCheck = {
-  id: 'pelvicTilt', label: 'Pelvis tilt (a coach checks by hand)', source: 'coach', sided: false,
+  id: 'pelvicTilt', label: 'Pelvis tilt (coach checks)', source: 'coach', sided: false,
   flag: 'The front of the hips sits well below or well above the back.',
 };
 const THORACIC: ScreenCheck = {
@@ -495,11 +495,11 @@ const MEANING: Record<string, string> = {
 const FIX: Record<string, string> = {
   heelLine: 'Foot work before any weights: press heel, big toe and little toe into the floor, then do slow calf raises.',
   kneeWindow: 'Side steps with a band, then slow squats watching your knee stay over your middle toes.',
-  hipLevel: 'One-leg exercises on the lower side, alongside your normal training.',
+  hipLevel: 'Do one-leg moves on the lower side, as well as your usual training.',
   shoulderLevel: 'Slow breathing first, then easy turning drills to both sides.',
   ribAngle: 'Long, slow breaths out, ribs down, before any heavy lifting over your head or on your back.',
   headFloat: 'Small chin nods, upper-back stretches over a roller, and raise the screen you look at all day.',
-  singleLeg: 'Thirty-second one-leg holds every day, then slow step-downs, before jumping drills.',
+  singleLeg: 'Stand on one leg for thirty seconds each day. Then add slow step-downs, then jumps.',
   pelvicTilt: 'Practice tipping your hips both ways so they can rest in the middle.',
   thoracicRotation: 'Turning drills to the stiffer side: hold each turn, do not bounce.',
 };

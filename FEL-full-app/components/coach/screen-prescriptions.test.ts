@@ -165,7 +165,7 @@ describe('the panel: camera / their answers / your checks, in that order, never 
     expect(plain(hip)).toContain('Hip level, right hip higher');
     expect(plain(hip)).toContain('Flagged for a closer look');
     expect(plain(hip)).toContain('right side higher by about 12% of your shoulder width · estimated');   // test changed: copy rewrite (CUE-REWRITE) — same value, its meaning in words
-    expect(plain(hip)).toContain('Fix: One-leg exercises on the lower side');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
+    expect(plain(hip)).toContain('Fix: Do one-leg moves on the lower side');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
     expect(plain(hip)).toContain('Corrective block (activate): Hip and middle hold');
   });
 

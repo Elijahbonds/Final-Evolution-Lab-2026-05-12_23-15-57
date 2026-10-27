@@ -47,19 +47,19 @@ export interface MovementSpec {
 export const MOVEMENT_SPECS: Readonly<Record<ReviewMovement, MovementSpec>> = {
   squat: {
     id: 'squat', label: 'Squat', view: 'front', faults: SQUAT_FAULTS, label_of: SQUAT_FAULT_LABEL, cues: SQUAT_CUES,
-    setup: 'Phone at hip height, 2 to 3 m away, facing you. Stand still for a second, then do your set.',
+    setup: 'Phone at hip height, 2 to 3 m away, facing you. Stand still, then go.',
   },
   lunge: {
     id: 'lunge', label: 'Lunge', view: 'front', faults: LUNGE_FAULTS, label_of: LUNGE_FAULT_LABEL, cues: LUNGE_CUES,
-    setup: 'Phone at hip height, 2 to 3 m away, facing you. Get in your stance, stand still, then go.',
+    setup: 'Phone at hip height, 2 to 3 m away, facing you. Get set, then go.',
   },
   hinge: {
     id: 'hinge', label: 'Hip hinge', view: 'side', faults: HINGE_FAULTS, label_of: HINGE_FAULT_LABEL, cues: HINGE_CUES,
-    setup: 'Side-on to the phone, 2 to 3 m away, at hip height. Stand tall and still, then go.',
+    setup: 'Side-on to the phone, 2 to 3 m away. Stand tall and still, then go.',
   },
   pushup: {
     id: 'pushup', label: 'Push-up', view: 'side', faults: PUSHUP_FAULTS, label_of: PUSHUP_FAULT_LABEL, cues: PUSHUP_CUES,
-    setup: 'Phone on the floor, side-on, 2 m away. Hold the top of your push-up still, then go.',
+    setup: 'Phone on the floor, side-on, 2 m away. Hold the top still, then go.',
   },
 };
 

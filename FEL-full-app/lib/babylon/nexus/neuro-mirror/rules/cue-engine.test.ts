@@ -450,7 +450,7 @@ describe('P9 fix: a faded fault that keeps showing steps back up (it never could
     expect(ce.levelOf('heelRise')).toBe('everyThird');
     const lines = fadeReviewLines(s.report, (f) => f);
     // test changed: copy rewrite (CUE-REWRITE) — same meaning: too often to leave, so next set it is cued every third time
-    expect(lines).toEqual(['heelRise: 4 of 8 reps, not said during the set. That is a lot, so next set you get a reminder every third time.']);
+    expect(lines).toEqual(['heelRise: 4 of 8 reps, not said during the set. Next set, a reminder every third time.']);
     expect(lines.join(' ')).not.toMatch(/holding it|stayed away/);
     // …and the next set it IS cued (every third), where before it was silent for good
     t = s.end + 10_000;
@@ -466,7 +466,7 @@ describe('P9 fix: a faded fault that keeps showing steps back up (it never could
     expect(s.report.faults[0]).toMatchObject({ level: 'everyThird', next: 'everyRep', slipped: true });
     expect(ce.levelOf('heelRise')).toBe('everyRep');
     // test changed: copy rewrite (CUE-REWRITE) — same meaning
-    expect(fadeReviewLines(s.report, (f) => f)[0]).toMatch(/That is a lot, so next set you get a reminder every time\.$/);
+    expect(fadeReviewLines(s.report, (f) => f)[0]).toMatch(/Next set, a reminder every time\.$/);
     const ce2 = new CueEngine({ clearByRep: true });
     set(ce2, 'heelRise', [1], 0);
     const two = set(ce2, 'heelRise', [2, 6], 50_000);

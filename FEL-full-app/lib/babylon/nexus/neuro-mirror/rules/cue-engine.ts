@@ -571,7 +571,7 @@ export function fadeReviewLines<F extends string>(report: SetReport<F>, label: (
       lines.push(`${name}: back on ${r.faultReps} of ${report.reps} reps, so the coach reminds you every rep again.`);
     } else if (r.slipped) {
       lines.push(`${name}: ${r.faultReps} of ${report.reps} reps${r.level === 'summaryOnly' ? ', not said during the set' : ', with a reminder every third time'}. `
-        + `That is a lot, so next set you get a reminder ${r.next === 'everyRep' ? 'every time' : 'every third time'}.`);
+        + `Next set, a reminder ${r.next === 'everyRep' ? 'every time' : 'every third time'}.`);
     } else if (r.level === 'summaryOnly' && r.faultReps > 0) {
       lines.push(`${name}: ${r.faultReps} of ${report.reps} reps. Not said during the set, because you had fixed it in earlier sets.`);
     } else if (r.level === 'everyThird' && r.faultReps > r.spoken) {

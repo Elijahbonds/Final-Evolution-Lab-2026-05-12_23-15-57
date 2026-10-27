@@ -39,7 +39,9 @@ export function shapeProblems(r: ResultLine): string[] {
   if (!r.next.text.trim()) out.push('no "what to do next"');
   if (r.next.href != null && !/^\/[\w\-/?=&#%.]*$/.test(r.next.href)) out.push(`next link is not a same-origin path: ${r.next.href}`);
   // a bare number with no meaning: a digit in "saw" needs a comparison or a meaning word in saw or means
-  if (/\d/.test(r.saw) && !/\b(about|same|up|down|more|less|than|best|last|usual|normal|range|higher|lower|faster|slower|of|out of|in a row|each|per)\b/i.test(`${r.saw} ${r.means}`)) {
+  // "on rep 4", "station 2" are positions, not measurements
+  const measured = r.saw.replace(/\b(rep|reps|set|station|step|side|leg) \d+\b/gi, '');
+  if (/\d/.test(measured) && !/\b(about|same|up|down|more|less|than|best|last|usual|normal|range|higher|lower|faster|slower|of|out of|in a row|each|per)\b/i.test(`${r.saw} ${r.means}`)) {
     out.push('a number with no meaning attached');
   }
   return out;

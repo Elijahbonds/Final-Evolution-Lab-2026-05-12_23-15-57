@@ -48,7 +48,7 @@ export const MIRROR_LIVE_MOVEMENTS: readonly LiveMovement[] = [
   },
   {
     id: 'pressRow', tab: 'Press / Row', title: 'Press and row',
-    reads: 'One foot forward, pressing and rowing a handle. The camera watches your elbow, shoulder and balance on every rep, and the coach talks you through it.',
+    reads: 'One foot forward, pressing and rowing a handle. The camera watches your elbow, shoulder and balance, and the coach talks you through it.',
   },
   {
     id: 'jump', tab: 'Jump', title: 'Vertical Jump',
