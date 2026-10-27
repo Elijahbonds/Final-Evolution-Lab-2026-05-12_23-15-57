@@ -16,7 +16,7 @@ const esbuild = require('esbuild');
 fs.mkdirSync(outDir, { recursive: true });
 const env = dev ? '"development"' : '"production"';
 await esbuild.build({
-  absWorkingDir: APP, entryPoints: [path.join(HERE, 'entry.mjs')], bundle: true, minify: !dev, format: 'iife', platform: 'browser', target: 'es2020',
+  absWorkingDir: APP, entryPoints: [path.join(HERE, process.env.ENTRY ?? 'entry.mjs')], bundle: true, minify: !dev, format: 'iife', platform: 'browser', target: 'es2020',
   tsconfig: path.join(APP, 'tsconfig.json'), define: { 'process.env.NODE_ENV': env },
   banner: { js: `window.process=window.process||{env:{NODE_ENV:${env}}};` },
   loader: { '.glb': 'dataurl', '.png': 'dataurl', '.jpg': 'dataurl', '.wasm': 'dataurl' },

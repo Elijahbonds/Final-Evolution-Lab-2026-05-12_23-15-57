@@ -25,7 +25,7 @@ const PAGE = process.env.PAGE ?? 'dev';
 const TIER = process.env.TIER ?? 'pro';
 const SEED = Number(process.env.SEED ?? 7);
 const GAME_S = Number(process.env.GAME_S ?? 180);
-const [VW, VH] = (process.env.VIEW ?? '640x360').split('x').map(Number);
+const [VW, VH] = (process.env.VIEW ?? '480x270').split('x').map(Number);
 const SHOTS = process.env.SHOTS ?? path.join(OUT, 'shots');
 fs.mkdirSync(OUT, { recursive: true }); fs.mkdirSync(SHOTS, { recursive: true });
 const T0 = Date.now(); const say = (m) => console.log(`[${MODE} ${SCEN} ${TIER} ${((Date.now() - T0) / 1000).toFixed(0)}s] ${m}`);
@@ -95,17 +95,18 @@ if (SCEN === 'game') {
   const T = (name, arg) => ev(([n, a]) => window.__hg.test[n](a), [name, arg]);
   const R = result.tests = { stick: [], stickTurbo: [], shot: [], flickStand: [], flickJog: [], pass: [], poke: [], block: [] };
   await ev(() => window.__hg.start());
-  for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.stick.push(await T('stick', false)); }
-  for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.stickTurbo.push(await T('stick', true)); }
-  for (let k = 0; k < 4; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
+  for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stick.push(await T('stick', false)); }
+  for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stickTurbo.push(await T('stick', true)); }
+  for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
+  const REPS = Number(process.env.REPS ?? 1);
   const dirs = ['left', 'right', 'up', 'down', 'upleft', 'upright', 'downleft', 'downright'];
-  for (const d of dirs) for (let k = 0; k < 2; k++) {
+  for (const d of dirs) for (let k = 0; k < REPS; k++) {
     await setOff(); await waitGame(1200);
     if (d === 'left' && k === 0) ev(() => window.__hg.strip('crossover-stand', 16, 3));
     R.flickStand.push(await T('flick', d));
     if (d === 'left' && k === 0) await saveStrip('crossover-stand');
   }
-  for (const d of dirs) for (let k = 0; k < 2; k++) {
+  for (const d of dirs) for (let k = 0; k < REPS; k++) {
     await setOff(); await waitGame(900);
     await ev(() => { const h = window.__hg; const me = window.__FEL_DEV__.hero(); let r = me; while (r.parent) r = r.parent; const p = r.getAbsolutePosition(); h.steer(0 - p.x, -0.6 - p.z, 0.7); });
     await waitGame(500);
@@ -115,7 +116,7 @@ if (SCEN === 'game') {
     await ev(() => window.__hg.stick(0, 0));
   }
   if (MODE === 'threevthree') for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.pass.push(await T('pass')); await waitGame(1500); }
-  for (let k = 0; k < 4; k++) {
+  for (let k = 0; k < 3; k++) {
     await setDef(); await waitGame(1400 + k * 250);
     if (k === 0) ev(() => window.__hg.strip('defense', 16, 4));
     R.poke.push(await T('poke'));

@@ -263,7 +263,7 @@
   const pctl = (a, p) => { if (!a.length) return null; const s = Float64Array.from(a).sort(); return s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))]; };
   const r2 = (x) => (x === null || x === undefined || !isFinite(x) ? null : Math.round(x * 100) / 100);
   HG.analyse = (opts = {}) => {
-    const n = F; const out = { frames: n, bodies: B.map((b) => b.id), perBody: {}, ball: {}, camera: {}, possessions: [] };
+    const n = F; const out = { f0: HG.f0, frames: n, bodies: B.map((b) => b.id), perBody: {}, ball: {}, camera: {}, possessions: [] };
     // possession segments (a change of the possession code; zeros carried forward)
     const pc = new Int8Array(n); let last = 0; for (let i = 0; i < n; i++) { pc[i] = poss[i] || last; last = pc[i]; }
     const cuts = new Set(); let segStart = 0;
@@ -339,6 +339,10 @@
       if (i > 1 && !cuts.has(i - 1)) { const q = (i - 2) * 7; cj.push(Math.hypot(camA[o] - 2 * camA[p] + camA[q], camA[o + 1] - 2 * camA[p + 1] + camA[q + 1], camA[o + 2] - 2 * camA[p + 2] + camA[q + 2]) * 3600); }
       nF++; if (scr[i * 3 + 2] && Math.abs(scr[i * 3]) < 0.9 && Math.abs(scr[i * 3 + 1]) < 0.9) inFrame++;
     }
+    // overlap: frames where two bodies' roots are closer than 0.6 m (two torsos of ~0.38 m radius interpenetrate), outside resets
+    let overlapF = 0, minPair = Infinity; const pairD = [];
+    for (let i = 0; i < n; i++) { if (cuts.has(i)) continue; let hit = false; for (let a = 0; a < B.length; a++) for (let c = a + 1; c < B.length; c++) { const oa = (i * NB + a) * K, oc = (i * NB + c) * K; const d = Math.hypot(pos[oa] - pos[oc], pos[oa + 2] - pos[oc + 2]); if (d < minPair) minPair = d; if (d < 1.2) pairD.push(d); if (d < 0.6) hit = true; } if (hit) overlapF++; }
+    out.overlap = { framesUnder06m: overlapF, pct: n ? r2(overlapF / n * 100) : null, minPairM: r2(minPair), closeP10M: r2(pctl(pairD, 0.1)) };
     out.camera = { speedP95: r2(pctl(cs, 0.95)), turnP95DegS: r2(pctl(cw, 0.95)), turnP99DegS: r2(pctl(cw, 0.99)), accelP95: r2(pctl(cj, 0.95)), accelP99: r2(pctl(cj, 0.99)), snaps, heroInFramePct: nF ? r2(inFrame / nF * 100) : null, fovs: [...fovs].slice(0, 8) };
     out.errors = HG.errors.slice(0, 10);
     if (opts.raw) out.raw = { possCode: Array.from(pc.filter((_, i) => i % 6 === 0)) };
