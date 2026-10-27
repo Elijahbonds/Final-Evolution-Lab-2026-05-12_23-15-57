@@ -13,6 +13,7 @@ import { paymentMethodsFor } from '@/lib/stripe-payment-methods';
 import { siteOrigin } from '@/lib/stripe/site-origin';
 import type { StoreClosedReason } from '@/lib/coach-store/stripeMode';
 import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+import { allowlistPermits } from '@/lib/payments/allowlist';
 import { bookFormatAllowed, bookOfferAllowed, currentBookPolicy, type BookTermsPolicy } from './bookTerms';
 
 // Same pin as lib/stripe.ts. The SDK's enum lags the account's version string.
@@ -81,7 +82,8 @@ export function bookCheckoutGate(env: NodeJS.ProcessEnv = process.env): BookChec
   const key = bookStripeSecret(env).trim();
   if (!key) return { ok: false, reason: 'payments_not_set_up' };
   if (!key.startsWith('sk_test_')) return { ok: false, reason: 'live_mode_off' };
-  if (!virtualPurchasesOn(env)) return { ok: false, reason: 'virtual_purchases_off' };
+  // PAYMENTS-READY: + PURCHASES_ALLOWLIST ('books'); unset = as before.
+  if (!virtualPurchasesOn(env) || !allowlistPermits('books', env)) return { ok: false, reason: 'virtual_purchases_off' };
   const origin = siteOrigin(env);
   if (!origin) return { ok: false, reason: 'site_url_not_set' };
   return { ok: true, key, origin };

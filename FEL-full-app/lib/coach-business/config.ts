@@ -35,6 +35,84 @@ export const CONNECT_FEE_BPS = 500;
 export const STRIPE_CARD_FEE_BPS = 290;
 export const STRIPE_CARD_FEE_FIXED_CENTS = 30;
 
+// ── PAYMENTS-READY (2026-10-26): the owner's two open money calls, each one env value away ─────────────────────────────
+// MONEY CONSTANTS. Every default below is TODAY's behaviour; nothing changes until the owner sets the env.
+//
+//   · PLATFORM_FEE_BPS_FREE / PLATFORM_FEE_BPS_PRO — FEL's share of a coach's sale, in basis points, by the coach's plan
+//     (plan.ts: Pro = an active FEL_COACH / FEL_FACILITY subscription or the coach-store allowlist). Default 500 (5%) for
+//     both: the owner's 5% of 2026-10-25. "0% on Pro" = PLATFORM_FEE_BPS_PRO=0.
+//   · PLATFORM_FEE_CAP_CENTS_MONTHLY — the most FEL takes from one coach in a calendar month (UTC), in cents, across
+//     every sale. Unset = no cap (today). A sale that would pass the cap is charged only what is left of it; past the
+//     cap FEL takes 0. The month's total is read from FEL's ledger (COACH_CONNECT_FEE less COACH_CONNECT_FEE_REFUND, by
+//     coach) plus the checkouts still open, so two checkouts started together cannot both spend the same room.
+//   · REFUND_PROCESSING_FEE — on a refund, does the buyer also get back their share of the processing fee? Default off:
+//     today's rule ("the processing fee is not refunded", docs/COACH-BUSINESS.md "Refunds"). On: the buyer gets the
+//     price AND the same share of the processing fee back, the coach's outcome is unchanged, and FEL absorbs Stripe's
+//     fee (Stripe keeps it on a refunded charge). assumption: default unchanged until the owner decides (the store
+//     terms §2.6 and the code disagree today; which one changes is the owner's call).
+// Every value is read on each use. A value that is not a whole number in range falls back to the default, and
+// scripts/payments-preflight.ts reports it, so a typo never silently changes a fee.
+
+/** (new, MONEY) FEL's share in bps for a Free coach while PLATFORM_FEE_BPS_FREE is unset: today's 5%. */
+export const PLATFORM_FEE_BPS_FREE_DEFAULT = CONNECT_FEE_BPS;
+/** (new, MONEY) FEL's share in bps for a Pro coach while PLATFORM_FEE_BPS_PRO is unset: today's 5%. */
+export const PLATFORM_FEE_BPS_PRO_DEFAULT = CONNECT_FEE_BPS;
+/** (new, MONEY) No monthly cap while PLATFORM_FEE_CAP_CENTS_MONTHLY is unset: today. */
+export const PLATFORM_FEE_CAP_CENTS_MONTHLY_DEFAULT: number | null = null;
+/** (new, MONEY) The processing fee is not refunded while REFUND_PROCESSING_FEE is unset: today. */
+export const REFUND_PROCESSING_FEE_DEFAULT = false;
+/** A cap above this is a typo, not a policy ($1,000,000 a month). */
+export const PLATFORM_FEE_CAP_MAX_CENTS = 100_000_000;
+
+export interface FeePolicy { bpsFree: number; bpsPro: number; capCentsMonthly: number | null }
+
+function bpsFrom(raw: string | undefined, fallback: number): number {
+  const v = (raw ?? '').trim();
+  if (!/^\d+$/.test(v)) return fallback;
+  const n = Number(v);
+  return n <= 10_000 ? n : fallback;
+}
+
+function capFrom(raw: string | undefined): number | null {
+  const v = (raw ?? '').trim();
+  if (!/^\d+$/.test(v)) return PLATFORM_FEE_CAP_CENTS_MONTHLY_DEFAULT;
+  const n = Number(v);
+  return n <= PLATFORM_FEE_CAP_MAX_CENTS ? n : PLATFORM_FEE_CAP_CENTS_MONTHLY_DEFAULT;
+}
+
+/** The platform-fee settings in force (defaults: 5% for every plan, no cap). */
+export function platformFeePolicy(env: NodeJS.ProcessEnv = process.env): FeePolicy {
+  return {
+    bpsFree: bpsFrom(env.PLATFORM_FEE_BPS_FREE, PLATFORM_FEE_BPS_FREE_DEFAULT),
+    bpsPro: bpsFrom(env.PLATFORM_FEE_BPS_PRO, PLATFORM_FEE_BPS_PRO_DEFAULT),
+    capCentsMonthly: capFrom(env.PLATFORM_FEE_CAP_CENTS_MONTHLY),
+  };
+}
+
+const ON_WORDS = ['1', 'true', 'on', 'yes'];
+const OFF_WORDS = ['', '0', 'false', 'off', 'no'];
+
+/** Does a refund also return the buyer's share of the processing fee? Default: no (today). */
+export function refundProcessingFee(env: NodeJS.ProcessEnv = process.env): boolean {
+  const v = (env.REFUND_PROCESSING_FEE ?? '').trim().toLowerCase();
+  if (ON_WORDS.includes(v)) return true;
+  return REFUND_PROCESSING_FEE_DEFAULT;
+}
+
+/** The money env values that are set but not understood (each falls back to its default). For the preflight. */
+export function moneyEnvProblems(env: NodeJS.ProcessEnv = process.env): string[] {
+  const out: string[] = [];
+  for (const k of ['PLATFORM_FEE_BPS_FREE', 'PLATFORM_FEE_BPS_PRO'] as const) {
+    const v = (env[k] ?? '').trim();
+    if (v && (!/^\d+$/.test(v) || Number(v) > 10_000)) out.push(`${k} is not a whole number of basis points from 0 to 10000; the default ${k === 'PLATFORM_FEE_BPS_FREE' ? PLATFORM_FEE_BPS_FREE_DEFAULT : PLATFORM_FEE_BPS_PRO_DEFAULT} applies`);
+  }
+  const cap = (env.PLATFORM_FEE_CAP_CENTS_MONTHLY ?? '').trim();
+  if (cap && (!/^\d+$/.test(cap) || Number(cap) > PLATFORM_FEE_CAP_MAX_CENTS)) out.push(`PLATFORM_FEE_CAP_CENTS_MONTHLY is not a whole number of cents up to ${PLATFORM_FEE_CAP_MAX_CENTS}; no cap applies`);
+  const r = (env.REFUND_PROCESSING_FEE ?? '').trim().toLowerCase();
+  if (!ON_WORDS.includes(r) && !OFF_WORDS.includes(r)) out.push('REFUND_PROCESSING_FEE is not 1/0 (or true/false, on/off, yes/no); the default (off) applies');
+  return out;
+}
+
 /** Coach Pro per month while COACH_PRO_PRICE_USD_CENTS is unset (owner, 2026-10-25: $39/month). */
 export const COACH_PRO_PRICE_DEFAULT_CENTS = 3900;
 
