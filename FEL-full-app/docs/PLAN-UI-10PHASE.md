@@ -324,3 +324,25 @@ Fixes in another lane's file are reported to that lane, not made here.
 **Files:** owned folders only. The rest is listed by owner.
 
 **Owner look-check:** a 2-minute walk through the app on a phone. Does anything still look like a different app?
+
+---
+
+## Status (2026-10-27)
+
+| Phase | Commits | Shipped as | Gate result (phone unless noted) |
+|---|---|---|---|
+| P1 design system | `0a16ae59` `3723c62b` | #463 | 6 sizes, 2 faces; surfaces ≥ 4.5:1 (by test); `/dev/ui` 0 a11y |
+| P2 fonts | `7d93f449` | #463 | serif runs with no next/font variables: 10 / 63 / 83 / 124 → **0** (landing / play / train / profile) |
+| P3 shell | `321a523f` | #468 | one accent; rail CLS source removed (`35104ffd`) |
+| P4 top screens | `736881bf` `e36e304e` | #468 | words above fold 46/133/141/104 → **25/42/83/67**; flat-empty 77/49/53/59 → **6/26/33/20 %**; imagery 0 → all four |
+| P5 game menus + couch | `25deded2` | #468 | end-screen card looks 2 → 1; hero zooms in couch view; no tuned number |
+| P6 results frame | `952ed0d3` | #468 | Quick Screen copy unchanged; surfaces and pills only |
+| P7 learn + Playbook | `47632b72` | #468 | Playbook words 164 → 90, flat-empty 51 → 28 %, CLS .091 → .006 |
+| P8 coach | `5e6e0443` | #468 | visible h1, one docked primary, empty state |
+| P9 a11y deepening | `f422ec31` `d16e3fe1` | #468 | 22 rooms: 0 critical; serious 35 → 1 → 0 (`0a73b273`); reduced motion / 200 % / 1.4.12: 0 |
+| P10 sweep + polish | `59345d01` `c67116c5` `35104ffd` (#468); `0a73b273` `c04f01aa` (lane/premium-ui-p10) | open | Profile and shell on the 6-step scale; Profile card looks and Train CLS re-measured with `--prod-fonts` |
+
+**Owner calls (2026-10-27)**, landed in `47632b72` and `cf93cb61`:
+
+- The /workout and /live doors are off the menus, and both still work by link.
+- The /signature hub is "Weekly challenges" in the menus and on the end screen.
