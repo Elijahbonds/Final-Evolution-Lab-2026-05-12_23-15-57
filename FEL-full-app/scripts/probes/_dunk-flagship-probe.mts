@@ -49,7 +49,7 @@ const BTN_I: Record<Btn, number> = { A: 0, B: 1, X: 2, Y: 3 }, DPAD_I: Record<Di
 const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head'];
 const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
 
-interface Frame { t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
+interface Frame { lv?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
 interface Rec { scen: string; rep: number; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; pressAt: number | null; t0: number; hud: string[]; err?: string }
 
 const PAD_INIT = `(() => {
@@ -96,7 +96,9 @@ const RECORDER = `(() => {
     try { const T = cam.getTarget ? cam.getTarget() : (cam.target || null); if (T) tg = [r4(T.x), r4(T.y), r4(T.z)]; } catch (e) {}
     const clips = scene.animationGroups.filter((g) => g.isPlaying && g.targetedAnimations.some((t) => targets.has(t.target))).map((g) => { const a = g.animatables && g.animatables[0]; const w = a && typeof a.weight === 'number' && a.weight >= 0 ? a.weight : (g.weight >= 0 ? g.weight : 1); return [g.name, Math.round(w * 100) / 100]; }).filter((c) => c[1] > 0.02);
     const f = window.__vc ? window.__vc.C.frames : 0;
-    R.frames.push({ t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1 });
+    const ringM = scene.getMeshByName('lob_catch_ring'), shadowM = scene.getMeshByName('lob_ball_shadow');
+    const lv = (ringM && ringM.isVisible && ringM.isEnabled() ? 1 : 0) + (shadowM && shadowM.isVisible && shadowM.isEnabled() ? 2 : 0);
+    R.frames.push({ t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
     if (R.frames.length > 4000) R.frames.shift();
     // the frame strip: pause the clock ON this frame so node photographs exactly it
     if (R.strip && R.strip.length && (f - R.f0) >= R.strip[0]) { R.strip.shift(); R.stripN++; R.stripWait = true; window.__vc.pause(); }
@@ -221,6 +223,9 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
     case 'selflob': return { ...base, walkMs: 0, standMs: 300 + jit, preY: true };
     case 'runlob': return { ...base, runY: true, walkMs: 300 + jit };
     case 'oop': case 'oopglass': case 'oopbounce': return { ...base, walkMs: 500 + jit };
+    case 'oopstand': return { ...base, walkMs: 0, standMs: 300 + jit };                                  // RT from standing
+    case 'ooppress': return { ...base, walkMs: 400, takeoff: 'press', pressAfterMs: 500 + jit };          // A early on the run
+    case 'ooprelease': return { ...base, walkMs: 400, takeoff: 'release', pressAfterMs: 450 + jit };      // RT let go early
     case 'show': return { ...base, recMs: 14000 };
     default: if (scen.startsWith('trick:')) { const a = AIR[scen.slice(6)]; return { ...base, walkMs: 400, air: [DPAD_I[a[0]], BTN_I[a[1]]] }; }
   }
@@ -228,7 +233,7 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
 }
 
 async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
-  const prop = scen === 'oop' ? 'alleyoop' : scen === 'oopglass' || scen === 'oopbounce' ? scen : (process.env.PROP ?? null);
+  const prop = scen === 'oop' || scen === 'oopstand' || scen === 'ooppress' || scen === 'ooprelease' ? 'alleyoop' : scen === 'oopglass' || scen === 'oopbounce' ? scen : (process.env.PROP ?? null);
   const list = scen === 'tricks' ? Object.keys(AIR).map((k) => `trick:${k}`) : Array.from({ length: reps }, () => scen);
   const out: Rec[] = [];
   let pg: { p: Page; errors: string[] } | null = null; let used = 0;
@@ -410,7 +415,11 @@ function lobMetrics(r: Rec) {
   const catchClip = caught ? Number(/@([\d.]+)/.exec(caught.msg)?.[1] ?? NaN) : null;
   // speed of the ball at the catch (how hard it arrives into the hand)
   const last = fl.slice(-3); const vIn = last.length >= 2 && last[0].ball && last[last.length - 1].ball ? Math.hypot(...[0, 1, 2].map((k) => last[last.length - 1].ball![k] - last[0].ball![k])) / ((last.length - 1) * DT) : NaN;
-  return { label: /\[LOB\] ([A-Z-' ]+?) (from|at|OFF)/.exec(thrown.msg)?.[1] ?? thrown.msg.slice(6, 30), caught: !!caught, lost: !!lost, flightMs: rnd(fl.length * 1000 / 60, 0), apexM: rnd(Math.max(...ys)),
+  const to = /to \(([-\d.]+),([-\d.]+),([-\d.]+)\)/.exec(thrown.msg); const catchY = to ? Number(to[2]) : NaN;
+  const ringShare = fl.filter((f) => ((f.lv ?? 0) & 1) === 1).length / Math.max(1, fl.length), shadowShare = fl.filter((f) => ((f.lv ?? 0) & 2) === 2).length / Math.max(1, fl.length);
+  const ringAfter = r.frames.slice(i1 + 25, i1 + 60).filter((f) => ((f.lv ?? 0) & 1) === 1).length;   // still up 0.4–1 s after the catch?
+  return { catchY: rnd(catchY), apexOverCatchM: rnd(Math.max(...ys) - catchY), ringShare: rnd(ringShare), shadowShare: rnd(shadowShare), ringLingerFrames: ringAfter, onRun: r.marks.some((m) => /lobs it on the run/.test(m.msg)),
+    label: /\[LOB\] ([A-Z-' ]+?) (from|at|OFF)/.exec(thrown.msg)?.[1] ?? thrown.msg.slice(6, 30), caught: !!caught, lost: !!lost, flightMs: rnd(fl.length * 1000 / 60, 0), apexM: rnd(Math.max(...ys)),
     catchClipT: catchClip, gapMinM: rnd(Math.min(...gaps)), gapAtEndM: rnd(gaps[gaps.length - 1]), arriveMps: rnd(vIn, 1), reaimed: r.marks.some((m) => /re-aimed/.test(m.msg)) };
 }
 

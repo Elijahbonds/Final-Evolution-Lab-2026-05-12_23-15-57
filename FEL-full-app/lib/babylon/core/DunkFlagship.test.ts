@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OOP_LOB_FLIGHT_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
+import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, OOP_WINDUP_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
 import { LOB_CATCH_CLIP_T } from './DunkLob';
 
 describe('DunkFlagship (b) — the alley-oop is a lob', () => {
@@ -13,6 +13,15 @@ describe('DunkFlagship (b) — the alley-oop is a lob', () => {
     const lob = lobApexOver(1.6, 2.9, OOP_LOB_FLIGHT_SEC), bullet = lobApexOver(1.6, 2.9, 0.35);
     expect(lob).toBeGreaterThan(0.6);
     expect(bullet).toBeLessThan(0.25);   // 0.20 m: a flat pass, ~10 m/s across 3.5 m
+  });
+  it('Phase 3: an early take-off still gets a lob — thrown on the take-off frame to the hang beat, it is FALLING at the hand', () => {
+    // the rig's early take-offs: the ball leaves the passer ~1.9 m up for a ~3.4 m catch. The old fallback (0.35 s at 0.9 × the
+    // rise) met the hand still climbing; the late beat's ~0.78 s flight tops out first and drops in.
+    const vyAtCatch = (y0: number, y1: number, tf: number) => (y1 - y0) / tf - (9.81 * tf) / 2;
+    const tf = OOP_LATE_CATCH_CLIP_T - 0.02;
+    expect(vyAtCatch(1.9, 3.4, 0.35)).toBeGreaterThan(2);    // the bullet: still rising 2.6 m/s into the hand
+    expect(vyAtCatch(1.9, 3.4, tf)).toBeLessThan(-1.5);      // the lob: falling ~1.9 m/s
+    expect(lobApexOver(1.9, 3.4, tf)).toBeGreaterThan(0.15); // and it topped out ~0.18 m over the catch first
   });
 });
 
@@ -36,5 +45,16 @@ describe('DunkFlagship Phase 2 — the landing arrives with its fall', () => {
     expect(timeToFloor(1.2263, 0)).toBeCloseTo(0.5, 3);            // ½ g t² = 1.2263 at t 0.5
     expect(timeToFloor(0.5, 5)).toBeLessThan(0.5 / 5);             // still accelerating: sooner than at a constant 5 m/s
     expect(timeToFloor(0.5, 5)).toBeGreaterThan(0.08);
+  });
+});
+
+describe('DunkFlagship Phase 3 — the passer winds up, then lobs', () => {
+  it('starts the toss OOP_WINDUP_SEC before the release, and both land before the catch beat on any run that charges in time', () => {
+    for (const runLeft of [3, 2, 1.2, 0.9, 0.5]) {
+      const windupDue = oopThrowDue(runLeft, LOB_CATCH_CLIP_T, OOP_LOB_FLIGHT_SEC + OOP_WINDUP_SEC);
+      const throwDue = oopThrowDue(runLeft, LOB_CATCH_CLIP_T, OOP_LOB_FLIGHT_SEC);
+      if (throwDue) expect(windupDue).toBe(true);   // never a release before its wind-up
+    }
+    expect(OOP_WINDUP_SEC).toBe(0.5);               // the toss clip's arms-overhead key
   });
 });
