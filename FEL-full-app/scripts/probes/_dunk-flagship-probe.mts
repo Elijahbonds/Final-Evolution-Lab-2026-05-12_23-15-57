@@ -148,7 +148,7 @@ async function startInPage(settleMs: number): Promise<{ playing: boolean; frames
 }
 
 interface AttemptCfg { scen: string; seed: number; standMs: number; walkMs: number; walkY: number; holdMs: number; takeoff: 'auto' | 'press' | 'release'; pressAfterMs: number;
-  preY: boolean; postYMs?: number; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'none'; recMs: number; strip: number[] | null }
+  preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'none'; recMs: number; strip: number[] | null }
 type AttemptOut = { err: string } | { t0: number; pressAt: number | null; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; hud: string[] };
 
 /** One attempt in the page, on the virtual clock. */
@@ -173,7 +173,14 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
     const R = w.__rec; R.frames = []; R.f0 = w.__vc.C.frames; R.strip = c.strip ? c.strip.slice() : null; R.on = true; const t0 = now();
     const launchedAt = (): number | null => { const m = w.__smp.marks.find((x) => x.t >= t0 && /\[DUNK-LAUNCH\]/.test(x.msg)); return m ? m.t : null; };
     await sleep(c.standMs);
-    if (c.preY) { await tap(3, 60); await sleep(c.postYMs ?? 150); }
+    if (c.preY) {
+      await tap(3, 60);
+      if (c.cueRe) {   // SWEEP, standing: the player runs on the cue (the RUN! flash, or the release itself) after a reaction time
+        const re = new RegExp(c.cueRe); const w0 = now();
+        while (now() - w0 < 4000 && !w.__smp.marks.some((m) => m.t >= t0 && re.test(m.msg))) await sleep(16);
+        await sleep(c.reactMs ?? 0);
+      } else await sleep(c.postYMs ?? 150);
+    }
     if (c.walkMs > 0) { pad.axes[1] = c.walkY; pad.timestamp = now(); await sleep(c.walkMs); }
     pad.axes[1] = -1; setB(7, true);
     let pressAt: number | null = null; let launch: number | null = null; const hold0 = now(); let ranY = false;
@@ -231,7 +238,9 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
   // standing throw and the run (0.15–0.95 s) — rep k is one cell, so a sweep of n reps covers it evenly
   const sw = { walk: [0, 150, 300, 450, 600, 750, 900][rep % 7], walkY: [-0.5, -0.3, -0.8][Math.floor(rep / 7) % 3], postY: [150, 350, 550, 750, 950][rep % 5] };
   const run = (b: AttemptCfg): AttemptCfg => SWEEP ? { ...b, walkMs: sw.walk, walkY: sw.walkY } : b;
-  const stand = (b: AttemptCfg): AttemptCfg => SWEEP ? { ...b, postYMs: sw.postY, standMs: 300 + (rep % 3) * 150 } : b;
+  // standing throws: the RUN! cue (glass, bounce) or the release (the plain self-lob: run as it leaves), then a 0–0.4 s reaction
+  const react = [0, 100, 200, 300, 400][rep % 5];
+  const stand = (b: AttemptCfg): AttemptCfg => SWEEP ? { ...b, cueRe: b.scen === 'selflob' ? '^\\[LOB\\] SELF-LOB from' : '^\\[LOB\\] (RUN!|off-glass armed)', reactMs: react, standMs: 300 + (rep % 3) * 150 } : b;
   switch (scen) {
     case 'selflobrun': case 'glass': case 'bounce': return run({ ...base, walkMs: 300 + jit });
     case 'glassstand': case 'bouncestand': return stand({ ...base, walkMs: 0, standMs: 300 + jit, preY: true });

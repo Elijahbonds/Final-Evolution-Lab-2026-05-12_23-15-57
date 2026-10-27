@@ -107,3 +107,44 @@ export function whiffWhy(d: { x: number; y: number; z: number } | null, fwd: { x
   if (m === Math.abs(along)) return along > 0 ? 'OUT AHEAD' : 'BEHIND YOU';
   return 'WIDE';
 }
+
+// ── Phase 4: THE OFF-GLASS LOB ON THE RUN MEETS THE BOARD ────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep, the OFF THE GLASS prop on the run): 0 of 4 caught, every throw OVER THE GLASS — the planner's own
+// log said "OFF THE BOARD" (it met the glass 4.08–4.77 m up; the board's top is 4.03). Its catch was the HANG beat (0.8 clip s) and
+// it left from a fixed 3.8 m: the run left plus 0.8 s is a flight that has to hang, so from anywhere past ~1 m out it meets the
+// glass over the board's top (the mode's own solver, swept: 4.03 m at 1.0 m out at 7 m/s, at 0.3 m at 4 m/s). On the run it now
+// aims at the RISE beat (a shorter flight: mid-board from 0.5–2.5 m out) and the prop throws when its predicted throw would meet
+// the board low enough — not at a fixed distance.
+/** (new) The running off-glass lob's catch beat (flight clip s): the rise beat, the plain lob's. Standing keeps the hang beat. */
+export const GLASS_RUN_CATCH_CLIP_T = 0.62;
+/** (new) The prop throws once its predicted throw meets the glass at most this far over the rim (m; the board's top is 0.975). */
+export const GLASS_AIM_TOP_OVER_RIM_M = 0.75;
+/** (new) …or once the release would be this close to the take-off line (m): nearer, the throw passes under the iron's front lip
+ *  (the model and the old rig note agree: inside 0.5 m it clanks), so this is the last moment it still can go. */
+export const GLASS_RELEASE_MIN_M = 0.6;
+/** The self-lob clip's release height over the floor (m; the rig's logged releases, 1.86–1.89). */
+export const SELF_LOB_RELEASE_Y = 1.88;
+/** Throw the off-glass prop now? `hitY` is where the predicted throw meets the glass (Infinity: no solution), `distAtRelease` the
+ *  release's distance to the take-off line. */
+export function glassThrowDue(hitY: number, rimY: number, distAtRelease: number, minDist = GLASS_RELEASE_MIN_M, topOverRim = GLASS_AIM_TOP_OVER_RIM_M): boolean {
+  if (distAtRelease <= minDist) return true;
+  return Number.isFinite(hitY) && hitY <= rimY + topOverRim;
+}
+
+// ── Phase 4: THE PASSER'S OFF-GLASS OOP ─────────────────────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep): 0 of 2 caught. The passer threw during the dunker's rise with the STANDING solve, which picks a
+// ~1.16 s flight for a mid-board hit while ~0.55 s of the rise was left; and from his oop spot on the wing (x −3.4) the mirror point
+// of a throw to the catch lies off the board (it met the glass's plane at x −2.2: WIDE OF THE GLASS). He now stands at the elbow,
+// where the mirror point is on the board, and throws on the run like the plain oop (Phase 3), timed so it meets the board this far
+// over the rim; the launch's re-aim (Phase 4) corrects what the run did after.
+/** (new) The glass oop's passer: this far left of the rim's line (m) … */
+export const OOP_GLASS_PASSER_X = -1.6;
+/** (new) … and this far out from the rim (m): the mirror point of his throw to the catch lands ~0.55 m left of the board's centre. */
+export const OOP_GLASS_PASSER_FROM_RIM_M = 5.5;
+/** (new) Where his throw meets the board (m over the rim; the board's top is 0.975). */
+export const OOP_GLASS_HIT_OVER_RIM_M = 0.6;
+/** The mirror point on a board at `boardZ` of a throw from `from` to `to` (x only, the flat reflection): where the glass is met. */
+export function glassMirrorX(from: { x: number; z: number }, to: { x: number; z: number }, boardZ: number): number {
+  const a = Math.abs(from.z - boardZ), b = Math.abs(to.z - boardZ);
+  return from.x + (to.x - from.x) * (a / Math.max(1e-6, a + b));
+}

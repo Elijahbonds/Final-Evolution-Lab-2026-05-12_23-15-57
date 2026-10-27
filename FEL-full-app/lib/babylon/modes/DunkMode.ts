@@ -87,7 +87,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -309,10 +309,8 @@ const BEAT_TAKEOFF_LEAD = 0.12;
 const LAUNCH_OUT_OF_BEAT_M = 1.0;
 /** The self-lob prop tosses itself this far before the takeoff line when the runner has not thrown it by hand. */
 const AUTO_LOB_AHEAD_M = 2.6;
-/** DUNK-GLASS-BOUNCE: the off-glass prop throws itself here — measured on the flight's own catch point: a throw released
- *  2.4–4 m out clears the iron on the way in (0.15–0.5 m) and meets the glass 3.5–3.8 m up; nearer than 2.2 m the ball is
- *  under the rim's front lip (a CLANK, honest), further and it meets the board near its top. */
-const AUTO_GLASS_AHEAD_M = 3.8;
+/* (DUNK-GLASS-BOUNCE's AUTO_GLASS_AHEAD_M 3.8 — the off-glass prop's fixed throw distance — is gone: Phase 4 throws it when its predicted
+ *  throw meets the board (glassPropDue). Its note, measured on the hang beat at an older run, no longer held: see core/DunkFlagship.) */
 /** The off-glass lob is aimed at the HANG beat (the hand still overhead, the body near its apex), not the rise: measured on
  *  the flight's own catch point, a rise-beat throw released inside 0.5 m of the line passes the iron's front lip by 5 cm
  *  or under it (a CLANK on two of three runs); at the hang beat the same release meets the board 3.5–3.8 m up with
@@ -403,7 +401,8 @@ export const DunkMode: ModeDefinition = (() => {
   let feet: { L: TransformNode | null; R: TransformNode | null } = { L: null, R: null };   // the clear test reads the FEET
   let win: Win = 'run';                       // the anim window in charge of the body
   // ── the lob (self-lob / kick-up / cartwheel toss / the alley-oop pass): one real arc, one fair catch ──
-  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, due: 0, why: '' as string, runCueAt: -1, runCued: false };
+  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, due: 0, catchT: LOB_CATCH_CLIP_T, why: '' as string, runCueAt: -1, runCued: false };
+  let glassArmed = false;   // Phase 4: Y + up (or Y on the glass prop) asked for the glass throw; it goes on the run when due
   let whiffGap = Infinity; const whiffD = new Vector3(), whiffFwd = new Vector3();   // Phase 4: the ball's nearest pass by the hand
   // DUNK-GLASS-BOUNCE: the backboard's front face (read off the venue's board mesh at load; the regulation fallback) and the
   // iron as twelve small colliders — the lob is swept against both every step
@@ -1175,7 +1174,7 @@ export const DunkMode: ModeDefinition = (() => {
       const token = ++obstacleToken;
       // the billboard oop's passer stands on the RUNWAY side of the line near the centre: the corner signs face up the runway, and
       // from the rim side there is no bank (the solve refuses a throw from behind the face)
-      const passerAt = prop === 'oopcorner' ? new Vector3(4.0, 0, gatherLine() + 5.0) : new Vector3(-3.4, 0, CFG.rimZ + 1.6);   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
+      const passerAt = prop === 'oopcorner' ? new Vector3(4.0, 0, gatherLine() + 5.0) : prop === 'oopglass' ? new Vector3(OOP_GLASS_PASSER_X, 0, CFG.rimZ + OOP_GLASS_PASSER_FROM_RIM_M) : new Vector3(-3.4, 0, CFG.rimZ + 1.6);   // Phase 4: the glass oop's passer at the elbow (from the wing its mirror point is off the board)   // the billboard oop: down the left side, so the mirror line meets the sign near its centre (from x −1.2 it crossed 3 m off it, measured)
       if (sparePasser) {   // IMPROVE (2026-10-06): the kept passer, shown again where this oop wants him
         teammate = sparePasser; sparePasser = null;
         teammate.root.position.copyFrom(passerAt); teammate.root.setEnabled(true);
@@ -1658,7 +1657,11 @@ export const DunkMode: ModeDefinition = (() => {
           if (isOop(prop)) refuse(ctx, `${rt.label} — THE PASSER HAS THE BALL`);
           else if (lob.thrown) refuse(ctx, `${rt.label} — THE BALL IS ALREADY UP · CATCH IT`);
           else if (rt.id === 'bounce' && phase === 'charge' && !bounceFits()) refuse(ctx, 'BOUNCE LOB — TOO CLOSE TO THE LINE · THROW IT STANDING');   // a bounce needs ~1 s of air: on the run it has to leave as the run starts
-          else startRunwayBeat(ctx, rt);
+          // Phase 4: THE GLASS THROW IS ARMED, NOT THROWN. Standing it could not be caught (a mid-board hit is a ~0.8 s flight; the
+          // run in from the runway's start is ~1.4 s before the catch beat even starts — LOST on every standing sweep run), and on the
+          // run its moment is narrow. Asked for anywhere, it goes up on the run at the moment its throw meets the board (glassPropDue).
+          else if (rt.id === 'offglass' && !glassArmed) { glassArmed = true; flash(ctx, 'OFF THE GLASS — IT GOES UP ON THE RUN', 900); ctx.setHud({ hint: phase === 'charge' ? 'OFF THE GLASS — KEEP RUNNING' : 'OFF THE GLASS — HOLD RT TO RUN' }); console.info('[LOB] off-glass armed: it goes up on the run'); }
+          else if (rt.id !== 'offglass') startRunwayBeat(ctx, rt);
         }
       }
       // TRICK COMBOS (THPS2-style) — mid-air, hold a d-pad direction and tap
@@ -1969,10 +1972,25 @@ export const DunkMode: ModeDefinition = (() => {
             console.info(`[LOB] the passer lobs it on the run: ${tf.toFixed(2)} s to the catch beat`);
           }
         }
+        // Phase 4: THE PASSER'S GLASS OOP GOES UP ON THE RUN TOO — wound up, then thrown when the run left plus the rise beat is the
+        // flight that meets the board OOP_GLASS_HIT_OVER_RIM_M over the iron (it used to leave during the rise on the standing solve)
+        if (prop === 'oopglass' && teammate && !lob.thrown && !runwayBeat) {
+          const runLeft = timeToLine(Math.max(0, player.root.position.z - gatherLine()), holdRunSpeed);
+          const from = ball.getAbsolutePosition(), tG = oopGlassFlight(from);
+          if (tG != null) {
+            if (!oopWound && oopThrowDue(runLeft, GLASS_RUN_CATCH_CLIP_T, tG + OOP_WINDUP_SEC)) { oopWound = true; teammate.animator.play(SPORT_CLIP.teammateToss, {}); }
+            if (oopThrowDue(runLeft, GLASS_RUN_CATCH_CLIP_T, tG)) {
+              if (!oopWound) { oopWound = true; teammate.animator.play(SPORT_CLIP.teammateToss, {}); }
+              throwGlassLob(ctx, from.clone(), runLeft + GLASS_RUN_CATCH_CLIP_T, false, Math.max(0.5, from.z - rim.z), GLASS_RUN_CATCH_CLIP_T);
+              SoundKit.play('whoosh', { pitch: 1.05, volume: 0.5 });
+              flash(ctx, 'OFF THE GLASS — GO GET IT', 800);
+            }
+          }
+        }
         if (prop === 'selflob' && !lob.thrown && !runwayBeat && player.root.position.z <= gatherLine() + AUTO_LOB_AHEAD_M) startRunwayBeat(ctx, runwayTrickFor('Y')!);
-        // DUNK-GLASS-BOUNCE: the off-glass prop throws where the geometry says (AUTO_GLASS_AHEAD_M); the bounce prop throws as the
+        // DUNK-GLASS-BOUNCE: the off-glass prop throws where the geometry says (Phase 4: glassPropDue); the bounce prop throws as the
         // run starts (a single bounce is a ~1 s throw — from standing, Y throws the bounce-BOUNCE with a RUN cue)
-        if (prop === 'offglass' && !lob.thrown && !runwayBeat && !pendingBeat && player.root.position.z <= gatherLine() + AUTO_GLASS_AHEAD_M) startRunwayBeat(ctx, runwayTrickById('offglass'));
+        if ((prop === 'offglass' || glassArmed) && !lob.thrown && !runwayBeat && !pendingBeat && glassPropDue()) { glassArmed = false; startRunwayBeat(ctx, runwayTrickById('offglass')); }   // Phase 4: when its throw would meet the board
         if (prop === 'bounce' && !lob.thrown && !runwayBeat && !pendingBeat && phaseSec >= 0.05) startRunwayBeat(ctx, runwayTrickById('bounce'));
         if (turn === 'player') liveTakeoff(ctx);   // dunk-next phase 7: where he would leave the floor, and on which foot
         const line = gatherLine();
@@ -2200,6 +2218,14 @@ export const DunkMode: ModeDefinition = (() => {
           if (clipTime >= 0.02) teammate.animator.play(SPORT_CLIP.teammateToss, {});   // the passer winds up as the dunker leaves the floor
           if (prop === 'oopcorner' && clipTime >= 0.02) {   // DUNK PARKOUR: the billboard oop leaves at once — the bank needs the whole rise
             throwCornerLob(ctx, ball.getAbsolutePosition().clone(), Math.max(0.45, CORNER_CATCH_CLIP_T - clipTime));
+          } else if (prop === 'oopglass' && clipTime >= 0.02) {
+            // Phase 4: the dunker left before the passer's glass throw was due — off the glass if a throw to the hang beat still meets
+            // the board from here, else a plain lob to it (said: NO TIME FOR THE GLASS); the standing solve this used ignored the clock
+            const from = ball.getAbsolutePosition().clone(), tf = Math.max(LOB_REAIM_MIN_SEC, GLASS_CATCH_CLIP_T - clipTime);
+            const g = glassLobVelocity(v3(from), v3(catchPointNow(GLASS_CATCH_CLIP_T)), glass.z, tf);
+            if (g && onGlass(g.hit)) throwGlassLob(ctx, from, tf, false, Math.max(0.5, from.z - rim.z), GLASS_CATCH_CLIP_T);
+            else { throwLob(ctx, from, 'ALLEY-OOP', tf, GLASS_CATCH_CLIP_T); flash(ctx, 'NO TIME FOR THE GLASS — ALLEY-OOP', 800); }
+            SoundKit.play('whoosh', { pitch: 1.05, volume: 0.5 });
           } else if (prop === 'alleyoop' && clipTime >= 0.02) {
             // DUNK-FLAGSHIP Phase 3: THE EARLY TAKE-OFF STILL GETS A LOB. A take-off before the run-throw was due (A early, RT let go
             // early) used to wait for 90 % of the rise and fire a 0.35 s bullet (measured 13–14 m/s at the hand, the top BELOW the
@@ -3053,6 +3079,26 @@ export const DunkMode: ModeDefinition = (() => {
         console.info(`[LOB] re-aimed at the launch: ${gap.toFixed(2)} m to the catch in ${tf.toFixed(2)} s (beat ${catchT.toFixed(2)}, the throw had ${left.toFixed(2)} s left)`);
       }
     }
+    // Phase 4: THE GLASS LOB RE-AIMS AT THE LAUNCH TOO. It was thrown on a PREDICTED take-off and never corrected (the plain lob is),
+    // so a run that left early or late met a ball that was not there. When the throw's own clock is off the real one by more than
+    // two frames, it is re-solved from where it is: still on its way to the board, off the same glass (if that still meets the
+    // board); already off it, the rest of its arc. A throw that was on time is left alone (no kink).
+    if (lob.live && !lob.caught && !lob.lost && lob.kind === 'glass' && ballSim.active) {
+      const from = ballSim.pos.clone(), to = catchPointNow(lob.catchT);
+      const tf = Math.max(LOB_REAIM_MIN_SEC, lob.catchT - 0.03), left = lob.due - lob.t;
+      if (Math.abs(left - tf) > 2 / 60) {
+        if (!lob.glass) {
+          const g = glassLobVelocity(v3(from), v3(to), glass.z, tf);
+          const onBoard = !!g && g.hit.x >= glass.xMin && g.hit.x <= glass.xMax && g.hit.y >= glass.yMin && g.hit.y <= glass.yMax;
+          if (g && onBoard) { ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z)); lobMarker?.aim(to); }
+          console.info(`[LOB] glass lob re-aimed at the launch: ${onBoard ? `off the glass at ${g!.hit.y.toFixed(2)} m` : 'no board from here — left as thrown'}, ${tf.toFixed(2)} s to the catch (the throw had ${left.toFixed(2)} s left)`);
+        } else {
+          const v = lobVelocity(from, to, tf);
+          ballSim.launch(from, new Vector3(v.x, v.y, v.z)); lobMarker?.aim(to);
+          console.info(`[LOB] glass lob re-aimed off the glass at the launch: ${tf.toFixed(2)} s to the catch (the throw had ${left.toFixed(2)} s left)`);
+        }
+      }
+    }
     console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${apexFor().toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}${lob.live ? ' lob live' : ''}`);
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
@@ -3758,7 +3804,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
-  function resetLob(): void { lobMarker?.clear(); oopWound = false; whiffGap = Infinity; lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.due = 0; lob.why = ''; lob.runCueAt = -1; lob.runCued = false; }
+  function resetLob(): void { lobMarker?.clear(); oopWound = false; whiffGap = Infinity; glassArmed = false; lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.due = 0; lob.catchT = LOB_CATCH_CLIP_T; lob.why = ''; lob.runCueAt = -1; lob.runCued = false; }
   function resetRunway(): void { teachHint = ''; pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; launchQueued = false; airTrick = null; runwayToken++; }
   /** A runway beat owns the body until it ends (the per-frame run / idle loops stand aside); the run keeps going under it. */
   function startRunwayBeat(ctx: ModeContext, rt: RunwayTrick): void {
@@ -3804,6 +3850,41 @@ export const DunkMode: ModeDefinition = (() => {
     const x = player.root.position.x + kickDropFrom.x, y = player.root.position.y + kickDropFrom.y, z = player.root.position.z + kickDropFrom.z;
     ball.position.set(x + (to.x - x) * k, y + (to.y - y) * k, z + (to.z - z) * k);
   }
+  const onGlass = (h: V3): boolean => h.x >= glass.xMin && h.x <= glass.xMax && h.y >= glass.yMin && h.y <= glass.yMax;
+  /** Phase 4: the glass oop's flight from the passer's hand `from` that meets the board OOP_GLASS_HIT_OVER_RIM_M over the iron on its
+   *  way to the rise-beat catch (bisected, as the standing throw's is); null when no such throw meets the board. */
+  function oopGlassFlight(from: Vector3): number | null {
+    const to = v3(catchPointNow(GLASS_RUN_CATCH_CLIP_T)), f = v3(from), want = rim.y + OOP_GLASS_HIT_OVER_RIM_M;
+    let lo = 0.45, hi = 2.5;
+    for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; const g = glassLobVelocity(f, to, glass.z, mid); if (!g || g.hit.y < want) lo = mid; else hi = mid; }
+    const g = glassLobVelocity(f, to, glass.z, hi);
+    return g && onGlass(g.hit) ? hi : null;
+  }
+  /** When the take-off comes, s from a runway beat's release (`beatLeft` of its clip still to play, `dist` to the line at the
+   *  release): on the run, the rest of the beat at its runScale, then the hold-run ramp with the gather (THE GATHER STRIDE: the
+   *  beat owns the body until it ends); standing, the stick's run in at 6 m/s, then the hold ramps past it. */
+  function runwayLaunchIn(rt: RunwayTrick, holdV: number, dist: number, beatLeft: number, onRun: boolean): number {
+    const vEnd = Math.min(HOLD_RUN_MAX, holdV + HOLD_RUN_RAMP * beatLeft);
+    const dBeat = rt.runScale * (holdV * beatLeft + 0.5 * (vEnd - holdV) * beatLeft);
+    const runTime = onRun
+      ? beatLeft + runTimeToLineGather(Math.max(0, dist - dBeat), vEnd, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec())
+      : lobFlightTime(dist, 6.5, false, 0) + 0.15 + beatLeft * (1 - rt.runScale);
+    return Math.max(runTime, beatLeft);
+  }
+  /** Phase 4: the OFF THE GLASS prop throws when the throw it would make (the beat started now, released at the clip's key) meets
+   *  the glass low enough on the board (core/DunkFlagship glassThrowDue), or at the last release that still clears the iron. */
+  function glassPropDue(): boolean {
+    const rt = runwayTrickById('offglass'); const rA = rt.releaseAt ?? 0.3;
+    const beatLeft = Math.max(0, (player.animator.durationOf(rt.clip) ?? rt.sec) - rA);
+    const v0 = holdRunSpeed, vRel = Math.min(HOLD_RUN_MAX, v0 + HOLD_RUN_RAMP * rA);
+    const dRel = rt.runScale * (v0 * rA + 0.5 * (vRel - v0) * rA);
+    const dist = player.root.position.z - gatherLine() - dRel;
+    if (dist <= GLASS_RELEASE_MIN_M) return true;
+    const tf = runwayLaunchIn(rt, vRel, dist, beatLeft, true) + GLASS_RUN_CATCH_CLIP_T;
+    const b = ball.getAbsolutePosition();
+    const g = glassLobVelocity({ x: b.x, y: player.root.position.y + SELF_LOB_RELEASE_Y, z: player.root.position.z - dRel }, v3(catchPointNow(GLASS_RUN_CATCH_CLIP_T)), glass.z, tf);
+    return glassThrowDue(g ? g.hit.y : Infinity, rim.y, dist);
+  }
   function runwayTick(ctx: ModeContext, dt: number): void {
     if (!runwayBeat) return;
     runwayT += dt;
@@ -3825,14 +3906,10 @@ export const DunkMode: ModeDefinition = (() => {
       // THE GATHER STRIDE (2026-09-18): the beat OWNS the body until it ends (no gather under it), so the run under the beat is the ramp
       // at the beat's runScale, and only the remainder is run with the gather — timing the whole distance on the gather threw the
       // kick-up 0.37 s long and the cartwheel's self-lob 5 m high (both LOST, measured)
-      const vEnd = Math.min(HOLD_RUN_MAX, holdRunSpeed + HOLD_RUN_RAMP * beatLeft);
-      const dBeat = rt.runScale * (holdRunSpeed * beatLeft + 0.5 * (vEnd - holdRunSpeed) * beatLeft);
-      const runTime = phase === 'charge'
-        ? beatLeft + runTimeToLineGather(Math.max(0, dist - dBeat), vEnd, HOLD_RUN_MAX, HOLD_RUN_RAMP, gatherStrideSpec())
-        : lobFlightTime(dist, 6.5, false, 0) + 0.15 + beatLeft * (1 - rt.runScale);   // a standing thrower runs in at the stick's 6 m/s, then the hold ramps past it
-      const tLaunch = Math.max(runTime, beatLeft);
+      const tLaunch = runwayLaunchIn(rt, holdRunSpeed, dist, beatLeft, phase === 'charge');   // (Phase 4: factored out, unchanged — the glass prop predicts with it)
       chargeAtLaunch = Math.max(charge, Math.min(1, (phaseSec + tLaunch) / 1.1));   // the keyboard's hold ramps over 1.1 s; a pad's depth is what it is
-      if (rt.id === 'offglass') throwGlassLob(ctx, from, tLaunch + GLASS_CATCH_CLIP_T, phase !== 'charge', dist);
+      // Phase 4: on the run the glass lob is caught on the RISE beat (a hang-beat catch from the run met the glass over the board)
+      if (rt.id === 'offglass') { const ct = phase === 'charge' ? GLASS_RUN_CATCH_CLIP_T : GLASS_CATCH_CLIP_T; throwGlassLob(ctx, from, tLaunch + ct, phase !== 'charge', dist, ct); }
       else if (rt.id === 'bounce') throwBounceLob(ctx, from, tLaunch + LOB_CATCH_CLIP_T, phase !== 'charge', dist);
       else if (rt.id === 'cartwheel') throwBounceLob(ctx, from, tLaunch + LOB_CATCH_CLIP_T, phase !== 'charge', dist);   // phase 10b: Jus Fly throws it into the floor and takes it off the bounce
       else throwLob(ctx, from, rt.id === 'handspring' ? 'SELF-LOB' : rt.label, tLaunch + LOB_CATCH_CLIP_T);
@@ -3867,7 +3944,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(v.x, v.y, v.z));
     lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = label; catchBlend = 1; catchPending = false;
-    lob.t = 0; lob.due = tf;   // Phase 3: the throw's own flight, for the launch's re-aim
+    lob.t = 0; lob.due = tf; lob.catchT = catchT;   // Phase 3: the throw's own flight, for the launch's re-aim
     lobMarker?.aim(to);
     setTrail('soft');
     console.info(`[LOB] ${label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
@@ -3938,8 +4015,8 @@ export const DunkMode: ModeDefinition = (() => {
   /** OFF THE GLASS: the toss goes AT the board and comes back off it to the catch point on the flight's clock. On the run
    *  the throw's timing is the run's (a throw too near the line meets the iron — a CLANK — and one too far the board's top);
    *  standing, the flight time is picked so the ball meets the glass 0.7 m over the iron and the run is cued to it. */
-  function throwGlassLob(ctx: ModeContext, from: Vector3, tf: number, standing: boolean, dist: number): void {
-    const to = catchPointNow(GLASS_CATCH_CLIP_T);
+  function throwGlassLob(ctx: ModeContext, from: Vector3, tf: number, standing: boolean, dist: number, catchT = GLASS_CATCH_CLIP_T): void {
+    const to = catchPointNow(catchT);
     let t = tf;
     if (standing) {   // bisect the flight time for a hit 0.7 m over the rim (the mid-board), then cue the run to it
       const want = rim.y + 0.7; let lo = 0.45, hi = 2.5;
@@ -3950,11 +4027,11 @@ export const DunkMode: ModeDefinition = (() => {
     if (!g) { console.warn('[LOB] off-glass throw impossible from here — a plain self-lob instead'); throwLob(ctx, from, 'SELF-LOB', tf); return; }
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z));
-    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'OFF-GLASS LOB'; lob.kind = 'glass'; lob.t = 0; catchBlend = 1; catchPending = false; lobMarker?.aim(to);
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'OFF-GLASS LOB'; lob.kind = 'glass'; lob.t = 0; lob.due = t; lob.catchT = catchT; catchBlend = 1; catchPending = false; lobMarker?.aim(to);
     setTrail('soft');
     const onBoard = g.hit.x >= glass.xMin && g.hit.x <= glass.xMax && g.hit.y >= glass.yMin && g.hit.y <= glass.yMax;
     console.info(`[LOB] OFF-GLASS LOB from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) at the glass (${g.hit.x.toFixed(2)},${g.hit.y.toFixed(2)}) @${g.t1.toFixed(2)} s${onBoard ? '' : ' — OFF THE BOARD'} then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${t.toFixed(2)} s${standing ? ' (standing)' : ''}`);
-    if (standing) armRunCue(t, dist, GLASS_CATCH_CLIP_T);
+    if (standing) armRunCue(t, dist, catchT);
   }
   /** DUNK PARKOUR (owner, 2026-09-18: "throw alley oops off that and dunk it"): the passer's toss off a CORNER BILLBOARD — solved
    *  in the sign's own frame (core/DunkLob.paneLobVelocity), flown in the world, reflected by the sign (BallPhysics.sweptPaneHit). */

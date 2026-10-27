@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, OOP_WINDUP_SEC, lobApexOver, oopThrowDue, slamImpact, whiffWhy, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
-import { LOB_CATCH_CLIP_T } from './DunkLob';
+import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, OOP_WINDUP_SEC, lobApexOver, oopThrowDue, slamImpact, whiffWhy, glassThrowDue, glassMirrorX, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, GLASS_RELEASE_MIN_M, GLASS_AIM_TOP_OVER_RIM_M, GLASS_RUN_CATCH_CLIP_T, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
+import { LOB_CATCH_CLIP_T, glassLobVelocity } from './DunkLob';
 
 describe('DunkFlagship (b) — the alley-oop is a lob', () => {
   it('is thrown once the run left plus the catch beat fits the lob\'s flight, and at once from a short run', () => {
@@ -72,5 +72,34 @@ describe('DunkFlagship Phase 4 — a whiff always says why', () => {
     expect(whiffWhy({ x: -0.7, y: 0, z: -0.7 }, { x: -1, z: -1 })).toBe('OUT AHEAD');
     expect(whiffWhy(null, toRim)).toBe('NEVER IN REACH');
     expect(whiffWhy({ x: Number.NaN, y: 0, z: 0 }, toRim)).toBe('NEVER IN REACH');
+  });
+});
+
+describe('DunkFlagship Phase 4 — the off-glass lob on the run meets the board', () => {
+  it('throws once the predicted hit is low enough on the board, or at the last release that clears the iron', () => {
+    const rimY = 3.05;
+    expect(glassThrowDue(4.4, rimY, 2.5)).toBe(false);                          // over the board's top: wait
+    expect(glassThrowDue(rimY + GLASS_AIM_TOP_OVER_RIM_M, rimY, 1.8)).toBe(true);
+    expect(glassThrowDue(Infinity, rimY, 1.8)).toBe(false);                     // no solution yet
+    expect(glassThrowDue(4.4, rimY, GLASS_RELEASE_MIN_M)).toBe(true);           // the last moment
+  });
+  it('the rise beat is what makes it possible: from 1.5 m out at a full run the hang beat meets the glass over the top, the rise beat on it', () => {
+    // the mode's own solver, the rig's numbers: released 1.88 m up, the catch on each beat, the board's face 0.39 m behind the rim
+    const rimZ = -10.28, glassZ = rimZ - 0.39, line = -7.5, d = 1.5, v = 7, from = { x: -0.27, y: 1.88, z: line + d };
+    const hang = glassLobVelocity(from, { x: -0.18, y: 3.65, z: -8.75 }, glassZ, d / v + 0.8);
+    const rise = glassLobVelocity(from, { x: -0.18, y: 3.43, z: -8.63 }, glassZ, d / v + GLASS_RUN_CATCH_CLIP_T);
+    expect(hang!.hit.y).toBeGreaterThan(3.05 + 0.975);                          // over the board's top (4.03)
+    expect(rise!.hit.y).toBeLessThan(3.05 + GLASS_AIM_TOP_OVER_RIM_M);
+    expect(GLASS_RUN_CATCH_CLIP_T).toBe(LOB_CATCH_CLIP_T);
+  });
+});
+
+describe('DunkFlagship Phase 4 — the passer\'s glass oop', () => {
+  it('from the elbow his throw meets the board; from the plain oop\'s wing spot it met the glass\'s plane off the board', () => {
+    const rimZ = -10.28, boardZ = rimZ - 0.39, halfW = 0.9, catchPt = { x: -0.18, z: -8.63 };
+    const wing = glassMirrorX({ x: -3.4, z: rimZ + 1.6 }, catchPt, boardZ);
+    const elbow = glassMirrorX({ x: OOP_GLASS_PASSER_X, z: rimZ + OOP_GLASS_PASSER_FROM_RIM_M }, catchPt, boardZ);
+    expect(Math.abs(wing)).toBeGreaterThan(halfW);       // −1.8: WIDE OF THE GLASS (the rig logged −2.2)
+    expect(Math.abs(elbow)).toBeLessThan(halfW - 0.2);   // −0.55: on the board with room
   });
 });
