@@ -6,6 +6,10 @@
 // for the drill. The owner saw a T-pose on this page: that was the drills page's DrillDemo (exercise-avatar-canvas's
 // one-clip stand-in), which this page no longer mounts.
 //
+// lane/library-anatomy-2 (the T-pose fix, not yet on lane/finish-release when this was written) adds
+// components/library/avatar-demo.tsx — the same stage behind a bind-pose guard, with a still "Demo coming" fallback — and
+// routes the drills page's DrillDemo through it. Once it lands, this file is a one-line swap to <AvatarDemo>.
+//
 // Phone care: the stage loads only once the box is near the screen (Babylon and the body are megabytes); with 3D off
 // (NEXT_PUBLIC_DISABLE_3D), no loop for the drill, or a stage that fails to load, it is the cue card — never a blank
 // box and never a wrong movement.
@@ -22,7 +26,7 @@ const ExerciseStage = dynamic(() => import('@/components/library/exercise-stage'
 const threeDisabled = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
 const NO_MUSCLES = { primary: [] as string[], secondary: [] as string[] };
 
-export function DrillDemoLoop({ clip, cues }: { clip: string | null; cues: readonly string[] }) {
+export function DrillDemoLoop({ clip, cues, noneLine }: { clip: string | null; cues: readonly string[]; noneLine?: string }) {
   const box = useRef<HTMLDivElement>(null);
   const [near, setNear] = useState(false);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
@@ -42,7 +46,7 @@ export function DrillDemoLoop({ clip, cues }: { clip: string | null; cues: reado
       <div className="flex items-start gap-3 rounded-xl bg-white/[0.04] p-4" data-daily-demo="cues">
         <Dumbbell aria-hidden className="mt-0.5 h-7 w-7 shrink-0 text-white/30" />
         <div className="min-w-0 space-y-1">
-          <p className="text-[13px] text-white/55">{clip ? DEMO_STILL_LINE : DEMO_NONE_LINE}</p>
+          <p className="text-[13px] text-white/55">{clip ? DEMO_STILL_LINE : noneLine ?? DEMO_NONE_LINE}</p>
           <ul className="space-y-0.5 text-[14px] text-white/85">{cues.slice(0, 2).map((c) => <li key={c}>{c}</li>)}</ul>
         </div>
       </div>

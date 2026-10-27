@@ -165,6 +165,12 @@ describe('copy style', () => {
     expect(needsLines(true).find((n) => n.id === 'distance')!.text).toContain('3.5 to 4.5 m');
     expect(needsLines(true).map((n) => n.id)).toContain('check');
   });
+  it('the demo loops are lane/library-anatomy-2\'s choice (surfaceDemo.ts DRILL_DEMO_LOOPS): a loop only where one IS the movement', () => {
+    expect(Object.fromEntries(Object.entries(GUIDES).map(([id, g]) => [id, g.demoClip]))).toEqual({
+      'pogo-bilateral': 'ex_pogo', 'safe-landing': 'ex_jump', 'countermovement-geometry': null, 'wake-up': null,
+    });
+    for (const g of Object.values(GUIDES)) if (!g.demoClip) expect(g.demoNone).toBeTruthy();
+  });
   it('every day\'s drill has a guide, and its demo loop is one the shared library stage plays', async () => {
     const { EXERCISE_CLIPS: REAL_EXERCISE_CLIPS } = await import('@/lib/babylon/anim/authored/exercise');
     for (const f of Object.values(FOCUS_DRILLS)) for (const d of [f.impact, f.calm]) if (d) {

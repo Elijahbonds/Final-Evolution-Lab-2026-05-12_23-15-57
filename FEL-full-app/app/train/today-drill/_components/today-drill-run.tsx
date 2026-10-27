@@ -96,7 +96,7 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   );
   const how = (
     <div className="space-y-5">
-      <Section title={DEMO_TITLE} id="demo"><DrillDemoLoop clip={guide.demoClip} cues={guide.cues} /></Section>
+      <Section title={DEMO_TITLE} id="demo"><DrillDemoLoop clip={guide.demoClip} cues={guide.cues} noneLine={guide.demoNone} /></Section>
       <Section title={STEPS_TITLE} id="steps">
         <ol className="space-y-2" data-daily-steps={steps.length}>
           {steps.map((s, i) => (
