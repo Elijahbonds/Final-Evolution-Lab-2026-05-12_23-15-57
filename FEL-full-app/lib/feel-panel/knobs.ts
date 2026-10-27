@@ -789,7 +789,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
   },  // ── dunk-flagship (owner playtest 2026-10-27: "smoother movement, better lobs") ──
   {
-    id: 'dunk.runwayStrideMps', label: 'Run-up: ground the stride covers', def: 4.57, min: 3.0, max: 6.0, step: 0.01, unit: 'm/s', group: 'Dunk · run-up',
+    id: 'dunk.runwayStrideMps', label: 'Run-up: ground the stride covers', def: 3.95, min: 3.0, max: 6.0, step: 0.01, unit: 'm/s', group: 'Dunk · run-up',
     source: 'lib/babylon/core/DunkFlagship.ts RUNWAY_STRIDE_MPS',
     hint: 'The run-up\'s legs are paced to this: lower = quicker steps for the same speed (the feet skate forward), higher = slower steps (they slide back).',
   },

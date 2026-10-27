@@ -228,7 +228,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
   let pg: { p: Page; errors: string[] } | null = null; let used = 0;
   for (let i = 0; i < list.length; i++) {
     if (!pg || used >= 4) { if (pg) await pg.p.context().close(); pg = await boot(b, prop); used = 0; }
-    const s = list[i]; const rep = scen === 'tricks' ? 0 : i;
+    const s = list[i]; const rep = scen === 'tricks' ? 0 : i + Number(process.env.REP0 ?? 0);   // REP0: a piece's first rep (one attempt per piece on a loaded rig)
     const cfg = cfgFor(s, rep);
     const stripOn = STRIP && i === 0;
     if (stripOn) cfg.strip = Array.from({ length: Number(process.env.STRIP_N ?? 20) }, (_, k) => Number(process.env.STRIP_FROM ?? 60) + k * Number(process.env.STRIP_STEP ?? 6));

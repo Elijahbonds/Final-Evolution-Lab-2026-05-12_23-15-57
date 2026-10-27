@@ -3,9 +3,11 @@
 // them on a playtest run (lib/feel-panel; never in ranked, staked or paid play). docs/DUNK-FLAGSHIP.md has the measurements.
 
 // ── (a) THE RUNWAY'S FEET MATCH THE GROUND ─────────────────────────────────────────────────────────────────────────────
-/** TUNED (was the authored HOOPS_STRIDE.run 3.6 m/s × RUNWAY_PIN 1.1): the ground speed the runway's dribble-run capture
- *  (bball_mc_dribble_run, CMU 78_06) covers at rate 1 — StrideMatch's HOOPS_STRIDE_CAPTURE.sprint, measured from the capture. */
-export const RUNWAY_STRIDE_MPS = 4.57;
+/** TUNED (was the authored HOOPS_STRIDE.run 3.6 m/s ÷ RUNWAY_PIN 1.1 = 3.27 effective): the ground speed the runway's dribble-run
+ *  capture (bball_mc_dribble_run, CMU 78_06) covers at rate 1 ON THE DUNKER. Measured on the rig from the planted foot: paced at
+ *  3.27 the feet read a capture of ~4.1 m/s (they cycled fast, sliding back); paced at StrideMatch's 4.57 (scaled to its reference
+ *  leg, not this body's) they read ~3.76 (too slow, sliding forward). 3.95 sits between the two reads. */
+export const RUNWAY_STRIDE_MPS = 3.95;
 
 // ── (b) THE ALLEY-OOP IS A LOB ──────────────────────────────────────────────────────────────────────────────────────────
 // Measured before (esbuild rig, the ALLEY-OOP prop): the passer threw after the take-off, at 0.9 × the rise beat, to arrive on

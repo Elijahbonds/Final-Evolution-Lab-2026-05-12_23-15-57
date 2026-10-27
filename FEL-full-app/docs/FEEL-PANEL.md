@@ -249,10 +249,10 @@ lane/dunk-flagship (group "Dunk · lobs"), new numbers, default as shipped by th
 (`DunkFlagship.ts` `OOP_LOB_FLIGHT_SEC`: the ALLEY-OOP passer lobs the ball while the dunker is still running, this long
 before the catch beat; it was a 0.35 s pass thrown after the take-off). It moves only when the pass leaves and how high it
 arcs; the catch, the slam window and the card are unchanged. **assumption:** the bounds (0.5 to 1.6 s) are safe, not tuned.
-lane/dunk-flagship (group "Dunk · run-up"), TUNED, flagged: `dunk.runwayStrideMps` 4.57 m/s (`DunkFlagship.ts`
-`RUNWAY_STRIDE_MPS`): the ground the run-up's dribble-run capture covers at rate 1 (StrideMatch's measured
-`HOOPS_STRIDE_CAPTURE.sprint`). The runway paced that capture against the authored 3.6 m/s × the 1.1 `RUNWAY_PIN`, so its
-feet cycled faster than the ground at every speed. **assumption:** the bounds (3.0 to 6.0 m/s) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · run-up"), TUNED, flagged: `dunk.runwayStrideMps` 3.95 m/s (`DunkFlagship.ts`
+`RUNWAY_STRIDE_MPS`): the ground the run-up's dribble-run capture covers at rate 1 on the dunker, read from the planted foot
+on the rig. The runway paced that capture at 3.6 m/s ÷ the 1.1 `RUNWAY_PIN` (3.27 effective), so its feet cycled faster
+than the ground; StrideMatch's 4.57 (its reference leg) read too slow on this body. **assumption:** the bounds (3.0 to 6.0 m/s) are safe, not tuned.
 lane/dunk-flagship (group "Dunk · slam"), TUNED, flagged: `dunk.slamHitStopBigMs` 100 ms and `dunk.slamShakeBig` 0.18
 (`DunkFlagship.ts` `SLAM_HITSTOP_BIG_MS`, `SLAM_SHAKE_BIG`): a perfect slam's hit-stop and shake. Every make froze 70 ms and
 shook 0.12 before; an ordinary make (accuracy ≤ 0.5) still does, and cleaner ones grow toward these (`slamImpact`).
