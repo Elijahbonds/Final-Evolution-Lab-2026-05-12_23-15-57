@@ -13,7 +13,7 @@
 
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { SessionContext } from 'next-auth/react';
-import { Activity, Camera, GraduationCap, Layers } from 'lucide-react';
+import { Activity, Camera, ChevronRight, GraduationCap, Layers } from 'lucide-react';
 import { CHAPTERS, chapterProgress } from '@/lib/education/course';
 import { loadState } from '@/lib/knowledge/storage';
 import { loginPath } from '@/lib/auth/safeNext';
@@ -74,11 +74,12 @@ export function LearnHome() {
             {CHAPTERS.map((c) => {
               const p = chapterProgress(c, done);
               return (
-                <li key={c.number} className="w-[128px] shrink-0 snap-start">
-                  <a href={`/education/playbook/${c.number}`} data-learn-chapter={c.number}
-                    className="fel-press flex flex-col items-center gap-2 rounded-[16px] p-2 text-center hover:bg-white/[0.04]">
+                <li key={c.number} className="shrink-0 snap-start">
+                  {/* the ring is the chapter: its number, how full it is; its title is its name to a screen reader and on
+                      hover (ten titles in a sideways row were 36 words on a phone's first screen) */}
+                  <a href={`/education/playbook/${c.number}`} data-learn-chapter={c.number} aria-label={`Chapter ${c.number}: ${c.title}`} title={c.title}
+                    className="fel-press flex flex-col items-center rounded-[16px] p-2 text-center hover:bg-white/[0.04]">
                     <StatRing value={p.pct} max={100} label={`Chapter ${c.number}, ${c.title}`} display={String(c.number)} size={112} stroke={8} />
-                    <span className={`${TYPE.small} line-clamp-2 text-fel-soft`}>{c.title}</span>
                   </a>
                 </li>
               );
@@ -91,7 +92,7 @@ export function LearnHome() {
           <h2 id="learn-practice" className={`${TYPE.heading} text-white`}>Practice</h2>
           <div className="mt-2 grid gap-1 md:grid-cols-2">
             {practice.map((r) => (
-              <ListRow key={r.id} href={r.href} icon={r.camera ? Camera : Activity} title={r.title}
+              <PracticeRowLink key={r.id} href={r.href} camera={r.camera} title={r.title}
                 line={`Chapter ${r.chapter} · ${r.camera && r.drill ? 'camera and drill' : r.camera ? 'on camera' : 'drill'}`} testId={`learn-practice-${r.id}`} />
             ))}
           </div>
@@ -120,5 +121,23 @@ export function LearnHome() {
         </section>
       </main>
     </div>
+  );
+}
+
+/** A Practice row: the kit's ListRow shape on the small sizes (14 / 12), so the shelf adds no fifth type size to the first
+ *  screen. look: premium-ui may fold this into ListRow as a `compact` size. */
+function PracticeRowLink({ href, camera, title, line, testId }: { href: string; camera: boolean; title: string; line: string; testId: string }) {
+  const Icon = camera ? Camera : Activity;
+  return (
+    <a href={href} data-testid={testId} data-fel-card="row" className="fel-press group flex min-h-[60px] items-center gap-3 rounded-[16px] px-3 py-2.5 hover:bg-white/[0.04]">
+      <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-fel-cyan/[0.12] shadow-[inset_0_0_0_1px_rgba(0,229,255,0.28)]">
+        <Icon className="h-5 w-5 text-fel-cyan" strokeWidth={2.1} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className={`${TYPE.small} truncate font-semibold text-white`}>{title}</span>
+        <span className={`${TYPE.label} truncate normal-case tracking-normal text-fel-dim`}>{line}</span>
+      </span>
+      <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-fel-quiet transition-transform group-hover:translate-x-0.5" />
+    </a>
   );
 }

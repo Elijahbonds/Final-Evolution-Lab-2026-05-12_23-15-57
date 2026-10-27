@@ -24,7 +24,7 @@ describe('the book is the owner\'s: byte for byte', () => {
   it('every lesson\'s purpose, paragraphs and trainer\'s note render behind Read more exactly as the book has them', () => {
     let n = 0;
     for (const c of CHAPTERS) for (const l of c.lessons) {
-      const html = renderToStaticMarkup(createElement(BookText, { lesson: l }));
+      const html = renderToStaticMarkup(createElement(BookText, { lesson: l, initiallyOpen: true }));
       expect(texts(html, 'data-book-para'), `${c.number}:${l.key}`).toEqual(l.prose);
       if (l.purpose) expect(texts(html, 'data-book-purpose')).toEqual([l.purpose]);
       if (l.note) expect(texts(html, 'data-book-note')).toEqual([l.note]);
@@ -33,10 +33,13 @@ describe('the book is the owner\'s: byte for byte', () => {
     expect(n).toBeGreaterThan(200);
   });
 
-  it('Read more is collapsed by default', () => {
-    const html = renderToStaticMarkup(createElement(BookText, { lesson: chapterByNumber(6)!.lessons[0] }));
+  it('Read more is collapsed by default, and the book is not on the page until it is opened', () => {
+    const l = chapterByNumber(6)!.lessons[0];
+    const html = renderToStaticMarkup(createElement(BookText, { lesson: l }));
     expect(html).toMatch(/<details data-read-more[^>]*>/);
     expect(html).not.toMatch(/<details[^>]* open/);
+    expect(html).not.toContain('data-book-para');
+    expect(html).toContain('Read more');
   });
 });
 

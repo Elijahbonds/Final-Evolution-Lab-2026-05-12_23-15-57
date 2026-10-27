@@ -188,17 +188,21 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
   );
 }
 
-/** The book's text for a lesson — its purpose, its paragraphs, its trainer's note — exactly as imported, behind Read more. */
-export function BookText({ lesson }: { lesson: Lesson }) {
+/**
+ * The book's text for a lesson — its purpose, its paragraphs, its trainer's note — exactly as imported, behind Read more.
+ * Collapsed, the words are not on the page at all (a closed <details> still lays its text out, and a phone's first screen
+ * should hold only what it shows); opening it renders them.
+ */
+export function BookText({ lesson, initiallyOpen = false }: { lesson: Lesson; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen);
   const conceptSteps = lesson.kind !== 'drill' ? lesson.steps : [];
   if (!lesson.purpose && !lesson.prose.length && !conceptSteps.length && !lesson.note) return null;
   return (
-    <details data-read-more className="group mt-5">
+    <details data-read-more open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="group mt-5">
       <summary className={`${TYPE.label} flex min-h-11 cursor-pointer list-none items-center gap-2 text-fel-cyan [&::-webkit-details-marker]:hidden`}>
-        <span className="group-open:hidden">Read more</span>
-        <span className="hidden group-open:inline">Read less</span>
+        {open ? 'Read less' : 'Read more'}
       </summary>
-      <div data-book-text className="mt-2 space-y-4">
+      {open && <div data-book-text className="mt-2 space-y-4">
         {lesson.purpose && <p data-book-purpose className={`${TYPE.body} text-fel-soft`}>{lesson.purpose}</p>}
         {lesson.prose.map((p, n) => <p key={n} data-book-para className={`${TYPE.body} text-fel-soft`}>{p}</p>)}
         {conceptSteps.length > 0 && (
@@ -213,7 +217,7 @@ export function BookText({ lesson }: { lesson: Lesson }) {
             <p data-book-note className={`${TYPE.body} mt-2 text-fel-soft`}>{lesson.note}</p>
           </aside>
         )}
-      </div>
+      </div>}
     </details>
   );
 }
