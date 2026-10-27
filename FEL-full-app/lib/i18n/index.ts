@@ -13,13 +13,15 @@ import shell from '@/messages/en/shell.json';
 import play from '@/messages/en/play.json';
 import train from '@/messages/en/train.json';
 import profile from '@/messages/en/profile.json';
+import ui from '@/messages/en/ui.json';
+import landing from '@/messages/en/landing.json';
 
 export const LOCALES = ['en'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'en';
 
 /** The English messages, by area. */
-export const EN = { settings, shell, play, train, profile } as const;
+export const EN = { settings, shell, play, train, profile, ui, landing } as const;
 
 type Leaves<T, P extends string = ''> = {
   [K in keyof T & string]: T[K] extends string ? `${P}${K}` : T[K] extends Record<string, unknown> ? Leaves<T[K], `${P}${K}.`> : never;

@@ -176,6 +176,13 @@ Check the webhook's deliveries in the Dashboard: every event should answer 200. 
 
 ## 9. Text the owner (and counsel) must write
 
+**Written 2026-10-27 on the owner's approval (card C28; drafted by Claude, not lawyer-reviewed):** the Purchase Terms and
+Refund Policy (`lib/purchase-terms.ts`, `/purchase-terms`), which FEL Pro and coaches' packages now tick
+(`lib/payments/terms.ts` `BUYER_TERMS`), and Privacy §7 (Stripe for every product, policy version `2026-10-27`). Still
+open from the list below: an in-app cancel for FEL Pro (`/api/stripe/portal` exists, and nothing links to it; the terms
+say "cancel by email" until it does), and counsel's read of the automatic-renewal terms. The purchase-screen lines in
+`lib/stripe/adult-gate.ts` are unchanged: the terms say the same rule, 18+ verified by birth year.
+
 This lane edited no legal or policy copy. Needed before going live:
 
 - **Refund policy** (one page): FEL Pro (weekly and monthly: is the current period refunded? a refund ends Pro at once

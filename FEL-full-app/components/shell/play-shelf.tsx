@@ -19,6 +19,8 @@ import { modeMenuMetaFor } from '@/lib/mode-menu';
 import { isUnlistedMode } from '@/lib/unlisted-modes';
 import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: "2 PLAYERS" on the games friends can play together
 import { COLOR } from '@/lib/design/tokens';
+import { TYPE } from '@/lib/design/type';
+import { enterDelay } from '@/components/ui/fel/page-enter';
 
 type ModeRow = { key: string; name: string; venue: string; href: string; desc: string; color: string; Icon: LucideIcon };
 
@@ -49,17 +51,17 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
         const venues = new Set(modes.map((m) => m.venue).filter(Boolean));
         const venueDistinguishes = venues.size > 1;
         return (
-          <section key={f.id} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 40}ms` }}>
+          <section key={f.id} className="fel-enter" style={enterDelay(i, 40)}>
             <button
               onClick={() => setOpen(isOpen ? null : f.id)}
               aria-expanded={isOpen}
-              className="group flex w-full items-center gap-3.5 rounded-2xl border px-4 py-3 text-left transition-all duration-300"
+              className="fel-press group flex min-h-[64px] w-full items-center gap-3.5 rounded-[20px] border px-4 py-3 text-left"
               style={{
                 borderColor: isOpen ? `${f.accent}55` : 'rgba(255,255,255,0.08)',
                 background: isOpen
                   ? `linear-gradient(90deg, ${f.accent}16 0%, rgba(255,255,255,0.02) 55%)`
-                  : 'rgba(255,255,255,0.02)',
-                boxShadow: isOpen ? `0 0 42px -18px ${f.accent}` : 'none',
+                  : 'linear-gradient(180deg, #12161c 0%, #0b0e12 100%)',
+                boxShadow: isOpen ? `0 0 42px -18px ${f.accent}, var(--fel-highlight)` : 'var(--fel-highlight)',
               }}
             >
               {/* The bubble: the family's colour as an object, not a border. The mode count used to live inside it,
@@ -76,18 +78,18 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
               />
 
               <span className="flex min-w-0 flex-1 items-baseline gap-3">
-                <span className="fel-heading shrink-0 text-[16px] font-bold leading-none text-white">{f.label}</span>
+                <span className={`${TYPE.heading} shrink-0 leading-none text-white`}>{f.label}</span>
                 {/* CLOSED, THE ROW SAYS WHAT IS INSIDE IT. Seven collapsed families with a mood line each filled
                     530px of the page and told you nothing you could act on, directly above a venue grid that shows
                     fourteen places with artwork. Listing the modes makes the shelf worth reading at rest; the
                     family's own line takes over once it is open and the modes are on screen underneath anyway. */}
-                <span className="min-w-0 truncate text-[12px] leading-none text-fel-quiet">
+                <span className={`${TYPE.small} min-w-0 truncate leading-none text-fel-dim`}>
                   {isOpen ? f.blurb : modes.map((m) => m.name).join('  ·  ')}
                 </span>
               </span>
 
               <span
-                className="shrink-0 font-mono text-[11px] font-bold tabular-nums transition-colors"
+                className="shrink-0 font-sans text-[12px] font-semibold tabular-nums transition-colors"
                 style={{ color: isOpen ? f.accent : COLOR.textQuiet }}
               >
                 {modes.length}
@@ -115,28 +117,29 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                       <li key={m.key}>
                         <Link
                           href={m.href}
-                          className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3
-                                     transition-all duration-200 hover:bg-white/[0.05]"
+                          className="fel-press flex items-center gap-3 rounded-[16px] border border-white/8 bg-white/[0.02] px-3 py-3
+                                     hover:bg-white/[0.05]"
                           style={{ boxShadow: 'none' }}
                           onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${m.color}66`; }}
                           onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; }}
                         >
                           <span
                             aria-hidden
-                            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border"
+                            className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] border"
                             style={{
                               borderColor: `${m.color}55`,
                               background: `linear-gradient(135deg, ${m.color}22, rgba(255,255,255,0.03))`,
                               color: m.color,
                             }}
                           >
-                            <Icon className="h-4 w-4" />
+                            <Icon className="h-5 w-5" />
                           </span>
                           <span className="min-w-0">
-                            <span className="block truncate text-[14px] font-semibold leading-tight text-white">{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
-                            <span className="mt-1 block line-clamp-2 text-[11.5px] leading-snug text-white/50">{m.desc}</span>
+                            <span className={`${TYPE.body} block truncate font-semibold leading-tight text-white`}>{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
+                            {/* premium-ui P10: on a phone the row is the game's name — a label, not a sentence; the line returns from sm up */}
+                            <span className={`${TYPE.small} mt-0.5 hidden truncate text-fel-dim sm:block`}>{m.desc}</span>
                             {m.venue && venueDistinguishes && (
-                              <span className="mt-1.5 block truncate font-mono text-[11px] uppercase tracking-wider text-fel-quiet">
+                              <span className="mt-1.5 block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
                                 {m.venue}
                               </span>
                             )}

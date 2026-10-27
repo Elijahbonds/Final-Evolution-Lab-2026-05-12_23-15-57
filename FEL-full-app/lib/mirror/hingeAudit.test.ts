@@ -38,8 +38,8 @@ describe('auditHinge — clean hip hinge', () => {
   });
   it('the note is estimated and names all three reads', () => {
     expect(r.note).toMatch(/^Estimated:/);
-    expect(r.note).toMatch(/hinge ratio/);
-    expect(r.note).toMatch(/dowel line/);
+    expect(r.note).toMatch(/hips bent about [0-9.]+ times as much as your knees/);   // test changed: copy rewrite (CUE-REWRITE) — the same ratio, said plainly
+    expect(r.note).toMatch(/back line/);   // test changed: copy rewrite — the broomstick (dowel) line is "back line"
     expect(r.note).toMatch(/shin/);
   });
 });

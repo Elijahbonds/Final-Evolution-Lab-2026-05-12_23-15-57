@@ -12,7 +12,7 @@ export function FilmSetLink({ exercise }: { exercise: { id: string; name: string
   if (!movement) return null;
   return (
     <Link href={`/coach/form-review?slot=${encodeURIComponent(exercise.id)}`} data-film-set={movement} className="inline-flex items-center gap-1.5 text-xs text-fel-cyan">
-      <ScanLine className="h-3.5 w-3.5" /> Film a set — the camera counts reps and flags the bad one
+      <ScanLine className="h-3.5 w-3.5" /> Film a set — the camera counts your reps and marks the one to work on
     </Link>
   );
 }

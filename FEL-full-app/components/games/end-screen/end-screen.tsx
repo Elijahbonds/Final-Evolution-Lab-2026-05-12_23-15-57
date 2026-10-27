@@ -94,7 +94,7 @@ function RewardTile({ show, instant, ms, value, prefix = '+', label, sub, color,
       <div data-recap={data} data-capped={capped ? '1' : undefined} className="flex h-full items-center gap-[0.5em] rounded-2xl border border-white/10 bg-white/[0.04] px-[0.6em] py-[0.4em]" style={{ boxShadow: show ? `inset 0 0 0 1px ${color}22, 0 0 24px ${color}14` : undefined }}>
         <Icon className="h-[1.4em] w-[1.4em] shrink-0" style={{ color }} />
         <div className="min-w-0">
-          <div className="font-mono text-[1.35em] font-bold leading-none" style={{ color }}>{prefix}{v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</div>
+          <div className="font-display tabular-nums text-[1.35em] font-bold leading-none" style={{ color }}>{prefix}{v.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}</div>
           <div className="mt-[0.2em] text-[0.72em] uppercase tracking-[0.12em] text-white/60">{label}</div>
           {sub && <div className="text-[0.72em] text-white/50">{sub}</div>}
         </div>
@@ -103,12 +103,14 @@ function RewardTile({ show, instant, ms, value, prefix = '+', label, sub, color,
   );
 }
 
-const btnBase = 'fel-heading flex items-center justify-center gap-[0.4em] rounded-xl font-bold outline-none transition-[transform,box-shadow,background-color] duration-150 data-[focused=true]:scale-[1.04] data-[focused=true]:ring-4 data-[focused=true]:ring-offset-2 data-[focused=true]:ring-offset-black disabled:opacity-60';
+// PREMIUM-UI P5 (2026-10-27): the actions are pills that give under the finger, the primary in the one accent with its
+// glow; focus (pad, remote, keyboard) still scales and rings exactly as before.
+const btnBase = 'fel-heading fel-press flex items-center justify-center gap-[0.4em] rounded-full font-bold outline-none transition-[transform,box-shadow,background-color] duration-150 data-[focused=true]:scale-[1.04] data-[focused=true]:ring-4 data-[focused=true]:ring-offset-2 data-[focused=true]:ring-offset-black disabled:opacity-60';
 
 function ActionButton({ a, focused, onPress }: { a: EndScreenAction; focused: boolean; onPress: (a: EndScreenAction) => void }) {
-  const tone = a.tone === 'primary' ? 'bg-[#00E5FF] text-black data-[focused=true]:ring-white'
+  const tone = a.tone === 'primary' ? 'bg-gradient-to-b from-[#4df0ff] via-[#00E5FF] to-[#00c8e0] text-[#021014] shadow-[0_10px_28px_-8px_rgba(0,229,255,0.6),inset_0_1px_0_rgba(255,255,255,0.45)] data-[focused=true]:ring-white'
     : a.tone === 'violet' ? 'border border-[#A855F7]/60 bg-[#A855F7]/10 text-[#C99BFF] data-[focused=true]:ring-[#A855F7]'
-    : 'border border-white/20 bg-white/[0.04] text-white/85 data-[focused=true]:ring-[#00E5FF]';
+    : 'border border-white/15 bg-white/[0.06] text-white/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] data-[focused=true]:ring-[#00E5FF]';
   return (
     <button type="button" data-end-focus={`x-${a.id}`} data-focused={focused} disabled={a.disabled} onClick={(e) => { e.stopPropagation(); onPress(a); }} className={`${btnBase} ${tone} px-[0.9em] py-[0.55em] text-[0.9em]`}>
       {a.label}
@@ -429,7 +431,7 @@ export function EndScreen(props: EndScreenProps) {
                   <div>
                     <div
                       data-end-score={fig.mine}
-                      className="font-mono font-bold leading-none tabular-nums"
+                      className="font-display tabular-nums font-bold leading-none tabular-nums"
                       style={{ fontSize: 'clamp(28px, min(calc(3vw + 1vh), 8vh), 96px)', color: newBest && shown('callouts') ? '#FFD700' : '#FFFFFF', textShadow: newBest && shown('callouts') ? '0 0 28px rgba(255,215,0,0.6)' : undefined }}
                     >
                       {fmt(score)}
@@ -454,7 +456,7 @@ export function EndScreen(props: EndScreenProps) {
                   <div data-end-highlights className="mt-[0.6em] flex flex-wrap justify-center gap-[0.4em]">
                     {lights.map((l) => (
                       <span key={l.key} data-highlight={l.key} className="rounded-lg border border-white/12 bg-white/[0.05] px-[0.6em] py-[0.2em] text-[0.8em] text-white/70">
-                        {l.label} <b className="font-mono text-white">{l.value}</b>
+                        {l.label} <b className="font-display tabular-nums text-white">{l.value}</b>
                       </span>
                     ))}
                   </div>
@@ -472,7 +474,7 @@ export function EndScreen(props: EndScreenProps) {
                       >
                         {c.id === 'best' ? <Star className="h-[1em] w-[1em]" /> : c.id === 'streak' ? <Flame className="h-[1em] w-[1em] text-[#FF7A2F]" /> : c.id === 'winRun' ? <Zap className="h-[1em] w-[1em] text-[#00E5FF]" /> : <Sparkles className="h-[1em] w-[1em]" />}
                         {c.text}
-                        {c.sub && <span className="font-mono text-[0.8em] font-normal opacity-75">· {c.sub}</span>}
+                        {c.sub && <span className="font-display tabular-nums text-[0.8em] font-normal opacity-75">· {c.sub}</span>}
                       </span>
                     ))}
                   </div>
@@ -500,7 +502,7 @@ export function EndScreen(props: EndScreenProps) {
               ) : recap.noPlay ? (
                 <Beat show={shown('noplay')} instant={fast}>
                   <div data-recap="noplay" className="rounded-2xl border border-white/10 bg-white/[0.04] p-[0.8em] text-center">
-                    <div className="font-mono font-bold text-white/80">NO PLAY RECORDED</div>
+                    <div className="font-display tabular-nums font-bold text-white/80">NO PLAY RECORDED</div>
                     <div className="mt-[0.2em] text-[0.85em] text-white/55">The run ended before you got going — nothing earned, nothing counted. Play again to score.</div>
                   </div>
                 </Beat>
@@ -509,14 +511,14 @@ export function EndScreen(props: EndScreenProps) {
                   {recap.unpaid && (
                     <Beat show={shown('unpaid')} instant={fast}>
                       <div data-recap="unpaid" className="rounded-2xl border border-white/10 bg-white/[0.04] p-[0.7em] text-center">
-                        <div className="font-mono font-bold text-white/80">{unpaidTitle(recap.unpaid)}</div>
+                        <div className="font-display tabular-nums font-bold text-white/80">{unpaidTitle(recap.unpaid)}</div>
                         <div className="mt-[0.2em] text-[0.85em] text-white/55">{unpaidLine(recap.unpaid)}</div>
                       </div>
                     </Beat>
                   )}
                   {recap.capMessage && (
                     <Beat show={shown('cap')} instant={fast}>
-                      <div data-recap="cap" className="rounded-2xl border border-[#FFB020]/30 bg-[#FFB020]/[0.06] p-[0.6em] text-center font-mono text-[0.85em] text-white/75">{recap.capMessage}</div>
+                      <div data-recap="cap" className="rounded-2xl border border-[#FFB020]/30 bg-[#FFB020]/[0.06] p-[0.6em] text-center font-display tabular-nums text-[0.85em] text-white/75">{recap.capMessage}</div>
                     </Beat>
                   )}
                   {!recap.unpaid && (
@@ -581,7 +583,7 @@ export function EndScreen(props: EndScreenProps) {
                 <Beat show={shown('goals')} instant={fast}>
                   <div data-end-goals className="rounded-2xl border border-[#FF7A2F]/25 bg-[#FF7A2F]/[0.05] px-[0.7em] py-[0.45em]">
                     <div className="mb-[0.3em] flex items-center gap-[0.4em] text-[0.72em] font-bold uppercase tracking-[0.2em] text-white/55">
-                      <Target className="h-[1.1em] w-[1.1em] text-[#FF7A2F]" /> Today&apos;s goals <span className="ml-auto font-mono normal-case tracking-normal text-white/45">{goalsDoneCount(goals)}</span>
+                      <Target className="h-[1.1em] w-[1.1em] text-[#FF7A2F]" /> Today&apos;s goals <span className="ml-auto font-display tabular-nums normal-case tracking-normal text-white/45">{goalsDoneCount(goals)}</span>
                     </div>
                     <ul className="grid gap-[0.3em] md:grid-cols-3">
                       {goals.map((g) => (
@@ -667,7 +669,7 @@ export function EndScreen(props: EndScreenProps) {
                 <span>✚ Move</span>
               </span>
             </div>
-            {share.url && <p className="mt-[0.4em] break-all font-mono text-[0.7em] text-white/45">{share.url}</p>}
+            {share.url && <p className="mt-[0.4em] break-all font-display tabular-nums text-[0.7em] text-white/45">{share.url}</p>}
           </footer>
         </motion.section>
       </div>

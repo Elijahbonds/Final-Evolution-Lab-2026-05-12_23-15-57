@@ -67,6 +67,10 @@ const { hasActivePro } = await import('@/lib/progression/upgradeGate');
 const { BOOKS } = await import('@/lib/books/bookCatalog');
 const { bookOfferAllowed } = await import('@/lib/books/bookTerms');
 const { STORE_TERMS_VERSION } = await import('@/lib/store-terms');
+// test changed (owner-approvals, 2026-10-27, card C28): FEL Pro buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS.fel_pro), not the coach store's terms; books still tick the store terms. The assertions are unchanged.
+const { BUYER_TERMS } = await import('@/lib/payments/terms');
+const FEL_PRO_TERMS_VERSION = BUYER_TERMS.fel_pro.version;
 
 const ENV: Record<string, string> = {
   STRIPE_SECRET_KEY: 'sk_test_launch_sales_fake',
@@ -134,13 +138,13 @@ describe.each([
   // test changed (payments-ready): FEL Pro now needs the buyer's store-terms tick before Stripe is called, so the buy
   // sends it, and the session and subscription metadata carry the accepted version and time beside the old keys.
   async function buyAndPay() {
-    const r = await call(stripeCheckout, { product: plan, termsAccepted: true, termsVersion: STORE_TERMS_VERSION });
+    const r = await call(stripeCheckout, { product: plan, termsAccepted: true, termsVersion: FEL_PRO_TERMS_VERSION });
     expect(r.status).toBe(200);
     expect(r.json.url).toMatch(/^https:\/\/checkout\.stripe\.test\//);
     const params = h.stripe.created[0];
     expect(params.mode).toBe('subscription');
     expect(params.line_items[0].price_data).toMatchObject({ unit_amount: cents, recurring: { interval } });
-    const meta = { userId: ADULT, product: 'FEL_PRO', plan, terms_version: STORE_TERMS_VERSION, terms_accepted_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) };
+    const meta = { userId: ADULT, product: 'FEL_PRO', plan, terms_version: FEL_PRO_TERMS_VERSION, terms_accepted_at: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) };
     expect(params.metadata).toEqual(meta);
     expect(params.subscription_data.metadata).toEqual(meta);
     // Stripe completes the checkout and bills the first invoice; both reach the shared webhook.

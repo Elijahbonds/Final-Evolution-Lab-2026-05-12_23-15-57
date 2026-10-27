@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The check names and lines asserted below follow the rewritten
+// copy (lib/cue-style/names.ts, docs/CUE-AUDIT.md); what each assertion checks is unchanged.
 // The Movement Screen's station graders (MIRROR-COACH P3, 2026-09-26) on P1's landmark-fixture harness: bodies built in
 // 3-D and filmed through the app's own virtual webcam (lib/mirror/fixtures), clean and under the synth's jitter.
 //
@@ -71,7 +73,7 @@ describe('every camera check: pass, flag, unreadable, mirrored', () => {
       it('a clear fault is flagged for a closer look, on the side it is on', () => {
         const g = grade(c, c.fault());
         expect(g.status, g.note).toBe('flag');
-        expect(g.note).toMatch(/flagged for a closer look/i);
+        expect(g.note).toMatch(/worth working on/i);   // test changed: copy rewrite (CUE-REWRITE) — the flag's words, same meaning
         if (c.faultSide) expect(g.side).toBe(c.faultSide);
         for (const seed of [1, 2, 3]) expect(grade(c, c.fault(seed)).status, `seed ${seed}`).toBe('flag');
       });
@@ -214,7 +216,8 @@ describe('what each grader reads, in numbers (synthetic, estimated)', () => {
     const lvl = gradeStation('hipLevel', front(), 'front', OPT);
     expect(formatGradeValue(lvl)).not.toMatch(/left|right/);
     const knee = gradeStation('kneeWindow', front({ kneeIn: { left: 6 } }), 'front', OPT);
-    expect(formatGradeValue(knee)).toMatch(/L 0\.\d\d in · R (0\.00|0\.0\d (in|out))/);
+    // test changed: copy rewrite (CUE-REWRITE) — the right knee that rounds to zero is "on the line" (or a tiny share), never a side word on zero
+    expect(formatGradeValue(knee)).toMatch(/^left knee about \d+% of your hip width inside the line, right knee (on the line|about [1-5]% of your hip width (inside|outside) the line)/);
   });
 
   it('one leg: the free foot never coming up, or too short a stance, is unreadable — not a pass', () => {
@@ -419,8 +422,8 @@ describe('unreadable is never pass', () => {
     // always said with its count, and the knee is listed as not read. It still is not 'proceed' and never "clear".
     expect(s.score).toBe(100);
     expect(s).toMatchObject({ readCount: 1, totalCount: 6 });
-    expect(s.notRead).toContain('Knee window');
-    expect(s.notMeasured.join(' ')).toMatch(/Knee window/);
+    expect(s.notRead).toContain('Knees from the front');
+    expect(s.notMeasured.join(' ')).toMatch(/Knees from the front/);
   });
 
   it('every way a measurement fails is unreadable, whatever the value says', () => {

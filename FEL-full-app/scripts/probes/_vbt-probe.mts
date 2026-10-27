@@ -109,7 +109,7 @@ check(bb.liveSpeeds.length >= 4, 'barbell: the big number changed rep by rep');
 // 2. the load-velocity line from two earlier loads + today's 100 kg
 const pr = await runSet('profile', { load: '100' });
 report.profile = pr;
-check(/e1RM ≈ \d+(\.\d)? ± \d+(\.\d)? kg/.test(String(pr.e1rm)), 'profile: e1RM with its ±');
+check(/Estimated max ≈ \d+(\.\d)? ± \d+(\.\d)? kg/.test(String(pr.e1rm)), 'profile: e1RM with its ±');
 check(/Accelerative strength today: \d/.test(String(pr.zoneLoads)), 'profile: loads for the coach\'s zone');
 check(pr.kept === 'device', 'profile: kept on the phone');
 

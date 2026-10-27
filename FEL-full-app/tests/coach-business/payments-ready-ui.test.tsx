@@ -9,7 +9,8 @@ describe('Book: the buyer ticks the store terms first', () => {
     const html = renderToStaticMarkup(createElement(BookButton, { slug: 'jordan-lee', packageId: 'pkg-1' }));
     expect(html).toContain('data-buyer-terms');
     expect(html).toMatch(/<input type="checkbox"[^>]*\/?>/);
-    expect(html).toContain('href="/store-terms"');
+    // test changed (owner-approvals, 2026-10-27, card C28): buyers tick the Purchase Terms now, not the coach store's terms
+    expect(html).toContain('href="/purchase-terms"');
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-action="book"|<button[^>]*data-action="book"[^>]*disabled=""/);
   });
 });

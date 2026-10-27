@@ -63,22 +63,23 @@ export function gradeOf(score: number): MovementAssessment['grade'] {
   return 'RECOVERING';
 }
 
+// CUE-REWRITE (2026-10-27): every number with its meaning, plain words ("valgus 0.31" → "a little inside the foot").
 const LINES: Record<CheckId, (s: number, v: number) => string> = {
-  depth: (s, v) => s >= 80 ? `Full depth — ${Math.round(v)}° at the bottom.`
-    : s >= 40 ? `Part way down — ${Math.round(v)}°. There is more range available.`
-    : `Short of depth at ${Math.round(v)}°. Sit further between your feet before you stand up.`,
-  kneeTrackingL: (s, v) => s >= 80 ? 'Left knee tracks over the foot the whole way.'
-    : s >= 40 ? `Left knee drifts inside the foot a little (${v.toFixed(2)}).`
-    : `Left knee falls inside the foot on the way down (${v.toFixed(2)}). Drive it out over the little toe.`,
-  kneeTrackingR: (s, v) => s >= 80 ? 'Right knee tracks over the foot the whole way.'
-    : s >= 40 ? `Right knee drifts inside the foot a little (${v.toFixed(2)}).`
-    : `Right knee falls inside the foot on the way down (${v.toFixed(2)}). Drive it out over the little toe.`,
-  symmetry: (s, v) => s >= 80 ? `Both sides load evenly — ${Math.round(v)}% apart.`
-    : s >= 40 ? `One side takes more than the other — ${Math.round(v)}% apart.`
-    : `You are ${Math.round(v)}% heavier on one side. Slow the descent and split it evenly.`,
-  trunk: (s, v) => s >= 80 ? `Chest stays up — ${Math.round(v)}° of lean.`
-    : s >= 40 ? `Some forward lean — ${Math.round(v)}°.`
-    : `Chest folds forward to ${Math.round(v)}°. Keep the ribs stacked over the hips.`,
+  depth: (s, v) => s >= 80 ? `Full depth: knees bent to about ${Math.round(v)}°.`
+    : s >= 40 ? `Part way down: knees bent to about ${Math.round(v)}°. You have more room to go.`
+    : `Not deep enough: knees bent to only about ${Math.round(v)}°. Sit lower between your feet.`,
+  kneeTrackingL: (s) => s >= 80 ? 'Left knee stays over the foot the whole way.'
+    : s >= 40 ? 'Left knee moves a little inside the foot.'
+    : 'Left knee caves in on the way down. Push it out over your toes.',
+  kneeTrackingR: (s) => s >= 80 ? 'Right knee stays over the foot the whole way.'
+    : s >= 40 ? 'Right knee moves a little inside the foot.'
+    : 'Right knee caves in on the way down. Push it out over your toes.',
+  symmetry: (s, v) => s >= 80 ? `Weight even on both feet (about ${Math.round(v)}% apart).`
+    : s >= 40 ? `One foot takes a bit more weight (about ${Math.round(v)}% more).`
+    : `About ${Math.round(v)}% more weight on one foot. Go down slower and keep it even.`,
+  trunk: (s, v) => s >= 80 ? `Chest stays up (about ${Math.round(v)}° of lean).`
+    : s >= 40 ? `Some forward lean (about ${Math.round(v)}°).`
+    : `Chest drops forward to about ${Math.round(v)}°. Keep your shoulders over your hips.`,
 };
 
 /**
@@ -106,11 +107,11 @@ export function assessSquat(scan: SquatScan): MovementAssessment {
   const provisional = scan.confidence < MIN_GRADEABLE_CONFIDENCE;
 
   const headline = provisional
-    ? 'Not enough of that rep was in frame to grade it. Step back so your whole body is in shot and go again.'
+    ? 'Not enough of that rep was in the shot to score. Step back so your whole body shows, and go again.'
     : grade === 'ELITE' ? `That squat is clean. ${worstCheck.line}`
-    : grade === 'PRIMED' ? `Good squat. The one to work on: ${worstCheck.line.toLowerCase()}`
-    : grade === 'READY' ? `Workable squat with one clear leak. ${worstCheck.line}`
-    : `This squat has a leak worth fixing before you load it. ${worstCheck.line}`;
+    : grade === 'PRIMED' ? `Good squat. One thing to work on: ${worstCheck.line.toLowerCase()}`
+    : grade === 'READY' ? `A solid squat with one clear thing to fix. ${worstCheck.line}`
+    : `Fix this before you add weight. ${worstCheck.line}`;
 
   return { score, grade, checks, worst: worstCheck.id, headline, confidence: scan.confidence, provisional };
 }

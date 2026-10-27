@@ -163,7 +163,7 @@ for (const width of [390, 1280]) {
   const overflow = width === 390 ? await page.evaluate(OVERFLOW(390)) as { scrollWidth: number; overflowing: number } : null;
   report[`coach_${tag}`] = { attentionLine: count, firstFlag, replayPixels: painted, replayPixelsPlaying: paintedLater, reply: reply ? JSON.parse(reply.body) : null, overflow, errors };
   check(/2 filmed sets to review/.test(count ?? ''), `${tag}: attention line ${count}`);
-  check(/knee caves on rep/.test(firstFlag ?? ''), `${tag}: first flag ${firstFlag}`);
+  check(/knee caves in on rep/.test(firstFlag ?? ''), `${tag}: first flag ${firstFlag}`);
   check(painted.length === 2 && painted.every((n) => n > 500), `${tag}: coach replay ${painted}`);
   check(!!reply && /^fault:kneeValgus:cue$/.test(JSON.parse(reply.body).cueId), `${tag}: reply ${reply?.body}`);
   check(!overflow || (overflow.scrollWidth <= 390 && overflow.overflowing === 0), `${tag}: overflow ${JSON.stringify(overflow)}`);

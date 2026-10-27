@@ -23,7 +23,7 @@ export function DeviceBests() {
   if (rows === null) return <p className="text-[12px] text-fel-quiet">Reading this phone’s records…</p>;
   if (!rows.length) {
     return (
-      <p className="text-[12.5px] text-white/50">
+      <p className="text-[14px] text-white/50">
         No bests on this phone yet. <Link href="/play" className="font-bold text-fel-cyan underline-offset-2 hover:underline">Play a mode →</Link>
       </p>
     );
@@ -33,15 +33,15 @@ export function DeviceBests() {
       <ul className="divide-y divide-white/[0.06]">
         {rows.map((r) => (
           <li key={r.mode} className="flex items-center justify-between gap-3 py-2.5">
-            <span className="min-w-0 truncate text-[13px] font-semibold text-white/85">{r.name}</span>
+            <span className="min-w-0 truncate text-[14px] font-semibold text-white/85">{r.name}</span>
             <span className="shrink-0 text-right">
-              <span className="fel-heading text-[17px] font-black text-fel-gold tabular-nums">{r.best.toLocaleString('en-US')}</span>
-              <span className="ml-2 font-mono text-[10px] text-fel-quiet">{r.runs} run{r.runs === 1 ? '' : 's'}</span>
+              <span className="fel-heading text-[16px] font-black text-fel-gold tabular-nums">{r.best.toLocaleString('en-US')}</span>
+              <span className="ml-2 font-sans text-[12px] text-fel-quiet">{r.runs} run{r.runs === 1 ? '' : 's'}</span>
             </span>
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-[10.5px] text-fel-quiet">On this phone only. Under-18 bests are never kept on the server.</p>
+      <p className="mt-2 text-[12px] text-fel-quiet">On this phone only. Under-18 bests are never kept on the server.</p>
     </>
   );
 }

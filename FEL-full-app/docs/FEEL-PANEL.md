@@ -257,3 +257,25 @@ lane/dunk-flagship (group "Dunk · slam"), TUNED, flagged: `dunk.slamHitStopBigM
 (`DunkFlagship.ts` `SLAM_HITSTOP_BIG_MS`, `SLAM_SHAKE_BIG`): a perfect slam's hit-stop and shake. Every make froze 70 ms and
 shook 0.12 before; an ordinary make (accuracy ≤ 0.5) still does, and cleaner ones grow toward these (`slamImpact`).
 **assumption:** the bounds (70–160 ms, 0.12–0.30) are safe, not tuned.
+
+lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, the owner has felt none of them yet):
+
+- Group "Hoops · AI reaction" (`hoops/reaction.ts`), **TUNED (new behaviour)**: `hoops.aiReactRookieMs` 420 ms, `hoops.aiReactProMs`
+  220 ms, `hoops.aiReactEliteMs` 120 ms (`AI_REACT_ROOKIE_MS` / `_PRO_MS` / `_ELITE_MS`, the owner's numbers and Difficulty's
+  `reactionMs`). Every hoops defender brain (1v1's rival, 3v3's three) sees the ball and the attackers this late, carried forward on
+  the motion it saw then: a straight run is tracked with no lag, a change of direction is seen this late. Before: 0 ms on every tier.
+  No speed, reach or odds changes. Staked and head-to-head runs play PRO, at the default.
+- Group "Hoops · team defense" (`hoops/teamDefense.ts`, 3v3 only): `hoops.doubleTeamOn` 1 (0 = one man on the ball, the release),
+  `hoops.doublePaintM` 3.0 m, `hoops.doubleAfterSec` 0.45 s, `hoops.doubleMaxSec` 2.0 s, `hoops.doubleCooldownSec` 4.0 s (a ball held
+  inside 3 m of the rim for 0.45 s draws the nearest other defender; he goes back on the pass, when the ball leaves the paint, or after
+  2 s; then none for 4 s); `hoops.switchOnScreenOn` 1 (0 = fight through every screen, the release), `hoops.switchHelpM` 2.6 m,
+  `hoops.switchCooldownSec` 1.5 s (a pick on the ball defender: the screener's man takes the ball when he is within 2.6 m of the
+  handler and nearer than the screened man; a swap, nobody unmarked).
+- Group "Hoops · contact" (`hoops/handCheck.ts`, `hoops/contactPoses.ts`, 1v1 and 3v3): `hoops.handCheckOn` 1 (0 = nothing counted,
+  nothing drawn), `hoops.handCheckReachOverM` 0.15 m (the forearm is on the hip inside BODY_STANDOFF 1.10 m + this; the standoff is
+  unchanged), `hoops.handCheckGapSec` 0.3 s, `hoops.handCheckFoulCount` 4, `hoops.handCheckWindowSec` 5 s (4 arrivals inside 5 s is the
+  Ref's HAND-CHECK; staying on the hip is one), `hoops.contactPoseOn` 1, `hoops.contactEaseInSec` 0.12 s, `hoops.contactEaseOutSec`
+  0.2 s, `hoops.contactChestLeanDeg` 7° (the drawn poses: the defender's forearm toward the hip, the handler's free arm as a bar, the
+  defender's chest in; drawn only, every rotation put back after the frame).
+
+**assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above (`feel()` is closed there).

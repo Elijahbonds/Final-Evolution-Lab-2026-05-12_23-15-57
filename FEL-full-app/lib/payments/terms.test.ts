@@ -1,6 +1,7 @@
 // PAYMENTS-READY: the terms tick (the store terms' shape) and the coach terms placeholder.
 import { describe, expect, it } from 'vitest';
 import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+import { PURCHASE_TERMS_VERSION } from '@/lib/purchase-terms';
 import {
   BUYER_TERMS, COACH_TERMS_HREF, COACH_TERMS_TEST_PLACEHOLDER, COACH_TERMS_VERSION, checkTerms, coachTermsSigned, coachTermsVersionFor, coachTermsView,
   termsMetadata,
@@ -27,18 +28,24 @@ describe('checkTerms', () => {
   });
 });
 
-describe('the coach terms are not written yet (owner)', () => {
-  it('the constant is null and there is no link: this lane writes no terms text', () => {
-    expect(COACH_TERMS_VERSION).toBeNull();
-    expect(COACH_TERMS_HREF).toBeNull();
-    expect(coachTermsSigned()).toBe(false);
+// test changed (owner-approvals, 2026-10-27; owner in chat: "You do it. I approve.", card C12): the coach terms are written
+// now (lib/coach-terms.ts), so COACH_TERMS_VERSION and COACH_TERMS_HREF are set and the "not written yet" pins became
+// "written". The null behaviour is still held below by passing null explicitly: the mechanism is unchanged.
+describe('the coach terms are written (owner-approved 2026-10-27, card C12)', () => {
+  it('the constant names the written version and its page', () => {
+    expect(COACH_TERMS_VERSION).toBe('coach-terms-2026-10-27');
+    expect(COACH_TERMS_HREF).toBe('/coach-terms');
+    expect(coachTermsSigned()).toBe(true);
+    expect(coachTermsView(true)).toEqual({ version: 'coach-terms-2026-10-27', href: '/coach-terms', signed: true });
+    expect(coachTermsView(false)).toEqual({ version: 'coach-terms-2026-10-27', href: '/coach-terms', signed: true });
   });
 
-  it('test mode runs on a placeholder no live account can carry; live mode accepts nothing', () => {
-    expect(coachTermsVersionFor(false)).toBe(COACH_TERMS_TEST_PLACEHOLDER);
-    expect(coachTermsVersionFor(true)).toBeNull();
-    expect(coachTermsView(true)).toEqual({ version: null, href: null, signed: false });
-    expect(coachTermsView(false)).toEqual({ version: COACH_TERMS_TEST_PLACEHOLDER, href: null, signed: false });
+  it('with no version (null), test mode runs on a placeholder no live account can carry; live mode accepts nothing', () => {
+    expect(coachTermsSigned(null)).toBe(false);
+    expect(coachTermsVersionFor(false, null)).toBe(COACH_TERMS_TEST_PLACEHOLDER);
+    expect(coachTermsVersionFor(true, null)).toBeNull();
+    expect(coachTermsView(true, null, null)).toEqual({ version: null, href: null, signed: false });
+    expect(coachTermsView(false, null, null)).toEqual({ version: COACH_TERMS_TEST_PLACEHOLDER, href: null, signed: false });
   });
 
   it('once signed, both modes ask for the signed version and link it', () => {
@@ -48,7 +55,11 @@ describe('the coach terms are not written yet (owner)', () => {
   });
 });
 
-it('buyers tick the store terms (assumption until the owner points them elsewhere)', () => {
-  expect(BUYER_TERMS.coach_package).toEqual({ version: STORE_TERMS_VERSION, href: '/store-terms' });
-  expect(BUYER_TERMS.fel_pro).toEqual({ version: STORE_TERMS_VERSION, href: '/store-terms' });
+// test changed (owner-approvals, 2026-10-27, card C28): buyers ticked the coach store's terms (an assumption until the owner
+// pointed them elsewhere). They tick the Purchase Terms now, which name FEL Pro and coaches' packages; the coach store and
+// audiobooks keep /store-terms.
+it('buyers tick the Purchase Terms; the coach store keeps its own', () => {
+  expect(BUYER_TERMS.coach_package).toEqual({ version: PURCHASE_TERMS_VERSION, href: '/purchase-terms' });
+  expect(BUYER_TERMS.fel_pro).toEqual({ version: PURCHASE_TERMS_VERSION, href: '/purchase-terms' });
+  expect(PURCHASE_TERMS_VERSION).not.toBe(STORE_TERMS_VERSION);
 });

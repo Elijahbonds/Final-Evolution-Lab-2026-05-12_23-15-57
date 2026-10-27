@@ -17,22 +17,22 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
           <div className="flex items-center gap-3">
             <Flame className="h-5 w-5 text-fel-ember" aria-hidden />
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-bold text-white">{b.streakDays > 0 ? `${b.streakDays}-day streak` : 'No streak running'}</p>
+              <p className="text-[14px] font-bold text-white">{b.streakDays > 0 ? `${b.streakDays}-day streak` : 'No streak running'}</p>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label={`Streak toward ${b.nextStreakGoal} days`} aria-valuemin={0} aria-valuemax={b.nextStreakGoal} aria-valuenow={b.streakDays}>
                 <span className="block h-full rounded-full bg-fel-ember" style={{ width: `${streakPct}%` }} />
               </div>
-              <p className="mt-1 text-[11px] text-fel-dim">Next: {b.nextStreakGoal} days</p>
+              <p className="mt-1 text-[12px] text-fel-dim">Next: {b.nextStreakGoal} days</p>
             </div>
           </div>
           {lv && (
             <div className="mt-4 flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-fel-emerald" aria-hidden />
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-white">Level {lv.level}</p>
+                <p className="text-[14px] font-bold text-white">Level {lv.level}</p>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Level progress" aria-valuemin={0} aria-valuemax={lv.need} aria-valuenow={lv.into}>
                   <span className="block h-full rounded-full bg-fel-emerald" style={{ width: `${Math.min(100, (lv.into / Math.max(1, lv.need)) * 100)}%` }} />
                 </div>
-                <p className="mt-1 font-mono text-[10.5px] text-fel-dim">{lv.into.toLocaleString('en-US')} / {lv.need.toLocaleString('en-US')} XP</p>
+                <p className="mt-1 font-sans text-[12px] text-fel-dim">{lv.into.toLocaleString('en-US')} / {lv.need.toLocaleString('en-US')} XP</p>
               </div>
             </div>
           )}
@@ -42,7 +42,7 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
           </div>
         </Card>
         <Card>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-gold">Mode mastery</p>
+          <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-gold">Mode mastery</p>
           {b.mastery.length ? (
             <ul className="mt-2 flex flex-wrap gap-2">
               {b.mastery.map((m) => (
@@ -53,7 +53,7 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-[12.5px] text-white/50">No tiers yet. Play any mode a few times to climb from Bronze.</p>
+            <p className="mt-2 text-[14px] text-white/50">No tiers yet. Play any mode a few times to climb from Bronze.</p>
           )}
         </Card>
       </div>

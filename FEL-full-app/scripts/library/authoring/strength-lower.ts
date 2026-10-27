@@ -25,7 +25,7 @@ export const STRENGTH_LOWER: Family[] = [
       { name: 'Wall Sit', v: 'wall-sit', level: 'beginner', equipment: ['wall'], setup: 'Back flat against a wall, slide down until the thighs are close to level, feet a step out from the wall.', cues: ['Press your back into the wall and the floor away through your heels.', 'Hold still and breathe out long.', KNEES_OUT], dosage: secs(3, 30, 45), lowLoad: ['back'], goals: ['strength', 'knee'] },
       { name: 'Bodyweight Box Squat', v: 'box-bw', level: 'beginner', equipment: ['box'], cue: 'Sit back to the box, touch it without dropping, and stand.', aliases: ['Box Squat to Bench'] },
       { name: 'Bodyweight Squat', v: 'bw', level: 'beginner', aliases: ['Air Squat'] },
-      { name: 'Counterweight Squat', v: 'counterweight', level: 'beginner', equipment: ['plate'], setup: 'Hold a light plate out in front at chest height, arms long, feet shoulder-width.', cue: 'Reach the plate toward the wall as you sit; it lets you sit deeper and stay tall.' },
+      { name: 'Counterweight Squat', v: 'counterweight', level: 'beginner', equipment: ['plate'], setup: 'Hold a light plate out in front at chest height, arms long, feet shoulder-width.', cue: 'Reach the plate toward the wall as you sit; it helps you sit deeper and stay tall.' },
       { name: 'Goblet Squat', v: 'goblet-kb', level: 'beginner', equipment: ['kettlebell'], setup: 'Hold a kettlebell by the horns against your chest, elbows pointing down, feet shoulder-width.', cue: 'Keep the bell glued to your chest from the top to the bottom.' },
       { name: 'Dumbbell Goblet Squat', v: 'goblet-db', level: 'beginner', equipment: ['dumbbell'], setup: 'Hold one dumbbell upright against your chest by the top end, feet shoulder-width.', cue: 'Keep the dumbbell glued to your chest from the top to the bottom.', ladder: 'goblet-db' },
       { name: 'Heels-Elevated Goblet Squat', v: 'goblet-heels-up', level: 'intermediate', equipment: ['kettlebell', 'plate'], setup: 'Heels on a thin plate or wedge, kettlebell held at the chest, feet a little narrower than usual.', cue: 'Let the knees travel forward over the laces while the heels stay heavy on the plate.' },
@@ -69,7 +69,7 @@ export const STRENGTH_LOWER: Family[] = [
     setup: 'Stand tall, feet hip-width, arms relaxed or holding the load the variant names.',
     cues: ['Step long enough that the back knee can drop straight down toward the floor.', FRONT_HEEL, 'Land the step quiet: no slap of the foot on the floor.'],
     faults: [
-      { fault: 'Short step that drives the front knee far past the toes', fix: 'Lengthen the step so the front shin stays close to vertical over the floor.' },
+      { fault: 'Short step, front knee far past the toes', fix: 'Lengthen the step so the front shin stays close to vertical over the floor.' },
       { fault: 'Front knee caving in', fix: 'Push the front knee out over your laces.' },
     ],
     dosage: reps(3, '8 each side', 75),
@@ -103,7 +103,7 @@ export const STRENGTH_LOWER: Family[] = [
       { name: 'Box Step-Up', v: 'bw', level: 'beginner' },
       { name: 'Dumbbell Box Step-Up', v: 'db', level: 'intermediate', equipment: ['box', 'dumbbell'], setup: 'Dumbbells at your sides, one whole foot on a knee-height box.' },
       { name: 'Barbell Box Step-Up', v: 'bb', level: 'advanced', equipment: ['box', 'barbell'], setup: 'Bar across the upper back, one whole foot on a knee-height box.', cautions: [RANGE_CAUTION] },
-      { name: 'Step-Up with Knee Drive', v: 'knee-drive', level: 'intermediate', cue: 'Stand tall on the box and drive the free knee up toward the ceiling, still for a beat.', goals: ['speed', 'balance'] },
+      { name: 'Step-Up with Knee Drive', v: 'knee-drive', level: 'intermediate', cue: 'Stand tall on the box and drive the free knee up toward the ceiling. Hold a beat.', goals: ['speed', 'balance'] },
       { name: 'Lateral Step-Up', v: 'lateral-bw', level: 'beginner', plane: 'frontal', ladder: 'lateral', setup: 'Stand side-on to a low box, the near foot on top.', cue: 'Push the box down through the heel on top and stand tall beside it.' },
       { name: 'Dumbbell Lateral Step-Up', v: 'lateral-db', level: 'intermediate', plane: 'frontal', ladder: 'lateral', equipment: ['box', 'dumbbell'], setup: 'Stand side-on to a box with a dumbbell at each side, the near foot on top.', cue: 'Push the box down through the heel on top and stand tall beside it.' },
       { name: 'Crossover Step-Up', v: 'crossover', level: 'intermediate', plane: 'frontal', ladder: 'lateral', setup: 'Stand side-on to a box; the far foot crosses over to step up on it.', cue: 'Drive the box down through the crossing foot and stand tall over it.', goals: ['agility', 'strength'] },
@@ -164,7 +164,7 @@ export const STRENGTH_LOWER: Family[] = [
     variants: [
       { name: 'Dowel Hip Hinge', v: 'dowel', level: 'beginner', equipment: ['dowel'], setup: 'Hold a dowel along your back so it touches the back of the head, between the shoulder blades and the tailbone.', cue: 'Keep all three points on the dowel as you push the wall behind you.', dosage: reps(2, '10', 30), aliases: ['Hip Hinge Drill'] },
       { name: 'Wall Hip Hinge', v: 'wall-tap', level: 'beginner', equipment: ['wall'], setup: 'Stand a foot in front of a wall, facing away from it.', cue: 'Tap the wall behind you with your hips, then stand tall.', dosage: reps(2, '10', 30) },
-      { name: 'Kettlebell Deadlift', v: 'kb-deadlift', level: 'beginner', equipment: ['kettlebell'], setup: 'Kettlebell between the feet, under your laces line; hinge down and grip the handle.', cue: 'Push the floor away and stand tall with the bell close.', ladder: 'deadlift' },
+      { name: 'Kettlebell Deadlift', v: 'kb-deadlift', level: 'beginner', equipment: ['kettlebell'], setup: 'Kettlebell between the feet, under your laces line; push your hips back, reach down and grip the handle.', cue: 'Push the floor away and stand tall with the bell close.', ladder: 'deadlift' },
       { name: 'Trap Bar Deadlift', v: 'trap-bar', level: 'intermediate', equipment: ['trap-bar'], setup: 'Stand in the middle of the trap bar, grip the handles, hips back and chest proud.', cue: 'Push the floor away and stand tall inside the bar.', ladder: 'deadlift', aliases: ['Hex Bar Deadlift'] },
       { name: 'Conventional Barbell Deadlift', v: 'bb-deadlift', level: 'advanced', equipment: ['barbell'], setup: 'Bar over the middle of your feet, hands just outside the legs, slack pulled out of the bar.', cue: 'Brace for a light punch before the bar leaves the floor.', ladder: 'deadlift', cautions: [RANGE_CAUTION] },
       { name: 'Dumbbell Romanian Deadlift', v: 'db-rdl', level: 'beginner', equipment: ['dumbbell'], ladder: 'rdl', aliases: ['DB RDL'] },
@@ -181,7 +181,7 @@ export const STRENGTH_LOWER: Family[] = [
     cues: ['Reach the free heel back toward the wall behind you as you tip forward.', 'Keep the belt line level, like a tray of drinks on it.', TRIPOD],
     faults: [
       { fault: 'Hips opening up toward the ceiling', fix: 'Point both front pockets at the floor the whole rep.' },
-      { fault: 'Losing balance at the bottom', fix: 'Shorten the reach and press all three tripod points into the floor.' },
+      { fault: 'Losing balance at the bottom', fix: 'Shorten the reach and press heel, big toe and little toe into the floor.' },
     ],
     dosage: reps(3, '6-8 each side', 60, '3-0-1-0'),
     variants: [
@@ -191,7 +191,7 @@ export const STRENGTH_LOWER: Family[] = [
       { name: 'Dumbbell Single-Leg Romanian Deadlift', v: 'db', level: 'intermediate', equipment: ['dumbbell'], setup: 'Stand on one leg holding a dumbbell in the opposite hand.' },
       { name: 'Kettlebell Single-Leg Romanian Deadlift', v: 'kb', level: 'intermediate', equipment: ['kettlebell'], ladder: 'kb', setup: 'Stand on one leg holding a kettlebell in the opposite hand.' },
       { name: 'Landmine Single-Leg Romanian Deadlift', v: 'landmine', level: 'intermediate', equipment: ['landmine'], ladder: 'landmine', setup: 'Stand on one leg beside the end of the landmine bar, holding it in the opposite hand.', cue: 'Let the bar guide a straight path down and up.' },
-      { name: 'Single-Leg Hip Airplane', v: 'airplane', level: 'advanced', ladder: 'airplane', setup: 'Stand on one leg, hinged forward so the trunk and the free leg are level with the floor.', cue: 'Turn the belt line open toward the wall and back to level, slow and smooth.', goals: ['hip', 'balance', 'mobility'] },
+      { name: 'Single-Leg Hip Airplane', v: 'airplane', level: 'advanced', ladder: 'airplane', setup: 'Stand on one leg, bent forward at the hips so the trunk and the free leg are level with the floor.', cue: 'Turn the belt line open toward the wall and back to level, slow and smooth.', goals: ['hip', 'balance', 'mobility'] },
     ],
   },
   {
@@ -233,14 +233,14 @@ export const STRENGTH_LOWER: Family[] = [
       { name: 'Single-Leg Slider Leg Curl', v: 'slider-sl', level: 'advanced', laterality: 'unilateral', setup: 'One heel on a slider, the other leg pointed at the ceiling, hips lifted.' },
       { name: 'Eccentric Nordic Curl', v: 'nordic-eccentric', level: 'intermediate', ladder: 'nordic', equipment: ['mat'], setup: 'Kneel on a mat with the ankles held down by a partner or a padded anchor.', cues: ['Lower toward the floor as slowly as you can, one straight line from knee to head.', 'Catch yourself on the floor with your hands, then push back up.', 'Stay long through the belt line; no folding at the hips.'], dosage: reps(3, '3-5', 90), aliases: ['Nordic Hamstring Lower'] },
       { name: 'Band-Assisted Nordic Curl', v: 'nordic-band', level: 'intermediate', ladder: 'nordic', equipment: ['mat', 'band'], setup: 'Kneel on a mat, ankles anchored, a band from high behind you looped around your chest.', cues: ['Lower toward the floor slowly while the band takes some weight.', 'Stay long through the belt line; no folding at the hips.', 'Pull back up to the start on the same path.'], dosage: reps(3, '4-6', 90) },
-      { name: 'Nordic Curl', v: 'nordic', level: 'advanced', ladder: 'nordic', equipment: ['mat'], youthOk: false, setup: 'Kneel on a mat with the ankles anchored.', cues: ['Lower toward the floor under control and pull back up without the hands.', 'Stay long through the belt line; no folding at the hips.', 'Stop the set when the lower stops being smooth.'], dosage: reps(3, '2-4', 120), cautions: ['Very demanding: build the eccentric version for weeks first.'] },
+      { name: 'Nordic Curl', v: 'nordic', level: 'advanced', ladder: 'nordic', equipment: ['mat'], youthOk: false, setup: 'Kneel on a mat with the ankles anchored.', cues: ['Lower toward the floor under control and pull back up without the hands.', 'Stay long through the belt line; no folding at the hips.', 'Stop the set when the lower stops being smooth.'], dosage: reps(3, '2-4', 120), cautions: ['Very demanding: build the slow-lowering (eccentric) version for weeks first.'] },
     ],
   },
   {
     family: 'kb-swing', block: B, category: 'power', pattern: 'hinge', plane: 'sagittal', laterality: 'bilateral', skillLayer: 'strength', braceMode: 'reflex',
     primary: ['glutes', 'hamstrings'], secondary: ['lower-back', 'forearms', 'deep-core'], goals: ['power', 'conditioning', 'hip', 'vertical'], sport: ['general', 'basketball'],
     lowLoad: ['knee'], youthOk: true, equipment: ['kettlebell'], clip: 'hinge',
-    setup: 'Kettlebell a foot in front of you, feet a little wider than the hips; hinge back and grip the handle.',
+    setup: 'Kettlebell a foot in front of you, feet a little wider than the hips; push your hips back and grip the handle.',
     cues: ['Hike the bell back high between your legs, like a football snap.', 'Snap the hips forward and let the bell float to chest height.', 'Stand tall at the top: still for a beat before the next hike.'],
     faults: [
       { fault: 'Squatting the swing', fix: 'Push the wall behind you with your hips; the knees bend only a little.' },
@@ -263,7 +263,7 @@ export const STRENGTH_LOWER: Family[] = [
     setup: 'Balls of the feet on the edge of a step, heels free, a hand on a wall or rail for balance.',
     cues: ['Push the floor away through the big-toe joint and rise as tall as you can.', 'Hold the top still for a beat.', 'Lower slow until the heels drop below the step: full range.'],
     faults: [
-      { fault: 'Rolling out to the little toe at the top', fix: 'Keep the big-toe joint heavy on the step as you rise.' },
+      { fault: 'Rolling out to the little toe', fix: 'Keep the big-toe joint heavy on the step as you rise.' },
       { fault: 'Bouncing at the bottom', fix: 'Pause for a beat with the heels low, then rise.' },
     ],
     dosage: reps(3, '12-15', 45, '1-1-1-3'),
@@ -285,7 +285,7 @@ export const STRENGTH_LOWER: Family[] = [
     setup: 'Lean your back on a wall with the heels about a foot out in front.',
     cues: ['Pull the toes up toward your shins as high as they go, heels on the floor.', 'Hold the top for a beat.', 'Lower the toes slowly back to the floor.'],
     faults: [
-      { fault: 'Heels sliding forward', fix: 'Bring the feet a little closer to the wall and keep the heels heavy on the floor.' },
+      { fault: 'Heels sliding forward', fix: 'Move your feet a little closer to the wall and keep your heels heavy on the floor.' },
       { fault: 'Slapping the toes down', fix: 'Lower on a slow three-count back to the floor.' },
     ],
     dosage: reps(3, '15-20', 30),

@@ -179,7 +179,7 @@ function reviewed(id: SignatureId, reviews: ReadonlyMap<string, StoredReview> | 
   const base = signatureProgram(id);
   if (!base) return null;
   const review = reviews?.get(id) ?? null;
-  return { program: applyEdits(base, cleanEdits(base, review?.edits ?? {})), status: statusOf(id, reviews ?? new Map()), review };
+  return { program: applyEdits(base, cleanEdits(base, review?.edits ?? {})), status: statusOf(id, reviews), review };
 }
 
 // ── the athlete ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -327,8 +327,10 @@ export async function reviewAct(adminId: string, body: ReviewAction, deps: Signa
     const edits = cleanEdits(base, body.edits);
     const problems = programProblems(applyEdits(base, edits), full);
     if (problems.length) return res(422, { error: 'invalid_program', problems });
-    await writeReview(deps.raw, { programId: base.id, status: prev?.status ?? 'draft', reviewerId: adminId, note, edits }, now.getTime());
-    return res(200, { ok: true, status: prev?.status ?? 'draft' });
+    // an edit keeps the program's standing status (the owner's approved default included): saving edits never hides it
+    const keep = statusOf(base.id, reviews);
+    await writeReview(deps.raw, { programId: base.id, status: keep, reviewerId: adminId, note, edits }, now.getTime());
+    return res(200, { ok: true, status: keep });
   }
   const edits = prev?.edits ?? {};
   if (body.action === 'approve') {

@@ -62,6 +62,11 @@ html {
   scroll-padding-top: 4.5rem;
   scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
 }
+/* A screen with a docked primary action (components/ui/fel/primary-cta.tsx, premium-ui P3): on a phone the pill sits above
+   the tab bar, so a focused element must clear both (2.4.11). */
+@media (max-width: 767px) {
+  html:has([data-fel-dock]) { scroll-padding-bottom: calc(10rem + env(safe-area-inset-bottom, 0px)); }
+}
 
 body {
   background-color: #050505;
@@ -74,7 +79,8 @@ body {
 }
 
 .fel-heading {
-  font-family: var(--font-display), sans-serif;
+  /* the fallback inside var(): a missing variable gives the system sans, never the browser's serif (P2 fonts fix) */
+  font-family: var(--font-display, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

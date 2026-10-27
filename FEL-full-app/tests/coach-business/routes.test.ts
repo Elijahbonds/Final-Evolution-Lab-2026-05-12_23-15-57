@@ -38,7 +38,7 @@ import { GET as drafts } from '@/app/api/coach/drafts/route';
 import { resetBusinessProbe } from '@/lib/coach-business/store';
 
 const req = (body: unknown = {}) => new Request('https://fel.test/x', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-const KEYS = ['COACH_CONNECT_PAYMENTS_ENABLED', 'COACH_CONNECT_LIVE', 'COACH_PRO_ENABLED', 'COACH_PRO_PRICE_USD_CENTS', 'COACH_FREE_CLIENT_LIMIT', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'NEXTAUTH_URL'];
+const KEYS = ['REFUND_PROCESSING_FEE', 'COACH_CONNECT_PAYMENTS_ENABLED', 'COACH_CONNECT_LIVE', 'COACH_PRO_ENABLED', 'COACH_PRO_PRICE_USD_CENTS', 'COACH_FREE_CLIENT_LIMIT', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'NEXTAUTH_URL'];
 
 beforeEach(() => {
   for (const k of KEYS) delete process.env[k];
@@ -90,7 +90,9 @@ describe('every money route is closed by default — and touches nothing', () =>
 
 describe('the shared Stripe webhook routes a COACH_CONNECT event to the coach business, first', () => {
   it('a refund is recorded once, and the book path is never asked', async () => {
-    Object.assign(process.env, { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: 'whsec_x' });
+    // test changed (owner-approvals, 2026-10-27): REFUND_PROCESSING_FEE defaults ON now; this test holds the price-only
+    // refund (FEL's 999 back, nothing of the processing fee), so it names that rule. The assertions are unchanged.
+    Object.assign(process.env, { STRIPE_SECRET_KEY: 'sk_test_x', STRIPE_WEBHOOK_SECRET: 'whsec_x', REFUND_PROCESSING_FEE: '0' });
     const fake = fakeCoachBusinessDb();
     seedCoach(fake.state);
     fake.state.sales.set('sale-1', { id: 'sale-1', packageId: 'pkg-1', coachId: 'coach-1', buyerId: 'b', kind: 'session_pack', status: 'PAID', amountCents: 19_999, feeCents: 999, refundedCents: 0, feeRefundedCents: 0, paymentIntentId: 'pi_1' });
