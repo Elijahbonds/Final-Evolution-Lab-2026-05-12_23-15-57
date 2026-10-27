@@ -252,6 +252,58 @@ function inclineScapPushup(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return run(scene, sk, 'ex_incline_scap_push_up', 2.0, [at(top, 0, true), at(sink, 0.7, true), at(sink, 1.0, true)], true);
 }
 
+// ── running a few steps, and stopping ─────────────────────────────────────────────────────────────────────────────
+/** A running step forward: `s` foot landing at z, the other pushing off behind on its ball, the arms driving. */
+function runStep(s: Side, z: number, oz: number): Pose {
+  const o = other(s);
+  return { bones: { Hips: [20, 0, 0], Spine: [4, 0, 0], Neck: [-14, 0, 0], [`${s}Foot`]: [-6, 0, 0], [`${o}Foot`]: [26, 0, 0] } as Record<string, Deg3>, feet: { [s]: [sx(s, 0.11), ANKLE, z], [o]: [sx(o, 0.11), ANKLE + 0.09, oz] } as Pair, kneePoles: bothDir(0.1, 0, 1), rel: { [o]: [sx(o, -0.02), -0.16, 0.26], [s]: [sx(s, 0.0), -0.40, -0.18] } as Pair, poles: { [o]: [sx(o, 0.2), -1, 0.2], [s]: [sx(s, 0.2), -0.4, -1] } as Pair, hipsY: -0.06, hipsZ: (z + oz) / 2 + 0.06 };
+}
+/** The stick: a wide two-foot athletic stance, hips back and low, the chest over the knees, held. */
+const STICK = (z: number): Pose => ({ bones: { Hips: [30, 0, 0], Spine: [8, 0, 0], Neck: [-16, 0, 0], LeftFoot: [-22, 0, 0], RightFoot: [-22, 0, 0] }, feet: both(0.24, ANKLE, z), kneePoles: bothDir(0.25, 0, 1), rel: { Left: [-0.06, -0.24, 0.30], Right: [0.06, -0.24, 0.30] }, poles: bothDir(0.3, -1, 0), hipsY: -0.30, hipsZ: z - 0.14 });
+/** ex_decel_stick (decel to stick) — three quick running steps, then the brake: the feet land wide, the hips drop back and
+ *  the stick is held; walk back. */
+function decelStick(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const z0 = -0.50;
+  return run(scene, sk, 'ex_decel_stick', 4.8, [
+    at(STANDING(z0), 0, true), at(runStep('Right', z0 + 0.40, z0), 0.4), at(runStep('Left', z0 + 0.85, z0 + 0.40), 0.65), at(runStep('Right', z0 + 1.25, z0 + 0.85), 0.9),
+    at(STICK(z0 + 1.45), 1.15, true), at(STICK(z0 + 1.45), 1.9, true), at(STANDING(z0 + 1.45), 2.3, true),
+    ...walkBack2(z0 + 1.45, z0, 2.3),
+  ]);
+}
+/** ex_jump_stop — two running steps, a low hop off one foot, landing on BOTH feet at once in the athletic stance (the
+ *  basketball jump stop), held; walk back. */
+function jumpStop(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const z0 = -0.40;
+  const hop: Pose = { bones: { Hips: [12, 0, 0], Spine: [4, 0, 0], ...legs(-24, 40), LeftFoot: [16, 0, 0], RightFoot: [16, 0, 0] }, rel: { Left: [-0.02, -0.26, 0.26], Right: [0.02, -0.26, 0.26] }, poles: bothDir(0.3, -1, 0), hipsY: 0.06, hipsZ: z0 + 1.0 };
+  return run(scene, sk, 'ex_jump_stop', 4.6, [
+    at(STANDING(z0), 0, true), at(runStep('Right', z0 + 0.40, z0), 0.4), at(runStep('Left', z0 + 0.85, z0 + 0.40), 0.65), at(hop, 0.88), at(STICK(z0 + 1.20), 1.08, true), at(STICK(z0 + 1.20), 1.8, true), at(STANDING(z0 + 1.20), 2.2, true),
+    ...walkBack2(z0 + 1.20, z0, 2.2),
+  ]);
+}
+/** Walk from z1 back to z0 in short steps, ending standing at z0 (closing the loop). */
+function walkBack2(z1: number, z0: number, t0: number): ExKey[] {
+  const keys: ExKey[] = [];
+  const n = Math.max(1, Math.ceil(Math.abs(z1 - z0) / 0.4));
+  for (let i = 1; i <= n; i++) {
+    const zf = z1 + ((z0 - z1) * i) / n, zp = z1 + ((z0 - z1) * (i - 1)) / n;
+    keys.push(at(STANDING(zf, 0, 0, zf, zp), t0 + (i - 0.5) * 0.45), at(STANDING(zf), t0 + i * 0.45, i === n));
+  }
+  return keys;
+}
+/** ex_lateral_skip — skipping sideways: the right foot leads out, the left chases it in the air, three to the right and three
+ *  back to the left, light on the balls of the feet, the arms swinging out and in. */
+function lateralSkip(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const keys: ExKey[] = [];
+  const W = 0.14, S = 0.34;
+  const ground = (x: number, open: boolean): Pose => ({ bones: { Hips: [8, 0, 0], Spine: [2, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, feet: { Left: [x - W - (open ? 0.08 : 0), ANKLE + 0.02, 0.06], Right: [x + W + (open ? 0.08 : 0), ANKLE + 0.02, 0.06] }, kneePoles: bothDir(0.2, 0, 1), rel: open ? { Left: [-0.30, -0.22, 0.10], Right: [0.30, -0.22, 0.10] } : { Left: [-0.04, -0.46, 0.06], Right: [0.04, -0.46, 0.06] }, poles: bothDir(0.6, -0.6, -0.2), hipsY: -0.06, hipsX: x });
+  const air = (x: number): Pose => ({ bones: { Hips: [4, 0, 0], ...legs(-10, 20), LeftUpLeg: [-10, 0, 10], RightUpLeg: [-10, 0, -10], LeftFoot: [28, 0, 0], RightFoot: [28, 0, 0] }, rel: { Left: [-0.40, -0.10, 0.08], Right: [0.40, -0.10, 0.08] }, poles: bothDir(0.6, -0.6, -0.2), hipsY: 0.10, hipsX: x });
+  let t = 0, x = 0;
+  const dir = [1, 1, 1, -1, -1, -1];
+  keys.push(at(ground(0, false), 0, true)); t = 0.3;
+  for (const d of dir) { keys.push(at(air(x + (d * S) / 2), t)); x += d * S; keys.push(at(ground(x, d > 0 ? false : false), t + 0.22)); t += 0.44; }
+  return run(scene, sk, 'ex_lateral_skip', t + 0.2, keys);
+}
+
 export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_def_stance', defStance], ['ex_sl_balance', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance', false)], ['ex_sl_balance_head', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance_head', true)],
   ['ex_seated_breathe', seatedBreathe], ['ex_adductor_squeeze', adductorSqueeze],
@@ -259,4 +311,5 @@ export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_box_jump', boxJump], ['ex_broad_jump_stick', broadJumpStick], ['ex_sl_hop_stick', slHopStick], ['ex_lateral_hop_stick', lateralHopStick], ['ex_drop_landing', dropLanding], ['ex_snap_down', snapDown],
   ['ex_supported_sl_rdl', supportedSlRdl], ['ex_hip_airplane', hipAirplane], ['ex_two_point_start', twoPointStart], ['ex_arm_swing', armSwing],
   ['ex_prone_t', proneT], ['ex_incline_scap_push_up', inclineScapPushup],
+  ['ex_decel_stick', decelStick], ['ex_jump_stop', jumpStop], ['ex_lateral_skip', lateralSkip],
 ];

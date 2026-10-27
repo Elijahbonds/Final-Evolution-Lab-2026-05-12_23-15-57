@@ -418,6 +418,9 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_slider_curl', families: ['hamstring-iso'], bases: /^long-lever$/, hold: 1.2 },
   { clip: (b) => ({ 'one-step': 'ex_approach_jump_one_step', 'two-step': 'ex_approach_jump_two_step', 'three-step': 'ex_approach_jump_three_step', 'one-foot': 'ex_approach_jump_one_foot' } as Record<string, string>)[b] ?? null,
     families: ['approach-jump'], bases: /^(one-step|two-step|three-step|one-foot)$/, emits: ['ex_approach_jump_one_step', 'ex_approach_jump_two_step', 'ex_approach_jump_three_step', 'ex_approach_jump_one_foot'] },
+  { clip: 'ex_decel_stick', families: ['deceleration'], bases: /^stick$/ },
+  { clip: 'ex_jump_stop', families: ['footwork'], bases: /^jump-stop$/ },
+  { clip: 'ex_lateral_skip', families: ['basketball-warmup'], bases: /^skip-lateral$/ },
   // assumption: recover and contest is the closeout the court plays (sprint, chop the feet, the hand up)
   { clip: 'bball_closeout', families: ['court-movement'], bases: /^recover-contest$/ },
   // ── trunk ──
@@ -642,7 +645,8 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank'
 export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt',
   'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip', 'ex_seated_kickback', 'ex_seated_kickback_one', 'ex_seated_row', 'ex_seated_row_one',
   // DEMO-LOOPS: read from the side
-  'ex_sl_squat_partial', 'ex_supported_sl_rdl', 'ex_hip_airplane', 'ex_two_point_start', 'ex_arm_swing', 'ex_broad_jump_stick', 'ex_sl_hop_stick', 'ex_snap_down', 'ex_cmj_dip']);
+  'ex_sl_squat_partial', 'ex_supported_sl_rdl', 'ex_hip_airplane', 'ex_two_point_start', 'ex_arm_swing', 'ex_broad_jump_stick', 'ex_sl_hop_stick', 'ex_snap_down', 'ex_cmj_dip', 'ex_decel_stick', 'ex_jump_stop',
+  'ex_approach_one', 'ex_approach_two', 'ex_approach_jump_one_step', 'ex_approach_jump_two_step', 'ex_approach_jump_three_step', 'ex_approach_jump_one_foot']);
 /** What the stage draws under a loop that needs it: a bench seat, a flat bench to lie on, or an incline bench. Bench loops
  *  lying down are framed from the side, like the floor loops. LIBRARY-ANATOMY-2: and the rest of a gym's furniture a loop
  *  stands, sits, lies or hangs on — a box, benches in front and behind, a pull-up bar, a low bar, dip bars, pads, a wall. */
