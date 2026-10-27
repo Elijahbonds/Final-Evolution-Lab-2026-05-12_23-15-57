@@ -59,8 +59,9 @@ const find = (tree: unknown, f: (p: Record<string, unknown>) => boolean) => [...
 async function startAndPlay(initial: NonNullable<ReturnType<typeof buildProgramView>>) {
   const page = mount(() => ProgramPage({ initial, clips: {} }));
   await flush();
-  const startBtn = find(page.tree, (p) => 'data-start' in p);
-  expect(startBtn, 'a Start button').not.toBeNull();
+  const startWrap = find(page.tree, (p) => 'data-start' in p);
+  expect(startWrap, 'a Start button').not.toBeNull();
+  const startBtn = find(startWrap, (p) => typeof p.onClick === 'function');   // the kit's PrimaryCta inside it
   (startBtn!.props.onClick as () => void)();
   await flush();
   const player = find(page.tree, (p) => !!p.session && !!p.mode);

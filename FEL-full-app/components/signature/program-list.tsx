@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Layers, ShieldCheck } from 'lucide-react';
 import type { ProgramCard } from '@/lib/signature/view';
 import { DRAFT_BADGE, NONE_APPROVED_LINE, NOT_READY_LINE, YOUTH_DEVICE_LINE, FREE_WEEK_LINE } from '@/lib/signature/copy';
+import { Chip } from '@/components/ui/fel/chip';
 import { SIG_LOOK } from './look';
 
 export const programHref = (id: string): string => `/train/programs/${id}`;
@@ -21,7 +22,7 @@ export function ProgramList({ ready, admin, youth, programs }: { ready: boolean;
   return (
     <div data-testid="signature-list" className="mx-auto max-w-[720px]">
       {closed && (
-        <p data-closed className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-[13.5px] text-fel-soft">
+        <p data-closed className={`fel-surface mb-4 rounded-2xl p-4 ${SIG_LOOK.body}`}>
           {admin ? (!ready ? NOT_READY_LINE : NONE_APPROVED_LINE) : COMING_SOON}
         </p>
       )}
@@ -30,7 +31,7 @@ export function ProgramList({ ready, admin, youth, programs }: { ready: boolean;
           <ShieldCheck aria-hidden className="h-4 w-4" /> Review the drafts →
         </Link>
       )}
-      {programs.length > 0 && <p className="mb-4 text-[13.5px] text-fel-soft">{youth ? YOUTH_DEVICE_LINE : FREE_WEEK_LINE}</p>}
+      {programs.length > 0 && <p className={`mb-4 ${SIG_LOOK.body}`}>{youth ? YOUTH_DEVICE_LINE : FREE_WEEK_LINE}</p>}
       <ul className="grid gap-3">
         {programs.map((p) => {
           const chip = chipOf(p);
@@ -43,12 +44,12 @@ export function ProgramList({ ready, admin, youth, programs }: { ready: boolean;
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-2">
                     <span className={SIG_LOOK.meta}>{p.range.planned} weeks</span>
-                    {chip && <span data-draft title={DRAFT_BADGE} className={SIG_LOOK.chip}>{chip}</span>}
+                    {chip && <span data-draft title={DRAFT_BADGE}><Chip tone="warning">{chip}</Chip></span>}
                   </span>
-                  <span className="fel-heading mt-1 block text-[17px] font-bold leading-tight text-white">{p.title}</span>
+                  <span className={SIG_LOOK.cardTitle}>{p.title}</span>
                   {p.progress
-                    ? <span data-progress className="mt-1 block text-[13.5px] text-[#00E5FF]">Week {p.progress.week} of {p.progress.of} · {p.progress.sessionsDone} of {p.progress.sessionsTotal} sessions</span>
-                    : <span className="mt-1 block text-[13.5px] leading-relaxed text-fel-soft">{p.tagline}</span>}
+                    ? <span data-progress className={`mt-1 block ${SIG_LOOK.body} text-fel-cyan`}>Week {p.progress.week} of {p.progress.of} · {p.progress.sessionsDone} of {p.progress.sessionsTotal} sessions</span>
+                    : <span className={`mt-1 block ${SIG_LOOK.body}`}>{p.tagline}</span>}
                   {p.prehabNote && <span data-prehab-note className="mt-1.5 block text-[12px] font-bold text-amber-200/85">{p.prehabNote}</span>}
                 </span>
               </Link>

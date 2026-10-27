@@ -1,13 +1,13 @@
 // components/session-player/look.ts — PLAT-P01 (2026-10-27): every class the session player draws with, in one file.
 //
-// premium-ui owns the look (tokens, the components/ui/fel kit). Its kit is not on lane/finish-release yet, so the player
-// uses the tokens that are (--fel-* through Tailwind's fel-* classes, app/theme.css) and keeps them here: when the kit
-// lands, the swap is this one file. TODO(premium-ui): swap BUTTON for the kit's primary button and .fel-press.
+// premium-ui owns the look: the type scale (lib/design/type.ts TYPE / NUM), the kit (components/ui/fel: the player's one
+// button is its PrimaryCta) and the tokens (fel-* classes). Every class the player adds on top is here, in one file.
 //
-// Type: four sizes — 10 px labels (the demo's own badge size), 16 px cue and button, 20 px name, 72 px the dose.
+// Type: four sizes — TYPE.label 12 (labels), TYPE.body 16 (cue, set-up), TYPE.heading 20 (the name; the CTA's own 20),
+// and the dose. THE ONE EXCEPTION, for premium-ui to rule on: the dose is 72 px, above TYPE.display's 44 on a phone,
+// because it is the one thing read from two metres away with the phone propped on the floor (the owner check).
 // Motion: decorative transitions are motion-safe only; the demo plays either way (it IS the instruction).
-
-export const ACCENT = '#00FF9D';   // the Train tab's green (TabPage accent on the program pages)
+import { NUM, TYPE } from '@/lib/design/type';
 
 export const LOOK = {
   shell: 'fixed inset-0 z-[70] flex flex-col bg-fel-bg text-fel-text',
@@ -20,30 +20,30 @@ export const LOOK = {
   progressWrap: 'min-w-0 flex-1',
   progressRow: 'flex h-1 gap-1',
   progressSeg: 'h-full flex-1 overflow-hidden rounded-full bg-white/15',
-  progressFill: 'block h-full rounded-full bg-[#00FF9D] motion-safe:transition-[width] motion-safe:duration-300',
-  label: 'font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fel-soft',
+  progressFill: 'block h-full rounded-full bg-fel-cyan motion-safe:transition-[width] motion-safe:duration-300',
+  label: `${TYPE.label} text-fel-soft`,
   body: 'flex min-h-0 flex-1 flex-col px-5 pt-4',
-  name: 'fel-heading text-[20px] font-black leading-tight text-white',
+  name: `${TYPE.heading} text-white`,
   doseRow: 'mt-1 flex items-baseline gap-3',
-  dose: 'fel-heading text-[72px] font-black leading-[0.95] tabular-nums text-white',
-  doseRest: 'fel-heading text-[72px] font-black leading-[0.95] tabular-nums text-[#00E5FF]',
-  doseSmall: 'text-[16px] font-bold text-fel-soft',
+  dose: `${NUM} text-[72px] leading-[0.95] text-white`,
+  doseRest: `${NUM} text-[72px] leading-[0.95] text-fel-cyan`,
+  doseSmall: `${TYPE.body} font-semibold text-fel-soft`,
   pips: 'mt-3 flex gap-1.5',
   pip: 'h-1.5 w-6 rounded-full',
-  cue: 'mt-3 text-[16px] leading-snug text-fel-soft',
+  cue: `mt-3 ${TYPE.body} text-fel-soft`,
   bottom: 'mt-auto px-5 pb-[max(18px,env(safe-area-inset-bottom))] pt-3',
-  button: 'fel-heading flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-5 text-[16px] font-black uppercase tracking-[0.08em] text-black shadow-[0_0_28px_rgba(0,255,157,0.28)] motion-safe:transition-transform motion-safe:duration-100 active:scale-[0.97] disabled:opacity-50',
-  buttonRest: 'fel-heading flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00E5FF] px-5 text-[16px] font-black uppercase tracking-[0.08em] text-black shadow-[0_0_28px_rgba(0,229,255,0.28)] motion-safe:transition-transform motion-safe:duration-100 active:scale-[0.97] disabled:opacity-50',
-  // the one quiet button (End, in the end-the-session question): the primary's shape, outlined
-  buttonQuiet: 'fel-heading flex min-h-[64px] w-full items-center justify-center gap-2 rounded-2xl border border-white/25 px-5 text-[16px] font-black uppercase tracking-[0.08em] text-white motion-safe:transition-transform motion-safe:duration-100 active:scale-[0.97]',
+  /** the kit's PrimaryCta, stretched to the column (it sizes itself to its words) */
+  cta: '[&>[data-fel-primary]]:w-full',
+  // the one quiet button (End, in the end-the-session question): the kit CTA's shape, outlined
+  buttonQuiet: 'fel-press inline-flex min-h-14 w-full items-center justify-center rounded-full border border-white/25 px-8 font-display text-[20px] font-extrabold uppercase leading-none tracking-[0.04em] text-white',
   setupBtn: 'grid h-11 w-11 shrink-0 place-items-center rounded-full text-fel-soft motion-safe:transition-transform active:scale-90',
   sheet: 'absolute inset-x-0 bottom-0 z-20 max-h-[70%] overflow-y-auto rounded-t-3xl border-t border-white/10 bg-fel-surface-2/95 px-5 pb-6 pt-4 shadow-[0_-12px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl motion-safe:animate-[felSheetUp_220ms_cubic-bezier(0.16,0.8,0.3,1)]',
-  sheetText: 'mt-2 text-[16px] leading-relaxed text-fel-soft',
+  sheetText: `mt-2 ${TYPE.body} text-fel-soft`,
   pausedVeil: 'pointer-events-none absolute inset-0 z-[5] grid place-items-center bg-black/55',
   finish: 'flex flex-1 flex-col items-center justify-center px-6 text-center',
-  finishTitle: 'fel-heading mt-4 text-[72px] font-black leading-none text-white',
-  stat: 'fel-heading text-[20px] font-black tabular-nums text-white',
-  finishLine: 'mt-6 max-w-[22rem] text-[16px] leading-snug text-fel-soft',
+  finishTitle: `mt-4 ${NUM} text-[72px] uppercase leading-none text-white`,
+  stat: `${NUM} ${TYPE.heading} text-white`,
+  finishLine: `mt-6 max-w-[22rem] ${TYPE.body} text-fel-soft`,
 } as const;
 
 /** The sheet's rise, motion-safe (the keyframes ship with the component, so no global stylesheet changes). */

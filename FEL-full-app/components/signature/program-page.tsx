@@ -25,6 +25,8 @@ import { fromSignature, playMode, type PlayMode } from '@/lib/session-player/fro
 import { doseLine } from '@/lib/session-player/dose';
 import type { Session } from '@/lib/session-player/model';
 import type { FinishResult } from '@/components/session-player/session-player';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { Chip } from '@/components/ui/fel/chip';
 import { SIG_LOOK } from './look';
 
 // the player (and its 3D demo) loads only when Start is tapped: a phone reading the page pays nothing for it
@@ -40,8 +42,8 @@ export const ABOUT = 'About this program';
 /** One collapsed row below Start (Today's exercises, The weeks, About this program): the page above the fold is the day. */
 function Fold({ label, count, testid, children }: { label: string; count?: number; testid: string; children: ReactNode }) {
   return (
-    <details data-testid={testid} className="group mt-3 rounded-2xl border border-white/8 bg-white/[0.02] px-4">
-      <summary className="flex min-h-[48px] cursor-pointer list-none items-center justify-between gap-2 text-[13.5px] font-bold text-white [&::-webkit-details-marker]:hidden">
+    <details data-testid={testid} className={SIG_LOOK.fold}>
+      <summary className={SIG_LOOK.foldSummary}>
         <span>{label}{count !== undefined && <span className="font-normal text-fel-soft"> · {count}</span>}</span>
         <ChevronDown aria-hidden className="h-4 w-4 text-fel-soft motion-safe:transition-transform group-open:rotate-180" />
       </summary>
@@ -55,8 +57,8 @@ function TodayList({ s }: { s: ServedSession }) {
   return (
     <Fold label={TODAY_LIST} count={s.items.length} testid="today-list">
       {!s.blocked && (
-        <a href={DAILY_DRILL_PATH} data-daily-drill-link className="flex min-h-[44px] items-center gap-2 text-[13.5px] text-fel-soft hover:text-white">
-          <PlayCircle aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" /> {DAILY_DRILL_LINE}
+        <a href={DAILY_DRILL_PATH} data-daily-drill-link className={`flex min-h-[44px] items-center gap-2 ${SIG_LOOK.body} hover:text-white`}>
+          <PlayCircle aria-hidden className="h-4 w-4 shrink-0 text-fel-cyan" /> {DAILY_DRILL_LINE}
         </a>
       )}
       <ul>
@@ -69,7 +71,7 @@ function TodayList({ s }: { s: ServedSession }) {
         ))}
       </ul>
       {s.held.length > 0 && (
-        <ul data-held className="grid gap-1 border-t border-white/[0.06] py-2.5">{s.held.map((h) => <li key={h.key} className="text-[13.5px] text-fel-soft">{h.line}</li>)}</ul>
+        <ul data-held className="grid gap-1 border-t border-white/[0.06] py-2.5">{s.held.map((h) => <li key={h.key} className="text-[14px] text-fel-soft">{h.line}</li>)}</ul>
       )}
     </Fold>
   );
@@ -80,7 +82,7 @@ function Weeks({ weeks, current, premiumLine }: { weeks: WeekView[]; current: nu
   const shown = open ? weeks : weeks.filter((w) => current === null || Math.abs(w.n - current) <= 1);
   return (
     <Fold label={THE_WEEKS} count={weeks.length} testid="week-view">
-      {premiumLine && <p className="mb-2 flex items-center gap-2 text-[13.5px] text-fel-soft" data-premium-line><CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-[#00E5FF]" />{premiumLine}</p>}
+      {premiumLine && <p className={`mb-2 flex items-center gap-2 ${SIG_LOOK.body}`} data-premium-line><CalendarDays aria-hidden className="h-4 w-4 shrink-0 text-fel-cyan" />{premiumLine}</p>}
       <ol className="grid gap-2">
         {shown.map((w) => (
           <li key={w.n} data-week={w.n} data-access={w.access} data-current={w.n === current ? '1' : '0'}
@@ -186,8 +188,8 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
 
   return (
     <div data-testid="signature-program" data-program={view.id} data-keep={view.keep} data-status={view.status} className="mx-auto max-w-[720px]">
-      {view.draft && <p className="mb-3"><span data-draft title={DRAFT_BADGE} aria-label={`${view.status === 'rejected' ? 'Rejected. ' : ''}${DRAFT_BADGE}`} className={SIG_LOOK.chip}>{view.status === 'rejected' ? 'Rejected' : 'Draft'}</span></p>}
-      {view.prehabNote && <p data-prehab-note className="mb-3 text-[13.5px] font-bold text-amber-100">{view.prehabNote}</p>}
+      {view.draft && <p className="mb-3" data-draft title={DRAFT_BADGE} aria-label={`${view.status === 'rejected' ? 'Rejected. ' : ''}${DRAFT_BADGE}`}><Chip tone="warning">{view.status === 'rejected' ? 'Rejected' : 'Draft'}</Chip></p>}
+      {view.prehabNote && <p data-prehab-note className={`mb-3 ${SIG_LOOK.note} font-semibold text-amber-100`}>{view.prehabNote}</p>}
 
       <section data-testid="today-session" data-session={today?.id} data-blocked={today?.blocked ? '1' : '0'} className={SIG_LOOK.today}>
         {view.premium.locked ? (
@@ -208,14 +210,14 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
             )}
             {!today.blocked && today.retest.length > 0 && (
               <p data-retests className={`mt-2 ${SIG_LOOK.note} text-fel-soft`}>
-                <Target aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-[#00FF9D]" />
+                <Target aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-fel-cyan" />
                 <span>{RETEST_FIRST}: {today.retest.map((r, i) => <span key={r}>{i ? ' · ' : ''}<a href={RETEST[r].href} className={SIG_LOOK.link}>{RETEST[r].label}</a></span>)}</span>
               </p>
             )}
             {play && (
-              <button type="button" data-start data-fel-press data-play-mode={play.mode} disabled={busy} onClick={start} className={SIG_LOOK.start}>
-                <Play aria-hidden className="h-5 w-5 fill-current" /> {START_LABEL}
-              </button>
+              <div className={SIG_LOOK.start} data-start data-play-mode={play.mode} data-busy={busy ? '1' : '0'}>
+                <PrimaryCta onClick={busy ? undefined : start} icon={<Play aria-hidden className="h-5 w-5 fill-current" />}>{START_LABEL}</PrimaryCta>
+              </div>
             )}
           </>
         ) : finished ? (

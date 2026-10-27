@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Info, Pause, Play, SkipBack, Volume2, VolumeX, X } from 'lucide-react';
 import { AvatarDemo } from '@/components/library/avatar-demo';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { reducedMotion } from '@/lib/a11y/reducedMotion';
 import { clock, doseParts, duration } from '@/lib/session-player/dose';
 import { isTimed, totalSets, type Session } from '@/lib/session-player/model';
@@ -79,7 +80,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
       <div className={LOOK.shell + quiet} data-session-player data-phase="finish" data-mode={mode} role="dialog" aria-modal="true" aria-label={session.title}>
         <style>{SHEET_KEYFRAMES}</style>
         <div className={LOOK.finish}>
-          <span className="grid h-20 w-20 place-items-center rounded-full bg-[#00FF9D]/15 motion-safe:animate-[felSheetUp_320ms_cubic-bezier(0.2,1.4,0.4,1)]"><Check aria-hidden className="h-10 w-10 text-[#00FF9D]" /></span>
+          <span className="grid h-20 w-20 place-items-center rounded-full bg-fel-cyan/15 motion-safe:animate-[felSheetUp_320ms_cubic-bezier(0.2,1.4,0.4,1)]"><Check aria-hidden className="h-10 w-10 text-fel-cyan" /></span>
           <p className={LOOK.finishTitle}>{T.done}</p>
           <dl className="mt-6 flex gap-10">
             <div><dd className={LOOK.stat} data-finish-time>{duration(state.elapsedMs)}</dd><dt className={LOOK.label}>{T.time}</dt></div>
@@ -88,9 +89,9 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
           {line && <p role="status" className={LOOK.finishLine} data-finish-line>{line}</p>}
         </div>
         <div className={LOOK.bottom}>
-          {failed
-            ? <button type="button" data-fel-press data-player-primary className={LOOK.button} onClick={runSave}>{T.tryAgain}</button>
-            : <button type="button" data-fel-press data-player-primary disabled={saving} className={LOOK.button} onClick={onClose}>{T.backToProgram}</button>}
+          <div className={LOOK.cta} data-player-primary>
+            {failed ? <PrimaryCta onClick={runSave}>{T.tryAgain}</PrimaryCta> : <PrimaryCta onClick={onClose}>{T.backToProgram}</PrimaryCta>}
+          </div>
         </div>
       </div>
     );
@@ -136,7 +137,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
               <div className="flex flex-col items-center gap-4 px-6 text-center">
                 <p className={LOOK.name}>{T.endAsk}</p>
                 <div className="grid w-full max-w-[20rem] gap-3">
-                  <button type="button" data-fel-press data-player-keep className={LOOK.button} onClick={() => { setAskEnd(false); p.resume(); }}>{T.keepGoing}</button>
+                  <div className={LOOK.cta} data-player-keep><PrimaryCta onClick={() => { setAskEnd(false); p.resume(); }}>{T.keepGoing}</PrimaryCta></div>
                   <button type="button" data-fel-press data-player-end className={LOOK.buttonQuiet} onClick={onClose}>{T.end}</button>
                 </div>
               </div>
@@ -163,7 +164,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
           {step.sets > 1 && (
             <div className={LOOK.pips} aria-hidden data-player-pips>
               {Array.from({ length: step.sets }, (_, i) => (
-                <span key={i} className={LOOK.pip} style={{ background: i < state.set - 1 ? '#00FF9D' : i === state.set - 1 ? (state.phase === 'work' ? '#ffffff' : '#00E5FF') : 'rgba(255,255,255,0.16)' }} />
+                <span key={i} className={LOOK.pip} style={{ background: i < state.set - 1 ? 'var(--fel-accent)' : i === state.set - 1 ? '#ffffff' : 'rgba(255,255,255,0.16)' }} />
               ))}
             </div>
           )}
@@ -182,7 +183,9 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
       </div>
 
       <div className={LOOK.bottom}>
-        <button type="button" data-fel-press data-player-primary className={state.phase === 'rest' && !state.paused ? LOOK.buttonRest : LOOK.button} onClick={() => { setAskEnd(false); p.primary(); }}>{button}</button>
+        <div className={LOOK.cta} data-player-primary>
+          <PrimaryCta onClick={() => { setAskEnd(false); p.primary(); }}>{button}</PrimaryCta>
+        </div>
       </div>
     </div>
   );
