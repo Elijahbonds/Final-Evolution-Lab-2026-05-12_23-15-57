@@ -2,7 +2,8 @@
 
 // HandTimer — the hand-timed stations (COMBINE-DAY, 2026-10-25): sprint and agility. The COACH times it: a big
 // start/stop stopwatch on this phone, or a time typed from their own watch. It says "hand-timed" wherever it shows a
-// time, and the camera plays no part (there is no camera sprint or agility timing in this app, and none is claimed).
+// time, and the camera plays no part here. SPRINT-SPEED (2026-10-25): a station the coach sets to the camera uses
+// components/sprint/camera-sprint-timer.tsx instead, for a verified adult; this stopwatch stays the default and the fallback.
 import { useEffect, useRef, useState } from 'react';
 import { Timer } from 'lucide-react';
 import { HAND_TIME_RANGE } from '@/lib/combine/catalogue';

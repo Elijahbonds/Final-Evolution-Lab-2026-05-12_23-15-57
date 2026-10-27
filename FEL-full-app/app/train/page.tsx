@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -71,6 +71,12 @@ export default async function TrainPage() {
       href: '/train/readiness', icon: Activity, accent: PALETTE.emerald, title: t('train.cards.readiness.title'),
       line: t('train.cards.readiness.line'),
       tag: t('train.cards.readiness.tag'),
+    },
+    {
+      // SPRINT-SPEED (2026-10-25): sprint and agility timed by the phone's camera (verified adults; the page says so to anyone else)
+      href: '/train/speed', icon: Gauge, accent: '#00FF9D', title: 'Sprint speed',
+      line: 'Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.',
+      tag: 'Time a run',
     },
     {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the

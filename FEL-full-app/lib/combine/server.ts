@@ -18,6 +18,7 @@ import { HELD_TODAY, todayHolds, type TodayHolds } from './today';
 import { loadWarmupContext, type WarmupDb } from '@/lib/coach/warmupServer';
 import { FALLBACK_WARMUP_CONTEXT } from '@/lib/coach/warmup';
 import { STATIONS, parseStations, type StationConfig } from './catalogue';
+import { CAMERA_TIMES_SAVED } from '@/lib/sprint/cameraSprint';
 import { cleanName, cleanSlots, MAX_ATHLETES } from './draft';
 import { bestOf, cleanWeights, rankValues } from './score';
 import * as store from './store';
@@ -131,7 +132,8 @@ function gridOf(rows: readonly store.StoredResult[], athletes: readonly CombineA
       const mine = rows.filter((r) => r.athleteId === a.id && r.stationId === st.id && r.attempt <= st.attempts);
       if (!mine.length) continue;
       const slots: Slots = Array.from({ length: st.attempts }, () => null);
-      for (const r of mine) slots[r.attempt - 1] = { value: r.value, at: r.recordedAt, ...(st.kind === 'approach' && r.touchCm != null ? { touchCm: r.touchCm } : {}) };
+      // a camera-timed sprint or 5-10-5 attempt is shown only while saving them is on and the athlete passes the camera gate
+      for (const r of mine.filter((x) => STATIONS[st.kind].method !== 'hand' || x.method !== 'camera' || (CAMERA_TIMES_SAVED && a.access.saveCamera))) slots[r.attempt - 1] = { value: r.value, at: r.recordedAt, ...(st.kind === 'approach' && r.touchCm != null ? { touchCm: r.touchCm } : {}), ...(r.method === 'camera' && (st.kind === 'sprint' || st.kind === 'agility') ? { method: 'camera' as const } : {}) };
       (grid[a.id] ??= {})[st.id] = slots;
     }
   }
@@ -203,14 +205,17 @@ export async function saveCombine(db: CombineDb, coachId: string, id: string, bo
         if (slots.some((s) => s !== null)) held.push({ athleteId, stationId: st.id });
         continue;
       }
-      const camera = STATIONS[st.kind].method !== 'hand';
-      if (!canKeepOnServer(a, st.kind) || (camera && !scanSave.has(athleteId))) {
+      // SPRINT-SPEED: a camera-timed sprint or 5-10-5 attempt is a camera number: kept only as the camera stations' are
+      // (a verified adult with the live opt-in, decided here and by the route's scan-save gate)
+      const cameraTimed = slots.some((s) => s?.method === 'camera');
+      const camera = STATIONS[st.kind].method !== 'hand' || cameraTimed;
+      if (!canKeepOnServer(a, st.kind) || (cameraTimed && (!CAMERA_TIMES_SAVED || !a.access.saveCamera)) || (camera && !scanSave.has(athleteId))) {
         if (slots.some((s) => s !== null)) keptOnDevice.push({ athleteId, stationId: st.id });
         continue;
       }
       slots.forEach((s, i) => {
         if (s === null) clear.push({ athleteId, stationId: st.id, attempt: i + 1 });
-        else rows.push({ athleteId, stationId: st.id, attempt: i + 1, value: s.value, touchCm: st.kind === 'approach' ? s.touchCm ?? null : null, method: STATIONS[st.kind].method });
+        else rows.push({ athleteId, stationId: st.id, attempt: i + 1, value: s.value, touchCm: st.kind === 'approach' ? s.touchCm ?? null : null, method: s.method === 'camera' ? 'camera' : STATIONS[st.kind].method });
       });
     }
   }

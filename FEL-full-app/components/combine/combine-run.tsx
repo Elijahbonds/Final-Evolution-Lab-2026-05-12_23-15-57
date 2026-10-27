@@ -20,6 +20,8 @@ import { drillById } from '@/lib/drills/drills';
 import type { DrillResult } from '@/lib/drills/DrillRunner';
 import { DrillLive } from '@/app/play/drills/_components/drill-live';
 import { HandTimer } from './hand-timer';
+import { CameraSprintTimer } from '@/components/sprint/camera-sprint-timer';
+import { CAMERA_STATION_HOW } from '@/lib/sprint/cameraSprint';
 import { JumpCamera } from './jump-camera';
 import { ApproachVideo } from './approach-video';
 
@@ -41,6 +43,7 @@ function Slots({ ev, athleteId, st }: { ev: CombineEvent; athleteId: string; st:
             <span className="block text-[10px] uppercase tracking-wider text-fel-dim">Try {i + 1}</span>
             <span className="block font-mono text-sm font-bold tabular-nums text-white">{s ? (s.value === null ? 'No mark' : formatValue(st.kind, s.value)) : '—'}</span>
             {s?.touchCm != null && <span className="block text-[10px] text-white/50">touch {formatValue('approach', s.touchCm)}</span>}
+            {s?.method === 'camera' && <span className="block text-[10px] text-[#00E5FF]" data-slot-camera>camera</span>}
           </li>
         );
       })}
@@ -73,11 +76,13 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
   const isHeld = !!athlete && !!st && heldToday(athlete, st);
   const left = athlete && st ? st.attempts - (ev.results[athlete.id]?.[st.id] ?? []).filter((s) => s !== null).length : 0;
   const progress = st ? stationProgress(ev, st.id) : { done: 0, total: 0 };
-  useEffect(() => { setDrillOpen(false); }, [athleteId, stationIdx]);
+  // SPRINT-SPEED: the coach can fall back to the stopwatch for one athlete at a camera station
+  const [handNow, setHandNow] = useState(false);
+  useEffect(() => { setDrillOpen(false); setHandNow(false); }, [athleteId, stationIdx]);
 
   // the athlete on screen stays on screen until the coach taps Next (or another name): pin them on the first record
   const pin = useCallback((id: string) => { if (st && current[st.id] === undefined) setCurrent((c) => ({ ...c, [st.id]: id })); }, [current, st]);
-  const record = useCallback((values: { value: number | null; touchCm?: number | null }[]) => {
+  const record = useCallback((values: { value: number | null; touchCm?: number | null; method?: 'camera' }[]) => {
     if (!athlete || !st) return;
     pin(athlete.id);
     onChange(recordAttempts(ev, athlete.id, st.id, values));
@@ -115,7 +120,7 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
 
       <section className="fel-card space-y-1 rounded-xl p-3">
         <h2 className="text-base font-black text-white">{stationName(st)}</h2>
-        <p className="text-xs text-white/50">{def.how}</p>
+        <p className="text-xs text-white/50">{st.timing === 'camera' ? CAMERA_STATION_HOW : def.how}</p>
         {status && <p className="text-[11px] text-fel-dim" data-combine-status>{status}</p>}
       </section>
 
@@ -144,7 +149,13 @@ export function CombineRun({ ev, onChange, onReport, onHome, roster, saving, sta
 
           {slot !== null && (
             <div data-combine-capture={def.method}>
-              {(st.kind === 'sprint' || st.kind === 'agility') && <HandTimer key={`${athlete.id}-${slot}`} kind={st.kind} onTime={(s) => record([{ value: s }])} />}
+              {(st.kind === 'sprint' || st.kind === 'agility') && (st.timing === 'camera' && athlete.access.camera && !handNow
+                // SPRINT-SPEED: the camera times it (lib/sprint/cameraSprint.ts); the attempt keeps `method: 'camera'`
+                ? <div className="space-y-2" data-combine-camera-timer>
+                    <CameraSprintTimer key={athlete.id} kind={st.kind} variant={st.variant} onTime={(s) => record([{ value: s, method: 'camera' as const }])} />
+                    <button type="button" onClick={() => setHandNow(true)} data-combine-use-stopwatch className="min-h-10 w-full rounded-xl border border-white/15 text-xs font-bold text-white/70">Use the stopwatch for this one</button>
+                  </div>
+                : <HandTimer key={`${athlete.id}-${slot}`} kind={st.kind} onTime={(s) => record([{ value: s }])} />)}
               {st.kind === 'cmj' && <JumpCamera key={athlete.id} jumps={left} athlete={athlete.name} onAttempts={record} />}
               {st.kind === 'approach' && (
                 <ApproachVideo key={athlete.id} left={left} reach={ev.reach[athlete.id] ?? null} onAttempts={record}

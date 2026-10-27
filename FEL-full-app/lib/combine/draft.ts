@@ -78,7 +78,7 @@ export function nextSlot(ev: CombineEvent, athleteId: string, stationId: string)
  * Record attempts into the next free slots (a camera take may read several jumps at once). A value is a number, or null
  * for a no-mark. Anything past the station's attempts is dropped. An athlete who may not be tested here: unchanged.
  */
-export function recordAttempts(ev: CombineEvent, athleteId: string, stationId: string, values: readonly { value: number | null; touchCm?: number | null }[], now: number = Date.now()): CombineEvent {
+export function recordAttempts(ev: CombineEvent, athleteId: string, stationId: string, values: readonly { value: number | null; touchCm?: number | null; method?: 'camera' }[], now: number = Date.now()): CombineEvent {
   const f = find(ev, athleteId, stationId);
   if (!f) return ev;
   const slots = slotsOf(ev, athleteId, f.st);
@@ -89,6 +89,8 @@ export function recordAttempts(ev: CombineEvent, athleteId: string, stationId: s
     const value = typeof v.value === 'number' && Number.isFinite(v.value) && v.value >= 0 ? v.value : null;
     const a: Attempt = { value, at: now };
     if (f.st.kind === 'approach' && typeof v.touchCm === 'number' && Number.isFinite(v.touchCm)) a.touchCm = v.touchCm;
+    // SPRINT-SPEED: a camera time, only at a sprint or agility station and only for an athlete the camera is open to
+    if (v.method === 'camera' && (f.st.kind === 'sprint' || f.st.kind === 'agility') && f.a.access.camera) a.method = 'camera';
     slots[i] = a;
     changed = true;
   }
@@ -190,6 +192,7 @@ export function cleanSlots(raw: unknown, attempts: number): Slots {
     const value = typeof a.value === 'number' && Number.isFinite(a.value) && a.value >= 0 ? a.value : null;
     const out: Attempt = { value, at: typeof a.at === 'number' ? a.at : 0 };
     if (typeof a.touchCm === 'number' && Number.isFinite(a.touchCm)) out.touchCm = a.touchCm;
+    if (a.method === 'camera') out.method = 'camera';
     return out;
   });
 }

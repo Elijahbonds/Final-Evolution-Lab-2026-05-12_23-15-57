@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { Download, Minus, Plus, Printer } from 'lucide-react';
 import { STATIONS, formatValue, stationName } from '@/lib/combine/catalogue';
+import { bestTimedBy, CAMERA_STATION_HOW } from '@/lib/sprint/cameraSprint';
 import { NO_ACCURACY_LINE, WHO_SEES_LINE, say } from '@/lib/combine/copy';
 import { combineCsv, csvFileName } from '@/lib/combine/csv';
 import { setWeights } from '@/lib/combine/draft';
@@ -94,7 +95,7 @@ export function CombineReport({ ev, onChange, onBack }: { ev: CombineEvent; onCh
                 <tr key={r.id} className="border-t border-white/5">
                   <td className="w-10 py-1.5 font-black text-white">{r.rank ?? '–'}</td>
                   <td className="py-1.5 text-white/90">{r.name}</td>
-                  <td className="py-1.5 text-right font-mono font-bold tabular-nums text-white">{formatValue(s.kind, r.value)}{r.touchCm != null && <span className="block text-[10px] font-normal text-white/50">touch {formatValue('approach', r.touchCm)}</span>}</td>
+                  <td className="py-1.5 text-right font-mono font-bold tabular-nums text-white">{formatValue(s.kind, r.value)}{s.timing === 'camera' && bestTimedBy(r.slots, r.value) && <span className="block text-[10px] font-normal text-[#00E5FF]" data-combine-timed-by>{bestTimedBy(r.slots, r.value)}</span>}{r.touchCm != null && <span className="block text-[10px] font-normal text-white/50">touch {formatValue('approach', r.touchCm)}</span>}</td>
                   <td className="hidden w-32 py-1.5 pl-3 text-right font-mono text-[11px] text-fel-dim sm:table-cell">{r.slots.map((x) => (x ? (x.value === null ? 'X' : formatValue(s.kind, x.value).replace(/ (in|s)$/, '')) : '·')).join(' / ')}</td>
                 </tr>
               ))}
@@ -131,7 +132,7 @@ export function CombineReport({ ev, onChange, onBack }: { ev: CombineEvent; onCh
         </div>
       </section>
 
-      <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE} {ev.stations.some((s) => STATIONS[s.kind].method === 'hand') ? 'Sprint and agility times are hand-timed by the coach.' : ''}</p>
+      <p className="text-[11px] text-fel-dim">{NO_ACCURACY_LINE} {ev.stations.some((s) => STATIONS[s.kind].method === 'hand' && s.timing !== 'camera') ? 'Sprint and agility times are hand-timed by the coach.' : ''} {ev.stations.some((s) => s.timing === 'camera') ? CAMERA_STATION_HOW : ''}</p>
       {who && <p className="text-[11px] text-fel-dim" data-combine-who>{who}</p>}
     </div>
   );
