@@ -15,6 +15,7 @@
 //
 //   npx tsx scripts/premium-ui/shots.mts <outDir> <label> --build-only        bundle now (no browser, no lock needed)
 //   ... --no-font-vars   bundle without next/font's variables, as a probe rig has none (counts serif text: P2)
+//   ... --prod-fonts     load the faces as production does (swap, behind next/font's size-adjusted fallbacks): CLS (P10)
 //   flock /home/user/wt/gate-queue.lock npx tsx scripts/premium-ui/shots.mts <outDir> <label> [<label> …] [--scenes=play,train] [--scenes-<label>=…]
 // The bundle lives in <outDir>/.build-<label>, so a "before" frozen with --build-only is shot later unchanged, however
 // long the gate queue is and whatever the tree looks like by then; an existing bundle is reused (--rebuild to redo it).
@@ -66,7 +67,7 @@ const FONT_BASE = '/__fonts';
 for (const label of LABELS) {
   const dir = join(OUT_ROOT, `.build-${label}`);
   if (REBUILD || !existsSync(join(dir, 'index.html'))) {
-    await buildRig(dir, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE, noFontVars: args.includes('--no-font-vars') });
+    await buildRig(dir, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE, noFontVars: args.includes('--no-font-vars'), prodFonts: args.includes('--prod-fonts') });
     writeFileSync(join(dir, 'built.txt'), new Date().toISOString());
     console.log(`built → ${dir}`);
   }
