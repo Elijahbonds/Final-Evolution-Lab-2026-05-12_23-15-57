@@ -30,7 +30,7 @@ export function applyTodayReadiness(rows: readonly TreeExercise[], r: TodayReadi
     rows: out,
     note: {
       band: r.band, label: BAND_LABEL[r.band], day: r.day, eased,
-      line: reasonLine({ reason: r.reason, dropPct: r.dropPct, feel: r.feel, baselineN: r.baselineN, priorChecks: r.baselineN, ruleDropPct: r.rule.dropPct }),
+      line: reasonLine({ reason: r.reason, dropPct: r.dropPct, feel: r.feel, baselineN: r.baselineN, priorChecks: r.baselineN, ruleDropPct: r.rule.dropPct, source: r.source }),
       next: coachedNextLine({ band: r.band, ease: r.ease && eased.length > 0, coachName: o.coachName, coachTold: r.coachTold, shared: r.shared }),
     },
   };

@@ -64,6 +64,9 @@ export type Pick =
   | { kind: 'catalogue'; id: string }
   | { kind: 'library'; id: string }
   | { kind: 'new'; name: string }
+  // COACH-DELIVERY COA-02 (2026-10-27): a FEL template exercise by its key (lib/coach/templateCatalogue.ts), seeded into the
+  // coach's own catalogue with its cues and faults, as the template clone seeds it — the first-block draft's lines
+  | { kind: 'template'; key: string }
   | { kind: 'skip' };
 
 export interface ConfirmItem {
@@ -78,6 +81,10 @@ export interface ConfirmItem {
   section?: SessionSection | null;
   isKeySet?: boolean;
   note?: string | null;
+  /** COACH-DELIVERY COA-02: the template's own structure on a line (absent on a paste: the builder's defaults). */
+  effortBand?: string | null;
+  holdSeconds?: number | null;
+  setupCues?: string[] | null;
 }
 export interface ConfirmDay { label: string; items: ConfirmItem[] }
 export interface ConfirmWeek { label: string; days: ConfirmDay[] }

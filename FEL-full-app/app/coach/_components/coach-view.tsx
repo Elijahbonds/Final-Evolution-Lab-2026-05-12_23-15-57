@@ -34,6 +34,9 @@ export function CoachView() {
   const [coach, setCoach] = useState(false);   // the Clients tab shows only for a certified coach or an existing coach of programs
   const [me, setMe] = useState<SharedBy | null>(null);
   useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}); }, []);
+  // COACH-DELIVERY (round 8 item b): a coach with nobody on their roster gets a "first client" link to the checklist
+  const [emptyRoster, setEmptyRoster] = useState(false);
+  useEffect(() => { if (coach) fetch('/api/coach/roster').then((r) => (r.ok ? r.json() : null)).then((j) => setEmptyRoster(Array.isArray(j?.roster) && j.roster.length === 0)).catch(() => {}); }, [coach]);
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
   useEffect(() => { fetch('/api/share/me').then((r) => r.ok ? r.json() : null).then((j) => j && setMe(j)).catch(() => {}); }, []);
@@ -57,6 +60,10 @@ export function CoachView() {
           {coach ? <Chip href="/coach/business" icon={<Briefcase aria-hidden className="h-4 w-4" />}>Your coaching business</Chip> : null}
         </div>
       </header>
+      {/* COACH-DELIVERY: a coach with no roster gets one quiet door to the first-client checklist (in the kit's chip look) */}
+      {coach && emptyRoster && tab !== 'clients' ? (
+        <button type="button" onClick={() => setTab('clients')} className={`fel-press mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-fel-emerald/40 bg-fel-emerald/[0.1] px-3 text-fel-emerald ${TYPE.label}`} data-first-client-link>Add your first client →</button>
+      ) : null}
       {/* Tab switcher: the kit's segmented look (a soft white pill on the lit tab; the accent stays for the action) */}
       <div className="mb-5 flex gap-1 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.03] p-1">
         {tabs.map((t) => {

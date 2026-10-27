@@ -312,6 +312,11 @@ lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, 
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above (`feel()` is closed there).
 
+lane/dunk-flagship Phase 2 (group "Dunk · landing"), new, default unchanged: `dunk.landLeadSec` 0 s (`DunkFlagship.ts`
+`LAND_LEAD_SEC`): how long before touchdown the landing absorb fades in. A 0.10 s lead measured worse on the rig (the hips arrive
+faster into the same short crouch: landing hip pops 2 → 4), so it ships off; the owner's dial. **assumption:** the bounds (0 to
+0.25 s) are safe, not tuned.
+
 lane/hoops-p02-defense (1v1 / 3v3 ten-phase pass, phase 2 "defence is skill, not dice"; owner 2026-10-20 HOOPS DEFENSE; the owner has
 felt none of these yet — every default is flagged in the lane report):
 

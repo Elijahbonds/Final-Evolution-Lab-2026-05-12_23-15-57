@@ -76,7 +76,7 @@ import { EmptyState } from '@/components/ui/fel/empty-state';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
+import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, Video } from 'lucide-react';
 import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 // COACH-VIDEO-REVIEW (2026-10-24): film a set of a readable exercise; the camera counts and flags (components/coach/form-review)
@@ -112,9 +112,12 @@ import { ReadinessTodayLine } from '@/components/readiness/readiness-today-line'
 // COACH-PARITY (2026-10-26): the coach's habits and check-ins (wiring only; nothing shows until the pending SQL is applied)
 import { HabitsToday, MY_HABITS_API } from '@/components/coach/parity/habits-today';
 import { CheckinCard, MY_CHECKINS_API } from '@/components/coach/parity/checkin-card';
+// COACH-DELIVERY (2026-10-26): the coach's calendar (COA-05) and branding (COA-04) on Today (wiring only)
+import { MY_SCHEDULE_API, MySchedule } from '@/components/coach/my-schedule';
+import { CoachBrandBar, MY_BRANDING_API } from '@/components/coach/brand-bar';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null; schedule?: string | null; branding?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API, schedule: MY_SCHEDULE_API, branding: MY_BRANDING_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -248,6 +251,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     <>
       {api.habits && <HabitsToday api={api.habits} />}
       {api.checkins && <CheckinCard api={api.checkins} />}
+      {/* COACH-DELIVERY COA-05 (2026-10-26): the coach's upcoming roster sessions (nothing until the pending SQL) */}
+      {api.schedule && <MySchedule api={api.schedule} />}
     </>
   );
   if (!data.program || !data.today) return (
@@ -275,6 +280,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   return (
     <div className="space-y-4" data-testid="today">
       {finishedCard}
+      {api.branding && <CoachBrandBar api={api.branding} />}
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
@@ -381,7 +387,6 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
   lastTime?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
-  const [demo, setDemo] = useState(false);
   // MIRROR-COACH P7 FIX: a timer on this card was started this visit (the set is under way), and the Dial-Up is running
   const [timerUsed, setTimerUsed] = useState(false);
   const [rampBusy, setRampBusy] = useState(false);
@@ -442,16 +447,12 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
       {c.easier && <div className="text-xs text-white/60" data-easier>{easierLine(c.easier.name)}</div>}
       {c.demo && (
         <div data-demo={c.demo.kind}>
+          {/* COACH-DELIVERY COA-09: never an embed. A YouTube demo is a labelled outbound link; FEL's own video autoplays
+              (muted, looped, inline: the premium rule — no tap to start) */}
           {c.demo.kind === 'link' ? (
-            <a href={c.demo.href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-xs text-fel-cyan"><ExternalLink className="h-3.5 w-3.5" /> Watch the demo</a>
-          ) : !demo ? (
-            <button type="button" onClick={() => setDemo(true)} className="inline-flex items-center gap-1 text-xs text-fel-cyan"><PlayCircle className="h-3.5 w-3.5" /> Watch the demo</button>
-          ) : c.demo.kind === 'youtube' ? (
-            <div className="aspect-video w-full overflow-hidden rounded-lg border border-white/10 bg-black">
-              <iframe src={c.demo.src} title={`${e.name} demo`} className="h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
-            </div>
+            <a href={c.demo.href} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-1 text-xs text-fel-cyan"><ExternalLink className="h-3.5 w-3.5" /> {c.demo.site === 'youtube' ? 'Demo on YouTube (opens outside FEL)' : 'Watch the demo'}</a>
           ) : (
-            <video src={c.demo.src} controls playsInline preload="metadata" className="w-full rounded-lg border border-white/10 bg-black" />
+            <video src={c.demo.src} autoPlay muted loop playsInline preload="metadata" aria-label={`${e.name} demo`} className="w-full rounded-lg border border-white/10 bg-black" />
           )}
         </div>
       )}

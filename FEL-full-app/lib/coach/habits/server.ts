@@ -10,7 +10,7 @@ import 'server-only';
 import { addDays, dayOf } from '@/lib/groups/week';
 import { STREAK_LOOKBACK_DAYS } from '@/lib/groups/activity';
 import { parityHealthEnabled, parityReady } from '../parity/probe';
-import { coachPeople, healthViewers, liveCoaches, mayAssign, teamIdsOf, whoIs, type PeopleDb } from '../parity/people';
+import { coachPeople, healthViewers, liveCoaches, mayAssign, teamIdsOf, whoIs, type HealthGate, type PeopleDb } from '../parity/people';
 import { cleanHabit, compliance, frequencyLine, habitReaches, habitStreak, HABIT_PRESETS, LIMITS, targetLine, tickDone, tickValue, weekProgress } from './rules';
 import { archiveHabit, clearTick, habitsFor, habitsForCoach, insertHabit, setTick, ticksForAthlete, ticksForHabits, type HabitRow } from './store';
 import { HEALTH_CONSENT_NEEDED_DRAFT, HEALTH_HABIT_LINE_DRAFT, HEALTH_OFF_LINE, SEEN_LINE, TEAM_HEALTH_NOTE_DRAFT } from './copy';
@@ -120,7 +120,7 @@ export async function myHabits(db: HabitDb, athleteId: string, now: Date = new D
   });
 }
 
-export async function tickHabit(db: HabitDb, athleteId: string, body: unknown, now: Date = new Date(), env: Env = process.env): Promise<Res> {
+export async function tickHabit(db: HabitDb, athleteId: string, body: unknown, now: Date = new Date(), env: Env = process.env, healthGate?: HealthGate): Promise<Res> {
   const nowMs = now.getTime();
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   if (!(await parityReady(db, nowMs))) return NOT_READY;
@@ -129,7 +129,7 @@ export async function tickHabit(db: HabitDb, athleteId: string, body: unknown, n
   const h = habits.find((x) => x.id === b.habitId);
   if (!h) return res(404, { error: 'not_found' });
   // the teen gate first (training data), then the health rules for a health habit — the same order as a check-in
-  const who = await whoIs(db, athleteId, parityHealthEnabled(env), now);
+  const who = await whoIs(db, athleteId, parityHealthEnabled(env), now, healthGate);
   if (!who.ok) return res(403, who.body);
   if (!habitReaches(h, who)) return who.adult ? res(400, { error: 'health_off' }) : res(403, { error: 'health_data_adults_only', saved: false });
   if (h.topic === 'health' && !who.healthConsent) return res(412, { error: 'health_data_consent_required', saved: false });

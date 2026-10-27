@@ -190,7 +190,8 @@ export async function packagesFor(db: RawDb, coachId: string): Promise<CoachPack
 
 export async function activePackagesFor(db: RawDb, coachIds: readonly string[]): Promise<CoachPackage[]> {
   if (!coachIds.length) return [];
-  return (await db.$queryRawUnsafe<PackageRow[]>(SQL.activePackagesFor, [...coachIds])).map(toPackage);
+  // COACH-DELIVERY COA-12: a team fee is sent to a roster, never listed publicly (packages.ts)
+  return (await db.$queryRawUnsafe<PackageRow[]>(SQL.activePackagesFor, [...coachIds])).map(toPackage).filter((p) => p.kind !== 'team_fee');
 }
 
 export async function packageById(db: RawDb, id: string): Promise<CoachPackage | null> {

@@ -354,7 +354,6 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
 
 /** A KB exercise the library does not have: its first cues, and its coach video when it has one (no 3D: no wrong movement). */
 function KbCueCard({ ex }: { ex: Exercise }) {
-  const [on, setOn] = useState(false);
   const video = videoSource(ex.videoUrl);
   const cues = (ex.coachingCues ?? '').split(/(?<=[.!?])\s+/).map((c) => c.trim()).filter(Boolean).slice(0, 2);
   return (
@@ -366,16 +365,15 @@ function KbCueCard({ ex }: { ex: Exercise }) {
           <ul className="space-y-0.5 text-[13px] text-white/85">{cues.map((c) => <li key={c}>{c}</li>)}</ul>
         </div>
       </div>
-      {video && (on || video.kind === 'file' ? (
+      {/* COACH-DELIVERY COA-09: own-storage video autoplays; a YouTube URL is a labelled outbound link, never an embed */}
+      {video && (video.kind === 'file' ? (
         <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
-          {video.kind === 'youtube'
-            ? <iframe src={video.src} className="h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen title={`${ex.name} video`} />
-            : <video src={video.src} className="h-full w-full" controls playsInline preload="metadata" title={`${ex.name} video`} />}
+          <video src={video.src} className="h-full w-full" autoPlay muted loop playsInline preload="metadata" title={`${ex.name} video`} />
         </div>
       ) : (
-        <button onClick={() => setOn(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF3366]/40 px-3 py-1.5 text-xs text-[#FF3366]">
-          <Play className="h-3.5 w-3.5" aria-hidden /> Play the coach video
-        </button>
+        <a href={video.href} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-[#FF3366]/40 px-3 text-xs text-[#FF3366]">
+          <Play className="h-3.5 w-3.5" aria-hidden /> Coach video on YouTube (opens outside FEL)
+        </a>
       ))}
     </div>
   );
