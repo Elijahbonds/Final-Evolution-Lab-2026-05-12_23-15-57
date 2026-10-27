@@ -39,7 +39,7 @@ export default async function PlayPage() {
         imagePosition: '50% 38%',
         primary: (
           // DUNK-LOOP-HANDSFREE: one obvious way into the camera-forward Prove It flow.
-          <PrimaryCta href="/play/dunkduel" docked testId="play-dunk-session-entry" icon={<Camera aria-hidden className="h-5 w-5" />}>
+          <PrimaryCta href="/play/dunkduel" docked data-testid="play-dunk-session-entry" icon={<Camera aria-hidden className="h-5 w-5" />}>
             {t('play.proveIt')}
           </PrimaryCta>
         ),
