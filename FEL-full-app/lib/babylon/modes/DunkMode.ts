@@ -34,7 +34,7 @@ import { TransformNode } from '@babylonjs/core';
 import { dressBall } from '../visual/meshyProps';
 import type { AbstractMesh, AnimationGroup, Camera, Observer, ParticleSystem, PBRMaterial, Scene } from '@babylonjs/core';
 import { mirrorGroupsInPlace, mirrorSide } from '../anim/groupMirror';   // DUNK MOTION phase 8: the right-handed dunker
-import { planGather, fitGather, gatherProgress, gatherSpeedAt, gatherDistAt, GATHER_CLIP_SEC, GATHER_BRAKE_FROM } from '../core/DunkGatherRun';   // …and push 1-2 at speed
+import { planGather, fitGather, gatherFitDist, gatherProgress, gatherSpeedAt, gatherDistAt, GATHER_CLIP_SEC, GATHER_BRAKE_FROM } from '../core/DunkGatherRun';   // …and push 1-2 at speed
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
 import { CharacterPipeline } from '../core/characterPipeline';
 import type { BodyView, ModeContext, ModeDefinition } from '../core/ModeHarness';
@@ -1871,7 +1871,11 @@ export const DunkMode: ModeDefinition = (() => {
           // the ground under them — a ~0.12 s penultimate at a sprint, the book's staccato. It starts ON the push foot when it can.
           const distNow = player.root.position.z - gatherLine();
           const vEnd = gatherEndSpeed(), plan = planGather(holdRunSpeed, vEnd);
-          const due = distNow <= Math.max(GATHER_MIN_M, plan.dist * 0.85);
+          // DUNK-FLAGSHIP (a): never later than the gather can be FIT at its fastest pace. A gather that starts inside
+          // gatherFitDist needs a clip rate over GATHER_RATE_MAX, fitGather clamps it, and the clamped profile starts BELOW the
+          // run — measured on the rig: 7.0 → 5.98 m/s in one frame at a full sprint (the run's top speed reaches the line first
+          // between two frames 0.12 m apart). Starting one frame's travel before that keeps the speed continuous into push 1-2.
+          const due = distNow <= Math.max(GATHER_MIN_M, plan.dist * 0.85, gatherFitDist(holdRunSpeed, vEnd) + holdRunSpeed * dt);
           const onFoot = distNow <= plan.dist * GATHER_LOCK_EARLY && pushFootReady() && (!dribble?.active || atPalm(dribble.phase, 0.16));
           // THE CHECK-MARK STEPS (phase 8): the gait's last strides quicken or stretch so the push foot arrives when the gather is due
           let adjust = 1;
@@ -2062,7 +2066,11 @@ export const DunkMode: ModeDefinition = (() => {
         const carryDir = Math.sign(rim.z + FLUSH_Z_AHEAD - launchZ) || -1;
         // THE FOOT DECIDES HOW MUCH RUN SURVIVES THE PLANT: a one-foot takeoff barely breaks stride (carry 1.6),
         // a two-foot gather plants and spends the run going up instead (0.45). Same line, two different bodies.
-        const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * launchCarry * Math.min(1, clipTime / PLANT_SEC);
+        // DUNK-FLAGSHIP (a): the drift is counted from the FIRST flight frame. The launch runs inside the frame the run reached the line,
+        // and that frame's flight step then rolled the plant on as well — two steps in one frame (measured: 2.1 → 4.2 → 2.2 m/s at the
+        // take-off frame). The plant still rolls PLANT_DRIFT_M by the end of the plant, so everything after it is unchanged.
+        if (plantClip0 < 0) plantClip0 = clipTime;
+        const plantFrom = launchZ + carryDir * PLANT_DRIFT_M * launchCarry * Math.min(1, Math.max(0, clipTime - plantClip0) / PLANT_SEC);   // (at its own speed, vEnd: one frame later than before)
         player.root.position.z = plantFrom + (rim.z + FLUSH_Z_AHEAD - plantFrom) * u;
         // DUNK MOTION phase 7: a STRAIGHT line from the plant to the rim (a jump cannot curve — the old pull toward rim.x bent the
         // flight's ground path); the stick's drift rides on top and fades by the flush, so the contact math is untouched
@@ -2662,6 +2670,7 @@ export const DunkMode: ModeDefinition = (() => {
     return u >= 1 ? arcHeight(t, EASTBAY_TIMING.extend) : dubbleArc(u, dubbleArcPower(uH));
   }
   function apexPredicted(): number { if (isDubble(prop)) return DUBBLE_APEX_M; return ((1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + apexLift()) * launchMult() + doubleLaunchLift; }
+  let plantClip0 = -1;   // DUNK-FLAGSHIP (a): the flight clock of the first flight frame (the plant's drift starts there)
   let launchZ = CFG.gatherZ;                  // where the flight left the floor (the carry is measured from here)
   let launchX = 0, launchBank = 0, airDriftX = 0;   // DUNK MOTION phase 7: the flight's straight line starts here; the curve's bank carries off the floor; the stick's drift
   /** DUNK MOTION phase 7: which side of the rim's line the J comes from this run (+1 / −1 world x; 0 = a straight run), the bank. */
@@ -2955,7 +2964,7 @@ export const DunkMode: ModeDefinition = (() => {
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     guestFactor = turn === 'player' ? guestSlamFactor(playerJumps++) : 1;   // IMPROVE (2026-10-06): a guest's first jumps (see slamWindowBase)
     if (guestFactor !== 1) console.info(`[DUNK] first jumps: slam window x${guestFactor.toFixed(2)}`);
-    launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
+    plantClip0 = -1; launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
