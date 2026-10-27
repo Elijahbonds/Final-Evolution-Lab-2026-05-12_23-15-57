@@ -24,6 +24,8 @@ const ROOT = join(__dirname, '..', '..');
 /** Files that are reached some way other than an import, each with the reason. */
 const NOT_IMPORTED: Record<string, string> = {
   'lib/babylon/modes/registry.ts': 'the mode registry — loaded by key at runtime, not by a static import',
+  // CUE-REWRITE (2026-10-27): the style screen's corpus — every line in scope, gathered for corpus.test.ts and the audit.
+  'lib/cue-style/corpus.ts': 'test support — gathers every cue, result and library line for lib/cue-style/corpus.test.ts (the style screen) and the CUE-AUDIT counts; tests are not counted as consumers',
   // COACH-AI-DRAFT (2026-10-24): the brief says behind a flag, off, until an AI-coach surface makes it natural; none does yet
   'lib/coach/weeklyDraft/solo.ts': 'solo drafts (the weekly draft with safe limits, no human coach): an owner call, flagged off (COACH_SOLO_DRAFTS_ENABLED) and wired to no surface yet; tested in solo.test.ts',
   // CREATOR SOUNDTRACK phase 0 (owner, 2026-10-06, "storage = Google Cloud Storage"): the creative-card upload route was

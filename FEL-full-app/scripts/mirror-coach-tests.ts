@@ -142,7 +142,7 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ce4.decide(1000, ['kneeValgus']);
   ce4.decide(8000, []);                       // fault clears
   const confirm = ce4.decide(8000 + 4500, []); // clear long enough → confirm
-  ok(confirm?.level === 'confirm', 'a cleared fault earns the confirm line ("That's it. Keep it.")');
+  ok(confirm?.level === 'confirm', 'a cleared fault earns the confirm line ("That\'s it. Keep it.")');
   ok(ce4.decide(8000 + 4500 + 7000, []) === null, 'then the coach shuts up');
 }
 
@@ -152,10 +152,11 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   // Matched on the pattern title map rather than one literal tuple, and case-insensitively on the stage copy:
   // the guided flow is the contract, the exact shouting is not.
   // MIRROR-COACH P4 lane 1 (registry-and-lunge, 2026-09-25): the title now reads from the pattern-audit registry
+  // test changed: copy rewrite (cue-rewrite lane) - the registry label is the canonical 'Squat' (docs/CUE-STYLE.md §6 retires 'Corrective Squat'); still checked at the source.
   // (lib/mirror/patterns.ts MIRROR_PATTERNS, squat entry one) rather than a literal string in the harness itself —
   // checked at the SOURCE (squatPattern.ts's own label) rather than re-asserting a copy of it here.
   const squatPatternSrc = readFileSync(new URL('../lib/mirror/squatPattern.ts', import.meta.url), 'utf8');
-  ok(/squat:\s*SQUAT_PATTERN\.label/.test(h) && /label:\s*'Corrective Squat'/.test(squatPatternSrc),
+  ok(/squat:\s*SQUAT_PATTERN\.label/.test(h) && /label:\s*'Squat'/.test(squatPatternSrc),
     'the picker offers the guided corrective squat (its title comes from the pattern registry, entry one)');
   ok(h.includes("patternRef.current === 'squat'"), 'the squat pattern runs its own analysis');
   ok(h.includes("analysis: patternRef.current === 'squat' ? 'squat' : 'zones'"), 'the compositor is routed by pattern');

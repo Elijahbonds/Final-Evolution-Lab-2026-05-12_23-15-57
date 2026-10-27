@@ -1025,7 +1025,7 @@ export function MirrorHarness({
     lunge: LUNGE_PATTERN.label,
     hinge: MOVEMENT_NAMES.hinge,
     pushup: MOVEMENT_NAMES.pushup,
-    jump: MOVEMENT_NAMES.jump,
+    jump: 'Vertical Jump', // the full accessible name (scripts/mirror-v2-tests.ts pins it)
     screen: 'Movement Screen',
   };
   const live = status === 'live';
