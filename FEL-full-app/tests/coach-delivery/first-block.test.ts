@@ -69,6 +69,11 @@ describe('the rules pick the work', () => {
     const d = draftFirstBlock({ answers: { daysPerWeek: 3, equipment: 'bodyweight', goal: null }, youth: false, prescriptions: [], catalogue: s.pe as never });
     const picks = d.weeks.flatMap((w) => w.days.flatMap((x) => x.items.map((l) => l.pick.kind)));
     expect(picks.every((k) => k === 'template' || k === 'catalogue')).toBe(true);
+    // lines carry the exercise's real name, and a template exercise the coach already has by that name is their row
+    const lines = d.weeks.flatMap((w) => w.days.flatMap((x) => x.items));
+    expect(lines.every((l) => /^[A-Z]/.test(l.name) && !l.name.includes('_'))).toBe(true);
+    const own = lines.filter((l) => l.pick.kind === 'catalogue');
+    for (const l of own) expect(s.pe.find((p) => p.id === (l.pick as { id: string }).id)!.name.toLowerCase()).toBe(l.name.toLowerCase());
     expect(cleanAnswers({ daysPerWeek: '9', equipment: 'boat' }, 3)).toEqual({ daysPerWeek: 4, equipment: 'bodyweight', goal: null });
   });
 });

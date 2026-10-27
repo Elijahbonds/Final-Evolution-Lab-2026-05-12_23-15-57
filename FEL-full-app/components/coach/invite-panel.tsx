@@ -74,8 +74,8 @@ export function InvitePanel({ bulk = true }: { bulk?: boolean } = {}) {
         <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">Add an athlete</h2>
       </header>
       <p className="mt-2 text-xs leading-relaxed text-white/50">
-        Send a link, show the QR, or write the code on the board. They sign up, land on your roster, and you can program
-        for them straight away.
+        {/* COACH-DELIVERY phase 2 (premium rule: fewer words, no paragraph over 24): was 25 words. DRAFT copy. */}
+        Send a link, show the QR or share the code. They join your roster.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">

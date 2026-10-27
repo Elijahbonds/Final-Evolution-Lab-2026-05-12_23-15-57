@@ -81,7 +81,7 @@ export function draftFirstBlock(o: {
           section: 'prep', sets: p.sets, reps: p.workSeconds ? null : p.reps, workSeconds: p.workSeconds, restSeconds: 30, note: p.because.slice(0, 280),
         })),
         ...s.items.map((i): DraftLine => {
-          const name = templateExercise(i.exercise)?.name ?? i.exercise;
+          const name = templateExercise(i.exercise)?.catalogue.name ?? i.exercise;
           const mine = own.get(nameKey(name));
           const sp = i.spec as Record<string, unknown>;
           return {
