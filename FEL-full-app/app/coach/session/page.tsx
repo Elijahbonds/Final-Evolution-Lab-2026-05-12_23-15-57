@@ -16,7 +16,7 @@ export default async function CoachSessionPage() {
   const serverVerified = userId ? verifiedAdult(await readDobYear(prisma, userId, 'coach_session_page')) : false;
   const optedIn = userId ? await canSaveScanNumbers(prisma, userId) : false;
   return (
-    <div className="min-h-screen bg-[#050505] pb-24">
+    <div className="min-h-screen bg-fel-bg pb-24">
       <SessionHome serverVerified={serverVerified} optedIn={optedIn} />
     </div>
   );

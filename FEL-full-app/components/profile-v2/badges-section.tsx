@@ -15,34 +15,34 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
       <div className="grid gap-3 md:grid-cols-2">
         <Card>
           <div className="flex items-center gap-3">
-            <Flame className="h-5 w-5 text-[#FF7A2F]" aria-hidden />
+            <Flame className="h-5 w-5 text-fel-ember" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-bold text-white">{b.streakDays > 0 ? `${b.streakDays}-day streak` : 'No streak running'}</p>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label={`Streak toward ${b.nextStreakGoal} days`} aria-valuemin={0} aria-valuemax={b.nextStreakGoal} aria-valuenow={b.streakDays}>
-                <span className="block h-full rounded-full bg-[#FF7A2F]" style={{ width: `${streakPct}%` }} />
+                <span className="block h-full rounded-full bg-fel-ember" style={{ width: `${streakPct}%` }} />
               </div>
-              <p className="mt-1 text-[11px] text-white/45">Next: {b.nextStreakGoal} days</p>
+              <p className="mt-1 text-[11px] text-fel-dim">Next: {b.nextStreakGoal} days</p>
             </div>
           </div>
           {lv && (
             <div className="mt-4 flex items-center gap-3">
-              <Sparkles className="h-5 w-5 text-[#00FF9D]" aria-hidden />
+              <Sparkles className="h-5 w-5 text-fel-emerald" aria-hidden />
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-bold text-white">Level {lv.level}</p>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Level progress" aria-valuemin={0} aria-valuemax={lv.need} aria-valuenow={lv.into}>
-                  <span className="block h-full rounded-full bg-[#00FF9D]" style={{ width: `${Math.min(100, (lv.into / Math.max(1, lv.need)) * 100)}%` }} />
+                  <span className="block h-full rounded-full bg-fel-emerald" style={{ width: `${Math.min(100, (lv.into / Math.max(1, lv.need)) * 100)}%` }} />
                 </div>
-                <p className="mt-1 font-mono text-[10.5px] text-white/40">{lv.into.toLocaleString('en-US')} / {lv.need.toLocaleString('en-US')} XP</p>
+                <p className="mt-1 font-mono text-[10.5px] text-fel-dim">{lv.into.toLocaleString('en-US')} / {lv.need.toLocaleString('en-US')} XP</p>
               </div>
             </div>
           )}
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[12px] text-white/60">
-            <span className="inline-flex items-center gap-1.5"><GraduationCap className="h-4 w-4 text-[#7B61FF]" aria-hidden />{b.academyPassed} Academy module{b.academyPassed === 1 ? '' : 's'} passed</span>
-            <span className="inline-flex items-center gap-1.5"><Ghost className="h-4 w-4 text-[#A855F7]" aria-hidden />{b.ghostBeats} ghost{b.ghostBeats === 1 ? '' : 's'} beaten{b.ghostBestRun > 1 ? ` · best run ${b.ghostBestRun}` : ''}</span>
+            <span className="inline-flex items-center gap-1.5"><GraduationCap className="h-4 w-4 text-fel-indigo" aria-hidden />{b.academyPassed} Academy module{b.academyPassed === 1 ? '' : 's'} passed</span>
+            <span className="inline-flex items-center gap-1.5"><Ghost className="h-4 w-4 text-fel-violet" aria-hidden />{b.ghostBeats} ghost{b.ghostBeats === 1 ? '' : 's'} beaten{b.ghostBestRun > 1 ? ` · best run ${b.ghostBestRun}` : ''}</span>
           </div>
         </Card>
         <Card>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#FFD700]">Mode mastery</p>
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-gold">Mode mastery</p>
           {b.mastery.length ? (
             <ul className="mt-2 flex flex-wrap gap-2">
               {b.mastery.map((m) => (

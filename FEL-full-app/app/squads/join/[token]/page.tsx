@@ -25,7 +25,7 @@ export default async function JoinGroupPage({ params }: { params: { token: strin
         : (
           <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-[14px] text-white/70">
             {b.available === false ? COMING_SOON : 'This invite is not open any more. Ask for a new code.'}
-            <Link href={SQUADS_PATH} className="mt-3 block min-h-[44px] font-bold text-[#00E5FF]">Squads and teams →</Link>
+            <Link href={SQUADS_PATH} className="mt-3 block min-h-[44px] font-bold text-fel-cyan">Squads and teams →</Link>
           </section>
         )}
     </TabPage>

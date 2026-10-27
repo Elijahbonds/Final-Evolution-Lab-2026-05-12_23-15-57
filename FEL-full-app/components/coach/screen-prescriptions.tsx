@@ -182,7 +182,7 @@ export type AddState = 'adding' | 'added' | 'failed';
 /** One prescription's key: a check, and a leg for the single-leg stance. */
 export const prescriptionKey = (p: Pick<Prescription, 'findingId' | 'side'>) => `${p.findingId}|${p.side ?? ''}`;
 
-const TONE: Record<CameraRow['status'], string> = { flag: 'text-[#FFC24B]', pass: 'text-[#00FF9D]', retest: 'text-white/55' };
+const TONE: Record<CameraRow['status'], string> = { flag: 'text-[#FFC24B]', pass: 'text-fel-emerald', retest: 'text-white/55' };
 const DOT: Record<CameraRow['status'], string> = { flag: '#FFC24B', pass: '#00FF9D', retest: 'rgba(255,255,255,0.3)' };
 const KIND_WORD = { release: 'release', activate: 'activate', pattern: 'pattern' } as const;
 
@@ -201,7 +201,7 @@ export interface DraftViewProps {
 export function DraftView({ clientId, draft, sessions, into, onInto, added, onAddOne, onAddBlock }: DraftViewProps) {
   // no screen to draft from (none, not graded, unreadable): one line, as before
   if (!draft.review) {
-    return <p className="text-xs text-white/35">{emptyDraftLine(draft.reason, { newerRunUngraded: !!draft.newerRunAt, unread: draft.unread })}</p>;
+    return <p className="text-xs text-fel-quiet">{emptyDraftLine(draft.reason, { newerRunUngraded: !!draft.newerRunAt, unread: draft.unread })}</p>;
   }
   const { review } = draft;
   const matched = draft.prescriptions.filter((p) => p.exercise);
@@ -212,31 +212,31 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
   return (
     <section className="rounded-lg border border-white/6 bg-white/[0.02] p-3 text-xs" aria-labelledby={`presc-${clientId}`} data-screen-review>
       <h4 id={`presc-${clientId}`} className="flex flex-wrap items-center gap-1.5 font-semibold text-white/80">
-        <ClipboardList className="h-3.5 w-3.5 text-[#00E5FF]" aria-hidden="true" />
+        <ClipboardList className="h-3.5 w-3.5 text-fel-cyan" aria-hidden="true" />
         From their screen
-        {draft.screenAt && <span className="font-normal text-white/35">· {new Date(draft.screenAt).toLocaleDateString()}{draft.screen ? ` · ${draft.screen}` : ''}</span>}
+        {draft.screenAt && <span className="font-normal text-fel-quiet">· {new Date(draft.screenAt).toLocaleDateString()}{draft.screen ? ` · ${draft.screen}` : ''}</span>}
       </h4>
       {draft.newerRunAt && (
-        <p className="mt-1 text-white/35">A newer run on {new Date(draft.newerRunAt).toLocaleDateString()} was not graded; this is the one before it.</p>
+        <p className="mt-1 text-fel-quiet">A newer run on {new Date(draft.newerRunAt).toLocaleDateString()} was not graded; this is the one before it.</p>
       )}
-      {draft.newerPartial && <p className="mt-1 text-white/35" data-newer-partial>{newerPartialLine(draft.newerPartial)}</p>}
+      {draft.newerPartial && <p className="mt-1 text-fel-quiet" data-newer-partial>{newerPartialLine(draft.newerPartial)}</p>}
       {/* owner decision #31: the score over what was read, never without the count (the camera rows below list the rest) */}
       {scoreLine(draft) && <p className="mt-1 font-semibold text-white/75" data-score>{scoreLine(draft)}</p>}
       {draft.headline && <p className="mt-1 text-white/60">{draft.headline}</p>}
-      {draft.reason && <p className="mt-1 text-white/45" data-draft-reason={draft.reason}>{emptyDraftLine(draft.reason, { newerRunUngraded: false, retests: draft.retests })}</p>}
+      {draft.reason && <p className="mt-1 text-fel-dim" data-draft-reason={draft.reason}>{emptyDraftLine(draft.reason, { newerRunUngraded: false, retests: draft.retests })}</p>}
       {!draft.reason && !!draft.retests && (
-        <p className="mt-1 text-white/45">{retestLine(draft.retests)}</p>
+        <p className="mt-1 text-fel-dim">{retestLine(draft.retests)}</p>
       )}
       {draft.provisional && (
         <p className="mt-1 text-[#FFC24B]/80">Provisional: fewer than three camera checks, or only one station, were read. Ask for a re-run before you program from it alone.</p>
       )}
-      {draft.youthNote && <p className="mt-1 text-white/45" data-youth={draft.youth}>{draft.youthNote}</p>}
+      {draft.youthNote && <p className="mt-1 text-fel-dim" data-youth={draft.youth}>{draft.youthNote}</p>}
       {draft.serverGraded === false && (
-        <p className="mt-1 text-white/35">Graded on their phone before FEL re-checked grades on the server (before 2026-09-26).</p>
+        <p className="mt-1 text-fel-quiet">Graded on their phone before FEL re-checked grades on the server (before 2026-09-26).</p>
       )}
 
       {/* 1 — the camera */}
-      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40" data-group="camera">{REVIEW_GROUPS.camera}</h5>
+      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="camera">{REVIEW_GROUPS.camera}</h5>
       <ul className="mt-1.5 space-y-2">
         {review.camera.map((r) => (
           <li key={`${r.checkId}|${r.side ?? ''}`} className="border-l-2 border-white/10 pl-2" data-check={r.checkId} data-status={r.status}>
@@ -261,9 +261,9 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       {/* the draft for the Prep section */}
       {draft.prescriptions.length > 0 && (
         <>
-          <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40" data-group="draft">Draft for their Prep section</h5>
+          <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="draft">Draft for their Prep section</h5>
           {sessions.length > 1 && (
-            <label className="mt-1.5 flex items-center gap-2 text-white/45">
+            <label className="mt-1.5 flex items-center gap-2 text-fel-dim">
               Add into
               <select value={into} onChange={(e) => onInto(e.target.value)} className="min-h-[36px] rounded bg-[#0f0f13] px-2 py-1 text-white/80">
                 {sessions.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -277,31 +277,31 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
                 <li key={prescriptionKey(p)} className="flex items-start justify-between gap-2" data-prescription={p.findingId}>
                   <span className="min-w-0">
                     <span className="text-white/85">{p.exercise ? p.exercise.name : 'No match in your catalogue'}</span>
-                    <span className="text-white/45"> — {p.sets}×{p.reps} · Prep</span>
+                    <span className="text-fel-dim"> — {p.sets}×{p.reps} · Prep</span>
                     <br />
-                    <span className="text-white/45">for {p.title}</span>
+                    <span className="text-fel-dim">for {p.title}</span>
                     {/* MIRROR-COACH P9 (2026-09-30): the matching written corrective, adults only — text for the coach, never an add */}
                     {p.corrective && (
                       <span className="mt-0.5 block text-white/55" data-written-corrective={p.findingId}>
                         Written corrective: {screenCorrectiveLine(p.corrective)}
                       </span>
                     )}
-                    {p.matchedBy === 'name' && <span className="text-white/35"> · matched by its name — tag it to be sure</span>}
+                    {p.matchedBy === 'name' && <span className="text-fel-quiet"> · matched by its name — tag it to be sure</span>}
                     {!p.exercise && p.wanted.length > 0 && (
-                      <span className="mt-0.5 flex items-center gap-1 text-white/35">
+                      <span className="mt-0.5 flex items-center gap-1 text-fel-quiet">
                         <Search className="h-3 w-3 shrink-0" aria-hidden="true" /> look for: {p.wanted.join('; ')}
                       </span>
                     )}
-                    {state === 'failed' && <span className="block text-[#FF3366]/80">That did not save. Try again.</span>}
+                    {state === 'failed' && <span className="block text-fel-crimson/80">That did not save. Try again.</span>}
                   </span>
                   {p.exercise && canAdd && (
                     state === 'added'
-                      ? <span className="flex min-h-[44px] shrink-0 items-center gap-1 text-[#00FF9D]"><Check className="h-3.5 w-3.5" aria-hidden="true" /> In Prep</span>
+                      ? <span className="flex min-h-[44px] shrink-0 items-center gap-1 text-fel-emerald"><Check className="h-3.5 w-3.5" aria-hidden="true" /> In Prep</span>
                       : (
                         <button
                           onClick={() => onAddOne(p)}
                           disabled={state === 'adding'}
-                          className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-lg border border-[#00E5FF]/40 text-[#00E5FF] disabled:opacity-50"
+                          className="grid min-h-[44px] min-w-[44px] shrink-0 place-items-center rounded-lg border border-fel-cyan/40 text-fel-cyan disabled:opacity-50"
                           aria-label={`Add ${p.exercise.name} to Prep`}
                         >
                           <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -315,7 +315,7 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
           {blockBodies.length > 0 && (
             <button
               onClick={onAddBlock}
-              className="mt-2 min-h-[44px] w-full rounded-lg border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-3 font-semibold text-[#00E5FF]"
+              className="mt-2 min-h-[44px] w-full rounded-lg border border-fel-cyan/50 bg-fel-cyan/10 px-3 font-semibold text-fel-cyan"
               data-add-block
             >
               Add the corrective block to Prep ({blockBodies.length} exercise{blockBodies.length === 1 ? '' : 's'})
@@ -325,9 +325,9 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
       )}
 
       {/* 2 — their answers, as they gave them */}
-      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40" data-group="answers">{REVIEW_GROUPS.answers}</h5>
+      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="answers">{REVIEW_GROUPS.answers}</h5>
       {review.answersWithheld ? (
-        <p className="mt-1.5 text-white/45" data-answers-withheld>{ANSWERS_WITHHELD}</p>
+        <p className="mt-1.5 text-fel-dim" data-answers-withheld>{ANSWERS_WITHHELD}</p>
       ) : (
         <>
           <ul className="mt-1.5 space-y-1.5">
@@ -337,23 +337,23 @@ export function DraftView({ clientId, draft, sessions, into, onInto, added, onAd
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-white/35">{ANSWERS_NOTE}</p>
+          <p className="mt-1 text-fel-quiet">{ANSWERS_NOTE}</p>
         </>
       )}
 
       {/* 3 — the hands-on checks */}
-      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40" data-group="coach">{REVIEW_GROUPS.coach}</h5>
+      <h5 className="mt-3 font-mono text-[10px] uppercase tracking-[0.14em] text-fel-dim" data-group="coach">{REVIEW_GROUPS.coach}</h5>
       {review.coachChecks.length > 0 ? (
         <ul className="mt-1.5 space-y-1">
           {review.coachChecks.map((c) => (
-            <li key={c.checkId} data-coach-check={c.checkId}><span className="text-white/85">{c.label}</span> <span className="text-white/45">— {c.line}</span></li>
+            <li key={c.checkId} data-coach-check={c.checkId}><span className="text-white/85">{c.label}</span> <span className="text-fel-dim">— {c.line}</span></li>
           ))}
         </ul>
       ) : (
-        <p className="mt-1.5 text-white/45">{review.coachChecksNote}</p>
+        <p className="mt-1.5 text-fel-dim">{review.coachChecksNote}</p>
       )}
 
-      <p className="mt-3 border-t border-white/6 pt-2 text-white/45">{CAMERA_NOT_DIAGNOSIS}</p>
+      <p className="mt-3 border-t border-white/6 pt-2 text-fel-dim">{CAMERA_NOT_DIAGNOSIS}</p>
     </section>
   );
 }

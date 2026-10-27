@@ -25,13 +25,13 @@ export function AccountDataPanel({
   return (
     <section className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
       <h2 className="fel-heading text-lg font-bold text-white">Your data</h2>
-      <p className="mt-1 text-xs text-white/40">
+      <p className="mt-1 text-xs text-fel-dim">
         Signed in as {email || 'this account'}. Download a JSON file of your profile, Mirror sessions, assessments, and the health data stored here.
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <a
           href="/api/account/export"
-          className="inline-flex items-center gap-2 rounded-md border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 text-xs font-bold text-[#00E5FF] transition-colors hover:bg-[#00E5FF]/20"
+          className="inline-flex items-center gap-2 rounded-md border border-fel-cyan/30 bg-fel-cyan/10 px-4 py-2 text-xs font-bold text-fel-cyan transition-colors hover:bg-fel-cyan/20"
         >
           <Download className="h-3.5 w-3.5" /> Download my data
         </a>
@@ -46,18 +46,18 @@ export function AccountDataPanel({
           <button
             type="button"
             onClick={onAskErase}
-            className="inline-flex items-center gap-2 rounded-md border border-[#FF3366]/30 bg-[#FF3366]/10 px-4 py-2 text-xs font-bold text-[#FF3366] transition-colors hover:bg-[#FF3366]/20"
+            className="inline-flex items-center gap-2 rounded-md border border-fel-crimson/30 bg-fel-crimson/10 px-4 py-2 text-xs font-bold text-fel-crimson transition-colors hover:bg-fel-crimson/20"
           >
             <Trash2 className="h-3.5 w-3.5" /> Erase my health data
           </button>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            <p className="max-w-xl text-xs text-[#FF3366]">{ERASE_WARNING}</p>
+            <p className="max-w-xl text-xs text-fel-crimson">{ERASE_WARNING}</p>
             <button
               type="button"
               onClick={onConfirmErase}
               disabled={erasing}
-              className="rounded-md bg-[#FF3366] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+              className="rounded-md bg-fel-crimson px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
             >
               {erasing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Yes, erase my health data'}
             </button>
