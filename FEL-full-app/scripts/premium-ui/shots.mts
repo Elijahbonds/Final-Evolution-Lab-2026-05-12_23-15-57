@@ -125,11 +125,12 @@ const MEASURE = `(() => {
   const shift = (window.__cls || 0); const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null;
   return { serif, words, sizesFold: [...sizesFold].sort(), sizesAll: [...sizesAll].sort(), families: [...fams], faces,
     buttons: { n: btnN, styles: btnSig.size }, cards: { n: cardN, styles: cardSig.size }, imagery: { n: imgN, pct: Math.round(100 * imgArea / (vw * vh)) },
-    motion: { animating: anim, transitions: trans, press }, cls: Math.round(shift * 1000) / 1000, fcp: fcp && Math.round(fcp), longTasks: window.__long || 0 };
+    motion: { animating: anim, transitions: trans, press }, cls: Math.round(shift * 1000) / 1000, shifts: (window.__shifts || []).slice(0, 8), fcp: fcp && Math.round(fcp), longTasks: window.__long || 0 };
 })()`;
 
 const INIT = `window.__cls = 0; window.__long = 0;
-  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch {}
+  window.__shifts = [];
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; for (const src of (e.sources || [])) { const n = src.node; window.__shifts.push(Math.round(e.value * 1000) / 1000 + ' ' + (n && n.nodeType === 1 ? n.tagName.toLowerCase() + (n.className && typeof n.className === 'string' ? '.' + n.className.trim().split(/\\s+/).slice(0, 3).join('.') : '') : n ? '#text' : '?')); } } }).observe({ type: 'layout-shift', buffered: true }); } catch {}
   try { new PerformanceObserver((l) => { window.__long += l.getEntries().length; }).observe({ type: 'longtask', buffered: true }); } catch {}`;
 
 /** % of the first screen that is flat near-black with nothing on it: 10 px blocks with no detail and no light. */

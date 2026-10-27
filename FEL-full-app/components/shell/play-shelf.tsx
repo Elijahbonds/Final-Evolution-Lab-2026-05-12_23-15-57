@@ -136,7 +136,8 @@ export function PlayShelf({ initialFamily }: { initialFamily?: string }) {
                           </span>
                           <span className="min-w-0">
                             <span className={`${TYPE.body} block truncate font-semibold leading-tight text-white`}>{m.name} <PartyBadge modeKey={m.key} className="ml-1" /></span>
-                            <span className={`${TYPE.small} mt-0.5 block truncate text-fel-dim`}>{m.desc}</span>
+                            {/* premium-ui P10: on a phone the row is the game's name — a label, not a sentence; the line returns from sm up */}
+                            <span className={`${TYPE.small} mt-0.5 hidden truncate text-fel-dim sm:block`}>{m.desc}</span>
                             {m.venue && venueDistinguishes && (
                               <span className="mt-1.5 block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
                                 {m.venue}

@@ -100,7 +100,7 @@ export function recommendNext(i: RecommendInput): NextPick | null {
     const sig = signatureFor(pick, week);
     return {
       kind: 'signature', modeKey: sig.mode, title: `Weekly challenge: ${sig.modeLabel}`, href: '/signature',
-      reason: "This week's Signature · today's attempt is open",
+      reason: "This week's challenge · today's attempt is open",   // owner 2026-10-27: "Weekly challenges", never "Signature", in menus
       detail: `${sig.modifier.name} · beat ${sig.targetScore}`,
     };
   }
