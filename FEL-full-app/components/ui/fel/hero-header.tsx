@@ -44,7 +44,8 @@ export function HeroHeader({
       )}
       {media && <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">{media}</div>}
       <div aria-hidden className="pointer-events-none absolute inset-0 z-0" style={{ background: 'var(--fel-scrim)' }} />
-      <div className={`relative z-10 mx-auto mt-auto flex w-full max-w-[1080px] flex-col gap-3 px-5 pt-28 ${dockSpace ? 'pb-28' : 'pb-7'} md:pb-9`}>
+      {/* data-couch-scale (P5): on a TV driven by a pad or a remote, the headline and actions zoom with the page column */}
+      <div data-couch-scale className={`relative z-10 mx-auto mt-auto flex w-full max-w-[1080px] flex-col gap-3 px-5 pt-28 ${dockSpace ? 'pb-28' : 'pb-7'} md:pb-9`}>
         {eyebrow && <p className={TYPE.label} style={{ color: accent }}>{eyebrow}</p>}
         <h1 className={`${TYPE.display} max-w-[14ch] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.55)]`}>{title}</h1>
         {line && <p className={`${TYPE.small} max-w-md text-fel-soft`}>{line}</p>}

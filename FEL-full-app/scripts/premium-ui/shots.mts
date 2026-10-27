@@ -41,7 +41,7 @@ const BUILD_ONLY = args.includes('--build-only');
 const REBUILD = args.includes('--rebuild') || BUILD_ONLY;
 mkdirSync(OUT, { recursive: true });
 
-export const SCENES = ['landing', 'play', 'train', 'profile', 'learn', 'coach', 'todaydrill', 'screenresults', 'devui'] as const;
+export const SCENES = ['landing', 'play', 'train', 'profile', 'learn', 'coach', 'todaydrill', 'screenresults', 'devui', 'endscreen', 'endloss'] as const;
 const scenes = (flag('scenes')?.split(',') ?? [...SCENES]).filter(Boolean);
 const WIDTHS = [{ w: 390, h: 844, name: 'phone' }, { w: 1280, h: 800, name: 'desktop' }];
 

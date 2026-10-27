@@ -3,7 +3,7 @@
 // the other): each scene calls the REAL page module with the server stubbed (scripts/a11y/rig.mts), awaits any async
 // server component in the tree, and renders it between the real StatusRail and TabBar, as app/layout.tsx does.
 //
-// Scenes (location.hash): landing play train profile learn coach todaydrill screenresults devui
+// Scenes (location.hash): landing play train profile learn coach todaydrill screenresults devui endscreen endloss
 import { Fragment, cloneElement, createElement as h, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StatusRail } from '@/components/shell/status-rail';
@@ -42,6 +42,9 @@ const SCENES: Record<string, { path: string; signedIn: boolean; load: () => Prom
   todaydrill: { path: '/train/today-drill', signedIn: true, load: () => import('@/app/train/today-drill/page') },
   screenresults: { path: '/play/mirror/assess/results', signedIn: false, load: screenResults },
   devui: { path: '/dev/ui', signedIn: true, load: () => import('@/app/dev/ui/page') },
+  // a game's end-of-run card, from its own dev fixture (P5: game menus)
+  endscreen: { path: '/dev/end-screen', signedIn: true, load: () => import('@/app/dev/end-screen/page'), props: { searchParams: { case: 'win' } } },
+  endloss: { path: '/dev/end-screen', signedIn: true, load: () => import('@/app/dev/end-screen/page'), props: { searchParams: { case: 'loss' } } },
 };
 
 const w = window as unknown as Window & { __PATH: string; __SESSION: unknown; __SCENE: string };
