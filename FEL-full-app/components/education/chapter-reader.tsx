@@ -2,26 +2,45 @@
 
 // The lesson player. One lesson at a time, because a chapter dumped on a page is a book, not a course.
 //
-// A drill lesson leads with WHAT YOU DO — the numbered steps — and keeps the book's explanation underneath it.
-// That ordering is deliberate: somebody standing in their front room with a phone propped up needs the steps,
-// and the reasoning is what they read afterwards or never. A concept lesson has it the other way round.
+// PLAT-P04 (2026-10-27): lessons that SHOW before they tell. The owner: the app "still feels cheap" (too much text, no
+// motion); the standing rule is autoplay, no extra taps, never confusing. So a lesson now reads, top to bottom:
+//   1. the demo — the avatar doing the movement, playing by itself on open, where the library has a loop that IS this
+//      movement (lib/education/lessonDemo.ts; no loop, no demo: never a borrowed movement);
+//   2. the steps as short cards you swipe (lesson-steps.ts: the book's own steps, split only between their sentences);
+//      a lesson with no steps leads with one line instead — the book's own first sentence, verbatim;
+//   3. "Check it on camera" / "Run it on camera";
+//   4. the book itself behind "Read more", collapsed, in its own words — never reworded (the owner's book);
+// and, once every lesson is done, the chapter's recap and its check. Somebody standing in their front room with a phone
+// propped up needs to see it and do it; the reasoning is what they read afterwards, or never.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Check, Gem, Lightbulb, Play } from 'lucide-react';
+import { ArrowLeft, Check, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Chapter } from '@/lib/education/course';
+import type { Chapter, Lesson } from '@/lib/education/course';
 import { chapterProgress, lessonId, nextChapterHref } from '@/lib/education/course';
 // EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: "Next chapter" opens the next chapter, a lesson that teaches a
 // Mirror movement links to the camera, and the chapter check (owner decision 6: shards at 80%) sits under the recap.
 import { movementForLesson } from '@/lib/education/lessonMovement';
+import { demoForLesson } from '@/lib/education/lessonDemo';
+import { AvatarDemo } from '@/components/library/avatar-demo';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { StatRing } from '@/components/ui/fel/stat-ring';
+import { Chip } from '@/components/ui/fel/chip';
+import { TYPE } from '@/lib/design/type';
 import { CameraLink } from './camera-link';
 import { DrillsLink } from '@/components/drills/drills-link';
 import { ChapterCheck } from './chapter-check';
+import { StepCards } from './step-cards';
+import { stepCards, summaryLine } from './lesson-steps';
+import { deviceStore, writeLastLesson } from './last-lesson';
+import { CHIP_BUTTON } from './look';
 
-export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?: Record<string, string> }) {
+const threeDisabled = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
+
+export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter; filmFor?: Record<string, string>; startAt?: string }) {
   const [done, setDone] = useState<Set<string>>(new Set());
-  const [i, setI] = useState(0);
+  const start = startAt ? chapter.lessons.findIndex((l) => l.key === startAt) : -1;
+  const [i, setI] = useState(Math.max(0, start));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -32,21 +51,32 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
         if (!live || !Array.isArray(j?.done)) return;
         const set = new Set<string>(j.done);
         setDone(set);
-        // Open on the first thing they have not done, rather than making them scroll past their own progress.
+        // Learn's Continue names the lesson (?lesson=); otherwise open on the first thing they have not done, rather than
+        // making them page past their own progress.
+        if (start >= 0) return;
         const next = chapter.lessons.findIndex((l) => !set.has(lessonId(chapter.number, l.key)));
         if (next > 0) setI(next);
       })
       .catch(() => {});
     return () => { live = false; };
-  }, [chapter]);
+  }, [chapter, start]);
 
   const lesson = chapter.lessons[i];
   const id = lesson ? lessonId(chapter.number, lesson.key) : '';
+
+  // Where you are, on this device only, so Learn's Continue brings you straight back (components/education/last-lesson.ts).
+  useEffect(() => {
+    if (lesson) writeLastLesson(deviceStore(), { chapter: chapter.number, lesson: lesson.key, at: Date.now() });
+  }, [chapter.number, lesson]);
+
   const isDone = done.has(id);
   const progress = useMemo(() => chapterProgress(chapter, done), [chapter, done]);
   const film = lesson ? filmFor?.[lesson.key] : undefined;
   const movement = id ? movementForLesson(id) : null;
+  const clip = id ? demoForLesson(id) : null;
   const next = nextChapterHref(chapter.number);
+  const chapterDone = progress.total > 0 && progress.done === progress.total;
+  const last = i === chapter.lessons.length - 1;
 
   const complete = useCallback(async () => {
     if (!lesson || busy || isDone) { setI((n) => Math.min(chapter.lessons.length - 1, n + 1)); return; }
@@ -72,139 +102,75 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
     }
   }, [lesson, busy, isDone, chapter]);
 
-  if (!lesson) return <p className="text-white/45">This chapter has no lessons yet.</p>;
+  if (!lesson) return <p className={`${TYPE.body} text-fel-dim`}>This chapter has no lessons yet.</p>;
+
+  const cards = lesson.kind === 'drill' ? stepCards(lesson.steps) : [];
+  const summary = cards.length ? null : summaryLine(lesson);
+  const nextLabel = next === '/education/playbook' ? 'All chapters' : 'Next chapter';
 
   return (
-    <>
-      <div className="mb-5">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
-            Lesson {i + 1} of {chapter.lessons.length}
-          </p>
-          <p className="font-mono text-[11px] text-white/35">{progress.pct}%</p>
-        </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/[0.07]">
-          <div className="h-full rounded-full bg-[#00FF9D] transition-[width] duration-500" style={{ width: `${progress.pct}%` }} />
-        </div>
+    <div className="pb-24 md:pb-0">
+      <div className="mb-4 flex items-center gap-3" data-lesson-progress>
+        <StatRing value={progress.pct} max={100} label="Chapter progress" display="" size={36} stroke={4} />
+        <p className={`${TYPE.label} flex-1 text-fel-dim`}>Lesson {i + 1} of {chapter.lessons.length}</p>
+        {i > 0 && (
+          <button type="button" onClick={() => setI((n) => Math.max(0, n - 1))} className={CHIP_BUTTON} aria-label="Previous lesson">
+            <ArrowLeft aria-hidden className="h-4 w-4" /> Back
+          </button>
+        )}
       </div>
 
-      {/* The lesson itself, keyed so each one animates in rather than swapping silently. */}
-      <article key={lesson.key} className="fel-rise rounded-2xl border border-white/8 bg-white/[0.02] p-5 sm:p-7">
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className="rounded-md px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em]"
-            style={{
-              background: lesson.kind === 'drill' ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.06)',
-              color: lesson.kind === 'drill' ? '#00E5FF' : 'rgba(255,255,255,0.45)',
-            }}
-          >
-            {lesson.kind === 'drill' ? 'Do this' : 'Understand this'}
-          </span>
-          {isDone && (
-            <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-[#00FF9D]">
-              <Check className="h-3 w-3" strokeWidth={3} /> Done
-            </span>
-          )}
+      {/* The lesson, keyed so each one animates in rather than swapping silently. */}
+      <article key={lesson.key} className="fel-rise" data-lesson={id} data-lesson-kind={lesson.kind}>
+        {/* 1. Show: the demo plays by itself on open. A filmed drill plays its film the same way. */}
+        {film ? (
+          <video src={film} autoPlay muted loop playsInline preload="metadata" data-lesson-film
+            className="aspect-video w-full rounded-[20px] border border-[color:var(--fel-hairline)] bg-black" />
+        ) : clip && !threeDisabled ? (
+          <div data-lesson-demo={clip} className="overflow-hidden rounded-[20px] border border-[color:var(--fel-hairline)]">
+            <AvatarDemo clip={clip} />
+          </div>
+        ) : null}
+
+        <div className={`flex flex-wrap items-center gap-2 ${film || clip ? 'mt-4' : ''}`}>
+          <Chip tone={lesson.kind === 'drill' ? 'accent' : 'neutral'}>{lesson.kind === 'drill' ? 'Do this' : 'Understand this'}</Chip>
+          {isDone && <Chip tone="success" icon={<Check aria-hidden className="h-3 w-3" strokeWidth={3} />}>Done</Chip>}
         </div>
+        <h2 className={`${TYPE.heading} mt-3 text-white`}>{lesson.title}</h2>
 
-        <h2 className="fel-heading mt-3 text-[22px] font-black leading-tight text-white sm:text-[26px]">{lesson.title}</h2>
-        {lesson.purpose && <p className="mt-2 text-[14px] leading-relaxed text-white/60">{lesson.purpose}</p>}
-
-        {/* The film, when one exists for this drill. Until then the steps carry it — see scripts/education/
-            ingest-films.ts for how a filmed exercise gets attached. */}
-        {film && (
-          <video
-            src={film}
-            controls
-            playsInline
-            preload="metadata"
-            className="mt-5 aspect-video w-full rounded-xl border border-white/10 bg-black"
-          />
+        {/* 2. Then the steps, a card at a time — or the book's one line where there are no steps. */}
+        {cards.length > 0 && <StepCards cards={cards} />}
+        {summary && (
+          <p data-lesson-summary className={`fel-surface mt-4 p-5 ${TYPE.heading} normal-case tracking-normal text-white`}>{summary}</p>
         )}
 
-        {/* A drill leads with what you do. A concept leads with why. */}
-        {lesson.kind === 'drill' && lesson.steps.length > 0 && (
-          <ol className="mt-5 space-y-2.5">
-            {lesson.steps.map((s, n) => (
-              <li key={n} className="flex gap-3">
-                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md bg-[#00E5FF]/12 font-mono text-[10px] font-black text-[#00E5FF]">
-                  {n + 1}
-                </span>
-                <span className="text-[14px] leading-relaxed text-white/80">{s}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        {lesson.prose.map((p, n) => (
-          <p key={n} className="mt-4 text-[14.5px] leading-[1.75] text-white/65">{p}</p>
-        ))}
-
-        {lesson.kind !== 'drill' && lesson.steps.length > 0 && (
-          <ul className="mt-4 space-y-2">
-            {lesson.steps.map((s, n) => (
-              <li key={n} className="flex gap-2.5 text-[14px] leading-relaxed text-white/70">
-                <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-white/30" />
-                {s}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* The book sets these as callouts and so does the course — it is the author talking to the coach. */}
-        {lesson.note && (
-          <aside className="mt-6 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/[0.05] p-4">
-            <p className="flex items-center gap-2 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-[#FFD700]">
-              <Lightbulb className="h-3.5 w-3.5" /> Trainer&rsquo;s note
-            </p>
-            <p className="mt-2 text-[13.5px] leading-relaxed text-white/70">{lesson.note}</p>
-          </aside>
-        )}
-
-        {/* Learn it, then check it on camera (lib/education/lessonMovement.ts). */}
-        {movement && <div className="mt-6"><CameraLink movement={movement} /></div>}
+        {/* 3. Learn it, then check it on camera (lib/education/lessonMovement.ts). */}
+        {movement && <div className="mt-5"><CameraLink movement={movement} /></div>}
         {/* …and run its drill on camera (lib/drills/playbookLinks.ts; Mirror & coaching Phase 6) */}
         {id && <DrillsLink lessonId={id} />}
+
+        {/* 4. The book, behind Read more: the owner's words, verbatim. */}
+        <BookText lesson={lesson} />
       </article>
 
-      <div className="mt-5 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setI((n) => Math.max(0, n - 1))}
-          disabled={i === 0}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/10 text-white/50
-                     transition-colors hover:border-white/30 hover:text-white disabled:opacity-30"
-          aria-label="Previous lesson"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
+      {/* The screen's one primary, where a thumb is: done, next, or on to the next chapter. */}
+      {chapterDone && last ? (
+        <PrimaryCta href={next} docked testId="lesson-primary">{nextLabel}</PrimaryCta>
+      ) : (
+        <PrimaryCta onClick={complete} docked testId="lesson-primary">
+          {isDone ? 'Next' : last ? 'Finish the chapter' : 'Mark done'}
+        </PrimaryCta>
+      )}
 
-        <button
-          type="button"
-          onClick={complete}
-          disabled={busy}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-3 text-[14px] font-bold
-                     transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
-          style={{
-            background: isDone ? 'rgba(255,255,255,0.06)' : '#00FF9D',
-            color: isDone ? 'rgba(255,255,255,0.7)' : '#050505',
-          }}
-        >
-          {isDone ? <>Next <ArrowRight className="h-4 w-4" /></>
-            : i === chapter.lessons.length - 1 ? <>Finish the chapter <Gem className="h-4 w-4" /></>
-            : <>Mark done <Check className="h-4 w-4" strokeWidth={3} /></>}
-        </button>
-      </div>
-
-      {progress.total > 0 && progress.done === progress.total && (
-        <section data-chapter-done className="mt-8 rounded-2xl border border-[#00FF9D]/25 bg-[#00FF9D]/[0.04] p-5">
+      {chapterDone && (
+        <section data-chapter-done className="fel-surface mt-8 p-5">
           {chapter.remember.length > 0 && (
             <>
-              <h3 className="fel-heading text-[15px] font-bold text-white">What to remember</h3>
+              <h3 className={`${TYPE.heading} text-white`}>What to remember</h3>
               <ul className="mt-3 space-y-2">
                 {chapter.remember.map((r, n) => (
-                  <li key={n} className="flex gap-2.5 text-[13.5px] leading-relaxed text-white/70">
-                    <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-[#00FF9D]" />
+                  <li key={n} className={`flex gap-2.5 ${TYPE.small} text-fel-soft`}>
+                    <span aria-hidden className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-fel-emerald" />
                     {r}
                   </li>
                 ))}
@@ -213,17 +179,41 @@ export function ChapterReader({ chapter, filmFor }: { chapter: Chapter; filmFor?
           )}
           {/* EDU-LINKS (2026-10-07): this went to the course index from every chapter. It opens the next one now, and the
               index after the last; and it shows on a chapter with no recap (5 and 8 have none), which it never did. */}
-          <Link
-            href={next}
-            data-next-chapter={next}
-            className="mt-4 inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#00FF9D]"
-          >
-            <Play className="h-3 w-3" /> {next === '/education/playbook' ? 'All chapters' : 'Next chapter'}
-          </Link>
+          <div className="mt-4"><Chip href={next} testId="next-chapter">{nextLabel}</Chip></div>
         </section>
       )}
 
-      {progress.total > 0 && progress.done === progress.total && <ChapterCheck chapter={chapter.number} />}
-    </>
+      {chapterDone && <ChapterCheck chapter={chapter.number} />}
+    </div>
+  );
+}
+
+/** The book's text for a lesson — its purpose, its paragraphs, its trainer's note — exactly as imported, behind Read more. */
+export function BookText({ lesson }: { lesson: Lesson }) {
+  const conceptSteps = lesson.kind !== 'drill' ? lesson.steps : [];
+  if (!lesson.purpose && !lesson.prose.length && !conceptSteps.length && !lesson.note) return null;
+  return (
+    <details data-read-more className="group mt-5">
+      <summary className={`${TYPE.label} flex min-h-11 cursor-pointer list-none items-center gap-2 text-fel-cyan [&::-webkit-details-marker]:hidden`}>
+        <span className="group-open:hidden">Read more</span>
+        <span className="hidden group-open:inline">Read less</span>
+      </summary>
+      <div data-book-text className="mt-2 space-y-4">
+        {lesson.purpose && <p data-book-purpose className={`${TYPE.body} text-fel-soft`}>{lesson.purpose}</p>}
+        {lesson.prose.map((p, n) => <p key={n} data-book-para className={`${TYPE.body} text-fel-soft`}>{p}</p>)}
+        {conceptSteps.length > 0 && (
+          <ul className="space-y-2">
+            {conceptSteps.map((s, n) => <li key={n} data-book-step className={`${TYPE.body} text-fel-soft`}>{s}</li>)}
+          </ul>
+        )}
+        {/* The book sets these as callouts and so does the course — it is the author talking to the coach. */}
+        {lesson.note && (
+          <aside className="rounded-[16px] border border-fel-gold/25 bg-fel-gold/[0.05] p-4">
+            <p className={`${TYPE.label} flex items-center gap-2 text-fel-gold`}><Lightbulb aria-hidden className="h-3.5 w-3.5" /> Trainer&rsquo;s note</p>
+            <p data-book-note className={`${TYPE.body} mt-2 text-fel-soft`}>{lesson.note}</p>
+          </aside>
+        )}
+      </div>
+    </details>
   );
 }

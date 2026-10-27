@@ -1,6 +1,5 @@
 import { getServerSession } from 'next-auth';
 import { notFound, redirect } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
@@ -8,7 +7,7 @@ import { TabPage } from '@/components/shell/tab-page';
 import { ChapterReader } from '@/components/education/chapter-reader';
 import { CHAPTERS, chapterByNumber } from '@/lib/education/course';
 import films from '@/lib/education/films.json';
-import { PALETTE } from '@/lib/design/palette';
+import { Chip } from '@/components/ui/fel/chip';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,12 +15,15 @@ export function generateStaticParams() {
   return CHAPTERS.map((c) => ({ chapter: String(c.number) }));
 }
 
-export default async function ChapterPage({ params }: { params: { chapter: string } }) {
+export default async function ChapterPage({ params, searchParams }: { params: { chapter: string }; searchParams?: { lesson?: string | string[] } }) {
   const session = await getServerSession(authOptions);
   const n = Number(params?.chapter);
   const chapter = Number.isFinite(n) ? chapterByNumber(n) : null;
   if (!chapter) notFound();
-  if (!session) redirect(loginPath(`/education/playbook/${chapter.number}`));
+  // PLAT-P04: Learn's Continue opens the lesson you were in (?lesson=<key>); a key the chapter does not teach is ignored.
+  const want = typeof searchParams?.lesson === 'string' ? searchParams.lesson : '';
+  const lesson = chapter.lessons.some((l) => l.key === want) ? want : undefined;
+  if (!session) redirect(loginPath(`/education/playbook/${chapter.number}${lesson ? `?lesson=${encodeURIComponent(lesson)}` : ''}`));
 
   // A drill shows its film when one has been ingested; otherwise the steps carry it on their own.
   const filmFor = Object.fromEntries(
@@ -30,23 +32,15 @@ export default async function ChapterPage({ params }: { params: { chapter: strin
       .map(([k, v]) => [k, v.url as string]),
   );
 
+  // PLAT-P04: the lesson shows before it tells, so the header is the chapter's name and nothing more — the subtitle
+  // was 8–12 words above the demo on a phone (it stays on the course index and on Learn).
   return (
     <TabPage
       eyebrow={`Chapter ${chapter.number}`}
       title={chapter.title}
-      lede={chapter.subtitle}
-      accent={PALETTE.emerald}
-      aside={
-        <Link
-          href="/education/playbook"
-          className="inline-flex items-center gap-2 rounded-xl border border-white/10 px-3.5 py-2 text-[12.5px]
-                     font-bold text-white/60 transition-colors hover:border-white/25 hover:text-white"
-        >
-          <ArrowLeft className="h-4 w-4" /> All chapters
-        </Link>
-      }
+      aside={<Chip href="/education/playbook" icon={<ArrowLeft aria-hidden className="h-4 w-4" />}>All chapters</Chip>}
     >
-      <ChapterReader chapter={chapter} filmFor={filmFor} />
+      <ChapterReader chapter={chapter} filmFor={filmFor} startAt={lesson} />
     </TabPage>
   );
 }
