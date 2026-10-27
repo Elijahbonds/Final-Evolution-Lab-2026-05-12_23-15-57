@@ -48,6 +48,19 @@ for (const f of files) {
   const sn = R.snaps || [];
   out.releaseBallY = { theirs: sn.filter((s) => /rival release|my block read/.test(s.m) && s.ball).map((s) => s.ball[1]), mine: sn.filter((s) => /my release/.test(s.m) && s.ball).map((s) => s.ball[1]) };
   out.botBlocks = R.bot?.blocks; out.botPokes = R.bot?.pokes; out.botShots = R.bot?.shots;
+  // the possession loop (drive.mjs POSS): one verdict per possession
+  if (R.poss?.length) {
+    const P = R.poss.map((p) => {
+      const b = p.banners.join(' | '), lg = p.log.join('\n');
+      if (p.side === 'def') return { side: 'def', sec: p.sec, shot: /rival release|rival dunk/.test(lg), myBlock: /(^| \| )REJECTED/.test(b), mySteal: /POCKET|STRIPPED ON THE BUMP|STOLE IT|PARRY|DRIVE-BY|STRIP!/.test(b), geo: p.log.filter((m) => /my block read/.test(m)).map((m) => m.replace(/^\[[^\]]+\] my block read on his /, '').slice(0, 80)), banners: b.slice(0, 120) };
+      return { side: 'off', sec: p.sec, shot: /my release|drive contest|mate shot/.test(lg), aiStop: /(^| \| )(STRIPPED|STOLEN|BLOCKED|MET AT THE RIM|CHARGE)/.test(b) || /strip by the ai/.test(lg), aiBlockReads: p.log.filter((m) => /my release/.test(m)).map((m) => `${m.match(/my release (\S+)/)?.[1]} d ${m.match(/ dist ([\d.]+)/)?.[1]} old ${m.match(/ block ([\d.]+)/)?.[1]}${m.match(/ geo (HIT|miss)/) ? ' geo ' + m.match(/ geo (HIT|miss)/)[1] + ' y ' + m.match(/ball y ([\d.]+)/)?.[1] : ''}`), reach: p.log.filter((m) => /ai reach resolve/.test(m)).map((m) => m.replace(/^\[[^\]]+\] ai reach resolve /, '').slice(0, 70)), banners: b.slice(0, 120) };
+    });
+    const D = P.filter((x) => x.side === 'def'), O = P.filter((x) => x.side === 'off');
+    out.possLoop = { def: D.length, theirShots: D.filter((x) => x.shot || x.myBlock).length, myBlocks: D.filter((x) => x.myBlock).length, mySteals: D.filter((x) => x.mySteal).length,
+      off: O.length, myShots: O.filter((x) => x.shot).length, aiStops: O.filter((x) => x.aiStop).length, list: P };
+    tot.poss = tot.poss || { def: 0, theirShots: 0, myBlocks: 0, off: 0, aiStops: 0 };
+    tot.poss.def += out.possLoop.def; tot.poss.theirShots += out.possLoop.theirShots; tot.poss.myBlocks += out.possLoop.myBlocks; tot.poss.off += out.possLoop.off; tot.poss.aiStops += out.possLoop.aiStops;
+  }
   console.log(JSON.stringify(out, null, 1));
   tot.theirRel += out.theirReleases; tot.myBlocks += out.myBlocks; tot.myGeoHits += out.myReads.hits; tot.myRel += out.myReleases; tot.aiOldExp += out.aiBlockOldExpected; tot.aiGeoHits += out.aiBlockGeoHits; tot.aiBlocked += out.aiBlocked;
   tot.steals += out.stopsOnMe.steals; tot.aiBlocks += out.stopsOnMe.blocks; tot.charges += out.stopsOnMe.charges; tot.goaltends += out.goaltends;

@@ -74,9 +74,42 @@ const result = { mode: MODE, scen: SCEN, tier: TIER, seed: SEED, view: `${VW}x${
 const outFile = path.join(OUT, `${SCEN}-${MODE}-${TIER}-s${SEED}${process.env.TAG ? '-' + process.env.TAG : ''}.json`);
 // hoops-p01: the input run writes what it has after every test group (a timeout on the shared box keeps the finished groups)
 const checkpoint = async (what) => { try { result.partial = what; result.log = await ev(() => window.__LOG); result.wallS = (Date.now() - T0) / 1000; fs.writeFileSync(outFile, JSON.stringify(result)); say('checkpoint ' + what); } catch (e) { say('checkpoint failed ' + e); } };
+// hoops-p02: THE POSSESSION LOOP — POSS defensive and POSS offensive possessions, each set by the seams (defend / offense) and played by
+// the bot (on defence: shadow the driver, poke, jump 220 ms after the gather; on the ball: drive, move, shoot or pass), each ended by
+// the possession changing or a shot going up (+ POSS_TAIL_MS to see it land), capped at POSS_CAP_MS of game time. Every possession
+// keeps its log lines and HUD banners — analyze-defense.mjs reads blocks, stops and contests per possession.
+const POSS = Number(process.env.POSS ?? 0);
+async function possLoop() {
+  const out = [];
+  const tag = MODE === 'onevone' ? '1V1' : '3V3';
+  const CAP = Number(process.env.POSS_CAP_MS ?? 7000), TAIL = Number(process.env.POSS_TAIL_MS ?? 1500);
+  for (let k = 0; k < POSS * 2; k++) {
+    const side = k % 2 === 0 ? 'def' : 'off';
+    await ev(() => { window.__hg.bot.on = false; });
+    await ev((a) => { const s = window.__FEL_DEV__.scene.metadata[a[0]]; if (a[1] === 'def') s.defend(); else s.offense(); }, [MODE, side]);
+    await waitGame(side === 'def' ? 200 : 600);
+    const f0 = await ev(() => window.__hg.frame); const t0 = await gameNow();
+    await ev(() => { window.__hg.bot.on = true; window.__hg.autoStrip = true; });
+    let endAt = null;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 1500));
+      const st = await ev((a) => { const L = window.__LOG || []; const since = L.filter((l) => l.f >= a[0]); const pc = window.__hg.possCode(); return { pc, shot: since.some((l) => new RegExp(a[1] === 'def' ? 'rival release|rival dunk|swat at k|my block read' : 'my release|blocked at the release|drive contest|mate shot').test(l.m)), over: since.some((l) => /strip by the ai|ai reach resolve strip|STOLEN|resetPossession|charge|REF\]/.test(l.m)) }; }, [f0, side]);
+      const g = (await gameNow()) - t0;
+      if (endAt === null && (st.shot || st.over || (side === 'def' ? st.pc === 1 : st.pc === 2))) endAt = g + TAIL;
+      if ((endAt !== null && g >= endAt) || g >= CAP) break;
+    }
+    await ev(() => { window.__hg.bot.on = false; });
+    const f1 = await ev(() => window.__hg.frame);
+    const rec = await ev((a) => ({ log: (window.__LOG || []).filter((l) => l.f >= a[0] && l.f <= a[1]).map((l) => l.m), banners: (window.__hud || []).filter((h) => h.f >= a[0] && h.f <= a[1] && h.banner).map((h) => String(h.banner)) }), [f0, f1]);
+    out.push({ side, f0, f1, sec: +((f1 - f0) / 60).toFixed(2), ...rec });
+    say(`poss ${k} ${side} ${out[out.length - 1].sec} s ${rec.banners.slice(0, 4).join(' | ')}`);
+    if (k % 2 === 1) { result.poss = out; await checkpoint('poss ' + k); }
+  }
+  return out;
+}
 if (SCEN === 'game') {
   await waitGame(800);
-  await ev(() => { window.__hg.start(); window.__hg.bot.on = true; });
+  await ev(() => { window.__hg.start(); window.__hg.bot.on = true; window.__hg.autoStrip = true; });   // hoops-p02: auto-strips on block / strip events
   const t0 = await gameNow(); let nextShot = 0; let k = 0;
   for (;;) {
     await new Promise((r) => setTimeout(r, 1500));
@@ -93,6 +126,10 @@ if (SCEN === 'game') {
   result.hud = await ev(() => window.__hud);
   result.inputs = await ev(() => window.__hg.inputs);
   result.snaps = await ev(() => window.__hg.snaps || []);   // hoops-p02: the defence snapshots
+  { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
+} else if (SCEN === 'poss') {   // hoops-p02: the possession loop alone
+  result.poss = await possLoop(); result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
+  { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);
@@ -146,6 +183,7 @@ if (SCEN === 'game') {
   }
   if (ON.has('block')) for (let k = 0; k < 3; k++) { await setDef(); await waitGame(1600); R.block.push(await T('block')); await waitGame(1500); }
   await shot('input-end');
+  if (POSS > 0) { await ev(() => window.__hg.stop()); result.poss = await possLoop(); const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }   // hoops-p02
   await ev(() => window.__hg.stop());
   // hoops-p01: the hero's pops in the 0.75 s from each stop's first frame (a stop / launch touch must not add pops)
   const an = await ev(() => window.__hg.analyse({ popFrames: true }));

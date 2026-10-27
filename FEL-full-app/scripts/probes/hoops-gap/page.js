@@ -141,7 +141,8 @@
   { const SNAP = /release|block|swat|reject|rim protector|reach|goaltend|strip|contest|hand up|BLOCK-GEO|STOP/i;
     const r3 = (v) => (v ? [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)] : null);
     const o = console.info.bind(console);
-    console.info = (...a) => { o(...a); try { const m = String(a[0] ?? ''); if (/^\[(1V1|3V3)-(DEF|REF|BLOCK|CONTEST)\]/.test(m) && SNAP.test(m) && HG.snaps.length < 3000) { const bl = ball(); HG.snaps.push({ f: HG.frame, m: m.slice(0, 200), ball: bl ? r3(bl.getAbsolutePosition()) : null, holder: holderOfBall()[0], bodies: B.map((b) => ({ id: b.id, root: r3(b.root.getAbsolutePosition()), rh: r3(b.rh && b.rh.getAbsolutePosition()), lh: r3(b.lh && b.lh.getAbsolutePosition()), hipsY: b.hips ? +b.hips.getAbsolutePosition().y.toFixed(3) : null })) }); } } catch (e) { /* the probe never breaks the game */ } };
+    console.info = (...a) => { o(...a); try { const m = String(a[0] ?? ''); if (HG.autoStrip && (HG.autoN || 0) < 8 && /blocked at the release|\] swat at k|rim protector swat|ai swat read at the bump: HIT|my block read .*HIT|ai reach resolve strip/.test(m)) { const n = HG.autoN = (HG.autoN || 0) + 1; HG.strip(`auto-${n}-${/my block|\] swat at/.test(m) ? 'myblock' : /reach/.test(m) ? 'aistrip' : 'aiblock'}`, 12, 3); }
+      if (/^\[(1V1|3V3)-(DEF|REF|BLOCK|CONTEST)\]/.test(m) && SNAP.test(m) && HG.snaps.length < 3000) { const bl = ball(); HG.snaps.push({ f: HG.frame, m: m.slice(0, 200), ball: bl ? r3(bl.getAbsolutePosition()) : null, holder: holderOfBall()[0], bodies: B.map((b) => ({ id: b.id, root: r3(b.root.getAbsolutePosition()), rh: r3(b.rh && b.rh.getAbsolutePosition()), lh: r3(b.lh && b.lh.getAbsolutePosition()), hipsY: b.hips ? +b.hips.getAbsolutePosition().y.toFixed(3) : null })) }); } } catch (e) { /* the probe never breaks the game */ } };
   }
 
   // ── world reads ──────────────────────────────────────────────────────────────────────────────────────────────────
