@@ -305,6 +305,27 @@ function approachMetrics(r: Rec) {
     for (let i = Math.max(0, moving); i < fr.length; i++) { if (ys[i] <= floor + 0.04) span.push(i); else flush(); }
     flush();
   }
+  // FOOT SKATE (the gate's measure): each frame, the LOWER of the four foot joints, when within 3 cm of the floor and the same joint
+  // as last frame, its world horizontal speed weighted (2 − 2^(h/H)) — the motion-synthesis literature's skate. The span measure
+  // above counts a swing foot skimming the floor at a sprint as a plant; this one reads only the foot carrying the body. By band.
+  const skate: Record<string, { n: number; mps: number }> = {};
+  {
+    const FJ = [1, 2, 3, 4];
+    const lowJ = (f: Frame) => FJ.reduce((b, k) => ((f.j[k]?.[1] ?? 9) < (f.j[b]?.[1] ?? 9) ? k : b), FJ[0]);
+    const gi = idxAt(r, markT(r, /gather stride/)); const G = gi > 0 && gi < fr.length ? gi : fr.length;
+    const hs = fr.slice(0, G).map((f) => f.j[lowJ(f)]?.[1] ?? 9); const floor = pct(hs.filter((y) => y < 5), 0.02); const Hc = 0.03;
+    const acc: Record<string, [number, number]> = {};
+    for (let i = 1; i < G; i++) {
+      const k = lowJ(fr[i]); if (k !== lowJ(fr[i - 1])) continue;
+      const a = fr[i - 1].j[k], b2 = fr[i].j[k]; if (!a || !b2) continue;
+      const h = b2[1] - floor; if (h > Hc) continue;
+      const v = hyp(fr[i].rp, fr[i - 1].rp) / DT, sp = hyp(b2, a) / DT, w = 2 - 2 ** (Math.max(0, h) / Hc);
+      const band = v < 2.5 ? 'walk' : v < 5 ? 'run' : 'sprint';
+      const e = (acc[band] ??= [0, 0]); e[0] += sp * w; e[1] += w;
+      const all = (acc.all ??= [0, 0]); if (v >= 2.5) { all[0] += sp * w; all[1] += w; }
+    }
+    for (const [k, [sw, w]] of Object.entries(acc)) skate[k] = { n: Math.round(w), mps: rnd(sw / Math.max(1e-9, w))! };
+  }
   // clip changes: a clip that enters at ≥ 0.6 weight on its first frame (no fade) is a hard cut
   let cuts = 0, changes = 0; const cutNames: string[] = [];
   for (let i = 1; i < fr.length; i++) {
@@ -323,7 +344,7 @@ function approachMetrics(r: Rec) {
     accelP95: rnd(pct(a.map(Math.abs), 0.95), 1), jerkRms: rnd(Math.sqrt(mean(jkMove.map((x) => x * x))), 0), jerkP95: rnd(pct(jkMove, 0.95), 0), jerkMax: rnd(Math.max(...jkMove), 0),
     hipAccP95: rnd(pct(hipsAcc, 0.95), 1), hipAccMax: rnd(Math.max(...hipsAcc), 1), hipPops, hipPopAt: hipPopAt.slice(0, 8),
     plants: slides.length, slideCmMed: rnd(pct(slides.map((s) => s.cm), 0.5), 1), slideCmP90: rnd(pct(slides.map((s) => s.cm), 0.9), 1), slideMpsMed: rnd(pct(slides.map((s) => s.mps), 0.5)),
-    contactFastShare: rnd(contactSpeeds.filter((x) => x > 0.5).length / Math.max(1, contactSpeeds.length)), slides: slides.slice(0, 16),
+    contactFastShare: rnd(contactSpeeds.filter((x) => x > 0.5).length / Math.max(1, contactSpeeds.length)), slides: slides.slice(0, 16), skate,
     clipChanges: changes, hardCuts: cuts, cutNames: [...new Set(cutNames)], bonePops, popBones, yawStepMaxDeg: rnd(Math.max(...yawStep), 1),
   };
 }
