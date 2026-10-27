@@ -2,6 +2,11 @@
 // be improved still … smoother movement, better lobs"). Pure; DunkMode reads every number through feel() so the owner can tune
 // them on a playtest run (lib/feel-panel; never in ranked, staked or paid play). docs/DUNK-FLAGSHIP.md has the measurements.
 
+// ── (a) THE RUNWAY'S FEET MATCH THE GROUND ─────────────────────────────────────────────────────────────────────────────
+/** TUNED (was the authored HOOPS_STRIDE.run 3.6 m/s × RUNWAY_PIN 1.1): the ground speed the runway's dribble-run capture
+ *  (bball_mc_dribble_run, CMU 78_06) covers at rate 1 — StrideMatch's HOOPS_STRIDE_CAPTURE.sprint, measured from the capture. */
+export const RUNWAY_STRIDE_MPS = 4.57;
+
 // ── (b) THE ALLEY-OOP IS A LOB ──────────────────────────────────────────────────────────────────────────────────────────
 // Measured before (esbuild rig, the ALLEY-OOP prop): the passer threw after the take-off, at 0.9 × the rise beat, to arrive on
 // the catch beat (LOB_CATCH_CLIP_T 0.62) — a 0.35 s pass from 3.5 m away, a ~10 m/s bullet whose top was barely over the catch.

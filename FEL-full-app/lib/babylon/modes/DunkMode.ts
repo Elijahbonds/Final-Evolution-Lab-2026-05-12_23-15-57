@@ -55,7 +55,7 @@ import { LEGS, legPose, easeLegPose, cloneLegPose, arcHeight, arcTopT, carryU, s
 import { EASTBAY_TIMING as EB } from '../anim/authored/timing';
 import { TAKE_OFF_ONE_CATCH } from '../anim/authored/dunkTakeoff';   // DUNK MOTION phase 7
 import { EASTBAY_TIMING, DUNK_TIMING } from '../anim/authored/timing';
-import { HOOPS_STRIDE } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
+import { HOOPS_STRIDE, RATE_MIN, RATE_MAX } from '../core/StrideMatch';   // THE GATHER STRIDE (2026-09-18): the runway loop paces to the run
 import { armChain, reachArm, shapeReach, limitElbowSwing, forgetElbowSwing, anatomicalElbowPole, type ArmChain } from '../anim/HandIK';
 import type { LimbDrag } from '../anim/LimbDrag';      // DUNK MOTION phase 3: overlap / follow-through on the limbs, the seams eased
 import { MotionLayers } from '../anim/motionLayers';   // HOOPS MOTION phase 3c: the drag, the wrists and the hinged arm are built there (lifted from here, unchanged)
@@ -86,7 +86,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { OOP_LOB_FLIGHT_SEC, oopThrowDue } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { OOP_LOB_FLIGHT_SEC, oopThrowDue, RUNWAY_STRIDE_MPS } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -635,7 +635,7 @@ export const DunkMode: ModeDefinition = (() => {
     busRun = { t: 0, s: alongPane(pane, player.root.position.x, player.root.position.z), pane, speed: Math.max(BUS_RUN.speedMin, speed) };
     runUpPeak = Math.max(runUpPeak, busRun.speed);
     endRunwayBeat(true); runwayBeat = null;
-    playClip(runLoop(), { loop: true }); player.animator.setPlaybackScale(runLoop(), strideRate(busRun.speed) * runwayPin(runLoop())); setWin('run');
+    playClip(runLoop(), { loop: true }); player.animator.setPlaybackScale(runLoop(), runwayRate(busRun.speed)); setWin('run');
     SoundKit.play('impact', { pitch: 1.2, volume: 0.45 }); ctx.feel?.impact?.(0.25); ctx.juice.flash('#a5f3fc', 50); ctx.camDirector.pulse(0.35, 0.3);
     EffectsKit.burst(ctx.scene, player.root.position.add(new Vector3(-pane.nx * 0.5, 1.0, -pane.nz * 0.5)), 'sparks');
     flash(ctx, `WALL RUN ON ${ride.name} — off the front of it`, 800); ctx.setHud({ hint: `RUNNING THE ${ride.short} — the jump is at its front end` });
@@ -1843,7 +1843,7 @@ export const DunkMode: ModeDefinition = (() => {
         // tricks fit before the slam window. Live 08's whole ramp, in one number.
         runUpPeak = Math.max(runUpPeak, Math.hypot(vel.x, vel.z));
         const moving = Math.hypot(vel.x, vel.z) > 0.5;
-        if (!runwayBeat) { playClip(moving ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(runLoop(), strideRate(Math.hypot(vel.x, vel.z)) * runwayPin(runLoop())); }   // a runway beat owns the body until it ends; the loop paces to the run
+        if (!runwayBeat) { playClip(moving ? runLoop() : SPORT_CLIP.idle, { loop: true }); setWin('run'); if (moving) player.animator.setPlaybackScale(runLoop(), runwayRate(Math.hypot(vel.x, vel.z))); }   // a runway beat owns the body until it ends; the loop paces to the run
         // IMPROVE (2026-10-06): pushed on CHANGE only — inside 0.2 m of the line this wrote the hint every frame (a React render a
         // frame; the move-list note below already says not to). Leaving the strip forgets it, so coming back says it again.
         if (player.root.position.z <= gatherLine() + 0.2) {
@@ -1937,7 +1937,7 @@ export const DunkMode: ModeDefinition = (() => {
         runwayVel.x = steer; runwayVel.z = -runNow;
         runMotion.update(steer, -runNow, player.root.rotation.y, dt);
         runUpPeak = Math.max(runUpPeak, Math.hypot(steer, holdRunSpeed));
-        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(runLoop(), strideRate(holdRunSpeed) * strideAdjust * runwayPin(runLoop())); }
+        if (!runwayBeat && !gatherStride) { setWin('run'); player.animator.setPlaybackScale(runLoop(), runwayRate(holdRunSpeed) * strideAdjust); }
         // THE RUNWAY TEACHES ITS MOVES (owner, 2026-09-16). Everything a player can throw on the run is a bare face
         // button under a held trigger — undiscoverable — and this pass added three more. The hold-run hint is the move
         // list now, and it turns into DOUBLE-UP the moment the double-up is actually on. Only pushed on CHANGE: a HUD
@@ -3643,6 +3643,15 @@ export const DunkMode: ModeDefinition = (() => {
   function runLoop(): string {
     const owned = player.animator.clipNames;
     return owned.has(RUNWAY_LOOP) || owned.has('bball_mc_dribble_run') ? RUNWAY_LOOP : SPORT_CLIP.moveLoop;
+  }
+  /** DUNK-FLAGSHIP (a): the runway loop's pace for a run at `mps`. The capture (bball_mc_dribble_run, CMU 78_06) covers
+   *  HOOPS_STRIDE_CAPTURE.sprint (4.57 m/s) at rate 1, but the runway paced it against the authored reference (HOOPS_STRIDE.run 3.6)
+   *  times RUNWAY_PIN (1.1) — its feet cycled 1.27 × 1.1 = 1.40× faster than the ground under them at every pace (a skate). It is
+   *  paced against the capture's own stride now (dunk.runwayStrideMps), inside StrideMatch's rate bounds; a body that plays the
+   *  authored loop keeps the authored reference. */
+  function runwayRate(mps: number): number {
+    if (!player.animator.clipNames.has('bball_mc_dribble_run')) return strideRate(mps) * runwayPin(runLoop());
+    return Math.min(RATE_MAX, Math.max(RATE_MIN, mps / feel('dunk.runwayStrideMps', RUNWAY_STRIDE_MPS)));
   }
   /** RUNWAY_PIN when `name` is the runway loop and the body plays its capture (the authored clip keeps its own pace). */
   function runwayPin(name: string): number {

@@ -789,6 +789,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
   },  // ── dunk-flagship (owner playtest 2026-10-27: "smoother movement, better lobs") ──
   {
+    id: 'dunk.runwayStrideMps', label: 'Run-up: ground the stride covers', def: 4.57, min: 3.0, max: 6.0, step: 0.01, unit: 'm/s', group: 'Dunk · run-up',
+    source: 'lib/babylon/core/DunkFlagship.ts RUNWAY_STRIDE_MPS',
+    hint: 'The run-up\'s legs are paced to this: lower = quicker steps for the same speed (the feet skate forward), higher = slower steps (they slide back).',
+  },
+  {
     id: 'dunk.oopLobFlightSec', label: 'Alley-oop: lob time in the air', def: 1.0, min: 0.5, max: 1.6, step: 0.05, unit: 's', group: 'Dunk · lobs',
     source: 'lib/babylon/core/DunkFlagship.ts OOP_LOB_FLIGHT_SEC',
     hint: 'How long the passer\'s lob hangs, release to the catch. Longer = a higher, slower arc thrown earlier in your run.',
