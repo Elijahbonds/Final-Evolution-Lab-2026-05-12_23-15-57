@@ -62,7 +62,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
         const { atBindPose, bindPoseDeviationDeg } = await import('@/lib/babylon/library/poseGuard');
         const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
-        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS, PROP_SHAPES } = await import('@/lib/library/demo');
+        const { FLOOR_CLIPS, SIDE_CLIPS, TRAVEL_CLIPS, DEMO_PROPS, PROP_SHAPES } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
         const mark = (k: string) => { if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now(); };
@@ -131,6 +131,11 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const frame = (p: ExerciseStageProps) => {
           if (p.view === 'muscles') return { alpha: p.side === 'front' ? FRONT_ALPHA : -FRONT_ALPHA, beta: 1.47, radius: 2.5, y: 0.9 };
           if (p.clip && FLOOR_CLIPS.has(p.clip)) return { alpha: 0.3, beta: 1.25, radius: 2.3, y: 0.3 };
+          // DEMO-LOOPS: a loop that travels is framed wide enough to keep the body in view the whole way
+          const travel = p.clip ? TRAVEL_CLIPS[p.clip] : undefined;
+          if (travel === 'forward') return { alpha: 0.12, beta: 1.38, radius: 3.9, y: 0.9 };
+          if (travel === 'lateral') return { alpha: FRONT_ALPHA - 0.35, beta: 1.38, radius: 3.6, y: 0.9 };
+          if (travel === 'both') return { alpha: FRONT_ALPHA - 0.8, beta: 1.2, radius: 4.2, y: 0.8 };
           if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.6, y: 0.85 };
           const prop = p.clip ? DEMO_PROPS[p.clip] : undefined;
           if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.4, y: 0.62 };

@@ -94,9 +94,10 @@ function wallChinTuck(scene: Scene, sk: Skeleton): AnimationGroup | null {
 /** ex_wall_slide_liftoff — facing the wall, the forearms on it: they slide up the wall, the hands lift a few centimetres off
  *  it at the top, back on, and slide down. */
 function wallSlideLiftOff(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const base = { bones: { ...STAND, Hips: [4, 0, 0] as Deg3 }, feet: both(0.12, ANKLE, 0.32), kneePoles: bothDir(0.1, 0, 1), hipsY: -0.02, hipsZ: 0.20 };
-  const low: Pose = { ...base, handsAt: both(0.22, 1.42, WALL_FACE - 0.03), poles: bothDir(0.4, -1, 0.2) };
-  const high: Pose = { ...base, handsAt: both(0.24, 1.86, WALL_FACE - 0.03), poles: bothDir(0.4, -1, 0.3) };
+  // close enough that the forearms lie on the wall (the elbows on it too, the poles toward it)
+  const base = { bones: { ...STAND, Hips: [4, 0, 0] as Deg3 }, feet: both(0.12, ANKLE, 0.44), kneePoles: bothDir(0.1, 0, 1), hipsY: -0.02, hipsZ: 0.34 };
+  const low: Pose = { ...base, handsAt: both(0.20, 1.46, WALL_FACE - 0.04), poles: bothDir(0.3, -0.4, 1) };
+  const high: Pose = { ...base, handsAt: both(0.22, 1.86, WALL_FACE - 0.04), poles: bothDir(0.3, -0.1, 1) };
   const off: Pose = { ...high, handsAt: both(0.24, 1.88, WALL_FACE - 0.10) };
   return run(scene, sk, 'ex_wall_slide_liftoff', 3.2, [at(low, 0, true), at(high, 1.0, true), at(off, 1.4, true), at(off, 1.7, true), at(high, 2.0, true), at(low, 2.9, true)]);
 }

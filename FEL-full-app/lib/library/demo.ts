@@ -654,6 +654,13 @@ export const FLOOR_CLIPS: ReadonlySet<string> = new Set(['ex_pushup', 'ex_plank'
   FLOW_CLIPS,
 ));
 /** Hinges and rows read from the side (the angle at the hips is the movement). */
+/** DEMO-LOOPS: loops that travel a metre or more — framed wide: forward travel from the side, sideways travel from the
+ *  front, both (the T-drill) from three-quarters. */
+export const TRAVEL_CLIPS: Readonly<Record<string, 'forward' | 'lateral' | 'both'>> = {
+  ex_approach_one: 'forward', ex_approach_two: 'forward', ex_approach_jump_one_step: 'forward', ex_approach_jump_two_step: 'forward', ex_approach_jump_three_step: 'forward', ex_approach_jump_one_foot: 'forward',
+  ex_decel_stick: 'forward', ex_jump_stop: 'forward', ex_broad_jump_stick: 'forward', ex_two_point_start: 'forward', ex_power_layup: 'forward', ex_catch_shoot_hop: 'forward',
+  ex_lateral_skip: 'lateral', ex_lateral_walk: 'lateral', ex_lateral_hop_stick: 'lateral', ex_t_drill: 'both',
+};
 export const SIDE_CLIPS: ReadonlySet<string> = new Set(['ex_hinge', 'ex_good_morning', 'ex_row', 'ex_row_one', 'ex_row_alt', 'ex_kickback', 'ex_kickback_one', 'ex_press_hk', 'ex_press_hk_one', 'ex_press_hk_alt',
   'ex_sl_rdl', 'ex_kickstand_rdl', 'ex_nordic', 'ex_squat_thrust', 'ex_burpee', 'ex_high_knees', 'ex_butt_kicks', 'ex_a_skip', 'ex_b_skip', 'ex_power_skip', 'ex_seated_kickback', 'ex_seated_kickback_one', 'ex_seated_row', 'ex_seated_row_one',
   // DEMO-LOOPS: read from the side
