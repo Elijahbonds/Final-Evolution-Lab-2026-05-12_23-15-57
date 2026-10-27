@@ -13,6 +13,7 @@ import { DECISION_LABEL, FREE_WEEK_LINE, PRO_INCLUDED_LINE, PRO_LOCKED_LINE, PRO
 import { expandPlan, planRange, plannedWeeks, positionIn, type PlanWeek } from './plan';
 import { serveSession, type DayGate, type Lookup, type ServedSession } from './serve';
 import type { DecisionKind, Enrollment, RetestKind, SignatureId, SignatureProgram, SourceRef } from './types';
+import { proBuyHref } from '@/lib/payments/proBuy';
 
 export type Keep = 'server' | 'device' | 'none';
 
@@ -125,7 +126,8 @@ export function buildProgramView(i: BuildInput): ProgramView | null {
     hasPro, freeWeeks: FREE_WEEKS, locked,
     line: youth ? YOUTH_PRO_LINE : locked ? (i.purchasesOpen ? PRO_LOCKED_LINE : PRO_NOT_ON_SALE_LINE) : hasPro ? PRO_INCLUDED_LINE : FREE_WEEK_LINE,
     purchasesOpen: i.purchasesOpen && !youth,
-    checkout: i.purchasesOpen && !youth ? { weekly: '/api/stripe/checkout?product=FEL_PRO', monthly: '/api/stripe/checkout?product=FEL_PRO_MONTHLY' } : null,
+    // PAYMENTS-READY: the /pro buy page (a GET link to the POST-only checkout route answered 405)
+    checkout: i.purchasesOpen && !youth ? { weekly: proBuyHref('weekly'), monthly: proBuyHref('monthly') } : null,
   };
 
   return {

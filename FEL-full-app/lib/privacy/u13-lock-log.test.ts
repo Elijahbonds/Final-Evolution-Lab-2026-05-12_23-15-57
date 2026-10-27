@@ -89,10 +89,15 @@ const UA = 'AgeScreenTest/1.0';
 // VbtZoneTarget, additive) at e9125b4b; with signature programs and combine day landed first (#451, #453), pinned at
 // c1cf9937, this lane's merge of lane/finish-release; coach parity landed next (#456): re-pinned at 0732f397, this lane's
 // second merge of lane/finish-release, the first commit carrying every pending file above.
+// PAYMENTS-READY (lane/payments-ready, 2026-10-26) prisma/pending/2026-10-26-payments-ready.sql (pending SQL only; schema.prisma
+// untouched; CoachConnectAccount.requirementsDue + CoachSaleDispute, additive) at 8f79c9cb; combine-day landed first (#453):
+// pinned at this lane's merge of lane/finish-release (d754d041), the first commit carrying both files.
+// MERGE 5418784a: the first commit carrying every pending file above.
+// MERGE 0fe07e1f: the first commit carrying every pending file above.
 // NEXUS-PUBLISH (lane/nexus-publish, NEX-06, 2026-10-26) prisma/pending/2026-10-26-studio-share.sql (pending SQL only; schema.prisma
-// untouched) at b610726c, the lane's commit carrying it; VBT landed first (#458): pinned at c6c5100a, this lane's merge of
-// lane/finish-release, the first commit carrying every pending file above.
-const PARENT = 'c6c5100a876bf52f09532b419b16755a23888c60';
+// untouched) at b610726c, the lane's commit carrying it; payments-ready and vbt landed first (#457, #458): re-pinned at this
+// lane's merge of lane/finish-release (MERGE_SHA_PENDING), the first commit carrying every pending file above.
+const PARENT = '0fe07e1f6e704a95a0b48dbbe233f3f9ef0872aa';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

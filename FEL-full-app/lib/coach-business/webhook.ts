@@ -17,10 +17,22 @@
 // renewal draft (invoice.created) and trued up on invoice.paid. These Stripe calls are made for an event Stripe sent about
 // a sale that exists, whatever the payments switch says now: a coach whose client renews after the owner switched
 // payments off is still owed the right split.
+//
+// PAYMENTS-READY (2026-10-26):
+//   · every ledger row carries the coachId, so the monthly cap (PLATFORM_FEE_CAP_CENTS_MONTHLY) can read a coach's month;
+//   · with a cap set, each monthly RENEWAL's share is capped too (invoice.created writes the capped split on the draft
+//     invoice's own metadata, which invoice.paid then reads; invoice.paid caps it itself if the draft was missed);
+//   · REFUND_PROCESSING_FEE on: a refund maps the charge's refunded total back to the price through the processing fee
+//     (fees.ts priceRefundedFromCharge), hands the coach back the processing fee's share with FEL's share, and books that
+//     share as COACH_CONNECT_PROCESSING_FEE_REFUND (FEL absorbing Stripe's fee). Off: exactly as before.
 import type Stripe from 'stripe';
 import { CONNECT_PRODUCT, invoiceFee, returnApplicationFee, type ConnectFeeStripe } from './connect';
-import { feeExcessCents, feePostings, feeRefundPostings, feeReturnedCents, felShareCents, refundStep } from './fees';
-import { applyRefund, markCanceled, markExpired, markPaid, saleById, type RawDb, type SaleRow } from './store';
+import { platformFeePolicy, refundProcessingFee } from './config';
+import {
+  feeExcessCents, feePostings, feeRefundPostings, feeReturnedCents, felShareCents, monthStartUtc, priceRefundedFromCharge,
+  processingShareCents, refundStep, saleSplit,
+} from './fees';
+import { applyRefund, coachFeesThisMonth, markCanceled, markExpired, markPaid, saleById, type RawDb, type SaleRow } from './store';
 
 type Meta = Record<string, string>;
 
@@ -56,7 +68,32 @@ export interface ConnectDeps {
   post(tx: LedgerPost): Promise<void>;
   /** Stripe, for the fee steps (a refund's share of the 5%, a monthly invoice's exact fee). */
   stripe(): ConnectFeeStripe;
+  /** PAYMENTS-READY: the env the money settings are read from (default process.env). */
+  env?: NodeJS.ProcessEnv;
+  /** PAYMENTS-READY: FEL's fees from a coach so far this month (default: the ledger, store.ts coachFeesThisMonth). */
+  feesThisMonth?(coachId: string, now: Date): Promise<number>;
+  /** PAYMENTS-READY: the clock (tests). */
+  now?(): Date;
 }
+
+function depsEnv(deps: ConnectDeps): NodeJS.ProcessEnv {
+  return deps.env ?? process.env;
+}
+
+/** A monthly renewal's split under the monthly cap: FEL's share lowered to what is left of the coach's cap this month.
+ *  Unchanged with no cap (the default). */
+async function cappedRenewal(deps: ConnectDeps, meta: Meta, split: MetaSplit): Promise<MetaSplit> {
+  const policy = platformFeePolicy(depsEnv(deps));
+  if (policy.capCentsMonthly === null || !meta.coachId) return split;
+  const now = deps.now?.() ?? new Date();
+  const soFar = deps.feesThisMonth ? await deps.feesThisMonth(meta.coachId, now) : await coachFeesThisMonth(deps.db, meta.coachId, monthStartUtc(now), now);
+  const room = Math.max(0, policy.capCentsMonthly - soFar);
+  if (split.felShareCents <= room) return split;
+  return { ...split, felShareCents: room, appFeeCents: room + (split.totalCents - split.priceCents) };
+}
+
+/** Marks an invoice whose split invoice.created already capped (its own metadata), so invoice.paid does not cap twice. */
+export const CAPPED_META = 'feeCapApplied';
 
 /** The split a sale's checkout wrote into its metadata (connect.ts saleMetadata), or null for an object without it. */
 export interface MetaSplit { priceCents: number; totalCents: number; felShareCents: number; appFeeCents: number }
@@ -120,7 +157,9 @@ export async function connectInvoicePaid(deps: ConnectDeps, invoice: Stripe.Invo
   if (!meta || !invoice.id) return 'noop';
   const amount = Number(invoice.amount_paid ?? 0);
   if (!Number.isSafeInteger(amount) || amount <= 0) return 'noop';
-  const split = metaSplit(meta);
+  const metaSplitRaw = metaSplit(meta);
+  // PAYMENTS-READY: a renewal under the monthly cap (unless invoice.created already capped this invoice's metadata)
+  const split = metaSplitRaw && invoice.billing_reason === 'subscription_cycle' && meta[CAPPED_META] !== '1' ? await cappedRenewal(deps, meta, metaSplitRaw) : metaSplitRaw;
   let fee: number;
   if (split && amount === split.totalCents) {
     const taken = await invoiceFee(deps.stripe(), invoice.id);
@@ -145,7 +184,7 @@ export async function connectInvoicePaid(deps: ConnectDeps, invoice: Stripe.Invo
       kind: 'COACH_CONNECT_FEE',
       idempotencyKey: `coach-connect-fee:${invoice.id}`,
       postings,
-      metadata: { saleId: meta.saleId, invoiceId: invoice.id, amountCents: amount, feeCents: fee },
+      metadata: { saleId: meta.saleId, ...(meta.coachId ? { coachId: meta.coachId } : {}), invoiceId: invoice.id, amountCents: amount, feeCents: fee },
     });
   }
   return 'fulfilled';
@@ -163,7 +202,17 @@ export async function connectInvoiceCreated(deps: ConnectDeps, invoice: Stripe.I
   if (!meta || !split || !invoice.id) return 'noop';
   if (invoice.status !== 'draft' || invoice.billing_reason !== 'subscription_cycle') return 'noop';
   if (Number(invoice.total ?? -1) !== split.totalCents) return 'noop';
-  await deps.stripe().invoices.update(invoice.id, { application_fee_amount: split.appFeeCents });
+  // PAYMENTS-READY: under a monthly cap the renewal's share is capped now, and the capped split is written on the
+  // invoice's own metadata (it overrides the subscription's), so invoice.paid trues up to it and books it.
+  const capped = await cappedRenewal(deps, meta, split);
+  if (capped === split) {
+    await deps.stripe().invoices.update(invoice.id, { application_fee_amount: split.appFeeCents });
+  } else {
+    await deps.stripe().invoices.update(invoice.id, {
+      application_fee_amount: capped.appFeeCents,
+      metadata: { felShareCents: String(capped.felShareCents), appFeeCents: String(capped.appFeeCents), [CAPPED_META]: '1' },
+    });
+  }
   return 'fee_set';
 }
 
@@ -184,7 +233,24 @@ export async function connectSubscriptionChanged(deps: ConnectDeps, sub: Stripe.
 }
 
 /** The refunded charge, as the refund route and charge.refunded both see it. */
-export interface RefundedCharge { id: string; refundedTotal: number; applicationFeeId: string | null }
+export interface RefundedCharge {
+  id: string;
+  refundedTotal: number;
+  applicationFeeId: string | null;
+  /** PAYMENTS-READY: the charge's own amount (price + processing fee), to size the processing fee's share. */
+  amountCents?: number;
+  /** PAYMENTS-READY: the charge's sale metadata (its totalCents is the fallback for amountCents). */
+  metadata?: Meta | null;
+}
+
+/** The processing fee a sale's buyer paid: the charge's amount less the price (else the metadata's, else today's rate). */
+export function processingFeeOf(sale: Pick<SaleRow, 'amountCents'>, charge: Pick<RefundedCharge, 'amountCents' | 'metadata'>): number {
+  const fromCharge = Number(charge.amountCents);
+  if (Number.isSafeInteger(fromCharge) && fromCharge >= sale.amountCents) return fromCharge - sale.amountCents;
+  const total = Number(charge.metadata?.totalCents);
+  if (Number.isSafeInteger(total) && total >= sale.amountCents) return total - sale.amountCents;
+  return saleSplit(sale.amountCents).processingFeeCents;
+}
 
 /**
  * The cumulative refund of a sale's price is now `charge.refundedTotal` (capped at the price: a refund of the processing
@@ -196,12 +262,24 @@ export interface RefundedCharge { id: string; refundedTotal: number; application
 export async function recordConnectRefund(deps: ConnectDeps, saleId: string, charge: RefundedCharge): Promise<ConnectOutcome> {
   const sale = await loadSale(deps, saleId);
   if (!sale) return 'unknown_sale';
-  const after = Math.min(Math.max(0, Math.floor(charge.refundedTotal)), sale.amountCents);
+  // PAYMENTS-READY: with REFUND_PROCESSING_FEE on, the charge's refunded total is the price share PLUS the processing
+  // fee's share; map it back to the price. Off (the default): today's min(refunded, price).
+  const refundFee = refundProcessingFee(depsEnv(deps));
+  const processing = refundFee ? processingFeeOf(sale, charge) : 0;
+  const shape = { priceCents: sale.amountCents, processingFeeCents: processing };
+  const after = refundFee
+    ? priceRefundedFromCharge(shape, charge.refundedTotal, true)
+    : Math.min(Math.max(0, Math.floor(charge.refundedTotal)), sale.amountCents);
   const step = refundStep(sale.feeCents, sale.amountCents, sale.refundedCents, after);
   if (step.refundDelta === 0) return 'noop';
-  if (step.feeDelta > 0) {
+  const processingDelta = refundFee
+    ? processingShareCents(processing, sale.amountCents, after) - processingShareCents(processing, sale.amountCents, sale.refundedCents)
+    : 0;
+  if (step.feeDelta > 0 || processingDelta > 0) {
     if (!charge.applicationFeeId) throw new Error('coach-connect refund: the charge has no application fee');
-    const target = feeReturnedCents(sale.feeCents, sale.amountCents, after);
+    // the coach gets back FEL's share of the 5% and, with the fee refunded, the processing fee's share (the refund took
+    // both from them through reverse_transfer), so the coach ends exactly where today's refund leaves them
+    const target = feeReturnedCents(sale.feeCents, sale.amountCents, after) + (refundFee ? processingShareCents(processing, sale.amountCents, after) : 0);
     await returnApplicationFee(deps.stripe(), charge.applicationFeeId, target, `coach-connect-fee-refund:${charge.id}`, { saleId: sale.id, chargeId: charge.id });
   }
   const postings = feeRefundPostings(step.feeDelta);
@@ -210,7 +288,16 @@ export async function recordConnectRefund(deps: ConnectDeps, saleId: string, cha
       kind: 'COACH_CONNECT_FEE_REFUND',
       idempotencyKey: `coach-connect-refund:${charge.id}:${after}`,
       postings,
-      metadata: { saleId: sale.id, chargeId: charge.id, refundedCents: after, feeReturnedCents: step.feeDelta },
+      metadata: { saleId: sale.id, coachId: sale.coachId, chargeId: charge.id, refundedCents: after, feeReturnedCents: step.feeDelta },
+    });
+  }
+  if (processingDelta > 0) {
+    // FEL absorbs Stripe's fee on the refunded share (Stripe keeps its fee on a refunded charge)
+    await deps.post({
+      kind: 'COACH_CONNECT_PROCESSING_FEE_REFUND',
+      idempotencyKey: `coach-connect-processing-refund:${charge.id}:${after}`,
+      postings: feeRefundPostings(processingDelta),
+      metadata: { saleId: sale.id, coachId: sale.coachId, chargeId: charge.id, refundedCents: after, processingReturnedCents: processingDelta },
     });
   }
   const status = after >= sale.amountCents ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
@@ -239,7 +326,7 @@ export async function fulfilCoachConnect(deps: ConnectDeps, event: Stripe.Event)
       const charge = obj as Stripe.Charge;
       const meta = coachConnectMeta(charge);
       if (!meta) return 'noop';
-      return recordConnectRefund(deps, meta.saleId, { id: charge.id, refundedTotal: Number(charge.amount_refunded ?? 0), applicationFeeId: idOf(charge.application_fee) });
+      return recordConnectRefund(deps, meta.saleId, { id: charge.id, refundedTotal: Number(charge.amount_refunded ?? 0), applicationFeeId: idOf(charge.application_fee), amountCents: Number(charge.amount), metadata: meta });
     }
     default:
       return 'noop';

@@ -34,6 +34,20 @@ export function businessFailed(event: string, e: unknown): void {
 /** Tests only. */
 export function resetBusinessProbe(): void {
   probe.reset();
+  paymentsReadyProbe.reset();
+}
+
+// PAYMENTS-READY (prisma/pending/2026-10-26-payments-ready.sql, after the coach-business file): CoachConnectAccount.
+// requirementsDue and CoachSaleDispute. The file creates CoachSaleDispute last but for its foreign key, so its presence
+// means the column is there too. Until it is applied, account.updated keeps the three status flags only and a dispute is
+// booked in the ledger without a row.
+const paymentsReadyProbe = pendingProbe('payments_ready', `SELECT 1 AS "ok" FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'CoachSaleDispute' LIMIT 1`);
+
+export function paymentsReadySchema(db: RawDb, now: number = Date.now()): Promise<boolean> {
+  return paymentsReadyProbe.ready(db, now);
+}
+export function paymentsReadyFailed(event: string, e: unknown): void {
+  paymentsReadyProbe.fail(event, e);
 }
 
 /** The statuses that hold a capacity spot (a partial refund is a goodwill credit, not a cancellation). A PENDING sale
@@ -73,6 +87,11 @@ export const SQL = {
     `INSERT INTO "CoachConnectAccount" ("userId", "stripeAccountId", "livemode", "createdAt", "updatedAt") VALUES ($1, $2, $3, NOW(), NOW()) ON CONFLICT ("userId") DO NOTHING`,
   updateConnect:
     `UPDATE "CoachConnectAccount" SET "chargesEnabled" = $2, "payoutsEnabled" = $3, "detailsSubmitted" = $4, "updatedAt" = NOW() WHERE "stripeAccountId" = $1`,
+  // PAYMENTS-READY (needs 2026-10-26-payments-ready.sql)
+  updateConnectDue:
+    `UPDATE "CoachConnectAccount" SET "chargesEnabled" = $2, "payoutsEnabled" = $3, "detailsSubmitted" = $4, "requirementsDue" = $5, "updatedAt" = NOW() WHERE "stripeAccountId" = $1`,
+  connectDueFor: `SELECT "requirementsDue" FROM "CoachConnectAccount" WHERE "userId" = $1`,
+  connectByAccount: `SELECT "userId", "stripeAccountId", "livemode", "chargesEnabled", "payoutsEnabled", "detailsSubmitted" FROM "CoachConnectAccount" WHERE "stripeAccountId" = $1`,
   // sales
   insertSale:
     `INSERT INTO "CoachSale" ("id", "packageId", "coachId", "buyerId", "kind", "status", "amountCents", "feeCents", "stripeAccountId", "livemode", "holdExpiresAt", "createdAt", "updatedAt") ` +
@@ -87,6 +106,31 @@ export const SQL = {
   markCanceled: `UPDATE "CoachSale" SET "status" = 'CANCELED', "updatedAt" = NOW() WHERE "id" = $1 AND "status" = 'ACTIVE'`,
   applyRefund:
     `UPDATE "CoachSale" SET "refundedCents" = $3, "feeRefundedCents" = "feeRefundedCents" + $4, "status" = $5, "updatedAt" = NOW() WHERE "id" = $1 AND "refundedCents" = $2`,
+  saleByPaymentIntent: `SELECT "id" FROM "CoachSale" WHERE "paymentIntentId" = $1`,
+  saleBySubscription: `SELECT "id" FROM "CoachSale" WHERE "subscriptionId" = $1`,
+  // PAYMENTS-READY: FEL's fees from one coach since $2 (the cap's month), net of the fee handed back on refunds, read from
+  // the ledger (webhook.ts books both with the coachId), plus the fees of that coach's checkouts still open (PENDING,
+  // unexpired), so two checkouts started together cannot spend the same room under the cap.
+  coachFeesSince:
+    `SELECT COALESCE(SUM(CASE WHEN "kind" = 'COACH_CONNECT_FEE' THEN ("metadata"->>'feeCents')::int ELSE -(("metadata"->>'feeReturnedCents')::int) END), 0)::int AS "n" ` +
+    `FROM "LedgerTransaction" WHERE "kind" IN ('COACH_CONNECT_FEE', 'COACH_CONNECT_FEE_REFUND') AND "metadata"->>'coachId' = $1 AND "createdAt" >= $2`,
+  coachPendingFees:
+    `SELECT COALESCE(SUM("feeCents"), 0)::int AS "n" FROM "CoachSale" WHERE "coachId" = $1 AND "status" = 'PENDING' AND "holdExpiresAt" > $2`,
+  // disputes (needs 2026-10-26-payments-ready.sql)
+  insertDispute:
+    `INSERT INTO "CoachSaleDispute" ("id", "saleId", "coachId", "chargeId", "amountCents", "reason", "stripeStatus", "livemode", "createdAt", "updatedAt") ` +
+    `VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) ON CONFLICT ("id") DO NOTHING`,
+  disputeById:
+    `SELECT "id", "saleId", "coachId", "chargeId", "amountCents", "reason", "stripeStatus", "outcome", "withdrawnCents", "reinstatedCents", "livemode", "createdAt", "closedAt" FROM "CoachSaleDispute" WHERE "id" = $1`,
+  // a closed dispute (WON/LOST) never reopens: Stripe does not order events, and an older "updated" must not undo it
+  setDisputeStatus:
+    `UPDATE "CoachSaleDispute" SET "stripeStatus" = $2, "outcome" = $3, "closedAt" = CASE WHEN $3 = 'OPEN' THEN NULL ELSE NOW() END, "updatedAt" = NOW() WHERE "id" = $1 AND "outcome" = 'OPEN'`,
+  // compare-and-set on the cumulative amounts, like a sale's refund
+  setDisputeFunds:
+    `UPDATE "CoachSaleDispute" SET "withdrawnCents" = $4, "reinstatedCents" = $5, "updatedAt" = NOW() WHERE "id" = $1 AND "withdrawnCents" = $2 AND "reinstatedCents" = $3`,
+  disputesForCoach:
+    `SELECT d."id", d."saleId", d."amountCents", d."reason", d."stripeStatus", d."outcome", d."withdrawnCents", d."reinstatedCents", d."livemode", d."createdAt", d."closedAt", p."title" ` +
+    `FROM "CoachSaleDispute" d JOIN "CoachSale" s ON s."id" = d."saleId" JOIN "CoachPackage" p ON p."id" = s."packageId" WHERE d."coachId" = $1 ORDER BY d."createdAt" DESC LIMIT 50`,
   salesForCoach:
     `SELECT s."id", s."packageId", s."kind", s."status", s."amountCents", s."feeCents", s."refundedCents", s."feeRefundedCents", s."livemode", s."paidAt", s."createdAt", p."title" ` +
     `FROM "CoachSale" s JOIN "CoachPackage" p ON p."id" = s."packageId" WHERE s."coachId" = $1 AND s."status" <> 'PENDING' AND s."status" <> 'EXPIRED' ORDER BY s."createdAt" DESC LIMIT 100`,
@@ -194,8 +238,33 @@ export async function keepConnect(db: RawDb, userId: string, stripeAccountId: st
   return row;
 }
 
-export async function updateConnect(db: RawDb, stripeAccountId: string, s: { chargesEnabled: boolean; payoutsEnabled: boolean; detailsSubmitted: boolean }): Promise<void> {
+export async function updateConnect(db: RawDb, stripeAccountId: string, s: { chargesEnabled: boolean; payoutsEnabled: boolean; detailsSubmitted: boolean; requirementsDue?: boolean }): Promise<void> {
+  // PAYMENTS-READY: the requirements flag is kept once its column is there; before that, the three flags as before.
+  if (s.requirementsDue !== undefined && (await paymentsReadySchema(db))) {
+    try {
+      await db.$executeRawUnsafe(SQL.updateConnectDue, stripeAccountId, s.chargesEnabled, s.payoutsEnabled, s.detailsSubmitted, s.requirementsDue);
+      return;
+    } catch (e) {
+      paymentsReadyFailed('connect_due_update_failed', e);
+    }
+  }
   await db.$executeRawUnsafe(SQL.updateConnect, stripeAccountId, s.chargesEnabled, s.payoutsEnabled, s.detailsSubmitted);
+}
+
+/** The coach's "Stripe is asking for something" flag; false until the payments-ready SQL is applied. */
+export async function connectRequirementsDue(db: RawDb, userId: string): Promise<boolean> {
+  if (!(await paymentsReadySchema(db))) return false;
+  try {
+    const r = (await db.$queryRawUnsafe<{ requirementsDue: boolean }[]>(SQL.connectDueFor, userId))[0];
+    return !!r?.requirementsDue;
+  } catch (e) {
+    paymentsReadyFailed('connect_due_read_failed', e);
+    return false;
+  }
+}
+
+export async function connectByAccount(db: RawDb, stripeAccountId: string): Promise<ConnectRow | null> {
+  return (await db.$queryRawUnsafe<ConnectRow[]>(SQL.connectByAccount, stripeAccountId))[0] ?? null;
 }
 
 // ── sales ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -209,6 +278,23 @@ export interface SaleRow {
 export async function saleById(db: RawDb, id: string): Promise<SaleRow | null> {
   const r = (await db.$queryRawUnsafe<SaleRow[]>(SQL.saleById, id))[0];
   return r ? { ...r, amountCents: Number(r.amountCents), feeCents: Number(r.feeCents), refundedCents: Number(r.refundedCents), feeRefundedCents: Number(r.feeRefundedCents) } : null;
+}
+
+export async function saleIdByPaymentIntent(db: RawDb, paymentIntentId: string): Promise<string | null> {
+  return (await db.$queryRawUnsafe<{ id: string }[]>(SQL.saleByPaymentIntent, paymentIntentId))[0]?.id ?? null;
+}
+
+export async function saleIdBySubscription(db: RawDb, subscriptionId: string): Promise<string | null> {
+  return (await db.$queryRawUnsafe<{ id: string }[]>(SQL.saleBySubscription, subscriptionId))[0]?.id ?? null;
+}
+
+/** FEL's fees from `coachId` since `since` (ledger, net of fee refunds) plus its open checkouts' fees at `now`. */
+export async function coachFeesThisMonth(db: RawDb, coachId: string, since: Date, now: Date): Promise<number> {
+  const [booked, pending] = await Promise.all([
+    db.$queryRawUnsafe<{ n: number }[]>(SQL.coachFeesSince, coachId, since),
+    db.$queryRawUnsafe<{ n: number }[]>(SQL.coachPendingFees, coachId, now),
+  ]);
+  return Math.max(0, Number(booked[0]?.n ?? 0)) + Math.max(0, Number(pending[0]?.n ?? 0));
 }
 
 export interface HoldInput { pkg: CoachPackage; buyerId: string; feeCents: number; stripeAccountId: string; livemode: boolean; now: Date; holdMinutes: number }
@@ -299,4 +385,55 @@ export async function applicationsFor(db: RawDb, coachId: string): Promise<Appli
 
 export async function setApplicationStatus(db: RawDb, id: string, coachId: string, status: 'OPEN' | 'ACCEPTED' | 'DECLINED'): Promise<boolean> {
   return (await db.$executeRawUnsafe(SQL.setApplicationStatus, id, coachId, status)) > 0;
+}
+
+// ── disputes (PAYMENTS-READY) ────────────────────────────────────────────────────────────────────────────────────────
+export type DisputeOutcome = 'OPEN' | 'WON' | 'LOST';
+export interface DisputeRow {
+  id: string; saleId: string; coachId: string; chargeId: string; amountCents: number; reason: string; stripeStatus: string;
+  outcome: DisputeOutcome; withdrawnCents: number; reinstatedCents: number; livemode: boolean; createdAt: Date; closedAt: Date | null;
+}
+
+function toDispute(r: DisputeRow): DisputeRow {
+  return { ...r, amountCents: Number(r.amountCents), withdrawnCents: Number(r.withdrawnCents), reinstatedCents: Number(r.reinstatedCents) };
+}
+
+/** Keep a dispute once (ON CONFLICT DO NOTHING); returns the row as stored, or null when the table is not there yet. */
+export async function keepDispute(db: RawDb, d: { id: string; saleId: string; coachId: string; chargeId: string; amountCents: number; reason: string; stripeStatus: string; livemode: boolean }): Promise<DisputeRow | null> {
+  if (!(await paymentsReadySchema(db))) return null;
+  try {
+    await db.$executeRawUnsafe(SQL.insertDispute, d.id, d.saleId, d.coachId, d.chargeId, d.amountCents, d.reason, d.stripeStatus, d.livemode);
+    const r = (await db.$queryRawUnsafe<DisputeRow[]>(SQL.disputeById, d.id))[0];
+    return r ? toDispute(r) : null;
+  } catch (e) {
+    paymentsReadyFailed('dispute_keep_failed', e);
+    throw e;
+  }
+}
+
+/** OPEN → OPEN (a newer Stripe status) or WON/LOST, once. True when it moved. */
+export async function setDisputeStatus(db: RawDb, id: string, stripeStatus: string, outcome: DisputeOutcome): Promise<boolean> {
+  return (await db.$executeRawUnsafe(SQL.setDisputeStatus, id, stripeStatus, outcome)) > 0;
+}
+
+/** Compare-and-set the money Stripe withdrew and returned. True only for the call that moved it. */
+export async function setDisputeFunds(db: RawDb, id: string, before: { withdrawnCents: number; reinstatedCents: number }, after: { withdrawnCents: number; reinstatedCents: number }): Promise<boolean> {
+  return (await db.$executeRawUnsafe(SQL.setDisputeFunds, id, before.withdrawnCents, before.reinstatedCents, after.withdrawnCents, after.reinstatedCents)) > 0;
+}
+
+export interface CoachDisputeView { id: string; saleId: string; title: string; amountCents: number; reason: string; stripeStatus: string; outcome: DisputeOutcome; livemode: boolean; createdAt: string; closedAt: string | null }
+
+/** The coach's disputes, newest first (the in-app notice on /coach/business). Empty until the SQL is applied. */
+export async function disputesForCoach(db: RawDb, coachId: string): Promise<CoachDisputeView[]> {
+  if (!(await paymentsReadySchema(db))) return [];
+  try {
+    const rows = await db.$queryRawUnsafe<(Omit<CoachDisputeView, 'createdAt' | 'closedAt'> & { createdAt: Date | string; closedAt: Date | string | null })[]>(SQL.disputesForCoach, coachId);
+    return rows.map((r) => ({
+      id: r.id, saleId: r.saleId, title: r.title, amountCents: Number(r.amountCents), reason: r.reason, stripeStatus: r.stripeStatus, outcome: r.outcome,
+      livemode: !!r.livemode, createdAt: new Date(r.createdAt).toISOString(), closedAt: r.closedAt === null ? null : new Date(r.closedAt).toISOString(),
+    }));
+  } catch (e) {
+    paymentsReadyFailed('disputes_read_failed', e);
+    return [];
+  }
 }
