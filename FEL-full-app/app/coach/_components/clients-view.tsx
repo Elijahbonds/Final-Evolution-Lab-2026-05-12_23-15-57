@@ -38,6 +38,7 @@ import { CoachCalendar } from '@/components/coach/calendar';
 import { BrandingPanel } from '@/components/coach/branding-panel';
 import { CoachReviewsPanel } from '@/components/coach/reviews';
 import { FirstClientChecklist } from '@/components/coach/first-client';
+import { FirstBlockDraft } from '@/components/coach/first-block';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -198,6 +199,12 @@ export function ClientsView() {
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
         <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
         {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
+        {/* COACH-DELIVERY COA-02: draft the first block from their goal, the coach's answers and their Mirror screen */}
+        {prog?.clientId && !prog.completedSessionIds.length && (
+          <FirstBlockDraft key={prog.tree.id} program={{ id: prog.tree.id, name: prog.tree.name }}
+            blank={prog.tree.blocks.every((b) => b.sessions.every((x) => x.exercises.length === 0))}
+            onTree={(tree) => { setPrograms((ps) => ps?.map((p) => p.tree.id === tree.id ? { ...p, tree } : p) ?? null); void fetch('/api/coach/programs/exercises').then((r) => r.json()).then((c) => setCatalogue(Array.isArray(c) ? c : [])).catch(() => {}); }} />
+        )}
         {prog && (
           <ImportProgram
             program={{ id: prog.tree.id, name: prog.tree.name, clientName: prog.clientName }}
