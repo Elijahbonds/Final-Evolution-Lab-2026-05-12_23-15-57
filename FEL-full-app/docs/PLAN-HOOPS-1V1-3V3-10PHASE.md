@@ -75,13 +75,15 @@ players" is the first item on his list.
 
 **Shots / strips:** `strip-*-crossover-stand`, `strip-*-crossover-jog`, `strip-*-jumper`, and a new stop strip; before and after.
 
-**Files:** `core/CourtMovement.ts` and `core/BasketballCore.ts` DribbleController (shared: the stop and reversal profile),
+**Files:** `core/HoopsStick.ts` (the gear numbers), `core/CourtMovement.ts` (shared: the stop and reversal profile),
 `core/StickHandle.ts`, `core/HandleSystem.ts` (shared: the flick read and the lock that swallows it), new
 `lib/babylon/hoops/response.ts` (press-to-beat: the first frame of every press is a visible beat), one-line hooks in both
 modes (shared), knobs.
 
-**Risk to tuned feel: HIGH.** `GEARS_HOOPS` stop / launch / reverse numbers and the DribbleController's 26 / 34 m/s²
-(BasketballCore:142) are tuned. Each is changed only if the gate needs it, flagged `TUNED from → to`, and kept as a knob so
+**Risk to tuned feel: HIGH.** `GEARS_HOOPS` stop / launch / reverse numbers (HoopsStick.ts:25–56: the stop is 22 m/s² at a
+walk and 11 at top speed, so a sprint glides ≈ 0.42 s / 0.96 m) are tuned. The owner's H3a set (#311: stop 32 / 26, load 0.7,
+gear-down 12, turn 720 °/s) is already a knob group with release defaults — the first move is an **owner call**: put H3a on
+the phone, feel it, pick. Each is changed only if the gate needs it, flagged `TUNED from → to`, and kept as a knob so
 the owner can put today's value back on his phone in one tap.
 
 **Owner feel-check:** 1v1 on ROOKIE, two minutes, no shooting: sprint and let go (does he stop where you let go?), cut back
