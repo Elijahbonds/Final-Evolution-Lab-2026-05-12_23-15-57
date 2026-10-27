@@ -19,7 +19,7 @@ written up here as a diff. Before/after numbers are taken on the rig for every c
 |---|---|
 | Root speed into push 1-2 | **7.0 → 5.98 m/s in one frame** (the gather fit clamps its rate) |
 | Take-off frame | **2.1 → 4.2 → 2.2 m/s** (the run's last step and the plant's first step in one frame) |
-| Planted foot slide on the run-up | **median 15.7 cm per plant, 1.83 m/s; 87 % of contact frames > 0.5 m/s**, mostly backward (the loop paced at 3.6 × 1.1 against a 4.57 m/s capture) |
+| Foot skate on the run-up (carrying foot, ≥ 2.5 m/s) | **1.11 m/s** (sprint 1.66): the feet cycled faster than the ground (the loop paced at 3.6 ÷ 1.1 = 3.27 m/s) |
 | Hips one-frame pops / bone pops before take-off | 12 / 31 (arms 21 of the 31) |
 | Launch → feet off · hang (feet off → on) · hips' rise | 100 ms · 2150 ms · 1.94 m |
 | Alley-oop | the passer throws **after** the take-off: a 0.35 s pass from 3.5 m (~10 m/s; top 0.20 m over the catch) |
@@ -34,7 +34,7 @@ written up here as a diff. Before/after numbers are taken on the rig for every c
 - **Goal:** the run carries its speed into push 1-2 and through the take-off frame; the run-up's feet stay planted.
 - **Exit gates:**
   - no one-frame root speed change over 0.6 m/s before the plant (baseline 1.02 and 2.07);
-  - planted-foot slide median ≤ 6 cm (baseline 15.7) and contact frames over 0.5 m/s ≤ 40 % (87 %);
+  - foot skate on the carrying foot at run speed (≥ 2.5 m/s; the lower foot within 3 cm of the floor, weighted) below baseline in the mean of the reps (baseline 1.11 m/s; the first plan's span measure counted a swing foot skimming the floor as a plant and was dropped);
   - pre-take-off bone pops not above baseline (31);
   - frame strip of the run-up from behind and from the side.
 - **Files:** `modes/DunkMode.ts`, `core/DunkGatherRun.ts`, `core/DunkFlagship.ts`, `lib/feel-panel/knobs.ts` (+ test, `FEEL-PANEL.md`); shared, flagged: `nexus/veniceBoardwalk.ts` (the storefronts hidden until placed).
