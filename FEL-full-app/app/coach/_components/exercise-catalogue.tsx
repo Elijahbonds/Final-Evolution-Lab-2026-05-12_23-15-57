@@ -112,7 +112,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
     <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-3 border border-white/6" role="tablist" aria-label="Exercise library">
       {(views as readonly (readonly [string, string])[]).map(([k, label]) => (
         <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k as 'library' | 'kb' | 'mine')}
-          className={`flex-1 rounded-lg py-2 text-xs font-medium ${view === k ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/40 hover:text-white/70'}`}>{label}</button>
+          className={`flex-1 rounded-lg py-2 text-xs font-medium ${view === k ? 'bg-fel-cyan/15 text-fel-cyan' : 'text-fel-dim hover:text-white/70'}`}>{label}</button>
       ))}
     </div>
   );
@@ -128,7 +128,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-[#00E5FF]" />
+        <Loader2 className="h-6 w-6 animate-spin text-fel-cyan" />
       </div>
     );
   }
@@ -139,18 +139,18 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
       {/* Search and filters */}
       <div className="space-y-3 mb-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fel-quiet" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search exercises..."
-            className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00E5FF]/40 transition-colors"
+            className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-fel-cyan/40 transition-colors"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setFilterPhase(null)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterPhase ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/30' : 'bg-[#16161a] text-white/40 border border-white/6 hover:text-white/60'}`}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterPhase ? 'bg-fel-cyan/15 text-fel-cyan border border-fel-cyan/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
           >
             All Phases
           </button>
@@ -158,7 +158,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
             <button
               key={p}
               onClick={() => setFilterPhase(filterPhase === p ? null : p)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterPhase === p ? 'bg-[#00E5FF]/15 text-[#00E5FF] border border-[#00E5FF]/30' : 'bg-[#16161a] text-white/40 border border-white/6 hover:text-white/60'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterPhase === p ? 'bg-fel-cyan/15 text-fel-cyan border border-fel-cyan/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
             >
               P{p}
             </button>
@@ -168,7 +168,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setFilterCat(null)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterCat ? 'bg-[#A855F7]/15 text-[#A855F7] border border-[#A855F7]/30' : 'bg-[#16161a] text-white/40 border border-white/6 hover:text-white/60'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterCat ? 'bg-fel-violet/15 text-fel-violet border border-fel-violet/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
             >
               All Categories
             </button>
@@ -176,7 +176,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
               <button
                 key={c.id}
                 onClick={() => setFilterCat(filterCat === c.id ? null : c.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterCat === c.id ? 'bg-[#A855F7]/15 text-[#A855F7] border border-[#A855F7]/30' : 'bg-[#16161a] text-white/40 border border-white/6 hover:text-white/60'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterCat === c.id ? 'bg-fel-violet/15 text-fel-violet border border-fel-violet/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
               >
                 {c.name}
               </button>
@@ -186,13 +186,13 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
       </div>
 
       {/* Results count */}
-      <p className="text-xs text-white/30 mb-3">{filtered.length} exercise{filtered.length !== 1 ? 's' : ''}</p>
+      <p className="text-xs text-fel-quiet mb-3">{filtered.length} exercise{filtered.length !== 1 ? 's' : ''}</p>
 
       {/* Exercise list grouped by phase */}
       <div className="space-y-4">
         {grouped.map(([phase, exs]) => (
           <div key={phase}>
-            <h4 className="fel-heading text-sm text-[#00E5FF]/70 mb-2">
+            <h4 className="fel-heading text-sm text-fel-cyan/70 mb-2">
               Phase {phase}: {PHASE_LABELS[phase] ?? ''}
             </h4>
             <div className="space-y-2">
@@ -200,12 +200,12 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
                 <button
                   key={ex.id}
                   onClick={() => setSelected(ex)}
-                  className="w-full text-left fel-card rounded-xl p-3 hover:border-[#00E5FF]/20 transition-all group"
+                  className="w-full text-left fel-card rounded-xl p-3 hover:border-fel-cyan/20 transition-all group"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <Dumbbell className="h-4 w-4 text-[#00E5FF] flex-shrink-0" />
+                        <Dumbbell className="h-4 w-4 text-fel-cyan flex-shrink-0" />
                         <span className="text-sm font-medium text-white truncate">{ex.name}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
@@ -213,20 +213,20 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
                           {ex.bounceLevel}
                         </span>
                         {ex.category?.name && (
-                          <span className="text-[10px] text-white/30">{ex.category.name}</span>
+                          <span className="text-[10px] text-fel-quiet">{ex.category.name}</span>
                         )}
                         {ex.targetPrqStat && (
-                          <span className="text-[10px] text-[#A855F7]/70 flex items-center gap-0.5">
+                          <span className="text-[10px] text-fel-violet/70 flex items-center gap-0.5">
                             <Target className="h-3 w-3" />{ex.targetPrqStat}
                           </span>
                         )}
-                        {ex.tags?.pattern && <span className="text-[10px] text-[#00E5FF]/60">{PATTERN_INFO[ex.tags.pattern].label}</span>}
+                        {ex.tags?.pattern && <span className="text-[10px] text-fel-cyan/60">{PATTERN_INFO[ex.tags.pattern].label}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {coach && mineKeys.has(nameKey(copyNameOf(ex))) && <Check className="h-4 w-4 text-[#7BD389]" aria-label="in your catalogue" />}
-                      {ex.videoUrl && <Play className="h-4 w-4 text-[#FF3366]/60" />}
-                      <ChevronRight className="h-4 w-4 text-white/20 group-hover:text-white/40 transition-colors" />
+                      {ex.videoUrl && <Play className="h-4 w-4 text-fel-crimson/60" />}
+                      <ChevronRight className="h-4 w-4 text-fel-quiet group-hover:text-white/40 transition-colors" />
                     </div>
                   </div>
                 </button>
@@ -237,7 +237,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
       </div>
 
       {filtered.length === 0 && (
-        <div className="text-center py-12 text-white/30 text-sm">
+        <div className="text-center py-12 text-fel-quiet text-sm">
           No exercises found. Try adjusting your filters.
         </div>
       )}
@@ -263,7 +263,7 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full sm:max-w-lg max-h-[85vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-[#0f0f13] border border-white/10 p-5">
         {/* Close button */}
-        <button onClick={onClose} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors">
+        <button onClick={onClose} className="absolute top-4 right-4 text-fel-dim hover:text-white transition-colors">
           <X className="h-5 w-5" />
         </button>
 
@@ -274,17 +274,17 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
             <span className="text-xs px-2 py-0.5 rounded-full border" style={{ color: LEVEL_COLORS[ex.bounceLevel] || '#999', borderColor: (LEVEL_COLORS[ex.bounceLevel] || '#999') + '40' }}>
               {ex.bounceLevel}
             </span>
-            <span className="text-xs text-white/30">
+            <span className="text-xs text-fel-quiet">
               Phase {ex.phase} · Ch{ex.chapter}
             </span>
             {ex.category?.name && (
-              <span className="text-xs text-[#A855F7]/60">{ex.category.name}</span>
+              <span className="text-xs text-fel-violet/60">{ex.category.name}</span>
             )}
           </div>
           {ex.tags && (
             <div className="mt-2 space-y-1">
               <TagRow pattern={ex.tags.pattern} braceMode={ex.tags.braceMode} layer={ex.tags.skillLayer} />
-              <p className="text-[11px] text-white/35">Why these tags: {ex.tags.why}</p>
+              <p className="text-[11px] text-fel-quiet">Why these tags: {ex.tags.why}</p>
             </div>
           )}
           {catalogue && (
@@ -292,10 +292,10 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
               {catalogue.inMine ? (
                 <button onClick={catalogue.open} className="inline-flex items-center gap-1.5 rounded-lg border border-[#7BD389]/40 px-3 py-1.5 text-xs text-[#7BD389]"><Check className="h-3.5 w-3.5" /> In your catalogue · open it</button>
               ) : ex.tags && !ex.tags.prescribable ? (
-                <p className="text-xs text-white/40">{CATALOGUE_ERROR_COPY.not_prescribable}</p>
+                <p className="text-xs text-fel-dim">{CATALOGUE_ERROR_COPY.not_prescribable}</p>
               ) : (
                 <button disabled={adding} onClick={async () => { setAdding(true); try { await catalogue.add(); } finally { setAdding(false); } }}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs text-[#00E5FF] disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-fel-cyan/40 bg-fel-cyan/10 px-3 py-1.5 text-xs text-fel-cyan disabled:opacity-50">
                   {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add to my catalogue
                 </button>
               )}
@@ -342,7 +342,7 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
 
         {/* Ask Coach button */}
         <div className="mt-4 pt-4 border-t border-white/6">
-          <p className="text-xs text-white/30 text-center">
+          <p className="text-xs text-fel-quiet text-center">
             Switch to the Coach tab to ask Elijah about this exercise
           </p>
         </div>
@@ -355,7 +355,7 @@ function DetailRow({ icon: Icon, label, value, color }: { icon: any; label: stri
   return (
     <div className="flex items-center gap-2">
       <Icon className="h-4 w-4 flex-shrink-0" style={{ color }} />
-      <span className="text-xs text-white/40">{label}:</span>
+      <span className="text-xs text-fel-dim">{label}:</span>
       <span className="text-sm text-white/80">{value}</span>
     </div>
   );

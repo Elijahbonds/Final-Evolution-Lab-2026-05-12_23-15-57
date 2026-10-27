@@ -10,7 +10,7 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
   const { opponents, rival, matchesPlayed, links } = data.squad;
   return (
     <Section id="squad" title="Squad & friends" purpose="Your head-to-head record against the people you’ve played." accent="#A855F7"
-      aside={<Link href="/multiplayer" className="shrink-0 rounded-full border border-[#A855F7]/40 px-3 py-1.5 text-[11.5px] font-bold text-[#C79BFF] hover:bg-[#A855F7]/10">Challenge someone</Link>}>
+      aside={<Link href="/multiplayer" className="shrink-0 rounded-full border border-fel-violet/40 px-3 py-1.5 text-[11.5px] font-bold text-[#C79BFF] hover:bg-fel-violet/10">Challenge someone</Link>}>
       <div className="grid gap-3 md:grid-cols-2">
         <Card>
           {rival ? (
@@ -18,9 +18,9 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#C79BFF]">Your rival</p>
               <div className="mt-1.5 flex items-center justify-between gap-3">
                 <p className="fel-heading truncate text-[20px] font-black text-white">{rival.name}</p>
-                <p className="fel-heading shrink-0 text-[20px] font-black tabular-nums"><span className="text-[#00FF9D]">{rival.wins}</span><span className="text-white/30"> – </span><span className="text-[#FF7A2F]">{rival.losses}</span>{rival.draws > 0 && <span className="text-white/40"> – {rival.draws}</span>}</p>
+                <p className="fel-heading shrink-0 text-[20px] font-black tabular-nums"><span className="text-fel-emerald">{rival.wins}</span><span className="text-fel-quiet"> – </span><span className="text-fel-ember">{rival.losses}</span>{rival.draws > 0 && <span className="text-fel-dim"> – {rival.draws}</span>}</p>
               </div>
-              <p className="text-[11px] text-white/40">Most played · last in {rival.mode}</p>
+              <p className="text-[11px] text-fel-dim">Most played · last in {rival.mode}</p>
             </>
           ) : (
             <p className="flex items-start gap-2 text-[12.5px] text-white/50"><Swords className="mt-0.5 h-4 w-4 shrink-0 text-[#C79BFF]" aria-hidden />No duels yet. Send a challenge and your record starts here.</p>
@@ -35,15 +35,15 @@ export function SquadSection({ data }: { data: ProfileV2Data }) {
               ))}
             </ul>
           )}
-          {matchesPlayed > 0 && <p className="mt-2 text-[10.5px] text-white/30">{matchesPlayed} duel{matchesPlayed === 1 ? '' : 's'} settled</p>}
+          {matchesPlayed > 0 && <p className="mt-2 text-[10.5px] text-fel-quiet">{matchesPlayed} duel{matchesPlayed === 1 ? '' : 's'} settled</p>}
         </Card>
         <Card>
-          <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#00E5FF]"><Link2 className="h-3.5 w-3.5" aria-hidden />Your challenge links</p>
+          <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-cyan"><Link2 className="h-3.5 w-3.5" aria-hidden />Your challenge links</p>
           {links.count > 0 ? (
             <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
               {[['Opened', links.opened], ['Tried', links.attempted], ['Beat you', links.beaten]].map(([k, v]) => (
                 <div key={k as string} className="rounded-xl bg-white/[0.03] py-2">
-                  <dt className="text-[10.5px] text-white/45">{k}</dt>
+                  <dt className="text-[10.5px] text-fel-dim">{k}</dt>
                   <dd className="fel-heading text-[20px] font-black text-white tabular-nums">{v}</dd>
                 </div>
               ))}

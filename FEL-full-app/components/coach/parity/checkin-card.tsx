@@ -21,7 +21,7 @@ interface FormView {
 }
 
 function Field({ q, value, onChange }: { q: CheckinQuestion; value: AnswerValue | undefined; onChange: (v: AnswerValue | null) => void }) {
-  const btn = (on: boolean) => `min-h-10 rounded-lg border text-sm ${on ? 'border-[#00E5FF]/60 bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/10 text-white/70'}`;
+  const btn = (on: boolean) => `min-h-10 rounded-lg border text-sm ${on ? 'border-fel-cyan/60 bg-fel-cyan/15 text-fel-cyan' : 'border-white/10 text-white/70'}`;
   return (
     <fieldset className="space-y-1.5" data-checkin-field={q.id}>
       <legend className="text-sm text-white/85">{q.prompt}</legend>
@@ -62,13 +62,13 @@ function OneForm({ f, api, onSent }: { f: FormView; api: string; onSent: () => v
     <div className="space-y-3 rounded-lg bg-white/[0.03] p-3" data-checkin-card={f.id} data-due={f.due}>
       <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-start justify-between gap-2 text-left">
         <span className="text-sm text-white">{DUE_LINE(f.title, f.coachName)}</span>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${f.due ? 'bg-[#FFB020]/15 text-[#FFB020]' : 'bg-[#00FF9D]/10 text-[#00FF9D]'}`}>{f.due ? 'Due' : 'Sent'}</span>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] ${f.due ? 'bg-[#FFB020]/15 text-[#FFB020]' : 'bg-fel-emerald/10 text-fel-emerald'}`}>{f.due ? 'Due' : 'Sent'}</span>
       </button>
       {open && (
         <div className="space-y-3">
           {f.questions.map((q) => <Field key={q.id} q={q} value={a[q.id]} onChange={(v) => set('a', q.id, v)} />)}
-          <p className="text-[11px] text-white/40">{f.lines.seen}</p>
-          {f.lines.skipped && <p className="text-[11px] text-white/40" data-checkin-skipped>{f.lines.skipped}</p>}
+          <p className="text-[11px] text-fel-dim">{f.lines.seen}</p>
+          {f.lines.skipped && <p className="text-[11px] text-fel-dim" data-checkin-skipped>{f.lines.skipped}</p>}
           {f.health && (
             <div className="space-y-3 rounded-lg border border-white/10 p-2" data-checkin-health>
               <p className="text-[11px] text-white/50">{f.health.line}</p>
@@ -82,7 +82,7 @@ function OneForm({ f, api, onSent }: { f: FormView; api: string; onSent: () => v
           )}
           {f.painCheck && <div className="rounded-lg border border-white/10 p-2" data-checkin-pain><PainCheckInChip exerciseName={`Check-in: ${f.title}`} kind="after" /></div>}
           {(f.questions.length > 0 || f.health?.allowed) && (
-            <button type="button" disabled={busy} onClick={() => void send()} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#00E5FF]/15 text-sm font-semibold text-[#00E5FF]" data-checkin-send>
+            <button type="button" disabled={busy} onClick={() => void send()} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-fel-cyan/15 text-sm font-semibold text-fel-cyan" data-checkin-send>
               {busy && <Loader2 className="h-4 w-4 animate-spin" />} {f.due ? 'Send to your coach' : 'Update answers'}
             </button>
           )}
@@ -102,7 +102,7 @@ export function CheckinCard({ api = MY_CHECKINS_API }: { api?: string }) {
   if (!forms.length) return null;
   return (
     <section className="fel-card space-y-2 rounded-xl p-4" data-checkins-today>
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><ClipboardCheck className="h-3.5 w-3.5" /> Check-in</div>
+      <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ClipboardCheck className="h-3.5 w-3.5" /> Check-in</div>
       {forms.map((f) => <OneForm key={`${f.id}:${f.due}`} f={f} api={api} onSent={load} />)}
     </section>
   );

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export default function CoachBusinessThanksPage({ searchParams }: { searchParams: { session_id?: string } }) {
   const id = typeof searchParams?.session_id === 'string' ? searchParams.session_id : '';
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <div className="min-h-screen bg-fel-bg">
       <CheckoutThanks sessionId={id} />
     </div>
   );

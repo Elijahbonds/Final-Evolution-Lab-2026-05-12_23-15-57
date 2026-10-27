@@ -56,7 +56,7 @@ export function AssignProgram({ program, roster, onDone }: { program: { id: stri
   if (!others.length) return null;
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3" data-assign-program>
-      <button onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 text-xs font-bold text-[#00E5FF]">
+      <button onClick={() => setOpen((o) => !o)} className="inline-flex items-center gap-1.5 text-xs font-bold text-fel-cyan">
         <CopyPlus className="h-3.5 w-3.5" /> Assign {program.name} to others
       </button>
       {open && (
@@ -82,7 +82,7 @@ export function AssignProgram({ program, roster, onDone }: { program: { id: stri
           </ul>
           <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs text-white/60">Starts <input type="date" value={start} onChange={(e) => setStart(e.target.value || today())} className="ml-1 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-xs text-white" /></label>
-            <button onClick={() => void assign()} disabled={busy || !picked.size} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[#00E5FF] px-3 py-1.5 text-xs font-bold text-[#050505] disabled:opacity-50" data-assign-submit>
+            <button onClick={() => void assign()} disabled={busy || !picked.size} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-fel-cyan px-3 py-1.5 text-xs font-bold text-fel-bg disabled:opacity-50" data-assign-submit>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CopyPlus className="h-3.5 w-3.5" />} Assign to {picked.size || '…'}
             </button>
           </div>

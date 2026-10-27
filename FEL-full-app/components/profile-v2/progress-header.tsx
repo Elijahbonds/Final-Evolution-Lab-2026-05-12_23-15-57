@@ -18,20 +18,20 @@ export function ProgressHeader({ data, viewer = false }: { data: ProfileV2Data; 
         <AthleteStage avatarKey={identity.avatarKey} cosmeticAssetId={identity.cosmeticAssetId} name={identity.name} accent={prq.color} allow3d={!viewer} />
         <div className="flex w-[128px] flex-col justify-between rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-3.5 lg:w-auto lg:flex-row lg:items-end">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">PRQ grade</p>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-dim">PRQ grade</p>
             <p className="fel-heading mt-1 text-[40px] font-black leading-none tabular-nums" style={{ color: prq.color }}>{prq.score === null ? '—' : Math.round(prq.score)}</p>
             <p className="mt-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: prq.color }}>{prq.status}</p>
           </div>
-          <p className="mt-2 text-[11px] leading-snug text-white/45">
+          <p className="mt-2 text-[11px] leading-snug text-fel-dim">
             {prq.measured === 0 ? 'Nothing measured yet' : `${prq.measured} of ${prq.total} skills measured`}
-            {identity.level && <span className="block font-mono text-[10.5px] text-[#00FF9D]/80">Level {identity.level.level}</span>}
+            {identity.level && <span className="block font-mono text-[10.5px] text-fel-emerald/80">Level {identity.level.level}</span>}
           </p>
         </div>
       </div>
       {!viewer && <div>
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <h2 id="week-h" className="fel-heading text-[16px] font-bold text-white">This week</h2>
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Last 7 days vs the 7 before</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fel-quiet">Last 7 days vs the 7 before</p>
         </div>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 lg:grid-cols-2">
           {data.tiles.map((t) => (t.key === 'form' && t.source === 'device'
@@ -39,7 +39,7 @@ export function ProgressHeader({ data, viewer = false }: { data: ProfileV2Data; 
             : <TileView key={t.key} tile={t} accent={ACCENT[t.key]} />))}
         </div>
         {/* PROGRESS CARD (value round item 1): the week as a card, with a share image */}
-        <Link href="/profile/week" data-testid="profile-week-card" className="mt-2.5 inline-flex min-h-11 items-center text-[12px] font-bold text-[#00E5FF] underline-offset-2 hover:underline">Your weekly card, and an image to share →</Link>
+        <Link href="/profile/week" data-testid="profile-week-card" className="mt-2.5 inline-flex min-h-11 items-center text-[12px] font-bold text-fel-cyan underline-offset-2 hover:underline">Your weekly card, and an image to share →</Link>
       </div>}
     </section>
   );

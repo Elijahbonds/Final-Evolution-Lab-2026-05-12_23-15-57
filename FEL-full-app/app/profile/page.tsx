@@ -9,6 +9,8 @@ import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileBody, ProfileActions } from '@/components/profile-v2/profile-body';
 import { AthleteStatusSection } from '@/components/profile/athlete-status-card';
+import { PALETTE } from '@/lib/design/palette';
+import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +33,7 @@ export default async function ProfilePage() {
   const data = await loadProfile(prisma as unknown as ProfileDb, me);
 
   return (
-    <TabPage eyebrow="Profile" title={data.identity.name} lede="Getting measurably better: your week, your bests, your record." accent="#FFD700"
+    <TabPage eyebrow={t('profile.eyebrow')} title={data.identity.name} lede={t('profile.lede')} accent={PALETTE.gold}
       aside={<ProfileActions />}
     >
       <ProfileBody data={data} />

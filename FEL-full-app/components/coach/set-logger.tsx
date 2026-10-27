@@ -25,7 +25,7 @@ export function UnitSwitch({ unit, onChange }: { unit: WeightUnit; onChange: (u:
   return (
     <div className="flex shrink-0 rounded-lg border border-white/10 p-0.5 text-xs" role="group" aria-label="Weight unit">
       {(['kg', 'lb'] as const).map((u) => (
-        <button key={u} type="button" aria-pressed={unit === u} onClick={() => onChange(u)} className={`rounded-md px-2 py-1 ${unit === u ? 'bg-[#00E5FF]/15 text-[#00E5FF]' : 'text-white/50'}`}>{u}</button>
+        <button key={u} type="button" aria-pressed={unit === u} onClick={() => onChange(u)} className={`rounded-md px-2 py-1 ${unit === u ? 'bg-fel-cyan/15 text-fel-cyan' : 'text-white/50'}`}>{u}</button>
       ))}
     </div>
   );
@@ -42,7 +42,7 @@ function MinutesBox({ n, workSeconds, hintSeconds, onSeconds }: { n: number; wor
   const [text, setText] = useState(() => minutesText(workSeconds));
   useEffect(() => { if (minutesToSecondsText(text) !== workSeconds) setText(minutesText(workSeconds)); }, [workSeconds]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-white/40">
+    <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-fel-dim">
       <input aria-label={`Set ${n} minutes`} value={text} inputMode="decimal" placeholder={minutesText(hintSeconds)} className={input}
         onChange={(e) => { const t = e.target.value.replace(/[^0-9.]/g, ''); setText(t); const sec = minutesToSecondsText(t); if (sec !== null) onSeconds(sec); }} />min
     </label>
@@ -76,20 +76,20 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
         return (
           <div key={i} className="rounded-lg border border-white/6 bg-white/[0.02] p-2 space-y-1.5" data-set-row={i}>
             <div className="flex items-center gap-2">
-              <div className="w-10 shrink-0 text-[11px] uppercase tracking-wider text-white/40">Set {n}</div>
+              <div className="w-10 shrink-0 text-[11px] uppercase tracking-wider text-fel-dim">Set {n}</div>
               {timed && logsInMinutes(workHint) ? (
                 <MinutesBox n={n} workSeconds={r.workSeconds} hintSeconds={workHint} onSeconds={(workSeconds) => set(i, { workSeconds })} />
               ) : timed ? (
-                <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-white/40">
+                <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-fel-dim">
                   <input aria-label={`Set ${n} seconds`} value={r.workSeconds} onChange={(e) => set(i, { workSeconds: e.target.value })} inputMode="numeric" placeholder={workHint} className={input} />s
                 </label>
               ) : (
-                <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-white/40">
+                <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-fel-dim">
                   <input aria-label={`Set ${n} reps`} value={r.reps} onChange={(e) => set(i, { reps: e.target.value })} inputMode="numeric" placeholder={repsHint} className={input} />reps
                 </label>
               )}
               {!simple && (
-                <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-white/40">
+                <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-fel-dim">
                   <input aria-label={`Set ${n} weight in ${unit}`} value={r.weight} onChange={(e) => set(i, { weight: e.target.value })} inputMode="decimal" placeholder="—" className={input} />{unit}
                 </label>
               )}
@@ -99,23 +99,23 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
               <>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <div className="flex items-center gap-1" role="group" aria-label={`Set ${n} reps left`}>
-                    <span className="text-[11px] text-white/40 mr-0.5">Reps left</span>
+                    <span className="text-[11px] text-fel-dim mr-0.5">Reps left</span>
                     {RIR_ANCHORS.map((a) => (
                       <button key={a.rir} type="button" aria-pressed={r.rir === a.rir} aria-label={`Set ${n} reps left ${a.short}`} title={a.text}
                         onClick={() => set(i, { rir: r.rir === a.rir ? null : a.rir })}
-                        className={`min-w-[28px] rounded-md border px-1.5 py-1 text-xs ${r.rir === a.rir ? 'border-[#00E5FF]/60 bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>
+                        className={`min-w-[28px] rounded-md border px-1.5 py-1 text-xs ${r.rir === a.rir ? 'border-fel-cyan/60 bg-fel-cyan/15 text-fel-cyan' : 'border-white/10 text-white/60'}`}>
                         {a.short}
                       </button>
                     ))}
                   </div>
-                  <label className="flex items-center gap-1 text-[11px] text-white/40">Effort
+                  <label className="flex items-center gap-1 text-[11px] text-fel-dim">Effort
                     <select aria-label={`Set ${n} effort`} value={r.effort ?? ''} onChange={(e) => set(i, { effort: e.target.value ? Number(e.target.value) : null })} className="rounded-lg bg-white/5 border border-white/10 px-1.5 py-1 text-white text-xs">
                       <option value="">—</option>
                       {effortOptions(youth).map((o) => <option key={o.effort} value={o.effort}>{o.label}</option>)}
                     </select>
                   </label>
                 </div>
-                {hint && <div className="text-[11px] text-white/40" data-rir-hint>{hint}</div>}
+                {hint && <div className="text-[11px] text-fel-dim" data-rir-hint>{hint}</div>}
               </>
             )}
           </div>
@@ -124,7 +124,7 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <button type="button" disabled={rows.length >= SET_LIMITS.maxSets} onClick={() => onChange([...rows, emptySetDraft()])} className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-white/70 disabled:opacity-30"><Plus className="h-3 w-3" /> Add a set</button>
         <button type="button" disabled={rows.length <= 1} onClick={() => onChange(rows.slice(0, -1))} className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-white/50 disabled:opacity-30"><Minus className="h-3 w-3" /> Remove the last</button>
-        {!simple && <span className="ml-auto text-[11px] text-white/30 hidden sm:inline">Effort: {EFFORT_ANCHOR}</span>}
+        {!simple && <span className="ml-auto text-[11px] text-fel-quiet hidden sm:inline">Effort: {EFFORT_ANCHOR}</span>}
       </div>
     </div>
   );

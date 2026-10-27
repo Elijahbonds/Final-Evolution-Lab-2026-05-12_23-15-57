@@ -16,7 +16,7 @@ export default async function LivePage({ params }: { params: { room: string } })
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath(`/coach/live/${params.room}`));
   return (
-    <div className="min-h-screen bg-[#050505] pb-24">
+    <div className="min-h-screen bg-fel-bg pb-24">
       <LiveRoom room={params.room} />
     </div>
   );

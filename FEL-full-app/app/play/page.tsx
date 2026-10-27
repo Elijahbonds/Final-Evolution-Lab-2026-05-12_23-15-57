@@ -16,6 +16,8 @@ import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
 import { WeekCardEntry } from '@/components/progress-card/week-entry';
 import { prisma } from '@/lib/db';
+import { PALETTE } from '@/lib/design/palette';
+import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,36 +29,36 @@ export default async function PlayPage() {
   const todayCard = me ? await todayCardFor(prisma, me) : null;
   return (
     <TabPage
-      eyebrow="Play"
-      title="Pick your lane"
+      eyebrow={t('play.eyebrow')}
+      title={t('play.title')}
       lede={SHELF_LEDE}
-      accent="#00E5FF"
+      accent={PALETTE.cyan}
       aside={
         <div className="flex flex-wrap items-center gap-2">
           {/* DUNK-LOOP-HANDSFREE: one obvious way into the camera-forward Prove It flow. */}
           <Link
             href="/play/dunkduel"
             data-testid="play-dunk-session-entry"
-            className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-[#FFD700]/60 bg-[#FFD700]/[0.14] px-5 py-3
-                       text-base font-black text-white transition-colors hover:bg-[#FFD700]/25"
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-fel-gold/60 bg-fel-gold/[0.14] px-5 py-3
+                       text-base font-black text-white transition-colors hover:bg-fel-gold/25"
           >
-            <Camera className="h-5 w-5 text-[#FFD700]" /> Prove It dunk duel
+            <Camera className="h-5 w-5 text-fel-gold" /> {t('play.proveIt')}
           </Link>
           {/* MULTIPLAYER (2026-10-06): the couch — one screen, phones and pads, friends join by QR. The first door. */}
           <Link
             href="/play/party"
             data-testid="play-party-entry"
-            className="inline-flex items-center gap-2 rounded-xl border border-[#00E5FF]/45 bg-[#00E5FF]/[0.1] min-h-12 px-4 py-2.5
-                       text-base font-bold text-white transition-colors hover:bg-[#00E5FF]/20"
+            className="inline-flex items-center gap-2 rounded-xl border border-fel-cyan/45 bg-fel-cyan/[0.1] min-h-12 px-4 py-2.5
+                       text-base font-bold text-white transition-colors hover:bg-fel-cyan/20"
           >
-            <Users className="h-4 w-4 text-[#00E5FF]" /> Couch multiplayer
+            <Users className="h-4 w-4 text-fel-cyan" /> {t('play.couch')}
           </Link>
           <Link
             href="/multiplayer"
-            className="inline-flex items-center gap-2 rounded-xl border border-[#FF3366]/35 bg-[#FF3366]/[0.07] min-h-12 px-4 py-2.5
-                       text-base font-bold text-white transition-colors hover:bg-[#FF3366]/15"
+            className="inline-flex items-center gap-2 rounded-xl border border-fel-crimson/35 bg-fel-crimson/[0.07] min-h-12 px-4 py-2.5
+                       text-base font-bold text-white transition-colors hover:bg-fel-crimson/15"
           >
-            <Swords className="h-4 w-4 text-[#FF3366]" /> Versus
+            <Swords className="h-4 w-4 text-fel-crimson" /> {t('play.versus')}
           </Link>
         </div>
       }
