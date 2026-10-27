@@ -1138,9 +1138,6 @@ export class TurboMeter {
 }
 
 // ── NEW (v3): the ball flight arc ────────────────────────────────────────
-/** Parabolic flight from the release point to the rim (or a front-rim
- *  clang point for misses). Pure visual sell — the make/miss is decided at
- *  release; step() returns 'flying' | 'made' | 'missed' when it lands. */
 /** A release's flight: how long it takes and how high it bows over the straight line (m). ShotArc flies it; hoops/blocks reads the
  *  same numbers to know where the ball will be in its first frames (hoops-p02: the block is the hand meeting THIS ball). */
 export function shotArcShape(style: ShotStyle, dist: number, apexAdd = 0): { duration: number; apex: number } {
@@ -1153,6 +1150,9 @@ export function shotArcShape(style: ShotStyle, dist: number, apexAdd = 0): { dur
   };
 }
 
+/** Parabolic flight from the release point to the rim (or a front-rim
+ *  clang point for misses). Pure visual sell — the make/miss is decided at
+ *  release; step() returns 'flying' | 'made' | 'missed' when it lands. */
 export class ShotArc {
   private from = new Vector3();
   private to = new Vector3();
