@@ -81,6 +81,7 @@ import { readPlayerIcon } from '../visual/playerIcon';
 import { mountVenue, type VenueHandle } from '../core/NexusVenue';  // M74
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { HoopJuice } from '../visual/HoopJuice';
+import { LobMarker } from '../visual/LobMarker';   // DUNK-FLAGSHIP (b)
 import { mountShotMeter3D, type ShotMeter3DHandle } from '../visual/ShotMeter3D';   // THE SLAM METER (owner, 2026-09-18)
 import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
@@ -466,6 +467,7 @@ export const DunkMode: ModeDefinition = (() => {
   let fovCam: Camera | null = null, fovBase = 0, fovT = 0, fovOn = false;   // juice soft #4
   let settleLatch = false;                    // juice soft #3
   let settleArmed = false, settleArmAt = 0;   // A+ P4: the settle waits for feet-down, not the flush frame
+  let lobMarker: LobMarker | null = null;     // DUNK-FLAGSHIP (b): where the lob meets the hand, and its shadow on the floor
   let hoopJuice: HoopJuice | null = null;     // juice LOOK: rim spring, net squash, hoop flash on the make
   let rimFx: RimFxHandle | null = null;       // vis-hoops-dunk: the ring of light, the sparks and the net's glow on a make
   let stands: ModeCrowd | null = null;       // w3-crowds (A9.9): the boardwalk crowd
@@ -1436,6 +1438,7 @@ export const DunkMode: ModeDefinition = (() => {
       EffectsKit.ambient(ctx.scene, 'venice');
       trail?.dispose(); trail = EffectsKit.ballTrail(ctx.scene, ball); trailKey = ''; trailOn = true; setTrail('soft');   // IMPROVE (2026-10-06): a reload never stacks a second trail
       hoopJuice?.dispose(); hoopJuice = new HoopJuice(ctx.scene, rim);
+      lobMarker?.dispose(); lobMarker = new LobMarker(ctx.scene);
       rimFx?.dispose(); rimFx = mountRimFx(ctx.scene, rim, (ctx.scene.metadata as { felTier?: string } | null)?.felTier);   // vis-hoops-dunk
       judgesTable?.dispose(); judgesTable = mountJudgesTable(ctx.scene, DUNK_COURT.judgesAt, DUNK_COURT.judgesFace, JUDGE_COUNT);   // vis-hoops-dunk
       stands?.dispose(); stands = mountModeCrowd(ctx, 'dunk');   // w3-crowds: the boardwalk crowd either side of the rim's line; it hears the dunks
@@ -1800,6 +1803,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (phase === 'approach' && runHeld > 0.02) beginRun(ctx);
       meter3d?.update(dt);
       rimFx?.update(dt); judgesTable?.update(dt);   // vis-hoops-dunk
+      if (lobMarker && ball) lobMarker.update(dt, ball.getAbsolutePosition(), lob.live ? groundUnderBall() : 0, player.root.rotation.y + Math.PI);   // DUNK-FLAGSHIP (b)
       ctx0 = ctx;
       fovTick(dt); settleTick(ctx);
       // A+ P5: the fov pinch starts on the APPROACH — inside 3.6 m (horizontal) of the rim during the run, not at takeoff
@@ -2580,6 +2584,7 @@ export const DunkMode: ModeDefinition = (() => {
       cancelLiveCeleb();
       skyRoot?.dispose(); skyRoot = null;   // THE SKY TIER
       hoopJuice?.dispose(); hoopJuice = null;
+      lobMarker?.dispose(); lobMarker = null;
       rimFx?.dispose(); rimFx = null; judgesTable?.dispose(); judgesTable = null;   // vis-hoops-dunk
       stands?.dispose(); stands = null;   // w3-crowds
       phoneFlashes?.dispose(); phoneFlashes = null;
@@ -3005,7 +3010,7 @@ export const DunkMode: ModeDefinition = (() => {
       const gap = Vector3.Distance(from, to);
       if (gap > 0.35) {
         const v = lobVelocity(from, to, tf);
-        ballSim.launch(from, new Vector3(v.x, v.y, v.z));
+        ballSim.launch(from, new Vector3(v.x, v.y, v.z)); lobMarker?.aim(to);
         console.info(`[LOB] re-aimed at the launch: ${gap.toFixed(2)} m to the catch in ${tf.toFixed(2)} s`);
       }
     }
@@ -3717,7 +3722,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
-  function resetLob(): void { lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.runCueAt = -1; lob.runCued = false; }
+  function resetLob(): void { lobMarker?.clear(); lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.runCueAt = -1; lob.runCued = false; }
   function resetRunway(): void { teachHint = ''; pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; launchQueued = false; airTrick = null; runwayToken++; }
   /** A runway beat owns the body until it ends (the per-frame run / idle loops stand aside); the run keeps going under it. */
   function startRunwayBeat(ctx: ModeContext, rt: RunwayTrick): void {
@@ -3826,6 +3831,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(v.x, v.y, v.z));
     lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = label; catchBlend = 1; catchPending = false;
+    lobMarker?.aim(to);
     setTrail('soft');
     console.info(`[LOB] ${label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
   }
@@ -3907,7 +3913,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (!g) { console.warn('[LOB] off-glass throw impossible from here — a plain self-lob instead'); throwLob(ctx, from, 'SELF-LOB', tf); return; }
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z));
-    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'OFF-GLASS LOB'; lob.kind = 'glass'; lob.t = 0; catchBlend = 1; catchPending = false;
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = 'OFF-GLASS LOB'; lob.kind = 'glass'; lob.t = 0; catchBlend = 1; catchPending = false; lobMarker?.aim(to);
     setTrail('soft');
     const onBoard = g.hit.x >= glass.xMin && g.hit.x <= glass.xMax && g.hit.y >= glass.yMin && g.hit.y <= glass.yMax;
     console.info(`[LOB] OFF-GLASS LOB from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) at the glass (${g.hit.x.toFixed(2)},${g.hit.y.toFixed(2)}) @${g.t1.toFixed(2)} s${onBoard ? '' : ' — OFF THE BOARD'} then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${t.toFixed(2)} s${standing ? ' (standing)' : ''}`);
@@ -3926,7 +3932,7 @@ export const DunkMode: ModeDefinition = (() => {
     }
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(g.v.x, g.v.y, g.v.z));
-    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = `${ride.short} OOP`; lob.kind = 'corner'; lob.t = 0; catchBlend = 1; catchPending = false;
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = `${ride.short} OOP`; lob.kind = 'corner'; lob.t = 0; catchBlend = 1; catchPending = false; lobMarker?.aim(to);
     setTrail('soft');
     console.info(`[LOB] BILLBOARD OOP from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) off the ${pane.side > 0 ? 'right' : 'left'} sign at (${g.hitWorld.x.toFixed(2)},${g.hitWorld.y.toFixed(2)},${g.hitWorld.z.toFixed(2)}) @${g.t1.toFixed(2)} s then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
   }
@@ -3956,7 +3962,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (!b) { console.warn('[LOB] bounce lob cannot fit — a plain self-lob instead'); throwLob(ctx, from, 'SELF-LOB', tf); return; }
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(b.v.x, b.v.y, b.v.z));
-    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = n === 2 ? 'BOUNCE-BOUNCE LOB' : 'BOUNCE LOB'; lob.kind = 'bounce'; lob.wantBounces = n; lob.t = 0; catchBlend = 1; catchPending = false;
+    lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = n === 2 ? 'BOUNCE-BOUNCE LOB' : 'BOUNCE LOB'; lob.kind = 'bounce'; lob.wantBounces = n; lob.t = 0; catchBlend = 1; catchPending = false; lobMarker?.aim(to);
     setTrail('soft');
     console.info(`[LOB] ${lob.label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) ${b.bounces.map((p, i) => `bounce ${i + 1} at (${p.x.toFixed(2)},${p.z.toFixed(2)}) @${b!.times[i].toFixed(2)} s${floorY > 0 ? ` on the ${obstacle?.spec.label} (${floorY.toFixed(2)} m)` : ''}`).join(', ')} then to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${t.toFixed(2)} s, last apex ${b.apex.toFixed(2)}${standing ? ' (standing)' : ''}`);
     if (standing) armRunCue(t, dist);
@@ -4002,7 +4008,7 @@ export const DunkMode: ModeDefinition = (() => {
     const hand = ballHandNode();
     if (hand) { catchWorld.copyFrom(world); catchPending = true; hand.computeWorldMatrix(true); hand.getWorldMatrix().invertToRef(_invHand); Vector3.TransformCoordinatesToRef(world, _invHand, catchFrom); catchBlend = 0; ball.position.copyFrom(catchFrom); }
     runwayDifficulty += CATCH_DIFFICULTY;
-    console.info(`[LOB] CAUGHT ${lob.label} @${clipTime.toFixed(2)}`);
+    console.info(`[LOB] CAUGHT ${lob.label} @${clipTime.toFixed(2)}`); lobMarker?.end(true);
     ctx.feel?.impact?.(0.15);
     SoundKit.play('whoosh', { pitch: 1.5, volume: 0.35 });
     EffectsKit.burst(ctx.scene, ball.getAbsolutePosition(), 'sparks');
@@ -4011,7 +4017,7 @@ export const DunkMode: ModeDefinition = (() => {
   function lostLob(ctx: ModeContext): void {
     if (!lob.live) return;
     lob.lost = true;
-    console.info(`[LOB] LOST ${lob.label} @${clipTime.toFixed(2)}`);
+    console.info(`[LOB] LOST ${lob.label} @${clipTime.toFixed(2)}`); lobMarker?.end(false);
     SoundKit.play('crowdGroan', { volume: 0.6 });
     ctx.feel?.impact?.(0.3);
     resolveDunk(ctx);   // no ball in hand → the miss path (its LOST THE … — MISSED line); the lob keeps bouncing

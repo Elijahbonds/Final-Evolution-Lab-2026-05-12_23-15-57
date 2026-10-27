@@ -238,7 +238,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     const run = p.evaluate(attemptInPage, cfg);
     let done = false; let res: AttemptOut | null = null;
     run.then((r) => { res = r; done = true; }, (e) => { res = { err: String(e).slice(0, 200) }; done = true; });
-    const tw = Date.now(); let k = 0;
+    const tw = Date.now(); let k = 0, k0 = 0;
     while (!done && Date.now() - tw < 600000) {
       if (stripOn) {
         const wait = await p.evaluate(() => (window as unknown as DunkWin).__rec.stripWait).catch(() => false);
@@ -250,6 +250,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
         }
       }
       await new Promise((r) => setTimeout(r, stripOn ? 60 : 400));
+      if (process.env.PROGRESS && Date.now() - tw > 30000 * (k0 + 1)) { k0++; const fr = await p.evaluate(() => (window as unknown as DunkWin).__vc.C.frames).catch(() => -1); console.log(`    … ${Math.round((Date.now() - tw) / 1000)} s wall, frame ${fr}`); }
     }
     used++;
     const r = res as AttemptOut | null;
