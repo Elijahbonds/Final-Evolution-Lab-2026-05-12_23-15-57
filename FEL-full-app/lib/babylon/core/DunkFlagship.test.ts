@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OOP_LOB_FLIGHT_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
+import { OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, lobApexOver, oopThrowDue, slamImpact, SLAM_HITSTOP_MS, SLAM_SHAKE, SLAM_SHAKE_MS, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, timeToFloor } from './DunkFlagship';
 import { LOB_CATCH_CLIP_T } from './DunkLob';
 
 describe('DunkFlagship (b) — the alley-oop is a lob', () => {
@@ -36,5 +36,16 @@ describe('DunkFlagship Phase 2 — the landing arrives with its fall', () => {
     expect(timeToFloor(1.2263, 0)).toBeCloseTo(0.5, 3);            // ½ g t² = 1.2263 at t 0.5
     expect(timeToFloor(0.5, 5)).toBeLessThan(0.5 / 5);             // still accelerating: sooner than at a constant 5 m/s
     expect(timeToFloor(0.5, 5)).toBeGreaterThan(0.08);
+  });
+});
+
+describe('DunkFlagship Phase 3 — the passer winds up, then lobs', () => {
+  it('starts the toss OOP_WINDUP_SEC before the release, and both land before the catch beat on any run that charges in time', () => {
+    for (const runLeft of [3, 2, 1.2, 0.9, 0.5]) {
+      const windupDue = oopThrowDue(runLeft, LOB_CATCH_CLIP_T, OOP_LOB_FLIGHT_SEC + OOP_WINDUP_SEC);
+      const throwDue = oopThrowDue(runLeft, LOB_CATCH_CLIP_T, OOP_LOB_FLIGHT_SEC);
+      if (throwDue) expect(windupDue).toBe(true);   // never a release before its wind-up
+    }
+    expect(OOP_WINDUP_SEC).toBe(0.5);               // the toss clip's arms-overhead key
   });
 });

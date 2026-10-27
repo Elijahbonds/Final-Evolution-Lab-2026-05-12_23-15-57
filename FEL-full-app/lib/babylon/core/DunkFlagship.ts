@@ -23,6 +23,10 @@ export const RUNWAY_STRIDE_SCALE = 1;
 
 /** (new) How long the passer's lob is in the air, release to the catch (s). */
 export const OOP_LOB_FLIGHT_SEC = 1.0;
+/** The passer's wind-up before the release (s): his toss clip starts this long before the ball leaves his hand. The toss plays
+ *  `jumpshot` (clipRegistry's teammateToss), whose release is its arms-overhead key at 0.5 s (baseClips; the CMU 124_05 capture
+ *  that replaces it on a hoops rig tops out at 0.5–0.55 s) — so the ball leaves from overhead, not from his hip mid-crouch. */
+export const OOP_WINDUP_SEC = 0.5;
 
 /** Throw now? `runToLaunchSec` is the run left to the take-off line, `catchClipT` the flight's catch beat. A run that starts
  *  inside the lob's time throws at once (a shorter, flatter lob — still on the catch beat). */
