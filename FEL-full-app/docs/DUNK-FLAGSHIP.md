@@ -86,5 +86,24 @@ Plain one-foot attempt: stand, stick walk, RT run to the line, take-off, slam on
 
 ## 5. Phase 1 — smooth run-up: results
 
-_Pending the final-code attempt (r9, queued on the shared rig lock). The attempts r1–r3 carried intermediate builds: they found
-the half step and then the double step at the plant's end that the final code fixes (a2), so they are not the "after"._
+Plain one-foot attempt, phone tier, 320×180 (the strip run at 480×270), virtual clock. Before = `36593d3a`, two attempts (r0, r1).
+After = the phase's final code, attempt r9 (recorded with the strip). The attempts r1–r3 in between carried intermediate builds:
+they found the half step and then the double step at the plant's end that the final code fixes (a2). Speed traces:
+`round9/dunk-flagship/shots/phase1-speed-before-after.jpg`; the contact sheet: `shots/phase1-before-after.jpg`.
+
+| Gate | Before (r0 / r1) | After (r9, final) | |
+|---|---|---|---|
+| Largest one-frame root-speed change, walk → the plant's end | 2.08 / 2.06 m/s (3 frames > 0.6) | **0.53** (0 frames > 0.6) | met |
+| Speed into push 1-2 | 7.0 → 5.98 in one frame | continuous (gather 1.24 m out, x1.94) | met |
+| The take-off frame and the plant | 2.1 → **4.2** → 2.2 m/s | 2.32 → 2.24 → 2.24 … 2.24 → 1.71 (the carry, as before) | met |
+| Root jerk, RMS | 528 / 407 m/s³ | **113** | |
+| Bone pops before the take-off | 31 / 32 | 28 | met (not above) |
+| Foot skate, carrying foot ≥ 2.5 m/s | 1.11 / 1.03 m/s | 1.25 (the pace is unchanged; within the reps' noise) | **not met** — the re-pace was tried and withdrawn (a3) |
+| Hang · hips' rise | 2150 ms · 1.94 m | 2167 ms · 1.93 m | unchanged |
+| Peak run speed on a matched run (r1 vs r1, same walk) | 7.0 m/s | 6.9 m/s (the gather starts ~0.15 m earlier) | behaviour change, flagged |
+
+Gate run (code `f45a8252` + the scan fix `b7cc7132`): tsc 0 errors · lint 0 warnings · mode-list-check 32 modes · ci-suite 208
+passed, 1 failed (`controller-link-tests` E10: a 260 ms wall-clock window at load average 31 — re-run alone 42 / 42), 11 DB suites
+skipped · vitest on `lib/babylon/{modes,core,nexus,visual}`, `lib/feel-panel`, `tests/probes`: 499 files, 5,771 tests, 1 failed
+(`reducedMotionGates` — the scan this lane's slam sizing broke; fixed as a test change, re-run green with the lane's new tests,
+27 / 27).
