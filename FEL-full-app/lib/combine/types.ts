@@ -36,6 +36,8 @@ export interface Attempt {
   value: number | null;
   /** Approach jumps only: the touch height (cm), when this athlete's standing reach was read in this combine. */
   touchCm?: number | null;
+  /** SPRINT-SPEED: a sprint or 5-10-5 attempt timed by the camera (an estimate); absent = the station's own method. */
+  method?: 'camera';
   at: number;
 }
 

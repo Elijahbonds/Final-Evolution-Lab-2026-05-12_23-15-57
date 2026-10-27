@@ -70,9 +70,15 @@ export default async function TrainPage() {
       tag: 'Check in',
     },
     {
+      // SPRINT-SPEED (2026-10-25): sprint and agility timed by the phone's camera (verified adults; the page says so to anyone else)
+      href: '/train/speed', icon: Gauge, accent: '#00FF9D', title: 'Sprint speed',
+      line: 'Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.',
+      tag: 'Time a run',
+    },
+    {
       // VBT (2026-10-25; wired by coach-delivery 2026-10-27, docs/VBT.md §7.1): camera bar speed (13+; a teen sees technique
       // speed only; the page says so)
-      href: '/train/velocity', icon: Gauge, accent: '#00E5FF', title: 'Bar speed',
+      href: '/train/velocity', icon: Dumbbell, accent: '#00E5FF', title: 'Bar speed',
       line: 'Rep speed from your camera: zones, speed loss, your load-velocity line. Estimates, not lab numbers.',
       tag: 'Track a set',
     },
