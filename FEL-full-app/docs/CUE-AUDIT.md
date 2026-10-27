@@ -49,6 +49,7 @@ in the middle of a rep was a 13-word sentence of images: *"Press the floor apart
 your second toes."* Then, when the fault cleared, *"There it is. Own it."*. The review was *"What was cued was gone on
 the last 2 reps — that reflex is the goal."*
 ![before: squat coach](cue-audit/before-squat-coach-390.png)
+![after: squat coach](cue-audit/after-squat-coach-390.png)
 
 **The hip hinge, a knee-dominant set** (`before-hinge-review-390.png`). The cues were *"Close a door behind you with your
 hips — more hips back, and the knee stays soft."* and *"Still squatting it. Send the hips back to the wall behind you
@@ -56,11 +57,13 @@ before the knee bends at all."* (17 words), said twice. The review card showed t
 "ESCALATE", "What was cued", *"Knees doing the work — hips not travelling back — 8 of 8 reps read"*. The first correction
 started while the ~4 s stage line was still being said (§4).
 ![before: hinge review](cue-audit/before-hinge-review-390.png)
+![after: hinge review](cue-audit/after-hinge-review-390.png)
 
 **The Quick Screen results** (`before-screen-results-390.png`). Each card was a band word and *"Try this: Band lateral walks,
 clamshells, goblet squat with knees pushed out"*: a list of drill names a beginner cannot act on, with no line saying what
 the result means. "Left vs right ankle gap / Try this: Extra sets on the tighter side".
 ![before: Quick Screen results](cue-audit/before-screen-results-390.png)
+![after: Quick Screen results](cue-audit/after-screen-results-390.png)
 
 **The Movement Screen's "what to work on"** (`before-mirror-steps-390.png`). Numbers with no meaning: *"The camera saw sway
 0.04 torso lengths a second, 2 touch-downs, 28 s on one leg · estimated."* Jargon: "PROPOSED · preview · Scoring thresholds
@@ -68,11 +71,13 @@ are proposed and pending coach approval", "Trunk and hip hold". Elsewhere in the
 pressure — breathing is happening at the neck"*, *"Exhale-biased breathing … before any heavy axial loading"*, *"Hip
 external-rotation work"*, *"Foot tripod work"*, and "This is not medical clearance — … belongs with a physician".
 ![before: Movement Screen steps](cue-audit/before-mirror-steps-390.png)
+![after: Movement Screen steps](cue-audit/after-mirror-steps-390.png)
 
 **The exercise library sheet** (`before-library-sheet-390.png`). Cues ran 17–29 words, and set-ups said "hinge" with no
 explanation. "Weaker hand" appeared on 100+ basketball entries. "Medicine ball" tripped the medical-word screen. The
 section was headed "COMMON FAULTS".
 ![before: library sheet](cue-audit/before-library-sheet-390.png)
+![after: library sheet](cue-audit/after-library-sheet-390.png)
 
 ## 2. Findings by surface
 
