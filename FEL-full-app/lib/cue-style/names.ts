@@ -61,6 +61,30 @@ export const FAULT_NAMES = {
 } as const;
 export type FaultName = keyof typeof FAULT_NAMES;
 
+/** WHAT IT MEANS, per fault: the middle part of a result line (lib/cue-style/result.ts). Movement words, no cause. */
+export const FAULT_MEANS: Partial<Readonly<Record<FaultName, string>>> = {
+  kneeCave: 'Knees that stay over your toes are easier to control.',
+  kneeCaveOne: 'Knees that stay over your toes are easier to control.',
+  frontKneeCave: 'A front knee that stays over your toes is easier to control.',
+  landingKneeCave: 'Landing with knees over toes is easier to control.',
+  kneeWobble: 'A steady front knee keeps the rep under control.',
+  heelLift: 'Heels down keeps you balanced. Often the ankles need more bend.',
+  shoulderShift: 'Staying in the middle lets both sides share the work.',
+  weightShift: 'Even weight lets both legs share the work.',
+  hipTip: 'Level hips keep the work on the front leg.',
+  upperBodyDrift: 'Staying tall keeps the work in your legs.',
+  sideLean: 'Staying tall keeps the work where it belongs.',
+  notDeep: 'More depth works your legs through more range.',
+  backBends: 'A flat back keeps the work in your hips and legs.',
+  kneesTooMuch: 'Pushing your hips back works the back of your legs, which is the point of this move.',
+  shinsForward: 'Still shins keep the move in your hips.',
+  hipsOffLine: 'A straight body makes the push-up work as one piece.',
+  handsNotUnder: 'Hands under your shoulders gives you the strongest push.',
+  headOffLine: 'A long neck keeps your head in line with your body.',
+  workingElbowRises: 'A low path keeps the work in your back and arm.',
+  workingShrug: 'Shoulders down keeps your neck out of the lift.',
+};
+
 /** The canonical movement names. */
 export const MOVEMENT_NAMES = {
   squat: 'Squat',

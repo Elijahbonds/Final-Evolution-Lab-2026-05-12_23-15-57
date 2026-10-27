@@ -26,7 +26,7 @@ import { flagsFor, scoreReps, setHeadline, summarize, type RepFlag, type ScoredR
 import { buildSubmission, MAX_SET_MS, type FormReviewSubmission } from '@/lib/coach/formReview/payload';
 import { VIDEO_STAYS_LINE } from '@/lib/coach/formReview/clipPolicy';
 import type { RecordContext } from '@/lib/coach/formReview/gate';
-import { repChips, replayPick } from '@/lib/coach/formReview/view';
+import { flagResult, repChips, replayPick } from '@/lib/coach/formReview/view';
 import { PoseReplay } from './pose-replay';
 import { SelfView } from '@/components/games/body-play';
 
@@ -225,7 +225,11 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
                 <li key={f.rep} className="rounded-lg border border-[#FFB020]/30 bg-[#FFB020]/5 p-2" data-flag={f.rep}>
                   <button type="button" onClick={() => setFocus(f.rep)} className="block w-full text-left">
                     <span className="block text-sm font-semibold text-[#FFB020]">{f.reason}{f.worst ? ' · worst rep' : ''}</span>
-                    {f.cue && <span className="mt-0.5 block text-sm text-white/80">{f.cue}</span>}
+                    {/* CUE-REWRITE: what it means and what to do next set (lib/coach/formReview/view.ts flagResult) */}
+                    {(() => { const r = flagResult(ctx.movement, f); return (<>
+                      <span className="mt-0.5 block text-sm text-white/70" data-flag-means>{r.means}</span>
+                      <span className="mt-0.5 block text-sm text-white/85" data-flag-next>{r.next.text}</span>
+                    </>); })()}
                   </button>
                 </li>
               ))}
