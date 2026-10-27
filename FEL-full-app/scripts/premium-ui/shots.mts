@@ -15,7 +15,7 @@
 //
 //   npx tsx scripts/premium-ui/shots.mts <outDir> <label> --build-only        bundle now (no browser, no lock needed)
 //   ... --no-font-vars   bundle without next/font's variables, as a probe rig has none (counts serif text: P2)
-//   flock /home/user/wt/gate-queue.lock npx tsx scripts/premium-ui/shots.mts <outDir> <label> [--scenes=play,train]
+//   flock /home/user/wt/gate-queue.lock npx tsx scripts/premium-ui/shots.mts <outDir> <label> [<label> …] [--scenes=play,train] [--scenes-<label>=…]
 // The bundle lives in <outDir>/.build-<label>, so a "before" frozen with --build-only is shot later unchanged, however
 // long the gate queue is and whatever the tree looks like by then; an existing bundle is reused (--rebuild to redo it).
 //
@@ -34,15 +34,18 @@ const args = process.argv.slice(2);
 const flag = (n: string) => args.find((a) => a.startsWith(`--${n}=`))?.split('=')[1];
 const pos = args.filter((a) => !a.startsWith('--'));
 const OUT_ROOT = resolve(pos[0] ?? join(ROOT, '.premium-ui'));
-const LABEL = pos[1] ?? 'now';
-const OUT = join(OUT_ROOT, LABEL);
-const BUILD = join(OUT_ROOT, `.build-${LABEL}`);
+// One or more labels: several frozen bundles are shot in ONE run — one lock hold, one browser (coordinator, 2026-10-27)
+const LABELS = pos.length > 1 ? pos.slice(1) : ['now'];
+let LABEL = LABELS[0];
+let OUT = join(OUT_ROOT, LABEL);
+let BUILD = join(OUT_ROOT, `.build-${LABEL}`);
 const BUILD_ONLY = args.includes('--build-only');
 const REBUILD = args.includes('--rebuild') || BUILD_ONLY;
-mkdirSync(OUT, { recursive: true });
 
-export const SCENES = ['landing', 'play', 'train', 'profile', 'learn', 'coach', 'todaydrill', 'screenresults', 'devui'] as const;
-const scenes = (flag('scenes')?.split(',') ?? [...SCENES]).filter(Boolean);
+import { SCENES } from './scenes.mts';
+export { SCENES };
+/** --scenes-<label>=a,b for one label, --scenes=a,b for all, else every scene */
+const scenesFor = (label: string) => ((flag(`scenes-${label}`) ?? flag('scenes'))?.split(',') ?? [...SCENES]).filter(Boolean);
 const WIDTHS = [{ w: 390, h: 844, name: 'phone' }, { w: 1280, h: 800, name: 'desktop' }];
 
 const TYPES: Record<string, string> = {
@@ -60,11 +63,15 @@ const server = createServer((req, res) => {
 });
 // fonts are served from a fixed path on whichever port the shoot gets, so a bundle built earlier still finds them
 const FONT_BASE = '/__fonts';
-if (REBUILD || !existsSync(join(BUILD, 'index.html'))) {
-  await buildRig(BUILD, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE, noFontVars: args.includes('--no-font-vars') });
-  writeFileSync(join(BUILD, 'built.txt'), new Date().toISOString());
+for (const label of LABELS) {
+  const dir = join(OUT_ROOT, `.build-${label}`);
+  if (REBUILD || !existsSync(join(dir, 'index.html'))) {
+    await buildRig(dir, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE, noFontVars: args.includes('--no-font-vars') });
+    writeFileSync(join(dir, 'built.txt'), new Date().toISOString());
+    console.log(`built → ${dir}`);
+  }
 }
-if (BUILD_ONLY) { console.log(`built → ${BUILD}`); process.exit(0); }
+if (BUILD_ONLY) process.exit(0);
 await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
 const ORIGIN = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
@@ -118,11 +125,12 @@ const MEASURE = `(() => {
   const shift = (window.__cls || 0); const fcp = performance.getEntriesByName('first-contentful-paint')[0]?.startTime ?? null;
   return { serif, words, sizesFold: [...sizesFold].sort(), sizesAll: [...sizesAll].sort(), families: [...fams], faces,
     buttons: { n: btnN, styles: btnSig.size }, cards: { n: cardN, styles: cardSig.size }, imagery: { n: imgN, pct: Math.round(100 * imgArea / (vw * vh)) },
-    motion: { animating: anim, transitions: trans, press }, cls: Math.round(shift * 1000) / 1000, fcp: fcp && Math.round(fcp), longTasks: window.__long || 0 };
+    motion: { animating: anim, transitions: trans, press }, cls: Math.round(shift * 1000) / 1000, shifts: (window.__shifts || []).slice(0, 8), fcp: fcp && Math.round(fcp), longTasks: window.__long || 0 };
 })()`;
 
 const INIT = `window.__cls = 0; window.__long = 0;
-  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch {}
+  window.__shifts = [];
+  try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; for (const src of (e.sources || [])) { const n = src.node; window.__shifts.push(Math.round(e.value * 1000) / 1000 + ' ' + (n && n.nodeType === 1 ? n.tagName.toLowerCase() + (n.className && typeof n.className === 'string' ? '.' + n.className.trim().split(/\\s+/).slice(0, 3).join('.') : '') : n ? '#text' : '?')); } } }).observe({ type: 'layout-shift', buffered: true }); } catch {}
   try { new PerformanceObserver((l) => { window.__long += l.getEntries().length; }).observe({ type: 'longtask', buffered: true }); } catch {}`;
 
 /** % of the first screen that is flat near-black with nothing on it: 10 px blocks with no detail and no light. */
@@ -141,8 +149,14 @@ async function emptyPct(png: string): Promise<number> {
 }
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true });
+for (const label of LABELS) {
+LABEL = label;
+OUT = join(OUT_ROOT, label);
+BUILD = join(OUT_ROOT, `.build-${label}`);
+mkdirSync(OUT, { recursive: true });
+console.log(`— ${label}`);
 const report: Record<string, Record<string, unknown>> = {};
-for (const s of scenes) {
+for (const s of scenesFor(label)) {
   report[s] = {};
   for (const vp of WIDTHS) {
     const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h }, deviceScaleFactor: 1, isMobile: vp.name === 'phone', hasTouch: vp.name === 'phone' });
@@ -169,7 +183,8 @@ for (const s of scenes) {
     console.log(`${s.padEnd(13)} ${vp.name.padEnd(7)} words ${String(mm.words.fold).padStart(3)}  sizes ${mm.sizesFold.length}/${mm.sizesAll.length}  btn ${mm.buttons.styles}  card ${mm.cards.styles}  empty ${String((report[s][vp.name] as { empty: number }).empty).padStart(2)}%  img ${mm.imagery.n}/${mm.imagery.pct}%  anim ${mm.motion.animating}  fcp ${mm.fcp}  cls ${mm.cls}  serif ${mm.serif}  a11y ${a11y ? `${a11y.critical}c/${a11y.serious}s/${a11y.total}` : '-'}${errors.length ? `  ERR ${errors[0].slice(0, 90)}` : ''}`);
   }
 }
-await browser.close();
-server.close();
 writeFileSync(join(OUT, 'metrics.json'), JSON.stringify({ label: LABEL, when: new Date().toISOString(), scenes: report }, null, 1));
 console.log(`→ ${join(OUT, 'metrics.json')}`);
+}
+await browser.close();
+server.close();

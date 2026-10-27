@@ -36,7 +36,7 @@ describe('the loop an entry plays (demoFor)', () => {
     expect(demoClipFor({ family: 'squat', variation: 'goblet-squat', equipment: ['dumbbell'] })).toBe('ex_squat');
     expect(demoClipFor({ family: 'squat', variation: 'squat', equipment: ['barbell'] })).toBe('ex_squat_bar');
     expect(demoClipFor({ family: 'squat', variation: 'front-squat', equipment: ['barbell'] })).toBe('ex_squat');
-    expect(demoClipFor({ family: 'squat', variation: 'overhead-squat', equipment: ['barbell'] })).toBeNull();
+    expect(demoClipFor({ family: 'squat', variation: 'overhead-squat', equipment: ['barbell'] })).toBe('ex_overhead_squat');   // DEMO-LOOPS: its own loop now (the arms overhead), never the plain squat's
     expect(demoClipFor({ family: 'overhead-press', variation: 'shoulder-press', equipment: ['dumbbell'] })).toBe('ex_press');
     expect(demoClipFor({ family: 'overhead-press', variation: 'seat-press', equipment: ['dumbbell'] })).toBe('ex_seated_press');   // seated: its own loop, on a bench
     expect(demoClipFor({ family: 'overhead-press', variation: 'landmine', equipment: ['landmine'] })).toBeNull();   // a landmine press is neither
@@ -71,8 +71,8 @@ describe('the loop an entry plays (demoFor)', () => {
   });
   it('coverage over the whole library (reported, and held from falling)', () => {
     const shown = ALL.filter((e) => demoFor(e)).length;
-    // LIBRARY-ANATOMY-2: 21.5% at the first pass → 45.6% with the authored loops; the floor follows (it was 0.18)
-    expect(shown / ALL.length).toBeGreaterThan(0.45);
+    // LIBRARY-ANATOMY-2: 21.5% at the first pass → 45.6%; DEMO-LOOPS: 46.8%. The floor follows (0.18 → 0.45 → 0.465)
+    expect(shown / ALL.length).toBeGreaterThan(0.465);
   });
 });
 

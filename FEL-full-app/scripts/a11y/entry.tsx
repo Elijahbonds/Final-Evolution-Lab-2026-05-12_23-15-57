@@ -4,7 +4,8 @@
 // server component in the tree it returns, and renders the result between the real StatusRail and TabBar, as
 // app/layout.tsx does. So the audit reads the markup the app ships, not a copy of it.
 //
-// Scenes (location.hash):  landing login signup play train profile learn education playbook account, and coach combine squads
+// Scenes (location.hash):  landing login signup play train profile learn education playbook account, and coach combine squads,
+// and (P9) venues modes library programs readiness speed velocity week guidance
 import { Fragment, cloneElement, createElement as h, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { StatusRail } from '@/components/shell/status-rail';
@@ -28,6 +29,16 @@ const SCENES: Record<string, { path: string; signedIn: boolean; load: () => Prom
   coach: { path: '/coach', signedIn: true, load: () => import('@/app/coach/page') },
   combine: { path: '/coach/combine', signedIn: true, load: () => import('@/app/coach/combine/page') },
   squads: { path: '/squads', signedIn: true, load: () => import('@/app/squads/page') },
+  // P9 (premium-ui, 2026-10-27): the re-audit past the ten key pages — every TabPage room the rig can render
+  venues: { path: '/venues', signedIn: true, load: () => import('@/app/venues/page') },
+  modes: { path: '/modes', signedIn: true, load: () => import('@/app/modes/page') },
+  library: { path: '/train/library', signedIn: true, load: () => import('@/app/train/library/page') },
+  programs: { path: '/train/programs', signedIn: true, load: () => import('@/app/train/programs/page') },
+  readiness: { path: '/train/readiness', signedIn: true, load: () => import('@/app/train/readiness/page') },
+  speed: { path: '/train/speed', signedIn: true, load: () => import('@/app/train/speed/page') },
+  velocity: { path: '/train/velocity', signedIn: true, load: () => import('@/app/train/velocity/page') },
+  week: { path: '/profile/week', signedIn: true, load: () => import('@/app/profile/week/page') },
+  guidance: { path: '/guidance', signedIn: true, load: () => import('@/app/guidance/page') },
 };
 
 const w = window as unknown as Window & { __PATH: string; __SESSION: unknown; __SCENE: string };

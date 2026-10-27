@@ -112,9 +112,10 @@ async function sheetJob(): Promise<void> {
   const report: Record<string, unknown> = {};
   const FRACS = (process.env.FRACS ?? '0,0.25,0.5,0.75').split(',').map(Number);   // the phases shot (a flow's moves sit between its holds)
   const shotsDir = join(OUT, 'clips'); mkdirSync(shotsDir, { recursive: true });
-  const page = await browser.newPage({ viewport: { width: 420, height: 315 }, deviceScaleFactor: 1 }); await page.addInitScript(NAME_SHIM);
+  // DEMO-LOOPS: W/H size the stage (390 × 292: the phone's), BODY picks the body (male | female | scan)
+  const page = await browser.newPage({ viewport: { width: Number(process.env.W ?? 420), height: Number(process.env.H ?? 315) }, deviceScaleFactor: 1 }); await page.addInitScript(NAME_SHIM);
   const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
-  await page.goto(`${url}/#stage:idle_stand`);
+  await page.goto(`${url}/${process.env.BODY ? `?body=${process.env.BODY}` : ''}#stage:idle_stand`);
   await stageReady(page);
   for (const clip of names) {
     const before = errors.length;

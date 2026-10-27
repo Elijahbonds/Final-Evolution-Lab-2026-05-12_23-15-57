@@ -31,10 +31,10 @@ export function SeasonCard({ season, active, instant, ms, onTierUp }: {
         <span className="flex items-center gap-2 font-bold text-[#FFD700]">
           <Crown className="h-[1em] w-[1em]" /> {season.name}
         </span>
-        <span className="font-mono text-white/75">+{Math.round(season.gained).toLocaleString('en-US')} season XP</span>
+        <span className="font-display tabular-nums text-white/75">+{Math.round(season.gained).toLocaleString('en-US')} season XP</span>
       </div>
       <div className="mt-[0.35em] flex items-center gap-3">
-        <span className="font-mono text-white/60">T{cur.tier}</span>
+        <span className="font-display tabular-nums text-white/60">T{cur.tier}</span>
         <div className="relative h-[0.6em] flex-1 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Season tier progress" aria-valuemin={0} aria-valuemax={season.need} aria-valuenow={season.into}>
           <div
             data-season-fill
@@ -42,7 +42,7 @@ export function SeasonCard({ season, active, instant, ms, onTierUp }: {
             style={{ width: `${width}%`, transition: glide ? `width ${glideMs}ms cubic-bezier(0.16,0.8,0.3,1)` : 'none' }}
           />
         </div>
-        <span className="font-mono text-white/60">T{cur.tier + 1}</span>
+        <span className="font-display tabular-nums text-white/60">T{cur.tier + 1}</span>
       </div>
       {showUp && (
         <p data-season-tierup className="mt-[0.3em] text-center font-bold text-[#FFD700]" style={instant ? undefined : { animation: 'fel-rise 320ms cubic-bezier(0.2,1.4,0.4,1) both' }}>

@@ -1,4 +1,5 @@
 'use client';
+import { EmptyState } from '@/components/ui/fel/empty-state';
 // Today — the client's side of the coaching loop (lane 1 C2/C3): the next session of your active program, logging,
 // Done, the coach's recent comments, and the thread.
 //
@@ -258,9 +259,9 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     <div className="space-y-4">
       {finishedCard}
       {parity}
-      <div className="fel-card rounded-xl p-6 text-center">
-        <p className="text-white/70 text-sm">{data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'}</p>
-      </div>
+      {/* premium-ui P8: the empty day as an empty state — a figure and the one line, not a grey box */}
+      <EmptyState title={data.program ? 'Program complete' : 'No program yet'}
+        line={data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'} />
     </div>
   );
   const { program, today } = data;
