@@ -44,6 +44,8 @@ import { ESTIMATE_LINE as SPRINT_ESTIMATE, FV_SLOPE_LINE, REACTION_LINE, RESULT_
 import { PAIN_REFERRAL } from '@/lib/assess/why';
 import { result, type ResultLine } from './result';
 import type { CueTier } from './style';
+import { LEVEL_WORD, REVIEW_COPY } from './review';
+import { CONFIRM_LINE } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 
 export interface StyleEntry {
   /** Stable id: '<surface>:<key>'. */
@@ -83,6 +85,9 @@ export function styleCorpus(): StyleEntry[] {
       add('mirror', `pattern:${p.id}:${c.faultId}:regress`, c.regress, 'prompt', file);
     }
   }
+  add('mirror', 'coach:confirm', CONFIRM_LINE, 'live', engine);
+  for (const [k, l] of Object.entries(REVIEW_COPY)) add('mirror', `review:${k}`, l, 'prompt', 'lib/cue-style/review.ts');
+  for (const [k, l] of Object.entries(LEVEL_WORD)) add('mirror', `review:level:${k}`, l, 'label', 'lib/cue-style/review.ts');
   // the said lines around a set
   for (const i of ISSUES) add('mirror', `framing:${i}`, framingLine(i), 'prompt', 'lib/mirror/framing.ts');
   add('mirror', 'framing:sideTurned', SIDE_TURNED, 'prompt', 'lib/mirror/framing.ts');

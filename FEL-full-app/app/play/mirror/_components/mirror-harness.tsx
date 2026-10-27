@@ -11,6 +11,7 @@
 // claims. No biomechanical statistics are fabricated — the only numbers shown
 // are the ones the engine actually computes for this session.
 
+import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';   // CUE-REWRITE: the review cards' words
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
@@ -1826,16 +1827,16 @@ export function MirrorHarness({
         {/* The review of a guided squat — what faulted, what was said, and whether it held. */}
         {pattern === 'squat' && squatStage === 'review' && (
           <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured</h2>
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">Findings</p>
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.firstReps}</p>
                 {/* Only faults the coach may judge are findings; the knee is reported separately below while unverified. */}
                 {/* MIRROR-COACH P2 (2026-09-26): "Clean structure — load it" was the verified line; with the knee on, a
                     check with nothing flagged says only that — the knee line below says whether the knees were read. */}
                 {cueableFaults(squatFindings).length === 0 ? (
                   <p className="mt-2 text-[13px] text-white/60">
-                    {VALGUS_CUE_VERIFIED ? 'No faults measured in the check.' : 'No judged faults in the check.'}
+                    {VALGUS_CUE_VERIFIED ? REVIEW_COPY.nothingInCheck : REVIEW_COPY.nothingJudged}
                   </p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
@@ -1875,14 +1876,14 @@ export function MirrorHarness({
                 })()}
               </div>
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">What was cued</p>
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.coachSaid}</p>
                 {cueLog.length === 0 ? (
-                  <p className="mt-2 text-[13px] text-white/60">No corrections were cued during the work set.</p>
+                  <p className="mt-2 text-[13px] text-white/60">{REVIEW_COPY.coachSaidNothing}</p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
                     {cueLog.map((c, i) => (
                       <li key={i} className="text-[13px] text-white/70">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
                       </li>
                     ))}
                   </ul>
@@ -1907,7 +1908,7 @@ export function MirrorHarness({
             result"). A squat lets the strong side hide; the lunge cannot, so the two sides are read side by side. */}
         {pattern === 'lunge' && lungeSession.stage === 'review' && (
           <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured — each side</h2>
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.headingEachSide}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               {(['left', 'right'] as LungeSide[]).map((side) => {
                 const r = lungeSideResult(lungeSession, side);
@@ -1920,15 +1921,15 @@ export function MirrorHarness({
                       {r.reps}<span className="ml-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white/35">reps</span>
                     </p>
                     {r.unreadable ? (
-                      <p className="mt-2 text-[13px] text-[#FFC24B]">Not square to the camera through this set — not read.</p>
+                      <p className="mt-2 text-[13px] text-[#FFC24B]">{REVIEW_COPY.turnedAway}</p>
                     ) : Object.keys(r.faultRepCounts).length === 0 ? (
-                      <p className="mt-2 text-[13px] text-white/60">{r.reps ? 'No faults measured.' : 'Not reached.'}</p>
+                      <p className="mt-2 text-[13px] text-white/60">{r.reps ? REVIEW_COPY.nothingToFix : REVIEW_COPY.notDone}</p>
                     ) : (
                       <ul className="mt-2 space-y-1.5">
                         {(Object.entries(r.faultRepCounts) as [LungeFault, number][]).map(([id, n]) => (
                           <li key={id} className="flex gap-2 text-[13px] text-white/70">
                             <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[#FF3366]" />
-                            {LUNGE_FAULT_LABEL[id]} — {n} of {r.reps} reps
+                            {repsLine(LUNGE_FAULT_LABEL[id], n, r.reps)}
                           </li>
                         ))}
                       </ul>
@@ -1942,7 +1943,7 @@ export function MirrorHarness({
               <ul className="mt-4 space-y-1.5 border-t border-white/[0.06] pt-4" data-lunge-cues>
                 {cueLog.map((c, i) => (
                   <li key={i} className="text-[13px] text-white/70">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
                   </li>
                 ))}
               </ul>

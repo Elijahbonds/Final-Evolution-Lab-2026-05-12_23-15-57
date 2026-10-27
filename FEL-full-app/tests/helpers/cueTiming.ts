@@ -52,8 +52,8 @@ export function sideCoach<F extends string>(spec: SideRepSpec<F>, table: CueTabl
     t = f.t;
     applySideRepFrame(spec, ref, engine, f, (x) => x, {
       state: () => {},
-      cue: (evt: CueEvent<F>) => said.push({ t, text: evt.text, fault: evt.fault, level: evt.level, stage: ref.current.stage, rep: ref.current.workReps.length }),
-      say: (line) => said.push({ t, text: line, fault: null, level: 'line', stage: ref.current.stage, rep: ref.current.workReps.length }),
+      cue: (evt: CueEvent<string>) => { said.push({ t, text: evt.text, fault: evt.fault, level: evt.level, stage: ref.current.stage, rep: ref.current.workReps.length }); },
+      say: (line) => { said.push({ t, text: line, fault: null, level: 'line', stage: ref.current.stage, rep: ref.current.workReps.length }); },
       review: () => {},
     });
   }
