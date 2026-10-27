@@ -264,7 +264,9 @@ three new knobs at their release values, so it still plays #311 exactly. **Every
 
 Measured (the real DribbleController at 60 fps), release → now: onset 4 → 2 frames; jog to 90 % 450 → 250 ms; stop from a jog 250 ms /
 0.53 m → 150 ms / 0.29 m; from a sprint 417 ms / 1.40 m → 233 ms / 0.69 m; a jog reversal to half pace the new way 450 → 183 ms. The
-browser rig's numbers are in the lane's report. **assumption:** the gates' bands are the hoops-audit's proposal, not owner numbers; the
+browser rig (`scripts/probes/hoops-gap`, the real modes, seed 7, PRO) agrees: onset 4 → 2 frames (1v1) and 3 → 2 (3v3); stop from a jog
+250 ms / 0.53 m → 150 ms / 0.29 m and from a sprint 417 ms / 1.40 m → 233 ms / 0.68–0.69 m in both modes. A snap reversal of the left
+stick at pace is a left-stick MOVE in the game (a behind-the-back / crossover cut), not this reversal: 283 ms to half pace, unchanged. **assumption:** the gates' bands are the hoops-audit's proposal, not owner numbers; the
 three new values are the least that meet them, not felt yet.
 
 lane/hoops-overtime (group "Hoops · rules"), **new**: `hoops.overtime3v3Sec` 30 s (`threevthreeOvertime.ts` `OVERTIME_3V3_SEC`, PR #268's
