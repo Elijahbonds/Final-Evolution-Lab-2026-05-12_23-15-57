@@ -13,7 +13,10 @@
 //   motion     elements animating at load, and interactive elements with a transition or press response
 //   cls / fcp  layout shift over the load, and first contentful paint on the phone with the CPU throttled 4x
 //
+//   npx tsx scripts/premium-ui/shots.mts <outDir> <label> --build-only        bundle now (no browser, no lock needed)
 //   flock /home/user/wt/gate-queue.lock npx tsx scripts/premium-ui/shots.mts <outDir> <label> [--scenes=play,train]
+// The bundle lives in <outDir>/.build-<label>, so a "before" frozen with --build-only is shot later unchanged, however
+// long the gate queue is and whatever the tree looks like by then; an existing bundle is reused (--rebuild to redo it).
 //
 // Writes <outDir>/<label>/<scene>-<phone|desktop>.png (the first screen), -full.png, and metrics.json.
 import { createServer } from 'node:http';
@@ -32,7 +35,9 @@ const pos = args.filter((a) => !a.startsWith('--'));
 const OUT_ROOT = resolve(pos[0] ?? join(ROOT, '.premium-ui'));
 const LABEL = pos[1] ?? 'now';
 const OUT = join(OUT_ROOT, LABEL);
-const BUILD = join(OUT_ROOT, '.build');
+const BUILD = join(OUT_ROOT, `.build-${LABEL}`);
+const BUILD_ONLY = args.includes('--build-only');
+const REBUILD = args.includes('--rebuild') || BUILD_ONLY;
 mkdirSync(OUT, { recursive: true });
 
 export const SCENES = ['landing', 'play', 'train', 'profile', 'learn', 'coach', 'todaydrill', 'screenresults', 'devui'] as const;
@@ -52,10 +57,15 @@ const server = createServer((req, res) => {
   res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream' });
   createReadStream(file).pipe(res);
 });
+// fonts are served from a fixed path on whichever port the shoot gets, so a bundle built earlier still finds them
+const FONT_BASE = '/__fonts';
+if (REBUILD || !existsSync(join(BUILD, 'index.html'))) {
+  await buildRig(BUILD, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: FONT_BASE });
+  writeFileSync(join(BUILD, 'built.txt'), new Date().toISOString());
+}
+if (BUILD_ONLY) { console.log(`built → ${BUILD}`); process.exit(0); }
 await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
 const ORIGIN = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-
-await buildRig(BUILD, { entry: join(ROOT, 'scripts/premium-ui/entry.tsx'), fontBase: `${ORIGIN}/__fonts` });
 
 // The page side: the text, type, button, card, imagery and motion counts. A string, so tsx never transforms it.
 const MEASURE = `(() => {
@@ -148,10 +158,13 @@ for (const s of scenes) {
     await page.screenshot({ path: fold });
     await page.screenshot({ path: join(OUT, `${s}-${vp.name}-full.png`), fullPage: true });
     const m = await page.evaluate(MEASURE) as Record<string, unknown>;
-    report[s][vp.name] = { ...m, empty: await emptyPct(fold), errors };
+    // the accessibility audit's static scan (scripts/a11y/inpage.ts is in the rig): names, contrast, targets, landmarks
+    const scan = await page.evaluate('window.__a11y ? window.__a11y.staticScan() : null').catch(() => null) as { violations: { severity: string; rule: string }[] } | null;
+    const a11y = scan ? { critical: scan.violations.filter((v) => v.severity === 'critical').length, serious: scan.violations.filter((v) => v.severity === 'serious').length, total: scan.violations.length, rules: [...new Set(scan.violations.map((v) => v.rule))] } : null;
+    report[s][vp.name] = { ...m, a11y, empty: await emptyPct(fold), errors };
     await ctx.close();
     const mm = m as { words: { fold: number }; sizesFold: string[]; sizesAll: string[]; buttons: { styles: number }; cards: { styles: number }; imagery: { n: number; pct: number }; motion: { animating: number }; fcp: number; cls: number };
-    console.log(`${s.padEnd(13)} ${vp.name.padEnd(7)} words ${String(mm.words.fold).padStart(3)}  sizes ${mm.sizesFold.length}/${mm.sizesAll.length}  btn ${mm.buttons.styles}  card ${mm.cards.styles}  empty ${String((report[s][vp.name] as { empty: number }).empty).padStart(2)}%  img ${mm.imagery.n}/${mm.imagery.pct}%  anim ${mm.motion.animating}  fcp ${mm.fcp}  cls ${mm.cls}${errors.length ? `  ERR ${errors[0].slice(0, 90)}` : ''}`);
+    console.log(`${s.padEnd(13)} ${vp.name.padEnd(7)} words ${String(mm.words.fold).padStart(3)}  sizes ${mm.sizesFold.length}/${mm.sizesAll.length}  btn ${mm.buttons.styles}  card ${mm.cards.styles}  empty ${String((report[s][vp.name] as { empty: number }).empty).padStart(2)}%  img ${mm.imagery.n}/${mm.imagery.pct}%  anim ${mm.motion.animating}  fcp ${mm.fcp}  cls ${mm.cls}  a11y ${a11y ? `${a11y.critical}c/${a11y.serious}s/${a11y.total}` : '-'}${errors.length ? `  ERR ${errors[0].slice(0, 90)}` : ''}`);
   }
 }
 await browser.close();
