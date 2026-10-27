@@ -111,7 +111,7 @@ describe('every Quick Screen page renders under Providers with no SessionProvide
     expect(threw).toBe(false);
     expect(m.providerMounts).toBe(0);
     expect(html).toContain('data-session="unauthenticated"');
-    expect(html).toContain('Just test my jump (about 1 min)');
+    expect(html).toContain('Measure my vertical (about 1 min)');
     expect(html).toContain('href="/play/mirror/assess?run=jump"');
     expect(html).not.toContain('src=');
     expect(fetchSpy).not.toHaveBeenCalled();

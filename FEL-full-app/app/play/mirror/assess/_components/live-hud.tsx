@@ -15,6 +15,8 @@ import { testDef, type Side } from '@/lib/assess/protocol';
 import { FRAMING_IN_FRAME, JUMP_LAND_TALL, READ_CLEAR, READ_PARTIAL, SCREEN_TEST_NAMES } from '@/lib/screen/copy';
 import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { cuesDue, cueFlash, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
+import { JUMP_GO, JUMP_HOW, SETUP_EYEBROW, SETUP_PLACE, SETUP_READY_LINE, setupHeadline } from '@/lib/vertical/copy';
+import { HandsOnHips, SetupPicture } from '@/components/vertical/setup-picture';
 
 /** SCREEN A: a rep is up on these steps — voice and colour only, no reading. */
 const NO_READING: ReadonlySet<RunnerView['step']> = new Set(['calibrate', 'calibrateSide', 'countdown', 'active', 'paused']);
@@ -99,18 +101,47 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
           {sideOn && !framingOk && !noReading ? (
             <p data-turn-side className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-[#00E5FF]">{SIDE_TURNED}</p>
           ) : null}
-          <div className="absolute inset-x-3 bottom-20 z-[6] rounded-2xl border border-white/15 bg-black/75 p-3 text-center backdrop-blur">
-            <p className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Camera setup</p>
-            <p className="mt-1 text-[16px] leading-snug text-white/85">Prop your device at hip height, 2–3 m away, portrait or landscape.</p>
-            <p className={`mt-2 text-[clamp(18px,5vw,26px)] font-black leading-tight ${v.setupReady ? 'text-[#00FF9D]' : 'text-[#FFB020]'}`}>
-              {v.setupReady ? 'Whole body in view — ready' : (v.framing?.instruction ?? 'Step into the shot')}
-            </p>
-          </div>
+          {/* VERTICAL-EASY (2026-10-27): the setup says itself — a picture of where the device goes, then ONE big word: the
+              fix ("Step back", "Whole body in view") in amber, or "Ready" in green with a tick. The full sentence sits under
+              it. Before: a line of distances to read ("hip height, 2–3 m away, portrait or landscape") and the fix below. */}
+          {(() => {
+            const head = setupHeadline(v.framing ?? null, v.setupReady || (v.step === 'calibrate' && framingOk));
+            return (
+              <div data-setup-card={head.ready ? 'ready' : 'fix'} className="absolute inset-x-3 bottom-20 z-[6] rounded-2xl border border-white/15 bg-black/75 p-3 text-center backdrop-blur">
+                <p className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">{SETUP_EYEBROW}</p>
+                <p data-setup-word className={`mt-1 flex items-center justify-center gap-2 text-[clamp(28px,8vw,40px)] font-black leading-none ${head.ready ? 'text-[#00FF9D]' : 'text-[#FFB020]'}`}>
+                  {head.ready ? <Check aria-hidden className="h-8 w-8" strokeWidth={3} /> : null}{head.word}
+                </p>
+                {head.ready
+                  ? (v.step === 'calibrate' ? <p className="mt-2 text-[16px] leading-snug text-white/85">{SETUP_READY_LINE}</p> : null)
+                  : (
+                    <div className="mt-2 flex items-center gap-3 text-left">
+                      <SetupPicture className="h-16 w-auto shrink-0" />
+                      <p className="text-[16px] leading-snug text-white/85">{v.framing?.instruction && v.framing.worst !== 'noBody' ? v.framing.instruction : SETUP_PLACE}</p>
+                    </div>
+                  )}
+              </div>
+            );
+          })()}
         </>
       ) : null}
       {/* MIRROR flight-time (PM): written only, under the jump setup — the flight time reads truest on straight legs */}
       {v.test === 'T5' && !noReading ? (
         <p data-jump-land-tall className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{JUMP_LAND_TALL}</p>
+      ) : null}
+      {/* VERTICAL-EASY: the jump's one rule as a picture, before the countdown — hands that leave the hips are the refusal
+          the owner's own recorded jump hit first */}
+      {v.test === 'T5' && v.step === 'position' ? (
+        <div data-jump-how className="absolute inset-x-3 top-[13rem] z-[6] flex items-center justify-center gap-3 rounded-2xl bg-black/60 px-3 py-2">
+          <HandsOnHips className="h-14 w-auto shrink-0" />
+          <p className="text-[16px] font-bold leading-snug text-white">{JUMP_HOW}</p>
+        </div>
+      ) : null}
+      {/* VERTICAL-EASY: "3, 2, 1, Jump!" — the word, big, for the moment the countdown ends */}
+      {v.test === 'T5' && v.step === 'active' && v.flash === 'start' ? (
+        <div data-jump-go className="pointer-events-none absolute inset-0 z-[7] grid place-items-center">
+          <span className="text-[clamp(72px,22vw,140px)] font-black uppercase leading-none text-[#00FF9D] drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">{JUMP_GO}</span>
+        </div>
       ) : null}
       {v.dimWarning && !noReading ? (
         <p className="absolute inset-x-3 top-[7.5rem] z-[6] text-center text-[16px] font-bold text-[#FFB020]">Low light — move closer to a window if you can</p>

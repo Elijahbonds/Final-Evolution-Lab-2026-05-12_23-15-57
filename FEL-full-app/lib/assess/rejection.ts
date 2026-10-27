@@ -14,9 +14,11 @@ const SAY: Record<RejectReason, string> = {
   tooFast: 'Too fast. Slow down a little.',
   lowConfidence: 'The camera lost you for a moment.',
   heelUp: 'Keep your heel flat on the floor.',
-  handsOff: 'Keep your hands on your hips.',
-  noLanding: 'The camera never saw you land.',
-  tooHigh: 'The camera lost your feet on that jump. Once more.',
+  // VERTICAL-EASY (2026-10-27): each jump refusal says the one reason and the one fix, then "jump again" — the runner
+  // is already waiting for the next one (no button).
+  handsOff: 'Your hands left your hips. Keep them there and jump again.',
+  noLanding: 'I missed your landing. Step back a little and jump again.',
+  tooHigh: 'Your feet left the shot. Step back a little and jump again.',
   shallow: 'Go a little deeper on the next one.',
   other: 'That one did not count.',
 };

@@ -6,6 +6,7 @@ import { MODE_INFO } from '@/lib/game-data';
 import { CLEAN_SHARE_SAME_BAND } from '@/lib/mirror/progressReading';
 import { compareWeeks, type Point, type WeekCompare } from './week';
 import { jumpRealChangeCm } from '@/lib/jump/session';
+import { MEASURE_VERTICAL } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the one front door
 import type { ProfileGates } from './gate';
 
 // ── where to go to get a number (the empty states point here) ─────────────────────────────────────────────────────
@@ -62,7 +63,7 @@ export function jumpTile(points: Point[], now: number, gates: ProfileGates): Pro
       ...base, value: null, compare: null, vsLine: null, source: null,
       empty: gates.adult
         ? { text: 'Turn on saving your jump numbers to track them here.', href: ACCOUNT_HREF, cta: 'Account settings' }
-        : { text: 'Jump numbers are saved for adults who opt in. Yours show after each jump check.', href: JUMP_CHECK_HREF, cta: 'Do a jump check' },
+        : { text: 'Jump numbers are saved for adults who opt in. Yours show after each jump check.', href: JUMP_CHECK_HREF, cta: MEASURE_VERTICAL },
     };
   }
   const c = compareWeeks(points.map((p) => ({ at: p.at, value: cmToIn(p.value) })), now, { reduce: 'max', sameBand: JUMP_SAME_BAND_IN });
@@ -70,7 +71,7 @@ export function jumpTile(points: Point[], now: number, gates: ProfileGates): Pro
     const last = points.length ? r1(cmToIn(Math.max(...points.map((p) => p.value)))) : null;
     return {
       ...base, value: null, compare: c, vsLine: null, source: 'account',
-      empty: { text: last !== null ? `No jump this week (best lately ${last} in).` : 'No jump on record yet.', href: JUMP_CHECK_HREF, cta: 'Do a Mirror jump check' },
+      empty: { text: last !== null ? `No jump this week (best lately ${last} in).` : 'No jump on record yet.', href: JUMP_CHECK_HREF, cta: MEASURE_VERTICAL },
     };
   }
   return { ...base, value: r1(c.thisWeek).toFixed(1), compare: c, vsLine: vsLine(c, (n) => r1(n).toFixed(1), 'in'), source: 'account', empty: null };

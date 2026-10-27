@@ -49,6 +49,13 @@ import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
 
 const STILL_MS = 900;
+/**
+ * (new, VERTICAL-EASY 2026-10-27; TUNED — flagged in docs/VERTICAL-EASY-AUDIT.md) The front stand's sway allowance once a
+ * stand has already been refused (calib.swayFallback, 2.5× calib.maxSway). Measured on the bench's still stand
+ * (lib/jump/ballistic.ts): the jitter alone reads 0.013–0.016 at the realistic noise, 0.025–0.032 at 2× and 0.038–0.048 at
+ * 3×; a real sway of 5 % of body height (about 9 cm at the hips) is still refused.
+ */
+export const CALIB_SWAY_FALLBACK: number = th('calib.swayFallback');
 
 function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
   if (!part) return null;
@@ -179,6 +186,8 @@ export type RunnerStep =
 
 /** Steps where the reading-quality badge applies; it reads over the frames of the current step. */
 const READ_STEPS: ReadonlySet<RunnerStep> = new Set<RunnerStep>(['position', 'countdown', 'active']);
+/** The steps before a rep is up, where a missed frame is skipped rather than restarting the hold (VERTICAL-EASY). */
+const SETUP_STEPS: ReadonlySet<RunnerStep> = new Set<RunnerStep>(['framing', 'calibrate', 'calibrateSide', 'position', 'countdown']);
 
 export type RepMark = 'clean' | 'fault' | 'notRead';
 
@@ -333,6 +342,10 @@ export class AssessRunner {
   private lastT: number | null = null;
   private badSince: number | null = null;
   private lostFrames = 0;
+  /** Missed frames in a row before a rep is up (VERTICAL-EASY: fewer than LOSS_FRAMES are skipped, not a reset). */
+  private setupBlinks = 0;
+  /** Front stands in a row that did not calibrate (VERTICAL-EASY: from the second, the sway fallback is tried). */
+  private calFails = 0;
   private readonly readShares: number[] = [];
   private readStep: RunnerStep | null = null;
   private donePart: { test: TestId; part: PartId } | null = null;
@@ -438,6 +451,15 @@ export class AssessRunner {
     const def = this.part?.def ?? this.parts[this.partIdx] ?? null;
     const view: 'front' | 'side' = this.step === 'calibrateSide' ? 'side' : def?.view ?? 'front';
     const framing = checkFraming({ landmarks: frame.image.map((l) => ({ x: l.x, y: l.y, visibility: l.v })), present: frame.present }, view);
+    // VERTICAL-EASY (2026-10-27): a BLINK IS NOT A RESET. Before a rep is up (the shot, the stand, the countdown), a frame
+    // the pose model missed used to restart the 1 s shot hold, throw away the 3 s stand and send the countdown back to the
+    // start — on the bench, 1 % missed frames took the jump check from 9 s to 20 s before "Go" (docs/VERTICAL-EASY-AUDIT.md).
+    // Now fewer than LOSS_FRAMES missed frames in a row are skipped there, the same allowance the test itself already
+    // gives a rep (it pauses only after LOSS_FRAMES). Nothing is read from a skipped frame; a real absence still resets.
+    if (SETUP_STEPS.has(this.step) && trackingLost(frame)) {
+      this.setupBlinks++;
+      if (this.setupBlinks < LOSS_FRAMES) return this.view(now);
+    } else this.setupBlinks = 0;
     this.lastFraming = framing;
     if (READ_STEPS.has(this.step)) {
       if (this.readStep !== this.step) { this.readShares.length = 0; this.readStep = this.step; }
@@ -464,10 +486,18 @@ export class AssessRunner {
         if (!framing.ok) { this.calFrames = []; this.say(this.fixLine(framing) ?? framing.instruction); break; }
         this.calFrames.push(frame);
         if (frame.t - this.calFrames[0].t >= th('calib.frontMs')) {
-          const r = calibrateFront(this.calFrames, this.o.aspect);
+          let r = calibrateFront(this.calFrames, this.o.aspect);
+          // VERTICAL-EASY (2026-10-27): a still athlete on a noisy camera was told "Hold still" forever — the sway gate
+          // (calib.maxSway 0.02) reads landmark jitter as sway, and a realistic camera already uses 0.016 of it (2× the
+          // noise: 0.03). From the second stand that does not pass, the same stand is read once more at
+          // CALIB_SWAY_FALLBACK; every other check (the hold, the share of usable frames, the body's size) is unchanged.
+          if (!r.ok && this.calFails >= 1) {
+            const loose = calibrateFront(this.calFrames, this.o.aspect, th('calib.frontMs'), CALIB_SWAY_FALLBACK);
+            if (loose.ok) r = loose;
+          }
           this.calFrames = [];
-          if (r.ok) { this.calib = { ...this.calib, front: r.value }; this.calWhy = null; this.startPart(now); }
-          else { this.calWhy = r.why; this.say(r.why); }
+          if (r.ok) { this.calFails = 0; this.calib = { ...this.calib, front: r.value }; this.calWhy = null; this.startPart(now); }
+          else { this.calFails++; this.calWhy = r.why; this.say(r.why); }
         }
         break;
       }
@@ -508,7 +538,8 @@ export class AssessRunner {
         }
         const left = th('ui.timing').countdownMs - (now - this.stepAt);
         const n = Math.ceil(left / 1000);
-        if (left <= 0) { this.go('active', now); this.pulse('start'); this.say('Go.', true); }
+        // VERTICAL-EASY: the jump's countdown ends "3, 2, 1, Jump!" (the word it asks for); every other part keeps "Go."
+        if (left <= 0) { const word = this.part?.def.test === 'T5' ? 'Jump!' : 'Go.'; this.go('active', now); this.pulse('start'); this.say(word, true); }
         else { if (n !== this.countN) { this.countN = n; this.pulse('countdown'); } this.say(String(n), true); }
         break;
       }

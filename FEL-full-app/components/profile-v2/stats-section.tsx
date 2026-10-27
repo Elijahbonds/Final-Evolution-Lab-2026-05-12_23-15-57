@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { ProfileV2Data } from '@/lib/profile-v2/assemble';
 import { JUMP_CHECK_HREF } from '@/lib/profile-v2/tiles';
+import { MEASURE_VERTICAL } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the one front door
 import { Section, Card } from './section';
 import { Sparkline } from './sparkline';
 import { DeviceBests } from './device-bests';
@@ -60,7 +61,7 @@ export function StatsSection({ data, viewer = false }: { data: ProfileV2Data; vi
             </ul>
           ) : (
             <p className="mt-2 text-[14px] text-white/50">
-              Nothing measured yet.{!viewer && <> <Link href={JUMP_CHECK_HREF} className="font-bold text-fel-cyan underline-offset-2 hover:underline">Do a Mirror jump check →</Link></>}
+              Nothing measured yet.{!viewer && <> <Link href={JUMP_CHECK_HREF} className="font-bold text-fel-cyan underline-offset-2 hover:underline">{MEASURE_VERTICAL} →</Link></>}
             </p>
           )}
           {!viewer && <Link href="/profile/edit#measure" className="mt-3 inline-block text-[12px] font-bold text-white/55 underline-offset-2 hover:text-white hover:underline">Log a measurement</Link>}

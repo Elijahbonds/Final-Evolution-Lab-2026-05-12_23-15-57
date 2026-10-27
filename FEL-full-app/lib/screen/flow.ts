@@ -1,8 +1,8 @@
 // flow — the Quick Screen's steps before the camera, as a pure reducer (SCREEN-SHIP, 2026-09-29; SCREEN-FIX).
 //
 //   start → age → (under 18 or no age: "A grown-up is with me") → "Does anything hurt right now?"
-//         → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right / Not sure) → the camera card
-//         → camera
+//         → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right / Not sure; the full screen
+//         only — VERTICAL-EASY: the jump alone skips it) → the camera card → camera
 //
 // The age is asked ONCE per run: a `start` carrying a locked answer (lib/screen/store.ts lockAge) skips the question —
 // and since AGE-RESET (audit 2.2, 2026-10-03) the page clears the answer on every new Start, so a `start` in practice
@@ -57,7 +57,7 @@ export function backStep(s: PreState): PreState {
     case 'age': case 'grownUp': case 'painStop': return PRE_START;
     case 'pain': return s.age && needsGrownUp(s.age) ? { step: 'grownUp', age: s.age, gate: null, kind: s.kind } : PRE_START;
     case 'takeoff': return { ...s, step: 'pain' };
-    case 'cameraInfo': return { ...s, step: 'takeoff' };
+    case 'cameraInfo': return { ...s, step: s.kind === 'jump' ? 'pain' : 'takeoff' };
     case 'camera': return { ...s, step: 'cameraInfo' };
   }
 }
@@ -79,7 +79,10 @@ export function preStep(s: PreState, e: PreEvent, now: Date = new Date()): PreSt
       return backStep(s);
     case 'pain':
       if (s.step !== 'pain' || !s.gate) return s;
-      return e.hurts ? { step: 'painStop', age: s.age, gate: null, kind: s.kind } : { ...s, step: 'takeoff' };
+      // VERTICAL-EASY (2026-10-27): the jump alone never asks the take-off foot. It labels the sided checks only (the
+      // full screen's), and the jump's own number does not use it; "Do the full screen" asks it then (assess-app.tsx).
+      if (e.hurts) return { step: 'painStop', age: s.age, gate: null, kind: s.kind };
+      return s.kind === 'jump' ? { ...s, step: 'cameraInfo' } : { ...s, step: 'takeoff' };
     case 'takeoff':
       if (s.step !== 'takeoff' || !s.gate) return s;
       return { ...s, step: 'cameraInfo' };

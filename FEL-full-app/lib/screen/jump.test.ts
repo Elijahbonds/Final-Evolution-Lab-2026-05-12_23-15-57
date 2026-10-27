@@ -93,8 +93,13 @@ describe('the jump result', () => {
     const h = html(false);
     expect(text(h)).toContain('about 16 in');   // MIRROR flight-time: a rounded estimate, never an exact number
     expect(text(h)).toContain('3 jumps, best one shown');   // test changed: copy rewrite (CUE-REWRITE) — same meaning
-    expect(text(h)).toContain('Your best jump today: the number to beat next time.');
-    expect(h).toContain('text-[40px]');
+    // test changed (VERTICAL-EASY, 2026-10-27): the result is one big number and three lines (saw / means / next, CUE-STYLE
+    // §4); JUMP_MEANING's line became the "means" line, the number grew from 40 px to 88 px, the ways on moved under
+    // "More detail" (still in the markup, one tap away).
+    expect(text(h)).toContain('Best of your 3 jumps: about 16 in.');
+    expect(text(h)).toContain('This is your number to beat.');
+    expect(text(h)).toContain('Measure again in a week');
+    expect(h).toContain('text-[88px]');
     expect(h).toContain('Do the full screen');
     expect(h).toContain('href="/screen/program/dunking"');
     expect(h).toContain('href="/play/brain-brawl"');
