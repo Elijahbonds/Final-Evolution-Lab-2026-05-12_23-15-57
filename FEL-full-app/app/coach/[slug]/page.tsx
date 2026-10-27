@@ -13,6 +13,9 @@ import { profileDescription, profileJsonLd, type PublicProfile } from '@/lib/coa
 import { loadBusinessSection } from '@/lib/coach-business/profileServer';
 import { rawDb } from '@/lib/coach-business/server';
 import { CoachProfileView, type StoreListingCard } from '@/components/coach-business/coach-profile-view';
+// COACH-DELIVERY (2026-10-26): the coach's brand (COA-04) above the page, and their clients' reviews (COA-10) below it
+import { brandingFor } from '@/lib/coach/brandingServer';
+import { BrandMark } from '@/components/coach/brand-bar';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,11 +98,15 @@ export default async function CoachStorePage({ params }: { params: { slug: strin
       };
     }
     const business = await loadBusinessSection(rawDb(), instructor.userId);
+    const brand = (await brandingFor(rawDb(), [instructor.userId]).catch(() => new Map())).get(instructor.userId) ?? null;
     const profile = toProfile(instructor);
     const jsonLd = profileJsonLd(profile, (business?.packages ?? []).filter((k) => k.action !== null), `${SITE_ORIGIN}/coach/${instructor.slug}`);
     return (
       <>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        {brand && (brand.name || brand.logoUrl) && (
+          <div className="mx-auto max-w-3xl px-4 pt-4" style={brand.accent ? { borderTop: `3px solid ${brand.accent}` } : undefined} data-coach-brand><BrandMark b={brand} size={40} /></div>
+        )}
         <CoachProfileView
           profile={profile}
           sports={business?.sports ?? []}

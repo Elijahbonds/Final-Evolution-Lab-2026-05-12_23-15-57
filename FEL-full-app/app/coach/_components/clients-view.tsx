@@ -34,6 +34,8 @@ import { HabitsPanel } from '@/components/coach/parity/habits-panel';
 import { ImportProgram } from '@/components/coach/parity/import-panel';
 // COACH-DELIVERY (2026-10-26): automations, the calendar, the first-block draft, branding (wiring only)
 import { AutomationsPanel } from '@/components/coach/automations-panel';
+import { CoachCalendar } from '@/components/coach/calendar';
+import { BrandingPanel } from '@/components/coach/branding-panel';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -117,6 +119,10 @@ export function ClientsView() {
       <HabitsPanel />
       {/* COACH-DELIVERY (2026-10-26): automations (COA-01) — wiring only; coming soon until the pending SQL */}
       <AutomationsPanel />
+      {/* COACH-DELIVERY (2026-10-26): roster sessions on a calendar with an .ics feed (COA-05) — wiring only */}
+      <CoachCalendar />
+      {/* COACH-DELIVERY (2026-10-26): the coach's brand (COA-04) — wiring only */}
+      <BrandingPanel />
       {/* COMBINE-DAY (2026-10-25): tryouts and testing days, run on this device (/coach/combine) */}
       <CombineEntry />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}

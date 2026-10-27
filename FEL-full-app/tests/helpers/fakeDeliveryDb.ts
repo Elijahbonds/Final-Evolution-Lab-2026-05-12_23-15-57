@@ -7,6 +7,8 @@
 import { fakeParityDb, type FakeParityDb } from './fakeParityDb';
 import { SQL as AUTO } from '@/lib/coach/automations/store';
 import { SQL as SURVEY } from '@/lib/coach/readiness/surveyStore';
+import { SQL as SCHED } from '@/lib/coach/schedule/store';
+import { SQL as BRAND } from '@/lib/coach/brandingServer';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -18,6 +20,9 @@ export interface FakeDeliveryDb extends FakeParityDb {
   clientSessions: { programId: string; clientId: string; completedAt: Date | null }[];
   messages: { id: string; programId: string; authorId: string; body: string; createdAt: Date }[];
   extra: { query: Map<string, (v: unknown[]) => unknown>; exec: Map<string, (v: unknown[]) => number> };
+  /** Users with a certified FacilitatorProfile (the builder's and branding's gate). */
+  certified: string[];
+  facilitatorProfile: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   coachingProgram: any; clientSession: any; programMessage: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
@@ -32,14 +37,15 @@ export function fakeDeliveryDb(o: { tables?: boolean; now?: string } = {}): Fake
   Object.assign(s, {
     deliveryTables: o.tables ?? true,
     automations: [], runs: [], surveys: [], branding: [], sessions: [], feeds: [], reviews: [], programs: [], clientSessions: [], messages: [],
-    extra: { query: new Map(), exec: new Map() },
+    extra: { query: new Map(), exec: new Map() }, certified: [],
   });
   const now = () => new Date(s.clock);
   const copy = <T,>(rows: Row[]) => rows.map((r) => ({ ...r })) as T;
 
   s.$queryRawUnsafe = async <T,>(q: string, ...v: unknown[]): Promise<T> => {
     if (q.includes('information_schema') && q.includes("'CoachReview'")) { s.log.push(q); return (s.deliveryTables ? [{ ok: 1 }] : []) as T; }
-    const own = q === AUTO.forCoach || q === AUTO.enabledAll || q === AUTO.enabledFor || q === AUTO.runsFor || q === AUTO.recentForCoach || s.extra.query.has(q);
+    const own = q === AUTO.forCoach || q === AUTO.enabledAll || q === AUTO.enabledFor || q === AUTO.runsFor || q === AUTO.recentForCoach
+      || q === SCHED.forCoach || q === SCHED.forCoaches || q === SCHED.feedNonce || q === BRAND.get || s.extra.query.has(q);
     if (!own) return parityQuery<T>(q, ...v);
     s.log.push(q);
     if (!s.deliveryTables) throw missing();
@@ -49,12 +55,16 @@ export function fakeDeliveryDb(o: { tables?: boolean; now?: string } = {}): Fake
       case AUTO.enabledFor: return copy<T>(s.automations.filter((a) => a.coachId === v[0] && a.enabled && a.archivedAt == null));
       case AUTO.runsFor: return copy<T>(s.runs.filter((r) => (v[0] as string[]).includes(r.automationId) && r.day >= (v[1] as string)));
       case AUTO.recentForCoach: return copy<T>(s.runs.filter((r) => r.coachId === v[0] && r.createdAt >= (v[1] as Date)).reverse());
+      case SCHED.forCoach: return copy<T>(s.sessions.filter((x) => x.coachId === v[0] && x.startsAt >= (v[1] as Date) && x.startsAt < (v[2] as Date)).sort((a, b) => a.startsAt - b.startsAt));
+      case SCHED.forCoaches: return copy<T>(s.sessions.filter((x) => (v[0] as string[]).includes(x.coachId) && x.startsAt >= (v[1] as Date) && x.startsAt < (v[2] as Date)).sort((a, b) => a.startsAt - b.startsAt));
+      case SCHED.feedNonce: return copy<T>(s.feeds.filter((f) => f.userId === v[0]));
+      case BRAND.get: return copy<T>(s.branding.filter((b) => (v[0] as string[]).includes(b.coachId)));
       default: return s.extra.query.get(q)!(v) as T;
     }
   };
 
   s.$executeRawUnsafe = async (q: string, ...v: unknown[]): Promise<number> => {
-    const own = Object.values(AUTO).includes(q as never) || s.extra.exec.has(q);
+    const own = Object.values(AUTO).includes(q as never) || Object.values(SCHED).includes(q as never) || Object.values(BRAND).includes(q as never) || s.extra.exec.has(q);
     if (!own) return parityExec(q, ...v);
     s.log.push(q);
     if (!s.deliveryTables) throw missing();
@@ -79,6 +89,18 @@ export function fakeDeliveryDb(o: { tables?: boolean; now?: string } = {}): Fake
         return 1;
       }
       case AUTO.finishRun: { const r = s.runs.find((x) => x.id === v[0]); if (!r) return 0; r.outcome = v[1]; r.messageId = v[2]; return 1; }
+      case SCHED.insert: { const [id, coachId, title, startsAt, minutes, place, scope, scopeId] = v; s.sessions.push({ id, coachId, title, startsAt, minutes, place, scope, scopeId, cancelledAt: null, updatedAt: now() }); return 1; }
+      case SCHED.update: {
+        const x = s.sessions.find((r) => r.id === v[0] && r.coachId === v[1] && r.cancelledAt == null);
+        if (!x) return 0;
+        Object.assign(x, { title: v[2], startsAt: v[3], minutes: v[4], place: v[5], scope: v[6], scopeId: v[7], updatedAt: now() });
+        return 1;
+      }
+      case SCHED.cancel: { const x = s.sessions.find((r) => r.id === v[0] && r.coachId === v[1] && r.cancelledAt == null); if (!x) return 0; x.cancelledAt = now(); x.updatedAt = now(); return 1; }
+      case SCHED.setFeed: { const f = s.feeds.find((r) => r.userId === v[0]); if (f) f.nonce = v[1]; else s.feeds.push({ userId: v[0], nonce: v[1] }); return 1; }
+      case SCHED.dropFeed: { const n = s.feeds.length; s.feeds = s.feeds.filter((r) => r.userId !== v[0]); return n - s.feeds.length; }
+      case BRAND.save: { const b = s.branding.find((r) => r.coachId === v[0]); if (b) Object.assign(b, { name: v[1], accent: v[2] }); else s.branding.push({ coachId: v[0], name: v[1], accent: v[2], logoPath: null }); return 1; }
+      case BRAND.setLogo: { const b = s.branding.find((r) => r.coachId === v[0]); if (b) b.logoPath = v[1]; else s.branding.push({ coachId: v[0], name: null, accent: null, logoPath: v[1] }); return 1; }
       default: return s.extra.exec.get(q)!(v);
     }
   };
@@ -97,7 +119,9 @@ export function fakeDeliveryDb(o: { tables?: boolean; now?: string } = {}): Fake
         .map((p) => ({ ...p, blocks: [{ sessions: p.sessionKinds.map((kind) => ({ kind })) }] }));
     },
     async findUnique({ where }: { where: Row }) { const p = s.programs.find((x) => x.id === where.id); return p ? { ...p } : null; },
+    async findFirst({ where }: { where: Row }) { return (await s.coachingProgram.findMany({ where }))[0] ?? null; },
   };
+  s.facilitatorProfile = { async findUnique({ where }: { where: Row }) { return s.certified.includes(where.userId) ? { certificationStatus: 'certified' } : null; } };
   s.clientSession = {
     async findMany({ where }: { where: Row }) {
       return s.clientSessions.filter((c) => inList(where.programId, c.programId) && inList(where.clientId, c.clientId) && (!where.completedAt?.gte || (c.completedAt && c.completedAt >= where.completedAt.gte)));

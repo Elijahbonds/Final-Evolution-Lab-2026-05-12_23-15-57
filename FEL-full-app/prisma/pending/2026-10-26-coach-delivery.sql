@@ -17,8 +17,10 @@
 --                         (lib/health/readiness.ts). HEALTH DATA: written only for a verified adult with a live health_data
 --                         grant (lib/privacy/healthWriteGate.ts HEALTH_WRITE_ROUTES i), seen by a coach only with that
 --                         athlete's live coach_view grant (lib/coach/readiness/gate.ts coachMaySee).
---   CoachBranding       — one row per coach: an accent colour ('#RRGGBB') and a logo object path in the EXISTING public
---                         creator bucket (CREATOR_MEDIA_PUBLIC_BUCKET); no logo when the bucket is not set. No new storage.
+--   CoachBranding       — one row per coach: a brand name (shown with the logo and signed under their invite emails — the
+--                         emails stay plain text, FEL's mail rule), an accent colour ('#RRGGBB', readable on FEL's dark
+--                         background) and a logo object path in the EXISTING public creator bucket (CREATOR_MEDIA_PUBLIC_BUCKET);
+--                         no logo when the bucket is not set. No new storage.
 --   CoachRosterSession  — a session on the coach's calendar (not a paid booking): title, start, minutes, an optional place
 --                         (a venue name; the form says never a home address), who it is for ('roster' | 'athlete' | 'team'
 --                         + scopeId), cancelledAt. Read into an .ics feed per coach and per athlete.
@@ -105,6 +107,7 @@ CREATE TABLE "ReadinessSurvey" (
 -- CreateTable
 CREATE TABLE "CoachBranding" (
     "coachId" TEXT NOT NULL,
+    "name" TEXT,
     "accent" TEXT,
     "logoPath" TEXT,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

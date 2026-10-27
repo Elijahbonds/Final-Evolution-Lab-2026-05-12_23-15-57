@@ -111,9 +111,12 @@ import { ReadinessTodayLine } from '@/components/readiness/readiness-today-line'
 // COACH-PARITY (2026-10-26): the coach's habits and check-ins (wiring only; nothing shows until the pending SQL is applied)
 import { HabitsToday, MY_HABITS_API } from '@/components/coach/parity/habits-today';
 import { CheckinCard, MY_CHECKINS_API } from '@/components/coach/parity/checkin-card';
+// COACH-DELIVERY (2026-10-26): the coach's calendar (COA-05) and branding (COA-04) on Today (wiring only)
+import { MY_SCHEDULE_API, MySchedule } from '@/components/coach/my-schedule';
+import { CoachBrandBar, MY_BRANDING_API } from '@/components/coach/brand-bar';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null; schedule?: string | null; branding?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API, schedule: MY_SCHEDULE_API, branding: MY_BRANDING_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -247,6 +250,8 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     <>
       {api.habits && <HabitsToday api={api.habits} />}
       {api.checkins && <CheckinCard api={api.checkins} />}
+      {/* COACH-DELIVERY COA-05 (2026-10-26): the coach's upcoming roster sessions (nothing until the pending SQL) */}
+      {api.schedule && <MySchedule api={api.schedule} />}
     </>
   );
   if (!data.program || !data.today) return (
@@ -274,6 +279,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   return (
     <div className="space-y-4" data-testid="today">
       {finishedCard}
+      {api.branding && <CoachBrandBar api={api.branding} />}
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
