@@ -33,8 +33,8 @@ const SCEN = (process.env.SCEN ?? 'approach,press,release,selflob,oop').split(',
 const REPS = Number(process.env.REPS ?? 3);
 const STRIP = process.env.STRIP === '1';
 const SEED = Number(process.env.SEED ?? 7);
-const W = Number(process.env.VW ?? 800), H = Number(process.env.VH ?? 450);
-const SCALE = Number(process.env.HWSCALE ?? 1.5);
+const W = Number(process.env.VW ?? 480), H = Number(process.env.VH ?? 270);
+const SCALE = Number(process.env.HWSCALE ?? 2);
 fs.mkdirSync(OUT, { recursive: true });
 const VCLOCK_JS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '_vclock-page.js'), 'utf8');
 
@@ -231,7 +231,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     const s = list[i]; const rep = scen === 'tricks' ? 0 : i;
     const cfg = cfgFor(s, rep);
     const stripOn = STRIP && i === 0;
-    if (stripOn) cfg.strip = Array.from({ length: 40 }, (_, k) => 6 + k * 6);
+    if (stripOn) cfg.strip = Array.from({ length: Number(process.env.STRIP_N ?? 20) }, (_, k) => Number(process.env.STRIP_FROM ?? 60) + k * Number(process.env.STRIP_STEP ?? 6));
     const p = pg.p;
     const shotsDir = path.join(OUT, 'strip', s.replace(':', '-'));
     if (stripOn) fs.mkdirSync(shotsDir, { recursive: true });
@@ -243,6 +243,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
       if (stripOn) {
         const wait = await p.evaluate(() => (window as unknown as DunkWin).__rec.stripWait).catch(() => false);
         if (wait) {
+          await p.evaluate(() => { const o = document.getElementById('o'); if (o) o.style.display = 'none'; }).catch(() => {});
           await p.screenshot({ path: path.join(shotsDir, `f${String(++k).padStart(2, '0')}.jpg`), quality: 70, type: 'jpeg' });
           await p.evaluate(() => { const w = window as unknown as DunkWin; w.__rec.stripWait = false; w.__vc.resume(); });
           continue;
@@ -254,6 +255,7 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     const r = res as AttemptOut | null;
     if (!r || 'err' in r) { console.log(`  ${s}#${rep}: ${r ? r.err : 'timeout'}`); out.push({ scen: s, rep, frames: [], marks: [], qa: [], pressAt: null, t0: 0, hud: [], err: r ? r.err : 'timeout' }); continue; }
     out.push({ scen: s, rep, ...r });
+    fs.writeFileSync(path.join(OUT, `rec-${scen}.json`), JSON.stringify(out));   // each attempt saved as it lands: a killed run keeps what it measured
     console.log(`  ${s}#${rep}: ${r.frames.length} frames, ${r.marks.length} marks${pg.errors.length ? ' · errors ' + pg.errors.length : ''}`);
   }
   if (pg) await pg.p.context().close();
@@ -402,7 +404,8 @@ const summary: Record<string, unknown> = { base: BASE, page: PAGE, seed: SEED, a
 try {
   for (const scen of SCEN) {
     console.log(`[${scen}]`);
-    const recs = await runScen(b, scen, REPS);
+    const recFile = path.join(OUT, `rec-${scen}.json`);
+    const recs: Rec[] = process.env.FROM_REC === '1' && fs.existsSync(recFile) ? JSON.parse(fs.readFileSync(recFile, 'utf8')) : await runScen(b, scen, REPS);
     fs.writeFileSync(path.join(OUT, `rec-${scen}.json`), JSON.stringify(recs));
     const rows = recs.map((r) => r.err ? { scen: r.scen, rep: r.rep, err: r.err } : { scen: r.scen, rep: r.rep, approach: approachMetrics(r), flight: flightMetrics(r), lob: lobMetrics(r), show: showMetrics(r), hud: r.hud.slice(0, 30) });
     if (scen === 'tricks') {
