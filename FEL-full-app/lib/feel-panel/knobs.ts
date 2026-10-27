@@ -492,6 +492,107 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/ReachTell.ts POKE_LEAD_SEC',
     hint: 'The poke aims this far ahead of a moving ball (0 = at the ball).',
   },
+  // ── hoops-p02 (1v1/3v3 ten-phase pass, phase 2 "defence is skill, not dice"): blocks, the contest, the AI strip, on-ball pressure ──
+  {
+    id: 'hoops.blockDiceOn', label: 'Blocks: dice (1) / hand meets ball (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts BLOCK_DICE_ON',
+    hint: 'A/B: 1 puts today\'s block rolls back exactly (aiBlockChance, checkBlock\'s window, jumpSwats, goaltending with no touch).',
+  },
+  {
+    id: 'hoops.blkShoulderM', label: 'Blocks: shoulder height', def: 1.55, min: 1.2, max: 1.9, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts SHOULDER_M',
+    hint: 'The shoulder the reaching arm swings from, standing; it rides the contest jump.',
+  },
+  {
+    id: 'hoops.blkArmM', label: 'Blocks: arm (shoulder to fingertips)', def: 0.85, min: 0.5, max: 1.2, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts ARM_M',
+    hint: 'How far the hand gets from the shoulder. With the shoulder: the standing reach.',
+  },
+  {
+    id: 'hoops.blkContactM', label: 'Blocks: ball meets hand within', def: 0.14, min: 0.05, max: 0.4, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts CONTACT_M',
+    hint: 'The ball centre this close to the reach is a touch (the ball radius and a fingertip).',
+  },
+  {
+    id: 'hoops.blkLookSec', label: 'Blocks: release flight a hand can meet', def: 0.25, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts LOOK_SEC',
+    hint: 'How much of a released shot\'s flight is read for a block.',
+  },
+  {
+    id: 'hoops.aiBlockLeadSec', label: 'AI block: leaves the floor before the release', def: 0.15, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts AI_BLOCK_LEAD_SEC',
+    hint: 'The AI times its jump this long before the release it expects (the green). Never before its reaction lets it.',
+  },
+  {
+    id: 'hoops.blkDeflectMps', label: 'Blocks: ball off the hand, speed', def: 2.4, min: 0.5, max: 6, step: 0.1, unit: 'm/s', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts DEFLECT_MPS',
+    hint: 'How fast a blocked ball leaves along the line it was hit.',
+  },
+  {
+    id: 'hoops.blkDeflectUpMps', label: 'Blocks: ball off the hand, lift', def: 1.4, min: 0, max: 4, step: 0.1, unit: 'm/s', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts DEFLECT_UP_MPS',
+    hint: 'Up off a rising hand (a falling hand spikes it down a little).',
+  },
+  {
+    id: 'hoops.oneContestOn', label: 'Contest: one model (1) / per shooter (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts ONE_CONTEST_ON',
+    hint: 'A/B: 0 puts each shooter\'s old contest formula back exactly.',
+  },
+  {
+    id: 'hoops.contestRangeM', label: 'Contest: distance reaches 0 at', def: 2.6, min: 1.5, max: 4, step: 0.05, unit: 'm', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CONTEST_RANGE_M',
+    hint: 'Planar. Today: 2.2 on my jumper, 3.0 on theirs and my mates\'.',
+  },
+  {
+    id: 'hoops.contestDistW', label: 'Contest: distance weight', def: 1, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CONTEST_DIST_W',
+    hint: 'How much the distance alone contests.',
+  },
+  {
+    id: 'hoops.contestJump', label: 'Contest: a jump at its top adds', def: 0.32, min: 0, max: 0.6, step: 0.01, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts JUMP_CONTEST',
+    hint: 'Today a flat 0.3 for 0.7 s; now on the jump\'s curve.',
+  },
+  {
+    id: 'hoops.contestJumpFloor', label: 'Contest: share at take-off / landing', def: 0.35, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts JUMP_CONTEST_FLOOR',
+    hint: 'Of the jump\'s contest, what a jump just leaving or coming down adds.',
+  },
+  {
+    id: 'hoops.contestCloseout', label: 'Contest: a full closeout adds', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CLOSEOUT_CONTEST',
+    hint: 'A defender running AT the shooter (not past him) adds up to this.',
+  },
+  {
+    id: 'hoops.contestCloseoutFullMps', label: 'Contest: full closeout speed', def: 3, min: 1, max: 6, step: 0.1, unit: 'm/s', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CLOSEOUT_FULL_MPS',
+    hint: 'Speed along the line to the shooter for the full closeout.',
+  },
+  {
+    id: 'hoops.stealDiceOn', label: 'AI strip: dice (1) / hand on the ball (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STEAL_DICE_ON',
+    hint: 'A/B: 1 puts today\'s strip rolls back exactly (0.22 a reach, 0.6 on the bump, 0.18 a bump strip).',
+  },
+  {
+    id: 'hoops.stripReachM', label: 'AI strip: hand reaches the ball within', def: 0.95, min: 0.5, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STRIP_REACH_M',
+    hint: 'Planar, the reacher to the ball, when his reach resolves.',
+  },
+  {
+    id: 'hoops.stripShieldM', label: 'AI strip: handler body shields within', def: 0.25, min: 0, max: 0.6, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STRIP_SHIELD_M',
+    hint: 'A ball whose line to the reacher passes this close to the handler is behind his body.',
+  },
+  {
+    id: 'hoops.stripBallMaxY', label: 'AI strip: ball off the palm below', def: 0.85, min: 0.3, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STRIP_BALL_MAX_Y',
+    hint: 'Above this the ball is held at the top of the dribble (the bump window ignores it).',
+  },
+  {
+    id: 'hoops.onBallCushionM', label: 'On-ball: most room on a moving handler', def: 1.35, min: 0, max: 4, step: 0.05, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pressure.ts ONBALL_CUSHION_M',
+    hint: 'The on-ball defender\'s cushion on a dribbler is capped at this. 0 = today\'s contain lever, uncapped.',
+  },
   // ── lane/hoops-def-tell (#273 T-C): two bodies never stand inside each other, and never pop apart (core/BodySeparation) ──
   {
     id: 'hoops.bodySepOn', label: 'Body separation on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',

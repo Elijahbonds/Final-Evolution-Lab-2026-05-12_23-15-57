@@ -43,11 +43,13 @@ export const CONTACT_M = 0.14;
 /** How much of a release's flight a hand can still meet (s). After this the ball is above every hand on the floor. Knob `hoops.blkLookSec`. */
 export const LOOK_SEC = 0.25;
 /** The contest jump both modes play (OneVOneMode JUMP_SEC / JUMP_VY 3.0 m/s; ThreeVThreeMode JUMP_SEC / JUMP_APEX): s and m. */
-export const JUMP_SEC = 0.75, JUMP_RISE_M = 0.46;
+export const JUMP_SEC = 0.75;
+export const JUMP_RISE_M = 0.46;
 /** The AI leaves the floor this long before the release it expects (the green's centre). Today's 0.15 s. Knob `hoops.aiBlockLeadSec`. */
 export const AI_BLOCK_LEAD_SEC = 0.15;
 /** The blocked ball's planar speed off the hand, and its lift off a rising / a falling hand (m/s). Knobs `hoops.blkDeflectMps`, `hoops.blkDeflectUpMps`. */
-export const DEFLECT_MPS = 2.4, DEFLECT_UP_MPS = 1.4;
+export const DEFLECT_MPS = 2.4;
+export const DEFLECT_UP_MPS = 1.4;
 
 export const blockDiceOn = (): boolean => feel('hoops.blockDiceOn', BLOCK_DICE_ON ? 1 : 0) >= 0.5;
 const shoulderM = (): number => feel('hoops.blkShoulderM', SHOULDER_M);

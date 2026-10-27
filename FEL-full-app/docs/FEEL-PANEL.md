@@ -311,3 +311,26 @@ lane/hoops-round2 (owner 2026-10-20, HOOPS DEFENSE / CONTACT; every number new, 
   defender's chest in; drawn only, every rotation put back after the frame).
 
 **assumption:** the bounds are safe, not tuned. A ranked, staked or head-to-head run reads every default above (`feel()` is closed there).
+
+lane/hoops-p02-defense (1v1 / 3v3 ten-phase pass, phase 2 "defence is skill, not dice"; owner 2026-10-20 HOOPS DEFENSE; the owner has
+felt none of these yet — every default is flagged in the lane report):
+
+- Group "Hoops · blocks (hand meets ball)" (`hoops/blocks.ts`), **TUNED (new behaviour)**: `hoops.blockDiceOn` 0 (1 = today's block rolls
+  back exactly: `aiBlockChance`, `checkBlock`'s window, `jumpSwats`, goaltending with no touch); `hoops.blkShoulderM` 1.55 m and
+  `hoops.blkArmM` 0.85 m (the reach: a sphere of the arm around the shoulder, the shoulder riding the contest jump — 2.40 m standing);
+  `hoops.blkContactM` 0.14 m (the ball's centre this close to the reach is a touch); `hoops.blkLookSec` 0.25 s (how much of a release's
+  flight is read); `hoops.aiBlockLeadSec` 0.15 s (the AI leaves the floor this long before the release it expects — today's number —
+  never before its tier's reaction); `hoops.blkDeflectMps` 2.4 m/s and `hoops.blkDeflectUpMps` 1.4 m/s (the ball off the hand, along
+  the line it was hit).
+- Group "Hoops · contest" (`hoops/contest.ts`), **TUNED (new behaviour)**: `hoops.oneContestOn` 1 (0 = each shooter's old formula);
+  `hoops.contestRangeM` 2.6 m (the distance term's zero; was 2.2 on my jumper, 3.0 on theirs and my mates'); `hoops.contestDistW` 1;
+  `hoops.contestJump` 0.32 and `hoops.contestJumpFloor` 0.35 (a contest jump on its curve: 0.32 at the top, 0.11 leaving or landing,
+  0 once landed — was a flat 0.3 for 0.7 s); `hoops.contestCloseout` 0.1 and `hoops.contestCloseoutFullMps` 3 m/s (a closeout running AT
+  the shooter adds up to 0.1; past him, nothing).
+- Group "Hoops · defense" (`hoops/steals.ts`, `hoops/pressure.ts`), **TUNED (new behaviour)**: `hoops.stealDiceOn` 0 (1 = today's strip
+  rolls: 0.22 a reach, 0.6 on the bump, 0.18 a bump strip); `hoops.stripReachM` 0.95 m, `hoops.stripShieldM` 0.25 m,
+  `hoops.stripBallMaxY` 0.85 m (the strip lands when his hand can get to the ball: in reach, not behind the handler's body, off the
+  palm); `hoops.onBallCushionM` 1.35 m (the on-ball man's most room on a moving handler; 0 = today's contain lever, uncapped).
+
+**assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the rig and the headless sim (lane report),
+not owner numbers. A ranked, staked or head-to-head run reads every default above.

@@ -605,7 +605,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   // hoops-p02: a body as the block test (hoops/blocks) and the contest (hoops/contest) see it
   const meBlocker = (): Blocker => ({ x: me.char.root.position.x, z: me.char.root.position.z, jumpAge: myJumpAge, handsUp: meHandUp });
   const bodyBlocker = (b: Body, handsUp = foeHandUp === b): Blocker => ({ x: b.char.root.position.x, z: b.char.root.position.z, jumpAge: b.jumpAge, handsUp });
-  const v3 = (p: P3): Vector3 => new Vector3(p.x, p.y, p.z);
+  const vec3 = (p: P3): Vector3 => new Vector3(p.x, p.y, p.z);
   /** One defender's contest on a shooter at `at` (hoops/contest): the hand up is mine (`meHandUp`) or the AI's hold (`foeHandUp`). */
   const contestBody = (d: Body, at: Vector3): ContestBody => {
     const v = d === me ? me.drib.vel : d.vel;
@@ -2596,7 +2596,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // no roll (the old chance is logged: what the dice would have charged), the roll behind hoops.blockDiceOn
     const aiRead = blockDiceOn() || !near ? null : meetsRelease(bodyBlocker(near, foeHandUp === near || near === armed), ballWorld().clone(), RIM, currentShot?.style ?? 'jumper', alteredApex(shotContest));
     console.info(`[3V3-DEF] my release ${currentShot?.style} contest ${shotContest.toFixed(2)} fatigue ${meFatigue01.toFixed(2)} handUp ${foeHandUp === near && !!near} jump ${!!near && near.jumpAge <= HAND_UP_SEC} block ${blockChance.toFixed(2)} rim ${distXZ(me.char.root.position, RIM_FLOOR).toFixed(2)} q ${quality} mod ${pctMod.toFixed(2)} pct ${pct.toFixed(2)} made ${arcMade} dist ${nearDist.toFixed(2)} oldContest ${oldContest.toFixed(2)}${aiRead ? ` geo ${aiRead.hit ? 'HIT' : 'miss'} gap ${aiRead.gap.toFixed(2)} at ${aiRead.t.toFixed(2)} s ball y ${aiRead.at.y.toFixed(2)} reach ${aiRead.reachTop.toFixed(2)} jumpAge ${near!.jumpAge === Infinity ? 'none' : near!.jumpAge.toFixed(2)}` : ''}`);
-    if (aiRead ? aiRead.hit : blockChance > 0 && roll() < blockChance) { blockedShot(ctx, near!, aiRead ? v3(deflect(bodyBlocker(near!, true), aiRead.at, aiRead.t)) : null); return; }
+    if (aiRead ? aiRead.hit : blockChance > 0 && roll() < blockChance) { blockedShot(ctx, near!, aiRead ? vec3(deflect(bodyBlocker(near!, true), aiRead.at, aiRead.t)) : null); return; }
     releaseBall(ball);
     gather = null;   // HOOPS-MOVE-KIT-A M1: a release inside the gather is a rushed shot
     // BIOMECH-HOOPS-WAVE1 G5: the held jumpshot (at its release frame) flows into the authored follow-through, HELD until the
@@ -2787,7 +2787,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           swatted = true; made = false; swatBy = protector;   // (no swing here: HIS block is my turnover, reported at feet-down)
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           const away = me.char.root.position.subtract(protector.char.root.position); away.y = 0; if (away.lengthSquared() < 1e-4) away.set(0, 0, 1); away.normalize();
-          ballSim.launch(at, protMeet === 'hit' ? v3(deflect(bodyBlocker(protector, true), at)) : away.scale(3.0).add(new Vector3((Math.random() - 0.5) * 2, 1.6, 0)));   // hoops-p02: where his hand hit it
+          ballSim.launch(at, protMeet === 'hit' ? vec3(deflect(bodyBlocker(protector, true), at)) : away.scale(3.0).add(new Vector3((Math.random() - 0.5) * 2, 1.6, 0)));   // hoops-p02: where his hand hit it
           ctx.juice.hitStop(60); ctx.juice.shake(0.12, 140); ctx.feel?.impact?.(0.5); EffectsKit.burst(ctx.scene, at, 'sparks');
           SoundKit.play('impact', { pitch: 0.7, volume: 0.7 }); SoundKit.play('crowdGroan', { volume: 0.6 });
           bannerFlash(ctx, 'MET AT THE RIM — REJECTED!', 1000);
@@ -2808,7 +2808,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (bumpHit ?? (swatChance > 0 && roll() < swatChance)) {
           swatted = true; made = false; swatBy = wall;   // (no swing here: see the protector's swat)
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
-          ballSim.launch(at, bumpHit ? v3(deflect(bodyBlocker(wall, true), at)) : c.dir.scale(-2.2).add(new Vector3((Math.random() - 0.5) * 2, 1.3, 0)));
+          ballSim.launch(at, bumpHit ? vec3(deflect(bodyBlocker(wall, true), at)) : c.dir.scale(-2.2).add(new Vector3((Math.random() - 0.5) * 2, 1.3, 0)));
           SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdGroan', { volume: 0.5 });
           ctx.feel?.impact?.(0.5); ctx.juice.shake(0.1, 120);
           wall.tree.beat('bball_block_reach', { fadeSec: 0.06 });
@@ -3839,7 +3839,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           swatted = true; made = false; box.blocks++;   // IMPROVE (2026-10-06) #9
           const at = ball.getAbsolutePosition().clone(); releaseBall(ball);
           const away = shooter.char.root.position.subtract(me.char.root.position); away.y = 0; away.normalize();
-          ballSim.launch(at, mySwat ? v3(deflect(meBlocker(), at)) : away.scale(-2.5).add(new Vector3((Math.random() - 0.5) * 2, 1.5, 0)));   // hoops-p02: where my hand hit it
+          ballSim.launch(at, mySwat ? vec3(deflect(meBlocker(), at)) : away.scale(-2.5).add(new Vector3((Math.random() - 0.5) * 2, 1.5, 0)));   // hoops-p02: where my hand hit it
           SoundKit.play('impact', { pitch: 0.7, volume: 0.6 }); SoundKit.play('crowdCheer', { volume: 0.7 });
           ctx.feel?.impact?.(0.5); ctx.juice.hitStop(50); ctx.juice.shake(0.1, 120);
           EffectsKit.burst(ctx.scene, at, 'sparks');
@@ -4329,7 +4329,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       ctx.feel?.impact?.(0.5);
       EffectsKit.burst(ctx.scene, shooter.char.root.position.add(new Vector3(0, 1.6, 0)), 'sparks');
       shooter.tree.beat('bball_contact_react');
-      releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), myRead ? v3(deflect(meBlocker(), myRead.at, myRead.t)) : new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose   // hoops-p02: where my hand hit it
+      releaseBall(ball); ballSim.launch(ball.getAbsolutePosition(), myRead ? vec3(deflect(meBlocker(), myRead.at, myRead.t)) : new Vector3((Math.random() - 0.5) * 4, 2, 3));   // BIOMECH-HOOPS-WAVE1 G6: a blocked ball goes loose   // hoops-p02: where my hand hit it
       putHud(ctx, { banner: 'REJECTED!' });
       mic?.say({ moment: 'game.block', priority: 2, side: 0.4, crowd: { moment: 'crowd.erupt', n: 2 } });   // THE MIC: the call before the gauge's
       swing(heroSwing({ play: 'block', by: 'me', on: 'foe' })); putHud(ctx, { momentum });   // MY block: it reported nothing
