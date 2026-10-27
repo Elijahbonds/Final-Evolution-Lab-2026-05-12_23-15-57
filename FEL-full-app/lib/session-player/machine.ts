@@ -16,6 +16,9 @@ import { isTimed, type Session } from './model';
 
 /** The count before the first set: time to step back from the phone and see the first demo. (new) */
 export const READY_SECONDS = 5;
+/** The count before the first set when its "How to set up" sheet opens by itself (an exercise this device has never run):
+ *  time to read the set-up and get into position, with no tap. (new) */
+export const READY_SETUP_SECONDS = 12;
 /** The least time between two exercises, when the source gives the set no rest: enough to walk to the next one. (new) */
 export const CHANGE_SECONDS = 5;
 /** Rest ticks in its last seconds (owner brief: "the last 3 s get a tick"). */
@@ -49,11 +52,11 @@ export interface Out { state: PlayerState; effects: Effect[] }
 
 const keep = (state: PlayerState): Out => ({ state, effects: [] });
 
-/** The player as it opens: the ready count over the first exercise. */
-export function startState(session: Session): Out {
+/** The player as it opens: the ready count over the first exercise (longer when its set-up is shown: READY_SETUP_SECONDS). */
+export function startState(session: Session, readySeconds = READY_SECONDS): Out {
   const empty = session.steps.length === 0;
   const state: PlayerState = {
-    phase: empty ? 'finish' : 'ready', step: 0, set: 1, leftMs: empty ? null : READY_SECONDS * 1000, fullMs: empty ? null : READY_SECONDS * 1000,
+    phase: empty ? 'finish' : 'ready', step: 0, set: 1, leftMs: empty ? null : readySeconds * 1000, fullMs: empty ? null : readySeconds * 1000,
     paused: false, elapsedMs: 0, setsDone: 0,
   };
   return { state, effects: [{ kind: 'enter', phase: state.phase, step: 0, set: 1, fresh: true }] };

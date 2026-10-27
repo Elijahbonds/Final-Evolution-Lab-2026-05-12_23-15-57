@@ -12,7 +12,7 @@ import { useSessionPlayer } from '@/components/session-player/use-session-player
 import type { Clock } from '@/lib/session-player/ticker';
 import type { Session } from '@/lib/session-player/model';
 import { SEEN_KEY } from '@/lib/session-player/seen';
-import { READY_SECONDS } from '@/lib/session-player/machine';
+import { READY_SECONDS, READY_SETUP_SECONDS } from '@/lib/session-player/machine';
 
 const SESSION: Session = { id: 'w1:A', title: 'Vertical Jump · A', steps: [
   { exId: 'goblet', name: 'Goblet Squat to Box', sets: 2, reps: '8', workSeconds: null, restSeconds: 30, setup: 'A box behind you.', cue: 'Sit back to the box', clip: 'ex_squat' },
@@ -55,7 +55,7 @@ describe('the session player, mounted', () => {
     p.api().togglePause(); await flush();
     expect(held()).toBe(1);
     // play it through: one tap per counted set
-    await advance(READY_SECONDS * 1000);
+    await advance(READY_SETUP_SECONDS * 1000);
     p.api().primary(); await flush();             // squat set 1 done → rest
     await advance(30_000);                        // rest counts itself into set 2
     p.api().primary(); await flush();             // squat set 2 done → the change to the plank
@@ -78,8 +78,11 @@ describe('the session player, mounted', () => {
   it('opens the set-up sheet by itself before the first set of a new exercise, and closes it when the set starts', async () => {
     const p = start();
     await flush();
-    expect(p.api().sheet).toBe(true);             // ready over a never-run exercise
+    expect(p.api().sheet).toBe(true);             // ready over a never-run exercise: the longer count, to read it
+    expect(p.api().state.leftMs).toBe(READY_SETUP_SECONDS * 1000);
     await advance(READY_SECONDS * 1000);
+    expect(p.api().state.phase).toBe('ready');
+    await advance((READY_SETUP_SECONDS - READY_SECONDS) * 1000);
     expect(p.api().state.phase).toBe('work');
     expect(p.api().sheet).toBe(false);            // nothing else visible during the set
     p.api().primary(); await flush();             // the first set done: this device has now run it
@@ -90,6 +93,7 @@ describe('the session player, mounted', () => {
     const q = start();
     await flush();
     expect(q.api().sheet).toBe(false);
+    expect(q.api().state.leftMs).toBe(READY_SECONDS * 1000);
     q.m.unmount();
   });
 
@@ -97,7 +101,7 @@ describe('the session player, mounted', () => {
     const p = start();
     await flush();
     expect(p.said).toEqual(['Goblet Squat to Box.']);
-    await advance(READY_SECONDS * 1000);
+    await advance(READY_SETUP_SECONDS * 1000);
     expect(p.said.at(-1)).toBe('Go. Sit back to the box.');
     p.api().primary(); await flush();
     expect(p.said.at(-1)).toBe('Rest.');
@@ -114,7 +118,7 @@ describe('the session player, mounted', () => {
 
   it('Back takes a mistaken Set done back', async () => {
     const p = start();
-    await advance(READY_SECONDS * 1000);
+    await advance(READY_SETUP_SECONDS * 1000);
     p.api().primary(); await flush();
     expect(p.api().state).toMatchObject({ phase: 'rest', setsDone: 1 });
     p.api().back(); await flush();

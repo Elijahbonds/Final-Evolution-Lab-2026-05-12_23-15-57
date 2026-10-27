@@ -4,7 +4,7 @@
 // lock (held while playing; let go on pause, the finish and close), the "How to set up" sheet (opens by itself before the
 // first set of an exercise this device has never run, closes by itself when the set starts) and the finish callback.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { back as backOf, pause as pauseOf, primary as primaryOf, resume as resumeOf, startState, tick, type Effect, type Out, type PlayerState } from '@/lib/session-player/machine';
+import { READY_SECONDS, READY_SETUP_SECONDS, back as backOf, pause as pauseOf, primary as primaryOf, resume as resumeOf, startState, tick, type Effect, type Out, type PlayerState } from '@/lib/session-player/machine';
 import type { Session } from '@/lib/session-player/model';
 import { markSeen, playerStorage, readSeen } from '@/lib/session-player/seen';
 import { browserVoice } from '@/lib/session-player/speaker';
@@ -22,11 +22,16 @@ export interface PlayerOptions {
 }
 
 export function useSessionPlayer(session: Session, o: PlayerOptions = {}) {
-  const first = useMemo<Out>(() => (o.initial ? { state: o.initial, effects: [] } : startState(session)), []);   // the player opens once
-  const [state, setState] = useState<PlayerState>(first.state);
-  const ref = useRef(state);
   const storage = useMemo(() => playerStorage(), []);
   const [seen, setSeen] = useState<Set<string>>(() => readSeen(storage));
+  // the first exercise's set-up opens by itself when this device has never run it: the ready count gives time to read it
+  const first = useMemo<Out>(() => {
+    if (o.initial) return { state: o.initial, effects: [] };
+    const st = session.steps[0];
+    return startState(session, st?.setup && !seen.has(st.exId) ? READY_SETUP_SECONDS : READY_SECONDS);
+  }, []);   // the player opens once
+  const [state, setState] = useState<PlayerState>(first.state);
+  const ref = useRef(state);
   const seenRef = useRef(seen);
   const [sheet, setSheet] = useState(false);
   const voice = useMemo(() => {

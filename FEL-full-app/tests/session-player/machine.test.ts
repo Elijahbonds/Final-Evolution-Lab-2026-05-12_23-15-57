@@ -23,6 +23,10 @@ describe('the session player machine', () => {
     expect(enters(o.effects)).toEqual(['ready:0.1*']);
   });
 
+  it('opens on a longer count when the first exercise\'s set-up is shown', () => {
+    expect(startState(S, 12).state).toMatchObject({ phase: 'ready', leftMs: 12_000, fullMs: 12_000 });
+  });
+
   it('an empty session goes straight to the finish', () => {
     expect(startState({ id: 'x', title: 'x', steps: [] }).state.phase).toBe('finish');
   });
