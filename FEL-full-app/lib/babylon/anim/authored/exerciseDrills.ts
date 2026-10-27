@@ -95,8 +95,17 @@ function wallDrive(scene: Scene, sk: Skeleton, name: string, march: boolean): An
     const o = other(s);
     return { ...base, bones: { ...base.bones, [`${s}UpLeg`]: [-96, 0, 0], [`${s}Leg`]: [104, 0, 0], [`${s}Foot`]: [-10, 0, 0] } as Record<string, Deg3>, feet: { [o]: base.feet![o] } as Pair, kneePoles: { [o]: [sx(o, 0), 0, 1] } as Pair };
   };
+  // toe-off: the heel comes up behind and the foot leaves the floor before the knee swings through (a foot swung straight
+  // forward from the floor dragged its toes through it)
+  const toeOff = (s: Side): Pose => {
+    const o = other(s);
+    return { ...base, bones: { ...base.bones, [`${s}UpLeg`]: [-20, 0, 0], [`${s}Leg`]: [80, 0, 0], [`${s}Foot`]: [30, 0, 0] } as Record<string, Deg3>, feet: { [o]: base.feet![o] } as Pair, kneePoles: { [o]: [sx(o, 0), 0, 1] } as Pair };
+  };
   const D = march ? 2.4 : 1.2, up = march ? 0.45 : 0.18;
-  return run(scene, sk, name, D, [at(base, 0, true), at(drive('Right'), D * 0.2, march), ...(march ? [at(drive('Right'), D * 0.2 + up)] : []), at(base, D * 0.5, true), at(drive('Left'), D * 0.7, march), ...(march ? [at(drive('Left'), D * 0.7 + up)] : [])]);
+  return run(scene, sk, name, D, [
+    at(base, 0, true), at(toeOff('Right'), D * 0.09), at(drive('Right'), D * 0.2, march), ...(march ? [at(drive('Right'), D * 0.2 + up)] : []), at(toeOff('Right'), D * 0.2 + (march ? up : 0) + D * 0.09),
+    at(base, D * 0.5, true), at(toeOff('Left'), D * 0.59), at(drive('Left'), D * 0.7, march), ...(march ? [at(drive('Left'), D * 0.7 + up)] : []), at(toeOff('Left'), D * 0.7 + (march ? up : 0) + D * 0.09),
+  ]);
 }
 
 /** ex_decel_three (three-step-decel) — quick steps in place, then the outside foot planted hard to one side: the knee
