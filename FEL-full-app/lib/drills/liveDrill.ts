@@ -130,6 +130,10 @@ export interface LiveDrill {
   cameraBack(): Promise<boolean>;
   /** One display frame (requestAnimationFrame). */
   tick(now?: number): void;
+  /** TODAY-DRILL (2026-10-27): a Pause tap. Exactly the hidden-tab pause (Phase 1's rule): the camera off (body play's
+   *  end(), the choice still remembered), the drill's clock stopped where it was; the camera never restarts by itself,
+   *  and cameraBack() + the space check + RESUME carry it on. A no-op outside setup / playing. */
+  pause(): void;
   /** Stop the drill here: its result so far, the camera off. */
   finish(): void;
   /** Leave: the camera off, the card unmounted, the bus stopped, the screen free to sleep. */
@@ -312,6 +316,12 @@ export function createLiveDrill(deps: LiveDrillDeps): LiveDrill {
       for (const prompt of s.say) deps.voice.say(prompt, (c) => { caption = { text: c, at: deps.now() }; publish(); });
       if (s.status === 'complete' || s.status === 'abandoned') { finishRun(); return; }
       publish();
+    },
+
+    pause() {
+      if (phase !== 'playing' && phase !== 'setup') return;
+      deps.bodyPlay.end();
+      onHidden();
     },
 
     finish() {
