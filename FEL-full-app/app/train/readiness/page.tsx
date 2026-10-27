@@ -7,6 +7,7 @@ import { prisma } from '@/lib/db';
 import { readDobYear } from '@/lib/privacy/scanSaveGate';
 import { TabPage } from '@/components/shell/tab-page';
 import { ReadinessCheck } from '@/components/readiness/readiness-check';
+import { ReadinessSurvey } from '@/components/coach/readiness-survey';   // COACH-DELIVERY COA-03 (2026-10-26)
 import { checkAccess } from '@/lib/coach/readiness/gate';
 import { ADULTS_ONLY_LINE } from '@/lib/coach/readiness/copy';
 
@@ -26,7 +27,9 @@ export default async function ReadinessPage() {
     <TabPage eyebrow="Train" title="Readiness check" lede="Three jumps against your own normal: ready, normal or low, and why." accent="#00E5FF"
       aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
       <div className="mx-auto max-w-md">
-        {access.ok ? <ReadinessCheck /> : (
+        {/* COACH-DELIVERY COA-03: the five-question survey beside the jump check, for a day with no room to jump (adults
+            only, like the check; it shows once the pending SQL is applied) */}
+        {access.ok ? <div className="space-y-4"><ReadinessCheck /><ReadinessSurvey /></div> : (
           <div className="fel-card rounded-xl p-5 text-sm text-white/75" data-readiness-adults-only>{ADULTS_ONLY_LINE}</div>
         )}
       </div>

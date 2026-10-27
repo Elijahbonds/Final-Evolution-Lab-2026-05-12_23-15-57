@@ -9,7 +9,7 @@
 // Before the pending SQL: GET { available: false }, writes 503 parity_not_ready.
 import 'server-only';
 import { parityHealthEnabled, parityReady } from '../parity/probe';
-import { coachPeople, healthViewers, liveCoaches, mayAssign, teamIdsOf, whoIs, type PeopleDb } from '../parity/people';
+import { coachPeople, healthViewers, liveCoaches, mayAssign, teamIdsOf, whoIs, type HealthGate, type PeopleDb } from '../parity/people';
 import { cleanAnswers, cleanForm, formLine, history, isDue, LIMITS, offersPainCheck, periodFor, questionsFor, series, weeksAnswered } from './rules';
 import { archiveForm, assign, answersForAthlete, answersForCoach, assignsFor, assignsForCoach, formsByIds, formsForCoach, insertForm, saveAnswer, unassign, updateForm } from './store';
 import { COACH_HEALTH_NOTE_DRAFT, HEALTH_CONSENT_NEEDED_DRAFT, HEALTH_OFF_LINE, HEALTH_SECTION_LINE_DRAFT, PAIN_LINE, TEEN_SKIPPED_LINE_DRAFT, TRAINING_SEEN_LINE } from './copy';
@@ -150,7 +150,7 @@ export async function myForms(db: CheckinDb, athleteId: string, now: Date = new 
   return res(200, { available: true, band: who.band, forms: out.sort((a, b) => Number(b.due) - Number(a.due)) });
 }
 
-export async function submit(db: CheckinDb, athleteId: string, body: unknown, now: Date = new Date(), env: Env = process.env): Promise<Res> {
+export async function submit(db: CheckinDb, athleteId: string, body: unknown, now: Date = new Date(), env: Env = process.env, healthGate?: HealthGate): Promise<Res> {
   const nowMs = now.getTime();
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   if (!(await parityReady(db, nowMs))) return NOT_READY;
@@ -159,7 +159,7 @@ export async function submit(db: CheckinDb, athleteId: string, body: unknown, no
   const f = forms.find((x) => x.id === b.formId);
   if (!f) return res(404, { error: 'not_found' });
   // the teen gate first: no coached training is saved for anyone it refuses (lib/coach/teenGate.ts)
-  const who = await whoIs(db, athleteId, parityHealthEnabled(env), now);
+  const who = await whoIs(db, athleteId, parityHealthEnabled(env), now, healthGate);
   if (!who.ok) return res(403, who.body);
   const qs = questionsFor(f.questions, { band: who.band, healthShown: who.healthShown, healthConsent: who.healthConsent });
   const t = cleanAnswers(qs.training, b.answers);

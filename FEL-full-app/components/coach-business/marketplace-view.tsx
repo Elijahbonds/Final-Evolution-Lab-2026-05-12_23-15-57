@@ -47,6 +47,8 @@ export function MarketplaceView({ q, cards, ready }: { q: MarketQuery; cards: Ma
                 <Link href={`/coach/${c.slug}`} className="block h-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-cyan-300/50">
                   <div className="flex items-baseline justify-between gap-2">
                     <h2 className="text-lg font-bold">{c.displayName}</h2>
+                    {/* COACH-DELIVERY COA-10: client reviews */}
+                    {c.rating ? <p className="text-xs text-white/60" data-coach-rating>★ {c.rating.avg} · {c.rating.count} review{c.rating.count === 1 ? '' : 's'}</p> : null}
                     {c.fromPriceCents !== null ? (
                       <p className="shrink-0 text-sm font-bold text-cyan-200">from ${(c.fromPriceCents / 100).toFixed(0)}{c.fromMonthly ? '/mo' : ''}</p>
                     ) : null}

@@ -13,7 +13,13 @@ export type ReadinessReason =
   | 'feel_caps'         // up, but a low "how do you feel": Normal, not Ready
   | 'low_drop'          // a real drop past the coach's threshold
   | 'low_drop_feel'     // a real dip, and a low feel
-  | 'low_twice';        // a real dip, and the check before was one too ("below the smallest real change twice in a row")
+  | 'low_twice'         // a real dip, and the check before was one too ("below the smallest real change twice in a row")
+  // COACH-DELIVERY COA-03 (2026-10-26): the five-question survey (./survey.ts), read by FEL's check-in rule, not measured
+  | 'survey_ok'         // the survey reads normal
+  | 'survey_low';       // the survey reads low (lib/health/readiness.ts's rule over the five answers)
+
+/** Where today's readiness came from (COACH-DELIVERY): the jump check, a warm-up bar-speed set (lib/vbt), the survey. */
+export type ReadinessSource = 'jump' | 'bar_speed' | 'survey';
 
 /** One day's jump numbers, as the check reads them (lib/jump/session.ts sessionStats on the counted jumps). */
 export interface DayJumps {
@@ -99,4 +105,6 @@ export interface TodayReadiness {
   coachTold: boolean;
   shared: boolean;
   day: string;
+  /** COACH-DELIVERY: which check this is (absent = the jump check). */
+  source?: ReadinessSource;
 }
