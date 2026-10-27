@@ -21,7 +21,7 @@
 import 'server-only';
 import { prisma } from '@/lib/db';
 import { isProUser } from '@/lib/pro-guard';
-import { isVirtualPurchasesEnabled } from '@/lib/flags';
+import { isPurchaseOpen } from '@/lib/payments/allowlist';
 import { youthRules } from '@/lib/coach/taxonomy';
 import { loadWarmupContext } from '@/lib/coach/warmupServer';
 import { FALLBACK_WARMUP_CONTEXT, type WarmupContext } from '@/lib/coach/warmup';
@@ -96,7 +96,7 @@ export function defaultDeps(): SignatureDeps {
     retestRows: loadRetestRows,
     readinessToday: soloReadinessToday,
     reward: rewardSession,
-    purchasesOpen: isVirtualPurchasesEnabled,
+    purchasesOpen: () => isPurchaseOpen('fel_pro'), // VIRTUAL_PURCHASES_ENABLED + PURCHASES_ALLOWLIST (payments-ready)
   };
 }
 

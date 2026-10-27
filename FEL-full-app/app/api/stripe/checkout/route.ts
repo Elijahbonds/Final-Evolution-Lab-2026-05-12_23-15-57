@@ -5,7 +5,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getStripe, STRIPE_PRODUCTS, COSMETIC_SKUS } from '@/lib/stripe';
-import { isStudioCreatorEnabled, isVirtualPurchasesEnabled } from '@/lib/flags';
+import { isStudioCreatorEnabled } from '@/lib/flags';
+import { isPurchaseOpen, STRIPE_CHECKOUT_PRODUCT } from '@/lib/payments/allowlist';
+import { BUYER_TERMS, checkTerms, termsMetadata, type AcceptedTerms } from '@/lib/payments/terms';
 import { paymentMethodsFor } from '@/lib/stripe-payment-methods';   // Cash App / BNPL / PayPal where each is actually supported
 import { stripeTestGate } from '@/lib/coach-store/stripeMode';
 import { storeClosed } from '@/lib/coach-store/gate';
@@ -41,7 +43,8 @@ export async function POST(req: NextRequest) {
   // monthly, STUDIO_CREATOR, FEL Coach, FEL Facility, the legacy coach block, cosmetics, studio
   // credits, marketplace — and anything unknown) is 409 store_closed, before getStripe()/customer
   // creation. Only the coach store (its own checkout path) sells real money at launch.
-  if (!isVirtualPurchasesEnabled()) return storeClosed('virtual_purchases_off');
+  // PAYMENTS-READY: PURCHASES_ALLOWLIST narrows it per product (lib/payments/allowlist.ts); unset = exactly as before.
+  if (!isPurchaseOpen(STRIPE_CHECKOUT_PRODUCT[product] ?? null)) return storeClosed('virtual_purchases_off');
   // STORE-READY B3: Stripe URLs come from the server constant NEXTAUTH_URL, never the Origin header.
   const site = siteOrigin();
   if (!site) return storeClosed('site_url_not_set');
@@ -50,6 +53,15 @@ export async function POST(req: NextRequest) {
   // adult (DB dobYear, strict rule; unknown age is not an adult) is 403 adults_only before any Stripe call.
   const refused = await adultBuyerGate(prisma, userId);
   if (refused) return refused;
+  // PAYMENTS-READY: FEL Pro asks the buyer's terms tick ({ termsAccepted: true, termsVersion }, the store terms' shape)
+  // before any Stripe call; the accepted version and time ride on the session's and the subscription's metadata.
+  let proTerms: AcceptedTerms | null = null;
+  if (STRIPE_CHECKOUT_PRODUCT[product] === 'fel_pro') {
+    const tick = checkTerms(body as { termsAccepted?: unknown; termsVersion?: unknown }, BUYER_TERMS.fel_pro.version);
+    if (!tick.ok) return NextResponse.json(tick.body, { status: tick.status });
+    proTerms = tick.accepted;
+  }
+  const termsMeta = proTerms ? termsMetadata(proTerms) : {};
   const stripe = getStripe();
 
   try {
@@ -93,11 +105,11 @@ export async function POST(req: NextRequest) {
         quantity: 1,
       }],
       // `plan` keeps the cadence for reporting; `product` stays the entitlement the webhook writes
-      metadata: { userId, product: entitlementProduct, plan: String(product) },
+      metadata: { userId, product: entitlementProduct, plan: String(product), ...termsMeta },
       // LAUNCH-SALES (B-W3): the same metadata on the SUBSCRIPTION, so every invoice carries it
       // (basil: invoice.parent.subscription_details.metadata). invoice.paid can then write the
       // Subscription row itself when it lands before checkout.session.completed.
-      subscription_data: { metadata: { userId, product: entitlementProduct, plan: String(product) } },
+      subscription_data: { metadata: { userId, product: entitlementProduct, plan: String(product), ...termsMeta } },
       success_url: `${origin}/account?stripe=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/account?stripe=cancel`,
     });
