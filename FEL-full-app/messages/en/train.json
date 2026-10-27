@@ -84,6 +84,11 @@
       "title": "Sprint speed",
       "line": "Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.",
       "tag": "Time a run"
+    },
+    "velocity": {
+      "title": "Bar speed",
+      "line": "Rep speed from your camera: zones, speed loss, your load-velocity line. Estimates, not lab numbers.",
+      "tag": "Track a set"
     }
   }
 }

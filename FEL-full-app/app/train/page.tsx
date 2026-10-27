@@ -81,9 +81,9 @@ export default async function TrainPage() {
     {
       // VBT (2026-10-25; wired by coach-delivery 2026-10-27, docs/VBT.md §7.1): camera bar speed (13+; a teen sees technique
       // speed only; the page says so)
-      href: '/train/velocity', icon: Dumbbell, accent: '#00E5FF', title: 'Bar speed',
-      line: 'Rep speed from your camera: zones, speed loss, your load-velocity line. Estimates, not lab numbers.',
-      tag: 'Track a set',
+      href: '/train/velocity', icon: Dumbbell, accent: PALETTE.cyan, title: t('train.cards.velocity.title'),
+      line: t('train.cards.velocity.line'),
+      tag: t('train.cards.velocity.tag'),
     },
     {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
