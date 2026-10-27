@@ -2662,7 +2662,10 @@ export const OneVOneMode: ModeDefinition = (() => {
     // the AI never left the floor against a dunk (a hand up, a roll at the bump); now a defender inside range jumps to MEET
     // me, timed into the flight, and at the meeting he either swats it or gets dunked on (the poster ride)
     let showtimeJudge: ShowtimeJudge | null = null, hangLeft = 0, hangOn = false;
-    const protectorK = defenderPos && foeBlockJumpAge === Infinity ? rimProtectorJump({ dist: Math.min(distXZ(foe.root.position, RIM_FLOOR), c.contested ? c.lateral + 0.3 : Infinity), set: c.contested ? c.set : Math.hypot(foeVelLast.x, foeVelLast.z) < 1.0, stunned: foeStunSec > 0 || foeFloored, kind: kind === 'poster' ? 'poster' : 'dunk', roll }) : null;
+    const protectorK0 = defenderPos && foeBlockJumpAge === Infinity ? rimProtectorJump({ dist: Math.min(distXZ(foe.root.position, RIM_FLOOR), c.contested ? c.lateral + 0.3 : Infinity), set: c.contested ? c.set : Math.hypot(foeVelLast.x, foeVelLast.z) < 1.0, stunned: foeStunSec > 0 || foeFloored, kind: kind === 'poster' ? 'poster' : 'dunk', roll }) : null;
+    // hoops-p02: in the hand read his jump is TIMED (the middle of the old random window, his average), not a second roll — whether he
+    // jumps at all is still his read; the swat is his hand on the ball
+    const protectorK = protectorK0 === null || blockDiceOn() ? protectorK0 : (RIM_PROTECT.jumpKFrom + RIM_PROTECT.jumpKTo) / 2;
     let protectorUp = false, protectorMet = false;
     if (protectorK !== null) console.info(`[1V1-DEF] rim protector armed at k ${protectorK.toFixed(2)}`);
     // D1: the AI reads the takeoff — a hand up (or a live contest jump) in the lane can SWAT the dunk at the bump

@@ -2654,7 +2654,10 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // floor to MEET me, timed into the flight; at the meeting he swats it or gets dunked on (see DriveFlight.ts)
     let showtimeJudge: ShowtimeJudge | null = null, hangLeft = 0, hangOn = false;
     const protector = foes.filter((f) => f.stunSec === 0 && !f.floored && f.jumpAge === Infinity).sort((a, b) => distXZ(a.char.root.position, RIM_FLOOR) - distXZ(b.char.root.position, RIM_FLOOR))[0] ?? null;
-    const protectorK = protector ? rimProtectorJump({ dist: Math.min(distXZ(protector.char.root.position, RIM_FLOOR), wall === protector && c.contested ? c.lateral + 0.3 : Infinity), set: Math.hypot(protector.vel.x, protector.vel.z) < 1.0, stunned: false, kind: kind === 'poster' ? 'poster' : 'dunk', roll }) : null;
+    const protectorK0 = protector ? rimProtectorJump({ dist: Math.min(distXZ(protector.char.root.position, RIM_FLOOR), wall === protector && c.contested ? c.lateral + 0.3 : Infinity), set: Math.hypot(protector.vel.x, protector.vel.z) < 1.0, stunned: false, kind: kind === 'poster' ? 'poster' : 'dunk', roll }) : null;
+    // hoops-p02: in the hand read his jump is TIMED (the middle of the old random window, his average), not a second roll — whether he
+    // jumps at all is still his read; the swat is his hand on the ball
+    const protectorK = protectorK0 === null || blockDiceOn() ? protectorK0 : (RIM_PROTECT.jumpKFrom + RIM_PROTECT.jumpKTo) / 2;
     let protectorUp = false, protectorMet = false;
     if (protectorK !== null) console.info(`[3V3-DEF] rim protector armed at k ${protectorK.toFixed(2)}`);
     // D1: the wall reads the takeoff — a hand up in the lane can SWAT the dunk at the bump
