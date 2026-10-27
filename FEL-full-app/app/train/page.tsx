@@ -74,9 +74,9 @@ export default async function TrainPage() {
     },
     {
       // SPRINT-SPEED (2026-10-25): sprint and agility timed by the phone's camera (verified adults; the page says so to anyone else)
-      href: '/train/speed', icon: Gauge, accent: '#00FF9D', title: 'Sprint speed',
-      line: 'Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.',
-      tag: 'Time a run',
+      href: '/train/speed', icon: Gauge, accent: '#00FF9D', title: t('train.cards.sprint.title'),
+      line: t('train.cards.sprint.line'),
+      tag: t('train.cards.sprint.tag'),
     },
     {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the

@@ -79,6 +79,11 @@
       "title": "Where you stand",
       "line": "PRQ, your grade, and what has moved since the last screen.",
       "tag": "Read"
+    },
+    "sprint": {
+      "title": "Sprint speed",
+      "line": "Your phone on the finish line times the sprint; side-on it reads your top speed. Camera estimates, each with its ±. 18 and over.",
+      "tag": "Time a run"
     }
   }
 }
