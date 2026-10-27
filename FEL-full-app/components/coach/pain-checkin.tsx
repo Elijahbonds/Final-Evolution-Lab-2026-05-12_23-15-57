@@ -195,8 +195,12 @@ function PainForm({ busy, fixedBodyArea, onSubmit }: { busy: boolean; fixedBodyA
  * decision, shown until the card is closed. `kind` is 'during' (mid-set) or 'after' (right after) — the only two a
  * live exercise card can mean; the next-morning follow-up is a separate flow (<NextMorningFollowUps> below).
  */
-export function PainCheckInChip({ exerciseName, programExerciseId, kind = 'after' }: { exerciseName: string; programExerciseId?: string | null; kind?: 'during' | 'after' }) {
-  const [open, setOpen] = useState(false);
+export function PainCheckInChip({ exerciseName, programExerciseId, kind = 'after', initiallyOpen = false }: {
+  exerciseName: string; programExerciseId?: string | null; kind?: 'during' | 'after';
+  /** TODAY-DRILL (2026-10-27): the drill's "This hurts: stop" opens the form at once (the same chip, the same route). */
+  initiallyOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(initiallyOpen);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [error, setError] = useState<string | null>(null);

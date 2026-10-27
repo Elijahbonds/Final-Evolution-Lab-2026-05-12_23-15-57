@@ -8,10 +8,13 @@ import type { DailyDrillView } from '@/lib/daily-drill/load';
 import {
   DAILY_DRILL_PATH, DAILY_EYEBROW, DONE_TITLE, START_CTA, STOPPED_LINE, doneLine, rewardLine,
 } from '@/lib/daily-drill/copy';
+import { FIRST_TIME_LINES, guideFor } from '@/lib/daily-drill/guide';
 
 export function DailyDrillCard({ view }: { view: DailyDrillView | null }) {
   if (!view) return null;
   const { plan, done } = view;
+  // TODAY-DRILL (2026-10-27): the plain name, why today from the person's own number, and what it improves
+  const guide = plan ? guideFor(plan.drillId) : null;
   if (!plan) {
     return (
       <section data-testid="daily-drill-card" data-daily-drill="stopped" className="mb-6 rounded-2xl border border-amber-300/25 bg-amber-300/[0.04] p-4 sm:p-5">
@@ -33,8 +36,10 @@ export function DailyDrillCard({ view }: { view: DailyDrillView | null }) {
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-white/45">{DAILY_EYEBROW} · {plan.minutes} min</p>
-          <p className="fel-heading mt-1 text-[16px] font-bold leading-tight text-white">{done ? `${DONE_TITLE}: ${plan.name}` : plan.name}</p>
-          <p className="mt-1 text-[13px] leading-relaxed text-white/60" data-daily-why>{view.why}</p>
+          <p className="fel-heading mt-1 text-[17px] font-bold leading-tight text-white">{done ? `${DONE_TITLE}: ${guide!.title}` : guide!.title}</p>
+          {view.newcomer && !done && <p className="mt-1 text-[12.5px] text-[#00E5FF]/90" data-daily-explainer>{FIRST_TIME_LINES[0]}</p>}
+          <p className="mt-1 text-[13.5px] leading-snug text-white/80" data-daily-why>{view.whyToday}</p>
+          {!done && <p className="mt-1 text-[12.5px] leading-snug text-white/55" data-daily-improves>{guide!.improves}</p>}
           <p className="mt-1.5 text-[12.5px] text-white/50" data-daily-reward>
             {done ? doneLine(done.amount, done.streakDays) : rewardLine(view.credit, view.streak.opensToday, view.streak.nextDays)}
           </p>
