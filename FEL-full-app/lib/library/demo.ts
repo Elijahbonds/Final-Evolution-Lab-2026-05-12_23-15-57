@@ -426,6 +426,13 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_copenhagen_raise_knee', families: ['hip-capacity'], bases: /^cph-raise-knee$/ },
   { clip: 'ex_calf_smr', families: ['roll'], bases: /^calf-smr$/ },
   { clip: 'ex_piriformis_smr', families: ['roll'], bases: /^piriformis-smr$/ },
+  // the shots and finishes (the ball not drawn, and the card says so)
+  { clip: 'ex_set_shot', families: ['shooting-spots'], bases: /^(free-throw|fatigue-ft)$/ },
+  { clip: 'ex_form_shot_one', families: ['shooting-form'], bases: /^one-hand$/ },
+  { clip: 'ex_catch_shoot_hop', families: ['shooting-form'], bases: /^hop$/ },
+  { clip: 'ex_pullup_jumper', families: ['shooting-form'], bases: /^pull-up$/ },
+  { clip: 'ex_power_layup', families: ['finishing'], bases: /^power$/ },
+  { clip: 'ex_jab_crossover', families: ['footwork'], bases: /^jab-cross$/ },
   // assumption: recover and contest is the closeout the court plays (sprint, chop the feet, the hand up)
   { clip: 'bball_closeout', families: ['court-movement'], bases: /^recover-contest$/ },
   // ── trunk ──
@@ -707,7 +714,9 @@ export const DEMO_PROPS: Readonly<Record<string, DemoProp>> = {
   ...(PROPPED_LOOPS as Readonly<Record<string, DemoProp>>),
 };
 /** Ball-handling and finishing loops: the stage draws no ball, and the card says so. */
-export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot');
+/** DEMO-LOOPS: the authored shooting and finishing loops carry a ball too (exerciseSignature.ts) */
+const BALL_LOOPS: ReadonlySet<string> = new Set(['ex_set_shot', 'ex_form_shot_one', 'ex_catch_shoot_hop', 'ex_pullup_jumper', 'ex_power_layup', 'ex_jab_crossover']);
+export const isBallClip = (clip: string | null | undefined): boolean => !!clip && (clip.startsWith('bball_') || clip === 'jumpshot' || BALL_LOOPS.has(clip));
 
 const ANATOMY: ReadonlyMap<string, string> = new Map(MUSCLES.map((m) => [m.id, m.anatomyKey]));
 

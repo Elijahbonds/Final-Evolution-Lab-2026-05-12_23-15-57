@@ -347,6 +347,83 @@ function piriformisSmr(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return run(scene, sk, 'ex_piriformis_smr', 2.4, [at(p(0), 0, true), at(p(1), 1.2, true)], true);
 }
 
+// ── shooting and finishing (the ball is not drawn: the stage says so, demo.ts isBallClip) ──────────────────────────
+const SET_POINT: Pair = { Right: [0.14, 1.62, 0.22], Left: [0.02, 1.60, 0.26] };
+const RELEASE: Pair = { Right: [0.14, 2.02, 0.44], Left: [0.04, 1.80, 0.32] };
+const AT_CHEST: Pair = { Right: [0.12, 1.16, 0.28], Left: [-0.06, 1.16, 0.30] };
+const SHOOT_POLES: Pair = { Right: [0.5, -1, 0.1], Left: [-0.8, -0.4, 0] };
+/** The shooter's stance: feet hip-width, the right a half step ahead, knees soft. */
+const shooter = (hands: Pair, dip: number, toes: number, o: Partial<Pose> = {}): Pose => ({
+  bones: { Hips: [6 + dip * 14, 0, 0], Spine: [2, 0, 0], Neck: [-6 - dip * 4, 0, 0], LeftFoot: [-dip * 18 + toes * 30, 0, 0], RightFoot: [-dip * 18 + toes * 30, 0, 0] },
+  feet: { Left: [-0.13, ANKLE + toes * 0.08, 0.04], Right: [0.13, ANKLE + toes * 0.08, 0.14] }, kneePoles: bothDir(0.12, 0, 1),
+  hands, poles: SHOOT_POLES, hipsY: -dip * 0.14 + toes * 0.08, ...o,
+});
+/** ex_set_shot (the free throw) — set, the ball at the chest; a knee dip; up through the legs onto the toes as the ball
+ *  goes up past the forehead and the shooting arm extends, the wrist snapping; the follow-through held; down. `oneHand`:
+ *  the guide hand stays off at the side (one-hand form shooting). */
+function setShot(scene: Scene, sk: Skeleton, name: string, oneHand: boolean): AnimationGroup | null {
+  const guide = (p: Pair): Pair => (oneHand ? { Right: p.Right, Left: [-0.24, 0.86, 0.08] } : p);
+  return run(scene, sk, name, 3.2, [
+    at(shooter(guide(AT_CHEST), 0, 0), 0, true), at(shooter(guide(AT_CHEST), 1, 0), 0.55, true), at(shooter(guide(SET_POINT), 0.4, 0.3), 0.85), at(shooter(guide(RELEASE), 0, 1), 1.05, true),
+    at(shooter(guide(RELEASE), 0, 1), 1.75, true), at(shooter(guide(AT_CHEST), 0, 0), 2.6, true),
+  ]);
+}
+const JUMP_LEGS = { LeftUpLeg: [-8, 0, 4] as Deg3, RightUpLeg: [-8, 0, -4] as Deg3, LeftLeg: [10, 0, 0] as Deg3, RightLeg: [10, 0, 0] as Deg3, LeftFoot: [30, 0, 0] as Deg3, RightFoot: [30, 0, 0] as Deg3 };
+/** The jumper's flight: legs long under the body, the ball released at the top. */
+const jumpShotAir = (z: number, y: number, hands: Pair): Pose => ({ bones: { Hips: [2, 0, 0], Spine: [0, 0, 0], Neck: [-6, 0, 0], ...JUMP_LEGS }, hands: { Right: [hands.Right![0], hands.Right![1] + y, hands.Right![2] + z], Left: [hands.Left![0], hands.Left![1] + y, hands.Left![2] + z] }, poles: SHOOT_POLES, hipsY: y, hipsZ: z });
+const shiftZ = (p: Pose, z: number): Pose => {
+  const f = (q?: Pair): Pair | undefined => q && Object.fromEntries(Object.entries(q).map(([k, v]) => [k, [v[0], v[1], v[2] + z]])) as Pair;
+  return { ...p, feet: f(p.feet), hands: f(p.hands), hipsZ: (p.hipsZ ?? 0) + z };
+};
+/** ex_catch_shoot_hop — a small two-foot hop forward into the catch (hands at the chest, landing in the dip), then straight
+ *  up into the jump shot, released at the top; land, step back. */
+function catchShootHop(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const z0 = -0.20, z1 = 0.10;
+  const hop: Pose = { bones: { Hips: [8, 0, 0], Spine: [2, 0, 0], ...JUMP_LEGS }, hands: { Right: [0.20, 1.20, z0 + 0.40], Left: [-0.20, 1.20, z0 + 0.42] }, poles: bothDir(0.6, -0.6, -0.2), hipsY: 0.06, hipsZ: (z0 + z1) / 2 };
+  return run(scene, sk, 'ex_catch_shoot_hop', 4.2, [
+    at(shiftZ(shooter({ Right: [0.24, 0.92, 0.10], Left: [-0.24, 0.92, 0.10] }, 0.3, 0), z0), 0, true), at(hop, 0.35), at(shiftZ(shooter(AT_CHEST, 1, 0), z1), 0.6, true),
+    at(shiftZ(shooter(SET_POINT, 0.2, 0.6), z1), 0.82), at(jumpShotAir(z1, 0.22, RELEASE), 1.05, true), at(jumpShotAir(z1, 0.22, RELEASE), 1.2, true),
+    at(shiftZ(shooter(RELEASE, 0.8, 0), z1), 1.5, true), at(shiftZ(shooter({ Right: [0.24, 0.92, 0.10], Left: [-0.24, 0.92, 0.10] }, 0, 0), z1), 2.2, true),
+    at(shiftZ(shooter({ Right: [0.24, 0.92, 0.10], Left: [-0.24, 0.92, 0.10] }, 0, 0, { feet: { Left: [-0.13, ANKLE, 0.04 + z1], Right: [0.13, ANKLE, 0.14 + (z0 + z1) / 2] } }), 0), 2.8),
+    at(shiftZ(shooter({ Right: [0.24, 0.92, 0.10], Left: [-0.24, 0.92, 0.10] }, 0.3, 0), z0), 3.6, true),
+  ]);
+}
+/** ex_pullup_jumper — two dribbles with the right hand from the stance (the ball not drawn: the hand pushes down at the
+ *  hip and rises), the gather (both hands to the ball), the dip, and the jump shot released at the top; land. */
+function pullupJumper(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const drib = (down: boolean): Pose => shooter({ Right: [0.30, down ? 0.62 : 0.86, 0.26], Left: [-0.30, 1.06, 0.30] }, 0.8, 0, { poles: { Right: [0.6, -0.2, -0.6], Left: [-1, -0.3, 0.2] } });
+  return run(scene, sk, 'ex_pullup_jumper', 3.8, [
+    at(drib(false), 0, true), at(drib(true), 0.25), at(drib(false), 0.5), at(drib(true), 0.75), at(drib(false), 1.0),
+    at(shooter({ Right: [0.20, 1.02, 0.24], Left: [0.02, 1.04, 0.26] }, 1, 0), 1.3, true), at(shooter(SET_POINT, 0.3, 0.6), 1.52), at(jumpShotAir(0, 0.22, RELEASE), 1.75, true), at(jumpShotAir(0, 0.22, RELEASE), 1.9, true),
+    at(shooter(RELEASE, 0.8, 0), 2.2, true), at(drib(false), 3.2, true),
+  ]);
+}
+/** ex_power_layup — a dribble stride into a two-foot jump stop (the ball high and tight at the chin, both hands), then up
+ *  off both feet, the ball carried up and laid off the glass with the right hand at the top; land, walk back. */
+function powerLayup(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const z0 = -0.40, zs = 0.20;
+  const chin: Pair = { Right: [0.12, 1.40, 0.26], Left: [-0.06, 1.40, 0.28] };
+  const stop: Pose = shiftZ({ bones: { Hips: [28, 0, 0], Spine: [8, 0, 0], Neck: [-12, 0, 0], LeftFoot: [-22, 0, 0], RightFoot: [-22, 0, 0] }, feet: both(0.22, ANKLE, 0.02), kneePoles: bothDir(0.2, 0, 1), hands: { Right: [0.12, 1.40 - 0.28, 0.26], Left: [-0.06, 1.40 - 0.28, 0.28] }, poles: bothDir(0.6, -0.6, -0.2), hipsY: -0.28, hipsZ: -0.10 }, zs);
+  const up: Pose = { bones: { Hips: [-2, 0, 0], Spine: [-2, 0, 0], ...JUMP_LEGS }, hands: { Right: [0.18, 2.44 + 0.28, zs + 0.30], Left: [-0.04, 1.96 + 0.28, zs + 0.24] }, poles: SHOOT_POLES, hipsY: 0.28, hipsZ: zs + 0.04 };
+  const stride: Pose = { bones: { Hips: [16, 0, 0], Spine: [4, 0, 0], Neck: [-10, 0, 0], LeftFoot: [24, 0, 0], RightFoot: [-6, 0, 0] }, feet: { Left: [-0.12, ANKLE + 0.08, z0 + 0.10], Right: [0.12, ANKLE, z0 + 0.50] }, kneePoles: bothDir(0.1, 0, 1), hands: { Right: [0.30, 0.66, z0 + 0.62], Left: [-0.26, 1.02, z0 + 0.50] }, poles: bothDir(0.6, -0.4, -0.4), hipsY: -0.10, hipsZ: z0 + 0.32 };
+  return run(scene, sk, 'ex_power_layup', 4.6, [
+    at(shiftZ(shooter({ Right: [0.30, 0.86, 0.26], Left: [-0.30, 1.06, 0.30] }, 0.5, 0), z0), 0, true), at(stride, 0.4), at(stop, 0.75, true), at(stop, 1.05, true),
+    at(shiftZ(shooter(chin, 0.3, 0.6), zs), 1.25), at(up, 1.5, true), at(up, 1.62, true), at({ ...stop, hands: shiftZ({ hands: chin } as Pose, zs).hands }, 1.95, true),
+    at(shiftZ(shooter({ Right: [0.24, 0.92, 0.10], Left: [-0.24, 0.92, 0.10] }, 0, 0), zs), 2.4, true),
+    at(shiftZ(shooter({ Right: [0.24, 0.92, 0.10], Left: [-0.24, 0.92, 0.10] }, 0, 0, { feet: { Left: [-0.13, ANKLE, 0.04 + zs], Right: [0.13, ANKLE, 0.14 + (zs + z0) / 2] } }), (zs + z0) / 2 - zs), 3.1),
+    at(shiftZ(shooter({ Right: [0.30, 0.86, 0.26], Left: [-0.30, 1.06, 0.30] }, 0.5, 0), z0), 3.8, true),
+  ]);
+}
+/** ex_jab_crossover — from the triple threat (the ball at the right hip), a quick jab of the right foot forward and back,
+ *  then the crossover step: the right foot steps across in front of the left, the ball swung low across the body to the
+ *  left hip, the shoulder dipping into the drive; back to the threat. */
+function jabCrossover(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const threat = (o: Partial<Pose> = {}): Pose => ({ bones: { Hips: [22, 0, 0], Spine: [6, 0, 0], Neck: [-14, 0, 0], LeftFoot: [-20, 0, 0], RightFoot: [-20, 0, 0] }, feet: { Left: [-0.16, ANKLE, 0.02], Right: [0.16, ANKLE, 0.08] }, kneePoles: bothDir(0.2, 0, 1), hands: { Right: [0.28, 0.98, 0.10], Left: [0.10, 1.00, 0.18] }, poles: bothDir(0.6, -0.6, -0.2), hipsY: -0.22, ...o });
+  const jab = threat({ feet: { Left: [-0.16, ANKLE, 0.02], Right: [0.18, ANKLE, 0.42] }, bones: { Hips: [26, 0, 0], Spine: [6, 0, 0], Neck: [-14, 0, 0], LeftFoot: [-26, 0, 0], RightFoot: [-10, 0, 0] }, hipsZ: 0.10 });
+  const cross = threat({ feet: { Left: [-0.16, ANKLE, 0.02], Right: [-0.30, ANKLE, 0.44] }, bones: { Hips: [30, 18, 0], Spine: [8, 10, 0], Neck: [-14, -10, 0], LeftFoot: [-24, 0, 0], RightFoot: [-16, 0, 0] }, hands: { Right: [-0.10, 0.80, 0.28], Left: [-0.30, 0.84, 0.18] }, hipsX: -0.12, hipsZ: 0.14, hipsY: -0.24 });
+  return run(scene, sk, 'ex_jab_crossover', 3.0, [at(threat(), 0, true), at(jab, 0.35, true), at(threat(), 0.75, true), at(cross, 1.2, true), at(cross, 1.6, true), at(threat(), 2.4, true)]);
+}
+
 export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_def_stance', defStance], ['ex_sl_balance', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance', false)], ['ex_sl_balance_head', (scene, sk) => slBalance(scene, sk, 'ex_sl_balance_head', true)],
   ['ex_seated_breathe', seatedBreathe], ['ex_adductor_squeeze', adductorSqueeze],
@@ -357,4 +434,6 @@ export const SIGNATURE_BUILDERS: [string, Builder][] = [
   ['ex_decel_stick', decelStick], ['ex_jump_stop', jumpStop], ['ex_lateral_skip', lateralSkip],
   ['ex_copenhagen_knee', copenhagenKnee], ['ex_copenhagen_raise_knee', copenhagenRaise],
   ['ex_calf_smr', calfSmr], ['ex_piriformis_smr', piriformisSmr],
+  ['ex_set_shot', (scene, sk) => setShot(scene, sk, 'ex_set_shot', false)], ['ex_form_shot_one', (scene, sk) => setShot(scene, sk, 'ex_form_shot_one', true)],
+  ['ex_catch_shoot_hop', catchShootHop], ['ex_pullup_jumper', pullupJumper], ['ex_power_layup', powerLayup], ['ex_jab_crossover', jabCrossover],
 ];
