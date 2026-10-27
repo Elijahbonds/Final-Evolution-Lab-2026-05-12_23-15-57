@@ -7,8 +7,12 @@ import dynamic from 'next/dynamic';
 import { Box } from 'lucide-react';
 import { AvatarFigure } from '@/components/avatar-figure';
 import { ROSTER } from '@/lib/game-data';
+import { Skeleton, SkeletonGroup } from '@/components/ui/fel/skeleton';
 
-const Athlete3D = dynamic(() => import('./athlete-3d'), { ssr: false, loading: () => <p className="flex h-full items-center justify-center text-[12px] text-white/50">Loading your athlete…</p> });
+// premium-ui P10: while the 3D chunk loads, the athlete's shape (a ring and a body line), never a line of grey text
+const Athlete3D = dynamic(() => import('./athlete-3d'), { ssr: false, loading: () => (
+  <SkeletonGroup className="flex h-full flex-col items-center justify-center gap-3"><Skeleton shape="ring" /><Skeleton className="!h-24 !w-10" /></SkeletonGroup>
+) });
 
 export function AthleteStage({ avatarKey, cosmeticAssetId, name, accent, allow3d = true }: { avatarKey: string | null; cosmeticAssetId: string | null; name: string; accent: string; allow3d?: boolean }) {
   const [three, setThree] = useState(false);

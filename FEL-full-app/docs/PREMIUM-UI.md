@@ -81,7 +81,39 @@ not a missing typeface. It is the mix: four faces, mono labels and 11 sizes.
 
 ## After
 
-The per-phase numbers, shots and contact sheets are in the sections below.
+### P2: fonts
+
+The fonts were measured on a rig with no next/font variables, which is what a probe rig and the crash screen have.
+
+| Screen | Serif runs before | Serif runs after |
+|---|---|---|
+| Landing | 10 | 0 |
+| Play | 63 | 0 |
+| Train | 83 | 0 |
+| Profile | 124 | 0 |
+
+### P4: top screens (phone, `736881bf`)
+
+Each cell is before → after.
+
+| Screen | words | sizes | btn | card | empty | img | fcp | cls | a11y |
+|---|---|---|---|---|---|---|---|---|---|
+| Landing | 46 → **25** | 5 → 4 | 1 → 2 | 2 → 1 | 77 → **6 %** | 0 → 1 (100 %) | 2440 → 2040 | 0.001 → 0 | 0/0/1 → 0/0/1 |
+| Play | 133 → 91 | 11 → 8 | 10 → 8 | 3 → 4 | 49 → 25 % | 0 → 2 | 2892 → 2896 | 0.015 → 0.006 | 0 → 0 |
+| Train | 141 → 84 | 10 → 8 | 7 → 4 | 2 → 1 | 53 → 29 % | 0 → 2 | 3300 → 3108 | 0.064 → 0.024 | 0 → 0/1/1 * |
+| Profile | 104 → 67 | 11 → 7 | 7 → 7 | 7 → 8 | 59 → 20 % | 0 → 2 | 3176 → 2112 | 0.004 → 0.006 | 0 → 0 |
+
+\* The new serious finding is today-drill's 10 px card eyebrow on Train, at 4.35:1. P4's page glow had lightened the
+area behind it. `e36e304e` removes the glow under a hero.
+
+**Missed P4 gates, and why:**
+
+- **Words above the fold ≤ 30.**
+  - Train: mostly the DailyDrillCard, at about 60 words. That is the today-drill lane's file, and its copy cut is in
+    flight.
+  - Play: the open Hoops shelf. The duplicate week card left Play in `e36e304e`.
+- **Train CLS 0.024** (from 0.064). It is chased in P10.
+- **Profile card looks 8.** The athlete stage moved onto the one card material in P10.
 
 ## Swaps routed to the running lanes, not made here
 
