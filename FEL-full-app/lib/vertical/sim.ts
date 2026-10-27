@@ -37,6 +37,8 @@ export interface LiveSimOptions {
    * shifted to start on "Go"); `truthCm` is the recording's ground truth per jump (lib/pose/__fixtures__ gt).
    */
   clip?: { stand: readonly PoseFrame[]; jump: readonly PoseFrame[]; truthCm: number[] };
+  /** Every view the runner returns, with its frame (the rig's screenshots pick theirs from here). */
+  onView?: (v: RunnerView, f: PoseFrame) => void;
 }
 
 export interface LiveSimResult {
@@ -96,6 +98,7 @@ export function simulateLiveJump(o: LiveSimOptions): LiveSimResult {
     else { const s = stand[i++ % stand.length]; f = { ...s, t }; }
     t = f.t;
     v = runner.tick(f, f.t);
+    o.onView?.(v, f);
     at[v.step] ??= f.t;
     if (v.say && v.say.id !== lastSay) { lastSay = v.say.id; said.push({ at: f.t, text: v.say.text }); }
     if (v.step === 'active' && !jumpFrames) {
