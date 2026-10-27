@@ -168,7 +168,7 @@ describe('the review: did the correction hold, measured on the reps', () => {
     const v = squatReviewVerdict(state.workReps, cued, opts);
     expect(v.kind).toBe('stillShowing');
     expect(v.still).toEqual(['heelRise']);
-    expect(v.line).toMatch(/^Still showing on the last reps: heels lifting on the descent\./);
+    expect(v.line).toMatch(/^Still there on your last reps: heels lift\./); // test changed: copy rewrite (CUE-REWRITE) — same meaning
     expect(v.line).not.toMatch(/held/i);
   });
 
@@ -177,7 +177,7 @@ describe('the review: did the correction hold, measured on the reps', () => {
     expect(cued.length).toBeGreaterThan(0);
     const v = squatReviewVerdict(state.workReps, cued, opts);
     expect(v.kind).toBe('held');
-    expect(v.line).toMatch(/gone on the last 2 reps/);
+    expect(v.line).toMatch(/gone on your last 2 reps/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('gone on the second-to-last rep but back on the last one is not held', () => {
@@ -188,24 +188,24 @@ describe('the review: did the correction hold, measured on the reps', () => {
   it('a regress that did not fix it says both', () => {
     const v = squatReviewVerdict([['heelRise'], ['heelRise']], [{ fault: 'heelRise', level: 'cue' }, { fault: 'heelRise', level: 'regress' }], opts);
     expect(v.kind).toBe('stillShowing');
-    expect(v.line).toMatch(/survived the cues — regress the drill/);
+    expect(v.line).toMatch(/have not fixed it yet.*Do the easier version/); // test changed: copy rewrite (CUE-REWRITE) — same meaning (it survived the cues: regress)
   });
 
   it('nothing cued: clean only when the knee is judged, and a fault measured but never cued is named, not called clean', () => {
-    expect(squatReviewVerdict([[], []], [], { ...opts, kneeJudged: true }).line).toBe('Clean set. Add load or speed next time.');
+    expect(squatReviewVerdict([[], []], [], { ...opts, kneeJudged: true }).line).toBe('Clean set: nothing to fix. Your squat held its shape on every rep we read. Next time, add a little weight or speed.'); // test changed: copy rewrite (CUE-REWRITE) — same meaning
     expect(squatReviewVerdict([[], []], [], opts).kind).toBe('kneeUnjudged');
     // the unjudged knee is not a fault the review may name
     expect(squatReviewVerdict([['kneeValgus'], []], [], opts).kind).toBe('kneeUnjudged');
     const v = squatReviewVerdict([['lateralShift'], []], [], { ...opts, kneeJudged: true });
     expect(v.kind).toBe('faultsNotCued');
-    expect(v.line).toMatch(/lateral weight shift/);
+    expect(v.line).toMatch(/weight shifts to one side/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('with the knee on and read square, a knee measured but never cued is named, and a clean set is clean', () => {
     const on = { cueable: (f: readonly SquatFrameInput['faults'][number][]) => cueableFaults(f, true), kneeJudged: true };
     const v = squatReviewVerdict([['kneeValgus'], []], [], on);
     expect(v.kind).toBe('faultsNotCued');
-    expect(v.line).toMatch(/knee drifting inward on the descent/);
+    expect(v.line).toMatch(/knees cave in/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
     expect(squatReviewVerdict([[], []], [], on).kind).toBe('clean');
     // on, but never read square (the harness passes kneeJudged false then): not a clean read on the knees
     expect(squatReviewVerdict([[], []], [], { ...on, kneeJudged: false }).kind).toBe('kneeUnjudged');
@@ -263,7 +263,7 @@ describe('the one-time square-up line (the knee is read only square to the camer
     expect(said[0].stageChanged).toBe(true);
     expect(said[0].state.stage).toBe('work');
     expect(state.squareUpSaid).toBe(true);
-    expect(SQUARE_UP_LINE).toMatch(/^Square up to the camera/);
+    expect(SQUARE_UP_LINE).toMatch(/^Face the camera straight on/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('never looped: a work set off square the whole way after it does not say it again', () => {
@@ -338,7 +338,7 @@ describe('the knee record (per POSE frame; square frames only)', () => {
 
   it('kneeReadLine: says when the knees were not read, and nothing when they were', () => {
     expect(kneeReadLine({ ...EMPTY_KNEE_RECORD, squareFrames: 40, notSquareFrames: 3 })).toBeNull();
-    expect(kneeReadLine({ ...EMPTY_KNEE_RECORD, notSquareFrames: 40 })).toMatch(/not square to the camera/);
+    expect(kneeReadLine({ ...EMPTY_KNEE_RECORD, notSquareFrames: 40 })).toMatch(/turned away from the camera/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
     expect(kneeReadLine({ ...EMPTY_KNEE_RECORD, squareFrames: 10, notSquareFrames: 30 })).toMatch(/part of the set/);
     for (const l of [kneeReadLine({ ...EMPTY_KNEE_RECORD, notSquareFrames: 1 }), SQUARE_UP_LINE]) {
       expect(l).not.toMatch(/injur|risk|pain|diagnos|valgus|weak/i);

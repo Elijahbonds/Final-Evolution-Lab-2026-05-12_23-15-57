@@ -32,7 +32,7 @@ import { readBarSpeed, warmupOf } from '@/lib/vbt/readiness';
 import { barSpeedDays, deviceStorage, keepDeviceSet, keptOf, readDeviceSets, type KeptSet } from '@/lib/vbt/sets';
 import { addMilestones, MILESTONES, reached } from '@/lib/vbt/milestones';
 import type { VbtFeatures, VbtTier } from '@/lib/vbt/gate';
-import { E1RM_LINE, ESTIMATE_LINE, NOT_SAVED_LINE, PRIVACY_LINE, SLOWMO_LINE, TEEN_LINE, setupLines, sourceLine, speedText, statusLine, stopLine } from '@/lib/vbt/copy';
+import { E1RM_LINE, ESTIMATE_LINE, NOT_SAVED_LINE, PRIVACY_LINE, SLOWMO_LINE, TEEN_LINE, setResult, setupLines, sourceLine, speedText, statusLine, stopLine } from '@/lib/vbt/copy';
 import { STRETCHES } from '@/lib/jump/slowmo';
 import type { Decoder } from '@/lib/jump/slowmoDecode';
 import { videoGrab, type Grab } from './frame-grab';
@@ -234,7 +234,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             </label>
           )}
           <p className="text-xs text-white/55" data-vbt-stopline>
-            {target ? `Your coach's target: ${ZONES[target.zone].name}, end the set at ${stopPct}% speed loss.` : `End the set at ${stopPct}% speed loss (default).`}
+            {target ? `Your coach's target: ${ZONES[target.zone].name}. End the set when the bar is ${stopPct}% slower than your best rep.` : `End the set when the bar is ${stopPct}% slower than your best rep.`}
           </p>
           <ul className="list-disc space-y-0.5 pl-4 text-xs text-white/60" data-vbt-guide>
             {setupLines(lift.family).map((l) => <li key={l}>{l}</li>)}
@@ -317,8 +317,8 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
               <>
                 <dl className="grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Reps</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-reps>{read?.counted ?? 0}{read?.partials ? ` +${read.partials}` : ''}</dd></div>
-                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Best</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-best>{read?.bestMcv != null ? read.bestMcv.toFixed(2) : '—'}</dd></div>
-                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Speed loss</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-loss>{read?.lossPct != null ? `${read.lossPct}%` : '—'}</dd></div>
+                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Best (m/s)</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-best>{read?.bestMcv != null ? read.bestMcv.toFixed(2) : '—'}</dd></div>
+                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Slowed by</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-loss>{read?.lossPct != null ? `${read.lossPct}%` : '—'}</dd></div>
                 </dl>
                 <ol className="space-y-1" data-vbt-reps-list>
                   {read?.reps.map((r) => (
@@ -329,6 +329,10 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
                   ))}
                 </ol>
                 {view.stop && <p className="text-xs text-[#FF4D8D]" data-vbt-sum-stop>{stopLine(stopPct)}</p>}
+                {/* CUE-REWRITE: what we saw / what it means / what next */}
+                {(() => { const r = setResult({ bestMcv: read?.bestMcv ?? null, lossPct: read?.lossPct ?? null, stopPct }); return (
+                  <div className="space-y-0.5 text-sm" data-vbt-result><p className="text-white/85">{r.saw}</p><p className="text-white/70" data-vbt-means>{r.means}</p><p className="font-bold text-white" data-vbt-next>{r.next.text}</p></div>
+                ); })()}
               </>
             )}
             <p className="text-[11px] text-white/45" data-vbt-source>{sourceLine(view.source)} {ESTIMATE_LINE}</p>
@@ -349,14 +353,14 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
 
           {profile && (
             <div className="fel-card space-y-1 rounded-xl p-4" data-vbt-profile>
-              <div className="text-[11px] uppercase tracking-wider text-white/40">Load-velocity line · estimate</div>
+              <div className="text-[11px] uppercase tracking-wider text-white/40">Weight and bar speed · estimate</div>
               {profile.ok ? (
                 <>
-                  {profile.e1rmKg != null && <div className="text-lg font-black text-white" data-vbt-e1rm>e1RM ≈ {profile.e1rmKg} ± {profile.e1rmPmKg} kg</div>}
+                  {profile.e1rmKg != null && <div className="text-lg font-black text-white" data-vbt-e1rm>Estimated max ≈ {profile.e1rmKg} ± {profile.e1rmPmKg} kg</div>}
                   {zoneLoads && <p className="text-sm text-white/75" data-vbt-zone-loads>{ZONES[targetZone].name} today: {zoneLoads.loKg}–{zoneLoads.hiKg} kg</p>}
-                  <p className="text-[11px] text-white/45">{profile.loads.length} loads{profile.r2 != null ? ` · R² ${profile.r2}` : ''}. {E1RM_LINE}</p>
+                  <p className="text-[11px] text-white/45">{profile.loads.length} loads{profile.r2 != null ? ` · fit ${profile.r2} (closer to 1 is better)` : ''}. {E1RM_LINE}</p>
                 </>
-              ) : <p className="text-sm text-white/60">{profile.why === 'few_loads' ? 'Track a second and third load (5 kg or more apart) to draw your load-velocity line.' : 'The bar did not slow as the load rose: track the loads again.'}</p>}
+              ) : <p className="text-sm text-white/60">{profile.why === 'few_loads' ? 'Film a second and third weight (5 kg or more apart) to see how your speed changes with weight.' : 'The bar did not slow as the load rose: track the loads again.'}</p>}
             </div>
           )}
 

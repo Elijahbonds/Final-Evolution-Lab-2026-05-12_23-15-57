@@ -25,6 +25,7 @@ export type RuleId =
   | 'and_one'
   | 'loose_ball_foul'
   | 'reach_in'
+  | 'hand_check'
   | 'three_seconds'
   | 'shot_clock'
   | 'goaltending'
@@ -133,6 +134,17 @@ export const HANDBOOK: readonly RuleEntry[] = [
     shots: 0,
     whistle: true,
     says: 'A defender who reaches through the handler rather than at the ball. The handler keeps it.',
+  },
+  {
+    // lane/hoops-round2 HOP-04 (owner 2026-10-20: "hand-checks (too many = foul)"): counted in hoops/handCheck
+    id: 'hand_check',
+    call: 'HAND-CHECK',
+    award: 'offense',
+    deadBall: true,
+    shots: 0,
+    whistle: true,
+    says: 'A forearm on the handler\'s hip is defence; putting it back on him again and again is not. Too many hand-checks in a '
+      + 'few seconds and the handler keeps the ball.',
   },
   {
     id: 'three_seconds',

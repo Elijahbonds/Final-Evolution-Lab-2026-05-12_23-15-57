@@ -5,6 +5,7 @@
 // PROPOSED file's labels and cues, and the screen's components).
 //
 // Pure data.
+import type { CheckId } from './PROPOSED-thresholds';
 
 /** Before the screen and on every result, above the fold. */
 export const DISCLAIMER = 'This is a free movement check, not a medical exam.';
@@ -92,7 +93,7 @@ export const JUMP_BUILD_PROGRAM = 'Build my Dunk Program';
 /** Adults only. Same-origin free play. The screen itself stays signed-out. */
 export const JUMP_PLAY_FREE = 'Play free (Brain Brawl)';
 /** Adults only. Height has no band in the register: this is the existing personal-best sentence. */
-export const JUMP_MEANING = 'A personal best to beat next time.';
+export const JUMP_MEANING = 'Your best jump today: the number to beat next time.';
 /** MIRROR flight-time step: what the number is (an estimate from video) and what it measures. No outside comparisons. */
 /** MIRROR flight-time (PM): on-screen only, under the jump setup; the recorded voice line is unchanged. */
 export const JUMP_LAND_TALL = 'Land tall, legs straight';
@@ -234,3 +235,40 @@ export const FRAMING_IN_FRAME = 'In frame';
 /** Reading-quality badge (UX advice §3): two states only, never a percentage — there is no validated accuracy number. */
 export const READ_CLEAR = 'Clear read';
 export const READ_PARTIAL = 'Partial read';
+
+/**
+ * CUE-REWRITE (2026-10-27): WHAT IT MEANS, per check — the middle part of every result card (docs/CUE-STYLE.md: what we
+ * saw / what it means / what to do next). Before, a card said the row's name, a band word and "Try this: <drill list>",
+ * and nothing about why it mattered. Movement words only: no cause inside the body, no condition, no promise (the
+ * screen's own rule, lib/screen/copy.test.ts). "Often" where a usual reason is named, because it is not measured.
+ */
+export const CHECK_MEANING: Readonly<Record<CheckId, string>> = {
+  'ohs.kneeCave': 'Your knees moved in as you went down. Knees that stay over your toes make landing and cutting easier to control.',
+  'ohs.forwardLean': 'Your chest tipped forward as you went down. Often the ankles or hips need more bend.',
+  'ohs.armsForward': 'Your arms came forward from overhead. Often the upper back or shoulders need more reach.',
+  'ohs.heelLift': 'Your heels came off the floor. Often the ankles need more bend.',
+  'ohs.depth': 'Your squat stayed high. More depth gives your legs more room to push from.',
+  'ohs.lateralShift': 'Your weight moved toward one foot. Even weight lets both legs share the work.',
+  'ktw.shinAngle': 'Your knee did not travel far past your toes with the heel down. Ankle bend helps you squat and land.',
+  'ktw.lrGap': 'One ankle bent further than the other. Closing the gap helps both legs share landings.',
+  'sls.kneeCave': 'On one leg, your knee moved in. Control on one leg matters for running, cutting and jumping.',
+  'sls.hipDrop': 'On one leg, the hip on the free side dropped. Level hips mean steadier running and landing.',
+  'sls.trunkLean': 'On one leg, you leaned to one side to keep your balance.',
+  'sls.lrGap': 'One leg did clearly better than the other. Work on the harder side first.',
+  'jump.landingKneeCave': 'Your knees moved in as you landed. Landing with knees over toes is easier to control.',
+  'jump.stiffLanding': 'You landed with nearly straight legs. Bending your knees softens the landing.',
+  'jump.landingWeightShift': 'You landed with more weight on one leg.',
+  'jump.height': 'Your best jump today. Beat it next time.',
+};
+
+/** A Green card's meaning and next step (a check with nothing to work on still says what to do). */
+export const GREEN_MEANING = 'Nothing here needs work right now.';
+export const GREEN_NEXT = 'Keep it in your warm-up, and check again in a month.';
+/** A card the camera could not read. */
+export const UNREAD_MEANING = 'The camera could not see this check clearly, so it has no result.';
+export const UNREAD_NEXT = 'Run the screen again with your whole body in the shot and good light.';
+/** The "Try this:" label in front of a card's drill. */
+export const TRY_THIS = 'Try this:';
+/** The jump card's meaning and next step (the number is "about", from video: lib/screen/jump.ts aboutInches). */
+export const JUMP_BEST_MEANS = 'Your best of today\'s jumps, estimated from video.';
+export const JUMP_BEST_NEXT = 'Run the screen again in a few weeks and try to beat it.';

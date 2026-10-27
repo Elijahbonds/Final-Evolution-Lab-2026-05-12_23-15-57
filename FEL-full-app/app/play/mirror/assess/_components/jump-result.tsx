@@ -43,7 +43,7 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn
           <p data-jump-missing className="mt-2 text-[18px] font-bold leading-snug">{KID_NO_JUMP}</p>
         )}
         {heightCm !== null ? <p data-jump-estimate className="mt-2 text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE}</p> : null}
-        <p data-jump-attempts className="mt-2 text-[16px] text-white/75">{attempts} attempts, best kept</p>
+        <p data-jump-attempts className="mt-2 text-[16px] text-white/75">{attempts} jumps, best one shown</p>
         <div className="mt-3 flex justify-center gap-2">
           <button type="button" data-unit="in" aria-pressed={unit === 'in'} onClick={() => pick('in')} className={`${unit === 'in' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Inches</button>
           <button type="button" data-unit="cm" aria-pressed={unit === 'cm'} onClick={() => pick('cm')} className={`${unit === 'cm' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Centimetres</button>

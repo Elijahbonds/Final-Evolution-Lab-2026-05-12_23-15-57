@@ -36,7 +36,7 @@ export function DeviceBests() {
             <span className="min-w-0 truncate text-[13px] font-semibold text-white/85">{r.name}</span>
             <span className="shrink-0 text-right">
               <span className="fel-heading text-[17px] font-black text-fel-gold tabular-nums">{r.best.toLocaleString('en-US')}</span>
-              <span className="ml-2 font-mono text-[10px] text-fel-quiet">{r.runs} run{r.runs === 1 ? '' : 's'}</span>
+              <span className="ml-2 font-sans text-[12px] text-fel-quiet">{r.runs} run{r.runs === 1 ? '' : 's'}</span>
             </span>
           </li>
         ))}

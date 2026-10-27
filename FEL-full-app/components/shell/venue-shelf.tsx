@@ -42,12 +42,12 @@ export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: 
       {heading ? (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="fel-heading text-[19px] font-bold text-white">{heading}</h2>
-          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-fel-quiet">
+          <span className="font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
             {t('shell.venues.live', { count: live })}
           </span>
         </div>
       ) : (
-        <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.16em] text-fel-quiet">
+        <p className="mb-4 font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
           {t('shell.venues.live', { count: live })}
         </p>
       )}
@@ -83,7 +83,7 @@ export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: 
                 <div className="absolute inset-0 bg-gradient-to-t from-fel-bg via-fel-bg/20 to-transparent" />
                 {venue.playable && (
                   <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-0.5
-                                   font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-fel-emerald ring-1 ring-fel-emerald/40">
+                                   font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-emerald ring-1 ring-fel-emerald/40">
                     <Play className="h-2.5 w-2.5" /> {t('shell.venues.liveBadge')}
                   </span>
                 )}

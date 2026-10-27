@@ -92,8 +92,8 @@ describe('the jump result', () => {
   it('an adult sees inches, the attempts, the meaning line, and the three ways on', () => {
     const h = html(false);
     expect(text(h)).toContain('about 16 in');   // MIRROR flight-time: a rounded estimate, never an exact number
-    expect(text(h)).toContain('3 attempts, best kept');
-    expect(text(h)).toContain('A personal best to beat next time.');
+    expect(text(h)).toContain('3 jumps, best one shown');   // test changed: copy rewrite (CUE-REWRITE) — same meaning
+    expect(text(h)).toContain('Your best jump today: the number to beat next time.');
     expect(h).toContain('text-[40px]');
     expect(h).toContain('Do the full screen');
     expect(h).toContain('href="/screen/program/dunking"');

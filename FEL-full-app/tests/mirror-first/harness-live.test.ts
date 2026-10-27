@@ -280,7 +280,7 @@ describe('a propped-up phone: the screen stays on, a hidden tab turns the camera
     vi.advanceTimersByTime(200);
     await settle();
     expect(text(m)).toContain('Breathe first.');              // still breathing, where it left off
-    expect(text(m)).not.toContain('The movement check.');
+    expect(text(m)).not.toContain('slow squats.');   // test changed: copy rewrite (CUE-REWRITE) — the check stage's caption is "First, 3 slow squats." now
     m.unmount();
   });
 });
@@ -343,7 +343,7 @@ describe('a body the camera cannot see whole is told so on the stage (framing\'s
     vi.advanceTimersByTime(200);
     await settle();
     const line = () => findAll(m.tree as ReactNode, (el) => el.props['data-in-shot'] !== undefined).map((e) => textOf(e.props.children));
-    expect(line()).toEqual(['Your feet are out of shot. Tilt the phone down or step back.']);
+    expect(line()).toEqual(['Feet in the shot. Tilt the phone down or step back.']);   // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — same meaning
     for (let i = 0; i < 5; i++) await frame();
     vi.advanceTimersByTime(200);
     await settle();

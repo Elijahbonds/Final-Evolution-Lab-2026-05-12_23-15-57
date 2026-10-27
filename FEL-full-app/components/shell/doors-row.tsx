@@ -16,7 +16,7 @@ export function DoorsRow({ tab, hide = [] }: { tab: Door['tab']; hide?: readonly
           <li key={d.href}>
             <Link
               href={d.href}
-              className="font-mono text-[11px] uppercase tracking-[0.12em] text-fel-quiet transition-colors hover:text-white/70"
+              className="font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet transition-colors hover:text-white/70"
             >
               {d.label}
             </Link>

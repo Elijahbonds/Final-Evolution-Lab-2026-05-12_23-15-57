@@ -9,6 +9,7 @@
 //
 // Pure data. No new cue copy: every cue line below is an existing CueRule (lib/mirror/*Audit.ts, cue-engine.ts CUES).
 
+import { FAULT_NAMES, sided } from '@/lib/cue-style/names';
 import { FAULT_PRIORITY } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 import type { SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 import type { CueRule } from '@/lib/mirror/patterns';
@@ -46,19 +47,19 @@ export interface MovementSpec {
 export const MOVEMENT_SPECS: Readonly<Record<ReviewMovement, MovementSpec>> = {
   squat: {
     id: 'squat', label: 'Squat', view: 'front', faults: SQUAT_FAULTS, label_of: SQUAT_FAULT_LABEL, cues: SQUAT_CUES,
-    setup: 'Phone at hip height, 2–3 m away, facing you. Stand still for a second, then do your set.',
+    setup: 'Phone at hip height, 2 to 3 m away, facing you. Stand still, then go.',
   },
   lunge: {
     id: 'lunge', label: 'Lunge', view: 'front', faults: LUNGE_FAULTS, label_of: LUNGE_FAULT_LABEL, cues: LUNGE_CUES,
-    setup: 'Phone at hip height, 2–3 m away, facing you. Set your stance, stand still for a second, then do your set.',
+    setup: 'Phone at hip height, 2 to 3 m away, facing you. Get set, then go.',
   },
   hinge: {
     id: 'hinge', label: 'Hip hinge', view: 'side', faults: HINGE_FAULTS, label_of: HINGE_FAULT_LABEL, cues: HINGE_CUES,
-    setup: 'Side-on to the phone, 2–3 m away, phone at hip height. Stand tall and still for a second, then do your set.',
+    setup: 'Side-on to the phone, 2 to 3 m away. Stand tall and still, then go.',
   },
   pushup: {
     id: 'pushup', label: 'Push-up', view: 'side', faults: PUSHUP_FAULTS, label_of: PUSHUP_FAULT_LABEL, cues: PUSHUP_CUES,
-    setup: 'Phone on the floor, side-on, 2 m away. Hold the top of your plank still for a second, then do your set.',
+    setup: 'Phone on the floor, side-on, 2 m away. Hold the top still, then go.',
   },
 };
 
@@ -66,23 +67,23 @@ export const MOVEMENT_SPECS: Readonly<Record<ReviewMovement, MovementSpec>> = {
  * The short form of a fault for a flag line: "<this> on rep 4". Movement words only, what the camera saw (the same rule
  * the review labels keep). A knee fault takes its side in front ("Left knee caves").
  */
+// CUE-REWRITE (2026-10-27): the flag line uses the canonical fault names (lib/cue-style/names.ts) — the same words the
+// Mirror's review card and the Quick Screen use ("Knees cave in", "Heels lift"), not a third set ("knee caves", "Torso
+// drifts", "Stops short").
 const SHORT: Readonly<Record<ReviewMovement, Readonly<Record<string, string>>>> = {
-  squat: { kneeValgus: 'knee caves', heelRise: 'Heels lift', armFall: 'Shoulders drift sideways', lateralShift: 'Weight shifts to one side', shallow: 'Shallow' },
-  lunge: { kneeIn: 'knee caves', hipDrop: 'Hips tip', torsoDrift: 'Torso drifts', wobble: 'knee wobbles', shallow: 'Shallow' },
-  hinge: { dowelLine: 'Back line breaks', hingeRatio: 'Knees do the work', shinAngle: 'Shin drifts forward' },
-  pushup: { bodyLine: 'Hips off the line', handSetup: 'Hands not under the shoulders', headLine: 'Head reaches', depth: 'Stops short' },
+  squat: { kneeValgus: FAULT_NAMES.kneeCave, heelRise: FAULT_NAMES.heelLift, armFall: FAULT_NAMES.shoulderShift, lateralShift: FAULT_NAMES.weightShift, shallow: FAULT_NAMES.notDeep },
+  lunge: { kneeIn: FAULT_NAMES.frontKneeCave, hipDrop: FAULT_NAMES.hipTip, torsoDrift: FAULT_NAMES.upperBodyDrift, wobble: FAULT_NAMES.kneeWobble, shallow: FAULT_NAMES.notDeep },
+  hinge: { dowelLine: FAULT_NAMES.backBends, hingeRatio: FAULT_NAMES.kneesTooMuch, shinAngle: FAULT_NAMES.shinsForward },
+  pushup: { bodyLine: FAULT_NAMES.hipsOffLine, handSetup: FAULT_NAMES.handsNotUnder, headLine: FAULT_NAMES.headOffLine, depth: FAULT_NAMES.notDeep },
 };
-/** The faults whose line names a side ("Left knee caves"). */
+/** The faults whose line names a side ("Left knee caves in"). */
 const SIDED: ReadonlySet<string> = new Set(['squat:kneeValgus', 'lunge:kneeIn', 'lunge:wobble']);
 
-/** "Left knee caves", "Both knees cave", "Heels lift". */
+/** "Left knee caves in", "Both knees cave in", "Heels lift". */
 export function faultPhrase(movement: ReviewMovement, fault: string, side: FaultSide | null | undefined): string {
   const s = SHORT[movement][fault] ?? MOVEMENT_SPECS[movement].label_of[fault] ?? fault;
   if (!SIDED.has(`${movement}:${fault}`)) return s;
-  if (side === 'both') return `Both ${s.replace(/^knee caves$/, 'knees cave').replace(/^knee wobbles$/, 'knees wobble')}`;
-  if (side === 'left') return `Left ${s}`;
-  if (side === 'right') return `Right ${s}`;
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return sided(s, side ?? null);
 }
 
 /** The Mirror's own cue for this fault (CueRule.cue), or null. */

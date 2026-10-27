@@ -34,6 +34,10 @@ import {
   HOOPS_RETREAT_SPEED_K,
 } from '@/lib/babylon/core/HoopsStick';
 import { PORTRAIT_HERO_MARGIN } from '@/lib/babylon/modes/netPortraitCam';
+import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/babylon/hoops/reaction';   // lane/hoops-round2
+import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
+import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
+import { CHEST_LEAN_DEG } from '@/lib/babylon/hoops/contactPoses';
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -69,6 +73,28 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.guardRangeM')).toBe(GUARD_RANGE_M);
     // tiebreak-cam (group "Tennis · camera")
     expect(def('tennis.portraitHeroMargin')).toBe(PORTRAIT_HERO_MARGIN);
+    // hoops-round2 (HOP-02 "Hoops · AI reaction", HOP-03 "Hoops · team defense", HOP-04 "Hoops · contact"): the owner's 420 / 220 / 120
+    expect(def('hoops.aiReactRookieMs')).toBe(AI_REACT_ROOKIE_MS);
+    expect(def('hoops.aiReactProMs')).toBe(AI_REACT_PRO_MS);
+    expect(def('hoops.aiReactEliteMs')).toBe(AI_REACT_ELITE_MS);
+    expect([AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS]).toEqual([420, 220, 120]);
+    expect(def('hoops.doubleTeamOn')).toBe(DOUBLE_TEAM_ON);
+    expect(def('hoops.doublePaintM')).toBe(DOUBLE_PAINT_M);
+    expect(def('hoops.doubleAfterSec')).toBe(DOUBLE_AFTER_SEC);
+    expect(def('hoops.doubleMaxSec')).toBe(DOUBLE_MAX_SEC);
+    expect(def('hoops.doubleCooldownSec')).toBe(DOUBLE_COOLDOWN_SEC);
+    expect(def('hoops.switchOnScreenOn')).toBe(SWITCH_ON_SCREEN_ON);
+    expect(def('hoops.switchHelpM')).toBe(SWITCH_HELP_M);
+    expect(def('hoops.switchCooldownSec')).toBe(SWITCH_COOLDOWN_SEC);
+    expect(def('hoops.handCheckOn')).toBe(HAND_CHECK_ON);
+    expect(def('hoops.handCheckReachOverM')).toBe(HAND_CHECK_REACH_OVER_M);
+    expect(def('hoops.handCheckGapSec')).toBe(HAND_CHECK_GAP_SEC);
+    expect(def('hoops.handCheckFoulCount')).toBe(HAND_CHECK_FOUL_COUNT);
+    expect(def('hoops.handCheckWindowSec')).toBe(HAND_CHECK_WINDOW_SEC);
+    expect(def('hoops.contactPoseOn')).toBe(CONTACT_POSE_ON);
+    expect(def('hoops.contactEaseInSec')).toBe(CONTACT_EASE_IN_SEC);
+    expect(def('hoops.contactEaseOutSec')).toBe(CONTACT_EASE_OUT_SEC);
+    expect(def('hoops.contactChestLeanDeg')).toBe(CHEST_LEAN_DEG);
     expect([COMBO_OPEN_K, COMBO_GRACE_SEC, GUARD_RANGE_M]).toEqual([0.5, 0.15, 2.0]);
     // hoops-shot-content
     expect(def('hoops.ftSetupSec')).toBe(FT_SETUP_SEC);

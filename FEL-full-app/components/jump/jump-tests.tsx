@@ -304,9 +304,9 @@ function Repeated({ read }: { read: Extract<ProtocolRead, { ok: true }> }) {
     <div data-rj className="space-y-2">
       {rj.best5RsiFlight !== null ? (
         <>
-          <p data-rj-best className="text-center text-[40px] font-black leading-none text-white">RSI {rj.best5RsiFlight.toFixed(2)}</p>
+          <p data-rj-best className="text-center text-[40px] font-black leading-none text-white">Bounce score {rj.best5RsiFlight.toFixed(2)}</p>
           <p className="text-center text-[16px] text-white/70">
-            Best 5 of {rj.counted} quick rebounds{est}: {(rj.best5ContactMs! / 1000).toFixed(2)} s on the floor, {inch(rj.best5HeightCm!)} in high. RSI here is time in the air divided by time on the floor.
+            Best 5 of {rj.counted} quick rebounds{est}: {(rj.best5ContactMs! / 1000).toFixed(2)} s on the floor, {inch(rj.best5HeightCm!)} in high. The bounce score (RSI) is time in the air divided by time on the floor: higher is springier. Next: try to raise it with quicker contacts.
           </p>
         </>
       ) : <p data-rj-why className="text-[18px] font-bold text-[#FFB020]">{rj.why}</p>}
@@ -316,7 +316,7 @@ function Repeated({ read }: { read: Extract<ProtocolRead, { ok: true }> }) {
           {rj.rebounds.map((x) => (
             <li key={x.to} data-rj-rebound={x.to} data-counted={x.counted} className="flex justify-between text-[16px] text-white/80">
               <span>Rebound {x.to}</span>
-              <span>{x.contactMs} ms · RSI {x.rsiFlight.toFixed(2)}{x.counted ? '' : ' · too long on the floor'}</span>
+              <span>{x.contactMs} ms · bounce {x.rsiFlight.toFixed(2)}{x.counted ? '' : ' · too long on the floor'}</span>
             </li>
           ))}
         </ul>
