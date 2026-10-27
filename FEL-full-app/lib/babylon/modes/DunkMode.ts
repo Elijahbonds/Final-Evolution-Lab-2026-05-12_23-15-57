@@ -2408,7 +2408,7 @@ export const DunkMode: ModeDefinition = (() => {
         dropVy = Math.min(FALL_SPEED_MAX, dropVy + GRAVITY * dt);
         player.root.position.y = Math.max(0, player.root.position.y - dropVy * dt);
         // DUNK-FLAGSHIP Phase 2: the absorb fades in over the fall's last LAND_LEAD_SEC (core/DunkFlagship) — fully in at touchdown
-        if (airHeld && player.root.position.y > 0) { const tf = dropVy >= FALL_SPEED_MAX - 1e-6 ? player.root.position.y / dropVy : timeToFloor(player.root.position.y, dropVy, GRAVITY);   // (at the fall's speed cap it no longer accelerates) if (tf <= feel('dunk.landLeadSec', LAND_LEAD_SEC)) landNow(Math.max(0.04, tf)); }
+        if (airHeld && player.root.position.y > 0) { const tf = dropVy >= FALL_SPEED_MAX - 1e-6 ? player.root.position.y / dropVy : timeToFloor(player.root.position.y, dropVy, GRAVITY); if (tf <= feel('dunk.landLeadSec', LAND_LEAD_SEC)) landNow(Math.max(0.04, tf)); }   // (at the fall's speed cap it no longer accelerates: height / speed)
         if (player.root.position.y <= 0) { dropToFloor = false; dropVy = 0; }
       }
       if (liveLandAt >= 0 && landDriftVz !== 0 && !replaying) {
