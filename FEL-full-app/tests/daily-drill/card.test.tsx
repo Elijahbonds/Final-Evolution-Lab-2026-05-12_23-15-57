@@ -31,10 +31,11 @@ describe('the daily drill card', () => {
     expect(out).toContain("Today's drill · 6 min");
     // test changed: drill redesign (TODAY-DRILL 2026-10-27) — the card says the plain name and why today in plain words
     expect(out).toContain('Soft landings');
-    expect(out).toContain("Your shooting is your lowest number right now (40% of 30 shots made), so today's drill works on soft, balanced landings.");
-    expect(out).toContain('Trains quiet, balanced landings');
+    expect(out).toContain('Shooting is your lowest score (40%). Today: soft landings.');
+    expect(out).toContain('Steady landings on every jump.');
     expect(out).not.toContain('data-daily-explainer');
-    expect(out).toContain('Finish it for 10 Lab Credits, and day 4 of your streak.');
+    // test changed: drill redesign (less text, owner 2026-10-27) — the reward as one short line, amounts unchanged
+    expect(out).toContain('+10 Lab Credits · Day 4 streak');
     expect(out).toContain('href="/train/today-drill"');
     expect(out).not.toContain('data-daily-nudge');
   });

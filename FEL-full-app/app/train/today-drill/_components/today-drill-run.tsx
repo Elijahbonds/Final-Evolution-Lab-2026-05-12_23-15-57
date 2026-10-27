@@ -13,22 +13,17 @@
 // pain check-in, never a second pain path.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
-import { Camera, Clock, Footprints, Smartphone, Sparkles } from 'lucide-react';
+import { ArrowUpToLine, Camera, CheckCircle2, Clock, Flame, Footprints, Maximize2, Smartphone, Sparkles } from 'lucide-react';
 import { setBodyPlayDobYear } from '@/lib/move/bodyPlayGrownUp';
 import { composeDailyDrill } from '@/lib/daily-drill/compose';
-import {
-  DAILY_DRILL_CLAIM_PATH, DAILY_EYEBROW, DONE_TITLE, KEPT_LINE, doneLine, rewardLine,
-} from '@/lib/daily-drill/copy';
-import {
-  CUES_TITLE, DEMO_TITLE, FIRST_TIME_LINES, FIRST_TIME_TITLE, NEEDS_TITLE, START_AGAIN_LABEL, START_LABEL, STEPS_TITLE,
-  guideFor, needsLines, stepsFor,
-} from '@/lib/daily-drill/guide';
+import { DAILY_DRILL_CLAIM_PATH, KEPT_LINE } from '@/lib/daily-drill/copy';
+import { FIRST_TIME_LINE, START_AGAIN_LABEL, START_LABEL, guideFor, needChips, rewardParts, stepsFor } from '@/lib/daily-drill/guide';
 import type { DailyDrillView } from '@/lib/daily-drill/load';
 import type { DrillResult } from '@/lib/drills/DrillRunner';
 import { DrillLive } from '@/app/play/drills/_components/drill-live';
-import { DrillDemo } from '@/app/play/drills/_components/drill-demo';
-import { drillById } from '@/lib/drills/drills';
+import { AvatarDemo } from '@/components/library/avatar-demo';
+import { useAutoOpen } from '@/components/library/use-auto-open';
+import { drillDemoLoop } from '@/lib/library/surfaceDemo';
 import { DrillResultView, DrillRunning, HurtPanel, type Claim } from './today-drill-live';
 
 /** POST the claim; the server's answer, or null when it failed. Exported for the tests. */
@@ -43,12 +38,17 @@ export async function postClaim(key: string, f: typeof fetch = fetch): Promise<{
   }
 }
 
-function Section({ title, children, id }: { title: string; children: React.ReactNode; id: string }) {
+const CHIP_ICON = { time: Clock, phone: Smartphone, floor: Maximize2, shoes: Footprints, above: ArrowUpToLine } as const;
+
+/** The shared drill demo's pieces (#462): the library stage, opening itself as it scrolls into view — no "watch" tap,
+ *  never a T-pose; the drill's own loop or the still start position. Without DrillDemo's long note line. */
+function Demo({ drillId }: { drillId: string }) {
+  const { ref, open } = useAutoOpen<HTMLDivElement>();
+  const off = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
   return (
-    <section className="space-y-2" data-daily-section={id}>
-      <h2 className="font-mono text-[11px] font-bold uppercase tracking-[0.16em] text-white/50">{title}</h2>
-      {children}
-    </section>
+    <div ref={ref} className="overflow-hidden rounded-2xl border border-white/10 bg-[#0c0c11]" data-daily-demo={drillId}>
+      {open && !off ? <AvatarDemo clip={drillDemoLoop(drillId)} /> : <div className="aspect-[4/3] w-full sm:aspect-video" />}
+    </div>
   );
 }
 
@@ -56,7 +56,6 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   const plan = view.plan!;
   const drill = useMemo(() => composeDailyDrill(plan), [plan]);
   const guide = guideFor(plan.drillId);
-  const main = drillById(plan.drillId);
   const steps = useMemo(() => stepsFor(plan.drillId, plan.phases), [plan]);
   const [stage, setStage] = useState<'intro' | 'live' | 'hurt'>('intro');
   const hurt = useRef(false);
@@ -90,70 +89,47 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   }
 
   const done = claim.state === 'done';
-  // owner (2026-10-27): "It should play automatically, don't make the platform confusing or hard to use." The one next
-  // action is one big button, always on screen (above the phone's tab bar), and nothing is folded away.
+  const newcomer = view.newcomer && !done;
+  const reward = rewardParts(view.credit, view.streak, claim.state === 'done' ? claim : null);
+  // owner (2026-10-27): "It should play automatically, don't make the platform confusing or hard to use", and less text.
+  // The next action is one big button, always on screen (above the phone's tab bar); big numbers, icon chips and the
+  // demo carry the meaning. A first-timer also gets one line on what the daily drill is, the 3 steps and the 2 cues.
   const startButton = (
     <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-[#050505]/95 px-4 py-3 md:bottom-0" data-daily-start-bar>
       <div className="mx-auto max-w-3xl">
         <button type="button" onClick={() => setStage('live')} data-daily-start
-          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-6 text-[17px] font-black text-black">
+          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-6 text-[18px] font-black tracking-wide text-black">
           <Camera aria-hidden className="h-5 w-5" /> {done ? START_AGAIN_LABEL : START_LABEL}
         </button>
       </div>
     </div>
   );
-  const how = (
-    <div className="space-y-5">
-      {/* the shared drill demo (lane/library-anatomy-2, #462): the library stage, the drill's own loop or the still start
-          position, opening by itself as it scrolls into view — no "watch" tap, never a T-pose */}
-      {main && <Section title={DEMO_TITLE} id="demo"><DrillDemo drill={main} /></Section>}
-      <Section title={STEPS_TITLE} id="steps">
-        <ol className="space-y-2" data-daily-steps={steps.length}>
-          {steps.map((s, i) => (
-            <li key={s} className="flex gap-3 text-[15px] leading-snug text-white/85">
-              <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-[13px] font-black text-white">{i + 1}</span>
-              <span>{s}</span>
-            </li>
-          ))}
-        </ol>
-      </Section>
-      <Section title={CUES_TITLE} id="cues">
-        <ul className="space-y-1.5" data-daily-cues={guide.cues.length}>
-          {guide.cues.map((c) => <li key={c} className="rounded-xl bg-[#00E5FF]/[0.07] px-3 py-2 text-[16px] font-bold text-white">{c}</li>)}
-        </ul>
-      </Section>
-      <Section title={NEEDS_TITLE} id="needs">
-        <ul className="space-y-1.5 text-[14px] leading-snug text-white/75">
-          {needsLines(guide.jumps).map((n) => <li key={n.id} data-daily-need={n.id} className="flex gap-2"><span aria-hidden className="text-[#00FF9D]">•</span>{n.text}</li>)}
-        </ul>
-      </Section>
-    </div>
-  );
 
   return (
-    <div className="space-y-5 pb-28" data-daily-page={plan.key} data-daily-newcomer={view.newcomer ? '1' : '0'}>
+    <div className="space-y-5 pb-28" data-daily-page={plan.key} data-daily-newcomer={newcomer ? '1' : '0'}>
       <header className="space-y-2">
-        <p className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">{DAILY_EYEBROW}</p>
-        <h1 className="text-[32px] font-black leading-[1.05] text-white">{guide.title}</h1>
-        <p className="text-[12px] text-white/40">{plan.name}, from the Playbook</p>
-        <p className="text-[16px] leading-snug text-white/85" data-daily-why>{view.whyToday}</p>
-        <p className="flex items-start gap-2 text-[15px] leading-snug text-white/70" data-daily-improves>
-          <Sparkles aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-[#00FF9D]" />{guide.improves}
-        </p>
-        <p className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-[13px] text-white/60" data-daily-chips>
-          <span className="inline-flex items-center gap-1"><Clock aria-hidden className="h-3.5 w-3.5" />{plan.minutes} min</span>
-          <span className="inline-flex items-center gap-1"><Footprints aria-hidden className="h-3.5 w-3.5" />2 m of floor{guide.jumps ? ', shoes on' : ''}</span>
-          <span className="inline-flex items-center gap-1"><Smartphone aria-hidden className="h-3.5 w-3.5" />Phone 4 m away</span>
-        </p>
+        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-white/40" data-daily-book>{plan.name}</p>
+        <h1 className="text-[36px] font-black leading-[1.02] tracking-tight text-white">{guide.title}</h1>
+        <p className="text-[17px] font-semibold leading-snug text-white/90" data-daily-why>{view.whyToday}</p>
+        {newcomer && (
+          <p className="flex items-center gap-2 text-[15px] text-white/70" data-daily-improves>
+            <Sparkles aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" />{guide.improves}
+          </p>
+        )}
       </header>
 
-      {view.newcomer && (
-        <div className="rounded-2xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] p-4" data-daily-explainer>
-          <p className="text-[15px] font-black text-white">{FIRST_TIME_TITLE}</p>
-          <p className="mt-1 text-[14px] leading-snug text-white/80">{FIRST_TIME_LINES[0]}</p>
-          <p className="text-[14px] leading-snug text-white/80">{FIRST_TIME_LINES[1]}</p>
-        </div>
-      )}
+      <ul className="flex flex-wrap gap-2" data-daily-chips>
+        {needChips(guide.jumps, plan.minutes).map((c) => {
+          const Icon = CHIP_ICON[c.id];
+          return (
+            <li key={c.id} data-daily-need={c.id} aria-label={c.label} title={c.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-[13px] font-semibold text-white/85">
+              <Icon aria-hidden className="h-4 w-4 text-[#00E5FF]" />{c.text}
+            </li>
+          );
+        })}
+      </ul>
+
+      {newcomer && <p className="rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-3 py-2 text-[14px] text-white/85" data-daily-explainer>{FIRST_TIME_LINE}</p>}
 
       {plan.heldNote && (
         <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[13px] leading-snug text-amber-100/90" data-daily-held>
@@ -162,13 +138,28 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
         </p>
       )}
 
-      {done
-        ? <p className="rounded-xl border border-[#00FF9D]/35 bg-[#00FF9D]/[0.07] px-3 py-2.5 text-[14px] text-white" data-daily-claim="done"><span className="font-bold">{DONE_TITLE}.</span> {doneLine(claim.amount, claim.streakDays)}</p>
-        : <p className="text-[14px] text-white/65" data-daily-reward>{rewardLine(view.credit, view.streak.opensToday, view.streak.nextDays)}</p>}
+      <p className="flex items-center gap-3 font-mono text-[14px] font-bold tracking-wide text-[#00FF9D]" data-daily-reward={reward.done ? 'done' : 'open'}>
+        {reward.done && <CheckCircle2 aria-label="Done today" className="h-4 w-4" />}
+        <span>{reward.credits}</span>
+        {reward.day !== null && <span className="inline-flex items-center gap-1 text-[#FFB020]" aria-label={`Day ${reward.day} of your streak`}><Flame aria-hidden className="h-4 w-4" />{reward.day}</span>}
+      </p>
 
-      {how}
+      <Demo drillId={plan.drillId} />
+
+      {newcomer && (
+        <ol className="space-y-2" data-daily-steps={steps.length}>
+          {steps.map((s, i) => (
+            <li key={s} className="flex items-center gap-3 text-[17px] font-semibold text-white">
+              <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 font-mono text-[15px] font-black text-[#00FF9D]">{i + 1}</span>
+              {s}
+            </li>
+          ))}
+        </ol>
+      )}
+      <ul className="flex flex-wrap gap-2" data-daily-cues={guide.cues.length}>
+        {guide.cues.map((c) => <li key={c} className="rounded-2xl bg-[#00E5FF]/[0.10] px-4 py-2.5 text-[18px] font-black text-white">{c}</li>)}
+      </ul>
       {startButton}
-      <Link href="/play/drills" className="inline-block text-[13px] text-white/50 underline-offset-2 hover:underline">All drills</Link>
     </div>
   );
 }

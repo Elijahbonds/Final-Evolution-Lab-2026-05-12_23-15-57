@@ -30,57 +30,82 @@ vi.mock('@/lib/move/bodyPlay', () => ({ bodyPlay: { confirmGrownUp: async () => 
 import { TodayDrillRun } from '@/app/train/today-drill/_components/today-drill-run';
 import { DrillResultView, DrillRunning, HurtPanel } from '@/app/train/today-drill/_components/today-drill-live';
 import { DrillLive } from '@/app/play/drills/_components/drill-live';
-import { DrillDemo } from '@/app/play/drills/_components/drill-demo';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { drillDemoLoop } from '@/lib/library/surfaceDemo';
 import { drive, findAll, textOf } from '@/tests/helpers/driveRender';
 import { LIVE_IDLE, type LiveDrillView } from '@/lib/drills/liveDrill';
 import { DrillRunner, type DrillResult } from '@/lib/drills/DrillRunner';
 import { composeDailyDrill } from '@/lib/daily-drill/compose';
 import { viewFrom } from '@/lib/daily-drill/load';
 import { HURT_LABEL, PAUSE_LABEL, STOP_LABEL } from '@/lib/daily-drill/guide';
-import { NOW, OPEN, hooper, jumper, newAdult } from '@/tests/helpers/dailyDrillRows';
+import { NOW, OPEN, YOUTH, hooper, jumper, newAdult, teen } from '@/tests/helpers/dailyDrillRows';
 
 const decode = (s: string) => s.replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/&quot;/g, '"');
 const intro = (v: ReturnType<typeof viewFrom>) => decode(renderToStaticMarkup(createElement(TodayDrillRun, { view: v, dobYear: 1994 })));
+/** Words a reader sees: the markup's text, counted the way the phone rig counts them. */
+const wordCount = (html: string) => (decode(html.replace(/<[^>]+>/g, ' ')).match(/[A-Za-z0-9][A-Za-z0-9'’.%-]*/g) ?? []).length;
 const live = (v: Partial<LiveDrillView>) => { h.view = { ...LIVE_IDLE, ...v }; };
 
 beforeEach(() => { h.calls = []; live({ phase: 'setup' }); });
 
 describe('before: purpose first, then what to do', () => {
-  it('a first-timer: the two-line explainer, then the demo, steps, cues and setup, all shown', () => {
+  it('a first-timer: the book label, the short why, what it improves, the chips, the one-line explainer, steps, cues', () => {
     const out = intro(viewFrom('u1', { ...hooper(), recentDrills: 0 }, OPEN, NOW));
     expect(out).toContain('data-daily-newcomer="1"');
-    expect(out).toContain('New to the daily drill?');
-    expect(out).toContain('Each day we pick one short drill from your lowest number.');
-    expect(out).toContain('<h1');
-    expect(out).toContain('Soft landings');
-    expect(out).toContain('Your shooting is your lowest number right now (40% of 30 shots made)');
-    expect(out).toContain('Trains quiet, balanced landings');
-    expect(out).toMatch(/6 min/);
-    for (const s of ['demo', 'steps', 'cues', 'needs']) expect(out).toContain(`data-daily-section="${s}"`);
-    expect(out).toContain('data-daily-cues="3"');
-    expect(out).toContain('3.5 to 4.5 m');
+    expect(out).toContain('New: one short drill a day, from your lowest score.');
+    expect(out).toMatch(/<h1[^>]*>Soft landings<\/h1>/);
+    expect(out).toContain('Safe Landing Check');                                       // the book name, a small label
+    expect(out).toContain('Shooting is your lowest score (40%). Today: soft landings.');
+    expect(out).toContain('Steady landings on every jump.');
+    for (const c of ['time', 'phone', 'floor', 'shoes', 'above']) expect(out).toContain(`data-daily-need="${c}"`);
+    expect(out).toContain('6 min');
+    expect(out).toContain('data-daily-steps="2"');
+    expect(out).toContain('data-daily-cues="2"');
+    expect(out).toContain('+10 Lab Credits');
+    expect(out).toContain('aria-label="Day 4 of your streak"');
   });
 
-  it('owner 2026-10-27: nothing folded away for anyone, and the next action is ONE big button, always on screen', () => {
+  it('owner 2026-10-27: less text — a first-timer reads ≤ 110 words before Start, a returning player ≤ 40', () => {
+    const cases = [
+      [{ ...hooper(), recentDrills: 0 }, OPEN, 110], [{ ...jumper(), recentDrills: 0 }, OPEN, 110], [newAdult(), OPEN, 110],
+      [hooper(), OPEN, 40], [jumper(), OPEN, 40], [teen(), YOUTH, 40],
+    ] as const;
+    for (const [rows, acc, max] of cases) {
+      const v = viewFrom('u1', rows, acc, NOW);
+      const n = wordCount(intro(v)) - wordCount(v.plan!.heldNote ?? '') - (v.plan!.heldHref ? 3 : 0);
+      expect(n, `${v.plan!.key} newcomer=${v.newcomer}: ${n} words`).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it('a returning player: no explainer, steps or improves line — the demo, the chips, the cues and Start', () => {
+    const out = intro(viewFrom('u1', hooper(), OPEN, NOW));
+    expect(out).toContain('data-daily-newcomer="0"');
+    expect(out).not.toContain('data-daily-explainer');
+    expect(out).not.toContain('data-daily-steps');
+    expect(out).toContain('data-daily-demo');
+    expect(out).toContain('data-daily-cues="2"');
+  });
+
+  it('owner 2026-10-27: nothing behind a tap, and the next action is ONE big button, always on screen', () => {
     for (const rows of [hooper(), { ...hooper(), recentDrills: 0 }]) {
       const out = intro(viewFrom('u1', rows, OPEN, NOW));
       expect(out).not.toContain('<details');
-      for (const s of ['demo', 'steps', 'cues', 'needs']) expect(out).toContain(`data-daily-section="${s}"`);
       expect((out.match(/data-daily-start=/g) ?? []).length).toBe(1);
-      expect(out).toMatch(/data-daily-start-bar[^>]*|class="fixed[^"]*"[^>]*data-daily-start-bar/);
+      expect(out).toContain('data-daily-start-bar');
       expect(out).toContain('bottom-[calc(4rem+env(safe-area-inset-bottom))]');   // above the phone's tab bar
       expect(out).not.toContain('Watch the 3D demo');                              // no "watch" tap: it plays by itself
     }
-    expect(intro(viewFrom('u1', hooper(), OPEN, NOW))).not.toContain('New to the daily drill?');
   });
 
-  it('the demo is the shared DrillDemo (#462: the library stage, autoplay), for the day\'s drill', () => {
-    const v = viewFrom('u1', { ...jumper(), recentDrills: 0 }, OPEN, NOW);
-    const { tree } = drive(() => TodayDrillRun({ view: v, dobYear: 1994 }) as ReactElement);
-    const demos = findAll(tree, (el) => el.type === DrillDemo);
-    expect(demos).toHaveLength(1);
-    expect(demos[0].props.drill.id).toBe('pogo-bilateral');
-    expect(demos[0].props.initiallyOpen).toBeUndefined();   // it opens itself on scroll into view: no tap
+  it('the demo is #462\'s shared stage (AvatarDemo + useAutoOpen + drillDemoLoop), for the day\'s drill', () => {
+    const out = intro(viewFrom('u1', { ...jumper(), recentDrills: 0 }, OPEN, NOW));
+    expect(out).toContain('data-daily-demo="pogo-bilateral"');
+    expect(drillDemoLoop('pogo-bilateral')).toBe('ex_pogo');
+    const src = readFileSync(join(__dirname, '../../app/train/today-drill/_components/today-drill-run.tsx'), 'utf8');
+    expect(src).toMatch(/from '@\/components\/library\/avatar-demo'/);
+    expect(src).toMatch(/from '@\/components\/library\/use-auto-open'/);
+    expect(src).not.toMatch(/exercise-avatar-canvas|exercise-stage/);
   });
 
   it('Start opens the camera screen with today\'s own running and result screens', () => {
@@ -105,7 +130,7 @@ describe('during: one step, one cue, the rep, rest and next; Pause / Stop / This
   it('a hop set: Step 4 of 8, its plain name, the rep counter, one cue, next = Rest', () => {
     const t = 240 + 9;   // the warm-up is 4 minutes; 9 s into set 1
     const out = html(createElement(DrillRunning, { slot: slot(at(t)), drillId: v.plan!.drillId, onHurt: () => {} }));
-    expect(out).toContain('Step 4 of 8');
+    expect(out).toContain('data-daily-step-of="4/8"');
     expect(out).toContain('Hops: set 1');
     expect(out).toMatch(/data-daily-rep="\d+\/20"/);
     expect((out.match(/data-daily-cue/g) ?? []).length).toBe(1);
@@ -157,7 +182,7 @@ describe('during: one step, one cue, the rep, rest and next; Pause / Stop / This
     expect(h.calls).toContain('close');
     const d = decode(out);
     expect(d).toContain('data-daily-hurt-panel');
-    expect(d).toContain('Drill stopped. Rest now.');
+    expect(d).toContain('Stopped. Rest now.');
     expect(d).toContain(`data-pain-checkin="${v2.plan!.name}"`);
     expect(d).toContain('Pain, 0–10');          // the chip's own form, opened (painRule decides; no copy of ours)
     expect(d).not.toMatch(/data-daily-claim="(done|sending)"/);
@@ -185,10 +210,10 @@ describe('after: what we saw / what it means / what is next', () => {
     expect(out).toContain('Done for today');
     expect(out).toContain('+30 Lab Credits. Streak: 4 days.');
     expect(out).toContain('What we saw');
-    expect(out).toContain('The camera saw 20 of 20 hops and landings on time, and 9 of 10 holds kept still.');
+    expect(out).toContain('Camera saw 20 of 20 on time, 9 of 10 held still.');
     expect(out).toContain('What it means');
     expect(out).toContain('What’s next');
-    expect(out).toContain('Tomorrow will likely work on soft, balanced landings again');
+    expect(out).toContain('Tomorrow: likely soft landings again.');
     expect(out).toContain('camera estimate');
     expect(out).toContain('Only the fact that you finished');
     expect(textOf(null)).toBe('');

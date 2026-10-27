@@ -24,6 +24,20 @@ export type Claim = { state: 'idle' } | { state: 'sending' } | { state: 'done'; 
 
 const clock = (sec: number) => { const s = Math.max(0, Math.ceil(sec)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
+/** The step counter: a ring that fills as the drill goes, "4/8" inside it. */
+function StepRing({ index, count, share }: { index: number; count: number; share: number }) {
+  const r = 30; const c = 2 * Math.PI * r;
+  return (
+    <div className="relative h-[76px] w-[76px] shrink-0" data-daily-step-of={`${index}/${count}`} aria-label={`Step ${index} of ${count}`}>
+      <svg viewBox="0 0 76 76" className="h-full w-full -rotate-90" aria-hidden>
+        <circle cx="38" cy="38" r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="7" />
+        <circle cx="38" cy="38" r={r} fill="none" stroke="#00FF9D" strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(1, Math.max(0, share)))} />
+      </svg>
+      <span className="absolute inset-0 grid place-items-center font-mono text-[20px] font-black tabular-nums text-white">{index}/{count}</span>
+    </div>
+  );
+}
+
 export function DrillRunning({ slot, drillId, onHurt }: { slot: DrillRunningSlot; drillId: string; onHurt: () => void }) {
   const { view, drill } = slot;
   const run = view.run;
@@ -35,33 +49,27 @@ export function DrillRunning({ slot, drillId, onHurt }: { slot: DrillRunningSlot
   const cue = view.caption ?? step?.cue ?? null;
   return (
     <section className="space-y-3 pb-28" data-drill-running={run?.status ?? 'starting'} data-daily-run={step ? `${step.index}/${step.count}` : 'starting'}>
-      <div className="space-y-1.5">
-        <div className="flex items-baseline justify-between gap-3 font-mono text-[12px] uppercase tracking-[0.12em] text-white/55">
-          <span data-daily-step-of>{step ? `Step ${step.index} of ${step.count}` : 'Starting'}</span>
-          {left !== null && <span className="tabular-nums">{clock(left)} left</span>}
+      {/* the big step counter: a ring that fills with the whole drill, the step number inside it */}
+      <div className="flex items-center gap-4">
+        <StepRing index={step?.index ?? 0} count={step?.count ?? drill.phases.length} share={(run?.drillSec ?? 0) / Math.max(1, total)} />
+        <div className="min-w-0 flex-1">
+          {!step?.rest && <h2 className="truncate text-[30px] font-black leading-[1.05] text-white" data-daily-step-name>{step?.name ?? drill.name}</h2>}
+          {left !== null && <p className="font-mono text-[15px] tabular-nums text-white/60">{clock(left)}</p>}
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
-          <div className="h-full rounded-full bg-[#00FF9D]" style={{ width: `${Math.min(100, ((run?.drillSec ?? 0) / Math.max(1, total)) * 100)}%` }} />
-        </div>
+        {step?.rep && (
+          <p className="shrink-0 text-right" data-daily-rep={`${step.rep.at}/${step.rep.of}`}>
+            <span className="block font-mono text-[48px] font-black leading-none tabular-nums text-[#00FF9D]">{step.rep.at}</span>
+            <span className="font-mono text-[13px] text-white/55">/ {step.rep.of}</span>
+          </p>
+        )}
       </div>
 
       {step?.rest ? (
         <div className="rounded-2xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] p-5 text-center" data-daily-rest>
           <p className="text-4xl font-black text-white">{REST_TITLE}</p>
-          <p className="mt-1 font-mono text-5xl font-black tabular-nums text-[#00E5FF]" aria-live="polite">{left !== null ? clock(left) : ''}</p>
-          <p className="mt-2 text-[16px] text-white/75">{step.cue}</p>
+          <p className="mt-1 font-mono text-6xl font-black tabular-nums text-[#00E5FF]" aria-live="polite">{left !== null ? clock(left) : ''}</p>
         </div>
-      ) : (
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="text-[32px] font-black leading-[1.05] text-white" data-daily-step-name>{step?.name ?? drill.name}</h2>
-          {step?.rep && (
-            <p className="shrink-0 text-right" data-daily-rep={`${step.rep.at}/${step.rep.of}`}>
-              <span className="block font-mono text-[40px] font-black leading-none tabular-nums text-[#00FF9D]">{step.rep.at}</span>
-              <span className="text-[12px] text-white/55">of {step.rep.of}</span>
-            </p>
-          )}
-        </div>
-      )}
+      ) : null}
 
       {/* ONE cue, right under the step, big enough to read from 4 m */}
       {!step?.rest && cue && <p className="text-[22px] font-black leading-snug text-white" aria-live="polite" data-daily-cue>{cue}</p>}

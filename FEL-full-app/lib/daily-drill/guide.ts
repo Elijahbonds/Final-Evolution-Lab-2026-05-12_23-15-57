@@ -7,6 +7,11 @@
 // says the same moves in plain words beside them. Every count in a step (sets, reps, rest) is READ FROM THE CHART the
 // day runs (lib/daily-drill/compose.ts phaseOf), so a step can never promise a rep the drill does not ask for.
 //
+// LESS TEXT (owner 2026-10-27: the app "feels cheap" partly from "too much text"; a dark premium athletic look): big
+// numbers, the demo and icon chips carry the meaning. Budgets, held by tests/daily-drill/today-drill-flow.test.tsx: a
+// first-timer's page ≤ 110 words before Start, a returning player's ≤ 40; ≤ 3 steps of ≤ 6 words; 2 cues; the result's
+// three rows ≤ 12 words each.
+//
 // COPY STYLE (until lane/cue-rewrite's docs/CUE-STYLE.md lands): short, positive, action-first; about a 6th–8th grade
 // reading level (guide.test.ts holds every fixed line to Flesch–Kincaid grade ≤ 8); no jargon without a plain gloss; no
 // medical words (lib/coach/weeklyDraft/copy.ts MEDICAL_WORDS, held by the test); teen-appropriate; never shaming. Product
@@ -24,17 +29,19 @@ export type GuideDrillId = 'pogo-bilateral' | 'countermovement-geometry' | 'safe
 interface PhaseWords { name: string; cue: string }
 
 export interface DrillGuide {
-  /** The plain name ("Soft landings"); the book's name stays beside it, small. */
+  /** The plain name ("Soft landings"); the book's name stays beside it as a small label. */
   title: string;
-  /** What today's drill works on, said inside the why-line ("soft, balanced landings"). */
+  /** What today's drill works on, in the why-line ("soft landings"). */
   works: string;
-  /** What it improves, in one line. */
+  /** What it improves: one short phrase. */
   improves: string;
-  /** The 2–3 key cues, in plain words. */
-  cues: string[];
+  /** The 2 key cues, as big chips. */
+  cues: [string, string];
   /** What one rep is called, plural ("hops"). */
   unit: string;
-  /** Jumps or lands: nothing overhead, shoes with grip. */
+  /** The work step's tail after the rep count, for a one-set drill ("slow squats, hold 3"). */
+  workStep?: string;
+  /** Jumps or lands: clear above, shoes on. */
   jumps: boolean;
   /** Plain words for each phase of the drill (and of the warm-up), by phase id. */
   phases: Record<string, PhaseWords>;
@@ -42,62 +49,64 @@ export interface DrillGuide {
 
 /** The quick Wake-Up's phases, as a short drill's warm-up runs them (plan.ts PREP_PHASES). */
 const WARMUP_WORDS: Record<string, PhaseWords> = {
-  'release-the-locks': { name: 'Loosen up', cue: 'Hands on a wall. Tense, relax, then sink a little lower.' },
-  pressurize: { name: 'Breathe', cue: 'Hands on your ribs. Breathe in for 4, hold for 2, out for 6.' },
-  'wake-the-tripod': { name: 'Wake up your feet', cue: 'Press down heel, big toe and little toe. Lift your arch and hold.' },
+  'release-the-locks': { name: 'Loosen up', cue: 'Hands on a wall. Tense, relax, sink lower.' },
+  pressurize: { name: 'Breathe', cue: 'In for 4. Hold 2. Out for 6.' },
+  'wake-the-tripod': { name: 'Wake up your feet', cue: 'Grip with heel and toes. Lift the arch.' },
   'open-the-joints': { name: 'Joint circles', cue: 'Slow circles, as big as feels easy.' },
-  'build-the-rhythm': { name: 'Bounce', cue: 'Quick, quiet bounces on the balls of your feet.' },
-  'prime-the-launch': { name: 'Jump and freeze', cue: 'Dip, jump, land soft, and freeze.' },
+  'build-the-rhythm': { name: 'Bounce', cue: 'Quick, quiet bounces on your toes.' },
+  'prime-the-launch': { name: 'Jump and freeze', cue: 'Dip, jump, land soft, freeze.' },
 };
 
-const REST_WORDS: PhaseWords = { name: 'Rest', cue: 'Walk it off. Come back into the picture before the timer ends.' };
+const REST_WORDS: PhaseWords = { name: 'Rest', cue: 'Walk it off. Back in the picture soon.' };
 
 export const GUIDES: Record<GuideDrillId, DrillGuide> = {
   'pogo-bilateral': {
     title: 'Springy hops',
-    works: 'quick, springy hops',
-    improves: 'Builds springy ankles for a quicker first step and a higher jump.',
-    cues: ['Stay on the balls of your feet.', 'Keep your knees almost straight.', 'Quick and quiet, like the floor is hot.'],
+    works: 'springy hops',
+    improves: 'Quicker first step, higher jump.',
+    cues: ['On your toes', 'Quick, quiet'],
     unit: 'hops',
     jumps: true,
     phases: {
       ...WARMUP_WORDS,
-      'set-1': { name: 'Hops: set 1', cue: 'Quick, quiet hops. Light feet.' },
+      'set-1': { name: 'Hops: set 1', cue: 'Quick, quiet hops.' },
       'set-2': { name: 'Hops: set 2', cue: 'Same bounce. Stay quiet.' },
-      'set-3': { name: 'Hops: last set', cue: 'Last set. Quick and light.' },
+      'set-3': { name: 'Hops: last set', cue: 'Last set. Light feet.' },
       'rest-1': REST_WORDS,
       'rest-2': REST_WORDS,
     },
   },
   'countermovement-geometry': {
     title: 'Slow squat check',
-    works: 'slow, steady squats',
-    improves: 'Teaches the dip before a good jump: hips back, knees over toes, heels down.',
-    cues: ['Sit your hips back, like reaching for a chair.', 'Knees point the same way as your toes.', 'Heels stay down the whole time.'],
+    works: 'slow squats',
+    improves: 'A stronger dip before you jump.',
+    cues: ['Hips back', 'Heels down'],
     unit: 'squats',
+    workStep: 'slow squats, hold 3',
     jumps: false,
     phases: {
       ...WARMUP_WORDS,
-      geometry: { name: 'Slow squats', cue: 'Sink slowly. Hold for 3. Rise slowly. No jump.' },
+      geometry: { name: 'Slow squats', cue: 'Sink slowly. Hold 3. Rise slowly.' },
     },
   },
   'safe-landing': {
     title: 'Soft landings',
-    works: 'soft, balanced landings',
-    improves: 'Trains quiet, balanced landings, so every jump ends steady.',
-    cues: ['Land on both feet at the same time.', 'Bend your knees and hips to soak it up.', 'Freeze and count to 3.'],
+    works: 'soft landings',
+    improves: 'Steady landings on every jump.',
+    cues: ['Both feet at once', 'Freeze for 3'],
     unit: 'landings',
+    workStep: 'hops, land and freeze',
     jumps: true,
     phases: {
       ...WARMUP_WORDS,
-      landings: { name: 'Soft landings', cue: 'Small hop. Land on both feet, soft, and freeze for 3.' },
+      landings: { name: 'Soft landings', cue: 'Small hop. Land soft. Freeze for 3.' },
     },
   },
   'wake-up': {
     title: 'Full-body wake-up',
-    works: 'waking up your whole body',
-    improves: 'Gets your joints moving and your body ready to play.',
-    cues: ['Move slowly and smoothly.', 'Breathe out as you move.', 'Go only as far as feels easy.'],
+    works: 'a full-body wake-up',
+    improves: 'Loose joints, ready to play.',
+    cues: ['Slow and smooth', 'Easy range only'],
     unit: 'moves',
     jumps: false,
     phases: { ...WARMUP_WORDS },
@@ -121,72 +130,74 @@ export const phaseReps = (p: Pick<DrillPhase, 'targets'>): number => p.targets.f
 
 // ── the copy ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export const FIRST_TIME_TITLE = 'New to the daily drill?';
-/** The first-timer's two lines: what the daily drill is. */
-export const FIRST_TIME_LINES: readonly [string, string] = [
-  'Each day we pick one short drill from your lowest number.',
-  'Do it on camera to keep your streak and earn Lab Credits. A new one comes tomorrow.',
-];
-export const STEPS_TITLE = 'What you will do';
-export const CUES_TITLE = 'Remember';
-export const NEEDS_TITLE = 'Before you start';
-export const DEMO_TITLE = 'Watch it first';
+/** The first-timer's line: what the daily drill is (the reward line beside it says what finishing pays). */
+export const FIRST_TIME_LINE = 'New: one short drill a day, from your lowest score.';
 export const START_LABEL = 'Start';
 export const START_AGAIN_LABEL = 'Do it again';
 
-/** What you need: space, shoes, the phone. Distances match body play's own setup hint (SETUP_HINT, 3.5 to 4.5 m). */
-export function needsLines(jumps: boolean): { id: string; text: string }[] {
+/** The setup, as icon chips. The distance is body play's own (SETUP_HINT, 3.5 to 4.5 m), rounded to its middle. */
+export function needChips(jumps: boolean, minutes: number): { id: 'time' | 'phone' | 'floor' | 'shoes' | 'above'; text: string; label: string }[] {
   return [
-    { id: 'phone', text: 'Phone on its side, about chest high. Lean it on something steady.' },
-    { id: 'distance', text: 'Step back 3.5 to 4.5 m, so your whole body fits, head to feet.' },
-    { id: 'space', text: jumps ? 'About 2 m of clear floor, and nothing overhead to hit.' : 'About 2 m of clear floor.' },
-    { id: 'shoes', text: jumps ? 'Shoes with grip.' : 'Shoes with grip, or bare feet on a floor that does not slip.' },
-    { id: 'check', text: 'The camera checks your framing before the clock starts.' },
+    { id: 'time', text: `${minutes} min`, label: `${minutes} minutes` },
+    { id: 'phone', text: '4 m away', label: 'Phone 4 m away, whole body in the picture' },
+    { id: 'floor', text: '2 m floor', label: '2 m of clear floor' },
+    ...(jumps ? [{ id: 'shoes' as const, text: 'Shoes on', label: 'Shoes with grip' }, { id: 'above' as const, text: 'Clear above', label: 'Nothing overhead to hit' }] : []),
   ];
 }
 
-const FOCUS_LABEL: Record<Exclude<Focus, 'starter'>, string> = {
-  jump: 'jump', form: 'squat form', shot: 'shooting', mobility: 'mobility',
-};
-
-/** Why today, tied to the person's real number: "Your shooting is your lowest number right now (…), so …". */
-export function whyToday(focus: Focus, skill: SkillReading | null, tied: boolean, drillId: string): string {
-  const g = guideFor(drillId);
-  if (!skill || focus === 'starter') return `We don't have your numbers yet, so today's drill is ${g.works}.`;
-  const label = FOCUS_LABEL[focus];
-  const base = `Your ${label} is your lowest number right now (${skill.display}), so today's drill works on ${g.works}.`;
-  const link = focus === 'shot' && drillId === 'safe-landing' ? ' Steady landings are the base of a good jump shot.' : '';
-  const slipped = skill.trend === 'worse' ? ' It dipped a little since last week.' : '';
-  const tie = tied ? ' It tied with another number, so the pick stays fixed for today.' : '';
-  return `${base}${link}${slipped}${tie}`;
+/** The reward as two chips for the page: the credits, and the streak day (a flame icon says "streak"). */
+export function rewardParts(credit: number, streak: { opensToday: boolean; nextDays: number }, done: { amount: number; streakDays: number | null } | null): { credits: string; day: number | null; done: boolean } {
+  if (done) return { credits: `+${done.amount} Lab Credits`, day: done.streakDays || null, done: true };
+  return { credits: `+${credit} Lab Credits`, day: streak.opensToday ? streak.nextDays : null, done: false };
 }
 
-/** The numbered steps, from the chart the day runs: the warm-up, the work, the rests, the finish. */
+/** What finishing pays, as one short line (the claim's own amounts, unchanged): "+10 Lab Credits · Day 4 streak". */
+export function rewardChip(credit: number, streak: { opensToday: boolean; nextDays: number }, done: { amount: number; streakDays: number | null } | null): string {
+  if (done) return `Done · +${done.amount} Lab Credits${done.streakDays ? ` · Day ${done.streakDays} streak` : ''}`;
+  return `+${credit} Lab Credits${streak.opensToday ? ` · Day ${streak.nextDays} streak` : ''}`;
+}
+
+const FOCUS_LABEL: Record<Exclude<Focus, 'starter'>, string> = {
+  jump: 'Jump', form: 'Squat form', shot: 'Shooting', mobility: 'Mobility',
+};
+
+/** The number, short ("26 in", "40%"): the reading's own display, cut to its value. */
+export function shortValue(skill: SkillReading): string {
+  const m = /^(?:power |mobility )?(\d+(?:\.\d+)?(?: in| of 100|%)?)/.exec(skill.display);
+  return m ? m[1].replace(' of 100', '/100') : skill.display;
+}
+
+/** Why today, one short line from the person's real number: "Shooting is your lowest score (40%). Today: soft landings." */
+export function whyToday(focus: Focus, skill: SkillReading | null, _tied: boolean, drillId: string): string {
+  const g = guideFor(drillId);
+  if (!skill || focus === 'starter') return `No scores yet. Today: ${g.works}.`;
+  return `${FOCUS_LABEL[focus]} is your lowest score (${shortValue(skill)}). Today: ${g.works}.`;
+}
+
+/** Up to 3 numbered steps of ≤ 6 words, from the chart the day runs: the warm-up, the work, the rest. */
 export function stepsFor(drillId: string, refs: readonly PhaseRef[]): string[] {
   const g = guideFor(drillId);
   const phases = refs.map((r) => ({ ref: r, p: phaseOf(r) })).filter((x): x is { ref: PhaseRef; p: DrillPhase } => !!x.p);
   const prep = phases.filter((x) => x.ref.drill === 'wake-up' && drillId !== 'wake-up');
   const main = phases.filter((x) => !(x.ref.drill === 'wake-up' && drillId !== 'wake-up'));
+  const mins = (xs: { p: DrillPhase }[]) => Math.round(xs.reduce((s, x) => s + x.p.durationSec, 0) / 60);
   const out: string[] = [];
-  if (prep.length) {
-    const min = Math.round(prep.reduce((s, x) => s + x.p.durationSec, 0) / 60);
-    out.push(`Warm up for ${min} minutes: ${prep.map((x) => phaseWords(drillId, x.p).name.toLowerCase()).join(', ')}. The screen leads you.`);
-  }
+  if (prep.length) out.push(`Warm up, ${mins(prep)} min.`);
   const work = main.filter((x) => x.p.presence === 'required');
   const rests = main.filter((x) => x.p.presence === 'free');
   if (drillId === 'wake-up') {
-    for (const x of work) out.push(`${phaseWords(drillId, x.p).name} (${Math.round(x.p.durationSec / 60)} min): ${phaseWords(drillId, x.p).cue}`);
+    out.push(`${work.length} moves, ${mins(work)} min.`);
+    out.push('Follow the screen.');
   } else if (work.length > 1) {
     const reps = work.map((x) => phaseReps(x.p));
     const same = reps.every((n) => n === reps[0]);
+    out.push(`${work.length} sets of ${same ? reps[0] : Math.max(...reps)} ${g.unit}.`);
     const restSec = rests[0]?.p.durationSec ?? 0;
-    out.push(`${work.length} sets of ${same ? reps[0] : `${Math.min(...reps)} to ${Math.max(...reps)}`} ${g.unit}.`);
-    if (restSec) out.push(`Rest ${restSec >= 60 ? `${Math.round(restSec / 60)} minute${restSec >= 120 ? 's' : ''}` : `${restSec} seconds`} between sets. The screen counts it down.`);
+    if (restSec) out.push(`Rest ${restSec >= 60 ? `${Math.round(restSec / 60)} min` : `${restSec} s`} between.`);
   } else if (work.length === 1) {
-    out.push(`${phaseReps(work[0].p)} ${g.unit}. ${phaseWords(drillId, work[0].p).cue}`);
+    out.push(`${phaseReps(work[0].p)} ${g.workStep ?? g.unit}.`);
   }
-  out.push('See how you did, and what comes next.');
-  return out;
+  return out.slice(0, 3);
 }
 
 // ── during the run ─────────────────────────────────────────────────────────────────────────────────────────────────
@@ -230,14 +241,14 @@ export function runStep(drillId: string, phases: readonly DrillPhase[], phaseInd
 
 export const PAUSE_LABEL = 'Pause';
 export const STOP_LABEL = 'Stop';
-export const HURT_LABEL = 'This hurts: stop';
+export const HURT_LABEL = 'This hurts';
 export const REST_TITLE = 'Rest';
 export const NEXT_PREFIX = 'Next:';
 export const LAST_STEP_LINE = 'Last step';
 /** The pain stop's own words. What to do next is the pain check-in's (lib/health/painRule.ts), shown verbatim. */
-export const HURT_TITLE = 'Drill stopped. Rest now.';
-export const HURT_LINE = 'Tell us where it hurts. Your answer sets what happens next, here and in tomorrow’s drill.';
-export const HURT_SKIP_LINE = 'You can skip this and just rest.';
+export const HURT_TITLE = 'Stopped. Rest now.';
+export const HURT_LINE = 'Where does it hurt? Your answer sets what comes next.';
+export const HURT_SKIP_LINE = 'Or skip this and rest.';
 
 // ── after ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -250,26 +261,27 @@ export interface ResultRead {
 
 const MEANS: Record<GuideDrillId, [string, string, string]> = {
   'pogo-bilateral': [
-    'Your bounce is quick and steady. That spring carries into your first step and your jump.',
-    'Most hops kept the beat. The ones that slipped are where your spring grows.',
-    'Quick hops take practice. A few days of this and the beat gets easier.',
+    'Quick, steady bounce. That spring carries into your jump.',
+    'Mostly on the beat. Keep the hops light.',
+    'Quick hops take practice. They get easier each day.',
   ],
   'countermovement-geometry': [
-    'Your squat stays steady at the bottom. That is the dip a strong jump starts from.',
-    'Most squats held steady. Slow down a little more on the way down.',
-    'Holding the bottom is hard at first. Going slower makes it easier.',
+    'Steady at the bottom. That is a strong dip.',
+    'Mostly steady. Go slower on the way down.',
+    'Holding the bottom takes practice. Slow down a little.',
   ],
   'safe-landing': [
-    'Your landings are steady. That is the base every jump and jump shot stands on.',
-    'Most landings held. The shaky ones are where today’s work pays off.',
-    'Steady landings take practice. Doing this each day is how they get quiet.',
+    'Steady landings. That is the base of every jump.',
+    'Most landings held. Keep freezing for 3.',
+    'Landings take practice. Each day makes them quieter.',
   ],
   'wake-up': [
-    'You moved every joint through its range. Your body is ready to play.',
-    'You moved every joint through its range. Your body is ready to play.',
-    'You moved every joint through its range. Your body is ready to play.',
+    'Every joint moved. You are ready to play.',
+    'Every joint moved. You are ready to play.',
+    'Every joint moved. You are ready to play.',
   ],
 };
+export const STOPPED_MEANS = 'Only a finished drill counts. Try again later today.';
 
 /** The drill's own phases (not the warm-up's) that the run finished. */
 function mainPhases(drillId: string, r: DrillResult, refs: readonly PhaseRef[]): DrillPhaseResult[] {
@@ -277,9 +289,8 @@ function mainPhases(drillId: string, r: DrillResult, refs: readonly PhaseRef[]):
   return r.phases.filter((p) => mainIds.has(p.id) && p.finished);
 }
 
-/** What we saw / what it means / what's next, from the run's result. Camera numbers are estimates, and say so. */
+/** What we saw / what it means / what's next (≤ 12 words each), from the run's result. Camera numbers are estimates. */
 export function readResult(drillId: string, r: DrillResult, refs: readonly PhaseRef[], tomorrow: string): ResultRead {
-  const g = guideFor(drillId);
   const done = r.status === 'complete';
   const main = mainPhases(drillId, r, refs);
   const targets = main.reduce((s, p) => s + p.targets, 0);
@@ -290,40 +301,28 @@ export function readResult(drillId: string, r: DrillResult, refs: readonly Phase
   const id = isGuideDrill(drillId) ? drillId : 'wake-up';
 
   let saw: string;
-  if (!done) saw = `You finished ${finishedSteps} of ${refs.length} steps before you stopped.`;
+  if (!done) saw = `You finished ${finishedSteps} of ${refs.length} steps.`;
   else if (targets === 0 || id === 'wake-up') saw = 'You finished every step.';
-  else {
-    // a landing counts with its jump in the steps; here the camera's count of every move it timed is said as such
-    const repWord = id === 'safe-landing' ? 'hops and landings' : g.unit;
-    saw = `The camera saw ${hits} of ${targets} ${repWord} on time${holds > 0 ? `, and ${held} of ${holds} holds kept still` : ''}.`;
-  }
+  else saw = `Camera saw ${hits} of ${targets} on time${holds > 0 ? `, ${held} of ${holds} held still` : ''}.`;
   const share = targets ? hits / targets : 1;
-  const means = !done
-    ? 'Stopping early is fine. Only a finished drill counts for today, so you can try again later.'
-    : MEANS[id][share >= 0.8 ? 0 : share >= 0.5 ? 1 : 2];
   return {
     title: done ? 'Done for today' : 'Stopped early',
     saw,
-    means,
+    means: done ? MEANS[id][share >= 0.8 ? 0 : share >= 0.5 ? 1 : 2] : STOPPED_MEANS,
     next: tomorrow,
   };
 }
 
 /** What tomorrow's drill will likely work on (the same pick, run with tomorrow's date: nothing new is read or kept). */
 export function tomorrowLine(today: Focus, tomorrow: Focus, tomorrowDrillId: string | null, skill: SkillReading | null): string {
-  if (today === 'starter' || !skill) return 'Tomorrow: the full-body wake-up again, until we have one of your numbers.';
-  const works = tomorrowDrillId ? guideFor(tomorrowDrillId).works : 'your next lowest number';
-  if (tomorrow === today) return `Tomorrow will likely work on ${works} again, while your ${FOCUS_LABEL[today]} is your lowest number. A new score can change that.`;
-  return `Tomorrow will likely work on ${works}.`;
+  if (today === 'starter' || !skill) return 'Tomorrow: the wake-up again, until we have a score.';
+  const works = tomorrowDrillId ? guideFor(tomorrowDrillId).works : 'your next lowest score';
+  return tomorrow === today ? `Tomorrow: likely ${works} again.` : `Tomorrow: likely ${works}.`;
 }
 
 /** Every fixed line this file can show (the reading-level and word tests read this list). */
 export function allFixedLines(): string[] {
-  const out = [
-    FIRST_TIME_TITLE, ...FIRST_TIME_LINES, STEPS_TITLE, CUES_TITLE, NEEDS_TITLE, DEMO_TITLE,
-    HURT_TITLE, HURT_LINE, HURT_SKIP_LINE, REST_WORDS.cue,
-    ...needsLines(true).map((x) => x.text), ...needsLines(false).map((x) => x.text),
-  ];
+  const out = [FIRST_TIME_LINE, HURT_TITLE, HURT_LINE, HURT_SKIP_LINE, REST_WORDS.cue, STOPPED_MEANS, ...needChips(true, 7).map((x) => x.text)];
   for (const g of Object.values(GUIDES)) {
     out.push(g.improves, ...g.cues);
     for (const w of Object.values(g.phases)) out.push(w.cue);
