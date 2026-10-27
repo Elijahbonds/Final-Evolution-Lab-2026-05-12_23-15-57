@@ -40,6 +40,7 @@
 // returns once; the same (prev, input) gives the same step and prev is not touched (sideRepStage.test.ts holds that).
 // Nothing here is saved or sent.
 import { result, resultText, type ResultLine } from '@/lib/cue-style/result';
+import { speechMs } from '@/lib/cue-style/speech';
 import type { Lm, PoseFrame } from '@/lib/pose/landmarks';
 import { SIDE_TURNED, SIDE_WIDTH_MAX, sideWidth } from './framing';
 import { pickNearSide } from './hingeAudit';
@@ -243,7 +244,7 @@ export function stepSideRep<F extends string>(
     state: { stage, reps, side, heldMs, lastOkMs, armed, armedFrames, buffer, wrongView, turnPromptSaid, checkReps, workReps, lastMs: input.nowMs },
     stageChanged: stage !== prev.stage,
     repClosed,
-    // the coach answers work-set reps only; a rep that closes the set is still cued (its faults are this set's)
+    // the coach answers work-set reps only; a rep that closes the set reports its faults (CUE-REWRITE: applySideRepFrame no longer SAYS them — the set is over)
     cueFaults: wasWork && present ? (repClosed ? repClosed.faults : []) : null,
     turnPrompt,
   };
@@ -339,14 +340,19 @@ export function applySideRepFrame<F extends string>(
   const step = stepSideRep(spec, ref.current, { nowMs: frame.t, frame });
   ref.current = step.state;
   if (step.repClosed || step.stageChanged || step.turnPrompt) fx.state(step.state);
-  if (step.turnPrompt) fx.say(SIDE_TURNED, true);
-  if (step.cueFaults) {
+  // CUE-REWRITE (2026-10-27): every line said here holds the coach quiet until it has been said (CueEngine.holdFor)
+  const say = (line: string, protect?: boolean) => { fx.say(line, protect); engine.holdFor(frame.t, speechMs(line)); };
+  if (step.turnPrompt) say(SIDE_TURNED, true);
+  // CUE-REWRITE (2026-10-27): NOTHING MID-REP IS SAID AFTER THE SET IS OVER. Measured on the rig's synthetic feeds: the
+  // rep that closed the set was still cued, on the frame the review opened — "Slower. Stay straight." to someone who had
+  // already stopped. The closing rep's faults still reach the engine's book (endRep, below) and the review card.
+  if (step.cueFaults && step.state.stage !== 'review') {
     const evt = engine.decide(frame.t, step.cueFaults);
     if (evt) fx.cue(evt);
   }
   if (was === 'work' && step.repClosed) engine.endRep(step.repClosed.faults, frame.t);
   if (step.stageChanged) {
     if (step.state.stage === 'review') fx.review(fadeReviewLines(engine.endSet(), label));
-    else { const line = sideRepStageLine(spec, step.state.stage); if (line) fx.say(line, true); }
+    else { const line = sideRepStageLine(spec, step.state.stage); if (line) say(line, true); }
   }
 }

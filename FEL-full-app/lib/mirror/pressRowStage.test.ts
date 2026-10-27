@@ -1,3 +1,4 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The confirmation is "That's it. Keep it." (was "There it is. Own it."); same meaning.
 // The press/row's faults reach the coach (MIRROR-COACH P9, 2026-09-30).
 //
 // Before P9 the cue engine's elbowFlare, shrug and trunkOffset cards could never fire: only the squat fed decide(). These
@@ -248,7 +249,7 @@ describe('end to end: the real kinematic engine\'s reads become the coach\'s cue
     expect(s1a.spoken[0]?.fault).toBe('elbowFlare');
     // MIRROR-COACH P9 fix: the coach now SEES the clean reps (clean frames are handed over as []), so the fixed elbow
     // gets its one confirmation — and nothing else is said
-    expect(s1b.spoken).toEqual([{ fault: 'elbowFlare', text: 'There it is. Own it.', level: 'confirm' }]);
+    expect(s1b.spoken).toEqual([{ fault: 'elbowFlare', text: "That's it. Keep it.", level: 'confirm' }]);
     const report = ce2.endSet();
     expect(report.faults.find((f) => f.fault === 'elbowFlare')).toMatchObject({ landed: true, next: 'everyThird' });
     // test changed: copy rewrite (CUE-REWRITE) — same meaning: the elbow fix held, fewer cues next set
@@ -374,7 +375,7 @@ describe('the coach sees clean frames (P9 fix): a fixed fault is confirmed, and 
     const b = filmSet({}, 3, ce, null, a.endMs);
     const c = filmSet({ flare: true }, 1, ce, null, b.endMs);
     expect(a.spoken).toEqual([{ fault: 'elbowFlare', text: CUES.elbowFlare.cue, level: 'cue' }]);
-    expect(b.spoken).toEqual([{ fault: 'elbowFlare', text: 'There it is. Own it.', level: 'confirm' }]);
+    expect(b.spoken).toEqual([{ fault: 'elbowFlare', text: "That's it. Keep it.", level: 'confirm' }]);
     expect(c.spoken[0]).toMatchObject({ fault: 'elbowFlare', level: 'cue' });
     expect([...a.spoken, ...b.spoken, ...c.spoken].some((e) => e.level === 'escalate' || e.level === 'regress')).toBe(false);
   });

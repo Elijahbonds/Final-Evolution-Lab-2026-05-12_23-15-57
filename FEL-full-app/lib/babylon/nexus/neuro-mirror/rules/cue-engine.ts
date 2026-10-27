@@ -220,6 +220,9 @@ export interface CueEvent<F extends string = FaultId> {
   level: 'cue' | 'reply' | 'escalate' | 'regress' | 'confirm';
 }
 
+/** The one confirmation, said once when a cued fault clears. CUE-REWRITE (2026-10-27): was "There it is. Own it." */
+export const CONFIRM_LINE = 'That\'s it. Keep it.';
+
 const HOLD_DOWN_MS = 6000;        // TUNE(elijah): one cue lands before the next
 const REPEAT_WINDOW_MS = 12000;   // TUNE(elijah): same fault still faulting → escalate
 const CLEAR_CONFIRM_MS = 4000;    // TUNE(elijah): fault gone this long → confirm once
@@ -326,6 +329,8 @@ export class CueEngine<F extends string = FaultId> {
    *  session's first HOLD_DOWN_MS (measured: the first fault never got cued). */
   private lastCueAt: number | null = null;
   private lastFault: F | null = null;
+  /** CUE-REWRITE (2026-10-27): the coach stays quiet until this pose time — another line is still being said (holdFor). */
+  private quietUntil: number | null = null;
   private faultSinceMs = new Map<F, number>();
   private clearedAtMs = new Map<F, number>();
   private confirmed = new Set<F>();
@@ -353,6 +358,7 @@ export class CueEngine<F extends string = FaultId> {
    */
   reset(): void {
     this.lastCueAt = null;
+    this.quietUntil = null;
     this.lastFault = null;
     this.faultSinceMs.clear();
     this.clearedAtMs.clear();
@@ -467,6 +473,18 @@ export class CueEngine<F extends string = FaultId> {
     return report;
   }
 
+  /**
+   * CUE-REWRITE (2026-10-27) — ONE VOICE AT A TIME. Another line was just said (a stage line, the square-up line, the
+   * "sit deeper" line): no cue starts until it has been said (`ms`, lib/cue-style/speech.ts speechMs). Measured on the
+   * rig's synthetic feeds: the side-on patterns' first correction started 3.0–3.5 s into a ~4 s stage announcement. The
+   * fault is still tracked while the coach waits (decide runs its bookkeeping); only the voice waits, and the cue is said
+   * on the first frame after the line ends if the fault is still there. Detection is unchanged.
+   */
+  holdFor(nowMs: number, ms: number): void {
+    const until = nowMs + Math.max(0, ms);
+    this.quietUntil = this.quietUntil === null ? until : Math.max(this.quietUntil, until);
+  }
+
   /** Feed the measured fault set. Returns a cue when the coach speaks. */
   decide(nowMs: number, active: readonly F[]): CueEvent<F> | null {
     const evt = this.decideVoice(nowMs, active);
@@ -503,7 +521,10 @@ export class CueEngine<F extends string = FaultId> {
       }
     }
 
-    // a cleared fault earns ONE confirmation ("there it is — own it"), then silence. Never for a fault on screen, and
+    // CUE-REWRITE: another line is still being said — the bookkeeping above ran; the voice waits (holdFor)
+    if (this.quietUntil !== null && nowMs < this.quietUntil) return null;
+
+    // a cleared fault earns ONE confirmation ("that's it — keep it"), then silence. Never for a fault on screen, and
     // (P9 fix) at a faded level only for a fault the coach spoke about this set — a confirmation is speech too, and
     // 'summaryOnly' says nothing during the set.
     for (const [f, clearedAt] of this.clearedAtMs) {
@@ -515,7 +536,7 @@ export class CueEngine<F extends string = FaultId> {
         this.clearedAtMs.delete(f);
         this.lastCueAt = nowMs;
         this.escalations.delete(f);
-        return { fault: f, text: 'There it is. Own it.', level: 'confirm' };
+        return { fault: f, text: CONFIRM_LINE, level: 'confirm' };
       }
     }
 

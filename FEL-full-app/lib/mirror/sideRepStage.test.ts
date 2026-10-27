@@ -231,16 +231,19 @@ describe('the hinge\'s coach (applySideRepFrame — the harness\'s own wiring)',
     expect(sideRepReview(HINGE_LIVE, state, (f) => HINGE_FAULT_LABEL[f]).verdict).toMatch(/^Your last 3 reps were clean\. Nothing needed fixing/); // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
-  it('a knee-dominant set: nothing during the check; cued from the first work rep, the reply on the 3rd, then "Still …"', () => {
+  it('a knee-dominant set: nothing during the check; cued once the stage line is said, the reply two reps on, then "Still …"', () => {
     const { state, cues } = coach(HINGE_LIVE, { clearByRep: true, table: HINGE_CUE_TABLE }, hingeSet({ reps: 11, rep: () => SQUATTY }));
     expect(state.stage).toBe('review');
     expect(cues.every((c) => c.reps >= 1)).toBe(true);                 // never during the check
     const card = HINGE_CUES.find((c) => c.faultId === 'hingeRatio')!;
     expect(cues.map((c) => c.evt.fault)).toEqual(cues.map(() => 'hingeRatio'));   // the ratio outranks the shin
     expect(cues[0].evt).toEqual({ fault: 'hingeRatio', text: card.cue, level: 'cue' });
-    expect(cues[0].reps).toBe(1);
+    // test changed: cue timing (CUE-REWRITE 2026-10-27). The first correction used to start on work rep 1, 3 s into the
+    // ~4 s stage line ("Now the work set: 8 reps…") — two lines at once. The coach now waits for the line to finish
+    // (CueEngine.holdFor), so the first correction lands on rep 2 and the reply two reps later. Same cards, same order.
+    expect(cues[0].reps).toBe(2);
     expect(cues[1].evt).toEqual({ fault: 'hingeRatio', text: card.reply, level: 'reply' });
-    expect(cues[1].reps).toBe(3);
+    expect(cues[1].reps).toBe(4);
     expect(cues[2].evt.level).toBe('escalate');
     expect(sideRepReview(HINGE_LIVE, state, (f) => HINGE_FAULT_LABEL[f]).verdict).toMatch(/^Still there on your last 3 reps: /);
   });

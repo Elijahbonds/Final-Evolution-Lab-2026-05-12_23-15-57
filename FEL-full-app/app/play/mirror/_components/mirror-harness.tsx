@@ -105,7 +105,8 @@ import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 // summary (lib/mirror/correctives.ts; adults only, youth rules show none).
 import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
 import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
-import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';   // VOICEOVER (2026-10-06)
+import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';
+import { speechMs } from '@/lib/cue-style/speech';   // CUE-REWRITE (2026-10-27): the coach waits while a line is said   // VOICEOVER (2026-10-06)
 // MIRROR-MOVES P2 (2026-10-07; plan Phase 2, "every live movement talks"): `?pattern=` opens a tab (patternParam.ts, read by
 // page.tsx); the hip hinge and the push-up are live tabs (owner decision 2026-10-07: both), each a side-on guided set graded
 // rep by rep by its tested batch audit (sideRepStage.ts) with its own coach; the lunge speaks through its own CueEngine; and
@@ -655,11 +656,13 @@ export function MirrorHarness({
             if (step.squareUp) {
               setSquareUpSaid(true);
               speak(SQUARE_UP_LINE, { protect: true });
+              cueEngineRef.current.holdFor(now, speechMs(SQUARE_UP_LINE));   // CUE-REWRITE: one voice at a time
             }
             // the first shallow descent of the session: say it once, then shallow reps count, marked (squatStage.ts)
             if (step.deeperPrompt) {
               setDeeperSaid(true);
               speak(DEEPER_LINE, { protect: true });
+              cueEngineRef.current.holdFor(now, speechMs(DEEPER_LINE));   // CUE-REWRITE: one voice at a time
             }
             if (step.cueFaults) {
               const evt = cueEngineRef.current.decide(now, step.cueFaults);
@@ -704,6 +707,7 @@ export function MirrorHarness({
               // itself reads lungeSession.turnPromptSaid[stage] directly, so no separate "said" flag is kept here
               if (step.turnPrompt) {
                 speak(framingLine('turned'), { protect: true });
+                lungeCueRef.current.holdFor(now, speechMs(framingLine('turned')));   // CUE-REWRITE: one voice at a time
               }
               // MIRROR-MOVES P2: the lunge's coach — this frame's cue, then the rep it ended, then the side's set (pressRow's order)
               if (step.cueFaults) {
