@@ -63,7 +63,10 @@ export function DrillRunning({ slot, drillId, onHurt }: { slot: DrillRunningSlot
         </div>
       )}
 
-      <div className="relative">
+      {/* ONE cue, right under the step, big enough to read from 4 m */}
+      {!step?.rest && cue && <p className="text-[22px] font-black leading-snug text-white" aria-live="polite" data-daily-cue>{cue}</p>}
+      <p className="text-[15px] text-white/60" data-daily-next>{step?.next ? `${NEXT_PREFIX} ${step.next}` : LAST_STEP_LINE}</p>
+      <div className="relative mx-auto max-h-[40vh] max-w-full overflow-hidden rounded-xl [&>*]:max-h-[40vh]">
         <SelfView className="w-full" />
         {view.flash && (
           <div className="pointer-events-none absolute right-3 top-3 rounded-lg bg-black/70 px-3 py-1 text-lg font-black"
@@ -74,9 +77,7 @@ export function DrillRunning({ slot, drillId, onHurt }: { slot: DrillRunningSlot
         {wait && <div className="absolute inset-x-3 bottom-3 rounded-xl bg-black/80 px-3 py-2 text-center text-lg font-black text-white" aria-live="polite">{wait}</div>}
       </div>
 
-      {!step?.rest && cue && <p className="text-[22px] font-black leading-snug text-white" aria-live="polite" data-daily-cue>{cue}</p>}
-      {phase?.pacer && run && <BreathPacer spec={{ ...phase.pacer, restSec: 0 }} elapsedSec={run.phaseSec} size="md" id="daily-drill" />}
-      <p className="text-[15px] text-white/60" data-daily-next>{step?.next ? `${NEXT_PREFIX} ${step.next}` : LAST_STEP_LINE}</p>
+      {phase?.pacer && run && <BreathPacer spec={{ ...phase.pacer, restSec: 0 }} elapsedSec={run.phaseSec} size="sm" id="daily-drill" />}
 
       {/* always on screen: pause, stop, and the pain stop (the existing pain check-in) */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-[#050505]/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3" data-daily-controls>
