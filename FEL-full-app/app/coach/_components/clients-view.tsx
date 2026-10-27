@@ -37,6 +37,7 @@ import { AutomationsPanel } from '@/components/coach/automations-panel';
 import { CoachCalendar } from '@/components/coach/calendar';
 import { BrandingPanel } from '@/components/coach/branding-panel';
 import { CoachReviewsPanel } from '@/components/coach/reviews';
+import { FirstClientChecklist } from '@/components/coach/first-client';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -59,6 +60,8 @@ export function ClientsView() {
   const [availability, setAvailability] = useState<Record<string, AvailabilityView> | null>(null);
   const [linked, setLinked] = useState<string[]>([]);
   const [guardian, setGuardian] = useState<{ eligible: string[]; email: boolean }>({ eligible: [], email: false });
+  const [openInvites, setOpenInvites] = useState(0);
+  useEffect(() => { fetch('/api/coach/invite').then((r) => (r.ok ? r.json() : null)).then((j) => setOpenInvites(Array.isArray(j?.invites) ? j.invites.length : 0)).catch(() => {}); }, []);
 
   const load = useCallback(async () => {
     const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
@@ -105,7 +108,9 @@ export function ClientsView() {
     <div className="space-y-4">
       {/* ADD AN ATHLETE comes first, because until 2026-09-19 there was no way to do it at all and a coach with an
           empty roster has nothing else on this screen to do. */}
-      <InvitePanel />
+      {/* COACH-DELIVERY (round 8 item b): the first-client checklist while the roster is empty */}
+      {roster.length === 0 && <FirstClientChecklist state={{ invited: openInvites > 0 }} />}
+      <div id="coach-invite"><InvitePanel /></div>
       {/* NEEDS YOU TODAY, above the roster: fifty rows is not an answer to "who needs me", and the reading the
           coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
           the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}

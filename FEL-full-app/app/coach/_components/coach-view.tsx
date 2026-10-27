@@ -32,6 +32,9 @@ export function CoachView() {
   const [coach, setCoach] = useState(false);   // the Clients tab shows only for a certified coach or an existing coach of programs
   const [me, setMe] = useState<SharedBy | null>(null);
   useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}); }, []);
+  // COACH-DELIVERY (round 8 item b): a coach with nobody on their roster gets a "first client" link to the checklist
+  const [emptyRoster, setEmptyRoster] = useState(false);
+  useEffect(() => { if (coach) fetch('/api/coach/roster').then((r) => (r.ok ? r.json() : null)).then((j) => setEmptyRoster(Array.isArray(j?.roster) && j.roster.length === 0)).catch(() => {}); }, [coach]);
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
   useEffect(() => { fetch('/api/share/me').then((r) => r.ok ? r.json() : null).then((j) => j && setMe(j)).catch(() => {}); }, []);
@@ -47,6 +50,9 @@ export function CoachView() {
       </Link>
       {/* COACH-BUSINESS: the coach's page, packages, payments and applications */}
       {coach ? <Link href="/coach/business" className="mb-4 flex min-h-11 items-center justify-center rounded-xl border border-cyan-300/50 px-4 text-sm font-bold text-cyan-200">Your coaching business</Link> : null}
+      {coach && emptyRoster && tab !== 'clients' ? (
+        <button type="button" onClick={() => setTab('clients')} className="mb-4 flex min-h-11 w-full items-center justify-center rounded-xl border border-[#00FF9D]/50 px-4 text-sm font-bold text-[#00FF9D]" data-first-client-link>Add your first client →</button>
+      ) : null}
       {/* Tab switcher */}
       <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-4 border border-white/6">
         {tabs.map((t) => {
