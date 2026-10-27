@@ -16,6 +16,7 @@
 // the sheet still scrolls on a phone; a sideways drag turns the camera.
 import { useEffect, useRef, useState } from 'react';
 import type { AnatomyHandle } from '@/lib/babylon/library/anatomyLook';
+import type { DemoProp } from '@/lib/library/demo';
 
 export type StageView = 'demo' | 'muscles';
 export type StageSide = 'front' | 'back';
@@ -54,13 +55,14 @@ export default function ExerciseStage(props: ExerciseStageProps) {
     let cleanup: (() => void) | null = null;
     (async () => {
       try {
-        const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial } = await import('@babylonjs/core');
+        const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Mesh } = await import('@babylonjs/core');
         const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
         const { DEFAULT_HERO_URL } = await import('@/lib/babylon/core/athleteRoster');
         const { reducedMotion } = await import('@/lib/a11y/reducedMotion');
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
+        const { atBindPose, bindPoseDeviationDeg } = await import('@/lib/babylon/library/poseGuard');
         const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
-        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS } = await import('@/lib/library/demo');
+        const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS, PROP_SHAPES } = await import('@/lib/library/demo');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
         const mark = (k: string) => { if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now(); };
@@ -88,20 +90,25 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         floorMat.diffuseColor = new Color3(0.12, 0.13, 0.17); floorMat.specularColor = Color3.Black(); floorMat.alpha = 0.9;
         floor.material = floorMat;
 
-        // the bench a seated or lying loop needs (DEMO_PROPS): plain boxes, one material, hidden unless the clip asks
+        // the bench a seated or lying loop needs (DEMO_PROPS): plain boxes, one material, hidden unless the clip asks.
+        // LIBRARY-ANATOMY-2: every prop's boxes are data (demo.ts PROP_SHAPES), built the first time a loop asks for it
         const propMat = new StandardMaterial('libraryPropMat', scene);
         propMat.diffuseColor = new Color3(0.2, 0.21, 0.26); propMat.specularColor = new Color3(0.05, 0.05, 0.05);
-        const box = (name: string, w: number, h: number, d: number, x: number, y: number, z: number, rx = 0) => {
-          const m = MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
-          m.position.set(x, y, z); m.rotation.x = rx; m.material = propMat; m.isPickable = false; m.setEnabled(false);
-          return m;
+        const props = new Map<string, InstanceType<typeof Mesh>[]>();
+        const propMeshes = (k: DemoProp) => {
+          let ms = props.get(k);
+          if (!ms) {
+            ms = PROP_SHAPES[k].map((b, i) => {
+              const m = MeshBuilder.CreateBox(`libraryProp_${k}_${i}`, { width: b.w, height: b.h, depth: b.d }, scene);
+              // (the body's +x is the stage's −x: the spawned root carries the importer's mirror — measured on the live rig)
+              m.position.set(-(b.x ?? 0), b.y, b.z); m.rotation.x = b.rx ?? 0; m.material = propMat; m.isPickable = false;
+              return m;
+            });
+            props.set(k, ms);
+          }
+          return ms;
         };
-        const props = {
-          seat: [box('benchSeat', 0.34, 0.44, 0.42, 0, 0.22, -0.02)],
-          bench: [box('benchFlat', 0.30, 0.44, 1.30, 0, 0.22, -0.52)],
-          incline: [box('benchInclineSeat', 0.34, 0.44, 0.42, 0, 0.22, 0.02), box('benchInclineBack', 0.34, 0.08, 0.95, 0, 0.79, -0.43, -Math.PI / 4)],
-        } as const;
-        const showProp = (clip: string | null) => { const want = clip ? DEMO_PROPS[clip] : undefined; for (const [k, ms] of Object.entries(props)) for (const m of ms) m.setEnabled(k === want); };
+        const showProp = (clip: string | null) => { const want = clip ? DEMO_PROPS[clip] : undefined; if (want) propMeshes(want); for (const [k, ms] of props) for (const m of ms) m.setEnabled(k === want); };
 
         const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
         if (disposed) { hero.dispose(); scene.dispose(); engine.dispose(); return; }
@@ -124,7 +131,17 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (p.clip && SIDE_CLIPS.has(p.clip)) return { alpha: 0.4, beta: 1.42, radius: 2.6, y: 0.85 };
           const prop = p.clip ? DEMO_PROPS[p.clip] : undefined;
           if (prop === 'bench' || prop === 'incline') return { alpha: 0.45, beta: 1.2, radius: 2.4, y: 0.62 };
-          if (prop === 'seat') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };
+          if (prop === 'seat' || prop === 'preacher') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };
+          // LIBRARY-ANATOMY-2: hanging from the bar, the body is high; on the dip bars, high too; on a box, a step up; lying on
+          // a bench or a pad, low and from the side
+          if (prop === 'pullbar') return { alpha: FRONT_ALPHA - 0.5, beta: 1.5, radius: 3.6, y: 1.5 };
+          if (prop === 'dipbars') return { alpha: FRONT_ALPHA - 0.7, beta: 1.45, radius: 3.0, y: 1.15 };
+          if (prop === 'wall') return { alpha: 0.05, beta: 1.36, radius: 3.0, y: 0.9 };
+          if (prop === 'box' || prop === 'boxside' || prop === 'stepbox' || prop === 'boxback' || prop === 'rearbench' || prop === 'wallback') return { alpha: 0.55, beta: 1.36, radius: 3.3, y: 1.0 };
+          if (prop === 'calfstep') return { alpha: 0.6, beta: 1.4, radius: 2.7, y: 0.85 };
+          if (prop) return { alpha: 0.45, beta: 1.22, radius: 2.6, y: 0.6 };
+          // sitting on the floor (the Z press): low, the arms going overhead
+          if (p.clip?.startsWith('ex_z_press')) return { alpha: FRONT_ALPHA - 0.6, beta: 1.32, radius: 2.5, y: 0.55 };
           return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
         };
         const play = (clip: string, hold: number | null | undefined) => {
@@ -160,7 +177,23 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (p.view !== shownView || p.side !== shownSide || p.clip !== shownClip) { target = frame(p); userTurned = false; }
           shownView = p.view; shownClip = p.clip; shownHold = p.hold; shownSide = p.side;
         };
-        live.current = { setView };
+        // T-POSE (owner playtest 2026-10-27): the 3D is shown only once the body is measured OFF its bind pose (poseGuard),
+        // and is measured again after every clip change. A body at bind (a clip that did not bind, did not build, or nothing
+        // driving the bones) gets the idle once; still at bind, the stage reports 'failed' and the switcher keeps the cue
+        // card up. A T-pose is never what the player is left looking at.
+        let retried = false;
+        let poseTimer: ReturnType<typeof setTimeout> | null = null;
+        const checkPose = () => {
+          poseTimer = null;
+          if (disposed) return;
+          scene.render();
+          if (!atBindPose(hero.skeleton)) { retried = false; setState('ready'); return; }
+          console.error('[FEL-LIBRARY] the body is at its bind pose', { clip: shownClip, view: shownView, deg: bindPoseDeviationDeg(hero.skeleton) });
+          if (!retried) { retried = true; play('idle_stand', null); poseTimer = setTimeout(checkPose, 400); return; }
+          setState('failed');
+        };
+        const recheck = (ms: number) => { if (poseTimer) clearTimeout(poseTimer); poseTimer = setTimeout(checkPose, ms); };
+        live.current = { setView: (p) => { const before = `${shownView}|${shownClip}|${shownHold}`; setView(p); if (`${shownView}|${shownClip}|${shownHold}` !== before) recheck(450); } };
         setView(latest.current);
         // the camera eases to its framing (a tab, side or clip change) — until the player turns it themselves; with reduced
         // motion it jumps there instead of moving by itself
@@ -185,9 +218,10 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('resize', onResize);
         sync();
-        setState('ready');
+        recheck(350);
         if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_LIBRARY_STAGE__?: unknown }).__FEL_LIBRARY_STAGE__ = { engine, scene, hero, cam, anatomy: () => anatomy };
         cleanup = () => {
+          if (poseTimer) clearTimeout(poseTimer);
           document.removeEventListener('visibilitychange', onVis);
           window.removeEventListener('resize', onResize);
           io?.disconnect();
