@@ -25,7 +25,7 @@ const GATES: Record<string, DayGate> = {
 };
 const adult = { userId: 'u1', isAdmin: false, youth: false, hasPro: false };
 /** PLAT-P01 measured 2026-10-27: Vertical Jump week-1 sets within 25 words while working (the ratchet only goes up). */
-const RATCHET_VJ_WITHIN = 20;
+const RATCHET_VJ_WITHIN = 22;
 const words = (s: string) => s.split(/\s+/).filter((x) => /[A-Za-z0-9]/.test(x)).length;   // the rig's count (scripts/plat-plan/shots.mts)
 
 /** Every session every program can serve, under every gate (the whole plan, not just week 1). */
@@ -158,7 +158,7 @@ describe('the words', () => {
     }
     // PLAT-P01 report: within / all and the max are printed by the gate run
     console.log(`[plat-p01] sets within 25 words while working: ${within} of ${all} (max ${max})`);
-    expect(within / all).toBeGreaterThanOrEqual(0.74);   // measured 4358 of 5826 (0.748) on 2026-10-27; a ratchet
+    expect(within / all).toBeGreaterThanOrEqual(0.86);   // measured 5038 of 5826 (0.865) on 2026-10-27 after demo-loops (#467); a ratchet
   });
 });
 

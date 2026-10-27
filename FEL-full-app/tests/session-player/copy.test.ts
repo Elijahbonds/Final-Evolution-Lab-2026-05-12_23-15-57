@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest';
 import { MEDICAL_WORDS } from '@/lib/coach/weeklyDraft/copy';
 import { PLAYER_COPY, stepOfLine } from '@/components/session-player/copy';
 import { DONE_LINE, GO_WORD, REST_WORD } from '@/lib/session-player/voice';
-import { RETEST_FIRST, START_LABEL, TODAY_LIST } from '@/components/signature/program-page';
-import { COMING_SOON } from '@/components/signature/program-list';
+import { ABOUT, RETEST_FIRST, START_LABEL, THE_WEEKS, TODAY_LIST } from '@/components/signature/program-page';
+import { NONE_APPROVED_LINE, NOT_READY_LINE } from '@/lib/signature/copy';
 
-const LINES = [...Object.values(PLAYER_COPY), stepOfLine(2, 6), GO_WORD, REST_WORD, DONE_LINE, START_LABEL, RETEST_FIRST, TODAY_LIST, COMING_SOON];
+const LINES = [...Object.values(PLAYER_COPY), stepOfLine(2, 6), GO_WORD, REST_WORD, DONE_LINE, START_LABEL, RETEST_FIRST, TODAY_LIST, THE_WEEKS, ABOUT];
 const words = (s: string) => s.split(/\s+/).filter((x) => /[A-Za-z0-9]/.test(x)).length;
 
 describe('the session player\'s words', () => {
@@ -19,8 +19,7 @@ describe('the session player\'s words', () => {
     for (const l of LINES) expect(words(l), l).toBeLessThanOrEqual(/[.?]$/.test(l) ? 8 : 4);
   });
 
-  it('the closed programs list tells an athlete one plain line, not how the tables and the review work', () => {
-    expect(COMING_SOON).toBe('Coming soon.');
-    expect(COMING_SOON).not.toMatch(/table|owner|approv/i);
+  it('the closed programs list tells an athlete the owner-approved line, not how the tables and the review work', () => {
+    for (const l of [NOT_READY_LINE, NONE_APPROVED_LINE]) expect(l).not.toMatch(/table|owner|approv/i);
   });
 });

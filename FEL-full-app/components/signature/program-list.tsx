@@ -1,8 +1,8 @@
 // SIGNATURE-PROGRAMS (2026-10-25): the four programs' cards on /train/programs. The view is lib/signature/server.ts
 // programsOverview (approved programs; the admin also sees drafts, labelled). Server-rendered: no script of its own.
 // PLAT-P01 (2026-10-27): one card per program — the weeks, the title, one line (the athlete's place in it once started,
-// else the tagline) and a status chip for the admin's drafts. While no program is open, an athlete reads one line,
-// COMING_SOON (draft copy for the Owner Inbox), instead of how the tables and the review work; the admin still reads why.
+// else the tagline) and a status chip for the admin's drafts. While no program is open, everyone reads the one
+// owner-approved line (lib/signature/copy.ts NOT_READY_LINE / NONE_APPROVED_LINE, owner-approvals #469).
 import Link from 'next/link';
 import { Layers, ShieldCheck } from 'lucide-react';
 import type { ProgramCard } from '@/lib/signature/view';
@@ -12,9 +12,6 @@ import { SIG_LOOK } from './look';
 
 export const programHref = (id: string): string => `/train/programs/${id}`;
 
-/** PLAT-P01 draft copy (Owner Inbox): what an athlete reads while no program is open. */
-export const COMING_SOON = 'Coming soon.';
-
 const chipOf = (p: ProgramCard): string | null => (p.status === 'rejected' ? 'Rejected' : p.draft ? 'Draft' : null);
 
 export function ProgramList({ ready, admin, youth, programs }: { ready: boolean; admin: boolean; youth: boolean; programs: ProgramCard[] }) {
@@ -23,7 +20,7 @@ export function ProgramList({ ready, admin, youth, programs }: { ready: boolean;
     <div data-testid="signature-list" className="mx-auto max-w-[720px]">
       {closed && (
         <p data-closed className={`fel-surface mb-4 rounded-2xl p-4 ${SIG_LOOK.body}`}>
-          {admin ? (!ready ? NOT_READY_LINE : NONE_APPROVED_LINE) : COMING_SOON}
+          {!ready ? NOT_READY_LINE : NONE_APPROVED_LINE}
         </p>
       )}
       {admin && (
