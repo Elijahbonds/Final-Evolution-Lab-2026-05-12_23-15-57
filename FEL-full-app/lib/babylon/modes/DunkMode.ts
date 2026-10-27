@@ -2075,7 +2075,10 @@ export const DunkMode: ModeDefinition = (() => {
         // carry is CONSTANT SPEED from the takeoff to the rim's front edge at the extension, whatever the takeoff distance
         // (a car is a 4.3 m jump, the plain runway 2.8 m). Before, an exponential pull (1.6/s) front-loaded the carry and
         // got 86% of the way from one fixed gather line — a car's near door was under the feet 0.2 s after takeoff.
-        player.root.position.y = (obstacle?.dubble ? dubbleHeight(clipTime) : arcHeight(clipTime, EASTBAY_TIMING.extend)) * apexFor();   // DUNK MOTION phase 9: the top AT the rim (DunkLegs.arcHeight) · phase 10: the Dubble Up's own curve
+        player.root.position.y = (obstacle?.dubble ? dubbleHeight(clipTime) : arcHeight(clipTime, EASTBAY_TIMING.extend)) * apexFor();
+        // DUNK-FLAGSHIP Phase 2: the height the runway stood the root at (0.028 m on the night's first run — the spawn's; 0 after a
+        // reset) is eased out over the plant instead of dropped on the take-off frame (measured: a 2.8 cm root step, the hips 1.8–3.4)
+        if (launchY0 !== 0) { const k = Math.min(1, clipTime / PLANT_SEC); player.root.position.y += launchY0 * (1 - k * k * (3 - 2 * k)); }   // DUNK MOTION phase 9: the top AT the rim (DunkLegs.arcHeight) · phase 10: the Dubble Up's own curve
         const u = carryU(clipTime, EASTBAY_TIMING.extend);
         // THE PLANT MOVES (2026-09-18): the root used to stand dead still at the line for PLANT_SEC (measured: 2.0 m/s → 0.0 → 1.9 m/s
         // on consecutive frames — the wall at the takeoff). The gather step keeps rolling through the plant (PLANT_DRIFT_M over the
@@ -2694,7 +2697,7 @@ export const DunkMode: ModeDefinition = (() => {
     return u >= 1 ? arcHeight(t, EASTBAY_TIMING.extend) : dubbleArc(u, dubbleArcPower(uH));
   }
   function apexPredicted(): number { if (isDubble(prop)) return DUBBLE_APEX_M; return ((1.05 + Math.max(charge, chargeAtLaunch) * 0.55) * (0.85 + Math.min(1, Math.max(runUpPeak, holdRunSpeed) / 7) * 0.3) + apexLift()) * launchMult() + doubleLaunchLift; }
-  let plantClip0 = -1, plantLead = 0, frameStartZ = 0;   // DUNK-FLAGSHIP (a): the flight clock of the first flight frame (the plant's drift starts there)
+  let plantClip0 = -1, plantLead = 0, frameStartZ = 0, launchY0 = 0;   // DUNK-FLAGSHIP (a): the flight clock of the first flight frame (the plant's drift starts there)
   let launchZ = CFG.gatherZ;                  // where the flight left the floor (the carry is measured from here)
   let launchX = 0, launchBank = 0, airDriftX = 0;   // DUNK MOTION phase 7: the flight's straight line starts here; the curve's bank carries off the floor; the stick's drift
   /** DUNK MOTION phase 7: which side of the rim's line the J comes from this run (+1 / −1 world x; 0 = a straight run), the bank. */
@@ -2968,6 +2971,7 @@ export const DunkMode: ModeDefinition = (() => {
 
   function launchDunk(ctx: ModeContext, cause: LaunchCause = 'auto'): void {
     if (phase === 'cinematic') return;
+    const fromBus = !!busRun;   // DUNK-FLAGSHIP Phase 2: the bus launch carries its own height (busLaunch.y0)
     if (runwayBeat) endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
     runwayBeat = null; launchQueued = false;
     if (busRun) {   // THE BUS WALL RUN: the jump off the front of the bus — from up its side, the flight a diagonal to the iron
@@ -2988,7 +2992,7 @@ export const DunkMode: ModeDefinition = (() => {
     { const f = readDisplaySetting().factor; if (f !== tvFactor) console.info(`[DUNK] TV MODE slam window x${f.toFixed(2)}`); tvFactor = f; }
     guestFactor = turn === 'player' ? guestSlamFactor(playerJumps++) : 1;   // IMPROVE (2026-10-06): a guest's first jumps (see slamWindowBase)
     if (guestFactor !== 1) console.info(`[DUNK] first jumps: slam window x${guestFactor.toFixed(2)}`);
-    plantClip0 = -1; plantLead = 0; launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
+    plantClip0 = -1; plantLead = 0; launchY0 = fromBus ? 0 : player.root.position.y; launchZ = player.root.position.z; airTrick = null; obstacleOver = false; obstacleCleared = false; obstacleMargin = Infinity;
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
