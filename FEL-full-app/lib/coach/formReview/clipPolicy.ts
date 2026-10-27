@@ -39,7 +39,8 @@ export function clipDecision(input: { band: 'adult' | 'teen' | null; optedInThis
   return { allowed: true };
 }
 
-/** The one line the client reads about video, on every set. */
+/** The one line the client reads about video, on every set. OWNER-APPROVED with the form review's wording (owner, in chat,
+ *  2026-10-27: "You do it. I approve." — Owner Inbox card C03, approved as written). */
 export const VIDEO_STAYS_LINE = 'Your video stays on your phone. Your coach gets the rep data and a skeleton replay.';
 
 /**

@@ -9,5 +9,6 @@ export const metadata = {
 };
 
 export default function LearnPage() {
-  return <LearnFeed />;
+  // A11-01 (2026-10-25): the page's landmark (WCAG 1.3.1 / 2.4.1) — the feed rendered with no <main> around it
+  return <main><LearnFeed /></main>;
 }

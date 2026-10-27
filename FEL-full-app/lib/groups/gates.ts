@@ -6,9 +6,10 @@
 // docs/COACH-LOOP.md §1); under 13 never; a blank birth year is asked for first.
 //
 // SQUAD = friends. Same age lines, and the SAME consent rule in a new scope: a 13–17 joins or starts a squad only with
-// a current guardian consent asked under wording that covers squads. No such wording exists (Privacy "Friends for
-// teens" is an open item, docs/PLATFORM-ROADMAP.md §4.1), so SQUADS_CONSENT_SINCE is null and every teen fails closed
-// until the owner approves the words drafted in docs/TEAMS-SQUADS.md and sets the date. assumption: the request-date
+// a current guardian consent asked under wording that covers squads. The owner APPROVED that wording on 2026-10-27 (in
+// chat, card C08: lib/consent/guardianGate.ts squadsConsentWords), but no guardian has been asked it yet: it goes live
+// with the withdraw path and the go-live date (guardianGate.ts lists the steps), so SQUADS_CONSENT_SINCE is still null
+// and every teen fails closed, as before. assumption: the request-date
 // proxy is the coach loop's (lib/coach/coachConsent.ts) and holds only if the words and the date ship together.
 
 import { guardianStatus } from '@/lib/consent/guardianGate';

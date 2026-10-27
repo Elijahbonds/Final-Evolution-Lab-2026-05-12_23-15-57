@@ -57,7 +57,8 @@ const gameNow = () => ev(() => performance.now());
 const waitGame = async (ms) => { const t0 = await gameNow(); for (;;) { if ((await gameNow()) - t0 >= ms) return; await new Promise((r) => setTimeout(r, 200)); } };
 const start = () => ev(() => { window.__bus?.emit({ t: 'button', btn: 'START', pressed: true }); window.__bus?.emit({ t: 'button', btn: 'START', pressed: false }); });
 const seamOk = () => ev((m) => !!window.__FEL_DEV__?.scene?.metadata?.[m], MODE).catch(() => false);
-await page.goto(`http://127.0.0.1:${PORT}/${PAGE}.html?mode=${MODE}&tier=${TIER}&perf=off`, { waitUntil: 'domcontentloaded', timeout: 240000 });
+const FEELQ = process.env.FEEL ? `&feel=${encodeURIComponent(process.env.FEEL)}` : '';   // hoops-p01: feel-panel values for the run
+await page.goto(`http://127.0.0.1:${PORT}/${PAGE}.html?mode=${MODE}&tier=${TIER}&perf=off${FEELQ}`, { waitUntil: 'domcontentloaded', timeout: 240000 });
 for (let i = 0; i < 900 && !(await seamOk()); i++) {
   await new Promise((r) => setTimeout(r, 500));
   if (i % 10 === 9) { const ph = await ev(() => [window.__phase, window.__err]).catch(() => null); if (ph && ph[1]) { say('error ' + ph[1]); break; } if (ph && (ph[0] === 'ready')) await start().catch(() => {}); }
@@ -70,6 +71,9 @@ const shot = async (name) => { const f = path.join(SHOTS, `${MODE}-${name}.png`)
 const saveStrip = async (name) => { const urls = await ev((n) => window.__hg.strips[n] || [], name); const dir = path.join(SHOTS, `strip-${MODE}-${name}`); fs.mkdirSync(dir, { recursive: true }); urls.forEach((u, i) => { if (u) fs.writeFileSync(path.join(dir, `${String(i).padStart(2, '0')}.jpg`), Buffer.from(u.split(',')[1], 'base64')); }); return urls.length; };
 
 const result = { mode: MODE, scen: SCEN, tier: TIER, seed: SEED, view: `${VW}x${VH}`, loadWallS };
+const outFile = path.join(OUT, `${SCEN}-${MODE}-${TIER}-s${SEED}${process.env.TAG ? '-' + process.env.TAG : ''}.json`);
+// hoops-p01: the input run writes what it has after every test group (a timeout on the shared box keeps the finished groups)
+const checkpoint = async (what) => { try { result.partial = what; result.log = await ev(() => window.__LOG); result.wallS = (Date.now() - T0) / 1000; fs.writeFileSync(outFile, JSON.stringify(result)); say('checkpoint ' + what); } catch (e) { say('checkpoint failed ' + e); } };
 if (SCEN === 'game') {
   await waitGame(800);
   await ev(() => { window.__hg.start(); window.__hg.bot.on = true; });
@@ -93,21 +97,36 @@ if (SCEN === 'game') {
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);
   const setDef = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.defend(); }, MODE);
   const T = (name, arg) => ev(([n, a]) => window.__hg.test[n](a), [name, arg]);
+  // hoops-p01: a big play (an ankle break) cuts to a REPLAY on the next dead ball, and a press made during it has no game to land in
+  // (the before run lost two jog flicks to one) — wait it out before a press
+  const noReplay = async () => { for (let i = 0; i < 20; i++) { const busy = await ev(() => { const L = window.__LOG || []; const f = window.__frameNo || 0; return L.some((l) => /\[HOOPS-REPLAY\]/.test(l.m) && f - l.f < 360); }); if (!busy) return; await waitGame(500); } };
   const R = result.tests = { stick: [], stickTurbo: [], shot: [], flickStand: [], flickJog: [], pass: [], poke: [], block: [] };
+  // hoops-p01: TESTS=stick,stop,shot,buffer,flick,pass,poke,block (default: all) — the shared lock is the scarce thing
+  const ON = new Set((process.env.TESTS ?? 'stick,stop,shot,buffer,flick,pass,poke,block').split(','));
   await ev(() => window.__hg.start());
-  for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stick.push(await T('stick', false)); }
-  for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stickTurbo.push(await T('stick', true)); }
-  for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
+  // hoops-p01: the first of each takes a strip from the stop's first frame (stop-jog / stop-sprint)
+  if (ON.has('stick')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stick.push(await T('stick', false)); }
+  if (ON.has('stick')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stickTurbo.push(await T('stick', true)); }
+  if (ON.has('stick')) await checkpoint('stick');
+  R.stopJog = []; R.stopSprint = [];
+  if (ON.has('stop')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stopJog.push(await T('stopLine', { turbo: false, strip: k === 0 ? 'stop-jog' : null })); if (k === 0) { await waitGame(300); await saveStrip('stop-jog'); } }
+  if (ON.has('stop')) for (let k = 0; k < 2; k++) { await setOff(); await waitGame(1200); R.stopSprint.push(await T('stopLine', { turbo: true, sec: 1.1, strip: k === 0 ? 'stop-sprint' : null })); if (k === 0) { await waitGame(300); await saveStrip('stop-sprint'); } }
+  if (ON.has('shot')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); if (k === 0) { ev(() => window.__hg.strip('jumper', 16, 3)); } R.shot.push(await T('shot')); if (k === 0) { await waitGame(300); await saveStrip('jumper'); } await waitGame(2500); }
+  if (ON.has('stop') || ON.has('shot')) await checkpoint('stop+shot');
+  // hoops-p01: the input buffer — Square tapped mid-spin and mid-crossover
+  R.buffer = [];
+  if (ON.has('buffer')) for (const kind of ['spin', 'spin', 'cross', 'cross']) { await setOff(); await waitGame(1200); R.buffer.push(await T('buffer', kind)); await waitGame(2500); }
+  if (ON.has('buffer')) await checkpoint('buffer');
   const REPS = Number(process.env.REPS ?? 1);
   const dirs = ['left', 'right', 'up', 'down', 'upleft', 'upright', 'downleft', 'downright'];
-  for (const d of dirs) for (let k = 0; k < REPS; k++) {
-    await setOff(); await waitGame(1200);
+  if (ON.has('flick')) for (const d of dirs) for (let k = 0; k < REPS; k++) {
+    await setOff(); await waitGame(1200); await noReplay();
     if (d === 'left' && k === 0) ev(() => window.__hg.strip('crossover-stand', 16, 3));
     R.flickStand.push(await T('flick', d));
     if (d === 'left' && k === 0) await saveStrip('crossover-stand');
   }
-  for (const d of dirs) for (let k = 0; k < REPS; k++) {
-    await setOff(); await waitGame(900);
+  if (ON.has('flick')) for (const d of dirs) for (let k = 0; k < REPS; k++) {
+    await setOff(); await waitGame(900); await noReplay(); await setOff(); await waitGame(400);
     await ev(() => { const h = window.__hg; const me = window.__FEL_DEV__.hero(); let r = me; while (r.parent) r = r.parent; const p = r.getAbsolutePosition(); h.steer(0 - p.x, -0.6 - p.z, 0.7); });
     await waitGame(500);
     if (d === 'right' && k === 0) ev(() => window.__hg.strip('crossover-jog', 16, 3));
@@ -115,22 +134,29 @@ if (SCEN === 'game') {
     if (d === 'right' && k === 0) await saveStrip('crossover-jog');
     await ev(() => window.__hg.stick(0, 0));
   }
-  if (MODE === 'threevthree') for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.pass.push(await T('pass')); await waitGame(1500); }
-  for (let k = 0; k < 3; k++) {
+  if (ON.has('flick')) await checkpoint('flick');
+  if (MODE === 'threevthree' && ON.has('pass')) for (let k = 0; k < 3; k++) { await setOff(); await waitGame(1200); R.pass.push(await T('pass')); await waitGame(1500); }
+  if (ON.has('poke')) for (let k = 0; k < 3; k++) {
     await setDef(); await waitGame(1400 + k * 250);
     if (k === 0) ev(() => window.__hg.strip('defense', 16, 4));
     R.poke.push(await T('poke'));
     if (k === 0) { await waitGame(600); await saveStrip('defense'); }
     await waitGame(1500);
   }
-  for (let k = 0; k < 3; k++) { await setDef(); await waitGame(1600); R.block.push(await T('block')); await waitGame(1500); }
+  if (ON.has('block')) for (let k = 0; k < 3; k++) { await setDef(); await waitGame(1600); R.block.push(await T('block')); await waitGame(1500); }
   await shot('input-end');
   await ev(() => window.__hg.stop());
+  // hoops-p01: the hero's pops in the 0.75 s from each stop's first frame (a stop / launch touch must not add pops)
+  const an = await ev(() => window.__hg.analyse({ popFrames: true }));
+  const popAt = (an.perBody.me && an.perBody.me.popAt) || []; const hf0 = an.f0 || 0;
+  const popsAfter = (s0) => popAt.filter((i) => i >= s0 - hf0 && i <= s0 - hf0 + 45).length;
+  result.stopPops = { afterReversal: [...R.stick, ...R.stickTurbo].map((x) => popsAfter(x.frames.s0)), jog: R.stopJog.map((x) => popsAfter(x.frames.s0)), sprint: R.stopSprint.map((x) => popsAfter(x.frames.s0)) };
+  result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null;
   result.log = await ev(() => window.__LOG);
 }
 result.pageErrors = pageErrs.slice(0, 10); result.hgErrors = await ev(() => window.__hg.errors).catch(() => []);
 result.wallS = (Date.now() - T0) / 1000;
-const outFile = path.join(OUT, `${SCEN}-${MODE}-${TIER}-s${SEED}.json`);
+result.feel = process.env.FEEL ? JSON.parse(process.env.FEEL) : null; delete result.partial;
 fs.writeFileSync(outFile, JSON.stringify(result));
 say('wrote ' + outFile + ' wall ' + result.wallS.toFixed(0) + ' s');
 await browser.close();

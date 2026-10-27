@@ -5,6 +5,7 @@ import { SITE_ORIGIN } from '@/lib/seo/publicPages';
 import { isCoachMarketplaceEnabled } from '@/lib/coach-business/config';
 import { filterCoaches, goalLabel, parseMarketQuery, sportLabel } from '@/lib/coach-business/market';
 import { loadMarketCards } from '@/lib/coach-business/marketServer';
+import { reviewSummaries } from '@/lib/coach-business/reviews';
 import type { RawDb } from '@/lib/coach-business/store';
 import { MarketplaceView } from '@/components/coach-business/marketplace-view';
 
@@ -33,6 +34,12 @@ export default async function CoachesPage({ searchParams }: { searchParams: Sear
   let cards = null;
   try {
     cards = await loadMarketCards(prisma as unknown as RawDb);
+    // COACH-DELIVERY COA-10: each coach's shown client reviews (count and average); nothing before the pending SQL
+    if (cards?.length) {
+      const ids = await prisma.instructor.findMany({ where: { slug: { in: cards.map((c) => c.slug) } }, select: { slug: true, userId: true } });
+      const sums = await reviewSummaries(prisma as unknown as RawDb, ids.map((i) => i.userId));
+      cards = cards.map((c) => ({ ...c, rating: sums.get(ids.find((i) => i.slug === c.slug)?.userId ?? '') ?? null }));
+    }
   } catch (e) {
     console.warn('[coach-business] marketplace read failed', e instanceof Error ? e.name : typeof e);
   }

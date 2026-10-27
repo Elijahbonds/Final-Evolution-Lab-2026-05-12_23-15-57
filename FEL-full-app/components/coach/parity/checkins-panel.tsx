@@ -76,8 +76,8 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
   return (
     <section className="fel-card space-y-3 rounded-xl p-4" data-checkins-panel>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><ClipboardCheck className="h-3.5 w-3.5" /> Check-ins</div>
-        {!building && <button type="button" onClick={() => setBuilding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-[#00E5FF]/50 px-3 text-sm text-[#00E5FF]" data-checkin-new><Plus className="h-4 w-4" /> New</button>}
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ClipboardCheck className="h-3.5 w-3.5" /> Check-ins</div>
+        {!building && <button type="button" onClick={() => setBuilding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-fel-cyan/50 px-3 text-sm text-fel-cyan" data-checkin-new><Plus className="h-4 w-4" /> New</button>}
       </div>
       {msg && <p className="text-xs text-white/60" data-checkin-msg>{msg}</p>}
 
@@ -85,7 +85,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
         <div className="space-y-3 rounded-lg bg-white/[0.03] p-3" data-checkin-builder>
           <input aria-label="Check-in name" value={title} onChange={(e) => setTitle(e.target.value)} className={input} maxLength={80} />
           <div className="flex gap-2">
-            {(['weekly', 'once'] as const).map((c) => <button key={c} type="button" onClick={() => setCadence(c)} className={`min-h-10 flex-1 rounded-lg border text-sm ${cadence === c ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/60'}`}>{c === 'weekly' ? 'Every week' : 'Once'}</button>)}
+            {(['weekly', 'once'] as const).map((c) => <button key={c} type="button" onClick={() => setCadence(c)} className={`min-h-10 flex-1 rounded-lg border text-sm ${cadence === c ? 'border-fel-cyan/50 bg-fel-cyan/10 text-fel-cyan' : 'border-white/10 text-white/60'}`}>{c === 'weekly' ? 'Every week' : 'Once'}</button>)}
           </div>
           {qs.map((q, i) => (
             <div key={i} className="space-y-2 rounded-lg border border-white/8 p-2" data-checkin-question={i}>
@@ -93,7 +93,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
                 <select aria-label={`Question ${i + 1} type`} value={q.kind} onChange={(e) => put(i, { kind: e.target.value as QuestionKind })} className="min-h-10 rounded-lg border border-white/10 bg-[#0b0d12] px-2 text-sm text-white">
                   {KINDS.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
                 </select>
-                <button type="button" aria-label="Remove question" onClick={() => setQs((all) => all.filter((_, k) => k !== i))} className="ml-auto min-h-10 rounded-lg px-2 text-white/40"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" aria-label="Remove question" onClick={() => setQs((all) => all.filter((_, k) => k !== i))} className="ml-auto min-h-10 rounded-lg px-2 text-fel-dim"><Trash2 className="h-4 w-4" /></button>
               </div>
               <input aria-label={`Question ${i + 1}`} placeholder="The question" value={q.prompt} onChange={(e) => put(i, { prompt: e.target.value })} className={input} maxLength={140} />
               {q.kind === 'number' && <input aria-label="Unit" placeholder="Unit (optional): kg, min, shots" value={q.unit} onChange={(e) => put(i, { unit: e.target.value })} className={input} maxLength={12} />}
@@ -102,10 +102,10 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
             </div>
           ))}
           {qs.length < 12 && <button type="button" onClick={() => setQs((all) => [...all, blank()])} className="min-h-10 w-full rounded-lg border border-dashed border-white/15 text-sm text-white/60">Add a question</button>}
-          <label className="flex items-start gap-2 text-sm text-white/80"><input type="checkbox" className="mt-1" checked={painCheck} onChange={(e) => setPainCheck(e.target.checked)} data-checkin-pain /> <span>Add the pain check <span className="block text-xs text-white/45">{board.lines?.pain}</span></span></label>
-          <p className="text-xs text-white/45" data-checkin-health-note>{board.lines?.health}</p>
+          <label className="flex items-start gap-2 text-sm text-white/80"><input type="checkbox" className="mt-1" checked={painCheck} onChange={(e) => setPainCheck(e.target.checked)} data-checkin-pain /> <span>Add the pain check <span className="block text-xs text-fel-dim">{board.lines?.pain}</span></span></label>
+          <p className="text-xs text-fel-dim" data-checkin-health-note>{board.lines?.health}</p>
           <div className="flex gap-2">
-            <button type="button" onClick={() => void save()} className="min-h-10 flex-1 rounded-lg bg-[#00E5FF]/15 text-sm font-semibold text-[#00E5FF]" data-checkin-save>Save check-in</button>
+            <button type="button" onClick={() => void save()} className="min-h-10 flex-1 rounded-lg bg-fel-cyan/15 text-sm font-semibold text-fel-cyan" data-checkin-save>Save check-in</button>
             <button type="button" onClick={() => setBuilding(false)} className="min-h-10 rounded-lg border border-white/10 px-3 text-sm text-white/60">Cancel</button>
           </div>
         </div>
@@ -118,7 +118,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="truncate text-sm font-semibold text-white">{f.title}</div>
-                <div className="text-xs text-white/45">{f.line} · {f.reach ? `${f.answeredNow} of ${f.reach} answered ${f.cadence === 'weekly' ? 'this week' : ''}` : 'not assigned yet'}</div>
+                <div className="text-xs text-fel-dim">{f.line} · {f.reach ? `${f.answeredNow} of ${f.reach} answered ${f.cadence === 'weekly' ? 'this week' : ''}` : 'not assigned yet'}</div>
               </div>
               <button type="button" onClick={() => { const next = open === f.id ? null : f.id; setOpen(next); load(next); }} className="min-h-10 shrink-0 rounded-lg border border-white/15 px-3 text-xs text-white/75" data-checkin-open>{open === f.id ? 'Close' : 'Answers'}</button>
             </div>
@@ -138,18 +138,18 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
                 {(board.teams ?? []).map((t) => <option key={t.id} value={`team:${t.id}`}>Team: {t.name} ({t.members})</option>)}
                 {(board.roster ?? []).map((r) => <option key={r.id} value={`athlete:${r.id}`}>{r.name}</option>)}
               </select>
-              <button type="button" onClick={() => void assign(f.id)} className="min-h-10 rounded-lg border border-[#00E5FF]/40 px-3 text-sm text-[#00E5FF]" data-checkin-assign>Assign</button>
+              <button type="button" onClick={() => void assign(f.id)} className="min-h-10 rounded-lg border border-fel-cyan/40 px-3 text-sm text-fel-cyan" data-checkin-assign>Assign</button>
             </div>
             {open === f.id && board.detail?.formId === f.id && (
               <div className="space-y-3" data-checkin-detail>
                 {!board.detail.athletes.length && <p className="text-xs text-white/50">No answers yet.</p>}
                 {board.detail.athletes.map((a) => (
                   <div key={a.id} className="space-y-1" data-checkin-athlete={a.id}>
-                    <div className="flex items-baseline justify-between text-xs"><span className="font-semibold text-white">{a.name}</span><span className="text-white/45">{a.compliance.answered}/{a.compliance.of} {f.cadence === 'weekly' ? 'weeks' : ''}{a.healthShared ? '' : ' · health not shared'}</span></div>
+                    <div className="flex items-baseline justify-between text-xs"><span className="font-semibold text-white">{a.name}</span><span className="text-fel-dim">{a.compliance.answered}/{a.compliance.of} {f.cadence === 'weekly' ? 'weeks' : ''}{a.healthShared ? '' : ' · health not shared'}</span></div>
                     {a.rows.length > 0 && (
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-[11px] text-white/75">
-                          <thead><tr><th className="pr-2 font-normal text-white/40">Week of</th>{a.columns.map((c) => <th key={c.id} className="max-w-[9rem] pr-2 font-normal text-white/40">{c.prompt} {a.series[c.id] && <Spark points={a.series[c.id]} />}</th>)}</tr></thead>
+                          <thead><tr><th className="pr-2 font-normal text-fel-dim">Week of</th>{a.columns.map((c) => <th key={c.id} className="max-w-[9rem] pr-2 font-normal text-fel-dim">{c.prompt} {a.series[c.id] && <Spark points={a.series[c.id]} />}</th>)}</tr></thead>
                           <tbody>{a.rows.map((r) => <tr key={r.period} className="border-t border-white/5"><td className="whitespace-nowrap pr-2 text-white/50">{r.period === 'once' ? '—' : r.period.slice(5)}</td>{a.columns.map((c) => <td key={c.id} className="pr-2 align-top">{r.cells[c.id]}</td>)}</tr>)}</tbody>
                         </table>
                       </div>
@@ -158,7 +158,7 @@ export function CheckinsPanel({ api = COACH_CHECKINS_API }: { api?: string }) {
                 ))}
               </div>
             )}
-            <button type="button" onClick={() => void post({ action: 'archive', id: f.id }).then(() => load())} className="text-[11px] text-white/35">Archive</button>
+            <button type="button" onClick={() => void post({ action: 'archive', id: f.id }).then(() => load())} className="text-[11px] text-fel-quiet">Archive</button>
           </li>
         ))}
       </ul>

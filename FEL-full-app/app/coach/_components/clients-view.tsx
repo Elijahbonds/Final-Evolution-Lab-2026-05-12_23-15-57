@@ -2,6 +2,7 @@
 // Clients — the coach's side of the loop (lane 1 C1/C3): programs I coach with the builder (prescribe exercises per
 // session), the inbox of completed sessions with logs and videos to comment, and the thread per program.
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { Loader2, Video, MessageSquare, IdCard } from 'lucide-react';
 import { InvitePanel } from '@/components/coach/invite-panel';
@@ -31,6 +32,15 @@ import { FormReviewQueue } from '@/components/coach/form-review/review-queue';
 import { CheckinsPanel } from '@/components/coach/parity/checkins-panel';
 import { HabitsPanel } from '@/components/coach/parity/habits-panel';
 import { ImportProgram } from '@/components/coach/parity/import-panel';
+// COACH-DELIVERY (2026-10-26): automations, the calendar, the first-block draft, branding (wiring only)
+import { AutomationsPanel } from '@/components/coach/automations-panel';
+import { BulkInvite } from '@/components/coach/bulk-invite';
+import { TAP } from './look';
+import { CoachCalendar } from '@/components/coach/calendar';
+import { BrandingPanel } from '@/components/coach/branding-panel';
+import { CoachReviewsPanel } from '@/components/coach/reviews';
+import { FirstClientChecklist } from '@/components/coach/first-client';
+import { FirstBlockDraft } from '@/components/coach/first-block';
 
 interface Program { tree: ProgramTree; role: 'coach' | 'client' | null; clientName: string; clientId?: string; completedSessionIds: string[]; plan: { status: string; goalText: string } | null }
 type Catalogue = BuilderCatalogueItem;
@@ -53,6 +63,8 @@ export function ClientsView() {
   const [availability, setAvailability] = useState<Record<string, AvailabilityView> | null>(null);
   const [linked, setLinked] = useState<string[]>([]);
   const [guardian, setGuardian] = useState<{ eligible: string[]; email: boolean }>({ eligible: [], email: false });
+  const [openInvites, setOpenInvites] = useState(0);
+  useEffect(() => { fetch('/api/coach/invite').then((r) => (r.ok ? r.json() : null)).then((j) => setOpenInvites(Array.isArray(j?.invites) ? j.invites.length : 0)).catch(() => {}); }, []);
 
   const load = useCallback(async () => {
     const [p, c, i, ro] = await Promise.all([fetch('/api/coach/programs').then((r) => r.json()), fetch('/api/coach/programs/exercises').then((r) => r.json()), fetch('/api/coach/inbox').then((r) => r.json()), fetch('/api/coach/roster').then((r) => r.json())]);
@@ -93,13 +105,16 @@ export function ClientsView() {
     if (r.ok) { setMsg(''); const t = await fetch(`/api/coach/messages?programId=${selected}`); setThread((await t.json()).messages ?? []); }
   };
 
-  if (!programs || !inbox) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (!programs || !inbox) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const prog = programs.find((p) => p.tree.id === selected) ?? null;
   return (
-    <div className="space-y-4">
+    // COACH-DELIVERY COA-06: the 44 px tap floor for everything in the tab (./look.ts)
+    <div className={`space-y-4 ${TAP}`} data-coach-clients>
       {/* ADD AN ATHLETE comes first, because until 2026-09-19 there was no way to do it at all and a coach with an
           empty roster has nothing else on this screen to do. */}
-      <InvitePanel />
+      {/* COACH-DELIVERY (round 8 item b): the first-client checklist while the roster is empty */}
+      {roster.length === 0 && <FirstClientChecklist state={{ invited: openInvites > 0 }} />}
+      <div id="coach-invite"><InvitePanel /></div>
       {/* NEEDS YOU TODAY, above the roster: fifty rows is not an answer to "who needs me", and the reading the
           coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
           the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}
@@ -108,13 +123,15 @@ export function ClientsView() {
       <DraftsInbox />
       <FormReviewQueue />
       <TeamsPanel />
+      {/* VBT (docs/VBT.md §7.2; wired by coach-delivery 2026-10-27): the coach's bar-speed view */}
+      <Link href="/coach/velocity" className="fel-card block rounded-xl p-4 text-sm text-white/80" data-coach-velocity-door>Bar speed: clients' reps, speed loss and target zones →</Link>
       <CheckinsPanel />
       <HabitsPanel />
       {/* COMBINE-DAY (2026-10-25): tryouts and testing days, run on this device (/coach/combine) */}
       <CombineEntry />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><IdCard className="h-3.5 w-3.5" /> Roster</div>
         {roster.length === 0 && <div className="text-sm text-white/50">No clients yet — send an invite above.</div>}
         {roster.some((r) => r.coverage) && <CoverageLegend />}
         {roster.map((r) => (
@@ -124,7 +141,7 @@ export function ClientsView() {
                   relabelled the one count "games" because it was GameSession (lib/camp/profile.ts history.sessions)
                   and a client with six coached sessions read "0 sessions"; the coached number is now beside it. */}
               {/* the counts wrap as one unit under the name on a phone instead of being cut to "2 coached · 2 gam…" */}
-              <div className="text-white text-sm">{r.name} <span className="text-white/40 whitespace-nowrap">{r.coachedSessions != null && <>· {r.coachedSessions} coached </>}· {r.gamesAtCap ? `${r.games ?? r.sessions}+` : (r.games ?? r.sessions)} games · {r.wins}W</span></div>
+              <div className="text-white text-sm">{r.name} <span className="text-fel-dim whitespace-nowrap">{r.coachedSessions != null && <>· {r.coachedSessions} coached </>}· {r.gamesAtCap ? `${r.games ?? r.sessions}+` : (r.games ?? r.sessions)} games · {r.wins}W</span></div>
               <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
               {/* the six-pattern strip, last 7 days; absent when this coach has no active program for them */}
               {r.coverage && <CoverageStrip strip={r.coverage} />}
@@ -139,13 +156,13 @@ export function ClientsView() {
             </div>
             {/* PROFILE V2 (2026-10-24): a coach sees their athlete's profile, teen or adult, public or not (/u/[slug]) */}
             {r.card?.slug && <a href={`/u/${r.card.slug}`} className="shrink-0 rounded-md border border-white/20 px-2 py-1 text-white/70">profile</a>}
-            {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]">card · {r.card.rarity}</a> : <span className="shrink-0 text-white/30">no public card</span>}
+            {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-fel-cyan/40 px-2 py-1 text-fel-cyan">card · {r.card.rarity}</a> : <span className="shrink-0 text-fel-quiet">no public card</span>}
           </div>
         ))}
       </div>
       {/* inbox */}
       <div className="fel-card rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between"><div className="text-[11px] uppercase tracking-wider text-white/40">Inbox</div><div className="text-xs text-[#FFD700]">{inbox.needsReview} to review</div></div>
+        <div className="flex items-center justify-between"><div className="text-[11px] uppercase tracking-wider text-fel-dim">Inbox</div><div className="text-xs text-fel-gold">{inbox.needsReview} to review</div></div>
         {inbox.items.length === 0 && <div className="text-sm text-white/50">No completed sessions yet.</div>}
         {inbox.items.slice(0, 8).map((it) => (
           <div key={it.id} className="rounded-lg bg-white/[0.03] border border-white/6 p-3 space-y-2">
@@ -155,15 +172,15 @@ export function ClientsView() {
                 {/* MIRROR-COACH P2 review (2026-09-26): a per-set log's summary "RPE" is the TOP set's effort, so it says
                     so, and the sets themselves — reps in reserve and effort per set, captured since P2 and returned by
                     the route as setLines — are listed under it instead of being dropped on the floor */}
-                <div><span className="text-white">{l.exercise}</span> <span className="text-white/40">({l.prescribed})</span> → {l.actualSets ?? '–'}×{l.actualReps ?? '–'} @ {l.actualLoad ?? '–'} · {l.setLines?.length ? 'top effort' : 'RPE'} {l.rpe ?? '–'}{l.clientNote ? ` · “${l.clientNote}”` : ''}{l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#00E5FF] ml-2"><Video className="h-3 w-3" /> video</a>}</div>
+                <div><span className="text-white">{l.exercise}</span> <span className="text-fel-dim">({l.prescribed})</span> → {l.actualSets ?? '–'}×{l.actualReps ?? '–'} @ {l.actualLoad ?? '–'} · {l.setLines?.length ? 'top effort' : 'RPE'} {l.rpe ?? '–'}{l.clientNote ? ` · “${l.clientNote}”` : ''}{l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-fel-cyan ml-2"><Video className="h-3 w-3" /> video</a>}</div>
                 {/* MIRROR-COACH P8 FIX (2026-09-30): a slot the protocol gate swapped says what was done instead */}
-                {l.servedLine && <div className="pl-3 text-[11px] text-[#FFD700]/85" data-served-line>{l.servedLine}</div>}
+                {l.servedLine && <div className="pl-3 text-[11px] text-fel-gold/85" data-served-line>{l.servedLine}</div>}
                 {!!l.setLines?.length && (
                   <ul className="pl-3 text-[11px] text-white/55 space-y-0.5" data-set-lines>
                     {l.setLines.map((line, k) => <li key={k}>{line}</li>)}
                   </ul>
                 )}
-                {l.coachComment ? <div className="text-[#00E5FF]/80">You: {l.coachComment}</div> : (
+                {l.coachComment ? <div className="text-fel-cyan/80">You: {l.coachComment}</div> : (
                   <div className="flex gap-2"><input value={comments[l.id] ?? ''} onChange={(e) => setComments((c) => ({ ...c, [l.id]: e.target.value }))} placeholder="Comment on this rep" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1 text-white" /><button onClick={() => review(l.id)} className="rounded-lg border border-white/10 px-2 text-white/80">Send</button></div>
                 )}
               </div>
@@ -173,10 +190,16 @@ export function ClientsView() {
       </div>
       {/* programs + builder */}
       <div className="fel-card rounded-xl p-4 space-y-3">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Programs I coach</div>
+        <div className="text-[11px] uppercase tracking-wider text-fel-dim">Programs I coach</div>
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
-        <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
+        <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-fel-cyan/50 text-fel-cyan bg-fel-cyan/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
         {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
+        {/* COACH-DELIVERY COA-02: draft the first block from their goal, the coach's answers and their Mirror screen */}
+        {prog?.clientId && !prog.completedSessionIds.length && (
+          <FirstBlockDraft key={prog.tree.id} program={{ id: prog.tree.id, name: prog.tree.name }}
+            blank={prog.tree.blocks.every((b) => b.sessions.every((x) => x.exercises.length === 0))}
+            onTree={(tree) => { setPrograms((ps) => ps?.map((p) => p.tree.id === tree.id ? { ...p, tree } : p) ?? null); void fetch('/api/coach/programs/exercises').then((r) => r.json()).then((c) => setCatalogue(Array.isArray(c) ? c : [])).catch(() => {}); }} />
+        )}
         {prog && (
           <ImportProgram
             program={{ id: prog.tree.id, name: prog.tree.name, clientName: prog.clientName }}
@@ -213,11 +236,25 @@ export function ClientsView() {
       </div>
       {prog && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={prog.tree.id} role="coach" /></div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={prog.tree.id} role="coach" /></div>
           <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your client" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
       )}
+      {/* COACH-DELIVERY phase 2 (premium rule): the settings this lane added sit in ONE collapsed Setup group at the bottom,
+          never on the first screen — team import, automations (COA-01), calendar (COA-05), brand (COA-04), reviews (COA-10),
+          and the team-fee entry (COA-12, on the business page) */}
+      <details className="fel-card rounded-xl p-4" data-coach-setup>
+        <summary className="flex min-h-12 cursor-pointer items-center text-sm font-semibold text-white/80">Setup</summary>
+        <div className="mt-3 space-y-4">
+          <BulkInvite onDone={() => { void load(); }} />
+          <AutomationsPanel />
+          <CoachCalendar />
+          <BrandingPanel />
+          <CoachReviewsPanel />
+          <Link href="/coach/business" className="flex min-h-11 items-center text-sm text-fel-cyan underline" data-team-fee-entry>Team fees and packages</Link>
+        </div>
+      </details>
     </div>
   );
 }

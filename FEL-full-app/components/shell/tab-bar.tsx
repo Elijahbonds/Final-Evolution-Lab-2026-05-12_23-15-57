@@ -17,6 +17,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Dumbbell, Gamepad2, UserRound } from 'lucide-react';
+import { PALETTE } from '@/lib/design/palette';
+import { COLOR } from '@/lib/design/tokens';
+import { t } from '@/lib/i18n';
+import { TYPE } from '@/lib/design/type';
 
 export interface TabDef {
   id: 'play' | 'train' | 'profile';
@@ -30,15 +34,15 @@ export interface TabDef {
 
 export const TABS: TabDef[] = [
   {
-    id: 'play', label: 'Play', href: '/play', icon: Gamepad2, accent: '#00E5FF',
+    id: 'play', label: t('shell.tabs.play'), href: '/play', icon: Gamepad2, accent: PALETTE.cyan,
     owns: ['/play', '/modes', '/arena', '/multiplayer', '/ladder', '/story', '/try', '/venues', '/host', '/join', '/party'],
   },
   {
-    id: 'train', label: 'Train', href: '/train', icon: Dumbbell, accent: '#00FF9D',
+    id: 'train', label: t('shell.tabs.train'), href: '/train', icon: Dumbbell, accent: PALETTE.emerald,
     owns: ['/train', '/training', '/coach', '/kitchens', '/workout', '/education', '/camp', '/live', '/learn'],
   },
   {
-    id: 'profile', label: 'Profile', href: '/profile', icon: UserRound, accent: '#FFD700',
+    id: 'profile', label: t('shell.tabs.profile'), href: '/profile', icon: UserRound, accent: PALETTE.gold,
     owns: [
       '/profile', '/cards', '/card', '/closet', '/wallet', '/store', '/shop', '/market', '/creator', '/sessions',
       '/account', '/settings', '/create', '/guidance', '/signature', '/support', '/press', '/team',
@@ -82,6 +86,9 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
   // already checks this; the bar did not, so a signed-out visitor on /signup got a navigation bar over the form.
   if (chromeHiddenFor(pathname) || status !== 'authenticated') return null;
 
+  // ONE ACCENT (premium-ui P3, 2026-10-27): the lit tab is FEL cyan on every tab. It used to take the tab's own colour
+  // (cyan, green, gold), which made three accents compete in the one bar the eye returns to most. The tab's own colour
+  // still names it in TABS (the doors, the shelf), never here. LOOK CHANGE, flagged.
   const items = TABS.map((t) => {
     const on = active?.id === t.id;
     const Icon = t.icon;
@@ -92,26 +99,29 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
           aria-current={on ? 'page' : undefined}
           className={
             variant === 'bar'
-              ? `group relative flex flex-col items-center gap-1 px-4 py-2.5
-                 pb-[max(0.625rem,env(safe-area-inset-bottom))] transition-colors`
-              : 'group relative flex items-center gap-2 rounded-xl px-3.5 py-1.5 transition-colors'
+              ? `fel-press group relative flex min-h-14 flex-col items-center justify-center gap-1 px-4 pt-2
+                 pb-[max(0.5rem,env(safe-area-inset-bottom))]`
+              : 'fel-press group relative flex min-h-10 items-center gap-2 rounded-full px-4 py-1.5'
           }
-          style={{ color: on ? t.accent : 'rgba(255,255,255,0.45)' }}
+          style={{ color: on ? COLOR.cyan : COLOR.textDim }}
         >
-          {/* the lit tab carries its own colour as a soft wash rather than a hard pill */}
-          {on && (
-            <span
-              aria-hidden
-              className={
-                variant === 'bar'
-                  ? 'pointer-events-none absolute inset-x-3 inset-y-1 rounded-xl'
-                  : 'pointer-events-none absolute inset-0 rounded-xl'
-              }
-              style={{ background: `${t.accent}14`, boxShadow: `inset 0 0 0 1px ${t.accent}33` }}
-            />
-          )}
-          <Icon className="relative h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 2} />
-          <span className="relative font-mono text-[10px] font-bold uppercase tracking-[0.14em] md:text-[11px]">
+          {/* the lit tab: a soft pill of the one accent behind the icon (bar) or the whole tab (rail) */}
+          <span
+            aria-hidden
+            className={
+              variant === 'bar'
+                ? 'pointer-events-none absolute left-1/2 top-1.5 h-8 w-14 -translate-x-1/2 rounded-full transition-all duration-300'
+                : 'pointer-events-none absolute inset-0 rounded-full transition-all duration-300'
+            }
+            style={{
+              background: on ? 'rgba(0, 229, 255, 0.14)' : 'transparent',
+              boxShadow: on ? 'inset 0 0 0 1px rgba(0, 229, 255, 0.28), 0 0 22px -6px rgba(0, 229, 255, 0.55)' : 'none',
+              transform: variant === 'bar' ? `translateX(-50%) scale(${on ? 1 : 0.6})` : undefined,
+              opacity: on ? 1 : 0,
+            }}
+          />
+          <Icon className={`relative ${variant === 'bar' ? 'mt-1 h-[20px] w-[20px]' : 'h-[18px] w-[18px]'}`} strokeWidth={on ? 2.4 : 2} />
+          <span className={`relative ${TYPE.label} `}>
             {t.label}
           </span>
         </Link>
@@ -121,7 +131,7 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
 
   if (variant === 'inline') {
     return (
-      <nav aria-label="Main">
+      <nav aria-label={t('shell.nav.main')}>
         <ul className="flex items-center gap-1">{items}</ul>
       </nav>
     );
@@ -132,9 +142,9 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
     // PHONE-FIRST-SCREEN (owner's pick, 2026-10-17): the bar's glass also carries the soundtrack strip. SoundtrackDock
     // fills [data-tabbar-strip] with the Now Playing chip while a song plays, so the chip is chrome the page scrolls
     // under, like the tabs, and never a pill floating on a card. Empty, the strip has no height.
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-[#050505]/90 backdrop-blur-xl md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-fel-bg/90 backdrop-blur-xl md:hidden">
       <div data-tabbar-strip />
-      <nav aria-label="Main">
+      <nav aria-label={t('shell.nav.main')}>
         <ul className="mx-auto flex max-w-md items-stretch justify-around">{items}</ul>
       </nav>
     </div>

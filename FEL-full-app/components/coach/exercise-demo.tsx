@@ -3,7 +3,8 @@
 // ExerciseDemo (M34) — every Coach exercise SHOWS the movement, never blank.
 //   • YOUR AVATAR tab: the learner's real 3D hero rig loops a representative
 //     athletic motion (components/coach/exercise-avatar-canvas via ssr:false).
-//   • COACH VIDEO tab: the founder-recorded YouTube demo (existing videoUrl).
+//   • COACH VIDEO tab: FEL's own-storage video autoplays (muted, looped); a YouTube URL is a labelled OUTBOUND LINK, never an
+//     embed (COACH-DELIVERY COA-09, owner 2026-10-20: no YouTube, no ads; assumption: kept as a link, not dropped).
 //   • Fallback: an animated cue card so the panel is never empty.
 // Adapted to THIS project's Exercise schema (no M17 ExerciseMoviePlayer exists).
 
@@ -14,7 +15,7 @@ import { Play, User, Dumbbell } from 'lucide-react';
 const ExerciseAvatarCanvas = dynamic(() => import('./exercise-avatar-canvas'), {
   ssr: false,
   loading: () => (
-    <div className="aspect-video w-full flex items-center justify-center bg-[#07070d] text-white/40 text-xs">
+    <div className="aspect-video w-full flex items-center justify-center bg-[#07070d] text-fel-dim text-xs">
       Loading your avatar…
     </div>
   ),
@@ -38,25 +39,24 @@ type Tab = 'avatar' | 'video';
 const threeDisabled =
   typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
 
-function youTubeEmbed(raw?: string): string | null {
+/** The coach video: an own-storage file (plays here) or an outbound link (YouTube or anything else http(s)). */
+function coachVideo(raw?: string): { kind: 'file'; src: string } | { kind: 'link'; href: string; youtube: boolean } | null {
   if (!raw) return null;
   try {
     const url = new URL(raw);
-    let id = '';
-    if (url.hostname === 'youtu.be') id = url.pathname.slice(1);
-    else if (url.hostname.includes('youtube.com')) id = url.searchParams.get('v') || '';
-    return id ? `https://www.youtube.com/embed/${id}?rel=0` : null;
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    if (/\.(mp4|webm|m4v|mov)$/i.test(url.pathname)) return { kind: 'file', src: url.href };
+    return { kind: 'link', href: url.href, youtube: /(^|\.)youtu(\.be|be\.com)$/.test(url.hostname) };
   } catch {
     return null;
   }
 }
 
 export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
-  const embedUrl = useMemo(() => youTubeEmbed(exercise.videoUrl), [exercise.videoUrl]);
-  const hasVideo = !!embedUrl;
+  const video = useMemo(() => coachVideo(exercise.videoUrl), [exercise.videoUrl]);
+  const hasVideo = !!video;
   const hasAvatar = !threeDisabled && exercise.clip !== null;
   const [tab, setTab] = useState<Tab>(hasAvatar ? 'avatar' : 'video');
-  const [showVideo, setShowVideo] = useState(false);
 
   const showTabs = hasAvatar && hasVideo;
 
@@ -69,7 +69,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
               key={t}
               onClick={() => setTab(t)}
               className={`flex-1 py-2 text-[11px] font-bold tracking-widest transition-colors ${
-                tab === t ? 'bg-white/[0.06] text-[#00E5FF]' : 'text-white/40 hover:text-white/70'
+                tab === t ? 'bg-white/[0.06] text-fel-cyan' : 'text-fel-dim hover:text-white/70'
               }`}
             >
               <span className="inline-flex items-center gap-1.5">
@@ -85,34 +85,22 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {tab === 'avatar' && hasAvatar && (
         <div className="relative">
           <ExerciseAvatarCanvas stat={exercise.targetPrqStat || ''} clip={exercise.clip ?? undefined} />
-          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
+          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-fel-cyan">
             YOUR AVATAR
           </span>
         </div>
       )}
 
-      {/* VIDEO demo (YouTube) */}
-      {tab === 'video' && hasVideo && (
-        showVideo ? (
+      {/* VIDEO demo: own storage autoplays; anything else is a labelled outbound link (no embed, no player) */}
+      {tab === 'video' && video && (
+        video.kind === 'file' ? (
           <div className="aspect-video w-full bg-black">
-            <iframe
-              src={embedUrl!}
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={`${exercise.name} demo`}
-            />
+            <video src={video.src} className="h-full w-full" autoPlay muted loop playsInline preload="metadata" title={`${exercise.name} demo`} />
           </div>
         ) : (
-          <button
-            onClick={() => setShowVideo(true)}
-            className="w-full aspect-video bg-[#16161a] border-b border-white/6 flex flex-col items-center justify-center gap-2 hover:border-[#FF3366]/30 transition-all group"
-          >
-            <div className="w-12 h-12 rounded-full bg-[#FF3366]/20 flex items-center justify-center group-hover:bg-[#FF3366]/30 transition-colors">
-              <Play className="h-6 w-6 text-[#FF3366]" />
-            </div>
-            <span className="text-sm text-white/50">Watch Coach Bonds Demo</span>
-          </button>
+          <a href={video.href} target="_blank" rel="noreferrer noopener" className="flex min-h-12 w-full items-center justify-center gap-2 border-b border-white/6 bg-[#16161a] px-4 text-sm text-white/60">
+            <Play className="h-5 w-5 text-fel-crimson" /> {video.youtube ? 'Coach demo on YouTube (opens outside FEL)' : 'Coach demo (opens outside FEL)'}
+          </a>
         )
       )}
 
@@ -120,10 +108,10 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {((tab === 'video' && !hasVideo) || (tab === 'avatar' && !hasAvatar)) && (
         <div className="p-5">
           <div className="fel-cuecard flex aspect-video w-full items-center justify-center rounded-xl bg-[#16161a]">
-            <Dumbbell className="h-10 w-10 text-white/30" />
+            <Dumbbell className="h-10 w-10 text-fel-quiet" />
           </div>
           {!hasVideo && (
-            <p className="mt-3 text-center text-[11px] text-white/40">
+            <p className="mt-3 text-center text-[11px] text-fel-dim">
               Follow the cues below.
             </p>
           )}

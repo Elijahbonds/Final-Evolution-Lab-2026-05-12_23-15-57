@@ -435,8 +435,9 @@ function EntrySheet({ e, tab, onClose, onUse, canAdd, onAdded, onOpen }: {
         <div className="mt-4 space-y-3 text-sm">
           <Section label="Set-up"><p className="text-white/75">{e.setup}</p></Section>
           <Section label="Cues"><ul className="list-disc space-y-1 pl-4 text-white/75">{e.cues.map((c) => <li key={c}>{c}</li>)}</ul></Section>
-          <Section label="Common faults">
-            <ul className="space-y-1.5">{e.faults.map((f) => <li key={f.fault} className="text-white/70"><span className="text-white/90">{f.fault}.</span> <span className="text-[#00E5FF]/80">{f.fix}</span></li>)}</ul>
+          {/* CUE-REWRITE (2026-10-27): "Common faults" → "Watch for" (the athlete's words, not the coach's), each with its fix */}
+          <Section label="Watch for">
+            <ul className="space-y-1.5">{e.faults.map((f) => <li key={f.fault} className="text-white/70"><span className="text-white/90">{f.fault}.</span> <span className="text-[#00E5FF]/80">Fix: {f.fix}</span></li>)}</ul>
           </Section>
           <Section label="Dose"><p className="text-white/75">{dose(e.dosage)}</p></Section>
           {e.prehabNote && <p className="text-[11px] text-white/45">{e.prehabNote}</p>}

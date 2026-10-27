@@ -67,54 +67,54 @@ export interface ScreenStation {
 /** The turn cue, so the athlete is told which way to face rather than left to guess. */
 export const TURN_CUE: Record<StationView, string> = {
   front: 'Face the camera.',
-  side: 'Turn side-on — left shoulder to the camera.',
-  back: 'Turn all the way around, back to the camera.',
+  side: 'Turn side-on, left shoulder to the camera.',
+  back: 'Turn around, back to the camera.',
 };
 
 const HEEL: ScreenCheck = {
   // MIRROR-COACH P3 review (2026-09-26): what two landmarks show from behind — the ankle→heel line. There is no Achilles
   // landmark (the label was "Heel line and Achilles") and the camera sees a line tilt, not a heel "roll inward" (the
   // flag was "One heel rolls inward while the other stays vertical.").
-  id: 'heelLine', label: 'Heel line', source: 'camera', sided: true, grader: 'heelLine',
-  flag: 'One heel line reads tilted from behind; the other does not.',
+  id: 'heelLine', label: 'Heels from behind', source: 'camera', sided: true, grader: 'heelLine',
+  flag: 'From behind, one heel tilts and the other does not.',
 };
 const KNEE: ScreenCheck = {
-  id: 'kneeWindow', label: 'Knee window', source: 'camera', sided: true, grader: 'kneeWindow',
+  id: 'kneeWindow', label: 'Knees from the front', source: 'camera', sided: true, grader: 'kneeWindow',
   // MIRROR-COACH P3 (2026-09-26): what the camera reads — the knee against its own hip–ankle line. It cannot see which
   // way a kneecap points (the line was "Kneecaps point inward, especially on the jumping leg.").
-  flag: 'A knee sits inside the line from its hip to its ankle.',
+  flag: 'A knee sits inside the line from hip to ankle.',
 };
 const HIPS: ScreenCheck = {
   // the camera reads the hip landmarks (joint centres), left against right — not the hip points a hand finds (P3), so
   // the label is "Hip level" (P3 review, 2026-09-26: it was "Hip points level"; stored rows keep only the check id)
   id: 'hipLevel', label: 'Hip level', source: 'camera', sided: true, grader: 'hipLevel',
-  flag: 'One hip sits noticeably higher than the other.',
+  flag: 'One hip sits clearly higher than the other.',
 };
 const RIBS: ScreenCheck = {
-  id: 'ribAngle', label: 'Rib angle and breath', source: 'selfReport', sided: false,
-  flag: 'A wide flared rib V with neck-muscle breathing instead of the lower ribs widening.',
+  id: 'ribAngle', label: 'Breathing', source: 'selfReport', sided: false,
+  flag: 'Breathing moves the shoulders and neck more than the lower ribs.',
 };
 const HEAD: ScreenCheck = {
-  id: 'headFloat', label: 'Head float', source: 'camera', sided: false, grader: 'headFloat',
-  flag: 'The ear sits clearly forward of the shoulder.',
+  id: 'headFloat', label: 'Head position', source: 'camera', sided: false, grader: 'headFloat',
+  flag: 'The ear sits clearly in front of the shoulder.',
 };
 const WOBBLE: ScreenCheck = {
-  id: 'singleLeg', label: 'Single-leg stance, 30 seconds a side', source: 'camera', sided: true, grader: 'singleLeg',
+  id: 'singleLeg', label: 'One-leg balance, 30 seconds a side', source: 'camera', sided: true, grader: 'singleLeg',
   // P3: what the grader reads (the free foot's touch-downs, the hips' sway). It was "…without the pelvis dropping or the
   // knee caving", neither of which it measures.
-  flag: 'Cannot hold thirty seconds on one leg without the free foot coming down or the hips swaying clearly.',
+  flag: 'On one leg, the free foot came down or the hips swayed a lot.',
 };
 const PELVIC_TILT: ScreenCheck = {
-  id: 'pelvicTilt', label: 'Pelvic tilt (hands on the hip points)', source: 'coach', sided: false,
-  flag: 'The front of the pelvis sits well below the back of it, or well above.',
+  id: 'pelvicTilt', label: 'Pelvis tilt (coach checks)', source: 'coach', sided: false,
+  flag: 'The front of the hips sits well below or well above the back.',
 };
 const THORACIC: ScreenCheck = {
-  id: 'thoracicRotation', label: 'Seated rotation, each side', source: 'coach', sided: true,
-  flag: 'Clearly less rotation to one side than the other.',
+  id: 'thoracicRotation', label: 'Seated turn, each side', source: 'coach', sided: true,
+  flag: 'You turn clearly less to one side than the other.',
 };
 const SHOULDER_LEVEL: ScreenCheck = {
-  id: 'shoulderLevel', label: 'Shoulder height', source: 'camera', sided: true, grader: 'shoulderLevel',
-  flag: 'One shoulder rides higher than the other in a default stance.',
+  id: 'shoulderLevel', label: 'Shoulder level', source: 'camera', sided: true, grader: 'shoulderLevel',
+  flag: 'One shoulder sits higher than the other when you stand relaxed.',
 };
 
 /**
@@ -124,15 +124,15 @@ const SHOULDER_LEVEL: ScreenCheck = {
 export const MODIFIED_SCREEN: ScreenStation[] = [
   // P3 review (2026-09-26): "toes pointing straight ahead" — a foot turned in moves the heel point sideways from behind,
   // which read as a tilted heel line (stationGraders.ts heelLine.footTurnMaxDiff now reads it as 'feetTurned')
-  { id: 'heels', view: 'back', cue: 'Turn all the way around, back to the camera. Feet about hip-width, toes pointing straight ahead. Look straight ahead.', holdSec: 12, checks: [HEEL] },
-  { id: 'frontStack', view: 'front', cue: 'Turn and face the camera. Same stance — do not fix anything.', holdSec: 14, checks: [KNEE, HIPS, SHOULDER_LEVEL] },
+  { id: 'heels', view: 'back', cue: 'Turn around, back to the camera. Feet hip-width, toes straight ahead. Look ahead.', holdSec: 12, checks: [HEEL] },
+  { id: 'frontStack', view: 'front', cue: 'Turn and face the camera. Stand the same way. Do not fix anything.', holdSec: 14, checks: [KNEE, HIPS, SHOULDER_LEVEL] },
   // MIRROR-COACH P3 (2026-09-25): the cue puts their hands where the questions will ask about (lib/mirror/selfReport.ts)
   // and says the questions come at the end — the athlete is across the room and cannot tap anything mid-screen. It
   // used to be "Take one easy breath in and out." and nothing ever asked what they felt.
-  { id: 'breath', view: 'front', cue: 'Stay facing me. Hands on the sides of your lower ribs, and take one easy breath in and out. Two quick questions about it at the end.', holdSec: 8, checks: [RIBS] },
-  { id: 'profile', view: 'side', cue: 'Turn side-on — left shoulder to the camera. Look straight ahead.', holdSec: 10, checks: [HEAD] },
-  { id: 'wobbleL', view: 'front', cue: 'Face me. Stand on your LEFT leg, other knee up to hip height, arms by your sides.', holdSec: 30, checks: [WOBBLE], stance: 'left' },
-  { id: 'wobbleR', view: 'front', cue: 'Now the RIGHT leg. Same thing — thirty seconds.', holdSec: 30, checks: [WOBBLE], stance: 'right' },
+  { id: 'breath', view: 'front', cue: 'Hands on the sides of your lower ribs. Take one easy breath in and out. Two questions come at the end.', holdSec: 8, checks: [RIBS] },
+  { id: 'profile', view: 'side', cue: 'Turn side-on, left shoulder to the camera. Look straight ahead.', holdSec: 10, checks: [HEAD] },
+  { id: 'wobbleL', view: 'front', cue: 'Face me. Stand on your LEFT leg, other knee up to hip height, arms down.', holdSec: 30, checks: [WOBBLE], stance: 'left' },
+  { id: 'wobbleR', view: 'front', cue: 'Now the RIGHT leg. Same thing, thirty seconds.', holdSec: 30, checks: [WOBBLE], stance: 'right' },
 ];
 
 /**
@@ -141,8 +141,8 @@ export const MODIFIED_SCREEN: ScreenStation[] = [
  */
 export const FULL_SCREEN: ScreenStation[] = [
   ...MODIFIED_SCREEN.slice(0, 4),
-  { id: 'pelvis', view: 'side', cue: 'Stay side-on. If a coach is with you, they can check the pelvis now.', holdSec: 12, checks: [PELVIC_TILT] },
-  { id: 'rotation', view: 'front', cue: 'Sit tall and rotate to each side as far as is comfortable.', holdSec: 20, checks: [THORACIC] },
+  { id: 'pelvis', view: 'side', cue: 'Stay side-on. If a coach is with you, they can check your hips now.', holdSec: 12, checks: [PELVIC_TILT] },
+  { id: 'rotation', view: 'front', cue: 'Sit tall and turn to each side as far as is comfortable.', holdSec: 20, checks: [THORACIC] },
   ...MODIFIED_SCREEN.slice(4),
 ];
 
@@ -153,6 +153,11 @@ export function screenFor(id: ScreenId): ScreenStation[] {
 /** The one FIX line for a flagged check — what the result card shows under a flag (MIRROR-COACH P3). */
 export function fixLine(checkId: string): string | null {
   return FIX[checkId] ?? null;
+}
+
+/** CUE-REWRITE: what a flag on this check means for you (the middle part of the result shape), or null. */
+export function meaningLine(checkId: string): string | null {
+  return MEANING[checkId] ?? null;
 }
 
 // ── SCORING ─────────────────────────────────────────────────────────────────
@@ -472,33 +477,31 @@ export function screenVariantFor(claimed: ScreenId, results: readonly CheckResul
 // MIRROR-COACH P3 (2026-09-26): the camera checks' lines say what was SEEN and why it matters to how you move — they
 // used to name causes the landmarks cannot show ("the rib cage is sitting rotated", "the hip cannot hold the pelvis
 // level") and one read as a risk ("where landing forces go wrong"). A graded screen shows them for the first time.
+// CUE-REWRITE (2026-10-27): what it means (MEANING) and the one thing to do (FIX), in plain words — no "cylinder",
+// "tripod", "external-rotation", "thoracic extension", "axial loading" or "plyometrics". Same checks, same intent;
+// before/after in docs/CUE-AUDIT.md.
 const MEANING: Record<string, string> = {
-  heelLine: 'From behind, one heel line tilts and the other does not, so the two feet are not giving the legs the same base.',
-  kneeWindow: 'Standing relaxed, a knee sits inside the line from hip to ankle — worth watching when you squat, land and cut.',
-  hipLevel: 'Standing relaxed, one hip reads higher than the other, so the two sides start from a tilt.',
-  shoulderLevel: 'Standing relaxed, one shoulder rides higher than the other.',
-  ribAngle: 'The cylinder is leaking pressure — breathing is happening at the neck instead of the lower ribs.',
-  headFloat: 'From the side, the ear sits ahead of the shoulder, so the head is carried forward of the trunk.',
-  singleLeg: 'Thirty seconds on one leg was hard to hold still on this side, and one leg is where every stride and landing happens.',
-  pelvicTilt: 'The pelvis is parked at one end of its range rather than sitting in the middle of it.',
-  thoracicRotation: 'Rotation is not shared evenly between the two sides.',
+  heelLine: 'Your two feet are not giving your legs the same base.',
+  kneeWindow: 'Worth watching when you squat, land and cut.',
+  hipLevel: 'Your two sides start from a tilt.',
+  shoulderLevel: 'Your two sides start from a tilt.',
+  ribAngle: 'Your breath is moving your neck and shoulders more than your ribs.',
+  headFloat: 'Your head is carried in front of your body.',
+  singleLeg: 'Holding still was hard on this side, and every stride and landing happens on one leg.',
+  pelvicTilt: 'Your hips sit tipped to one end instead of in the middle.',
+  thoracicRotation: 'Your turn is not shared evenly between the two sides.',
 };
 
 const FIX: Record<string, string> = {
-  heelLine: 'Foot tripod work before anything loaded — short-foot holds, then slow calf raises with the heel tracking straight.',
-  // MIRROR-COACH P9 fix (2026-09-30): it said "…and glute-medius work" — a muscle by name, which FEL's cue policy
-  // (lib/coach/cueLint.ts rule 1) does not use; the same hip work, named by what it is
-  kneeWindow: 'Hip external-rotation work and banded side steps, then slow tempo squats watching the knee track over the second toe.',
-  // P3 review (2026-09-26): capacity to build, not a restriction — the line said "stop loading the tilt with heavy
-  // bilateral lifts for now", reachable from one estimated 2-D camera read
-  hipLevel: 'Single-leg hip work on the low side, to build that side up alongside your normal lifting.',
-  // P3: the camera saw a height difference, not a restriction — the line no longer names a "restricted side"
-  shoulderLevel: 'Breathing work first, then easy rotation drills to both sides.',
-  ribAngle: 'Exhale-biased breathing — long exhales, ribs down — before any heavy axial loading.',
-  headFloat: 'Chin nods and thoracic extension over a roller, and raise the screen you are looking at all day.',
-  singleLeg: 'Thirty-second stance holds daily, then step-downs, before plyometrics go back in.',
-  pelvicTilt: 'Position work at both ends of the pelvis range so it can sit in the middle.',
-  thoracicRotation: 'Rotation work to the restricted side, held, not bounced.',
+  heelLine: 'Foot work before any weights: press heel, big toe and little toe into the floor, then do slow calf raises.',
+  kneeWindow: 'Side steps with a band, then slow squats watching your knee stay over your middle toes.',
+  hipLevel: 'Do one-leg moves on the lower side, as well as your usual training.',
+  shoulderLevel: 'Slow breathing first, then easy turning drills to both sides.',
+  ribAngle: 'Long, slow breaths out, ribs down, before any heavy lifting over your head or on your back.',
+  headFloat: 'Small chin nods, upper-back stretches over a roller, and raise the screen you look at all day.',
+  singleLeg: 'Stand on one leg for thirty seconds each day. Then add slow step-downs, then jumps.',
+  pelvicTilt: 'Practice tipping your hips both ways so they can rest in the middle.',
+  thoracicRotation: 'Turning drills to the stiffer side: hold each turn, do not bounce.',
 };
 
 /**
@@ -596,16 +599,17 @@ export function scoreScreen(screen: ScreenId, rawResults: readonly CheckResult[]
   const programming = triage === 'seeSpecialist'
     // P3 review (2026-09-26): reachable from camera flags alone now, so it says what to BUILD and who to show, not what
     // to stop ("Hold off on heavy load and high-volume jumping until this is looked at in person" read as a risk)
-    ? ['Keep practising skills at controlled intensity.',
-       'Build the corrective work above into every session, and have a coach look at these flags in person.',
-       'This is not medical clearance — pain, swelling, numbness or a pop belongs with a physician.']
+    ? ['Keep practising your skills at an easy to medium effort.',
+       'Add the work above to every session, and have a coach look at these in person.',
+       // the not-clearance sentence is a disclaimer (kept word for word: legal/policy copy is out of this lane's scope)
+       'This is not medical clearance. If anything hurts, swells or goes numb, stop and see a health professional.']
     : triage === 'addressFirst'
-      ? ['Keep training.', 'Do the corrective work above before you add intensity, not instead of training.',
-         'Re-run this screen in two weeks and compare the sides.']
+      ? ['Keep training.', 'Do the work above before you train harder, not instead of training.',
+         'Run this screen again in two weeks and compare your sides.']
       : triage === 'partial'
         ? []
-        // 'an ankle injury', not 'an ankle sprain': the screen names no condition (lib/share/screen.ts)
-        : ['Train normally.', 'Re-run this screen monthly, or after an ankle injury, a growth spurt, or a jump in workload.'];
+        // CUE-REWRITE: was "…after an ankle injury…" — no injury word on a result (docs/CUE-STYLE.md); "a long break" keeps the retest
+        : ['Train as normal.', 'Run this screen again each month, or after a growth spurt, a long break, or a big jump in training.'];
 
   const worstSided = findings.find(oneSided);
   const unpairedLeg = findings.find((r) => r.otherLegUnread);
@@ -617,23 +621,23 @@ export function scoreScreen(screen: ScreenId, rawResults: readonly CheckResult[]
   // P3 review (2026-09-26): the side is said as what it MEANS (sideWords): a level check names the side that read higher
   // and is a difference between two sides, so it does not get the "one side off and one side fine" line.
   const sidedLine = (f: { checkId: string; side?: 'left' | 'right' }) => LEVEL_CHECKS.has(f.checkId)
-    ? `${label(f.checkId)} was flagged for a closer look: the ${sideWords(f.checkId, f.side!).replace(/ higher$/, '')} read higher.`
-    : `${label(f.checkId)} was flagged for a closer look on the ${sideWords(f.checkId, f.side!)}. One side off and one side fine matters more than both being mildly off.`;
+    ? `${label(f.checkId)}: worth working on. Your ${sideWords(f.checkId, f.side!).replace(/ higher$/, '')} sat higher.`
+    : `${label(f.checkId)}: worth working on, on the ${sideWords(f.checkId, f.side!)}. One side off matters more than both a little off.`;
   // MIRROR-COACH P3 follow-up (2026-09-28): the partial line counts checks the way the panel and the server do
   // (cameraChecksRead — "1 of 6", not "1 of 7" slots beside a "1 of 6" figure) and names what was not read — and, since
   // its review, says a missing leg beside the count (readPhrase: "6 of 6 camera checks read, one leg not read")
-  const counted = `${readPhrase({ readCount, totalCount, legsNotRead }, 'camera checks')}${legsNotRead > 0 ? ',' : ''}`;
+  const counted = `${readPhrase({ readCount, totalCount, legsNotRead }, 'camera checks')}`;
   const otherLeg = (side: 'left' | 'right') => (side === 'left' ? 'right' : 'left');
   const headline = triage === 'partial'
-    ? `Partly graded: ${counted} and none flagged; not read: ${notRead.join(', ')} — so this is not a clear screen.`
+    ? `Partly read: ${counted}, nothing to work on. Not read: ${notRead.join(', ')}. So this is not a full screen yet.`
     : movementFlags === 0
-      ? 'Nothing flagged. That is a platform you can load.'
+      ? 'Nothing to work on. You are ready to train harder.'
       : worstSided
         ? sidedLine(worstSided)
         : movementFlags === 1 && unpairedLeg
           // one leg read and flagged, the other not read: named, and not "one side off and one side fine"
-          ? `${label(unpairedLeg.checkId)} was flagged for a closer look on the ${sideWords(unpairedLeg.checkId, unpairedLeg.side!)}; the ${otherLeg(unpairedLeg.side!)} leg was not read.`
-          : `${movementFlags} flag${movementFlags > 1 ? 's' : ''} worth clearing before you add intensity.`;
+          ? `${label(unpairedLeg.checkId)}: worth working on, on the ${sideWords(unpairedLeg.checkId, unpairedLeg.side!)}. The ${otherLeg(unpairedLeg.side!)} leg was not read.`
+          : `${movementFlags} thing${movementFlags > 1 ? 's' : ''} to work on before you train harder.`;
 
   return {
     screen, graded: true, movementFlags, redFlags: movementFlags, asymmetries, score, triage, headline, meaning,

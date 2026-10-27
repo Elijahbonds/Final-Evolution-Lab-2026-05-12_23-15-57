@@ -209,7 +209,9 @@
   const logSince = (f0, re) => (window.__LOG || []).find((l) => l.f >= f0 && re.test(l.m));
   HG.test = {};
   // T1/T2: the stick — onset (the root has moved 2 cm), 90 % of the pace it settles at, the stop; then a reversal at pace
-  HG.test.stick = async (turboOn) => {
+  HG.test.stick = async (arg) => {
+    // hoops-p01: arg is the turbo flag, or { turbo, strip } — `strip` names a frame strip taken from the stop's first frame
+    const turboOn = arg && typeof arg === 'object' ? !!arg.turbo : !!arg; const stripName = arg && typeof arg === 'object' ? arg.strip : null;
     const sp = speedSampler(); const o = { turbo: !!turboOn };
     const p0 = meP().clone ? meP().clone() : { x: meP().x, z: meP().z };
     if (turboOn) turbo(true);
@@ -224,10 +226,26 @@
     const rv = await watch(() => { const p = meP(); const dx = p.x - prev.x, dz = p.z - prev.z; prev = p.clone(); return (dx * dir.x + dz * dir.z) / dl * 60 > 0.5 * o.settle; }, 2); o.reverseF = rv.frames;
     await waitSec(0.6);
     // the stop
-    const s0 = HG.frame; const ps = meP().clone(); stick(0, 0); if (turboOn) turbo(false);
+    const s0 = HG.frame; const ps = meP().clone(); o.stopFromMps = +o.settle.toFixed(2); stick(0, 0); if (turboOn) turbo(false);
+    if (stripName) HG.strip(stripName, 14, 2);
     let prev2 = meP().clone();
     const st = await watch(() => { const p = meP(); const v = Math.hypot(p.x - prev2.x, p.z - prev2.z) * 60; prev2 = p.clone(); return v < 0.15; }, 2); o.stopF = st.frames; const pe = meP(); o.stopM = +Math.hypot(pe.x - ps.x, pe.z - ps.z).toFixed(2);
     o.frames = { f0, r0, s0 };
+    return o;
+  };
+  // T2b (hoops-p01): THE STOP FROM PACE — run straight across the court for `sec` (a jog, or the turbo), let go of everything; the frames
+  // until the root is under 0.15 m/s and the metres it slid. (T1's own stop comes after its reversal, a backpedal capped at 0.7 of a jog.)
+  HG.test.stopLine = async (arg) => {
+    const turboOn = !!(arg && arg.turbo); const o = { turbo: turboOn }; const sp = speedSampler();
+    const p0 = meP().clone(); const tx = RIM.x - p0.x, tz = RIM.z - p0.z;
+    const sgn = (-tz) * (p0.x >= 0 ? -1 : 1) >= 0 ? 1 : -1;   // across the court, away from the nearer sideline (over it is a turnover)
+    if (turboOn) turbo(true); steer(-tz * sgn, tx * sgn, 1);
+    const vs = []; await watch(() => { vs.push(sp()); return false; }, (arg && arg.sec) || 1.0); o.fromMps = +(vs.slice(-6).reduce((a, b) => a + b, 0) / 6).toFixed(2);
+    const s0 = HG.frame; const ps = meP().clone(); stick(0, 0); if (turboOn) turbo(false);
+    if (arg && arg.strip) HG.strip(arg.strip, 14, 2);
+    let prev = meP().clone(); const tr = [];
+    const st = await watch(() => { const p = meP(); const v = Math.hypot(p.x - prev.x, p.z - prev.z) * 60; prev = p.clone(); tr.push(+v.toFixed(2)); return v < 0.15; }, 2);
+    o.stopF = st.frames; const pe = meP(); o.stopM = +Math.hypot(pe.x - ps.x, pe.z - ps.z).toFixed(2); o.trace = tr.slice(0, 40); o.frames = { s0 };
     return o;
   };
   // T3: the shot press — the meter shows, the ball moves up, the body answers (1v1 anim tree state); then let go at the green
@@ -240,6 +258,24 @@
     const rel = await watch(() => { const mm = meterNow(); return mm.t >= mm.c; }, 2); release('X'); o.releaseF = HG.frame - f0;
     const ban = await watch(() => { const h = (window.__hud || []).filter((x) => x.f >= f0 && x.banner); return h.length ? h[h.length - 1].banner : null; }, 3); o.banner = ban.v; o.f0 = f0;
     return o;
+  };
+  // T3b (hoops-p01): THE INPUT BUFFER — Square tapped while a move is still going. kind 'spin': the right-stick rotation (the spin locks
+  // the shot gate), the tap 0.1 s into the spin; clearF = the spin's last frame, fireF = the first frame the shot is on (meter / shooting /
+  // gather / finish). kind 'cross': the up-away flick (the crossover with the ball in the right hand), the tap 4 frames later.
+  const sweep = () => { const n = 7; for (let i = 0; i <= n; i++) { const a = Math.PI * (1 - i / n); const x = +(0.9 * Math.cos(a)).toFixed(2), y = +(-0.9 * Math.sin(a)).toFixed(2); if (i === 0) emit({ t: 'stick', side: 'R', x, y }); else later(i / 60, () => emit({ t: 'stick', side: 'R', x, y })); } later((n + 1) / 60, () => emit({ t: 'stick', side: 'R', x: 0, y: 0 })); };
+  HG.sweep = sweep;
+  HG.test.buffer = async (kind) => {
+    const o = { kind }; const post = () => S().post(); const f0 = HG.frame;
+    if (kind === 'spin') sweep(); else flick('upleft');
+    const busy = await watch(() => (kind === 'spin' ? post().spinning : logSince(f0, /\[(1V1|3V3)-(HANDLE|STICK)\]/)), 0.8); o.busyF = busy.frames;
+    await waitSec(kind === 'spin' ? 0.1 : 4 / 60);
+    const p0 = post(); o.busyAtPress = kind === 'spin' ? !!p0.spinning : null; o.shootingBefore = !!(p0.shooting || p0.finish || p0.gather);
+    const fp = HG.frame; tap('X');
+    let clearAt = null, fireAt = null;
+    await watch(() => { const p = post(); if (clearAt === null && !(kind === 'spin' && p.spinning)) clearAt = HG.frame; if (fireAt === null && (p.shooting || p.finish || p.gather || meterNow().t > 0)) fireAt = HG.frame; return fireAt !== null && clearAt !== null; }, 2.5);
+    o.pressToClearF = clearAt === null ? null : clearAt - fp; o.pressToFireF = fireAt === null ? null : fireAt - fp; o.clearToFireF = fireAt === null || clearAt === null ? null : fireAt - clearAt;
+    o.log = ((window.__LOG || []).filter((l) => l.f >= f0).map((l) => l.m.slice(0, 70)).slice(0, 6)).join(' | ');
+    o.f0 = f0; return o;
   };
   // T4: a right-stick flick — did a move fire (a HANDLE / STICK / MOVE log line), and how long until the ball moved sideways
   HG.test.flick = async (dir) => {
@@ -282,7 +318,7 @@
           const nb = []; for (let k = Math.max(1, i - 6); k <= Math.min(n - 1, i + 6); k++) if (k !== i) nb.push(w[k]); nb.sort((a, b) => a - b);
           const med = nb[Math.floor(nb.length / 2)] || 0; const side = Math.max(w[i - 3] || 0, w[i + 3] || 0);
           if (/Arm|Leg|Hand|Foot/.test(WATCH[j]) && w[i] > 1500) R.whips++;
-          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (w[i] >= 3000) R.severe++; R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
+          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) R.severe++; R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
         }
       }
       // root snaps (> 20 deg of yaw in one frame) and root jumps (0.25-0.5 m in one frame) outside resets

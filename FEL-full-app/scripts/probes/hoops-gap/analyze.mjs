@@ -44,15 +44,27 @@ if (R.scen === 'game') {
   out.motion = A.perBody; out.ball = A.ball; out.camera = A.camera; out.overlap = A.overlap; out.bot = R.bot; out.errors = [...(R.pageErrors || []), ...(R.hgErrors || [])];
 } else {
   const T = R.tests;
-  const row = (name, arr, keys) => ({ name, n: arr.length, ...Object.fromEntries(keys.map((k) => [k + 'Ms', ms(med(arr.map((x) => x[k])))])), raw: arr.map((x) => Object.fromEntries(keys.map((k) => [k, x[k]]))) });
-  out.stick = row('stick', T.stick, ['onsetF', 'to90F', 'reverseF', 'stopF']); out.stick.settle = med(T.stick.map((x) => x.settle)); out.stick.stopM = med(T.stick.map((x) => x.stopM));
+  const row = (name, arr = [], keys) => ({ name, n: arr.length, ...Object.fromEntries(keys.map((k) => [k + 'Ms', ms(med(arr.map((x) => x[k])))])), raw: arr.map((x) => Object.fromEntries(keys.map((k) => [k, x[k]]))) });
+  out.stick = row('stick', T.stick, ['onsetF', 'to90F', 'reverseF', 'stopF']); out.stick.settle = med((T.stick || []).map((x) => x.settle)); out.stick.stopM = med(T.stick.map((x) => x.stopM));
   out.stickTurbo = row('stickTurbo', T.stickTurbo, ['onsetF', 'to90F', 'reverseF', 'stopF']); out.stickTurbo.settle = med(T.stickTurbo.map((x) => x.settle)); out.stickTurbo.stopM = med(T.stickTurbo.map((x) => x.stopM));
-  out.shot = row('shot', T.shot, ['meterF', 'ballUpF', 'animF', 'releaseF']); out.shot.banners = T.shot.map((x) => x.banner);
-  const fl = (arr) => ({ fired: arr.filter((x) => x.logF !== null).length, n: arr.length, logMs: ms(med(arr.map((x) => x.logF))), moves: arr.map((x) => `${x.dir}:${x.logF === null ? 'NONE' : x.log.replace(/^\[[A-Z0-9-]+\] /, '').slice(0, 40)} shift ${x.ballShift}`) });
+  out.shot = row('shot', T.shot, ['meterF', 'ballUpF', 'animF', 'releaseF']); out.shot.banners = (T.shot || []).map((x) => x.banner);
+  const fl = (arr = []) => ({ fired: arr.filter((x) => x.logF !== null).length, n: arr.length, logMs: ms(med(arr.map((x) => x.logF))), moves: arr.map((x) => `${x.dir}:${x.logF === null ? 'NONE' : x.log.replace(/^\[[A-Z0-9-]+\] /, '').slice(0, 40)} shift ${x.ballShift}`) });
+  out.stick.stopFromMps = med(T.stick.map((x) => x.stopFromMps)); out.stickTurbo.stopFromMps = med(T.stickTurbo.map((x) => x.stopFromMps));
+  const sl = (arr) => (arr?.length ? { n: arr.length, fromMps: med(arr.map((x) => x.fromMps)), stopMs: ms(med(arr.map((x) => x.stopF))), stopM: med(arr.map((x) => x.stopM)), raw: arr.map((x) => `${x.fromMps} m/s → ${x.stopF} f / ${x.stopM} m`) } : null);
+  out.stopJog = sl(T.stopJog); out.stopSprint = sl(T.stopSprint);
+  if (T.buffer?.length) out.buffer = T.buffer.map((x) => `${x.kind}: busy@press ${x.busyAtPress} press→clear ${ms(x.pressToClearF)} ms press→fire ${ms(x.pressToFireF)} ms clear→fire ${ms(x.clearToFireF)} ms`);
+  out.stopPops = R.stopPops; out.heroMotion = R.heroMotion;
   out.flickStand = fl(T.flickStand); out.flickJog = fl(T.flickJog);
+  // hoops-p01: stricter — a move RENDERED (a HANDLE move / size-up / link / snatch / slide line, a spin, PAUSIN', a drop step) inside 0.7 s
+  // of the flick, or a refusal said out loud (a banner from core/Refusal); a `[*-STICK] flick → x` line alone only says the gesture was read
+  const LOG = R.log || []; const HUD = R.hud || [];
+  const FIRED = /\[(1V1|3V3)-HANDLE\] (move|size-up|link|snatch|btb|spin gathers|retract)|\[(1V1|3V3)-MOVE\] (spin|front pivot|reverse pivot|footwork)|\[(1V1|3V3)-STICK\] (PAUSIN|drop step)/;
+  const strict = (arr = []) => { const rows = arr.map((x) => { const l = LOG.find((q) => q.f >= x.f0 && q.f <= x.f0 + 42 && FIRED.test(q.m)); const read = LOG.find((q) => q.f >= x.f0 && q.f <= x.f0 + 42 && /\[(1V1|3V3)-STICK\]/.test(q.m)); return { dir: x.dir, fired: !!l, read: read ? read.m.replace(/^\[[A-Z0-9-]+\] /, '').slice(0, 60) : 'NO READ', move: l ? l.m.replace(/^\[[A-Z0-9-]+\] /, '').slice(0, 50) : '-', fireMs: l ? ms(l.f - x.f0) : null }; });
+    return { fired: rows.filter((r) => r.fired).length, n: rows.length, silent: rows.filter((r) => !r.fired && r.read === 'NO READ').length, rows: rows.map((r) => `${r.dir}: ${r.fired ? 'FIRED ' + r.fireMs + ' ms ' + r.move : 'NOT FIRED (' + r.read + ')'}`) }; };
+  out.flickStandStrict = strict(T.flickStand); out.flickJogStrict = strict(T.flickJog);
   if (T.pass?.length) out.pass = row('pass', T.pass, ['leaveF', 'catchF']);
-  out.poke = row('poke', T.poke, ['logF', 'handF']); out.poke.logs = T.poke.map((x) => x.log);
-  out.block = row('block', T.block, ['upF']); out.block.rise = T.block.map((x) => x.rise);
+  out.poke = row('poke', T.poke, ['logF', 'handF']); out.poke.logs = (T.poke || []).map((x) => x.log);
+  out.block = row('block', T.block, ['upF']); out.block.rise = (T.block || []).map((x) => x.rise);
   out.errors = [...(R.pageErrors || []), ...(R.hgErrors || [])];
 }
 console.log(JSON.stringify(out, null, 1));

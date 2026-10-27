@@ -10,7 +10,8 @@ export default async function CoachPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/coach'));
   return (
-    <div className="min-h-screen bg-[#050505] pb-20">
+    <div className="min-h-screen bg-fel-bg pb-20">
+      {/* A11-01's heading is now the visible one in CoachView (premium-ui P8): one h1, seen and read */}
       <CoachView />
     </div>
   );

@@ -1,7 +1,7 @@
 // RunResult — one camera run's numbers, every one an estimate with its ± (SPRINT-SPEED, 2026-10-25).
 import type { RunResult } from '@/lib/sprint/session';
 import { modelSpeed } from '@/lib/sprint/trace';
-import { AGILITY_BETA_LINE, ESTIMATE_LINE, FV_SLOPE_LINE, MOVEMENT_LINE, REACTION_LINE, mph, speedWithBand, timeWithBand } from '@/lib/sprint/copy';
+import { AGILITY_BETA_LINE, ESTIMATE_LINE, FV_SLOPE_LINE, MOVEMENT_LINE, REACTION_LINE, mph, speedWithBand, timeWithBand, RESULT_MEANS, RESULT_NEXT } from '@/lib/sprint/copy';
 
 export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { ok: true }>['trace']> }) {
   const pts = trace.curve;
@@ -23,7 +23,7 @@ export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { 
         <text x={10} y={14} fill="#ffffff80" fontSize={9}>{(vMax / 1.1).toFixed(1)} m/s</text>
         <text x={312} y={116} fill="#ffffff80" fontSize={9} textAnchor="end">{(t1 - t0).toFixed(1)} s in view</text>
       </svg>
-      <figcaption className="text-[11px] text-white/45">Green: the speed the camera saw. {fit ? 'Dashed: Samozino’s model fitted to it.' : ''}</figcaption>
+      <figcaption className="text-[11px] text-white/45">Green: the speed the camera saw. {fit ? 'Dashed: the smooth sprint curve that fits it best.' : ''}</figcaption>
     </figure>
   );
 }
@@ -56,14 +56,14 @@ export function RunResultCard({ result }: { result: RunResult }) {
       {tr && <SpeedChart trace={tr} />}
       {tr?.model && tr.profile && (
         <div className="space-y-1.5" data-sprint-profile>
-          <div className="text-[11px] uppercase tracking-wider text-white/45">Sprint profile (Samozino) · estimate</div>
+          <div className="text-[11px] uppercase tracking-wider text-white/45">Sprint profile · estimate</div>
           <dl className="grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">v_max</dt><dd className="font-bold text-white" data-sprint-vmax>{speedWithBand(tr.model.vmax, tr.model.vmaxSd)}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">τ (acceleration time)</dt><dd className="font-bold text-white">{tr.model.tau.toFixed(2)} s ± {Math.max(0.01, 2 * tr.model.tauSd).toFixed(2)}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">F0</dt><dd className="font-bold text-white">{tr.profile.f0PerKg.toFixed(1)} N/kg{tr.profile.f0N ? ` · ${Math.round(tr.profile.f0N)} N` : ''}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Pmax</dt><dd className="font-bold text-white">{tr.profile.pmaxPerKg.toFixed(1)} W/kg{tr.profile.pmaxW ? ` · ${Math.round(tr.profile.pmaxW)} W` : ''}</dd></div>
+            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Top speed (curve)</dt><dd className="font-bold text-white" data-sprint-vmax>{speedWithBand(tr.model.vmax, tr.model.vmaxSd)}</dd></div>
+            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Time to speed up</dt><dd className="font-bold text-white">{tr.model.tau.toFixed(2)} s ± {Math.max(0.01, 2 * tr.model.tauSd).toFixed(2)}</dd></div>
+            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Starting push</dt><dd className="font-bold text-white">{tr.profile.f0PerKg.toFixed(1)} N/kg{tr.profile.f0N ? ` · ${Math.round(tr.profile.f0N)} N` : ''}</dd></div>
+            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Max power</dt><dd className="font-bold text-white">{tr.profile.pmaxPerKg.toFixed(1)} W/kg{tr.profile.pmaxW ? ` · ${Math.round(tr.profile.pmaxW)} W` : ''}</dd></div>
           </dl>
-          <p className="text-[11px] text-white/45">{tr.profile.withAir ? 'Air resistance included (from height and body mass).' : 'Per kilogram, without air resistance (no body mass given).'} F-V slope {tr.profile.slopePerKg.toFixed(2)} N·s/m/kg. {FV_SLOPE_LINE}</p>
+          <p className="text-[11px] text-white/45">{tr.profile.withAir ? 'Air resistance included (from height and body mass).' : 'Per kilogram, without air resistance (no body mass given).'} Strength-to-speed balance (force-velocity slope) {tr.profile.slopePerKg.toFixed(2)}. {FV_SLOPE_LINE}</p>
         </div>
       )}
       <ul className="space-y-1 text-xs text-white/55">
@@ -74,6 +74,9 @@ export function RunResultCard({ result }: { result: RunResult }) {
         <li>Pose rate {r.poseHz} frames a second.</li>
         <li data-sprint-estimate>{ESTIMATE_LINE}</li>
       </ul>
+      {/* CUE-REWRITE: what the number means, and the one next step */}
+      <p className="text-sm text-white/75" data-sprint-means>{RESULT_MEANS}</p>
+      <p className="text-sm font-bold text-white" data-sprint-next>{RESULT_NEXT}</p>
     </div>
   );
 }

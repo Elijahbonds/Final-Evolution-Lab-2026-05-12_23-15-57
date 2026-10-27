@@ -19,18 +19,22 @@ import { ANATOMY_PALETTE, anatomyLegend, initialSide, rgbHex, secondaryShown } f
 import { isBallClip } from '@/lib/library/demo';
 import type { StageSide } from './exercise-stage';
 
-const ExerciseStage = dynamic(() => import('./exercise-stage'), {
-  ssr: false,
-  loading: () => <p className="flex h-full items-center justify-center text-[12px] text-white/45">Loading your athlete…</p>,
-});
+// LIBRARY-ANATOMY-2 (owner, 2026-10-25): no blank wait. The cue card (Demo) or the muscle list (Muscles) shows in the stage's
+// box at once — while the chunk downloads and the body spawns — and cross-fades to the 3D when the stage is ready
+// (StagePreview below), so the chunk's own loading state draws nothing.
+const ExerciseStage = dynamic(() => import('./exercise-stage'), { ssr: false, loading: () => null });
 
 export type DemoTab = 'demo' | 'muscles' | 'cues' | 'video';
 export const DEMO_TAB_LABEL: Record<DemoTab, string> = { demo: 'Demo', muscles: 'Muscles', cues: 'Cues', video: 'Video' };
 
 const threeDisabled = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
 
-/** A coach or FEL video URL → what plays it: a YouTube embed, a file the browser plays itself, or nothing. */
-export function videoSource(raw: string | null | undefined): { kind: 'youtube'; src: string } | { kind: 'file'; src: string } | null {
+/**
+ * A coach or FEL video URL → what shows it: a file the browser plays itself (FEL's own storage), a YouTube URL as a labelled
+ * OUTBOUND LINK (COACH-DELIVERY COA-09, owner 2026-10-20: no YouTube embeds, no ads on FEL; assumption: kept as a link, not
+ * dropped), or nothing.
+ */
+export function videoSource(raw: string | null | undefined): { kind: 'link'; href: string } | { kind: 'file'; src: string } | null {
   if (!raw) return null;
   try {
     const url = new URL(raw);
@@ -38,7 +42,7 @@ export function videoSource(raw: string | null | undefined): { kind: 'youtube'; 
     let id = '';
     if (url.hostname === 'youtu.be') id = url.pathname.slice(1);
     else if (url.hostname.endsWith('youtube.com')) id = url.searchParams.get('v') || (url.pathname.startsWith('/shorts/') ? url.pathname.split('/')[2] ?? '' : '');
-    if (id && /^[\w-]{6,20}$/.test(id)) return { kind: 'youtube', src: `https://www.youtube.com/embed/${id}?rel=0` };
+    if (id && /^[\w-]{6,20}$/.test(id)) return { kind: 'link', href: url.href };
     if (/\.(mp4|webm|m4v|mov)$/i.test(url.pathname)) return { kind: 'file', src: url.href };
     return null;
   } catch {
@@ -62,7 +66,7 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
   const legend = useMemo(() => anatomyLegend(entry), [entry]);
   const [side, setSide] = useState<StageSide>(() => initialSide(entry.muscleMap.primary));
   const video = videoSource(entry.demo.videoUrl);
-  const [videoOn, setVideoOn] = useState(false);
+  const [stageState, setStageState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const secondary = rgbHex(secondaryShown());
   // the sheet's "Easier / Harder version" swaps the entry under the same switcher: the stage stays loaded and plays the new
   // one; the side, the video and a tab the new entry does not have start over
@@ -71,7 +75,6 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
     if (lastId.current === entry.id) return;
     lastId.current = entry.id;
     setSide(initialSide(entry.muscleMap.primary));
-    setVideoOn(false);
     setTab((t) => (demoTabs(entry).includes(t) ? t : 'cues'));
   }, [entry]);
 
@@ -99,15 +102,18 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
       {/* the stage (Demo and Muscles share it; hidden, not unmounted, on the other tabs — its loop stops while hidden) */}
       {has3d && stageOpened && (
         <div className={stageShown ? 'relative' : 'hidden'}>
-          <div className="aspect-[4/3] w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a] sm:aspect-video">
-            <ExerciseStage view={stageView} clip={clip} hold={entry.avatarHold} muscles={entry.muscleMap} side={side} />
+          <div className="relative aspect-[4/3] w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a] sm:aspect-video">
+            <div className={`h-full w-full transition-opacity duration-300 ${stageState === 'ready' ? 'opacity-100' : 'opacity-0'}`}>
+              <ExerciseStage view={stageView} clip={clip} hold={entry.avatarHold} muscles={entry.muscleMap} side={side} onState={setStageState} />
+            </div>
+            <StagePreview entry={entry} view={stageView} legend={legend} secondary={secondary} state={stageState} />
           </div>
-          {tab === 'demo' && (
+          {tab === 'demo' && stageState === 'ready' && (
             <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
               YOUR ATHLETE{entry.avatarHold != null ? ' · HOLD' : ''}
             </span>
           )}
-          {tab === 'demo' && isBallClip(clip) && (
+          {tab === 'demo' && stageState === 'ready' && isBallClip(clip) && (
             <span className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] text-white/70" data-testid="ball-note">The ball isn&apos;t drawn here.</span>
           )}
           {tab === 'muscles' && (
@@ -171,19 +177,49 @@ export function LibraryDemo({ entry, initialTab }: { entry: LibraryCard; initial
       )}
 
       {tab === 'video' && video && (
-        videoOn || video.kind === 'file' ? (
+        video.kind === 'file' ? (
           <div className="aspect-video w-full bg-black">
-            {video.kind === 'youtube'
-              ? <iframe src={video.src} className="h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen title={`${entry.name} video`} />
-              : <video src={video.src} className="h-full w-full" controls playsInline preload="metadata" title={`${entry.name} video`} />}
+            {/* own-storage video autoplays, muted and looped (the premium rule: no tap to start) */}
+            <video src={video.src} className="h-full w-full" autoPlay muted loop playsInline preload="metadata" title={`${entry.name} video`} />
           </div>
         ) : (
-          <button onClick={() => setVideoOn(true)} className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-[#16161a]">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#FF3366]/20"><Play className="h-6 w-6 text-[#FF3366]" aria-hidden /></span>
-            <span className="text-sm text-white/55">Play the coach video</span>
-          </button>
+          <a href={video.href} target="_blank" rel="noreferrer noopener" className="flex min-h-12 items-center justify-center gap-2 bg-[#16161a] px-4 text-sm text-white/70" data-video-outbound>
+            <Play className="h-5 w-5 text-[#FF3366]" aria-hidden /> Coach video on YouTube (opens outside FEL)
+          </a>
         )
       )}
+    </div>
+  );
+}
+
+/**
+ * The stage's first paint (LIBRARY-ANATOMY-2): what the 3D will show, as text, in the same box — the cues for the Demo,
+ * the muscles for Muscles — over the stage while it loads, faded out as the 3D fades in. Kept (not faded) if 3D fails.
+ */
+function StagePreview({ entry, view, legend, secondary, state }: {
+  entry: LibraryCard; view: 'demo' | 'muscles'; legend: ReturnType<typeof anatomyLegend>; secondary: string; state: 'loading' | 'ready' | 'failed';
+}) {
+  const shown = state !== 'ready';
+  const main = legend.filter((m) => m.tier === 'primary'), also = legend.filter((m) => m.tier !== 'primary');
+  return (
+    <div aria-hidden={!shown} data-testid="stage-preview" data-shown={shown ? 'true' : 'false'}
+      className={`absolute inset-0 flex flex-col justify-center gap-3 overflow-hidden px-5 py-4 transition-opacity duration-300 ${shown ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+      {view === 'demo' ? (
+        <div>
+          <h5 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/45">Think about</h5>
+          <ul className="space-y-1 text-[14px] leading-snug text-white/90">{entry.cues.slice(0, 3).map((c) => <li key={c}>{c}</li>)}</ul>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">Main</p>
+          <ul className="flex flex-wrap gap-1.5">{main.map((m) => <li key={m.id} className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-[12px] text-white"><span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ background: ANATOMY_PALETTE.primary }} />{m.label}</li>)}</ul>
+          {also.length > 0 && <>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-white/45">Also</p>
+            <ul className="flex flex-wrap gap-1.5">{also.map((m) => <li key={m.id} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1 text-[12px] text-white/75"><span aria-hidden className="h-2.5 w-2.5 rounded-sm" style={{ background: secondary }} />{m.label}</li>)}</ul>
+          </>}
+        </div>
+      )}
+      <p className="text-[11px] text-white/40" role="status">{state === 'failed' ? 'Couldn’t load 3D on this device.' : 'Loading your athlete…'}</p>
     </div>
   );
 }

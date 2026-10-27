@@ -48,9 +48,9 @@ const CHALLENGES: readonly [string, string, number, string, Partial<Variant>?][]
   ['with Leg Lift', 'leg-lift', 1, 'Lift one foot an inch off the floor and hold, the body still.'],
   ['with Arm Reach', 'arm-reach', 1, 'Reach one hand long toward the wall ahead and hold, the body still.'],
   ['with Band Row', 'band-row', 2, 'Row the band toward the floor beside you with one hand, the body still.', { equipment: ['band'] }],
-  ['with Knee-to-Elbow', 'knee-elbow', 1, 'Draw one knee in off the floor toward the same-side elbow and back, slow, the line still.'],
+  ['with Knee-to-Elbow', 'knee-elbow', 1, 'Slowly draw one knee off the floor toward the same-side elbow and back, body still.'],
   ['with Partner Push', 'partner-push', 2, 'A partner gives light pushes from the sides; stay still, like a table.'],
-  ['with Plate Drag', 'plate-drag', 2, 'Reach under and drag a light plate across the floor to the other side, the body still.', { equipment: ['plate'] }],
+  ['with Plate Drag', 'plate-drag', 2, 'Reach under and drag a light plate across the floor to the other side, body still.', { equipment: ['plate'] }],
 ];
 function plankVariants(): Variant[] {
   const out: Variant[] = [];
@@ -74,8 +74,8 @@ const ROLLOUTS: readonly [string, string, number, string, Variant['equipment']][
   ['Stability Ball Knee Tuck', 'ball-tuck', 1, 'High plank, shins on the ball: roll the ball in toward the chest and out.', ['stability-ball']],
   ['Suspension Trainer Fallout', 'trx-fallout', 1, 'Lean into the straps and reach them up toward the ceiling, slow, then back.', ['suspension-trainer']],
   ['Suspension Trainer Pike', 'trx-pike', 2, 'Feet in the straps, high plank: lift the hips toward the ceiling, slow.', ['suspension-trainer']],
-  ['Side Plank Hip Dip', 'side-dip', 1, 'In a side plank, lower the hips toward the floor and lift them back to the line, slow.', ['mat']],
-  ['Side Plank Reach-Through', 'side-reach', 2, 'In a side plank, reach the top hand under the body toward the wall behind, then open up.', ['mat']],
+  ['Side Plank Hip Dip', 'side-dip', 1, 'In a side plank, lower your hips toward the floor and lift them back up, slowly.', ['mat']],
+  ['Side Plank Reach-Through', 'side-reach', 2, 'In a side plank, reach the top hand under you toward the wall behind, then open up.', ['mat']],
 ];
 
 // ── med-ball throws: throw × stance ───────────────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ const THROWS: readonly [string, string, number, string, Variant['pattern']][] = 
   ['Rotational Scoop Toss', 'scoop', 1, 'Load the back hip, then turn and scoop the ball into the wall, fast.', 'rotation'],
   ['Rotational Shot Put', 'shot-put', 1, 'Ball at the shoulder, turn and push it into the wall like a shot put.', 'rotation'],
   ['Side Toss', 'side-toss', 1, 'Swing the ball across the body and let it fly into the wall beside you.', 'rotation'],
-  ['Underhand Scoop Throw', 'underhand', 0, 'Swing the ball low between the knees, then drive the floor away and throw it up the wall.', 'hinge'],
+  ['Underhand Scoop Throw', 'underhand', 0, 'Swing the ball low between your knees, then push the floor away and throw it up the wall.', 'hinge'],
   ['Single-Arm Push Throw', 'single-push', 1, 'Ball in one hand at the shoulder, step and push it into the wall fast.', 'push'],
   ['Rotational Overhead Throw', 'rot-overhead', 2, 'Ball overhead, turn and throw it down across the body into the wall.', 'rotation'],
 ];
@@ -108,13 +108,13 @@ function throwVariants(): Variant[] {
 }
 
 const DEAD_BUG: readonly [string, string, number, string, Variant['equipment']][] = [
-  ['Dead Bug with Ball Squeeze', 'ball', 0, 'Squeeze a ball between the hands and knees, then reach one arm and the opposite leg long toward the floor.', ['stability-ball', 'mat']],
-  ['Dead Bug with Plate Hold', 'plate', 1, 'Hold a light plate up toward the ceiling while the legs take turns reaching toward the floor.', ['plate', 'mat']],
-  ['Dead Bug with Kettlebell Press', 'kb', 1, 'Press a light bell up toward the ceiling with one hand; the opposite leg reaches toward the floor.', ['kettlebell', 'mat']],
-  ['Dead Bug, Wall Press', 'wall', 0, 'Hands press into a wall behind the head while the legs take turns reaching toward the floor.', ['wall', 'mat']],
+  ['Dead Bug with Ball Squeeze', 'ball', 0, 'Squeeze a ball between your hands and knees, then reach one arm and the other leg long.', ['stability-ball', 'mat']],
+  ['Dead Bug with Plate Hold', 'plate', 1, 'Hold a light plate up to the ceiling while your legs take turns reaching to the floor.', ['plate', 'mat']],
+  ['Dead Bug with Kettlebell Press', 'kb', 1, 'Press a light weight up to the ceiling with one hand; the other leg reaches to the floor.', ['kettlebell', 'mat']],
+  ['Dead Bug, Wall Press', 'wall', 0, 'Hands press into a wall behind your head while your legs take turns reaching to the floor.', ['wall', 'mat']],
   ['Dead Bug, Legs Only', 'legs', 0, 'Arms on the floor; the legs take turns reaching long toward the floor, slow.', ['mat']],
-  ['Bird Dog with Band Row', 'bird-band', 1, 'On hands and knees, reach the opposite leg long toward the wall behind while one hand rows a band.', ['band', 'mat']],
-  ['Plank Bird Dog', 'bird-plank', 2, 'From a high plank, reach one hand toward the wall ahead and the opposite foot toward the wall behind.', ['mat']],
+  ['Bird Dog with Band Row', 'bird-band', 1, 'On hands and knees, reach one leg back to the wall while the other hand rows a band.', ['band', 'mat']],
+  ['Plank Bird Dog', 'bird-plank', 2, 'From a high plank, reach one hand to the wall ahead, the other foot to the wall behind.', ['mat']],
   ['Bird Dog Hold, Knee Hover', 'bird-hover', 1, 'Knees hovering an inch off the floor, reach the opposite arm and leg long and hold.', ['mat']],
 ];
 
@@ -128,7 +128,7 @@ export const LATER_TRUNK: Family[] = [
     setup: 'Side-on to the anchor, the handle at the chest.',
     cues: ['The handle travels on a straight line; the pull never drags it off.', 'Tall and still, like a post planted in the floor.', 'Breathe out slowly as you press.'],
     faults: [
-      { fault: 'Turning toward the anchor', fix: 'Keep the handle on a straight line out from the chest; stay square to the wall ahead.' },
+      { fault: 'Turning toward the anchor', fix: 'Keep the handle on a straight line out from your chest; stay square to the wall ahead.' },
       { fault: 'Leaning away from the band', fix: 'Stand tall and still, like a post planted in the floor.' },
     ],
     dosage: reps(3, '10 each side', 30), variants: pallofVariants(),
@@ -152,7 +152,7 @@ export const LATER_TRUNK: Family[] = [
     setup: 'Take the position named on the floor.',
     cues: ['Only as far as the line stays long.', 'Move slow both ways.', 'Push the floor away the whole rep.'],
     faults: [
-      { fault: 'The low back sagging toward the floor at the far end', fix: 'Shorten the range: only as far as the line stays long.' },
+      { fault: 'Low back sagging toward the floor', fix: 'Shorten the range: only as far as the line stays long.' },
     ],
     dosage: reps(3, '8', 45), variants: ROLLOUTS.map(([name, k, l, cue, equipment]) => va(name, k, l, { cue, equipment })),
   },

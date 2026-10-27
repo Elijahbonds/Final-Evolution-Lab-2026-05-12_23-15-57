@@ -87,7 +87,7 @@ export function workBreathAt(breath: PacerSpec | null | undefined, run: TimerRun
 /** The ring on a timed breath item's Work run, with the preset's name and how-to. Presentational. */
 export function WorkBreath({ spec, sec }: { spec: PacerSpec; sec: number }) {
   return (
-    <div className="flex items-center gap-3 rounded-md border border-[#00E5FF]/20 bg-[#00E5FF]/5 p-2" data-work-breath>
+    <div className="flex items-center gap-3 rounded-md border border-fel-cyan/20 bg-fel-cyan/5 p-2" data-work-breath>
       <BreathPacer id="work-breath" spec={spec} elapsedSec={sec} size="sm" liveCaption />
       <div className="min-w-0 space-y-0.5">
         <div className="text-xs font-medium text-white">{POST_SESSION_BREATH.name}</div>
@@ -206,28 +206,28 @@ export function SetTimer({ timers, onWorkLogged, testId, onRunChange, settleBloc
   return (
     <div className="rounded-lg border border-white/8 bg-black/20 p-2 space-y-2" data-testid={testId}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <Timer className="h-3.5 w-3.5 text-white/40" aria-hidden="true" />
+        <Timer className="h-3.5 w-3.5 text-fel-dim" aria-hidden="true" />
         {timers.map((t) => (
           <button key={t.kind} type="button" onClick={() => start(t)} data-timer={t.kind}
-            className={`rounded-md border px-2 py-1 text-xs ${run?.kind === t.kind ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/70'}`}>
+            className={`rounded-md border px-2 py-1 text-xs ${run?.kind === t.kind ? 'border-fel-cyan/50 bg-fel-cyan/10 text-fel-cyan' : 'border-white/10 text-white/70'}`}>
             {t.label}
           </button>
         ))}
         {chip.show && (
           <button type="button" onClick={tapSettle} disabled={!settling && !chip.spec} aria-pressed={settling} data-settle-chip
             title={!settling && chip.why ? SETTLE_WHY_LINE[chip.why] : BETWEEN_SET_SETTLE.lead} data-settle-why={chip.why ?? undefined}
-            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${settling ? 'border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#00E5FF]' : 'border-white/10 text-white/70'}`}>
+            className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs disabled:opacity-30 ${settling ? 'border-fel-cyan/50 bg-fel-cyan/10 text-fel-cyan' : 'border-white/10 text-white/70'}`}>
             <Wind className="h-3 w-3" aria-hidden="true" />{settling ? 'Stop settle' : chip.label}
           </button>
         )}
-        <button type="button" onClick={() => { const on = !sound; setSound(on); writeSound(on); }} aria-label={sound ? 'Mute the timer' : 'Unmute the timer'} className="ml-auto text-white/40 hover:text-white">
+        <button type="button" onClick={() => { const on = !sound; setSound(on); writeSound(on); }} aria-label={sound ? 'Mute the timer' : 'Unmute the timer'} className="ml-auto text-fel-dim hover:text-white">
           {sound ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
         </button>
       </div>
       {run && view && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] uppercase tracking-wider text-white/40">{run.kind}{view.done ? ' · done' : view.paused ? ' · paused' : ''}</div>
+            <div className="text-[11px] uppercase tracking-wider text-fel-dim">{run.kind}{view.done ? ' · done' : view.paused ? ' · paused' : ''}</div>
             <div className="font-mono text-2xl tabular-nums text-white" data-testid={testId ? `${testId}-clock` : undefined} aria-live="off">{formatClock(view.remaining)}</div>
             <div className="flex items-center gap-1">
               {!view.done && <button type="button" onClick={togglePause} aria-label={view.paused ? 'Resume' : 'Pause'} className="rounded-md border border-white/10 p-1.5 text-white/70">{view.paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>}
@@ -235,12 +235,12 @@ export function SetTimer({ timers, onWorkLogged, testId, onRunChange, settleBloc
             </div>
           </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-            <div className={`h-full ${run.kind === 'rest' ? 'bg-white/40' : 'bg-[#00E5FF]'}`} style={{ width: `${Math.round(view.fraction * 100)}%` }} />
+            <div className={`h-full ${run.kind === 'rest' ? 'bg-white/40' : 'bg-fel-cyan'}`} style={{ width: `${Math.round(view.fraction * 100)}%` }} />
           </div>
-          {run.kind === 'work' && <div className="text-[11px] text-white/40">{view.done ? 'Logged in the next set.' : 'Stop early and the seconds you worked go in the next set.'}</div>}
+          {run.kind === 'work' && <div className="text-[11px] text-fel-dim">{view.done ? 'Logged in the next set.' : 'Stop early and the seconds you worked go in the next set.'}</div>}
           {workBreath && <WorkBreath spec={workBreath.spec} sec={workBreath.sec} />}
           {settling && settle && (
-            <div className="flex items-center gap-3 rounded-md border border-[#00E5FF]/20 bg-[#00E5FF]/5 p-2" data-settle>
+            <div className="flex items-center gap-3 rounded-md border border-fel-cyan/20 bg-fel-cyan/5 p-2" data-settle>
               <BreathPacer id="settle" spec={settle} elapsedSec={view.elapsed} size="sm" liveCaption />
               <div className="min-w-0 space-y-0.5">
                 <div className="text-xs font-medium text-white">{BETWEEN_SET_SETTLE.name}</div>

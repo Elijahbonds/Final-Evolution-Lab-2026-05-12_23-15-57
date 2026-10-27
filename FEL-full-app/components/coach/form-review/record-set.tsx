@@ -7,7 +7,7 @@
 //      the drills use). The picture is shown to the athlete as a self-view and goes nowhere else.
 //   2. Each frame goes through lib/coach/formReview/reader.ts: the reps are counted live, and each closed rep is graded
 //      by the movement's tested audit.
-//   3. Stop: every rep scored, the worst rep and any rep under the line flagged with its reason ("Left knee caves on rep
+//   3. Stop: every rep scored, the worst rep and any rep under the line flagged with its reason ("Left knee caves in on rep
 //      4") and the Mirror's own cue for it — on the phone, at once, before anything is sent. The flagged rep replays as a
 //      skeleton beside the best one.
 //   4. Send: the POSE DATA ONLY (lib/coach/formReview/payload.ts) goes to the coach's queue, if the gates allow it
@@ -26,7 +26,7 @@ import { flagsFor, scoreReps, setHeadline, summarize, type RepFlag, type ScoredR
 import { buildSubmission, MAX_SET_MS, type FormReviewSubmission } from '@/lib/coach/formReview/payload';
 import { VIDEO_STAYS_LINE } from '@/lib/coach/formReview/clipPolicy';
 import type { RecordContext } from '@/lib/coach/formReview/gate';
-import { repChips, replayPick } from '@/lib/coach/formReview/view';
+import { flagResult, repChips, replayPick } from '@/lib/coach/formReview/view';
 import { PoseReplay } from './pose-replay';
 import { SelfView } from '@/components/games/body-play';
 
@@ -37,10 +37,10 @@ type Phase = 'ready' | 'starting' | 'recording' | 'done' | 'sending' | 'sent';
 interface Result { reps: ScoredRep[]; flags: RepFlag[]; set: SetSummary; submission: FormReviewSubmission }
 
 const CHIP_CLASS: Record<string, string> = {
-  clean: 'border-[#00FF9D]/40 text-[#00FF9D]',
+  clean: 'border-fel-emerald/40 text-fel-emerald',
   flagged: 'border-[#FFB020]/60 bg-[#FFB020]/10 text-[#FFB020]',
   minor: 'border-white/25 text-white/75',
-  unread: 'border-white/10 text-white/35',
+  unread: 'border-white/10 text-fel-quiet',
 };
 
 /**
@@ -165,10 +165,10 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   return (
     <div className="space-y-4" data-record-set={ctx.movement}>
       <div className="fel-card space-y-2 rounded-xl p-4">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Film a set for your coach</div>
+        <div className="text-[11px] uppercase tracking-wider text-fel-dim">Film a set for your coach</div>
         <h1 className="text-lg font-bold text-white">{ctx.exerciseName}</h1>
         <p className="text-sm text-white/65">{spec.setup}</p>
-        <p className="text-xs text-white/45">The camera counts your reps and reads each one. Every number is an estimate.</p>
+        <p className="text-xs text-fel-dim">The camera counts your reps and reads each one. Every number is an estimate.</p>
       </div>
 
       {/* collapsed (not unmounted: the camera attaches to it on "Film it again") once a set has been read */}
@@ -189,7 +189,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         )}
       </div>
 
-      {why && <p role="alert" className="text-sm text-[#FF3366]">{why}</p>}
+      {why && <p role="alert" className="text-sm text-fel-crimson">{why}</p>}
 
       <div className="flex gap-2">
         {phase === 'recording' ? (
@@ -198,7 +198,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
           </button>
         ) : (
           <button type="button" onClick={() => void start()} disabled={phase === 'starting' || phase === 'sending'} data-record-start
-            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-4 font-bold text-black disabled:opacity-50">
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-fel-cyan px-4 font-bold text-black disabled:opacity-50">
             {phase === 'starting' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
             {result ? 'Film it again' : 'Start the camera'}
           </button>
@@ -225,7 +225,11 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
                 <li key={f.rep} className="rounded-lg border border-[#FFB020]/30 bg-[#FFB020]/5 p-2" data-flag={f.rep}>
                   <button type="button" onClick={() => setFocus(f.rep)} className="block w-full text-left">
                     <span className="block text-sm font-semibold text-[#FFB020]">{f.reason}{f.worst ? ' · worst rep' : ''}</span>
-                    {f.cue && <span className="mt-0.5 block text-sm text-white/80">{f.cue}</span>}
+                    {/* CUE-REWRITE: what it means and what to do next set (lib/coach/formReview/view.ts flagResult) */}
+                    {(() => { const r = flagResult(ctx.movement, f); return (<>
+                      <span className="mt-0.5 block text-sm text-white/70" data-flag-means>{r.means}</span>
+                      <span className="mt-0.5 block text-sm text-white/85" data-flag-next>{r.next.text}</span>
+                    </>); })()}
                   </button>
                 </li>
               ))}
@@ -234,32 +238,32 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
           {pick && <PoseReplay tracks={result.submission.tracks} aspect={result.submission.aspect} rep={pick.rep} best={pick.best} />}
           <p className="text-xs text-white/55" data-video-line>{VIDEO_STAYS_LINE}</p>
           {phase === 'sent' ? (
-            <p className="flex items-center gap-2 text-sm font-semibold text-[#00FF9D]" data-sent><CheckCircle2 className="h-4 w-4" /> Sent to your coach.</p>
+            <p className="flex items-center gap-2 text-sm font-semibold text-fel-emerald" data-sent><CheckCircle2 className="h-4 w-4" /> Sent to your coach.</p>
           ) : canSend ? (
             <button type="button" onClick={() => void send()} disabled={phase === 'sending'} data-send
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-4 font-bold text-[#00E5FF] disabled:opacity-50">
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-fel-cyan/50 bg-fel-cyan/10 px-4 font-bold text-fel-cyan disabled:opacity-50">
               {phase === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send the rep data to my coach
             </button>
           ) : !ctx.send.ok ? (
             <p className="text-sm text-white/65" data-send-refused={ctx.send.error}>
               {ctx.send.message}{' '}
-              {ctx.send.href && ctx.send.action && <Link href={ctx.send.href} className="text-[#00E5FF] underline">{ctx.send.action}</Link>}
+              {ctx.send.href && ctx.send.action && <Link href={ctx.send.href} className="text-fel-cyan underline">{ctx.send.action}</Link>}
             </p>
           ) : !ctx.ready ? (
             <p className="text-sm text-white/65" data-send-not-ready>Sending sets to your coach opens soon. Your flags are above, and nothing was sent.</p>
           ) : null}
-          {sendError && <p role="alert" className="text-sm text-[#FF3366]">{sendError}</p>}
+          {sendError && <p role="alert" className="text-sm text-fel-crimson">{sendError}</p>}
         </div>
       )}
 
       {mine && mine.length > 0 && (
         <div className="fel-card space-y-2 rounded-xl p-4" data-my-sets>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Sets you sent</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Sets you sent</div>
           {mine.slice(0, 6).map((m) => (
             <div key={m.id} className="flex items-center justify-between gap-2 text-sm">
               <span className="min-w-0 truncate text-white/80">{m.exerciseName} · {m.reps} reps{m.setScore !== null ? ` · ${m.setScore}` : ''}</span>
               <span className="flex shrink-0 items-center gap-2">
-                <span className={m.status === 'reviewed' ? 'text-[#00FF9D]' : 'text-white/45'}>{m.status === 'reviewed' ? 'Reviewed' : 'Waiting'}</span>
+                <span className={m.status === 'reviewed' ? 'text-fel-emerald' : 'text-fel-dim'}>{m.status === 'reviewed' ? 'Reviewed' : 'Waiting'}</span>
                 <button type="button" onClick={() => void remove(m.id)} aria-label={`Delete the ${m.exerciseName} set`} className="grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-white/50">
                   <Trash2 className="h-4 w-4" />
                 </button>

@@ -68,7 +68,7 @@ export default function Athlete3D({ onClose }: { onClose: () => void }) {
           {state === 'loading' ? 'Loading your athlete…' : 'Couldn’t load 3D on this device.'}
         </p>
       )}
-      <button type="button" onClick={onClose} className="absolute right-2 top-2 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white/80">
+      <button type="button" onClick={onClose} className="absolute right-2 top-2 rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[12px] font-bold text-white/80">
         Close 3D
       </button>
     </div>

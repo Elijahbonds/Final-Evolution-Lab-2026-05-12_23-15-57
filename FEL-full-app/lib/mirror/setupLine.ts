@@ -94,13 +94,13 @@ function summaryLine(faults: PatternFaultReading[]): string {
   const by = (id: SetupFaultId) => faults.find((f) => f.id === id)!;
   const hip = by('hipHeight'), bar = by('barLine'), head = by('headLine');
   if (hip.status === 'fault') return hip.value < SETUP_THRESHOLDS.hipHeightLow
-    ? 'Hips are riding high — sit them down toward the bar, knees add the bend.'
-    : 'Hips are low for a pull — this reads as a squat stance. Hips up a touch, chest over the bar.';
-  if (bar.status === 'fault') return 'Shoulders are behind the bar — bring your chest over it a touch.';
-  if (head.status === 'fault') return 'Set your head in line first — one long line from your ears to your hips.';
-  if (hip.status === 'unreadable') return 'Can\'t see your hips and knees well enough to check your set-up — square up in frame.';
-  if (bar.status === 'unreadable') return 'Can\'t see the bar hand well enough to check your set-up — bring it into frame.';
-  if (head.status === 'unreadable') return 'Can\'t see your head and shoulders well enough to check your set-up — square up in frame.';
+    ? 'Hips too high. Sit them down toward the bar and bend your knees more.'
+    : 'Hips too low for a lift from the floor. Raise them a little, chest over the bar.';
+  if (bar.status === 'fault') return 'Shoulders behind the bar. Bring your chest over it a little.';
+  if (head.status === 'fault') return 'Head out of line. Keep one long line from your ears to your hips.';
+  if (hip.status === 'unreadable') return 'I can\'t see your hips and knees. Turn side-on and get your whole body in the shot.';
+  if (bar.status === 'unreadable') return 'I can\'t see the hand on the bar. Bring it into the shot.';
+  if (head.status === 'unreadable') return 'I can\'t see your head and shoulders. Get your whole body in the shot.';
   return 'Set-up looks ready.';
 }
 
@@ -121,7 +121,7 @@ export function auditSetup(
 
   const side = ctx.side ?? pickNearSide(present, t.minVis);
   if (!side) {
-    return { faults: ALL_IDS.map((id) => unreadable(id, undefined)), readableFrames: 0, note: 'Too little of you in view to tell which side is toward the camera.' };
+    return { faults: ALL_IDS.map((id) => unreadable(id, undefined)), readableFrames: 0, note: 'Step back so your whole body is in the shot.' };
   }
 
   let sideOnVotes = 0, viewVotes = 0;
@@ -176,24 +176,26 @@ export function auditSetup(
 // MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
 // table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
 // names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
+// CUE-REWRITE (2026-10-27): cue, escalate and reply are said mid-rep (2–5 words, docs/CUE-STYLE.md); regress is said
+// when the set stops (one plain action, ≤ 14 words). Same faults, same intent; before/after in docs/CUE-AUDIT.md.
 export const SETUP_CUES: readonly CueRule[] = [
   {
     faultId: 'hipHeight',
-    cue: 'Sit your hips down level with the bar — let your knees add the bend, not your back.',
-    escalate: 'Still riding high. Touch the bar to the floor from a dead stop before you set up again.',
-    regress: 'Set up from blocks or a rack pin a few inches up, so the hips do not have as far to travel yet.',
+    cue: 'Hips down to bar height',
+    escalate: 'Reset. Hips lower.',
+    regress: 'Set the bar on blocks a few inches up, so your hips travel less.',
   },
   {
     faultId: 'barLine',
-    cue: 'Bring your shoulders over the bar — chest up and over your hands.',
-    escalate: 'Still behind it. Walk the bar back until it is under your armpits before you set your hands.',
-    regress: 'Set up with the bar (or a light bag) a hand-width closer than feels natural, and find the line from there.',
+    cue: 'Shoulders over the bar',
+    escalate: 'Reset. Shoulders over the bar.',
+    regress: 'Set up with the bar a hand-width closer, then find the line.',
   },
   {
     faultId: 'headLine',
-    cue: 'Eyes to a spot on the floor a few feet ahead — one long line, ears to hips, before you pull.',
-    escalate: 'Find that spot on the floor first, hold your eyes on it, then hinge into the set-up without losing the line.',
-    regress: 'Set up facing a wall a few feet off and keep your eyes on the same spot the whole time.',
+    cue: 'Eyes on a spot ahead',
+    escalate: 'Find the spot, then lift',
+    regress: 'Face a wall a few feet away and keep your eyes on one spot.',
   },
 ];
 

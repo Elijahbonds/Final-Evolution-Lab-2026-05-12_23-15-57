@@ -99,7 +99,7 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
     if (Array.isArray(j.notes) && j.notes.length) toast.warning('Heads-up: a cue reads as a body-part or medical cue, so the reviewer may ask for a reword.');
   };
 
-  if (!items) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (!items) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const untagged = items.filter((i) => !i.pattern).length;
   const byId = new Map(items.map((i) => [i.id, i]));
 
@@ -107,11 +107,11 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm text-white">My catalogue <span className="text-white/40">· {items.length} exercise{items.length === 1 ? '' : 's'}</span></div>
-          <div className="text-xs text-white/40">What you can put in a program on the Clients tab.{untagged > 0 && <span className="text-[#FFD700]/80"> {untagged} without a pattern yet.</span>}</div>
+          <div className="text-sm text-white">My catalogue <span className="text-fel-dim">· {items.length} exercise{items.length === 1 ? '' : 's'}</span></div>
+          <div className="text-xs text-fel-dim">What you can put in a program on the Clients tab.{untagged > 0 && <span className="text-fel-gold/80"> {untagged} without a pattern yet.</span>}</div>
         </div>
         {editing === null && (
-          <button onClick={() => setEditing('new')} className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs text-[#00E5FF]">
+          <button onClick={() => setEditing('new')} className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-fel-cyan/40 bg-fel-cyan/10 px-3 py-1.5 text-xs text-fel-cyan">
             <Plus className="h-3.5 w-3.5" /> New exercise
           </button>
         )}
@@ -131,19 +131,19 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
         <div className="fel-card rounded-xl p-5 text-center space-y-3">
           <div className="text-sm text-white/70">Your catalogue is empty, so the builder has nothing to program yet.</div>
           <div className="flex flex-wrap justify-center gap-2">
-            <button onClick={() => setEditing('new')} className="inline-flex items-center gap-1.5 rounded-lg border border-[#00E5FF]/40 px-3 py-1.5 text-xs text-[#00E5FF]"><Plus className="h-3.5 w-3.5" /> Write your own</button>
+            <button onClick={() => setEditing('new')} className="inline-flex items-center gap-1.5 rounded-lg border border-fel-cyan/40 px-3 py-1.5 text-xs text-fel-cyan"><Plus className="h-3.5 w-3.5" /> Write your own</button>
             {onBrowseKb && <button onClick={onBrowseKb} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/80"><BookOpen className="h-3.5 w-3.5" /> Copy from the knowledge base</button>}
           </div>
         </div>
       ) : (
         <>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your catalogue..." className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00E5FF]/40" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fel-quiet" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your catalogue..." className="w-full rounded-xl bg-[#16161a] border border-white/10 pl-10 pr-4 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-fel-cyan/40" />
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {(['all', ...PATTERNS, 'untagged'] as Filter[]).map((f) => (
-              <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-lg text-[11px] border ${filter === f ? 'bg-[#00E5FF]/15 text-[#00E5FF] border-[#00E5FF]/30' : 'bg-[#16161a] text-white/40 border-white/6 hover:text-white/60'}`}>
+              <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-lg text-[11px] border ${filter === f ? 'bg-fel-cyan/15 text-fel-cyan border-fel-cyan/30' : 'bg-[#16161a] text-fel-dim border-white/6 hover:text-white/60'}`}>
                 {f === 'all' ? 'All' : f === 'untagged' ? 'No pattern' : PATTERN_INFO[f].label}
               </button>
             ))}
@@ -155,24 +155,24 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white truncate">{it.name}</span>
-                      {it.demoVideoUrl && <Play className="h-3.5 w-3.5 shrink-0 text-[#FF3366]/70" aria-label="has a demo video" />}
+                      {it.demoVideoUrl && <Play className="h-3.5 w-3.5 shrink-0 text-fel-crimson/70" aria-label="has a demo video" />}
                     </div>
                     <TagRow pattern={it.pattern} braceMode={it.braceMode} layer={it.skillLayer} category={it.category} />
-                    <div className="mt-1 text-[11px] text-white/40">
+                    <div className="mt-1 text-[11px] text-fel-dim">
                       {it.primaryCues.length} cue{it.primaryCues.length === 1 ? '' : 's'} · {(it.commonFaults ?? []).length} fault{(it.commonFaults ?? []).length === 1 ? '' : 's'}
                       {it.regressionOfId && byId.get(it.regressionOfId) && <> · easier: {byId.get(it.regressionOfId)!.name}</>}
                       {it.progressionOfId && byId.get(it.progressionOfId) && <> · harder: {byId.get(it.progressionOfId)!.name}</>}
                     </div>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <button onClick={() => setEditing(it)} aria-label={`Edit ${it.name}`} className="rounded-lg p-1.5 text-white/40 hover:text-white"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => void submit(it)} aria-label={`Submit ${it.name} to the library`} title="Submit to library" className="rounded-lg p-1.5 text-white/30 hover:text-[#00E5FF]"><Upload className="h-4 w-4" /></button>
-                    <button onClick={() => void remove(it)} aria-label={`Delete ${it.name}`} className="rounded-lg p-1.5 text-white/30 hover:text-[#FF3366]"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => setEditing(it)} aria-label={`Edit ${it.name}`} className="rounded-lg p-1.5 text-fel-dim hover:text-white"><Pencil className="h-4 w-4" /></button>
+                    <button onClick={() => void submit(it)} aria-label={`Submit ${it.name} to the library`} title="Submit to library" className="rounded-lg p-1.5 text-fel-quiet hover:text-fel-cyan"><Upload className="h-4 w-4" /></button>
+                    <button onClick={() => void remove(it)} aria-label={`Delete ${it.name}`} className="rounded-lg p-1.5 text-fel-quiet hover:text-fel-crimson"><Trash2 className="h-4 w-4" /></button>
                   </div>
                 </div>
               </div>
             ))}
-            {shown.length === 0 && <div className="py-8 text-center text-sm text-white/30">Nothing matches. Try another filter.</div>}
+            {shown.length === 0 && <div className="py-8 text-center text-sm text-fel-quiet">Nothing matches. Try another filter.</div>}
           </div>
         </>
       )}
@@ -185,11 +185,11 @@ export function TagRow({ pattern, braceMode, layer, category }: { pattern: Movem
   const l = skillLayer(layer);
   return (
     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
-      {pattern ? <span className="rounded-full border border-[#00E5FF]/30 px-2 py-0.5 text-[#00E5FF]/90">{PATTERN_INFO[pattern].label}</span>
-        : <span className="rounded-full border border-[#FFD700]/30 px-2 py-0.5 text-[#FFD700]/80">no pattern</span>}
+      {pattern ? <span className="rounded-full border border-fel-cyan/30 px-2 py-0.5 text-fel-cyan/90">{PATTERN_INFO[pattern].label}</span>
+        : <span className="rounded-full border border-fel-gold/30 px-2 py-0.5 text-fel-gold/80">no pattern</span>}
       {braceMode && <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/60">{BRACE_INFO[braceMode].label}</span>}
-      {l && <span className="rounded-full border border-[#A855F7]/30 px-2 py-0.5 text-[#A855F7]/90">{l.label}</span>}
-      {category && <span className="text-white/30">{category}</span>}
+      {l && <span className="rounded-full border border-fel-violet/30 px-2 py-0.5 text-fel-violet/90">{l.label}</span>}
+      {category && <span className="text-fel-quiet">{category}</span>}
     </div>
   );
 }
@@ -199,19 +199,49 @@ function Field({ label, hint, error, group, children }: { label: string; hint?: 
   const Tag = group ? 'div' : 'label';
   return (
     <Tag className="block space-y-1" {...(group ? { role: 'group', 'aria-label': label } : {})}>
-      <span className="block text-[11px] uppercase tracking-wider text-white/40">{label}</span>
+      <span className="block text-[11px] uppercase tracking-wider text-fel-dim">{label}</span>
       {children}
-      {error ? <span className="block text-xs text-[#FF3366]">{error}</span> : hint ? <span className="block text-[11px] text-white/35">{hint}</span> : null}
+      {error ? <span className="block text-xs text-fel-crimson">{error}</span> : hint ? <span className="block text-[11px] text-fel-quiet">{hint}</span> : null}
     </Tag>
   );
 }
 
-const input = 'w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#00E5FF]/40';
+const input = 'w-full rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-fel-cyan/40';
+
+const COACH_VIDEO_API = '/api/coach/catalogue/video';
+
+/** COACH-DELIVERY COA-08: pick a clip → a signed, size-bound PUT straight to FEL's own storage → its URL in the demo field. */
+function CoachVideoUpload({ on, onUploaded }: { on: boolean; onUploaded: (url: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  if (!on) return null;
+  const upload = async (f: File | undefined) => {
+    if (!f) return;
+    setBusy(true);
+    try {
+      const r = await fetch(COACH_VIDEO_API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contentType: f.type, bytes: f.size }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) { toast.error(j.error === 'video_size' ? 'Clips can be up to 60 MB.' : j.error === 'video_type' ? 'An MP4, WebM or MOV, please.' : 'Uploads are not on yet.'); return; }
+      const put = await fetch(j.put.url, { method: 'PUT', headers: j.put.headers, body: f });
+      if (!put.ok) { toast.error('The upload did not finish. Try again.'); return; }
+      onUploaded(j.url);
+      toast.success('Uploaded. Save the exercise to keep it.');
+    } finally { setBusy(false); }
+  };
+  return (
+    <label className="mt-1.5 inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 px-3 text-xs text-white/75">
+      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Upload a clip
+      <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" disabled={busy} onChange={(e) => void upload(e.target.files?.[0])} />
+    </label>
+  );
+}
 
 function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: CatalogueItem | null; others: CatalogueItem[]; onCancel: () => void; onSaved: () => void }) {
   const [d, setD] = useState<Draft>(() => (initial ? toDraft(initial) : EMPTY));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<{ field?: string; message: string } | null>(null);
+  // COACH-DELIVERY COA-08: is the own-storage upload on? (no button until the owner sets the bucket and switch, OWN-16)
+  const [videoOn, setVideoOn] = useState(false);
+  useEffect(() => { fetch(COACH_VIDEO_API).then((r) => (r.ok ? r.json() : null)).then((j) => setVideoOn(!!j?.on)).catch(() => {}); }, []);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
   const fieldErr = (f: string) => (err?.field === f ? err.message : null);
 
@@ -239,10 +269,10 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
   };
 
   return (
-    <div className="fel-card rounded-xl p-4 space-y-3 border border-[#00E5FF]/20">
+    <div className="fel-card rounded-xl p-4 space-y-3 border border-fel-cyan/20">
       <div className="flex items-center justify-between">
         <div className="text-sm text-white">{initial ? `Edit ${initial.name}` : 'New exercise'}</div>
-        <button onClick={onCancel} aria-label="Close" className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
+        <button onClick={onCancel} aria-label="Close" className="text-fel-dim hover:text-white"><X className="h-4 w-4" /></button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -287,12 +317,12 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
       </Field>
       {suggestions.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[11px] text-white/35">Set-up cues for a {PATTERN_INFO[pattern!].label.toLowerCase()}{freeSlot < 0 ? ' (clear a cue slot to use one)' : ', tap to use as a cue'}:</div>
+          <div className="text-[11px] text-fel-quiet">Set-up cues for a {PATTERN_INFO[pattern!].label.toLowerCase()}{freeSlot < 0 ? ' (clear a cue slot to use one)' : ', tap to use as a cue'}:</div>
           <div className="flex flex-wrap gap-1.5">
             {suggestions.map((s) => (
               <button key={s.id} type="button" disabled={freeSlot < 0 || d.cues.includes(s.text)}
                 onClick={() => set('cues', d.cues.map((x, j) => (j === freeSlot ? s.text : x)))}
-                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 disabled:opacity-35 hover:border-[#00E5FF]/40">{s.text}</button>
+                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 disabled:opacity-35 hover:border-fel-cyan/40">{s.text}</button>
             ))}
           </div>
         </div>
@@ -304,18 +334,20 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
             <div key={i} className="flex gap-1.5">
               <input value={f.fault} onChange={(e) => set('faults', d.faults.map((x, j) => (j === i ? { ...x, fault: e.target.value } : x)))} maxLength={CATALOGUE_LIMITS.fault} placeholder="Fault" className={`${input} flex-1`} />
               <input value={f.correctionCue} onChange={(e) => set('faults', d.faults.map((x, j) => (j === i ? { ...x, correctionCue: e.target.value } : x)))} maxLength={CATALOGUE_LIMITS.fault} placeholder="Cue for it" className={`${input} flex-1`} />
-              <button type="button" onClick={() => set('faults', d.faults.length > 1 ? d.faults.filter((_, j) => j !== i) : [{ fault: '', correctionCue: '' }])} aria-label="Remove fault" className="text-white/30 hover:text-[#FF3366]"><X className="h-4 w-4" /></button>
+              <button type="button" onClick={() => set('faults', d.faults.length > 1 ? d.faults.filter((_, j) => j !== i) : [{ fault: '', correctionCue: '' }])} aria-label="Remove fault" className="text-fel-quiet hover:text-fel-crimson"><X className="h-4 w-4" /></button>
             </div>
           ))}
           {d.faults.length < CATALOGUE_LIMITS.faults && (
-            <button type="button" onClick={() => set('faults', [...d.faults, { fault: '', correctionCue: '' }])} className="text-xs text-[#00E5FF]/80">+ Add a fault</button>
+            <button type="button" onClick={() => set('faults', [...d.faults, { fault: '', correctionCue: '' }])} className="text-xs text-fel-cyan/80">+ Add a fault</button>
           )}
         </div>
       </Field>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Demo video link" error={fieldErr('demoVideoUrl')} hint="A YouTube or cloud link, starting https://">
+        {/* COACH-DELIVERY COA-08/09: own-storage video (upload, when the owner has switched it on) — no YouTube ask */}
+        <Field label="Demo video" error={fieldErr('demoVideoUrl')} hint={videoOn ? 'Upload a short clip, or paste a link.' : 'A video file link, starting https://'}>
           <input value={d.demoVideoUrl} onChange={(e) => set('demoVideoUrl', e.target.value)} placeholder="https://..." className={input} />
+          <CoachVideoUpload on={videoOn} onUploaded={(url) => set('demoVideoUrl', url)} />
         </Field>
         <Field label="Equipment" error={fieldErr('equipment')} hint="Comma-separated, e.g. kettlebell, box">
           <input value={d.equipment} onChange={(e) => set('equipment', e.target.value)} className={input} />
@@ -338,10 +370,10 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
         </Field>
       </div>
 
-      {err && !err.field && <div className="text-xs text-[#FF3366]">{err.message}</div>}
+      {err && !err.field && <div className="text-xs text-fel-crimson">{err.message}</div>}
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onCancel} className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/70">Cancel</button>
-        <button onClick={() => void save()} disabled={busy || !d.name.trim()} className="inline-flex items-center gap-1.5 rounded-lg border border-[#00E5FF]/40 bg-[#00E5FF]/10 px-3 py-1.5 text-xs text-[#00E5FF] disabled:opacity-40">
+        <button onClick={() => void save()} disabled={busy || !d.name.trim()} className="inline-flex items-center gap-1.5 rounded-lg border border-fel-cyan/40 bg-fel-cyan/10 px-3 py-1.5 text-xs text-fel-cyan disabled:opacity-40">
           {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{initial ? 'Save' : 'Add to catalogue'}
         </button>
       </div>

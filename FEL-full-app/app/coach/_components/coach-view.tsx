@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { MessageSquare, BookOpen, Video, CalendarCheck, Users, Send } from 'lucide-react';
+import { MessageSquare, BookOpen, Video, CalendarCheck, Users, Send, Dumbbell, Briefcase } from 'lucide-react';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { Chip } from '@/components/ui/fel/chip';
+import { TYPE } from '@/lib/design/type';
 import { CoachChat } from './coach-chat';
 import { useAiStatus } from '@/lib/abacus/useAiStatus';
 import { ExerciseCatalogue } from './exercise-catalogue';
@@ -32,6 +34,9 @@ export function CoachView() {
   const [coach, setCoach] = useState(false);   // the Clients tab shows only for a certified coach or an existing coach of programs
   const [me, setMe] = useState<SharedBy | null>(null);
   useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}); }, []);
+  // COACH-DELIVERY (round 8 item b): a coach with nobody on their roster gets a "first client" link to the checklist
+  const [emptyRoster, setEmptyRoster] = useState(false);
+  useEffect(() => { if (coach) fetch('/api/coach/roster').then((r) => (r.ok ? r.json() : null)).then((j) => setEmptyRoster(Array.isArray(j?.roster) && j.roster.length === 0)).catch(() => {}); }, [coach]);
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
   useEffect(() => { fetch('/api/share/me').then((r) => r.ok ? r.json() : null).then((j) => j && setMe(j)).catch(() => {}); }, []);
@@ -41,14 +46,26 @@ export function CoachView() {
   const tabs = TABS.filter((t) => (!COACH_ONLY.includes(t.key) || coach) && (t.key !== 'chat' || chatOn));
 
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-4">
-      <Link href="/coach/session" className="mb-4 flex min-h-12 items-center justify-center rounded-xl bg-[#FF2D95] px-4 text-base font-bold text-black">
-        Court session
-      </Link>
-      {/* COACH-BUSINESS: the coach's page, packages, payments and applications */}
-      {coach ? <Link href="/coach/business" className="mb-4 flex min-h-11 items-center justify-center rounded-xl border border-cyan-300/50 px-4 text-sm font-bold text-cyan-200">Your coaching business</Link> : null}
-      {/* Tab switcher */}
-      <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-4 border border-white/6">
+    <main className="fel-fade mx-auto max-w-[900px] px-5 pb-28 pt-8 md:pb-10">
+      {/* PREMIUM-UI P8 (2026-10-27): the page says where you are (it was a screen-reader-only heading), Court session is the
+          ONE primary — the one-accent pill, docked on a phone (was a fourth accent, pink) — and the business is a quiet door */}
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <p className={`${TYPE.label} text-fel-cyan`}>Train</p>
+          <h1 className={`${TYPE.title} text-white`}>Coach</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <PrimaryCta href="/coach/session" docked icon={<Dumbbell aria-hidden className="h-5 w-5" />}>Court session</PrimaryCta>
+          {/* COACH-BUSINESS: the coach's page, packages, payments and applications */}
+          {coach ? <Chip href="/coach/business" icon={<Briefcase aria-hidden className="h-4 w-4" />}>Your coaching business</Chip> : null}
+        </div>
+      </header>
+      {/* COACH-DELIVERY: a coach with no roster gets one quiet door to the first-client checklist (in the kit's chip look) */}
+      {coach && emptyRoster && tab !== 'clients' ? (
+        <button type="button" onClick={() => setTab('clients')} className={`fel-press mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-fel-emerald/40 bg-fel-emerald/[0.1] px-3 text-fel-emerald ${TYPE.label}`} data-first-client-link>Add your first client →</button>
+      ) : null}
+      {/* Tab switcher: the kit's segmented look (a soft white pill on the lit tab; the accent stays for the action) */}
+      <div className="mb-5 flex gap-1 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.03] p-1">
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -58,10 +75,10 @@ export function CoachView() {
               onClick={() => setTab(t.key)}
               // COACH-LOOP P1 (2026-10-20): on a phone the icon sits over the label, so five tabs fit 390 px without
               // squeezing "Form Check" onto two lines beside a crushed icon (measured: scripts/probes/_coach-phone-probe.mts)
-              className={`min-w-0 flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-lg py-2 sm:py-2.5 text-[11px] leading-tight sm:text-sm font-medium transition-all ${
+              className={`fel-press min-w-0 flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-full py-2 sm:py-2.5 text-[12px] font-semibold leading-tight sm:text-[14px] ${
                 active
-                  ? 'bg-[#00E5FF]/15 text-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.2)]'
-                  : 'text-white/40 hover:text-white/70'
+                  ? 'bg-white/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
+                  : 'text-fel-dim hover:text-white/80'
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -76,7 +93,7 @@ export function CoachView() {
       {tab === 'clients' && <ClientsView />}
       {tab === 'send' && (me
         ? <SendView me={me} />
-        : <div className="py-16 text-center text-sm text-white/40">Loading your details…</div>)}
+        : <div className="py-16 text-center text-sm text-fel-dim">Loading your details…</div>)}
       {tab === 'chat' && chatOn && <CoachChat />}
       {/* MIRROR-COACH P2: a coach's Exercises tab also holds their prescribable catalogue + "Add to my catalogue" */}
       {tab === 'catalogue' && <ExerciseCatalogue coach={coach} />}

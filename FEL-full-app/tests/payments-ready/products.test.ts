@@ -40,7 +40,11 @@ const { GET: walletConfig } = await import('@/app/api/v1/wallet/config/route');
 const { POST: bookCheckout } = await import('@/app/api/books/checkout/route');
 const { BOOKS } = await import('@/lib/books/bookCatalog');
 const { bookOfferAllowed } = await import('@/lib/books/bookTerms');
-const { STORE_TERMS_VERSION } = await import('@/lib/store-terms');
+// test changed (owner-approvals, 2026-10-27, card C28): FEL Pro buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS.fel_pro), not the coach store's terms; the tick's version is read from there. The assertions are unchanged.
+const { BUYER_TERMS } = await import('@/lib/payments/terms');
+const BUYER_TERMS_VERSION = BUYER_TERMS.fel_pro.version;
+const { STORE_TERMS_VERSION } = await import('@/lib/store-terms');   // books still tick the coach store's terms
 const { buyPro } = await import('@/lib/payments/proBuy');
 
 const ENV: Record<string, string> = {
@@ -54,7 +58,7 @@ const ENV: Record<string, string> = {
 };
 const KEYS = [...Object.keys(ENV), 'PURCHASES_ALLOWLIST'];
 const saved: Record<string, string | undefined> = {};
-const TICK = { termsAccepted: true, termsVersion: STORE_TERMS_VERSION };
+const TICK = { termsAccepted: true, termsVersion: BUYER_TERMS_VERSION };
 const offer = BOOKS.flatMap((b) => b.offers).find((o) => bookOfferAllowed(o))!;
 
 beforeEach(() => {
@@ -85,7 +89,7 @@ const ROUTES: [string, (req: any) => Promise<Response>, unknown][] = [
   ['coins', coinCheckout, { pack_id: 'coins_starter' }],
   ['shards', shardCheckout, { pack_id: 'pack_starter' }],
   ['season_pass', seasonCheckout, {}],
-  ['books', bookCheckout, { offerId: offer?.id, ...TICK }],
+  ['books', bookCheckout, { offerId: offer?.id, termsAccepted: true, termsVersion: STORE_TERMS_VERSION }],
 ];
 
 describe('PURCHASES_ALLOWLIST unset: exactly as before', () => {
@@ -132,11 +136,11 @@ describe('FEL Pro: the buyer ticks the terms before Stripe is called', () => {
   it.each([
     ['no tick', { product: 'FEL_PRO' }],
     ['ticked an old version', { product: 'FEL_PRO_MONTHLY', termsAccepted: true, termsVersion: 'store-terms-2026-10-04' }],
-    ['version without the tick', { product: 'FEL_PRO', termsVersion: STORE_TERMS_VERSION }],
+    ['version without the tick', { product: 'FEL_PRO', termsVersion: BUYER_TERMS_VERSION }],
   ])('%s: 409 terms_required naming the current version, nothing at Stripe', async (_n, body) => {
     const r = await call(stripeCheckout, body);
     expect(r.status).toBe(409);
-    expect(r.json).toEqual({ error: 'terms_required', version: STORE_TERMS_VERSION });
+    expect(r.json).toEqual({ error: 'terms_required', version: BUYER_TERMS_VERSION });
     expect(h.stripe.created).toHaveLength(0);
     expect(h.stripe.customersCreated).toHaveLength(0);
   });
@@ -157,7 +161,7 @@ describe('FEL Pro: the buyer ticks the terms before Stripe is called', () => {
     expect((await call(stripeCheckout, { product: 'FEL_PRO', ...TICK })).status).toBe(200);
     const p = h.stripe.created[0];
     for (const meta of [p.metadata, p.subscription_data.metadata]) {
-      expect(meta.terms_version).toBe(STORE_TERMS_VERSION);
+      expect(meta.terms_version).toBe(BUYER_TERMS_VERSION);
       expect(Date.parse(meta.terms_accepted_at)).toBeGreaterThanOrEqual(before - 1000);
     }
   });
@@ -168,22 +172,22 @@ describe('the /pro page\'s button, end to end through the real route', () => {
   const viaRoute = (async (_url: string, init: RequestInit) => stripeCheckout(jsonRequest(JSON.parse(String(init.body))))) as unknown as typeof fetch;
 
   it('an adult goes to Stripe with the plan they picked and the tick on the metadata', async () => {
-    const out = await buyPro(viaRoute, 'weekly', STORE_TERMS_VERSION);
+    const out = await buyPro(viaRoute, 'weekly', BUYER_TERMS_VERSION);
     expect(out.kind).toBe('redirect');
     expect(h.stripe.created[0].line_items[0].price_data).toMatchObject({ unit_amount: 600, recurring: { interval: 'week' } });
-    expect(h.stripe.created[0].metadata.terms_version).toBe(STORE_TERMS_VERSION);
+    expect(h.stripe.created[0].metadata.terms_version).toBe(BUYER_TERMS_VERSION);
   });
 
   it('a teen sees exactly what the route answers today, and nothing reaches Stripe', async () => {
     h.user = MINOR;
     const direct = await call(stripeCheckout, { product: 'FEL_PRO_MONTHLY', ...TICK });
     expect(direct.status).toBe(403);
-    expect(await buyPro(viaRoute, 'monthly', STORE_TERMS_VERSION)).toEqual({ kind: 'refused', message: direct.json.message });
+    expect(await buyPro(viaRoute, 'monthly', BUYER_TERMS_VERSION)).toEqual({ kind: 'refused', message: direct.json.message });
     expect(h.stripe.created).toHaveLength(0);
   });
 
   it('closed by the allow list: the page\'s not-on-sale line', async () => {
     process.env.PURCHASES_ALLOWLIST = 'coins';
-    expect((await buyPro(viaRoute, 'monthly', STORE_TERMS_VERSION)).kind).toBe('closed');
+    expect((await buyPro(viaRoute, 'monthly', BUYER_TERMS_VERSION)).kind).toBe('closed');
   });
 });

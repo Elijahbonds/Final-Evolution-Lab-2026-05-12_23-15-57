@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The flag lines use the canonical fault names now
+// (lib/cue-style/names.ts: "Left knee caves in", "Back bends"); every assertion checks what it checked before.
 // COACH-VIDEO-REVIEW (2026-10-24): what the client's and the coach's screens draw from a scored set.
 import { describe, expect, it } from 'vitest';
 import { ageLabel, repChips, replayPick } from './view';
@@ -14,7 +16,7 @@ const flags = flagsFor('squat', reps);
 describe('the rep strip', () => {
   it('clean, flagged, a minor fault, not read — each with its words', () => {
     expect(repChips('squat', reps, flags).map((c) => [c.n, c.tone, c.title])).toEqual([
-      [1, 'clean', 'Rep 1: clean'], [2, 'minor', 'Rep 2: Heels lift'], [3, 'flagged', 'Rep 3: Left knee caves'], [4, 'unread', 'Rep 4: not read from this angle'],
+      [1, 'clean', 'Rep 1: clean'], [2, 'minor', 'Rep 2: Heels lift'], [3, 'flagged', 'Rep 3: Left knee caves in'], [4, 'unread', 'Rep 4: not read from this angle'],
     ]);
   });
 });

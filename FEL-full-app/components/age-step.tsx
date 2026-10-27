@@ -125,6 +125,7 @@ export function AgeStep({
       <p className="text-center text-sm text-white/70">{AGE_QUESTION}</p>
       {locked === null ? (
         <select
+          aria-label="Birth year"
           value={year}
           onChange={(e) => { setYear(e.target.value); setInvalid(null); }}
           className="w-full rounded-md border border-white/10 bg-[#16161A] px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[#00E5FF]/60"

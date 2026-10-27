@@ -22,111 +22,19 @@
 // SUITE: every name is `ex_*` (clipScope.ts suite 'exercise'), an OPT-IN suite: only a scene whose scope names it (the
 // library stage, felModeId 'library') builds these, so no mode and no unscoped preview pays for 30 extra builds at spawn.
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
-import { buildPoseClip, type Deg3, type PoseKey } from '../poseClip';
+import {
+  ANKLE, TOE_ANKLE, both, bothDir, mix, loop, rep, STANCE, SQUAT_FEET, KNEES_OUT, HANG, HANG_POLES, ELBOWS_DOWN, ELBOWS_BACK, ELBOWS_OUT,
+  ELBOWS_UP, STAND, HIGH_PLANK, UPPER, repOf, type Deg3, type ExKey, type Pair, type V3,
+} from './exerciseKit';
+import { MORE_BUILDERS } from './exerciseMore';
+import { FLOOR_BUILDERS } from './exerciseFloor';
+import { ATHLETIC_BUILDERS } from './exerciseAthletic';
+import { BODY_BUILDERS } from './exerciseBody';
+import { PROP_BUILDERS } from './exerciseProps';
+import { VARIANT_BUILDERS } from './exerciseVariants';
+import { DRILL_BUILDERS } from './exerciseDrills';
+import { SIGNATURE_BUILDERS } from './exerciseSignature';
 
-type V3 = [number, number, number];
-interface Pair { Left?: V3; Right?: V3 }
-
-/** The ankle target that lands the hero's ankles at stance height (basketball.ts ANKLE_Y, measured there). */
-const ANKLE = 0.095;
-/** A plank's ankle: on the toes, the heel up — a hair higher than standing. */
-const TOE_ANKLE = 0.11;
-
-/** Both sides from the right side's numbers: the left is the mirror (x negated). */
-const both = (x: number, y: number, z: number): Pair => ({ Left: [-x, y, z], Right: [x, y, z] });
-/** Mirror a right-side pole / rel to the left. */
-const bothDir = (x: number, y: number, z: number): Pair => ({ Left: [-x, y, z], Right: [x, y, z] });
-
-interface ExKey {
-  t: number;
-  bones?: Record<string, Deg3>;
-  /** wrist targets in the FINAL frame (root metres, after hipsY) */
-  hands?: Pair;
-  /** wrists from the posed shoulder (rides the torso) */
-  rel?: Pair;
-  poles?: Pair;
-  /** ankle targets in the FINAL frame */
-  feet?: Pair;
-  kneePoles?: Pair;
-  hipsY?: number;
-  hold?: boolean;
-}
-
-/** An ExKey → the solver's key: hands and feet are solved with the hips at bind and THEN lowered by hipsY, so a final-
- *  frame target is raised by −hipsY here (basketball.ts feetAt is the same move). */
-function k(e: ExKey): PoseKey {
-  const h = e.hipsY ?? 0;
-  const up = (p?: Pair): Pair | undefined => p && {
-    ...(p.Left ? { Left: [p.Left[0], p.Left[1] - h, p.Left[2]] as V3 } : {}),
-    ...(p.Right ? { Right: [p.Right[0], p.Right[1] - h, p.Right[2]] as V3 } : {}),
-  };
-  return {
-    t: e.t, bones: e.bones, hands: up(e.hands), handsRel: e.rel, poles: e.poles, feet: up(e.feet), kneePoles: e.kneePoles,
-    hipsY: e.hipsY, hold: e.hold,
-  };
-}
-
-/** Linear mix of two keys (bones, targets, hipsY) — the in-between keys a rep is solved at, so a planted ankle is exactly
- *  on its target at every quarter of the range instead of drifting between two far-apart solves (measured on the squat:
- *  6 cm into the floor half-way down with only its top and bottom solved). Targets present on one side only are kept. */
-function mix(a: Omit<ExKey, 't'>, b: Omit<ExKey, 't'>, u: number): Omit<ExKey, 't'> {
-  const n = (x: number, y: number) => x + (y - x) * u;
-  const v = (x?: V3, y?: V3): V3 | undefined => (x && y ? [n(x[0], y[0]), n(x[1], y[1]), n(x[2], y[2])] : u < 0.5 ? x : y);
-  const pair = (x?: Pair, y?: Pair): Pair | undefined => {
-    if (!x && !y) return undefined;
-    const L = v(x?.Left, y?.Left), R = v(x?.Right, y?.Right);
-    return { ...(L ? { Left: L } : {}), ...(R ? { Right: R } : {}) };
-  };
-  const bones: Record<string, Deg3> = {};
-  for (const name of new Set([...Object.keys(a.bones ?? {}), ...Object.keys(b.bones ?? {})])) {
-    const x = a.bones?.[name] ?? [0, 0, 0], y = b.bones?.[name] ?? [0, 0, 0];
-    bones[name] = [n(x[0], y[0]), n(x[1], y[1]), n(x[2], y[2])];
-  }
-  return {
-    bones, hands: pair(a.hands, b.hands), rel: pair(a.rel, b.rel), poles: u < 0.5 ? a.poles : b.poles, feet: pair(a.feet, b.feet),
-    kneePoles: u < 0.5 ? a.kneePoles : b.kneePoles, hipsY: n(a.hipsY ?? 0, b.hipsY ?? 0),
-  };
-}
-
-/** A loop: the keys at the given times, the last one a copy of the first at `duration`. A bone keyed on any key is keyed on
- *  every key (0 = its bind rotation where a key leaves it out) — a track keyed on two keys of five holds its value across
- *  the other three, and a foot pointed for the flight stayed pointed on the floor. */
-function loop(scene: Scene, sk: Skeleton, name: string, duration: number, keys: ExKey[]): AnimationGroup | null {
-  const closed = [...keys, { ...keys[0], t: duration }];
-  const names = new Set(closed.flatMap((e) => Object.keys(e.bones ?? {})));
-  const filled = closed.map((e) => ({ ...e, bones: Object.fromEntries([...names].map((b) => [b, e.bones?.[b] ?? [0, 0, 0]])) as Record<string, Deg3> }));
-  return buildPoseClip(scene, sk, name, duration, filled.map(k), { smooth: true, periodic: true });
-}
-
-/** A two-pose rep: A (start) → B (end range) → A, with the given seconds down, held, up and rested. The way down and the
- *  way up are each solved at two in-between keys (mix). */
-function rep(scene: Scene, sk: Skeleton, name: string, a: Omit<ExKey, 't'>, b: Omit<ExKey, 't'>, down = 1.0, hold = 0.3, upSec = 0.9, rest = 0.4): AnimationGroup | null {
-  const t1 = down, t2 = down + hold, t3 = t2 + upSec, D = t3 + rest;
-  const ease = (u: number) => u * u * (3 - 2 * u);   // the in-between keys sit where an eased rep is at that time
-  const keys: ExKey[] = [{ ...a, t: 0, hold: true }];
-  for (const f of [1 / 3, 2 / 3]) keys.push({ ...mix(a, b, ease(f)), t: t1 * f });
-  keys.push({ ...b, t: t1, hold: true });
-  if (hold > 0) keys.push({ ...b, t: t2, hold: true });
-  for (const f of [1 / 3, 2 / 3]) keys.push({ ...mix(b, a, ease(f)), t: t2 + upSec * f });
-  keys.push({ ...a, t: t3, hold: true });
-  return loop(scene, sk, name, D, keys);
-}
-
-// ── shared stances ───────────────────────────────────────────────────────────────────────────────────────────────────
-
-/** Hip-width stance, toes a touch forward of the root (the hips sit back over the heels in a squat or a hinge). */
-const STANCE: Pair = both(0.13, ANKLE, 0.08);
-/** Squat stance: a little wider, knees tracking out over the toes. */
-const SQUAT_FEET: Pair = both(0.19, ANKLE, 0.10);
-const KNEES_OUT: Pair = bothDir(0.35, 0, 1);
-/** Arms hanging at the sides, a soft elbow (locomotion.ts HANG_DEFAULT). */
-const HANG: Pair = both(0.24, 0.84, 0.06);
-const HANG_POLES: Pair = bothDir(0.2, -0.3, -0.9);
-const ELBOWS_DOWN: Pair = bothDir(0.25, -1, -0.1);
-const ELBOWS_BACK: Pair = bothDir(0.15, -0.4, -1);
-const ELBOWS_OUT: Pair = bothDir(1, -0.2, -0.2);
-const ELBOWS_UP: Pair = bothDir(0.6, 0.6, -0.4);
-const STAND: Record<string, Deg3> = { Hips: [0, 0, 0], Spine: [2, 0, 0], Spine1: [0, 0, 0], Neck: [0, 0, 0] };
 
 // ── lower body ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -291,55 +199,21 @@ export function buildExJumpingJack(scene: Scene, sk: Skeleton): AnimationGroup |
 }
 
 // ── upper body, standing ─────────────────────────────────────────────────────────────────────────────────────────────
-
-/** The press's two ends, from the posed shoulder: the hands at the front of the shoulders, and locked out overhead. */
-const RACK: Pair = { Left: [0.0, 0.05, 0.14], Right: [0.0, 0.05, 0.14] };
-const OVERHEAD: Pair = { Left: [0.0, 0.62, -0.02], Right: [0.0, 0.62, -0.02] };
+// The two ends of each lift are data (exerciseKit.ts UPPER): the one-arm, alternating and kneeling versions
+// (exerciseMore.ts) are made from the same two poses, so they are the same lift.
 
 /** ex_press — a standing overhead press: from the front of the shoulders to locked out overhead. */
-export function buildExPress(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const base = { bones: { ...STAND, Spine: [0, 0, 0] as Deg3 }, feet: STANCE };
-  const rack = { ...base, rel: RACK, poles: bothDir(0.4, -1, 0.3), hipsY: 0 };
-  const top = { ...base, bones: { ...base.bones, Neck: [4, 0, 0] as Deg3 }, rel: OVERHEAD, poles: bothDir(1, 0.1, -0.1), hipsY: 0 };
-  return rep(scene, sk, 'ex_press', rack, top, 0.8, 0.25, 1.0, 0.35);
-}
-
+export const buildExPress = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_press', UPPER.press);
 /** ex_curl — a standing curl: elbows still at the sides, the hands come up to the shoulders. */
-export function buildExCurl(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const down = { bones: STAND, feet: STANCE, hands: both(0.22, 0.86, 0.10), poles: ELBOWS_BACK, hipsY: 0 };
-  const up = { bones: STAND, feet: STANCE, hands: both(0.20, 1.34, 0.20), poles: bothDir(0.15, -0.8, -0.6), hipsY: 0 };
-  return rep(scene, sk, 'ex_curl', down, up, 0.8, 0.2, 1.0, 0.3);
-}
-
+export const buildExCurl = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_curl', UPPER.curl);
 /** ex_lateral_raise — the arms rise out to the sides to shoulder height, elbows soft. */
-export function buildExLateralRaise(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const down = { bones: STAND, feet: STANCE, hands: both(0.22, 0.86, 0.12), poles: ELBOWS_OUT, hipsY: 0 };
-  const up = { bones: STAND, feet: STANCE, hands: both(0.74, 1.38, 0.10), poles: bothDir(0.2, 0.6, -0.8), hipsY: 0 };
-  return rep(scene, sk, 'ex_lateral_raise', down, up, 0.8, 0.2, 1.0, 0.3);
-}
-
+export const buildExLateralRaise = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_lateral_raise', UPPER.lateral);
 /** ex_front_raise — the arms rise straight out in front to shoulder height. */
-export function buildExFrontRaise(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const down = { bones: STAND, feet: STANCE, hands: both(0.17, 0.86, 0.16), poles: ELBOWS_OUT, hipsY: 0 };
-  const up = { bones: STAND, feet: STANCE, hands: both(0.18, 1.40, 0.60), poles: ELBOWS_OUT, hipsY: 0 };
-  return rep(scene, sk, 'ex_front_raise', down, up, 0.8, 0.2, 1.0, 0.3);
-}
-
+export const buildExFrontRaise = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_front_raise', UPPER.front);
 /** ex_row — a bent-over row: hinged to about 45°, the hands pull from under the shoulders to the lower ribs. */
-export function buildExRow(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const feet = both(0.14, ANKLE, 0.18);
-  const bones = { Hips: [48, 0, 0] as Deg3, Spine: [4, 0, 0] as Deg3, Neck: [-24, 0, 0] as Deg3, LeftLeg: [18, 0, 0] as Deg3, RightLeg: [18, 0, 0] as Deg3 };
-  const hang = { bones, feet, kneePoles: bothDir(0.1, 0, 1), rel: { Left: [0.04, -0.50, 0.06] as V3, Right: [-0.04, -0.50, 0.06] as V3 }, poles: ELBOWS_OUT, hipsY: -0.08 };
-  const pulled = { bones, feet, kneePoles: bothDir(0.1, 0, 1), rel: { Left: [-0.02, -0.30, -0.22] as V3, Right: [0.02, -0.30, -0.22] as V3 }, poles: bothDir(0.4, 0.5, -0.8), hipsY: -0.08 };
-  return rep(scene, sk, 'ex_row', hang, pulled, 0.7, 0.3, 0.9, 0.3);
-}
-
+export const buildExRow = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_row', UPPER.row);
 /** ex_upright_row — the hands travel up the front of the body to the collarbones, elbows leading high. */
-export function buildExUprightRow(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const down = { bones: STAND, feet: STANCE, hands: both(0.10, 0.84, 0.14), poles: ELBOWS_OUT, hipsY: 0 };
-  const up = { bones: STAND, feet: STANCE, hands: both(0.10, 1.36, 0.16), poles: bothDir(1, 0.5, 0), hipsY: 0 };
-  return rep(scene, sk, 'ex_upright_row', down, up, 0.8, 0.2, 0.9, 0.3);
-}
+export const buildExUprightRow = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_upright_row', UPPER.upright);
 
 /** ex_shrug — the shoulders lift toward the ears and lower, arms long. */
 export function buildExShrug(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -349,19 +223,9 @@ export function buildExShrug(scene: Scene, sk: Skeleton): AnimationGroup | null 
 }
 
 /** ex_triceps_overhead — hands behind the head, elbows pointed up; the forearms extend to straight overhead. */
-export function buildExTricepsOverhead(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const bent = { bones: STAND, feet: STANCE, rel: { Left: [0.14, 0.22, -0.14] as V3, Right: [-0.14, 0.22, -0.14] as V3 }, poles: bothDir(0.2, 1, 0.3), hipsY: 0 };
-  const straight = { bones: STAND, feet: STANCE, rel: { Left: [0.12, 0.52, 0.02] as V3, Right: [-0.12, 0.52, 0.02] as V3 }, poles: bothDir(0.2, 1, 0.3), hipsY: 0 };
-  return rep(scene, sk, 'ex_triceps_overhead', bent, straight, 0.8, 0.2, 1.0, 0.3);
-}
-
+export const buildExTricepsOverhead = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_triceps_overhead', UPPER.tricepsOverhead);
 /** ex_pushdown — elbows pinned at the sides, the hands press down from the chest to the thighs (cable pushdown). */
-export function buildExPushdown(scene: Scene, sk: Skeleton): AnimationGroup | null {
-  const bones = { ...STAND, Spine: [8, 0, 0] as Deg3 };
-  const up = { bones, feet: STANCE, hands: both(0.15, 1.12, 0.30), poles: ELBOWS_BACK, hipsY: 0 };
-  const down = { bones, feet: STANCE, hands: both(0.16, 0.86, 0.18), poles: ELBOWS_BACK, hipsY: 0 };
-  return rep(scene, sk, 'ex_pushdown', up, down, 0.7, 0.2, 0.9, 0.3);
-}
+export const buildExPushdown = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_pushdown', UPPER.pushdown);
 
 // ── on the floor ─────────────────────────────────────────────────────────────────────────────────────────────────────
 // A face-down body is the Hips pitched forward (+x) with the hipsY that puts the wrists and toes on the floor; the
@@ -377,7 +241,6 @@ export function buildExPushup(scene: Scene, sk: Skeleton): AnimationGroup | null
 }
 
 /** The top of a push-up (hands under the shoulders, arms long, one line from heels to head). */
-const HIGH_PLANK: Omit<ExKey, 't'> = { bones: { Hips: [70, 0, 0], Spine: [0, 0, 0], Neck: [-30, 0, 0], LeftFoot: [8, 0, 0], RightFoot: [8, 0, 0] }, feet: both(0.11, TOE_ANKLE, -0.90), kneePoles: bothDir(0, -1, 0.1), hands: both(0.24, 0.05, 0.44), poles: bothDir(0.6, 0.2, -0.7), hipsY: -0.58 };
 
 /** ex_plank_high — the push-up's top, held, breathing (high plank, push-up hold at the top). */
 export function buildExPlankHigh(scene: Scene, sk: Skeleton): AnimationGroup | null {
@@ -466,58 +329,31 @@ export function buildExCrunch(scene: Scene, sk: Skeleton): AnimationGroup | null
 // Seated: the hip joints a hand above the seat top (0.44 m), thighs level, feet flat. Lying: the back on the bench top, the
 // feet on the floor either side of it, knees up. Incline: the seat, and the back pad at 45°.
 
-const SEAT_Y = -0.37;   // hipsY that sits the pelvis on a 0.44 m bench
-const SEATED: Omit<ExKey, 't' | 'hands' | 'rel' | 'poles'> = {
-  bones: { Hips: [0, 0, 0], Spine: [0, 0, 0], Neck: [0, 0, 0], LeftUpLeg: [-86, 0, 8], RightUpLeg: [-86, 0, -8] },
-  feet: both(0.19, ANKLE, 0.48), kneePoles: bothDir(0.1, 0.3, 1), hipsY: SEAT_Y,
-};
-const seat = (e: Omit<ExKey, 't'>): Omit<ExKey, 't'> => ({ ...SEATED, ...e, bones: { ...SEATED.bones, ...(e.bones ?? {}) }, hipsY: SEAT_Y });
-const LIE_Y = -0.42;    // hipsY that lays the back on a 0.44 m bench
-const LYING: Omit<ExKey, 't' | 'hands' | 'rel' | 'poles'> = {
-  bones: { Hips: [-90, 0, 0], Spine: [0, 0, 0], Neck: [8, 0, 0] },
-  feet: both(0.26, ANKLE, 0.40), kneePoles: bothDir(0.3, 1, 0.2), hipsY: LIE_Y,
-};
-const lie = (e: Omit<ExKey, 't'>): Omit<ExKey, 't'> => ({ ...LYING, ...e, bones: { ...LYING.bones, ...(e.bones ?? {}) }, hipsY: LIE_Y });
-const INCLINE_Y = -0.38;
-const INCLINED: Omit<ExKey, 't' | 'hands' | 'rel' | 'poles'> = {
-  bones: { Hips: [-45, 0, 0], Spine: [0, 0, 0], Neck: [10, 0, 0] },
-  feet: both(0.22, ANKLE, 0.46), kneePoles: bothDir(0.2, 0.6, 1), hipsY: INCLINE_Y,
-};
-const incline = (e: Omit<ExKey, 't'>): Omit<ExKey, 't'> => ({ ...INCLINED, ...e, bones: { ...INCLINED.bones, ...(e.bones ?? {}) }, hipsY: INCLINE_Y });
 
 /** ex_seated_press — the overhead press, seated on a bench. */
-export const buildExSeatedPress = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_seated_press',
-  seat({ rel: RACK, poles: bothDir(0.4, -1, 0.3) }), seat({ rel: OVERHEAD, poles: bothDir(1, 0.1, -0.1) }), 0.8, 0.25, 1.0, 0.35);
+export const buildExSeatedPress = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_seated_press', UPPER.seatedPress);
 /** ex_seated_curl — the curl, seated on the end of a bench, arms hanging beside it. */
-export const buildExSeatedCurl = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_seated_curl',
-  seat({ hands: both(0.25, 0.86 + SEAT_Y, 0.08), poles: ELBOWS_BACK }), seat({ hands: both(0.21, 1.34 + SEAT_Y, 0.20), poles: bothDir(0.15, -0.8, -0.6) }), 0.8, 0.2, 1.0, 0.3);
+export const buildExSeatedCurl = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_seated_curl', UPPER.seatedCurl);
 /** ex_seated_lateral_raise — the lateral raise, seated. */
-export const buildExSeatedLateralRaise = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_seated_lateral_raise',
-  seat({ hands: both(0.25, 0.86 + SEAT_Y, 0.10), poles: ELBOWS_OUT }), seat({ hands: both(0.74, 1.38 + SEAT_Y, 0.10), poles: bothDir(0.2, 0.6, -0.8) }), 0.8, 0.2, 1.0, 0.3);
+export const buildExSeatedLateralRaise = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_seated_lateral_raise', UPPER.seatedLateral);
 /** ex_seated_triceps — the overhead triceps extension, seated. */
-export const buildExSeatedTriceps = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_seated_triceps',
-  seat({ rel: { Left: [0.14, 0.22, -0.14], Right: [-0.14, 0.22, -0.14] }, poles: bothDir(0.2, 1, 0.3) }), seat({ rel: { Left: [0.12, 0.52, 0.02], Right: [-0.12, 0.52, 0.02] }, poles: bothDir(0.2, 1, 0.3) }), 0.8, 0.2, 1.0, 0.3);
+export const buildExSeatedTriceps = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_seated_triceps', UPPER.seatedTriceps);
 
 /** ex_bench_press — on the back on a flat bench: the hands lower to the chest and press to straight arms over the shoulders. */
-export const buildExBenchPress = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_bench_press',
-  lie({ hands: both(0.24, 1.10, -0.44), poles: bothDir(0.7, -0.5, 0) }), lie({ hands: both(0.27, 0.70, -0.34), poles: bothDir(0.7, -0.7, 0.1) }), 1.0, 0.2, 0.9, 0.35);
+export const buildExBenchPress = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_bench_press', UPPER.bench);
 /** ex_floor_press — the press lying on the floor, knees up: the upper arms stop on the floor. */
 export function buildExFloorPress(scene: Scene, sk: Skeleton): AnimationGroup | null {
   const base = { bones: { Hips: [-88, 0, 0] as Deg3, Spine: [0, 0, 0] as Deg3, Neck: [10, 0, 0] as Deg3 }, feet: both(0.20, ANKLE, 0.46), kneePoles: bothDir(0.1, 1, 0.3), hipsY: -0.84 };
   return rep(scene, sk, 'ex_floor_press', { ...base, hands: both(0.22, 0.70, -0.44), poles: bothDir(0.7, -0.5, 0) }, { ...base, hands: both(0.27, 0.30, -0.34), poles: bothDir(0.8, -0.6, 0) }, 0.9, 0.25, 0.8, 0.35);
 }
 /** ex_fly — on a flat bench: the arms open wide, elbows soft, and close back over the chest. */
-export const buildExFly = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_fly',
-  lie({ hands: both(0.12, 1.08, -0.42), poles: bothDir(0.6, -0.3, 0.2) }), lie({ hands: both(0.70, 0.66, -0.40), poles: bothDir(0.2, -1, 0.1) }), 1.1, 0.2, 1.0, 0.35);
+export const buildExFly = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_fly', UPPER.fly);
 /** ex_skull_crusher — on a flat bench, upper arms still and pointing up: the hands lower toward the forehead and press back. */
-export const buildExSkullCrusher = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_skull_crusher',
-  lie({ hands: both(0.12, 1.10, -0.46), poles: bothDir(0.2, 0.6, 0.6) }), lie({ hands: both(0.11, 0.78, -0.70), poles: bothDir(0.15, 1, 0.3) }), 0.9, 0.2, 0.9, 0.35);
+export const buildExSkullCrusher = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_skull_crusher', UPPER.skull);
 /** ex_incline_press — on a bench inclined to 45°: from the top of the chest to straight arms over the shoulders. */
-export const buildExInclinePress = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_incline_press',
-  incline({ hands: both(0.22, 1.42, -0.26), poles: bothDir(0.7, -0.3, 0.1) }), incline({ hands: both(0.28, 1.04, -0.14), poles: bothDir(0.7, -0.7, 0.2) }), 1.0, 0.2, 0.9, 0.35);
+export const buildExInclinePress = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_incline_press', UPPER.inclinePress);
 /** ex_incline_fly — the fly on a 45° bench. */
-export const buildExInclineFly = (scene: Scene, sk: Skeleton) => rep(scene, sk, 'ex_incline_fly',
-  incline({ hands: both(0.12, 1.42, -0.26), poles: bothDir(0.6, -0.3, 0.2) }), incline({ hands: both(0.68, 1.00, -0.22), poles: bothDir(0.2, -1, 0.1) }), 1.1, 0.2, 1.0, 0.35);
+export const buildExInclineFly = (scene: Scene, sk: Skeleton) => repOf(scene, sk, 'ex_incline_fly', UPPER.inclineFly);
 
 // ── mobility ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -574,5 +410,24 @@ export const EXERCISE_BUILDERS: readonly [string, (scene: Scene, sk: Skeleton) =
   ['ex_seated_triceps', buildExSeatedTriceps], ['ex_bench_press', buildExBenchPress], ['ex_floor_press', buildExFloorPress], ['ex_fly', buildExFly],
   ['ex_skull_crusher', buildExSkullCrusher], ['ex_incline_press', buildExInclinePress], ['ex_incline_fly', buildExInclineFly],
   ['ex_arm_circles', buildExArmCircles], ['ex_quad_stretch', buildExQuadStretch], ['ex_breathe', buildExBreathe],
+  // LIBRARY-ANATOMY-2: the one-arm, alternating and kneeling lifts (exerciseMore.ts)
+  ...MORE_BUILDERS,
+  // LIBRARY-ANATOMY-2: the mobility positions and the flows made of them (exerciseFloor.ts)
+  ...FLOOR_BUILDERS,
+  // LIBRARY-ANATOMY-2: anti-rotation, throws, chops, carries, swings, rotator cuff (exerciseAthletic.ts)
+  ...ATHLETIC_BUILDERS,
+  // LIBRARY-ANATOMY-2: lunges sideways, single-leg hinges, trunk, planks, conditioning, drills, jumps, rope, crawls (exerciseBody.ts)
+  ...BODY_BUILDERS,
+  // LIBRARY-ANATOMY-2: on a box, a bench, a bar, a pad (exerciseProps.ts; the stage draws the prop)
+  ...PROP_BUILDERS,
+  ...VARIANT_BUILDERS,
+  // DEMO-LOOPS (2026-10-27): the Quick Screen's checks and the daily drills (exerciseDrills.ts)
+  ...DRILL_BUILDERS,
+  // DEMO-LOOPS: the signature programs' exercises (exerciseSignature.ts)
+  ...SIGNATURE_BUILDERS,
 ];
+/** Build one exercise loop by name (authored/index.ts registers each name through this). */
+export function buildExerciseClip(name: string, scene: Scene, sk: Skeleton): AnimationGroup | null {
+  return EXERCISE_BUILDERS.find(([n]) => n === name)?.[1](scene, sk) ?? null;
+}
 export const EXERCISE_CLIPS: readonly string[] = EXERCISE_BUILDERS.map(([n]) => n);

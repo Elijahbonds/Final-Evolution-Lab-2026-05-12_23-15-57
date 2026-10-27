@@ -16,7 +16,7 @@ export default async function SignatureReviewPage() {
   if (!(await requireAdmin())) notFound();
   const initial = await reviewOverview(defaultDeps()).catch(() => null);
   return (
-    <div className="min-h-screen bg-[#050505] pb-20">
+    <div className="min-h-screen bg-fel-bg pb-20">
       <ProgramReview initial={initial} />
     </div>
   );
