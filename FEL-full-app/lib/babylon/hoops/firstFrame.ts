@@ -13,18 +13,42 @@
 // mesh prepares its effect per sub-mesh and per shadow generator exactly as the render would (the same instancing flags), and any
 // shader it starts compiles during READY. Nothing is drawn, nothing moves, no number in the game changes. The streamed load (the
 // court and you first, the rest after: PRF-04) is the perf-load lane's ModeHarness work; hoops adopts it when that lands.
-import type { AbstractMesh, Scene } from '@babylonjs/core';
+import type { AbstractMesh, Material, Mesh, Scene } from '@babylonjs/core';
 
 export interface WarmReport { meshes: number; ready: number; ms: number }
 
-/** Prepare every enabled mesh's material and shadow effects now (end of load), not on the first playing frame. */
+/** Prepare every enabled mesh's material and shadow effects now (end of load), not on the first playing frame. Every sub-mesh is
+ *  asked (Mesh.isReady stops at the first one still compiling, which left the rest for the first frame: measured, the frame still
+ *  ran isReadyForSubMesh / _prepareEffect for ~80 ms throttled). */
 export function warmFirstFrame(scene: Scene, tag = 'HOOPS'): WarmReport {
   const t0 = typeof performance !== 'undefined' ? performance.now() : 0;
+  const engine = scene.getEngine();
+  const instancedCaps = !!engine.getCaps().instancedArrays;
   let meshes = 0, ready = 0;
-  for (const m of scene.meshes as AbstractMesh[]) {
-    if (!m.isEnabled() || !m.isVisible || !m.subMeshes?.length) continue;
+  for (const am of scene.meshes as AbstractMesh[]) {
+    if (!am.isEnabled() || !am.isVisible || !am.subMeshes?.length) continue;
     meshes++;
-    try { if (m.isReady(true)) ready++; } catch { /* a mesh that cannot answer yet is checked by its first render, as before */ }
+    const m = am as Mesh;
+    try {
+      const inst = instancedCaps && ((m.instances?.length ?? 0) > 0 || !!m.hasThinInstances);
+      am.computeWorldMatrix();
+      let ok = true;
+      for (const sm of am.subMeshes) {
+        const mat = sm.getMaterial() ?? scene.defaultMaterial;
+        if (!mat) continue;
+        const r = (mat as Material & { _storeEffectOnSubMeshes?: boolean })._storeEffectOnSubMeshes ? mat.isReadyForSubMesh(am, sm, inst) : mat.isReady(am, inst);
+        ok = ok && r;
+        for (const light of am.lightSources) {
+          const gens = light.getShadowGenerators?.(); if (!gens) continue;
+          for (const g of gens.values()) {
+            const list = g.getShadowMap()?.renderList;
+            if (list && list.indexOf(am) < 0) continue;
+            ok = g.isReady(sm, inst, mat.needAlphaBlendingForMesh(am)) && ok;
+          }
+        }
+      }
+      if (ok) ready++;
+    } catch { /* a mesh that cannot answer yet is checked by its first render, as before */ }
   }
   const ms = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
   console.info(`[${tag}-LOAD] first-frame warm: ${ready}/${meshes} meshes ready in ${ms.toFixed(0)} ms`);
