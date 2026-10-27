@@ -13,7 +13,7 @@
 //
 // The rules are pure and tested (lib/a11y/wcag.ts). Severity: critical / serious / moderate, defined there.
 //
-//   npx tsx scripts/a11y/audit.mts <outDir> [label] [--pages=play,train] [--gate=play,train,...]
+//   npx tsx scripts/a11y/audit.mts <outDir> [label] [--pages=play,train] [--gate=play,train,...] [--build-only | --prebuilt=<dir>]
 //
 // Writes <outDir>/<label>/audit.json and a full-page shot per page and width. Prints one line per page.
 // --gate: exit 1 when any listed page has a critical (the pages this lane owns). Without it the audit only reports.
@@ -46,7 +46,11 @@ const gate = flag('gate')?.split(',').filter(Boolean) ?? [];
 const WIDTHS = [{ w: 390, h: 844, name: 'phone' }, { w: 1280, h: 800, name: 'desktop' }];
 const TAB_MAX = 90;
 
-const { html } = await buildRig(BUILD);
+// --prebuilt=<dir> (premium-ui, 2026-10-27): audit a bundle frozen earlier (`--build-only` writes one), so a baseline is
+// the tree it was built from even when the gate queue runs it an hour later.
+const PREBUILT = flag('prebuilt');
+if (args.includes('--build-only')) { await buildRig(BUILD); console.log(`built → ${BUILD}`); process.exit(0); }
+const { html } = PREBUILT ? { html: join(resolve(PREBUILT), 'index.html') } : await buildRig(BUILD);
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true });
 

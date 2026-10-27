@@ -74,7 +74,8 @@ body {
 }
 
 .fel-heading {
-  font-family: var(--font-display), sans-serif;
+  /* the fallback inside var(): a missing variable gives the system sans, never the browser's serif (P2 fonts fix) */
+  font-family: var(--font-display, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }

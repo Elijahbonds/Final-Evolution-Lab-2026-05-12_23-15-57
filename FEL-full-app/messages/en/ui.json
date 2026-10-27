@@ -1,0 +1,10 @@
+{
+  "loading": "Loading",
+  "delta": {
+    "up": "Up {value}",
+    "down": "Down {value}",
+    "flat": "No change"
+  },
+  "ring": "{label}: {value} of {max}",
+  "ringEmpty": "{label}: not measured yet"
+}

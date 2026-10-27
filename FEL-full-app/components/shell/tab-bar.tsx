@@ -114,7 +114,7 @@ export function TabBar({ variant = 'bar' }: { variant?: 'bar' | 'inline' } = {})
             />
           )}
           <Icon className="relative h-[18px] w-[18px]" strokeWidth={on ? 2.4 : 2} />
-          <span className="relative font-mono text-[10px] font-bold uppercase tracking-[0.14em] md:text-[11px]">
+          <span className="relative font-sans text-[12px] font-semibold uppercase tracking-[0.14em]">
             {t.label}
           </span>
         </Link>
