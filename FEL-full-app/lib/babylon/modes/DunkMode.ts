@@ -2089,7 +2089,9 @@ export const DunkMode: ModeDefinition = (() => {
         // …and on that first frame the plant makes up the rest of the frame's step at its own speed (the run's last frame only covered
         // what was left to the line: measured 2.35 → 1.13 → 2.24 m/s with the drift simply delayed)
         if (plantClip0 < 0) { plantClip0 = clipTime; plantLead = Math.max(0, (PLANT_DRIFT_M * launchCarry / PLANT_SEC) * dt - Math.abs(frameStartZ - launchZ)); }
-        const plantFrom = launchZ + carryDir * (plantLead + PLANT_DRIFT_M * launchCarry * Math.min(1, Math.max(0, clipTime - plantClip0) / PLANT_SEC));
+        // (the drift stops exactly where the carry starts, PLANT_SEC on the flight clock — run one frame past it, both moved the body
+        // on that frame: measured 2.24 → 3.9 → 1.7 m/s at +0.1 s)
+        const plantFrom = launchZ + carryDir * (plantLead + PLANT_DRIFT_M * launchCarry * Math.max(0, Math.min(clipTime, PLANT_SEC) - plantClip0) / PLANT_SEC);
         player.root.position.z = plantFrom + (rim.z + FLUSH_Z_AHEAD - plantFrom) * u;
         // DUNK MOTION phase 7: a STRAIGHT line from the plant to the rim (a jump cannot curve — the old pull toward rim.x bent the
         // flight's ground path); the stick's drift rides on top and fades by the flush, so the contact math is untouched
