@@ -91,6 +91,18 @@ describe('the route imports nothing from Babylon', () => {
     expect(bad).toEqual([]);
   });
 
+  // T-POSE FIX (2026-10-27, owner playtest: the drill avatar T-posed). The Quick Screen's drill demo now plays the real
+  // authored loop on the library stage (Babylon) instead of the old one-clip three.js canvas. Same contract as before:
+  // TAP TO OPEN — nothing 3D loads until the person taps "watch" (components/library/avatar-demo.tsx mounts the stage
+  // through next/dynamic, ssr:false, only after the tap). That ONE lazy import is excused BY NAME; the test below proves
+  // it stays lazy, and every other path from the route must still never reach @babylonjs/*.
+  const ON_TAP_ONLY = new Map([['components/library/avatar-demo.tsx', './exercise-stage']]);
+  it('the stage is reached only through the on-tap dynamic import (ssr:false), never a static import', () => {
+    const src = readFileSync('components/library/avatar-demo.tsx', 'utf8');
+    expect(src).toMatch(/dynamic\(\s*\(\)\s*=>\s*import\('\.\/exercise-stage'\),\s*\{\s*ssr:\s*false/);
+    expect(src).not.toMatch(/import\s+[^'"]*from\s*['"]\.\/exercise-stage['"]/);
+  });
+
   it('nothing the route imports, followed through every local module, reaches @babylonjs/*', () => {
     const resolve = (from: string, spec: string): string | null => {
       const base = spec.startsWith('@/') ? spec.slice(2) : spec.startsWith('.') ? join(dirname(from), spec) : null;
@@ -105,6 +117,7 @@ describe('the route imports nothing from Babylon', () => {
       if (seen.has(f)) return;
       seen.add(f);
       for (const m of valueImports(readFileSync(f, 'utf8'))) {
+        if (ON_TAP_ONLY.get(f) === m) continue;   // the one on-tap 3D load, excused by name (below)
         if (m.startsWith('@babylonjs/')) bad.push(`${f} → ${m}`);
         const next = resolve(f, m);
         if (next) walk(next);
