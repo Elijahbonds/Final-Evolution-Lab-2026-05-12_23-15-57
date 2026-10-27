@@ -860,6 +860,10 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_arm_swing', () => buildExerciseClip('ex_arm_swing', scene, skeleton)],
     ['ex_prone_t', () => buildExerciseClip('ex_prone_t', scene, skeleton)],
     ['ex_incline_scap_push_up', () => buildExerciseClip('ex_incline_scap_push_up', scene, skeleton)],
+    ['ex_approach_jump_one_step', () => buildExerciseClip('ex_approach_jump_one_step', scene, skeleton)],
+    ['ex_approach_jump_two_step', () => buildExerciseClip('ex_approach_jump_two_step', scene, skeleton)],
+    ['ex_approach_jump_three_step', () => buildExerciseClip('ex_approach_jump_three_step', scene, skeleton)],
+    ['ex_approach_jump_one_foot', () => buildExerciseClip('ex_approach_jump_one_foot', scene, skeleton)],
   ];
 }
 

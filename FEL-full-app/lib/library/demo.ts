@@ -416,6 +416,8 @@ export const DEMO_RULES: readonly DemoRule[] = [
   // the bridge held at its top: the heels on the bench, and the heels far out on the floor (the slider curl's long position)
   { clip: 'ex_bridge_feetup', families: ['hamstring-iso'], bases: /^bench-hold$/, hold: 1.0 },
   { clip: 'ex_slider_curl', families: ['hamstring-iso'], bases: /^long-lever$/, hold: 1.2 },
+  { clip: (b) => ({ 'one-step': 'ex_approach_jump_one_step', 'two-step': 'ex_approach_jump_two_step', 'three-step': 'ex_approach_jump_three_step', 'one-foot': 'ex_approach_jump_one_foot' } as Record<string, string>)[b] ?? null,
+    families: ['approach-jump'], bases: /^(one-step|two-step|three-step|one-foot)$/, emits: ['ex_approach_jump_one_step', 'ex_approach_jump_two_step', 'ex_approach_jump_three_step', 'ex_approach_jump_one_foot'] },
   // assumption: recover and contest is the closeout the court plays (sprint, chop the feet, the hand up)
   { clip: 'bball_closeout', families: ['court-movement'], bases: /^recover-contest$/ },
   // ── trunk ──

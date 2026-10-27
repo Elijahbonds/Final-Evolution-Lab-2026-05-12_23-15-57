@@ -154,10 +154,16 @@ function tDrill(scene: Scene, sk: Skeleton): AnimationGroup | null {
  *  foot), a quick plant, and up — off the left foot with the right knee driving (one), or both feet closing under a
  *  deeper gather and off two (two); the arms swing back on the penultimate and drive up; land soft on two feet, and
  *  walk back to the start. */
-function approach(scene: Scene, sk: Skeleton, name: string, two: boolean): AnimationGroup | null {
+function approach(scene: Scene, sk: Skeleton, name: string, two: boolean, o: { runIn?: boolean; extra?: number; oz?: number } = { runIn: true }): AnimationGroup | null {
+  const extra = o.extra ?? 0, oz = o.oz ?? 0;
+  const Z = (p: Pose): Pose => {
+    const f = (v?: V3): V3 | undefined => (v ? [v[0], v[1], v[2] + oz] : undefined);
+    const pair = (q?: Pair): Pair | undefined => (q ? { ...(q.Left ? { Left: f(q.Left) } : {}), ...(q.Right ? { Right: f(q.Right) } : {}) } : undefined);
+    return { ...p, feet: pair(p.feet), hands: pair(p.hands), hipsZ: (p.hipsZ ?? 0) + oz };
+  };
   const runIn = (s: Side, t: number): ExKey => at(stride(s, { [`${s}UpLeg`]: [-56, 0, 0], [`${s}Leg`]: [80, 0, 0], [`${s}Foot`]: [10, 0, 0] }, 0.03), t);
   const armsBack: Pair = both(0.24, 0.66, -0.34), armsUp: Pair = both(0.22, 2.10, 0.30);
-  const pen: Pose = { bones: { Hips: [18, 0, 0], Spine: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [20, 0, 0], RightFoot: [-16, 0, 0] }, feet: { Left: [-0.12, ANKLE + 0.04, 0.02], Right: [0.12, ANKLE, 0.72] }, kneePoles: bothDir(0.1, 0, 1), hands: armsBack, poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.26, hipsZ: 0.36 };
+  const pen: Pose = { bones: { Hips: [18, 0, 0], Spine: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [30, 0, 0], RightFoot: [-16, 0, 0] }, feet: { Left: [-0.12, ANKLE + 0.11, 0.02], Right: [0.12, ANKLE, 0.72] }, kneePoles: bothDir(0.1, 0, 1), hands: armsBack, poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.26, hipsZ: 0.36 };
   const plant: Pose = two
     ? { bones: { Hips: [26, 0, 0], Spine: [10, 0, 0], Neck: [-12, 0, 0], LeftFoot: [-20, 0, 0], RightFoot: [-20, 0, 0] }, feet: { Left: [-0.13, ANKLE, 0.86], Right: [0.13, ANKLE, 0.80] }, kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.62, 0.40), poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.32, hipsZ: 0.78 }
     : { bones: { Hips: [16, 0, 0], Spine: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [-14, 0, 0], RightFoot: [10, 0, 0] }, feet: { Left: [-0.11, ANKLE, 0.98], Right: [0.12, ANKLE + 0.06, 0.70] }, kneePoles: bothDir(0.1, 0, 1), hands: both(0.26, 0.70, 0.62), poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.18, hipsZ: 0.86 };
@@ -166,13 +172,51 @@ function approach(scene: Scene, sk: Skeleton, name: string, two: boolean): Anima
     ? { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [-6, 0, 4], RightUpLeg: [-6, 0, -4], LeftLeg: [8, 0, 0], RightLeg: [8, 0, 0], LeftFoot: [34, 0, 0], RightFoot: [34, 0, 0] }, hands: armsUp, poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.24, hipsZ: z0 + 0.06 }
     : { bones: { Hips: [-2, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [4, 0, 4], LeftLeg: [10, 0, 0], LeftFoot: [36, 0, 0], RightUpLeg: [-84, 0, -4], RightLeg: [90, 0, 0], RightFoot: [10, 0, 0] }, hands: armsUp, poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.26, hipsZ: z0 + 0.04 };
   const land: Pose = { bones: { Hips: [22, 0, 0], Spine: [10, 0, 0], Neck: [-10, 0, 0], LeftFoot: [-16, 0, 0], RightFoot: [-16, 0, 0] }, feet: both(0.13, ANKLE, z0 + 0.12), kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.80, z0 + 0.42), poles: HANG_POLES, hipsY: -0.24, hipsZ: z0 + 0.06 };
-  const stand = (z: number, lz = z, rz = z): Pose => ({ bones: { ...STAND }, feet: { Left: [-0.12, ANKLE, lz], Right: [0.12, ANKLE, rz] }, kneePoles: bothDir(0.1, 0, 1), hands: HANG, poles: HANG_POLES, hipsY: 0, hipsZ: z - 0.06 });
+  const stand = (z: number, lz = z, rz = z): Pose => ({ bones: { ...STAND }, feet: { Left: [-0.12, ANKLE, lz], Right: [0.12, ANKLE, rz] }, kneePoles: bothDir(0.1, 0, 1), hands: { Left: [-0.24, 0.84, z + 0.06], Right: [0.24, 0.84, z + 0.06] }, poles: HANG_POLES, hipsY: 0, hipsZ: z - 0.06 });
+  // the approach's own steps before the penultimate (a walk-in: the right, then the left landing where the penultimate starts)
+  const z1 = 0.02 - extra * 0.45;
+  const lead: ExKey[] = [];
+  let t = 0;
+  if (o.runIn) { lead.push(runIn('Left', 0), runIn('Right', 0.3), runIn('Left', 0.6), runIn('Right', 0.9)); t = 1.35; }
+  else {
+    lead.push(at(Z(stand(z1)), 0, true)); t = 0.5;
+    const feet = { Left: z1, Right: z1 };
+    for (let k = 0; k < extra; k++) {
+      const s: Side = (extra - k) % 2 === 0 ? 'Right' : 'Left';
+      const from = feet[s]; feet[s] = z1 + (k + 1) * 0.45 + (s === 'Right' ? 0.25 : 0);
+      const mid = (feet.Left + feet.Right) / 2;
+      // the rear foot rolls onto its ball as the body passes over the front one
+      const rear: Side = feet.Left < feet.Right ? 'Left' : 'Right';
+      const w = stand(mid, feet.Left, feet.Right);
+      const rf = w.feet![rear]!;
+      lead.push(at(Z({ ...w, feet: { ...w.feet, [rear]: [rf[0], ANKLE + 0.06, rf[2]] }, bones: { ...STAND, Hips: [10, 0, 0], Spine: [4, 0, 0], [`${rear}Foot`]: [20, 0, 0] } }), t));
+      t += 0.32;
+      void from;
+    }
+    t += 0.15;
+    // the lean into the penultimate: the left heel already peeling up as the hips go forward over it
+    const w = stand(0.02);
+    lead.push(at(Z({ ...w, feet: { Left: [-0.12, ANKLE + 0.06, 0.02], Right: [0.12, ANKLE, feet.Right] }, bones: { ...STAND, Hips: [12, 0, 0], Spine: [4, 0, 0], LeftFoot: [18, 0, 0] }, hipsZ: 0.10 }), t - 0.2));
+  }
   const zb = z0 + 0.12;
-  return run(scene, sk, name, 6.4, [
-    runIn('Left', 0), runIn('Right', 0.3), runIn('Left', 0.6), runIn('Right', 0.9),
-    at(pen, 1.35, true), at(plant, 1.62), at(air, 1.92), at(land, 2.3, true), at(land, 2.6, true),
-    at(stand(zb), 3.1, true), at(stand(zb * 0.66, zb * 0.66, zb), 3.7), at(stand(zb * 0.66), 4.1), at(stand(zb * 0.33, zb * 0.33, zb * 0.66), 4.6), at(stand(zb * 0.33), 5.0), at(stand(0, 0, zb * 0.33), 5.5), at(stand(0), 5.9, true),
-  ]);
+  // the touchdown: the balls of the feet meet the floor, the legs long, just before the landing sinks (a waypoint: without
+  // it the hips' spline overshot the landing and the toes went through the floor)
+  const touchdown: Pose = { bones: { Hips: [6, 0, 0], Spine: [2, 0, 0], LeftFoot: [14, 0, 0], RightFoot: [14, 0, 0] }, feet: both(0.13, ANKLE + 0.05, z0 + 0.12), kneePoles: bothDir(0.15, 0, 1), hands: both(0.24, 1.30, z0 + 0.36), poles: bothDir(0.6, -0.2, -0.5), hipsY: -0.02, hipsZ: z0 + 0.10 };
+  // the push: the take-off feet still down on their balls as the legs drive long, the arms swinging up (the last contact)
+  const push: Pose = two
+    ? { bones: { Hips: [8, 0, 0], Spine: [2, 0, 0], LeftFoot: [14, 0, 0], RightFoot: [14, 0, 0] }, feet: { Left: [-0.13, ANKLE + 0.06, 0.86], Right: [0.13, ANKLE + 0.06, 0.80] }, kneePoles: bothDir(0.15, 0, 1), hands: both(0.24, 1.40, 0.90), poles: bothDir(0.6, -0.2, -0.5), hipsY: 0.0, hipsZ: 0.84 }
+    : { bones: { Hips: [6, 0, 0], Spine: [0, 0, 0], LeftFoot: [16, 0, 0], RightUpLeg: [-60, 0, -4], RightLeg: [80, 0, 0], RightFoot: [10, 0, 0] }, feet: { Left: [-0.11, ANKLE + 0.06, 0.98] }, kneePoles: { Left: [-0.1, 0, 1] }, hands: both(0.24, 1.40, 1.04), poles: bothDir(0.6, -0.2, -0.5), hipsY: 0.02, hipsZ: 0.96 };
+  const keys: ExKey[] = [...lead, at(Z(pen), t, true), at(Z(plant), t + 0.27), at(Z(push), t + 0.42), at(Z(air), t + 0.6), at(Z(touchdown), t + 0.8), at(Z(land), t + 0.98, true), at(Z(land), t + 1.25, true), at(Z(stand(zb)), t + 1.75, true)];
+  // walk back to the start
+  const home = o.runIn ? 0 : z1;
+  const n = Math.max(1, Math.ceil((zb - home) / 0.4));
+  let tt = t + 1.75;
+  for (let i = 1; i <= n; i++) {
+    const zf = zb - ((zb - home) * i) / n, zp = zb - ((zb - home) * (i - 1)) / n;
+    keys.push(at(Z(stand(zf, zf, zp)), tt + 0.5), at(Z(stand(zf)), tt + 0.9, i === n));
+    tt += 0.9;
+  }
+  return run(scene, sk, name, tt + 0.4, keys);
 }
 
 /** ex_wake_up — the Pre-Game Wake-Up's phases in order, one beat each: tall, hands on the lower ribs, a slow breath (the
@@ -205,4 +249,9 @@ export const DRILL_BUILDERS: [string, Builder][] = [
   ['ex_cmj_dip', cmjDip], ['ex_wall_drive', (scene, sk) => wallDrive(scene, sk, 'ex_wall_drive', false)], ['ex_wall_march', (scene, sk) => wallDrive(scene, sk, 'ex_wall_march', true)],
   ['ex_decel_three', decelThree], ['ex_t_drill', tDrill], ['ex_wake_up', wakeUp],
   ['ex_approach_one', (scene, sk) => approach(scene, sk, 'ex_approach_one', false)], ['ex_approach_two', (scene, sk) => approach(scene, sk, 'ex_approach_two', true)],
+  // the library's approach jumps: walked in, a step or three, no running in place
+  ['ex_approach_jump_one_step', (scene, sk) => approach(scene, sk, 'ex_approach_jump_one_step', true, { extra: 0, oz: -0.40 })],
+  ['ex_approach_jump_two_step', (scene, sk) => approach(scene, sk, 'ex_approach_jump_two_step', true, { extra: 1, oz: -0.30 })],
+  ['ex_approach_jump_three_step', (scene, sk) => approach(scene, sk, 'ex_approach_jump_three_step', true, { extra: 2, oz: -0.10 })],
+  ['ex_approach_jump_one_foot', (scene, sk) => approach(scene, sk, 'ex_approach_jump_one_foot', false, { extra: 2, oz: -0.10 })],
 ];
