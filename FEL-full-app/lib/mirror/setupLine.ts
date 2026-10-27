@@ -176,24 +176,26 @@ export function auditSetup(
 // MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
 // table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
 // names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
+// CUE-REWRITE (2026-10-27): cue, escalate and reply are said mid-rep (2–5 words, docs/CUE-STYLE.md); regress is said
+// when the set stops (one plain action, ≤ 14 words). Same faults, same intent; before/after in docs/CUE-AUDIT.md.
 export const SETUP_CUES: readonly CueRule[] = [
   {
     faultId: 'hipHeight',
-    cue: 'Sit your hips down level with the bar — let your knees add the bend, not your back.',
-    escalate: 'Still riding high. Touch the bar to the floor from a dead stop before you set up again.',
-    regress: 'Set up from blocks or a rack pin a few inches up, so the hips do not have as far to travel yet.',
+    cue: 'Hips down to bar height',
+    escalate: 'Reset. Hips lower.',
+    regress: 'Set the bar on blocks a few inches up, so your hips travel less.',
   },
   {
     faultId: 'barLine',
-    cue: 'Bring your shoulders over the bar — chest up and over your hands.',
-    escalate: 'Still behind it. Walk the bar back until it is under your armpits before you set your hands.',
-    regress: 'Set up with the bar (or a light bag) a hand-width closer than feels natural, and find the line from there.',
+    cue: 'Shoulders over the bar',
+    escalate: 'Reset. Shoulders over the bar.',
+    regress: 'Set up with the bar a hand-width closer, then find the line.',
   },
   {
     faultId: 'headLine',
-    cue: 'Eyes to a spot on the floor a few feet ahead — one long line, ears to hips, before you pull.',
-    escalate: 'Find that spot on the floor first, hold your eyes on it, then hinge into the set-up without losing the line.',
-    regress: 'Set up facing a wall a few feet off and keep your eyes on the same spot the whole time.',
+    cue: 'Eyes on a spot ahead',
+    escalate: 'Find the spot, then lift',
+    regress: 'Face a wall a few feet away and keep your eyes on one spot.',
   },
 ];
 

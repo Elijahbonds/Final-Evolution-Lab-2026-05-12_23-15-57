@@ -51,6 +51,8 @@
 // faults (and the check's findings) — the audit's own note says 'shallow' is the rep-level coach's to assign — so an
 // athlete who cannot go deeper still finishes the set, and the review says the depth was shallow instead of pretending
 // the reps were full ones.
+import { FAULT_NAMES } from '@/lib/cue-style/names';
+import { result, resultText, type ResultLine } from '@/lib/cue-style/result';
 import type { SquatFault, SquatFrameResult, SquatPhase } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 import { pacerCycleSec, type PacerSpec } from '@/lib/breath/pacer';
 
@@ -83,7 +85,7 @@ export const BREATH_CYCLE_MS = pacerCycleSec(SQUAT_BREATH_PACER) * 1000;
 
 /** The breathe stage's direction under the picture, from the spec (the harness renders it after "Breathe first."). */
 export const squatBreathLine = (s: PacerSpec = SQUAT_BREATH_PACER): string =>
-  `In through the nose ${s.inSec}s${s.holdSec > 0 ? ` · hold ${s.holdSec}s` : ''} · out slow ${s.outSec}s, ${s.rounds} cycles.`;
+  `Breathe in through your nose for ${s.inSec} seconds${s.holdSec > 0 ? `, hold for ${s.holdSec}` : ''}, then out slowly for ${s.outSec}. ${s.rounds} times.`;
 
 /** Seconds into the breathe stage on the pose clock at `nowMs` (0 before its first frame). */
 export function breathElapsedSec(state: Pick<SquatSessionState, 'breatheStartMs'>, nowMs: number): number {
@@ -161,7 +163,7 @@ export const SHALLOW_MIN_FRAMES = 4;
  * Said once a session, on the first shallow descent (which is not counted). An action in movement words: what the
  * camera measures (the hips going down), nothing about why they did not. After it, shallow reps count and are marked.
  */
-export const DEEPER_LINE = 'Sit a little deeper if you can — I count a squat when your hips drop. Shallow ones still count from here, marked shallow.';
+export const DEEPER_LINE = 'Sit a bit deeper so I can count it. Shallow ones count from now on.';
 
 export interface SquatStep {
   state: SquatSessionState;
@@ -190,7 +192,7 @@ export interface SquatStep {
  * (squat-audit.ts squareOn). One line, an action, in the framing check's voice (framing.ts SAY.turned) — and never
  * looped: an athlete who stays turned hears it once a session and the review says the knees were not read.
  */
-export const SQUARE_UP_LINE = 'Square up to the camera — I read your knees from the front.';
+export const SQUARE_UP_LINE = 'Face the camera straight on, so I can see your knees.';
 /**
  * "Off square for the whole set": at most this share of the stage's knee-read frames were square. Not zero, so a
  * frame or two of noise reading square does not count as having squared up; the gate itself averages over 20 frames.
@@ -361,23 +363,23 @@ export function stepKneeRecord(prev: KneeRecord, stage: SquatStage, read: KneeRe
 
 /** How the review describes the knee read, from the record (null = nothing to add: the knees were read). */
 export function kneeReadLine(rec: KneeRecord): string | null {
-  if (rec.squareFrames === 0 && rec.notSquareFrames === 0) return 'Knees not read: the camera did not see a squat it could read them on.';
-  if (rec.squareFrames === 0) return 'Knees not read: you were not square to the camera. Next time, face it square-on — I read the knees from the front.';
+  if (rec.squareFrames === 0 && rec.notSquareFrames === 0) return 'Knees not checked: the camera did not see a squat clearly.';
+  if (rec.squareFrames === 0) return 'Knees not checked: you were turned away from the camera. Next time, face it straight on.';
   const share = rec.notSquareFrames / (rec.squareFrames + rec.notSquareFrames);
-  if (share >= 0.5) return 'Knees read on part of the set only: for the rest you were not square to the camera.';
+  if (share >= 0.5) return 'Knees checked on part of the set only: you were turned away for the rest.';
   return null;
 }
 
 // ── the review ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 /** What each fault is called in the review. Movement words only: no cause the camera cannot see (MIRROR-COACH P1). */
+// CUE-REWRITE (2026-10-27): the canonical names (lib/cue-style/names.ts), the same on every surface.
 export const SQUAT_FAULT_LABEL: Record<SquatFault, string> = {
-  kneeValgus: 'Knee drifting inward on the descent',
-  // was "Heels lifting (dorsiflexion limit)": a heel-y read cannot tell an ankle limit from stance, balance or shoes
-  heelRise: 'Heels lifting on the descent',
-  armFall: 'Shoulders drifting sideways off the start line',
-  lateralShift: 'Lateral weight shift',
-  shallow: 'Shallow depth',
+  kneeValgus: FAULT_NAMES.kneeCave,
+  heelRise: FAULT_NAMES.heelLift,
+  armFall: FAULT_NAMES.shoulderShift,
+  lateralShift: FAULT_NAMES.weightShift,
+  shallow: FAULT_NAMES.notDeep,
 };
 
 /** "Held" is read from this many reps at the end of the work set. */
@@ -390,7 +392,11 @@ export interface SquatVerdict {
   /** The cued faults still present on the last HELD_REPS reps. */
   still: SquatFault[];
   line: string;
+  /** CUE-REWRITE: the review in the three-part result shape (what we saw / what it means / what next); `line` is its text. */
+  result: ResultLine;
 }
+
+const verdict = (kind: SquatVerdictKind, still: SquatFault[], r: ResultLine): SquatVerdict => ({ kind, still, result: r, line: resultText(r) });
 
 /**
  * Whether the correction held — MEASURED on the last reps, not inferred from the cue log (MIRROR-COACH P1, 2026-09-25).
@@ -413,29 +419,26 @@ export function squatReviewVerdict(
   if (!cuedFaults.length) {
     const seen = [...new Set(opts.cueable(workReps.flat()))];
     if (seen.length) {
-      return { kind: 'faultsNotCued', still: [], line: `Not cued, but measured on some reps: ${seen.map(lower).join(', ')}.` };
+      return verdict('faultsNotCued', [], result(`Seen on some reps, but not often enough to call out: ${seen.map(lower).join(', ')}.`,
+        'Your squat mostly held its shape.', 'Next set, watch for it in your first few reps.'));
     }
     return opts.kneeJudged
-      ? { kind: 'clean', still: [], line: 'Clean set. Add load or speed next time.' }
-      : { kind: 'kneeUnjudged', still: [], line: 'Nothing was cued. The knees were not judged, so this is not a clean read on them yet.' };
+      ? verdict('clean', [], result('Clean set: nothing to fix.', 'Your squat held its shape on every rep we read.', 'Next time, add a little weight or speed.'))
+      : verdict('kneeUnjudged', [], result('Nothing to fix was seen, but the camera could not check your knees.', 'So this is not a full clean set yet.', 'Next set, face the camera straight on.'));
   }
   const last = workReps.slice(-HELD_REPS);
   if (last.length < HELD_REPS) {
-    return { kind: 'tooFewReps', still: [], line: 'Not enough reps were read at the end of the set to say whether the correction held.' };
+    return verdict('tooFewReps', [], result('Too few reps were read at the end of the set.', 'So we cannot tell yet if the fix stuck.', 'Do one more set with your whole body in the shot.'));
   }
   const still = cuedFaults.filter((f) => last.some((rep) => rep.includes(f)));
   const regressed = said.some((c) => c.level === 'regress');
   if (still.length) {
-    return {
-      kind: 'stillShowing', still,
-      line: `Still showing on the last reps: ${still.map(lower).join(', ')}. `
-        + (regressed
-          ? 'It survived the cues — regress the drill and rebuild. That is the correction working, not failing.'
-          : 'Next session, slow the descent and let each cue land before adding anything.'),
-    };
+    return verdict('stillShowing', still, regressed
+      ? result(`Still there on your last reps: ${still.map(lower).join(', ')}.`, 'The reminders have not fixed it yet. That is normal: it takes practice.',
+        'Do the easier version the coach gave you, then build back up.')
+      : result(`Still there on your last reps: ${still.map(lower).join(', ')}.`, 'It often takes a few sets to fix.',
+        'Next time, go down slower and let each reminder sink in.'));
   }
-  return {
-    kind: 'held', still: [],
-    line: `What was cued was gone on the last ${HELD_REPS} reps — that reflex is the goal. Next session it should need fewer cues.`,
-  };
+  return verdict('held', [], result(`Fixed: what the coach reminded you about was gone on your last ${HELD_REPS} reps.`,
+    'Your body is learning the new pattern.', 'Next set should need fewer reminders.'));
 }

@@ -300,27 +300,29 @@ export function auditHinge(
 // MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
 // table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
 // names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
+// CUE-REWRITE (2026-10-27): cue, escalate and reply are said mid-rep (2–5 words, docs/CUE-STYLE.md); regress is said
+// when the set stops (one plain action, ≤ 14 words). Same faults, same intent; before/after in docs/CUE-AUDIT.md.
 export const HINGE_CUES: readonly CueRule[] = [
   {
     faultId: 'hingeRatio',
-    cue: 'Close a door behind you with your hips — more hips back, and the knee stays soft.',
-    escalate: 'Still squatting it. Send the hips back to the wall behind you before the knee bends at all.',
-    regress: 'Hands on a wall or a doorframe. Hinge back only until the stretch stops you, no lower — the range earns itself.',
-    reply: 'Hips back to the wall behind you.',
+    cue: 'Hips back, knees soft',
+    escalate: 'Slower. Hips back first.',
+    regress: 'Hands on a wall. Push your hips back only as far as is comfortable.',
+    reply: 'Hips to the wall behind',
   },
   {
     faultId: 'dowelLine',
-    cue: 'Hinge as if a broomstick lies along your back — it stays touching your head and your hips.',
-    escalate: 'That line is still breaking. Eyes to a spot on the floor a few feet ahead, then hinge without losing the broomstick.',
-    regress: 'Pick a spot on the floor a few feet ahead and hold your eyes there the whole rep — the line follows the eyes.',
-    reply: 'Keep the broomstick touching, head to hips.',
+    cue: 'Back flat, like a board',
+    escalate: 'Slower. Keep your back flat.',
+    regress: 'Look at a spot on the floor ahead and keep your eyes there.',
+    reply: 'Long, flat back',
   },
   {
     faultId: 'shinAngle',
-    cue: 'Send the hips back toward the wall behind you — the shin stays still, the knee stays put.',
-    escalate: 'Still drifting forward. Sit back toward your heels as the hips travel back to the wall.',
-    regress: 'Stand an inch off a wall behind you. If your knee taps it, the shin travelled too far — reset and go slower.',
-    reply: 'Hips to the wall, knee stays put.',
+    cue: 'Hips back, shins still',
+    escalate: 'Slower. Shins stay still.',
+    regress: 'Face a wall an inch away. If your knee taps it, go slower.',
+    reply: 'Shins stay still',
   },
 ];
 

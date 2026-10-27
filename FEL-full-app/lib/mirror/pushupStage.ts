@@ -11,6 +11,7 @@
 // position: the body lying along the floor (the shoulder-to-hip line nearer horizontal than vertical), so the elbows
 // bending while someone gets down to the floor never count as a rep. Every threshold the grade uses is PUSHUP_THRESHOLDS,
 // PROPOSED, untouched here (the capture lane tunes them).
+import { FAULT_NAMES } from '@/lib/cue-style/names';
 import type { Lm } from '@/lib/pose/landmarks';
 import { LM } from '@/lib/pose/landmarks';
 import { PUSHUP_CUES, PUSHUP_THRESHOLDS, auditPushup } from './pushupAudit';
@@ -23,11 +24,12 @@ export type PushupFault = 'bodyLine' | 'handSetup' | 'headLine' | 'depth';
 export const PUSHUP_FAULTS: readonly PushupFault[] = ['bodyLine', 'handSetup', 'headLine', 'depth'];
 
 /** What each fault is called in the review — what the camera saw, never a cause or a diagnosis. */
+// CUE-REWRITE (2026-10-27): the canonical names (lib/cue-style/names.ts).
 export const PUSHUP_FAULT_LABEL: Readonly<Record<PushupFault, string>> = {
-  bodyLine: 'Hips off the head-to-heels line (sagging or piking)',
-  handSetup: 'Hands not under the shoulders at the top',
-  headLine: 'Head reaching off the body line',
-  depth: 'Reps stopping short of the bottom',
+  bodyLine: FAULT_NAMES.hipsOffLine,
+  handSetup: FAULT_NAMES.handsNotUnder,
+  headLine: FAULT_NAMES.headOffLine,
+  depth: FAULT_NAMES.notDeep,
 };
 
 const vis = (l: Lm | undefined): l is Lm => !!l && l.v >= PUSHUP_THRESHOLDS.minVis;
@@ -71,9 +73,9 @@ export const PUSHUP_CUE_TABLE = cueTableFor(PUSHUP_CUES, PUSHUP_FAULTS);
 
 /** Before Start: how to set the phone up. Said on the tab, not spoken. */
 export const PUSHUP_FRAMING = [
-  'Put the phone on the floor, side-on to you, about 2 m away, so it sees you from head to heels — the camera reads your body line and depth from the side.',
-  'Knees down is a push-up too: the Mirror reads that variant the same way. Stop the set if anything hurts.',
+  'Phone on the floor, side-on, about 2 m away, so it sees you head to heels.',
+  'Push-ups from your knees count too. If anything hurts, stop.',
 ] as const;
 
 /** During setup: what to do before the first rep counts. */
-export const PUSHUP_SETUP_LINE = 'Side-on to the camera, in your plank with straight arms — the check starts when you are still.';
+export const PUSHUP_SETUP_LINE = 'Side-on, at the top of your push-up, arms straight. Hold still to start.';

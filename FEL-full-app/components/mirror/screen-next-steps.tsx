@@ -54,6 +54,8 @@ export function ScreenNextSteps({ screen, grades, youth = 'unknownAge' }: Screen
             <li key={i} className="rounded-xl border border-[#FFC24B]/25 bg-black/20 px-4 py-3" data-work-item>
               <p className="text-[13.5px] font-semibold text-white/85">{w.title}</p>
               <p className="mt-1 break-words text-[12.5px] leading-relaxed text-white/55">{w.saw}</p>
+              {/* CUE-REWRITE: what it means, between what was seen and what to do (docs/CUE-STYLE.md) */}
+              <p data-means className="mt-1 text-[12.5px] leading-relaxed text-white/70">{w.means}</p>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-white/75"><span className="font-bold text-white/85">What to do: </span>{w.todo}</p>
               {w.block && (
                 w.blockShownAbove
