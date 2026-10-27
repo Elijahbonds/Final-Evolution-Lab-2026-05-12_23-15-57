@@ -1,8 +1,10 @@
 'use client';
 
 // ExerciseDemo (M34) — every Coach exercise SHOWS the movement, never blank.
-//   • YOUR AVATAR tab: the learner's real 3D hero rig loops a representative
-//     athletic motion (components/coach/exercise-avatar-canvas via ssr:false).
+//   • YOUR AVATAR tab: the learner's own athlete doing the exercise — the exercise library's stage
+//     (components/library/exercise-stage via ssr:false) playing the entry's own loop. FITNESS-TPOSE (2026-10-26): the
+//     old canvas (exercise-avatar-canvas, /models/elijah.glb) had no exercise clip at all and played one unrelated
+//     mocap for every exercise; with no clip, or a loop that will not play, the tab is the cue card, never a bind pose.
 //   • COACH VIDEO tab: the founder-recorded YouTube demo (existing videoUrl).
 //   • Fallback: an animated cue card so the panel is never empty.
 // Adapted to THIS project's Exercise schema (no M17 ExerciseMoviePlayer exists).
@@ -11,7 +13,7 @@ import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Play, User, Dumbbell } from 'lucide-react';
 
-const ExerciseAvatarCanvas = dynamic(() => import('./exercise-avatar-canvas'), {
+const ExerciseStage = dynamic(() => import('@/components/library/exercise-stage'), {
   ssr: false,
   loading: () => (
     <div className="aspect-video w-full flex items-center justify-center bg-[#07070d] text-white/40 text-xs">
@@ -28,12 +30,15 @@ export interface ExerciseDemoData {
   /**
    * EXERCISE-LIBRARY (2026-10-25): the avatar clip a library entry maps to (lib/library/demo.ts avatarClip). A string
    * plays that clip; null means the rig has no clip for this movement yet, so the avatar tab is not shown rather than
-   * a motion that does not match. Left out, the old behaviour (a clip chosen from targetPrqStat).
+   * a motion that does not match. FITNESS-TPOSE: left out is the same as null (the old stat-picked clip never existed
+   * in the model, so it was always the wrong motion).
    */
   clip?: string | null;
 }
 
 type Tab = 'avatar' | 'video';
+
+const NO_MUSCLES = { primary: [] as string[], secondary: [] as string[] };
 
 const threeDisabled =
   typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
@@ -54,11 +59,12 @@ function youTubeEmbed(raw?: string): string | null {
 export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
   const embedUrl = useMemo(() => youTubeEmbed(exercise.videoUrl), [exercise.videoUrl]);
   const hasVideo = !!embedUrl;
-  const hasAvatar = !threeDisabled && exercise.clip !== null;
+  const [stageFailed, setStageFailed] = useState(false);
+  const hasAvatar = !threeDisabled && !!exercise.clip && !stageFailed;
   const [tab, setTab] = useState<Tab>(hasAvatar ? 'avatar' : 'video');
   const [showVideo, setShowVideo] = useState(false);
 
-  const showTabs = hasAvatar && hasVideo;
+  const showTabs = !threeDisabled && !!exercise.clip && hasVideo;   // a failed stage keeps its tab (the cue card), so the video stays reachable
 
   return (
     <div className="overflow-hidden rounded-xl border border-white/10 bg-[#0c0c11]">
@@ -84,7 +90,9 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {/* AVATAR demo */}
       {tab === 'avatar' && hasAvatar && (
         <div className="relative">
-          <ExerciseAvatarCanvas stat={exercise.targetPrqStat || ''} clip={exercise.clip ?? undefined} />
+          <div className="aspect-video w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a]">
+            <ExerciseStage view="demo" clip={exercise.clip!} muscles={NO_MUSCLES} side="front" onState={(s) => { if (s === 'failed') setStageFailed(true); }} />
+          </div>
           <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-[#00E5FF]">
             YOUR AVATAR
           </span>

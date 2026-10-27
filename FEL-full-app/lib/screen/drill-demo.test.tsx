@@ -16,10 +16,10 @@ describe('the drill demo', () => {
     expect(h).not.toContain('data-demo-open');
   });
 
-  it('DEMO RENDERS: opened, it is the 3D character (loading client-side), labelled with the drill, the note under it', () => {
+  it('DEMO RENDERS: opened, it is the still cue card, labelled with the drill, the note under it', () => {
     const h = renderToStaticMarkup(createElement(DrillDemo, { test: 'T3', drill: 'Hips level', initiallyOpen: true }));
     expect(h).toContain('data-demo-open="T3"');
-    expect(h).toContain('Loading the demo');   // ExerciseDemo's avatar canvas, loaded client-side only (ssr:false)
+    expect(h).toContain('data-demo-still');   // the still cue card: nothing 3D on the screen path
     expect(h).toContain('aria-label="Single-leg squat: Hips level"');
     expect(h).toContain(DEMO_NOTE);
     expect(h).not.toMatch(/<iframe|youtube/i);   // no video URL passed: no third-party player on the screen path
@@ -31,9 +31,9 @@ describe('the drill demo', () => {
     expect(DEMO_STAT.T5).toBe('power');
   });
 
-  it('reuses ExerciseDemo’s 3D canvas (components/coach/exercise-avatar-canvas.tsx) rather than a new asset', () => {
+  it('shows the still cue card, not the 3D stage (no Babylon on the Quick Screen route)', () => {
     const src = readFileSync('app/play/mirror/assess/_components/drill-demo.tsx', 'utf8');
-    expect(src).toMatch(/import\('@\/components\/coach\/exercise-avatar-canvas'\)/);
+    expect(src).not.toMatch(/components\/library\/exercise-stage/);
     expect(src).not.toMatch(/components\/coach\/exercise-demo'/);   // its YouTube tab would break the off-site guard
   });
 });

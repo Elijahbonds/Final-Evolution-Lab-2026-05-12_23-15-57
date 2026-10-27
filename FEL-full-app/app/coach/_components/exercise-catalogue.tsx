@@ -311,6 +311,9 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
               videoUrl: ex.videoUrl,
               targetPrqStat: ex.targetPrqStat,
               dosage: ex.dosage,
+              // FITNESS-TPOSE (2026-10-26): a Blueprint KB item carries no library family or variation, so no loop is
+              // known to show it faithfully: the cue card (never the old canvas's one unrelated mocap, or a bind pose)
+              clip: null,
             }}
           />
         </div>

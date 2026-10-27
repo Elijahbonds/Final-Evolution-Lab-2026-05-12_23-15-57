@@ -183,6 +183,10 @@ export function Avatar({
   const groupRef = useRef<THREE.Group>(null);
   const smoothTime = useRef(0);
   const finishListeners = useRef(new Map<THREE.AnimationAction, () => void>());
+  // FITNESS-TPOSE (2026-10-26): the last LOOP a caller asked for. The effect below stops every action in its cleanup
+  // (a remount, a re-built model, React's dev double-run); a caller that plays only once in onReady never asked again,
+  // so the rig sat in its bind pose — a T-pose. The loop is restarted after onReady unless the caller already did.
+  const lastLoop = useRef<{ name: string; timeScale: number; fadeIn: number } | null>(null);
 
   // Listen for animation finished events
   useEffect(() => {
@@ -233,6 +237,7 @@ export function Avatar({
         act.timeScale = timeScale;
         act.fadeIn(fadeIn);
         act.play();
+        lastLoop.current = loop ? { name, timeScale, fadeIn } : null;
         if (onFinish) {
           finishListeners.current.set(act, onFinish);
         }
@@ -258,6 +263,7 @@ export function Avatar({
       },
     };
     onReady(handle);
+    restartLoop(lastLoop.current, actionMap, handle.play);
     return () => { mixer.stopAllAction(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [built]);
@@ -268,4 +274,19 @@ export function Avatar({
   });
 
   return <primitive object={built.group} ref={groupRef} />;
+}
+
+/**
+ * FITNESS-TPOSE (2026-10-26): after a remount, restart the loop the caller last asked for when nothing is playing (the
+ * cleanup stopped it). A caller that played again in onReady is left alone; a clip the model lacks is not invented.
+ */
+export function restartLoop(
+  last: { name: string; timeScale: number; fadeIn: number } | null,
+  actionMap: ReadonlyMap<string, { isRunning(): boolean }>,
+  play: (name: string, opts: { loop: boolean; timeScale: number; fadeIn: number }) => unknown,
+): boolean {
+  if (!last || !actionMap.has(last.name)) return false;
+  for (const a of actionMap.values()) if (a.isRunning()) return false;
+  play(last.name, { loop: true, timeScale: last.timeScale, fadeIn: last.fadeIn });
+  return true;
 }

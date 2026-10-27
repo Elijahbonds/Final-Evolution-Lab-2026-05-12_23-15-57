@@ -14,6 +14,10 @@
 // capped at 1.5; the render loop stops while the page is hidden or the stage is scrolled out of view; with reduced
 // motion on, the camera never moves by itself. The canvas leaves vertical swipes to the page (touch-action: pan-y), so
 // the sheet still scrolls on a phone; a sideways drag turns the camera.
+//
+// FITNESS-TPOSE (2026-10-26): a phone gets the phone body (scene.metadata.felTier, as the Closet sets it; without it
+// CharacterLibrary loaded the 8.6 MB scan on every phone). A loop that will not build or play is said in the console and
+// the stage reports 'failed', so the caller shows its cue card — the body is never left standing in its bind pose.
 import { useEffect, useRef, useState } from 'react';
 import type { AnatomyHandle } from '@/lib/babylon/library/anatomyLook';
 
@@ -61,6 +65,8 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         const { applyAnatomy } = await import('@/lib/babylon/library/anatomyLook');
         const { buildAuthoredClip } = await import('@/lib/babylon/anim/authored');
         const { FLOOR_CLIPS, SIDE_CLIPS, DEMO_PROPS } = await import('@/lib/library/demo');
+        const { fitCanvas } = await import('@/lib/babylon/core/canvasFit');
+        const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
         const canvas = canvasRef.current;
         if (disposed || !canvas) return;
         const mark = (k: string) => { if (process.env.NODE_ENV === 'development') ((window as unknown as { __FEL_STAGE_T__?: Record<string, number> }).__FEL_STAGE_T__ ??= {})[k] = performance.now(); };
@@ -70,6 +76,8 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         engine.setHardwareScalingLevel(1 / Math.min(1.5, window.devicePixelRatio || 1));
         const scene = new Scene(engine);
         (scene.metadata ??= {}).felModeId = 'library';
+        // the tier the body is chosen by (CharacterLibrary heroUrlForTier): a phone gets the phone file
+        scene.metadata.felTier = detectQualityTier(canvas, fitCanvas({ cssWidth: canvas.clientWidth || 360, cssHeight: canvas.clientHeight || 270, dpr: window.devicePixelRatio || 1 }));
         scene.clearColor = new Color4(0, 0, 0, 0);
         scene.skipPointerMovePicking = true;
         const cam = new ArcRotateCamera('libraryCam', FRONT_ALPHA - 0.45, 1.36, 3.5, new Vector3(0, 0.92, 0), scene);
@@ -127,10 +135,15 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           if (prop === 'seat') return { alpha: FRONT_ALPHA - 0.55, beta: 1.36, radius: 2.35, y: 0.7 };
           return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
         };
-        const play = (clip: string, hold: number | null | undefined) => {
+        let loopFailed = false;
+        const play = (clip: string, hold: number | null | undefined): boolean => {
           // the library scope is lazy: an entry's loop is built the first time it is asked for (clipScope `lazy`)
-          buildAuthoredClip(hero.animator, scene, hero.skeleton, clip);
+          const built = buildAuthoredClip(hero.animator, scene, hero.skeleton, clip);
           const g = hero.animator.play(clip, { loop: true, fadeSec: 0.25, restart: true });
+          if (!built || !g) {
+            console.warn('[FEL-LIBRARY] no loop', clip, { built, played: !!g });
+            return false;
+          }
           if (g && hold != null) {
             // an isometric hold: the rep's hardest point, held (CharacterAnimator keeps the group; pause it on that frame)
             g.goToFrame(g.from + hold * 30);
@@ -138,6 +151,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
           }
           // a body doing an exercise is busy: no idle breathing or weight shift layered over the loop
           hero.secondary?.setActivity(() => (clip === 'idle_stand' ? 0 : 1));
+          return true;
         };
         const setView = (p: ExerciseStageProps) => {
           const musclesKey = `${p.muscles.primary.join(',')}|${p.muscles.secondary.join(',')}`;
@@ -152,14 +166,16 @@ export default function ExerciseStage(props: ExerciseStageProps) {
               }
             } else {
               anatomy?.restore(); anatomy = null;
-              play(p.clip ?? 'idle_stand', p.clip ? p.hold : null);
+              loopFailed = !play(p.clip ?? 'idle_stand', p.clip ? p.hold : null);
               showProp(p.clip);
+              if (ready) setState(loopFailed ? 'failed' : 'ready');
             }
           }
           if (p.view === 'muscles' && anatomy && musclesKey !== shownMuscles) { anatomy.show(p.muscles); shownMuscles = musclesKey; }
           if (p.view !== shownView || p.side !== shownSide || p.clip !== shownClip) { target = frame(p); userTurned = false; }
           shownView = p.view; shownClip = p.clip; shownHold = p.hold; shownSide = p.side;
         };
+        let ready = false;
         live.current = { setView };
         setView(latest.current);
         // the camera eases to its framing (a tab, side or clip change) — until the player turns it themselves; with reduced
@@ -185,7 +201,8 @@ export default function ExerciseStage(props: ExerciseStageProps) {
         document.addEventListener('visibilitychange', onVis);
         window.addEventListener('resize', onResize);
         sync();
-        setState('ready');
+        ready = true;
+        setState(loopFailed ? 'failed' : 'ready');
         if (process.env.NODE_ENV === 'development') (window as unknown as { __FEL_LIBRARY_STAGE__?: unknown }).__FEL_LIBRARY_STAGE__ = { engine, scene, hero, cam, anatomy: () => anatomy };
         cleanup = () => {
           document.removeEventListener('visibilitychange', onVis);
@@ -210,7 +227,7 @@ export default function ExerciseStage(props: ExerciseStageProps) {
 
   return (
     <div className="relative h-full w-full">
-      <canvas ref={canvasRef} className="h-full w-full outline-none" style={{ touchAction: 'pan-y' }} aria-label={props.view === 'muscles' ? 'The muscles this exercise works, on your athlete. Drag sideways to turn.' : 'Your athlete doing this exercise. Drag sideways to turn.'} data-testid="exercise-stage" data-state={state} />
+      <canvas ref={canvasRef} className="h-full w-full outline-none" style={{ touchAction: 'pan-y', visibility: state === 'failed' ? 'hidden' : undefined }} aria-label={props.view === 'muscles' ? 'The muscles this exercise works, on your athlete. Drag sideways to turn.' : 'Your athlete doing this exercise. Drag sideways to turn.'} data-testid="exercise-stage" data-state={state} />
       {state !== 'ready' && (
         <p className="absolute inset-0 flex items-center justify-center text-center text-[12px] text-white/50">
           {state === 'loading' ? 'Loading your athlete…' : 'Couldn’t load 3D on this device.'}
