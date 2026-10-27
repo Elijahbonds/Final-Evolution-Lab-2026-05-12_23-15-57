@@ -199,27 +199,33 @@ returning player does not). The chart's time to its first
 target comes from the chart, and is the same in both builds. The camera's own setup (permission, framing) needs a real
 camera and is not in these numbers.
 
-| Who (fixture) | Build | Words on the way to Start | Scrolls to reach Start | UI time, tap → START | Read (200 wpm) | Chart → first rep | **Total** |
+| Who (fixture) | Build | Words before Start | Scrolls to reach Start | UI time, tap → START | Read (200 wpm) | Chart → first rep | **Total** |
 |---|---|---|---|---|---|---|---|
 | First-timer, hooper (landings) | before | 127 | 0 | 0.7 s | 38 s | 6 s | **45 s** |
-| | after | 269 | 0 | 1.8 s ¹ | 81 s | 6 s | **89 s** |
-| First-timer, no number (Wake-Up) | before | 153 | 0 | 0.7 s | 46 s | 126 s ² | **173 s** |
-| | after | 307 | 0 | 2.2 s ¹ | 92 s | 126 s ² | **220 s** |
-| Returning, hooper | before | — | 0 | 0.8 s | — | 6 s | **7 s** |
-| | after | — | 0 | 2.3 s ¹ | — | 6 s | **8 s** |
-| Returning, jumper (hops) | before | — | **1** | 0.6 s | — | 6 s | **7 s** |
-| | after | — | 0 | 2.3 s ¹ | — | 6 s | **8 s** |
+| | after | **65** | 0 | 3.4 s ¹ | 20 s | 6 s | **29 s** |
+| First-timer, no score (Wake-Up) | before | 153 | 0 | 0.7 s | 46 s | 126 s ² | **173 s** |
+| | after | **55** | 0 | 5.4 s ¹ | 17 s | 126 s ² | **148 s** |
+| Returning, hooper | before | 127 | 0 | 0.8 s | — | 6 s | **7 s** |
+| | after | **36** | 0 | 2.7 s ¹ | — | 6 s | **9 s** |
+| Returning, jumper (hops) | before | 177 | **1** | 0.6 s | — | 6 s | **7 s** |
+| | after | **37** | 0 | 2.8 s ¹ | — | 6 s | **9 s** |
 
-¹ The demo now plays by itself (owner, 2026-10-27), so the library stage (Babylon and the body) loads as soon as the page
-opens. On a 4× throttled CPU that delays the Start tap's response by about 1–1.5 s. It is the cost of the autoplay
-decision.
+"Words before Start" counts every word a reader passes: the back link, the page, and the shared demo's own badge or
+loading line. It leaves out the fixed Start bar and the tab bar. `today-drill-flow.test.tsx` holds the page's own text
+to 110 words or fewer for a first-timer and 40 or fewer for a returning player, so the budget fails a test, not just
+this table.
+
+¹ The demo plays by itself (owner, 2026-10-27), so the library stage (Babylon and the body) loads as soon as the page
+opens, and it competes with the Start tap on a 4× throttled CPU. This last run also shared the machine with other
+lanes' rigs (load average about 18 on 4 CPUs), so these UI times are noisy and high. The earlier runs of the same build
+measured 1.1–2.3 s.
 ² The Wake-Up's first phase ("Loosen up", 2 min) has no target to count. The first rep of the main drill is at 246 s
 (after the 4-minute warm-up) for every short drill, in both builds.
 
-What this says: a first-timer who reads the whole page now reads about 40–45 s more, which is the explainer, the steps,
-the cues and the setup the owner asked for. Start is always on screen, so reading is a choice, not a gate. A returning
-player taps Start straight away with no scroll; before, the hop drill's Start was below the fold. Taps and screens are
-unchanged: 3 taps (card, Start, START) and 4 screens (Train, drill page, space check, running).
+What this says: a first-timer reads about half the words of the old page (65 vs 127 on the landing drill), with the why,
+the steps, the cues and the setup now there. A returning player sees 36–37 words, about 70–80% fewer, and no longer
+scrolls on the hop drill. Taps and screens are unchanged: 3 taps (card, Start, START) and 4 screens (Train, drill page,
+space check, running).
 
 In-drill (pogo plan, `live-jump-*.png`): the controls in view while running were "End the drill" (before) and "Pause ·
 Stop · This hurts: stop" (after), on every running shot (warm-up, set, rest). There was no horizontal overflow and no
