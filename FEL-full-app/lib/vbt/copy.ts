@@ -15,7 +15,7 @@ export const NOT_SAVED_LINE = 'Kept on this phone only. Turn on saving your move
 export const TEEN_LINE = 'Rep speed and zones only for now: no max-lift estimates under 18, and your sets are not kept.';
 export const UNDER_13_LINE = 'The bar-speed tool is for 13 and over.';
 export const AGE_UNKNOWN_LINE = 'Add your birth year in your account to use the bar-speed tool.';
-export const E1RM_LINE = 'Estimated max: the most you could lift once, worked out from how your bar slows as the weight goes up. An estimate, never a test.';
+export const E1RM_LINE = 'Estimated max: the most you could lift once, worked out from how your bar slows as weight goes up. An estimate, not a test.';
 export const SLOWMO_LINE = 'Pick a slow-motion video filmed side-on. It is read on this phone and never uploaded.';
 
 /** The setup guide, per family. */

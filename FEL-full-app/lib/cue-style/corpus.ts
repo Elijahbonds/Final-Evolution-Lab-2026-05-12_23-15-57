@@ -35,6 +35,13 @@ import {
 } from '@/lib/screen/copy';
 import { DRAFT_CUES, GRADED_CHECKS, cueOf } from '@/lib/screen/PROPOSED-thresholds';
 import { FAULT_NAMES, MOVEMENT_NAMES } from './names';
+import { SETUP_CUES } from '@/lib/coach/taxonomy';
+import { TEMPLATE_EXERCISES } from '@/lib/coach/templateCatalogue';
+import { PRIMERS, ROCK_HOLDS } from '@/lib/coach/warmupContent';
+import { DEFAULT_NEXT } from '@/lib/coach/readiness/next';
+import { E1RM_LINE, ESTIMATE_LINE as VBT_ESTIMATE, TEEN_LINE, setResult, stopLine } from '@/lib/vbt/copy';
+import { ESTIMATE_LINE as SPRINT_ESTIMATE, FV_SLOPE_LINE, REACTION_LINE, RESULT_MEANS as SPRINT_MEANS, RESULT_NEXT as SPRINT_NEXT } from '@/lib/sprint/copy';
+import { PAIN_REFERRAL } from '@/lib/assess/why';
 import { result, type ResultLine } from './result';
 import type { CueTier } from './style';
 
@@ -136,6 +143,25 @@ export function styleCorpus(): StyleEntry[] {
     if (l) add('mirror', `kneeRead:${k}`, l, 'result', 'lib/mirror/squatStage.ts');
   }
 
+  // ── programs and the coach's session player: the set-up pick list, the template exercises, the warm-up ──
+  for (const c of SETUP_CUES) add('programs', `setupCue:${c.id}`, c.text, 'card', 'lib/coach/taxonomy.ts');
+  for (const e of TEMPLATE_EXERCISES) {
+    e.catalogue.primaryCues.forEach((t, i) => add('programs', `template:${e.key}:cue${i}`, t, 'card', 'lib/coach/templateCatalogue.ts'));
+    e.catalogue.commonFaults.forEach((f, i) => {
+      add('programs', `template:${e.key}:fault${i}`, f.fault, 'label', 'lib/coach/templateCatalogue.ts');
+      add('programs', `template:${e.key}:fix${i}`, f.correctionCue, 'card', 'lib/coach/templateCatalogue.ts');
+    });
+  }
+  for (const r of ROCK_HOLDS) { add('programs', `warmup:${r.id}:setup`, r.setup, 'setup', 'lib/coach/warmupContent.ts'); add('programs', `warmup:${r.id}:cue`, r.cue, 'setup', 'lib/coach/warmupContent.ts'); }
+  for (const p of PRIMERS) add('programs', `primer:${p.id}:cue`, p.cue, 'card', 'lib/coach/warmupContent.ts');
+
+  // ── readiness, bar speed, sprint, the Quick Screen's pain stop ──
+  for (const [b, l] of Object.entries(DEFAULT_NEXT)) add('readiness', `next:${b}`, l, 'result', 'lib/coach/readiness/next.ts');
+  for (const [k, l] of Object.entries({ VBT_ESTIMATE, TEEN_LINE, E1RM_LINE })) add('vbt', `line:${k}`, l, 'result', 'lib/vbt/copy.ts');
+  add('vbt', 'stop', stopLine(20), 'prompt', 'lib/vbt/copy.ts');
+  for (const [k, l] of Object.entries({ SPRINT_ESTIMATE, FV_SLOPE_LINE, REACTION_LINE })) add('sprint', `line:${k}`, l, 'result', 'lib/sprint/copy.ts');
+  add('quick-screen', 'painReferral', PAIN_REFERRAL, 'result', 'lib/assess/why.ts');
+
   // ── the canonical names themselves ──
   for (const [k, l] of Object.entries(FAULT_NAMES)) add('names', `fault:${k}`, l, 'label', 'lib/cue-style/names.ts');
   for (const [k, l] of Object.entries(MOVEMENT_NAMES)) add('names', `movement:${k}`, l, 'label', 'lib/cue-style/names.ts');
@@ -176,6 +202,10 @@ export function resultCorpus(): ResultEntry[] {
   }
   add('quick-screen', 'card:green', 'app/play/mirror/assess/_components/results-view.tsx', result('Good to go.', GREEN_MEANING, GREEN_NEXT));
   add('quick-screen', 'card:unread', 'app/play/mirror/assess/_components/results-view.tsx', result('Not read.', UNREAD_MEANING, UNREAD_NEXT));
+  for (const [k, o] of Object.entries({ none: { bestMcv: null, lossPct: null }, one: { bestMcv: 0.62, lossPct: null }, under: { bestMcv: 0.62, lossPct: 12 }, over: { bestMcv: 0.62, lossPct: 25 } })) {
+    add('vbt', `set:${k}`, 'lib/vbt/copy.ts', setResult({ ...o, stopPct: 20 }));
+  }
+  add('sprint', 'run', 'components/sprint/run-result.tsx', result('40 yd: 4.82 s ± 0.03.', SPRINT_MEANS, SPRINT_NEXT));
   add('quick-screen', 'card:jump', 'app/play/mirror/assess/_components/results-view.tsx', result('Your best jump: about 17 in.', JUMP_BEST_MEANS, JUMP_BEST_NEXT));
   return out;
 }

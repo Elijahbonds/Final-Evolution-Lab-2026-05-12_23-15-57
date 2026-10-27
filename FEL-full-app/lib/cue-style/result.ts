@@ -41,7 +41,7 @@ export function shapeProblems(r: ResultLine): string[] {
   // a bare number with no meaning: a digit in "saw" needs a comparison or a meaning word in saw or means
   // "on rep 4", "station 2" are positions, not measurements
   const measured = r.saw.replace(/\b(rep|reps|set|station|step|side|leg) \d+\b/gi, '');
-  if (/\d/.test(measured) && !/\b(about|same|up|down|more|less|than|best|last|usual|normal|range|higher|lower|faster|slower|of|out of|in a row|each|per)\b/i.test(`${r.saw} ${r.means}`)) {
+  if (/\d/.test(measured) && !/\b(about|same|up|down|more|less|than|best|last|usual|normal|range|higher|lower|faster|slower|of|out of|in a row|each|per|beat|estimate)\b/i.test(`${r.saw} ${r.means}`)) {
     out.push('a number with no meaning attached');
   }
   return out;
