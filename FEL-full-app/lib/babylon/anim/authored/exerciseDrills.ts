@@ -5,7 +5,7 @@
 // Owner decision (2026-10-25, held 2026-10-27): authored loops only, never a wrong movement. Same kit, same pipeline as
 // the library's 480 (exerciseKit: targets in the final frame, `rel` from the posed shoulder, every loop closes).
 import type { AnimationGroup, Scene, Skeleton } from '@babylonjs/core';
-import { ANKLE, STAND, HANG, HANG_POLES, SQUAT_FEET, KNEES_OUT, STANCE, both, bothDir, rep, type Deg3, type ExKey, type Pair } from './exerciseKit';
+import { ANKLE, STAND, HANG, HANG_POLES, SQUAT_FEET, KNEES_OUT, STANCE, both, bothDir, rep, type Deg3, type ExKey, type Pair, type V3 } from './exerciseKit';
 import { run, at, sx, other, stride } from './exerciseBody';
 
 type Pose = Omit<ExKey, 't'>;
@@ -14,6 +14,7 @@ type Builder = (scene: Scene, sk: Skeleton) => AnimationGroup | null;
 /** Hands on the hips (the check's "hands on hips"; the standing leg curl's). */
 const ON_HIPS: Pair = { Left: [0.04, -0.42, 0.08], Right: [-0.04, -0.42, 0.08] };
 const HIPS_POLES = bothDir(1, -0.2, 0);
+const ELBOWS_OUT_BACK = bothDir(0.15, -0.4, -1);
 const CHEST: Pair = { Left: [0.13, -0.24, 0.26], Right: [-0.13, -0.24, 0.26] };
 const ARMS_FWD: Pair = { Left: [0.04, -0.06, 0.50], Right: [-0.04, -0.06, 0.50] };
 
@@ -114,8 +115,94 @@ function decelThree(scene: Scene, sk: Skeleton): AnimationGroup | null {
   return run(scene, sk, 'ex_decel_three', 3.2, [...steps(0), at(plant('Right'), 0.7, true), at(plant('Right'), 1.45, true), ...steps(1.6), at(plant('Left'), 2.3, true), at(plant('Left'), 3.05, true)]);
 }
 
+// ── travelling a few steps (the T in two metres, the approach's two steps) ──────────────────────────────────────────
+/** The athletic stance: knees and hips bent, the trunk forward, the hands up in front at the waist. */
+const ATHLETIC = { bones: { Hips: [16, 0, 0] as Deg3, Spine: [6, 0, 0] as Deg3, Neck: [-12, 0, 0] as Deg3, LeftFoot: [-14, 0, 0] as Deg3, RightFoot: [-14, 0, 0] as Deg3 }, rel: { Left: [0.0, -0.30, 0.22] as V3, Right: [0.0, -0.30, 0.22] as V3 }, poles: bothDir(0.4, -1, 0), hipsY: -0.14 };
+/** A stance key: the feet where given (final frame), the hips over their middle. */
+function stanceAt(lx: number, lz: number, rx: number, rz: number, o: Partial<Pose> = {}): Pose {
+  return { ...ATHLETIC, feet: { Left: [lx, ANKLE, lz], Right: [rx, ANKLE, rz] }, kneePoles: bothDir(0.15, 0, 1), hipsX: (lx + rx) / 2, hipsZ: (lz + rz) / 2 - 0.08, ...o, bones: { ...ATHLETIC.bones, ...(o.bones ?? {}) } };
+}
+/** Down to touch the floor (the T-drill's cone) beside the `s` foot with that hand, the other hand up in front. */
+function touch(base: Pose, s: Side): Pose {
+  const f = base.feet![s]!, o = other(s);
+  return { ...base, bones: { ...base.bones, Hips: [44, 0, 0], Spine: [14, 0, 0], Neck: [-24, 0, 0], LeftFoot: [-26, 0, 0], RightFoot: [-26, 0, 0] }, hands: { [s]: [f[0] + sx(s, 0.12), 0.08, f[2] + 0.22] } as Pair, rel: { [o]: [0, -0.30, 0.22] } as Pair, hipsY: -0.42 };
+}
+/** ex_t_drill — the T in two metres: fast feet forward, touch the cone; shuffle left, touch; shuffle right across, touch;
+ *  shuffle back to the middle; backpedal to the start. The feet never cross on a shuffle. */
+function tDrill(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const W = 0.15, F = 0.70, L = 0.50;
+  const seq: [Pose, number][] = [];
+  let t = 0;
+  const add = (p: Pose, dt: number) => { seq.push([p, t]); t += dt; };
+  // forward: four quick steps
+  for (let i = 0; i <= 4; i++) { const z = (F * i) / 4; const lead = i % 2 === 0; add(stanceAt(-W, z + (lead ? 0 : 0.0), W, z + (lead ? 0.10 : 0)), 0.22); }
+  add(touch(stanceAt(-W, F, W, F + 0.10), 'Right'), 0.45);
+  // shuffle left (the left foot leads, the right follows, never past it)
+  for (let i = 1; i <= 2; i++) { const x = -(L * i) / 2; add(stanceAt(x - W - 0.12, F, x + W - 0.06, F), 0.16); add(stanceAt(x - W, F, x + W, F), 0.16); }
+  add(touch(stanceAt(-L - W, F, -L + W, F), 'Left'), 0.45);
+  // shuffle right across, two widths
+  for (let i = 1; i <= 4; i++) { const x = -L + (2 * L * i) / 4; add(stanceAt(x - W + 0.06, F, x + W + 0.12, F), 0.16); add(stanceAt(x - W, F, x + W, F), 0.16); }
+  add(touch(stanceAt(L - W, F, L + W, F), 'Right'), 0.45);
+  // back to the middle
+  for (let i = 1; i <= 2; i++) { const x = L - (L * i) / 2; add(stanceAt(x - W - 0.12, F, x + W - 0.06, F), 0.16); add(stanceAt(x - W, F, x + W, F), 0.16); }
+  // backpedal to the start: short steps back, the trunk over the feet
+  for (let i = 1; i <= 4; i++) { const z = F - (F * i) / 4; const lead = i % 2 === 1; add(stanceAt(-W, z + (lead ? -0.08 : 0), W, z + (lead ? 0 : -0.08), { bones: { Hips: [22, 0, 0] } }), 0.22); }
+  return run(scene, sk, 'ex_t_drill', t + 0.3, seq.map(([p, tt], i) => at(p, tt, i === 0)));
+}
+
+/** ex_approach_one / ex_approach_two — run in place on the beat; then the push: a long, low penultimate step (the right
+ *  foot), a quick plant, and up — off the left foot with the right knee driving (one), or both feet closing under a
+ *  deeper gather and off two (two); the arms swing back on the penultimate and drive up; land soft on two feet, and
+ *  walk back to the start. */
+function approach(scene: Scene, sk: Skeleton, name: string, two: boolean): AnimationGroup | null {
+  const runIn = (s: Side, t: number): ExKey => at(stride(s, { [`${s}UpLeg`]: [-56, 0, 0], [`${s}Leg`]: [80, 0, 0], [`${s}Foot`]: [10, 0, 0] }, 0.03), t);
+  const armsBack: Pair = both(0.24, 0.66, -0.34), armsUp: Pair = both(0.22, 2.10, 0.30);
+  const pen: Pose = { bones: { Hips: [18, 0, 0], Spine: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [20, 0, 0], RightFoot: [-16, 0, 0] }, feet: { Left: [-0.12, ANKLE + 0.04, 0.02], Right: [0.12, ANKLE, 0.72] }, kneePoles: bothDir(0.1, 0, 1), hands: armsBack, poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.26, hipsZ: 0.36 };
+  const plant: Pose = two
+    ? { bones: { Hips: [26, 0, 0], Spine: [10, 0, 0], Neck: [-12, 0, 0], LeftFoot: [-20, 0, 0], RightFoot: [-20, 0, 0] }, feet: { Left: [-0.13, ANKLE, 0.86], Right: [0.13, ANKLE, 0.80] }, kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.62, 0.40), poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.32, hipsZ: 0.78 }
+    : { bones: { Hips: [16, 0, 0], Spine: [6, 0, 0], Neck: [-10, 0, 0], LeftFoot: [-14, 0, 0], RightFoot: [10, 0, 0] }, feet: { Left: [-0.11, ANKLE, 0.98], Right: [0.12, ANKLE + 0.06, 0.70] }, kneePoles: bothDir(0.1, 0, 1), hands: both(0.26, 0.70, 0.62), poles: bothDir(0.3, 0.3, -0.9), hipsY: -0.18, hipsZ: 0.86 };
+  const z0 = two ? 0.83 : 0.98;
+  const air: Pose = two
+    ? { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [-6, 0, 4], RightUpLeg: [-6, 0, -4], LeftLeg: [8, 0, 0], RightLeg: [8, 0, 0], LeftFoot: [34, 0, 0], RightFoot: [34, 0, 0] }, hands: armsUp, poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.24, hipsZ: z0 + 0.06 }
+    : { bones: { Hips: [-2, 0, 0], Spine: [-2, 0, 0], LeftUpLeg: [4, 0, 4], LeftLeg: [10, 0, 0], LeftFoot: [36, 0, 0], RightUpLeg: [-84, 0, -4], RightLeg: [90, 0, 0], RightFoot: [10, 0, 0] }, hands: armsUp, poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.26, hipsZ: z0 + 0.04 };
+  const land: Pose = { bones: { Hips: [22, 0, 0], Spine: [10, 0, 0], Neck: [-10, 0, 0], LeftFoot: [-16, 0, 0], RightFoot: [-16, 0, 0] }, feet: both(0.13, ANKLE, z0 + 0.12), kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.80, z0 + 0.42), poles: HANG_POLES, hipsY: -0.24, hipsZ: z0 + 0.06 };
+  const stand = (z: number, lz = z, rz = z): Pose => ({ bones: { ...STAND }, feet: { Left: [-0.12, ANKLE, lz], Right: [0.12, ANKLE, rz] }, kneePoles: bothDir(0.1, 0, 1), hands: HANG, poles: HANG_POLES, hipsY: 0, hipsZ: z - 0.06 });
+  const zb = z0 + 0.12;
+  return run(scene, sk, name, 6.4, [
+    runIn('Left', 0), runIn('Right', 0.3), runIn('Left', 0.6), runIn('Right', 0.9),
+    at(pen, 1.35, true), at(plant, 1.62), at(air, 1.92), at(land, 2.3, true), at(land, 2.6, true),
+    at(stand(zb), 3.1, true), at(stand(zb * 0.66, zb * 0.66, zb), 3.7), at(stand(zb * 0.66), 4.1), at(stand(zb * 0.33, zb * 0.33, zb * 0.66), 4.6), at(stand(zb * 0.33), 5.0), at(stand(0, 0, zb * 0.33), 5.5), at(stand(0), 5.9, true),
+  ]);
+}
+
+/** ex_wake_up — the Pre-Game Wake-Up's phases in order, one beat each: tall, hands on the lower ribs, a slow breath (the
+ *  ribs widen); a knee lifted and circled at the hip (open the joints); four quick pogos (the rhythm); then the launch —
+ *  stance, dip, jump, land and pause. */
+function wakeUp(scene: Scene, sk: Skeleton): AnimationGroup | null {
+  const ribs: Pair = { Left: [0.05, -0.30, 0.16], Right: [-0.05, -0.30, 0.16] };
+  const breath = (inhale: number): Pose => ({ bones: { ...STAND, Spine: [2 - inhale * 3, 0, 0], Spine1: [-inhale * 2, 0, 0] }, feet: STANCE, kneePoles: bothDir(0.1, 0, 1), rel: ribs, poles: bothDir(0.8, -0.5, 0), hipsY: inhale * 0.01 });
+  // the right thigh lifted to level and circled: forward-out-back-in at the hip, on the left leg
+  const circle = (a: number): Pose => ({
+    bones: { ...STAND, RightUpLeg: [-62 + 18 * Math.cos(a), 0, -18 * Math.sin(a) - 4], RightLeg: [80, 0, 0], RightFoot: [10, 0, 0] },
+    feet: { Left: [-0.10, ANKLE, 0.06] }, kneePoles: { Left: [-0.05, 0, 1] }, rel: ON_HIPS, poles: HIPS_POLES, hipsY: 0, hipsX: -0.05,
+  });
+  const pogoDown: Pose = { bones: { ...STAND, Hips: [4, 0, 0] }, feet: STANCE, kneePoles: bothDir(0.1, 0, 1), hands: both(0.26, 0.91, 0.16), poles: ELBOWS_OUT_BACK, hipsY: -0.05 };
+  const pogoUp: Pose = { bones: { ...STAND, LeftUpLeg: [-4, 0, 3], RightUpLeg: [-4, 0, -3], LeftLeg: [6, 0, 0], RightLeg: [6, 0, 0], LeftFoot: [28, 0, 0], RightFoot: [28, 0, 0] }, hands: both(0.26, 1.10, 0.16), poles: ELBOWS_OUT_BACK, hipsY: 0.12 };
+  const legs = (thigh: number, knee: number): Record<string, Deg3> => ({ LeftUpLeg: [thigh, 0, 4], RightUpLeg: [thigh, 0, -4], LeftLeg: [knee, 0, 0], RightLeg: [knee, 0, 0] });
+  const takeoff: Pose = { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], ...legs(-4, 4), LeftFoot: [34, 0, 0], RightFoot: [34, 0, 0] }, hands: both(0.20, 2.15, 0.12), poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.10 };
+  const peak: Pose = { bones: { Hips: [0, 0, 0], Spine: [-2, 0, 0], ...legs(-10, 14), LeftFoot: [26, 0, 0], RightFoot: [26, 0, 0] }, hands: both(0.22, 2.24, 0.14), poles: bothDir(0.9, 0.1, -0.3), hipsY: 0.24 };
+  const landing: Pose = { bones: { Hips: [20, 0, 0], Spine: [10, 0, 0], Neck: [-10, 0, 0], LeftFoot: [-16, 0, 0], RightFoot: [-16, 0, 0] }, feet: STANCE, kneePoles: bothDir(0.15, 0, 1), hands: both(0.26, 0.70, 0.34), poles: HANG_POLES, hipsY: -0.22 };
+  const keys: ExKey[] = [at(TALL, 0, true), at(breath(0), 0.5, true), at(breath(1), 1.6, true), at(breath(0), 2.8, true)];
+  for (let i = 0; i <= 8; i++) keys.push(at(circle((i / 8) * 2 * Math.PI), 3.3 + i * 0.25, i === 0 || i === 8));
+  keys.push(at(TALL, 5.8, true));
+  for (let i = 0; i < 4; i++) { keys.push(at(pogoDown, 6.1 + i * 0.5)); keys.push(at(pogoUp, 6.35 + i * 0.5)); }
+  keys.push(at(pogoDown, 8.1), at(TALL, 8.5, true), at(DIP, 9.0, true), at({ ...DIP, bones: { ...DIP.bones, Hips: [8, 0, 0], Spine: [2, 0, 0] }, hands: both(0.24, 1.40, 0.10), hipsY: -0.02 }, 9.2), at(takeoff, 9.32), at(peak, 9.52, true), at(landing, 9.9, true), at(landing, 10.5, true), at(TALL, 11.0, true));
+  return run(scene, sk, 'ex_wake_up', 11.6, keys);
+}
+
 export const DRILL_BUILDERS: [string, Builder][] = [
   ['ex_overhead_squat', overheadSquat], ['ex_knee_to_wall', kneeToWall], ['ex_sl_squat_partial', slSquatPartial], ['ex_jump_hands_hips', jumpHandsHips],
   ['ex_cmj_dip', cmjDip], ['ex_wall_drive', (scene, sk) => wallDrive(scene, sk, 'ex_wall_drive', false)], ['ex_wall_march', (scene, sk) => wallDrive(scene, sk, 'ex_wall_march', true)],
-  ['ex_decel_three', decelThree],
+  ['ex_decel_three', decelThree], ['ex_t_drill', tDrill], ['ex_wake_up', wakeUp],
+  ['ex_approach_one', (scene, sk) => approach(scene, sk, 'ex_approach_one', false)], ['ex_approach_two', (scene, sk) => approach(scene, sk, 'ex_approach_two', true)],
 ];

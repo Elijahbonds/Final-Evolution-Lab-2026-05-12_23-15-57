@@ -18,14 +18,15 @@ export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
   // assumption: a countermovement jump and a soft, held landing (the drill holds three seconds; the loop lands and resets)
   'safe-landing': 'ex_jump',
   'lateral-bound': 'ex_lateral_bound',
-  'wake-up': null,
+  // DEMO-LOOPS: its six phases in order, one beat each (breath, hip circle, pogos, the launch)
+  'wake-up': 'ex_wake_up',
   // DEMO-LOOPS (2026-10-27): authored for the drill (anim/authored/exerciseDrills.ts)
   'countermovement-geometry': 'ex_cmj_dip',
   'wall-drive': 'ex_wall_drive',
   'three-step-decel': 'ex_decel_three',
-  't-drill': null,
-  'approach-one-foot': null,
-  'approach-two-foot': null,
+  't-drill': 'ex_t_drill',
+  'approach-one-foot': 'ex_approach_one',
+  'approach-two-foot': 'ex_approach_two',
 };
 
 /** A Quick Screen test (lib/screen/copy.ts SCREEN_TEST_NAMES) → its loop: the overhead squat, the knee-to-wall ankle

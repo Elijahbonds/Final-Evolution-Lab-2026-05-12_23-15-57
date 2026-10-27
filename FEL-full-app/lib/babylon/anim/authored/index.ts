@@ -833,6 +833,10 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_wall_drive', () => buildExerciseClip('ex_wall_drive', scene, skeleton)],
     ['ex_wall_march', () => buildExerciseClip('ex_wall_march', scene, skeleton)],
     ['ex_decel_three', () => buildExerciseClip('ex_decel_three', scene, skeleton)],
+    ['ex_t_drill', () => buildExerciseClip('ex_t_drill', scene, skeleton)],
+    ['ex_approach_one', () => buildExerciseClip('ex_approach_one', scene, skeleton)],
+    ['ex_approach_two', () => buildExerciseClip('ex_approach_two', scene, skeleton)],
+    ['ex_wake_up', () => buildExerciseClip('ex_wake_up', scene, skeleton)],
   ];
 }
 
