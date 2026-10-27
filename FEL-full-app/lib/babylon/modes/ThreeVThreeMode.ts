@@ -2303,7 +2303,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
-        shotBuffer.tick(shooting || dunking || finish || spin, performance.now());   // hoops-p01: the lock the buffered squeeze waits out
+        shotBuffer.tick(!!(shooting || dunking || finish || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
         if (iAmCarrier && meIntent.actionHeld > 0.02 && (shooting || dunking || finish || spin)) shotBuffer.press(performance.now());
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP (see 1v1)
           const held = meIntent.actionHeld > 0.02, edge = held && !squeezeHeldWas; squeezeHeldWas = held;

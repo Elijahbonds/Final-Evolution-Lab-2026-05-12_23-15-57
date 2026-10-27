@@ -1932,7 +1932,7 @@ export const OneVOneMode: ModeDefinition = (() => {
           if (Math.hypot(postStick.x, postStick.y) < 0.35 && shimmyLeft <= 0) stickShot = null;
         }
         // a squeeze made while the body is committed WAITS instead of vanishing
-        shotBuffer.tick(shooting || dunking || spin, performance.now());   // hoops-p01: the lock the buffered squeeze waits out
+        shotBuffer.tick(!!(shooting || dunking || spin), performance.now());   // hoops-p01: the lock the buffered squeeze waits out
         if (carrying && meSlot.intent.actionHeld > 0.02 && (shooting || dunking || spin)) shotBuffer.press(performance.now());
         { // H2e (owner 2026-10-16): THE HOP STEP ON A DOUBLE TAP — a second Square inside HOP_TAP_SEC of the first, on a drive, turns the
           // gather that press started (or the pump its quick release made) into the hop step (core/FinishFootwork)
