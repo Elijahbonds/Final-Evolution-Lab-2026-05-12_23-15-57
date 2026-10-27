@@ -15,7 +15,6 @@ import { SeasonPassTrack } from '@/components/season-pass-track';
 // MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
 import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
-import { WeekCardEntry } from '@/components/progress-card/week-entry';
 import { prisma } from '@/lib/db';
 import { t } from '@/lib/i18n';
 
@@ -27,6 +26,7 @@ export default async function PlayPage() {
   if (!session) redirect(loginPath('/play'));
   const me = (session.user as { id?: string } | undefined)?.id;
   const todayCard = me ? await todayCardFor(prisma, me) : null;
+  // The week card is not on Play any more: it is Profile's one primary and sits on Train (P4 follow-up, 2026-10-27).
   // PREMIUM-UI P4 (2026-10-27): the Venice court at golden hour full-bleed, the shelf's promise in one line, and ONE
   // primary — the Prove It dunk duel, the flagship, docked where a thumb is. Couch and Versus are two quiet doors beside it.
   return (
@@ -53,7 +53,6 @@ export default async function PlayPage() {
       }}
     >
       <TodayCard view={todayCard} />
-      <WeekCardEntry />
       <PlayShelf />
       <VenueStrip />
       <div className="mt-10 empty:mt-0"><SeasonPassTrack /></div>

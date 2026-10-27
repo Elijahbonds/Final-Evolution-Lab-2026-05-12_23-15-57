@@ -38,7 +38,9 @@ export function TabPage({
   children: ReactNode; aside?: ReactNode; hero?: TabHero;
 }) {
   return (
-    <div className="relative min-h-screen bg-fel-bg pb-28 md:pb-12" style={{ backgroundImage: 'var(--fel-page-glow)' }}>
+    // the glow only where there is no hero: under a hero it lightened the ink behind the first cards (a 10 px label on Train
+    // fell to 4.35:1 in the P4 audit), and the hero is the light there anyway
+    <div className="relative min-h-screen bg-fel-bg pb-28 md:pb-12" style={hero ? undefined : { backgroundImage: 'var(--fel-page-glow)' }}>
       {hero && (
         <HeroHeader image={hero.image} imagePosition={hero.imagePosition} media={hero.media} eyebrow={eyebrow} title={title} line={lede}>
           {hero.primary}
