@@ -140,8 +140,8 @@ they are doing it, **what** to do, and **how they did**. The pick, the gates, th
 |---|---|---|
 | Train card | The book's name ("Safe Landing Check") and "Picked from your lowest number: shooting, 40% of 30 shots made." | A plain name ("Soft landings"), why today in a sentence ("Your shooting is your lowest number right now (40% of 30 shots made), so today's drill works on soft, balanced landings."), what it improves, the reward. A first-timer also gets "Each day we pick one short drill from your lowest number." |
 | Drill page, top | The book's name, the old why-line, "The same drill all day…" | Plain name (the book's name small under it), why today, what it improves, and chips for minutes, floor and shoes, and phone distance |
-| First-timer | Nothing | A two-line explainer of what the daily drill is. Then everything is open: the demo, the numbered steps, the 2–3 key cues, and the setup. Start is at the end |
-| Returning player | The same long page as a first-timer | Start sits right under the reward line. "Steps, cues and setup" is one tap away, closed |
+| First-timer | Nothing | A two-line explainer of what the daily drill is, on the card and the page |
+| Everyone | Start under eight phase cards, so the hop drill needed a scroll | Owner, 2026-10-27: "It should play automatically, don't make the platform confusing or hard to use." Nothing is folded away (the demo, the numbered steps, the 2–3 key cues and the setup are always shown, and the demo plays by itself). The next action is one big **Start**, fixed at the bottom above the phone's tab bar, so it is never scrolled to |
 | Steps | One card per chart phase, in the book's words ("Pressurize the System · 1 min", "Set 1 · 0.3 min") | 3–4 short numbered steps read from the chart the day runs ("Warm up for 4 minutes: …", "3 sets of 20 hops.", "Rest 1 minute between sets.") |
 | Demo | "Watch the 3D demo", which opened the drills page's `DrillDemo`: the one-clip `exercise-avatar-canvas` stand-in, where the owner saw the T-pose | The shared library stage (`components/library/exercise-stage.tsx`) looping the drill's own `ex_*` clip (`ex_pogo` for hops, `ex_jump` for landings: the same choice as lane/library-anatomy-2's `surfaceDemo.ts`). It loads once the box is near the screen. The slow squat check (a quarter dip, which the full-squat loop does not show) and the Wake-Up (six different phases) show a cue card, never a wrong movement |
 | Setup | Only inside body play's space check | Phone on its side about chest high, 3.5 to 4.5 m (body play's own `SETUP_HINT`, pinned by a test), 2 m of floor, nothing overhead for jumps, shoes, and "the camera checks your framing before the clock starts" |
@@ -231,8 +231,9 @@ on origin when this lane ran. When it lands, `guide.ts` is the one file to re-re
 
 1. **Copy for review (product copy):** every line in `guide.ts` (plain names, why-today, improves, cues, steps, the
    during words, the three result bands, the hurt panel's two lines) and the reworded `STOPPED_LINE`.
-2. **First-timer page length:** a first-timer reads about 70–90 s before Start (236–296 words). The alternative is a
-   shorter first view with the steps folded, as for a returning player.
+2. **First-timer page length:** a first-timer who reads everything reads for about a minute or more (see the table).
+   Following the owner's 2026-10-27 call, nothing is folded away. Start is always on screen, so reading is a choice,
+   not a gate.
 3. **The shooting → landings link:** "Steady landings are the base of a good jump shot." It is the existing mapping's
    reasoning (`plan.ts`), now said out loud.
 4. **The demo:** the T-pose was the drills page's old `DrillDemo` (`exercise-avatar-canvas`, one unrelated clip; on this
