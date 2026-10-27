@@ -403,7 +403,7 @@ export const DunkMode: ModeDefinition = (() => {
   let feet: { L: TransformNode | null; R: TransformNode | null } = { L: null, R: null };   // the clear test reads the FEET
   let win: Win = 'run';                       // the anim window in charge of the body
   // ── the lob (self-lob / kick-up / cartwheel toss / the alley-oop pass): one real arc, one fair catch ──
-  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, runCueAt: -1, runCued: false };
+  const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, due: 0, runCueAt: -1, runCued: false };
   // DUNK-GLASS-BOUNCE: the backboard's front face (read off the venue's board mesh at load; the regulation fallback) and the
   // iron as twelve small colliders — the lob is swept against both every step
   const glass = { z: CFG.rimZ - HOOP.BOARD_FACE_TO_RIM_CENTRE_M, xMin: -HOOP.BOARD_W / 2, xMax: HOOP.BOARD_W / 2, yMin: CFG.rimHeight - HOOP.BOARD_BOTTOM_BELOW_RIM_M, yMax: CFG.rimHeight + HOOP.BOARD_TOP_ABOVE_RIM_M, found: false };
@@ -3031,13 +3031,20 @@ export const DunkMode: ModeDefinition = (() => {
     // where it is to arrive on the catch beat (a ball already close to the catch keeps its arc: nothing to fix).
     if (lob.live && !lob.caught && !lob.lost && lob.kind === 'plain' && !lob.glass && ballSim.active) {
       const from = ballSim.pos.clone();
-      const to = catchPointNow(LOB_CATCH_CLIP_T);
-      const tf = Math.max(LOB_REAIM_MIN_SEC, LOB_CATCH_CLIP_T - 0.03);
+      // DUNK-FLAGSHIP Phase 3: the oop keeps its own timing. A take-off just after the passer let go (measured: 6 frames, 1.5 m
+      // short of the line) used to squeeze a 0.99 s lob onto the 0.62 beat — a second, flatter throw (0.88 s, top 0.09 m). The
+      // re-aim now takes whichever catch beat is nearer the flight the throw still had left (the on-time run arrives with ~0.6 s:
+      // unchanged), so an early take-off catches on the hang beat, as a take-off before the throw does.
+      const late = prop === 'alleyoop' ? feel('dunk.oopLateCatchClipT', OOP_LATE_CATCH_CLIP_T) : LOB_CATCH_CLIP_T;
+      const left = lob.due - lob.t;
+      const catchT = late > LOB_CATCH_CLIP_T && left >= (LOB_CATCH_CLIP_T + late) / 2 ? late : LOB_CATCH_CLIP_T;
+      const to = catchPointNow(catchT);
+      const tf = Math.max(LOB_REAIM_MIN_SEC, catchT - 0.03);
       const gap = Vector3.Distance(from, to);
       if (gap > 0.35) {
         const v = lobVelocity(from, to, tf);
         ballSim.launch(from, new Vector3(v.x, v.y, v.z)); lobMarker?.aim(to);
-        console.info(`[LOB] re-aimed at the launch: ${gap.toFixed(2)} m to the catch in ${tf.toFixed(2)} s`);
+        console.info(`[LOB] re-aimed at the launch: ${gap.toFixed(2)} m to the catch in ${tf.toFixed(2)} s (beat ${catchT.toFixed(2)}, the throw had ${left.toFixed(2)} s left)`);
       }
     }
     console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${apexFor().toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}${lob.live ? ' lob live' : ''}`);
@@ -3745,7 +3752,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   // ── DUNK-CONTROL-JUICE (2026-09-08): runway tricks, the lob, the catch ──────────────────────────────────────────
-  function resetLob(): void { lobMarker?.clear(); oopWound = false; lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.runCueAt = -1; lob.runCued = false; }
+  function resetLob(): void { lobMarker?.clear(); oopWound = false; lob.live = false; lob.thrown = false; lob.caught = false; lob.lost = false; lob.label = ''; lob.kind = 'plain'; lob.glass = false; lob.over = false; lob.bounces = 0; lob.wantBounces = 0; lob.env = ''; lob.clanked = false; lob.t = 0; lob.due = 0; lob.runCueAt = -1; lob.runCued = false; }
   function resetRunway(): void { teachHint = ''; pendingBeat = null; runwayBeat = null; runwayT = 0; runwayReleased = false; runwayLabels = []; runwayDifficulty = 0; launchQueued = false; airTrick = null; runwayToken++; }
   /** A runway beat owns the body until it ends (the per-frame run / idle loops stand aside); the run keeps going under it. */
   function startRunwayBeat(ctx: ModeContext, rt: RunwayTrick): void {
@@ -3854,6 +3861,7 @@ export const DunkMode: ModeDefinition = (() => {
     if (ball.parent) { releasePos.copyFrom(ball.getAbsolutePosition()); releaseBall(ball); ball.position.copyFrom(releasePos); }
     ballSim.launch(from, new Vector3(v.x, v.y, v.z));
     lob.live = true; lob.thrown = true; lob.caught = false; lob.lost = false; lob.label = label; catchBlend = 1; catchPending = false;
+    lob.t = 0; lob.due = tf;   // Phase 3: the throw's own flight, for the launch's re-aim
     lobMarker?.aim(to);
     setTrail('soft');
     console.info(`[LOB] ${label} from (${from.x.toFixed(2)},${from.y.toFixed(2)},${from.z.toFixed(2)}) to (${to.x.toFixed(2)},${to.y.toFixed(2)},${to.z.toFixed(2)}) in ${tf.toFixed(2)} s`);
