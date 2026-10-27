@@ -15,7 +15,7 @@ export function AvatarDemo({ clip }: { clip: string | null }) {
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const still = !clip;
   return (
-    <div className="relative aspect-video w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a]" data-avatar-demo={clip ?? 'still'} data-avatar-state={state}>
+    <div className="relative aspect-[4/3] w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a] sm:aspect-video" data-avatar-demo={clip ?? 'still'} data-avatar-state={state}>
       <div className={`h-full w-full transition-opacity duration-300 ${state === 'ready' ? 'opacity-100' : 'opacity-0'}`}>
         <ExerciseStage view="demo" clip={clip ?? STILL_DEMO_CLIP} hold={still ? 0 : null} muscles={NO_MUSCLES} side="front" onState={setState} />
       </div>
