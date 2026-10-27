@@ -6,6 +6,7 @@
 import { useMemo, useState } from 'react';
 import { Minus, Plus, UserPlus, X } from 'lucide-react';
 import { MAX_ATTEMPTS, MAX_STATIONS, STATIONS, STATION_KINDS, parseStation, stationName, type StationConfig, type StationKind } from '@/lib/combine/catalogue';
+import { CAMERA_STATION_HOW, timingChoices } from '@/lib/sprint/cameraSprint';
 import { CAMERA_ADULTS_LINE, HELD_LINES, HELD_TODAY_LINE, say } from '@/lib/combine/copy';
 import { adhocAthlete, defaultEventName, newEvent } from '@/lib/combine/draft';
 import type { CombineAthlete, CombineEvent } from '@/lib/combine/types';
@@ -54,6 +55,7 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
     setPicked(new Set(ctx.athletes.filter((a) => a.access.testable && (!ids || ids.has(a.id))).map((a) => a.id)));
   };
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const setTiming = (id: string) => setStations((s) => s.map((x) => (x.id === id ? (x.timing === 'camera' ? { id: x.id, kind: x.kind, variant: x.variant, attempts: x.attempts } : { ...x, timing: 'camera' as const }) : x)));
   const setAttempts = (id: string, d: number) => setStations((s) => s.map((x) => (x.id === id ? { ...x, attempts: Math.min(MAX_ATTEMPTS, Math.max(1, x.attempts + d)) } : x)));
   const add = () => {
     const s = parseStation({ kind: addKind, variant: addVariant });
@@ -123,7 +125,14 @@ export function CombineSetup({ ctx, onStart, onCancel }: { ctx: CombineCtx; onSt
             <li key={s.id} className="flex items-center gap-2 rounded-xl border border-white/8 bg-black/20 p-3" data-combine-station={s.id}>
               <span className="min-w-0 flex-1">
                 <span className="block font-bold text-white">{stationName(s)}</span>
-                <span className="block text-xs text-white/45">{STATIONS[s.kind].how}</span>
+                <span className="block text-xs text-white/45">{s.timing === 'camera' ? CAMERA_STATION_HOW : STATIONS[s.kind].how}</span>
+                {/* SPRINT-SPEED (2026-10-25): the coach picks hand or camera for a sprint or 5-10-5 station */}
+                {(s.kind === 'sprint' || s.kind === 'agility') && timingChoices(s.kind, s.variant).includes('camera') && (
+                  <button type="button" onClick={() => setTiming(s.id)} data-combine-timing={s.timing ?? 'hand'}
+                    className="mt-1.5 min-h-9 rounded-lg border border-white/15 px-2.5 text-xs font-bold text-white/80">
+                    Timed by: <span className="text-[#00E5FF]">{s.timing === 'camera' ? 'camera' : 'hand'}</span> · switch
+                  </button>
+                )}
               </span>
               <span className="flex shrink-0 items-center gap-1" aria-label={`Best of ${s.attempts}`}>
                 <button type="button" onClick={() => setAttempts(s.id, -1)} aria-label="Fewer attempts" className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 text-white/70"><Minus className="h-4 w-4" /></button>
