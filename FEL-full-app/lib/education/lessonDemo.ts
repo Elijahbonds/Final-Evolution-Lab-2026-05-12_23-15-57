@@ -13,7 +13,7 @@
 // NOT LISTED, AND WHY (the gaps are queued for demo-loops in the lane report, never filled with a near miss):
 //   ch. 2 the Ankle Architecture Reset (the foot tripod, short foot) · ch. 4 the ankle (seated circles, then knee-to-wall:
 //   the library's knee-to-wall loop shows only the second half), the hip 90/90, the quadruped thoracic rotation · ch. 5
-//   each Wake-Up phase on its own (the protocol's loop plays all of them; it opens the protocol lesson instead) · ch. 7 the
+//   each Wake-Up phase but the pogos (the protocol's loop plays all of them, so it opens the protocol lesson instead) · ch. 7 the
 //   partner-resisted march · ch. 8 the hip hinge (the library's hinge loop is the loaded deadlift / RDL, not the hands-on-
 //   thighs bodyweight hinge the book teaches) · ch. 9 the supine spinal twist (the library's twist rocks both knees; the
 //   book draws one knee across). Chapter 3's checks are things you look at, standing still, and chapters 1 and 10 teach
@@ -37,6 +37,8 @@ export interface LessonDemo {
 export const LESSON_DEMOS: readonly LessonDemo[] = [
   // ch. 5 — the whole 10-minute protocol is the Wake-Up drill, and its loop plays the phases in order
   { chapter: 5, lesson: 'the-10-minute-pre-game-protocol', source: { kind: 'drill', drill: 'wake-up' } },
+  // Phase 5 is, in the book's words, "bilateral oscillatory pogos": the library's pogo hop is that movement
+  { chapter: 5, lesson: 'build-the-rhythm', source: { kind: 'library', exercise: 'pogo-hop', clip: 'ex_pogo' } },
   // ch. 6 — jumping and landing
   { chapter: 6, lesson: 'the-countermovement-geometry-check', source: { kind: 'drill', drill: 'countermovement-geometry' } },
   { chapter: 6, lesson: 'the-oscillatory-pogo-progression', source: { kind: 'drill', drill: 'pogo-bilateral' } },
