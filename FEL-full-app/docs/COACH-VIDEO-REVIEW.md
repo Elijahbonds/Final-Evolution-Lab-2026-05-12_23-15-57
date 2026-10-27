@@ -22,7 +22,9 @@ first, and only pose data is sent.
    - every flag with its reason and the Mirror's own cue for that fault;
    - the flagged rep replayed as a skeleton beside the client's best rep.
 4. All of step 3 happens on the phone before anything is sent. The page always says: "Your video stays on your phone.
-   Your coach gets the rep data and a skeleton replay."
+   Your coach gets the rep data and a skeleton replay." The form review's wording is **approved as written** (owner, in
+   chat, 2026-10-27, card C03), and the 90-day skeleton replay is now in the Privacy Policy (§1 and §2, version
+   `2026-10-27`), as the card recommended.
 5. **Send the rep data to my coach** posts pose data only (§3). Under **Sets you sent**, each set shows Waiting or
    Reviewed, and the client can delete it.
 

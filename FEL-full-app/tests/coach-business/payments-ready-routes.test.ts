@@ -28,8 +28,11 @@ import { POST as webhook } from '@/app/api/stripe/webhook/route';
 import { GET as connectGet, POST as connectPost } from '@/app/api/coach/business/connect/route';
 import { POST as checkout } from '@/app/api/coach/business/checkout/route';
 import { resetBusinessProbe } from '@/lib/coach-business/store';
-import { COACH_TERMS_TEST_PLACEHOLDER } from '@/lib/payments/terms';
-import { STORE_TERMS_VERSION } from '@/lib/store-terms';
+// test changed (owner-approvals, 2026-10-27, card C28): buyers tick the Purchase Terms now (lib/payments/terms.ts
+// BUYER_TERMS → /purchase-terms), not the coach store's terms, so the tick's version is read from BUYER_TERMS. The
+// assertions are unchanged.
+import { BUYER_TERMS, COACH_TERMS_HREF, COACH_TERMS_VERSION } from '@/lib/payments/terms';
+const BUYER_TERMS_VERSION = BUYER_TERMS.coach_package.version;
 
 const KEYS = ['COACH_CONNECT_PAYMENTS_ENABLED', 'COACH_CONNECT_LIVE', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_CONNECT_WEBHOOK_SECRET', 'NEXTAUTH_URL', 'COACH_PRO_ENABLED'];
 const sdk = new Stripe('sk_test_offline_signing_only');
@@ -132,28 +135,31 @@ describe('POST /api/coach/business/connect: the coach ticks the coach terms firs
   }
   const post = (body: unknown) => connectPost(new Request('https://fel.test/x', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
 
-  it('no tick: 409 terms_required naming the version (test-mode placeholder; no link while the terms are unwritten); nothing at Stripe', async () => {
+  // test changed (owner-approvals, 2026-10-27, card C12): the coach terms are written (lib/coach-terms.ts), so the route
+  // names the written version and links /coach-terms where it named the test-mode placeholder and no link. Same checks.
+  it('no tick: 409 terms_required naming the version and its page; nothing at Stripe', async () => {
     const w = world();
     const r = await post({});
     expect(r.status).toBe(409);
-    expect(await r.json()).toEqual({ error: 'terms_required', version: COACH_TERMS_TEST_PLACEHOLDER, href: null });
+    expect(await r.json()).toEqual({ error: 'terms_required', version: COACH_TERMS_VERSION, href: COACH_TERMS_HREF });
+    expect([COACH_TERMS_VERSION, COACH_TERMS_HREF]).toEqual(['coach-terms-2026-10-27', '/coach-terms']);
     expect(w.calls).toEqual([]);
     expect(w.fake.state.connect.size).toBe(0);
   });
 
   it('ticked: the account is made with the acceptance on it; again later: kept, not rewritten', async () => {
     const w = world();
-    const tick = { termsAccepted: true, termsVersion: COACH_TERMS_TEST_PLACEHOLDER };
+    const tick = { termsAccepted: true, termsVersion: COACH_TERMS_VERSION };
     const r = await post(tick);
     expect(await r.json()).toEqual({ url: 'https://connect.stripe.test/onboarding' });
-    expect(w.calls[0].params.metadata).toMatchObject({ userId: 'coach-1', coach_terms_version: COACH_TERMS_TEST_PLACEHOLDER, coach_terms_accepted_at: expect.stringMatching(/^\d{4}-/) });
+    expect(w.calls[0].params.metadata).toMatchObject({ userId: 'coach-1', coach_terms_version: COACH_TERMS_VERSION, coach_terms_accepted_at: expect.stringMatching(/^\d{4}-/) });
     expect((await post(tick)).status).toBe(200);
     expect(w.calls.filter((c) => c.op === 'accounts.update')).toEqual([]);
   });
 
   it('GET keeps whether Stripe is asking the coach for something', async () => {
     const w = world();
-    await post({ termsAccepted: true, termsVersion: COACH_TERMS_TEST_PLACEHOLDER });
+    await post({ termsAccepted: true, termsVersion: COACH_TERMS_VERSION });
     const r = await connectGet();
     expect(await r.json()).toMatchObject({ connected: true, chargesEnabled: false, requirementsDue: true });
     expect(w.fake.state.connect.get('coach-1')).toMatchObject({ requirementsDue: true });
@@ -175,7 +181,7 @@ describe('POST /api/coach/business/checkout: the buyer\'s tick', () => {
     };
     const r = await checkout(new Request('https://fel.test/x', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ packageId: 'pkg-1' }) }));
     expect(r.status).toBe(409);
-    expect(await r.json()).toEqual({ error: 'terms_required', version: STORE_TERMS_VERSION });
+    expect(await r.json()).toEqual({ error: 'terms_required', version: BUYER_TERMS_VERSION });
     expect(fake.state.sales.size).toBe(0);
   });
 });

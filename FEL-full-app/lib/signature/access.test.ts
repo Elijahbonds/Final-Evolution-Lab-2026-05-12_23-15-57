@@ -2,8 +2,8 @@
 // FEL Pro), through the page's own view builder; and the retest reads against the start of the program.
 import { describe, expect, it } from 'vitest';
 import { loadLibraryFiles } from '@/lib/library/files';
-import { FREE_WEEKS, canSee, canStart, statusOf, weekAccess, type Viewer } from './access';
-import { signatureProgram } from './content';
+import { FREE_WEEKS, OWNER_APPROVED, canSee, canStart, statusOf, weekAccess, type Viewer } from './access';
+import { SIGNATURE_PROGRAMS, signatureProgram } from './content';
 import { NO_ROWS, readsFrom, windows } from './facts';
 import { PRO_NOT_ON_SALE_LINE, YOUTH_PRO_LINE } from './copy';
 import type { DayGate, ExerciseLite } from './serve';
@@ -24,10 +24,23 @@ const view = (o: Partial<Parameters<typeof buildProgramView>[0]> = {}) =>
   buildProgramView({ program: VJ, status: 'approved', viewer: athlete(), ready: true, enrollment: null, gate: GATE, lookup, purchasesOpen: false, ...o });
 
 describe('draft vs approved', () => {
-  it('every program is a draft until the owner approves it', () => {
-    expect(statusOf('vertical-jump', new Map())).toBe('draft');
+  // test changed (owner-approvals, 2026-10-27): was "every program is a draft until the owner approves it", with
+  // statusOf('vertical-jump', new Map()) → 'draft'. The owner approved all four programs as drafted (in chat, 2026-10-27,
+  // cards C20/C21), so with NO review row a program is 'approved'; a row still decides, and an unreadable review table
+  // (null: the pending SQL not applied) is still 'draft' — the fail-closed half of the old assertion, kept below.
+  it('the owner approved all four as drafted: approved with no review row, and a row still decides', () => {
+    expect([...OWNER_APPROVED].sort()).toEqual(SIGNATURE_PROGRAMS.map((p) => p.id).sort());
+    for (const p of SIGNATURE_PROGRAMS) expect(statusOf(p.id, new Map())).toBe('approved');
     expect(statusOf('vertical-jump', new Map([['vertical-jump', { status: 'approved' }]]))).toBe('approved');
+    expect(statusOf('vertical-jump', new Map([['vertical-jump', { status: 'rejected' }]]))).toBe('rejected');
+    expect(statusOf('vertical-jump', new Map([['vertical-jump', { status: 'draft' }]]))).toBe('draft');
     expect(statusOf('vertical-jump', new Map([['vertical-jump', { status: 'nonsense' }]]))).toBe('draft');
+    // another program's row does not touch this one's default
+    expect(statusOf('pain-free', new Map([['vertical-jump', { status: 'rejected' }]]))).toBe('approved');
+  });
+
+  it('fails closed: with the review table unreadable (the pending SQL not applied), every program is a draft', () => {
+    for (const p of SIGNATURE_PROGRAMS) expect(statusOf(p.id, null)).toBe('draft');
   });
 
   it('an athlete never sees a draft or a rejected program; the admin previews both, labelled, with the gaps', () => {
