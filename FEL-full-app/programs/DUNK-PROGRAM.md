@@ -43,7 +43,7 @@ Tracks 1 and 2 hand you to Track 3 when you pass their exit checks. Everyone end
 - This is coaching, not medical care. **It doesn't diagnose or treat anything**, and it can't promise you won't get hurt. The screen is where we start, not a diagnosis.
 - **Refer out before starting or continuing** if you have: pain that wakes you at night; numbness, tingling or weakness down a leg; a joint that gives way; swelling after training; a recent sprain, fracture or surgery; heel or knee-cap pain that's lasted more than two weeks; chest pain, fainting or unusual shortness of breath; or leaking, pain or heaviness in the pelvic floor (see a pelvic health physio; the pelvic floor cue here is a coaching cue only).
 - **Breathing:** no long breath holds. Brace, then breathe out on the effort or on landing. "Brace, don't freeze."
-- **Teen limits (13–17):** 2–3 days a week, about 30–50 contacts per session and about 110 a week, under 900 for the whole 8 weeks. No rung 5 or 5C, no loaded jumps, and dunk sessions stay at 10 attempts or fewer. Overcoming isometrics are allowed.
+- **Teen limits (13–17):** Under 18: most sessions use 30-50 jump contacts. FEL never goes above 55 in one session. 2–3 days a week, about 110 contacts a week and under 900 for the whole 8 weeks (Elijah's rule). No rung 5 or 5C, no loaded jumps, and dunk sessions stay at 10 attempts or fewer. Overcoming isometrics are allowed.
 - **Box drop jumps (rung 5C)** are adults only and unlocked only by me in a live or video review.
 - **Slept under 6 hours?** Train lighter and skip max-effort jumps that day.
 

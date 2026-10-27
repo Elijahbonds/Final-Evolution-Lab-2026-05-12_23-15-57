@@ -169,8 +169,9 @@ export function bandAllowed(id: string | null | undefined, youth: boolean): bool
  * "Push all-out against something that will not move"). Decision #6: none of it reaches a youth client's card.
  */
 // YOUTH-CONTACT-CAP (2026-10-26): + "push as fast and hard as you can", the dunk program's adult isometric cue
-// (programs/DUNK-PROGRAM.md:293), which the filter missed (fel-specs/YOUTH-RULE-CHECK-26c1b4ab-2026-10-24.md item 2).
-export const MAX_EFFORT_CUE = /\b(all[- ]out|maximal|max(?:imum)?[- ]effort|everything you (?:have|had|'ve got)|push as fast and hard as you can)\b/i;
+// (programs/DUNK-PROGRAM.md:293), which the filter missed (fel-specs/YOUTH-RULE-CHECK-26c1b4ab-2026-10-24.md item 2);
+// PM 2026-10-26: + "as fast as you can", "as hard as you can", "as high as you can" and "explode" (any case).
+export const MAX_EFFORT_CUE = /\b(all[- ]out|maximal|max(?:imum)?[- ]effort|everything you (?:have|had|'ve got)|push as fast and hard as you can|as (?:fast|hard|high) as you can|explod(?:e|es|ing))\b/i;
 export const youthSafeCues = (cues: readonly string[]): string[] => cues.filter((c) => !MAX_EFFORT_CUE.test(c));
 
 /** The band a logged RPE falls in (RPE 7.5 rounds to 8). null for anything that is not an RPE 1–10. */

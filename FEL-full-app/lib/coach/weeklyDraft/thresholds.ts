@@ -36,6 +36,8 @@ export const MAX_DRAFT_SETS = { adult: 5, youth: 4 } as const;
  * is one rep of protocol-gated work, counted as sets × the top of the rep range (./contacts.ts).
  */
 export const MAX_TEEN_SESSION_CONTACTS = 55;
+// Elijah's rule (programs/DUNK-PROGRAM.md §4): about 110 jump contacts a week and under 900 for the whole 8 weeks
+// under 18. Not read by any code yet (the draft engine sees one week's sessions, not a week's or a program's total).
 /** An easier week never takes a row below this many sets. */
 export const MIN_EASE_SETS = 2;
 
