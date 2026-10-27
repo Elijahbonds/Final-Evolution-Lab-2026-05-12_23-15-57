@@ -29,8 +29,11 @@ describe('the daily drill card', () => {
     const out = decode(html(viewFrom('u1', hooper(), OPEN, NOW)));
     expect(out).toContain('data-daily-drill="open"');
     expect(out).toContain("Today's drill · 6 min");
-    expect(out).toContain('Safe Landing Check');
-    expect(out).toContain('Picked from your lowest number: shooting, 40% of 30 shots made.');
+    // test changed: drill redesign (TODAY-DRILL 2026-10-27) — the card says the plain name and why today in plain words
+    expect(out).toContain('Soft landings');
+    expect(out).toContain("Your shooting is your lowest number right now (40% of 30 shots made), so today's drill works on soft, balanced landings.");
+    expect(out).toContain('Trains quiet, balanced landings');
+    expect(out).not.toContain('data-daily-explainer');
     expect(out).toContain('Finish it for 10 Lab Credits, and day 4 of your streak.');
     expect(out).toContain('href="/train/today-drill"');
     expect(out).not.toContain('data-daily-nudge');
@@ -38,7 +41,9 @@ describe('the daily drill card', () => {
 
   it('no number yet: the Wake-Up and the nudge to measure', () => {
     const out = decode(html(viewFrom('u1', newAdult(), OPEN, NOW)));
-    expect(out).toContain('Pre-Game Wake-Up');
+    // test changed: drill redesign — the plain name, and a first-timer's one-line explainer
+    expect(out).toContain('Full-body wake-up');
+    expect(out).toContain('data-daily-explainer');
     expect(out).toContain('data-daily-nudge');
     expect(out).toContain('href="/account"');
   });
