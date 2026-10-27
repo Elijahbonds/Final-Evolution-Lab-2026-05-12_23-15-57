@@ -73,7 +73,7 @@ describe('steps: at most 3, each ≤ 6 words, counts from the chart the day runs
 
 describe('chips and reward: short, amounts unchanged', () => {
   it('setup as icon chips: time, phone distance, floor; shoes and clear above when it jumps', () => {
-    expect(needChips(true, 7).map((c) => c.text)).toEqual(['7 min', '4 m away', '2 m floor', 'Shoes on', 'Clear above']);
+    expect(needChips(true, 7).map((c) => c.text)).toEqual(['7 min', '4 m', '2 m floor', 'Shoes on', 'Clear above']);
     expect(needChips(false, 5).map((c) => c.id)).toEqual(['time', 'phone', 'floor']);
   });
   it('the reward line is the claim\'s own numbers', () => {
@@ -187,7 +187,7 @@ describe('copy style', () => {
   });
   it('the phone distance chip is the middle of body play\'s own SETUP_HINT (3.5 to 4.5 m)', () => {
     expect(SETUP_HINT).toContain('3.5 to 4.5 m');
-    expect(needChips(true, 7).find((c) => c.id === 'phone')!.text).toBe('4 m away');
+    expect(needChips(true, 7).find((c) => c.id === 'phone')!.text).toBe('4 m');
     expect(needChips(true, 7).find((c) => c.id === 'phone')!.label).toContain('Phone 4 m away');
   });
   it('every day\'s drill has a guide and a catalogue drill (the shared DrillDemo shows its loop, lib/library/surfaceDemo.ts)', () => {

@@ -139,7 +139,7 @@ export const START_AGAIN_LABEL = 'Do it again';
 export function needChips(jumps: boolean, minutes: number): { id: 'time' | 'phone' | 'floor' | 'shoes' | 'above'; text: string; label: string }[] {
   return [
     { id: 'time', text: `${minutes} min`, label: `${minutes} minutes` },
-    { id: 'phone', text: '4 m away', label: 'Phone 4 m away, whole body in the picture' },
+    { id: 'phone', text: '4 m', label: 'Phone 4 m away, whole body in the picture' },
     { id: 'floor', text: '2 m floor', label: '2 m of clear floor' },
     ...(jumps ? [{ id: 'shoes' as const, text: 'Shoes on', label: 'Shoes with grip' }, { id: 'above' as const, text: 'Clear above', label: 'Nothing overhead to hit' }] : []),
   ];
