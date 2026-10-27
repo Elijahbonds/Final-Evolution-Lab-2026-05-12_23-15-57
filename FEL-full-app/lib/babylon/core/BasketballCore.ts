@@ -33,6 +33,7 @@ import {   // HOOPS-MOVE-KIT-A O1–O3: the off-ball jobs (screen / roll / pop /
 } from './HoopsOffball';
 import { BallSideShade } from './BallSideShade';   // hoops-defense-fx (owner 2026-10-20): the on-ball man shades the ball side
 import { aiPokes } from './ReachTell';   // lane/hoops-def-tell (#273 T-A): the poke is a per-second rate aimed at the led ball
+import { cushionLever } from '../hoops/pressure';   // hoops-p02 (1v1/3v3 phase 2): the on-ball man's cushion on a moving handler
 
 // ── Movement ─────────────────────────────────────────────────────────────
 export interface DribbleResult { crossover: boolean; hesitation: boolean; speed01: number; facingRad: number; planting: boolean; gear: Gear; intensity01: number; paceChange: boolean }
@@ -936,7 +937,7 @@ export class DefenderBrain implements AIBehavior {
     if (onBall && !beaten && !press && handlerSpeed < 0.9) {
       const armLever = DefenderBrain.ARMS_LENGTH / Math.max(0.5, Vector3.Distance(anchor, hoop));
       if (lever > armLever) denyPoint = Vector3.Lerp(anchor, hoop, armLever);
-    }
+    } else if (onBall && !beaten && !press) denyPoint = Vector3.Lerp(anchor, hoop, cushionLever(lever, distXZ(anchor, hoop)));   // hoops-p02: on a MOVING handler, at most a cushion off him (hoops/pressure)
     if (!onBall) denyPoint = Vector3.Lerp(denyPoint, ball, 0.22);
     if (helping) denyPoint = Vector3.Lerp(hoop, ball, 0.2);   // the low man steps INTO the drive
 
@@ -1140,6 +1141,18 @@ export class TurboMeter {
 /** Parabolic flight from the release point to the rim (or a front-rim
  *  clang point for misses). Pure visual sell — the make/miss is decided at
  *  release; step() returns 'flying' | 'made' | 'missed' when it lands. */
+/** A release's flight: how long it takes and how high it bows over the straight line (m). ShotArc flies it; hoops/blocks reads the
+ *  same numbers to know where the ball will be in its first frames (hoops-p02: the block is the hand meeting THIS ball). */
+export function shotArcShape(style: ShotStyle, dist: number, apexAdd = 0): { duration: number; apex: number } {
+  const layupLike = style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup';
+  return {
+    duration: layupLike ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045),
+    // HOOPS-MOVE-KIT-B: a hook goes UP and over the shoulder (a high soft arc off the block); a fadeaway is a longer,
+    // higher ball because the body is falling away from the rim as it leaves
+    apex: (style === 'floater' ? 2.2 : layupLike ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd,   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
+  };
+}
+
 export class ShotArc {
   private from = new Vector3();
   private to = new Vector3();
@@ -1174,11 +1187,9 @@ export class ShotArc {
       this.to.x += (Math.random() - 0.5) * 0.3;
       this.to.z += 0.22;
     }
-    const dist = Vector3.Distance(from, rim);
-    this.duration = style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 0.4 : Math.min(0.9, 0.45 + dist * 0.045);
-    // HOOPS-MOVE-KIT-B: a hook goes UP and over the shoulder (a high soft arc off the block); a fadeaway is a longer,
-    // higher ball because the body is falling away from the rim as it leaves
-    this.apex = (style === 'floater' ? 2.2 : style === 'layup' || style === 'reverse' || style === 'scoop' || style === 'spinLayup' || style === 'hangLayup' ? 0.9 : style === 'hook' ? 2.0 : style === 'fadeaway' ? 1.85 : 1.6) + apexAdd;   // HOOPS-MOVE-KIT-A D3: an ALTERED release arcs higher
+    const shape = shotArcShape(style, Vector3.Distance(from, rim), apexAdd);   // hoops-p02: one formula, read by the block test too
+    this.duration = shape.duration;
+    this.apex = shape.apex;
     this.t = 0;
     this.active = true;
   }

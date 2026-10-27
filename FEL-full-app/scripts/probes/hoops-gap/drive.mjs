@@ -92,6 +92,7 @@ if (SCEN === 'game') {
   result.log = await ev(() => window.__LOG);
   result.hud = await ev(() => window.__hud);
   result.inputs = await ev(() => window.__hg.inputs);
+  result.snaps = await ev(() => window.__hg.snaps || []);   // hoops-p02: the defence snapshots
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
   const setOff = () => S((m) => { const s = window.__FEL_DEV__.scene.metadata[m]; s.offense(); }, MODE);
@@ -152,6 +153,7 @@ if (SCEN === 'game') {
   const popsAfter = (s0) => popAt.filter((i) => i >= s0 - hf0 && i <= s0 - hf0 + 45).length;
   result.stopPops = { afterReversal: [...R.stick, ...R.stickTurbo].map((x) => popsAfter(x.frames.s0)), jog: R.stopJog.map((x) => popsAfter(x.frames.s0)), sprint: R.stopSprint.map((x) => popsAfter(x.frames.s0)) };
   result.heroMotion = an.perBody.me ? { ...an.perBody.me, popAt: undefined } : null;
+  result.snaps = await ev(() => window.__hg.snaps || []);   // hoops-p02
   result.log = await ev(() => window.__LOG);
 }
 result.pageErrors = pageErrs.slice(0, 10); result.hgErrors = await ev(() => window.__hg.errors).catch(() => []);
