@@ -248,7 +248,7 @@ export const LAST_STEP_LINE = 'Last step';
 /** The pain stop's own words. What to do next is the pain check-in's (lib/health/painRule.ts), shown verbatim. */
 export const HURT_TITLE = 'Drill stopped. Rest now.';
 export const HURT_LINE = 'Tell us where it hurts. Your answer sets what happens next, here and in tomorrow’s drill.';
-export const HURT_SKIP_LINE = 'You can skip this. Today’s drill stays stopped either way.';
+export const HURT_SKIP_LINE = 'You can skip this and just rest.';
 
 // ── after ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
