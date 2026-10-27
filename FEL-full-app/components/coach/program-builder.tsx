@@ -247,15 +247,17 @@ export function ProgramBuilder({ tree, completedSessionIds, catalogue, onTree, e
                     <div className="text-[10px] uppercase tracking-wider text-fel-dim">{g.label}</div>
                     {g.items.map((e, i) => (
                       <div key={e.id} className="rounded-md border border-white/6 bg-black/20">
-                        <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-white/80">
-                          <button onClick={() => edit(e)} className="min-w-0 text-left flex-1" aria-expanded={open === e.id}>
+                        {/* PLATFORM PHASE 5 (2026-10-27): the name has the whole row and the four controls sit on their own line
+                            under it — beside four 44 px tap targets (COA-06's floor) a long name wrapped into a narrow column */}
+                        <div className="flex flex-col gap-1 px-2 py-1.5 text-xs text-white/80" data-builder-row>
+                          <button onClick={() => edit(e)} className="min-w-0 text-left" aria-expanded={open === e.id}>
                             {labels[e.id] && <span className="mr-1.5 rounded bg-fel-cyan/15 px-1 text-[10px] font-semibold text-fel-cyan">{labels[e.id]}</span>}
                             {e.isKeySet && <span className="mr-1.5 inline-flex items-center gap-0.5 rounded bg-fel-gold/15 px-1 text-[10px] font-semibold text-fel-gold"><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY</span>}
                             <span className="text-white">{e.name}</span>
                             <span className="text-white/50"> — {doseLine(e)}</span>
                             {e.setupCues.length > 0 && <span className="text-fel-quiet"> · {e.setupCues.length} cue{e.setupCues.length > 1 ? 's' : ''}</span>}
                           </button>
-                          <span className="flex shrink-0 items-center gap-1">
+                          <span className="flex items-center justify-end gap-1" data-builder-row-controls>
                             <button disabled={busy || i === 0} onClick={() => void call({ action: 'move', sessionExerciseId: e.id, direction: 'up' })} className="text-fel-quiet hover:text-white disabled:opacity-20" aria-label={`Move ${e.name} up`}><ArrowUp className="h-3.5 w-3.5" /></button>
                             <button disabled={busy || i === g.items.length - 1} onClick={() => void call({ action: 'move', sessionExerciseId: e.id, direction: 'down' })} className="text-fel-quiet hover:text-white disabled:opacity-20" aria-label={`Move ${e.name} down`}><ArrowDown className="h-3.5 w-3.5" /></button>
                             <button onClick={() => edit(e)} className="text-fel-quiet hover:text-white" aria-label={`Edit ${e.name}`}>{open === e.id ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}</button>
