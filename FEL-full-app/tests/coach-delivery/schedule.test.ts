@@ -1,5 +1,6 @@
 // COACH-DELIVERY COA-05 (2026-10-26): roster sessions on a coach's calendar, the athlete's view, and the .ics feed — which
 // must validate against the RFC 5545 basics (CRLF, folding at 75 octets, TEXT escaping, the required properties).
+import { readFileSync } from 'node:fs';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FakeDeliveryDb } from '@/tests/helpers/fakeDeliveryDb';
@@ -14,6 +15,8 @@ import { GET as mineGET, POST as minePOST } from '@/app/api/coach/me/schedule/ro
 import { GET as feedGET } from '@/app/api/coach/schedule/feed/[token]/route';
 import { calendarFeedIcs, icsFold, icsText } from '@/lib/coach-store/ics';
 import { cleanSession, clashWith } from '@/lib/coach/schedule/rules';
+import { feedToken, newFeedNonce, readFeedToken } from '@/lib/coach/schedule/feedToken';
+import { SQL as scheduleSql } from '@/lib/coach/schedule/store';
 import { resetDeliveryProbe } from '@/lib/coach/delivery/probe';
 import { resetParityProbe } from '@/lib/coach/parity/probe';
 import { resetGroupsProbe } from '@/lib/groups/store';
@@ -173,5 +176,94 @@ describe('the .ics feed (RFC 5545 basics)', () => {
     expect((await feed('/api/coach/schedule/feed/c1.forged.ics')).status).toBe(404);
     await act({ action: 'feed_off' });
     expect((await feed(reset.feed.path)).status).toBe(404);
+  });
+});
+
+// routeContract: /api/coach/schedule/feed/[token] is PUBLIC BY DESIGN (a calendar app sends no cookie), so the link is
+// the key. Each property the contract's reason claims is proved here.
+describe('the feed link is the only key (PUBLIC_BY_DESIGN in lib/api/routeContract.test.ts)', () => {
+  const sigOf = (path: string) => decodeURIComponent(path.split('/').pop()!).replace(/\.ics$/, '').split('.')[1];
+
+  it('is high-entropy: a 256-bit HMAC signature over a 144-bit random nonce; every reset draws a new one', async () => {
+    const path = (await (await act({ action: 'feed_on' })).json()).feed.path as string;
+    expect(Buffer.from(sigOf(path), 'base64url')).toHaveLength(32);                       // SHA-256: 256 bits ≥ 128
+    const nonces = new Set(Array.from({ length: 200 }, () => newFeedNonce()));
+    expect(nonces.size).toBe(200);
+    for (const n of nonces) expect(Buffer.from(n, 'base64url')).toHaveLength(18);         // 144 bits of randomBytes
+    const paths = new Set([path]);
+    for (let i = 0; i < 5; i++) paths.add((await (await act({ action: 'feed_reset' })).json()).feed.path);
+    expect(paths.size).toBe(6);
+  });
+
+  it('is compared in constant time and never stored: the table holds the nonce, the token needs the server secret too', async () => {
+    const src = readFileSync('lib/coach/schedule/feedToken.ts', 'utf8');
+    expect(src).toContain('timingSafeEqual(want, got)');
+    expect(src).not.toMatch(/parts\[1\]\s*===|===\s*parts\[1\]/);
+    expect(scheduleSql.setFeed).toMatch(/\("userId", "nonce", "createdAt"\)/);
+    const path = (await (await act({ action: 'feed_on' })).json()).feed.path as string;
+    const sig = sigOf(path);
+    // one character off, a byte short, a byte long: all refused (the length check runs before timingSafeEqual)
+    const flip = (sig[0] === 'A' ? 'B' : 'A') + sig.slice(1);
+    for (const bad of [flip, sig.slice(0, -1), `${sig}A`]) expect(await readFeedToken(`c1.${bad}`, async () => (h.db.feeds.find((f) => f.userId === 'c1')?.nonce as string | undefined) ?? null)).toBeNull();
+    // the same nonce under another secret is not the same token
+    const nonce = String(h.db.feeds.find((f) => f.userId === 'c1')!.nonce);
+    expect(feedToken('c1', nonce, 'another-secret-entirely-0123456789')).not.toBe(feedToken('c1', nonce));
+    expect(feedToken('c1', nonce, '')).toBeNull();                                         // no secret: no feed at all
+  });
+
+  it('its owner can rotate it (the old link dies) or switch it off — the coach and the athlete alike', async () => {
+    const first = (await (await act({ action: 'feed_on' })).json()).feed.path;
+    expect((await (await act({ action: 'feed_on' })).json()).feed.path).toBe(first);        // on is idempotent
+    const second = (await (await act({ action: 'feed_reset' })).json()).feed.path;
+    expect((await feed(first)).status).toBe(404);
+    expect((await feed(second)).status).toBe(200);
+    await act({ action: 'feed_off' });
+    expect((await feed(second)).status).toBe(404);
+    h.user = 'ada';
+    const a1 = (await (await mine({ action: 'feed_on' })).json()).feed.path;
+    const a2 = (await (await mine({ action: 'feed_reset' })).json()).feed.path;
+    expect((await feed(a1)).status).toBe(404);
+    expect((await feed(a2)).status).toBe(200);
+    await mine({ action: 'feed_off' });
+    expect((await feed(a2)).status).toBe(404);
+  });
+
+  it('exposes no minor\'s data and no health data: adults only, and only time, title and place', async () => {
+    await act({ action: 'create', title: 'Team practice', startsAt: at(24), minutes: 90, scope: 'team', scopeId: 't1', place: 'North gym' });
+    await act({ action: 'create', title: 'Private session', startsAt: at(30), minutes: 60, scope: 'athlete', scopeId: 'tia' });
+    // the coach's feed: no athlete is named, listed or identified — not the teen, not an adult
+    const coachIcs = await (await feed((await (await act({ action: 'feed_on' })).json()).feed.path)).text();
+    for (const who of ['tia', 'Tia', 'ada', 'Ada', 'bo@', 'Varsity']) expect(coachIcs, who).not.toContain(who);
+    const { logical } = assertRfc5545(coachIcs);
+    const props = new Set(logical.map((l) => l.split(':')[0]));
+    expect([...props].sort()).toEqual(['BEGIN', 'CALSCALE', 'DTEND', 'DTSTAMP', 'DTSTART', 'END', 'LOCATION', 'METHOD', 'PRODID', 'STATUS', 'SUMMARY', 'UID', 'VERSION', 'X-WR-CALNAME']);
+    // nothing from the body reaches it: the feed's code reads sessions and the age gate, never readiness, check-ins or surveys
+    const server = readFileSync('lib/coach/schedule/server.ts', 'utf8');
+    expect(server).not.toMatch(/readiness|checkin|survey|habit|healthData|canWriteHealthData/i);
+    // a teen gets no link — even with the guardian's coach-training consent (a leaked link would say where a minor will be)
+    h.user = 'tia';
+    const teen = await mine({ action: 'feed_on' });
+    expect(teen.status).toBe(403);
+    expect((await teen.json()).error).toBe('feed_adults_only');
+    // and a link made before (a nonce written some other way) still serves nothing for a minor
+    h.db.feeds.push({ userId: 'tia', nonce: newFeedNonce() });
+    const teenToken = feedToken('tia', String(h.db.feeds.find((f) => f.userId === 'tia')!.nonce))!;
+    expect((await feed(`/api/coach/schedule/feed/${teenToken}.ics`)).status).toBe(404);
+    // an account with no birth year is not an adult either (fails closed)
+    seedPerson(h.db, 'nob', 'blank', 'Nob');
+    h.user = 'nob';
+    expect((await mine({ action: 'feed_on' })).status).toBe(403);
+  });
+
+  it('a wrong token is a 404 with nothing in it — never a 403 that would confirm the account exists', async () => {
+    const good = decodeURIComponent((await (await act({ action: 'feed_on' })).json()).feed.path.split('/').pop()!);
+    const sig = good.replace(/\.ics$/, '').split('.')[1];
+    const wrong = ['c1.forged.ics', `ada.${sig}.ics`, `nobody.${sig}.ics`, 'c1.ics', '', '..', `c1.${sig}.extra.ics`, `${'x'.repeat(65)}.${sig}.ics`];
+    for (const t of wrong) {
+      const r = await feedGET(new Request(`http://fel.test/api/coach/schedule/feed/x`), { params: { token: t } });
+      expect(r.status, t).toBe(404);
+      expect(await r.json(), t).toEqual({ error: 'not_found' });
+      expect(r.headers.get('cache-control'), t).toBe('no-store');
+    }
   });
 });

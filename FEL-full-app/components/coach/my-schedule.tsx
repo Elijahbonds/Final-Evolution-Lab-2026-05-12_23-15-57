@@ -23,9 +23,10 @@ export function MySchedule({ api = MY_SCHEDULE_API }: { api?: string }) {
     let path = feed?.path ?? null;
     if (!path) {
       const r = await fetch(api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'feed_on' }) }).catch(() => null);
-      const j = r?.ok ? await r.json().catch(() => null) : null;
-      path = j?.feed?.path ?? null;
-      setFeed(j?.feed ?? null);
+      const j = r ? await r.json().catch(() => null) : null;
+      if (j?.error === 'feed_adults_only') { setMsg('Calendar links are for adult accounts.'); return; }
+      path = r?.ok ? j?.feed?.path ?? null : null;
+      setFeed(r?.ok ? j?.feed ?? null : null);
     }
     if (!path) { setMsg('The calendar link is not available yet.'); return; }
     try { await navigator.clipboard.writeText(`${window.location.origin}${path}`); setMsg('Link copied. Add it to your calendar app as a subscription.'); } catch { setMsg(`${window.location.origin}${path}`); }

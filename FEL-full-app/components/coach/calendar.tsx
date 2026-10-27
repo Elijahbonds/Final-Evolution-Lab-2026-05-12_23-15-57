@@ -51,6 +51,7 @@ export function CoachCalendar({ api = COACH_SCHEDULE_API }: { api?: string }) {
   const feed = async (action: 'feed_on' | 'feed_reset') => {
     const { ok, j } = await post({ action });
     if (ok) { setBoard((b) => b && { ...b, feed: j.feed as Board['feed'] }); setMsg(action === 'feed_reset' ? 'New link made; the old one stopped working.' : 'Calendar link ready.'); }
+    else if (j?.error === 'feed_adults_only') setMsg('Calendar links are for adult accounts.');
   };
   const copyFeed = async () => {
     if (!board?.feed?.path) return;

@@ -13,7 +13,7 @@ bucket (OWN-16), terms and Stripe (OWN-04/06).
 | COA-03 | Readiness survey: five questions beside the jump check, read by the daily check-in's low rule and the coach's readiness rule. Health data: verified adult + `health_data` (health write **i**); the coach sees it with `coach_view`. | `lib/coach/readiness/survey*.ts` |
 | VBT §7.3 | Today eases, and the coach is alerted, from a warm-up bar-speed Low — the newest of today's jump check, bar speed and survey stands. | `lib/coach/readiness/sources.ts` |
 | COA-04 | Brand: name, accent (WCAG AA on FEL's dark), logo in the existing public creator bucket. On the coach page, the athlete's Today, the invite email's sign-off (email stays plain text). | `lib/coach/branding*.ts` |
-| COA-05 | Roster sessions on a calendar; a clash with another session or a held/paid store booking is refused; one signed .ics feed per person (RFC 5545 basics tested). | `lib/coach/schedule/**`, `lib/coach-store/ics.ts` |
+| COA-05 | Roster sessions on a calendar; a clash with another session or a held/paid store booking is refused; one signed .ics feed per person (RFC 5545 basics tested). The feed route is public by design (a calendar app sends no cookie): a 256-bit HMAC link, compared in constant time, reset or switched off by its owner, verified adults only, time/title/place only, any bad link a 404. | `lib/coach/schedule/**`, `lib/coach-store/ics.ts` |
 | COA-06 | `/coach` Clients at 390 px: no sideways scroll; a 44 px tap floor for the whole tab (`app/coach/_components/look.ts`). | rig: `scripts/probes/_coach-delivery-phone.mts` |
 | COA-07 | TeamSnap / SportsEngine / LeagueApps roster exports read by name; guardian emails never become invites. | `lib/coach/bulkImport.ts` |
 | COA-08 | A coach's own demo clip, by signed PUT to the public creator bucket; off until `COACH_VIDEO_UPLOADS_ENABLED` and the bucket. | `lib/library/coachVideo.ts` |
@@ -28,9 +28,10 @@ The lane's settings live in one collapsed **Setup** group at the bottom of Clien
 ## Owner calls
 
 1. Apply `prisma/pending/2026-10-26-coach-delivery.sql` (seven additive tables; rollback in its header).
-2. Retention: an erased coach's automations, sessions, brand and reviews go; an athlete's own survey answers, reviews and
-   automation audit rows go (`lib/data-rights/registry.ts`). Alternative: keep reviews with the athlete nulled.
+2. **Decided (owner, 2026-10-27):** retention follows the registry as written: an erased coach's automations, sessions,
+   brand and reviews go; an athlete's own survey answers, reviews and automation audit rows go (`lib/data-rights/registry.ts`).
 3. Draft copy: automation presets, survey lines, team-fee message, review errors, first-client steps.
 4. Schedule the hourly automation sweep (Cloud Scheduler → `POST /api/coach/automations/sweep`).
-5. Turn review text public once SAF-06 is wired (`REVIEW_TEXT_PUBLIC`).
-6. The coach store still takes 15% (`lib/fees.ts`); the dashboard line now shows the coach-business fee (owner call 5).
+5. **Decided (owner, 2026-10-27):** review text stays private until SAF-06 is wired (`REVIEW_TEXT_PUBLIC` stays false).
+6. **Decided (owner, 2026-10-27):** team fees go to adults only (`lib/coach-business/teamFee.ts`); no guardian-pays flow.
+7. The coach store still takes 15% (`lib/fees.ts`); the dashboard line now shows the coach-business fee (owner call 5).

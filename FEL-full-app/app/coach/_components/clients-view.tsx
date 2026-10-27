@@ -114,7 +114,7 @@ export function ClientsView() {
           empty roster has nothing else on this screen to do. */}
       {/* COACH-DELIVERY (round 8 item b): the first-client checklist while the roster is empty */}
       {roster.length === 0 && <FirstClientChecklist state={{ invited: openInvites > 0 }} />}
-      <div id="coach-invite"><InvitePanel bulk={false} /></div>
+      <div id="coach-invite"><InvitePanel /></div>
       {/* NEEDS YOU TODAY, above the roster: fifty rows is not an answer to "who needs me", and the reading the
           coach would otherwise do by eye is already written in lib/coach/{triage,compliance}.ts. It sits BELOW
           the invite panel for that panel's own reason — a coach with nobody on the roster has nothing to triage. */}

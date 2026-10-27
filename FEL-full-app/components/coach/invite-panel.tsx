@@ -19,8 +19,9 @@ import { BulkInvite } from './bulk-invite';
 
 interface Invite { token: string; use: 'once' | 'many'; expiresAt: string; joined: number }
 
-/** `bulk` false: the team import lives in the Clients tab's Setup group instead (COACH-DELIVERY phase 2, the premium rule). */
-export function InvitePanel({ bulk = true }: { bulk?: boolean } = {}) {
+/** The team import is off by default: it lives in the Clients tab's Setup group (COACH-DELIVERY phase 2, the premium rule).
+ *  `bulk` puts it back inside the panel for a page that has no Setup group. */
+export function InvitePanel({ bulk = false }: { bulk?: boolean } = {}) {
   const [invites, setInvites] = useState<Invite[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<{ token: string; data: string } | null>(null);

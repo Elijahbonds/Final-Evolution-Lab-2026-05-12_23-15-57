@@ -30,6 +30,13 @@ const soft = <T,>(p: Promise<T>, empty: T): Promise<T> => p.catch(() => empty);
 
 const view = (s: SessionRow) => ({ id: s.id, title: s.title, startsAt: s.startsAt.toISOString(), endsAt: endOf(s).toISOString(), minutes: s.minutes, place: s.place, scope: s.scope, scopeId: s.scopeId, cancelled: !!s.cancelledAt });
 
+/** The feed link is a bearer key a calendar app holds with no session, so only a verified adult may have one: a leaked
+ *  teen link would say where and when a minor will be, whatever their guardian has consented to. Fails closed. */
+async function feedAllowed(db: ScheduleDb, userId: string, nowMs: number): Promise<boolean> {
+  const g = await readTeenGate(db, userId, new Date(nowMs));
+  return g.ok && g.band === 'adult';
+}
+
 async function feedState(db: ScheduleDb, userId: string, nowMs: number) {
   const nonce = await feedNonce(db, userId, nowMs);
   const token = nonce ? feedToken(userId, nonce) : null;
@@ -72,6 +79,7 @@ export async function scheduleAct(db: ScheduleDb, userId: string, body: unknown,
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
   if (!(await deliveryReady(db, nowMs))) return NOT_READY;
   if (b.action === 'feed_on' || b.action === 'feed_reset') {
+    if (!(await feedAllowed(db, userId, nowMs))) return res(403, { error: 'feed_adults_only' });
     const have = b.action === 'feed_on' ? await feedNonce(db, userId, nowMs) : null;
     if (!have && !(await setFeedNonce(db, userId, newFeedNonce(), nowMs))) return res(500, { error: 'not_saved' });
     const feed = await feedState(db, userId, nowMs);
@@ -127,7 +135,7 @@ export async function feedIcs(db: ScheduleDb, token: string, now: Date = new Dat
   const nowMs = now.getTime();
   if (!(await deliveryReady(db, nowMs))) return null;
   const userId = await readFeedToken(token, (id) => feedNonce(db, id, nowMs));
-  if (!userId) return null;
+  if (!userId || !(await feedAllowed(db, userId, nowMs))) return null;
   const from = new Date(nowMs - 30 * DAY), to = new Date(nowMs + 180 * DAY);
   const [own, asAthlete] = await Promise.all([sessionsForCoach(db, userId, from, to, nowMs), athleteSessions(db, userId, from, to, nowMs)]);
   const events: FeedEvent[] = [
