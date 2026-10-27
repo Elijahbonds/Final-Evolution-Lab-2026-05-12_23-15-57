@@ -99,7 +99,9 @@ const UA = 'AgeScreenTest/1.0';
 // SQL only, schema.prisma untouched) at 0467a4dc, the lane commit carrying both on top of every file above.
 // Coach-parity landed first (#456): pinned at the merge of lane/finish-release into lane/safety (1397dc45), the first
 // commit carrying every pending file above.
-const PARENT = '0fe07e1f6e704a95a0b48dbbe233f3f9ef0872aa';
+// MERGE a0fe6763 (lane/safety, after payments-ready, sprint-speed and vbt landed): the first commit carrying every
+// pending file above.
+const PARENT = 'a0fe67636b6d33a043921bd16555cdaef122cec2';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
