@@ -10,12 +10,22 @@ import vm from 'node:vm';
 export const SW_PATH = path.resolve(__dirname, '../../public/sw.js');
 export const ORIGIN = 'https://fel.test';
 
-export interface SwRoute { strategy: 'bypass' | 'network-fallback' | 'cache-first' | 'stale-while-revalidate'; cache?: string }
+export interface SwRoute {
+  strategy: 'bypass' | 'network-fallback' | 'cache-first' | 'stale-while-revalidate' | 'network-first';
+  cache?: string; key?: string; clear?: string;
+}
+export interface SwNotification { title: string; options: { body: string; tag?: string; icon: string; badge: string; data: { url: string } } }
 export interface SwRules {
   VERSION: string; POSE_VERSION: string; OFFLINE_URL: string; STATIC_MAX_ENTRIES: number;
-  CACHES: { static: string; pose: string; offline: string };
-  strategyFor(req: { url: string; origin: string; method?: string; mode?: string; range?: boolean }): SwRoute;
-  isCurrentCache(name: string): boolean;
+  PAGES_MAX_ENTRIES: number; ASSETS_MAX_ENTRIES: number;
+  CACHES: { static: string; pose: string; offline: string; pages: string; assets: string };
+  OFFLINE_PAGES: string[]; OFFLINE_LESSON: RegExp; REFUSED_PARAMS: string[];
+  strategyFor(req: { url: string; origin: string; method?: string; mode?: string; range?: boolean; offline?: boolean }): SwRoute;
+  isCurrentCache(name: string, offline?: boolean): boolean;
+  offlineFrom(search: string | undefined): boolean;
+  sameFile(a: Response, b: Response): boolean;
+  safePath(v: unknown): string;
+  notificationFor(d: unknown): SwNotification;
 }
 
 const source = () => readFileSync(SW_PATH, 'utf8');
@@ -51,10 +61,14 @@ export function request(pathOrUrl: string, init: { method?: string; mode?: strin
   return { url: new URL(pathOrUrl, ORIGIN).href, method: init.method ?? 'GET', mode: init.mode ?? 'cors', headers: new Headers(init.headers ?? {}) };
 }
 
-export function startSw(network: (url: string) => Promise<Response>) {
+/** `search` is the worker's own URL query (offline-push: '?offline=1' turns offline play on). */
+export function startSw(network: (url: string) => Promise<Response>, opts: { search?: string; windows?: string[] } = {}) {
   const listeners = new Map<string, Handler>();
   const named = new Map<string, FakeCache>();
-  const calls = { skipWaiting: 0, claim: 0, preloadEnabled: 0, fetched: [] as string[] };
+  const calls = {
+    skipWaiting: 0, claim: 0, preloadEnabled: 0, fetched: [] as string[],
+    shown: [] as { title: string; options: SwNotification['options'] }[], opened: [] as string[], focused: [] as string[],
+  };
   const fetchImpl = async (r: string | { url: string }) => { const url = keyOf(r); calls.fetched.push(url); return network(url); };
   const caches = {
     async open(name: string) { if (!named.has(name)) named.set(name, new FakeCache(fetchImpl)); return named.get(name)!; },
@@ -62,12 +76,20 @@ export function startSw(network: (url: string) => Promise<Response>) {
     async delete(name: string) { return named.delete(name); },
     async match(r: string | { url: string }) { for (const c of named.values()) { const hit = await c.match(r); if (hit) return hit; } return undefined; },
   };
+  const windows = (opts.windows ?? []).map((url) => ({ url, focus: async () => { calls.focused.push(url); } }));
   const self = {
-    location: { origin: ORIGIN },
+    location: { origin: ORIGIN, search: opts.search ?? '' },
     addEventListener: (type: string, fn: Handler) => listeners.set(type, fn),
     skipWaiting: async () => { calls.skipWaiting += 1; },
-    clients: { claim: async () => { calls.claim += 1; } },
-    registration: { navigationPreload: { enable: async () => { calls.preloadEnabled += 1; } } },
+    clients: {
+      claim: async () => { calls.claim += 1; },
+      matchAll: async () => windows,
+      openWindow: async (url: string) => { calls.opened.push(url); },
+    },
+    registration: {
+      navigationPreload: { enable: async () => { calls.preloadEnabled += 1; } },
+      showNotification: async (title: string, options: SwNotification['options']) => { calls.shown.push({ title, options }); },
+    },
   };
   const ctx = vm.createContext({
     self, caches, fetch: fetchImpl, URL, Headers, Response, Promise, console,
@@ -94,5 +116,32 @@ export function startSw(network: (url: string) => Promise<Response>) {
     return { handled: true as const, response };
   }
 
-  return { lifecycle, fetchEvent, calls, cacheNames: () => [...named.keys()].sort(), cache: (n: string) => named.get(n), openCache: caches.open };
+  /** offline-push: post a message to the worker (what a page's postMessage delivers) and wait for its work. */
+  async function message(data: unknown) {
+    const waits: Promise<unknown>[] = [];
+    listeners.get('message')!({ data, waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    await Promise.all(waits);
+  }
+
+  /** offline-push: a push arriving. `body` is what the browser decrypted; `json()` throws on a body that is not JSON. */
+  async function push(body: string | null) {
+    const waits: Promise<unknown>[] = [];
+    const data = body === null ? null : { json: () => JSON.parse(body) };
+    listeners.get('push')!({ data, waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    await Promise.all(waits);
+  }
+
+  /** offline-push: the player taps a notification whose data.url is `url`. */
+  async function notificationClick(url: unknown) {
+    const waits: Promise<unknown>[] = [];
+    let closed = false;
+    listeners.get('notificationclick')!({ notification: { data: { url }, close: () => { closed = true; } }, waitUntil: (p: Promise<unknown>) => waits.push(p) });
+    await Promise.all(waits);
+    return { closed };
+  }
+
+  return {
+    lifecycle, fetchEvent, message, push, notificationClick, calls,
+    cacheNames: () => [...named.keys()].sort(), cache: (n: string) => named.get(n), openCache: caches.open,
+  };
 }

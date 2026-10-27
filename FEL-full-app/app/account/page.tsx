@@ -9,6 +9,7 @@ import { ScanSaveAccount } from '@/components/privacy/scan-save-account';
 import { TabPage } from '@/components/shell/tab-page';
 import { MotionSetting } from '@/components/settings/motion-setting';
 import { PrqDataRights, HealthDataSection } from '@/components/profile-view';
+import { PushSettings } from '@/components/pwa/push-settings';   // offline-push: adult opt-in notifications
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,7 @@ export default async function AccountPage() {
       <HealthDataSection />
       {/* HOTFIX (2026-09-24): reduced motion — the device decides by default; this is the override, both ways */}
       <div className="mt-8"><MotionSetting /></div>
+      <PushSettings />
       <p className="mt-4 text-sm"><Link href="/account/coaching">Coaching</Link></p>
     </TabPage>
   );

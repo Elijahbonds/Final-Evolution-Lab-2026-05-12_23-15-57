@@ -6,6 +6,7 @@ import { isCertifiedCoach } from '@/lib/coach/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { aiCallerFromEnv, coachWeek, type DraftReadDb } from '@/lib/coach/weeklyDraft/server';
 import { decideChange, parseDecideBody, type ApproveDb } from '@/lib/coach/weeklyDraft/approve';
+import { notifyPlanUpdate } from '@/lib/push/server';   // offline-push: the athlete's opted-in adult push
 import { coachFeatureRefusal, type PlanDb } from '@/lib/coach-business/planServer';
 
 /**
@@ -46,5 +47,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) return bad(parsed.error);
   const r = await decideChange(prisma as unknown as ApproveDb, userId, parsed.input);
   if (!r.ok) return NextResponse.json({ error: r.error, ...(r.why ? { why: r.why } : {}) }, { status: r.status });
+  await notifyPlanUpdate(parsed.input.draftId, r.written);   // only when something was written; bounded, never throws
   return NextResponse.json({ decision: r.decision, already: r.already, written: r.written });
 }

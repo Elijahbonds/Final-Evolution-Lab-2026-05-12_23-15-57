@@ -5,6 +5,7 @@ import { currentUserId, bad } from '@/lib/camp/server';
 import { rateLimit } from '@/lib/rate-limit';
 import { approveAllSafe, type ApproveDb } from '@/lib/coach/weeklyDraft/approve';
 import { NOTE_MAX_CHARS } from '@/lib/coach/weeklyDraft/thresholds';
+import { notifyPlanUpdate } from '@/lib/push/server';   // offline-push: the athlete's opted-in adult push
 
 /**
  * COACH-AI-DRAFT (2026-10-24): "Approve all safe" — POST { draftId, note? }. Every change in that athlete's draft that the
@@ -24,5 +25,6 @@ export async function POST(req: NextRequest) {
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, NOTE_MAX_CHARS) || null : null;
   const r = await approveAllSafe(prisma as unknown as ApproveDb, userId, draftId, note);
   if (!r.ok) return bad(r.error, r.status);
+  await notifyPlanUpdate(draftId, r.result.approved.length);   // bounded, never throws
   return NextResponse.json(r.result);
 }

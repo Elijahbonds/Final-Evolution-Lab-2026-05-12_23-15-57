@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { accessRole, validateMessage } from '@/lib/coach/loop';
 import { decorateThread, threadReadStates, type RawDb } from '@/lib/coach/messageReads';
+import { notifyCoachMessage } from '@/lib/push/server';   // offline-push: the other side's opted-in adult push (never the text)
 
 async function programFor(programId: string, userId: string) {
   const p = await prisma.coachingProgram.findUnique({ where: { id: programId }, select: { id: true, coachId: true, clientId: true } });
@@ -42,5 +43,6 @@ export async function POST(req: NextRequest) {
   const text = validateMessage(body.body);
   if (!text) return bad('body_required');
   const m = await prisma.programMessage.create({ data: { programId: r.program.id, authorId: userId, body: text } });
+  await notifyCoachMessage(r.program, userId);   // bounded (lib/push/server.ts HOOK_WAIT_MS); never throws
   return NextResponse.json({ message: { ...m, mine: true, fromCoach: userId === r.program.coachId } });
 }

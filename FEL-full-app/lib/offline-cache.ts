@@ -1,9 +1,21 @@
 /**
  * lib/offline-cache.ts
  *
- * Offline resilience for game results: store-and-forward queue so a
- * session played offline (or through a flaky connection) still lands in
- * /api/sessions — and, for story runs, can still complete its node.
+ * OFFLINE-PUSH (round 8, 2026-10-26): wired at last. A single-player run played
+ * with no signal (offline play, lib/pwa/offlinePlay.ts) is queued here by
+ * lib/pwa/offlineShell.ts and sent to POST /api/offline/results when the signal
+ * is back, as PRACTICE: the server records it in the player's history
+ * (OfflinePlay) and pays nothing, because it never started or timed the run
+ * (ECONOMY-SESSIONS-HARDEN). Paid runs still go through
+ * lib/sessions/finishOutbox.ts and /api/sessions, exactly as before.
+ * What changed here: every entry carries the account that played it and is
+ * sent only while that account is signed in (a shared phone never files one
+ * player's run under another's), entries older than the server accepts are
+ * dropped, and the old postOrQueue (it posted to /api/sessions, which refuses a
+ * run the server did not start) is gone. Tests: lib/offline-cache.test.ts.
+ *
+ * Original (pre-wiring) intent: a store-and-forward queue so a session played
+ * offline (or through a flaky connection) still lands on the server.
  *
  * Harvested from reference/copilot_systems/OfflineCacheSystem.js:
  *  - namespaced localStorage persistence with in-memory fallback (kept)
@@ -11,20 +23,17 @@
  *  - isOffline() navigator.onLine check (kept)
  * Added beyond the harvest: client-generated idempotency ids, bounded
  * queue + bounded retry attempts, permanent-vs-transient failure
- * handling on flush, auto-flush wiring (online/visibilitychange), and a
- * typed GameShell contract (`postOrQueue`).
+ * handling on flush, and auto-flush wiring (online/visibilitychange).
  *
  * SERVER-AUTHORITATIVE NOTE: this queue only defers the *delivery* of a
- * result to /api/sessions. It never computes balances, PRQ, or story
- * unlocks — those stay behind the API. A story node completion is only
- * requested AFTER the queued session row has been accepted by the server
- * (we need the server's sessionId for /api/story/complete).
+ * result. It never computes balances, PRQ, or story unlocks — and the offline
+ * results endpoint pays nothing at all.
  *
  * Client-only module: guard all usage behind 'use client' components.
  */
 
 // ---------------------------------------------------------------------------
-// Payload contract (matches GameShell's /api/sessions POST body)
+// Payload contract (POST /api/offline/results; lib/pwa/offlineResults.ts parseOfflineResult)
 // ---------------------------------------------------------------------------
 
 export interface SessionResultPayload {
@@ -33,6 +42,8 @@ export interface SessionResultPayload {
   /** ISO timestamp of when the run actually finished (not when synced). */
   completedAt: string;
   durationMs?: number;
+  /** The run's own verdict (offline: practice, never paid; the server stores it as told). */
+  won?: boolean;
   /** Story context: set when the run was launched via /play/<mode>?story=<nodeId>. */
   storyNodeId?: string;
   /** Mode-specific stat bag, passed through opaquely. */
@@ -44,6 +55,8 @@ export interface SessionResultPayload {
 export interface QueuedResult {
   /** Client-generated idempotency id — survives retries and reloads. */
   clientId: string;
+  /** The account that played it; sent only while that account is signed in. */
+  userId: string | null;
   payload: SessionResultPayload;
   queuedAt: number;
   attempts: number;
@@ -57,15 +70,6 @@ export interface FlushOutcome {
   remaining: number;
   /** Server responses for delivered items, keyed by clientId. */
   responses: Record<string, unknown>;
-}
-
-export interface PostOrQueueResult {
-  delivered: boolean;
-  /** Present when delivered: the parsed /api/sessions response
-   *  (contains the server sessionId needed for /api/story/complete). */
-  response?: unknown;
-  /** Present when queued: number of results now waiting. */
-  queuedCount?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +149,14 @@ export interface SessionResultQueueOptions {
   maxQueue?: number;
   /** Entries are dropped after this many failed delivery attempts. */
   maxAttempts?: number;
+  /** Entries older than this are dropped unsent (the server refuses them). */
+  maxAgeMs?: number;
 }
+
+/** = lib/pwa/offlineResults.ts OFFLINE_RESULT_MAX_AGE_MS: the server accepts runs played in the last 14 days. */
+export const OFFLINE_QUEUE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+/** Where offline runs are sent. */
+export const OFFLINE_RESULTS_ENDPOINT = '/api/offline/results';
 
 const QUEUE_KEY = 'session-result-queue';
 
@@ -154,13 +165,15 @@ export class SessionResultQueue {
   private readonly store: NamespacedStore;
   private readonly maxQueue: number;
   private readonly maxAttempts: number;
+  private readonly maxAgeMs: number;
   private flushing = false;
 
   constructor(options: SessionResultQueueOptions = {}) {
-    this.endpoint = options.endpoint ?? '/api/sessions';
+    this.endpoint = options.endpoint ?? OFFLINE_RESULTS_ENDPOINT;
     this.store = new NamespacedStore(options.namespace ?? 'fel');
     this.maxQueue = options.maxQueue ?? 50;
     this.maxAttempts = options.maxAttempts ?? 8;
+    this.maxAgeMs = options.maxAgeMs ?? OFFLINE_QUEUE_MAX_AGE_MS;
   }
 
   get pendingCount(): number {
@@ -171,11 +184,17 @@ export class SessionResultQueue {
     return this.loadQueue();
   }
 
-  /** Adds a result to the queue. Returns the queue length. */
-  enqueue(payload: SessionResultPayload): number {
+  /** Results waiting for this account. */
+  pendingFor(userId: string | null): number {
+    return userId ? this.loadQueue().filter((e) => e.userId === userId).length : 0;
+  }
+
+  /** Adds a result to the queue, filed under the account that played it. Returns the queue length. */
+  enqueue(payload: SessionResultPayload, userId: string | null = null): number {
     const queue = this.loadQueue();
     queue.push({
       clientId: makeClientId(),
+      userId,
       payload,
       queuedAt: Date.now(),
       attempts: 0,
@@ -189,53 +208,32 @@ export class SessionResultQueue {
   }
 
   /**
-   * GameShell contract: try to deliver immediately; on network failure
-   * (or known-offline), queue for later. Server 4xx responses are NOT
-   * queued — the payload is invalid and retrying cannot fix it.
+   * Attempts to deliver everything in the queue that belongs to `userId`,
+   * oldest first (another account's entries wait for that account; with no
+   * account nothing is sent). Stops early on network failure (still offline).
+   * Safe to call from multiple triggers — re-entrant calls no-op while a flush
+   * is running.
    */
-  async postOrQueue(payload: SessionResultPayload): Promise<PostOrQueueResult> {
-    if (!isOffline()) {
-      try {
-        const res = await this.post(payload);
-        if (res.ok) {
-          return { delivered: true, response: await safeJson(res) };
-        }
-        if (res.status >= 400 && res.status < 500) {
-          // Permanent rejection — surface it, don't queue a poison pill.
-          throw new Error(`Session rejected by server (${res.status})`);
-        }
-        // 5xx: transient — fall through to queue.
-      } catch (error) {
-        if (error instanceof Error && error.message.startsWith('Session rejected')) {
-          throw error;
-        }
-        // Network error — fall through to queue.
-      }
-    }
-    const queuedCount = this.enqueue(payload);
-    return { delivered: false, queuedCount };
-  }
-
-  /**
-   * Attempts to deliver everything in the queue, oldest first.
-   * Stops early on network failure (still offline). Safe to call from
-   * multiple triggers — re-entrant calls no-op while a flush is running.
-   */
-  async flush(): Promise<FlushOutcome> {
+  async flush(userId: string | null, now: number = Date.now()): Promise<FlushOutcome> {
     const outcome: FlushOutcome = {
       delivered: 0,
       dropped: 0,
       remaining: 0,
       responses: {},
     };
-    if (this.flushing || isOffline()) {
+    if (this.flushing || isOffline() || !userId) {
       outcome.remaining = this.pendingCount;
       return outcome;
     }
 
     this.flushing = true;
     try {
-      let queue = this.loadQueue();
+      const all = this.loadQueue();
+      // too old for the server to accept: dropped, unsent
+      const fresh = all.filter((e) => now - e.queuedAt < this.maxAgeMs);
+      outcome.dropped += all.length - fresh.length;
+      const queue = fresh.filter((e) => e.userId === userId);
+      const others = fresh.filter((e) => e.userId !== userId);
       const keep: QueuedResult[] = [];
 
       for (let i = 0; i < queue.length; i += 1) {
@@ -257,6 +255,12 @@ export class SessionResultQueue {
           outcome.responses[entry.clientId] = await safeJson(res);
           continue;
         }
+        if (res.status === 503) {
+          // the server is not ready to record it yet (its table is not applied): wait, without using up an attempt —
+          // the age limit above still ends the wait
+          keep.push(entry);
+          continue;
+        }
         if (res.status >= 400 && res.status < 500 && res.status !== 401 && res.status !== 429) {
           // Permanently invalid payload — drop it.
           outcome.dropped += 1;
@@ -273,9 +277,9 @@ export class SessionResultQueue {
 
       // Merge with anything enqueued while we were flushing.
       const enqueuedDuringFlush = this.loadQueue().filter(
-        (e) => !queue.some((q) => q.clientId === e.clientId),
+        (e) => !all.some((q) => q.clientId === e.clientId),
       );
-      const next = [...keep, ...enqueuedDuringFlush];
+      const next = [...others, ...keep, ...enqueuedDuringFlush];
       this.saveQueue(next);
       outcome.remaining = next.length;
       return outcome;
@@ -288,13 +292,14 @@ export class SessionResultQueue {
    * Wires auto-flush to reconnect and tab-foreground events.
    * Returns a cleanup function (call in the component's unmount effect).
    */
-  attachAutoFlush(onFlush?: (outcome: FlushOutcome) => void): () => void {
+  attachAutoFlush(userId: () => string | null, onFlush?: (outcome: FlushOutcome) => void): () => void {
     if (typeof window === 'undefined') {
       return () => undefined;
     }
     const trigger = (): void => {
-      if (this.pendingCount === 0) return;
-      void this.flush().then((outcome) => {
+      const who = userId();
+      if (this.pendingFor(who) === 0) return;
+      void this.flush(who).then((outcome) => {
         if (onFlush && (outcome.delivered > 0 || outcome.dropped > 0)) {
           onFlush(outcome);
         }
@@ -327,7 +332,7 @@ export class SessionResultQueue {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Lets /api/sessions dedupe replays if it chooses to honor it.
+        // The server records one row per id (OfflinePlay userId + runKey), however often it is re-sent.
         ...(clientId ? { 'X-Client-Result-Id': clientId } : {}),
       },
       body: JSON.stringify(payload),

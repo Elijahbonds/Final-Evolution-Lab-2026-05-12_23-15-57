@@ -18,6 +18,7 @@ const TITLES: Readonly<Record<string, string>> = {
   RUN_CLOSED: 'ALREADY RECORDED',
   RUN_IN_FLIGHT: 'STILL RECORDING',
   NOT_SAVED: 'NOT SAVED YET',
+  PLAYED_OFFLINE: 'PLAYED OFFLINE — PRACTICE',   // offline-push (lib/pwa/offlineShell.ts)
 };
 
 const LINES: Readonly<Record<string, string>> = {
@@ -34,6 +35,7 @@ const LINES: Readonly<Record<string, string>> = {
   RUN_CLOSED: 'This run was already recorded.',
   RUN_IN_FLIGHT: 'This run is being recorded in another tab.',
   NOT_SAVED: "Your result didn't reach the server. It will be sent again the next time you open a game.",
+  PLAYED_OFFLINE: "Saved on this phone. It's added to your history when you're back online. Coins and XP need a connection, so nothing was paid.",
 };
 
 /** The key the card is written from: a SCORE_INVALID for a mode with no measured rules yet is its own case, not a bad result. */

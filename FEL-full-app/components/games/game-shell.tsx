@@ -34,6 +34,7 @@ import { feelOverridesUsed } from '@/lib/feel-panel/feel';   // feel-panel lane 
 import { isFreeDanceResult } from '@/lib/babylon/dance/freeDance';   // lane/dance-extras-2
 import { PartyInvite } from '@/components/party/party-invite';   // MULTIPLAYER: the results card's door to the party room
 import { formReadStore, formForPost } from '@/lib/move/formRead';   // HOOPS BODY (P10): the run's FORM read, adults only
+import { rememberOfflineProfile, offlineProfile, queueOfflineRun, offlineAnswer, isOfflineNow } from '@/lib/pwa/offlineShell';   // OFFLINE-PUSH: no signal
 import {
   type CarnivalStop, type CarnivalRunState,
   recordCarnivalResult, clearCarnivalRun,
@@ -173,6 +174,7 @@ function GameShellInner({
    *  null until a grant lands, and left null for a refused earn or a zero grant nothing capped (no "+0" tile). */
   const [recapCoins, setRecapCoins] = useState<{ coins: number; capped: boolean } | null>(null);
   const finishUser = useRef<string | null>(null);   // QA-H2: the signed-in user a finish is saved under (/api/profile)
+  const offlineRun = useRef(false);   // OFFLINE-PUSH: this game started from the device's copy of the profile (no signal)
   const runSeq = useRef(0);   // a grant that lands after REPLAY belongs to the run before it
   const [carnivalRun, setCarnivalRun] = useState<CarnivalRunState | null>(null);
   const [storyReward, setStoryReward] = useState<{ rewardLC: number; badge?: { name: string } | null } | null>(null);
@@ -296,6 +298,8 @@ function GameShellInner({
       .then((j) => {
         if (!live) return;
         if (j?.grade) {
+          offlineRun.current = false;
+          rememberOfflineProfile(j);   // OFFLINE-PUSH: kept for a start with no signal (lib/pwa/offlineShell.ts)
           setProfile({ prq: j?.prq ?? 50, grade: j.grade, display: readPrqDisplay(j) });
           // QA-H2: who is signed in; a finish a reload cut off is re-sent once that is known, and only that user's
           // (the server finishes a runId once: never paid twice)
@@ -305,7 +309,15 @@ function GameShellInner({
           router.replace('/login');
         }
       })
-      .catch(() => { if (live) setUnreachable(true); });
+      .catch(() => {
+        if (!live) return;
+        // OFFLINE-PUSH: no signal at all (not an answer) — start from this device's copy when offline play is on
+        const saved = offlineProfile(window.location.search);
+        if (!saved) { setUnreachable(true); return; }
+        offlineRun.current = true;
+        finishUser.current = saved.userId;
+        setProfile({ prq: saved.prq, grade: saved.grade as PrqGrade, display: readPrqDisplay(saved) });
+      });
     return () => {
       live = false;
     };
@@ -322,7 +334,11 @@ function GameShellInner({
       // this run's server run, read now (a REPLAY swaps in the next one). Not cleared: a game that ends the same run twice
       // finishes the same runId twice, and the server answers the second with the first's stored result (replayed)
       const started = serverRun.current ?? Promise.resolve(null);
-      started.then((runId) => sendFinish(finishStore(), runId, { ...FINISH_DEPS, fetch: (_url, init) => fetch('/api/sessions', init) }, Date.now(), JSON.stringify({
+      // OFFLINE-PUSH: no server run and no signal — queued on this phone for the history (practice, never paid), and the
+      // card says "played offline" (lib/pwa/offlineShell.ts). Otherwise exactly as before.
+      started.then((runId) => (!runId && (offlineRun.current || isOfflineNow()) && queueOfflineRun(mode, res, finishUser.current, window.location.search)
+        ? offlineAnswer()
+        : sendFinish(finishStore(), runId, { ...FINISH_DEPS, fetch: (_url, init) => fetch('/api/sessions', init) }, Date.now(), JSON.stringify({
           mode,
           // ECONOMY-SESSIONS-HARDEN: the run the server started; the server checks the score as sent (a whole number >= 0,
           // within the mode's rules) and times the run itself — `duration` is only the room's own figure now
@@ -352,7 +368,7 @@ function GameShellInner({
           // bounds it (formSummary.boundFormSummary) and writes it only for a verified, opted-in 18+ account
           ...(() => { let st: Storage | null = null; try { st = sessionStorage; } catch { /* none */ }
             const form = formForPost(formReadStore.finishRun(sessionStore.record()?.runId), st); return form ? { form } : {}; })(),
-        }), finishUser.current))
+        }), finishUser.current)))
         // a refusal (SCORE_INVALID, RUN_MISSING, RUN_EXPIRED…) is a 4xx whose body says why: read it for the card. An answer
         // that is not about the run (401/403/404/408/429: still in the outbox) reads as NOT_SAVED
         .then((r) => (r && settled(r) ? r.json().catch(() => null) : null))
