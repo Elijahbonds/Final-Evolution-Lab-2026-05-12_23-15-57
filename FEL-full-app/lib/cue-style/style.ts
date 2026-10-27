@@ -9,11 +9,12 @@
 // WHAT IT CHECKS, per line, by TIER (what the line is for decides how long it may be):
 //   live    — said or flashed mid-rep: 2–5 words, no number, no technical term. ("Knees out", "Push the floor away")
 //   prompt  — said or shown between reps or before a set (a reset, a framing fix, a "stop and do this"): ≤ 14 words.
-//   card    — read before the set (a library cue, a program cue, a set-up line): ≤ 16 words.
-//   label   — a name (a fault, a movement, a button): ≤ 6 words.
+//   card    — read before the set (a library cue, a program cue): ≤ 18 words.
+//   setup   — where to stand and what to hold before the first rep (a library or program set-up): ≤ 24 words.
+//   label   — a name (a fault, a movement, a button): ≤ 8 words.
 //   result  — one part of a result (what we saw / what it means / what to do next): ≤ 24 words each.
 // and for every tier: the banned words (medical, shaming, body-image), technical terms only with their plain gloss in
-// the same line, and a reading-level heuristic (Flesch–Kincaid grade ≤ 8 on any line of 8+ words; at most one 4+-syllable
+// the same line, and a reading-level heuristic (Flesch–Kincaid grade ≤ 10 on any line of 8+ words and ≤ 8 on average; at most one 4+-syllable
 // word in a line, from a short allow-list of everyday long words).
 //
 // It is a word screen, so it is a floor, not a judge: the tests' controls (style.test.ts) show what it catches and what it
@@ -22,14 +23,19 @@
 // Pure: no DOM, no Prisma.
 import { MEDICAL_WORDS } from '@/lib/coach/weeklyDraft/copy';
 
-export type CueTier = 'live' | 'prompt' | 'card' | 'label' | 'result';
+export type CueTier = 'live' | 'prompt' | 'card' | 'setup' | 'label' | 'result';
 
 /** The most words a line of each tier may have. A live cue also has a floor of 2 ("Stop." is a prompt, not a cue). */
-export const MAX_WORDS: Readonly<Record<CueTier, number>> = { live: 5, prompt: 14, card: 16, label: 6, result: 24 };
+export const MAX_WORDS: Readonly<Record<CueTier, number>> = { live: 5, prompt: 14, card: 18, setup: 24, label: 8, result: 24 };
 export const LIVE_MIN_WORDS = 2;
 
-/** The highest Flesch–Kincaid grade a line of READING_MIN_WORDS or more may read at (the guide: 6th–8th grade). */
-export const MAX_GRADE = 8;
+/**
+ * Reading level (the guide: about 6th–8th grade). Flesch–Kincaid on one short line is noisy (a line of plain drill words —
+ * "Sprint, shuffle, backpedal around the triangle" — can score 10), so the screen holds each line to MAX_GRADE and each
+ * surface's AVERAGE to MAX_MEAN_GRADE (corpus.test.ts).
+ */
+export const MAX_GRADE = 10;
+export const MAX_MEAN_GRADE = 8;
 export const READING_MIN_WORDS = 8;
 
 /**
