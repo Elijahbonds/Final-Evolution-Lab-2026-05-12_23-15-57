@@ -142,7 +142,7 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ce4.decide(1000, ['kneeValgus']);
   ce4.decide(8000, []);                       // fault clears
   const confirm = ce4.decide(8000 + 4500, []); // clear long enough → confirm
-  ok(confirm?.level === 'confirm', 'a cleared fault earns "There it is. Own it."');
+  ok(confirm?.level === 'confirm', 'a cleared fault earns the confirm line ("That's it. Keep it.")');
   ok(ce4.decide(8000 + 4500 + 7000, []) === null, 'then the coach shuts up');
 }
 
