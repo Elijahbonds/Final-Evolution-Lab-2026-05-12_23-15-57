@@ -83,3 +83,23 @@ Plain one-foot attempt: stand, stick walk, RT run to the line, take-off, slam on
 | a2 | The take-off frame moved the body twice (the run's last step and the plant's first): 2.1 → 4.2 → 2.2 m/s. The plant's drift now starts on the first flight frame, makes up the rest of that frame's step at its own speed, and stops exactly where the carry starts (two intermediate versions were measured and fixed: a half step, 2.35 → 1.13, then a double step at the plant's end, 2.24 → 3.9 → 1.7). | none (the plant still rolls PLANT_DRIFT_M; the carry lands on the same rim point) |
 | a3 | The run-up's leg pace: re-paced to 4.57 then 3.95 m/s and measured. 3.95 skated less at a sprint and more at 2.5–5 m/s, with no overall gain, so the **shipped pace stays**, now behind a knob. | **(new knob, default unchanged)** `dunk.runwayStrideScale` 1 |
 | b1 | The alley-oop is a lob thrown on the run (1.0 s in the air) instead of a 0.35 s pass after the take-off. | **(new)** `OOP_LOB_FLIGHT_SEC` 1.0 s; knob `dunk.oopLobFlightSec` |
+
+## 5. Phase 1 — smooth run-up: results
+
+Plain one-foot attempt, phone tier, 320×180, virtual clock. Before = `36593d3a` (2 attempts), after = the phase's final code
+(`f45a8252`+; attempt r3, and r9 recorded with the strip). Earlier "after" attempts (r1, r2) carried intermediate builds and are
+kept in the scratchpad only as the record of why the code changed.
+
+| Gate | Before | After | |
+|---|---|---|---|
+| Largest one-frame root-speed change, from the walk to the plant's end | 2.06–2.08 m/s (3 frames > 0.6) | 0.53 m/s (0 frames > 0.6) | met |
+| Speed into push 1-2 | 7.0 → 5.98 in one frame | continuous (the gather starts 1.34 m out, x1.94) | met |
+| The take-off frame | 2.1 → 4.2 → 2.2 m/s | 2.32 → 2.24 → 2.24 | met |
+| Root jerk, RMS | 407–528 m/s³ | 107–113 | |
+| Bone pops before the take-off | 31–32 | 30 | met (not above) |
+| Foot skate, carrying foot at ≥ 2.5 m/s | 1.03–1.11 m/s | 1.25 (pace unchanged: within the reps' noise) | **not met**: the re-pace was tried and withdrawn (a3) |
+| Hang · hips' rise | 2150 ms · 1.94 m | 2167 ms · 1.93 m | unchanged |
+
+Gate run: tsc 0 errors; lint 0 warnings; mode-list-check 32 modes; ci-suite 208 passed, 1 failed (`controller-link-tests`
+E10, a 260 ms wall-clock window at load average 31; re-run alone 42 / 42), 11 DB suites skipped; vitest on `lib/babylon/modes`,
+`core`, `nexus`, `visual`, `lib/feel-panel`, `tests/probes`: 499 files, 5,771 tests, 1 failed (the scan below, fixed; re-run green).
