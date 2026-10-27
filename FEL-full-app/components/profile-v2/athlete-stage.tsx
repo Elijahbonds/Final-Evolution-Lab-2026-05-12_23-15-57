@@ -15,13 +15,13 @@ export function AthleteStage({ avatarKey, cosmeticAssetId, name, accent, allow3d
   const avatar = ROSTER.find((r) => r.key === avatarKey) ?? ROSTER[0];
   if (three) {
     return (
-      <div className="h-[300px] w-full overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08080c] lg:h-[300px]">
+      <div className="fel-surface h-[300px] w-full overflow-hidden lg:h-[300px]">
         <Athlete3D onClose={() => setThree(false)} />
       </div>
     );
   }
   return (
-    <div className="relative flex h-[172px] w-full items-center justify-center overflow-hidden rounded-2xl border border-white/[0.07] bg-[#08080c] lg:h-[300px]">
+    <div className="fel-surface relative flex h-[172px] w-full items-center justify-center overflow-hidden lg:h-[300px]">
       <div aria-hidden className="absolute inset-x-6 bottom-3 h-6 rounded-[50%]" style={{ background: `radial-gradient(closest-side, ${accent}33, transparent)` }} />
       <div className="relative lg:scale-[1.8]" role="img" aria-label={`${name}'s athlete`}>
         <AvatarFigure avatar={avatar} size={104} cosmeticAssetId={cosmeticAssetId} />
@@ -29,7 +29,7 @@ export function AthleteStage({ avatarKey, cosmeticAssetId, name, accent, allow3d
       {allow3d && <button
         type="button"
         onClick={() => setThree(true)}
-        className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/50 px-3 py-1.5 text-[11px] font-bold text-white/85 hover:bg-black/70"
+        className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/50 px-3 py-1.5 text-[12px] font-bold text-white/85 hover:bg-black/70"
       >
         <Box className="h-3.5 w-3.5" aria-hidden /> See in 3D
       </button>}

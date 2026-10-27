@@ -29,7 +29,7 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
 export function Coming({ title, text, href, cta }: { title: string; text: string; href?: string; cta?: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-white/[0.12] p-4">
-      <p className="flex items-center gap-2 text-[13px] font-bold text-white/75">
+      <p className="flex items-center gap-2 text-[14px] font-bold text-white/75">
         {title}
         <span className="rounded-full bg-white/[0.06] px-2 py-0.5 font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim">Coming</span>
       </p>

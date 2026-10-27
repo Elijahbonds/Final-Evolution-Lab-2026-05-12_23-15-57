@@ -41,7 +41,7 @@ export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: 
     <section className={heading ? 'mt-12' : ''}>
       {heading ? (
         <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="fel-heading text-[19px] font-bold text-white">{heading}</h2>
+          <h2 className="fel-heading text-[20px] font-bold text-white">{heading}</h2>
           <span className="font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
             {t('shell.venues.live', { count: live })}
           </span>
@@ -74,7 +74,7 @@ export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: 
                   // A venue whose art has not shipped yet gets a branded tile rather than a grey hole.
                   <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(168,85,247,0.35)_0%,rgba(0,229,255,0.14)_55%,rgba(5,5,5,0.95)_100%)]">
                     <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
-                      <span className="fel-heading text-[22px] font-black uppercase leading-none tracking-tight text-white/80">
+                      <span className="fel-heading text-[20px] font-black uppercase leading-none tracking-tight text-white/80">
                         {venue.name}
                       </span>
                     </div>
@@ -90,7 +90,7 @@ export function VenueShelf({ heading = t('shell.venues.heading') }: { heading?: 
               </div>
               <div className="flex items-center gap-2 p-4">
                 <div className="min-w-0">
-                  <h3 className="fel-heading text-[17px] font-bold leading-tight text-white">{venue.name}</h3>
+                  <h3 className="fel-heading text-[16px] font-bold leading-tight text-white">{venue.name}</h3>
                   {/* QA P1-28: the live modes whose venue this is (lib/venueModes), not a hand list that drifts */}
                   <p className="mt-1 line-clamp-2 text-[12px] text-fel-quiet">{venueCardModes(venue).join(' · ')}</p>
                 </div>

@@ -65,7 +65,7 @@ export function StatusRail() {
   return (
     <header className="sticky top-0 z-40 border-b border-[color:var(--fel-hairline)] bg-fel-bg/85 backdrop-blur-xl">
       <div data-couch-scale className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4">
-        <Link href="/play" className="fel-heading inline-flex min-h-10 shrink-0 items-center text-[19px] font-bold leading-none text-white md:text-[21px]">
+        <Link href="/play" className="fel-heading inline-flex min-h-10 shrink-0 items-center text-[20px] font-bold leading-none text-white">
           <span className="text-fel-cyan">FE</span>L
         </Link>
 
