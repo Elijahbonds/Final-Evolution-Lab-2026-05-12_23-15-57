@@ -36,7 +36,7 @@ describe('the loop an entry plays (demoFor)', () => {
     expect(demoClipFor({ family: 'squat', variation: 'goblet-squat', equipment: ['dumbbell'] })).toBe('ex_squat');
     expect(demoClipFor({ family: 'squat', variation: 'squat', equipment: ['barbell'] })).toBe('ex_squat_bar');
     expect(demoClipFor({ family: 'squat', variation: 'front-squat', equipment: ['barbell'] })).toBe('ex_squat');
-    expect(demoClipFor({ family: 'squat', variation: 'overhead-squat', equipment: ['barbell'] })).toBeNull();
+    expect(demoClipFor({ family: 'squat', variation: 'overhead-squat', equipment: ['barbell'] })).toBe('ex_overhead_squat');   // DEMO-LOOPS: its own loop now (the arms overhead), never the plain squat's
     expect(demoClipFor({ family: 'overhead-press', variation: 'shoulder-press', equipment: ['dumbbell'] })).toBe('ex_press');
     expect(demoClipFor({ family: 'overhead-press', variation: 'seat-press', equipment: ['dumbbell'] })).toBe('ex_seated_press');   // seated: its own loop, on a bench
     expect(demoClipFor({ family: 'overhead-press', variation: 'landmine', equipment: ['landmine'] })).toBeNull();   // a landmine press is neither

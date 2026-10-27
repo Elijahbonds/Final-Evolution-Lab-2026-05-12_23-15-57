@@ -825,6 +825,14 @@ function authoredBuilders(scene: Scene, skeleton: Skeleton): [string, () => Anim
     ['ex_seated_kickback_one', () => buildExerciseClip('ex_seated_kickback_one', scene, skeleton)],
     ['ex_pullover', () => buildExerciseClip('ex_pullover', scene, skeleton)],
     ['ex_pullover_bent', () => buildExerciseClip('ex_pullover_bent', scene, skeleton)],
+    ['ex_overhead_squat', () => buildExerciseClip('ex_overhead_squat', scene, skeleton)],
+    ['ex_knee_to_wall', () => buildExerciseClip('ex_knee_to_wall', scene, skeleton)],
+    ['ex_sl_squat_partial', () => buildExerciseClip('ex_sl_squat_partial', scene, skeleton)],
+    ['ex_jump_hands_hips', () => buildExerciseClip('ex_jump_hands_hips', scene, skeleton)],
+    ['ex_cmj_dip', () => buildExerciseClip('ex_cmj_dip', scene, skeleton)],
+    ['ex_wall_drive', () => buildExerciseClip('ex_wall_drive', scene, skeleton)],
+    ['ex_wall_march', () => buildExerciseClip('ex_wall_march', scene, skeleton)],
+    ['ex_decel_three', () => buildExerciseClip('ex_decel_three', scene, skeleton)],
   ];
 }
 

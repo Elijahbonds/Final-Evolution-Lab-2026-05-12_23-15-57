@@ -12,6 +12,7 @@
 //
 // Pure. Client-safe.
 
+import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS } from './surfaceDemo';
 import { MUSCLES, type MovementPattern, type MuscleId } from './vocab';
 import { FLOW_CLIPS, FLOW_SEQS, flowClip } from '@/lib/babylon/anim/authored/exerciseFlows';   // (data only: no Babylon)
 import { PROPPED_LOOPS } from '@/lib/babylon/anim/authored/exerciseProps.data';   // (data only: which loop stands on what)
@@ -377,6 +378,12 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_pullover', families: ['fly'], bases: /^straight-arm-pullover$/ },
   { clip: 'ex_pullover', families: ['db-upper'], bases: /^pullover$/ },
   { clip: 'ex_pullover_bent', families: ['fly'], bases: /^bent-arm-pullover$/ },
+  // ── DEMO-LOOPS (2026-10-27): the Quick Screen's checks and the daily drills, where the library has them (anim/authored/exerciseDrills.ts) ──
+  { clip: 'ex_overhead_squat', families: ['squat'], bases: /^overhead-squat$/ },
+  { clip: 'ex_overhead_squat', families: ['loaded-mobility'], bases: /^dowel-ohs$/, hold: 1.35 },
+  { clip: 'ex_knee_to_wall', families: ['ankle-mobility'], bases: /^knee-to-wall$/ },
+  { clip: 'ex_wall_march', families: ['sprint-mechanics'], bases: /^wall-march$/ },
+  { clip: 'ex_wall_drive', families: ['sprint-mechanics'], bases: /^wall-switch$/ },
   // ── trunk ──
   { clip: 'ex_plank', families: ['plank'], bases: /^(plank|forearm)$/ },
   { clip: 'ex_dead_bug', families: ['plank'], bases: /^dead-bug$/ },
@@ -387,7 +394,10 @@ export const DEMO_RULES: readonly DemoRule[] = [
   { clip: 'ex_mountain_climber', families: ['conditioning-circuit', 'cardio'], bases: /^mountain-climber$/ },
   // ── jumps, hops, conditioning ──
   { clip: 'ex_jump', families: ['vertical-jump'], bases: /^(squat-jump|cmj|cmj-stick|cmj-repeat)$/ },
-  { clip: 'ex_jump', families: ['vertical-jump-builds'], bases: /^(squat-jump-pause|cmj-target|cmj-hips|squat-jump-hips)$/ },
+  // DEMO-LOOPS (2026-10-27): the hands-on-hips jumps keep their hands on the hips (ex_jump swings the arms: a different jump).
+  // The squat jump from a held squat has no loop of its own: the cue card.
+  { clip: 'ex_jump', families: ['vertical-jump-builds'], bases: /^(squat-jump-pause|cmj-target)$/ },
+  { clip: 'ex_jump_hands_hips', families: ['vertical-jump-builds'], bases: /^cmj-hips$/ },
   { clip: 'ex_jump', families: ['jump'], bases: /^(freehand-jump-squat|weight-jump-squat|rocket-jump)$/ },
   { clip: 'ex_jump', families: ['loaded-jump'], bases: /^vest-cmj$/ },
   { clip: 'ex_jump', families: ['rebound-jump'], bases: /^touches$/ },
@@ -576,6 +586,8 @@ export const DEMO_CLIPS: readonly string[] = (() => {
     else for (const b of ['x', 'x-weak']) for (const eq of [[], ['barbell']]) { const c = r.clip(b, eq); if (c) out.add(c); }
   }
   for (const table of Object.values(MODIFIER_LOOPS)) for (const c of Object.values(table)) out.add(c);
+  // DEMO-LOOPS: the loops the drill and check demos play (lib/library/surfaceDemo.ts) are the stage's too
+  for (const c of [...Object.values(DRILL_DEMO_LOOPS), ...Object.values(SCREEN_DEMO_LOOPS)]) if (c) out.add(c);
   return [...out].sort();
 })();
 

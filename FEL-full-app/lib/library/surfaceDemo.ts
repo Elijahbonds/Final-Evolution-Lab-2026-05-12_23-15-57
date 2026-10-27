@@ -19,19 +19,21 @@ export const DRILL_DEMO_LOOPS: Readonly<Record<string, string | null>> = {
   'safe-landing': 'ex_jump',
   'lateral-bound': 'ex_lateral_bound',
   'wake-up': null,
-  // the dip to the countermovement's bottom, held — a quarter dip, not the full squat the loop shows
-  'countermovement-geometry': null,
-  'wall-drive': null,
-  'three-step-decel': null,
+  // DEMO-LOOPS (2026-10-27): authored for the drill (anim/authored/exerciseDrills.ts)
+  'countermovement-geometry': 'ex_cmj_dip',
+  'wall-drive': 'ex_wall_drive',
+  'three-step-decel': 'ex_decel_three',
   't-drill': null,
   'approach-one-foot': null,
   'approach-two-foot': null,
 };
 
-/** A Quick Screen test (lib/screen/copy.ts SCREEN_TEST_NAMES) → its loop. None of the four has one yet: the overhead
- *  squat's arms, the knee-to-wall ankle bend, the partial single-leg squat and the hands-on-hips jump each differ from
- *  every loop there is. */
-export const SCREEN_DEMO_LOOPS: Readonly<Record<'T1' | 'T2' | 'T3' | 'T5', string | null>> = { T1: null, T2: null, T3: null, T5: null };
+/** A Quick Screen test (lib/screen/copy.ts SCREEN_TEST_NAMES) → its loop: the overhead squat, the knee-to-wall ankle
+ *  bend, the partial single-leg squat and the hands-on-hips jump. */
+export const SCREEN_DEMO_LOOPS: Readonly<Record<'T1' | 'T2' | 'T3' | 'T5', string | null>> = {
+  // DEMO-LOOPS (2026-10-27): each check authored as itself (anim/authored/exerciseDrills.ts)
+  T1: 'ex_overhead_squat', T2: 'ex_knee_to_wall', T3: 'ex_sl_squat_partial', T5: 'ex_jump_hands_hips',
+};
 
 /** The still a surface with no loop shows: the body standing in the start position (held, not looping), "Demo coming". */
 export const STILL_DEMO_CLIP = 'idle_stand';
