@@ -96,8 +96,8 @@ const UA = 'AgeScreenTest/1.0';
 // MERGE 0fe07e1f: the first commit carrying every pending file above.
 // NEXUS-PUBLISH (lane/nexus-publish, NEX-06, 2026-10-26) prisma/pending/2026-10-26-studio-share.sql (pending SQL only; schema.prisma
 // untouched) at b610726c, the lane's commit carrying it; payments-ready and vbt landed first (#457, #458): re-pinned at this
-// lane's merge of lane/finish-release (MERGE_SHA_PENDING), the first commit carrying every pending file above.
-const PARENT = '0fe07e1f6e704a95a0b48dbbe233f3f9ef0872aa';
+// lane's merge of lane/finish-release (cf1ff9ca), the first commit carrying every pending file above.
+const PARENT = 'cf1ff9caf180bf51a7315191d4197e29573fe78b';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {
