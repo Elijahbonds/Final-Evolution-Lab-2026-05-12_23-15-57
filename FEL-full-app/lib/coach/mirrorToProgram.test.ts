@@ -80,10 +80,10 @@ const drafted = (over: Over, catalogue = CAT) => coachDraft([{ metrics: row(over
 describe('each FLAGGED camera check maps to its FIX line, its block and a catalogue exercise — with what the camera read', () => {
   const expected: Record<Key, { exercise: string; block: string | null; value: RegExp }> = {
     heelLine: { exercise: 'tripod', block: null, value: /^left heel tilts 14° outward, right heel 2° outward · estimated$/ },
-    kneeWindow: { exercise: 'hip9090', block: 'Ask the hips to lead the hinge', value: /^left knee about 35% of your hip width inside the line, right knee about [23]% of your hip width inside the line · estimated$/ },
+    kneeWindow: { exercise: 'hip9090', block: 'Lead with your hips', value: /^left knee about 35% of your hip width inside the line, right knee about [23]% of your hip width inside the line · estimated$/ },
     hipLevel: { exercise: 'split', block: 'Hip and middle hold', value: /^right side higher by about 12% of your shoulder width · estimated$/ },
-    shoulderLevel: { exercise: 'd360', block: 'Open the ribcage', value: /^left side higher by about 10% of your shoulder width · estimated$/ },
-    headFloat: { exercise: 'tspine', block: 'Ask the mid-back to hold', value: /^ear in front of the shoulder by about 20% of your upper-body length · estimated$/ },
+    shoulderLevel: { exercise: 'd360', block: 'Loosen the upper back', value: /^left side higher by about 10% of your shoulder width · estimated$/ },
+    headFloat: { exercise: 'tspine', block: 'Hold a tall upper back', value: /^ear in front of the shoulder by about 20% of your upper-body length · estimated$/ },
     singleLegL: { exercise: 'tripod', block: 'Hip and middle hold', value: /^28 s on one leg, free foot down 2 times, little sway · estimated$/ },
     singleLegR: { exercise: 'tripod', block: 'Hip and middle hold', value: /^28 s on one leg, free foot down 0 times, a lot of sway · estimated$/ },
   };

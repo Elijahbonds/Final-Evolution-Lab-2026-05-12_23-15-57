@@ -208,7 +208,7 @@ describe('PATCH + the coach\'s draft on the live screen', () => {
     expect(cam).toMatchObject({ heelLine: 'pass', 'kneeWindow:left': 'flag', hipLevel: 'pass', shoulderLevel: 'pass', headFloat: 'retest' });
     const knee = d.review.camera.find((r: Row) => r.checkId === 'kneeWindow');
     expect(knee.fix).toMatch(/^Side steps with a band, then slow squats/);   // test changed: copy rewrite (CUE-REWRITE) — the same hip work, plain words   // P9 fix: no muscle named (cueLint rule 1)
-    expect(knee.block).toMatchObject({ title: 'Ask the hips to lead the hinge' });
+    expect(knee.block).toMatchObject({ title: 'Lead with your hips' });
     expect(d.review.answers.map((a: Row) => a.said)).toEqual([ANSWERS_WITHHELD, ANSWERS_WITHHELD]);
     expect(d.review.coachChecks).toEqual([]);
     expect(d.prescriptions).toHaveLength(1);

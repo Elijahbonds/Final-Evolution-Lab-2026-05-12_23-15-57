@@ -38,8 +38,8 @@ describe('what to work on, after the screen', () => {
     expect(t).toContain('The camera saw: left side higher by about 10% of your shoulder width · estimated.');
     expect(t).toContain('Your two sides start from a tilt.');   // CUE-REWRITE: what it means, between saw and do
     expect(t).toContain(`What to do: ${fixLine('shoulderLevel')}`);
-    expect(t).toContain('Open the ribcage · about 6 min');
-    expect(t).toContain('Side-lying open book, 6 per side');
+    expect(t).toContain('Loosen the upper back · about 6 min');   // test changed: copy rewrite (CUE-REWRITE) — same meaning
+    expect(t).toContain('Open book: lie on your side and open your top arm, 6 per side');
   });
 
   it('two flags that share a block show it once', () => {
@@ -63,13 +63,13 @@ describe('what to work on, after the screen', () => {
     const gs = grades({ shoulderLevel: g('shoulderLevel', { value: 0.1 }) });
     for (const youth of ['minor', 'unknownAge'] as const) {
       const t = text(render(gs, youth));
-      expect(t).not.toContain('Open the ribcage');
+      expect(t).not.toContain('Loosen the upper back');
       expect(t).not.toContain('Side-lying open book');
       expect(t).toContain(`What to do: ${fixLine('shoulderLevel')}`);
       expect(t).toContain(text(YOUTH_BLOCKS_OFF[youth]).trim());
     }
     const noProp = text(renderToStaticMarkup(createElement(ScreenNextSteps, { screen: 'modified', grades: gs })));
-    expect(noProp).not.toContain('Open the ribcage');
+    expect(noProp).not.toContain('Loosen the upper back');
     expect(noProp).toContain(text(YOUTH_BLOCKS_OFF.unknownAge).trim());
   });
 
