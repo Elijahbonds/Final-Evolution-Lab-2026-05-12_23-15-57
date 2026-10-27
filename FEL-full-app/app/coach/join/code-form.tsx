@@ -40,11 +40,11 @@ export function CodeForm({ initial }: { initial: string }) {
         data-invite-code-input
       />
       <button type="submit" disabled={busy}
-        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-6 py-3 font-bold text-[#050505] disabled:opacity-60">
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-fel-cyan px-6 py-3 font-bold text-fel-bg disabled:opacity-60">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Find my coach
       </button>
-      {error && <p className="mt-3 text-xs text-[#FF3366]" role="alert">{error}</p>}
+      {error && <p className="mt-3 text-xs text-fel-crimson" role="alert">{error}</p>}
     </form>
   );
 }

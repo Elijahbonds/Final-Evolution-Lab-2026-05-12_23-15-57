@@ -103,7 +103,7 @@ export function ClientsView() {
     if (r.ok) { setMsg(''); const t = await fetch(`/api/coach/messages?programId=${selected}`); setThread((await t.json()).messages ?? []); }
   };
 
-  if (!programs || !inbox) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (!programs || !inbox) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   const prog = programs.find((p) => p.tree.id === selected) ?? null;
   return (
     <div className="space-y-4">
@@ -136,7 +136,7 @@ export function ClientsView() {
       <CombineEntry />
       {/* roster — lane 5 S3: every client with their card, PRQ and deltas since the program began */}
       <div className="fel-card rounded-xl p-4 space-y-2">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><IdCard className="h-3.5 w-3.5" /> Roster</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><IdCard className="h-3.5 w-3.5" /> Roster</div>
         {roster.length === 0 && <div className="text-sm text-white/50">No clients yet — send an invite above.</div>}
         {roster.some((r) => r.coverage) && <CoverageLegend />}
         {roster.map((r) => (
@@ -146,7 +146,7 @@ export function ClientsView() {
                   relabelled the one count "games" because it was GameSession (lib/camp/profile.ts history.sessions)
                   and a client with six coached sessions read "0 sessions"; the coached number is now beside it. */}
               {/* the counts wrap as one unit under the name on a phone instead of being cut to "2 coached · 2 gam…" */}
-              <div className="text-white text-sm">{r.name} <span className="text-white/40 whitespace-nowrap">{r.coachedSessions != null && <>· {r.coachedSessions} coached </>}· {r.gamesAtCap ? `${r.games ?? r.sessions}+` : (r.games ?? r.sessions)} games · {r.wins}W</span></div>
+              <div className="text-white text-sm">{r.name} <span className="text-fel-dim whitespace-nowrap">{r.coachedSessions != null && <>· {r.coachedSessions} coached </>}· {r.gamesAtCap ? `${r.games ?? r.sessions}+` : (r.games ?? r.sessions)} games · {r.wins}W</span></div>
               <div className="text-white/50 truncate">{r.prq ? Object.entries(r.prq).slice(0, 4).map(([k, v]) => `${k.slice(0, 3)} ${Math.round(v)}${r.prqDelta?.[k] ? ` (${r.prqDelta[k] > 0 ? '+' : ''}${Math.round(r.prqDelta[k])})` : ''}`).join(' · ') : 'no PRQ yet'}</div>
               {/* the six-pattern strip, last 7 days; absent when this coach has no active program for them */}
               {r.coverage && <CoverageStrip strip={r.coverage} />}
@@ -161,13 +161,13 @@ export function ClientsView() {
             </div>
             {/* PROFILE V2 (2026-10-24): a coach sees their athlete's profile, teen or adult, public or not (/u/[slug]) */}
             {r.card?.slug && <a href={`/u/${r.card.slug}`} className="shrink-0 rounded-md border border-white/20 px-2 py-1 text-white/70">profile</a>}
-            {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-[#00E5FF]/40 px-2 py-1 text-[#00E5FF]">card · {r.card.rarity}</a> : <span className="shrink-0 text-white/30">no public card</span>}
+            {r.card?.published ? <a href={`/card/${r.card.slug}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-md border border-fel-cyan/40 px-2 py-1 text-fel-cyan">card · {r.card.rarity}</a> : <span className="shrink-0 text-fel-quiet">no public card</span>}
           </div>
         ))}
       </div>
       {/* inbox */}
       <div className="fel-card rounded-xl p-4 space-y-3">
-        <div className="flex items-center justify-between"><div className="text-[11px] uppercase tracking-wider text-white/40">Inbox</div><div className="text-xs text-[#FFD700]">{inbox.needsReview} to review</div></div>
+        <div className="flex items-center justify-between"><div className="text-[11px] uppercase tracking-wider text-fel-dim">Inbox</div><div className="text-xs text-fel-gold">{inbox.needsReview} to review</div></div>
         {inbox.items.length === 0 && <div className="text-sm text-white/50">No completed sessions yet.</div>}
         {inbox.items.slice(0, 8).map((it) => (
           <div key={it.id} className="rounded-lg bg-white/[0.03] border border-white/6 p-3 space-y-2">
@@ -177,15 +177,15 @@ export function ClientsView() {
                 {/* MIRROR-COACH P2 review (2026-09-26): a per-set log's summary "RPE" is the TOP set's effort, so it says
                     so, and the sets themselves — reps in reserve and effort per set, captured since P2 and returned by
                     the route as setLines — are listed under it instead of being dropped on the floor */}
-                <div><span className="text-white">{l.exercise}</span> <span className="text-white/40">({l.prescribed})</span> → {l.actualSets ?? '–'}×{l.actualReps ?? '–'} @ {l.actualLoad ?? '–'} · {l.setLines?.length ? 'top effort' : 'RPE'} {l.rpe ?? '–'}{l.clientNote ? ` · “${l.clientNote}”` : ''}{l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#00E5FF] ml-2"><Video className="h-3 w-3" /> video</a>}</div>
+                <div><span className="text-white">{l.exercise}</span> <span className="text-fel-dim">({l.prescribed})</span> → {l.actualSets ?? '–'}×{l.actualReps ?? '–'} @ {l.actualLoad ?? '–'} · {l.setLines?.length ? 'top effort' : 'RPE'} {l.rpe ?? '–'}{l.clientNote ? ` · “${l.clientNote}”` : ''}{l.videoUrl && <a href={l.videoUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-fel-cyan ml-2"><Video className="h-3 w-3" /> video</a>}</div>
                 {/* MIRROR-COACH P8 FIX (2026-09-30): a slot the protocol gate swapped says what was done instead */}
-                {l.servedLine && <div className="pl-3 text-[11px] text-[#FFD700]/85" data-served-line>{l.servedLine}</div>}
+                {l.servedLine && <div className="pl-3 text-[11px] text-fel-gold/85" data-served-line>{l.servedLine}</div>}
                 {!!l.setLines?.length && (
                   <ul className="pl-3 text-[11px] text-white/55 space-y-0.5" data-set-lines>
                     {l.setLines.map((line, k) => <li key={k}>{line}</li>)}
                   </ul>
                 )}
-                {l.coachComment ? <div className="text-[#00E5FF]/80">You: {l.coachComment}</div> : (
+                {l.coachComment ? <div className="text-fel-cyan/80">You: {l.coachComment}</div> : (
                   <div className="flex gap-2"><input value={comments[l.id] ?? ''} onChange={(e) => setComments((c) => ({ ...c, [l.id]: e.target.value }))} placeholder="Comment on this rep" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1 text-white" /><button onClick={() => review(l.id)} className="rounded-lg border border-white/10 px-2 text-white/80">Send</button></div>
                 )}
               </div>
@@ -195,9 +195,9 @@ export function ClientsView() {
       </div>
       {/* programs + builder */}
       <div className="fel-card rounded-xl p-4 space-y-3">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Programs I coach</div>
+        <div className="text-[11px] uppercase tracking-wider text-fel-dim">Programs I coach</div>
         {programs.length === 0 && <div className="text-sm text-white/50">Draft a Plan for a mentee in Camp — its milestones become the program you build here.</div>}
-        <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-[#00E5FF]/50 text-[#00E5FF] bg-[#00E5FF]/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
+        <div className="flex gap-2 flex-wrap">{programs.map((p) => <button key={p.tree.id} onClick={() => setSelected(p.tree.id)} className={`rounded-lg px-3 py-1.5 text-xs border ${selected === p.tree.id ? 'border-fel-cyan/50 text-fel-cyan bg-fel-cyan/10' : 'border-white/10 text-white/70'}`}>{p.clientName} · {p.tree.name}<UnreadPill n={unreadBadge(unread, p.tree.id)} /></button>)}</div>
         {prog?.clientId && <AssignProgram program={{ id: prog.tree.id, name: prog.tree.name, clientId: prog.clientId }} roster={roster} onDone={() => void load()} />}
         {/* COACH-DELIVERY COA-02: draft the first block from their goal, the coach's answers and their Mirror screen */}
         {prog?.clientId && !prog.completedSessionIds.length && (
@@ -241,7 +241,7 @@ export function ClientsView() {
       </div>
       {prog && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={prog.tree.id} role="coach" /></div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {prog.clientName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={prog.tree.id} role="coach" /></div>
           <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your client" className="flex-1 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>

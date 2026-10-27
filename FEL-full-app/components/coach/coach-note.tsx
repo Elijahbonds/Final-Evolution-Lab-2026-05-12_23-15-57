@@ -24,12 +24,12 @@ export function splitCorrectiveLink(note: string): { before: string; href: strin
 export function CoachNote({ note }: { note: string }) {
   const parts = splitCorrectiveLink(note);
   return (
-    <div className="text-xs text-[#00E5FF]/80" data-coach-note>
+    <div className="text-xs text-fel-cyan/80" data-coach-note>
       Coach:{' '}
       {parts ? (
         <>
           {parts.before}
-          <Link href={parts.href} data-corrective-link className="font-semibold underline decoration-[#00E5FF]/40 hover:text-[#00E5FF]">
+          <Link href={parts.href} data-corrective-link className="font-semibold underline decoration-fel-cyan/40 hover:text-fel-cyan">
             open it in the Mirror
           </Link>
           {parts.after}

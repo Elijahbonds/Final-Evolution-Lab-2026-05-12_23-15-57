@@ -21,7 +21,7 @@ export function MyAvailabilityLine({ endpoint }: { endpoint: string }) {
 export function AvailabilityLineView({ view }: { view: AvailabilityView | null }) {
   if (!view || view.status === 'full') return null;
   return (
-    <div data-my-availability={view.status} className={`rounded-xl border px-4 py-2.5 text-sm ${view.status === 'out' ? 'border-[#FF2D95]/40 bg-[#FF2D95]/10 text-white' : 'border-[#FFD700]/40 bg-[#FFD700]/10 text-white'}`}>
+    <div data-my-availability={view.status} className={`rounded-xl border px-4 py-2.5 text-sm ${view.status === 'out' ? 'border-[#FF2D95]/40 bg-[#FF2D95]/10 text-white' : 'border-fel-gold/40 bg-fel-gold/10 text-white'}`}>
       {availabilityLine(view, 'athlete')}
     </div>
   );

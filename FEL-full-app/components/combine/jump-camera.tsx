@@ -78,7 +78,7 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
           <div className="absolute inset-x-3 top-3 rounded-lg bg-black/65 px-3 py-2 text-center text-white" aria-live="polite" data-combine-caption>
             <div className="text-lg font-black">{caption}</div>
             <div className="mt-1 flex justify-center gap-1.5" aria-hidden>
-              {Array.from({ length: live.asked }, (_, i) => <span key={i} className={`h-2 w-6 rounded-full ${i < live.jumps ? 'bg-[#00FF9D]' : 'bg-white/25'}`} />)}
+              {Array.from({ length: live.asked }, (_, i) => <span key={i} className={`h-2 w-6 rounded-full ${i < live.jumps ? 'bg-fel-emerald' : 'bg-white/25'}`} />)}
             </div>
           </div>
         )}
@@ -90,12 +90,12 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
         </button>
       ) : (
         <button type="button" onClick={() => void start()} disabled={phase === 'reading'} data-combine-start-camera
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-4 font-bold text-black disabled:opacity-50">
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-fel-cyan px-4 font-bold text-black disabled:opacity-50">
           {phase === 'reading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
           {jumps === 1 ? 'Start the camera: 1 jump' : `Start the camera: ${jumps} jumps`}
         </button>
       )}
-      <p className="text-[11px] text-white/40">{CAMERA_NOTE}</p>
+      <p className="text-[11px] text-fel-dim">{CAMERA_NOTE}</p>
     </div>
   );
 }

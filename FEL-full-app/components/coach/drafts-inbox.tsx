@@ -19,8 +19,8 @@ type Decide = (d: InboxDraft, c: DraftChange, decision: 'approve' | 'reject' | '
 
 const SAFETY_STYLE: Record<string, string> = {
   safe: 'border-[#39FF14]/40 text-[#39FF14]',
-  review: 'border-[#FFD700]/50 text-[#FFD700]',
-  unsafe: 'border-[#FF3366]/50 text-[#FF3366]',
+  review: 'border-fel-gold/50 text-fel-gold',
+  unsafe: 'border-fel-crimson/50 text-fel-crimson',
 };
 
 export function DraftsInbox({ api = DRAFTS_API, safeApi = DRAFTS_SAFE_API }: { api?: string; safeApi?: string }) {
@@ -97,13 +97,13 @@ export function DraftsBoard({ data, busy = null, notes = {}, onNote = () => {}, 
   return (
     <section aria-labelledby="drafts-heading" className="fel-card rounded-xl p-4 space-y-3" data-testid="drafts-inbox">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="drafts-heading" className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40">
+        <h2 id="drafts-heading" className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim">
           <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" /> {DRAFTS_COPY.heading}
         </h2>
-        <span className="text-xs text-[#FFD700]" data-pending={pending}>{pending} to decide · week of {data.weekKey}</span>
+        <span className="text-xs text-fel-gold" data-pending={pending}>{pending} to decide · week of {data.weekKey}</span>
       </div>
       <p className="text-xs text-white/50">{DRAFTS_COPY.explainer}</p>
-      {!data.approvals && <p className="rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 text-xs text-[#FFD700]/90" data-testid="drafts-not-ready">{DRAFTS_COPY.notReady}</p>}
+      {!data.approvals && <p className="rounded-lg border border-fel-gold/30 bg-fel-gold/5 px-3 py-2 text-xs text-fel-gold/90" data-testid="drafts-not-ready">{DRAFTS_COPY.notReady}</p>}
       {!withChanges.length && <p className="text-sm text-white/50">{DRAFTS_COPY.empty}</p>}
       {withChanges.map((d) => (
         <DraftCard key={`${d.clientId}:${d.programId}`} draft={d} approvals={data.approvals} busy={busy} note={notes[d.clientId] ?? ''}
@@ -133,7 +133,7 @@ export function DraftCard({ draft: d, approvals, busy, note, onNote, onDecide, o
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold text-white">{d.name}</h3>
           {d.band === 'teen' && <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/60">Under 18 · conservative</span>}
-          {d.engine === 'rules+ai' && <span className="inline-flex items-center gap-1 rounded-full border border-[#00E5FF]/40 px-2 py-0.5 text-[10px] text-[#00E5FF]" title={DRAFTS_COPY.ai}><Sparkles className="h-3 w-3" aria-hidden="true" />AI wording</span>}
+          {d.engine === 'rules+ai' && <span className="inline-flex items-center gap-1 rounded-full border border-fel-cyan/40 px-2 py-0.5 text-[10px] text-fel-cyan" title={DRAFTS_COPY.ai}><Sparkles className="h-3 w-3" aria-hidden="true" />AI wording</span>}
         </div>
         <p className="text-xs text-white/50">{d.context[0]}</p>
         {d.summary && <p className="text-sm italic text-white/70" data-ai-summary>{d.summary}</p>}
@@ -145,7 +145,7 @@ export function DraftCard({ draft: d, approvals, busy, note, onNote, onDecide, o
 
       {canDecide && (
         <div className="space-y-2">
-          <label className="block text-[11px] uppercase tracking-wider text-white/40" htmlFor={`note-${d.clientId}`}>{DRAFTS_COPY.noteLabel}</label>
+          <label className="block text-[11px] uppercase tracking-wider text-fel-dim" htmlFor={`note-${d.clientId}`}>{DRAFTS_COPY.noteLabel}</label>
           <input id={`note-${d.clientId}`} value={note} maxLength={280} onChange={(e) => onNote(e.target.value)} placeholder={DRAFTS_COPY.notePlaceholder}
             className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30" />
           <button type="button" onClick={onApproveSafe} disabled={!safe.length || busy === `safe:${d.clientId}`} data-testid="approve-all-safe"
@@ -157,7 +157,7 @@ export function DraftCard({ draft: d, approvals, busy, note, onNote, onDecide, o
 
       {d.held.length > 0 && (
         <details className="text-xs text-white/60" data-held={d.held.length}>
-          <summary className="cursor-pointer select-none"><ShieldAlert className="mr-1 inline h-3.5 w-3.5 text-[#FF3366]" aria-hidden="true" />{DRAFTS_COPY.held} ({d.held.length})</summary>
+          <summary className="cursor-pointer select-none"><ShieldAlert className="mr-1 inline h-3.5 w-3.5 text-fel-crimson" aria-hidden="true" />{DRAFTS_COPY.held} ({d.held.length})</summary>
           <ul className="mt-1 space-y-1 pl-5">{d.held.map((h, i) => <li key={i}><span className="text-white/80">{h.title}</span> — {h.why}</li>)}</ul>
         </details>
       )}
@@ -180,11 +180,11 @@ function ChangeRow({ draft, change: c, canDecide, busy, youth, onDecide }: { dra
         <span className="min-w-0 flex-1 text-sm font-medium text-white">{c.title}</span>
         <span className="flex shrink-0 items-center gap-1.5">
           <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${SAFETY_STYLE[c.safety]}`}>{SAFETY_LABEL[c.safety]}</span>
-          <span className="text-[10px] text-white/40">{CONFIDENCE_LABEL[c.confidence]}</span>
+          <span className="text-[10px] text-fel-dim">{CONFIDENCE_LABEL[c.confidence]}</span>
         </span>
       </div>
       <p className="text-xs text-white/70">{c.reason}</p>
-      {c.aiNote && <p className="text-xs text-[#00E5FF]/85"><Sparkles className="mr-1 inline h-3 w-3" aria-hidden="true" />{c.aiNote}</p>}
+      {c.aiNote && <p className="text-xs text-fel-cyan/85"><Sparkles className="mr-1 inline h-3 w-3" aria-hidden="true" />{c.aiNote}</p>}
       {(c.ops.length > 0 || c.evidence.length > 0 || c.method) && (
         <details className="text-[11px] text-white/50">
           <summary className="cursor-pointer select-none">The data and the edits</summary>
@@ -199,7 +199,7 @@ function ChangeRow({ draft, change: c, canDecide, busy, youth, onDecide }: { dra
         <p className="text-xs font-semibold text-white/60" data-decision={decided.decision}>{DECISION_LABEL[decided.decision as 'approved'] ?? decided.decision}</p>
       ) : canDecide && !editing ? (
         <div className="flex flex-wrap gap-2 pt-1">
-          <button type="button" disabled={busy} onClick={() => void onDecide(draft, c, 'approve')} className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-[#00E5FF]/15 px-3 text-sm font-semibold text-[#00E5FF] disabled:opacity-40"><Check className="h-4 w-4" aria-hidden="true" />{DRAFTS_COPY.approve}</button>
+          <button type="button" disabled={busy} onClick={() => void onDecide(draft, c, 'approve')} className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-fel-cyan/15 px-3 text-sm font-semibold text-fel-cyan disabled:opacity-40"><Check className="h-4 w-4" aria-hidden="true" />{DRAFTS_COPY.approve}</button>
           {rows.length > 0 && <button type="button" disabled={busy} onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-white/15 px-3 text-sm text-white/80 disabled:opacity-40"><Pencil className="h-4 w-4" aria-hidden="true" />{DRAFTS_COPY.edit}</button>}
           <button type="button" disabled={busy} onClick={() => void onDecide(draft, c, 'reject')} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-white/15 px-3 text-sm text-white/60 disabled:opacity-40"><X className="h-4 w-4" aria-hidden="true" />{DRAFTS_COPY.reject}</button>
         </div>
@@ -208,14 +208,14 @@ function ChangeRow({ draft, change: c, canDecide, busy, youth, onDecide }: { dra
           {rows.map((r, i) => (
             <fieldset key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <legend className="col-span-full pb-1 text-[11px] text-white/50">{r.label}</legend>
-              <label className="text-[10px] text-white/40">Sets<input inputMode="numeric" value={r.sets} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, sets: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
-              <label className="text-[10px] text-white/40">Reps<input value={r.reps} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, reps: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
-              <label className="text-[10px] text-white/40">Load<input value={r.load} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, load: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
-              <label className="text-[10px] text-white/40">Band<select value={r.effortBand} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, effortBand: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-[#0f0f13] px-2 py-1.5 text-sm text-white"><option value="">None</option>{bands.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}</select></label>
+              <label className="text-[10px] text-fel-dim">Sets<input inputMode="numeric" value={r.sets} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, sets: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
+              <label className="text-[10px] text-fel-dim">Reps<input value={r.reps} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, reps: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
+              <label className="text-[10px] text-fel-dim">Load<input value={r.load} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, load: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
+              <label className="text-[10px] text-fel-dim">Band<select value={r.effortBand} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, effortBand: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-[#0f0f13] px-2 py-1.5 text-sm text-white"><option value="">None</option>{bands.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}</select></label>
             </fieldset>
           ))}
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={async () => { if (await onDecide(draft, c, 'edit', editsFrom(c, rows))) setEditing(false); }} className="min-h-11 rounded-lg bg-[#00E5FF]/15 px-3 text-sm font-semibold text-[#00E5FF] disabled:opacity-40">{DRAFTS_COPY.save}</button>
+            <button type="button" disabled={busy} onClick={async () => { if (await onDecide(draft, c, 'edit', editsFrom(c, rows))) setEditing(false); }} className="min-h-11 rounded-lg bg-fel-cyan/15 px-3 text-sm font-semibold text-fel-cyan disabled:opacity-40">{DRAFTS_COPY.save}</button>
             <button type="button" onClick={() => { setRows(editRows(c)); setEditing(false); }} className="min-h-11 rounded-lg border border-white/15 px-3 text-sm text-white/60">{DRAFTS_COPY.cancel}</button>
           </div>
         </div>

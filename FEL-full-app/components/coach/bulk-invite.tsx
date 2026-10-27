@@ -67,26 +67,26 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
   return (
     <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
       <div>
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><Mail className="h-3.5 w-3.5" /> Email an invite</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><Mail className="h-3.5 w-3.5" /> Email an invite</div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void one(); }} placeholder="athlete@email.com" type="email" inputMode="email" autoComplete="off" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" data-email-invite />
-          <button onClick={() => void one()} disabled={!!busy || !email.trim()} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#00E5FF] px-3 py-1.5 text-xs font-bold text-[#050505] disabled:opacity-50">
+          <button onClick={() => void one()} disabled={!!busy || !email.trim()} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-fel-cyan px-3 py-1.5 text-xs font-bold text-fel-bg disabled:opacity-50">
             {busy === 'one' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />} Send
           </button>
         </div>
       </div>
 
       <div>
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><Users className="h-3.5 w-3.5" /> Add a team</div>
-        <p className="mt-1 text-xs text-white/45">Paste one athlete per line (name, email — or just a name), or upload a CSV — a TeamSnap, SportsEngine or LeagueApps roster export works as it is. Everyone gets their own code.</p>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><Users className="h-3.5 w-3.5" /> Add a team</div>
+        <p className="mt-1 text-xs text-fel-dim">Paste one athlete per line (name, email — or just a name), or upload a CSV. Everyone gets their own code.</p>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder={'Sam Lee, sam@email.com\nRia Khan\nName,Email (a CSV header works too)'}
           className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 font-mono text-xs text-white" data-bulk-text />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input ref={file} type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" className="hidden" onChange={(e) => void readFile(e.target.files?.[0])} />
           <button onClick={() => file.current?.click()} className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 px-3 py-1.5 text-xs text-white/80"><FileUp className="h-3.5 w-3.5" /> CSV file</button>
           <label className="inline-flex items-center gap-1.5 text-xs text-white/60"><input type="checkbox" checked={send} onChange={(e) => setSend(e.target.checked)} /> Email the ones with an address</label>
-          <button onClick={() => void post('team', { text, send })} disabled={!!busy || !text.trim()} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-[#00E5FF] px-3 py-1.5 text-xs font-bold text-[#050505] disabled:opacity-50" data-bulk-submit>
+          <button onClick={() => void post('team', { text, send })} disabled={!!busy || !text.trim()} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-fel-cyan px-3 py-1.5 text-xs font-bold text-fel-bg disabled:opacity-50" data-bulk-submit>
             {busy === 'team' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Users className="h-3.5 w-3.5" />} Make invites
           </button>
         </div>
@@ -101,20 +101,20 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
               <button onClick={() => window.print()} title="Print the sheet" className="rounded-md border border-white/15 p-1.5 text-white/70"><Printer className="h-3.5 w-3.5" /></button>
             </span>
           </div>
-          <p className="mt-1 text-[11px] text-white/40">Athletes type their code at {JOIN_BY_CODE_PATH}, or open their own link.</p>
+          <p className="mt-1 text-[11px] text-fel-dim">Athletes type their code at {JOIN_BY_CODE_PATH}, or open their own link.</p>
           {/* COACH-DELIVERY COA-07: which team app's export it was read as (player columns only) */}
-          {importFormatLine(result.format ?? undefined) && <p className="mt-1 text-[11px] text-white/55" data-import-format={result.format ?? ''}>{importFormatLine(result.format ?? undefined)}</p>}
+          {importFormatLine(result.format ?? undefined) && <p className="mt-1 text-[11px] text-fel-dim" data-import-format={result.format ?? ''}>{importFormatLine(result.format ?? undefined)}</p>}
           <ul className="mt-2 space-y-1">
             {result.sheet.map((s) => (
               <li key={s.code} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
                 <span className="min-w-0 break-words text-white">{s.name ?? s.email ?? `Line ${s.line}`}</span>
-                <span className="font-mono tracking-wider text-[#00E5FF]">{s.code}</span>
-                <span className="text-white/40">{EMAILED_COPY[s.emailed]}</span>
+                <span className="font-mono tracking-wider text-fel-cyan">{s.code}</span>
+                <span className="text-fel-dim">{EMAILED_COPY[s.emailed]}</span>
               </li>
             ))}
           </ul>
           {!!result.problems.length && (
-            <ul className="mt-2 space-y-0.5 text-[11px] text-[#FFD700]/85">
+            <ul className="mt-2 space-y-0.5 text-[11px] text-fel-gold/85">
               {result.problems.map((p) => <li key={`${p.line}-${p.problem}`}>Line {p.line}: {IMPORT_PROBLEM_COPY[p.problem]}</li>)}
             </ul>
           )}

@@ -21,6 +21,9 @@ import { WALLET_REFRESH_EVENT } from '@/components/wallet-chip';
 import { DualWalletChip } from '@/components/dual-wallet-chip';
 import { readPrqDisplay, type PrqDisplay } from '@/lib/prq-display';
 import { TabBar, chromeHiddenFor } from '@/components/shell/tab-bar';
+// A11-02 / A11-05 (2026-10-25): pad and remote focus in the menus, and the couch view — mounted here, once, for every page
+import { useMenuFocus } from '@/components/shell/use-menu-focus';
+import { t } from '@/lib/i18n';
 
 // QA P0-01: the chip prints the MEASURED PRQ (lib/prq-display) — `prq` on the profile body is the seeded gameplay number.
 interface RailData { prq: PrqDisplay; isAdmin: boolean }
@@ -29,6 +32,7 @@ export function StatusRail() {
   const pathname = usePathname() || '/';
   const { status } = useSession();
   const [data, setData] = useState<RailData | null>(null);
+  useMenuFocus();
 
   useEffect(() => {
     if (status !== 'authenticated') return;
@@ -54,10 +58,10 @@ export function StatusRail() {
   if (chromeHiddenFor(pathname) || status !== 'authenticated') return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-[#050505]/85 backdrop-blur-xl">
-      <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4">
-        <Link href="/play" className="fel-heading shrink-0 text-[19px] font-bold leading-none text-white md:text-[21px]">
-          <span className="text-[#00E5FF]">FE</span>L
+    <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-fel-bg/85 backdrop-blur-xl">
+      <div data-couch-scale className="mx-auto flex h-14 max-w-[1200px] items-center gap-3 px-4">
+        <Link href="/play" className="fel-heading inline-flex min-h-10 shrink-0 items-center text-[19px] font-bold leading-none text-white md:text-[21px]">
+          <span className="text-fel-cyan">FE</span>L
         </Link>
 
         {/* the tabs live in the middle of the rail on a desktop, and at the bottom of the screen on a phone */}
@@ -79,22 +83,22 @@ export function StatusRail() {
                 {data.prq.score === null ? '—' : Math.round(data.prq.score)}
                 <span className="hidden sm:inline">· {data.prq.status}</span>
               </Link>
-              <Link href="/store" aria-label="Open the store" className="transition-transform active:scale-95">
+              <Link href="/store" aria-label={t('shell.rail.openStore')} className="transition-transform active:scale-95">
                 <DualWalletChip />
               </Link>
               {data.isAdmin && (
                 <>
                   <Link
                     href="/admin/metrics"
-                    aria-label="Growth metrics"
-                    className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
+                    aria-label={t('shell.rail.metrics')}
+                    className="hidden rounded-lg border border-white/10 p-1.5 text-fel-dim transition-colors hover:text-white sm:inline-flex"
                   >
                     <BarChart3 className="h-4 w-4" />
                   </Link>
                   <Link
                     href="/coach/admin"
-                    aria-label="Exercise knowledge-base admin"
-                    className="hidden rounded-lg border border-white/10 p-1.5 text-white/45 transition-colors hover:text-white sm:inline-flex"
+                    aria-label={t('shell.rail.kbAdmin')}
+                    className="hidden rounded-lg border border-white/10 p-1.5 text-fel-dim transition-colors hover:text-white sm:inline-flex"
                   >
                     <BookOpen className="h-4 w-4" />
                   </Link>
@@ -106,8 +110,8 @@ export function StatusRail() {
           )}
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            aria-label="Sign out"
-            className="rounded-lg border border-white/10 p-1.5 text-white/40 transition-colors hover:border-[#FF3366]/50 hover:text-[#FF3366]"
+            aria-label={t('shell.rail.signOut')}
+            className="rounded-lg border border-white/10 p-1.5 text-fel-dim transition-colors hover:border-fel-crimson/50 hover:text-fel-crimson"
           >
             <LogOut className="h-4 w-4" />
           </button>

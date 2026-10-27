@@ -13,6 +13,7 @@
 // Each step below is therefore `phone px + (zoom - 1) × growth`: exactly today's size on a phone (zoom 1, so a phone
 // layout covers no more of the play area than it did), and at least TV_MIN_READ_PX once the 1080p zoom applies.
 import { HUD_ZOOM_MAX, TV_SAFE } from '@/lib/ui/consoleView';
+import { cuePalette, onColorVisionChange, readColorVision, shapeCues, type ColorVision } from '@/lib/a11y/colorVision';
 
 // ── Palette ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,42 @@ export const HUD_THEME_VAR: Record<HudTone, string | null> = {
   power: '--fel-violet', text: '--fel-text', ink: '--fel-bg', them: null, info: null,
 };
 
+// ── Colour vision (A11-03, lane/a11y-design, 2026-10-25) ───────────────────────────────────────────────────────────────
+// The player's colour-vision setting (lib/a11y/colorVision.ts: off / deuteranopia / protanopia / tritanopia) swaps the
+// tones that collide for that deficiency, and every HUD piece draws through hudColor, so every migrated host follows.
+// 'off' is HUD_RGB exactly: the signed-off palette, unchanged. Colours only — no size, timing or band width is touched.
+let vision: ColorVision = 'off';
+let tones: Record<HudTone, readonly [number, number, number]> = HUD_RGB;
+
+/** Set the colour-vision setting the HUD draws with (the settings page and the stored choice call this). */
+export function setHudColorVision(v: ColorVision): void {
+  vision = v;
+  tones = cuePalette(HUD_RGB as Record<HudTone, readonly [number, number, number]>, v);
+}
+/** The setting the HUD is drawing with now. */
+export const hudColorVision = (): ColorVision => vision;
+
+if (typeof window !== 'undefined') {
+  setHudColorVision(readColorVision());
+  onColorVisionChange(() => setHudColorVision(readColorVision()));
+}
+
+/**
+ * SHAPE BESIDE COLOUR (WCAG 1.4.1): with a colour-vision setting on, a meter's bands carry a pattern as well as a tone —
+ * the PERFECT band (score) hatched, a danger band cross-hatched, the GOOD band edged on both ends. Background image and
+ * inset shadow only: the band's box, and so its width and the window it shows, is exactly the mode's.
+ */
+export function hudCueShape(tone: HudTone | undefined, fill: string): { background: string; boxShadow?: string } {
+  if (!tone || !shapeCues(vision)) return { background: fill };
+  if (tone === 'score') return { background: `repeating-linear-gradient(135deg, rgba(5, 5, 5, 0.6) 0 2px, transparent 2px 5px), ${fill}` };
+  if (tone === 'danger') return { background: `repeating-linear-gradient(45deg, rgba(5, 5, 5, 0.55) 0 2px, transparent 2px 6px), repeating-linear-gradient(135deg, rgba(5, 5, 5, 0.55) 0 2px, transparent 2px 6px), ${fill}` };
+  if (tone === 'good') return { background: fill, boxShadow: 'inset 2px 0 0 rgba(255, 255, 255, 0.95), inset -2px 0 0 rgba(255, 255, 255, 0.95)' };
+  return { background: fill };
+}
+
 /** A tone as a CSS colour, at an alpha (1 = solid). rgba() rather than color-mix() so an older TV browser draws it. */
 export function hudColor(tone: HudTone, alpha = 1): string {
-  const [r, g, b] = HUD_RGB[tone];
+  const [r, g, b] = tones[tone];
   const a = Math.max(0, Math.min(1, alpha));
   return a >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${Math.round(a * 1000) / 1000})`;
 }

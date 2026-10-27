@@ -66,8 +66,8 @@ export function CoachView() {
               // squeezing "Form Check" onto two lines beside a crushed icon (measured: scripts/probes/_coach-phone-probe.mts)
               className={`min-w-0 flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-lg py-2 sm:py-2.5 text-[11px] leading-tight sm:text-sm font-medium transition-all ${
                 active
-                  ? 'bg-[#00E5FF]/15 text-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.2)]'
-                  : 'text-white/40 hover:text-white/70'
+                  ? 'bg-fel-cyan/15 text-fel-cyan shadow-[0_0_12px_rgba(0,229,255,0.2)]'
+                  : 'text-fel-dim hover:text-white/70'
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -82,7 +82,7 @@ export function CoachView() {
       {tab === 'clients' && <ClientsView />}
       {tab === 'send' && (me
         ? <SendView me={me} />
-        : <div className="py-16 text-center text-sm text-white/40">Loading your details…</div>)}
+        : <div className="py-16 text-center text-sm text-fel-dim">Loading your details…</div>)}
       {tab === 'chat' && chatOn && <CoachChat />}
       {/* MIRROR-COACH P2: a coach's Exercises tab also holds their prescribable catalogue + "Add to my catalogue" */}
       {tab === 'catalogue' && <ExerciseCatalogue coach={coach} />}

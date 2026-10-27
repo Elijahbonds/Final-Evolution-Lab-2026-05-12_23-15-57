@@ -48,7 +48,7 @@ export function GuardianLockedNotice() {
       <Lock className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
       <span>
         A parent or guardian needs to say it&apos;s OK before this saves.{' '}
-        <Link href="/consent/guardian" className="font-medium text-[#00E5FF] underline underline-offset-2">
+        <Link href="/consent/guardian" className="font-medium text-fel-cyan underline underline-offset-2">
           Ask now
         </Link>
       </span>
@@ -102,7 +102,7 @@ export function HealthConsentLockedNotice({ onGranted }: { onGranted: () => void
       >
         {busy && <Loader2 className="h-3 w-3 animate-spin" />} I agree — turn this on
       </button>
-      {error && <p className="text-[11px] text-[#FF3366]">That didn&apos;t save — try again.</p>}
+      {error && <p className="text-[11px] text-fel-crimson">That didn&apos;t save — try again.</p>}
     </div>
   );
 }
@@ -128,11 +128,11 @@ async function submitPainCheckIn(body: Record<string, unknown>): Promise<{ ok: t
 
 const chipBase = 'rounded-full px-2.5 py-1 text-[11px] border';
 const scoreBtn = (active: boolean) =>
-  `h-7 w-7 shrink-0 rounded-md text-xs font-medium border ${active ? 'bg-[#00E5FF]/20 border-[#00E5FF]/50 text-[#00E5FF]' : 'border-white/10 text-white/60'}`;
+  `h-7 w-7 shrink-0 rounded-md text-xs font-medium border ${active ? 'bg-fel-cyan/20 border-fel-cyan/50 text-fel-cyan' : 'border-white/10 text-white/60'}`;
 
 /** The result banner: the server's own words, colored only by how urgent it is. Never re-explains the decision. */
 function ResultBanner({ r }: { r: SubmitResult }) {
-  const tone = r.hardStop ? 'border-[#FF3366]/40 bg-[#FF3366]/10 text-[#FF3366]' : r.stop ? 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]' : 'border-[#00FF9D]/30 bg-[#00FF9D]/8 text-[#00FF9D]';
+  const tone = r.hardStop ? 'border-fel-crimson/40 bg-fel-crimson/10 text-fel-crimson' : r.stop ? 'border-fel-gold/40 bg-fel-gold/10 text-fel-gold' : 'border-fel-emerald/30 bg-fel-emerald/8 text-fel-emerald';
   return (
     <div className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${tone}`} role="status" data-pain-decision={r.decision}>
       {r.hardStop && <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
@@ -158,7 +158,7 @@ function PainForm({ busy, fixedBodyArea, onSubmit }: { busy: boolean; fixedBodyA
   return (
     <div className="space-y-2">
       <div>
-        <div className="text-[11px] text-white/45 mb-1">Pain, 0–10</div>
+        <div className="text-[11px] text-fel-dim mb-1">Pain, 0–10</div>
         <div className="flex flex-wrap gap-1">
           {Array.from({ length: 11 }, (_, n) => n).map((n) => (
             <button key={n} type="button" aria-pressed={score === n} onClick={() => setScore(n)} className={scoreBtn(score === n)}>{n}</button>
@@ -167,19 +167,19 @@ function PainForm({ busy, fixedBodyArea, onSubmit }: { busy: boolean; fixedBodyA
       </div>
       {!fixedBodyArea && (
         <div>
-          <div className="text-[11px] text-white/45 mb-1">Where</div>
+          <div className="text-[11px] text-fel-dim mb-1">Where</div>
           <div className="flex flex-wrap gap-1">
             {BODY_AREAS.map((a) => (
-              <button key={a.id} type="button" aria-pressed={bodyArea === a.id} onClick={() => setBodyArea(a.id)} className={`${chipBase} ${bodyArea === a.id ? 'bg-[#00E5FF]/15 border-[#00E5FF]/40 text-[#00E5FF]' : 'border-white/10 text-white/55'}`}>{a.label}</button>
+              <button key={a.id} type="button" aria-pressed={bodyArea === a.id} onClick={() => setBodyArea(a.id)} className={`${chipBase} ${bodyArea === a.id ? 'bg-fel-cyan/15 border-fel-cyan/40 text-fel-cyan' : 'border-white/10 text-white/55'}`}>{a.label}</button>
             ))}
           </div>
         </div>
       )}
       <div>
-        <div className="text-[11px] text-white/45 mb-1">Did any of these happen?</div>
+        <div className="text-[11px] text-fel-dim mb-1">Did any of these happen?</div>
         <div className="flex flex-wrap gap-1">
           {ACUTE_EVENTS.map((e) => (
-            <button key={e.id} type="button" aria-pressed={acute.includes(e.id)} onClick={() => toggle(e.id)} className={`${chipBase} ${acute.includes(e.id) ? 'bg-[#FF3366]/15 border-[#FF3366]/40 text-[#FF3366]' : 'border-white/10 text-white/55'}`}>{e.label}</button>
+            <button key={e.id} type="button" aria-pressed={acute.includes(e.id)} onClick={() => toggle(e.id)} className={`${chipBase} ${acute.includes(e.id) ? 'bg-fel-crimson/15 border-fel-crimson/40 text-fel-crimson' : 'border-white/10 text-white/55'}`}>{e.label}</button>
           ))}
         </div>
       </div>
@@ -222,7 +222,7 @@ export function PainCheckInChip({ exerciseName, programExerciseId, kind = 'after
 
   return (
     <div data-pain-checkin={exerciseName}>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 text-[11px] text-white/40 hover:text-white/60">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex items-center gap-1 text-[11px] text-fel-dim hover:text-white/60">
         Pain? (optional) {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
       {open && needsHealthConsent && (
@@ -232,7 +232,7 @@ export function PainCheckInChip({ exerciseName, programExerciseId, kind = 'after
       )}
       {open && locked && !needsHealthConsent && <div className="mt-1.5"><GuardianLockedNotice /></div>}
       {open && !result && !locked && !needsHealthConsent && <div className="mt-1.5"><PainForm busy={busy} onSubmit={submit} /></div>}
-      {error && <div className="mt-1 text-[11px] text-[#FF3366]">{error}</div>}
+      {error && <div className="mt-1 text-[11px] text-fel-crimson">{error}</div>}
       {result && <div className="mt-1.5"><ResultBanner r={result} /></div>}
     </div>
   );
@@ -314,7 +314,7 @@ export function NextMorningFollowUps() {
                 fixedBodyArea={p.bodyArea as BodyAreaId}
                 onSubmit={(v) => submit(i, v)}
               />
-              <button type="button" onClick={() => setSkipped((s) => new Set(s).add(i))} className="text-[11px] text-white/35 underline">Not now</button>
+              <button type="button" onClick={() => setSkipped((s) => new Set(s).add(i))} className="text-[11px] text-fel-quiet underline">Not now</button>
             </>
           )}
         </div>
