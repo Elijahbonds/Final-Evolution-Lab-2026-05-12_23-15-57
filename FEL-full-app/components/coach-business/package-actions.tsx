@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { MARKET_GOALS } from '@/lib/coach-business/market';
 import type { PackageAction } from '@/lib/coach-business/packages';
 import { loginPath } from '@/lib/auth/safeNext';
+import { BUYER_TERMS } from '@/lib/payments/terms';
 
 export const BUSINESS_API = '/api/coach/business';
 
@@ -24,16 +25,29 @@ function signInFirst(slug: string): string {
 
 export function BookButton({ slug, packageId }: { slug: string; packageId: string }) {
   const [sent, setSent] = useState<Sent>({ kind: 'idle' });
+  // PAYMENTS-READY: the buyer ticks the store terms before Stripe is called (the server checks the same version).
+  const [agreed, setAgreed] = useState(false);
+  const terms = BUYER_TERMS.coach_package;
   const book = async () => {
+    if (!agreed) return;
     setSent({ kind: 'busy' });
-    const r = await post(`${BUSINESS_API}/checkout`, { packageId });
+    const r = await post(`${BUSINESS_API}/checkout`, { packageId, termsAccepted: true, termsVersion: terms.version });
     if (r.status === 401) { window.location.href = signInFirst(slug); return; }
     if (r.ok && typeof r.json.url === 'string') { window.location.href = r.json.url; return; }
+    if (r.status === 409 && r.json.error === 'terms_required') {
+      setAgreed(false);
+      setSent({ kind: 'error', text: 'The store terms were updated. Reload the page and tick the box again.' });
+      return;
+    }
     setSent({ kind: 'error', text: typeof r.json.message === 'string' ? r.json.message : 'Checkout could not start. Try again.' });
   };
   return (
     <div>
-      <button type="button" onClick={book} disabled={sent.kind === 'busy'} data-action="book"
+      <label className="mb-2 flex items-start gap-2 text-xs text-white/70" data-buyer-terms>
+        <input type="checkbox" className="mt-0.5" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+        <span>I agree to the <a className="font-bold text-cyan-300 underline" href={terms.href} target="_blank" rel="noopener noreferrer">store terms</a>.</span>
+      </label>
+      <button type="button" onClick={book} disabled={sent.kind === 'busy' || !agreed} data-action="book"
         className="min-h-11 rounded-xl bg-cyan-300 px-4 text-sm font-bold text-black disabled:opacity-60">
         {sent.kind === 'busy' ? 'Opening checkout…' : 'Book'}
       </button>

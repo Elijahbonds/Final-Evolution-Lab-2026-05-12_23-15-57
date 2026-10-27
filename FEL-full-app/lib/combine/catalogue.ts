@@ -9,15 +9,18 @@
 //   approach  the approach jump from a side-on video the coach's phone took (lib/jump/sideView.ts analyseSideClip, the
 //             existing reader). Touch height only when this athlete's standing reach was read in this combine
 //             (lib/jump/reach.ts readReach + touchHeight). The video is read on the phone and never uploaded.
-//   agility   HAND-TIMED. The code has no camera timer for a shuffle or a 5-10-5: the Playbook's T-drill and lateral
-//             bound are rhythm charts (lib/drills), scored on the beat, not timed start to finish. So the coach times it.
-//   sprint    HAND-TIMED stopwatch entry. There is no camera sprint timing and none is claimed.
+//   agility   HAND-TIMED by default. SPRINT-SPEED (2026-10-25): the coach may set the 5-10-5 to the CAMERA instead
+//             (lib/sprint/agility.ts, beta); the 3-cone and the shuffle stay hand-timed.
+//   sprint    HAND-TIMED stopwatch entry by default. SPRINT-SPEED (2026-10-25): the coach may set a sprint station to the
+//             CAMERA (lib/sprint/timing.ts, the phone on the finish line). Camera times are estimates and say "camera";
+//             a station's `timing: 'camera'` is the choice, and each attempt keeps how it was timed (types.ts Attempt).
 //   skill     an existing Mirror drill (lib/drills DRILLS, run by app/play/drills' DrillLive) scored by its own
 //             DrillRunner: the share of targets hit on the beat. No new scorer.
 //
 // Pure, client-safe.
 import { DRILLS } from '@/lib/drills/drills';
 import { drillTargetCount } from '@/lib/drills/chart';
+import { timingChoices } from '@/lib/sprint/cameraSprint';
 
 export type StationKind = 'cmj' | 'approach' | 'agility' | 'sprint' | 'skill';
 export const STATION_KINDS: readonly StationKind[] = ['cmj', 'approach', 'agility', 'sprint', 'skill'];
@@ -99,6 +102,8 @@ export interface StationConfig {
   kind: StationKind;
   variant: string;
   attempts: number;
+  /** SPRINT-SPEED: a sprint or 5-10-5 station the coach set to the camera (absent = hand-timed). */
+  timing?: 'camera';
 }
 
 export const stationId = (kind: StationKind, variant: string): string => `${kind}:${variant}`;
@@ -115,7 +120,8 @@ export function parseStation(raw: unknown): StationConfig | null {
   const def = STATIONS[r.kind];
   if (!def.variants.some((v) => v.id === r.variant)) return null;
   const n = typeof r.attempts === 'number' && Number.isFinite(r.attempts) ? Math.round(r.attempts) : def.defaultAttempts;
-  return { id: stationId(r.kind, r.variant), kind: r.kind, variant: r.variant, attempts: Math.min(MAX_ATTEMPTS, Math.max(1, n)) };
+  const camera = r.timing === 'camera' && (r.kind === 'sprint' || r.kind === 'agility') && timingChoices(r.kind, r.variant).includes('camera');
+  return { id: stationId(r.kind, r.variant), kind: r.kind, variant: r.variant, attempts: Math.min(MAX_ATTEMPTS, Math.max(1, n)), ...(camera ? { timing: 'camera' as const } : {}) };
 }
 
 /** Stations from untrusted input: valid ones only, each once, at most MAX_STATIONS. */
@@ -133,11 +139,11 @@ export function variantLabel(s: Pick<StationConfig, 'kind' | 'variant'>): string
   return STATIONS[s.kind].variants.find((v) => v.id === s.variant)?.label ?? s.variant;
 }
 
-/** "Sprint · 40 yd (hand-timed)": every hand-timed station says so wherever its name is shown. */
-export function stationName(s: Pick<StationConfig, 'kind' | 'variant'>): string {
+/** "Sprint · 40 yd (hand-timed)": every hand-timed station says so wherever its name is shown; a camera one "(camera)". */
+export function stationName(s: Pick<StationConfig, 'kind' | 'variant'> & { timing?: StationConfig['timing'] }): string {
   const def = STATIONS[s.kind];
   const v = def.variants.length > 1 ? ` · ${variantLabel(s)}` : '';
-  return `${def.label}${v}${def.method === 'hand' ? ' (hand-timed)' : ''}`;
+  return `${def.label}${v}${def.method === 'hand' ? (s.timing === 'camera' ? ' (camera)' : ' (hand-timed)') : ''}`;
 }
 
 const IN = 2.54;

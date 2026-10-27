@@ -2,6 +2,7 @@
 // The split of a coach's sale across every price from $1 to $500, its rounding under every way Stripe could round,
 // refunds (partial and full), monthly coaching (the first invoice's true-up and each renewal's exact fee), the closed
 // switches (no Stripe call), and the one Coach Pro price behind every place it shows.
+import { STORE_TERMS_VERSION } from '@/lib/store-terms';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type Stripe from 'stripe';
@@ -276,13 +277,14 @@ describe('every switch off: no Stripe call', () => {
     expect(proGate({ COACH_PRO_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_live_x', NEXTAUTH_URL: 'https://fel.test' } as any)).toEqual({ ok: false, reason: 'live_mode_off' });
   });
 
+  // test changed (payments-ready): the checkout now needs the buyer's store-terms tick, so the call passes it.
   it('switches on (test key): the checkout reaches Stripe with the grossed-up split', async () => {
     const env = { COACH_CONNECT_PAYMENTS_ENABLED: '1', STRIPE_SECRET_KEY: 'sk_test_x', NEXTAUTH_URL: 'https://fel.test' } as unknown as NodeJS.ProcessEnv;
     const fake = fakeCoachBusinessDb();
     seedCoach(fake.state, { priceCents: 1_500 });
     const made: any[] = [];
     const stripe = { checkout: { sessions: { create: async (p: any) => { made.push(p); return { id: 'cs_test_0123456789abc', url: 'u' }; } } } };
-    const r = await startPackageCheckout({ db: fake.db as any, stripe: () => stripe as any, env, now: NOW, isAdult: async () => true, plan: async () => 'pro', ensureCustomer: async () => 'cus', coachSlug: async () => 'c' }, 'b', 'pkg-1');
+    const r = await startPackageCheckout({ db: fake.db as any, stripe: () => stripe as any, env, now: NOW, isAdult: async () => true, plan: async () => 'pro', ensureCustomer: async () => 'cus', coachSlug: async () => 'c' }, 'b', 'pkg-1', { termsAccepted: true, termsVersion: STORE_TERMS_VERSION });
     expect(r).toMatchObject({ ok: true });
     expect(made[0].payment_intent_data.application_fee_amount).toBe(75 + 76);
     expect(made[0].line_items.map((l: any) => l.price_data.unit_amount)).toEqual([1_500, 76]);
