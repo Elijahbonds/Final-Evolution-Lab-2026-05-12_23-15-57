@@ -63,12 +63,16 @@ const PAD_INIT = `(() => {
 const RECORDER = `(() => {
   const dev = window.__FEL_DEV__, scene = dev.scene;
   const S = window.__smp = { marks: [] };
-  const markRe = /^\\[(DUNK-[A-Z-]+|LOB|HANDS|JUICE-[A-Z]+|FEL-DUNK|DUBBLE)/;
+  const markRe = /^\\[(DUNK-[A-Z-]+|LOB|HANDS|JUICE-[A-Z]+|FEL-DUNK|DUBBLE|RIG-FEEL)/;
   for (const k of ['info', 'log', 'warn']) { const o = console[k].bind(console); console[k] = (...a) => { const s = String(a[0]); if (markRe.test(s)) S.marks.push({ t: performance.now(), msg: s.slice(0, 240) }); o(...a); }; }
   const R = window.__rec = { on: false, frames: [], strip: null, stripWait: false, stripN: 0, f0: 0 };
   const JN = ${JSON.stringify(JN)}, QN = ${JSON.stringify(QN)};
   const clean = (n) => n.replace(/^mixamorig:?/, '').replace(/_c\\d+$/, '');
   let rootRef = null, jn = null, qn = null, targets = null;
+  // YTRAP (Phase 2): every change to the hero root's height with a short stack, as a mark (an unminified bundle names the writer)
+  const ytrap = ${process.env.YTRAP === '1'}; let yTrapped = null;
+  const trapY = (root) => { if (!ytrap || yTrapped === root) return; yTrapped = root; const v = root.position; let y = v._y; let n = 0;
+    Object.defineProperty(v, '_y', { configurable: true, get() { return y; }, set(nv) { if (Math.abs(nv - y) > 1e-4 && n < 40 && (Math.abs(nv) < 0.06 || Math.abs(y) < 0.06)) { n++; S.marks.push({ t: performance.now(), msg: '[YTRAP] ' + y.toFixed(4) + ' → ' + Number(nv).toFixed(4) + ' @ ' + new Error().stack.split('\\n').slice(2, 6).map((x) => x.trim().replace(/\\(?https?:[^)]*\\/([a-z]+)\\.js:/, '($1:').slice(0, 60)).join(' < ') }); } y = nv; } }); };
   const bind = (root) => {
     const sk = scene.skeletons.find((s) => s.bones.some((b) => { const t = b.getTransformNode(); return t && t.isDescendantOf(root); }));
     const nodes = sk ? sk.bones.map((b) => b.getTransformNode()).filter(Boolean) : [];
@@ -82,6 +86,7 @@ const RECORDER = `(() => {
     if (!R.on) return;
     const h = dev.hero(); if (!h) return; let root = h; while (root.parent) root = root.parent;
     if (rootRef !== root) bind(root);
+    trapY(root);
     const rp = root.position;
     let yaw = root.rotation.y; const rq = root.rotationQuaternion; if (rq) { yaw = Math.atan2(2 * (rq.w * rq.y + rq.x * rq.z), 1 - 2 * (rq.y * rq.y + rq.x * rq.x)); }
     const j = jn.map((n) => { if (!n) return null; const a = n.getAbsolutePosition(); return [r4(a.x), r4(a.y), r4(a.z)]; });
@@ -96,6 +101,7 @@ const RECORDER = `(() => {
     // the frame strip: pause the clock ON this frame so node photographs exactly it
     if (R.strip && R.strip.length && (f - R.f0) >= R.strip[0]) { R.strip.shift(); R.stripN++; R.stripWait = true; window.__vc.pause(); }
   });
+  if (ytrap) { const h0 = dev.hero(); if (h0) { let r0 = h0; while (r0.parent) r0 = r0.parent; trapY(r0); } }   // from boot: the intro's writes too
   window.__hud = () => window.__hudObj || {};
   window.__HUDLOG = []; let last = '';
   setInterval(() => { const h = window.__hud(); const s = [h.banner, h.hint, h.slamBeat].filter(Boolean).join(' | '); if (s && s !== last) { last = s; window.__HUDLOG.push({ t: performance.now(), s }); } }, 16);
@@ -178,7 +184,7 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
     while (now() < end) { await sleep(100); }
     R.on = false;
     const qa = w.__FEL_QA__ ? w.__FEL_QA__.events(4000).filter((e) => e.t >= t0).map((e) => ({ t: e.t, kind: String(e.kind), name: String(e.key ?? '') })) : [];
-    return { t0, pressAt, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0), qa, hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
+    return { t0, pressAt, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0 || m.msg.startsWith('[YTRAP]')), qa, hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
   } finally { w.__vc.pause(); }
 }
 
