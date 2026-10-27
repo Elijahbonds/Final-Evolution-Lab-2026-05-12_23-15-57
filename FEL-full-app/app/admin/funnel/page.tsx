@@ -5,6 +5,9 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { computeFunnelCounts, STAGE_META, FUNNEL_ORDER } from '@/lib/marketing/funnel';
 import { ReengageButton } from '@/components/marketing/reengage-button';
+import { attributionReport } from '@/lib/marketing/utm';
+import { readAttribution, ATTRIBUTION_WINDOW_DAYS } from '@/lib/marketing/attributionRead';
+import { FIRST_WIN_CAP_SEC, FIRST_WINS, firstWinSummary } from '@/lib/onboarding/firstWin';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +29,11 @@ export default async function AdminFunnelPage() {
   });
   const counts = computeFunnelCounts(rows.map((r) => ({ stage: r.stage as any })));
   const recent = rows.slice(0, 50);
+  // ONB-04 / ONB-02: sign-ups by where the first visit came from (first purchase joined by account), and first wins
+  // by path. Our own tables only; a read that fails shows an empty table, never a 500.
+  const attr = await readAttribution(prisma);
+  const sources = attributionReport(attr.signups, attr.orders);
+  const wins = firstWinSummary(attr.firstWins);
 
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
@@ -62,6 +70,59 @@ export default async function AdminFunnelPage() {
               </div>
             );
           })}
+        </div>
+
+        <h2 className="mt-10 fel-heading text-xl font-bold text-white">Where sign-ups came from</h2>
+        <p className="mt-1 font-mono text-[11px] text-white/45">
+          Last {ATTRIBUTION_WINDOW_DAYS} days. utm_source / medium / campaign and ?ref from the first visit, kept on the
+          visitor&apos;s own browser and sent with the sign-up. First purchase = their first paid order. No pixels.
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-white/10" data-funnel-sources>
+          <table className="w-full text-left text-sm">
+            <thead className="bg-white/[0.04] font-mono text-[11px] uppercase tracking-wider text-white/50">
+              <tr>
+                <th className="px-4 py-3">Source</th>
+                <th className="px-4 py-3">Medium</th>
+                <th className="px-4 py-3">Campaign</th>
+                <th className="px-4 py-3">Ref</th>
+                <th className="px-4 py-3 text-right">Sign-ups</th>
+                <th className="px-4 py-3 text-right">First purchases</th>
+                <th className="px-4 py-3 text-right">First-purchase $</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-white/40">No sign-ups in this window.</td></tr>
+              ) : sources.map((l) => (
+                <tr key={`${l.source}|${l.medium}|${l.campaign}|${l.ref}`} className="border-t border-white/5" data-source-row={l.source}>
+                  <td className="px-4 py-3 text-white/80">{l.source}</td>
+                  <td className="px-4 py-3 text-white/50">{l.medium}</td>
+                  <td className="px-4 py-3 text-white/50">{l.campaign}</td>
+                  <td className="px-4 py-3 text-white/50">{l.ref}</td>
+                  <td className="px-4 py-3 text-right text-white/80">{l.signups}</td>
+                  <td className="px-4 py-3 text-right text-white/80">{l.purchasers}</td>
+                  <td className="px-4 py-3 text-right text-white/50">{(l.firstPurchaseCents / 100).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 className="mt-10 fel-heading text-xl font-bold text-white">First wins by path</h2>
+        <p className="mt-1 font-mono text-[11px] text-white/45">
+          Last {ATTRIBUTION_WINDOW_DAYS} days, timed on /welcome from the page to &quot;You did it&quot;. Play&apos;s win is the
+          first dunk, inside the game. The bar is {FIRST_WIN_CAP_SEC} seconds.
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5" data-funnel-first-wins>
+          {wins.map((w) => (
+            <div key={w.path} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-3xl font-black" style={{ color: FIRST_WINS[w.path].accent }}>{w.wins}</div>
+              <div className="mt-1 font-mono text-[11px] uppercase tracking-wider text-white/60">{FIRST_WINS[w.path].label}</div>
+              <div className="mt-1 text-[11px] text-white/40">
+                {w.medianSec === null ? 'No wins yet' : `median ${w.medianSec.toFixed(1)} s · ${w.underCap} under ${FIRST_WIN_CAP_SEC} s`}
+              </div>
+            </div>
+          ))}
         </div>
 
         <h2 className="mt-10 fel-heading text-xl font-bold text-white">Recent leads</h2>
