@@ -15,7 +15,7 @@ function Games({ games }: { games: CardGames }) {
     <div className="mt-4 rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-[#FFD700]">Games</p>
-        {games.runsLine && <p className="text-right text-[11.5px] text-white/50">{games.runsLine}</p>}
+        {games.runsLine && <p className="text-right text-[12px] text-fel-dim">{games.runsLine}</p>}
       </div>
       {games.modes.length > 0 ? (
         <ul className="mt-1 divide-y divide-white/[0.06]">
@@ -38,19 +38,19 @@ function Games({ games }: { games: CardGames }) {
                     aria-label={m.compare.thisWeek === null ? 'not played this week' : undefined}>
                     {m.compare.thisWeek === null ? '—' : Math.round(m.compare.thisWeek).toLocaleString('en-US')}
                   </span>
-                  <span className="block font-mono text-[10px] text-white/35">best this week</span>
+                  <span className="block font-sans text-[12px] text-fel-quiet">best this week</span>
                 </span>
               </li>
             );
           })}
         </ul>
       ) : games.scope === 'device' ? (
-        <p className="mt-2 text-[12px] leading-snug text-white/50">
+        <p className="mt-2 text-[12px] leading-snug text-fel-dim">
           Under 18, or with no birth year on the account, your game scores stay on this phone, so the card counts runs, not scores.{' '}
           <Link href="/profile#stats" className="font-bold text-[#FFD700] underline-offset-2 hover:underline">Your bests →</Link>
         </p>
       ) : (
-        <p className="mt-2 text-[12px] leading-snug text-white/50">
+        <p className="mt-2 text-[12px] leading-snug text-fel-dim">
           No scored runs in the last two weeks.{' '}
           <Link href="/play" className="font-bold text-[#FFD700] underline-offset-2 hover:underline">Play a mode →</Link>
         </p>
@@ -64,11 +64,11 @@ export function ProgressCardView({ card }: { card: ProgressCard }) {
     <section aria-labelledby="week-card-h" data-card-state={card.state}
       className="rounded-3xl border border-white/[0.08] bg-[linear-gradient(160deg,rgba(11,42,51,0.55)_0%,#08080c_55%)] p-3.5 sm:p-5">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-white/45">Your week</p>
+        <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim">Your week</p>
         <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#00E5FF]">{weekLabel(card)}</p>
       </div>
       <h2 id="week-card-h" className="fel-heading mt-2 text-[21px] font-black leading-tight text-white">{card.headline}</h2>
-      <p className="mt-1 text-[11.5px] text-white/40">Last 7 days against the 7 before. A dash is something nobody measured.</p>
+      <p className="mt-1 text-[12px] text-fel-dim">Last 7 days against the 7 before. A dash is something nobody measured.</p>
       <div className="mt-4 grid grid-cols-2 gap-2.5 md:grid-cols-4">
         {card.metrics.map((t) => <TileView key={t.key} tile={t} accent={ACCENT[t.key] ?? '#fff'} />)}
       </div>

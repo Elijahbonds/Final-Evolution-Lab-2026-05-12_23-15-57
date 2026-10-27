@@ -14,22 +14,22 @@ export function PrivacySection({ data }: { data: ProfileV2Data }) {
     <Section id="privacy" title="Who can see your profile" purpose="Your progress is yours. Choose who else sees it." accent="#00FF9D">
       <Card>
         {p.minorOrUnknown ? (
-          <p className="flex items-start gap-2.5 text-[12.5px] leading-snug text-white/70">
+          <p className="flex items-start gap-2.5 text-[14px] leading-snug text-white/70">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-fel-emerald" aria-hidden />
             <span><b className="text-white">Private.</b> Only you and your coaches can see your profile. Accounts under 18 never get a public page.</span>
           </p>
         ) : p.cardSlug ? (
           <>
             <PublicToggle initial={p.visibility === 'public'} />
-            <p className="mt-2 text-[11.5px] text-fel-dim">Your page: <Link href={`/u/${p.cardSlug}`} className="font-mono text-fel-cyan underline-offset-2 hover:underline">/u/{p.cardSlug}</Link></p>
+            <p className="mt-2 text-[12px] text-fel-dim">Your page: <Link href={`/u/${p.cardSlug}`} className="font-mono text-fel-cyan underline-offset-2 hover:underline">/u/{p.cardSlug}</Link></p>
           </>
         ) : (
-          <p className="text-[12.5px] leading-snug text-white/60">
+          <p className="text-[14px] leading-snug text-white/60">
             <b className="text-white">Friends only.</b> Want a public page? <Link href="/profile/edit#card" className="font-bold text-fel-cyan underline-offset-2 hover:underline">Make your card</Link>, then switch it on here.
           </p>
         )}
         <div className="mt-3 border-t border-white/[0.06] pt-3">
-          <p className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/60"><ShieldCheck className="h-3.5 w-3.5 text-fel-cyan" aria-hidden />Coaches who can see it</p>
+          <p className="flex items-center gap-1.5 text-[12px] font-bold text-white/60"><ShieldCheck className="h-3.5 w-3.5 text-fel-cyan" aria-hidden />Coaches who can see it</p>
           <p className="mt-1 text-[12px] text-white/50">{p.coaches.length ? p.coaches.join(', ') : 'None. A coach you join sees your profile.'}</p>
         </div>
       </Card>

@@ -13,8 +13,8 @@ import { LIE_BACK, SUPINE, turn } from './exerciseFloor';
 type Pose = Omit<ExKey, 't'>;
 type Side = 'Left' | 'Right';
 type Builder = (scene: Scene, sk: Skeleton) => AnimationGroup | null;
-const other = (s: Side): Side => (s === 'Left' ? 'Right' : 'Left');
-const sx = (s: Side, x: number) => (s === 'Left' ? -x : x);
+export const other = (s: Side): Side => (s === 'Left' ? 'Right' : 'Left');
+export const sx = (s: Side, x: number) => (s === 'Left' ? -x : x);
 
 /** Keys at the given times, each move solved half-way too (a planted foot stays planted between two far-apart keys); a foot
  *  or hand that travels further than a step between two keys is lifted at the half-way key, not slid. */
@@ -227,7 +227,7 @@ function sealJack(scene: Scene, sk: Skeleton): AnimationGroup | null {
 
 // ── sprint drills in place ──────────────────────────────────────────────────────────────────────────────────────────
 /** One running step in place: `s`'s knee up (or heel kicked up), the other foot on its ball, the opposite arm driving. */
-function stride(s: Side, legBones: Record<string, Deg3>, hop: number): Pose {
+export function stride(s: Side, legBones: Record<string, Deg3>, hop: number): Pose {
   const o = other(s);
   return {
     bones: { Hips: [4, 0, 0], Spine: [4, 0, 0], Neck: [-2, 0, 0], ...legBones, [`${o}Foot`]: [16, 0, 0] } as Record<string, Deg3>,
@@ -236,9 +236,9 @@ function stride(s: Side, legBones: Record<string, Deg3>, hop: number): Pose {
     hipsY: 0.02 + hop,
   };
 }
-const kneeUp = (s: Side, h = 1): Record<string, Deg3> => ({ [`${s}UpLeg`]: [-84 * h, 0, 0], [`${s}Leg`]: [94 * h, 0, 0], [`${s}Foot`]: [10, 0, 0] });
+export const kneeUp = (s: Side, h = 1): Record<string, Deg3> => ({ [`${s}UpLeg`]: [-84 * h, 0, 0], [`${s}Leg`]: [94 * h, 0, 0], [`${s}Foot`]: [10, 0, 0] });
 const heelUp = (s: Side): Record<string, Deg3> => ({ [`${s}UpLeg`]: [6, 0, 0], [`${s}Leg`]: [132, 0, 0], [`${s}Foot`]: [40, 0, 0] });
-function inPlace(scene: Scene, sk: Skeleton, name: string, dur: number, poses: Pose[]): AnimationGroup | null {
+export function inPlace(scene: Scene, sk: Skeleton, name: string, dur: number, poses: Pose[]): AnimationGroup | null {
   return run(scene, sk, name, dur, poses.map((p, i) => at(p, (dur * i) / poses.length)));
 }
 const highKnees = (scene: Scene, sk: Skeleton) => inPlace(scene, sk, 'ex_high_knees', 0.6, [stride('Left', kneeUp('Left'), 0.03), stride('Right', kneeUp('Right'), 0.03)]);

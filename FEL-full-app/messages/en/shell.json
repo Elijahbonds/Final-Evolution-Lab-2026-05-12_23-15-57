@@ -1,6 +1,13 @@
 {
-  "tabs": { "play": "Play", "train": "Train", "profile": "Profile" },
-  "nav": { "main": "Main", "more": "More" },
+  "tabs": {
+    "play": "Play",
+    "train": "Train",
+    "profile": "Profile"
+  },
+  "nav": {
+    "main": "Main",
+    "more": "More"
+  },
   "rail": {
     "openStore": "Open the store",
     "metrics": "Growth metrics",
@@ -12,7 +19,6 @@
     "live": "{count} live",
     "liveBadge": "Live",
     "artwork": "{name} venue artwork",
-    "browse": "Browse by venue",
-    "browseLine": "{count} places — the court, the dojo, the slope, the break."
+    "browse": "Browse by venue"
   }
 }

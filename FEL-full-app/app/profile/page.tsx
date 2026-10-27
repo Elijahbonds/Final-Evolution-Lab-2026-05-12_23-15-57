@@ -9,7 +9,8 @@ import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileBody, ProfileActions } from '@/components/profile-v2/profile-body';
 import { AthleteStatusSection } from '@/components/profile/athlete-status-card';
-import { PALETTE } from '@/lib/design/palette';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { CalendarDays } from 'lucide-react';
 import { t } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -33,8 +34,15 @@ export default async function ProfilePage() {
   const data = await loadProfile(prisma as unknown as ProfileDb, me);
 
   return (
-    <TabPage eyebrow={t('profile.eyebrow')} title={data.identity.name} lede={t('profile.lede')} accent={PALETTE.gold}
-      aside={<ProfileActions />}
+    // PREMIUM-UI P4 (2026-10-27): the Venice sunset full-bleed with the athlete's name on it; the athlete and the PRQ ring
+    // open the page; ONE primary — this week's card, the share — docked; Edit and Settings are two quiet doors.
+    <TabPage eyebrow={t('profile.eyebrow')} title={data.identity.name} lede={t('profile.lede')}
+      hero={{
+        image: '/backdrops/venice-sky-sunset.jpg',
+        imagePosition: '50% 70%',
+        primary: <PrimaryCta href="/profile/week" docked testId="profile-week-card" icon={<CalendarDays aria-hidden className="h-5 w-5" />}>{t('profile.weekCard')}</PrimaryCta>,
+        chips: <ProfileActions />,
+      }}
     >
       <ProfileBody data={data} />
 

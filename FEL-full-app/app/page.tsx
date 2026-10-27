@@ -28,7 +28,7 @@ export default async function HomePage({ searchParams }: { searchParams: { sessi
   // this page's verify first, and the redirect happens only after (client-side).
   if (session && !searchParams.session_id) redirect('/play');
   return (
-    <div className="min-h-screen bg-[#050505]">
+    <div className="min-h-screen bg-fel-bg">
       {/* Suspense: useSearchParams bails out of prerendering. VerifyCheckoutParams
           renders null and redirects to /play itself once the verify has settled. */}
       <Suspense fallback={null}>
