@@ -164,19 +164,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
 
       {chapterDone && (
         <section data-chapter-done className="fel-surface mt-8 p-5">
-          {chapter.remember.length > 0 && (
-            <>
-              <h3 className={`${TYPE.heading} text-white`}>What to remember</h3>
-              <ul className="mt-3 space-y-2">
-                {chapter.remember.map((r, n) => (
-                  <li key={n} className={`flex gap-2.5 ${TYPE.small} text-fel-soft`}>
-                    <span aria-hidden className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-fel-emerald" />
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          {chapter.remember.length > 0 && <Remember items={chapter.remember} />}
           {/* EDU-LINKS (2026-10-07): this went to the course index from every chapter. It opens the next one now, and the
               index after the last; and it shows on a chapter with no recap (5 and 8 have none), which it never did. */}
           <div className="mt-4"><Chip href={next} testId="next-chapter">{nextLabel}</Chip></div>
@@ -218,6 +206,29 @@ export function BookText({ lesson, initiallyOpen = false }: { lesson: Lesson; in
           </aside>
         )}
       </div>}
+    </details>
+  );
+}
+
+/** The chapter's own recap ("What to Remember" in the book), one tap away and verbatim — like Read more, its words are
+ *  on the page only once opened, so a finished chapter opens on its lesson, its next step and its check. */
+function Remember({ items }: { items: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details data-chapter-remember open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className={`${TYPE.heading} flex min-h-11 cursor-pointer list-none items-center text-white [&::-webkit-details-marker]:hidden`}>
+        What to remember
+      </summary>
+      {open && (
+        <ul className="mt-3 space-y-2">
+          {items.map((r, n) => (
+            <li key={n} data-remember className={`flex gap-2.5 ${TYPE.small} text-fel-soft`}>
+              <span aria-hidden className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-fel-emerald" />
+              {r}
+            </li>
+          ))}
+        </ul>
+      )}
     </details>
   );
 }
