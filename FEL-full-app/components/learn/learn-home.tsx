@@ -24,6 +24,8 @@ import { StatRing } from '@/components/ui/fel/stat-ring';
 import { ListRow } from '@/components/ui/fel/cards';
 import { EducationView } from '@/components/education-view';
 import { deviceStore, readLastLesson } from '@/components/education/last-lesson';
+import { warmLessonDemo } from '@/components/education/warm-demo';
+import { demoForLesson } from '@/lib/education/lessonDemo';
 import { continueTarget } from './continue';
 import { practiceRows } from './practice';
 
@@ -58,6 +60,12 @@ export function LearnHome() {
     [device, done, signedIn],
   );
   const practice = useMemo(() => practiceRows(), []);
+
+  // Continue opens a lesson that starts on its demo: load the 3D code while the phone is idle, so the tap lands warm.
+  useEffect(() => {
+    const m = /^\/education\/playbook\/(\d+)\?lesson=([^&]+)/.exec(target.href);
+    if (device && m && demoForLesson(`${m[1]}:${decodeURIComponent(m[2])}`)) warmLessonDemo();
+  }, [device, target.href]);
 
   return (
     <div className="relative min-h-screen bg-fel-bg pb-28 md:pb-12" data-learn-home>
