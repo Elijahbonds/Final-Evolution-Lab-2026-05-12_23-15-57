@@ -19,7 +19,7 @@ export function StatsSection({ data, viewer = false }: { data: ProfileV2Data; vi
     <Section id="stats" title="Stats & personal bests" purpose="Your best in every mode you play, and what you’ve measured, over the last 8 weeks." accent="#FFD700">
       <div className="grid gap-3 md:grid-cols-2">
         <Card>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-gold">Personal bests</p>
+          <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-gold">Personal bests</p>
           <div className="mt-2">
             {stats.bestsScope === 'device' ? (viewer ? <p className="text-[12.5px] text-fel-dim">Bests for this account stay on its owner’s phone.</p> : <DeviceBests />)
               : stats.modes.length === 0 ? (
@@ -30,7 +30,7 @@ export function StatsSection({ data, viewer = false }: { data: ProfileV2Data; vi
                     <li key={m.mode} className="grid grid-cols-[minmax(0,1fr)_72px_auto] items-center gap-3 py-2.5">
                       <span className="min-w-0">
                         <span className="block truncate text-[13px] font-semibold text-white/85">{m.name}</span>
-                        <span className="font-mono text-[10px] text-fel-quiet">{m.runs} run{m.runs === 1 ? '' : 's'}</span>
+                        <span className="font-sans text-[12px] text-fel-quiet">{m.runs} run{m.runs === 1 ? '' : 's'}</span>
                       </span>
                       <Sparkline values={m.weeks} color="#FFD700" height={26} width={72} label={`${m.name}: best score each week for 8 weeks`} />
                       <span className="fel-heading text-right text-[17px] font-black text-fel-gold tabular-nums">{m.best.toLocaleString('en-US')}</span>
@@ -41,10 +41,10 @@ export function StatsSection({ data, viewer = false }: { data: ProfileV2Data; vi
           </div>
         </Card>
         <Card>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-cyan">Measured skills</p>
+          <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-cyan">Measured skills</p>
           {lines.map((l) => (
             <div key={l.key} className="mt-3">
-              <p className="flex items-baseline justify-between text-[12px] text-white/60"><span>{l.label}</span>{l.best && <span className="font-mono text-[10.5px] text-fel-dim">{l.best}</span>}</p>
+              <p className="flex items-baseline justify-between text-[12px] text-white/60"><span>{l.label}</span>{l.best && <span className="font-sans text-[12px] text-fel-dim">{l.best}</span>}</p>
               <div className="mt-1"><Sparkline values={l.values} color={l.color} label={`${l.label}, 8 weeks`} /></div>
             </div>
           ))}
