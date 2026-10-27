@@ -85,7 +85,7 @@ function App() {
     // before: a natural arm swing, refused; after: arm swing is read, so the refusal shown is the step away from the stand
     case 'refusal': body = __VER__ === 'before'
       ? live((v) => !!v.rejection, { style: { armSwing: true } }, false)
-      : live((v) => !!v.rejection, { beats: [{ trial: { heightM: 0.4 } }, { rest: 0.6 }, { decoy: { kind: 'step', dz: 0.6 } }, { rest: 0.8 }, { trial: { heightM: 0.42 } }], style: { armSwing: true } }, false); break;
+      : live((v) => !!v.rejection, { beats: [{ trial: { heightM: 0.4 } }, { rest: 0.6 }, { decoy: { kind: 'step', dz: 0.3 } }, { rest: 0.8 }, { trial: { heightM: 0.42 } }], style: { armSwing: true } }, false); break;
     case 'pain-check': body = live((v) => v.step === 'painCheck'); break;
     case 'result': body = result(); break;
   }

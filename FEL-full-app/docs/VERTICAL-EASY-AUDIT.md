@@ -285,8 +285,38 @@ take 0.148–0.161 (refused). It applies to the front door only; the hands-on-hi
 
 ### 7.1 The front door on the live bench (`scripts/vertical-easy-bench.ts`, rows "FRONT DOOR")
 
-FRONT_DOOR_TABLE
+| condition (6 seeds, 6 trials offered) | fps | runs to a number | counted / graded | camera → number (s) | best vs truth bias / SD (cm) |
+|---|---|---|---|---|---|
+| arm swing — on the hands-on-hips check (before, and still) | 30 / 60 | 0/6 / 0/6 | 0/36 / 0/36 | – (35.9 / 35.5 to "No jump counted") | – |
+| **arm swing — front door** | 30 | 6/6 | **18/18** | 24.1 | −0.38 / 1.10 |
+| hands on hips — front door | 30 | 6/6 | 18/18 | 24.1 | −0.38 / 1.10 |
+| arm swing, bent-knee landing — front door | 30 | 6/6 | 18/18 | 24.1 | +0.77 / 3.40 |
+| arm swing, motion blur — front door | 30 | 6/6 | 18/18 | 24.1 | −2.20 / 3.86 |
+| arm swing, heavy noise (2×) — front door | 30 | 6/6 | 18/18 | 27.1 | −0.65 / 2.71 |
+| **arm swing — front door** | 60 | 6/6 | **18/18** | 24.0 | −0.33 / 1.01 |
+| hands on hips — front door | 60 | 6/6 | 18/18 | 24.0 | −0.33 / 1.01 |
+| arm swing, bent-knee landing — front door | 60 | 6/6 | 18/18 | 24.3 | +0.68 / 1.48 |
+| arm swing, motion blur — front door | 60 | 6/6 | 18/18 | 24.3 | −1.32 / 2.07 |
+| arm swing, heavy noise (2×) — front door | 60 | 6/6 | 18/18 | 27.0 | −1.82 / 3.04 |
+
+Every arm-swing row reads exactly as its hands-on-hips twin (§6.1): same bias, same spread — the flight read does not see
+the arms. 60 of 60 runs reach a number; 180 of 180 jumps counted.
 
 ### 7.2 The owner's recorded jump (`jump_two_foot_high`), its number
 
-RECORDED_TABLE
+The take (a DeepMotion solve of the owner's phone video, 30 fps): three natural jumps with an arm swing, 40 cm of travel
+toward and away from the lens, the clip starting mid-dip. Flight-time truth 30.5 / 83.7 / 25.4 cm.
+
+| Read | Jumps counted | Its number | Why the others were refused |
+|---|---|---|---|
+| Hands-on-hips check, live, stand held where the take ended (before = after) | 0 of 3 | none | hands left the hips (read 62.5); feet did not rise as far as the air time needs (40 cm of travel); landing out of the clip |
+| **Front door, arms free, live, the same stand** | 0 of 3 | **none** | **moved from the stand** (drift 0.16; it read 62.5 for 30.5 — the guard stops it); the same two as above |
+| Front door, arms free, offline, calibrated where the take starts (`t5-cmj.test.ts`'s own stand) | 0 of 3 | none | the one jump read whole (**23.4 cm for 25.4**, −2.0) was taken 0.148 body heights from the stand → refused as moved; the other two as above |
+| …the same without the stand guard | 1 of 3 | **23.4 cm** (truth 25.4) | — |
+
+So on the owner's own take the front door gives **no number, with a plain reason** ("You moved from your spot. Go back to
+where you stood and jump again."), where a number would have been 62.5 cm for a 30.5 cm jump. The one jump the camera saw
+whole reads 23.4 cm against 25.4 — inside the camera's range — but it was taken about 40 cm from the stand, which this
+guard refuses. `jump_two_foot_low` (four in-place rebounds, no travel) reads the same either way: 4 of 4, best 28.4 cm
+(truth 32.0; rebounds with 0.13 s contacts are not the protocol, `t5-cmj.test.ts` pins its mean error ≤ 6 cm). The repo holds
+no other recorded standing jump; an owner phone check of a still, arms-free jump is the next real number (§8).
