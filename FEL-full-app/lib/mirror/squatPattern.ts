@@ -105,7 +105,7 @@ export const SQUAT_CUES: readonly CueRule[] = SQUAT_PATTERN_FAULT_IDS.map((id) =
  */
 export const squatPattern: MirrorPattern = {
   id: 'squat',
-  label: 'Corrective Squat',
+  label: 'Squat',   // CUE-REWRITE: the canonical name (lib/cue-style/names.ts)
   view: 'front',
   reps: { checkReps: SQUAT_CHECK_REPS, workReps: SQUAT_WORK_REPS },
   audit: auditSquat,

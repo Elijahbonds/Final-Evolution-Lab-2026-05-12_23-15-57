@@ -18,7 +18,7 @@ export const ATHLETIC_EXTRA: Family[] = [
     ],
     dosage: contacts(4, 10, 75),
     variants: [
-      { name: 'Power Skip', v: 'power-skip', level: 'beginner', cue: 'Skip as high as you can off the floor, the knee and the opposite arm driving up.', goals: ['vertical', 'warmup'] },
+      { name: 'Power Skip', v: 'power-skip', level: 'beginner', cue: 'Skip as high as you can off the floor, knee and opposite arm driving up.', goals: ['vertical', 'warmup'] },
       { name: 'Alternate-Leg Bound', v: 'alternate', level: 'intermediate', aliases: ['Running Bound'] },
       { name: 'Single-Leg Bound Series', v: 'single-leg', level: 'advanced', laterality: 'unilateral', cue: 'Bound on the same leg down the lane, quick and springy on each contact.', dosage: contacts(3, 6, 90) },
       { name: 'Bound to Sprint', v: 'to-sprint', level: 'advanced', cue: 'Four bounds into a ten-metre sprint, the rhythm unbroken.' },
@@ -77,7 +77,7 @@ export const ATHLETIC_EXTRA: Family[] = [
       { name: 'Heels-on-Bench Bridge Hold', v: 'bench-hold', level: 'beginner' },
       { name: 'Long-Lever Bridge Hold', v: 'long-lever', level: 'intermediate', setup: 'On your back on a mat, heels on a bench with the knees nearly straight.' },
       { name: 'Single-Leg Heels-on-Bench Bridge Hold', v: 'single-leg', level: 'advanced', laterality: 'unilateral', setup: 'On your back on a mat, one heel on a bench, the other leg pointed at the ceiling.' },
-      { name: 'Isometric Hinge Against Strap', v: 'strap-hinge', level: 'intermediate', equipment: ['band'], setup: 'Stand on the middle of a heavy band, hinged at the knees-and-hips position you want, hands on the band.', cues: ['Push the floor away against the band without moving.', 'Hold still and breathe smoothly.', 'Ease off slowly at the end of the hold.'] },
+      { name: 'Isometric Hinge Against Strap', v: 'strap-hinge', level: 'intermediate', equipment: ['band'], setup: 'Stand on the middle of a heavy band, knees and hips bent to the position you want, hands on the band.', cues: ['Push the floor away against the band without moving.', 'Hold still and breathe smoothly.', 'Ease off slowly at the end of the hold.'] },
     ],
   },
   {
@@ -102,7 +102,7 @@ export const ATHLETIC_EXTRA: Family[] = [
     primary: ['delts', 'lats'], secondary: ['chest', 'rotator-cuff', 'mid-back'], goals: ['mobility', 'shoulder', 'warmup'], sport: ['general', 'basketball', 'volleyball', 'tennis'],
     lowLoad: ['knee', 'ankle', 'back'], youthOk: true, equipment: ['dowel'], clip: 'stretch',
     setup: 'Stand tall holding a dowel with a wide grip in front of the thighs.',
-    cues: ['Lift the dowel up and over toward the wall behind, arms long, only as far as it stays smooth.', 'Widen the grip if it catches.', EXHALE],
+    cues: ['Lift the stick up and over toward the wall behind, arms long, as far as it stays smooth.', 'Widen the grip if it catches.', EXHALE],
     faults: [
       { fault: 'Bending the elbows to get over', fix: 'Widen the grip on the dowel until the arms stay long.' },
       { fault: 'Arching back to fake the range', fix: 'Tuck the belt buckle up and move the dowel less.' },
@@ -114,7 +114,7 @@ export const ATHLETIC_EXTRA: Family[] = [
       { name: 'Doorway Chest Stretch', v: 'doorway', level: 'beginner', equipment: ['wall'], laterality: 'unilateral', setup: 'Forearm on a door frame or wall edge at shoulder height, one foot forward.', cues: ['Step through the doorway until the first firm pull.', 'Hold still and breathe.', EXHALE], dosage: secs(2, 30, 15) },
       { name: 'Prone Scorpion Reach', v: 'scorpion', level: 'intermediate', equipment: ['mat'], laterality: 'alternating', setup: 'Lie face down on a mat, arms out in a T.', cue: 'Reach one heel up and across toward the opposite hand on the floor, slow.', goals: ['hip', 'mobility'] },
       { name: 'Tall-Kneeling Hip Rotation', v: 'tall-kneel-rotation', level: 'beginner', equipment: ['mat'], setup: 'Kneel tall on a mat, hands on the hips.', cue: 'Turn the belt line to one wall and back, the knees still on the floor.', goals: ['hip', 'mobility'] },
-      { name: 'Spinal Wave', v: 'spinal-wave', level: 'intermediate', equipment: [], setup: 'Stand tall with the hands on the thighs.', cue: 'Roll a slow wave down from the top of the head to the belt line and back up, smooth.' },
+      { name: 'Spinal Wave', v: 'spinal-wave', level: 'intermediate', equipment: [], setup: 'Stand tall with the hands on the thighs.', cue: 'Roll a slow wave from the top of your head down to your belt line and back up.' },
     ],
   },
   {
@@ -129,7 +129,7 @@ export const ATHLETIC_EXTRA: Family[] = [
     ],
     dosage: reps(2, '10 each side', 15),
     variants: [
-      { name: 'Tripod Foot Lift', v: 'tripod-lift', level: 'beginner', cue: 'Press the three tripod points down and lift the arch off the floor, hold for three.' },
+      { name: 'Tripod Foot Lift', v: 'tripod-lift', level: 'beginner', cue: 'Press heel, big toe and little toe into the floor and lift the arch. Hold for three.' },
       { name: 'Single-Leg Calf Raise on Flat Floor', v: 'sl-flat', level: 'beginner', cue: 'Rise on one foot through the big-toe joint and lower slow to the floor.', primary: ['calves', 'foot'], secondary: ['soleus'] },
       { name: 'Big-Toe Press', v: 'big-toe-press', level: 'beginner', cue: 'Press only the big toe down into the floor and hold for five.' },
       { name: 'Marble Pick-Up', v: 'marble', level: 'beginner', equipment: ['towel'], setup: 'Sit with a few small objects and a towel on the floor in front.', cue: 'Pick up each object with the toes and drop it on the towel.' },

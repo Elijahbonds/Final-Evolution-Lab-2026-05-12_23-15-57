@@ -18,20 +18,20 @@ export function ProgressHeader({ data, viewer = false }: { data: ProfileV2Data; 
         <AthleteStage avatarKey={identity.avatarKey} cosmeticAssetId={identity.cosmeticAssetId} name={identity.name} accent={prq.color} allow3d={!viewer} />
         <div className="flex w-[128px] flex-col justify-between rounded-2xl border border-white/[0.07] bg-[#0c0c11] p-3.5 lg:w-auto lg:flex-row lg:items-end">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-dim">PRQ grade</p>
+            <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim">PRQ grade</p>
             <p className="fel-heading mt-1 text-[40px] font-black leading-none tabular-nums" style={{ color: prq.color }}>{prq.score === null ? '—' : Math.round(prq.score)}</p>
-            <p className="mt-1 font-mono text-[10.5px] font-bold uppercase tracking-[0.12em]" style={{ color: prq.color }}>{prq.status}</p>
+            <p className="mt-1 font-sans text-[12px] font-semibold uppercase tracking-[0.14em]" style={{ color: prq.color }}>{prq.status}</p>
           </div>
           <p className="mt-2 text-[11px] leading-snug text-fel-dim">
             {prq.measured === 0 ? 'Nothing measured yet' : `${prq.measured} of ${prq.total} skills measured`}
-            {identity.level && <span className="block font-mono text-[10.5px] text-fel-emerald/80">Level {identity.level.level}</span>}
+            {identity.level && <span className="block font-sans text-[12px] text-fel-emerald/80">Level {identity.level.level}</span>}
           </p>
         </div>
       </div>
       {!viewer && <div>
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <h2 id="week-h" className="fel-heading text-[16px] font-bold text-white">This week</h2>
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-fel-quiet">Last 7 days vs the 7 before</p>
+          <p className="font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">Last 7 days vs the 7 before</p>
         </div>
         <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 lg:grid-cols-2">
           {data.tiles.map((t) => (t.key === 'form' && t.source === 'device'

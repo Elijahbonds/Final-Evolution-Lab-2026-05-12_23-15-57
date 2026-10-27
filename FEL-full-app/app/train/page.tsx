@@ -196,7 +196,7 @@ export default async function TrainPage() {
                   {/* One colour moment per card. The icon tile carries the accent because it is the destination's
                       identity; the call to action repeating it gave five cards ten coloured marks on a page whose
                       own colour is green, and the eye had nowhere to land. */}
-                  <span className="mt-3 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em]
+                  <span className="mt-3 inline-block font-sans text-[12px] font-semibold uppercase tracking-[0.14em]
                                    text-fel-dim transition-colors group-hover:text-white/75">
                     {c.tag} →
                   </span>

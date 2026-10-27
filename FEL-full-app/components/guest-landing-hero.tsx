@@ -30,7 +30,7 @@ export function GuestLandingHero() {
       </div>
 
       <div className="relative z-10 max-w-2xl">
-        <span className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.2em] text-[#FFD700]">
+        <span className="inline-flex items-center gap-2 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-4 py-1.5 font-sans text-[12px] uppercase tracking-[0.14em] text-[#FFD700]">
           <Zap className="h-3.5 w-3.5" /> Season 1 · Golden Hour
         </span>
 

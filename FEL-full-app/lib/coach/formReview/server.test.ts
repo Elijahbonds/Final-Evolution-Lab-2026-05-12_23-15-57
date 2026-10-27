@@ -1,3 +1,5 @@
+// CUE-REWRITE (2026-10-27) — test changed: copy rewrite. The flag lines use the canonical fault names now
+// (lib/cue-style/names.ts: "Left knee caves in", "Back bends"); every assertion checks what it checked before.
 // COACH-VIDEO-REVIEW (2026-10-24): the routes' logic behind every gate, on an in-memory database
 // (tests/helpers/fakeFormReviewDb.ts answers the store's statements by name).
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -30,7 +32,7 @@ describe('the client sends a set', () => {
     // the client claims a clean set; the server recomputes from the faults it was sent
     const r = await send('adult');
     expect(r.status).toBe(200);
-    expect(r.body.flags).toEqual([expect.objectContaining({ rep: 2, reason: 'Left knee caves on rep 2', worst: true })]);
+    expect(r.body.flags).toEqual([expect.objectContaining({ rep: 2, reason: 'Left knee caves in on rep 2', worst: true })]);
     expect(w.rows).toHaveLength(1);
     const row = w.rows[0];
     expect(row).toMatchObject({ clientId: 'adult', coachId: 'coach', programId: 'p1', sessionExerciseId: 's1', exerciseName: 'Goblet squat', movement: 'squat', band: 'adult', reps: 4, flagCount: 1, status: 'unreviewed' });
@@ -91,7 +93,7 @@ describe('the coach\'s queue', () => {
     expect(r.body.available).toBe(true);
     expect(r.body.unreviewed).toBe(2);
     const items = r.body.items as { flags: { reason: string }[]; clientName: string; setScore: number; trend: { line: string } }[];
-    expect(items[0].flags[0].reason).toBe('Left knee caves on rep 2');
+    expect(items[0].flags[0].reason).toBe('Left knee caves in on rep 2');
     expect(items[0].clientName).toBe('Ana');
     expect(items[0].trend.line).toBe('First reviewed set of this movement.');
     expect(items[1].flags).toEqual([]);
@@ -138,7 +140,7 @@ describe('one set, and the reply', () => {
   it('a preset cue and a note go to the program\'s thread, and the set is reviewed — once', async () => {
     const r = await replyToFormReview(db, 'coach', id, { cueId: 'fault:kneeValgus:cue', note: 'Lighter bell.', rep: 2 });
     expect(r.status).toBe(200);
-    expect(w.messages).toEqual([expect.objectContaining({ programId: 'p1', authorId: 'coach', body: `Form review · Goblet squat, rep 2 (Left knee caves)\nCue: ${cueFor('squat', 'kneeValgus')!.cue}\nLighter bell.` })]);
+    expect(w.messages).toEqual([expect.objectContaining({ programId: 'p1', authorId: 'coach', body: `Form review · Goblet squat, rep 2 (Left knee caves in)\nCue: ${cueFor('squat', 'kneeValgus')!.cue}\nLighter bell.` })]);
     expect(w.rows[0]).toMatchObject({ status: 'reviewed', replyMessageId: w.messages[0].id });
     expect((await replyToFormReview(db, 'coach', id, { note: 'again' })).status).toBe(409);
     expect(w.messages).toHaveLength(1);

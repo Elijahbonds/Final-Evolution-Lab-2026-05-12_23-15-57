@@ -100,15 +100,17 @@ export const SIDE_WIDTH_MAX = 0.35;
 
 const ORDER: FramingIssue[] = ['noBody', 'cutOffBottom', 'cutOffTop', 'turned', 'tooClose', 'tooFar', 'offCentre', 'dim'];
 
+// CUE-REWRITE (2026-10-27): said from across the room, so short and action-first (the Quick Screen's own framing lines,
+// lib/screen/copy.ts FRAMING_FIX_LINES, are the model). Before/after in docs/CUE-AUDIT.md.
 const SAY: Record<FramingIssue, string> = {
-  noBody: 'Step into the shot — I cannot see you yet.',
-  cutOffBottom: 'Your feet are out of shot. Tilt the phone down or step back.',
-  cutOffTop: 'Your head is out of shot. Tilt the phone up or step back.',
-  turned: 'Turn and face the camera square-on — I read your knees from the front.',
-  tooClose: 'Step back a couple of paces so your whole body stays in shot when you squat.',
-  tooFar: 'Come forward a little — you are far enough away that I am guessing.',
+  noBody: 'Step into the shot.',
+  cutOffBottom: 'Feet in the shot. Tilt the phone down or step back.',
+  cutOffTop: 'Head in the shot. Tilt the phone up or step back.',
+  turned: 'Face the camera straight on.',
+  tooClose: 'Step back two steps.',
+  tooFar: 'Come a little closer.',
   offCentre: 'Move to the middle of the shot.',
-  dim: 'More light, or a plainer background — I am losing track of you.',
+  dim: 'More light, please. I am losing you.',
 };
 
 /** The one line said for an issue (the front view's line for 'turned'). Read-only: lib/mirror/screenRunner.ts names the
@@ -195,9 +197,9 @@ export function checkFraming(frame: FramingFrame, view: FramingView = 'front'): 
   // the side line names no movement: the screen's side stations read the head over the shoulder, not a hinge
   const say = worst === 'turned'
     ? view === 'side' ? SIDE_TURNED
-      : view === 'back' ? 'Turn all the way around — I read the heel line from behind.'
+      : view === 'back' ? 'Turn around, back to the camera.'
       : SAY.turned
-    : worst ? SAY[worst] : 'Good shot — start when you are ready.';
+    : worst ? SAY[worst] : 'Good. Start when you are ready.';
   return {
     ok: issues.length === 0,
     issues,

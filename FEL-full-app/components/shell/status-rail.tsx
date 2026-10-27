@@ -76,7 +76,7 @@ export function StatusRail() {
               <Link
                 href="/profile"
                 title={data.prq.badge}
-                className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-[11px] font-bold"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-sans text-[12px] font-semibold"
                 style={{ borderColor: `${data.prq.color}33`, color: data.prq.color, background: `${data.prq.color}0D` }}
               >
                 <Zap className="h-3.5 w-3.5" />

@@ -161,7 +161,7 @@ describe('an adult who opted in (canSaveScan true): the squat compares against t
     const m = mount(() => MirrorHarness({ youth: null, canSaveScan: true, initialPattern: 'squat' }));
     await start(m);
     await squatSet(EIGHT);
-    expect(text(m)).toContain('What the camera measured');          // the review is up
+    expect(text(m)).toContain('What the camera saw');          // the review is up (test changed: copy rewrite, CUE-REWRITE — same card)
     await end(m);
     expect(posts()).toHaveLength(1);
     const { url, body } = posts()[0];
@@ -184,7 +184,7 @@ describe('an adult who opted in (canSaveScan true): the squat compares against t
     await start(m);
     await squatSet(EIGHT);
     await end(m);
-    expect(said(m)).toContain('Your saved sessions could not be read just now');
+    expect(said(m)).toContain('Your saved sessions could not be loaded just now');   // test changed: copy rewrite — same meaning
     expect(store.size).toBe(0);
     m.unmount();
   });
@@ -212,7 +212,7 @@ describe('an adult who opted in (canSaveScan true): the squat compares against t
     expect(body.patternId).toBe('split-stance-press-row');
     expect(body.recent).toBe(true);
     expect(body.checkValues).toBeUndefined();
-    expect(said(m)).toContain('Zone faults per rep 0.5 — your last 3 averaged 1.0. Better than your last 3.');
+    expect(said(m)).toContain('Things to fix per rep 0.5 — your last 3 averaged 1.0. Better than your last 3.');   // test changed: copy rewrite — same comparison
     m.unmount();
   });
 

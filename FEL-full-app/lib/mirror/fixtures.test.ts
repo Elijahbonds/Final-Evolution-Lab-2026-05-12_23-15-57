@@ -139,7 +139,8 @@ describe('4. invariants a re-record must never accept', () => {
         expect(said.length, name).toBeGreaterThan(0);
         // MIRROR-COACH P9 (2026-09-30): was /^Knees out/. The knee card now leads with the floor (lib/coach/cueLint.ts, the
         // external-focus policy) — the same card, still telling the knees to go out, pinned as tightly as before.
-        expect(said[0].text, name).toMatch(/^Press the floor apart with your feet — knees travel out/);
+        // test changed: copy rewrite (CUE-REWRITE 2026-10-27) — the live cue is 2–5 words now; still the knees going out
+        expect(said[0].text, name).toMatch(/^Knees out over toes$/);
         expect(s.shown, name).toContain('kneeValgus');
       } else if (squats.includes(name) || /^(stand|single_leg|seated|hinge|pushup)/.test(name)) {
         expect(said, name).toEqual([]);

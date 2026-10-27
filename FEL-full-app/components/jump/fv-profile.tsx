@@ -28,7 +28,7 @@ export function FvProfile({ adult, reads }: { adult: boolean; reads: readonly Fv
   const fv = massKg !== null ? fvProfile({ adult, massKg, points: pts }) : null;
   return (
     <section data-fv className="space-y-3 rounded-3xl border border-white/15 bg-white/[0.04] p-5">
-      <h2 className="text-[18px] font-black text-white">Power and force-velocity (estimates)</h2>
+      <h2 className="text-[18px] font-black text-white">Power, strength and speed (estimates)</h2>
       <p className="text-[16px] leading-snug text-white/70">Optional. Type your body weight to see power. It stays on this page: it is not saved or sent.</p>
       <div className="flex items-center gap-2">
         <label className="flex-1">
@@ -62,12 +62,13 @@ export function FvProfile({ adult, reads }: { adult: boolean; reads: readonly Fv
       ) : null}
       {fv ? (fv.ok ? (
         <div data-fv-profile className="rounded-2xl border border-white/10 p-3 text-[16px] text-white/85">
-          <p className="font-bold text-white">Force-velocity profile ({fv.fv.n} jumps, {fv.fv.loads} loads)</p>
+          <p className="font-bold text-white">Strength and speed profile, also called force-velocity ({fv.fv.n} jumps, {fv.fv.loads} loads)</p>
           <p>Max force {fv.fv.f0PerKg.toFixed(1)} N/kg · max speed {fv.fv.v0Mps.toFixed(2)} m/s · max power {fv.fv.pmaxPerKg.toFixed(1)} W/kg</p>
-          <p className="text-white/60">Line fit r² {fv.fv.r2.toFixed(2)}. Estimates from jump height and push-off (Samozino method), not measured force.</p>
+          <p>More max force means more strength; more max speed means more quickness. Compare with your own last profile.</p>
+          <p className="text-white/60">How well your jumps fit a line: {fv.fv.r2.toFixed(2)} (closer to 1 is better). Worked out from jump height and push-off, not measured force.</p>
         </div>
       ) : fv.why in FV_WHY ? <p data-fv-why className="text-[16px] text-white/70">{FV_WHY[fv.why as keyof typeof FV_WHY]}</p> : null) : null}
-      <p className="text-[16px] leading-snug text-white/60">Peak power uses the Sayers formula; mean push power and force use the Samozino method. All are estimates.</p>
+      <p className="text-[16px] leading-snug text-white/60">Power and force are worked out from your jump height, push-off and body weight with standard formulas (Sayers, Samozino). All are estimates.</p>
     </section>
   );
 }

@@ -56,7 +56,11 @@ const stubs: Plugin = {
   },
 };
 
-export async function buildRig(BUILD: string): Promise<{ html: string }> {
+/** PREMIUM-UI (2026-10-27): other rigs reuse this one. `entry` swaps the page bundle (default: the a11y scenes);
+ *  `fontBase` serves the font files from an http origin instead of file:// (a rig served over http cannot read file://). */
+export interface RigOptions { entry?: string; fontBase?: string; /** leave next/font's variables unset, as a probe rig does (the P2 fonts check) */ noFontVars?: boolean }
+
+export async function buildRig(BUILD: string, opts: RigOptions = {}): Promise<{ html: string }> {
 mkdirSync(BUILD, { recursive: true });
 const common = {
   bundle: true, format: 'iife' as const, platform: 'browser' as const, jsx: 'automatic' as const, logLevel: 'error' as const,
@@ -65,18 +69,18 @@ const common = {
   loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.wasm': 'empty', '.glb': 'empty' } as Record<string, 'empty'>,
   external: ['@mediapipe/tasks-vision', '@babylonjs/*'],
 };
-await build({ ...common, entryPoints: [join(ROOT, 'scripts/a11y/entry.tsx')], outfile: join(BUILD, 'pages.js'), splitting: false });
+await build({ ...common, entryPoints: [opts.entry ?? join(ROOT, 'scripts/a11y/entry.tsx')], outfile: join(BUILD, 'pages.js'), splitting: false });
 await build({ ...common, entryPoints: [join(ROOT, 'scripts/a11y/inpage.ts')], outfile: join(BUILD, 'inpage.js') });
   const cssFile = join(BUILD, 'app.css');
 execFileSync(join(ROOT, 'node_modules/.bin/tailwindcss'), ['-c', join(ROOT, 'tailwind.config.ts'), '-i', join(ROOT, 'app/globals.css'), '-o', cssFile], { cwd: ROOT, stdio: 'ignore' });
 // app/layout.tsx's next/font faces, as plain @font-face rules over the same files, under the same variables
-const face = (fam: string, file: string, weight: string) => `@font-face{font-family:'${fam}';src:url('file://${join(ROOT, 'app/fonts', file)}') format('woff2');font-weight:${weight};font-display:block}`;
+const face = (fam: string, file: string, weight: string) => `@font-face{font-family:'${fam}';src:url('${opts.fontBase ? `${opts.fontBase}/${file}` : `file://${join(ROOT, 'app/fonts', file)}`}') format('woff2');font-weight:${weight};font-display:block}`;
 const FONTS = [
   ...['500', '600', '700', '800'].map((wt) => face('FEL Barlow', `barlow-condensed-latin-${wt}.woff2`, wt)),
   face('FEL Plex', 'ibm-plex-sans-latin-variable.woff2', '400 700'),
   face('FEL Mono', 'jetbrains-mono-latin-variable.woff2', '100 800'),
   ...['400', '500', '600', '700'].map((wt) => face('FEL Chakra', `chakra-petch-latin-${wt}.woff2`, wt)),
-  `:root{--font-display:'FEL Barlow';--font-sans:'FEL Plex';--font-mono:'FEL Mono';--font-chakra:'FEL Chakra'}`,
+  opts.noFontVars ? '' : `:root{--font-display:'FEL Barlow';--font-sans:'FEL Plex';--font-mono:'FEL Mono';--font-chakra:'FEL Chakra'}`,
 ].join('\n');
 const css = FONTS + '\n' + readFileSync(cssFile, 'utf8') + '\n' + readFileSync(join(ROOT, 'app/theme.css'), 'utf8');
 const html = join(BUILD, 'index.html');

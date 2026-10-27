@@ -102,7 +102,7 @@ export const PLYO: Family[] = [
     setup: 'Stand tall behind a line on the floor, feet hip-width, arms ready to swing.',
     cues: ['Swing the arms back, then push the floor away out in front of you.', 'Reach the landing out in front and stick it.', QUIET],
     faults: [
-      { fault: 'Landing with the chest over the toes', fix: 'Reach the feet out to the floor in front and sit the hips back as you land.' },
+      { fault: 'Landing with the chest over the toes', fix: 'Reach your feet to the floor in front and sit your hips back as you land.' },
       { fault: 'Jumping up instead of out', fix: 'Aim for a spot on the floor out in front, not the ceiling.' },
     ],
     dosage: reps(4, '3', 60),
@@ -149,7 +149,7 @@ export const PLYO: Family[] = [
       { name: 'Two-Step Approach Jump', v: 'two-step', level: 'intermediate', aliases: ['Penultimate Step Jump'] },
       { name: 'Three-Step Approach Jump', v: 'three-step', level: 'advanced' },
       { name: 'One-Foot Approach Jump', v: 'one-foot', level: 'intermediate', ladder: 'one-foot', laterality: 'unilateral', cue: 'Run in and take off from one foot, the other knee driving up toward the target.', aliases: ['Layup Takeoff Jump'] },
-      { name: 'Weak-Side One-Foot Approach Jump', v: 'one-foot-off', level: 'advanced', ladder: 'one-foot', laterality: 'unilateral', cue: 'Same jump from your weaker foot, the other knee driving up toward the target.' },
+      { name: 'Weak-Side One-Foot Approach Jump', v: 'one-foot-off', level: 'advanced', ladder: 'one-foot', laterality: 'unilateral', cue: 'Same jump from your less-used foot, the other knee driving up toward the target.' },
     ],
   },
   {
@@ -183,7 +183,7 @@ export const PLYO: Family[] = [
     dosage: reps(4, '5', 60),
     variants: [
       { name: 'Med Ball Chest Pass', v: 'chest-pass', level: 'beginner', equipment: ['medicine-ball', 'wall'], aliases: ['Medicine Ball Chest Throw'] },
-      { name: 'Med Ball Scoop Toss Forward', v: 'scoop-forward', level: 'intermediate', setup: 'Hold the ball between the legs in a hinge, open space in front.', cue: 'Push the wall behind you with your hips, then throw the ball forward and up.' },
+      { name: 'Med Ball Scoop Toss Forward', v: 'scoop-forward', level: 'intermediate', setup: 'Hold the ball between the legs bent forward at the hips, open space in front.', cue: 'Push the wall behind you with your hips, then throw the ball forward and up.' },
       { name: 'Med Ball Overhead Backward Toss', v: 'backward-toss', level: 'intermediate', setup: 'Stand with your back to open space, ball held low between the legs.', cue: 'Drive the floor away and throw the ball up and back over your head.', aliases: ['Med Ball Back Toss'] },
       { name: 'Med Ball Slam', v: 'slam', level: 'beginner', equipment: ['slam-ball'], setup: 'Stand tall holding a slam ball overhead.', cue: 'Slam the ball into the floor in front of you, full speed.', aliases: ['Ball Slam'] },
       { name: 'Med Ball Squat Throw', v: 'squat-throw', level: 'intermediate', setup: 'Hold the ball at the chest, feet hip-width, open space above.', cue: 'Sink and jump, throwing the ball straight up toward the ceiling.', goals: ['vertical'] },

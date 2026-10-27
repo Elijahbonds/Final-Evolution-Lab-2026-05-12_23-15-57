@@ -164,16 +164,16 @@ describe('the panel: camera / their answers / your checks, in that order, never 
     expect(hip).toContain('data-status="flag"');
     expect(plain(hip)).toContain('Hip level, right hip higher');
     expect(plain(hip)).toContain('Flagged for a closer look');
-    expect(plain(hip)).toContain('0.12 of a shoulder width, right higher · estimated');
-    expect(plain(hip)).toContain('Fix: Single-leg hip work on the low side');
-    expect(plain(hip)).toContain('Corrective block (activate): Trunk and hip hold');
+    expect(plain(hip)).toContain('right side higher by about 12% of your shoulder width · estimated');   // test changed: copy rewrite (CUE-REWRITE) — same value, its meaning in words
+    expect(plain(hip)).toContain('Fix: Do one-leg moves on the lower side');   // test changed: copy rewrite (CUE-REWRITE) — the same drill in one plain action
+    expect(plain(hip)).toContain('Corrective block (activate): Hip and middle hold');
   });
 
   it('an unreadable check reads RETEST with why — and the panel never says clear', () => {
     const html = view();
     const head = html.slice(html.indexOf('data-check="headFloat"'));
     expect(head).toContain('data-status="retest"');
-    expect(plain(head.slice(0, 1200))).toMatch(/Retest .*Not read: too few clear frames/);
+    expect(plain(head.slice(0, 1200))).toMatch(/Retest .*Not read: the camera got too few clear looks/);   // test changed: copy rewrite (CUE-REWRITE) — same reason, plain words
     // ("clear frames" is the grader's own reason — a frame, not the screen)
     expect(plain(html)).not.toMatch(/came back clear|\bis clear\b|clear screen/i);
   });

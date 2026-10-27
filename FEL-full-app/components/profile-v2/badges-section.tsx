@@ -32,7 +32,7 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Level progress" aria-valuemin={0} aria-valuemax={lv.need} aria-valuenow={lv.into}>
                   <span className="block h-full rounded-full bg-fel-emerald" style={{ width: `${Math.min(100, (lv.into / Math.max(1, lv.need)) * 100)}%` }} />
                 </div>
-                <p className="mt-1 font-mono text-[10.5px] text-fel-dim">{lv.into.toLocaleString('en-US')} / {lv.need.toLocaleString('en-US')} XP</p>
+                <p className="mt-1 font-sans text-[12px] text-fel-dim">{lv.into.toLocaleString('en-US')} / {lv.need.toLocaleString('en-US')} XP</p>
               </div>
             </div>
           )}
@@ -42,7 +42,7 @@ export function BadgesSection({ data, viewer = false }: { data: ProfileV2Data; v
           </div>
         </Card>
         <Card>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-fel-gold">Mode mastery</p>
+          <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-gold">Mode mastery</p>
           {b.mastery.length ? (
             <ul className="mt-2 flex flex-wrap gap-2">
               {b.mastery.map((m) => (
