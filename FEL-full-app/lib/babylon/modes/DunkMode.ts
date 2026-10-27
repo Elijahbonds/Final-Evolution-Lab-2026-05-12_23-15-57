@@ -86,6 +86,8 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
+import { OOP_LOB_FLIGHT_SEC, oopThrowDue } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, isDubble, DUBBLE_HEAD_TOP, DUBBLE_APEX_M, dubbleArc, dubbleArcPower, type ObstacleKind } from '../core/DunkObstacles';
@@ -1945,6 +1947,16 @@ export const DunkMode: ModeDefinition = (() => {
           if (line !== teachHint && turn === 'player') { teachHint = line; ctx.setHud({ hint: line }); }   // (phase 11: the move list is the player's — the rival's turn keeps his line)
         }
         // the SELF-LOB prop tosses itself ahead of the takeoff when the runner has not thrown it by hand
+        // DUNK-FLAGSHIP (b): THE ALLEY-OOP IS A LOB — the passer throws while the dunker is still running, so the ball hangs over
+        // the rim for the run and the jump to meet it (core/DunkFlagship; it used to be a 0.35 s bullet thrown after the take-off)
+        if (prop === 'alleyoop' && teammate && !lob.thrown && !runwayBeat) {
+          const tf = timeToLine(Math.max(0, player.root.position.z - gatherLine()), holdRunSpeed) + LOB_CATCH_CLIP_T;
+          if (oopThrowDue(tf - LOB_CATCH_CLIP_T, LOB_CATCH_CLIP_T, feel('dunk.oopLobFlightSec', OOP_LOB_FLIGHT_SEC))) {
+            teammate.animator.play(SPORT_CLIP.teammateToss, {});
+            throwLob(ctx, ball.getAbsolutePosition().clone(), 'ALLEY-OOP', tf);
+            console.info(`[LOB] the passer lobs it on the run: ${tf.toFixed(2)} s to the catch beat`);
+          }
+        }
         if (prop === 'selflob' && !lob.thrown && !runwayBeat && player.root.position.z <= gatherLine() + AUTO_LOB_AHEAD_M) startRunwayBeat(ctx, runwayTrickFor('Y')!);
         // DUNK-GLASS-BOUNCE: the off-glass prop throws where the geometry says (AUTO_GLASS_AHEAD_M); the bounce prop throws as the
         // run starts (a single bounce is a ~1 s throw — from standing, Y throws the bounce-BOUNCE with a RUN cue)
@@ -3030,7 +3042,7 @@ export const DunkMode: ModeDefinition = (() => {
     else if (approach.difficulty > 0 || vectorLive()) flash(ctx, `${vectorLive() ? (vectorWallRun ? `OFF THE ${ride.short} RUN · ` : 'OFF THE REBOUND · ') : ''}${approach.label}${approach.angleDeg >= 10 ? ` · ${approach.angleDeg}°` : ''}`, 900);
     dribble?.update(0, 0, false); gatherLatched = false; gatherStride = false; gatherRun = null; finishRelease = -1;   // DUNK-POSTURE-LEGS: the dribble is parked (the ball back in the palm) before the takeoff takes it
     if (prop === 'oopalien') { /* the ball waits in the saucer (setupProp put it there) */ }
-    else if (isOop(prop)) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
+    else if (isOop(prop) && !lob.thrown) { if (teammate) attachBallToHand(ball, teammate.skeleton, 'RightHand'); else releaseBall(ball); }   // (DUNK-FLAGSHIP (b): an oop lobbed on the run is already in the air)   // the ball rides the passer's palm until the toss (it used to wait at his idle hand and teleport 0.87 m up on the throw)
     else if (isDubble(prop)) { /* the ball waits on the helper's head: the grab is the hand's job (dubbleTick) */ }
     else if (!lob.live) attachBallToHand(ball, player.skeleton, hand('RightHand'));   // a lob already in the air stays there — the catch is the hand's job
     // the track plays you OUT; it does not play under the dunk. The crowd owns the flight.

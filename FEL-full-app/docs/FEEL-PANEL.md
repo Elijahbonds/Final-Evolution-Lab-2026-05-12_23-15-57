@@ -245,3 +245,7 @@ lane/tiebreak-cam (group "Tennis · camera"), new number, default as shipped by 
 (`netPortraitCam.ts` `PORTRAIT_HERO_MARGIN`: on a phone held upright, Tennis and its tiebreak variant turn the play camera
 only when the player would come closer than this share of the frame's width to a side edge; wide screens are never touched).
 **assumption:** the bounds (0.05 to 0.35) are safe, not tuned.
+lane/dunk-flagship (group "Dunk · lobs"), new numbers, default as shipped by that lane: `dunk.oopLobFlightSec` 1.0 s
+(`DunkFlagship.ts` `OOP_LOB_FLIGHT_SEC`: the ALLEY-OOP passer lobs the ball while the dunker is still running, this long
+before the catch beat; it was a 0.35 s pass thrown after the take-off). It moves only when the pass leaves and how high it
+arcs; the catch, the slam window and the card are unchanged. **assumption:** the bounds (0.5 to 1.6 s) are safe, not tuned.
