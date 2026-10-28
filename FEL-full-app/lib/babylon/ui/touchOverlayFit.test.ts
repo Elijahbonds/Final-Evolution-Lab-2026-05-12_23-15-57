@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fitDeck } from './TouchOverlay';
+import { fitDeck, DEAD_L_STICK } from './TouchOverlay';
 
 const MARGIN = 12;
 const VIEWS = [
@@ -43,5 +43,18 @@ describe('fitDeck: every control lies inside the visible stage and the viewport'
     expect(src).toContain("style={lifted(SAFE_RIGHT, fit.r, 'bottom right')}");
     expect(src).toContain("style={lifted(COMPACT_RIGHT, cs * fit.r, 'bottom right')}");
     expect(src).toContain('bottom: `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${fit.lift}px)`');
+  });
+});
+
+// gameplay-clean (2026-10-28): the deck draws the inert ring, not a live MOVE stick, only where the mode's file reads no left stick
+describe('a dead left stick is drawn dead', () => {
+  const FILE: Record<string, string> = { baseball: 'BaseballInningsMode.ts', sprint: 'SprintMode.ts', brainbrawl: 'BrainBrawlMode.ts', who_scene_it: 'WhoSceneItMode.ts' };
+  it('every listed mode reads no LEFT stick', () => {
+    for (const m of DEAD_L_STICK) {
+      expect(FILE[m], m).toBeTruthy();
+      const src = readFileSync(path.join(__dirname, '../modes', FILE[m]), 'utf8');
+      const reads = src.match(/t === 'stick'[^\n]*/g) ?? [];
+      expect(reads.filter((l) => !/side === 'R'/.test(l)), m).toEqual([]);   // the sprint's one stick read is the R look
+    }
   });
 });

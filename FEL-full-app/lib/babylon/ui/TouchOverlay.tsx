@@ -116,7 +116,7 @@ export function TouchOverlay(props: { bus: InputBus; modeId: string; visible: bo
       {/* compact: the stick in the corner and the d-pad inboard of it (row-reverse keeps the DOM order) */}
       <div ref={colL} className={`pointer-events-auto absolute bottom-3 left-3 flex gap-2 ${compact ? 'flex-row-reverse items-end' : 'flex-col items-center'}`} style={lifted(compact ? COMPACT_LEFT : SAFE_LEFT, cs * fit.l, 'bottom left')}>
         <DPad bus={props.bus} />
-        <AnalogStick bus={props.bus} side="L" label="MOVE" />
+        {DEAD_L_STICK.has(props.modeId) ? <HollowStick /> : <AnalogStick bus={props.bus} side="L" label="MOVE" />}
       </div>
       {compact ? (
         // compact: the diamond in the corner with the boost pill over it, the right stick inboard of the diamond
@@ -182,6 +182,11 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
 
 /** The R stick's socket on a mode that reads nothing from it (MODE-STICK-FACE, 2026-09-07): the same 96 px footprint
  *  so the diamond above it never moves, a dashed ring at 30 % like an inert verb — an empty socket, not a control. */
+/** gameplay-clean (2026-10-28): the modes whose LEFT stick moves nothing — a timed swing, a d-pad sprint, two quizzes. The deck
+ *  drew a live MOVE stick there that answered with nothing (the audit's photographs: baseball's bottom-left); it is the
+ *  inert dashed ring now, like an unbound right stick. touchOverlayFit.test.ts holds each to its mode file reading no L stick. */
+export const DEAD_L_STICK: ReadonlySet<string> = new Set(['baseball', 'sprint', 'brainbrawl', 'who_scene_it']);
+
 function HollowStick() {
   return <div aria-hidden="true" className="pointer-events-none h-24 w-24 rounded-full border border-dashed border-white opacity-30" />;
 }
