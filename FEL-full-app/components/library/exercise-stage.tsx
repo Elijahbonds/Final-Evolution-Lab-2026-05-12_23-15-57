@@ -330,6 +330,18 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
   const onResize = () => engine.resize();
   let uses = 0;
 
+  const unbind = () => {
+    bound = false;
+    if (poseTimer) clearTimeout(poseTimer);
+    poseTimer = null; onDrawn = null;
+    report = () => undefined;
+    document.removeEventListener('visibilitychange', onVis);
+    window.removeEventListener('resize', onResize);
+    io?.unobserve(canvas);
+    sync();
+    canvas.remove();
+  };
+
   return {
     canvas,
     bind(box, p, onState) {
@@ -369,21 +381,11 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
       if (`${shownView}|${shownClip}|${shownHold}` !== before) recheck(450);
     },
     fresh: () => !disposed && cachedIdentity() === lookAtSpawn,
-    unbind() {
-      bound = false;
-      if (poseTimer) clearTimeout(poseTimer);
-      poseTimer = null; onDrawn = null;
-      report = () => undefined;
-      document.removeEventListener('visibilitychange', onVis);
-      window.removeEventListener('resize', onResize);
-      io?.unobserve(canvas);
-      sync();
-      canvas.remove();
-    },
+    unbind,
     dispose() {
       if (disposed) return;
       disposed = true;
-      if (bound) this.unbind();
+      if (bound) unbind();
       io?.disconnect();
       engine.stopRenderLoop();
       anatomy?.restore();

@@ -112,7 +112,9 @@ describe('the scan\'s phone file plays every loop the full scan plays, the same 
           reset(body);
           grp.start(false, 1, grp.from, grp.to, false); grp.goToFrame(grp.from + (D * i / 4) * 30); r.scene.render();
           const d = bindPoseDeviationDeg(r.sk);
-          if (body === 'scanMobile' && (d == null || d < 15)) bad.push(`${body} ${clip} @${(D * i / 4).toFixed(2)}s: ${d?.toFixed(1)}° from bind`);
+          // the live stage's own line (BIND_POSE_DEG), not the 15° the surface loops above clear: ex_arm_circles stands
+          // straight with the arms out — 8.5–13.8° off bind on both scans, by design of the movement, and the stage shows it
+          if (body === 'scanMobile' && (d == null || d <= BIND_POSE_DEG)) bad.push(`${body} ${clip} @${(D * i / 4).toFixed(2)}s: ${d?.toFixed(1)}° from bind`);
           at[body] = JOINTS.map((j) => { const n = boneNode(r.sk, j)!; n.computeWorldMatrix(true); return n.getAbsolutePosition().clone(); });
           grp.stop();
         }

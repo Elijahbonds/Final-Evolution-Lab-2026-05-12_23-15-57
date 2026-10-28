@@ -15,7 +15,7 @@
 import { build } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { chromium, type Page } from 'playwright-core';
@@ -44,6 +44,8 @@ async function bundle(): Promise<void> {
 }
 
 const TYPES: Record<string, string> = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.glb': 'model/gltf-binary', '.json': 'application/json', '.wasm': 'application/wasm', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ktx2': 'image/ktx2', '.env': 'application/octet-stream' };
+/** DEMO-SPEED: bytes this server sent, per kind (a cache hit never reaches it; a worker's request does) — the speed job's wire count */
+let served: Record<string, number> = {};
 function serve(): Promise<{ url: string; close(): void }> {
   const server = createServer((req, res) => {
     const p = decodeURIComponent((req.url ?? '/').split('?')[0]);
@@ -51,7 +53,10 @@ function serve(): Promise<{ url: string; close(): void }> {
     const f = tries.find((x) => existsSync(x) && statSync(x).isFile());
     if (!f) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { 'content-type': TYPES[extname(f)] ?? 'application/octet-stream', 'cache-control': 'max-age=3600' });
-    res.end(readFileSync(f));
+    const body = readFileSync(f);
+    const k = /\.glb$/.test(p) ? p.replace(/^.*\/models\//, 'models/') : /\.js$/.test(p) ? 'js' : 'other';
+    served[k] = (served[k] ?? 0) + body.length;
+    res.end(body);
   });
   return new Promise((ok) => server.listen(0, '127.0.0.1', () => { const a = server.address() as { port: number }; ok({ url: `http://127.0.0.1:${a.port}`, close: () => server.close() }); }));
 }
@@ -328,12 +333,17 @@ async function tposeJob(): Promise<void> {
  *  Reads the stage's User Timing marks (fel-stage:*, fel-char:*), the resource timings and the bytes on the wire (CDP). */
 async function speedJob(): Promise<void> {
   const { url, close } = await serve();
-  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
   const clip = process.env.CLIP ?? 'ex_squat';
   const out: Record<string, unknown> = {};
-  for (const prof of (process.env.PROFILES ?? 'rig,none').split(',')) for (const body of (process.env.BODIES ?? 'scan,male').split(',')) {
-    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-    const page = await ctx.newPage(); await page.addInitScript(NAME_SHIM);
+  // REPS=n repeats each profile × body in a fresh browser profile (the box is shared: one run is noisy)
+  const reps = Number(process.env.REPS ?? 1);
+  for (let rep = 0; rep < reps; rep++) for (const prof of (process.env.PROFILES ?? 'rig,none').split(',')) for (const body of (process.env.BODIES ?? 'scan,male').split(',')) {
+    // a PERSISTENT profile (a disk cache, as a phone's browser has): an incognito context's in-memory cache is small, and
+    // measured here it kept neither the GLB nor the big chunks, so its "warm" visit re-downloaded everything
+    const profileDir = join(OUT, `profile-${prof}-${body}`);
+    rmSync(profileDir, { recursive: true, force: true });
+    const ctx = await chromium.launchPersistentContext(profileDir, { executablePath: chromiumExe(), headless: true, args: GL_ARGS, viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    const page = ctx.pages()[0] ?? await ctx.newPage(); await page.addInitScript(NAME_SHIM);
     const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 200))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
     const cdp = await ctx.newCDPSession(page);
     if (prof === 'rig') await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
@@ -344,9 +354,13 @@ async function speedJob(): Promise<void> {
     cdp.on('Network.loadingFinished', (e: { requestId: string; encodedDataLength: number }) => { const u = reqs.get(e.requestId) ?? '?'; const k = /\.glb$/.test(u) ? u.replace(/^.*\/models\//, 'models/') : /\.js$/.test(u) ? 'js' : /\/api\//.test(u) ? 'api' : 'other'; wire[k] = (wire[k] ?? 0) + e.encodedDataLength; });
     const runs: Record<string, unknown> = {};
     for (const visit of ['cold', 'warm', 'remount'] as const) {
-      wire = {};
+      wire = {}; served = {};
       const t0 = Date.now();
+      // CPUPROF=1: a sampled CPU profile of the warm visit (same-origin navigation, so the renderer and its profiler stay)
+      const prof1 = process.env.CPUPROF === '1' && visit === 'warm';
+      if (prof1) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
       if (visit === 'remount') await page.evaluate(() => (window as unknown as { __rigRemount(): void }).__rigRemount());
+      else if (prof1) await page.goto(`${url}/?body=${body}&v=${visit}#avatar:${clip}`);
       else { await page.goto('about:blank'); await page.goto(`${url}/?body=${body}&v=${visit}#avatar:${clip}`); }
       await page.waitForFunction((v) => {
         const mounts = performance.getEntriesByName('rig:mount');
@@ -355,12 +369,35 @@ async function speedJob(): Promise<void> {
         return (v !== 'remount' || mounts.length > 1) && (st === 'failed' || (ready.length > 0 && ready[ready.length - 1].startTime > mounts[mounts.length - 1].startTime));
       }, visit, { timeout: 600_000, polling: 100 });
       const wallMs = Date.now() - t0;
+      let cpuTop: [string, number][] | undefined;
+      let cpuIncl: [string, number][] | undefined;
+      if (prof1) {
+        const { profile } = await cdp.send('Profiler.stop') as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number }; hitCount?: number }[]; startTime: number; endTime: number; samples: number[] } };
+        const per = (profile.endTime - profile.startTime) / 1000 / Math.max(1, profile.samples.length);
+        const self = new Map<string, number>();
+        for (const n of profile.nodes) { if (!n.hitCount) continue; const k = `${n.callFrame.functionName || '(anon)'} ${n.callFrame.url.replace(/^.*\//, '')}:${n.callFrame.lineNumber}`; self.set(k, (self.get(k) ?? 0) + n.hitCount * per); }
+        cpuTop = [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 45).map(([k, v]) => [k, Math.round(v)]);
+        // inclusive: each sample counts once for every distinct function on its stack (where the spawn's time goes)
+        const parent = new Map<number, number>();
+        for (const n of profile.nodes as unknown as { id: number; children?: number[] }[]) for (const c of n.children ?? []) parent.set(c, n.id);
+        const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+        const incl = new Map<string, number>();
+        for (const sid of profile.samples) {
+          const seen = new Set<string>();
+          for (let id: number | undefined = sid; id != null; id = parent.get(id)) {
+            const n = byId.get(id)!; const fn = n.callFrame.functionName; if (!fn) continue;
+            const k = `${fn} ${n.callFrame.url.replace(/^.*\//, '')}:${n.callFrame.lineNumber}`;
+            if (!seen.has(k)) { seen.add(k); incl.set(k, (incl.get(k) ?? 0) + per); }
+          }
+        }
+        cpuIncl = [...incl.entries()].sort((a, b) => b[1] - a[1]).slice(0, 80).map(([k, v]) => [k, Math.round(v)]);
+      }
       await page.waitForTimeout(500);
       const r = await page.evaluate(() => {
         const mounts = performance.getEntriesByName('rig:mount');
         const m0 = mounts[mounts.length - 1].startTime;
         const marks: Record<string, number> = {};
-        for (const e of performance.getEntriesByType('mark')) if (e.startTime >= m0 && /^fel-/.test(e.name)) { const k = e.name.replace(/^fel-(stage|char):/, ''); if (marks[k] == null) marks[k] = Math.round(e.startTime - m0); }
+        for (const e of performance.getEntriesByType('mark')) if (e.startTime >= m0 && /^fel-/.test(e.name)) { const k = e.name.replace(/^fel-(stage|char):/, '').replace(/^fel-warm:/, 'warm-'); if (marks[k] == null) marks[k] = Math.round(e.startTime - m0); }
         const res = (performance.getEntriesByType('resource') as PerformanceResourceTiming[]).filter((e) => e.startTime >= m0 - 5);
         const glb = res.filter((e) => /\.glb$/.test(e.name)).map((e) => ({ file: e.name.replace(/^.*\/models\//, ''), start: Math.round(e.startTime - m0), end: Math.round(e.responseEnd - m0), transferKB: Math.round(e.transferSize / 1024), bodyKB: Math.round(e.encodedBodySize / 1024) }));
         const js = res.filter((e) => /\.js$/.test(e.name));
@@ -368,14 +405,16 @@ async function speedJob(): Promise<void> {
         return { marks, glb, jsChunks: js.length, jsLastByteMs: jsEnd, state: document.querySelector('[data-avatar-state]')?.getAttribute('data-avatar-state'), sinceNavMs: Math.round(m0) };
       });
       const kb = Object.fromEntries(Object.entries(wire).map(([k, v]) => [k, Math.round(v / 1024)]));
-      runs[visit] = { ...r, wallMs, wireKB: kb, wireTotalKB: Object.values(kb).reduce((x, y) => x + y, 0) };
+      const sk = Object.fromEntries(Object.entries(served).map(([k, v]) => [k, Math.round(v / 1024)]));
+      runs[visit] = { ...r, wallMs, wireKB: kb, wireTotalKB: Object.values(kb).reduce((x, y) => x + y, 0), servedKB: sk, servedTotalKB: Object.values(sk).reduce((x, y) => x + y, 0), ...(cpuTop ? { cpuTop, cpuIncl } : {}) };
       if (process.env.SHOTS === '1') await page.screenshot({ path: join(OUT, `speed-${prof}-${body}-${visit}.jpg`), type: 'jpeg', quality: 70 });
     }
-    out[`${prof}:${body}`] = { ...runs, errors: errors.filter((e) => !/favicon|404/.test(e)).slice(0, 6) };
-    console.error(`[speed] ${prof}:${body} done`);
+    out[`${prof}:${body}${reps > 1 ? `#${rep}` : ''}`] = { ...runs, errors: errors.filter((e) => !/favicon|404/.test(e)).slice(0, 6) };
+    console.error(`[speed] ${prof}:${body}#${rep} done`);
     await ctx.close();
+    rmSync(profileDir, { recursive: true, force: true });
   }
-  await browser.close(); close();
+  close();
   console.log(JSON.stringify(out, null, 1));
 }
 

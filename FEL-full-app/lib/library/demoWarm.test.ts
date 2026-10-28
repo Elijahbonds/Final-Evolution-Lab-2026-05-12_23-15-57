@@ -37,6 +37,17 @@ describe('the demo body the early start fetches', () => {
     expect(calls).toHaveLength(3);
   });
 
+  it('asks the cache first: a warm visit reads nothing; a cold one fetches the file to the end', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (u: string, init?: RequestInit) => {
+      calls.push(`${u}${init?.cache ? ` (${init.cache})` : ''}`);
+      if (u === '/api/v1/hero-body') return Response.json({ body: 'kit-female' });
+      return init?.cache === 'only-if-cached' ? new Response(null, { status: 504 }) : new Response(new Uint8Array(8));
+    }));
+    await warmDemoBody();
+    expect(calls).toEqual(['/api/v1/hero-body', `${KIT_BODY_URL.female} (only-if-cached)`, KIT_BODY_URL.female]);
+  });
+
   it('a failed warm-up never throws (the spawn then fetches the file itself)', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     await expect(warmDemoBody()).resolves.toBeUndefined();
@@ -59,8 +70,8 @@ describe('the tier rule has one home', () => {
   it('the early-start modules never import Babylon', () => {
     for (const f of ['lib/library/demoWarm.ts', 'lib/babylon/core/heroBodyRead.ts', 'lib/babylon/scene/tierRule.ts']) {
       const src = readFileSync(f, 'utf8');
-      expect(src, f).not.toMatch(/from\s+['"]@babylonjs\//);
-      expect(src, f).not.toMatch(/import\s+(?!type)[^;]*from\s+['"][^'"]*(QualityTier|CharacterLibrary|playerIdentity)['"]/);
+      expect(src, f).not.toMatch(/^import[^\n]*from\s+['"]@babylonjs\//m);
+      expect(src, f).not.toMatch(/^import\s+(?!type\b)[^\n;]*from\s+['"][^'"]*(QualityTier|CharacterLibrary|playerIdentity)['"]/m);
     }
   });
 });

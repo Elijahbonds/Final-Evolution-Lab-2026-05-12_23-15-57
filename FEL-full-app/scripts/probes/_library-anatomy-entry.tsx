@@ -69,6 +69,7 @@ if (mode === 'avatar') {
   // window.__rigRemount() unmounts it and mounts a fresh one in the same page — a route change and back, in one session
   const Avatar = () => createElement('div', { style: { width: '358px', background: '#0c0c11' } }, createElement(AvatarDemo, { clip: a && a !== 'still' ? a : null }));
   (window as unknown as { __rigRemount?: () => void }).__rigRemount = () => { root.render(createElement('div')); setTimeout(() => { performance.mark('rig:mount'); root.render(createElement(Avatar)); }, 50); };
+  try { performance.setResourceTimingBufferSize(5000); } catch { /* the rig's 240 chunks fill the default 250 before the GLB */ }
   performance.mark('rig:mount');
   root.render(createElement(Avatar));
 } else if (mode === 'stage' || mode === 'muscles') {
