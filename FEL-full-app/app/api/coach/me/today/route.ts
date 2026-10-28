@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { currentUserId, bad } from '@/lib/camp/server';
 import { loadToday } from '@/lib/coach/todayServer';
+import { todayReadiness, type ReadinessDb } from '@/lib/coach/readiness/server';
 
 /**
  * GET /api/coach/me/today — the client's next session across their active programs, with the open log and recent coach
@@ -13,5 +14,7 @@ import { loadToday } from '@/lib/coach/todayServer';
 export async function GET() {
   const userId = await currentUserId();
   if (!userId) return bad('unauthorized', 401);
-  return NextResponse.json(await loadToday(prisma, userId));
+  // COACH-READINESS (2026-10-25): today's saved jump check under the program coach's rule (Low + "ease off" eases the day)
+  const now = new Date();
+  return NextResponse.json(await loadToday(prisma, userId, now, { readiness: (coachId) => todayReadiness(prisma as unknown as ReadinessDb, userId, coachId, now) }));
 }

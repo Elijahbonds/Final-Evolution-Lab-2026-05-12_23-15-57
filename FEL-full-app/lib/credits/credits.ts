@@ -461,16 +461,18 @@ export const CREDITS: Credit[] = [
     recordedIn: [
       'lib/babylon/audio/SoundKit.ts', 'lib/babylon/music/WalkOut.ts', 'scripts/backdrop/paint-beach-dome.py', 'scripts/venue/navmesh-gen.mts',
       'scripts/anim-audit.ts', 'scripts/avatar/forge.mts', 'scripts/avatar/roster.mts', 'docs/history/SHIP-PASS-3.md', 'docs/history/SHIP-PASS-6-LOOK.md',
+      'scripts/brand/make-app-icons.ts',
     ],
     evidence: [
       'models/_forge/: the FORGE hero and its roster, "built from nothing but code" (scripts/avatar/forge.mts, scripts/avatar/roster.mts), archived there 2026-09-04 (docs/history/SHIP-PASS-3.md)',
       'models/props/venice/: "the second writer\'s venice kit (far pier, three sail billboards)" (docs/history/SHIP-PASS-6-LOOK.md); the files are Blender boxes and cylinders (pier_deck, pier_post_*, sail_hull/mast/cloth) with flat materials and no textures',
       'og-image.png: the app\'s name and tagline in the brand colours over plain circles and lines; no outside imagery in it',
+      'icons/: the installable-app icons (192, 512, maskable 512, apple-touch 180), drawn from favicon.svg by scripts/brand/make-app-icons.ts (APP-FEEL, 2026-10-25); no outside imagery',
       'models/dragon/: the dragon ride partner (v5, phase4-swoop p4s5 LODs), built from scratch in free Blender 4.2.3 by the 3D Art lane (65-bone DR_ rig, clips, sculpt and bakes; sparse morphs by its own script); its build notes record "No Meshy GLB was opened or edited" and free tools only (fel-specs dragon-ride-build/phase4-power/README.md, phase4-detail/README.md)',
     ],
     covers: [
       'favicon.svg', 'models/navmesh/', 'anim-audit/', 'agent-manifest.json', 'backdrops/baked/beach.jpg',
-      'models/_forge/', 'models/props/venice/', 'og-image.png', 'models/dragon/',
+      'models/_forge/', 'models/props/venice/', 'og-image.png', 'models/dragon/', 'icons/',
     ],
     manifestLicences: [],
   },
@@ -521,6 +523,8 @@ export function pdCredits(entries: readonly PdEntry[] = signedPdEntries()): Cred
 /** Files under public/ that are not assets, each with the reason. */
 export const NOT_ASSETS: Record<string, string> = {
   '_prisma/': 'the generated Prisma client, copied into public/ for the deploy bundle (docs/DEPLOY-NOTES-PRISMA.md): server code, not an asset',
+  'sw.js': 'the service worker (APP-FEEL, 2026-10-25): hand-written code served from the site root, not an asset',
+  'offline.html': 'the offline fallback page the service worker shows (APP-FEEL, 2026-10-25): FEL\'s own text, not an asset',
 };
 
 const matches = (path: string, cover: string) =>

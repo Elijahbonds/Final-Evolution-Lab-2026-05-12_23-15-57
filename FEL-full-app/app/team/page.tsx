@@ -1,10 +1,13 @@
 import Link from 'next/link';
-import { approvedProfiles, coachStoreBookHref, publicProfileSpecialty } from '@/lib/creator/creatorCatalog';
+import {
+  PUBLIC_PAGE_COPY, TEAM_BOOK_OPEN, approvedProfiles, coachStoreBookHref, publicProfileSpecialty,
+} from '@/lib/creator/creatorCatalog';
 import { bookHrefWhenStoreOpen } from '@/lib/creator/coachStoreLink';
-import { teamPageLede } from '@/lib/creator/teamCopy';
 import { CreatorFrame, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
 import { currentViewer } from '@/lib/creator/creatorViewer';
+import { teamPageLede } from '@/lib/creator/teamCopy';
 import { isCoachStoreEnabled } from '@/lib/flags';
+import { OwnerCopy } from '@/components/public-copy/owner-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Team — Final Evolution Lab' };
@@ -20,6 +23,10 @@ export default async function TeamPage() {
       title={<>Final Evolution <span className="text-[#F5C518]">Team</span></>}
       lede={teamPageLede(coachStoreOpen)}
     >
+      {/* ONB-05: Appendix B as approved (2026-10-20). Its booking sentence is said only while the coach store is open
+          (the lede above already says what to do while it is closed). */}
+      <OwnerCopy parts={[PUBLIC_PAGE_COPY.team.lede, ' ', ...PUBLIC_PAGE_COPY.team.body, ...(coachStoreOpen ? [' ', TEAM_BOOK_OPEN] : [])]}
+        className="mt-6 max-w-2xl text-sm leading-relaxed text-white/75" />
       <section className="mt-8">
         <SectionTitle>Profiles</SectionTitle>
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

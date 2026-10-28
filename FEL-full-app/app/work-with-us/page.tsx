@@ -1,11 +1,12 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { getApprovedProfile } from '@/lib/creator/creatorCatalog';
+import { PUBLIC_PAGE_COPY, getApprovedProfile } from '@/lib/creator/creatorCatalog';
 import { BUDGET_RANGES, INQUIRIES_UNAVAILABLE_MESSAGE, INQUIRY_SOURCES } from '@/lib/creator/inquiry';
 import { inquiriesReady, type RawDb } from '@/lib/creator/inquiryStore';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, SectionTitle } from '@/components/creator-platform/creator-frame';
 import { InquiryForm } from '@/components/creator-platform/inquiry-form';
+import { OwnerCopy } from '@/components/public-copy/owner-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Work with us — Final Evolution Lab' };
@@ -22,8 +23,10 @@ export default async function WorkWithUsPage({ searchParams }: { searchParams: {
     <CreatorFrame
       signedIn={viewer.signedIn}
       title={<>Work <span className="text-[#F5C518]">with us</span></>}
-      lede="Brand partnerships, appearances and custom work. Tell us what you have in mind."
+      lede={PUBLIC_PAGE_COPY.workWithUs.lede}
     >
+      {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
+      <OwnerCopy parts={PUBLIC_PAGE_COPY.workWithUs.body} className="mt-6 max-w-2xl text-sm leading-relaxed text-white/75" />
       <section className="mt-8 rounded-2xl border border-white/10 bg-[#101010] p-5">
         <SectionTitle>{profile ? `Inquiry for ${profile.name}` : 'Inquiry'}</SectionTitle>
         {open ? (

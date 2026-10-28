@@ -14,11 +14,13 @@ export default async function PlaybookPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/education/playbook'));
   return (
+    // PREMIUM-UI P7 (2026-10-27): the owner's book opens on the owner's own dunk photograph (public/brand, credited), the
+    // lede cut from 24 words to 11; the chapters follow.
     <TabPage
       eyebrow="The Playbook"
-      title="How the body actually moves"
-      lede="Ten chapters on human movement — the control panel, the joints, the jump, the landing, the reset. Every drill is one you can run tonight."
-      accent="#00FF9D"
+      title="How the body moves"
+      lede="Ten chapters on human movement. Every drill runs tonight."
+      hero={{ image: '/brand/bonds-dunk-gym.jpg', imagePosition: '50% 20%' }}
     >
       <ChapterList />
       <FurtherReading />

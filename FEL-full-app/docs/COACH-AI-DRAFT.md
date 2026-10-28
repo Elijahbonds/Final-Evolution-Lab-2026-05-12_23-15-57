@@ -155,7 +155,8 @@ a client id, a logged number or a health reading.
    | Note length | 280 characters |
    | Pain window | 14 days |
 
-2. **Copy** (`lib/coach/weeklyDraft/copy.ts`). Read the SAFETY-COPY lines first: `easeOffReason` and
+2. **Copy** (`lib/coach/weeklyDraft/copy.ts`) — **approved** (owner, in chat, 2026-10-27, card C02), with the card's one
+   change: the coach's "Approvals switch on…" line no longer names this document. Read the SAFETY-COPY lines first: `easeOffReason` and
    `easeOffClientLine` say "see a professional", "check with a clinician" and "tell an adult". They follow the pain
    check-in's wording, name no condition and promise nothing, but they are new sentences about pain.
 3. **The pending SQL** (§4).

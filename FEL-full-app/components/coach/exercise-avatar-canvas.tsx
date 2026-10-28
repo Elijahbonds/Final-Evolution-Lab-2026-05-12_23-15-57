@@ -23,9 +23,10 @@ export function clipForStat(stat: string): string {
   return 'idle_stand';
 }
 
-export default function ExerciseAvatarCanvas({ stat }: { stat: string }) {
+export default function ExerciseAvatarCanvas({ stat, clip: chosenClip }: { stat: string; clip?: string }) {
   const avatar = useRef<AvatarHandle | null>(null);
-  const clip = clipForStat(stat);
+  // EXERCISE-LIBRARY (2026-10-25): a library entry names its clip (lib/library/demo.ts); else the stat picks one
+  const clip = chosenClip ?? clipForStat(stat);
 
   return (
     <div className="aspect-video w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a]">

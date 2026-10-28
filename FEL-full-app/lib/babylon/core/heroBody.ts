@@ -29,6 +29,16 @@ export const KIT_BODY_URL: Record<BodyType, string> = {
 export const BODY_TYPES: readonly BodyType[] = ['male', 'female'];
 export const DEFAULT_BODY_TYPE: BodyType = 'male';
 
+/** The scan's phone file (Ship Pass 6: the decimated bake, 54k verts, 1K textures): the same 22 bones, rest pose and skin as
+ *  SCAN_BODY_URL. CharacterLibrary loads it in its place on the mobile tier (scanUrlForTier) — and so does anything that
+ *  fetches the body ahead of a spawn (the library stage's early start), so the two always ask for the same file. */
+export const SCAN_BODY_MOBILE_URL = '/models/elijah-meshy.mobile.glb';
+
+/** THE RULE for the scan's phone file: the scan on the mobile tier is its phone file; every other body and tier is as asked. */
+export function scanUrlForTier(url: string, tier: string | null | undefined): string {
+  return url === SCAN_BODY_URL && tier === 'mobile' ? SCAN_BODY_MOBILE_URL : url;
+}
+
 export function urlForHeroBody(kind: HeroBodyKind): string {
   return kind === 'scan' ? SCAN_BODY_URL : KIT_BODY_URL[kind === 'kit-female' ? 'female' : 'male'];
 }
@@ -36,7 +46,7 @@ export function urlForHeroBody(kind: HeroBodyKind): string {
 /** Every file that IS a player body — an opponent spawn must never land on one of these. */
 export function isPlayerBodyUrl(url: string): boolean {
   return url === SCAN_BODY_URL || url === KIT_BODY_URL.male || url === KIT_BODY_URL.female
-    || url === '/models/elijah-meshy.mobile.glb';
+    || url === SCAN_BODY_MOBILE_URL;
 }
 
 /** Parse the server allowlist. Case- and whitespace-insensitive; empty entries dropped. */

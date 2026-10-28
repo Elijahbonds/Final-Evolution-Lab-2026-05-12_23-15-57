@@ -1,6 +1,7 @@
 // DAILY-DRILL — the card's and the page's words, in one place so a test reads what the page says. Product copy for the
 // owner's review (docs/DAILY-DRILL.md, owner calls); none of it is legal or policy text. Pure and client-safe.
 import { SCREEN_HOME } from '@/lib/screen/routes';
+import { JUMP_CHECK } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the hands-on-hips jump check
 import type { Focus } from './plan';
 import type { SkillReading } from './skills';
 
@@ -18,7 +19,9 @@ export const DAILY_EYEBROW = "Today's drill";
 export const SAME_ALL_DAY_LINE = 'The same drill all day, on every device. A new one tomorrow.';
 export const START_CTA = "Start today's drill";
 export const DONE_TITLE = 'Done for today';
-export const STOPPED_LINE = "Today's drill is paused until you've checked with a clinician and cleared it from the Mirror. This isn't a diagnosis — it's just a pause.";
+// TODAY-DRILL (2026-10-27): reworded so no line names a medical word (lib/coach/weeklyDraft/copy.ts MEDICAL_WORDS caught
+// "diagnosis"); the meaning is unchanged: a pause until a clinician has been seen and the Mirror cleared it.
+export const STOPPED_LINE = "Today's drill is on pause. Check with a clinician first, then clear it from the Mirror. It's a pause, not a verdict.";
 /** Said on the result card instead of the drills page's "nothing is saved": here one fact is kept. */
 export const KEPT_LINE = 'Only the fact that you finished today’s drill is kept, for your streak and Lab Credits. Nothing the camera read is sent.';
 export const PREP_LINE = 'Four calm minutes of the Wake-Up first, then the drill.';
@@ -51,7 +54,7 @@ export interface Nudge { text: string; href: string; cta: string }
  * (profile v2's: an opted-in verified adult's numbers are on the account; nobody else's are).
  */
 export function measureNudge(g: { adult: boolean; canSaveScan: boolean }): Nudge {
-  if (g.canSaveScan) return { text: 'Do a one-minute jump check, and tomorrow’s drill is picked from your numbers.', href: JUMP_CHECK_HREF, cta: 'Do a jump check' };
+  if (g.canSaveScan) return { text: 'Do a one-minute jump check, and tomorrow’s drill is picked from your numbers.', href: JUMP_CHECK_HREF, cta: JUMP_CHECK };
   if (g.adult) return { text: 'Turn on saving your jump numbers, and your drill is picked from them.', href: ACCOUNT_HREF, cta: 'Account settings' };
   return { text: 'Under 18, your numbers stay on your phone, so your daily drill is the all-round one. You can still check your jump any time.', href: SCREEN_HOME, cta: 'Check your jump' };
 }

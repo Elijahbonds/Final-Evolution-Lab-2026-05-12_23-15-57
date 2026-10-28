@@ -3,6 +3,7 @@ import { formatUsd } from '@/lib/books/bookCatalog';
 import {
   AUDIENCE_STATS,
   MEDIA_KIT,
+  PUBLIC_PAGE_COPY,
   mediaKitProfile,
   publicMediaKitHighlight,
   publicMediaKitPackageDetail,
@@ -10,6 +11,7 @@ import {
 } from '@/lib/creator/creatorCatalog';
 import { currentViewer } from '@/lib/creator/creatorViewer';
 import { CreatorFrame, ExampleBadge, ProfilePhoto, SectionTitle } from '@/components/creator-platform/creator-frame';
+import { OwnerCopy } from '@/components/public-copy/owner-copy';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Media kit — Final Evolution Lab' };
@@ -23,8 +25,10 @@ export default async function MediaKitPage() {
     <CreatorFrame
       signedIn={viewer.signedIn}
       title={<>Media <span className="text-[#F5C518]">kit</span></>}
-      lede="For brands and partners. Everything marked EXAMPLE is draft information until confirmed."
+      lede={PUBLIC_PAGE_COPY.mediaKit.lede}
     >
+      {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
+      <OwnerCopy parts={PUBLIC_PAGE_COPY.mediaKit.body} className="mt-6 max-w-2xl text-sm leading-relaxed text-white/75" />
       <section className="mt-8 grid gap-6 md:grid-cols-[180px_1fr]">
         {profile ? <ProfilePhoto name={profile.name} photoUrl={profile.photoUrl} size="lg" /> : null}
         <div>

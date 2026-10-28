@@ -10,7 +10,9 @@
      variables are missing (the root crash screen renders its own <html>), the whole token is unset and each consumer's
      own var() fallback (ui-monospace) applies. */
   --fel-font-display: var(--font-chakra), var(--font-mono), ui-monospace, monospace;
-  --fel-font-body: 'Inter', system-ui, sans-serif;
+  /* The text face (P2 fonts fix, 2026-10-27): this named 'Inter', which the app never loads, so anything reading the token
+     drew in the system face. It is IBM Plex Sans, the face the body already uses. */
+  --fel-font-body: var(--font-sans, ui-sans-serif), system-ui, sans-serif;
 
   /* Core palette.
      THE TOKENS NOW HOLD THE COLOURS THE APP ACTUALLY USES (2026-09-20). This block described a palette the
@@ -25,6 +27,11 @@
   --fel-line: #232c38;
   --fel-text: #f2f5f9;
   --fel-text-dim: #8b97a5;
+  /* THE TEXT LADDER (A11-06, 2026-10-25): text > soft > dim > quiet, every step at least 4.5:1 on --fel-bg, --fel-surface
+     and --fel-surface-2 (lib/design/tokens.test.ts measures it). The pages' ad-hoc text-white/30..45 was 2.5:1 to 4.46:1
+     on the ink, under the WCAG 1.4.3 floor; those runs move onto these. Soft and quiet are new; text and dim unchanged. */
+  --fel-text-soft: #c3cad3;
+  --fel-text-quiet: #7d8794;
 
   /* Brand accents */
   --fel-cyan: #00E5FF;      /* primary actions, focus */
@@ -41,6 +48,14 @@
      is illegal had no colour cue. Defined here as the names those call sites use for the colours beside them. */
   --fel-red: #FF3366;
   --fel-purple: #A855F7;
+
+  /* The TV HUD's two reads the theme had no name for (components/games/tv-hud/tokens.ts HUD_RGB.them / .info), so every
+     HUD tone has a theme token: one set (A11-06). Values unchanged. */
+  --fel-them: #facc15;
+  --fel-info: #9ad7ff;
+
+  /* Keyboard, pad and remote focus (A11-01 / A11-02): one ring everywhere (app/globals.css draws it). */
+  --fel-focus: #00E5FF;
 
   /* Rarity ladder (cards, wearables) */
   --fel-rarity-common: #9aa7b4;
@@ -77,7 +92,7 @@
 }
 
 .fel-cta {                   /* primary action button */
-  font-family: var(--fel-font-display);
+  font-family: var(--fel-font-display, ui-monospace, monospace);
   font-weight: 900;
   letter-spacing: 0.06em;
   color: #05060a;
@@ -91,7 +106,7 @@
 .fel-cta--gold { background: var(--fel-gold); box-shadow: var(--fel-glow-gold); }
 
 .fel-stat {                  /* big HUD numbers (score, timer, PRQ) */
-  font-family: var(--fel-font-display);
+  font-family: var(--fel-font-display, ui-monospace, monospace);
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   color: var(--fel-text);
@@ -101,7 +116,7 @@
 .fel-stat--danger { color: var(--fel-crimson); }
 
 .fel-chip {                  /* labels: LIVE, SPONSORED, style names */
-  font-family: var(--fel-font-display);
+  font-family: var(--fel-font-display, ui-monospace, monospace);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.18em;
@@ -137,3 +152,91 @@
 @media (prefers-reduced-motion: reduce) {
   .fel-cta, .fel-count, .fel-boot-bar { transition: none !important; animation: none !important; }
 }
+
+/* ── PREMIUM (lane/premium-ui, 2026-10-27; docs/PLAN-UI-10PHASE.md P1) ──────────────────────────────────────────────
+   The owner: "it still feels cheap" — too much text, flat and empty, inconsistent, no motion. These are the pieces the
+   pages are rebuilt from (components/ui/fel/**; the living style page is /dev/ui). TypeScript mirrors:
+   lib/design/{type,space,motion}.ts, held equal by lib/design/premium.test.ts.
+   ONE ACCENT: FEL cyan is the action colour. The other palette colours stay for meaning (success, warning, danger,
+   rarity), never for decoration. */
+:root {
+  --fel-accent: #00E5FF;
+  --fel-accent-ink: #021014;          /* text on the accent: 13:1 */
+
+  /* Surfaces are light, not outlines: a gradient with a soft top highlight, lifted off the ink. Worst-case (brightest)
+     composites are what the text ladder is measured on: raised #12161c, overlay #141a22, lit #161d27. */
+  --fel-elev-1: linear-gradient(180deg, #12161c 0%, #0b0e12 100%);
+  --fel-elev-2: rgba(20, 26, 34, 0.86);
+  --fel-elev-3: #161d27;          /* the same value as surface-2, the brightest surface the quiet text step still reads on */
+  --fel-hairline: rgba(255, 255, 255, 0.07);
+  --fel-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --fel-shadow-lift: 0 18px 40px -22px rgba(0, 0, 0, 0.9);
+  /* the hero's scrim: the image fades into the ink, so the headline sits on dark and the page continues out of it */
+  --fel-scrim: linear-gradient(180deg, rgba(5, 5, 5, 0.25) 0%, rgba(5, 5, 5, 0.1) 30%, rgba(5, 5, 5, 0.7) 66%, #050505 100%);
+  --fel-page-glow: radial-gradient(120% 60% at 50% -10%, rgba(0, 229, 255, 0.07) 0%, transparent 60%);
+
+  /* Radii beside --fel-r-card (20) and --fel-r-pill */
+  --fel-r-sm: 12px;
+  --fel-r-md: 16px;
+  --fel-r-xl: 28px;
+
+  /* Motion: three durations, two curves (--fel-ease-pop above is the second). Zero when motion is reduced (below). */
+  --fel-dur-fast: 140ms;
+  --fel-dur-base: 240ms;
+  --fel-dur-slow: 420ms;
+  --fel-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* REDUCED MOTION, from either source: the app's own Motion setting on <html> (data-fel-motion, set by useMotionAttr),
+   or the device's, unless the player chose Full in the app. */
+html[data-fel-motion="reduce"] { --fel-dur-fast: 0ms; --fel-dur-base: 0ms; --fel-dur-slow: 0ms; }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-fel-motion="full"]) { --fel-dur-fast: 0ms; --fel-dur-base: 0ms; --fel-dur-slow: 0ms; }
+  html:not([data-fel-motion="full"]) :is(.fel-enter, .fel-fade, .fel-skeleton, .fel-ring-arc) { animation: none !important; opacity: 1; transform: none; }
+}
+html[data-fel-motion="reduce"] :is(.fel-enter, .fel-fade, .fel-skeleton, .fel-ring-arc) { animation: none !important; opacity: 1; transform: none; }
+
+.fel-surface {               /* a card: lifted, not outlined */
+  background: var(--fel-elev-1);
+  border: 1px solid var(--fel-hairline);
+  border-radius: var(--fel-r-card);
+  box-shadow: var(--fel-highlight);
+}
+.fel-glass {                 /* a sheet, a bar, a dock */
+  background: var(--fel-elev-2);
+  border: 1px solid var(--fel-hairline);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+.fel-press {                 /* every tappable thing: it gives under the finger */
+  transition: transform var(--fel-dur-fast) var(--fel-ease-pop), background-color var(--fel-dur-base) ease,
+              border-color var(--fel-dur-base) ease, box-shadow var(--fel-dur-base) ease, color var(--fel-dur-base) ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.fel-press:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .fel-lift:hover { transform: translateY(-2px); box-shadow: var(--fel-highlight), var(--fel-shadow-lift); }
+}
+
+@keyframes fel-enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fel-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fel-shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.fel-enter {                 /* an arrival: a short rise, staggered by --fel-enter-delay */
+  animation: fel-enter var(--fel-dur-slow) var(--fel-ease-out) both;
+  animation-delay: var(--fel-enter-delay, 0ms);
+}
+.fel-fade {                  /* the page enter: opacity only, so nothing fixed inside is ever re-parented by a transform */
+  animation: fel-fade var(--fel-dur-base) ease-out both;
+}
+.fel-skeleton {              /* a loading placeholder in the shape of what is coming */
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.04) 30%, rgba(255, 255, 255, 0.1) 50%, rgba(255, 255, 255, 0.04) 70%);
+  background-size: 300% 100%;
+  animation: fel-shimmer 1.4s ease-in-out infinite;
+  border-radius: var(--fel-r-sm);
+}
+@keyframes fel-ring-fill { from { stroke-dashoffset: var(--fel-ring-c, 0); } }
+.fel-ring-arc {              /* a ring fills on arrival, then follows its value */
+  animation: fel-ring-fill var(--fel-dur-slow) var(--fel-ease-out) both;
+  transition: stroke-dashoffset var(--fel-dur-slow) var(--fel-ease-out);
+}
+.fel-num { font-variant-numeric: tabular-nums; }

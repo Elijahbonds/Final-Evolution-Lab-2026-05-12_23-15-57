@@ -1,4 +1,5 @@
 'use client';
+import { EmptyState } from '@/components/ui/fel/empty-state';
 // Today — the client's side of the coaching loop (lane 1 C2/C3): the next session of your active program, logging,
 // Done, the coach's recent comments, and the thread.
 //
@@ -75,9 +76,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, PlayCircle, Video } from 'lucide-react';
+import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, Video } from 'lucide-react';
 import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
+// COACH-VIDEO-REVIEW (2026-10-24): film a set of a readable exercise; the camera counts and flags (components/coach/form-review)
+import { FilmSetLink } from '@/components/coach/form-review/film-set-link';
 import { SetTimer } from '@/components/coach/set-timer';
 import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
 import { ReadinessCheckInCard } from '@/components/coach/readiness-checkin';
@@ -95,6 +98,7 @@ import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
 import { CoachNote } from '@/components/coach/coach-note';
 // COACH-AI Phase 8 (2026-10-07): the thread's read markers ("N new", "Seen"; nothing until the pending SQL is applied)
 import { ThreadMessages, UnreadPill } from '@/components/coach/thread-messages';
+import { LiveSessionLink } from '@/components/coach/live/live-session-link';   // COACH-LIVE (2026-10-25): wiring only
 import { markReadIfNeeded, unreadInThread } from '@/lib/coach/messageReadsView';
 import { PlanUpdateCard } from '@/components/coach/plan-update-card';
 import { PLAN_UPDATES_API } from '@/lib/coach/weeklyDraft/view';
@@ -104,9 +108,16 @@ import { AVAILABILITY_API } from '@/components/coach/availability-picker';
 // MIRROR-PROGRESS (2026-10-07; plan Phase 4): each card's "Last time: 3×8 @ 60 kg" — the athlete's own newest completed log
 // of that exercise (lib/coach/loop.ts progressSeries, served as today.lastTime), in the unit the card is showing
 import { lastTimeLine } from '@/lib/coach/loop';
+import { ReadinessTodayLine } from '@/components/readiness/readiness-today-line';   // COACH-READINESS (2026-10-25): wiring only
+// COACH-PARITY (2026-10-26): the coach's habits and check-ins (wiring only; nothing shows until the pending SQL is applied)
+import { HabitsToday, MY_HABITS_API } from '@/components/coach/parity/habits-today';
+import { CheckinCard, MY_CHECKINS_API } from '@/components/coach/parity/checkin-card';
+// COACH-DELIVERY (2026-10-26): the coach's calendar (COA-05) and branding (COA-04) on Today (wiring only)
+import { MY_SCHEDULE_API, MySchedule } from '@/components/coach/my-schedule';
+import { CoachBrandBar, MY_BRANDING_API } from '@/components/coach/brand-bar';
 
-export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null }
-export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API };
+export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null; schedule?: string | null; branding?: string | null }
+export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API, schedule: MY_SCHEDULE_API, branding: MY_BRANDING_API };
 
 /**
  * Whether the key set is under way on this device (MIRROR-COACH P7 FIX): a set row has something typed in it, or one of
@@ -211,7 +222,7 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const layout = useMemo(() => todayLayout(data?.today?.session.exercises ?? []), [data]);
   const markCooldown = (sessionId: string) => setCooldownDoneIds((ids) => (ids.includes(sessionId) ? ids : [...ids, sessionId]));
 
-  if (!data) return <div className="flex justify-center py-16 text-white/40"><Loader2 className="h-5 w-5 animate-spin" /></div>;
+  if (!data) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   // MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
   // red-flag hard stop": checked ahead of the "no program" / "program complete" branches below, and ahead of every
   // exercise card and its logging form — a standing red flag pauses Today outright rather than one card at a time.
@@ -232,15 +243,25 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     <div ref={finishedRef} className="space-y-1" data-finished-session={finished.sessionId}>
       <CooldownCard key={`finished-${finished.sessionId}`} exercises={finished.exercises} programId={finished.programId} sessionId={finished.sessionId}
         endpoint={api.cooldown ?? null} lead={`${finished.label} done. Cool down now, while you're still warm.`} onDone={() => markCooldown(finished.sessionId)} />
-      <button type="button" onClick={() => setFinished(null)} className="px-1 text-xs text-white/45" data-finished-close>Close</button>
+      <button type="button" onClick={() => setFinished(null)} className="px-1 text-xs text-fel-dim" data-finished-close>Close</button>
     </div>
   ) : null;
+  // COACH-PARITY: habits and check-ins come from the coach, not the program, so they show with or without one
+  const parity = (
+    <>
+      {api.habits && <HabitsToday api={api.habits} />}
+      {api.checkins && <CheckinCard api={api.checkins} />}
+      {/* COACH-DELIVERY COA-05 (2026-10-26): the coach's upcoming roster sessions (nothing until the pending SQL) */}
+      {api.schedule && <MySchedule api={api.schedule} />}
+    </>
+  );
   if (!data.program || !data.today) return (
     <div className="space-y-4">
       {finishedCard}
-      <div className="fel-card rounded-xl p-6 text-center">
-        <p className="text-white/70 text-sm">{data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'}</p>
-      </div>
+      {parity}
+      {/* premium-ui P8: the empty day as an empty state — a figure and the one line, not a grey box */}
+      <EmptyState title={data.program ? 'Program complete' : 'No program yet'}
+        line={data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'} />
     </div>
   );
   const { program, today } = data;
@@ -259,17 +280,20 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   return (
     <div className="space-y-4" data-testid="today">
       {finishedCard}
+      {api.branding && <CoachBrandBar api={api.branding} />}
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
+      {parity}
+      <ReadinessTodayLine note={today.readiness} api={api.readiness} />
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wider text-white/40">{program.name} · coach {program.coachName}</div>
+            <div className="text-[11px] uppercase tracking-wider text-fel-dim">{program.name} · coach {program.coachName}</div>
             <div className="fel-heading text-lg text-white mt-1">{today.block.label} · {today.session.label}</div>
-            <div className="text-xs text-white/40 mt-0.5">Session {today.index + 1} of {today.total}</div>
+            <div className="text-xs text-fel-dim mt-0.5">Session {today.index + 1} of {today.total}</div>
             {recovery && <div className="text-xs text-[#7BD389]/90 mt-1" data-off-day-line>{OFF_DAY_LINE}</div>}
           </div>
           {!recovery && <UnitSwitch unit={unit} onChange={switchUnit} />}
@@ -284,13 +308,13 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
         <section key={sec.section} className="space-y-2" data-section={sec.section} aria-label={sec.label}>
           <div className="px-1">
             <div className="text-[11px] uppercase tracking-wider text-white/50">{sec.label}</div>
-            <div className="text-[11px] text-white/35">{sec.meaning}</div>
+            <div className="text-[11px] text-fel-quiet">{sec.meaning}</div>
           </div>
           {sec.blocks.map((b) => b.kind === 'single' ? card(b.item, b.label) : (
-            <div key={`ss-${b.group}-${b.items[0].item.id}`} className="rounded-xl border border-[#00E5FF]/20 p-2 space-y-2" data-superset={b.group}>
+            <div key={`ss-${b.group}-${b.items[0].item.id}`} className="rounded-xl border border-fel-cyan/20 p-2 space-y-2" data-superset={b.group}>
               <div className="px-1">
-                <div className="text-xs font-medium text-[#00E5FF]">Superset {b.group}</div>
-                <div className="text-[11px] text-white/45">{supersetHint(b.items.map((x) => x.label))}</div>
+                <div className="text-xs font-medium text-fel-cyan">Superset {b.group}</div>
+                <div className="text-[11px] text-fel-dim">{supersetHint(b.items.map((x) => x.label))}</div>
               </div>
               {b.items.map((x) => card(x.item, x.label))}
             </div>
@@ -304,17 +328,17 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       )}
       <div className="flex gap-2">
         <button disabled={busy} onClick={() => submit(false)} className="flex-1 rounded-xl border border-white/10 py-3 text-sm text-white/80">Save</button>
-        <button disabled={busy} onClick={() => submit(true)} className="flex-1 rounded-xl bg-[#00E5FF]/15 border border-[#00E5FF]/40 py-3 text-sm font-medium text-[#00E5FF] flex items-center justify-center gap-2"><CheckCircle2 className="h-4 w-4" /> Done</button>
+        <button disabled={busy} onClick={() => submit(true)} className="flex-1 rounded-xl bg-fel-cyan/15 border border-fel-cyan/40 py-3 text-sm font-medium text-fel-cyan flex items-center justify-center gap-2"><CheckCircle2 className="h-4 w-4" /> Done</button>
       </div>
       {data.recentComments.length > 0 && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Coach comments</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Coach comments</div>
           {data.recentComments.map((c, i) => <div key={i} className="text-sm text-white/80"><span className="text-white/50">{c.exercise}:</span> {c.comment}</div>)}
         </div>
       )}
       {api.messages && (
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unreadInThread(thread)} /></div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={program.id} role="client" /></div>
           <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your coach" className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
@@ -332,12 +356,12 @@ export const showsNextCooldown = (finished: { sessionId: string } | null): boole
  * as an off day. lib/coach/offDay.ts weekView builds the entries; this only draws them.
  */
 export function WeekStrip({ label, entries }: { label: string; entries: readonly WeekEntry[] }) {
-  const look = (e: WeekEntry) => e.state === 'today' ? 'border-[#00E5FF]/60 bg-[#00E5FF]/10 text-[#00E5FF]'
+  const look = (e: WeekEntry) => e.state === 'today' ? 'border-fel-cyan/60 bg-fel-cyan/10 text-fel-cyan'
     : e.state === 'done' ? 'border-[#7BD389]/40 bg-[#7BD389]/10 text-[#7BD389]'
       : e.kind === 'recovery' ? 'border-dashed border-[#7BD389]/40 text-[#7BD389]/80' : 'border-white/15 text-white/60';
   return (
     <div className="mt-3 space-y-1" data-testid="week-strip">
-      <div className="text-[10px] uppercase tracking-wider text-white/35">This week · {label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-fel-quiet">This week · {label}</div>
       <ol className="flex flex-wrap gap-1" aria-label={`This week, ${label}`}>
         {entries.map((e) => (
           <li key={e.id} data-week-entry={e.id} data-kind={e.kind} data-state={e.state}
@@ -363,7 +387,6 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
   lastTime?: string | null;
   onSets: (s: SetDraft[]) => void; onNote: (v: string) => void; onVideo: (v: string) => void;
 }) {
-  const [demo, setDemo] = useState(false);
   // MIRROR-COACH P7 FIX: a timer on this card was started this visit (the set is under way), and the Dial-Up is running
   const [timerUsed, setTimerUsed] = useState(false);
   const [rampBusy, setRampBusy] = useState(false);
@@ -384,56 +407,52 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
     onSets(draft.sets.map((r, k) => (k === i ? { ...r, workSeconds: String(seconds) } : r)));
   }, [draft.sets, onSets]);
   return (
-    <div ref={cardRef} className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-[#FFD700]/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
+    <div ref={cardRef} className={`fel-card rounded-xl p-4 space-y-3 ${e.isKeySet ? 'border border-fel-gold/30' : ''}`} data-exercise={e.id} data-key-set={e.isKeySet ? 'true' : undefined}>
       <div className="space-y-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
-          {label && <span className="rounded bg-[#00E5FF]/15 px-1 text-[10px] font-semibold text-[#00E5FF]" data-label>{label}</span>}
-          {e.isKeySet && <span className="inline-flex items-center gap-0.5 rounded bg-[#FFD700]/15 px-1 text-[10px] font-semibold text-[#FFD700]" data-key-badge><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY SET</span>}
+          {label && <span className="rounded bg-fel-cyan/15 px-1 text-[10px] font-semibold text-fel-cyan" data-label>{label}</span>}
+          {e.isKeySet && <span className="inline-flex items-center gap-0.5 rounded bg-fel-gold/15 px-1 text-[10px] font-semibold text-fel-gold" data-key-badge><KeyRound className="h-2.5 w-2.5" aria-hidden="true" />KEY SET</span>}
           <span className="text-white font-medium" data-name>{e.name}</span>
         </div>
         <div className="text-xs text-white/60" data-dose>{e.dose} · tempo {e.tempo} · rest {e.restSeconds}s</div>
-        {lastTime && <div className="text-xs text-[#00E5FF]/75" data-last-time>{lastTime}</div>}
-        {tags && <div className="text-[11px] text-white/35">{tags}</div>}
-        {e.isKeySet && <div className="text-[11px] text-[#FFD700]/80">{KEY_SET_LINE}</div>}
+        {lastTime && <div className="text-xs text-fel-cyan/75" data-last-time>{lastTime}</div>}
+        {tags && <div className="text-[11px] text-fel-quiet">{tags}</div>}
+        {e.isKeySet && <div className="text-[11px] text-fel-gold/80">{KEY_SET_LINE}</div>}
       </div>
       {/* MIRROR-COACH P8: the protocol gate served this easier step in place of what was prescribed, and says why */}
       {e.protocolGate && <GateSwapLine note={e.protocolGate} />}
       {/* MIRROR-COACH P7: the Dial-Up Breath, before set-up and the first set — rendered only when the server says so */}
       {rampEndpoint && <RampBreath sessionExerciseId={e.id} endpoint={rampEndpoint} started={keySetUnderWay(draft.sets, timerUsed)} onDone={toTheSet} onRunningChange={setRampBusy} />}
 
-      {c.band && <div className="text-xs text-white/70" data-band={c.band.id}><span className="font-medium text-white">{c.band.label}</span> <span className="text-white/40">({c.band.rir})</span>: {c.band.meaning}</div>}
+      {c.band && <div className="text-xs text-white/70" data-band={c.band.id}><span className="font-medium text-white">{c.band.label}</span> <span className="text-fel-dim">({c.band.rir})</span>: {c.band.meaning}</div>}
       {c.setup.length > 0 && (
         <div className="space-y-0.5" data-setup>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Before the first rep</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Before the first rep</div>
           {c.setup.map((s) => <div key={s.id} className="text-sm text-white/85">· {s.text}</div>)}
         </div>
       )}
       {e.coachNote && <CoachNote note={e.coachNote} />}
       {c.cues.length > 0 && (
         <div className="space-y-0.5" data-cues>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Cues</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Cues</div>
           {c.cues.map((q) => <div key={q} className="text-sm text-white/85">· {q}</div>)}
         </div>
       )}
       {c.faults.length > 0 && (
         <div className="space-y-0.5" data-faults>
-          <div className="text-[11px] uppercase tracking-wider text-white/40">Common faults</div>
+          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Common faults</div>
           {c.faults.map((f) => <div key={f.fault} className="text-sm text-white/75"><span className="text-white/90">{f.fault}</span>{f.fix && <span className="text-white/55"> → {f.fix}</span>}</div>)}
         </div>
       )}
       {c.easier && <div className="text-xs text-white/60" data-easier>{easierLine(c.easier.name)}</div>}
       {c.demo && (
         <div data-demo={c.demo.kind}>
+          {/* COACH-DELIVERY COA-09: never an embed. A YouTube demo is a labelled outbound link; FEL's own video autoplays
+              (muted, looped, inline: the premium rule — no tap to start) */}
           {c.demo.kind === 'link' ? (
-            <a href={c.demo.href} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 text-xs text-[#00E5FF]"><ExternalLink className="h-3.5 w-3.5" /> Watch the demo</a>
-          ) : !demo ? (
-            <button type="button" onClick={() => setDemo(true)} className="inline-flex items-center gap-1 text-xs text-[#00E5FF]"><PlayCircle className="h-3.5 w-3.5" /> Watch the demo</button>
-          ) : c.demo.kind === 'youtube' ? (
-            <div className="aspect-video w-full overflow-hidden rounded-lg border border-white/10 bg-black">
-              <iframe src={c.demo.src} title={`${e.name} demo`} className="h-full w-full" allow="encrypted-media; picture-in-picture" allowFullScreen loading="lazy" referrerPolicy="strict-origin-when-cross-origin" />
-            </div>
+            <a href={c.demo.href} target="_blank" rel="noreferrer noopener" className="inline-flex min-h-11 items-center gap-1 text-xs text-fel-cyan"><ExternalLink className="h-3.5 w-3.5" /> {c.demo.site === 'youtube' ? 'Demo on YouTube (opens outside FEL)' : 'Watch the demo'}</a>
           ) : (
-            <video src={c.demo.src} controls playsInline preload="metadata" className="w-full rounded-lg border border-white/10 bg-black" />
+            <video src={c.demo.src} autoPlay muted loop playsInline preload="metadata" aria-label={`${e.name} demo`} className="w-full rounded-lg border border-white/10 bg-black" />
           )}
         </div>
       )}
@@ -446,12 +465,13 @@ function ExerciseCard({ e, label, draft, unit, error, prev, simpleLog = false, r
         </div>
       )}
       <SetLogger name={e.name} rows={draft.sets} unit={unit} timed={timed} simple={simpleLog || simpleLogging(e)} youth={!!e.youthRules} repsHint={repsPlaceholder(e.reps)} workHint={String(e.workSeconds ?? '')} onChange={onSets} />
-      {error && <div className="text-xs text-[#FF3366]" role="alert" data-set-error>{error}</div>}
+      {error && <div className="text-xs text-fel-crimson" role="alert" data-set-error>{error}</div>}
       {/* the client's free-text line to the coach — kept alongside the pain check-in (phase 5), not replaced by it: a
          note can say "felt off" about form or effort with no pain in it at all. */}
       <textarea value={draft.clientNote} onChange={(ev) => onNote(ev.target.value)} placeholder={NOTE_PROMPT} aria-label={`${e.name}: note to your coach`} rows={2} maxLength={500} className="w-full resize-y rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" />
       <PainCheckInChip exerciseName={e.name} programExerciseId={e.exerciseId} />
-      <div className="flex items-center gap-2"><Video className="h-4 w-4 shrink-0 text-white/40" /><input value={draft.videoUrl} onChange={(ev) => onVideo(ev.target.value)} placeholder="Form video link (https://…)" aria-label={`${e.name}: form video link`} className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /></div>
+      <FilmSetLink exercise={e} />
+      <div className="flex items-center gap-2"><Video className="h-4 w-4 shrink-0 text-fel-dim" /><input value={draft.videoUrl} onChange={(ev) => onVideo(ev.target.value)} placeholder="Form video link (https://…)" aria-label={`${e.name}: form video link`} className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /></div>
     </div>
   );
 }

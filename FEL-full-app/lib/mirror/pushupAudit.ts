@@ -92,23 +92,25 @@ export const PUSHUP_THRESHOLDS: PushupThresholds = {
 // MIRROR-COACH P9 (2026-09-30): reworded to FEL's external-focus policy (lib/coach/cueLint.ts, whose test lints this
 // table): a cue that names a body part leads with the floor, the wall, the ceiling, the camera or the load, and nothing
 // names a muscle to squeeze or feel. The fault each line answers, and its three levels, are unchanged.
+// CUE-REWRITE (2026-10-27): cue, escalate and reply are said mid-rep (2–5 words, docs/CUE-STYLE.md); regress is said
+// when the set stops (one plain action, ≤ 14 words). Same faults, same intent; before/after in docs/CUE-AUDIT.md.
 export const PUSHUP_CUES: readonly CueRule[] = [
-  { faultId: 'depth', cue: 'All the way down — chest to a fist off the floor.',
-    escalate: 'Still stopping short. Slow the descent and own the bottom before you press.',
-    regress: 'Knees down. Same line, same depth, less weight to press.',
-    reply: 'Chest to a fist off the floor.' },
-  { faultId: 'bodyLine', cue: 'Be one stiff plank from the floor up — a straight line, head to heels, before you move.',
-    escalate: 'Still bending in the middle. Push the floor away and move as one stiff plank.',
-    regress: 'Knees down, or hands on a box — same line, less line to hold.',
-    reply: 'One stiff plank from the floor up.' },
-  { faultId: 'headLine', cue: 'Eyes on the floor just past your hands — a long neck, not a reaching chin.',
-    escalate: 'Still reaching. Eyes back down to a spot on the floor just past your hands.',
-    regress: 'Pause at the top. Set the neck first, THEN start the rep.',
-    reply: 'Eyes on the floor past your hands.' },
-  { faultId: 'handSetup', cue: 'Set the hands on the floor right under the shoulders before you go down.',
-    escalate: 'Still walked out. Reset the top position — hands under shoulders, then descend.',
-    regress: 'From your knees: set the hands under the shoulders, hold two seconds, then rep.',
-    reply: 'Hands on the floor under the shoulders.' },
+  { faultId: 'depth', cue: 'Chest close to the floor',
+    escalate: 'Slower. All the way down.',
+    regress: 'Knees down. Same straight body, same depth.',
+    reply: 'Lower, then push' },
+  { faultId: 'bodyLine', cue: 'Body straight like a plank',
+    escalate: 'Slower. Stay straight.',
+    regress: 'Knees down, or hands on a box. Keep your body straight.',
+    reply: 'Push the floor away' },
+  { faultId: 'headLine', cue: 'Look at the floor ahead',
+    escalate: 'Slower. Eyes on the floor.',
+    regress: 'Pause at the top. Set your head in line, then start.',
+    reply: 'Eyes on the floor' },
+  { faultId: 'handSetup', cue: 'Hands right under your shoulders',
+    escalate: 'Reset. Hands under shoulders.',
+    regress: 'From your knees: hands under shoulders, hold two seconds, then go.',
+    reply: 'Hands under shoulders' },
 ];
 
 const vis = (l: Lm | undefined, t: number): l is Lm => !!l && l.v >= t;

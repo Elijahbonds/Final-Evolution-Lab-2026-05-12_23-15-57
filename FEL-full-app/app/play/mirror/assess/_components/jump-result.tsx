@@ -1,25 +1,45 @@
 'use client';
 
-// The jump-only result (SCREEN-JUMP-ONLY). Separate from ResultsView so the full screen's one next step stays the book.
+// The jump-only result (SCREEN-JUMP-ONLY; VERTICAL-EASY 2026-10-27: "Measure my vertical").
 //
-// Adults see the number, the attempt count, the personal-best line, and three ways on: the rest of this screen
-// (the jump is kept), the Dunking lane, and Brain Brawl. Under 18 and "rather not say" see the number, the
-// attempts, the unit toggle, "Do the full screen", "Run it again" and the privacy page — no band and no link out.
-import { useState } from 'react';
+// ONE BIG NUMBER, then three short lines (docs/CUE-STYLE.md §4): what we saw (the best of the jumps that counted), what it
+// means (against the last one, or the number to beat), what to do next. Then ONE primary, "Done", and a quiet "Jump again".
+// Everything else — inches or centimetres, the estimate line, the full screen, the dunk program, Brain Brawl, and for an
+// adult the session card, the slow-mo and the other tests (`more`) — is one tap away under "More detail", so a first-timer
+// reads a number and three lines, not a page. Before: two disclaimers, a label, the number, an estimate paragraph, the
+// attempts, a unit toggle, a meaning line, five buttons, a privacy link, then three more cards.
+//
+// Under 18 and "rather not say": the number from page memory, the change since their last screen here, the save-your-number
+// line, no program or game link (unchanged rules). The disclaimer and the stop line stay on the page, at the foot.
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { jumpChange, jumpChangeLine } from '@/lib/screen/kid';
+import { Check } from 'lucide-react';
 import {
-  DISCLAIMER, JUMP_BUILD_PROGRAM, JUMP_ESTIMATE_LINE, JUMP_DO_FULL, JUMP_MEANING, JUMP_PLAY_FREE, KID_JUMP, KID_NO_JUMP, KID_SAVE_LINE,
-  PRIVACY_LINK, RUN_IT_AGAIN, STOP_LINE,
+  DISCLAIMER, JUMP_BUILD_PROGRAM, JUMP_ESTIMATE_LINE, JUMP_DO_FULL, JUMP_PLAY_FREE, KID_NO_JUMP, KID_SAVE_LINE,
+  PRIVACY_LINK, STOP_LINE,
 } from '@/lib/screen/copy';
-import { formatJumpEstimate, readJumpUnit, writeJumpUnit, type JumpUnit } from '@/lib/screen/jump';
+import { readJumpUnit, writeJumpUnit, type JumpUnit } from '@/lib/screen/jump';
+import { inches } from '@/lib/assess/why';
 import { PRIVACY_PATH, programPath } from '@/lib/screen/routes';
 import { tabStorage } from '@/lib/screen/store';
+import {
+  RESULT_AGAIN, RESULT_DONE, RESULT_LABEL, RESULT_LABEL_SWING, RESULT_MORE, RESULT_NEXT, RESULT_NONE_MEANS, RESULT_NONE_NEXT, RESULT_NONE_SAW,
+  resultMeans, resultSaw,
+} from '@/lib/vertical/copy';
+import { changeOf } from '@/lib/vertical/result';
 import { primaryBtn, quietBtn } from './screen-ui';
 
-export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn, lastIn, onFull, onAgain }: {
+/** The one quiet look on this screen besides the primary: a text button (premium rule: ≤ 3 button looks with the back arrow). */
+const LINK = 'fel-press inline-flex min-h-12 w-full items-center justify-center text-[16px] font-bold text-white/80 underline underline-offset-4';
+
+/** Where "Done" goes: the app's front door (signed in it opens Play; signed out, the landing). */
+export const RESULT_DONE_HREF = '/';
+
+export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, kid, jumpIn, lastIn, onFull, onAgain, lastCm = null, armSwing = false, more = null }: {
   heightCm: number | null;
-  /** The grader's one-frame timing band (cm): shown as the ± range, never an exact number. */
+  /** Jumps that counted (default: every attempt). */
+  counted?: number;
+  /** The grader's band (cm): shown as the ± range, never an exact number. */
   plusMinusCm?: number | null;
   attempts: number;
   kid: boolean;
@@ -27,42 +47,83 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, kid, jumpIn
   lastIn: number | null;
   onFull: () => void;
   onAgain: () => void;
+  /** An adult's last result IN THE SAME SERIES on this device (lib/vertical/series.ts), for "what it means". */
+  lastCm?: number | null;
+  /** "Measure my vertical": read arms free, labelled "with arm swing" — never compared with a hands-on-hips number. */
+  armSwing?: boolean;
+  /** An adult's detail cards (session card, slow-mo, more tests), shown under "More detail". */
+  more?: ReactNode;
 }) {
   const [unit, setUnit] = useState<JumpUnit>(() => readJumpUnit(tabStorage()));
   const pick = (u: JumpUnit) => { setUnit(u); writeJumpUnit(tabStorage(), u); };
-  const change = kid ? jumpChange(jumpIn, lastIn) : null;
+  void jumpIn;                                                   // the kid's number is heightCm; lastIn is their last one here
+  const change = heightCm === null ? null : changeOf(heightCm, kid ? (lastIn === null ? null : lastIn * 2.54) : lastCm, unit);
+  const v = heightCm === null ? null : unit === 'cm' ? heightCm : inches(heightCm);
+  const pm = heightCm === null || plusMinusCm === null || !Number.isFinite(plusMinusCm) ? null
+    : Math.max(1, Math.round(unit === 'cm' ? plusMinusCm : inches(plusMinusCm)));
+  const u = unit === 'cm' ? 'cm' : 'in';
+  const estimate = v === null ? '' : `about ${Math.round(v)}${pm === null ? '' : ` ±${pm}`} ${u}`;
   return (
-    <div data-jump-result={kid ? 'kid' : 'adult'} className="space-y-3">
-      <p data-disclaimer className="text-[16px] font-bold leading-snug">{DISCLAIMER}</p>
-      <p data-stop-line className="text-[16px] text-white/70">{STOP_LINE}</p>
+    <div data-jump-result={kid ? 'kid' : 'adult'} className="space-y-4">
       <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
-        <p className="text-[16px] text-white/80">{KID_JUMP}</p>
-        {heightCm !== null ? (
-          <p data-jump-number className="mt-1 text-[40px] font-black leading-none text-white">{formatJumpEstimate(heightCm, plusMinusCm, unit)}</p>
+        <p data-jump-label={armSwing ? 'arm-swing' : 'hands-on-hips'} className="text-[16px] font-bold uppercase tracking-[0.16em] text-white/60">{armSwing ? RESULT_LABEL_SWING : RESULT_LABEL}</p>
+        {v !== null ? (
+          <p data-jump-number aria-label={estimate} className="mt-2 flex items-baseline justify-center gap-2 font-black leading-none text-white">
+            <span className="sr-only">about </span>
+            <span className="text-[88px] tracking-tight">{Math.round(v)}</span>{' '}
+            <span className="text-[28px]">{pm === null ? '' : `±${pm} `}{u}</span>
+          </p>
         ) : (
-          <p data-jump-missing className="mt-2 text-[18px] font-bold leading-snug">{KID_NO_JUMP}</p>
+          <p data-jump-missing className="mt-2 text-[28px] font-black leading-tight">{KID_NO_JUMP}</p>
         )}
-        {heightCm !== null ? <p data-jump-estimate className="mt-2 text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE}</p> : null}
-        <p data-jump-attempts className="mt-2 text-[16px] text-white/75">{attempts} attempts, best kept</p>
-        <div className="mt-3 flex justify-center gap-2">
-          <button type="button" data-unit="in" aria-pressed={unit === 'in'} onClick={() => pick('in')} className={`${unit === 'in' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Inches</button>
-          <button type="button" data-unit="cm" aria-pressed={unit === 'cm'} onClick={() => pick('cm')} className={`${unit === 'cm' ? primaryBtn : quietBtn} min-h-12 max-w-[8rem]`}>Centimetres</button>
-        </div>
-        {!kid && heightCm !== null ? <p data-jump-meaning className="mt-3 text-[16px] text-white/80">{JUMP_MEANING}</p> : null}
-        {change ? <p data-kid-change className="mt-2 text-[16px] font-bold text-white/85">{jumpChangeLine(change)}</p> : null}
-        {kid && heightCm !== null ? <p data-kid-save-line className="mt-3 text-[16px] leading-snug text-white/75">{KID_SAVE_LINE}</p> : null}
+        <ul data-jump-lines className="mx-auto mt-4 max-w-sm space-y-2 text-left text-[16px] leading-snug">
+          {v !== null ? (
+            <>
+              <li data-jump-saw className="font-bold text-white">{resultSaw(counted ?? attempts, `${Math.round(v)} ${u}`)}</li>
+              <li data-jump-meaning className="text-white/80">{resultMeans(change)}</li>
+              <li data-jump-next className="text-white/80">{RESULT_NEXT}</li>
+            </>
+          ) : (
+            <>
+              <li data-jump-saw className="font-bold text-white">{RESULT_NONE_SAW}</li>
+              <li data-jump-meaning className="text-white/80">{RESULT_NONE_MEANS}</li>
+              <li data-jump-next className="text-white/80">{RESULT_NONE_NEXT}</li>
+            </>
+          )}
+        </ul>
+        {kid && v !== null ? <p data-kid-save-line className="mt-3 text-[16px] leading-snug text-white/75">{KID_SAVE_LINE}</p> : null}
       </section>
-      <button type="button" data-primary data-do-full onClick={onFull} className={primaryBtn}>{JUMP_DO_FULL}</button>
-      {!kid ? (
-        <>
-          <Link href={programPath('dunking')} prefetch={false} data-cta="program" className={quietBtn}>{JUMP_BUILD_PROGRAM}</Link>
-          <Link href="/play/brain-brawl" prefetch={false} data-cta="play" className={quietBtn}>{JUMP_PLAY_FREE}</Link>
-        </>
-      ) : null}
-      <button type="button" data-run-again onClick={onAgain} className={quietBtn}>{RUN_IT_AGAIN}</button>
-      <p className="text-center text-[16px] text-white/70">
-        <Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
-      </p>
+
+      <Link href={RESULT_DONE_HREF} prefetch={false} data-primary data-done className={primaryBtn}>
+        <Check aria-hidden className="mr-2 h-5 w-5" strokeWidth={3} />{RESULT_DONE}
+      </Link>
+      <button type="button" data-run-again onClick={onAgain} className={LINK}>{RESULT_AGAIN}</button>
+
+      <details data-jump-more className="[&_summary::-webkit-details-marker]:hidden">
+        <summary className={`${LINK} cursor-pointer list-none`}>{RESULT_MORE}</summary>
+        <div className="mt-3 space-y-3 text-left">
+          {v !== null ? <p data-jump-estimate className="text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE} Today: {estimate}.</p> : null}
+          <p data-jump-attempts className="text-[16px] text-white/75">{attempts} jumps, best one shown</p>
+          <div className="flex justify-center gap-2" role="group" aria-label="Units">
+            <button type="button" data-unit="in" aria-pressed={unit === 'in'} onClick={() => pick('in')} className={`${quietBtn} max-w-[10rem] ${unit === 'in' ? 'border-[#00E5FF] text-[#00E5FF]' : ''}`}>Inches</button>
+            <button type="button" data-unit="cm" aria-pressed={unit === 'cm'} onClick={() => pick('cm')} className={`${quietBtn} max-w-[10rem] ${unit === 'cm' ? 'border-[#00E5FF] text-[#00E5FF]' : ''}`}>Centimetres</button>
+          </div>
+          <button type="button" data-do-full onClick={onFull} className={quietBtn}>{JUMP_DO_FULL}</button>
+          {!kid ? (
+            <>
+              <Link href={programPath('dunking')} prefetch={false} data-cta="program" className={quietBtn}>{JUMP_BUILD_PROGRAM}</Link>
+              <Link href="/play/brain-brawl" prefetch={false} data-cta="play" className={quietBtn}>{JUMP_PLAY_FREE}</Link>
+            </>
+          ) : null}
+          {more}
+        </div>
+      </details>
+
+      <div className="space-y-1 text-center text-[16px] text-white/60">
+        <p data-disclaimer>{DISCLAIMER}</p>
+        <p data-stop-line>{STOP_LINE}</p>
+        <p><Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className={LINK}>{PRIVACY_LINK}</Link></p>
+      </div>
     </div>
   );
 }

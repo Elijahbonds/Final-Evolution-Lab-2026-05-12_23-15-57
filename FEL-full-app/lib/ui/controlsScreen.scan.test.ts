@@ -24,7 +24,8 @@ const LIVE: readonly string[] = [
   // dunk + dunk duel — the run, the beat, the judges (runwayTeachLine / takeoffTell come from core and are live too)
   'RUNNING THE ${} — the jump is at its front end', 'HOLD to run — come in FASTER: the run-up buys your air', 'HOLD to run — then tap jump',
   'CATCH IT!', 'SLAM — OR WAIT FOR THE BEAT', 'WINDOW OPEN', 'NOW!', 'THE JUDGES CONFER…', "PRIME'S CARD…",
-  'HOLD to run — then tap jump · LOOK stick orbits the camera',   // the watchdog's reset, once it has put you back on the line
+  'HOLD to run — then tap jump · LOOK stick orbits the camera',
+  'OFF THE GLASS — KEEP RUNNING', 'OFF THE GLASS — HOLD RT TO RUN',   // dunk P4: the armed off-glass throw (it goes up on the run)   // the watchdog's reset, once it has put you back on the line
   '${} — ON THE RUN', 'HOLD — running to the rim · GATHER (L2) to go up off two feet · steer with the stick · release early to jump from here',
   'WAIT FOR IT…', 'RUN! HOLD to run — then tap jump', "${} — THE RIVAL'S DUNK", '${} — HE NEEDS ${} TO TAKE IT',
   '${} — take the device${}', 'HOLD — running to the rim · steer with the stick · release early to jump from here', 'SLAM!',

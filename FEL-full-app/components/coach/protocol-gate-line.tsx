@@ -15,11 +15,11 @@ const linkWords = (href: string) => LINK_WORDS[href] ?? 'Open';
 
 export function GateSwapLine({ note }: { note: TodayGateNote }) {
   return (
-    <div className="flex items-start gap-1.5 rounded-md border border-[#FFD700]/20 bg-[#FFD700]/[0.05] px-2 py-1.5 text-xs text-white/75" data-protocol-gate={note.reason}>
-      <ShieldHalf className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FFD700]/80" aria-hidden="true" />
+    <div className="flex items-start gap-1.5 rounded-md border border-fel-gold/20 bg-fel-gold/[0.05] px-2 py-1.5 text-xs text-white/75" data-protocol-gate={note.reason}>
+      <ShieldHalf className="mt-0.5 h-3.5 w-3.5 shrink-0 text-fel-gold/80" aria-hidden="true" />
       <span>
         <span data-gate-line>{note.line}</span>
-        {note.href && <> <Link href={note.href} className="text-[#00E5FF] underline-offset-2 hover:underline" data-gate-href>{linkWords(note.href)}</Link></>}
+        {note.href && <> <Link href={note.href} className="text-fel-cyan underline-offset-2 hover:underline" data-gate-href>{linkWords(note.href)}</Link></>}
       </span>
     </div>
   );
@@ -31,10 +31,10 @@ export function GateHeldList({ items }: { items: readonly TodayHeldItem[] }) {
     <div className="fel-card rounded-xl p-3 space-y-1.5" data-testid="protocol-held">
       {items.map((h) => (
         <div key={h.id} className="flex items-start gap-1.5 text-xs text-white/70" data-held={h.id} data-protocol-gate={h.reason}>
-          <ShieldHalf className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#FFD700]/80" aria-hidden="true" />
+          <ShieldHalf className="mt-0.5 h-3.5 w-3.5 shrink-0 text-fel-gold/80" aria-hidden="true" />
           <span>
             <span data-gate-line>{h.line}</span>
-            {h.href && <> <Link href={h.href} className="text-[#00E5FF] underline-offset-2 hover:underline" data-gate-href>{linkWords(h.href)}</Link></>}
+            {h.href && <> <Link href={h.href} className="text-fel-cyan underline-offset-2 hover:underline" data-gate-href>{linkWords(h.href)}</Link></>}
           </span>
         </div>
       ))}
@@ -46,7 +46,7 @@ export function CoachGateLine({ gate }: { gate: CoachGateView }) {
   const open = gate.state === 'open' || gate.state === 'open_youth';
   const Icon = open ? ShieldCheck : ShieldHalf;
   return (
-    <div className={`flex items-start gap-1.5 border-t border-white/6 px-2 py-1.5 text-[11px] ${open ? 'text-white/50' : 'text-[#FFD700]/85'}`} data-coach-gate={gate.state}>
+    <div className={`flex items-start gap-1.5 border-t border-white/6 px-2 py-1.5 text-[11px] ${open ? 'text-white/50' : 'text-fel-gold/85'}`} data-coach-gate={gate.state}>
       <Icon className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" /> <span>{gate.line}</span>
     </div>
   );

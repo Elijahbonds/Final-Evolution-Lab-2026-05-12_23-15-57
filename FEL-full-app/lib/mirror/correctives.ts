@@ -320,7 +320,8 @@ export function screenDrillWords(checkId: string, side?: 'left' | 'right' | null
     case 'hipLevel':
     case 'singleLeg':
       return {
-        setup: `Split stance facing the camera, a light band looped around your hips and tied off to one side. ${read}; try the pull from each side and keep the side where staying square takes more work.`,
+        // CUE-REWRITE (2026-10-27): shorter, one action per sentence
+        setup: `Split stance facing the camera, a light band around your hips, tied off to one side. ${read}. Try the pull from each side; keep the side that is harder to stay square on.`,
         cue: BAND_DRILLS.trunkShift.cue,
       };
     default:

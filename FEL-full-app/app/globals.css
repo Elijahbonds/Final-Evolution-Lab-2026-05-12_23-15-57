@@ -39,6 +39,35 @@ html {
   color-scheme: dark;
 }
 
+/* FOCUS YOU CAN SEE (A11-01 / A11-02, lane/a11y-design, 2026-10-25). WCAG 2.4.7: the audit (scripts/a11y/audit.mts) tabbed
+   the sign-in and sign-up forms and focus landed on fields that changed nothing on screen — `outline-none` with no ring in
+   its place. One ring for every keyboard, pad and remote stop: the theme's focus token, 2 px, offset so it reads on any
+   surface. Only :focus-visible (keyboard, pad, remote), never a tap or a click. A component that draws its own indicator
+   keeps it; the base rule is in the base layer, so a utility on the element wins. The !important line is for the one
+   case that drew nothing: a form field whose `outline-none` left a transparent outline — its colour is put back. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--fel-focus, #00E5FF);
+    outline-offset: 2px;
+  }
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline-color: var(--fel-focus, #00E5FF) !important;
+}
+
+/* FOCUS NOT HIDDEN (WCAG 2.4.11). On a phone the tab bar is fixed to the bottom and the status rail is sticky at the top:
+   a stop the browser scrolled into view sat UNDER the bar (16 shelf links on /play in the audit). The scroll padding
+   keeps every focused element clear of both. Height of the bar (about 64 px) plus the home indicator. */
+html {
+  scroll-padding-top: 4.5rem;
+  scroll-padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+/* A screen with a docked primary action (components/ui/fel/primary-cta.tsx, premium-ui P3): on a phone the pill sits above
+   the tab bar, so a focused element must clear both (2.4.11). */
+@media (max-width: 767px) {
+  html:has([data-fel-dock]) { scroll-padding-bottom: calc(10rem + env(safe-area-inset-bottom, 0px)); }
+}
+
 body {
   background-color: #050505;
   color: hsl(var(--foreground));
@@ -50,7 +79,8 @@ body {
 }
 
 .fel-heading {
-  font-family: var(--font-display), sans-serif;
+  /* the fallback inside var(): a missing variable gives the system sans, never the browser's serif (P2 fonts fix) */
+  font-family: var(--font-display, ui-sans-serif), ui-sans-serif, system-ui, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -177,3 +207,13 @@ canvas {
   .fixed[class*="backdrop-blur"], .sticky[class*="backdrop-blur"], .fixed [class*="backdrop-blur"], .sticky [class*="backdrop-blur"],
   .fel-chrome-glass { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 }
+
+/* COUCH VIEW (A11-05, lane/a11y-design, 2026-10-25): on a big sideways screen driven by a pad or a TV remote (or with the
+   choice set to On), the page column and the status rail zoom with the screen's height, the way the in-game HUD does
+   (lib/design/couch.ts: 1x up to 480 px tall, 2.25x at 1080p), and the column narrows by the same factor so it fits the
+   title-safe frame. Phones, laptops and touch never get it unless asked. */
+html[data-fel-couch] [data-couch-scale] {
+  zoom: var(--fel-couch-zoom, 1);
+  max-width: var(--fel-couch-col, 1080px);
+}
+html[data-fel-couch] { scroll-padding-top: calc(4.5rem * var(--fel-couch-zoom, 1)); }

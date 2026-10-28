@@ -11,8 +11,12 @@
 // claims. No biomechanical statistics are fabricated — the only numbers shown
 // are the ones the engine actually computes for this session.
 
+import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';
+import { MOVEMENT_NAMES } from '@/lib/cue-style/names';   // CUE-REWRITE: the review cards' words
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';   // VERTICAL-EASY: the one front door
+import { MEASURE_VERTICAL } from '@/lib/vertical/copy';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
@@ -38,7 +42,7 @@ import { DunkTracker, refusalLine, type DunkMetrics } from '@/lib/irl/dunkTracke
 // session ended. This keeps the numbers — and only the numbers; the clip never leaves the phone.
 import { attemptFrom, progressLine, readProgress, type DunkProgress } from '@/lib/irl/dunkProgress';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
-import { RepCounter, type RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
+import type { RepState } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
 import type { SquatFault } from '@/lib/babylon/nexus/neuro-mirror/rules/squat-audit';
 import { CueEngine, VALGUS_CUE_VERIFIED, cueableFaults, fadeReviewLines, type CueEvent, type FaultId } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 // MIRROR-COACH P9 (2026-09-30): the press/row's three faults reach the coach (lib/mirror/pressRowStage.ts), the coach
@@ -72,12 +76,15 @@ import { chipLabel } from '@/lib/mirror/hudChip';
 // changes: `pose` is handed to onFrame for every analysis mode already). RepCounter is REUSED for the rep count (the
 // phase brief's own words), the same class the press/row pattern already counts by — one instance, reset at the
 // left→right hand-over. lungeStage.ts is the pure per-frame step (the same discipline squatStage.ts explains).
+// MIRROR-FIXES (2026-10-25): the lunge's rep book is lib/mirror/lungeReps.ts LungeRepCounter now, counted on LungeAudit's
+// depth01 — RepCounter on the audit's velocity phase counted 24 of 76 jittered lunges (that file's header says why).
+import { LungeRepCounter } from '@/lib/mirror/lungeReps';
 import { MIRROR_PATTERNS } from '@/lib/mirror/patterns';
 import { LungeAudit, type LungeFault } from '@/lib/mirror/lungeAudit';
 import { checkFraming, framingLine } from '@/lib/mirror/framing';
 import { ConfidenceFloor } from '@/lib/pose/confidenceFloor';   // MIRROR P3 (capture): "move closer / more light" on the lite model
 import {
-  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession, lungePhaseToMovement,
+  LUNGE_CUE_TABLE, LUNGE_FAULT_LABEL, LUNGE_REPS_PER_SIDE, initialLungeSession,
   lungeSideResult, stepLungeSession, type LungeSessionState, type LungeSide,
 } from '@/lib/mirror/lungeStage';
 // THE GUIDED MOVEMENT SCREEN. Every one of these was written for this and then never mounted — the runner, the
@@ -102,7 +109,8 @@ import type { YouthGate } from '@/lib/mirror/screenCorrectives';
 // summary (lib/mirror/correctives.ts; adults only, youth rules show none).
 import { CorrectivesPicker, SessionCorrectives } from '@/components/mirror/session-correctives';
 import { sessionLikeFromSummary } from '@/lib/mirror/correctives';
-import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';   // VOICEOVER (2026-10-06)
+import { speakNatural } from '@/lib/babylon/audio/voice/speakNatural';
+import { speechMs } from '@/lib/cue-style/speech';   // CUE-REWRITE (2026-10-27): the coach waits while a line is said   // VOICEOVER (2026-10-06)
 // MIRROR-MOVES P2 (2026-10-07; plan Phase 2, "every live movement talks"): `?pattern=` opens a tab (patternParam.ts, read by
 // page.tsx); the hip hinge and the push-up are live tabs (owner decision 2026-10-07: both), each a side-on guided set graded
 // rep by rep by its tested batch audit (sideRepStage.ts) with its own coach; the lunge speaks through its own CueEngine; and
@@ -358,11 +366,11 @@ export function MirrorHarness({
 
   // THE LUNGE (MIRROR-COACH P4 lane 1, 2026-09-25, owner decision #9: "lunge — mount"). LungeAudit runs live off the
   // raw pose stream (no analysis mode needed — see the import comment above); lib/mirror/lungeStage.ts is the pure
-  // per-frame step (the same discipline as the squat's), and RepCounter is the reused rep book — ONE instance, reset
+  // per-frame step (the same discipline as the squat's), and LungeRepCounter (lungeReps.ts) is the rep book — ONE instance, reset
   // at the left→right hand-over, since the two sides are separate sets. React state below mirrors the session ref
   // for rendering only; lungeSessionRef is what stepLungeSession actually reads and writes.
   const lungeAuditRef = useRef(new LungeAudit());
-  const lungeRepCounterRef = useRef(new RepCounter());
+  const lungeRepCounterRef = useRef(new LungeRepCounter());
   const lungeSessionRef = useRef(initialLungeSession());
   const [lungeSession, setLungeSession] = useState<LungeSessionState>(initialLungeSession());
   // MIRROR-MOVES P2: the lunge's own coach (its own table — the squat's 'shallow' says something else), one set per side
@@ -534,7 +542,7 @@ export function MirrorHarness({
     setSquareUpSaid(false);
     setDeeperSaid(false);
     lungeAuditRef.current.reset();
-    lungeRepCounterRef.current = new RepCounter();
+    lungeRepCounterRef.current = new LungeRepCounter();
     lungeSessionRef.current = initialLungeSession();
     setLungeSession(initialLungeSession());
     lungeCueRef.current.reset();
@@ -652,11 +660,13 @@ export function MirrorHarness({
             if (step.squareUp) {
               setSquareUpSaid(true);
               speak(SQUARE_UP_LINE, { protect: true });
+              cueEngineRef.current.holdFor(now, speechMs(SQUARE_UP_LINE));   // CUE-REWRITE: one voice at a time
             }
             // the first shallow descent of the session: say it once, then shallow reps count, marked (squatStage.ts)
             if (step.deeperPrompt) {
               setDeeperSaid(true);
               speak(DEEPER_LINE, { protect: true });
+              cueEngineRef.current.holdFor(now, speechMs(DEEPER_LINE));   // CUE-REWRITE: one voice at a time
             }
             if (step.cueFaults) {
               const evt = cueEngineRef.current.decide(now, step.cueFaults);
@@ -688,19 +698,20 @@ export function MirrorHarness({
             hud.set({ lungeFramedRight: framing.ok });
             if (lungeSessionRef.current.stage !== 'review') {
               const was = lungeSessionRef.current.stage;
-              const repInfo = lungeRepCounterRef.current.feed(lungePhaseToMovement(lungeRead.phase), now);
+              const repDone = lungeRepCounterRef.current.feed(lungeRead, now);
               const step = stepLungeSession(lungeSessionRef.current, {
                 nowMs: now, present: lungeRead.present, framedRight: framing.ok, phase: lungeRead.phase,
-                faults: lungeRead.faults, repCompleted: !!repInfo,
+                faults: lungeRead.faults, repCompleted: repDone,
               });
               lungeSessionRef.current = step.state;
               if (step.repCounted || step.stageChanged || step.findingsChanged) setLungeSession(step.state);
               // the left→right hand-over (and review) gets a FRESH rep counter: the two sides are separate sets
-              if (step.stageChanged) lungeRepCounterRef.current = new RepCounter();
+              if (step.stageChanged) lungeRepCounterRef.current = new LungeRepCounter();
               // the turn line is said ONCE per side, never looped (P1's lesson — see lungeStage.ts); the banner
               // itself reads lungeSession.turnPromptSaid[stage] directly, so no separate "said" flag is kept here
               if (step.turnPrompt) {
                 speak(framingLine('turned'), { protect: true });
+                lungeCueRef.current.holdFor(now, speechMs(framingLine('turned')));   // CUE-REWRITE: one voice at a time
               }
               // MIRROR-MOVES P2: the lunge's coach — this frame's cue, then the rep it ended, then the side's set (pressRow's order)
               if (step.cueFaults) {
@@ -1010,12 +1021,13 @@ export function MirrorHarness({
   // MIRROR-COACH P4 lane 1: the squat and the lunge read their full title straight from MIRROR_PATTERNS (the
   // registry's own label, entry one and two) — pressRow/jump/screen are not pattern-audit entries and keep their own.
   const PATTERN_TITLE: Record<Pattern, string> = {
-    pressRow: 'Split-Stance Press / Row',
+    // CUE-REWRITE (2026-10-27): the canonical movement names (lib/cue-style/names.ts)
+    pressRow: MOVEMENT_NAMES.pressRow,
     squat: SQUAT_PATTERN.label,
     lunge: LUNGE_PATTERN.label,
-    hinge: 'Hip Hinge',
-    pushup: 'Push-up',
-    jump: 'Vertical Jump',
+    hinge: MOVEMENT_NAMES.hinge,
+    pushup: MOVEMENT_NAMES.pushup,
+    jump: 'Vertical Jump', // the full accessible name (scripts/mirror-v2-tests.ts pins it)
     screen: 'Movement Screen',
   };
   const live = status === 'live';
@@ -1409,16 +1421,16 @@ export function MirrorHarness({
         {pattern === 'squat' && live && (
           <p className="mt-4 text-[13px] leading-relaxed text-white/55">
             {squatStage === 'breathe' && (
-              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} The breath is the bedrock — everything else builds on it.</>
+              <><span className="font-bold text-white">Breathe first.</span> {squatBreathLine()} A calm breath first makes the rest easier.</>
             )}
             {squatStage === 'check' && (
-              <><span className="font-bold text-white">The movement check.</span> {SQUAT_CHECK_REPS} slow squats — heels, shoulders and shift{VALGUS_CUE_VERIFIED ? ', and knees (face the camera square-on)' : ' (knees measured, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
+              <><span className="font-bold text-white">First, {SQUAT_CHECK_REPS} slow squats.</span> The camera watches your heels, balance{VALGUS_CUE_VERIFIED ? ' and knees (face it straight on)' : ' (knees watched, not judged)'}. Squat {Math.min(squatReps + 1, SQUAT_CHECK_REPS)} of {SQUAT_CHECK_REPS}.</>
             )}
             {squatStage === 'work' && (
-              <><span className="font-bold text-white">The work set.</span> {SQUAT_WORK_REPS} squats — cued from what the camera measures. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
+              <><span className="font-bold text-white">Now {SQUAT_WORK_REPS} squats.</span> The coach talks you through what the camera sees. Squat {Math.min(squatReps + 1, SQUAT_WORK_REPS)} of {SQUAT_WORK_REPS}.</>
             )}
             {squatStage === 'review' && (
-              <><span className="font-bold text-white">Review.</span> What faulted, what was cued, and whether the correction held.</>
+              <><span className="font-bold text-white">Your set.</span> What the camera saw, what the coach said, and whether the fix stuck.</>
             )}
           </p>
         )}
@@ -1664,6 +1676,11 @@ export function MirrorHarness({
             </>
           ) : pattern === 'jump' ? (
             <>
+              {/* VERTICAL-EASY (2026-10-27): one front door for a vertical — the guided check (countdown, three jumps, JUMP-PRO's
+                  reader). This tab keeps its own dunk-progress read. */}
+              <Link href={MEASURE_VERTICAL_HREF} data-measure-vertical className="mb-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-4 text-[15px] font-bold text-white">
+                {MEASURE_VERTICAL}<span aria-hidden className="text-[#00E5FF]">→</span>
+              </Link>
               {/* WHAT YOU CAME BACK FOR. The best to beat, the rhythm you are keeping, the line over weeks, and
                   the next dunk named — the four the owner asked for, in the order they matter when you are
                   standing in a gym with your phone propped against a bag. */}
@@ -1819,16 +1836,16 @@ export function MirrorHarness({
         {/* The review of a guided squat — what faulted, what was said, and whether it held. */}
         {pattern === 'squat' && squatStage === 'review' && (
           <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured</h2>
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.heading}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">Findings</p>
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.firstReps}</p>
                 {/* Only faults the coach may judge are findings; the knee is reported separately below while unverified. */}
                 {/* MIRROR-COACH P2 (2026-09-26): "Clean structure — load it" was the verified line; with the knee on, a
                     check with nothing flagged says only that — the knee line below says whether the knees were read. */}
                 {cueableFaults(squatFindings).length === 0 ? (
                   <p className="mt-2 text-[13px] text-white/60">
-                    {VALGUS_CUE_VERIFIED ? 'No faults measured in the check.' : 'No judged faults in the check.'}
+                    {VALGUS_CUE_VERIFIED ? REVIEW_COPY.nothingInCheck : REVIEW_COPY.nothingJudged}
                   </p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
@@ -1868,14 +1885,14 @@ export function MirrorHarness({
                 })()}
               </div>
               <div>
-                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">What was cued</p>
+                <p className="font-mono text-[9.5px] uppercase tracking-[0.16em] text-white/35">{REVIEW_COPY.coachSaid}</p>
                 {cueLog.length === 0 ? (
-                  <p className="mt-2 text-[13px] text-white/60">No corrections were cued during the work set.</p>
+                  <p className="mt-2 text-[13px] text-white/60">{REVIEW_COPY.coachSaidNothing}</p>
                 ) : (
                   <ul className="mt-2 space-y-1.5">
                     {cueLog.map((c, i) => (
                       <li key={i} className="text-[13px] text-white/70">
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
                       </li>
                     ))}
                   </ul>
@@ -1900,7 +1917,7 @@ export function MirrorHarness({
             result"). A squat lets the strong side hide; the lunge cannot, so the two sides are read side by side. */}
         {pattern === 'lunge' && lungeSession.stage === 'review' && (
           <section className="mt-6 rounded-2xl border border-white/8 bg-white/[0.02] p-5">
-            <h2 className="fel-heading text-[15px] font-bold text-white/80">What the camera measured — each side</h2>
+            <h2 className="fel-heading text-[15px] font-bold text-white/80">{REVIEW_COPY.headingEachSide}</h2>
             <div className="mt-3 grid gap-5 sm:grid-cols-2">
               {(['left', 'right'] as LungeSide[]).map((side) => {
                 const r = lungeSideResult(lungeSession, side);
@@ -1913,15 +1930,15 @@ export function MirrorHarness({
                       {r.reps}<span className="ml-1.5 text-[12px] font-mono uppercase tracking-[0.14em] text-white/35">reps</span>
                     </p>
                     {r.unreadable ? (
-                      <p className="mt-2 text-[13px] text-[#FFC24B]">Not square to the camera through this set — not read.</p>
+                      <p className="mt-2 text-[13px] text-[#FFC24B]">{REVIEW_COPY.turnedAway}</p>
                     ) : Object.keys(r.faultRepCounts).length === 0 ? (
-                      <p className="mt-2 text-[13px] text-white/60">{r.reps ? 'No faults measured.' : 'Not reached.'}</p>
+                      <p className="mt-2 text-[13px] text-white/60">{r.reps ? REVIEW_COPY.nothingToFix : REVIEW_COPY.notDone}</p>
                     ) : (
                       <ul className="mt-2 space-y-1.5">
                         {(Object.entries(r.faultRepCounts) as [LungeFault, number][]).map(([id, n]) => (
                           <li key={id} className="flex gap-2 text-[13px] text-white/70">
                             <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[#FF3366]" />
-                            {LUNGE_FAULT_LABEL[id]} — {n} of {r.reps} reps
+                            {repsLine(LUNGE_FAULT_LABEL[id], n, r.reps)}
                           </li>
                         ))}
                       </ul>
@@ -1935,7 +1952,7 @@ export function MirrorHarness({
               <ul className="mt-4 space-y-1.5 border-t border-white/[0.06] pt-4" data-lunge-cues>
                 {cueLog.map((c, i) => (
                   <li key={i} className="text-[13px] text-white/70">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{c.level}</span>{' '}{c.text}
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/30">{levelWord(c.level)}</span>{' '}{c.text}
                   </li>
                 ))}
               </ul>

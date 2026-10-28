@@ -22,11 +22,10 @@ export const DOORS: Door[] = [
   { href: '/modes', label: 'All modes', tab: 'play' },
 
   // TRAIN — the coaching business, the credentials, the classes, the gym.
-  { href: '/workout', label: 'Workouts', tab: 'train' },
+  // OWNER (2026-10-27): /workout and /live ("Program guide") are off the menus; the routes still work by link
+  // (lib/nav/reachability.test.ts NOT_NAVIGABLE says so).
   { href: '/camp', label: 'Camp', tab: 'train' },
-  { href: '/education', label: 'Education', tab: 'train' },
-  { href: '/learn', label: 'Learn feed', tab: 'train' },
-  { href: '/live', label: 'Program guide', tab: 'train' },
+  { href: '/learn', label: 'Learn', tab: 'train' },   // PLAT-P04 (2026-10-27): one Learn door for Education + Learn feed
   { href: '/coach', label: 'Coaching', tab: 'train' },
 
   // PROFILE — what you own, what you have done, what you make.
@@ -38,7 +37,9 @@ export const DOORS: Door[] = [
   { href: '/market', label: 'Marketplace', tab: 'profile' },
   { href: '/create', label: 'Create', tab: 'profile' },
   { href: '/guidance', label: 'Pathways', tab: 'profile' },
-  { href: '/signature', label: 'Signature', tab: 'profile' },
+  // OWNER (2026-10-27): the hoops weekly challenge hub is "Weekly challenges" in the menus, so it is never confused with
+  // Signature programs (/train/programs). The route keeps its address.
+  { href: '/signature', label: 'Weekly challenges', tab: 'profile' },
   { href: '/support', label: 'Support', tab: 'profile' },
 ];
 

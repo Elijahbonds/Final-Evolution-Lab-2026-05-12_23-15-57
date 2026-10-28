@@ -40,7 +40,7 @@ describe('running the screen', () => {
     const s = r.tick(shot('front'), 0);          // facing the camera is the wrong way for station one
     expect(s.station?.view).toBe('back');
     expect(s.phase).toBe('positioning');
-    expect(s.say).toMatch(/turn all the way around/i);
+    expect(s.say).toMatch(/turn around, back to the camera/i);   // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('the clock only runs on a good shot', () => {

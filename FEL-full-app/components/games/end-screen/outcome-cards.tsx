@@ -67,12 +67,12 @@ export function ArenaCard({ r, onNavigate }: { r: EndArenaResult; onNavigate: (h
       ) : r.result === 'tie' ? (
         <p className="mt-[0.2em] text-white/85">Tie — both entries refunded ({r.feeLc} LC each).</p>
       ) : r.iWon ? (
-        <p className="mt-[0.2em] font-mono font-bold text-[#00FF9D]">You won the duel — +{r.payout} LC</p>
+        <p className="mt-[0.2em] font-display tabular-nums font-bold text-[#00FF9D]">You won the duel — +{r.payout} LC</p>
       ) : (
         <p className="mt-[0.2em] text-[#FF3366]">You lost this duel. Better luck next time.</p>
       )}
       {r.settled && typeof r.myScore === 'number' && typeof r.oppScore === 'number' && (
-        <p className="mt-[0.2em] font-mono text-[0.8em] text-white/65">Your {n(r.myScore)} vs the house rival&apos;s {n(r.oppScore)}</p>
+        <p className="mt-[0.2em] font-display tabular-nums text-[0.8em] text-white/65">Your {n(r.myScore)} vs the house rival&apos;s {n(r.oppScore)}</p>
       )}
       <NavLink href="/arena" id="arena" onNavigate={onNavigate}>Back to the Arena</NavLink>
     </div>
@@ -85,7 +85,7 @@ export function CarnivalCard({ run }: { run: CarnivalRunState }) {
       <p className="flex items-center justify-center gap-2 text-[0.85em] font-bold text-[#FFD700]">
         <PartyPopper className="h-[1em] w-[1em]" /> CARNIVAL NIGHT — STOP {run.index} OF {run.lineup.length}
       </p>
-      <p className="mt-[0.2em] font-mono text-white/75">Running total: {n(carnivalRunTotalScore(run))}</p>
+      <p className="mt-[0.2em] font-display tabular-nums text-white/75">Running total: {n(carnivalRunTotalScore(run))}</p>
     </div>
   );
 }
@@ -94,7 +94,7 @@ export function StoryRewardCard({ r, lc }: { r: EndStoryReward; lc: number }) {
   return (
     <div data-recap="story" className="rounded-2xl border border-[#A855F7]/35 bg-[#A855F7]/10 px-[0.7em] py-[0.45em] text-center">
       <p className="flex items-center justify-center gap-2 text-[0.85em] font-bold text-[#A855F7]"><BookOpen className="h-[1em] w-[1em]" /> STORY NODE COMPLETE</p>
-      <p className="mt-[0.2em] font-mono text-[1.2em] font-bold text-[#FFD700]">+{Math.round(lc).toLocaleString('en-US')} LC</p>
+      <p className="mt-[0.2em] font-display tabular-nums text-[1.2em] font-bold text-[#FFD700]">+{Math.round(lc).toLocaleString('en-US')} LC</p>
       {r.badge && <p className="mt-[0.2em] font-bold text-amber-400">BADGE EARNED · {r.badge.name}</p>}
     </div>
   );

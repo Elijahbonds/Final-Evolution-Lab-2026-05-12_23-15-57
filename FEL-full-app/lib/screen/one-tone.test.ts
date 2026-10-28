@@ -92,7 +92,8 @@ describe('one tone per pulse', () => {
     expect(v.step).toBe('done');
     // the reps that counted: each part's final valid count, read as the part finishes (its last rep ends the part on the
     // same tick, so no view ever shows the final count), and all seven parts finished
-    expect(finals.map((f) => f.part)).toEqual(['T1-front', 'T1-side', 'T2-left', 'T2-right', 'T3-left', 'T3-right', 'T5']);
+    // SCREEN-EASY (2026-10-28; test changed): the front-on parts first, then side-on, the wall last
+    expect(finals.map((f) => f.part)).toEqual(['T1-front', 'T3-left', 'T3-right', 'T5', 'T1-side', 'T2-left', 'T2-right']);
     const counted = finals.reduce((a, f) => a + f.valid, 0);
     expect(tones.filter((k) => k === 'retry')).toHaveLength(finals.reduce((a, f) => a + (f.attempts - f.valid), 0));
     expect(counted).toBeGreaterThan(0);

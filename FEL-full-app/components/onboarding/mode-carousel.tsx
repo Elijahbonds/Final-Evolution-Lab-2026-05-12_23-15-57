@@ -66,7 +66,7 @@ export function ModeCarousel({ lead, value, onChange, accent }: CarouselProps) {
   return (
     <div className="relative">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/35">
+        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-fel-quiet">
           Your first game
         </p>
         <div className="hidden gap-1.5 sm:flex">

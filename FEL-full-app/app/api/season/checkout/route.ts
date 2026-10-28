@@ -27,7 +27,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { getStripe } from '@/lib/stripe';
-import { FEATURE_DISABLED, isSeasonPassPurchaseEnabled, isVirtualPurchasesEnabled, seasonPassProPriceUsdCents } from '@/lib/flags';
+import { FEATURE_DISABLED, isSeasonPassPurchaseEnabled, seasonPassProPriceUsdCents } from '@/lib/flags';
+import { isPurchaseOpen } from '@/lib/payments/allowlist';
 import { getActiveSeason, getPassState } from '@/lib/season/season-service';
 import { storeClosed } from '@/lib/coach-store/gate';
 import { siteOrigin } from '@/lib/stripe/site-origin';
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   // the B10 live-key fence off (the season pass PRO lane is fenced with the SAME flag), no price —
   // all BEFORE getActiveSeason(), getStripe(), customers.create or any prisma write.
   if (!(process.env.STRIPE_SECRET_KEY ?? '').trim()) return storeClosed('payments_not_set_up');
-  if (!isVirtualPurchasesEnabled()) return storeClosed('virtual_purchases_off');
+  if (!isPurchaseOpen('season_pass')) return storeClosed('virtual_purchases_off'); // + PURCHASES_ALLOWLIST (payments-ready)
 
   const priceUsdCents = seasonPassProPriceUsdCents();
   if (priceUsdCents === null) {
