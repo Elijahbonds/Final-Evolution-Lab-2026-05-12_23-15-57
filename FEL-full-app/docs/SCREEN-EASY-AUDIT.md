@@ -192,6 +192,14 @@ see the wall); the Mirror's Movement Screen turns three times; the QR start card
 | Result page, flagged: visible words · font sizes · button looks · primary | 242 · 5 · 4 · none marked | **167 · 5 (3 own + 2 inside the demo stage) · 3 · the book, 76 px** |
 | Result page, clean: words · sizes · looks | 180 · 3 · 4 | **44 · 3 · 3** |
 
+**The jump-only runs share the runner**, so they were measured too (`scripts/vertical-easy-bench.ts --seeds 6 --fps 30,60`):
+- The hands-on-hips jump check (realistic noise) went from 24.1 / 24.0 s to **21.4 / 21.5 s** at 30 / 60 fps. Its
+  6-word set-up line is now heard (+0.5 s), and the 3 s done card is gone (−3 s).
+- "Measure my vertical" (arm swing) went from 24.1 / 24.0 s to **24.6 / 24.7 s**. Its 14-word arms-free line,
+  VERTICAL-EASY's copy, is now said in full before the 3-2-1: +3.5 s for the line, −3 s for the card.
+- Best jump against the truth is **identical**: −0.38 / 1.10 cm and −0.33 / 1.01 cm, as in VERTICAL-EASY-AUDIT §6.1.
+- 36 of 36 and 36 of 36 jumps were counted.
+
 **The first-timer estimate** uses the same assumptions as VERTICAL-EASY: about 3 s to read and tap each screen before the
 camera, 2 s for the camera prompt, 3 s for the pose model, and 1.4 s for the device check. Before: 6 × 3 + 6.4 + 165.7.
 After: 3 × 3 + 6.4 + 142.9. The camera part is measured; the rest is the assumption.
