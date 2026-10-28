@@ -84,7 +84,7 @@ describe('WarmupPrep', () => {
     expect(m).toContain(NOTE_COPY.pain);
   });
 
-  it("the coach's own Prime section is today's primer; their JUMP work there lets a youth athlete keep the Wake-Up's jumps, but never the adults-only Build the Rhythm", () => {
+  it("the coach's own Prime section is today's primer; their JUMP work there lets a youth athlete keep the Wake-Up's jumps", () => {
     const withPrime = [ex('p1', 0, 'prime', 'locomotion', false, true), ...SQUAT_DAY];
     const m = text(html({ exercises: withPrime, contextUrl: null, initialContext: { ...ADULT_HEEL, isYouth: true } }));
     expect(m).not.toContain('data-kind="primer"');
