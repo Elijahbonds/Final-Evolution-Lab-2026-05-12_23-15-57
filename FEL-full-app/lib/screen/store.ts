@@ -24,6 +24,7 @@ import { isAgeBand, isKid, strictestAge, type AgeBand } from './age';
 import { SUMMARY_VERSION, type ScreenSummary } from './checks';
 import { GRADED_CHECKS, THRESHOLDS_VERSION, type BandWord } from './PROPOSED-thresholds';
 import { isLaneSlug } from './PROPOSED-program-lanes';
+import { isTrustLevel, isTrustMeasureId, isTrustReason } from './trust-rows';
 
 export type { AgeBand } from './age';
 
@@ -75,6 +76,16 @@ function parseGate(raw: string | null): GateRecord | null {
 
 const GRADED_IDS = new Set(GRADED_CHECKS.map((c) => c.id as string));
 
+/** MIRROR-TRUST-RATING: a trust row is an id, an optional side, a level and reason words, and nothing else. */
+function isTrustRow(r: unknown): boolean {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return false;
+  const o = r as Record<string, unknown>;
+  if (!Object.keys(o).every((k) => k === 'id' || k === 'side' || k === 'level' || k === 'reasons')) return false;
+  if (!isTrustMeasureId(o.id) || !isTrustLevel(o.level)) return false;
+  if ('side' in o && o.side !== 'left' && o.side !== 'right') return false;
+  return Array.isArray(o.reasons) && o.reasons.every(isTrustReason);
+}
+
 function parseSummary(raw: string | null): ScreenSummary | null {
   try {
     const o = JSON.parse(raw ?? 'null') as ScreenSummary | null;
@@ -86,6 +97,7 @@ function parseSummary(raw: string | null): ScreenSummary | null {
     if (o.topFlag !== null && !GRADED_IDS.has(o.topFlag)) return null;
     if (typeof o.complete !== 'boolean' || typeof o.clean !== 'boolean') return null;
     if (o.jumpBestIn !== null && !(typeof o.jumpBestIn === 'number' && Number.isFinite(o.jumpBestIn))) return null;
+    if (o.trust !== undefined && !(Array.isArray(o.trust) && o.trust.every(isTrustRow))) return null;
     return o;
   } catch { return null; }
 }

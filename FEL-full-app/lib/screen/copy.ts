@@ -5,6 +5,7 @@
 // PROPOSED file's labels and cues, and the screen's components).
 //
 // Pure data.
+import type { TrustLevel, TrustReason } from './trust-rows';
 import type { CheckId } from './PROPOSED-thresholds';
 
 /** Before the screen and on every result, above the fold. */
@@ -238,6 +239,26 @@ export const FRAMING_IN_FRAME = 'In frame';
 /** Reading-quality badge (UX advice §3): two states only, never a percentage — there is no validated accuracy number. */
 export const READ_CLEAR = 'Clear read';
 export const READ_PARTIAL = 'Partial read';
+
+/**
+ * MIRROR-TRUST-RATING: the trust chip's words, one line per reason, and the one line above "Your checks". Low reads
+ * grey, never like a Red band. Worked out on this device, nothing sent: the line says so, in the screen's plain words.
+ */
+export const TRUST_WORDS: Record<TrustLevel, string> = { high: 'High trust', medium: 'Medium trust', low: 'Low trust' };
+export const TRUST_REASON_LINES: Record<TrustReason, string> = {
+  lowVisibility: 'a joint was hidden or blurry',
+  dim: 'more light, or a plainer background',
+  wrongView: 'camera angle off — set up the way the test shows',
+  cutOff: 'part of the body was out of the picture',
+  distance: 'too close, too far or off-centre',
+  tooFewFrames: 'only part of the movement was read clearly',
+  lowPoseHz: 'the camera gave too few frames each second',
+  fewValidReps: 'not enough clean reps',
+  jumpFpsLow: 'the camera was too slow to time the jump',
+  under240: 'the camera is too slow to time a jump exactly',
+  notRead: 'not read clearly',
+};
+export const TRUST_INFO_LINE = 'Trust shows how clearly the camera saw each check. It is worked out on this device; nothing is sent.';
 
 /**
  * CUE-REWRITE (2026-10-27): WHAT IT MEANS, per check — the middle part of every result card (docs/CUE-STYLE.md: what we
