@@ -40,6 +40,7 @@ import { captions } from './captions';
 import { captionsFromHud, rememberHud } from './hudCaptions';   // MECHANICS PASS: press → perceivable answer, agent-only   // M43: unlock audio on first user gesture
 import type { BackdropFamily } from '../visual/Backdrops';
 import { FrameGuard, assertSpawned } from './FrameGuard';
+import { OccluderFade } from './OccluderFade';   // gameplay-clean (2026-10-28): what blocks the view of the hero goes see-through
 import { watchCanvasFit } from './canvasFit';       // M95 (Pass 2): cap DPR + backing-pixel budget
 import { prewarmScene, prewarmWanted } from './shaderPrewarm';
 import { installLoadProgress, LoadStallClock } from './loadProgress';   // FIRST-DUNK-BUDGET: the load watchdog watches the download
@@ -414,6 +415,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
   let ambientStarted = false;   // M43: crowd/dojo bed starts once, on first input
   let unsub: (() => void) | null = null;
   let frameGuard: FrameGuard | null = null;
+  let occluderFade: OccluderFade | null = null;   // gameplay-clean: live play only, like the frame guard
   let iblShadows: IblShadowsHandle | null = null;
   const replayTrack: TransformNode[] = [];   // vis-board: nodes a mode asked ctx.trackReplay to record (registered when the director is built, after load())
   let replay: ReplayDirector | null = null;   // A9.12: a mode that asked for replays (def.replay)
@@ -422,6 +424,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     phase = p;
     // M37: hero-off-screen watchdog runs only during live play.
     if (p === 'playing') frameGuard?.start(); else frameGuard?.stop();
+    if (p === 'playing') occluderFade?.start(); else occluderFade?.stop();   // a replay, a pause or the card gets the scene back as built
     // M67: a shader compile is a defect only while gameplay is actually running.
     perf.setPlaying(p === 'playing');
     // M67: publish readiness for the smoke test. 'loaded' vs 'playing' matters —
@@ -611,6 +614,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
 
   // M37: hero-framing watchdog — recenters the camera if the hero leaves frame.
   frameGuard = new FrameGuard(scene, camera, () => heroRef.current, camDirector, () => objectiveRef.current);
+  occluderFade = new OccluderFade(scene, () => heroRef.current, def.modeId);
   // `instrument` (2026-09-12): SceneInstrumentation is a bare module specifier, so a probe running
   // IN the page cannot import it — which is why per-mode performance had never been measured and the
   // locomotion Phase 3 gate ("animation pass <= 4 ms") had to be reported unjudgeable. Handing the
@@ -635,6 +639,8 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     // THE MIC (2026-09-24): the audio graph, so a probe can record what the game actually sounds like (the MC on the PA, the
     // crowd ducking under him) instead of trusting that a cue that was logged was also heard
     audio: () => SoundKit.graph(),
+    // gameplay-clean: how many meshes the occluder fade holds see-through right now (the audit rig reads it)
+    occluders: () => occluderFade?.count ?? 0,
   };
   // CONTROLLER-STICK-LIVE (2026-09-14): a QA eye on the production server (`next start`, /try) waited 120 s for
   // `__FEL_DEV__.input`, which only a dev build published — so it read an empty roster and zero slot events under
@@ -1030,6 +1036,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
     agentBridge()?.detach();   // M69
     renderWatchdog?.disarm();
     frameGuard?.stop();
+    occluderFade?.dispose();
     unBody();            // MOVEMENT PLAY P3: no more body frames for this mode…
     store.unmount();     // …and its card goes (a stale writer — a later mount took over — does nothing)
     unsub?.();
