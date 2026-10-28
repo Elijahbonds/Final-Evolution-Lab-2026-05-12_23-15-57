@@ -40,7 +40,8 @@ import { CharacterPipeline } from '../core/characterPipeline';
 import type { BodyView, ModeContext, ModeDefinition } from '../core/ModeHarness';
 import type { FelInput } from '../core/InputBus';
 import type { BodyEvent } from '@/lib/pose/BodyReader';
-import { DUNK_BODY, DunkBodyBinder } from '@/lib/move/dunkBody';
+import { DUNK_BODY, DunkBodyBinder, DUNK_FULL_RISE_M, DUNK_RUN_HOLD } from '@/lib/move/dunkBody';
+import { fetchVerifiedJumpCm } from '@/lib/dunk/verifiedJumpClient';   // dunk-flagship Phase 5: the verified real jump
 import { BallSim } from '../core/BallPhysics';
 import { firstNight, nextNight, cardWon, cardVerdict, dunkOffDecide, dunkOffRuleLine, dunkOffByLine, type NightState, type DunkOffCard } from '../core/ContinuousNight';   // TRY-ONBOARD G1: the GO AGAIN ledger
 import { neverBindPose } from '../anim/importSanitizer';
@@ -87,7 +88,7 @@ import { applyOceanCourt } from '../visual/CourtSurface';
 import { applyVeniceDunkLookPass } from '../visual/veniceSurroundVisibility';
 import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
-import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
+import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
@@ -357,6 +358,9 @@ const HAND_IK_MAX = 0.6, HAND_IK_LAG_SEC = 0.12, HAND_IK_RIM_UP = 0.08, REACH_PO
 const HAND_IK_MAX_JAM = 0.95;
 const RIM_AIM_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]norimaim=1/.test(location.search);   // DUNK-BALL-ARMS-RIM dev A/B
 const REACH_OFF = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' && /[?&]noreach=1/.test(location.search);
+/** Dev (rig only): `?verifiedJumpCm=<n>` stands in for GET /api/dunk/verified-jump (no server on the rig). The knob still has
+ *  to be on; a production build has no such override (NODE_ENV is fixed at build time). */
+const DEV_VERIFIED_JUMP_CM = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' ? (location.search.match(/[?&]verifiedJumpCm=([\d.]+)/)?.[1] ?? null) : null;
 /** Dev: `?prop=<id>` starts the night on that prop (the motion probe's Dubble Up runs). */
 const DEV_PROP = process.env.NODE_ENV === 'development' && typeof location !== 'undefined' ? (location.search.match(/[?&]prop=([a-z0-9]+)/)?.[1] ?? null) : null;
 /** DUNK MOTION phase 10 — THE DUBBLE UP: the ball hand starts down for the ball this far before the helper; it takes it within this gap
@@ -402,6 +406,8 @@ export const DunkMode: ModeDefinition = (() => {
   let win: Win = 'run';                       // the anim window in charge of the body
   // ── the lob (self-lob / kick-up / cartwheel toss / the alley-oop pass): one real arc, one fair catch ──
   const lob = { live: false, thrown: false, caught: false, lost: false, label: '', kind: 'plain' as 'plain' | 'glass' | 'bounce' | 'corner', glass: false, over: false, bounces: 0, wantBounces: 0, env: '' as string, clanked: false, t: 0, due: 0, catchT: LOB_CATCH_CLIP_T, why: '' as string, runCueAt: -1, runCued: false };
+  let bodyRT = 0, handRT = 0;   // Phase 5: RUN's pull from the body (onBody) and from a hand (pad, keys, touch)
+  let personalRiseM: number | null = null;   // Phase 5: the full rise from the athlete's verified best jump (m), when the knob is on
   let lobFrameLift = 0; const _lobObj = new Vector3();   // Phase 4: the runway camera's objective lifted with a lob in the air
   let glassArmed = false;   // Phase 4: Y + up (or Y on the glass prop) asked for the glass throw; it goes on the run when due
   let whiffGap = Infinity; const whiffD = new Vector3(), whiffFwd = new Vector3();   // Phase 4: the ball's nearest pass by the hand
@@ -1349,7 +1355,15 @@ export const DunkMode: ModeDefinition = (() => {
     onBody(ctx: ModeContext, ev: BodyEvent, _view: BodyView): boolean {
       if (phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic') return false;
       const act = dunkBody.see(ev);
-      for (const e of act.now) def.onInput(ctx, e);
+      // Phase 5: THE TAKE-OFF'S POWER IS YOUR JUMP over a full rise — the fixed 0.70 m (lib/move/dunkBody, unchanged), or, with the
+      // knob on, your own VERIFIED best jump (only a verified adult's saved Quick Screen; never in ranked / staked / paid: feel()).
+      if (ev.kind === 'takeoff' && act.now.some((e) => e.t === 'trigger' && e.side === 'R')) {
+        const personal = personalRiseM != null && feel('dunk.realJumpPersonal', REAL_JUMP_PERSONAL) >= 0.5;
+        const full = personal ? personalRiseM! : DUNK_FULL_RISE_M, power = riseToPower(dunkBody.heightM, full);
+        for (const e of act.now) if (e.t === 'trigger' && e.side === 'R') e.value = Math.max(DUNK_RUN_HOLD, power);
+        console.info(`[DUNK-BODY] take-off: rise ${dunkBody.heightM.toFixed(2)} m → power ${power.toFixed(2)} (full rise ${full.toFixed(2)} m, ${personal ? 'your verified jump' : 'fixed'})`);
+      }
+      for (const e of act.now) { if (e.t === 'trigger' && e.side === 'R') bodyRT = e.value; def.onInput(ctx, e); }   // Phase 5: the body's RUN, kept apart
       if (act.slamClip !== null) bodySlamClip = act.slamClip;
       return act.took;
     },
@@ -1358,6 +1372,11 @@ export const DunkMode: ModeDefinition = (() => {
     ownsCrowd: true,
 
     async load(ctx: ModeContext) {
+      // Phase 5: the verified real jump, read once (knob on only; a guest or an unverified account reads null — the fixed mapping)
+      if (feel('dunk.realJumpPersonal', REAL_JUMP_PERSONAL) >= 0.5) {
+        if (DEV_VERIFIED_JUMP_CM) personalRiseM = personalFullRiseM(Number(DEV_VERIFIED_JUMP_CM));
+        else void fetchVerifiedJumpCm().then((cm) => { personalRiseM = personalFullRiseM(cm); console.info(`[DUNK-BODY] verified jump: ${cm == null ? 'none — the fixed mapping' : `${cm} cm`}`); });
+      }
       // ONE BUS PER MOUNT, OWNED BY THE HARNESS. This mode built its own, which worked and was
       // INAUDIBLE: the crowd swell and the tier sting are bound to the harness's bus, and there was
       // exactly one onTierChange subscriber in the game. Same reports, same weights, now heard.
@@ -1464,7 +1483,7 @@ export const DunkMode: ModeDefinition = (() => {
       dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
       styleTaps = 0; hangSec = 0; aHeld = false; usedCombos.clear(); momentum.reset(); flight.reset();
       runUpPeak = 0; launchSpeed01 = 0; obstacleClipped = false; toppling = false; gatherHeld = false; gatherTold = '';
-      dunkBody.reset(); bodySlamClip = null;
+      dunkBody.reset(); bodySlamClip = null; bodyRT = 0;
       vectorAt = -1e9; vectorWallRun = false; doubleLaunched = false; doubleLaunchLift = 0; boardSwung = false; hangBase = null; swingAng = 0; skyTapped = false; boardTopFlip = false; boardRan = false; l1DownAt = -1; busRun = null; busLaunch = null; busRan = false;
         // (ASSET-POLISH: no second pick here. This one ran after the rival had spawned and put `foe` back to night 1,
         // CASS, so the name on the card never matched the body that walked out.)
@@ -1773,20 +1792,27 @@ export const DunkMode: ModeDefinition = (() => {
       }
 
       if (e.t === 'trigger' && e.side === 'R') {
+        // Phase 5: THE BODY'S RUN IS NOT LET GO BY AN IDLE PAD. The body's RT reaches this handler from onBody, past the bus's arbiter,
+        // and a seated pad re-sends its own trigger every frame (InputBus.pollPads) — an idle one, 0, one frame after the body's
+        // jog started the run: "RUN let go", the take-off on the first step (measured on the rig: every body dunk launched at the
+        // top of the runway). RUN is the deeper of the hand's and the body's pull, as the arbiter folds them; pad-only, it is the
+        // pad's exactly.
+        if (e.src !== 'body') handRT = e.value;
+        const rt = Math.max(handRT, bodyRT);
         // MECHANICS PASS (2026-09-15): RUN (RT) was silent 6 of 6 when held outside the runway — through the judges, the
         // replay, the rival's turn. The first press of a hold is answered with what the contest is doing.
-        if (e.value > 0.5 && !runPressWas && phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic' && !(phase === 'judging' && runBackAt >= 0)) {
+        if (rt > 0.5 && !runPressWas && phase !== 'approach' && phase !== 'charge' && phase !== 'cinematic' && !(phase === 'judging' && runBackAt >= 0)) {
           refuse(ctx, phase === 'rivalTurn' ? "RIVAL'S TURN" : phase === 'judging' || phase === 'resolve' ? 'THE JUDGES ARE SCORING' : 'WAIT');
         }
-        runPressWas = e.value > 0.5;
-        { const down = e.value > 0, edge = down && !runDownWas; runDownWas = down;   // dunk-next phase 8: RUN again in the air is the pump; on a miss, RUN IT BACK
+        runPressWas = rt > 0.5;
+        { const down = rt > 0, edge = down && !runDownWas; runDownWas = down;   // dunk-next phase 8: RUN again in the air is the pump; on a miss, RUN IT BACK
           if (edge && phase === 'cinematic') hangPump(ctx); else if (edge && phase === 'judging' && runBackAt >= 0) runItBack(ctx); }
-        runHeld = e.value;
-        if (phase === 'approach' && e.value > 0.02) beginRun(ctx);
+        runHeld = rt;
+        if (phase === 'approach' && rt > 0.02) beginRun(ctx);
         if (phase === 'charge') {
-          charge = Math.max(charge, e.value);
+          charge = Math.max(charge, rt);
           ctx.setHud({ charge: Math.round(charge * 100) });
-          if (e.value === 0) launchDunk(ctx, 'press');
+          if (rt === 0) { console.info(`[DUNK-LAUNCH] RUN let go (${e.src ?? 'pad'}) — the take-off`); launchDunk(ctx, 'press'); }
         }
       }
 
@@ -3050,6 +3076,7 @@ export const DunkMode: ModeDefinition = (() => {
   }
 
   function launchDunk(ctx: ModeContext, cause: LaunchCause = 'auto'): void {
+    bodyRT = 0;   // Phase 5: the body's run ends at the take-off (RUN in the air and RUN IT BACK are the hand's again)
     if (phase === 'cinematic') return;
     const fromBus = !!busRun;   // DUNK-FLAGSHIP Phase 2: the bus launch carries its own height (busLaunch.y0)
     if (runwayBeat) endRunwayBeat(true);   // a toss / kick / cartwheel still running gives the body to the takeoff (no run loop in between — the launch clip crossfades out of the beat)
@@ -3143,7 +3170,7 @@ export const DunkMode: ModeDefinition = (() => {
         console.info(`[LOB] bounce lob re-aimed at the launch: ${v ? `${n >= 1 ? `${n} bounce${n > 1 ? 's' : ''} to go` : 'off its last bounce'}` : 'no fit from here — left as thrown'}, ${tf.toFixed(2)} s to the catch (the throw had ${left.toFixed(2)} s left)`);
       }
     }
-    console.info(`[DUNK-LAUNCH] charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${apexFor().toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}${lob.live ? ' lob live' : ''}`);
+    console.info(`[DUNK-LAUNCH] (${cause}) charge ${charge.toFixed(2)} run ${runUpPeak.toFixed(1)} apex ${apexFor().toFixed(2)} from z ${launchZ.toFixed(2)} to line ${gatherLine().toFixed(2)}${lob.live ? ' lob live' : ''}`);
     // The run-up, not the stick at the release instant: during the charge the
     // stick is usually neutral, so the old `hypot(stickX, stickY)` read ~0 and
     // EVERY dunk launched as a walk-up. Peak measured approach speed is the
@@ -4330,7 +4357,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.juice.hitStop(sb.hitStopMs, { gameplay: true });   // HOTFIX (2026-09-24): paired with the gameplay freeze below — reduced motion keeps both, so the limbs never move while the root and ball hold
     feelHitStop(sb.hitStopMs);   // DUNK-HANDS-RIM H3: the mode's clock stops on the iron too (the ball on the ring, the body) — one beat, composed; never a second slow-mo
     ctx.juice.shake(sb.shake, sb.shakeMs);
-    console.info(`[DUNK-IMPACT] slam ${qteAccuracy.toFixed(2)}${aHeld ? ' + hang' : ''}: hit-stop ${sb.hitStopMs} ms, shake ${sb.shake.toFixed(3)} for ${sb.shakeMs} ms`);
+    console.info(`[DUNK-IMPACT] slam ${qteAccuracy.toFixed(2)}${aHeld && qteAccuracy > SLAM_BIG_FROM ? ' + hang' : ''}: hit-stop ${sb.hitStopMs} ms, shake ${sb.shake.toFixed(3)} for ${sb.shakeMs} ms`);
     ctx.juice.flash('#fff6dd', 120);
     ctx.camDirector.pulse(0.9, 0.32);   // DUNK-BODY-MID: the CONTACT is a camera beat too — a short hard push onto the iron under the hit-stop, so the punch reads from behind (the flight had a push-in at the hang rise and nothing at the rim)
     SoundKit.play('impact', { pitch: 0.7, volume: 0.8 }); console.info('[JUICE-SFX] impact slam');   // A+ P2: the ONE slam thud of the attempt
@@ -4881,7 +4908,7 @@ export const DunkMode: ModeDefinition = (() => {
     playClip(SPORT_CLIP.idle, { loop: true });
     charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
-    dunkBody.reset(); bodySlamClip = null;
+    dunkBody.reset(); bodySlamClip = null; bodyRT = 0;
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
     styleTaps = 0; hangSec = 0; revealed = []; slamTiming = null;
     runUpPeak = 0; obstacleClipped = false; toppling = false; runwayIds = [];

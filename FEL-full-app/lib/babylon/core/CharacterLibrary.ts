@@ -23,7 +23,7 @@ import { snapToGround } from './groundSnap';                // M69: feet-on-cour
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
-import { urlForHeroBody, KIT_BODY_URL } from './heroBody';
+import { urlForHeroBody, KIT_BODY_URL, scanUrlForTier } from './heroBody';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
 import { installStyleMotion } from '../anim/styleMotion';
 import { pickedVocab } from '../combat/styleVocab';
@@ -53,6 +53,9 @@ export interface SpawnedCharacter {
   /** Phase 2 "alive" layer (breathing, weight shift, head look-at). GLB path
    *  only; modes call `secondary?.setLookTarget(() => ball.position)`. */
   secondary?: SecondaryMotionHandle;
+  /** Present only on a `deferHeroCapture` player spawn: builds the player's captured hoops / fight / dunk clips and routes
+   *  plays through them (what spawn otherwise does itself). Idempotent; call before the first clip a capture can replace. */
+  installHeroCapture?: () => void;
   dispose(): void;
 }
 
@@ -82,6 +85,10 @@ export interface SpawnOpts {
    *  player — then it is an opponent. Pass it only where that rule cannot see the intent (a preview that spawns the
    *  next body before disposing the last). */
   role?: 'player' | 'opponent';
+  /** DEMO-SPEED (2026-10-27): leave the player's captured clips (HERO_CAPTURE) unbuilt at spawn and hand the caller
+   *  `installHeroCapture` instead. For the library stage, whose idle and exercise loops no capture replaces: building the
+   *  captures was ~0.4 s of the spawn on the phone profile, before the first frame of a squat that never plays one. */
+  deferHeroCapture?: boolean;
 }
 
 // ── WHO IS THE PLAYER (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14) ───────────────────────────────────────────────────
@@ -154,13 +161,18 @@ function splitUrl(url: string): { rootUrl: string; filename: string } {
   return { rootUrl: url.slice(0, i + 1), filename: url.slice(i + 1) };
 }
 
+/** DEMO-SPEED (2026-10-27): a User Timing mark (the GLB's load and parse, on a phone's profile); never throws. */
+function userMark(name: string, url: string): void { try { performance.mark(name, { detail: url }); } catch { /* no User Timing */ } }
+
 async function loadContainer(scene: Scene, url: string): Promise<AssetContainer> {
   const cache = containersFor(scene);
   let p = cache.get(url);
   if (!p) {
     const { rootUrl, filename } = splitUrl(url);
+    userMark('fel-char:load', url);
     p = SceneLoader.LoadAssetContainerAsync(rootUrl, filename, scene)
       .then((container) => {
+        userMark('fel-char:loaded', url);
         // GATE 0: normalize mixamorig-prefixed bones + reject non-conformant
         // rigs AT LOAD, before any spawn can freeze at bind pose. Runs once
         // per cached container; unprefixed rigs pass through untouched.
@@ -183,9 +195,11 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
  *  (the probe's old scene.textures basis could not see them); the mobile file is 24 MB. Only the DEFAULT hero is
  *  swapped — a dev override (?hero=) or an explicitly requested body always loads as asked, and the desktop tier's
  *  look is untouched. */
-const MOBILE_HERO_URL = '/models/elijah-meshy.mobile.glb';   // Ship Pass 6: the scan's decimated bake (54k verts, 1K textures)
+// Ship Pass 6: the scan's decimated bake (54k verts, 1K textures). DEMO-SPEED (2026-10-27): the file and the rule live in
+// heroBody.ts (SCAN_BODY_MOBILE_URL, scanUrlForTier) so the library stage's early fetch asks for the same file; DEFAULT_HERO_URL
+// is SCAN_BODY_URL (athleteRoster.cast.test holds both spellings).
 function tierOf(scene: Scene): QualityTier { return (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop'; }
-function heroUrlForTier(url: string, scene: Scene): string { return url === DEFAULT_HERO_URL && tierOf(scene) === 'mobile' ? MOBILE_HERO_URL : url; }
+function heroUrlForTier(url: string, scene: Scene): string { return scanUrlForTier(url, tierOf(scene)); }
 /** The hero for this scene's tier, falling back to the requested file if the tier's variant will not load — a
  *  texture variant can never brick a spawn (the roster's rule). */
 async function loadHero(scene: Scene, url: string): Promise<{ container: AssetContainer; url: string }> {
@@ -326,9 +340,13 @@ export const CharacterLibrary = {
     installSafePlay(animator, opts.modeId ?? effectiveUrl);
     // AN OPPONENT MOVES LIKE A CAPTURED PERSON (EVERYONE-BODY-MOCAP-OPPONENTS): the mode's in-scope captures replace the
     // authored clips it asks for. The outermost play wrapper, so modes that re-call neverBindPose/installSafePlay are no-ops.
+    let installHeroCapture: (() => void) | undefined;
     if (role === 'opponent') installOpponentMotion(animator, scene, skeleton);
     // HOOPS MOVEMENT (owner 2026-09-15): the player plays the same hoops captures — one motion set for both bodies on a court
-    else if (!heroCaptureOff()) installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE);
+    else if (!heroCaptureOff()) {
+      if (opts.deferHeroCapture) installHeroCapture = () => { installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE); };
+      else installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE);
+    }
     // THE STYLE'S OWN MOVES (2026-09-15, owner: capoeira / breaking, taekwondo / tricking, parkour): in a fight mode the
     // player's picked school brings its vocabulary; The Hundred and Free Run also get the parkour set. Outermost wrapper.
     if (role !== 'opponent') {
@@ -410,6 +428,7 @@ export const CharacterLibrary = {
     const spawned: SpawnedCharacter = {
       id: `char_${spawnCounter}`,
       root, meshes, skeleton, animator, secondary,
+      ...(installHeroCapture ? { installHeroCapture } : {}),
       dispose() {
         livePlayers.get(scene)?.delete(root);
         if (rosterPicked) dealtBodies.get(scene)?.delete(effectiveUrl);   // the person is free for the next spawn

@@ -29,6 +29,8 @@ describe('DunkFlagship (c) — the iron answers how hard it was hit', () => {
   it('an ordinary make keeps the shipped beat exactly', () => {
     for (const a of [0, 0.2, 0.5]) expect(slamImpact(a, false)).toEqual({ hitStopMs: SLAM_HITSTOP_MS, shake: SLAM_SHAKE, shakeMs: SLAM_SHAKE_MS });
     expect(slamImpact(Number.NaN, false).hitStopMs).toBe(SLAM_HITSTOP_MS);
+    // Phase 5: SLAM is still held at contact after any tap, so an ordinary make with `hang` keeps the shipped beat too
+    for (const a of [0, 0.3, 0.5]) expect(slamImpact(a, true)).toEqual({ hitStopMs: SLAM_HITSTOP_MS, shake: SLAM_SHAKE, shakeMs: SLAM_SHAKE_MS });
   });
   it('grows with the slam, to the big beat at a perfect one, never past it', () => {
     let prev = 0;
