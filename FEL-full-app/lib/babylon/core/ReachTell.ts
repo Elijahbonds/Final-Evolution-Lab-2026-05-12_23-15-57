@@ -28,8 +28,10 @@ export const POKE_READ_ON = true;
 // ── the reach (3v3's values moved here unchanged; 1v1 now reaches by the same rules) ──
 /** No AI defender starts two reaches inside this (s). Moved from ThreeVThreeMode, unchanged; not a knob (a cadence, not odds). */
 export const AI_REACH_COOLDOWN_SEC = 1.2;
-/** A steal intent in range becomes a reach this often. 3v3's 0.5, unchanged; NEW in 1v1 (was: every intent). Knob `hoops.aiReachGate`. */
-export const AI_REACH_GATE = 0.5;
+/** A steal intent in range becomes a reach this often. 3v3's 0.5; NEW in 1v1 (was: every intent). TUNED 0.5 → 0.7 (hoops-p02, coordinator
+ *  call 1A: with the strip decided by the hand on the ball the AI reached too rarely to stop anyone — 0 stops in 18 of my possessions
+ *  on the rig). Knob `hoops.aiReachGate`. */
+export const AI_REACH_GATE = 0.7;
 /** A reach that lands strips this often. 3v3's 0.22, unchanged; NEW in 1v1 (was: 1.0). Knob `hoops.aiStealChance`. */
 export const AI_STEAL_CHANCE = 0.22;
 /** …and this often inside the bump window (the ball out of the hand). 3v3's 0.6, unchanged; NEW in 1v1. Knob `hoops.aiStealOnBump`. */

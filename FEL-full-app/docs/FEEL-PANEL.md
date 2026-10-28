@@ -173,7 +173,7 @@ lean), `hoops.defenseRaiseM` 0.15 m, `hoops.raiseReach` 0.97, `hoops.stanceEaseS
 `teammateShoots` on the ring (RimDecides), unchanged.
 lane/hoops-def-tell (#273 and #274 rebuilt, owner 2026-10-23). Group "Hoops · defense", the tell and the separation shipped ON:
 `hoops.aiReachTellOn` 1 (`ReachTell.ts` `AI_REACH_TELL_ON`; 0 = the release's reach exactly), `hoops.aiReachTellSec` 0.25 s,
-`hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5, `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
+`hoops.aiReachStunSec` 0.35 s, `hoops.aiReachGate` 0.5 (TUNED 0.7 by hoops-p02, below), `hoops.aiStealChance` 0.22, `hoops.aiStealOnBump` 0.6 (3v3's odds, unchanged,
 now 1v1's too), `hoops.pokeReadOn` 1 (0 = the old per-frame poke at the deny point exactly), `hoops.stealRatePerSec` 1.2 /s,
 `hoops.pokeRangeM` 1.2 m, `hoops.pokeLeadSec` 0.1 s; `hoops.bodySepOn` 1 (`BodySeparation.ts` `BODY_SEP_ON`; 0 = the release's contact
 exactly), `hoops.capsuleRadius1v1M` 0.55 m (read when 1v1 loads its bodies: restart the run after changing it), `hoops.bodyHardGapM`
@@ -331,7 +331,7 @@ felt none of these yet — every default is flagged in the lane report):
   `hoops.blkContactM` 0.14 m (the ball's centre this close to the reach is a touch); `hoops.blkLookSec` 0.25 s (how much of a release's
   flight is read); `hoops.aiBlockLeadSec` **TUNED 0.15 → 0.25 s** (the AI leaves the floor this long before the release it expects, so the
   top of his jump meets the ball); `hoops.aiBlockReactOn` 0 (1 = his jump also waits out his tier's reaction after my gather: measured,
-  a PRO jump then never reached a quick finish); `hoops.blkReleaseJumperM` 2.45 m and `hoops.blkReleaseLayupM`
+  a PRO jump then never reached a quick finish); `hoops.blkReleaseJumperM` 2.6 m (TUNED 2.45 → 2.6 after calls 1A / 2A) and `hoops.blkReleaseLayupM`
   2.5 m (the block reads the ball from where it leaves the hand, above the court: the release fires before the clip's arms are up,
   the rig read their layups leaving from 1.65–1.74 m, and from the chest any jump reached them); `hoops.blkDeflectMps` 2.4 m/s and `hoops.blkDeflectUpMps` 1.4 m/s (the ball off the hand, along
   the line it was hit).
@@ -341,10 +341,14 @@ felt none of these yet — every default is flagged in the lane report):
   0 once landed — was a flat 0.3 for 0.7 s); `hoops.contestCloseout` 0.1 and `hoops.contestCloseoutFullMps` 3 m/s (a closeout running AT
   the shooter adds up to 0.1; past him, nothing).
 - Group "Hoops · defense" (`hoops/steals.ts`, `hoops/pressure.ts`), **TUNED (new behaviour)**: `hoops.stealDiceOn` 0 (1 = today's strip
-  rolls: 0.22 a reach, 0.6 on the bump, 0.18 a bump strip); `hoops.stripReachM` 0.95 m, `hoops.stripShieldM` 0.25 m,
+  rolls: 0.22 a reach, 0.6 on the bump, 0.18 a bump strip); `hoops.stripReachM` 1.2 m (TUNED 0.95 → 1.2: the poke's own reach), `hoops.stripShieldM` 0.25 m,
   `hoops.stripBallMaxY` 0.85 m (the strip lands when his hand can get to the ball: in reach, not behind the handler's body, off the
   palm); `hoops.onBallCushionM` 1.35 m and `hoops.onBallCushionPerMps` 0.3 s (the on-ball man's most room on a moving handler: 1.35 m + 0.3 s ×
   his speed — about today's room against a 6 m/s sprint, pressure on a probing dribble; 0 = today's contain lever, uncapped).
 
 **assumption:** the bounds are safe, not tuned; the defaults are this lane's calibration on the rig and the headless sim (lane report),
 not owner numbers. A ranked, staked or head-to-head run reads every default above.
+
+lane/hoops-p02-defense, coordinator calls 1A / 2A (2026-10-28), **TUNED**: `hoops.aiReachGate` 0.5 → 0.7 (a steal intent in range becomes
+a reach more often; the strip is still his hand on the ball) and, new as a knob, `hoops.aiBlockJumpChance` 0.3 → 0.45 (`HoopsDefense.ts`
+`AI_BLOCK_JUMP_CHANCE`: in range at my gather the AI leaves the floor this often, else a hand up; the block is his hand on the ball).

@@ -58,7 +58,7 @@ export const DEFLECT_UP_MPS = 1.4;
  *  3v3 rival's layups "released" at 1.65–1.74 m, the ball still at his chest), and from the chest any jump reaches it — the hand
  *  would carry the ball up here before it leaves. The block reads the ball from the higher of the two. Knobs `hoops.blkReleaseJumperM`,
  *  `hoops.blkReleaseLayupM`. */
-export const RELEASE_JUMPER_M = 2.45;
+export const RELEASE_JUMPER_M = 2.6;   // TUNED 2.45 → 2.6 (hoops-p02, after calls 1A/2A: the AI's 0.45 jump blocked my jumpers at 13.1 % vs the dice's 4.8 %; 7.5 % here)
 export const RELEASE_LAYUP_M = 2.5;
 export const blockDiceOn = (): boolean => feel('hoops.blockDiceOn', BLOCK_DICE_ON ? 1 : 0) >= 0.5;
 const shoulderM = (): number => feel('hoops.blkShoulderM', SHOULDER_M);

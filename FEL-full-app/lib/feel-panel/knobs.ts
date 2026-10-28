@@ -458,7 +458,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long a defender whose reach missed is stuck (the lane his miss opens).',
   },
   {
-    id: 'hoops.aiReachGate', label: 'AI reach: intent becomes a reach', def: 0.5, min: 0, max: 1, step: 0.01, unit: '', group: 'Hoops · defense',
+    id: 'hoops.aiReachGate', label: 'AI reach: intent becomes a reach', def: 0.7, min: 0, max: 1, step: 0.01, unit: '', group: 'Hoops · defense',
     source: 'lib/babylon/core/ReachTell.ts AI_REACH_GATE',
     hint: 'Odds: the share of the AI\'s steal intents in range that become a reach (one reach per 1.2 s at most).',
   },
@@ -514,7 +514,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'The ball centre this close to the reach is a touch (the ball radius and a fingertip).',
   },
   {
-    id: 'hoops.blkReleaseJumperM', label: 'Blocks: a jumper leaves the hand at', def: 2.45, min: 1.8, max: 3.2, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    id: 'hoops.blkReleaseJumperM', label: 'Blocks: a jumper leaves the hand at', def: 2.6, min: 1.8, max: 3.2, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
     source: 'lib/babylon/hoops/blocks.ts RELEASE_JUMPER_M',
     hint: 'Above the shooter\'s feet. The block reads the ball from here when the drawn ball is still lower (the release fires before the arms are up).',
   },
@@ -527,6 +527,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.blkLookSec', label: 'Blocks: release flight a hand can meet', def: 0.25, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
     source: 'lib/babylon/hoops/blocks.ts LOOK_SEC',
     hint: 'How much of a released shot\'s flight is read for a block.',
+  },
+  {
+    id: 'hoops.aiBlockJumpChance', label: 'AI block: jumps at my gather this often', def: 0.45, min: 0, max: 1, step: 0.01, unit: '', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/core/HoopsDefense.ts AI_BLOCK_JUMP_CHANCE',
+    hint: 'In range at my gather, the AI leaves the floor (timed to my release) this often; otherwise a hand up. His choice — the block is his hand on the ball.',
   },
   {
     id: 'hoops.aiBlockReactOn', label: 'AI block: wait out its reaction (1) / jump off the read (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · blocks (hand meets ball)',
@@ -589,7 +594,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A/B: 1 puts today\'s strip rolls back exactly (0.22 a reach, 0.6 on the bump, 0.18 a bump strip).',
   },
   {
-    id: 'hoops.stripReachM', label: 'AI strip: hand reaches the ball within', def: 0.95, min: 0.5, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    id: 'hoops.stripReachM', label: 'AI strip: hand reaches the ball within', def: 1.2, min: 0.5, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
     source: 'lib/babylon/hoops/steals.ts STRIP_REACH_M',
     hint: 'Planar, the reacher to the ball, when his reach resolves.',
   },

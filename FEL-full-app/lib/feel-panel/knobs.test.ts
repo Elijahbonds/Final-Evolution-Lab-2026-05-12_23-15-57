@@ -42,6 +42,7 @@ import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBL
 import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
 import { CHEST_LEAN_DEG } from '@/lib/babylon/hoops/contactPoses';
 import * as P2B from '@/lib/babylon/hoops/blocks';   // hoops-p02
+import { AI_BLOCK_JUMP_CHANCE } from '@/lib/babylon/core/HoopsDefense';   // hoops-p02
 import * as P2C from '@/lib/babylon/hoops/contest';   // hoops-p02
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
@@ -175,7 +176,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.pokeRangeM')).toBe(POKE_RANGE);
     expect(def('hoops.pokeLeadSec')).toBe(POKE_LEAD_SEC);
     expect([AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC])
-      .toEqual([true, 0.25, 0.35, 0.5, 0.22, 0.6, true, 1.2, 1.2, 0.1]);
+      .toEqual([true, 0.25, 0.35, 0.7, 0.22, 0.6, true, 1.2, 1.2, 0.1]);   // hoops-p02: AI_REACH_GATE TUNED 0.5 → 0.7
     // hoops-p02 (1v1/3v3 phase 2): blocks, the contest, the AI strip, on-ball pressure — defaults pinned
     expect(def('hoops.blockDiceOn')).toBe(P2B.BLOCK_DICE_ON ? 1 : 0);
     expect(def('hoops.blkShoulderM')).toBe(P2B.SHOULDER_M);
@@ -186,6 +187,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.blkReleaseLayupM')).toBe(P2B.RELEASE_LAYUP_M);
     expect(def('hoops.aiBlockLeadSec')).toBe(P2B.AI_BLOCK_LEAD_SEC);
     expect(def('hoops.aiBlockReactOn')).toBe(P2B.AI_BLOCK_REACT_ON ? 1 : 0);
+    expect(def('hoops.aiBlockJumpChance')).toBe(AI_BLOCK_JUMP_CHANCE);
     expect(def('hoops.blkDeflectMps')).toBe(P2B.DEFLECT_MPS);
     expect(def('hoops.blkDeflectUpMps')).toBe(P2B.DEFLECT_UP_MPS);
     expect(def('hoops.oneContestOn')).toBe(P2C.ONE_CONTEST_ON ? 1 : 0);

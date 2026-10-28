@@ -72,8 +72,10 @@ export function driveStrip(i: DriveStripInput): DriveStripRead {
 
 /** 1 = today's strip rolls (aiStealChance / aiStealOnBump / AI_BUMP_STRIP_CHANCE); 0 = the hand on the ball. Knob `hoops.stealDiceOn`. */
 export const STEAL_DICE_ON = false;
-/** The reacher's hand gets this far from his root to the ball (m, planar): an arm and a lean. Knob `hoops.stripReachM`. */
-export const STRIP_REACH_M = 0.95;
+/** The reacher's hand gets this far from his root to the ball (m, planar): an arm and a lean — the poke's own reach (ReachTell POKE_RANGE).
+ *  TUNED 0.95 → 1.2 (hoops-p02: at 0.95 a reach from the standoff almost never got to a ball in the outside hand — 0 % of reads in the
+ *  possession model against the dice's 22 %; 14 % at 1.2). Knob `hoops.stripReachM`. */
+export const STRIP_REACH_M = 1.2;
 /** The handler's body shields a ball this close to the reacher's line through him (m). Knob `hoops.stripShieldM`. */
 export const STRIP_SHIELD_M = 0.25;
 /** A ball above this is in the palm at the top of the dribble (m). Knob `hoops.stripBallMaxY`. */

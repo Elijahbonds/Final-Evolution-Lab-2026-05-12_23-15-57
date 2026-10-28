@@ -13,6 +13,8 @@ const { meetsRelease, aiBlockJumpAtSec, releaseFrom, JUMP_SEC } = await import(A
 type Blocker = { x: number; z: number; jumpAge: number; handsUp: boolean };
 const { aiBlockChance, aiShotRead } = await import(APP + '/lib/babylon/core/HoopsDefense.ts');
 const { checkBlock } = await import(APP + '/lib/babylon/core/BasketballCore.ts');
+const { aiStripLands } = await import(APP + '/lib/babylon/hoops/steals.ts');
+const { aiReachGate } = await import(APP + '/lib/babylon/core/ReachTell.ts');
 const { Vector3 } = await import('@babylonjs/core');
 
 setFeelUser(true); setFeelSession(null);
@@ -68,6 +70,60 @@ function aiBlock(H: number, style: 'jumper' | 'layup') {
   return { old: pct(old, N), geo: pct(geo, N), reads: pct(reads, N) };
 }
 
+// C — STOPS PER 10 OF MY POSSESSIONS (the possession model, coordinator 2026-10-28). The rig plays too few possessions to read a rate, so
+// this composes one possession from the rig's measured rates and the real modules:
+//   · possession length: the rig's offensive possessions (after: 32.4 s over 8 in 1v1, 27.0 s over 9 in 3v3 → mean 3.47 s), exponential;
+//   · AI reaches: a Poisson rate, the rig's measured tells per offensive second at the gate it ran with (before 2 in 63.3 s at gate 0.5;
+//     after 4 in 59.4 s at gate 0.5 with the cushion), scaled by the live gate (aiReachGate) — the gate is downstream of the intent;
+//   · a reach resolves after its 0.25 s tell: beaten if I move the ball in it (the bot's moves every 0.9–2.3 s → 1 − e^(−0.25/1.6)) or
+//     the shot leaves first; otherwise the strip is aiStripLands (geometry) on a sampled frame — reacher 1.1–1.5 m off, ±45° of my
+//     front; the ball in the hand away from him (outside hand when guarded), 0.35 m out, 0.15 m ahead, at a dribble-cycle height
+//     (0.12–0.95 m) — or the old roll (0.22) for the dice;
+//   · a shot ends the possession (rig after: 16 shots in 17 possessions → 0.94); the AI blocks it at aiBlock()'s rate on a mix of
+//     70 % finishes at the rim / 30 % jumpers (the rig's mix) — the geometry, or the dice's expected value for "before";
+//   · other forced turnovers (an interception, a charge drawn): the rig's pooled rate, 1 in 31 possessions.
+// assumption: every rate above is the rig's small-sample measure; the dribble geometry is a model, not the drawn ball.
+function stops(N: number, dice: boolean, tellsPerSec05: number) {
+  const L0 = 3.47, PSHOT = 0.94, POTHER = 1 / 31, PMOVE = 1 - Math.exp(-0.25 / 1.6);
+  const lambda = tellsPerSec05 * aiReachGate() / 0.5;
+  const blkJ = aiBlock(Number(process.env.MY_H ?? 2.1), 'jumper'), blkL = aiBlock(Number(process.env.MY_H ?? 2.1), 'layup');
+  const pBlock = (dice ? 0.3 * parseFloat(blkJ.old) + 0.7 * parseFloat(blkL.old) : 0.3 * parseFloat(blkJ.geo) + 0.7 * parseFloat(blkL.geo)) / 100;
+  let st = 0, strips = 0, blocks = 0, others = 0, reaches = 0, stripReads = 0, stripLands = 0;
+  for (let i = 0; i < N; i++) {
+    const L = -Math.log(1 - rnd()) * L0;
+    let t = -Math.log(1 - rnd()) / lambda, stopped = false;
+    while (t < L && !stopped) {
+      reaches++;
+      if (t + 0.25 < L && rnd() >= PMOVE) {
+        let lands: boolean;
+        if (dice) lands = rnd() < 0.22;
+        else {
+          const th = (rnd() - 0.5) * Math.PI / 2, d = 1.1 + rnd() * 0.4;
+          const reacher = { x: Math.sin(th) * d, z: Math.cos(th) * d };
+          const side = Math.abs(th) > 0.26 ? -Math.sign(th) : (rnd() < 0.5 ? -1 : 1);
+          const ball = { x: side * 0.35, y: 0.12 + 0.83 * Math.abs(Math.cos(Math.PI * rnd())), z: 0.15 };
+          lands = aiStripLands(reacher, { x: 0, z: 0 }, ball).lands; stripReads++; if (lands) stripLands++;
+        }
+        if (lands) { stopped = true; strips++; }
+      }
+      t += 1.2 + -Math.log(1 - rnd()) / lambda;   // the reach cooldown, then the next
+    }
+    if (!stopped && rnd() < POTHER) { stopped = true; others++; }
+    if (!stopped && rnd() < PSHOT && rnd() < pBlock) { stopped = true; blocks++; }
+    if (stopped) st++;
+  }
+  return { per10: +(10 * st / N).toFixed(2), strips: +(10 * strips / N).toFixed(2), blocks: +(10 * blocks / N).toFixed(2), other: +(10 * others / N).toFixed(2), reachesPerPoss: +(reaches / N).toFixed(2), stripLandsGivenRead: stripReads ? +(stripLands / stripReads).toFixed(3) : null, pBlockPerShot: +pBlock.toFixed(3) };
+}
+if (process.argv.includes('--stops')) {
+  const N = Number(arg('--n', '4000'));
+  resetAllFeelOverrides(); seed = 7;
+  console.log('STOPS before (dice, gate 0.5, jump 0.3, rig tell rate 2/63.3 s):', JSON.stringify((() => { setFeelOverride('hoops.aiReachGate', 0.5); setFeelOverride('hoops.aiBlockJumpChance', 0.3); return stops(N, true, 2 / 63.3); })()));
+  for (const cfg of JSON.parse(process.env.CONFIGS ?? '[{}]') as Record<string, number>[]) {
+    resetAllFeelOverrides(); seed = 7; for (const [k, v] of Object.entries(cfg)) { if (setFeelOverride(k, Number(v)) === null) throw new Error('not a knob: ' + k); }
+    console.log('STOPS after', JSON.stringify(cfg), '(geometry, rig tell rate 4/59.4 s at gate 0.5):', JSON.stringify(stops(N, false, 4 / 59.4)));
+  }
+  process.exit(0);
+}
 const CONFIGS: Record<string, number>[] = JSON.parse(process.env.CONFIGS ?? '[{}]');
 for (const cfg of CONFIGS) {
   resetAllFeelOverrides(); for (const [k, v] of Object.entries(cfg)) { if (setFeelOverride(k, Number(v)) === null) throw new Error('not a knob: ' + k); }
