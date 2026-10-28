@@ -15,6 +15,7 @@
 //
 // Pure. Client-safe.
 import { JUMP_CHECK_HREF } from '@/lib/daily-drill/copy';
+import { JUMP_CHECK } from '@/lib/vertical/copy';   // VERTICAL-EASY: one name for the hands-on-hips jump check
 import { LANDING_CHECK_ENTRY } from '@/lib/drills/route';
 import type { DecisionKind, ReadResult, RetestKind } from './types';
 
@@ -22,7 +23,7 @@ export const PROGRAMS_TITLE = 'Signature programs';
 export const PROGRAMS_LEDE = "FEL's own programs, from the owner's books: eight to twelve weeks each, re-tested as you go, and the plan moves with what the re-tests read.";
 
 export const RETEST: Record<RetestKind, { label: string; line: string; href: string; cta: string }> = {
-  jump: { label: 'Jump check', line: 'Three jumps on the camera: your best and your trend.', href: JUMP_CHECK_HREF, cta: 'Do the jump check' },
+  jump: { label: 'Jump check', line: 'Three jumps on the camera: your best and your trend.', href: JUMP_CHECK_HREF, cta: JUMP_CHECK },
   landing: { label: 'Landing check', line: 'The one-minute landing check that opens the jumping.', href: LANDING_CHECK_ENTRY, cta: 'Do the landing check' },
   form: { label: 'Mirror', line: 'A squat or lunge set on the Mirror: how many reps stay clean.', href: '/play/mirror', cta: 'Open the Mirror' },
   shot: { label: 'Shooting', line: 'A round of body-play shooting: your makes.', href: '/play/threepoint', cta: 'Shoot a round' },

@@ -3,6 +3,10 @@
   "title": "The work between games",
   "lede": "Screen it, program it, fuel it.",
   "cards": {
+    "vertical": {
+      "title": "Measure my vertical",
+      "line": "Prop your phone up, jump three times. About a minute."
+    },
     "mirror": {
       "title": "The Mirror",
       "line": "Squat coach and movement screen. Every number is an estimate."
