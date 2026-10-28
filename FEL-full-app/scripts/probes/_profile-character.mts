@@ -71,7 +71,8 @@ async function bundle(label: string): Promise<void> {
   mkdirSync(SITE, { recursive: true });
   await build({
     entryPoints: [join(ROOT, 'scripts/probes/_profile-character-entry.tsx')], bundle: true, outdir: SITE, entryNames: 'rig', format: 'esm', splitting: true, platform: 'browser',
-    jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: true,
+    // MINIFY=0: readable names for the `profile` job's CPU profile (still a production build)
+    jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error', minify: process.env.MINIFY !== '0',
     banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "production" } }; var __dirname = "/";' },
     loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.glb': 'empty', '.wasm': 'empty' },
     external: ['@mediapipe/tasks-vision'],
@@ -127,7 +128,7 @@ const RECORDER = `(() => {
   requestAnimationFrame(tick);
 })()`;
 
-interface Visit { fcp: number | null; marks: Record<string, number>; steps: Record<string, number>; long: [number, number][]; longCount: number; longTotal: number; longMax: number; tbtAfterFcp: number; longBeforeFcp: number; taps: { maxMs: number; maxDelay: number; all: number[] }; heapMB: number; error?: string }
+interface Visit { fcp: number | null; marks: Record<string, number>; steps: Record<string, number>; long: [number, number][]; longCount: number; longTotal: number; longMax: number; tbtAfterFcp: number; longBeforeFcp: number; taps: { maxMs: number; maxDelay: number; all: number[]; wallMs: number[]; maxWallMs: number; events: [string, number, number, number][] }; heapMB: number; error?: string }
 
 async function visit(ctx: BrowserContext, page: Page, url: string, shot: string, opts: { liveTimeout: number; taps: boolean; before: boolean; tap3d?: boolean }): Promise<Visit> {
   const cdp = await ctx.newCDPSession(page);
@@ -144,6 +145,7 @@ async function visit(ctx: BrowserContext, page: Page, url: string, shot: string,
     await page.waitForTimeout(500);
     await page.getByRole('button', { name: /See in 3D/ }).click();
   }
+  const wall: number[] = [];
   if (opts.taps) {
     // six taps on the page's first heading, 2.5 s apart from FCP+0.5 s (the stage waits for a quiet second, so taps this
     // far apart also land while the 3D loads): a tap the stage's load must not hold up
@@ -151,7 +153,8 @@ async function visit(ctx: BrowserContext, page: Page, url: string, shot: string,
       await page.waitForTimeout(i === 0 ? 500 : 2500);
       const t = page.locator('h2, h1').first();
       const box = await t.boundingBox().catch(() => null);
-      if (box) await page.mouse.click(box.x + 8, box.y + 6);
+      // wall time from sending the tap to the page having taken it (the renderer's main thread must be free to ack it)
+      if (box) { const t = Date.now(); await page.mouse.click(box.x + 8, box.y + 6); wall.push(Date.now() - t); }
     }
   }
   await posterShot;
@@ -177,7 +180,7 @@ async function visit(ctx: BrowserContext, page: Page, url: string, shot: string,
     longCount: long.length, longTotal: long.reduce((a, l) => a + l[1], 0), longMax: long.reduce((a, l) => Math.max(a, l[1]), 0),
     longBeforeFcp: long.filter((l) => l[0] < (fcp ?? 0)).reduce((a, l) => a + l[1], 0),
     tbtAfterFcp: long.filter((l) => l[0] >= (fcp ?? 0)).reduce((a, l) => a + Math.max(0, l[1] - 50), 0),
-    taps: { maxMs: taps.reduce((a, e) => Math.max(a, e[2]), 0), maxDelay: taps.reduce((a, e) => Math.max(a, e[3]), 0), all: taps.map((e) => e[2]) },
+    taps: { maxMs: taps.reduce((a, e) => Math.max(a, e[2]), 0), maxDelay: taps.reduce((a, e) => Math.max(a, e[3]), 0), all: taps.map((e) => e[2]), wallMs: wall, maxWallMs: Math.max(0, ...wall), events: m.events },
     heapMB: Math.round(heap / 1e5) / 10,
     ...(err ? { error: err.slice(0, 400) } : {}),
   };
@@ -226,6 +229,48 @@ async function run(label: string): Promise<void> {
   writeFileSync(join(dir, 'metrics.json'), JSON.stringify(out, null, 2));
 }
 
+/** Where the 3D's main-thread time goes: a CPU profile of the first visit (build with MINIFY=0), self time by function. */
+async function profileJob(label: string): Promise<void> {
+  const site = join(OUT, `.build-${label}`);
+  const { url, close } = await serve(site);
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+    await ctx.addInitScript(NAME_SHIM);
+    await ctx.addInitScript(RECORDER);
+    const page = await ctx.newPage();
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    await cdp.send('Profiler.enable');
+    await cdp.send('Profiler.setSamplingInterval', { interval: 1000 });
+    await cdp.send('Profiler.start');
+    await page.goto(`${url}/#own`);
+    await page.waitForFunction(() => document.querySelector('[data-athlete-state]')?.getAttribute('data-athlete-state') === 'live', undefined, { timeout: 300_000 }).catch(() => {});
+    const { profile } = await cdp.send('Profiler.stop') as { profile: { nodes: { id: number; callFrame: { functionName: string; url: string; lineNumber: number }; children?: number[] }[]; samples: number[]; timeDeltas: number[] } };
+    const m = await page.evaluate(() => ({ long: (window as unknown as { __M: { long: [number, number][] } }).__M.long, steps: Object.fromEntries(performance.getEntriesByType('mark').filter((e) => e.name.startsWith('fel-athlete:')).map((e) => [e.name.slice(12), Math.round(e.startTime)])) }));
+    const byId = new Map(profile.nodes.map((n) => [n.id, n]));
+    const parent = new Map<number, number>();
+    for (const n of profile.nodes) for (const c of n.children ?? []) parent.set(c, n.id);
+    const self = new Map<string, number>();
+    const incl = new Map<string, number>();
+    profile.samples.forEach((id, i) => {
+      const dt = (profile.timeDeltas[i] ?? 0) / 1000;
+      const n = byId.get(id)!;
+      const key = (f: { functionName: string; url: string; lineNumber: number }) => `${f.functionName || '(anon)'} ${f.url.split('/').pop()}:${f.lineNumber}`;
+      self.set(key(n.callFrame), (self.get(key(n.callFrame)) ?? 0) + dt);
+      const seen = new Set<string>();
+      for (let cur: number | undefined = id; cur != null; cur = parent.get(cur)) { const k = key(byId.get(cur)!.callFrame); if (!seen.has(k)) { seen.add(k); incl.set(k, (incl.get(k) ?? 0) + dt); } }
+    });
+    const top = (mp: Map<string, number>, n: number) => [...mp].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${Math.round(v)} ms  ${k}`);
+    const out = { steps: m.steps, long: m.long.filter((l) => l[1] >= 150), self: top(self, 30), inclusive: top(incl, 60) };
+    writeFileSync(join(OUT, `profile-${label}.json`), JSON.stringify(out, null, 2));
+    console.log(JSON.stringify({ steps: out.steps, long: out.long }));
+    console.log(out.self.join('\n'));
+    await ctx.close();
+  } finally { await browser.close(); close(); }
+}
+
 if (job === 'build') { for (const l of labels.length ? labels : ['now']) await bundle(l); }
+else if (job === 'profile') { for (const l of labels) await profileJob(l); }
 else if (job === 'run') { for (const l of labels.length ? labels : ['now']) await run(l); }
 else throw new Error(`unknown job ${job}`);

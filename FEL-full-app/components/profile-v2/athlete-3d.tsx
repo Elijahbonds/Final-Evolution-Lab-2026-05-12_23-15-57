@@ -70,6 +70,12 @@ export default function Athlete3D(props: Athlete3DProps) {
         const liveScale = 1 / Math.min(2, window.devicePixelRatio || 1);
         engine.setHardwareScalingLevel(liveScale);
         const scene = new Scene(engine);
+        // THE CLIP SCOPE (measured, scripts/probes/_profile-character.mts `profile`): a scene no mode owns is UNSCOPED, so the
+        // spawn built every authored clip of every sport and installed the hoops captures — 11 s of the 14 s spawn task on
+        // the 4×-throttled phone rig, for a body that only ever idles here. The exercise library's demo stage has the same
+        // need and its own lazy scope (clipScope.ts 'library': the core clips at spawn, the rest on demand), so the profile
+        // stands in it too. Not a standard-frame mode (playFrame.ts), so the player's height and build still show.
+        (scene.metadata ??= {}).felModeId = 'library';
         scene.clearColor = new Color4(0, 0, 0, 0);
         scene.skipPointerMovePicking = true;
         const cam = new ArcRotateCamera('profileCam', PROFILE_CAM.alpha, PROFILE_CAM.beta, PROFILE_CAM.radius, new Vector3(0, PROFILE_CAM.y, 0), scene);

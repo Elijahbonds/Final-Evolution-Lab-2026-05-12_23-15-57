@@ -49,4 +49,12 @@ describe('the athlete stage', () => {
     expect(s).toMatch(/reducedMotion\(\)/);
     expect(s).toMatch(/atBindPose/);   // never a T-pose, never a T-pose picture
   });
+
+  it('spawns in the library’s lazy clip scope (an unscoped scene built every sport’s clips: 11 of 14 s on the rig), not a standard-frame mode', async () => {
+    expect(src('athlete-3d.tsx')).toMatch(/felModeId = 'library'/);
+    const { scopeForMode } = await import('@/lib/babylon/anim/clipScope');
+    const { isStandardFrame } = await import('@/lib/babylon/core/playFrame');
+    expect(scopeForMode('library')?.lazy).toBe(true);
+    expect(isStandardFrame({ modeId: 'library' })).toBe(false);   // the player's own height and build still show
+  });
 });
