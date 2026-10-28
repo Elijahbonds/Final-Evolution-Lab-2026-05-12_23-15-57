@@ -151,7 +151,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
                   {q.options.map((o) => (
                     <label
                       key={o}
-                      className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-[13.5px] leading-snug text-white/75 ${
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-[14px] leading-snug text-white/75 ${
                         picked[q.id] === o ? 'border-[#A855F7]/60 bg-[#A855F7]/[0.08]' : 'border-white/8'}`}
                     >
                       <input
