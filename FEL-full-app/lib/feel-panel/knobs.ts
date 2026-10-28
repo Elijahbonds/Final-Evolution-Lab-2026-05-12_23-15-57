@@ -1174,7 +1174,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
   {
     id: 'hoops.rivalBudgetSec', label: '3v3 rivals: the possession budget', def: 10, min: 4, max: 20, step: 0.5, unit: 's', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_BUDGET_SEC',
-    hint: 'Past this the handler attacks now (× the tier: ROOKIE 0.8, ELITE 1.05).',
+    hint: 'Past this the handler attacks now (× the tier: ROOKIE 0.9, ELITE 1.05).',
   },
   {
     id: 'hoops.rivalAttackPullUpSec', label: '3v3 rivals: held in front, pull up after', def: 0.8, min: 0.3, max: 3, step: 0.05, unit: 's', group: 'Hoops · rival offense',

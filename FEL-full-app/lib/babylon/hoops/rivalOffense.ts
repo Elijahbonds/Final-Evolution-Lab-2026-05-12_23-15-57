@@ -324,7 +324,8 @@ export class RivalKit implements AttackerDelegate {
       if (!inLane && (along <= 0.2 || dDist > CONTAIN_RANGE + 0.2)) this.judge.won = true;
       if (this.judge.won || this.judge.t >= MOVE_JUDGE_SEC) {
         const m = this.judge.move; this.memory[m] = Math.max(-1, Math.min(1, this.memory[m] * 0.6 + (this.judge.won ? 0.6 : -0.3)));
-        if (this.judge.won && b.containedSec > 0.15) this.beaten = true;   // a move that cleared a man who was set is a beaten man (a dunk at the rim, D1)
+        // (a move that clears him is a LAYUP line, as an open drive is: D1's dunk stays the blow-by's — a whiffed reach, a jump at nothing.
+        //  Measured: a move's win as "beaten" doubled his dunks against a late defender, 88 → 173 in 300, the mix the odds sit on)
         this.judge = null;
       }
     }

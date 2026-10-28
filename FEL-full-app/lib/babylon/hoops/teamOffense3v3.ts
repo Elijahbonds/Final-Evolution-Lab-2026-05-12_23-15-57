@@ -60,7 +60,7 @@ const pullUpMaxM = (): number => feel('hoops.rivalPullUpMaxM', RIVAL_PULLUP_MAX_
  *  screen and in a swing, how many passes a possession can hold, whether it reads the screen (reject / hit the roll man). */
 export interface TeamTier { probeK: number; budgetK: number; screenChance: number; swingChance: number; passes: number; readsScreen: boolean; movesPerProbe: number }
 export const TEAM_TIER: Readonly<Record<Tier, TeamTier>> = {
-  rookie: { probeK: 0.6, budgetK: 0.8, screenChance: 0.3, swingChance: 0.35, passes: 1, readsScreen: false, movesPerProbe: 1 },
+  rookie: { probeK: 0.9, budgetK: 0.9, screenChance: 0.3, swingChance: 0.35, passes: 1, readsScreen: false, movesPerProbe: 1 },
   pro: { probeK: 1, budgetK: 1, screenChance: 0.65, swingChance: 0.5, passes: 2, readsScreen: true, movesPerProbe: 2 },
   elite: { probeK: 1.1, budgetK: 1.05, screenChance: 0.75, swingChance: 0.6, passes: 3, readsScreen: true, movesPerProbe: 2 },
 };
