@@ -67,8 +67,8 @@ export const CALIB_SWAY_FALLBACK: number = th('calib.swayFallback');
  * hold the wrong leg ("Other leg") and to start the second leg on "Go." without a 3-2-1 once the right leg is up.
  */
 export const STANCE_FOOT_UP = 2 * th('t5.contactLine');
-/** Frames in a row on the wrong leg before the runner holds the part (a wobble is not a wrong leg). */
-const WRONG_LEG_FRAMES = 8;
+/** Frames in a row on the wrong leg before the runner holds the part (a wobble is not a wrong leg): tracking loss's own count. */
+const WRONG_LEG_FRAMES = LOSS_FRAMES;
 
 function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
   if (!part) return null;

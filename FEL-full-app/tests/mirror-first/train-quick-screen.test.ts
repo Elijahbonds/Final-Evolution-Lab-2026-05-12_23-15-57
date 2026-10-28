@@ -35,6 +35,7 @@ vi.mock('@/lib/daily-drill/load', async (orig) => ({
 
 import TrainPage from '@/app/train/page';
 import { SCREEN_HOME, isQuickScreenPath } from '@/lib/screen/routes';
+import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 import { screenText } from '@/lib/share/screen';
 
 beforeEach(() => { h.reads = []; });
@@ -47,13 +48,17 @@ const card = (html: string) => {
 };
 
 describe('/train, the Quick Screen card', () => {
-  it('is on the shelf, linking the screen\'s front door (/screen), never a deep link past its age step', async () => {
+  // SCREEN-EASY (2026-10-28; test changed, flagged): the card opens the FULL screen itself, no longer /screen's start card —
+  // whose first button is the jump, which /train has as its own card. Still never a way past the screen's own steps: a
+  // ?run= start asks the age question first (lib/screen/minor-lock.test.tsx, "from a ?run= link (no start card)"), and the
+  // pain question after it. /screen stays the QR address.
+  it('is on the shelf, opening the full screen at its own age step (?run=full; never past it)', async () => {
     const c = card(await render());
     expect(c).not.toBeNull();
-    expect(c!.href).toBe(SCREEN_HOME);
-    expect(c!.href).toBe('/screen');
-    expect(isQuickScreenPath(c!.href)).toBe(true);
-    expect(c!.href).not.toMatch(/assess|\?run=/);
+    expect(c!.href).toBe(FULL_SCREEN_HREF);
+    expect(c!.href).toBe('/play/mirror/assess?run=full');
+    expect(isQuickScreenPath(c!.href.split('?')[0])).toBe(true);
+    expect(c!.href).not.toBe(SCREEN_HOME);
   });
 
   it('says it sends nothing, and names no condition, treatment or guarantee', async () => {

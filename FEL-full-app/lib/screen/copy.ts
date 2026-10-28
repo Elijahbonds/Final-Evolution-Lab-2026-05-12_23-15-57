@@ -171,7 +171,7 @@ export const FRAMING_FIX_LINES = {
 
 /** After each test (SCREEN A): asked by voice, answered with one big tap; it waits — no timeout, no default. */
 // SCREEN-EASY (2026-10-28): both hands up is the "no", from where the athlete stands (lib/screen-easy/handsUp.ts); it was
-// 'Any pain in that one? Tap yes or no when you walk back.' — a walk to the phone and back after every test.
+// 'Any pain in that one? Tap yes or no when you walk back.' — a walk to the device and back after every test.
 export const PAIN_CHECK_LINE = 'Any pain? If not, put both hands up. If it hurts, tap Yes.';
 
 /** The first counted rep of a run (SCREEN A): what the beep means. Said once per run. */

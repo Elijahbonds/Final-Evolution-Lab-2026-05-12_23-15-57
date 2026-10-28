@@ -14,7 +14,7 @@ export const SETUP = {
   'T1-front': 'Overhead squat. Face the camera, arms straight up. Squat deep, three times.',
   'T3-left': 'Stand on your left leg, hands on hips. Squat a third of the way, three times.',
   'T3-right': 'Now your right leg. Same again, three times.',
-  T5: 'Jump. Hands on hips. Dip and jump high, then stand still. Three jumps.',
+  T5: 'Jump. Hands on hips, three jumps.',
   'T1-side': 'Now turn side-on, left side to the camera. Same overhead squat, three times.',
   'T2-left': 'Last one, at a wall. Left foot forward, heel down. Knee to the wall, three times.',
   'T2-right': 'Now turn around, right foot forward. Same again, three times.',
@@ -44,7 +44,7 @@ export const WALL_LINE = 'Side-on, one foot forward. Knee to the wall, heel down
 export const NO_WALL_SKIPPED = 'Ankle bend skipped: it needs a wall.';
 
 /** Before the camera (the pain step): the start card's privacy line, for a start that did not pass the start card. */
-export const VIDEO_STAYS = 'The video stays on this phone.';
+export const VIDEO_STAYS = 'The video stays on this device.';
 /** Under the take-off question (was "Asked once, before the camera. Your sided results are labelled with your jumping leg."). */
 export const TAKEOFF_NOTE = 'It labels your left and right results.';
 
