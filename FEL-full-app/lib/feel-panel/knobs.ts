@@ -1191,6 +1191,53 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_PULLUP_MAX_M',
     hint: 'The off-the-dribble pull-up is taken only inside this (the release\'s jumper base has no range term).',
   },
+  // hoops-p04 (1v1/3v3 phase 4 "feet and transitions"): one blend + minimum-hold rule (anim/hoopsTransitions), the shot clips on their
+  // release (hoops/releaseTiming). Every default is this lane's; the owner has felt none of them.
+  {
+    id: 'hoops.transitionRuleOn', label: 'Transitions: one blend + hold rule (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts TRANSITION_RULE_ON',
+    hint: '1: every clip change a hoops body makes is floored and sibling loops held (anim/hoopsTransitions). 0: each state\'s own fade and the old dwell exactly.',
+  },
+  {
+    id: 'hoops.gaitFadeSec', label: 'Transitions: gait loop to gait loop', def: 0.22, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts GAIT_FADE_SEC',
+    hint: 'The blend between the dribble / run loops (their legs are out of phase; time hides it).',
+  },
+  {
+    id: 'hoops.defenseFadeSec', label: 'Transitions: defence loop to defence loop', def: 0.2, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts DEFENSE_FADE_SEC',
+    hint: 'The blend between the slides, the backpedal, the closeout, the crossover step.',
+  },
+  {
+    id: 'hoops.crossFadeSec', label: 'Transitions: across groups / a settle', def: 0.2, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts CROSS_FADE_SEC',
+    hint: 'Offence to defence, and a loop after a beat or a hold.',
+  },
+  {
+    id: 'hoops.beatFadeFloorSec', label: 'Transitions: a beat\'s shortest fade', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts BEAT_FADE_FLOOR_SEC',
+    hint: 'A move, a reach, a shot: the clip starts on the press, its weight comes in no faster than this.',
+  },
+  {
+    id: 'hoops.priorityFadeSec', label: 'Transitions: a priority cut\'s shortest fade', def: 0.08, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts PRIORITY_FADE_SEC',
+    hint: 'A stagger, the floor, a dunk.',
+  },
+  {
+    id: 'hoops.minHoldSec', label: 'Transitions: a loop\'s minimum hold', def: 0.22, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/hoopsTransitions.ts MIN_HOLD_SEC',
+    hint: 'A loop plays at least this long before a sibling loop replaces it (the old dwell, now for every loop group).',
+  },
+  {
+    id: 'hoops.releaseToClipOn', label: 'Rival shots: release on the clip (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/releaseTiming.ts RELEASE_TO_CLIP_ON',
+    hint: '1: the rival\'s jumper / finish clip is paced so the ball leaves on its release key. 0: the clip from its first frame at speed 1, as before.',
+  },
+  {
+    id: 'hoops.jumperFromRiseOn', label: 'Jumper: enter at the rise (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · transitions',
+    source: 'lib/babylon/hoops/releaseTiming.ts JUMPER_FROM_RISE_ON',
+    hint: '1: the hero\'s jumper skips its load dip (the ball rises on the press) and is paced from the rise to the green. 0: from its first frame.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

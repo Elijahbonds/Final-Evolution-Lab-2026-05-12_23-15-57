@@ -328,7 +328,7 @@
           const nb = []; for (let k = Math.max(1, i - 6); k <= Math.min(n - 1, i + 6); k++) if (k !== i) nb.push(w[k]); nb.sort((a, b) => a - b);
           const med = nb[Math.floor(nb.length / 2)] || 0; const side = Math.max(w[i - 3] || 0, w[i + 3] || 0);
           if (/Arm|Leg|Hand|Foot/.test(WATCH[j]) && w[i] > 1500) R.whips++;
-          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) R.severe++; R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
+          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) { R.severe++; if ((R.severeAt || (R.severeAt = [])).length < 60) R.severeAt.push([HG.f0 + i, WATCH[j], Math.round(w[i])]); }   /* hoops-p04: where the severe pops are */ R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
         }
       }
       // root snaps (> 20 deg of yaw in one frame) and root jumps (0.25-0.5 m in one frame) outside resets
@@ -337,7 +337,7 @@
         if (cuts.has(i)) continue;
         const o = (i * NB + bi) * K, p = ((i - 1) * NB + bi) * K;
         let dy = Math.abs(pos[o + 3] - pos[p + 3]) * 180 / Math.PI; if (dy > 180) dy = 360 - dy;
-        if (dy > 20) { R.rootSnaps++; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.rootSnaps || (P.rootSnaps = {}))[B[bi].id] = (P.rootSnaps[B[bi].id] || 0) + 1; } }
+        if (dy > 20) { R.rootSnaps++; if ((R.snapAt || (R.snapAt = [])).length < 60) R.snapAt.push([HG.f0 + i, +dy.toFixed(1)]); const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.rootSnaps || (P.rootSnaps = {}))[B[bi].id] = (P.rootSnaps[B[bi].id] || 0) + 1; } }
         const d = Math.hypot(pos[o] - pos[p], pos[o + 2] - pos[p + 2]); if (d > 0.25) R.rootJumps++;
         vel[i] = d * 60;
         if (i > 1 && vel[i - 1] !== undefined && !cuts.has(i - 1)) { const q = ((i - 2) * NB + bi) * K; const ax = (pos[o] - 2 * pos[p] + pos[q]) * 3600, az = (pos[o + 2] - 2 * pos[p + 2] + pos[q + 2]) * 3600; acc.push(Math.hypot(ax, az)); }

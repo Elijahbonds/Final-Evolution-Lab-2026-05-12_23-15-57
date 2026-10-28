@@ -236,7 +236,7 @@ export function pickWeighted<K extends string>(w: Readonly<Record<K, number>>, r
 // ── THE KIT ATTACKER (AttackerBrain delegates its decision here when the mode gives it a kit) ───────────────────────────────────
 const ZERO = (): Vector3 => new Vector3(0, 0, 0);
 const decision = (wish: Vector3, phase: AttackDecision['phase'], o: Partial<AttackDecision> = {}): AttackDecision =>
-  ({ wish, phase, contained: false, exposure: 0, step: false, crossover: null, shot: null, action: null, backToRim: false, look: null, moveSide: null, ...o });
+  ({ wish, phase, contained: false, exposure: 0, step: false, crossover: null, shot: null, action: null, backToRim: false, look: null, moveSide: null, shotPlan: null, ...o });
 
 export class RivalKit implements AttackerDelegate {
   readonly profile: TierProfile;
@@ -303,11 +303,11 @@ export class RivalKit implements AttackerDelegate {
         const action: RivalAction = shot === 'dunk' ? 'dunk' : shot === 'layup' ? 'layup' : this.look === 'floater' ? 'floater' : 'pull_up';   // a post hook is a layup's odds and name
         return decision(ZERO(), 'released', { shot, look: this.look, action: this.say(action) });
       }
-      return decision(stride, 'gather', { look: this.look, backToRim: false });
+      return decision(stride, 'gather', { look: this.look, backToRim: false, shotPlan: this.pending });
     }
     if (b.phase === 'stepback') {
       this.stepbackSec += dt;
-      if (this.stepbackSec >= STEPBACK_SEC) { b.phase = 'gather'; this.gatherSec = 0; return decision(ZERO(), 'gather'); }
+      if (this.stepbackSec >= STEPBACK_SEC) { b.phase = 'gather'; this.gatherSec = 0; return decision(ZERO(), 'gather', { shotPlan: this.pending }); }
       return decision(dir.scale(-STEPBACK_SPEED), 'stepback', { exposure: 0.2 });
     }
     const dv = new Vector3(defender.x - self.x, 0, defender.z - self.z);
@@ -348,7 +348,7 @@ export class RivalKit implements AttackerDelegate {
       const gaveRoom = dDist > CONTAIN_RANGE + 0.15 && this.profile.punishRate >= 0.5;   // PRO+ read: he backed off — turn and shoot
       if (dist < postHookM()) { this.pending = 'layup'; this.look = 'hook'; }
       else if (this.postSec >= postMaxSec() || gaveRoom) { this.pending = 'jumper'; this.look = 'fade'; }
-      if (this.pending) { b.phase = 'gather'; this.gatherSec = 0; return decision(ZERO(), 'gather', { look: this.look, backToRim: this.look === 'fade' }); }
+      if (this.pending) { b.phase = 'gather'; this.gatherSec = 0; return decision(ZERO(), 'gather', { look: this.look, backToRim: this.look === 'fade', shotPlan: this.pending }); }
       return decision(intoBody(wish, self, defender, POST_INTO_MPS), 'post', { contained: inLane, exposure, backToRim });
     } else if (this.move) {
       // A MOVE IN PROGRESS: its shape, on its side
@@ -421,7 +421,7 @@ export class RivalKit implements AttackerDelegate {
     if (this.pending === 'layup' || this.pending === 'dunk' || this.pending === 'jumper') {
       this.endMove(b);
       b.phase = 'gather'; this.gatherSec = 0;
-      return decision(ZERO(), 'gather', { contained: inLane, action, look: this.look });
+      return decision(ZERO(), 'gather', { contained: inLane, action, look: this.look, shotPlan: this.pending });
     }
     return decision(intoBody(wish, self, defender, 0), b.phase, { contained: inLane, exposure, step, crossover, action, backToRim, moveSide });
   }

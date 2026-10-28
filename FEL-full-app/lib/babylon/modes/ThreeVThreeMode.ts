@@ -177,6 +177,8 @@ import { EffectsKit, applyTrail, type TrailLevel, type AmbientHandle } from '../
 import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
 import { TeamOffense3v3, teamOffenseOn, crossesHand } from '../hoops/teamOffense3v3';   // hoops-p03 (1v1/3v3 phase 3): their team offence on bodies
 import { KIT_RENDER, type KitMove } from '../hoops/rivalOffense';   // hoops-p03: the handler's kit moves
+import { jumperPace, finishPace, jumperFromRiseOn } from '../hoops/releaseTiming';   // hoops-p04: the rival's shot leaves on the clip's release; the hero's rise skips the load
+import { riseStartOf } from '../anim/opponentMotion';   // hoops-p04
 import { Aware3v3 } from './threevthreeAware';   // lane/h3-aware (#313 H3c): the bodies off the ball watch it, their possession plays both ends, a real D stance
 import { MateBall, mateReadOn, RELEASE_ROLL_RIM_M, RELEASE_ROLL_PER_FRAME } from './threevthreeMate';   // lane/h3-aware (#315 H3e): my teammate with the ball reads and plays
 /** H2c (dev log): the defender states the stepping pass added or re-routed. */
@@ -2946,9 +2948,13 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     const rc = riseClipFor(kind, me.char.animator);   // hoops-shot-content: a step-back rises on its own release (same green: paced on its own release key)
     const clipSec = me.char.animator.durationOf(rc.clip) ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01);
+    // hoops-p04 (routed from phase 1: the ball rose 14 frames after the press, riding the jumper's load dip): the rise is entered at the
+    // clip's RISE (anim/opponentMotion CAPTURE_RISE_START_01, as the 3PT shooter's is) and paced from there, so the release still lands on
+    // the green; `hoops.jumperFromRiseOn` 0 = the clip from its first frame, as before
+    const rise01 = jumperFromRiseOn() ? Math.min(riseStartOf(me.animator, rc.clip, 0), rc.release01) : 0;
+    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01 - rise01);
     riseHop = new JumperRise(shotMeter.riseSec, greenInRise01, JUMPER_HOP_APEX, sync);   // lane/h3-handler (#314 port): DEFENSE-LOOK's hop, leaving the floor after the load, the apex at the release
-    me.tree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08 });
+    me.tree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08, from01: rise01 });
   }
   /** M3: a layup / floater — the ball into the finishing hand, the finish clip paced to the green, the stride and the hop. */
   function startFinish(ctx: ModeContext, style: FinishStyle, contest: number, defenderPos: Vector3 | null, sideIn?: 'left' | 'right', preSec = 0): void {
@@ -4257,7 +4263,11 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
       driverDribbling = false;   // HOOPS MOTION phase 3: the gather — his carry parks the ball into his hand for the finish
       tellPlan = plan;
       const side = rivalFinishHand(shooter, tellPlan);
-      shooter.tree.beat(tellPlan === 'dunk' ? 'dunk_charge_gather' : tellPlan === 'layup' ? FINISH_CLIP.layup[side] : 'jumpshot', { fadeSec: 0.08, holdEnd: tellPlan !== 'jumper' });
+      // hoops-p04: the wind-up is PACED to the release (hoops/releaseTiming): the jumper entered at its rise, its release key on the tell's
+      // last frame — it played from its first frame at speed 1, so the ball left at the dip, at the chest (phase 2's routed finding)
+      const toSec = Math.max(0.05, driveSec * (1 - k));
+      const pace = tellPlan === 'jumper' ? jumperPace(shooter.char.animator, toSec) : tellPlan === 'layup' ? finishPace('layup', toSec) : null;
+      shooter.tree.beat(tellPlan === 'dunk' ? 'dunk_charge_gather' : tellPlan === 'layup' ? FINISH_CLIP.layup[side] : 'jumpshot', { fadeSec: 0.08, holdEnd: tellPlan !== 'jumper', ...(pace ? { speedRatio: pace.speedRatio, from01: pace.from01 } : {}) });
       console.info(`[3V3-DEF] rival gather ${tellPlan} at k ${k.toFixed(2)} (${(driveSec * (1 - k)).toFixed(2)} s to the release)`);
     };
     // THE BODIES MEET (the drive's charge / blocking foul), as a step both drives take — see the call site in the release's drive

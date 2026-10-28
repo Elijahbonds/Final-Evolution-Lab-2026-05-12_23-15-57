@@ -156,7 +156,7 @@ import {
   resolveBodyCollision, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, DUNK_RANGE, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC, HAND_UP_CONTEST, proximityContest01,
-  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF, type RivalShotLook } from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF, type RivalShotLook, GATHER_SEC } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed } from '../core/BallHandling';   // (hoops-shot-content: the release frame of the clip that plays is read in hoops/shotLooks.riseClipFor)
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
@@ -237,6 +237,8 @@ import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA 
 import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP-02: the rival defender reacts late by tier (420 / 220 / 120 ms)
 import { aiReactMs } from '../hoops/reaction';   // hoops-p02: the AI's block jump is never before it could have read my shot
 import { RivalKit, rivalKitOn, KIT_RENDER, type KitMove } from '../hoops/rivalOffense';   // hoops-p03 (1v1/3v3 phase 3): the rival's move kit and reads
+import { jumperPace, finishPace, jumperFromRiseOn } from '../hoops/releaseTiming';   // hoops-p04: the rival's shot leaves on the clip's release; the hero's rise skips the load
+import { riseStartOf } from '../anim/opponentMotion';   // hoops-p04
 import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
@@ -475,6 +477,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   const kitTheAttacker = (): void => { const want = rivalKitOn() ? runTier() : null; if (want === kitTier) return; kitTier = want; attacker.kit = want ? new RivalKit(want) : null; };
   const nerveTheAttacker = (): void => { attacker.patience = attackerPatience(nerve(rivalStanding()).aggression, knobs); };   // IMPROVE (2026-10-06) #2: × the tier (PRO ×1: the old 1 / max(0.5, aggression))
   let gatherShown = false, stepbackShown = false;
+  let riseShown = false;   // hoops-p04: the gather already played his shot's rise (the release beats the follow-through)
   let myJumpAge = Infinity;
   let dunkLabel = '';            // which dunk the drive earned (HoopsDunks) — the banner names it when it lands
   let oobSec = 0;                // how long the carrier has been ON the line, still pushing at it
@@ -2311,7 +2314,12 @@ export const OneVOneMode: ModeDefinition = (() => {
               // HOOPS MOTION phase 3: his finish and his jumper are right-handed clips — a crossover may have left the ball in his left
               // hand, so it is handed to the right as he gathers (a gather, palm to palm), never shot out of the wrong one
               if (!(ball.metadata as { felReleased?: boolean } | undefined)?.felReleased) gatherBallToHand(ball, foe.skeleton, hoopsHand(foe));
-              if (distXZ(foe.root.position, RIM_FLOOR) < 2.2) foeAnimTree.beat('bball_layup_gather');
+              // hoops-p04: a JUMPER's gather plays the shot itself, paced so its release key lands on the release (hoops/releaseTiming) — it
+              // held the dunk's charge gather and started the jumpshot AT the release, so the ball left at the clip's first frame, arms down
+              const plan = dec.shotPlan ?? (distXZ(foe.root.position, RIM_FLOOR) < 2.2 ? 'layup' : 'jumper');
+              const pace = plan === 'jumper' ? (dec.look === 'floater' ? finishPace('floater', GATHER_SEC) : dec.look === 'fade' ? finishPace('fadeaway', GATHER_SEC) : jumperPace(foe.animator, GATHER_SEC)) : null;
+              if (pace) { riseShown = true; foeAnimTree.beat(dec.look === 'floater' ? 'bball_floater' : dec.look === 'fade' ? 'bball_fadeaway' : 'jumpshot', { fadeSec: 0.08, holdEnd: true, speedRatio: pace.speedRatio, from01: pace.from01 }); }
+              else if (distXZ(foe.root.position, RIM_FLOOR) < 2.2) foeAnimTree.beat('bball_layup_gather');
               else foeAnimTree.hold(SPORT_CLIP.dunkChargeGather, { fadeSec: 0.08 });
               SoundKit.play('whoosh', { pitch: 0.9, volume: 0.25 });
             }
@@ -2522,7 +2530,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (hoopsFx?.deadBall(() => startDefense(ctx, banner))) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
-    defPhase = 'check'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
+    defPhase = 'check'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; riseShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null; foeStealReach.reset();   // #273: a showing reach ends with the possession
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
@@ -2568,7 +2576,8 @@ export const OneVOneMode: ModeDefinition = (() => {
     releaseBall(ball);
     // a jumper rises out of the gather hold; a layup leaves the hand at the top of the layup gather beat, which plays out
     // (a jumpshot cut in over it popped the hand 0.37 m)
-    if (style === 'jumper') foeAnimTree.beat(look === 'floater' ? 'bball_floater' : look === 'fade' ? 'bball_fadeaway' : 'jumpshot', { fadeSec: 0.1, onSettle: () => { if (defPhase === 'shot') foeAnimTree.beat('bball_follow_through', { fadeSec: 0.2 }); } });   // BIOMECH-HOOPS-WAVE1 G5: the rival holds his follow-through too   // hoops-p03: the floater / the fade
+    if (style === 'jumper' && riseShown) { riseShown = false; foeAnimTree.beat('bball_follow_through', { fadeSec: 0.2 }); }   // hoops-p04: the rise played from the gather; this is the release
+    else if (style === 'jumper') foeAnimTree.beat(look === 'floater' ? 'bball_floater' : look === 'fade' ? 'bball_fadeaway' : 'jumpshot', { fadeSec: 0.1, onSettle: () => { if (defPhase === 'shot') foeAnimTree.beat('bball_follow_through', { fadeSec: 0.2 }); } });   // BIOMECH-HOOPS-WAVE1 G5: the rival holds his follow-through too   // hoops-p03: the floater / the fade
     else if (look === 'hook') foeAnimTree.beat('bball_hook', { fadeSec: 0.1 });   // hoops-p03: the post's hook (a layup's odds)
     // BLOCK check — a timed jump in range erases it. A jumper needs the blocker INSIDE the step-back (1.2 m — from further
     // out a hand up is a contest, below); a layup at the rim can be chased down from BLOCK_RANGE.
@@ -3004,9 +3013,13 @@ export const OneVOneMode: ModeDefinition = (() => {
     const rc = riseClipFor(kind, me.animator);   // hoops-shot-content: a step-back rises on its own release (same green: paced on its own release key)
     const clipSec = me.animator.durationOf(rc.clip) ?? 1.0;
     const greenInRise01 = (shotMeter.greenCenter01 * shotMeter.durationSec - shotMeter.gatherSec) / shotMeter.riseSec;
-    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01);
+    // hoops-p04 (routed from phase 1: the ball rose 14 frames after the press, riding the jumper's load dip): the rise is entered at the
+    // clip's RISE (anim/opponentMotion CAPTURE_RISE_START_01, as the 3PT shooter's is) and paced from there, so the release still lands on
+    // the green; `hoops.jumperFromRiseOn` 0 = the clip from its first frame, as before
+    const rise01 = jumperFromRiseOn() ? Math.min(riseStartOf(me.animator, rc.clip, 0), rc.release01) : 0;
+    const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01 - rise01);
     riseHop = new JumperRise(shotMeter.riseSec, greenInRise01, JUMPER_HOP_APEX, sync);   // lane/h3-handler (#314 port): leave the floor after the load, the apex at the release
-    meAnimTree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08 });
+    meAnimTree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08, from01: rise01 });
   }
   /** M3: a layup / floater. The ball into the finishing hand (the side the drive comes from, or away from the defender),
    *  the finish clip paced so its release key (the top of the hop) is the green, the body strides the last step and hops. */
@@ -3840,7 +3853,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     // straight to 'drive', never 'check': they already have the ball at the rim, there is nothing to check up for
-    defPhase = 'drive'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false;
+    defPhase = 'drive'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; riseShown = false; stepbackShown = false;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false; meShotWin = 'none'; foeShotWin = 'none';
     if (gather || finish || spin || posting) meAnimTree.release();

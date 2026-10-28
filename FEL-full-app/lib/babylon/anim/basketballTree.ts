@@ -22,6 +22,7 @@ import { boneNode, findBone } from './boneLookup';
 import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover fade, the same number doMove uses
 import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs keep running under a handle move
 import { protectClip, protectDribbles, restTempoFor } from './RestDribble';   // lane/h3-handler (#312 port): the dribble at rest
+import { transitionFor, transitionRuleOn } from './hoopsTransitions';   // hoops-p04: one blend + minimum-hold rule for every clip change
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -231,12 +232,12 @@ function withoutTrigger(i: AnimTreeInput, state: BasketballAnimState): AnimTreeI
 /** States that may cut a beat in flight. */
 const PRIORITY = new Set<BasketballAnimState>(['floor', 'contact_stagger', 'dunk']);
 
-export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number };
+export interface TreeBeatOpts { fadeSec?: number; speedRatio?: number; /** hoops-p04: start this far into the clip (a shot paced from its rise). */ from01?: number; onSettle?: () => void; /** Sit in this loop after the beat until the mode calls release() (a knockdown → the floor). */ settleTo?: { clip: string; fadeSec?: number; speedRatio?: number };
   /** BIOMECH-HOOPS-WAVE1: HOLD the beat's last frame when it runs out (an aerial clip in a flight — the dunk contest's
    *  playAir) until the mode's next beat / release(): the 0.35 s launch used to run out mid-air and settle into the run
    *  loop, the arms crossfading down through a T at the jam. */
   holdEnd?: boolean }
-export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number }
+export interface TreeHoldOpts { fadeSec?: number; speedRatio?: number; /** hoops-p04: start this far into the clip (a jumper held from its rise, its load skipped). */ from01?: number }
 
 /**
  * The ONE owner of a basketball body (ONEVONE-DEFENSE-LOGIC, 2026-09-07 — the boards' / combat's discipline). The mode
@@ -316,7 +317,10 @@ export class BasketballAnimTree {
       if (!yields) return this.override.state ?? this.current ?? c.state;
     }
     const now = typeof performance !== 'undefined' ? performance.now() / 1000 : 0;
-    if (c.state !== this.current && c.loop && this.sameGroup(this.current, c.state) && now - this.stateSince < BasketballAnimTree.DWELL_SEC) return this.current!;   // the dwell
+    // hoops-p04: THE RULE (anim/hoopsTransitions) — the fade floor and the minimum hold for this pair; off, the release's dwell exactly
+    const tr = transitionFor(this.current, c.state, c.loop, c.fadeSec);
+    const holdSec = transitionRuleOn() ? tr.holdSec : c.loop && this.sameGroup(this.current, c.state) ? BasketballAnimTree.DWELL_SEC : 0;
+    if (c.state !== this.current && c.loop && holdSec > 0 && now - this.stateSince < holdSec) return this.current!;   // the dwell
     // (phase 4b) the same loop state in the other hand is its twin: replayed with the state's own fade
     const handChanged = c.state === this.current && c.loop && !!this.strideClip && c.clip !== this.strideClip;
     if (c.state !== this.current || handChanged) {
@@ -333,9 +337,9 @@ export class BasketballAnimTree {
         if (r0 !== null && !carryOn) this.strideFilter.set(r0);
         // H2 (moveLegs): out of a handle move, the loop picks up at the stride phase the legs layer carried through it
         const phase01 = this.legs?.live ? this.legs.phaseFor(c.clip) : undefined;   // (the other hand's twin: half a stride on)
-        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: c.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });
+        if (!carryOn) this.animator.play(c.clip, { loop: true, fadeSec: tr.fadeSec, speedRatio: r0 ?? 1, ...(phase01 !== undefined ? { phase01 } : {}) });   // hoops-p04: the rule's fade
         this.loopPlaying = c.clip;
-      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE
+      } else { this.strideClip = null; const isMove = c.state === 'crossover' || c.state === 'crossover_right'; this.playBeat(c.clip, { fadeSec: isMove && (input.moveRate ?? 1) > 1 ? moveFadeSec(true) : c.fadeSec, speedRatio: isMove ? input.moveRate ?? 1 : 1 }, c.state); }   // MOVE PACE   // (playBeat floors the fade: the rule)
     }
     // STRIDE MATCHING, every frame. The loop is only (re)played on a STATE CHANGE — which is what keeps it stable —
     // so the rate has to be set on the RUNNING animation instead, or a per-frame play() would restart the clip every
@@ -355,7 +359,7 @@ export class BasketballAnimTree {
     this.token++; this.loopPlaying = null;
     this.override = { kind: 'hold', clip, state: null };
     this.current = null;
-    this.animator.play(clip, { loop: true, fadeSec: opts.fadeSec ?? 0.12, speedRatio: opts.speedRatio ?? 1 });
+    this.animator.play(clip, { loop: true, fadeSec: transitionFor(null, null, false, opts.fadeSec ?? 0.12).fadeSec, speedRatio: opts.speedRatio ?? 1, ...(opts.from01 ? { from01: opts.from01 } : {}) });   // hoops-p04: the rule's floor; a hold may start at its rise
   }
 
   /** End a beat / hold now and settle into the tree's choice. */
@@ -384,7 +388,8 @@ export class BasketballAnimTree {
     if (this.legsBeat) this.legs!.begin(this.strideClip);
     this.override = { kind: 'beat', clip, state };
     this.animator.play(clip, {
-      loop: false, fadeSec: opts.fadeSec ?? 0.1, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame
+      loop: false, fadeSec: transitionFor(this.current, state, false, opts.fadeSec ?? 0.1).fadeSec, speedRatio: opts.speedRatio ?? 1, restart: true,   // POLISH: 0.08 → 0.10 — the reach and hand-up beats out of a stance popped a wrist 1 m in a frame   // hoops-p04: the rule's floor (a press is not delayed: the clip starts now)
+      ...(opts.from01 ? { from01: opts.from01 } : {}),   // hoops-p04: a shot paced from its rise
       onEnd: () => {
         if (this.token !== tok) return;   // cut by a newer beat / hold / release / reset
         // ANIM CLEAN-UP (2026-09-18): the ended beat is parked on its last frame so whatever follows FADES from it — an

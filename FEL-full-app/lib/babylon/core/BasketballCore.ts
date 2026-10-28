@@ -1366,6 +1366,8 @@ export interface AttackDecision {
   look?: RivalShotLook;
   /** hoops-p03: the side of HIS body a kit move started this frame goes to (the ball's end side on a behind-the-back) — the clip's. */
   moveSide?: 'left' | 'right' | null;
+  /** hoops-p04: on a gather frame, the shot it is for (the clip is paced to its release: hoops/releaseTiming). */
+  shotPlan?: 'layup' | 'jumper' | 'dunk' | null;
 }
 /** hoops-p03: the brain's decision, delegated (hoops/rivalOffense RivalKit). It owns its per-possession state and writes the brain's
  *  public t / phase / containedSec, which the mode reads. */
@@ -1426,7 +1428,7 @@ export class AttackerBrain {
       // a layup gathers in stride (the last step to the rim); a jumper rises on the spot
       const stride = (this.pending === 'layup' || this.pending === 'dunk') && dist > 0.9 ? dir.scale(LAYUP_STRIDE_SPEED) : zero;
       if (this.gatherSec >= GATHER_SEC) { this.phase = 'released'; return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: this.pending }; }
-      return { wish: stride, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null };
+      return { wish: stride, phase: 'gather', contained: false, exposure: 0, step: false, crossover: null, shot: null, shotPlan: this.pending };
     }
     const perp = new Vector3(-dir.z, 0, dir.x);               // the lane's lateral
     if (this.phase === 'stepback') {
@@ -1491,7 +1493,7 @@ export class AttackerBrain {
       if (inLane) { this.phase = 'stepback'; this.stepbackSec = 0; wish = dir.scale(-STEPBACK_SPEED); exposure = 0.2; }
       else { this.phase = 'gather'; this.gatherSec = 0; wish = zero; exposure = 0; }
     }
-    return { wish, phase: this.phase, contained: inLane, exposure, step, crossover, shot: null };
+    return { wish, phase: this.phase, contained: inLane, exposure, step, crossover, shot: null, ...(this.phase === 'gather' ? { shotPlan: this.pending } : {}) };
   }
 }
 /** Which side of the body a lateral vector is on — the athlete's DRAWN side, through the one helper (athleteSide.ts; HOOPS MOTION
