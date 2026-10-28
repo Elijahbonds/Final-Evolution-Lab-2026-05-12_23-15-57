@@ -422,6 +422,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     runnerRef.current?.answerTakeoff(side, now());
   };
   const reportPain = () => runnerRef.current?.reportPain(now());
+  const skipWall = () => runnerRef.current?.skipWall(now());          // SCREEN-EASY: no wall, the ankle bend is skipped
 
   const cam = status?.camera;
   const aspect = cam?.width && cam.height ? `${cam.width} / ${cam.height}` : '4 / 3';
@@ -516,7 +517,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
               autoContinue={begin} okSinceRef={deviceOkSince} />
           ) : null}
           {phase === 'running' && view ? (
-            <LiveHud view={view} voiceOn={voice.on} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} />
+            <LiveHud view={view} voiceOn={voice.on} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} onSkipWall={skipWall} />
           ) : null}
         </div>
       ) : null}

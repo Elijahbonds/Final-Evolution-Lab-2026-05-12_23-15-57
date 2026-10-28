@@ -17,12 +17,16 @@ import { SIDE_TURNED } from '@/lib/mirror/framing';
 import { cuesDue, cueFlash, FLASH_COLOUR, FLASH_MS } from '@/lib/screen/realtime-cues';
 import { JUMP_GO, JUMP_HOW, JUMP_HOW_FREE, SETUP_EYEBROW, SETUP_PLACE, SETUP_READY_LINE, setupHeadline } from '@/lib/vertical/copy';
 import { ArmSwing, HandsOnHips, SetupPicture } from '@/components/vertical/setup-picture';
+import { HandsUp, WallSetup } from '@/components/screen-easy/pictures';
+import { HANDS_UP_HINT, NO_WALL_BUTTON, WALL_LINE } from '@/lib/screen-easy/copy';
 
 /** SCREEN A: a rep is up on these steps — voice and colour only, no reading. */
 const NO_READING: ReadonlySet<RunnerView['step']> = new Set(['calibrate', 'calibrateSide', 'countdown', 'active', 'paused']);
 
-export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
+export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop, onSkipWall }: {
   view: RunnerView; voiceOn?: boolean; onPain: (pain: boolean) => void; onTakeoff: (s: Side) => void; onStop: () => void;
+  /** SCREEN-EASY: "No wall here? Skip it" while the ankle bend is set up. */
+  onSkipWall?: () => void;
 }) {
   const v = view;
   const lastCue = useRef(0);
@@ -107,7 +111,8 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
               fix ("Step back", "Whole body in view") in amber, or "Ready" in green with a tick. The full sentence sits under
               it. Before: a line of distances to read ("hip height, 2–3 m away, portrait or landscape") and the fix below. */}
           {(() => {
-            const head = setupHeadline(v.framing ?? null, v.setupReady || (v.step === 'calibrate' && framingOk));
+            // SCREEN-EASY: the single-leg squat on the wrong leg says so in the one big word
+            const head = v.wrongLeg ? { word: 'Other leg', ready: false } : setupHeadline(v.framing ?? null, v.setupReady || (v.step === 'calibrate' && framingOk));
             return (
               <div data-setup-card={head.ready ? 'ready' : 'fix'} className="absolute inset-x-3 bottom-20 z-[6] rounded-2xl border border-white/15 bg-black/75 p-3 text-center backdrop-blur">
                 <p className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">{SETUP_EYEBROW}</p>
@@ -119,7 +124,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
                   : (
                     <div className="mt-2 flex items-center gap-3 text-left">
                       <SetupPicture className="h-16 w-auto shrink-0" />
-                      <p className="text-[16px] leading-snug text-white/85">{v.framing?.instruction && v.framing.worst !== 'noBody' ? v.framing.instruction : SETUP_PLACE}</p>
+                      <p className="text-[16px] leading-snug text-white/85">{v.wrongLeg ? v.instruction : v.framing?.instruction && v.framing.worst !== 'noBody' ? v.framing.instruction : SETUP_PLACE}</p>
                     </div>
                   )}
               </div>
@@ -137,6 +142,20 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
         <div data-jump-how={v.armsFree ? 'arms-free' : 'hands-on-hips'} className="absolute inset-x-3 top-[13rem] z-[6] flex items-center justify-center gap-3 rounded-2xl bg-black/60 px-3 py-2">
           {v.armsFree ? <ArmSwing className="h-14 w-auto shrink-0" /> : <HandsOnHips className="h-14 w-auto shrink-0" />}
           <p className="text-[16px] font-bold leading-snug text-white">{v.armsFree ? JUMP_HOW_FREE : JUMP_HOW}</p>
+        </div>
+      ) : null}
+      {/* SCREEN-EASY: the ankle bend's one plain picture, and its way out when there is no wall (skipped, never guessed) */}
+      {v.canSkipWall && !noReading ? (
+        <div data-wall-card className="absolute inset-x-3 top-[13rem] z-[6] rounded-2xl bg-black/70 px-3 py-2">
+          <div className="flex items-center justify-center gap-3">
+            <WallSetup className="h-14 w-auto shrink-0" />
+            <p className="text-[16px] font-bold leading-snug text-white">{WALL_LINE}</p>
+          </div>
+          {onSkipWall ? (
+            <button type="button" data-skip-wall onClick={onSkipWall} className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/25 px-4 text-[16px] font-bold text-white">
+              {NO_WALL_BUTTON}
+            </button>
+          ) : null}
         </div>
       ) : null}
       {/* VERTICAL-EASY: "3, 2, 1, Jump!" — the word, big, for the moment the countdown ends */}
@@ -193,7 +212,23 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop }: {
       {/* after each test (SCREEN A): one big tap, at least a quarter of the screen tall; it waits — no timeout, no default */}
       {v.step === 'pain' || v.step === 'painCheck' ? (
         <div data-pain-check className="absolute inset-0 z-[9] flex flex-col bg-black/70 px-5 py-5 text-center">
+          {/* SCREEN-EASY: the test's "done" line heads the question (the 3 s "done" card before it is gone) */}
+          {v.step === 'painCheck' && v.mini ? (
+            <p data-pain-done className="flex shrink-0 items-center justify-center gap-1.5 text-[16px] font-bold text-[#00FF9D]"><Check aria-hidden className="h-5 w-5" strokeWidth={3} />{v.mini.text}</p>
+          ) : null}
           <p className="shrink-0 text-[clamp(24px,6vw,34px)] font-black leading-tight">{v.step === 'pain' ? 'Any pain right now?' : 'Any pain in that one?'}</p>
+          {/* SCREEN-EASY: both hands up is the "no", from where the athlete stands (lib/screen-easy/handsUp.ts) */}
+          {v.handsUpAnswer ? (
+            <div data-hands-up-answer className="mx-auto mt-2 flex shrink-0 items-center gap-3">
+              <HandsUp className="h-16 w-auto shrink-0" />
+              <div className="text-left">
+                <p className="text-[clamp(18px,5vw,24px)] font-black leading-tight text-[#00FF9D]">{HANDS_UP_HINT}</p>
+                <span className="mt-1.5 block h-2 w-40 overflow-hidden rounded-full bg-white/15" aria-hidden>
+                  <span className="block h-full bg-[#00FF9D]" style={{ width: `${Math.round((v.handsUpHold ?? 0) * 100)}%` }} />
+                </span>
+              </div>
+            </div>
+          ) : null}
           <p className="mx-auto mt-1 max-w-sm shrink-0 text-[16px] text-white/65">If something hurts, the screen stops here and nothing is saved.</p>
           <div className="mt-4 flex min-h-0 flex-1 gap-3">
             <button type="button" onClick={() => onPain(false)} data-pain="no" className="min-h-[25%] flex-1 self-stretch rounded-3xl bg-[#00FF9D] text-[22px] font-black text-black">No</button>

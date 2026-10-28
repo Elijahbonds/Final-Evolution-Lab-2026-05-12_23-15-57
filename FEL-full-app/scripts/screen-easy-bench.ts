@@ -24,14 +24,14 @@ export const CONDITIONS: Cond[] = [
   { name: 'realistic + 1% missed frames', o: { noise: true, dropRate: 0.01 } },
   { name: 'realistic + 10% missed frames', o: { noise: true, dropRate: 0.1 } },
   { name: 'first-timer mistakes (realistic)', o: { noise: true, dropRate: 0.01, moves: FIRST_TIMER } },
-  { name: 'no wall (realistic)', o: { noise: true, dropRate: 0.01, wall: false } },
+  { name: "no wall (realistic)", o: { noise: true, dropRate: 0.01, wall: false } },
 ];
 
 const mean = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN);
 const f1 = (x: number) => (Number.isFinite(x) ? x.toFixed(1) : '–');
 
 export interface Row {
-  name: string; fps: number; runs: number; done: number; sec: number; secMax: number; taps: number; cut: number;
+  name: string; fps: number; runs: number; done: number; sec: number; secMax: number; taps: number; hands: number; cut: number;
   refused: Record<string, Record<string, number>>; restarts: number; perPart: Record<string, number>; bySteps: Record<string, number>;
   scores: string[];
 }
@@ -54,7 +54,7 @@ export function runBench(conds: readonly Cond[], fpsSet: readonly number[], nSee
     }
     rows.push({
       name: c.name, fps, runs: runs.length, done: runs.filter((r) => r.done).length, sec: mean(secs), secMax: secs.length ? Math.max(...secs) : NaN,
-      taps: mean(runs.map((r) => r.taps)), cut: mean(runs.map((r) => r.cut.length)),
+      taps: mean(runs.map((r) => r.taps)), hands: mean(runs.map((r) => r.handsUp)), cut: mean(runs.map((r) => r.cut.length)),
       refused, restarts: runs.reduce((a, r) => a + r.parts.reduce((b, p) => b + p.restarts, 0), 0),
       perPart: Object.fromEntries(Object.entries(perPart).map(([k, v]) => [k, mean(v)])),
       bySteps: Object.fromEntries(Object.entries(bySteps).map(([k, v]) => [k, mean(v)])),
@@ -65,8 +65,8 @@ export function runBench(conds: readonly Cond[], fpsSet: readonly number[], nSee
 }
 
 export function benchTable(rows: readonly Row[]): string {
-  const head = '| condition | fps | runs to a result | camera → result (s, mean / max) | taps in the flow | lines cut off | refusals (part: line ×n) | part restarts | scores |';
-  return [head, '|---|---|---|---|---|---|---|---|---|', ...rows.map((r) => `| ${r.name} | ${r.fps} | ${r.done}/${r.runs} | ${f1(r.sec)} / ${f1(r.secMax)} | ${f1(r.taps)} | ${f1(r.cut)} | ${Object.entries(r.refused).map(([p, m]) => `${p}: ${Object.entries(m).map(([k, n]) => `"${k}" ×${n}`).join(', ')}`).join('; ') || '–'} | ${r.restarts} | ${r.scores.join(' / ')} |`)].join('\n');
+  const head = '| condition | fps | runs to a result | camera → result (s, mean / max) | walks to the phone (taps) | hands-up answers | lines cut off | refusals (part: line ×n) | part restarts | scores |';
+  return [head, '|---|---|---|---|---|---|---|---|---|---|', ...rows.map((r) => `| ${r.name} | ${r.fps} | ${r.done}/${r.runs} | ${f1(r.sec)} / ${f1(r.secMax)} | ${f1(r.taps)} | ${f1(r.hands)} | ${f1(r.cut)} | ${Object.entries(r.refused).map(([p, m]) => `${p}: ${Object.entries(m).map(([k, n]) => `"${k}" ×${n}`).join(', ')}`).join('; ') || '–'} | ${r.restarts} | ${r.scores.join(' / ')} |`)].join('\n');
 }
 
 export function stepTable(rows: readonly Row[]): string {
