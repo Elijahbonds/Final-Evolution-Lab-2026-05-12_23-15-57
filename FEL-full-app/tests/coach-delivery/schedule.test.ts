@@ -233,7 +233,10 @@ describe('the feed link is the only key (PUBLIC_BY_DESIGN in lib/api/routeContra
     await act({ action: 'create', title: 'Private session', startsAt: at(30), minutes: 60, scope: 'athlete', scopeId: 'tia' });
     // the coach's feed: no athlete is named, listed or identified — not the teen, not an adult
     const coachIcs = await (await feed((await (await act({ action: 'feed_on' })).json()).feed.path)).text();
-    for (const who of ['tia', 'Tia', 'ada', 'Ada', 'bo@', 'Varsity']) expect(coachIcs, who).not.toContain(who);
+    // UID lines carry random ids (lowercase letters and digits) that can contain 'ada' or 'tia' by chance, so they are
+    // left out of the name check; every other line, where a name could actually be shown, is checked.
+    const shown = coachIcs.replace(/^UID:.*$/gm, '');
+    for (const who of ['tia', 'Tia', 'ada', 'Ada', 'bo@', 'Varsity']) expect(shown, who).not.toContain(who);
     const { logical } = assertRfc5545(coachIcs);
     const props = new Set(logical.map((l) => l.split(':')[0]));
     expect([...props].sort()).toEqual(['BEGIN', 'CALSCALE', 'DTEND', 'DTSTAMP', 'DTSTART', 'END', 'LOCATION', 'METHOD', 'PRODID', 'STATUS', 'SUMMARY', 'UID', 'VERSION', 'X-WR-CALNAME']);
