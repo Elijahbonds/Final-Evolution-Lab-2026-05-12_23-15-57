@@ -15,6 +15,10 @@ import { Check, ClipboardCheck, Gem, RotateCcw, X } from 'lucide-react';
 import { readDeviceChecks, recordDeviceCheck, writeDeviceChecks } from '@/lib/education/checkDevice';
 import { chapterView } from '@/lib/results/small';
 import { ResultCard } from '@/components/result-card/result-card';
+import { LOOK as RESULT_LOOK } from '@/components/result-card/look';
+
+/** The score and what it paid take the screen (the check is the chapter's last block: room to scroll it to the top). */
+const FILL_LOOK = RESULT_LOOK.fill;
 import { CHIP_BUTTON } from './look';
 
 export interface CheckQuestion { id: string; question: string; options: string[]; draft: boolean }
@@ -170,7 +174,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
           the chapter (a score has no noise: the same score is "the same"), and the check's own pass / fail line. The
           reader's docked "Next chapter" is the screen's one primary, so the card has none; a fail keeps "Try again". */}
       {result && (
-        <div data-check-result={result.passed ? 'pass' : 'fail'} role="status" className="mt-4">
+        <div data-check-result={result.passed ? 'pass' : 'fail'} role="status" className={`mt-4 ${FILL_LOOK}`}>
           <ResultCard primary={false} seeAll={false} fill={false}
             view={chapterView({ score: result.score, bestBefore, line: result.passed ? CHECK_COPY.pass(result.score) : CHECK_COPY.fail(result.score, result.passMark), next: { label: '', href: null } })} />
           {result.passed ? (
