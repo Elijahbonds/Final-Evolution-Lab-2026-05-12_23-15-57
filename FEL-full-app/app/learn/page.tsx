@@ -1,14 +1,13 @@
-import { LearnFeed } from '@/components/learn/learn-feed';
+import { LearnHome } from '@/components/learn/learn-home';
 
-// /learn — the Knowledge Feed (docs/KNOWLEDGE-FEED.md). Open to guests, whose progress stays on the device. A signed-in
-// verified adult's progress also syncs to the account (KNOWLEDGE-FEED v2, /api/learn/*); under 18 stays on the device.
-// Guests see the first 5 Playbook cards and sign in for the rest (lib/knowledge/access.ts).
+// /learn — Learn, the one home (PLAT-P04, 2026-10-27): Continue, the Playbook course, Practice, the feed (/learn/feed) and
+// the Academy, in that order (components/learn/learn-home.tsx). Open to guests: the course's own pages ask for sign-in,
+// the feed and the place-marker live on the device.
 export const metadata = {
   title: 'Learn · Final Evolution Lab',
-  description: 'Bite-sized lessons, quick quizzes and spaced reviews — a learning feed for your idle time.',
+  description: 'The Playbook course, a lesson at a time: watch it, do it, then check it on camera.',
 };
 
 export default function LearnPage() {
-  // A11-01 (2026-10-25): the page's landmark (WCAG 1.3.1 / 2.4.1) — the feed rendered with no <main> around it
-  return <main><LearnFeed /></main>;
+  return <LearnHome />;
 }
