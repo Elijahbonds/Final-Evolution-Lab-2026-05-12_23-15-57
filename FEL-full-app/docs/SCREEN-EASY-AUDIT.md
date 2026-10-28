@@ -178,7 +178,7 @@ see the wall); the Mirror's Movement Screen turns three times; the QR start card
 |---|---|---|
 | **Taps from Home (Play) to the result** | 10 + permission (Train, Quick Screen, full, age, pain, take-off, 4 pain checks) | **3** + permission (Screen my movement, age, pain); from Train 4 |
 | Screens before the camera | 4 (start card, age, pain, take-off) | **2** (age, pain) |
-| Words before the camera (rig) | 145 (73 + 16 + 25 + 31) | **48** (16 + 32) |
+| Words before the camera (rig) | 145 (73 + 16 + 25 + 31) | **47** (16 + 31) |
 | Walks to the phone during the screen | 4 | **0** (1 with no wall: the skip) |
 | **Camera → result, realistic + 1 % missed frames** (mean / max) | 165.7 / 169.8 s | **142.9 / 143.0 s** |
 | … clean · 10 % missed · first-timer mistakes | 160.3 · 163.6 / 168.1 · 175.0 / 180.8 | **143.0 · 144.3 / 147.9 · 153.8 / 155.6** |
@@ -189,7 +189,8 @@ see the wall); the Mirror's Movement Screen turns three times; the QR start card
 | Refusals on the first-timer mistakes (the ones the athlete really made) | T2 ×9, T5 ×4 | T2 ×5, T5 ×4 (the 4 noise-only T2 refusals are gone) |
 | Scores, bench (every condition) | T1:3/2 T2:3 T3:3 (1 with a foot down) T5:3 | **identical** |
 | Validation | — | no grader, band or threshold line changed; the fixture and grader suites pass unchanged |
-| Result page (flagged screen): words · sizes · looks · primary | 242 · 5 · 4 · none marked | see §5.1 |
+| Result page, flagged: visible words · font sizes · button looks · primary | 242 · 5 · 4 · none marked | **167 · 5 (3 own + 2 inside the demo stage) · 3 · the book, 76 px** |
+| Result page, clean: words · sizes · looks | 180 · 3 · 4 | **44 · 3 · 3** |
 
 **The first-timer estimate** uses the same assumptions as VERTICAL-EASY: about 3 s to read and tap each screen before the
 camera, 2 s for the camera prompt, 3 s for the pose model, and 1.4 s for the device check. Before: 6 × 3 + 6.4 + 165.7.
@@ -215,7 +216,34 @@ What is left to cut is tuned or an owner call: the 3-2-1 (§6 call 4), and the l
 
 Each cell: font sizes · button looks · the primary's height · visible words · sideways scroll (px).
 
-RIG_TABLE
+| Screen | Before | After |
+|---|---|---|
+| age | 2 · 2 · – · 16 · 0 | 2 · 2 · – · 16 · 0 |
+| pain | 2 · 3 · 52 · 25 · 0 | 2 · 3 · 52 · 31 · 0 |
+| take-off foot | 2 · 3 · 52 · 31 · 0 | **gone** |
+| set-up (T1 facing, ready) | 4 · 2 · – · 25 · 0 | 4 · 2 · – · 25 · 0 |
+| turn side-on (T1 side) | 5 · 2 · – · 35 · 0 | 4 · 2 · – · 37 · 0 |
+| the wall (T2 left) | 5 · 2 · – · 46 · 0 | 4 · 3 · – · 41 · 0 (the picture and "No wall here? Skip it" inside the set-up card) |
+| pain check (after T3) | 3 · 3 · – · 25 · 0 | 4 · 3 · – · 32 · 0 |
+| result, flagged | 5 · 4 · – · 242 · 0 | 5 · 3 · 76 · 167 · 0 |
+| result, clean | 3 · 4 · – · 180 · 0 | 3 · 3 · 76 · 44 · 0 |
+
+Held after:
+- 0 sideways scroll on every screen.
+- One primary of 48 px or more where a screen has one: the pain step's "No, nothing hurts" is 52 px; on the result the
+  book is 76 px (its label wraps to two lines) and is now marked as the primary.
+- ≤ 3 button looks everywhere. The pain step stays at 3: its new privacy line is plain text, not a link. The result went
+  from 4 looks to 3.
+- The pain check went from 3 sizes to 4: it now has the done line, the question and the hands-up hint.
+- ≤ 4 font sizes everywhere but the flagged result. Its 12 and 14 px are inside the drill demo's 3-D stage
+  (`components/library/avatar-demo.tsx`: the 10 px "YOUR AVATAR" badge, rendered at Chromium's 12 px floor, and the
+  14 px status line). That file belongs to demo-speed, and it is flagged to them. The result's own sizes are 16, 22 and
+  35 px.
+- Words: the flagged result shows 167 words up front (before: 242 on one long page) and the clean result 44 (before: 180).
+  The rig counts visible text, so closed "More detail" content is not counted.
+
+The live stage is drawn 3:4, a phone held upright (assumption: a portrait camera).
+Contact sheet: `screen-easy-before-after.jpg` in this lane's scratchpad (the path is in the PR body).
 
 ---
 

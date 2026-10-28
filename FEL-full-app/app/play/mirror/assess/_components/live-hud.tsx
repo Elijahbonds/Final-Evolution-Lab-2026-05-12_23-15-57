@@ -61,7 +61,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop, onSki
           <p className="mt-0.5 text-[clamp(28px,8vw,44px)] font-black leading-none text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">{v.test && v.test in SCREEN_TEST_NAMES ? SCREEN_TEST_NAMES[v.test as keyof typeof SCREEN_TEST_NAMES] : v.move.name}</p>
           <p className="mt-1 text-[clamp(16px,4.5vw,22px)] font-bold leading-snug text-[#00E5FF]">{v.move.cue}</p>
         </div>
-      ) : !noReading && (v.test || v.label) && !(v.move && v.move.total === 1) ? (
+      ) : !noReading && (v.test || v.label) && !(v.move && v.move.total === 1) && v.step !== 'painCheck' ? (
         <div className="absolute left-3 top-3 flex flex-col gap-1.5 z-[6]">
           {v.test ? <span className="rounded-full bg-black/60 px-3 py-1 text-[16px] font-bold text-white/85">{v.test in SCREEN_TEST_NAMES ? SCREEN_TEST_NAMES[v.test as keyof typeof SCREEN_TEST_NAMES] : testDef(v.test).short}</span> : null}
           {v.label ? <span className="rounded-full bg-[#00E5FF] px-3 py-1 text-[16px] font-black tracking-wide text-black">{v.label}</span> : null}
@@ -119,7 +119,21 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop, onSki
                 <p data-setup-word className={`mt-1 flex items-center justify-center gap-2 text-[clamp(28px,8vw,40px)] font-black leading-none ${head.ready ? 'text-[#00FF9D]' : 'text-[#FFB020]'}`}>
                   {head.ready ? <Check aria-hidden className="h-8 w-8" strokeWidth={3} /> : null}{head.word}
                 </p>
-                {head.ready
+                {/* SCREEN-EASY: the ankle bend's one plain picture in the same card, and its way out when there is no wall
+                    (skipped, never guessed) */}
+                {v.canSkipWall ? (
+                  <div data-wall-card>
+                    <div className="mt-2 flex items-center gap-3 text-left">
+                      <WallSetup className="h-14 w-auto shrink-0" />
+                      <p className="text-[16px] leading-snug text-white/85">{!head.ready && v.framing?.instruction && v.framing.worst !== 'noBody' ? v.framing.instruction : WALL_LINE}</p>
+                    </div>
+                    {onSkipWall ? (
+                      <button type="button" data-skip-wall onClick={onSkipWall} className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/25 px-4 text-[16px] font-bold text-white">
+                        {NO_WALL_BUTTON}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : head.ready
                   ? (v.step === 'calibrate' ? <p className="mt-2 text-[16px] leading-snug text-white/85">{SETUP_READY_LINE}</p> : null)
                   : (
                     <div className="mt-2 flex items-center gap-3 text-left">
@@ -142,20 +156,6 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop, onSki
         <div data-jump-how={v.armsFree ? 'arms-free' : 'hands-on-hips'} className="absolute inset-x-3 top-[13rem] z-[6] flex items-center justify-center gap-3 rounded-2xl bg-black/60 px-3 py-2">
           {v.armsFree ? <ArmSwing className="h-14 w-auto shrink-0" /> : <HandsOnHips className="h-14 w-auto shrink-0" />}
           <p className="text-[16px] font-bold leading-snug text-white">{v.armsFree ? JUMP_HOW_FREE : JUMP_HOW}</p>
-        </div>
-      ) : null}
-      {/* SCREEN-EASY: the ankle bend's one plain picture, and its way out when there is no wall (skipped, never guessed) */}
-      {v.canSkipWall && !noReading ? (
-        <div data-wall-card className="absolute inset-x-3 top-[13rem] z-[6] rounded-2xl bg-black/70 px-3 py-2">
-          <div className="flex items-center justify-center gap-3">
-            <WallSetup className="h-14 w-auto shrink-0" />
-            <p className="text-[16px] font-bold leading-snug text-white">{WALL_LINE}</p>
-          </div>
-          {onSkipWall ? (
-            <button type="button" data-skip-wall onClick={onSkipWall} className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/25 px-4 text-[16px] font-bold text-white">
-              {NO_WALL_BUTTON}
-            </button>
-          ) : null}
         </div>
       ) : null}
       {/* VERTICAL-EASY: "3, 2, 1, Jump!" — the word, big, for the moment the countdown ends */}
