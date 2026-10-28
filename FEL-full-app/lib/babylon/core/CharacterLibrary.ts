@@ -53,6 +53,9 @@ export interface SpawnedCharacter {
   /** Phase 2 "alive" layer (breathing, weight shift, head look-at). GLB path
    *  only; modes call `secondary?.setLookTarget(() => ball.position)`. */
   secondary?: SecondaryMotionHandle;
+  /** Present only on a `deferHeroCapture` player spawn: builds the player's captured hoops / fight / dunk clips and routes
+   *  plays through them (what spawn otherwise does itself). Idempotent; call before the first clip a capture can replace. */
+  installHeroCapture?: () => void;
   dispose(): void;
 }
 
@@ -82,6 +85,10 @@ export interface SpawnOpts {
    *  player — then it is an opponent. Pass it only where that rule cannot see the intent (a preview that spawns the
    *  next body before disposing the last). */
   role?: 'player' | 'opponent';
+  /** DEMO-SPEED (2026-10-27): leave the player's captured clips (HERO_CAPTURE) unbuilt at spawn and hand the caller
+   *  `installHeroCapture` instead. For the library stage, whose idle and exercise loops no capture replaces: building the
+   *  captures was ~0.4 s of the spawn on the phone profile, before the first frame of a squat that never plays one. */
+  deferHeroCapture?: boolean;
 }
 
 // ── WHO IS THE PLAYER (EVERYONE-BODY-MOCAP-OPPONENTS, 2026-09-14) ───────────────────────────────────────────────────
@@ -333,9 +340,13 @@ export const CharacterLibrary = {
     installSafePlay(animator, opts.modeId ?? effectiveUrl);
     // AN OPPONENT MOVES LIKE A CAPTURED PERSON (EVERYONE-BODY-MOCAP-OPPONENTS): the mode's in-scope captures replace the
     // authored clips it asks for. The outermost play wrapper, so modes that re-call neverBindPose/installSafePlay are no-ops.
+    let installHeroCapture: (() => void) | undefined;
     if (role === 'opponent') installOpponentMotion(animator, scene, skeleton);
     // HOOPS MOVEMENT (owner 2026-09-15): the player plays the same hoops captures — one motion set for both bodies on a court
-    else if (!heroCaptureOff()) installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE);
+    else if (!heroCaptureOff()) {
+      if (opts.deferHeroCapture) installHeroCapture = () => { installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE); };
+      else installOpponentMotion(animator, scene, skeleton, undefined, HERO_CAPTURE);
+    }
     // THE STYLE'S OWN MOVES (2026-09-15, owner: capoeira / breaking, taekwondo / tricking, parkour): in a fight mode the
     // player's picked school brings its vocabulary; The Hundred and Free Run also get the parkour set. Outermost wrapper.
     if (role !== 'opponent') {
@@ -417,6 +428,7 @@ export const CharacterLibrary = {
     const spawned: SpawnedCharacter = {
       id: `char_${spawnCounter}`,
       root, meshes, skeleton, animator, secondary,
+      ...(installHeroCapture ? { installHeroCapture } : {}),
       dispose() {
         livePlayers.get(scene)?.delete(root);
         if (rosterPicked) dealtBodies.get(scene)?.delete(effectiveUrl);   // the person is free for the next spawn

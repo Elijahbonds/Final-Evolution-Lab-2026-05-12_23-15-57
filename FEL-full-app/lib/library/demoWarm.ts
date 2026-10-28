@@ -36,27 +36,33 @@ let warming: { url: string | null; done: Promise<void> } | null = null;
 // main thread — busy evaluating Babylon at exactly this moment — never touches them. Measured on the rig (4× CPU): read on the
 // main thread, a WARM visit's 3.3 MB came out of the disk cache in 0.6–1.1 s, because each chunk waited for a turn between
 // Babylon's modules; the spawn's own load then waited on it.
-const WORKER_SRC = 'onmessage=function(e){fetch(e.data).then(function(r){return r.arrayBuffer()}).then(function(){postMessage(1)},function(){postMessage(0)})}';
+const WORKER_SRC = 'onmessage=function(e){fetch(e.data).then(function(r){if(!r.ok)throw 0;return r.arrayBuffer()}).then(function(){postMessage(1)},function(){postMessage(0)})}';
 
-/** Is the file in the HTTP cache already (a warm visit)? Asks the cache only (no network) and reads no body. A browser that
- *  cannot answer says no, and the file is fetched as on a cold visit. Measured on the rig: on a warm visit a worker's own
- *  start-up alone cost 0.6–1.5 s while Babylon evaluated, and the spawn waited for it. */
-async function inHttpCache(url: string): Promise<boolean> {
+// A warm visit has the file in the HTTP cache already, and fetching it again only costs time (the spawn waits on this). The
+// device remembers which file it fetched (localStorage, a per-device convenience: blocked or empty storage just means the
+// file is fetched as on a first visit). A remembered file is not fetched again; if the browser evicted it since, the spawn
+// fetches it itself, as it always did. Not an only-if-cached probe: a miss logs a network error on every first visit.
+// Firebase revalidates a stale file with a 304, so remembering it for a week costs at most a header round trip.
+const REMEMBER_KEY = 'fel-demo-body';
+const REMEMBER_MS = 7 * 24 * 3600_000;
+function remembered(url: string, now = Date.now()): boolean {
   try {
-    const r = await fetch(url, { cache: 'only-if-cached', mode: 'same-origin' });
-    void r.body?.cancel().catch(() => undefined);
-    return r.ok;
+    const v = JSON.parse(localStorage.getItem(REMEMBER_KEY) ?? 'null') as { url?: string; at?: number } | null;
+    return !!v && v.url === url && typeof v.at === 'number' && now - v.at < REMEMBER_MS;
   } catch { return false; }
 }
+function remember(url: string): void {
+  try { localStorage.setItem(REMEMBER_KEY, JSON.stringify({ url, at: Date.now() })); } catch { /* storage blocked: fetched again next time */ }
+}
 const userMark = (k: string) => { try { performance.mark(`fel-warm:${k}`); } catch { /* no User Timing */ } };
-function fetchOffThread(url: string): Promise<void> | null {
+function fetchOffThread(url: string): Promise<boolean> | null {
   try {
     if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL.createObjectURL !== 'function') return null;
     const src = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
     const w = new Worker(src);
     URL.revokeObjectURL(src);
-    return new Promise<void>((done) => {
-      const end = (e?: MessageEvent) => { userMark(e?.data === 1 ? 'fetched' : 'failed'); w.terminate(); done(); };
+    return new Promise<boolean>((done) => {
+      const end = (e?: MessageEvent) => { userMark(e?.data === 1 ? 'fetched' : 'failed'); w.terminate(); done(e?.data === 1); };
       w.onmessage = end; w.onerror = () => end();
       w.postMessage(new URL(url, location.href).href);
     });
@@ -73,11 +79,12 @@ export function warmDemoBody(): Promise<void> {
     userMark('answer');
     const url = demoBodyUrl(answer?.body, deviceTierDecision().tier);
     w.url = url;
-    if (await inHttpCache(url)) { userMark('cached'); return; }
+    if (remembered(url)) { userMark('cached'); return; }
     const off = fetchOffThread(url);
-    if (off) { await off; return; }
+    if (off) { if (await off) remember(url); return; }
     const r = await fetch(url);
     await r.arrayBuffer();   // read to the end, so the whole file is in the cache; the bytes themselves are dropped
+    if (r.ok) remember(url);
   })().catch(() => undefined);
   warming = w;
   return w.done;

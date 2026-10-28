@@ -37,15 +37,27 @@ describe('the demo body the early start fetches', () => {
     expect(calls).toHaveLength(3);
   });
 
-  it('asks the cache first: a warm visit reads nothing; a cold one fetches the file to the end', async () => {
+  it('a device that fetched the file before does not fetch it again (a warm visit); a new body is fetched', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } });
     const calls: string[] = [];
-    vi.stubGlobal('fetch', vi.fn(async (u: string, init?: RequestInit) => {
-      calls.push(`${u}${init?.cache ? ` (${init.cache})` : ''}`);
-      if (u === '/api/v1/hero-body') return Response.json({ body: 'kit-female' });
-      return init?.cache === 'only-if-cached' ? new Response(null, { status: 504 }) : new Response(new Uint8Array(8));
-    }));
+    let body = 'kit-female';
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => { calls.push(u); return u === '/api/v1/hero-body' ? Response.json({ body }) : new Response(new Uint8Array(8)); }));
     await warmDemoBody();
-    expect(calls).toEqual(['/api/v1/hero-body', `${KIT_BODY_URL.female} (only-if-cached)`, KIT_BODY_URL.female]);
+    expect(calls).toEqual(['/api/v1/hero-body', KIT_BODY_URL.female]);
+    resetDemoWarm(); void takeHeroBodyRead(); calls.length = 0;
+    await warmDemoBody();                                   // the next visit: remembered, nothing fetched but the answer
+    expect(calls).toEqual(['/api/v1/hero-body']);
+    resetDemoWarm(); void takeHeroBodyRead(); calls.length = 0; body = 'kit-male';
+    await warmDemoBody();                                   // the player changed body: that file is fetched
+    expect(calls).toEqual(['/api/v1/hero-body', KIT_BODY_URL.male]);
+  });
+
+  it('storage that throws (a private window) only means the file is fetched again', async () => {
+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } });
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => (u === '/api/v1/hero-body' ? Response.json({ body: 'scan' }) : new Response(new Uint8Array(8)))));
+    await expect(warmDemoBody()).resolves.toBeUndefined();
+    expect(warmedBodyUrl()).toBe(SCAN_BODY_URL);
   });
 
   it('a failed warm-up never throws (the spawn then fetches the file itself)', async () => {

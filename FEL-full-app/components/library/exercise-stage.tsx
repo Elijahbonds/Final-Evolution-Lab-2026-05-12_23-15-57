@@ -176,7 +176,8 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
   mark('scene');
   // the early fetch has the body in the HTTP cache (or failed: the loader then fetches it itself)
   await body;
-  const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand' });
+  // the player's hoops captures are built the first time a clip that one can replace is played (play() below), not here
+  const hero = await CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { role: 'player', startClip: 'idle_stand', deferHeroCapture: true });
   if (anatomyFirst) await anatomyFirst.catch(() => null);
   if (gone()) { hero.dispose(); scene.dispose(); engine.dispose(); return null; }
   mark('spawned');
@@ -221,6 +222,9 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
     return { alpha: FRONT_ALPHA - 0.5, beta: 1.4, radius: 2.55, y: 0.86 };
   };
   const play = (clip: string, hold: number | null | undefined) => {
+    // DEMO-SPEED: a capture replaces only court and fight clips (opponentMotion OPPONENT_VARIANTS) — never the idle or an
+    // ex_* loop — so they are built the first time anything else plays, exactly as spawn would have (same wrapper, outermost)
+    if (clip !== 'idle_stand' && !clip.startsWith('ex_')) hero.installHeroCapture?.();
     // the library scope is lazy: an entry's loop is built the first time it is asked for (clipScope `lazy`)
     buildAuthoredClip(hero.animator, scene, hero.skeleton, clip);
     const g = hero.animator.play(clip, { loop: true, fadeSec: 0.25, restart: true });
