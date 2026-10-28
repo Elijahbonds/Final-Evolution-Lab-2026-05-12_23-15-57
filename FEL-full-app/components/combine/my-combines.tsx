@@ -47,7 +47,7 @@ export function MyCombines({ available, events }: { available: boolean; events: 
   return (
     <div className="space-y-4" data-my-combines={events.length}>
       {first ? (
-        <ResultCard reveal={false} view={stationView(first, previousStation(newest, top.id, first.id), { label: MINE_PROGRESS, href: PROGRESS_HREF })}
+        <ResultCard reveal={false} fill view={stationView(first, previousStation(newest, top.id, first.id), { label: MINE_PROGRESS, href: PROGRESS_HREF })}
           details={<p className={LOOK.detail}>{top.name} · {new Date(top.createdAt).toLocaleDateString()}. {NO_ACCURACY_LINE}</p>} />
       ) : null}
       {lead && <p className="text-sm text-white/60">{lead}</p>}

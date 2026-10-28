@@ -11,6 +11,7 @@
 // card renders nothing; until #424 lands the caller passes null.
 //
 // Shows numbers the page already holds. Saves nothing, sends nothing.
+import { useState } from 'react';
 import { BadgeCheck, CircleDashed } from 'lucide-react';
 import type { T5Extra } from '@/lib/assess/scoring';
 import { sessionTip, verifyJump, type TrialFlag, type TrustLevelHook, type VerifyBlock } from '@/lib/jump/session';
@@ -49,6 +50,8 @@ export const JUMP_NEXT_TIP = 'Next: try the tip above on your next jump.';
 export const JUMP_NEXT_UNVERIFIED = 'Next: film again with your whole body in the shot and good light.';
 
 export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5: T5Extra | null; trustLevel?: TrustLevelHook | null; source?: 'live' | 'slowmo' }) {
+  // collapsed by default; display:none when closed, so the first screen measures only what it shows
+  const [open, setOpen] = useState(false);
   if (!t5 || trustLevel === 'low') return null;
   const valid = t5.jumps.filter((j) => j.valid);
   if (!valid.length) return null;
@@ -60,8 +63,8 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
   const vc = clean ? verifyJump(clean, { poseHz: t5.poseFps, source, trust: trustLevel }) : null;
   const tip = sessionTip(t5.jumps);
   const verified = v.verified || !!vc?.verified;
-  // PLAT-P03 (2026-10-28): the card under a jump result is detail, so it leads with its one fact — verified or not, and
-  // the tip — and keeps every jump, the set, the real-change line, the rebound and the next step behind "Your jumps"
+  // PLAT-P03 (2026-10-28): the card under a jump result is detail, so it leads with its one fact — verified or not —
+  // and keeps the tip, every jump, the set, the real-change line, the rebound and the next step behind "Your jumps"
   // (collapsed). Every sentence is the card's own, unchanged.
   return (
     <section data-jump-session className="fel-surface p-5">
@@ -69,9 +72,10 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
         {verified ? <BadgeCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0" /> : <CircleDashed aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />}
         <span>{v.verified ? 'Verified jump' : vc?.verified && clean ? `Verified best: ${inch(clean.heightCm)} in (jump ${clean.index})` : `Not verified: ${BLOCK_WORDS[v.blocks[0]]}`}</span>
       </p>
-      {tip ? <p data-jump-tip className="mt-2 text-[16px] leading-snug text-white/80">{tip}</p> : null}
-      <details data-jump-session-more className="mt-2 [&_summary::-webkit-details-marker]:hidden">
-        <summary className="fel-press inline-flex min-h-12 cursor-pointer list-none items-center text-[16px] font-bold text-white/80 underline underline-offset-4">Your jumps</summary>
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} data-jump-session-more
+        className="fel-press mt-2 inline-flex min-h-12 items-center text-[16px] font-bold text-white/80 underline underline-offset-4">Your jumps</button>
+      <div hidden={!open}>
+        {tip ? <p data-jump-tip className="mt-2 text-[16px] leading-snug text-white/80">{tip}</p> : null}
         <ul className="mt-2 space-y-1.5">
           {t5.jumps.map((j) => (
             <li key={j.index} data-jump-row={j.index} data-valid={j.valid} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[16px]">
@@ -108,7 +112,7 @@ export function JumpSessionCard({ t5, trustLevel = null, source = 'live' }: { t5
         <p data-jump-next className="mt-2 text-[16px] leading-snug text-white/80">
           {verified ? JUMP_NEXT_VERIFIED : tip ? JUMP_NEXT_TIP : JUMP_NEXT_UNVERIFIED}
         </p>
-      </details>
+      </div>
     </section>
   );
 }

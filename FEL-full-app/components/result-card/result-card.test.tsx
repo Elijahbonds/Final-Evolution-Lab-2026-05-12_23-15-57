@@ -29,8 +29,9 @@ describe('the result card', () => {
   it('exactly one primary, then "See all" (the door to My progress), and the detail collapsed', () => {
     expect(html.match(/data-fel-primary/g)).toHaveLength(1);
     expect(html).toContain(`href="${PROGRESS_HREF}"`);
-    expect(html).toMatch(/<details data-result-details[^>]*>(?![^<]*open)/);
-    expect(html).not.toMatch(/<details[^>]* open/);
+    expect(html).toContain('data-result-details="closed"');
+    expect(html).toMatch(/aria-expanded="false"/);
+    expect(html).toMatch(/<div id="[^"]+" hidden=""/);
   });
   it('no arrow without a comparison; no primary where the screen has its own', () => {
     const quiet = renderToStaticMarkup(h(ResultCard, { view: view({ vsLast: null, vsLine: null }), primary: false }));

@@ -137,7 +137,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
             <li key={q.id} data-check-question={q.id} data-verdict={v === undefined ? undefined : v ? 'right' : 'wrong'}>
               <fieldset disabled={!!result || busy}>
                 <legend className="flex gap-2 text-[14px] font-bold leading-snug text-white/90">
-                  <span className="font-mono text-white/40">{n + 1}.</span>
+                  <span className="font-mono text-fel-dim">{n + 1}.</span>
                   <span>{q.question}</span>
                   {v !== undefined && (v
                     ? <Check aria-label="right" className="h-4 w-4 shrink-0 text-[#00FF9D]" strokeWidth={3} />
@@ -171,11 +171,11 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
           reader's docked "Next chapter" is the screen's one primary, so the card has none; a fail keeps "Try again". */}
       {result && (
         <div data-check-result={result.passed ? 'pass' : 'fail'} role="status" className="mt-4">
-          <ResultCard primary={false} seeAll={false}
+          <ResultCard primary={false} seeAll={false} fill={false}
             view={chapterView({ score: result.score, bestBefore, line: result.passed ? CHECK_COPY.pass(result.score) : CHECK_COPY.fail(result.score, result.passMark), next: { label: '', href: null } })} />
           {result.passed ? (
             (result.awarded > 0 || result.bonus > 0) && (
-              <p className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[16px] font-bold text-white">
+              <p className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[14px] font-bold text-white">
                 {result.awarded > 0 && (
                   <span data-check-awarded className="inline-flex items-center gap-1">
                     <Gem aria-hidden className="h-4 w-4 text-[#A855F7]" /> +{result.awarded} shards
@@ -186,7 +186,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
             )
           ) : (
             <div className="mt-3 text-center">
-              <p className="text-[16px] text-fel-soft">{CHECK_COPY.failNext}</p>
+              <p className="text-[14px] text-fel-soft">{CHECK_COPY.failNext}</p>
               <button type="button" onClick={onRetry} data-check-retry className={`${CHIP_BUTTON} mt-3`}>
                 <RotateCcw aria-hidden className="h-4 w-4" /> {CHECK_COPY.retry}
               </button>

@@ -15,7 +15,7 @@
 // the result is what the first screen shows.
 //
 // The look is ./look.ts (one file for premium-ui to swap).
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
@@ -34,7 +34,13 @@ export function paragraphs(line: string): string[] {
   const t = line.trim();
   if (!t) return [];
   if (t.split(/\s+/).length <= MAX_PARAGRAPH_WORDS) return [t];
-  return t.split(/(?<=[.!?])\s+(?=[A-Z0-9"'“(])/).map((s) => s.trim()).filter(Boolean);
+  // no regex lookbehind: Safari before 16.4 cannot parse one, and one bad regex breaks the whole bundle on that phone
+  const out: string[] = [];
+  let from = 0;
+  const end = /[.!?]\s+(?=[A-Z0-9"'“(])/g;
+  for (let m = end.exec(t); m; m = end.exec(t)) { out.push(t.slice(from, m.index + 1).trim()); from = m.index + m[0].length; }
+  out.push(t.slice(from).trim());
+  return out.filter(Boolean);
 }
 
 /** The number's decimals, from how the tool formatted it ("24.5" → 1, "5.12" → 2). */
@@ -66,7 +72,7 @@ function CountUp({ value }: { value: string }) {
   return <span ref={ref} data-result-value className={LOOK.number}>{value}</span>;
 }
 
-export function ResultCard({ view, onNext, primary = true, details, seeAll = true, reveal = true, testId }: {
+export function ResultCard({ view, onNext, primary = true, details, seeAll = true, reveal = true, fill, testId }: {
   view: ResultView;
   /** The next step as an in-page action (run again, next set); otherwise the button goes to `view.next.href`. */
   onNext?: () => void;
@@ -77,9 +83,13 @@ export function ResultCard({ view, onNext, primary = true, details, seeAll = tru
   seeAll?: boolean;
   /** Scroll the card into view when it appears (a result that arrives under the set-up). */
   reveal?: boolean;
+  /** The result takes the screen: whatever follows the card starts below the fold (default: with `reveal`). */
+  fill?: boolean;
   testId?: string;
 }) {
   const ref = useRef<HTMLElement>(null);
+  const [open, setOpen] = useState(false);
+  const bodyId = useId();
   useEffect(() => {
     if (!reveal) return;
     let reduce = true;
@@ -101,7 +111,7 @@ export function ResultCard({ view, onNext, primary = true, details, seeAll = tru
     : <button type="button" onClick={onNext} data-testid="result-next" className={LOOK.quiet}>{view.next.label}</button>;
   const showSeeAll = seeAll && view.next.href !== PROGRESS_HREF;
 
-  return (
+  const card = (
     <section ref={ref} data-result-card data-testid={testId} data-vs={view.vsLast ?? 'none'} className={LOOK.card}>
       <p data-result-measure className={LOOK.label}>
         <span>{view.measure}</span>
@@ -127,11 +137,17 @@ export function ResultCard({ view, onNext, primary = true, details, seeAll = tru
         </div>
       ) : null}
       {details ? (
-        <details data-result-details className={LOOK.details}>
-          <summary className={`${LOOK.quiet} w-full cursor-pointer list-none`}>{RESULT_COPY.details}</summary>
-          <div className={LOOK.detailsBody}>{details}</div>
-        </details>
+        // a disclosure, not <details>: a closed <details> still lays its text out (chapter-reader's BookText found the
+        // same), so a phone's first screen measured every hidden word. Closed, this body is display:none.
+        <div data-result-details={open ? 'open' : 'closed'} className={LOOK.details}>
+          <button type="button" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)} className={`${LOOK.quiet} w-full`}>
+            {RESULT_COPY.details}
+          </button>
+          <div id={bodyId} hidden={!open} className={LOOK.detailsBody}>{details}</div>
+        </div>
       ) : null}
     </section>
   );
+  // the result IS the screen: the card, then room to the tab bar, so the screen's first view is the card alone
+  return (fill ?? reveal) ? <div data-result-fill className={LOOK.fill}>{card}</div> : card;
 }

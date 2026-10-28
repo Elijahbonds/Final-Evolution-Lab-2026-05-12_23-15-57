@@ -44,13 +44,14 @@ export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { 
  * `onAgain` is the speed page's own (/train/speed). Without it (combine day's camera timer) the card is embedded: no
  * button, no "See all", no comparison unless `last` is given.
  */
-export function RunResultCard({ result, last = null, onAgain }: { result: RunResult; last?: SprintRecord | null; onAgain?: () => void }) {
+export function RunResultCard({ result, last = null, onAgain, note = null }: { result: RunResult; last?: SprintRecord | null; onAgain?: () => void; note?: string | null }) {
   if (!result.ok) {
     return <div role="alert" className="fel-card rounded-xl p-4 text-sm text-[#FFB020]" data-sprint-result="failed">{result.why}</div>;
   }
   const r = result;
   const tr = r.trace;
-  const view = sprintView(r, last, RESULT_MEANS, { label: RESULT_COPY.runAgain, href: null });
+  // the card's line is the meaning's first sentence; the whole line (its estimate caveat too) is in Details, unchanged
+  const view = sprintView(r, last, RESULT_MEANS.split('. ')[0] + '.', { label: RESULT_COPY.runAgain, href: null });
   return (
     <div data-sprint-result={r.test}>
       <ResultCard view={view} onNext={onAgain} seeAll={!!onAgain} reveal={!!onAgain} details={(
@@ -91,8 +92,10 @@ export function RunResultCard({ result, last = null, onAgain }: { result: RunRes
             <li>Pose rate {r.poseHz} frames a second.</li>
             <li data-sprint-estimate>{ESTIMATE_LINE}</li>
           </ul>
-          {/* CUE-REWRITE: what the number means is the card's line; the one next step, word for word */}
+          {/* CUE-REWRITE: what the number means and the one next step, word for word */}
+          <p className={LOOK.detail} data-sprint-means>{RESULT_MEANS}</p>
           <p className={`${LOOK.detail} font-bold text-white`} data-sprint-next>{RESULT_NEXT}</p>
+          {note ? <p className={LOOK.detail} data-sprint-note>{note}</p> : null}
         </div>
       )} />
     </div>

@@ -103,7 +103,7 @@ export function JumpTests({ adult, decode, storage = null, liveT5 = null, pilot 
   const sideOf = (id: 'singleLeft' | 'singleRight') => { const r = runs[id]; return r?.phase === 'done' && r.read.ok ? sideBest(r.read.t5) : null; };
   return (
     <section data-jump-tests className="space-y-3 rounded-3xl border border-white/15 bg-white/[0.04] p-5">
-      <h2 className="text-[18px] font-black text-white">Jump tests</h2>
+      <h2 className="font-display text-[20px] font-bold uppercase tracking-[0.03em] text-white">Jump tests</h2>
       <div className="grid gap-2" role="group" aria-label="Pick a test">
         {MENU.map((m) => (
           <button key={m.id} type="button" data-test-pick={m.id} aria-pressed={pick === m.id} onClick={() => setPick(m.id)}
@@ -157,7 +157,7 @@ function TestRun({ id, pilot, run, onRead, onAbort, onUpdate, storage, hipsBest 
   const idle = !run || run.phase === 'error';
   return (
     <div data-test-run={id} className="space-y-3 rounded-2xl border border-white/10 p-4">
-      <h3 className="text-[18px] font-black text-white">{def.name}</h3>
+      <h3 className="font-display text-[20px] font-bold uppercase tracking-[0.03em] text-white">{def.name}</h3>
       {idle ? (
         <>
           <ol data-test-steps className="list-decimal space-y-1 pl-5 text-[16px] leading-snug text-white/80">

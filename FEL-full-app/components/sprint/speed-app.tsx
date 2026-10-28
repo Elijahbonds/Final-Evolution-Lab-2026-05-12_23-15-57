@@ -90,8 +90,8 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
 
   return (
     <div className="space-y-4" data-speed-app data-sprint-showing={showing ? 'result' : 'setup'}>
-      {last && <RunResultCard result={last} last={prior} onAgain={again} />}
-      {last?.ok && kept !== null && <p className="text-center text-xs text-white/50" data-sprint-kept={kept ? 'device' : 'none'}>{kept ? 'Kept in your history on this phone.' : 'Could not keep it on this phone (storage is off).'}</p>}
+      {last && <RunResultCard result={last} last={prior} onAgain={again} note={last.ok && kept !== null ? (kept ? 'Kept in your history on this phone.' : 'Could not keep it on this phone (storage is off).') : null} />}
+      {last?.ok && kept !== null && <span hidden data-sprint-kept={kept ? 'device' : 'none'} />}
 
       <div className={`space-y-4 ${showing ? 'hidden' : ''}`}>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Test">

@@ -248,7 +248,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             {setupLines(lift.family).map((l) => <li key={l}>{l}</li>)}
             <li>The camera asks for 60 frames a second where your phone can hold it.</li>
           </ul>
-          <p className="text-[11px] text-white/40">{PRIVACY_LINE}</p>
+          <p className="text-[12px] text-fel-dim">{PRIVACY_LINE}</p>
         </div>
       )}
 
@@ -340,9 +340,9 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             ) : (
               <>
                 <dl className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Reps</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-reps>{read?.counted ?? 0}{read?.partials ? ` +${read.partials}` : ''}</dd></div>
-                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Best (m/s)</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-best>{read?.bestMcv != null ? read.bestMcv.toFixed(2) : '—'}</dd></div>
-                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Slowed by</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-loss>{read?.lossPct != null ? `${read.lossPct}%` : '—'}</dd></div>
+                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[12px] text-fel-dim">Reps</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-reps>{read?.counted ?? 0}{read?.partials ? ` +${read.partials}` : ''}</dd></div>
+                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[12px] text-fel-dim">Best (m/s)</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-best>{read?.bestMcv != null ? read.bestMcv.toFixed(2) : '—'}</dd></div>
+                  <div className="rounded-lg bg-white/5 p-2"><dt className="text-[12px] text-fel-dim">Slowed by</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-loss>{read?.lossPct != null ? `${read.lossPct}%` : '—'}</dd></div>
                 </dl>
                 <ol className="space-y-1" data-vbt-reps-list>
                   {read?.reps.map((x) => (
@@ -357,7 +357,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
                 <div className="space-y-0.5 text-sm" data-vbt-result><p className="text-white/85">{r.saw}</p><p className="text-white/70" data-vbt-means>{r.means}</p><p className="font-bold text-white" data-vbt-next>{r.next.text}</p></div>
               </>
             )}
-            <p className="text-[11px] text-white/45" data-vbt-source>{sourceLine(view.source)} {ESTIMATE_LINE}</p>
+            <p className="text-[12px] text-fel-dim" data-vbt-source>{sourceLine(view.source)} {ESTIMATE_LINE}</p>
             <p className="flex items-center gap-1.5 text-xs text-white/50" data-vbt-kept={kept ?? ''}>
               {kept === 'server' ? <><CheckCircle2 className="h-3.5 w-3.5 text-[#00FF9D]" /> Saved to your history.</> : kept === 'device' ? NOT_SAVED_LINE : ctx.tier === 'teen' ? 'Not kept.' : ''}
             </p>
@@ -365,7 +365,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
 
           {warmRead && (
             <div className="space-y-1" data-vbt-readiness data-band={warmRead.read.band}>
-              <div className="text-[11px] uppercase tracking-wider text-white/40">Warm-up readiness · bar speed</div>
+              <div className="text-[12px] uppercase tracking-wider text-fel-dim">Warm-up readiness · bar speed</div>
               <div className="text-lg font-black text-white">{BAND_LABEL[warmRead.read.band]}</div>
               <p className="text-sm text-white/70">
                 {warmRead.facts.baseline ? `Best ${(warmRead.kept.bestMcv).toFixed(2)} m/s at ${loadKg} kg against your normal ${(warmRead.facts.baseline.bestCm / 100).toFixed(2)} (${warmRead.facts.dropPct != null && warmRead.facts.dropPct > 0 ? '−' : '+'}${Math.abs(warmRead.facts.dropPct ?? 0)}%).` : 'Building your normal: three warm-ups on other days at this load and this compares you with yourself.'}
@@ -375,12 +375,12 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
 
           {profile && (
             <div className="space-y-1" data-vbt-profile>
-              <div className="text-[11px] uppercase tracking-wider text-white/40">Weight and bar speed · estimate</div>
+              <div className="text-[12px] uppercase tracking-wider text-fel-dim">Weight and bar speed · estimate</div>
               {profile.ok ? (
                 <>
                   {profile.e1rmKg != null && <div className="text-lg font-black text-white" data-vbt-e1rm>Estimated max ≈ {profile.e1rmKg} ± {profile.e1rmPmKg} kg</div>}
                   {zoneLoads && <p className="text-sm text-white/75" data-vbt-zone-loads>{ZONES[targetZone].name} today: {zoneLoads.loKg}–{zoneLoads.hiKg} kg</p>}
-                  <p className="text-[11px] text-white/45">{profile.loads.length} loads{profile.r2 != null ? ` · fit ${profile.r2} (closer to 1 is better)` : ''}. {E1RM_LINE}</p>
+                  <p className="text-[12px] text-fel-dim">{profile.loads.length} loads{profile.r2 != null ? ` · fit ${profile.r2} (closer to 1 is better)` : ''}. {E1RM_LINE}</p>
                 </>
               ) : <p className="text-sm text-white/60">{profile.why === 'few_loads' ? 'Film a second and third weight (5 kg or more apart) to see how your speed changes with weight.' : 'The bar did not slow as the load rose: track the loads again.'}</p>}
             </div>
@@ -390,7 +390,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
 
           {fresh.length > 0 && (
             <div className="fel-card rounded-xl p-4" data-vbt-milestones>
-              <div className="text-[11px] uppercase tracking-wider text-white/40">Unlocked · practice challenges</div>
+              <div className="text-[12px] uppercase tracking-wider text-fel-dim">Unlocked · practice challenges</div>
               <ul className="mt-1 space-y-1 text-sm text-white/80">
                 {MILESTONES.filter((m) => fresh.includes(m.id)).map((m) => <li key={m.id} data-vbt-milestone={m.id}><b>{m.label}</b> — {m.challenge}</li>)}
               </ul>
@@ -399,7 +399,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
         </div>
         );
       })()}
-      <p className="text-center text-xs text-white/40">
+      <p className="text-center text-xs text-fel-dim">
         <Link href="/train" className="underline">Back to Train</Link> · <Link href="/coach/velocity" className="underline" data-vbt-coach-door>Coaching? Your athletes&apos; bar speed</Link>
       </p>
     </div>
