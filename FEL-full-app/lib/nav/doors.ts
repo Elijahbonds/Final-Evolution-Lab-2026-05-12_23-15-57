@@ -25,8 +25,7 @@ export const DOORS: Door[] = [
   // OWNER (2026-10-27): /workout and /live ("Program guide") are off the menus; the routes still work by link
   // (lib/nav/reachability.test.ts NOT_NAVIGABLE says so).
   { href: '/camp', label: 'Camp', tab: 'train' },
-  { href: '/education', label: 'Education', tab: 'train' },
-  { href: '/learn', label: 'Learn feed', tab: 'train' },
+  { href: '/learn', label: 'Learn', tab: 'train' },   // PLAT-P04 (2026-10-27): one Learn door for Education + Learn feed
   { href: '/coach', label: 'Coaching', tab: 'train' },
 
   // PROFILE — what you own, what you have done, what you make.

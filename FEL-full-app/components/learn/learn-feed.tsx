@@ -1,6 +1,6 @@
 'use client';
 
-// LearnFeed — the Knowledge Feed at /learn (KNOWLEDGE-FEED v1, owner 2026-10-06; docs/KNOWLEDGE-FEED.md).
+// LearnFeed — the Knowledge Feed at /learn/feed (PLAT-P04 moved it from /learn, now Learn's home; KNOWLEDGE-FEED v1, owner 2026-10-06; docs/KNOWLEDGE-FEED.md).
 //
 // A full-screen vertical timeline, one card per screen, CSS scroll-snap so a thumb swipe or a mouse wheel moves one
 // card; arrows/j/k/space and a gamepad's d-pad move exactly one card through lib/knowledge/feedNav. What comes next is
@@ -317,7 +317,8 @@ export function LearnFeed() {
   const streak = liveStreak(state.streak, today);
   const topicsOffered = availableTopics(signedIn).map((t) => ({ ...t, blurb: topicBlurb(t, signedIn) }));
   const playbookLocked = state.topics.includes('playbook') ? lockedCount(CARDS, signedIn, 'playbook') : 0;
-  const closeHref = signedIn ? '/train' : '/';
+  // PLAT-P04: the feed is one shelf of Learn (/learn/feed), so closing it goes back to Learn
+  const closeHref = '/learn';
 
   const onTopicsDone = (picked: TopicId[]) => {
     const next = setTopics(stateRef.current ?? freshState(), picked);
@@ -374,7 +375,7 @@ export function LearnFeed() {
             <h2 className="text-[clamp(1.6rem,4vw,3rem)] font-black">You're all caught up</h2>
             <p className="max-w-md text-white/65 md:text-xl">Missed questions come back for review, and new reviews are due over the next few days. Add a topic for more.</p>
             {playbookLocked > 0 && (
-              <Link href={loginPath('/learn')} className="rounded-full border border-[#00FF9D]/50 px-5 py-2.5 font-bold text-[#00FF9D]" data-learn-signin>
+              <Link href={loginPath('/learn/feed')} className="rounded-full border border-[#00FF9D]/50 px-5 py-2.5 font-bold text-[#00FF9D]" data-learn-signin>
                 Sign in for {playbookLocked} more Playbook cards
               </Link>
             )}
