@@ -2,23 +2,15 @@
 //
 // The demo is the library stage (components/library/exercise-stage.tsx, demo-loops' — read-only here): Babylon and the
 // stage's code arrive on first use, which on a mid phone is most of the wait before the avatar moves. When Learn's
-// Continue points at a lesson that opens on a demo, Learn loads that code while the phone is idle, so the lesson's demo
-// starts from warm code. Only the code: no model, no scene, no GPU work. Skipped with 3D switched off or Save-Data on.
-
-const threeDisabled = typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DISABLE_3D === '1';
-
-let warmed = false;
+// Continue points at a lesson that opens on a demo, Learn starts it while the phone is idle, so the lesson's demo starts
+// warm. Skipped with 3D switched off or Save-Data on.
+//
+// DEMO-SPEED-2 (coordinator 2026-10-28): through the demo's own warm-up (avatar-demo.tsx warmAvatarDemo) — the stage's
+// code (which brings Babylon) AND the body's file (lib/library/demoWarm.ts: this player's body, the phone file on a phone,
+// read off the main thread, skipped when this device fetched it before). It was the code only, so the body started
+// downloading at the tap. One warm-up for every surface, once a page, with the same two skips.
+import { warmAvatarDemo } from '@/components/library/avatar-demo';
 
 export function warmLessonDemo(): void {
-  if (warmed || typeof window === 'undefined' || threeDisabled) return;
-  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
-  if (conn?.saveData) return;
-  warmed = true;
-  const go = () => {
-    void import('@/components/library/exercise-stage').catch(() => {});
-    void import('@babylonjs/core').catch(() => {});
-  };
-  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
-  if (typeof w.requestIdleCallback === 'function') w.requestIdleCallback(go, { timeout: 3000 });
-  else setTimeout(go, 1500);
+  warmAvatarDemo();
 }

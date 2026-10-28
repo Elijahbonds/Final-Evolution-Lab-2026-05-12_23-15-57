@@ -23,7 +23,7 @@ import { snapToGround } from './groundSnap';                // M69: feet-on-cour
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
-import { urlForHeroBody, KIT_BODY_URL, scanUrlForTier } from './heroBody';
+import { urlForHeroBody, KIT_BODY_URL, bodyUrlForTier } from './heroBody';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
 import { installStyleMotion } from '../anim/styleMotion';
 import { pickedVocab } from '../combat/styleVocab';
@@ -192,14 +192,14 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
  *  fel-hero.glb — only the textures differ: skin at 1024², every other map (six hair styles, two jerseys, two shoes,
  *  shorts, eyes) at 512² (`scripts/avatar/import-mpfb.mts <in> <out> --textures-only`). Measured before this: the
  *  desktop file's fifteen maps were 96 MB of GPU memory in EVERY mode that spawns the untinted hero, on both tiers
- *  (the probe's old scene.textures basis could not see them); the mobile file is 24 MB. Only the DEFAULT hero is
- *  swapped — a dev override (?hero=) or an explicitly requested body always loads as asked, and the desktop tier's
- *  look is untouched. */
-// Ship Pass 6: the scan's decimated bake (54k verts, 1K textures). DEMO-SPEED (2026-10-27): the file and the rule live in
-// heroBody.ts (SCAN_BODY_MOBILE_URL, scanUrlForTier) so the library stage's early fetch asks for the same file; DEFAULT_HERO_URL
-// is SCAN_BODY_URL (athleteRoster.cast.test holds both spellings).
+ *  (the probe's old scene.textures basis could not see them); the mobile file is 24 MB. Only the player bodies
+ *  are swapped (the scan and, since DEMO-SPEED-2, the kit bodies: heroBody bodyUrlForTier) — any other file loads as
+ *  asked, and the desktop tier's look is untouched. */
+// Ship Pass 6: the scan's decimated bake (54k verts, 1K textures); DEMO-SPEED-2 (2026-10-28): the kit bodies' phone files
+// (skin 1024², the rest 512²). The files and the one rule live in heroBody.ts (bodyUrlForTier), so the library stage's early
+// fetch asks for the same file; DEFAULT_HERO_URL is SCAN_BODY_URL (heroBody.test holds both spellings).
 function tierOf(scene: Scene): QualityTier { return (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop'; }
-function heroUrlForTier(url: string, scene: Scene): string { return scanUrlForTier(url, tierOf(scene)); }
+function heroUrlForTier(url: string, scene: Scene): string { return bodyUrlForTier(url, tierOf(scene)); }
 /** The hero for this scene's tier, falling back to the requested file if the tier's variant will not load — a
  *  texture variant can never brick a spawn (the roster's rule). */
 async function loadHero(scene: Scene, url: string): Promise<{ container: AssetContainer; url: string }> {
