@@ -47,8 +47,17 @@ import { rejectionForPart, type Rejection } from './rejection';
 import { AUTO_ADVANCE_MS, type FlashKind } from '@/lib/screen/realtime-cues';
 import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
+import { liftArms, liftArmsTest } from '@/lib/vertical/armsFree';
+import { ARMS_FREE_SETUP } from '@/lib/vertical/copy';
 
 const STILL_MS = 900;
+/**
+ * (new, VERTICAL-EASY 2026-10-27; TUNED — flagged in docs/VERTICAL-EASY-AUDIT.md) The front stand's sway allowance once a
+ * stand has already been refused (calib.swayFallback, 2.5× calib.maxSway). Measured on the bench's still stand
+ * (lib/jump/ballistic.ts): the jitter alone reads 0.013–0.016 at the realistic noise, 0.025–0.032 at 2× and 0.038–0.048 at
+ * 3×; a real sway of 5 % of body height (about 9 cm at the hips) is still refused.
+ */
+export const CALIB_SWAY_FALLBACK: number = th('calib.swayFallback');
 
 function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
   if (!part) return null;
@@ -179,6 +188,8 @@ export type RunnerStep =
 
 /** Steps where the reading-quality badge applies; it reads over the frames of the current step. */
 const READ_STEPS: ReadonlySet<RunnerStep> = new Set<RunnerStep>(['position', 'countdown', 'active']);
+/** The steps before a rep is up, where a missed frame is skipped rather than restarting the hold (VERTICAL-EASY). */
+const SETUP_STEPS: ReadonlySet<RunnerStep> = new Set<RunnerStep>(['framing', 'calibrate', 'calibrateSide', 'position', 'countdown']);
 
 export type RepMark = 'clean' | 'fault' | 'notRead';
 
@@ -227,6 +238,8 @@ export interface RunnerView {
   retryMessage: string | null;
   /** Hands-free: no tap prompts in the runner. */
   handsFree: boolean;
+  /** VERTICAL-EASY: the jump is read arms free ("Measure my vertical"). */
+  armsFree: boolean;
   /**
    * Reading quality over the frames of the current step while a test is set up or running: 'clear' when the mean share of
    * landmarks at scoring visibility (gate.visibilityScoring) is at least gate.minConfidence, else 'partial'. Null
@@ -299,6 +312,12 @@ export interface RunnerOptions {
   /** Tests already graded this run (the jump), used when this pass has no capture for them. */
   priorTests?: Partial<Record<TestId, TestResult>>;
   cameraFps?: () => number | null;
+  /**
+   * VERTICAL-EASY (owner, 2026-10-27: "allow arm swing"): "Measure my vertical" reads a natural jump, arms free — T5's
+   * hands-on-hips refusal is lifted (lib/vertical/armsFree.ts) and the setup line says so. The hands-on-hips jump check,
+   * the full screen and the readiness check leave it unset.
+   */
+  armsFree?: boolean;
 }
 
 export class AssessRunner {
@@ -333,6 +352,10 @@ export class AssessRunner {
   private lastT: number | null = null;
   private badSince: number | null = null;
   private lostFrames = 0;
+  /** Missed frames in a row before a rep is up (VERTICAL-EASY: fewer than LOSS_FRAMES are skipped, not a reset). */
+  private setupBlinks = 0;
+  /** Front stands in a row that did not calibrate (VERTICAL-EASY: from the second, the sway fallback is tried). */
+  private calFails = 0;
   private readonly readShares: number[] = [];
   private readStep: RunnerStep | null = null;
   private donePart: { test: TestId; part: PartId } | null = null;
@@ -438,6 +461,15 @@ export class AssessRunner {
     const def = this.part?.def ?? this.parts[this.partIdx] ?? null;
     const view: 'front' | 'side' = this.step === 'calibrateSide' ? 'side' : def?.view ?? 'front';
     const framing = checkFraming({ landmarks: frame.image.map((l) => ({ x: l.x, y: l.y, visibility: l.v })), present: frame.present }, view);
+    // VERTICAL-EASY (2026-10-27): a BLINK IS NOT A RESET. Before a rep is up (the shot, the stand, the countdown), a frame
+    // the pose model missed used to restart the 1 s shot hold, throw away the 3 s stand and send the countdown back to the
+    // start — on the bench, 1 % missed frames took the jump check from 9 s to 20 s before "Go" (docs/VERTICAL-EASY-AUDIT.md).
+    // Now fewer than LOSS_FRAMES missed frames in a row are skipped there, the same allowance the test itself already
+    // gives a rep (it pauses only after LOSS_FRAMES). Nothing is read from a skipped frame; a real absence still resets.
+    if (SETUP_STEPS.has(this.step) && trackingLost(frame)) {
+      this.setupBlinks++;
+      if (this.setupBlinks < LOSS_FRAMES) return this.view(now);
+    } else this.setupBlinks = 0;
     this.lastFraming = framing;
     if (READ_STEPS.has(this.step)) {
       if (this.readStep !== this.step) { this.readShares.length = 0; this.readStep = this.step; }
@@ -464,10 +496,18 @@ export class AssessRunner {
         if (!framing.ok) { this.calFrames = []; this.say(this.fixLine(framing) ?? framing.instruction); break; }
         this.calFrames.push(frame);
         if (frame.t - this.calFrames[0].t >= th('calib.frontMs')) {
-          const r = calibrateFront(this.calFrames, this.o.aspect);
+          let r = calibrateFront(this.calFrames, this.o.aspect);
+          // VERTICAL-EASY (2026-10-27): a still athlete on a noisy camera was told "Hold still" forever — the sway gate
+          // (calib.maxSway 0.02) reads landmark jitter as sway, and a realistic camera already uses 0.016 of it (2× the
+          // noise: 0.03). From the second stand that does not pass, the same stand is read once more at
+          // CALIB_SWAY_FALLBACK; every other check (the hold, the share of usable frames, the body's size) is unchanged.
+          if (!r.ok && this.calFails >= 1) {
+            const loose = calibrateFront(this.calFrames, this.o.aspect, th('calib.frontMs'), CALIB_SWAY_FALLBACK);
+            if (loose.ok) r = loose;
+          }
           this.calFrames = [];
-          if (r.ok) { this.calib = { ...this.calib, front: r.value }; this.calWhy = null; this.startPart(now); }
-          else { this.calWhy = r.why; this.say(r.why); }
+          if (r.ok) { this.calFails = 0; this.calib = { ...this.calib, front: r.value }; this.calWhy = null; this.startPart(now); }
+          else { this.calFails++; this.calWhy = r.why; this.say(r.why); }
         }
         break;
       }
@@ -508,7 +548,8 @@ export class AssessRunner {
         }
         const left = th('ui.timing').countdownMs - (now - this.stepAt);
         const n = Math.ceil(left / 1000);
-        if (left <= 0) { this.go('active', now); this.pulse('start'); this.say('Go.', true); }
+        // VERTICAL-EASY: the jump's countdown ends "3, 2, 1, Jump!" (the word it asks for); every other part keeps "Go."
+        if (left <= 0) { const word = this.part?.def.test === 'T5' ? 'Jump!' : 'Go.'; this.go('active', now); this.pulse('start'); this.say(word, true); }
         else { if (n !== this.countN) { this.countN = n; this.pulse('countdown'); } this.say(String(n), true); }
         break;
       }
@@ -616,9 +657,17 @@ export class AssessRunner {
     this.lostFrames = 0;
     this.go('position', now);
     // SCREEN A: dim is said here, before the countdown — never mid-rep (activeOk keeps it a warning only).
-    this.say(def.setup, true);
+    this.say(this.setupOf(def), true);
     if (this.lastFraming?.issues.includes('dim')) this.say(FRAMING_FIX_LINES.dim, true);
   }
+
+  /** VERTICAL-EASY: the arms-free read of a T5 result (any other test, or a hands-on-hips run, unchanged). */
+  private armsFreeT5<T extends TestResult>(t: T): T {
+    return this.o.armsFree ? liftArmsTest(t, { frames: this.captures.T5 ?? [], front: this.calib.front }) : t;
+  }
+
+  /** The part's setup line: the arms-free jump says its own (VERTICAL-EASY). */
+  private setupOf(def: PartDef): string { return this.o.armsFree && def.test === 'T5' ? ARMS_FREE_SETUP : def.setup; }
 
   private resetPart(): void {
     const p = this.part!;
@@ -738,7 +787,7 @@ export class AssessRunner {
     const last = flights[flights.length - 1];
     if ((p.frames[p.frames.length - 1]?.t ?? 0) - last.landT < th('ui.timing').jumpSettleMs) return;   // let the landing settle first
     const res = gradeT5(p.frames, { calibration: this.calib, aspect: this.o.aspect });
-    const jumps = res.t5.jumps;
+    const jumps = (this.o.armsFree ? liftArms(res.t5, { frames: p.frames, front }) : res.t5).jumps;
     for (let k = p.lastFlightCount; k < jumps.length; k++) {
       const j = jumps[k];
       p.attempts++;
@@ -783,7 +832,7 @@ export class AssessRunner {
     const t = d.test === 'T1' ? gradeT1(this.captures.T1, ctx)
       : d.test === 'T2' ? gradeT2(this.captures.T2, ctx)
       : d.test === 'T3' ? gradeT3(this.captures.T3, ctx)
-      : gradeT5(this.captures.T5 ?? [], { ...ctx, cameraFps: this.o.cameraFps?.() ?? null });
+      : this.armsFreeT5(gradeT5(this.captures.T5 ?? [], { ...ctx, cameraFps: this.o.cameraFps?.() ?? null }));
     this.graded.push(t);
     this.mini = { test: t.id, text: doneLine(t) };
     this.say(`${lastCount}${this.mini.text}`, true);
@@ -804,6 +853,7 @@ export class AssessRunner {
       T3: Object.keys(this.captures.T3).length ? this.captures.T3 : undefined,
       T5: this.captures.T5 ?? undefined, painAfter: this.painAfter, takeoffLeg: this.takeoff, cameraFps: this.o.cameraFps?.() ?? null,
     }, this.o.priorTests);
+    if (this.o.armsFree) this.result = { ...this.result, tests: this.result.tests.map((x) => this.armsFreeT5(x)) };
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
     this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
@@ -865,6 +915,7 @@ export class AssessRunner {
       dimWarning: this.dimWarning,
       retryMessage: this.retryMessage,
       handsFree: this.handsFree,
+      armsFree: !!this.o.armsFree,
       readQuality: READ_STEPS.has(this.step) && this.readStep === this.step && this.readShares.length
         ? (this.readShares.reduce((a, b) => a + b, 0) / this.readShares.length >= th('gate.minConfidence') ? 'clear' : 'partial') : null,
     };
@@ -879,9 +930,9 @@ export class AssessRunner {
       case 'calibrate': return this.calWhy ?? 'Stand still facing the camera, arms by your sides.';
       case 'calibrateSide': return this.calWhy ?? 'Stand still side-on, left side to the camera.';
       case 'position': return this.lastFraming && !this.lastFraming.ok
-        ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def?.setup ?? '';
+        ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def ? this.setupOf(def) : '';
       case 'countdown': return 'Get ready.';
-      case 'active': return def?.setup ?? '';
+      case 'active': return def ? this.setupOf(def) : '';
       case 'paused': return `${this.pauseLine(this.lastFraming)} ${this.lastFraming?.instruction ?? ''}`.trim();
       case 'partDone': return 'Done.';
       case 'miniResult': return this.mini?.text ?? '';

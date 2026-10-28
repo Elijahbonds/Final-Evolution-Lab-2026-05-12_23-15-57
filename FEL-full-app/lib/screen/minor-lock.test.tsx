@@ -254,7 +254,9 @@ describe('under 13, 13–17 and "rather not say": no camera ask, no camera, one 
 });
 
 describe('18 or older: unchanged — the camera card, then the camera', () => {
-  it('jump and full: pain → take-off → the camera card → one camera start', () => {
+  // test changed (VERTICAL-EASY, 2026-10-27): the jump alone has no take-off step now (lib/screen/flow.ts); the full
+  // screen keeps it. The camera is still asked for exactly once, and only for 18 or older.
+  it('jump: pain → the camera card → one camera start; full: pain → take-off → the camera card → one camera start', () => {
     for (const kind of ['jump', 'full'] as const) {
       cam.starts = [];
       forgetAgeForTests();
@@ -263,7 +265,8 @@ describe('18 or older: unchanged — the camera card, then the camera', () => {
       answer(page, '18+', kind);
       expect(page.find(KidNoCamera)).toEqual([]);
       page.press(one<{ onAnswer: (h: boolean) => void }>(page, PainStep).onAnswer.bind(null, false));
-      page.press(one<{ onAnswer: (s: 'left' | 'right' | null) => void }>(page, TakeoffStep).onAnswer.bind(null, 'left'));
+      if (kind === 'full') page.press(one<{ onAnswer: (s: 'left' | 'right' | null) => void }>(page, TakeoffStep).onAnswer.bind(null, 'left'));
+      else expect(page.find(TakeoffStep)).toEqual([]);
       // the camera card's effect presses it (SCREEN-REALTIME): the camera is asked for, once
       expect(cam.starts).toHaveLength(1);
       expect(page.find(KidNoCamera)).toEqual([]);

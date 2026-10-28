@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { Camera, Swords, Users } from 'lucide-react';
+import { ArrowUpFromLine, Camera, Swords, Users } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
@@ -17,6 +17,7 @@ import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
 import { prisma } from '@/lib/db';
 import { t } from '@/lib/i18n';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +49,8 @@ export default async function PlayPage() {
             {/* MULTIPLAYER (2026-10-06): the couch — one screen, phones and pads, friends join by QR. */}
             <Chip href="/play/party" testId="play-party-entry" icon={<Users aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.couch')}</Chip>
             <Chip href="/multiplayer" icon={<Swords aria-hidden className="h-4 w-4 text-fel-crimson" />}>{t('play.versus')}</Chip>
+            {/* VERTICAL-EASY (2026-10-27): the one front door to measuring a vertical, one tap from the signed-in home */}
+            <Chip href={MEASURE_VERTICAL_HREF} testId="play-vertical-entry" icon={<ArrowUpFromLine aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.vertical')}</Chip>
           </>
         ),
       }}
