@@ -34,9 +34,9 @@ const [OUT, MODES_ARG] = process.argv.slice(2);
 if (!OUT || !MODES_ARG) { console.error('usage: node audit.mjs <outDir> <mode,...>'); process.exit(2); }
 const MODES = MODES_ARG.split(',').filter(Boolean);
 const PORT = process.env.PORT ?? '3661';
-const PLAY_S = Number(process.env.PLAY_S ?? 30);
-const PAUSE_AT = Number(process.env.PAUSE_AT ?? 14);
-const PERF_S = Number(process.env.PERF_S ?? 3);
+const PLAY_S = Number(process.env.PLAY_S ?? 22);   // 22 s of scripted play (was 30: on the shared box at load 10–19 the 230 s wall budget cut most runs to 15–25 s anyway)
+const PAUSE_AT = Number(process.env.PAUSE_AT ?? 10);
+const PERF_S = Number(process.env.PERF_S ?? 2.5);
 const FAST = process.env.FAST !== '0';
 const SHOTS = process.env.SHOTS !== '0';
 const RM = process.env.RM === '1';
@@ -305,6 +305,10 @@ function analyze(mode, rec, S) {
   // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
   const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
   for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS }); }
+  // HARD pops: a peak of 1500°/s or more (25° in one frame) — fast dance and swing motion lives around 900–1300 °/s at its
+  // peak (carnival, dance), a snap into a pose at 3700–10000 (baseball's swing contact, karate's strikes)
+  const hard = events.filter((e) => e.peak >= 1500);
+  out.hardPopEvents = hard.length; out.hardPopsPerMin = r2(hard.length / Math.max(1e-6, play.length / 3600));
   out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
   out.popEventEx = events.sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')}`);
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
@@ -460,7 +464,7 @@ const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? '/
   args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const mode of MODES) {
-  const tWall0 = Date.now(); const row = { mode, tag: TAG, at: new Date().toISOString() };
+  const tWall0 = Date.now(); const row = { mode, tag: TAG, at: new Date().toISOString(), playS: PLAY_S, pauseAt: PAUSE_AT };
   const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: Number(process.env.DPR ?? 1), isMobile: true, hasTouch: true, reducedMotion: RM ? 'reduce' : 'no-preference' });
   await ctx.addInitScript({ content: INIT });
   const p = await ctx.newPage();
@@ -518,7 +522,7 @@ for (const mode of MODES) {
       }
     }
     // play to the end of the script
-    let shots = (process.env.SHOT_AT ?? '6,12').split(',').map(Number).filter((x) => x < PLAY_S); let thr = false, first = null, pauseShot = false, touchDone = false;
+    let shots = (process.env.SHOT_AT ?? '5,14').split(',').map(Number).filter((x) => x < PLAY_S); let thr = false, first = null, pauseShot = false, touchDone = false;
     const tPlay = Date.now();
     for (;;) {
       const s = await ev(() => ({ t: window.__S?.t ?? -1, ph: window.__sessionStore?.view().phase, ps: window.__S?.pauseState, done: window.__S?.done, g: window.__gameS(), n: window.__rec.frames.length }));
