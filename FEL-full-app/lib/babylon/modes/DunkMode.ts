@@ -141,6 +141,7 @@ import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the c
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
 import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
+import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
@@ -1505,6 +1506,7 @@ export const DunkMode: ModeDefinition = (() => {
         rivalName: foe.name,
         dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '', runBack: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read, no RUN IT BACK
       });
+      if (turn === 'player' && isStaticControlsHint(runwayHint)) ctx.setHud({ hint: liveRunwayHint() });   // DUNK-LIVE-TIMING-FIX LP-04: input is live (setPhase('approach')), so is the run line
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
       readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
     },
@@ -1897,7 +1899,7 @@ export const DunkMode: ModeDefinition = (() => {
           if (tip && tip !== idleTipShown) { idleTipShown = tip; ctx.setHud({ hint: tip }); }
         } else {
           idleSec = 0;
-          if (idleTipShown) { idleTipShown = null; if (player.root.position.z > gatherLine() + 0.2) ctx.setHud({ hint: runwayHint }); }
+          if (idleTipShown) { idleTipShown = null; if (player.root.position.z > gatherLine() + 0.2) ctx.setHud({ hint: liveRunwayHint() }); }   // DUNK-LIVE-TIMING-FIX LP-04: the live line, not the blanked static one
         }
       }
 
@@ -2355,7 +2357,12 @@ export const DunkMode: ModeDefinition = (() => {
         if (qteWindowOpen && !wasOpen && !lob.live) {
           const held = slamLatch.open(openAt, holdSec);
           if (held && 'slamAt' in held) slamNow(ctx, held.slamAt);
-          else if (held) refuse(ctx, `TOO EARLY — ${Math.round(held.tooEarlySec * 1000)} ms BEFORE THE WINDOW`);
+          else if (held) {
+            // DUNK-LIVE-TIMING-FIX LP-01(d): the refused press goes on the strip where it was (cue / early), never as a 'miss' under a TOO EARLY
+            // banner. The strip only: slamTiming stays null, so the miss's sound (missBeat) and the chip are as before. The press was at openAt − tooEarlySec.
+            beatSlam = slamReadout(openAt - held.tooEarlySec, EASTBAY_TIMING.extend, 0, window / 2).zone; pushBeats(ctx);
+            refuse(ctx, `TOO EARLY — ${Math.round(held.tooEarlySec * 1000)} ms BEFORE THE WINDOW`);
+          }
         }
         if (clipTime >= closeAt) { meter3d?.end(lob.live ? 'brick' : 'late'); if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
       }
@@ -3235,10 +3242,16 @@ export const DunkMode: ModeDefinition = (() => {
    *  had landed perfectly read as "WINDMILL — MISSED" — the one line the eye saw on the flight where the trick fired and
    *  the SLAM press was eaten (99109f7). The trick is what you did; the slam is what you missed. The name still leads,
    *  because the judges scored it and the card names it, but it no longer wears the failure. */
+  /** DUNK-LIVE-TIMING-FIX LP-04: the runway line as the host will see it. The default line is a static button map, which the harness blanks
+   *  in play (staticControls.ts) and the READY card shows, so the runway shows the live run line instead (on the scan's LIVE list). The
+   *  practice / dunk-off / final-round lines are live already and pass through. The watchdog's line stays the fallback. */
+  const RUN_LIVE_HINT = 'HOLD to run — then tap jump';
+  function liveRunwayHint(): string { return isStaticControlsHint(runwayHint) ? RUN_LIVE_HINT : runwayHint; }
   /** dunk-next phase 8: what went wrong, as the booth's blooper hears it — missWhy's own reading, in four words. */
   function missKind(): MissKind {
     if (obstacleClipped) return 'prop';
     if (lob.live || lob.lost) return 'lob';
+    if (slamTiming?.zone === 'late') return 'late';   // DUNK-LIVE-TIMING-FIX LP-01(b): a late iron miss is called late, as the strip and the chip read it
     return slamSeen ? 'early' : 'noSlam';
   }
   function missWhy(): string {
@@ -3247,6 +3260,10 @@ export const DunkMode: ModeDefinition = (() => {
     // Every press inside the accepted window (the buffer's edge through the close) is a MAKE, so a miss with a press on
     // the record is a press that came in front of it — say that, not "off the iron": it is the one thing the player can fix.
     const named = namedTricks();
+    // DUNK-LIVE-TIMING-FIX LP-01(a): a press inside the window more than ~0.7 of its half past the beat is iron too (execution under
+    // RIM_CLEAN). The strip and the chip read that zone (slamReadout) as LATE, so the banner does too: one verdict — LATE — MISSED, the
+    // mirror of TOO EARLY (PM copy, 2026-10-28).
+    if (slamTiming?.zone === 'late') { const late = 'LATE'; return named ? `${named} · ${late}` : late; }
     const why = slamSeen ? 'THREW IT AT THE IRON TOO EARLY' : 'NO SLAM';
     return named ? `${named} · ${why}` : why;
   }
@@ -4954,6 +4971,7 @@ export const DunkMode: ModeDefinition = (() => {
       hint: runwayHint,   // F4 (review): six controls in one line taught none of them (IMPROVE 2026-10-06: the line is kept for the standing tips to give back to)
       charge: 0, slamPulse: false,
     });
+    if (turn === 'player' && isStaticControlsHint(runwayHint)) ctx.setHud({ hint: liveRunwayHint() });   // DUNK-LIVE-TIMING-FIX LP-04: every attempt (RUN IT BACK too) opens with the live run line
     mic?.release();
     if (turn === 'player') {   // THE MIC: who is up — the attempt, and the pressure in the final round
       const moment = stakes.attemptsUsed >= 2 ? 'dunk.lastchance' : stakes.attemptsUsed === 1 ? 'dunk.retry'
