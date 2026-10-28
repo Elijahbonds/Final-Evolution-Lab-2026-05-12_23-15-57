@@ -120,8 +120,8 @@ function installRecorder(cfg) {
     const e = c.globalPosition || c.position; let blocked = 0, who = -1;
     for (const p of pts) {
       if (!p) continue;
-      const d = p.subtract(e); const len = d.length(); if (len < 0.3) continue;
-      const ray = new Ray(e.clone(), d.scale(1 / len), len - 0.25);
+      const d = p.subtract(e); const len = d.length(); if (len < 1.2) continue;
+      const ray = new Ray(e.clone(), d.scale(1 / len), len - 1.0);   // a metre short: the hero's own gear and vehicle (aero's scarf, a wingtip) is not a blocked view
       // the props and the world only: a skinned body (a rival, a horde fighter, their kit) in front of the hero is play, not a blocked view
       const hit = scene.pickWithRay(ray, (m) => m.isEnabled() && m.isVisible && (m.visibility === undefined || m.visibility > 0.25) && !heroMeshes.has(m) && !m.skeleton
         && m.getTotalVertices && m.getTotalVertices() > 0 && !(m.material && m.material.alpha !== undefined && m.material.alpha < 0.3)
@@ -301,10 +301,10 @@ function analyze(mode, rec, S) {
       const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '' });
     }
   }
-  // one EVENT is every bone that pops within 3 frames of another (a snap into a pose moves many bones at once); the
+  // one EVENT is every bone that pops within 10 frames of another (a snap into a pose moves many bones at once); the
   // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
   const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
-  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 3) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS }); }
+  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 10) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS }); }
   out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
   out.popEventEx = events.sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')}`);
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);

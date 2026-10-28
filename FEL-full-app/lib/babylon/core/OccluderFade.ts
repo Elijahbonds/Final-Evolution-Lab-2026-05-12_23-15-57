@@ -39,6 +39,8 @@ export const OCCLUDER_CHECK_FRAMES = 3;
 export const OCCLUDER_MIN_RADIUS_M = 0.3;
 /** A mesh whose bounding sphere is larger than this is the world, not a prop (m). */
 export const OCCLUDER_MAX_RADIUS_M = 30;
+/** The rays stop this far short of the hero's head, chest and hips (m): what is that close is the hero's own gear or ride. */
+export const OCCLUDER_NEAR_HERO_M = 1;
 /** Modes held by their own lanes: the finding is routed, not applied (docs/GAMEPLAY-CLEAN-AUDIT.md). */
 export const OCCLUDER_FADE_OFF: ReadonlySet<string> = new Set(['dunk', 'onevone', 'threevthree']);
 /** Never faded, by name: the floor the hero stands on and the sky behind it. */
@@ -139,8 +141,9 @@ export class OccluderFade {
       : [root.add(new Vector3(0, 1.6, 0)), root.add(new Vector3(0, 1.1, 0)), root.add(new Vector3(0, 0.9, 0))];
     for (const p of pts) {
       if (!p) continue;
-      const d = p.subtract(eye); const len = d.length(); if (len < 0.5) continue;
-      this.ray.origin.copyFrom(eye); this.ray.direction.copyFrom(d.scaleInPlace(1 / len)); this.ray.length = len - 0.3;
+      const d = p.subtract(eye); const len = d.length(); if (len < OCCLUDER_NEAR_HERO_M + 0.2) continue;
+      // stop short of the body: the hero's own gear and ride (a kart's shell, a plane's wing, a scarf) is not in the way
+      this.ray.origin.copyFrom(eye); this.ray.direction.copyFrom(d.scaleInPlace(1 / len)); this.ray.length = len - OCCLUDER_NEAR_HERO_M;
       const hits = this.scene.multiPickWithRay(this.ray, (m) => this.pickable(m)) ?? [];
       for (const hit of hits) {
         const m = hit.pickedMesh; if (!m) continue;

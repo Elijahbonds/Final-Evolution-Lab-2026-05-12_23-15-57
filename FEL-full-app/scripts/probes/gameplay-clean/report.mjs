@@ -49,5 +49,16 @@ for (const r of rows) {
   const c = (x, s) => `${x} ${s}`;
   lines.push(`| ${r.mode} | ${c(k.load, r.readyS)} | ${c(k.pops, r.popEventsPerMin ?? r.popsPerMin)} | ${c(k.pose, `${r.tposeFrames}/${r.restPoseFrames}`)} | ${k.skate === 'n/a' ? 'n/a' : c(k.skate, `${r.contactSlideRatio} (${r.contacts})`)} | ${c(k.occl, `${r.heroHiddenPct} · ${r.heroInFramePct}`)} | ${c(k.cam, r.camCutsAfterIntro)} | ${c(k.hud, `${k.words} · ${k.small} · ${k.over} · ${k.lowC}`)} | ${c(k.perf, `${r.phoneCpuMsP50}/${r.phoneCpuMsP95}`)} | ${c(k.draws, `${r.drawsMean}/${r.drawsMax}`)} | ${c(k.input, `${r.respMsMed} (${r.pressAnswered}/${r.pressCount})`)} | ${c(k.stuck, r.longestStillS)} | ${c(k.pause, r.pause?.state ?? '')} | ${c(k.errors, k.errs.length)} |`);
 }
+// the in-game controls, per mode: what the rig saw on READY, in play and on the pause
+const cl = [];
+cl.push('| mode | pause: pad / keys (START, ESC) | pause: touch button | controls on READY · on pause | way out in play | touch deck · a tap reaches the game | feel tab | HUD smallest px (play) | tap targets < 44 px (play) |');
+cl.push('|---|---|---|---|---|---|---|---|---|');
+for (const r of rows) {
+  if (r.fail || r.bootFail) { cl.push(`| ${r.mode} | R boot | | | | | | | |`); continue; }
+  const pl = r.play ?? []; const p0 = pl[0] ?? {};
+  const touchOk = (Array.isArray(r.touchTap) && r.touchTap.length > 0) || (r.touchTap && r.touchTap.events?.length > 0);
+  cl.push(`| ${r.mode} | ${r.pause?.state === 'resumed' ? 'G' : 'R'} ${r.pause?.state ?? ''} | ${pl.some((s) => s.pauseButton) ? 'G yes' : 'R none'} | ${r.ready?.controlsPanel?.length ? 'G' : 'R'} ${r.ready?.controlsRows ?? 0} rows · ${r.pauseScreen?.controlsPanel?.length ? 'G' : 'R'} | ${pl.some((s) => s.leaveButton) ? 'G' : 'R'} | ${p0.touchDeck ? 'G' : 'A'} deck · ${touchOk ? `G ${r.touchTap.label ?? r.touchTap[0]}` : `R ${JSON.stringify(r.touchTap ?? 'not tried')}`} | ${pl.some((s) => s.feelTab) ? 'G' : 'R'} | ${Math.min(...pl.map((s) => s.smallest ?? 99))} | ${Math.max(...pl.map((s) => s.tapSmall ?? 0))} |`);
+}
+if (process.argv.includes('--controls')) { console.log(cl.join('\n')); process.exit(0); }
 if (process.argv.includes('--json')) console.log(JSON.stringify(rows.map((r) => ({ mode: r.mode, ...grade(r) }))));
 else console.log(lines.join('\n'));
