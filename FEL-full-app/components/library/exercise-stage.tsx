@@ -19,7 +19,7 @@
 // slow-phone rig (scripts/probes/_library-anatomy.mts speed), the stage now:
 //   · decides the device's quality tier the way a full-screen mode on this device would (tierRule deviceTierDecision —
 //     the viewport, not the stage's small box) and stamps it on the scene, so on a phone CharacterLibrary loads the scan's
-//     phone file (heroBody scanUrlForTier: 3.3 MB, 1K maps, the same 22 bones) and the phone texture cap applies, as in
+//     phone file (heroBody bodyUrlForTier: 3.3 MB, 1K maps, the same 22 bones) and the phone texture cap applies, as in
 //     every mode on that phone;
 //   · starts fetching that body (lib/library/demoWarm.ts) the moment it mounts, alongside Babylon's download, and loads
 //     its modules in parallel instead of one after another;
@@ -27,11 +27,12 @@
 //   · is PARKED when it unmounts: the canvas leaves the page with its engine, scene, body, built loops and compiled shaders
 //     intact, and the next stage to mount (a route change and back, the next drill, the library sheet) takes it — no
 //     download, parse, retarget or shader compile again. One is parked at most, for ten minutes; the page leaving
-//     disposes it.
+//     or a game mode mounting (DEMO-SPEED-2: lib/babylon/core/parkedStage.ts) disposes it.
 import { useEffect, useRef, useState } from 'react';
 import type { AnatomyHandle } from '@/lib/babylon/library/anatomyLook';
 import type { DemoProp } from '@/lib/library/demo';
 import { unscaledBodyUrl, warmDemoBody, warmedBodyUrl } from '@/lib/library/demoWarm';
+import { dropParkedStage, holdParkedStage } from '@/lib/babylon/core/parkedStage';
 
 export type StageView = 'demo' | 'muscles';
 export type StageSide = 'front' | 'back';
@@ -73,23 +74,27 @@ function mark(k: string): void {
 }
 
 // ── the parking slot (DEMO-SPEED) ──
+// DEMO-SPEED-2: a game mode mounting releases it (lib/babylon/core/parkedStage.ts, called by lookStack.mountLookStack)
 const PARK_MS = 10 * 60_000;
 let parked: { host: StageHost; timer: ReturnType<typeof setTimeout> } | null = null;
 let pageHideHooked = false;
+/** Dispose whatever is parked (the timer, the page leaving, a game mode mounting). */
+const releaseParked = () => { const p = parked; if (!p) return; parked = null; clearTimeout(p.timer); dropParkedStage(releaseParked); p.host.dispose(); };
 function takeParked(): StageHost | null {
   const p = parked;
   if (!p) return null;
-  parked = null; clearTimeout(p.timer);
+  parked = null; clearTimeout(p.timer); dropParkedStage(releaseParked);
   if (!p.host.fresh()) { p.host.dispose(); return null; }   // the Closet saved a new look since: build it again
   return p.host;
 }
 function parkHost(host: StageHost): void {
   host.unbind();
   if (parked) { host.dispose(); return; }   // one parked at most: a phone keeps one body, not one per card it scrolled past
-  parked = { host, timer: setTimeout(() => { if (parked?.host === host) { parked = null; host.dispose(); } }, PARK_MS) };
+  parked = { host, timer: setTimeout(releaseParked, PARK_MS) };
+  holdParkedStage(releaseParked);
   if (!pageHideHooked && typeof window !== 'undefined') {
     pageHideHooked = true;
-    window.addEventListener('pagehide', () => { const h = takeParked(); h?.dispose(); });
+    window.addEventListener('pagehide', releaseParked);
   }
 }
 
