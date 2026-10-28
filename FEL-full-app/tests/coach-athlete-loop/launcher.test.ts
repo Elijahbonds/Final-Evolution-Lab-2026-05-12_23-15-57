@@ -106,6 +106,30 @@ describe("Today, the coached athlete's launcher", () => {
     inner.unmount(); m.unmount();
   });
 
+  it('Set done logs the set (the plan\'s reps, then this session\'s set before it); the last set is in the finish\'s save', async () => {
+    const { m } = await mountToday();
+    (findAll(m.tree as ReactNode, (el) => el.type === PrimaryCta)[0].props.onClick as () => void)();
+    await settle();
+    const props = findAll(m.tree as ReactNode, (el) => el.type === CoachSessionPlayer)[0].props as unknown as Parameters<typeof CoachSessionPlayer>[0];
+    const k = props.coach.refs.findIndex((r) => r.kind === 'exercise');
+    const slot = (props.coach.refs[k] as { slot: string }).slot;
+    const rows: Record<string, unknown[]> = {};
+    const saves: { complete: boolean; rows?: Record<string, { reps: string }[]> }[] = [];
+    const inner = mount(() => CoachSessionPlayer({ ...props, onRows: (sl, r) => { rows[sl] = r; }, save: async (o) => { saves.push(o as never); return { ok: true, line: null }; } }));
+    const sp = (inner.tree as { props: { onState: (s: unknown) => void; onFinish: () => Promise<{ ok: boolean; line: string | null }> } }).props;
+    const st = (phase: string, set: number, setsDone: number) => ({ phase, step: k, set, leftMs: null, fullMs: null, paused: false, elapsedMs: 0, setsDone });
+    sp.onState(st('work', 1, 0));
+    sp.onState(st('rest', 2, 1));                                    // Set done on set 1
+    expect((rows[slot] as { reps: string }[])[0].reps).toBe('5');
+    sp.onState(st('work', 3, 2));                                    // … set 3 is the last: the finish comes in the same tick
+    const r = await sp.onFinish();
+    expect(r).toEqual({ ok: true, line: C.saved });
+    expect(saves).toHaveLength(1);
+    expect(saves[0].complete).toBe(true);
+    expect(saves[0].rows![slot][2].reps).toBe('5');
+    inner.unmount(); m.unmount();
+  });
+
   it('nothing was taken away: every card, its logging, Save and Done sit behind "Full session"', () => {
     const src = readFileSync('app/coach/_components/today-view.tsx', 'utf8');
     const at = src.indexOf('<LauncherSheet id="plan"');

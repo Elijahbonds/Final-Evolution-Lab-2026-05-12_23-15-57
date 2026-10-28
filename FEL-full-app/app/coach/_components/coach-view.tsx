@@ -65,7 +65,7 @@ export function CoachView() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {hasSession && tab === 'today'
-            ? <Link href="/coach/session" className={`fel-press inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-4 ${TYPE.label} text-white/85`}><Dumbbell aria-hidden className="h-4 w-4" />Court session</Link>
+            ? <Link href="/coach/session" className={`fel-press inline-flex min-h-11 items-center gap-2 ${TYPE.label} text-fel-soft`}><Dumbbell aria-hidden className="h-4 w-4" />Court session</Link>
             : <PrimaryCta href="/coach/session" docked icon={<Dumbbell aria-hidden className="h-5 w-5" />}>Court session</PrimaryCta>}
         </div>
       </header>

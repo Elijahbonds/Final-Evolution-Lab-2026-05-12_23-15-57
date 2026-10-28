@@ -85,8 +85,9 @@ export interface CoachSessionPlayerProps {
   reply: CoachReply | null;
   /** Write one slot's rows into Today's drafts. */
   onRows: (slot: string, rows: SetDraft[]) => void;
-  /** Save the drafts. `complete`: the session is done (and `cooldown`: FEL's cool-down ran). `keepalive`: leaving the page. */
-  save: (o: { complete: boolean; cooldown: boolean; keepalive?: boolean }) => Promise<FinishResult>;
+  /** Save the drafts. `complete`: the session is done (and `cooldown`: FEL's cool-down ran). `keepalive`: leaving the page.
+   *  `rows`: slots whose rows are newer than the drafts the caller holds (the last set, logged in the same tick as the finish). */
+  save: (o: { complete: boolean; cooldown: boolean; keepalive?: boolean; rows?: Record<string, SetDraft[]> }) => Promise<FinishResult>;
   onClose: () => void;
   initial?: PlayerState;
 }
@@ -99,11 +100,14 @@ export function CoachSessionPlayer({ coach, exercises, drafts, unit, simpleLog, 
   const finished = useRef(false);
   // rows Set done filled in (slot:index): a Back that undoes the set clears them again; a row the athlete typed stays
   const filled = useRef(new Set<string>());
+  // the set on screen while it is worked: the finish comes in the same tick as the last Set done, before onState reports it
+  const working = useRef<{ step: number; set: number } | null>(null);
 
   // Set done: the set just done is logged (a blank row gets the prefill); the machine has moved on, so read it back
   const onState = useCallback((s: PlayerState) => {
     const prev = stateRef.current;
     stateRef.current = s;
+    if (s.phase === 'work') working.current = { step: s.step, set: s.set };
     if (!prev) return;
     if (s.setsDone < prev.setsDone && s.phase === 'work') {
       const back = slotSet(coach.refs, s.step, s.set);
@@ -123,7 +127,20 @@ export function CoachSessionPlayer({ coach, exercises, drafts, unit, simpleLog, 
     while (rows.length <= at.index) rows.push(emptySetDraft());
     if (!rows[at.index] || draftIsEmpty(rows[at.index])) filled.current.add(`${at.slot}:${at.index}`);
     rows[at.index] = prefillRow(e, rows, at.index);
+    if (s.phase !== 'finish') onRows(at.slot, rows);   // the finish logged it already (finish below)
+  }, [coach.refs, bySlot, onRows]);
+
+  /** The last set's row, logged at the finish (the same rule as every Set done). */
+  const lastRows = useCallback((): Record<string, SetDraft[]> => {
+    const w = working.current;
+    const at = w ? slotSet(coach.refs, w.step, w.set) : null;
+    const e = at ? bySlot.get(at.slot) : null;
+    if (!at || !e) return {};
+    const rows = [...(draftsRef.current[at.slot]?.sets ?? [])];
+    while (rows.length <= at.index) rows.push(emptySetDraft());
+    rows[at.index] = prefillRow(e, rows, at.index);
     onRows(at.slot, rows);
+    return { [at.slot]: rows };
   }, [coach.refs, bySlot, onRows]);
 
   const leaveToFilm = useCallback(() => {
@@ -135,9 +152,9 @@ export function CoachSessionPlayer({ coach, exercises, drafts, unit, simpleLog, 
   const finish = useCallback(async (): Promise<FinishResult> => {
     finished.current = true;
     writeResume(null);
-    const r = await save({ complete: true, cooldown: coach.cooldown });
+    const r = await save({ complete: true, cooldown: coach.cooldown, rows: lastRows() });
     return r.ok ? { ok: true, line: r.line ?? C.saved } : r;
-  }, [save, coach.cooldown]);
+  }, [save, coach.cooldown, lastRows]);
 
   const close = useCallback(() => {
     // ended early: keep what was logged (an open session, as Today's Save always did); the finish already saved

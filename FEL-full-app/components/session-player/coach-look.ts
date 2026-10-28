@@ -8,6 +8,7 @@ export const COACH_LOOK = {
   reply: 'rounded-2xl border border-fel-cyan/30 bg-[#0b1d24]/90 px-4 py-3 backdrop-blur-sm motion-safe:animate-[felSheetUp_320ms_cubic-bezier(0.16,0.8,0.3,1)]',
   replyFrom: `${TYPE.label} text-fel-cyan`,
   replyBody: `mt-1 line-clamp-3 ${TYPE.body} text-white`,
+  replyBodySmall: `mt-1 line-clamp-3 ${TYPE.small} text-white`,
   log: 'space-y-1.5',
   logHead: `${TYPE.label} text-fel-soft`,
   film: '[&_a]:min-h-11 [&_a]:text-[12px]',
@@ -17,8 +18,10 @@ export const COACH_LOOK = {
   eyebrow: `${TYPE.label} text-fel-soft`,
   title: `${TYPE.heading} mt-1 text-white`,
   cta: 'mt-4 [&>[data-fel-primary]]:w-full',
-  rows: 'fel-surface flex flex-col divide-y divide-white/[0.06] overflow-hidden p-0',
-  row: `flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left ${TYPE.body} text-white/90 fel-press`,
+  rows: 'fel-surface flex flex-col overflow-hidden p-0',
+  // a row's divider is an inset shadow, not a border: a row reads as a list line, not one more button look
+  row: `flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left ${TYPE.small} text-white/90 fel-press [&:not(:first-child)]:shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]`,
+  offDay: `${TYPE.label} text-[#7BD389]`,
   rowSide: `${TYPE.label} text-fel-soft`,
   /** the empty day's one quiet action (the kit's outlined shape) */
   quietCta: `fel-press mt-2 inline-flex min-h-12 items-center justify-center rounded-full border border-white/25 px-6 ${TYPE.label} text-white`,

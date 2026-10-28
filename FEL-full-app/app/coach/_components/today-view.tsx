@@ -216,11 +216,11 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
     setUnit(to); writeWeightUnit(to);
   };
 
-  const logBody = (complete: boolean) => {
+  const logBody = (complete: boolean, rows: Record<string, SetDraft[]> = {}) => {
     if (!data?.today || !data.program) return null;
     // MIRROR-COACH P8 FIX (2026-09-30): what this card served on each slot — the gate's easier step, or null for "as
     // written" — so the coach's inbox never reads a logged easier step as the jump (the server checks the claim)
-    const logs = data.today.session.exercises.filter((e) => drafts[e.id]).map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl, servedExerciseId: servedClaim(e) }));
+    const logs = data.today.session.exercises.filter((e) => drafts[e.id]).map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(rows[e.id] ?? drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl, servedExerciseId: servedClaim(e) }));
     return JSON.stringify({ programId: data.program.id, sessionId: data.today.session.id, logs, complete });
   };
   const submit = async (complete: boolean) => {
@@ -250,8 +250,8 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
     void load();
   };
   /** PLAT-P06: the player's save — the same log route and body as Save / Done; then the cool-down route when FEL's ran. */
-  const savePlayed = async (o: { complete: boolean; cooldown: boolean; keepalive?: boolean }): Promise<FinishResult> => {
-    const body = logBody(o.complete);
+  const savePlayed = async (o: { complete: boolean; cooldown: boolean; keepalive?: boolean; rows?: Record<string, SetDraft[]> }): Promise<FinishResult> => {
+    const body = logBody(o.complete, o.rows);
     if (!body || !data?.today || !data.program) return { ok: false, line: null };
     try {
       const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body, ...(o.keepalive ? { keepalive: true } : {}) });
@@ -363,24 +363,23 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
       {finishedCard}
       {api.branding && <CoachBrandBar api={api.branding} />}
       {/* PLAT-P06: the coach's note on top — their newest word since the last session (lib/coach/coachReply.ts) */}
-      {data.reply && <CoachReplyCard reply={data.reply} />}
+      {data.reply && <CoachReplyCard reply={data.reply} small />}
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
       <ReadinessTodayLine note={today.readiness} api={api.readiness} />
       {/* PLAT-P06: the launcher — today's session, ONE primary, the week */}
       <section className={L.card} data-today-launcher data-session-kind={today.session.kind}>
-        <p className={L.eyebrow}>{program.name}</p>
         <h2 className={L.title} data-today-title>{today.block.label} · {today.session.label}</h2>
-        {recovery && <p className={`${L.eyebrow} mt-1 text-[#7BD389]`} data-off-day-line>{OFF_DAY_LINE}</p>}
+        {recovery && <p className={`${L.offDay} mt-1`} data-off-day-line>{OFF_DAY_LINE}</p>}
         {playable && <div className={L.cta} data-today-start><PrimaryCta onClick={() => start()} testId="today-start">{C.start}</PrimaryCta></div>}
-        {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
+        {today.week && today.week.entries.length > 1 && <WeekDots label={today.week.label} entries={today.week.entries} />}
       </section>
       <nav className={L.rows} aria-label={C.rowsLabel}>
         {/* How you feel: the pain follow-ups and the readiness check-in, at the top of the full session (their place, as before) */}
         <LauncherRow label={C.rows.feel} onClick={() => setSheet('plan')} testId="today-row-feel" />
         {parity}
-        <LauncherRow label={C.rows.plan} side={`${today.index + 1}/${today.total}`} onClick={() => setSheet('plan')} testId="today-row-plan" />
+        <LauncherRow label={C.rows.plan} onClick={() => setSheet('plan')} testId="today-row-plan" />
         {api.messages && <LauncherRow label={C.rows.thread} side={unread ? `${unread}` : undefined} onClick={() => setSheet('thread')} testId="today-row-thread" />}
       </nav>
 
@@ -400,6 +399,7 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
           </div>
           {!recovery && <UnitSwitch unit={unit} onChange={switchUnit} />}
         </div>
+        {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
       </div>
       {today.session.exercises.length === 0 && !today.session.held?.length && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
       {/* MIRROR-COACH P8: items the protocol gate holds back today (no ungated easier step on their ladder) */}
@@ -514,6 +514,22 @@ function LauncherSheet({ id, title, open, onOpen, always = false, children }: {
 /** Today's own cool-down card shows only when no just-finished session's card is up (MIRROR-COACH P6 FIX, 2026-09-29):
  *  both at once put the next session's done tap by the Done button, where the finished session's tap belonged. */
 export const showsNextCooldown = (finished: { sessionId: string } | null): boolean => finished === null;
+
+/**
+ * PLAT-P06 (2026-10-28): the week on the launcher, as marks, not words — done, today, next, an off day dashed. Each mark
+ * names itself to a screen reader (the list's label carries the whole week); the words are in WeekStrip, in the full
+ * session.
+ */
+export function WeekDots({ label, entries }: { label: string; entries: readonly WeekEntry[] }) {
+  const look = (e: WeekEntry) => e.state === 'today' ? 'bg-fel-cyan' : e.state === 'done' ? 'bg-[#7BD389]'
+    : e.kind === 'recovery' ? 'border border-dashed border-[#7BD389]/60' : 'bg-white/15';
+  const said = entries.map((e) => `${e.label}${e.state === 'done' ? ', done' : e.state === 'today' ? ', today' : ''}`).join('; ');
+  return (
+    <ol className="mt-4 flex gap-1.5" aria-label={`This week, ${label}: ${said}`} data-testid="week-dots">
+      {entries.map((e) => <li key={e.id} data-week-entry={e.id} data-kind={e.kind} data-state={e.state} className={`h-1.5 flex-1 rounded-full ${look(e)}`} />)}
+    </ol>
+  );
+}
 
 /**
  * This week on Today (MIRROR-COACH P6, 2026-09-29): the block's sessions in order, done / today / next, an off day named
