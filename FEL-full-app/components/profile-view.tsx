@@ -135,7 +135,7 @@ export function PrqDataRights() {
       <h3 className="fel-heading text-lg font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
       {/* REVIEW (2026-09-24, D5): both buttons cover the movement history too (lib/prq-data-rights.ts), the numbers
           worked out from the camera that the privacy policy sends people here to export or delete */}
-      <p className="text-xs text-white/40 mb-4">
+      <p className="text-xs text-fel-dim mb-4">
         Export or delete your PRQ measurements and your movement history (jumps, dunks, form reads and screens worked out from the camera) at any time.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -261,7 +261,7 @@ export function HealthDataSection() {
       <h3 className="fel-heading flex items-center gap-2 text-lg font-bold text-white mb-1">
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
-      <p className="text-xs text-white/40 mb-4">
+      <p className="text-xs text-fel-dim mb-4">
         Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
@@ -269,7 +269,7 @@ export function HealthDataSection() {
       <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
         <div>
           <div className="text-sm font-bold text-white">Health data collection</div>
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-fel-dim">
             {granted
               ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
               : 'Off — nothing is being collected.'}

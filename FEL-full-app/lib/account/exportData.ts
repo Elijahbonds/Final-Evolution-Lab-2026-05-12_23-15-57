@@ -3,9 +3,16 @@
 //
 // The user id is the signed-in session's. This function has no other way to choose a person.
 // profile is an allow-list: password, KYC, and every other User column are not copied.
+//
+// DATA-RIGHTS-SWEEP (2026-10-25): `accountTables` carries every OTHER table a person has rows in — teams and squads,
+// coach drafts and decisions, the coach business tables, library submissions, the wallet ledger (referral grants and
+// daily drill claims are ledger rows), challenge results carried from a guest session, programs and training logs, the
+// store's orders and bookings — as lib/data-rights/registry.ts classifies them, with secrets (tokens, key material)
+// left out. A pending table not applied yet is skipped quietly and named in `accountTables.notYetCreated`.
 
 import type { Prisma } from '@/public/_prisma/client';
 import { collectPrqExport } from '@/lib/prq-data-rights';
+import { collectTables, hasRaw, type CollectedTables } from '@/lib/data-rights/rights';
 
 type Db = Pick<
   Prisma.TransactionClient,
@@ -45,10 +52,13 @@ export async function collectAccountExport(db: Db, userId: string, now?: Date) {
     db.playerProfile.findUnique({ where: { userId } }),
     db.mirrorSession.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
   ]);
+  // A client without raw calls (a test stand-in) has no account tables to read.
+  const accountTables: CollectedTables = hasRaw(db) ? await collectTables(db, userId) : { tables: {}, notYetCreated: [] };
   return {
     ...base,
     profile: publicProfile(user),
     playerProfile,
     mirrorSessions,
+    accountTables,
   };
 }

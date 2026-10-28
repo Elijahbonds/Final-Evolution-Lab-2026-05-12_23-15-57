@@ -47,21 +47,21 @@
 // Pure: no DOM, no fetch. Runs in the browser (the Mirror) and on the server (the coach's route).
 import type { ZoneId } from '../babylon/nexus/neuro-mirror';
 import { playbookBlock, type BlockKind, type PlaybookBlock } from './program';
-import { cameraSlots, fixLine, sideWords, type CheckResult, type ScreenId } from './screen';
+import { cameraSlots, fixLine, meaningLine, sideWords, type CheckResult, type ScreenId } from './screen';
 import { RETEST_HINT, formatGradeValue, isGraderId, retestHintFor, type GraderId, type UnreadableReason } from './stationGraders';
 import { gapExceedsEighteenYears } from '@/lib/age/ageRules';
 
 /** Said wherever a screen's mapping is shown — to the athlete and to the coach. */
 export const CAMERA_NOT_DIAGNOSIS = 'This is what the camera saw, not a diagnosis.';
 /** A camera slot with no reading at all (the screen ended early, or a pre-P3 client posted nothing for it). */
-export const NOT_MEASURED_NOTE = 'Not read: no reading came back for this check.';
+export const NOT_MEASURED_NOTE = 'Not read: the camera got nothing for this check.';
 /** What a retest asks for when there is no reason to go on. */
-export const RETEST_DEFAULT_HINT = 'Run this station again next time.';
+export const RETEST_DEFAULT_HINT = 'Do this part again next time.';
 
 /** The camera checks, short, the way a list of results names them. */
 export const SHORT_LABEL: Record<GraderId, string> = {
-  heelLine: 'Heel line', kneeWindow: 'Knee window', hipLevel: 'Hip level',
-  shoulderLevel: 'Shoulder height', headFloat: 'Head float', singleLeg: 'Single-leg stance',
+  heelLine: 'Heels from behind', kneeWindow: 'Knees from the front', hipLevel: 'Hip level',
+  shoulderLevel: 'Shoulder level', headFloat: 'Head position', singleLeg: 'One-leg balance',
 };
 
 /**
@@ -74,8 +74,8 @@ export const CORRECTIVE_BLOCK: Record<GraderId, { zone: ZoneId; kind: BlockKind;
   shoulderLevel: { zone: 'rib_thoracic', kind: 'release' },
   headFloat: { zone: 'rib_thoracic', kind: 'activate' },
   // one title for the two, so "Same block as above" names the block it follows
-  hipLevel: { zone: 'lumbo_pelvic', kind: 'activate', title: 'Trunk and hip hold' },
-  singleLeg: { zone: 'lumbo_pelvic', kind: 'activate', title: 'Trunk and hip hold' },
+  hipLevel: { zone: 'lumbo_pelvic', kind: 'activate', title: 'Hip and middle hold' },
+  singleLeg: { zone: 'lumbo_pelvic', kind: 'activate', title: 'Hip and middle hold' },
   kneeWindow: { zone: 'posterior_chain', kind: 'activate' },
   heelLine: null,
 };
@@ -227,6 +227,8 @@ export interface AthleteWorkItem {
   title: string;
   /** "The camera saw …" */
   saw: string;
+  /** CUE-REWRITE: what it means for you (screen.ts meaningLine) — the middle part of the result shape. */
+  means: string;
   /** The FIX line. */
   todo: string;
   block: PlaybookBlock | null;
@@ -269,8 +271,8 @@ export function youthGateFor(dobYear: number | null | undefined, now: Date = new
 }
 
 export const YOUTH_BLOCKS_OFF: Record<Exclude<YouthGate, null>, string> = {
-  minor: 'Corrective blocks are off under 18 for now. The fix above is the work — do it with your coach or a parent.',
-  unknownAge: 'Corrective blocks are off until your birth year is on your account (they are for adults for now). The fix above is the work.',
+  minor: 'The extra drill blocks are for adults for now. Do the fix above with your coach or a parent.',
+  unknownAge: 'The extra drill blocks are for adults. Add your birth year to your account to see them. The fix above is the work.',
 };
 
 /** The outcomes with their written blocks taken off (a youth athlete, above). */
@@ -289,7 +291,8 @@ export function athletePlan(rawOutcomes: readonly CheckOutcome[], opts: { youth?
     if (key) shown.add(key);
     return {
       title: outcomeTitle(o),
-      saw: o.value ? `The camera saw ${o.value}.` : 'The camera flagged this one for a closer look.',
+      saw: o.value ? `The camera saw: ${o.value}.` : 'The camera marked this one as worth working on.',
+      means: meaningLine(o.checkId) ?? 'Worth a closer look with your coach.',
       todo: o.fix ?? 'Ask your coach what to work on for this one.',
       block: o.block,
       blockShownAbove,
@@ -305,7 +308,7 @@ export function athletePlan(rawOutcomes: readonly CheckOutcome[], opts: { youth?
     : retest.length === outcomes.length
       ? 'The camera could not read enough of this screen to say what to work on. Run it again.'
       : retest.length
-        ? 'Nothing flagged in what the camera read. Some checks were not read, so run those again before you call it done.'
-        : 'Nothing flagged in any check the camera read.';
+        ? 'Nothing to work on in what the camera read. Some checks were not read, so run those again.'
+        : 'Nothing to work on in any check the camera read.';
   return { headline, work, retest, nothing, note: CAMERA_NOT_DIAGNOSIS, ...(blocked && opts.youth ? { blocksNote: YOUTH_BLOCKS_OFF[opts.youth] } : {}) };
 }

@@ -1,0 +1,140 @@
+// Authored block: trunk (anti-extension, anti-rotation, anti-lateral flexion, rotation power). The Playbook's cylinder.
+import { reps, secs, meters, type Family } from './types';
+
+const B = 'trunk';
+const PUNCH = 'Brace for a light punch, then keep breathing behind it.';
+const STILL = 'Hold still: nothing moves but the air.';
+
+export const TRUNK: Family[] = [
+  {
+    family: 'plank', block: B, category: 'core', pattern: 'other', plane: 'sagittal', laterality: 'bilateral', skillLayer: 'cylinder', braceMode: 'set',
+    primary: ['abs', 'deep-core'], secondary: ['obliques', 'delts', 'glutes'], goals: ['trunk', 'posture'], sport: ['general', 'basketball'],
+    lowLoad: ['knee', 'ankle', 'back'], youthOk: true, equipment: [], clip: 'brace',
+    setup: 'Forearms on the floor under the shoulders, body in one long line from head to heels.',
+    cues: [PUNCH, STILL, 'Push the floor away with your forearms.'],
+    faults: [
+      { fault: 'Hips sagging toward the floor', fix: 'Tuck the belt buckle toward your chin and push the floor away.' },
+      { fault: 'Hips piked up high', fix: 'Lower the hips until you make one line to the floor.' },
+      { fault: 'Holding the breath', fix: 'Breathe in through the nose, out long, without the line moving.' },
+    ],
+    dosage: secs(3, 30, 45),
+    variants: [
+      { name: 'Incline Plank', v: 'incline', level: 'beginner', equipment: ['bench'], setup: 'Forearms on a bench, body in one long line from head to heels.', cue: 'Push the bench away with your forearms.' },
+      { name: 'Forearm Plank', v: 'forearm', level: 'beginner', aliases: ['Front Plank'] },
+      { name: 'High Plank', v: 'high', level: 'beginner', setup: 'Hands under the shoulders, arms straight, body in one long line.', cue: 'Push the floor away with straight arms.' },
+      { name: 'Plank Shoulder Tap', v: 'shoulder-tap', level: 'intermediate', laterality: 'alternating', setup: 'High plank, feet a little wider than the hips.', cue: 'Tap one hand to the opposite shoulder while the hips stay still as a table.', dosage: reps(3, '10 each side', 45) },
+      { name: 'Plank Reach', v: 'reach', level: 'intermediate', laterality: 'alternating', cue: 'Reach one hand forward toward the wall ahead without the hips moving.', dosage: reps(3, '8 each side', 45) },
+      { name: 'Long-Lever Plank', v: 'long-lever', level: 'advanced', setup: 'Forearm plank with the elbows a hand-width further forward than the shoulders.', cue: 'Pull the elbows toward the toes on the floor without moving.' },
+      { name: 'Body Saw', v: 'body-saw', level: 'advanced', equipment: ['slider'], setup: 'Forearm plank with the feet on sliders.', cue: 'Rock the body forward and back an inch or two along the floor, line unbroken.', dosage: reps(3, '8', 60) },
+      { name: 'Bear Plank Hold', v: 'bear-hold', level: 'beginner', ladder: 'bear', setup: 'On hands and feet, knees bent and hovering a fist above the floor, back flat as a table.', cue: 'Hover the knees above the floor and keep the back flat as a table.', aliases: ['Bear Hold'] },
+      { name: 'Bear Crawl', v: 'bear-crawl', level: 'intermediate', ladder: 'bear', laterality: 'alternating', setup: 'On hands and feet, knees hovering a fist above the floor.', cue: 'Crawl forward with small steps, the back flat as a table.', clip: 'crawl', dosage: meters(3, 10, 45), goals: ['trunk', 'shoulder', 'warmup'] },
+      { name: 'Lateral Bear Crawl', v: 'bear-lateral', level: 'intermediate', ladder: 'bear', laterality: 'alternating', plane: 'frontal', setup: 'On hands and feet, knees hovering a fist above the floor.', cue: 'Crawl sideways with small steps, the back flat as a table.', clip: 'crawl', dosage: meters(3, 10, 45) },
+    ],
+  },
+  {
+    family: 'side-plank', block: B, category: 'core', pattern: 'other', plane: 'frontal', laterality: 'unilateral', skillLayer: 'cylinder', braceMode: 'set',
+    primary: ['obliques', 'glute-med'], secondary: ['deep-core', 'adductors', 'delts'], goals: ['trunk', 'hip', 'posture'], sport: ['general', 'basketball', 'soccer'],
+    lowLoad: ['knee', 'ankle', 'back'], youthOk: true, equipment: [], clip: 'brace',
+    setup: 'Lie on one side, forearm on the floor under the shoulder, body in one long line.',
+    cues: ['Lift the hips and push the floor away with your forearm.', STILL, 'Grow long from the top of your head to the wall behind your feet.'],
+    faults: [
+      { fault: 'Hips sagging toward the floor', fix: 'Lift the belt line up toward the ceiling.' },
+      { fault: 'Rolling forward', fix: 'Stack the hips on top of each other, square to the wall ahead.' },
+    ],
+    dosage: secs(3, 25, 30),
+    variants: [
+      { name: 'Short Side Plank', v: 'short', level: 'beginner', setup: 'Lie on one side, forearm under the shoulder, knees bent behind you.', aliases: ['Kneeling Side Plank'] },
+      { name: 'Side Plank', v: 'full', level: 'beginner' },
+      { name: 'Side Plank Top-Leg Raise', v: 'leg-raise', level: 'intermediate', cue: 'Hold the side plank and lift the top foot toward the ceiling, slow.', goals: ['hip'] },
+      { name: 'Copenhagen Plank, Short Lever', v: 'copenhagen-short', level: 'intermediate', ladder: 'copenhagen', equipment: ['bench'], setup: 'Side plank with the top knee resting on a bench, the bottom leg hanging.', cue: 'Press the bench down with the top knee and lift the hips.', primary: ['adductors', 'obliques'], secondary: ['glute-med'], goals: ['hip', 'knee'] },
+      { name: 'Copenhagen Plank', v: 'copenhagen-long', level: 'advanced', ladder: 'copenhagen', equipment: ['bench'], setup: 'Side plank with the top foot resting on a bench, the bottom leg hanging.', cue: 'Press the bench down with the top foot and lift the hips.', primary: ['adductors', 'obliques'], secondary: ['glute-med'], goals: ['hip', 'knee'] },
+      { name: 'Side Plank with Row', v: 'row', level: 'advanced', equipment: ['band'], setup: 'Side plank facing a band anchored at chest height, the top hand holding the band.', cue: 'Row the band to your ribs while the hips stay up and still.' },
+    ],
+  },
+  {
+    family: 'dead-bug', block: B, category: 'core', pattern: 'other', plane: 'sagittal', laterality: 'alternating', skillLayer: 'cylinder', braceMode: 'set',
+    primary: ['deep-core', 'abs'], secondary: ['hip-flexors', 'obliques'], goals: ['trunk', 'posture'], sport: ['general', 'basketball'],
+    lowLoad: ['knee', 'ankle', 'back', 'shoulder', 'wrist'], youthOk: true, equipment: [], clip: 'brace',
+    setup: 'On your back, arms reaching to the ceiling, hips and knees bent to right angles.',
+    cues: ['Press the lower back gently into the floor and keep it there.', 'Reach one heel long toward the wall ahead, slow, and bring it back.', 'Breathe out long as the leg reaches.'],
+    faults: [
+      { fault: 'Lower back arching off the floor', fix: 'Shorten the reach so the lower back stays heavy on the floor.' },
+      { fault: 'Rushing the reps', fix: 'Reach on a slow three-count and return on three.' },
+    ],
+    dosage: reps(3, '6 each side', 30),
+    variants: [
+      { name: 'Dead Bug Heel Tap', v: 'heel-tap', level: 'beginner', cue: 'Tap one heel to the floor, slow and quiet, and bring it back.' },
+      { name: 'Dead Bug', v: 'full', level: 'beginner' },
+      { name: 'Band-Resisted Dead Bug', v: 'band', level: 'intermediate', equipment: ['band'], setup: 'On your back, holding a band anchored behind your head with straight arms.', cue: 'Pull the band toward your knees and hold it there as the legs reach.' },
+      { name: 'Weighted Dead Bug', v: 'weighted', level: 'intermediate', equipment: ['dumbbell'], setup: 'On your back, one dumbbell held over the chest with both hands.' },
+      { name: 'Bird Dog', v: 'bird-dog', level: 'beginner', ladder: 'bird-dog', setup: 'On hands and knees, hands under the shoulders, knees under the hips.', cues: ['Reach one hand toward the wall ahead and the opposite heel toward the wall behind.', 'Keep the back flat as a table, like a cup of water on it.', 'Return slow and switch sides.'] },
+      { name: 'Bird Dog Row', v: 'bird-dog-row', level: 'intermediate', ladder: 'bird-dog', equipment: ['dumbbell', 'bench'], setup: 'One hand and the same-side knee on a bench, the other leg reaching back, a dumbbell in the free hand.', cues: ['Row the dumbbell to your ribs while the back stays flat as a table.', 'Reach the free heel long toward the wall behind.', 'Lower the weight slow until it hangs at full range.'] },
+    ],
+  },
+  {
+    family: 'anti-rotation', block: B, category: 'core', pattern: 'rotation', plane: 'transverse', laterality: 'unilateral', skillLayer: 'cylinder', braceMode: 'set',
+    primary: ['obliques', 'deep-core'], secondary: ['abs', 'glutes'], goals: ['trunk', 'agility'], sport: ['general', 'basketball', 'tennis', 'football'],
+    lowLoad: ['knee', 'back'], youthOk: true, equipment: ['band'], clip: 'brace',
+    setup: 'Stand side-on to a band anchored at chest height, the handle at your chest in both hands.',
+    cues: ['Press the band straight out from your chest and hold it still.', 'Let the band pull; you do not turn toward the anchor.', 'Bring the band back to your chest slow.'],
+    faults: [
+      { fault: 'Turning toward the anchor', fix: 'Step further from the anchor only when you can stay square to the wall ahead.' },
+      { fault: 'Shrugging the band up', fix: 'Press straight out at chest height, away from your ears.' },
+    ],
+    dosage: reps(3, '10 each side', 30),
+    variants: [
+      { name: 'Tall-Kneeling Pallof Press', v: 'tall-kneel', level: 'beginner', setup: 'Kneel tall side-on to a band anchored at chest height, the handle at your chest.', aliases: ['Kneeling Pallof Press'] },
+      { name: 'Half-Kneeling Pallof Press', v: 'half-kneel', level: 'beginner', setup: 'Half-kneeling side-on to the anchor, the inside knee down, the handle at your chest.' },
+      { name: 'Band Pallof Press', v: 'standing', level: 'beginner', aliases: ['Anti-Rotation Press'] },
+      { name: 'Cable Pallof Press', v: 'cable', level: 'intermediate', equipment: ['cable'], setup: 'Stand side-on to a cable at chest height, the handle at your chest.' },
+      { name: 'Pallof Press Walkout', v: 'walkout', level: 'intermediate', cue: 'Hold the band out in front and side-step away from the anchor and back, still as a post.', dosage: reps(3, '5 steps each way', 45) },
+      { name: 'Split-Stance Pallof Press', v: 'split', level: 'intermediate', setup: 'Split stance side-on to the anchor, the handle at your chest.' },
+      { name: 'Band Anti-Rotation March', v: 'march', level: 'advanced', laterality: 'alternating', cue: 'Hold the band out in front and march in place, knees up, still as a post.', dosage: reps(3, '10 each side', 45) },
+      { name: 'Half-Kneeling Cable Chop', v: 'chop', level: 'intermediate', ladder: 'chop', equipment: ['cable'], laterality: 'unilateral', setup: 'Half-kneeling side-on to a high cable, a rope or handle in both hands up by the anchor.', cues: ['Pull the handle across and down past the far hip on a smooth path.', 'Keep the belt line square to the wall ahead.', 'Return slow to the start.'], clip: 'rotate' },
+      { name: 'Half-Kneeling Cable Lift', v: 'lift', level: 'intermediate', ladder: 'lift', equipment: ['cable'], laterality: 'unilateral', setup: 'Half-kneeling side-on to a low cable, the handle in both hands down by the anchor.', cues: ['Lift the handle across and up past the far shoulder on a smooth path.', 'Keep the belt line square to the wall ahead.', 'Return slow to the start.'], clip: 'rotate' },
+      { name: 'Band Woodchop', v: 'band-chop', level: 'beginner', ladder: 'chop', laterality: 'unilateral', setup: 'Stand side-on to a band anchored high, the handle in both hands up by the anchor.', cues: ['Pull the band across and down past the far hip on a smooth path.', 'Turn the back foot as the band crosses.', 'Return slow to the start.'], clip: 'rotate' },
+    ],
+  },
+  {
+    family: 'rotational-power', block: B, category: 'power', pattern: 'rotation', plane: 'transverse', laterality: 'unilateral', skillLayer: 'wake-up', braceMode: 'reflex',
+    primary: ['obliques', 'glutes'], secondary: ['abs', 'delts', 'adductors'], goals: ['power', 'trunk'], sport: ['general', 'basketball', 'tennis', 'football'],
+    lowLoad: ['knee', 'back'], youthOk: true, equipment: ['medicine-ball', 'wall'], clip: 'throw',
+    setup: 'Stand side-on to a solid wall, a med ball held at the back hip.',
+    cues: ['Throw it through the wall: full speed every rep.', 'Turn the back foot and let the throw start from the floor.', 'Reset still between reps so every throw is fast.'],
+    faults: [
+      { fault: 'Arms-only throws', fix: 'Turn the back foot against the floor first; the arms finish the throw.' },
+      { fault: 'Slow, tired reps', fix: 'Rest longer: every throw should be the fastest one yet.' },
+    ],
+    dosage: reps(4, '5 each side', 60),
+    variants: [
+      { name: 'Half-Kneeling Rotational Med Ball Throw', v: 'hk', level: 'beginner', setup: 'Half-kneeling side-on to a wall, the ball at the back hip.', cue: 'Turn from the middle and throw the ball into the wall.' },
+      { name: 'Rotational Med Ball Scoop Toss', v: 'scoop', level: 'intermediate', aliases: ['Med Ball Side Toss'] },
+      { name: 'Rotational Med Ball Shot Put', v: 'shot-put', level: 'intermediate', setup: 'Side-on to a wall, the ball held at the back shoulder in one hand, the other hand behind it.', cue: 'Push the ball off the back shoulder through the wall.' },
+      { name: 'Step-Behind Rotational Throw', v: 'step-behind', level: 'advanced', cue: 'Step the back foot behind the front, then throw through the wall.', youthOk: true },
+      { name: 'Landmine Rotation', v: 'landmine', level: 'intermediate', ladder: 'landmine', equipment: ['landmine'], setup: 'Face the landmine, the bar end held at chest height in both hands, arms long.', cues: ['Swing the bar end to one hip on a smooth arc, then to the other.', 'Turn the back foot as the bar crosses.', 'Keep the arms long and the bar path smooth.'], clip: 'rotate' },
+    ],
+  },
+  {
+    family: 'trunk-flexion', block: B, category: 'core', pattern: 'other', plane: 'sagittal', laterality: 'bilateral', skillLayer: 'cylinder', braceMode: 'set',
+    primary: ['abs'], secondary: ['hip-flexors', 'obliques'], goals: ['trunk'], sport: ['general', 'basketball', 'volleyball'],
+    lowLoad: ['knee', 'ankle'], youthOk: true, equipment: [], clip: 'brace',
+    setup: 'Lie on your back on the floor, lower back steady.',
+    cues: ['Curl the belt buckle toward your ribs on a slow, smooth path.', 'Breathe out as you curl.', 'Lower slow until you are back at the start.'],
+    faults: [
+      { fault: 'Yanking or swinging to finish the rep', fix: 'Move on a slow two-count; shorten the range if you need momentum.' },
+      { fault: 'Lower back arching off the floor', fix: 'Shorten the range so the lower back stays heavy on the floor.' },
+    ],
+    dosage: reps(3, '10-12', 45),
+    variants: [
+      { name: 'Modified Curl-Up', v: 'curl-up', level: 'beginner', setup: 'On your back, one knee bent and one leg long, hands under the lower back.', cue: 'Lift your head and the tops of your shoulders an inch off the floor and hold a beat.' },
+      { name: 'Hollow Body Hold, Tucked', v: 'hollow-tuck', level: 'beginner', ladder: 'hollow', setup: 'On your back, knees pulled in, arms reaching toward the feet.', cues: ['Press the lower back into the floor and lift the shoulders a little.', 'Hold still and breathe out long.', 'Make yourself a shallow banana shape on the floor.'], dosage: secs(3, 20, 30) },
+      { name: 'Hollow Body Hold', v: 'hollow', level: 'intermediate', ladder: 'hollow', setup: 'On your back, legs long and low, arms reaching overhead.', cues: ['Press the lower back into the floor and hover the heels a few inches above it.', 'Hold still and breathe out long.', 'Make yourself a shallow banana shape on the floor.'], dosage: secs(3, 20, 30) },
+      { name: 'Hollow Body Rock', v: 'hollow-rock', level: 'advanced', ladder: 'hollow', setup: 'Hold the hollow body shape on the floor.', cues: ['Rock gently along the floor without the banana shape changing.', 'Breathe out long through the rocks.', 'Stop the set when the shape breaks.'], dosage: reps(3, '10', 45) },
+      { name: 'Hanging Knee Raise', v: 'hanging-knee', level: 'intermediate', ladder: 'hanging', equipment: ['pull-up-bar'], setup: 'Hang from the bar with straight arms, legs long.', cue: 'Bring the knees up toward the bar without swinging, then lower slow.', goals: ['grip'] },
+      { name: 'Hanging Leg Raise to Bar', v: 'hanging-toes', level: 'advanced', ladder: 'hanging', equipment: ['pull-up-bar'], setup: 'Hang from the bar with straight arms, legs long.', cue: 'Lift the toes up to the bar without swinging, then lower slow.', youthOk: true, goals: ['grip'] },
+      { name: 'Kneeling Ab Wheel Rollout', v: 'ab-wheel-knees', level: 'intermediate', ladder: 'wheel', equipment: ['ab-wheel', 'mat'], setup: 'Kneel on a mat with the hands on the wheel under the shoulders.', cue: 'Roll the wheel out only as far as the line holds, then pull it back.' },
+      { name: 'Stability Ball Rollout', v: 'ball-rollout', level: 'beginner', ladder: 'wheel', equipment: ['stability-ball', 'mat'], setup: 'Kneel on a mat with the forearms on a stability ball in front.', cue: 'Roll the ball forward only as far as the line holds, then pull it back.' },
+      { name: 'Stability Ball Stir the Pot', v: 'stir', level: 'advanced', ladder: 'stir', equipment: ['stability-ball'], setup: 'Forearm plank with the forearms on a stability ball.', cue: 'Draw small circles on the ball with your forearms while the hips stay still.', dosage: reps(3, '6 each way', 60) },
+    ],
+  },
+];

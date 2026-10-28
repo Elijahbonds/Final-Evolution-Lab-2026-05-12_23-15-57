@@ -84,10 +84,14 @@ describe('the weekly door', () => {
     expect(readFileSync(join(__dirname, 'week-entry.tsx'), 'utf8')).not.toMatch(/prisma|fetch\(/);
   });
 
-  it('is on Train and on the profile header', () => {
+  // TEST CHANGED (premium-ui P4, 2026-10-27): the Profile tab's door moved from a text link in the progress header to the
+  // tab's ONE docked primary (app/profile/page.tsx), same href and the same data-testid; the intent — the weekly door is on
+  // the Profile tab — is what this still holds.
+  it('is on Train and is the Profile tab\'s primary', () => {
     const root = join(__dirname, '..', '..');
     expect(readFileSync(join(root, 'app/train/page.tsx'), 'utf8')).toContain('<WeekCardEntry />');
-    expect(readFileSync(join(root, 'components/profile-v2/progress-header.tsx'), 'utf8')).toContain('href="/profile/week"');
+    const profile = readFileSync(join(root, 'app/profile/page.tsx'), 'utf8');
+    expect(profile).toMatch(/<PrimaryCta href="\/profile\/week" docked testId="profile-week-card"/);
   });
 });
 

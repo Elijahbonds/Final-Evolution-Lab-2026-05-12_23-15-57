@@ -121,12 +121,22 @@ function Running({ view, drill, onEnd }: { view: LiveDrillView; drill: Drill; on
   );
 }
 
-export function DrillLive({ drill, onLeave, onResult, keptLine }: {
+/** TODAY-DRILL (2026-10-27): what a page that draws its own running screen is handed (the controller's own actions). */
+export interface DrillRunningSlot { view: LiveDrillView; drill: Drill; end: () => void; pause: () => void; leave: () => void }
+/** TODAY-DRILL: what a page that draws its own result is handed. */
+export interface DrillResultSlot { result: DrillResult; drill: Drill; again: () => void; leave: () => void }
+
+export function DrillLive({ drill, onLeave, onResult, keptLine, renderRunning, renderResult }: {
   drill: Drill; onLeave: () => void;
   /** DAILY-DRILL (2026-10-24): told once per result when a run ends (the daily drill claims a 'complete' one). */
   onResult?: (result: DrillResult) => void;
   /** DAILY-DRILL: the result card's line about what is kept, in place of NOTHING_SAVED_LINE. */
   keptLine?: string;
+  /** TODAY-DRILL: the page's own running screen in place of Running (the space check, the grown-up step, the camera-off
+   *  pause and every rule above stay this component's). */
+  renderRunning?: (slot: DrillRunningSlot) => JSX.Element;
+  /** TODAY-DRILL: the page's own result in place of ResultCard. */
+  renderResult?: (slot: DrillResultSlot) => JSX.Element;
 }) {
   const [wake, setWake] = useState<WakeLockState>('off');
   const { handle, view } = useLiveDrill(setWake);
@@ -152,7 +162,9 @@ export function DrillLive({ drill, onLeave, onResult, keptLine }: {
 
   let stage: JSX.Element;
   if (view.phase === 'done' && view.result) {
-    stage = <ResultCard result={view.result} drill={drill} onAgain={start} onLeave={leave} keptLine={keptLine} />;
+    stage = renderResult
+      ? renderResult({ result: view.result, drill, again: start, leave })
+      : <ResultCard result={view.result} drill={drill} onAgain={start} onLeave={leave} keptLine={keptLine} />;
   } else if (body.grownUp === 'ask') {
     stage = (
       <div data-drill-grown-up="" className="max-w-md">
@@ -160,7 +172,9 @@ export function DrillLive({ drill, onLeave, onResult, keptLine }: {
       </div>
     );
   } else if (view.phase === 'playing') {
-    stage = <Running view={view} drill={drill} onEnd={() => handle?.live.finish()} />;
+    stage = renderRunning
+      ? renderRunning({ view, drill, end: () => handle?.live.finish(), pause: () => handle?.live.pause(), leave })
+      : <Running view={view} drill={drill} onEnd={() => handle?.live.finish()} />;
   } else if ((view.phase === 'setup' || view.phase === 'paused') && body.stage !== 'off') {
     stage = body.collapsed ? (
       <button type="button" onClick={() => bodyPlay.collapse(false)}
@@ -190,7 +204,7 @@ export function DrillLive({ drill, onLeave, onResult, keptLine }: {
       {view.waiting && <p className="text-sm text-white/70">Starting as soon as the space check says all set.</p>}
       {stage}
       {wakeLine && <p className="text-[12px] text-amber-200/80">{wakeLine}</p>}
-      {view.phase !== 'done' && (
+      {view.phase !== 'done' && !(renderRunning && view.phase === 'playing') && (
         <button type="button" onClick={leave} className="text-sm text-white/55 underline">Leave the drill</button>
       )}
     </div>

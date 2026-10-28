@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { CheckCircle2, Circle, Lock, GraduationCap, Dumbbell, ChevronDown, Loader2, Zap, Brain } from 'lucide-react';
 import { TRACKS, MODE_INFO, canonicalModeKey } from '@/lib/game-data';
+import { TYPE } from '@/lib/design/type';
 
 /** NEXUS adaptive queue item (from /api/nexus/queue) */
 interface NexusQueueItem {
@@ -88,12 +89,15 @@ export function EducationView() {
     }
   };
 
+  // PLAT-P04 (2026-10-27), owner call §5.2 (a): the Academy moved to the bottom of Learn (/learn) — a section of that page
+  // now, not a page of its own (/education redirects to /learn). Its lessons, its checkpoints and its Lab Credits are
+  // exactly as they were; only the header changed, from the page's EDUCATION title to the section's name.
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-6">
+    <div data-academy>
       <div className="flex items-center gap-3">
-        <GraduationCap className="h-7 w-7 text-[#00E5FF]" />
+        <GraduationCap aria-hidden className="h-7 w-7 text-[#00E5FF]" />
         <div>
-          <h1 className="fel-heading text-3xl font-bold text-white">EDUCATION</h1>
+          <h2 id="academy" className={`${TYPE.heading} text-white`}>Academy</h2>
           <p className="text-sm text-white/50">Learn the theory. Run the drill. Earn Lab Credits.</p>
         </div>
       </div>
@@ -260,6 +264,6 @@ export function EducationView() {
         );
       })}
       {!loaded && <p className="mt-6 text-center font-mono text-xs text-white/35">Loading progress…</p>}
-    </main>
+    </div>
   );
 }

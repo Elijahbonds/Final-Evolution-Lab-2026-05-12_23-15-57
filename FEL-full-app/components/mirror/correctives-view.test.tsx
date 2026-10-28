@@ -44,7 +44,7 @@ describe('an adult', () => {
   it('the program with its retest schedule', () => {
     const html = render(null, [row(1, { upper_traps: 3 }), row(2, { upper_traps: 4 })]);
     expect(html).toContain('data-block="release"');
-    expect(text(html)).toContain('Retest in 4 press/row sets in the Mirror.');
+    expect(text(html)).toContain('Check-up in 4 press and row sets in the Mirror.');   // test changed: copy rewrite (CUE-REWRITE) — same meaning
     expect(text(html)).toContain(PROGRAM_DISCLAIMER);
     expect(html).not.toContain('data-last-retest');
   });

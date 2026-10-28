@@ -19,7 +19,9 @@ import { BulkInvite } from './bulk-invite';
 
 interface Invite { token: string; use: 'once' | 'many'; expiresAt: string; joined: number }
 
-export function InvitePanel() {
+/** The team import is off by default: it lives in the Clients tab's Setup group (COACH-DELIVERY phase 2, the premium rule).
+ *  `bulk` puts it back inside the panel for a page that has no Setup group. */
+export function InvitePanel({ bulk = false }: { bulk?: boolean } = {}) {
   const [invites, setInvites] = useState<Invite[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<{ token: string; data: string } | null>(null);
@@ -69,17 +71,17 @@ export function InvitePanel() {
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
       <header className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-[#00E5FF]" />
+        <Users className="h-4 w-4 text-fel-cyan" />
         <h2 className="fel-heading text-sm font-bold uppercase tracking-wide text-white">Add an athlete</h2>
       </header>
       <p className="mt-2 text-xs leading-relaxed text-white/50">
-        Send a link, show the QR, or write the code on the board. They sign up, land on your roster, and you can program
-        for them straight away.
+        {/* COACH-DELIVERY phase 2 (premium rule: fewer words, no paragraph over 24): was 25 words. DRAFT copy. */}
+        Send a link, show the QR or share the code. They join your roster.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button onClick={() => make('once')} disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#00E5FF] px-4 py-2 text-xs font-bold text-[#050505] disabled:opacity-60">
+          className="inline-flex items-center gap-2 rounded-lg bg-fel-cyan px-4 py-2 text-xs font-bold text-fel-bg disabled:opacity-60">
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
           Link for one athlete
         </button>
@@ -89,8 +91,8 @@ export function InvitePanel() {
         </button>
       </div>
 
-      {invites === null && <p className="mt-4 text-xs text-white/35">Loading…</p>}
-      {invites?.length === 0 && <p className="mt-4 text-xs text-white/35">No open invites.</p>}
+      {invites === null && <p className="mt-4 text-xs text-fel-quiet">Loading…</p>}
+      {invites?.length === 0 && <p className="mt-4 text-xs text-fel-quiet">No open invites.</p>}
 
       <ul className="mt-4 space-y-2">
         {invites?.map((i) => {
@@ -98,21 +100,21 @@ export function InvitePanel() {
           return (
           <li key={i.token} className="rounded-xl border border-white/10 bg-black/30 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-fel-dim">
                 {i.use === 'once' ? 'One athlete' : 'Reusable'} · {i.joined} joined
               </span>
-              {code && <span className="font-mono text-sm font-bold tracking-[0.15em] text-[#00E5FF]" title={`Type it at ${JOIN_BY_CODE_PATH}`} data-invite-code>{formatCode(code)}</span>}
+              {code && <span className="font-mono text-sm font-bold tracking-[0.15em] text-fel-cyan" title={`Type it at ${JOIN_BY_CODE_PATH}`} data-invite-code>{formatCode(code)}</span>}
               <span className="ml-auto flex gap-1">
                 <button onClick={() => copy(i.token)} title="Copy the link"
                   className="rounded-md border border-white/15 p-1.5 text-white/70 hover:text-white">
-                  {copied === i.token ? <Check className="h-3.5 w-3.5 text-[#00FF9D]" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copied === i.token ? <Check className="h-3.5 w-3.5 text-fel-emerald" /> : <Copy className="h-3.5 w-3.5" />}
                 </button>
                 <button onClick={() => showQr(i.token)} title="Show the QR"
                   className="rounded-md border border-white/15 p-1.5 text-white/70 hover:text-white">
                   <QrCode className="h-3.5 w-3.5" />
                 </button>
                 <button onClick={() => revoke(i.token)} title="Revoke"
-                  className="rounded-md border border-white/15 p-1.5 text-white/40 hover:text-[#FF3366]">
+                  className="rounded-md border border-white/15 p-1.5 text-fel-dim hover:text-fel-crimson">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </span>
@@ -128,9 +130,9 @@ export function InvitePanel() {
         })}
       </ul>
       {invites?.some((i) => codeOfToken(i.token)) && (
-        <p className="mt-2 text-[11px] text-white/40">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
+        <p className="mt-2 text-[11px] text-fel-dim">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
       )}
-      <BulkInvite onDone={() => void load()} />
+      {bulk && <BulkInvite onDone={() => void load()} />}
     </section>
   );
 }

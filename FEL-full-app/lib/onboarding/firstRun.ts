@@ -7,8 +7,11 @@
 //
 // Two things decide the first screen:
 //
-//   THE PATH      Game first, or body first. Some people arrive to play and some arrive to be assessed, and
-//                 guessing wrong is how you lose either one. It is a question, asked once, in plain words.
+//   THE PATH      What they came for, asked once, in plain words. ONB-01 (owner QUALITY 2026-10-20, "pick-your-path
+//                 onboarding: play / train / learn / teach / create -> one start + a 60 s guided first win") widened
+//                 this from game-or-body to five paths. `body`, the old second answer, is read as `train`: a saved
+//                 pick, an old link or an old client still lands somewhere real. Each path ends in ONE first win
+//                 (lib/onboarding/firstWin.ts).
 //
 //   THE GAME      If a creator's link or QR brought them, the creator's SIGNATURE MODE is the first game —
 //                 CreatorCard.mode, which already exists and already means exactly this. Somebody who scans
@@ -21,12 +24,27 @@ import { MODE_INFO, VENUES, canonicalModeKey } from '../game-data';
 import { isUnlistedMode } from '../unlisted-modes';
 import { shelvedModes } from '../nav/families';
 
-export type OnboardingPath = 'play' | 'body';
+/** The five ways in (ONB-01), in the order the picker shows them. */
+export const PATHS = ['play', 'train', 'learn', 'teach', 'create'] as const;
+export type OnboardingPath = (typeof PATHS)[number];
+/** A path as it may arrive: one of the five, or `body` — the old "body first", now `train`. */
+export type PathKey = OnboardingPath | 'body';
 
-/** Where each path begins. `body` is the Mirror because a movement screen is the front door to everything else. */
-export const PATH_HOME: Record<OnboardingPath, string> = {
+/** The guided first-win page (app/welcome). Every path but play starts there; play opens its game directly. */
+export const WELCOME_PATH = '/welcome';
+export const welcomeHref = (path: OnboardingPath): string => `/welcome?path=${path}`;
+
+/**
+ * Where each path's whole surface lives — the door the first win hands on to. `body` is kept as a key so an old
+ * caller reading PATH_HOME.body still gets an answer; it is train's.
+ */
+export const PATH_HOME: Record<PathKey, string> = {
   play: '/play',
-  body: '/play/mirror',
+  train: '/train/today-drill',
+  learn: '/learn',
+  teach: '/coach',
+  create: '/closet',
+  body: '/train/today-drill',
 };
 
 /** The one game to open with when nothing and nobody has said otherwise. */
@@ -34,8 +52,24 @@ export const DEFAULT_FIRST_GAME = 'dunkContest';
 
 const FIRST_RUN_MODE_KEYS = new Set(shelvedModes());
 
-export function isPath(v: unknown): v is OnboardingPath {
-  return v === 'play' || v === 'body';
+export function isPath(v: unknown): v is PathKey {
+  return v === 'body' || (PATHS as readonly unknown[]).includes(v);
+}
+
+/** One of the five, from anything: `body` reads as `train`; anything unrecognised is null (the caller's default). */
+export function toPath(v: unknown): OnboardingPath | null {
+  if (v === 'body') return 'train';
+  return (PATHS as readonly unknown[]).includes(v) ? (v as OnboardingPath) : null;
+}
+
+/**
+ * Teaching is for verified adults: a coach invites strangers onto a roster, and a teen account is set up with no public
+ * anything. A teen (or an unknown age) who picks it is offered train instead — the same default the rest of the app
+ * keeps for them. `adult` is the caller's verified-adult answer (lib/privacy/verifiedAdult).
+ */
+export function pathFor(v: unknown, opts: { adult: boolean }): OnboardingPath {
+  const p = toPath(v) ?? 'play';
+  return p === 'teach' && !opts.adult ? 'train' : p;
 }
 
 /** A mode key is usable only if something can actually be opened with it.
@@ -69,9 +103,14 @@ export function resolveFirstGame(opts: {
   return DEFAULT_FIRST_GAME;
 }
 
-/** Where a new athlete lands once the questions are answered. */
-export function destinationFor(path: OnboardingPath, modeKey?: string | null): string {
-  if (path === 'body') return PATH_HOME.body;
+/**
+ * Where a new athlete lands once the questions are answered. Play opens the game itself — the creator's, their pick, or
+ * the dunk — because the game IS the first win and a page in front of it would only slow the first dunk. Every other
+ * path lands on its guided first win (app/welcome), which hands on to PATH_HOME.
+ */
+export function destinationFor(path: PathKey, modeKey?: string | null): string {
+  const p = toPath(path) ?? 'play';
+  if (p !== 'play') return welcomeHref(p);
   const key = resolveFirstGame({ chosen: modeKey });
   return MODE_INFO[key]?.href ?? PATH_HOME.play;
 }

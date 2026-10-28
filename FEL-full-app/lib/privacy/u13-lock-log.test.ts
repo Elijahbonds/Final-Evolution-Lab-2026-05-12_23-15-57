@@ -55,7 +55,50 @@ const UA = 'AgeScreenTest/1.0';
 // pending SQL: whichever lands second bumps this to the merge carrying both.
 // COACH-AI-DRAFT (lane/coach-ai-draft, 2026-10-24) prisma/pending/2026-10-24-coach-ai-draft.sql (pending SQL only; schema.prisma
 // untouched; CoachProgramDraft + CoachDraftDecision, additive) at ad3b04fa, the lane commit carrying it on top of every file above.
-const PARENT = 'ad3b04faad63dd7be01b45b724971ea2c6e658c6';
+// COACH-VIDEO-REVIEW (lane/coach-video-review, 2026-10-24) prisma/pending/2026-10-24-coach-form-review.sql (pending SQL only;
+// schema.prisma untouched; CoachFormReview, additive) at 02c1e49c, the lane commit carrying it on top of every file above.
+// lane/coach-ai-draft landed first (#436): pinned at c2c5140e, this lane's merge of lane/finish-release, the first
+// commit carrying both pending files.
+// TEAMS-SQUADS (lane/teams-squads, 2026-10-25) prisma/pending/2026-10-25-teams-squads.sql (pending SQL only; schema.prisma
+// untouched; TrainingGroup + TrainingGroupMember + TrainingGroupAct, additive) at e0adbbd8, the lane commit carrying it on
+// top of every file above; lane/coach-video-review landed first (#438): pinned at the merge of lane/finish-release into
+// this lane (f123fb66), the first commit carrying all three 2026-10-24/25 pending files.
+// COACH-BUSINESS (lane/coach-business, 2026-10-25) prisma/pending/2026-10-25-coach-business.sql (pending SQL only; schema.prisma
+// untouched; six additive tables) at 44680dbc. lane/coach-video-review landed first (#438): pinned at b4857b8d, this
+// lane's merge of lane/finish-release, the first commit carrying all three 2026-10-24/25 pending files.
+// Both landed: pinned at the merge of lane/finish-release into lane/teams-squads carrying teams-squads + coach-business SQL.
+// EXERCISE-LIBRARY (lane/exercise-library, 2026-10-25) prisma/pending/2026-10-25-exercise-library.sql (pending SQL only;
+// schema.prisma untouched; LibraryExercise + LibrarySubmission + ProgramExercise.libraryExerciseId, additive) at 8656ba16.
+// lane/coach-business landed first (#442): pinned at this lane's merge of lane/finish-release, the first commit carrying
+// all four 2026-10-24/25 pending files, ef5ed65f.
+// Teams + exercise library both landed: pinned at the merge of lane/finish-release into lane/teams-squads that carries every pending file above.
+// COACH-READINESS (lane/coach-readiness, 2026-10-25) prisma/pending/2026-10-25-coach-readiness.sql (pending SQL only; schema.prisma
+// untouched; ReadinessJumpCheck + ReadinessRule + ReadinessAlert, additive) at 80954d8b, the lane commit carrying it on top of
+// every file above.
+// SIGNATURE-PROGRAMS (lane/signature-programs, 2026-10-25) prisma/pending/2026-10-25-signature-programs.sql (pending SQL only;
+// schema.prisma untouched; SignatureProgramReview + SignatureEnrollment, additive) at 3b1851c6, the lane commit carrying it on
+// top of every file above.
+// COMBINE-DAY (lane/combine-day, 2026-10-25) prisma/pending/2026-10-25-combine-day.sql (pending SQL only; schema.prisma
+// untouched; CombineEvent + CombineEntrant + CombineResult, additive) at f1954c91; with the signature programs' file it is
+// carried by the merge 0fba61f1, the first commit holding every file above.
+// COACH-PARITY (lane/coach-parity, 2026-10-26) prisma/pending/2026-10-26-coach-parity.sql (pending SQL only; schema.prisma
+// untouched; CoachCheckinForm + CoachCheckinAssign + CoachCheckinAnswer + CoachHabit + CoachHabitTick, additive) at f5e6bc63,
+// the lane commit carrying it on top of every file above. Signature programs and combine day landed first (#451, #453):
+// pinned at e7769157, this lane's merge of lane/finish-release, the first commit carrying every pending file above.
+// VBT (lane/vbt, 2026-10-25) prisma/pending/2026-10-26-vbt.sql (pending SQL only; schema.prisma untouched; VbtSet +
+// VbtZoneTarget, additive) at e9125b4b; with signature programs and combine day landed first (#451, #453), pinned at
+// c1cf9937, this lane's merge of lane/finish-release; coach parity landed next (#456): re-pinned at 0732f397, this lane's
+// second merge of lane/finish-release, the first commit carrying every pending file above.
+// PAYMENTS-READY (lane/payments-ready, 2026-10-26) prisma/pending/2026-10-26-payments-ready.sql (pending SQL only; schema.prisma
+// untouched; CoachConnectAccount.requirementsDue + CoachSaleDispute, additive) at 8f79c9cb; combine-day landed first (#453):
+// pinned at this lane's merge of lane/finish-release (d754d041), the first commit carrying both files.
+// MERGE 5418784a: the first commit carrying every pending file above.
+// MERGE 0fe07e1f: the first commit carrying every pending file above.
+// COACH-DELIVERY (lane/coach-delivery, 2026-10-26) prisma/pending/2026-10-26-coach-delivery.sql (pending SQL only; schema.prisma
+// untouched; CoachAutomation + CoachAutomationRun + ReadinessSurvey + CoachBranding + CoachRosterSession + CoachCalendarFeed +
+// CoachReview, additive); payments-ready landed first (#457): pinned at d25aaa24, this lane's merge of lane/finish-release,
+// the first commit carrying every pending file above.
+const PARENT = 'd25aaa2435cd2fc72450493a928d11c5c93be513';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

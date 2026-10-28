@@ -1,52 +1,70 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { MessageSquare, BookOpen, Video, CalendarCheck, Users, Send } from 'lucide-react';
+import { MessageSquare, BookOpen, Video, CalendarCheck, Dumbbell } from 'lucide-react';
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { TYPE } from '@/lib/design/type';
 import { CoachChat } from './coach-chat';
 import { useAiStatus } from '@/lib/abacus/useAiStatus';
 import { ExerciseCatalogue } from './exercise-catalogue';
 import { FormFeedback } from './form-feedback';
 import { TodayView } from './today-view';
 import { ClientsView } from './clients-view';
-import { SendView } from './send-view';
+import { LOOK } from '@/components/coach/coach-queue/look';
 import type { SharedBy } from '@/lib/share/shareable';
 
 // lane 1 (SPEC-PASSION-PIPELINES): Today = the client's session loop; Clients = the certified coach's builder + inbox.
-// Send (2026-09-13) = texting programming to a client. Coach-only, like Clients.
+// PLATFORM PHASE 5 (2026-10-27): a COACH no longer gets six tabs. /coach is their home — "Needs you today", the roster's
+// week, and their tools under it (app/coach/_components/clients-view.tsx). A CLIENT never sees a coach tab: their /coach
+// is their Today, with Exercises, Form Check and the AI coach beside it (phase 6 rebuilds it). Which one is decided by
+// what the server says about the account, as before: a certified coach, or a coach of programs.
 const TABS = [
   { key: 'today', label: 'Today', icon: CalendarCheck },
-  { key: 'clients', label: 'Clients', icon: Users },
-  { key: 'send', label: 'Send', icon: Send },
   { key: 'chat', label: 'Coach', icon: MessageSquare },
   { key: 'catalogue', label: 'Exercises', icon: BookOpen },
   { key: 'form', label: 'Form Check', icon: Video },
 ] as const;
 
-const COACH_ONLY: readonly string[] = ['clients', 'send'];
-
 type Tab = typeof TABS[number]['key'];
 
 export function CoachView() {
   const [tab, setTab] = useState<Tab>('today');
-  const [coach, setCoach] = useState(false);   // the Clients tab shows only for a certified coach or an existing coach of programs
+  const [coach, setCoach] = useState(false);   // the coach home shows only for a certified coach or an existing coach of programs
+  // until the server has said which, the client view is laid out but not shown: a coach never sees it flash and jump away
+  const [known, setKnown] = useState(false);
   const [me, setMe] = useState<SharedBy | null>(null);
-  useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}); }, []);
+  useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}).finally(() => setKnown(true)); }, []);
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
   useEffect(() => { fetch('/api/share/me').then((r) => r.ok ? r.json() : null).then((j) => j && setMe(j)).catch(() => {}); }, []);
   // NP-1: the Coach (AI chat) tab only exists while the AI coach is available; otherwise it is removed, not labelled.
   const [coachAi] = useAiStatus('coach');
   const chatOn = coachAi === 'available';
-  const tabs = TABS.filter((t) => (!COACH_ONLY.includes(t.key) || coach) && (t.key !== 'chat' || chatOn));
+  const tabs = TABS.filter((t) => t.key !== 'chat' || chatOn);
+
+  if (coach) {
+    return (
+      <main className={LOOK.page} data-coach-home>
+        <ClientsView me={me} chatOn={chatOn} />
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto max-w-[900px] px-4 py-4">
-      <Link href="/coach/session" className="mb-4 flex min-h-12 items-center justify-center rounded-xl bg-[#FF2D95] px-4 text-base font-bold text-black">
-        Court session
-      </Link>
-      {/* Tab switcher */}
-      <div className="flex gap-1 rounded-xl bg-[#0f0f13] p-1 mb-4 border border-white/6">
+    <main className={`fel-fade mx-auto max-w-[900px] px-5 pb-28 pt-8 md:pb-10 ${known ? '' : 'invisible'}`}>
+      {/* PREMIUM-UI P8 (2026-10-27): the page says where you are (it was a screen-reader-only heading), Court session is the
+          ONE primary — the one-accent pill, docked on a phone (was a fourth accent, pink) */}
+      <header className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <p className={`${TYPE.label} text-fel-cyan`}>Train</p>
+          <h1 className={`${TYPE.title} text-white`}>Coach</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <PrimaryCta href="/coach/session" docked icon={<Dumbbell aria-hidden className="h-5 w-5" />}>Court session</PrimaryCta>
+        </div>
+      </header>
+      {/* Tab switcher: the kit's segmented look (a soft white pill on the lit tab; the accent stays for the action) */}
+      <div className="mb-5 flex gap-1 rounded-full border border-[color:var(--fel-hairline)] bg-white/[0.03] p-1">
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -54,12 +72,12 @@ export function CoachView() {
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              // COACH-LOOP P1 (2026-10-20): on a phone the icon sits over the label, so five tabs fit 390 px without
+              // COACH-LOOP P1 (2026-10-20): on a phone the icon sits over the label, so the tabs fit 390 px without
               // squeezing "Form Check" onto two lines beside a crushed icon (measured: scripts/probes/_coach-phone-probe.mts)
-              className={`min-w-0 flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-lg py-2 sm:py-2.5 text-[11px] leading-tight sm:text-sm font-medium transition-all ${
+              className={`fel-press min-w-0 flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 rounded-full py-2 sm:py-2.5 text-[12px] font-semibold leading-tight sm:text-[14px] ${
                 active
-                  ? 'bg-[#00E5FF]/15 text-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.2)]'
-                  : 'text-white/40 hover:text-white/70'
+                  ? 'bg-white/[0.14] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]'
+                  : 'text-fel-dim hover:text-white/80'
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -71,13 +89,8 @@ export function CoachView() {
 
       {/* Tab content */}
       {tab === 'today' && <TodayView />}
-      {tab === 'clients' && <ClientsView />}
-      {tab === 'send' && (me
-        ? <SendView me={me} />
-        : <div className="py-16 text-center text-sm text-white/40">Loading your details…</div>)}
       {tab === 'chat' && chatOn && <CoachChat />}
-      {/* MIRROR-COACH P2: a coach's Exercises tab also holds their prescribable catalogue + "Add to my catalogue" */}
-      {tab === 'catalogue' && <ExerciseCatalogue coach={coach} />}
+      {tab === 'catalogue' && <ExerciseCatalogue coach={false} />}
       {tab === 'form' && <FormFeedback />}
     </main>
   );

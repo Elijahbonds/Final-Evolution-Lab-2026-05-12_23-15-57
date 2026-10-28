@@ -104,7 +104,7 @@ export function refuseScanSave(): NextResponse {
   return NextResponse.json({ ...SCAN_SAVE_REFUSED }, { status: 403 });
 }
 
-export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j';
+export type ScanSaveRouteId = '1a' | '1b' | '1c' | '1d' | '1e' | '1f' | '1g' | '1h' | '1i' | '1j' | '1k' | '1l' | '1m' | '1n';
 
 export interface ScanSaveRoute {
   id: ScanSaveRouteId;
@@ -135,4 +135,17 @@ export const SCAN_SAVE_ROUTES: readonly ScanSaveRoute[] = [
   { id: '1h', file: 'app/api/v1/camp/sessions/route.ts', handler: 'POST', writes: "CampSession prqDelta + movementDelta (the mentee's numbers; the facilitator's record still saves)", status: 'gated', holder: null },
   { id: '1i', file: 'app/api/mirror/prove-it/route.ts', handler: 'POST', writes: 'WorkoutScan kind prove_it (numbers only, idempotent on runId)', status: 'gated', holder: null },
   { id: '1j', file: 'app/api/mirror/screen-history/route.ts', handler: 'POST', writes: 'WorkoutScan kind rescreen (scores and flags, idempotent on runId)', status: 'gated', holder: null },
+  // COACH-VIDEO-REVIEW (2026-10-24): a filmed set sent to the athlete's coach — pose keypoints, rep scores and flags, never
+  // video. Adults: this gate; 13–17: off in code (lib/coach/formReview/gate.ts TEEN_POSE_REVIEW_ENABLED, an owner call).
+  { id: '1k', file: 'app/api/coach/form-reviews/route.ts', handler: 'POST', writes: 'CoachFormReview (pose keypoints, rep scores and flags; pending SQL 2026-10-24-coach-form-review.sql)', status: 'gated', holder: null, via: ['lib/coach/formReview/server.ts', 'lib/coach/formReview/store.ts'] },
+  // COACH-READINESS (2026-10-25): the daily jump check — the day's jump NUMBERS (best, mean, typical error, the band), never
+  // a frame. Verified adults who opted in; everyone else keeps the history on their own phone (lib/coach/readiness/gate.ts).
+  { id: '1l', file: 'app/api/readiness/check/route.ts', handler: 'POST', writes: 'ReadinessJumpCheck (the day\'s jump numbers and band; pending SQL 2026-10-25-coach-readiness.sql) and the ReadinessAlert it fires', status: 'gated', holder: null, via: ['lib/coach/readiness/server.ts', 'lib/coach/readiness/store.ts'] },
+  // COMBINE-DAY (2026-10-25): a coach's combine — the jump, approach and skill-drill NUMBERS a coach's camera read for an
+  // athlete, never a frame. Kept per athlete only for a verified adult with the live opt-in (lib/combine/gate.ts
+  // canKeepOnServer, decided on the server from fresh rows); anyone else's camera numbers stay on the coach's phone.
+  { id: '1m', file: 'app/api/coach/combine/[id]/route.ts', handler: 'PUT', writes: 'CombineResult camera/video rows (jump, approach, skill drill, and, only once lib/sprint/cameraSprint.ts CAMERA_TIMES_SAVED is on (an owner call, off), a sprint or 5-10-5 timed by the camera — SPRINT-SPEED; pending SQL 2026-10-25-combine-day.sql), per athlete through profileGates canSaveScan; hand-timed rows are not movement data', status: 'gated', holder: null, via: ['lib/combine/server.ts', 'lib/combine/store.ts'] },
+  // VBT (2026-10-25): a tracked set's bar-speed NUMBERS (speeds, reps, velocity loss, a warm-up's band), never a frame.
+  // Verified adults who opted in; an adult who has not keeps sets on the phone; a teen's are kept nowhere (lib/vbt/gate.ts).
+  { id: '1n', file: 'app/api/vbt/sets/route.ts', handler: 'POST', writes: 'VbtSet (a set\'s bar-speed numbers; pending SQL 2026-10-26-vbt.sql)', status: 'gated', holder: null, via: ['lib/vbt/server.ts', 'lib/vbt/store.ts'] },
 ];

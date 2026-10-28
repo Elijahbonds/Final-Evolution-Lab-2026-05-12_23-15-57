@@ -208,8 +208,9 @@ export interface JumpRead {
   landingSymMs: number | null;
   /** Deepest knee bend in the dip (deg, reported only). */
   dipKneeFlex: number | null;
-  // ── JUMP-PRO (2026-10-24), additive: lib/jump/refine.ts and lib/jump/session.ts. MEMORY ONLY: prqWrite's record
-  // keeps its own allow-list, so none of these is saved or sent. ──
+  // ── JUMP-PRO (2026-10-24), additive: lib/jump/refine.ts and lib/jump/session.ts. prqWrite's record keeps its own
+  // allow-list: since JUMP-PRO 2 (2026-10-25) it saves `method`, `heightSdCm` and `quality` (the verified rule's facts,
+  // opted-in adults only); the rest stays in memory. ──
   /** 'refined': re-timed from the whole flight (heightCm is the take-off-velocity height); 'frames': the finder's edges. */
   method?: 'refined' | 'frames';
   /** g·T²/8 of the (refined) flight, before the landing drop is taken out. */

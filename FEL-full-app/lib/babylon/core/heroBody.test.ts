@@ -3,8 +3,9 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   decideHeroBody, parseOwnerEmails, urlForHeroBody, isPlayerBodyUrl, proportionsFromFrame, bodyTypeOf,
-  SCAN_BODY_URL, KIT_BODY_URL,
+  SCAN_BODY_URL, KIT_BODY_URL, SCAN_BODY_MOBILE_URL, scanUrlForTier,
 } from './heroBody';
+import { DEFAULT_HERO_URL } from './athleteRoster';
 
 describe('heroBody — the scan is the owner\'s body only; everyone else wears the creator\'s kit body', () => {
   const owners = parseOwnerEmails(' Owner@Example.com , ,second@example.com');
@@ -122,5 +123,19 @@ describe('heroBody — a slot chooses the body, within what the account owns', (
     expect(decideHeroBody('someone@else.com', owners, null, 'scan')).toBe('kit-male');
     expect(decideHeroBody(null, owners, null, 'scan')).toBe('kit-male');
     expect(decideHeroBody('someone@else.com', owners, { bodyType: 'male' }, 'female')).toBe('kit-female');
+  });
+});
+
+// DEMO-SPEED (2026-10-27): the scan's phone file has ONE rule, shared by CharacterLibrary's tier swap and the library stage's
+// early fetch. CharacterLibrary's rule was `url === DEFAULT_HERO_URL && tier === 'mobile'`; it reads scanUrlForTier now, so
+// the scan must still be the default hero's file, or the swap would quietly stop.
+describe('the scan\'s phone file', () => {
+  it('is picked for the scan on the mobile tier only', () => {
+    expect(DEFAULT_HERO_URL).toBe(SCAN_BODY_URL);
+    expect(scanUrlForTier(SCAN_BODY_URL, 'mobile')).toBe(SCAN_BODY_MOBILE_URL);
+    for (const t of ['desktop', 'high', undefined, null]) expect(scanUrlForTier(SCAN_BODY_URL, t)).toBe(SCAN_BODY_URL);
+    for (const u of [KIT_BODY_URL.male, KIT_BODY_URL.female, '/models/athletes/atlas.glb']) expect(scanUrlForTier(u, 'mobile')).toBe(u);
+    expect(isPlayerBodyUrl(SCAN_BODY_MOBILE_URL)).toBe(true);
+    expect(existsSync(join('public', SCAN_BODY_MOBILE_URL))).toBe(true);
   });
 });

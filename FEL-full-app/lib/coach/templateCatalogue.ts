@@ -234,7 +234,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     x('pike-push-up', 'Pike Push-Up', 'push', '2-0-1-0', [
       'Hands on the floor, hips high, heels lifted.',
       'Lower your head toward a spot just in front of your hands, then press away.',
-    ], { commonFaults: [f('The hips drop and it turns into a push-up', 'Walk the feet in along the floor, closer to the hands, so the hips stay high.')] }),
+    ], { commonFaults: [f('Hips drop into a push-up', 'Walk the feet in along the floor, closer to the hands, so the hips stay high.')] }),
     x('feet-elevated-pike', 'Feet-Elevated Pike Push-Up', 'push', '2-0-1-0', [
       'Feet on a step or chair, hips stacked high over the hands.',
       'Lower slow, then press up.',
@@ -246,7 +246,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Pull your chest to the frame, elbows toward your back pockets.',
     ], { equipment: ['sturdy door frame'] }),
     x('door-row', 'Door Frame Row', 'pull', '2-0-1-1', [
-      'Hold both sides of a sturdy door frame, walk the feet in and lean back with a straight body.',
+      'Hold both sides of a sturdy door frame, walk your feet in, lean back with a straight body.',
       'Pull your chest to the door frame fast, lower slow.',
     ], { equipment: ['sturdy door frame'], commonFaults: [f('The hips sag as you pull', 'Stay one straight plank from the door frame to your heels as you pull.')] }),
     x('door-row-single', 'Single-Arm Door Frame Row', 'pull', '2-0-1-1', [
@@ -263,9 +263,9 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Pull the bag toward your hip, lower slow.',
     ], { equipment: ['backpack', 'chair'] }),
     x('backpack-row', 'Bent-Over Backpack Row', 'pull', '2-0-1-1', [
-      'Hinge forward with a long back, both hands on a loaded backpack.',
+      'Bend forward from the hips with a long back, both hands on a loaded backpack.',
       'Pull the bag to your lower chest, elbows toward your back pockets.',
-    ], { equipment: ['backpack'], commonFaults: [f('The chest rises to help the pull', 'Keep the hinge frozen and move only the bag.')] }),
+    ], { equipment: ['backpack'], commonFaults: [f('The chest rises to help the pull', 'Move only the bag; keep your hips and back frozen.')] }),
     x('backpack-row-squeeze', 'Bent-Over Backpack Row, 3-Second Squeeze', 'pull', '2-0-1-3', [
       'The same row; hold the bag in for three seconds each rep.',
     ], { equipment: ['backpack'] }),
@@ -277,7 +277,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
     ]),
     x('prone-yt', 'Prone Y-T Raise', 'pull', '1-1-1-1', [
       'Face down, forehead on a folded towel.',
-      'Lift the arms off the floor in a Y and lower, then in a T and lower. That is one rep.',
+      'Lift your arms off the floor in a Y, lower, then in a T, lower: one rep.',
     ], { equipment: ['towel'], commonFaults: [f('The head lifts with the arms', 'Keep the forehead on the towel and let only the arms move.')] }),
     x('prone-yt-hold', 'Prone Y-T Raise, 3-Second Holds', 'pull', '1-0-1-3', [
       'The same Y and T, each held up for three seconds.',
@@ -409,7 +409,7 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Bar across the upper back, hands snug; brace for a light punch before you unrack.',
       'Sit down between the heels, then drive the floor away.',
     ], { equipment: ['barbell', 'squat rack'], commonFaults: [
-      f('The hips shoot up first out of the bottom', 'Push the floor away with chest and hips rising together; take weight off the bar.'),
+      f('Hips shoot up first from the bottom', 'Push the floor away with chest and hips rising together; take weight off the bar.'),
       f('The knees drift in on the way up', 'Spread the floor apart with your feet.'),
     ] }),
     x('back-squat-pause', 'Paused Barbell Back Squat', 'squat', '3-2-1-0', [
@@ -419,13 +419,13 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
   ]),
   L('g-deadlift', 'hinge', [
     x('kb-deadlift', 'Kettlebell Deadlift', 'hinge', '2-0-1-0', [
-      'Kettlebell between the feet; hinge down with a long back.',
+      'Kettlebell between your feet; push your hips back and reach down, back long.',
       'Push the floor away and stand tall.',
     ], { equipment: ['kettlebell'] }),
     x('trap-bar-deadlift', 'Trap Bar Deadlift', 'hinge', '2-0-1-0', [
       'Stand in the middle of the bar, grip the handles, chest tall.',
       'Brace for a light punch, then push the floor away until you stand tall.',
-    ], { equipment: ['trap bar'], commonFaults: [f('The back rounds as the bar leaves the floor', 'Take the slack out of the bar and brace for a light punch before it moves; take weight off.')] }),
+    ], { equipment: ['trap bar'], commonFaults: [f('Back rounds as the bar leaves the floor', 'Take the slack out of the bar and brace for a light punch before it moves.')] }),
     x('barbell-deadlift', 'Barbell Deadlift', 'hinge', '2-0-1-0', [
       'Bar over the middle of the foot, shins close to it.',
       'Brace, squeeze the bar and push the floor away.',
@@ -512,9 +512,9 @@ export const TEMPLATE_LADDERS: readonly TemplateLadder[] = [
       'Pull the dumbbell toward your hip, lower slow.',
     ], { equipment: ['dumbbell', 'bench'], commonFaults: [f('The body twists to lift the weight', 'Keep the chest square to the bench; use a lighter dumbbell.')] }),
     x('bb-row', 'Barbell Bent-Over Row', 'pull', '2-0-1-1', [
-      'Hinge forward with a long back, the bar hanging at the knees.',
+      'Bend forward from the hips with a long back, the bar hanging at the knees.',
       'Pull the bar to your lower chest, lower with control.',
-    ], { equipment: ['barbell'], commonFaults: [f('Standing up to heave the bar', 'Hold the hinge still; take weight off the bar.')] }),
+    ], { equipment: ['barbell'], commonFaults: [f('Standing up to heave the bar', 'Take weight off the bar; hold your hips and back still.')] }),
     x('bb-row-squeeze', 'Barbell Bent-Over Row, 2-Second Squeeze', 'pull', '2-0-1-2', [
       'The same row; hold the bar in for two seconds each rep.',
     ], { equipment: ['barbell'] }),

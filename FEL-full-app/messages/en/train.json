@@ -1,0 +1,85 @@
+{
+  "eyebrow": "Train",
+  "title": "The work between games",
+  "lede": "Screen it, program it, fuel it.",
+  "cards": {
+    "vertical": {
+      "title": "Measure my vertical",
+      "line": "Prop your phone up, jump three times. About a minute."
+    },
+    "mirror": {
+      "title": "The Mirror",
+      "line": "Squat coach and movement screen. Every number is an estimate."
+    },
+    "quickScreen": {
+      "title": "Screen my movement",
+      "line": "Four moves on camera, about three minutes. Nothing is sent."
+    },
+    "readiness": {
+      "title": "Readiness check",
+      "line": "Three jumps against your normal; a low day eases. 18 and over."
+    },
+    "drills": {
+      "title": "Drills",
+      "line": "Wake-up and landing drills on camera. Nothing is sent."
+    },
+    "programming": {
+      "title": "Your programming",
+      "lineCoach": "Written by {name}.",
+      "lineBlocks": "Your blocks and sessions.",
+      "lineNone": "No coach yet. An invite link brings their plan."
+    },
+    "signature": {
+      "title": "Signature programs"
+    },
+    "library": {
+      "title": "Exercise library",
+      "line": "Every exercise, with cues and faults. Search or ask."
+    },
+    "iron": {
+      "title": "Iron Paradise",
+      "line": "The gym floor. Lift, jump, and put a number on it."
+    },
+    "playbook": {
+      "title": "The Playbook",
+      "line": "Ten chapters on how the body moves."
+    },
+    "fuel": {
+      "title": "Fuel",
+      "line": "Meals keyed to the numbers you enter."
+    },
+    "squads": {
+      "title": "Squads and teams",
+      "line": "Group streaks and a weekly league. No messages."
+    },
+    "roster": {
+      "title": "Your roster",
+      "line": "Who you coach, what they did, who is drifting."
+    },
+    "combine": {
+      "title": "Combine day",
+      "line": "Run a tryout station by station, then rank it."
+    },
+    "combines": {
+      "title": "Your combines",
+      "line": "Your combine numbers, and where you placed."
+    },
+    "standing": {
+      "title": "Where you stand",
+      "line": "PRQ, your grade, and what has moved."
+    },
+    "sprint": {
+      "title": "Sprint speed",
+      "line": "Camera-timed sprints and top speed, each with its ±. 18 and over."
+    },
+    "velocity": {
+      "title": "Bar speed",
+      "line": "Rep speed from your camera. Estimates, not lab numbers."
+    }
+  },
+  "section": {
+    "measure": "Measure",
+    "program": "Program",
+    "learn": "Learn and fuel"
+  }
+}

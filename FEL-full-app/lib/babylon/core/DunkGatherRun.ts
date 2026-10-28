@@ -57,6 +57,11 @@ export function planGather(v0: number, vEnd: number): GatherPlan {
   return { rate, dist, sec: GATHER_CLIP_SEC / rate };
 }
 /** A gather that starts `distNow` from the line: the rate that lands the plant ON the line at the clip's end. */
+/** DUNK-FLAGSHIP (a): the shortest distance a gather can be fit into without clamping its rate at GATHER_RATE_MAX — inside it
+ *  fitGather's profile starts slower than the run (a one-frame speed drop). */
+export function gatherFitDist(v0: number, vEnd: number): number {
+  return gatherDistAt(GATHER_CLIP_SEC, Math.max(0.5, v0), vEnd) / GATHER_RATE_MAX;
+}
 export function fitGather(distNow: number, v0: number, vEnd: number): GatherPlan {
   const v = Math.max(0.5, v0), d = Math.max(0.05, distNow);
   const rate = Math.min(GATHER_RATE_MAX, Math.max(GATHER_RATE_MIN, gatherDistAt(GATHER_CLIP_SEC, v, vEnd) / d));

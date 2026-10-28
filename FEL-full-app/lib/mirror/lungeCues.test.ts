@@ -1,5 +1,5 @@
 // MIRROR-MOVES P2 (2026-10-07; plan Phase 2 / item #3): the lunge speaks. Driven the way the harness drives it — LungeAudit,
-// the reused RepCounter, framing's front test, stepLungeSession, and the lunge's OWN CueEngine (LUNGE_CUE_TABLE) — over the
+// the lunge's rep counter (lungeReps.ts LungeRepCounter — MIRROR-FIXES 2026-10-25: was RepCounter), framing's front test, stepLungeSession, and the lunge's OWN CueEngine (LUNGE_CUE_TABLE) — over the
 // stored fixtures (lunge_left_front.json clean, lunge_right_front_knee_in.json a 5 cm cave) and, for the noise floor,
 // re-filmed under lib/pose/synth.ts's default landmark jitter.
 import { describe, expect, it } from 'vitest';
@@ -10,15 +10,15 @@ import { filmBodies, repDepths } from './fixtures/sideRepBuild';
 import { LUNGE_CUES, LungeAudit } from './lungeAudit';
 import { checkFraming } from './framing';
 import {
-  LUNGE_CUE_PERSIST_FRAMES, LUNGE_CUE_TABLE, LUNGE_FAULTS, LUNGE_FAULT_LABEL, initialLungeSession, lungePhaseToMovement, stepLungeSession,
+  LUNGE_CUE_PERSIST_FRAMES, LUNGE_CUE_TABLE, LUNGE_FAULTS, LUNGE_FAULT_LABEL, initialLungeSession, stepLungeSession,
 } from './lungeStage';
-import { RepCounter } from '@/lib/babylon/nexus/neuro-mirror/rules/rep-counter';
+import { LungeRepCounter } from './lungeReps';
 import { CueEngine, fadeReviewLines, type CueEvent } from '@/lib/babylon/nexus/neuro-mirror/rules/cue-engine';
 import type { PoseFrame } from '@/lib/babylon/nexus/neuro-mirror/pose/mediapipe-adapter';
 
 function drive(frames: readonly PoseFrame[]) {
   const audit = new LungeAudit();
-  let counter = new RepCounter();
+  let counter = new LungeRepCounter();
   let s = initialLungeSession();
   const engine = new CueEngine({ clearByRep: true, table: LUNGE_CUE_TABLE });
   const said: CueEvent<string>[] = [];
@@ -27,10 +27,10 @@ function drive(frames: readonly PoseFrame[]) {
     if (s.stage === 'review') break;
     const read = audit.evaluate({ landmarks: pose.landmarks, timestampMs: pose.timestampMs, present: pose.present });
     const framing = checkFraming({ present: pose.present, landmarks: pose.landmarks }, 'front');
-    const rep = counter.feed(lungePhaseToMovement(read.phase), pose.timestampMs);
+    const rep = counter.feed(read, pose.timestampMs);
     const step = stepLungeSession(s, { nowMs: pose.timestampMs, present: read.present, framedRight: framing.ok, phase: read.phase, faults: read.faults, repCompleted: !!rep });
     s = step.state;
-    if (step.stageChanged) counter = new RepCounter();
+    if (step.stageChanged) counter = new LungeRepCounter();
     if (step.cueFaults) { const e = engine.decide(pose.timestampMs, step.cueFaults); if (e) said.push(e); }
     if (step.repCueFaults) engine.endRep(step.repCueFaults, pose.timestampMs);
     if (step.stageChanged) fade.push(...fadeReviewLines(engine.endSet(), (f) => LUNGE_FAULT_LABEL[f]));
