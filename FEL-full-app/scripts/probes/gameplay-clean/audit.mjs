@@ -488,9 +488,13 @@ for (const mode of MODES) {
       }
       if (!touchDone && s.t >= PAUSE_AT + 4 && s.ph === 'playing') {
         touchDone = true;
-        const at = await ev(() => { const deck = document.querySelector('[data-touch-deck]'); if (!deck) return null; const els = [...deck.querySelectorAll('div')].filter((e) => { const r = e.getBoundingClientRect(); return r.width >= 50 && r.width <= 80 && Math.abs(r.width - r.height) < 4 && getComputedStyle(e).borderStyle !== 'dashed'; });
-          if (!els.length) return null; els.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom); const r = els[0].getBoundingClientRect(); window.__busMark = window.__rec.bus.length; return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-        if (at) { await p.touchscreen.tap(at.x, at.y); await sleep(600); row.touchTap = await ev(() => window.__rec.bus.slice(window.__busMark).filter((e) => e[4] !== 'key' && e[4] !== 'space').map((e) => `${e[1]}:${e[2]}`).slice(0, 4)); }
+        const at = await ev(() => { const deck = document.querySelector('[data-touch-deck]'); if (!deck) return null;
+          // the face buttons are 64 px <button>s; the one lowest and furthest right is the diamond's bottom slot (A)
+          const els = [...deck.querySelectorAll('button')].filter((e) => { const r = e.getBoundingClientRect(); return r.width >= 40 && r.width <= 90 && Math.abs(r.width - r.height) < 4; });
+          if (!els.length) return null; els.sort((a, b) => { const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect(); return (rb.bottom + rb.right * 0.01) - (ra.bottom + ra.right * 0.01); });
+          const r = els[0].getBoundingClientRect(); window.__busMark = window.__rec.bus.length; return { x: r.x + r.width / 2, y: r.y + r.height / 2, label: (els[0].textContent || '').trim().slice(0, 12) }; });
+        if (at) { await p.touchscreen.tap(at.x, at.y); await sleep(800); const got = await ev(() => window.__rec.bus.slice(window.__busMark).filter((e) => e[4] !== 'key' && e[4] !== 'space').map((e) => `${e[1]}:${e[2]}`).slice(0, 4));
+          row.touchTap = { label: at.label, events: got }; }
         else row.touchTap = 'no deck';
       }
       if (!thr && s.t >= PLAY_S - PERF_S) { thr = true; await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); await ev(() => { window.__thr = true; }); }

@@ -50,6 +50,12 @@ const SYSTEM_ROWS: Record<string, ButtonRow[]> = {
   bigair: [{ input: 'D-PAD ← →', action: 'ALTERNATE STRIDES', group: 'system' }],
   sprint: [{ input: 'D-PAD ← →', action: 'ALTERNATE STRIDES', group: 'system' }],
   skateboard: [{ input: 'R-STICK FLICK', action: 'FLIP TRICK', group: 'system' }],
+  // gameplay-clean (2026-10-28): the three STORM fighters' X is two verbs — a tap DASHES, a HOLD GUARDS — and the deck and
+  // the CONTROLS list named only the dash, so the guard (and the parry and counter the lines talk about) had no button on
+  // the sheet. Duel (BLOCK) and Showdown (GUARD) already name theirs.
+  karate: [{ input: 'HOLD X', action: 'GUARD', group: 'system' }],
+  karate_vs: [{ input: 'HOLD X', action: 'GUARD', group: 'system' }],
+  mixedcombat: [{ input: 'HOLD X', action: 'GUARD', group: 'system' }],
   // ADVENTURE A4 (2026-10-06): the shoulders, triggers and d-pad the plan's control table puts beside the face verbs
   adventure: [
     { input: 'HOLD B', action: 'SPRINT · CRUISE', group: 'system' },
