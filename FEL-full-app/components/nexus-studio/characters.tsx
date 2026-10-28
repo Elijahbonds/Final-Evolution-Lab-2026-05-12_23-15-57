@@ -31,6 +31,9 @@ import { C, PanelTitle, Row, Select, TextField } from './ui';
 
 export interface ClosetLook { label: string; code: string; body: string }
 
+/** STUDIO-EASY: what to do when the Closet has no saved look (it said only that there was none). */
+export const NO_LOOKS = 'No saved looks yet. Open the Closet, make a look and tap Save, then come back and tap From my Closet again.';
+
 /**
  * The creator's saved Closet looks as share codes. `fetchJson` and `local` are injected for tests. A guest (401), a failed
  * read or a closet with no saved look answers [] — never throws.
@@ -57,7 +60,7 @@ function AddCharacter({ onAdd, compact }: { onAdd(c: { name: string; lookCode: s
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const openCloset = async () => { setMode('closet'); setError(null); setLooks(null); const l = await loadClosetLooks(); setLooks(l); if (!l.length) setError('No saved looks in your Closet on this account — make one in the Closet, or paste a code.'); };
+  const openCloset = async () => { setMode('closet'); setError(null); setLooks(null); const l = await loadClosetLooks(); setLooks(l); if (!l.length) setError(NO_LOOKS); };
   const paste = async () => {
     setBusy(true); setError(null);
     const r = await decodeCharacter({ name: 'Pasted look', lookCode: code.trim() });
@@ -86,6 +89,11 @@ function AddCharacter({ onAdd, compact }: { onAdd(c: { name: string; lookCode: s
         </div>
       )}
       {error && <p className="mt-1 text-[12px]" style={{ color: C.ember }} role="alert">{error}</p>}
+      {error === NO_LOOKS && (
+        <a href="/closet" target="_blank" rel="noopener" className="mt-1.5 inline-flex min-h-10 items-center gap-1.5 rounded-md border px-3 text-[13px]" style={{ borderColor: C.line, color: C.text }} data-testid="open-closet">
+          <Shirt className="h-4 w-4" aria-hidden /> Open the Closet
+        </a>
+      )}
     </div>
   );
 }

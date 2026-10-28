@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const ai = vi.hoisted(() => ({ state: 'loading' as 'loading' | 'available' | 'coming_soon' }));
 vi.mock('@/lib/abacus/useAiStatus', () => ({ useAiStatus: () => [ai.state, () => {}] }));
 
-import { AiVenuePanel, aiCtxOf, aiRequestBody, reviewOf } from './ai-venue-panel';
+import { AI_OFF_LINE, AiVenuePanel, aiCtxOf, aiRequestBody, reviewOf } from './ai-venue-panel';
 import { AI_COMING_SOON_MESSAGE } from '@/lib/abacus/aiStatus';
 import { sanitizeAiEdits } from '@/lib/nexus-studio/aiEdits';
 import { starterProject, type StudioApi } from './use-studio';
@@ -22,7 +22,8 @@ describe('the kill switch decides', () => {
   it('coming soon: the neutral words, and nothing can be sent', () => {
     ai.state = 'coming_soon';
     const h = html();
-    expect(h).toContain(AI_COMING_SOON_MESSAGE.studio);
+    expect(h).toContain(AI_OFF_LINE);   // STUDIO-EASY: the honest line replaced "coming soon" (coordinator decision 5)
+    expect(h).not.toContain(AI_COMING_SOON_MESSAGE.studio);
     expect(h).toMatch(/<textarea[^>]*disabled=""/);
     expect(h).toMatch(/<button[^>]*disabled=""[^>]*>.*Build into/);
   });
@@ -33,7 +34,7 @@ describe('the kill switch decides', () => {
   it('available: the prompt is open and the venue it builds into is named', () => {
     ai.state = 'available';
     const h = html();
-    expect(h).not.toContain(AI_COMING_SOON_MESSAGE.studio);
+    expect(h).not.toContain(AI_OFF_LINE);
     expect(h).not.toMatch(/<textarea[^>]*disabled=""/);
     expect(h).toContain('Build into “Center Court remix”');
   });

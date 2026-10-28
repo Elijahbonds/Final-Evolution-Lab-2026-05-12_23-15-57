@@ -98,7 +98,9 @@ const UA = 'AgeScreenTest/1.0';
 // untouched; CoachAutomation + CoachAutomationRun + ReadinessSurvey + CoachBranding + CoachRosterSession + CoachCalendarFeed +
 // CoachReview, additive); payments-ready landed first (#457): pinned at d25aaa24, this lane's merge of lane/finish-release,
 // the first commit carrying every pending file above.
-const PARENT = 'd25aaa2435cd2fc72450493a928d11c5c93be513';
+// STUDIO-EASY (lane/studio-easy, 2026-10-28) merged lane/nexus-publish (its studio-share.sql) onto the release's pending files:
+// pinned at that merge, 47a0ee64, the first commit carrying every pending file above.
+const PARENT = '47a0ee648daa5ba349abcfbc1f59dc57c541f8f2';
 
 /** Resolve a diff base for the schema-ban check when CI's checkout is shallow. */
 function resolvePrismaDiffBase(): string {

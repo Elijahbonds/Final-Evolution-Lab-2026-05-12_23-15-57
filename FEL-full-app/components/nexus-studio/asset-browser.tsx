@@ -30,6 +30,12 @@ export function gridMove(key: string, i: number, n: number, cols = 2): number | 
   return to === null ? null : Math.max(0, Math.min(n - 1, to));
 }
 
+/** STUDIO-EASY: after a placement the 3D view takes focus, so the arrows nudge the new object (as in Figma) instead of walking the
+ *  grid; the "Skip to things to add" link brings focus back. */
+function afterPlace(): void {
+  try { document.querySelector<HTMLElement>('[data-testid=studio-canvas]')?.focus({ preventScroll: true }); } catch { /* no DOM */ }
+}
+
 export function AssetBrowser({ onPlace }: { onPlace(item: CatalogItem): void }) {
   const [query, setQuery] = useState('');
   const groups = useMemo(() => groupCatalog(catalog(), query), [query]);
@@ -64,7 +70,7 @@ export function AssetBrowser({ onPlace }: { onPlace(item: CatalogItem): void }) 
                 <li key={c.id}>
                   <button type="button" draggable ref={(el) => { if (el) refs.current.set(c.id, el); else refs.current.delete(c.id); }}
                     tabIndex={flat[cur]?.id === c.id ? 0 : -1} onFocus={() => setCurrent(flat.indexOf(c))} onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, c.id); e.dataTransfer.effectAllowed = 'copy'; }}
-                    onClick={() => onPlace(c)} title={`${c.label}: tap to place it in the middle of the view, or drag it into the view (${c.source})`} aria-label={`Add ${c.label}`}
+                    onClick={() => { onPlace(c); afterPlace(); }} title={`${c.label}: tap to place it in the middle of the view, or drag it into the view (${c.source})`} aria-label={`Add ${c.label}`}
                     className="flex min-h-10 w-full items-center rounded-md border px-2 py-1.5 text-left transition-colors hover:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line, background: C.surface }}>
                     {/* STUDIO-EASY: the engine source ("FixtureLights · flood") moved to the tooltip and the search; the card says what it is */}
                     <span className="block truncate text-[13px]" style={{ color: C.text }}>{c.label}</span>

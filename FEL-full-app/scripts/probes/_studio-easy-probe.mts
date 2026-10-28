@@ -58,7 +58,7 @@ const ORIGIN = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 const WIDTHS = { phone: { width: 390, height: 844 }, desktop: { width: 1280, height: 800 } } as const;
 type Width = keyof typeof WIDTHS;
 const widths = (flag('widths')?.split(',') ?? ['desktop', 'phone']) as Width[];
-const ALL_TASKS = ['new', 'firstcourt', 'place', 'ai', 'character', 'script', 'playtest', 'save', 'reopen', 'publish'] as const;
+const ALL_TASKS = ['new', 'firstcourt', 'place', 'arrows', 'ai', 'character', 'script', 'playtest', 'save', 'reopen', 'publish'] as const;
 type Task = (typeof ALL_TASKS)[number];
 const tasks = (flag('tasks')?.split(',') ?? [...ALL_TASKS]) as Task[];
 
@@ -183,6 +183,15 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       // a first visit: is there a project, and is the next step said? then: start a second, new project
       const welcome = await page.locator('text=/make your first|start here|step 1/i').count();
       notes.push(welcome ? 'a first-visit guide is on screen' : 'no first-visit guide: the editor opens on an empty venue with no hint of a first step');
+      const projects = page.locator('button[aria-label^="Projects"]').filter({ visible: true });
+      if (await projects.count()) {
+        await d.tap('button[aria-label^="Projects"]', 'Projects');
+        await d.tap('[data-testid=projects-new]', 'New project');
+        await page.waitForTimeout(500);
+        done = (await page.evaluate(`JSON.parse(localStorage.getItem('fel.nexusStudio.shelf.v1') || '{"projects":[]}').projects.length`)) === 1;
+        notes.push(done ? 'the first project moved to Projects; a new one opened on the guide' : 'the old project was not kept');
+        break;
+      }
       const newBtn = page.locator(`${btn('new project')}, ${aria('new project')}`).filter({ visible: true });
       if (await newBtn.count()) {
         await d.tap(`${btn('new project')}, ${aria('new project')}`, 'New project');
@@ -195,7 +204,15 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
     case 'firstcourt': {
       // a first court that looks like something: a night light, floods round it, the walk-in intro played
       const guide = page.locator('[data-testid=first-court]').filter({ visible: true });
-      if (await guide.count()) {
+      if (await guide.count() && await page.locator('[data-testid=guide-quick]').count()) {
+        notes.push('the guide is open on arrival: one tap makes the court, one more plays it');
+        await d.tap('[data-testid=guide-quick]', 'Make it for me');
+        await page.waitForTimeout(800);
+        await shot(page, `${width}-firstcourt-made`);
+        const popup = page.waitForEvent('popup', { timeout: 4000 }).catch(() => null);
+        await d.tap('[data-testid=guide-play]', 'Play it');
+        const pop = await popup; if (pop) { notes.push(`Play it opens ${new URL(pop.url()).pathname} (dev build; a production build opens the game's own page with ?share=)`); await pop.close(); }
+      } else if (await guide.count()) {
         notes.push('the guide is open on arrival');
         await d.tap('[data-testid=guide-light-nightGame]', 'Night game');
         await d.tap('[data-testid=guide-add-floods]', 'Floodlights');
@@ -246,6 +263,20 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       const lightColour = await page.evaluate(`(() => { const p = JSON.parse(localStorage.getItem('fel.nexusStudio.v1') || 'null'); return null; })()`);
       void lightColour;
       undo = (await page.locator('button[aria-label^="Redo"]').first().isEnabled().catch(() => false)) ? 'Ctrl+Z took the colour back; Redo is lit' : 'Ctrl+Z did nothing visible';
+      break;
+    }
+    case 'arrows': {
+      // place a light, then press → : does the light move (a nudge), and does focus jump somewhere else (the menus' arrow focus)?
+      await d.tap('[data-testid=asset-list] button:has-text("Floodlight")', 'Floodlight');
+      await d.waitFor(`${objects} >= 1`, 5000, 'saved');
+      const x0 = await page.evaluate(`(() => { const p = JSON.parse(localStorage.getItem('fel.nexusStudio.v1')); const v = p.venues.find((x) => x.id === p.activeVenueId); return v.objects[v.objects.length - 1].t.p[0]; })()`);
+      const f0 = await page.evaluate(`document.activeElement ? (document.activeElement.getAttribute('aria-label') || document.activeElement.textContent || document.activeElement.tagName).trim().slice(0, 40) : ''`);
+      await d.key('ArrowRight', 'nudge right');
+      await page.waitForTimeout(2200);
+      const x1 = await page.evaluate(`(() => { const p = JSON.parse(localStorage.getItem('fel.nexusStudio.v1')); const v = p.venues.find((x) => x.id === p.activeVenueId); return v.objects[v.objects.length - 1].t.p[0]; })()`);
+      const f1 = await page.evaluate(`document.activeElement ? (document.activeElement.getAttribute('aria-label') || document.activeElement.textContent || document.activeElement.tagName).trim().slice(0, 40) : ''`);
+      done = x1 !== x0 && f0 === f1;
+      notes.push(`light x ${x0} → ${x1}; focus “${f0}” → “${f1}”${f0 !== f1 ? ' (focus jumped)' : ''}`);
       break;
     }
     case 'ai': {
@@ -322,7 +353,22 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       // a publish or share action (not "Paste a share code", which brings a look in)
       const PUB = `${btn('^(publish|share)( |$)')}, button[aria-label^="Publish" i], button[aria-label^="Share" i]`;
       const pub = page.locator(PUB).filter({ visible: true });
-      if (await pub.count()) { await d.tap(PUB, 'Publish / Share'); done = true; }
+      if (await pub.count()) {
+        await d.tap(PUB, 'Publish');
+        if (await page.locator('button:has-text("Measure on Phone")').filter({ visible: true }).count()) {
+          await d.tap('button:has-text("Measure on Phone")', 'Measure on Phone');
+          await d.waitFor(`!!document.querySelector('[data-testid=publish-phone]') && !/not measured/.test(document.querySelector('[data-testid=publish-phone]').textContent)`, 120000, 'the phone measurement');
+        }
+        const dl = page.waitForEvent('download', { timeout: 6000 }).catch(() => null);
+        await d.tap('button:has-text("Check and download")', 'Check and download');
+        const f = await dl;
+        const refused = await page.locator('[data-testid=publish-refused] li').allTextContents().catch(() => []);
+        notes.push(f ? `Publish passed and downloaded ${f.suggestedFilename()} (to commit; the merge publishes it)` : `Publish refused: ${refused.slice(0, 2).join(' | ')}`);
+        const share = page.locator('[data-testid=share-make]').filter({ visible: true });
+        if (await share.count()) { await share.click(); await page.waitForTimeout(800); notes.push(`Make a share link: ${(await page.locator('[data-testid=share-refused], [data-testid=share-made]').first().textContent().catch(() => '')) ?? ''}`.slice(0, 160)); }
+        done = !!f;
+        if (!done) deadEnd = 'Publish did not finish on the rig';
+      }
       else {
         deadEnd = 'no publish or share on this base: Export (.nexus.json) is the only way to hand a project on';
         const dl = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);

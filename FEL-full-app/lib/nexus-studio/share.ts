@@ -27,6 +27,7 @@ import { sanitizeVenueExport, type StudioVenueExport } from './exportVenue';
 import { publicView } from './published';
 import { publishGate, type PhoneSample } from './publishGate';
 import { screenShareText } from './shareScreen';
+import { modeRoute } from './shareHandoff';
 import { studioAudienceAllows } from './audience';
 import { targetOf } from './targets';
 
@@ -73,17 +74,9 @@ export function prepareShare(raw: unknown, phone: PhoneSample | null): SharePrep
   return problems.length ? { ok: false, problems } : { ok: true, exp };
 }
 
-/** Where a link opens: the mode's own page, with the hand-off key (the live tiebreak is Tennis's variant). */
-export function shareRoute(mode: string, key: string): string | null {
-  const k = encodeURIComponent(key);
-  switch (mode) {
-    case 'tiebreak': return `/play/tennis?variant=tiebreak&share=${k}`;
-    case 'football': return `/play/football?share=${k}`;
-    case 'volleyball': return `/play/volleyball?share=${k}`;
-    case 'derby': return `/play/derby?share=${k}`;
-    default: return null;
-  }
-}
+/** Where a link opens: the mode's own page, with the hand-off key (the live tiebreak is Tennis's variant). STUDIO-EASY: the table
+ *  moved to shareHandoff.ts (client-safe, no node crypto) so the Studio's production Play-test opens the same pages. */
+export function shareRoute(mode: string, key: string): string | null { return modeRoute(mode, key); }
 
 export { SHARE_HANDOFF_PREFIX } from './shareHandoff';
 

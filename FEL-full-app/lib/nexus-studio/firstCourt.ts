@@ -39,11 +39,11 @@ export const GUIDE_ADDS: ReadonlyArray<{ id: GuideAdd; label: string }> = [
 
 /** The words on each step: a title (≤ 5 words) and one hint (≤ 12 words). docs/CUE-STYLE.md §1 "Prompt". */
 export const GUIDE_STEPS = [
-  { title: 'Pick the light', hint: 'Tap one. You can change it any time.' },
+  { title: 'Pick the light', hint: 'One tap builds it all, or pick the light yourself.' },
   { title: 'Add lights and fans', hint: 'Tap one or both. Drag them later to move them.' },
   { title: 'Watch your court', hint: 'See it the way the game opens.' },
 ] as const;
-export const GUIDE_DONE = { title: 'Your court is ready', hint: 'It saves on this device as you go.' } as const;
+export const GUIDE_DONE = { title: 'Your court is ready', hint: 'Play it now. It saves on this device as you go.' } as const;
 
 /** Pure: should a visit open on the guide? Only an untouched first project, and only until the guide was finished or skipped. */
 export function offerGuide(p: Pick<StudioProject, 'venues' | 'characters' | 'scripts'>, mark: string | null): boolean {
@@ -94,4 +94,19 @@ export function addCommand(v: StudioVenue, what: GuideAdd): { cmd: Command; ids:
 /** Step 3: the venue opens on the walk-in intro (so Play-test opens the same way), one undo step; null if it already does. */
 export function introCommand(v: StudioVenue): Command | null {
   return v.intro === 'walkIn' ? null : editVenue(v, { intro: 'walkIn' }, 'intro');
+}
+
+/**
+ * "Make it for me" (coordinator decision 2: one tap to a playable court): the three steps' night light, the floods, the fans on
+ * the sidelines and the walk-in intro as ONE command — one Undo takes the whole court back. Null when the venue is too full.
+ */
+export function quickCourtCommand(v: StudioVenue): { cmd: Command; ids: string[] } | null {
+  const floods = addCommand(v, 'floods');
+  const fans = addCommand(v, 'fans');
+  if (!floods || !fans || v.objects.length + floods.ids.length + fans.ids.length > LIMITS.objects) return null;
+  const intro = introCommand(v);
+  return {
+    cmd: { label: 'Make a first court', ops: [...lightCommand(v, 'nightGame').ops, ...floods.cmd.ops, ...fans.cmd.ops, ...(intro?.ops ?? [])] },
+    ids: [...floods.ids, ...fans.ids],
+  };
 }

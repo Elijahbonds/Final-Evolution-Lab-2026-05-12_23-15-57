@@ -5,7 +5,7 @@ import { createStack, execute, undo } from './commands';
 import { STUDIO_DOC_VERSION, activeVenue, parseProject } from './doc';
 import {
   GUIDE_ADDS, GUIDE_DONE, GUIDE_KEY, GUIDE_LIGHTS, GUIDE_STEPS, addCommand, guideStep, hasLightsOrFans, introCommand, lightCommand,
-  offerGuide, readGuideMark, writeGuideMark,
+  offerGuide, quickCourtCommand, readGuideMark, writeGuideMark,
 } from './firstCourt';
 import { starterProject } from '@/components/nexus-studio/use-studio';
 import { memoryKV } from '@/tests/helpers/nexusStudio';
@@ -72,6 +72,23 @@ describe('the three steps', () => {
     expect(v.intro).toBe('walkIn');
     expect(introCommand(v)).toBeNull();
     for (let i = 0; i < 4; i++) st = undo(st);
+    expect(st.doc.venues).toEqual(p.venues);
+  });
+
+  it('"Make it for me": the whole court in ONE undo step, and the guide is then on its last step', () => {
+    const p = starterProject();
+    let st = createStack(p);
+    const q = quickCourtCommand(activeVenue(st.doc)!)!;
+    st = execute(st, q.cmd);
+    const v = activeVenue(st.doc)!;
+    expect(v.mood).toBe('nightGame');
+    expect(v.intro).toBe('walkIn');
+    expect(v.objects.filter((o) => o.type === 'fixture')).toHaveLength(4);
+    expect(v.objects.filter((o) => o.type === 'crowdStand')).toHaveLength(2);
+    expect(new Set(v.objects.map((o) => o.id)).size).toBe(v.objects.length);
+    expect(q.ids).toHaveLength(6);
+    expect(guideStep(v, { picked: true, watched: true })).toBe(3);
+    st = undo(st);
     expect(st.doc.venues).toEqual(p.venues);
   });
 

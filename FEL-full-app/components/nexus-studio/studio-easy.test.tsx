@@ -19,6 +19,9 @@ import { starterProject, type StudioApi } from './use-studio';
 import { FIRST_COURT_TITLE, GUIDE_LIGHTS, GUIDE_STEPS } from '@/lib/nexus-studio/firstCourt';
 import { SHORTCUTS } from '@/lib/nexus-studio/shortcuts';
 import { chromeHiddenFor } from '@/components/shell/tab-bar';
+import { gridMove } from './asset-browser';
+import { SKIP_TARGETS } from './studio-app';
+import { NO_LOOKS } from './characters';
 
 const ROOT = join(__dirname, '..', '..');
 const noop = () => {};
@@ -34,7 +37,7 @@ describe('the shell', () => {
     const back = /<a [^>]*aria-label="Leave the Studio"[^>]*>/.exec(html)?.[0] ?? '';
     expect(back).toContain('href="/play"');
     expect(html).toMatch(/<h1[^>]*>Nexus Studio<\/h1>/);
-    expect(html).toContain('aria-label="New project"');
+    expect(html).toContain('aria-label="Projects: new, open"');
     expect(html).toContain('aria-label="Help and keys"');
   });
   it('fills the screen on its own: the app bar and the phone tab bar stand aside on /studio', () => {
@@ -45,10 +48,43 @@ describe('the shell', () => {
     expect(src).toMatch(/if \(trackRef\.current === 'venue'\) return;/);
     expect(src).toMatch(/c === 'undo'\) studio\.undo\(\); else if \(c === 'redo'\) studio\.redo\(\); else studio\.save\(\)/);
   });
-  it('New project is one undoable command (the last project comes back with Undo) and opens the guide', () => {
+  it('New project and Open move the open project to the list (never replace it), and a new one opens the guide', () => {
     const src = readFileSync(join(ROOT, 'components/nexus-studio/studio-app.tsx'), 'utf8');
-    expect(src).toMatch(/studio\.run\(\{ \.\.\.importProject\(starterProject\(\)\), label: 'New project' \}\)/);
-    expect(src).toMatch(/Undo brings the last one back/);
+    expect(src).toContain('const r = swapIn(kv, doc, nextId);');
+    expect(src).toMatch(/if \(!r\.ok\) \{ setProjErr\(r\.error\); return; \}/);
+    expect(src).toContain('if (!nextId) setGuide(true);');
+  });
+  it('Play-test in a production build uses the shipped share hand-off on the game’s own page (practice), not the dev route', () => {
+    const src = readFileSync(join(ROOT, 'components/nexus-studio/studio-app.tsx'), 'utf8');
+    const prod = src.slice(src.indexOf('if (!studioLoadAllowed()) {'), src.indexOf('const exp = exportVenue('));
+    expect(prod).toContain('modeRoute(t.key, key)');
+    expect(prod).toContain('handOff(store, key,');
+    expect(prod).not.toContain('/dev/');
+  });
+});
+
+describe('keyboard', () => {
+  it('skip links come first: the 3D view, settings, things to add', () => {
+    const html = clean(renderToStaticMarkup(createElement(NexusStudioApp)));
+    const first = html.indexOf('Skip to the 3D view');
+    expect(first).toBeGreaterThan(-1);
+    expect(first).toBeLessThan(html.indexOf('<header'));
+    expect(SKIP_TARGETS.map((t) => t.label)).toEqual(['Skip to the 3D view', 'Skip to settings', 'Skip to things to add']);
+    const editor = readFileSync(join(ROOT, 'components/nexus-studio/venue-editor.tsx'), 'utf8');
+    expect(editor).toContain('id="studio-inspector" tabIndex={-1}');
+  });
+  it('the asset grid is one Tab stop; arrows, Home and End walk it, clamped at the ends', () => {
+    expect(gridMove('ArrowRight', 0, 10)).toBe(1);
+    expect(gridMove('ArrowDown', 0, 10)).toBe(2);
+    expect(gridMove('ArrowUp', 1, 10)).toBe(0);
+    expect(gridMove('ArrowLeft', 0, 10)).toBe(0);
+    expect(gridMove('End', 3, 10)).toBe(9);
+    expect(gridMove('Home', 7, 10)).toBe(0);
+    expect(gridMove('ArrowDown', 9, 10)).toBe(9);
+    expect(gridMove('a', 3, 10)).toBeNull();
+    expect(gridMove('ArrowRight', 0, 0)).toBeNull();
+    const src = readFileSync(join(ROOT, 'components/nexus-studio/asset-browser.tsx'), 'utf8');
+    expect(src).toContain("tabIndex={flat[cur]?.id === c.id ? 0 : -1}");
   });
 });
 
@@ -60,6 +96,7 @@ describe('make your first court', () => {
     expect(html).toContain(`1. ${GUIDE_STEPS[0].title}`);
     expect(html).toContain('aria-label="Step 1 of 3"');
     for (const l of GUIDE_LIGHTS) expect(html).toContain(`data-testid="guide-light-${l.mood}"`);
+    expect(html).toContain('Make it for me');   // one tap to a playable court
     expect(html).toContain('aria-label="Close the guide"');
   });
   it('no wall of text: fewer than 40 words on the card', () => {
@@ -89,6 +126,10 @@ describe('empty states say what to do', () => {
     expect(h).toContain('Build by hand');
     expect(h).toContain('Make your first court');
     expect(h).not.toContain('a sunny clay court with palms');   // no greyed-out example chips while it is off
+  });
+  it('no saved Closet look: the message says what to do, and the Closet is a tap away', () => {
+    expect(NO_LOOKS).toMatch(/Open the Closet, make a look and tap Save/);
+    expect(readFileSync(join(ROOT, 'components/nexus-studio/characters.tsx'), 'utf8')).toContain('error === NO_LOOKS && (');
   });
   it('characters: none yet, and where they come from', () => {
     const h = clean(renderToStaticMarkup(createElement(CharactersTrack, { studio: studio() })));

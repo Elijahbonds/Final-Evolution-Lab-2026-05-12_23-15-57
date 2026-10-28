@@ -257,7 +257,7 @@ export function VenueEditor({ studio, onHandle }: { studio: StudioApi; onHandle?
           );
         })}
       </nav>
-      <aside className={`${sheet === 'inspect' ? 'flex' : 'hidden'} order-3 min-h-0 flex-1 flex-col overflow-y-auto border-l md:order-none md:flex md:flex-none md:overflow-visible`} style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector">
+      <aside className={`${sheet === 'inspect' ? 'flex' : 'hidden'} order-3 min-h-0 flex-1 flex-col overflow-y-auto border-l md:order-none md:flex md:flex-none md:overflow-visible`} style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector" id="studio-inspector" tabIndex={-1}>
         <Inspector venue={venue} project={doc} object={object} run={run} seal={seal} onDelete={(id) => del([id])} onDuplicate={(id) => dup([id])}
           group={group} groupActions={{ duplicate: () => dup(), copy, remove: () => del(), flag: (k) => flag(k), turn, saveStamp: () => saveStamp() }}
           onPreviewIntro={(k) => { const ok = vp.current?.previewIntro(k); setNote(ok ? 'Previewing the intro — Esc to stop' : 'Reduced motion is on: the intro is skipped, as in the mode'); }}

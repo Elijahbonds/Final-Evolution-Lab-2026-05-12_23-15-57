@@ -13,7 +13,7 @@ import { Check, Sparkles, X, Play } from 'lucide-react';
 import { TYPE } from '@/lib/design/type';
 import { reducedMotion } from '@/lib/a11y/reducedMotion';
 import {
-  FIRST_COURT_TITLE, GUIDE_ADDS, GUIDE_DONE, GUIDE_LIGHTS, GUIDE_STEPS, addCommand, guideStep, introCommand, lightCommand,
+  FIRST_COURT_TITLE, GUIDE_ADDS, GUIDE_DONE, GUIDE_LIGHTS, GUIDE_STEPS, addCommand, guideStep, introCommand, lightCommand, quickCourtCommand,
   type GuideAdd,
 } from '@/lib/nexus-studio/firstCourt';
 import type { Command } from '@/lib/nexus-studio/commands';
@@ -32,12 +32,14 @@ export interface FirstCourtProps {
   onPlaced?(ids: string[]): void;
   onFinish(): void;
   onSkip(): void;
+  /** Play the court in the game (the header's Play-test). Absent: no Play button on the last step. */
+  onPlay?(): void;
 }
 
-export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip }: FirstCourtProps) {
+export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip, onPlay }: FirstCourtProps) {
   const [picked, setPicked] = useState<string | null>(null);
   const [added, setAdded] = useState<GuideAdd[]>([]);
-  const [watched, setWatched] = useState<null | 'flown' | 'still'>(null);
+  const [watched, setWatched] = useState<null | 'flown' | 'still' | 'skipped'>(null);
   const step = guideStep(venue, { picked: !!picked, watched: !!watched });
   const [hint, setHint] = useState(false);
   const calm = useCalm();
@@ -50,6 +52,12 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip }: 
     return () => clearTimeout(t);
   }, [step]);
 
+  // one tap: the whole court (night light, floods, fans, the walk-in intro) as one undo step, then straight to "Play it"
+  const quick = () => {
+    const r = quickCourtCommand(venue);
+    if (!r) return;
+    run(r.cmd); onPlaced?.(r.ids); setPicked('nightGame'); setAdded(['floods', 'fans']); setWatched('skipped');
+  };
   const pick = (mood: (typeof GUIDE_LIGHTS)[number]['mood']) => { run(lightCommand(venue, mood)); setPicked(mood); };
   const add = (what: GuideAdd) => {
     const r = addCommand(venue, what);
@@ -92,9 +100,15 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip }: 
       <p className={`${TYPE.small} mt-1`} style={{ color: 'var(--fel-text-soft, #c3cad3)' }}>{words.hint}</p>
 
       <div className="mt-3 flex flex-wrap gap-2">
+        {step === 0 && (
+          <button type="button" onClick={quick} data-testid="guide-quick" data-fel-primary className={`${choice} w-full border-transparent ${ring(hint)}`}
+            style={{ background: 'linear-gradient(180deg, #4df0ff 0%, var(--fel-accent, #00E5FF) 55%, #00c8e0 100%)', color: '#050505' }}>
+            <Sparkles className="h-4 w-4" aria-hidden /> Make it for me
+          </button>
+        )}
         {step === 0 && GUIDE_LIGHTS.map((l, i) => (
           <button key={l.mood} type="button" onClick={() => pick(l.mood)} data-testid={`guide-light-${l.mood}`}
-            className={`${choice} ${ring(hint && i === 1)}`} style={{ borderColor: C.line, color: C.text, background: C.surface2 }}>{l.label}</button>
+            className={choice} style={{ borderColor: C.line, color: C.text, background: C.surface2 }}>{l.label}</button>
         ))}
         {step === 1 && GUIDE_ADDS.map((a, i) => (
           <button key={a.id} type="button" onClick={() => add(a.id)} disabled={added.includes(a.id)} data-testid={`guide-add-${a.id}`}
@@ -115,9 +129,15 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip }: 
         )}
         {step === 3 && (
           <>
+            {onPlay && (
+              <button type="button" onClick={() => { onFinish(); onPlay(); }} data-testid="guide-play" data-fel-primary className={`${choice} border-transparent`}
+                style={{ background: 'linear-gradient(180deg, #4df0ff 0%, var(--fel-accent, #00E5FF) 55%, #00c8e0 100%)', color: '#050505' }}>
+                <Play className="h-4 w-4" aria-hidden /> Play it
+              </button>
+            )}
             {watched === 'still' && <p className={`${TYPE.small} w-full`} style={{ color: C.dim }}>Reduced motion is on, so the camera stays still.</p>}
-            <button type="button" onClick={onFinish} data-testid="guide-finish" data-fel-primary className={`${choice} border-transparent`}
-              style={{ background: 'linear-gradient(180deg, #4df0ff 0%, var(--fel-accent, #00E5FF) 55%, #00c8e0 100%)', color: '#050505' }}>
+            {watched === 'skipped' && <button type="button" onClick={watch} data-testid="guide-watch" className={choice} style={{ borderColor: C.line, color: C.text, background: C.surface2 }}>Watch the intro</button>}
+            <button type="button" onClick={onFinish} data-testid="guide-finish" className={choice} style={{ borderColor: C.line, color: C.text, background: C.surface2 }}>
               <Check className="h-4 w-4" aria-hidden /> Keep building
             </button>
           </>
@@ -125,7 +145,7 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip }: 
       </div>
       {hint && step < 3 && (
         <p className={`${TYPE.small} mt-2`} style={{ color: C.gold }} data-testid="guide-hint" role="status">
-          {step === 0 ? 'Try Night game.' : step === 1 ? 'Try Floodlights.' : 'Tap Watch it.'}
+          {step === 0 ? 'Tap Make it for me.' : step === 1 ? 'Try Floodlights.' : 'Tap Watch it.'}
         </p>
       )}
     </section>

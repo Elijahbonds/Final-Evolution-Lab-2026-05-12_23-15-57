@@ -19,12 +19,15 @@
 import { useState } from 'react';
 import { Sparkles, Check, X, Loader2, BookOpen } from 'lucide-react';
 import { useAiStatus } from '@/lib/abacus/useAiStatus';
-import { AI_COMING_SOON_MESSAGE, isComingSoonResponse } from '@/lib/abacus/aiStatus';
+import { isComingSoonResponse } from '@/lib/abacus/aiStatus';
 import { AI_LIMITS, compileAiEdits, reviewAiEdits, sanitizeAiEdits, sanitizeSummary, venueForAi, type AiEdit, type AiProjectCtx } from '@/lib/nexus-studio/aiEdits';
 import type { StudioApi } from './use-studio';
 import { C, PanelTitle } from './ui';
 
 export const AI_VENUE_PATH = '/api/cell/venue';
+/** STUDIO-EASY (coordinator decision 5, 2026-10-28): the honest line while the switch is off. The builder calls a paid model
+ *  (app/api/cell/venue → completeText), so it stays off by default; "coming soon" promised a date nobody had set. */
+export const AI_OFF_LINE = 'The AI builder is switched off. It runs on a paid AI service, so it is off until that is turned on. You can build everything by hand.';
 export const AI_VENUE_EXAMPLES = [
   'a night beach court with floodlights and a packed far stand',
   'a sunny clay court with palms on the left and a half-empty bleacher',
@@ -122,7 +125,7 @@ export function AiVenuePanel({ studio, onApplied, onBuildByHand, onGuide }: {
       {!available ? (
         // STUDIO-EASY: "coming soon" was a dead end over a greyed-out form; it now says what to do instead, with the two ways on
         <div className="mx-3 rounded-lg border p-3" style={{ borderColor: ai === 'loading' ? C.line : 'rgba(255,215,0,0.35)', background: C.surface2 }} data-testid="ai-venue-status" role="status">
-          <p className="text-[14px]" style={{ color: ai === 'loading' ? C.dim : C.gold }}>{ai === 'loading' ? 'Checking the AI builder…' : AI_COMING_SOON_MESSAGE.studio}</p>
+          <p className="text-[14px]" style={{ color: ai === 'loading' ? C.dim : C.gold }}>{ai === 'loading' ? 'Checking the AI builder…' : AI_OFF_LINE}</p>
           {ai !== 'loading' && (onBuildByHand || onGuide) && (
             <div className="mt-2 flex flex-wrap gap-2">
               {onBuildByHand && <button type="button" onClick={onBuildByHand} className="min-h-10 rounded-md px-3 text-[13px] font-semibold" style={{ background: C.cyan, color: '#050505' }} data-testid="ai-build-by-hand">Build by hand</button>}
