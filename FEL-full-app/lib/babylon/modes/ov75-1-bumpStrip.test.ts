@@ -87,7 +87,10 @@ describe('OV-S3: OneVOneMode reads the tier once per run (source scan)', () => {
   it('no bare readTier() call in 1v1; 3v3 still calls aiBumpStrips with three arguments', () => {
     expect(SRC).not.toMatch(/\breadTier\(\)/);
     const call = SRC_3V3.slice(SRC_3V3.indexOf('aiBumpStrips('));
-    expect(call).toMatch(/^aiBumpStrips\(victim\.vel\.length\(\) < 1\.0, facingCos\(victim\.char\.root\.rotation\.y, victim\.char\.root\.position, me\.char\.root\.position\), roll\)\)/);
+    // main (hoops-p02, 2b71d771) put the roll behind stealDiceOn() with an aiStripLands branch after it: the call still closes on
+    // `roll)` — three arguments, so 3v3 keeps the default odds (AI_BUMP_STRIP_CHANCE) — and the next thing is that branch, not a chance
+    expect(call).toMatch(/^aiBumpStrips\(victim\.vel\.length\(\) < 1\.0, facingCos\(victim\.char\.root\.rotation\.y, victim\.char\.root\.position, me\.char\.root\.position\), roll\)\n\s*: victim\.vel\.length\(\) < 1\.0 && /);
+    expect(SRC_3V3).toMatch(/stealDiceOn\(\) \? aiBumpStrips\(victim\./);   // the roll is the dice path's
     expect(SRC_3V3.match(/aiBumpStrips\(/g)).toHaveLength(1);
   });
 });
