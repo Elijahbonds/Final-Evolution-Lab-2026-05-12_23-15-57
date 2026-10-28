@@ -1,7 +1,7 @@
 // tierRule — the tier POLICY, with no Babylon in it (DEMO-SPEED, 2026-10-27). Moved here verbatim from QualityTier.ts,
 // which re-exports all of it (its callers are unchanged): QualityTier.ts imports @babylonjs/core (SSAO), so code that must
 // decide the tier BEFORE Babylon has loaded — the library stage's early start, which picks the body file a phone fetches
-// while Babylon downloads — could not import the rule without pulling the engine in. One rule, two doors.
+// while Babylon downloads — could not reach the rule without pulling the engine in. One rule, two doors.
 import type { FitResult } from '../core/canvasFit';
 import { fitCanvas } from '../core/canvasFit';
 import { readGraphicsChoice, readTierParam, isLegacyLook, type GraphicsChoice } from './graphicsSetting';

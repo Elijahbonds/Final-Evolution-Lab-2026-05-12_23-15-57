@@ -5,7 +5,7 @@
 // later. An early read is handed to that next identity read instead of asking the server twice — once, and only while it
 // is fresh (30 s), so it can never stand in for a read made after the player changed their body.
 //
-// No Babylon here: the drill surfaces' static import graph must not reach @babylonjs/* (lib/assess/replay.test.ts).
+// No Babylon here: nothing the drill surfaces load up front may reach @babylonjs/* (lib/assess/replay.test.ts walks it).
 import type { HeroBodyAnswer } from './playerIdentity';
 
 const FRESH_MS = 30_000;
