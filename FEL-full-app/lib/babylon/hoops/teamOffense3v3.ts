@@ -180,7 +180,7 @@ export class TeamOffense3v3 {
         if (this.move) {
           this.moveT += dt;
           const f = moveFrame(this.move, this.moveT);
-          out.wish = vec(f.fwd * PROBE_FWD_K, f.lat * PROBE_LAT_K, this.moveSide); out.exposure = f.exposure;
+          out.wish = vec(f.fwd * PROBE_FWD_K, f.lat * PROBE_LAT_K, this.moveSide); out.exposure = KIT_CROSSES[this.move] ? f.exposure : Math.min(f.exposure, DRIVE_EXPOSURE);   // a size-up at the top is not a commit: only a ball that changes hands is out where a hand gets it
           if (f.done) { this.move = null; this.moveT = 0; if (!inLane && along < 0.4 && man) { this.startAttack(v); out.action = this.say('drive'); } }
           break;
         }

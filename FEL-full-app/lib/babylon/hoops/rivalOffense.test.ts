@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { Vector3 } from '@babylonjs/core';
 import {
   RivalKit, moveFrame, moveWeights, pickWeighted, actionVariety, windowedVariety, KIT_WEIGHTS, KIT_MOVES, RIVAL_ACTIONS, RIVAL_KIT_ON,
-  RIVAL_TIGHT_M, IN_OUT_EXPOSED_FROM, IN_OUT_EXPOSED_TO, type KitMove,
+  RIVAL_TIGHT_M, IN_OUT_EXPOSED_FROM, IN_OUT_EXPOSED_TO, intoBody, TOUCH_M, type KitMove,
 } from './rivalOffense';
 import { AttackerBrain, STEAL_EXPOSURE_MIN, GATHER_SEC, SIDESTEP_SEC, CROSSOVER_EXPOSED_FROM, CROSSOVER_EXPOSED_TO, rivalShotPct } from '../core/BasketballCore';
 
@@ -76,6 +76,14 @@ describe('hoops/rivalOffense — the kit', () => {
   });
   it('the tiers differ in WHAT he does: a rookie has no spin, in-and-out, behind or post; an elite has them all', () => {
     for (const m of ['spin', 'in_and_out', 'behind', 'post_up'] as KitMove[]) { expect(KIT_WEIGHTS.rookie[m]).toBe(0); expect(KIT_WEIGHTS.elite[m]).toBeGreaterThan(0); }
+  });
+  it('a body does not run through a body: inside the touch range the wish into him is capped, the rest of it kept', () => {
+    const self = { x: 0, z: 0 }, man = { x: 0, z: -1.0 };
+    const w = intoBody(new Vector3(1, 0, -5), self, man, 0);
+    expect(w.z).toBeGreaterThan(-1);   // most of the 5 m/s into his chest is gone
+    expect(w.x).toBeCloseTo(1, 9);     // across him is kept: he goes round
+    expect(intoBody(new Vector3(0, 0, -5), self, { x: 0, z: -(TOUCH_M + 0.1) }, 0).z).toBe(-5);   // out of range: untouched
+    expect(intoBody(new Vector3(0, 0, 3), self, man, 0).z).toBe(3);   // away from him: untouched
   });
   it('pickWeighted reads the roll across the table and never picks a zero', () => {
     const w = { a: 1, b: 0, c: 3 };
