@@ -13,30 +13,33 @@ function Phone({ x, y, rot = 0 }: { x: number; y: number; rot?: number }) {
   );
 }
 
+// TOOLS-EASY (2026-10-28): plain words, each step 24 words or fewer (docs/CUE-STYLE.md set-up tier). The speed trace's
+// step named "a Samozino profile (v_max, τ, F0, Pmax)" — four words the guide keeps away from the athlete; the profile
+// itself is unchanged and still under the result's Details.
 export const SETUP_STEPS: Record<SprintTest, string[]> = {
   gate: [
-    'Stand the phone ON the finish line, 3–5 m to the side of the lane, aimed straight across it, propped at hip height.',
-    'Tap two points on the finish line as the phone sees it (a cone on the far side and the line on the ground), or keep the centre line.',
-    'Type the distance. Choose the start: the phone\'s Go (the athlete hears it), or the first movement when the start is in view.',
-    'Sprint through the line. The time is the torso crossing it, as a race is judged.',
+    'Stand the phone on the finish line, 3 to 5 m to the side of the lane, aimed across it, about hip high.',
+    'Tap the two ends of the finish line on the picture, or keep the centre line.',
+    'Pick the distance and the start: the phone says Go, or you start from still in view.',
+    'Sprint through the line. The time stops when your body crosses it, as a race is judged.',
   ],
   flying: [
-    'Mark two lines across the lane (10 or 20 m apart) with a pole or tall cone ON the running line at each.',
-    'Stand the phone well back (≥ 12 m for 10 m) and square to the lane, halfway between the lines, both in view.',
-    'Tap the bottom and top of each pole: line 1, then line 2. Type their distance.',
-    'Run in from at least 20 m back, flat out through both lines. Run over the markers: running off them is in the ±.',
+    'Put a pole or tall cone on the running line at each end, 10 or 20 m apart.',
+    'Stand the phone well back, at least 12 m for a 10 m gap, square to the lane and halfway between the poles.',
+    'Tap the bottom and the top of each pole, the first and then the second. Type how far apart they are.',
+    'Run in from at least 20 m back, flat out through both poles.',
   ],
   trace: [
-    'Stand the phone far back and side-on (≥ 20 m to see 30 m of the run), propped still, the start line inside the picture.',
-    'Put one marker on the start line and one further along the lane, and tap both; type the distance between them. (No markers: type the athlete\'s height.)',
-    'Start on the phone\'s Go or from still in view. Run through the whole picture.',
-    'You get a speed curve, top speed, and a Samozino profile (v_max, τ, F0, Pmax): all estimates.',
+    'Stand the phone far back and side-on, at least 20 m away and still, with the start line in the picture.',
+    'Put a marker on the start line and one further along. Tap both and type the distance. No markers: type your height.',
+    'Start on the phone\'s Go, or from still in view. Run through the whole picture.',
+    'You get a speed curve, your top speed and how fast you speed up. All are estimates.',
   ],
   agility: [
-    'Three cones on one line, 5 yards apart. Stand the phone ≈ 9 m back, square to the cones, all three and the feet in view.',
-    'Tap the left cone, then the middle, then the right.',
-    'Start straddling the middle line, still. Sprint to one line, touch it, to the far line, touch it, back through the middle.',
-    'Beta: the camera reads the turning foot. A turn short of a line gets no time.',
+    'Three cones on one line, 5 yards apart. Stand the phone about 9 m back, with all three cones and your feet in view.',
+    'Tap the left cone, then the middle one, then the right one.',
+    'Start still, astride the middle line. Sprint to one line and touch it, then the far line, then back through the middle.',
+    'Early version: the camera reads your turning foot. A turn short of a line gets no time.',
   ],
 };
 

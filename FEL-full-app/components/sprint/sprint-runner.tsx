@@ -76,8 +76,10 @@ type Phase = 'idle' | 'starting' | 'calibrate' | 'ready' | 'running' | 'reading'
 const CALL_WORDS: Record<GoCall, string> = { marks: 'On your marks', set: 'Set', go: 'GO' };
 const MAX_RUN_MS = 40_000;
 
-export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
+export function SprintRunner({ base, onResult, facingMode = 'environment', onLive }: {
   base: RunBase; onResult: (r: RunResult, cfg: RunConfig) => void; facingMode?: 'user' | 'environment';
+  /** TOOLS-EASY (2026-10-28): the camera turned on or off (the speed page folds its set-up while it is on). */
+  onLive?: (on: boolean) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [why, setWhy] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
   const wake = useRef<MirrorWakeLock | null>(null);
   const latest = useRef<PoseFrame | null>(null);
   const prompts = tapPrompts(base);
+  useEffect(() => { onLive?.(phase !== 'idle'); }, [phase, onLive]);
   const point: BodyPointKind = base.test === 'gate' || base.test === 'flying' ? base.point : 'hips';
 
   const stopPoll = () => { if (poll.current) clearInterval(poll.current); poll.current = null; go.current?.cancel(); go.current = null; };
@@ -211,7 +214,8 @@ export function SprintRunner({ base, onResult, facingMode = 'environment' }: {
                 {base.test === 'trace' && taps.length === 2 && <line x1={taps[0].x} y1={taps[0].y} x2={taps[1].x} y2={taps[1].y} stroke="#00FF9D" strokeDasharray="4 4" strokeWidth={2} vectorEffect="non-scaling-stroke" />}
                 {dot && <circle cx={dot.x} cy={dot.y} r={0.014} fill="#FFB020" data-sprint-dot />}
               </svg>
-              {prompt && <div className="absolute inset-x-2 top-2 rounded-lg bg-black/70 px-3 py-2 text-center text-sm font-bold text-white" data-sprint-prompt>{prompt}</div>}
+              {/* TOOLS-EASY: the tap to make, big (the setup card's word size and amber) — it was a 14 px line */}
+              {prompt && <div className="absolute inset-x-2 top-2 rounded-2xl border border-white/15 bg-black/75 px-3 py-2 text-center text-[clamp(20px,6vw,28px)] font-black leading-tight text-[#FFB020]" data-sprint-prompt>{prompt}</div>}
               {call && <div className={`absolute inset-0 flex items-center justify-center text-4xl font-black ${call === 'go' ? 'bg-[#00FF9D]/40 text-white' : 'text-white'}`} data-sprint-call={call}>{CALL_WORDS[call]}</div>}
               {phase === 'running' && !call && <div className="absolute inset-x-2 bottom-2 rounded-lg bg-black/65 px-3 py-1.5 text-center text-sm font-bold text-white" data-sprint-live>Running — the camera is watching the {base.test === 'agility' ? 'lines' : base.test === 'trace' ? 'run' : 'line'}</div>}
             </div>

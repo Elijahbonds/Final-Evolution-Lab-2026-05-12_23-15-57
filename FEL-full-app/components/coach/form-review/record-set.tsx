@@ -29,6 +29,14 @@ import type { RecordContext } from '@/lib/coach/formReview/gate';
 import { flagResult, repChips, replayPick } from '@/lib/coach/formReview/view';
 import { PoseReplay } from './pose-replay';
 import { SelfView } from '@/components/games/body-play';
+// TOOLS-EASY (2026-10-28): the shared setup card until the first rep, one voice, one name for the stop button
+import { SetupCard } from '@/components/tools-easy/setup-card';
+import { useOneVoice } from '@/components/tools-easy/use-one-voice';
+import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
+import { READY_LINE, STOP_AND_READ } from '@/lib/tools-easy/copy';
+
+/** The movements that start standing, so the standing framing check reads them (a push-up is read lying down: no card). */
+const STANDING_START: ReadonlySet<string> = new Set(['squat', 'lunge', 'hinge']);
 
 export const FORM_REVIEWS_API = '/api/coach/form-reviews';
 
@@ -72,6 +80,8 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
   const wake = useRef<MirrorWakeLock | null>(null);
   const overlay = useRef<HTMLCanvasElement>(null);
   const latest = useRef<PoseFrame | null>(null);
+  const [setup, setSetup] = useState<SetupWord | null>(null);
+  const voice = useOneVoice('form-review');
 
   const loadMine = useCallback(() => {
     fetch(`${api}?mine=1`).then((r) => (r.ok ? r.json() : null)).then((j) => setMine(j?.available ? j.items : null)).catch(() => setMine(null));
@@ -100,6 +110,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
 
   const finish = useCallback(() => {
     release();
+    voice.hush();
     if (poseService().status.source === 'camera') poseService().stop();
     const all = frames.current;
     const reps = scoreReps(ctx.movement, reader.current?.reps() ?? []);
@@ -110,7 +121,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
     setResult({ reps, flags, set: summarize(reps), submission });
     setFocus(flags[0]?.rep ?? null);
     setPhase('done');
-  }, [ctx, release]);
+  }, [ctx, release, voice]);
 
   const start = useCallback(async () => {
     setWhy(null); setResult(null); setCount(0); setSendError(null);
@@ -123,17 +134,25 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
     wake.current ??= new MirrorWakeLock((navigator as Navigator & { wakeLock?: WakeLockApiLike }).wakeLock ?? null, document);
     void wake.current.hold();
     let t0: number | null = null;
+    const guide = STANDING_START.has(ctx.movement) ? new SetupReader(spec.view) : null;
+    let word = '', reps = 0;
+    setSetup(null);
     off.current.push(svc.onFrame((f) => {
       t0 ??= f.t;
       // only what the reader and the replay need: the image landmarks, never the picture
       frames.current.push({ t: f.t, present: f.present, image: f.present ? f.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [] });
       latest.current = frames.current[frames.current.length - 1];
       const closed = reader.current?.step(latest.current);
-      if (closed) setCount(closed.n);
+      if (closed) { setCount(closed.n); reps = closed.n; }
+      // TOOLS-EASY: until the first rep, the setup card's one word (the movement's own view), said when it changes
+      if (guide && reps === 0) {
+        const w = guide.push(latest.current);
+        if (w.word !== word) { word = w.word; setSetup(w); voice.say(w.ready ? `${w.word}. ${READY_LINE}` : w.word); }
+      }
       if (f.t - t0 >= MAX_SET_MS) finish();
     }));
     setPhase('recording');
-  }, [ctx.movement, finish]);
+  }, [ctx.movement, finish, spec.view, voice]);
 
   const send = useCallback(async () => {
     if (!result) return;
@@ -176,6 +195,9 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
         {/* Z-P4-4: the camera picture is shown in one place only, SelfView (components/games/body-play.tsx), mirrored as before */}
         <SelfView className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }} />
         <canvas ref={overlay} width={480} height={640} aria-hidden className={`pointer-events-none absolute inset-0 h-full w-full ${phase === 'recording' ? '' : 'hidden'}`} data-live-skeleton />
+        {phase === 'recording' && count === 0 && setup && (
+          <SetupCard word={setup.word} ready={setup.ready} line={setup.ready ? READY_LINE : setup.line} picture={spec.view === 'side' ? 'side' : 'front'} />
+        )}
         {phase === 'recording' && (
           <div className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-1.5 text-white" aria-live="polite">
             <span className="text-3xl font-black tabular-nums" data-rep-count>{count}</span>
@@ -194,7 +216,7 @@ export function RecordSet({ ctx, api = FORM_REVIEWS_API }: { ctx: RecordContext;
       <div className="flex gap-2">
         {phase === 'recording' ? (
           <button type="button" onClick={finish} data-record-stop className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black">
-            <Square className="h-4 w-4" /> Stop — I&apos;m done
+            <Square className="h-4 w-4" /> {STOP_AND_READ}
           </button>
         ) : (
           <button type="button" onClick={() => void start()} disabled={phase === 'starting' || phase === 'sending'} data-record-start

@@ -9,6 +9,7 @@ import { sprintView } from '@/lib/results/sprint';
 import { RESULT_COPY } from '@/lib/results/copy';
 import { ResultCard } from '@/components/result-card/result-card';
 import { LOOK } from '@/components/result-card/look';
+import { withSprintFix } from '@/lib/tools-easy/sprintFix';
 
 export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { ok: true }>['trace']> }) {
   const pts = trace.curve;
@@ -46,7 +47,8 @@ export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { 
  */
 export function RunResultCard({ result, last = null, onAgain, note = null }: { result: RunResult; last?: SprintRecord | null; onAgain?: () => void; note?: string | null }) {
   if (!result.ok) {
-    return <div role="alert" className="fel-card rounded-xl p-4 text-sm text-[#FFB020]" data-sprint-result="failed">{result.why}</div>;
+    // TOOLS-EASY (2026-10-28): the reason and its fix (lib/tools-easy/sprintFix.ts), in the refusal's amber
+    return <div role="alert" className="fel-card rounded-xl p-4 text-[16px] font-bold leading-snug text-[#FFB020]" data-sprint-result="failed">{withSprintFix(result.why)}</div>;
   }
   const r = result;
   const tr = r.trace;

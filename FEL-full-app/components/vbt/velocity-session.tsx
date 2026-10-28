@@ -40,6 +40,11 @@ import { LOOK } from '@/components/result-card/look';
 import { STRETCHES } from '@/lib/jump/slowmo';
 import type { Decoder } from '@/lib/jump/slowmoDecode';
 import { videoGrab, type Grab } from './frame-grab';
+// TOOLS-EASY (2026-10-28): the shared setup card (side-on), one voice, one name for the camera button
+import { SetupCard, SideSetup } from '@/components/tools-easy/setup-card';
+import { useOneVoice } from '@/components/tools-easy/use-one-voice';
+import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
+import { LOAD_LABEL, READY_LINE, RULER_LINE, RULER_WORD, SLOWMO_LABEL, START_CAMERA, TIPS_LABEL } from '@/lib/tools-easy/copy';
 
 export const VBT_API = '/api/vbt/sets';
 const HEIGHT_KEY = 'fel.vbt.height.v1';
@@ -71,6 +76,8 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
   const [fresh, setFresh] = useState<string[]>([]);
   const [deviceSets, setDeviceSets] = useState<KeptSet[]>([]);
   const [filmedAt, setFilmedAt] = useState<number>(240);
+  const [setup, setSetup] = useState<SetupWord | null>(null);
+  const voice = useOneVoice('vbt');
   /** PLAT-P03: when this set ended (the card compares it with the last set BEFORE it). */
   const [setAt, setSetAt] = useState<number>(0);
   const live = useRef<VbtLive | null>(null);
@@ -130,9 +137,10 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
   const finish = useCallback(() => {
     const l = live.current;
     release();
+    voice.hush();
     if (!l) return;
     void settle(l.finish());
-  }, [release, settle]);
+  }, [release, settle, voice]);
 
   const start = useCallback(async () => {
     setWhy(null); setKept(null); setFresh([]); setView(null);
@@ -151,8 +159,16 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
     const tracker = new PlateTracker();
     const grabFrame = grab ?? videoGrab(() => svc.video);
     let shown: LiveView | null = null, cued = false;
+    const reader = new SetupReader('side');
+    let word = '';
+    setSetup(null);
     off.current.push(svc.onFrame((fr) => {
       const image = fr.present ? fr.image.map((p) => ({ x: p.x, y: p.y, z: p.z, v: p.v })) : [];
+      // TOOLS-EASY: until the first rep is read, the setup card's word (side-on), said when it changes
+      if (!shown?.headline) {
+        const w = reader.push({ t: fr.t, present: fr.present, image });
+        if (w.word !== word) { word = w.word; setSetup(w); voice.say(w.ready ? `${w.word}. ${READY_LINE}` : w.word); }
+      }
       let plate = null;
       if (lift.point === 'bar' && image.length) {
         const g = plateGuess(image, aspect, heightM);
@@ -161,10 +177,11 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
       }
       const v = l.push({ t: fr.t, image, plate } satisfies VbtFrame);
       if (v !== shown) { shown = v; setView(v); }
-      if (v.stop && !cued) { cued = true; try { navigator.vibrate?.(250); } catch { /* no buzz */ } }
+      // TOOLS-EASY: the stop line is said as well as buzzed (a 250 ms buzz on a phone propped 3 m away goes unfelt)
+      if (v.stop && !cued) { cued = true; try { navigator.vibrate?.(250); } catch { /* no buzz */ } voice.say(stopLine(stopPct)); }
     }));
     setPhase('live');
-  }, [grab, heightM, lift.point, liftId, loadKg, stopPct]);
+  }, [grab, heightM, lift.point, liftId, loadKg, stopPct, voice]);
 
   /** A slow-motion file, read on this phone; the clock is the one the athlete says it was filmed at. */
   const importClip = useCallback(async (file: File) => {
@@ -225,7 +242,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
           </div>
           <div className="grid grid-cols-2 gap-2">
             {lift.loaded && (
-              <label className="text-xs text-white/55">Load (kg)
+              <label className="text-xs text-white/55">{LOAD_LABEL}
                 <input inputMode="decimal" value={load} onChange={(e) => setLoad(e.target.value.replace(/[^0-9.]/g, ''))} data-vbt-load
                   className="mt-1 block min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-base text-white" placeholder="100" />
               </label>
@@ -244,10 +261,18 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
           <p className="text-xs text-white/55" data-vbt-stopline>
             {target ? `Your coach's target: ${ZONES[target.zone].name}. End the set when the bar is ${stopPct}% slower than your best rep.` : `End the set when the bar is ${stopPct}% slower than your best rep.`}
           </p>
-          <ul className="list-disc space-y-0.5 pl-4 text-xs text-white/60" data-vbt-guide>
-            {setupLines(lift.family).map((l) => <li key={l}>{l}</li>)}
-            <li>The camera asks for 60 frames a second where your phone can hold it.</li>
-          </ul>
+          {/* TOOLS-EASY (2026-10-28): where the phone goes, as a picture and one line; the rest of the tips one tap away */}
+          <div className="flex items-center gap-3" data-vbt-setup-picture>
+            <SideSetup className="h-14 w-auto shrink-0" />
+            <p className="text-sm text-white/80">{setupLines(lift.family)[0]}</p>
+          </div>
+          <details className="text-xs text-white/60" data-vbt-guide>
+            <summary className="flex min-h-11 cursor-pointer items-center font-bold text-white/80">{TIPS_LABEL}</summary>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {setupLines(lift.family).slice(1).map((l) => <li key={l}>{l}</li>)}
+              <li>The camera asks for 60 frames a second where your phone can hold it.</li>
+            </ul>
+          </details>
           <p className="text-[12px] text-fel-dim">{PRIVACY_LINE}</p>
         </div>
       )}
@@ -270,6 +295,11 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
             </div>
           </div>
         )}
+        {/* TOOLS-EASY: before the first rep, the shared setup card (side-on picture, one big word) — it was one line */}
+        {phase === 'live' && !head && setup && (
+          <SetupCard word={view?.status === 'no_ruler' ? RULER_WORD : setup.word} ready={view?.status !== 'no_ruler' && setup.ready}
+            line={view?.status === 'no_ruler' ? RULER_LINE : setup.ready ? READY_LINE : setup.line} picture="side" />
+        )}
         {phase === 'live' && view?.stop && (
           <div className="absolute inset-x-3 bottom-3 rounded-xl bg-[#FF4D8D] px-3 py-3 text-center text-base font-black text-black" role="alert" data-vbt-stop>{stopLine(stopPct)}</div>
         )}
@@ -284,13 +314,16 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
           </button>
         ) : (
           <div className="space-y-2">
-            <button type="button" onClick={() => void start()} disabled={phase !== 'setup' || (lift.loaded && !loadKg && lift.family !== 'medball')} data-vbt-start
+            {/* TOOLS-EASY (2026-10-28): no longer locked until a weight is typed — the speed needs none; the weight only adds
+                the set to the max estimate (lib/vbt/sets.ts keeps loadKg null) */}
+            <button type="button" onClick={() => void start()} disabled={phase !== 'setup'} data-vbt-start
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#00E5FF] px-4 font-bold text-black disabled:opacity-50">
               {phase === 'starting' || phase === 'reading' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-              {phase === 'reading' ? 'Reading the video…' : 'Start the set'}
+              {phase === 'reading' ? 'Reading the video…' : START_CAMERA}
             </button>
             {phase === 'setup' && (
-              <div className="fel-card space-y-2 rounded-xl p-3" data-vbt-slowmo>
+              <details className="fel-card space-y-2 rounded-xl p-3" data-vbt-slowmo>
+                <summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-white/80">{SLOWMO_LABEL}</summary>
                 <p className="text-xs text-white/60">{SLOWMO_LINE}</p>
                 <div className="flex items-center gap-2 text-xs text-white/60">
                   Filmed at
@@ -304,7 +337,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
                   <Film className="h-4 w-4" /> Pick a slow-mo video
                   <input type="file" accept="video/*" className="sr-only" data-vbt-file onChange={(e) => { const f = e.target.files?.[0]; if (f) void importClip(f); e.target.value = ''; }} />
                 </label>
-              </div>
+              </details>
             )}
           </div>
         )

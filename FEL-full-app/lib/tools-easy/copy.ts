@@ -20,3 +20,11 @@ export const READINESS_HOW = 'Prop your phone up and step back. Hands on hips, t
 
 /** The Mirror's Jump tab, which no longer measures (card tier). */
 export const JUMP_TAB_LINE = 'Your vertical is measured with one guided check: three jumps, about a minute. Your dunk progress is below.';
+
+/** Bar speed (label / set-up tiers). */
+export const LOAD_LABEL = 'Weight (kg, optional)';
+export const TIPS_LABEL = 'More set-up tips';
+export const SLOWMO_LABEL = 'Read a slow-motion video instead';
+export const READY_LINE = 'Start your set.';
+export const RULER_WORD = 'Show the plate';
+export const RULER_LINE = 'The camera needs the plate or your height. End the set and type your height.';

@@ -32,6 +32,28 @@ const GATE_DISTANCES: { id: string; label: string; m: number }[] = [
 ];
 const num = (s: string): number | null => { const n = Number(s.replace(',', '.')); return s.trim() && Number.isFinite(n) ? n : null; };
 
+const FOLD_LABEL = 'Change the test or the set-up';
+const SETTINGS_WORD = 'Settings';
+
+/** What is set, in one line (the settings' summary). */
+function settingsOf(b: RunBase): string {
+  if (b.test === 'gate') return `${b.label} · ${b.start === 'go' ? 'the phone says Go' : 'start from still'}`;
+  if (b.test === 'flying') return `poles ${b.distanceM} m apart`;
+  if (b.test === 'trace') return b.useMarkers ? `markers ${b.markerM} m apart` : 'scaled by your height';
+  return b.start === 'go' ? 'the phone says Go' : 'start from still';
+}
+
+/** The camera is on: its children fold into one closed line; otherwise they show as they are. */
+function Fold({ on, label, children }: { on: boolean; label: string; children: React.ReactNode }) {
+  if (!on) return <>{children}</>;
+  return (
+    <details className="fel-card rounded-xl p-3" data-sprint-folded>
+      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-white">{label}</summary>
+      <div className="mt-3 space-y-4">{children}</div>
+    </details>
+  );
+}
+
 function Chip({ on, onClick, children, data }: { on: boolean; onClick: () => void; children: React.ReactNode; data?: string }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} data-sprint-chip={data}
@@ -54,6 +76,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
   const [last, setLast] = useState<RunResult | null>(null);
   const [runs, setRuns] = useState<SprintRecord[]>([]);
   const [kept, setKept] = useState<boolean | null>(null);
+  const [cameraOn, setCameraOn] = useState(false);
   // PLAT-P03: the last comparable run on this phone, read BEFORE this one is kept (the card's arrow)
   const [prior, setPrior] = useState<SprintRecord | null>(null);
   useEffect(() => { setRuns(readRuns(runStorage())); }, []);
@@ -86,6 +109,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
   // PLAT-P03: a result is the screen. The card comes first; the set-up, the settings and the history fold away until
   // "Run it again" (the runner stays mounted, so the camera and the tapped lines are still there for the next run).
   const showing = !!last;
+  const settingsLine = `${SETTINGS_WORD}: ${settingsOf(base)}`;
   const again = () => setLast(null);
 
   return (
@@ -94,6 +118,9 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
       {last?.ok && kept !== null && <span hidden data-sprint-kept={kept ? 'device' : 'none'} />}
 
       <div className={`space-y-4 ${showing ? 'hidden' : ''}`}>
+      {/* TOOLS-EASY (2026-10-28): once the camera is on, the test, the set-up and the settings fold into one line above the
+          picture (214 words stayed on screen around it) */}
+      <Fold on={cameraOn} label={FOLD_LABEL}>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Test">
         {TESTS.map((t) => <Chip key={t} on={test === t} onClick={() => { setTest(t); setLast(null); }} data={`test:${t}`}>{TEST_LABEL[t]}{t === 'agility' ? ' (beta)' : ''}</Chip>)}
       </div>
@@ -103,7 +130,10 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
         <ol className="list-decimal space-y-1 pl-5 text-sm text-white/75">{SETUP_STEPS[test].map((s) => <li key={s}>{s}</li>)}</ol>
       </section>
 
-      <section className="fel-card space-y-3 rounded-xl p-4" data-sprint-settings>
+      {/* TOOLS-EASY: the settings sit behind one line that says what is set (the defaults run a test as they are) */}
+      <details className="fel-card rounded-xl p-4" data-sprint-settings-fold>
+      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-bold text-white" data-sprint-settings-summary>{settingsLine}</summary>
+      <section className="mt-3 space-y-3" data-sprint-settings>
         {test === 'gate' && (
           <>
             <div className="text-xs font-semibold text-white/60">Distance</div>
@@ -152,10 +182,12 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
           </>
         )}
       </section>
+      </details>
+      </Fold>
 
-      <SprintRunner base={base} onResult={onResult} />
+      <SprintRunner base={base} onResult={onResult} onLive={setCameraOn} />
 
-      <section className="fel-card space-y-2 rounded-xl p-4" data-sprint-history>
+      <section className={`fel-card space-y-2 rounded-xl p-4 ${cameraOn ? 'hidden' : ''}`} data-sprint-history>
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-white">History <span className="font-normal text-white/45">(this phone)</span></div>
           <div className="flex gap-2">
