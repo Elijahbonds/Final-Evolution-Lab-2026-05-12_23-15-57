@@ -26,7 +26,7 @@ describe('(a) /play/mirror/assess renders for a guest', () => {
     expect(t).toContain('Hands-on-hips jump');
     expect(t).not.toMatch(/dorsiflexion|countermovement/i);
     expect(h).toMatch(/<a[^>]*href="\/screen\/privacy"/);
-    expect(h).toMatch(/data-primary[^>]*>Just test my jump \(about 1 min\)/);
+    expect(h).toMatch(/data-primary[^>]*>Measure my vertical \(about 1 min\)/);
     expect(h).toContain('Full movement screen (about 5 min)');
     expect(t).not.toMatch(/sign in|log in|create an account/i);
     // the page module reads no session any more
@@ -54,10 +54,11 @@ describe('(d) /screen: one stable QR address', () => {
     const { default: ScreenEntry } = await import('@/app/screen/page');
     const h = renderToStaticMarkup(createElement(ScreenEntry));
     const t = text(h);
-    expect(t.indexOf('Just test my jump (about 1 min)')).toBeGreaterThan(-1);
-    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
-    expect(t.indexOf('Just test my jump (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
-    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=jump"/);
+    expect(t.indexOf('Measure my vertical (about 1 min)')).toBeGreaterThan(-1);
+    expect(t.indexOf('Measure my vertical (about 1 min)')).toBeLessThan(t.indexOf('Full movement screen (about 5 min)'));
+    expect(t.indexOf('Measure my vertical (about 1 min)')).toBeLessThan(t.indexOf('This is a free movement check, not a medical exam.'));
+    // test changed (VERTICAL-EASY, 2026-10-27): the start card's first button is "Measure my vertical", the arms-free run
+    expect(h).toMatch(/href="\/play\/mirror\/assess\?run=vertical"/);
     expect(h).toMatch(/href="\/play\/mirror\/assess\?run=full"/);
     expect(h).not.toMatch(/[?&amp;]src=/);
     expect(h).not.toMatch(/NEXT_REDIRECT|pose|wasm|mediapipe/i);

@@ -291,6 +291,15 @@ export function isGoaltending(ballVelY: number, ballY: number, rimY: number): bo
   return ballVelY < -0.2 && ballY > rimY;
 }
 
+/**
+ * GOALTENDING NEEDS A TOUCH (owner 2026-10-20, HOOPS DEFENSE; 1v1 / 3v3 ten-phase pass, phase 2). The modes called it on "I am off the
+ * floor near the rim while their ball falls above the ring" — a jump that never came near the ball was goaltending. Now the call also
+ * needs `touched`: the defender's hand on the ball that frame (hoops/blocks handOnBall). The rule's own read is unchanged.
+ */
+export function isGoaltendTouch(touched: boolean, ballVelY: number, ballY: number, rimY: number): boolean {
+  return touched && isGoaltending(ballVelY, ballY, rimY);
+}
+
 /** Seconds an offensive body may stand in the paint before the ref calls it. */
 export const THREE_SECOND_LIMIT = 3;
 
