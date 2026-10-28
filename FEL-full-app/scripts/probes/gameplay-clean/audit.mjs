@@ -377,6 +377,11 @@ function analyze(mode, rec, S) {
   const starts = []; for (let i = 1; i < F.length; i++) if (F[i].ph === 'playing' && F[i - 1].ph !== 'playing') starts.push(F[i].t);
   const inPlay = cuts.filter((c) => !starts.some((s0) => c.t >= s0 && c.t < s0 + 3));
   out.camCutsAfterIntro = inPlay.length; out.camCutAfterEx = inPlay.slice(0, 5);
+  // shake: the eye's frame-to-frame acceleration net of the hero's (a shake is a high-frequency wobble; a follow is smooth).
+  // p95 in mm — the reduced-motion run (RM=1) should cut it where the shakes are
+  const acc = []; for (let i = 2; i < F.length; i++) { const a = F[i - 2], b = F[i - 1], c = F[i]; if (a.ph !== 'playing' || b.ph !== 'playing' || c.ph !== 'playing' || !a.cam || !a.r || !b.r || !c.r) continue;
+    const e = [0, 1, 2].map((k) => (c.cam[k] - c.r[k]) - 2 * (b.cam[k] - b.r[k]) + (a.cam[k] - a.r[k])); acc.push(Math.hypot(...e) * 1000); }
+  out.camShakeP95mm = r2(pct(acc, 0.95)); out.camShakeP99mm = r2(pct(acc, 0.99));
   out.camCuts = cuts.length; out.camCutsPerMin = r2(cuts.length / Math.max(1e-6, play.length / 3600)); out.camCutEx = cuts.slice(0, 5);
   // occlusion
   const occ = play.filter((f) => f.oc !== undefined && f.oc >= 0);
@@ -499,10 +504,21 @@ for (const mode of MODES) {
     const tTap = Date.now();
     if (st.ph === 'ready') {
       const btn = p.locator('button', { hasText: 'TAP TO START' }).first();
-      if (await btn.count()) await btn.click({ timeout: 10000 }).catch(() => {}); else await ev(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })));
+      if (await btn.count()) await btn.click({ timeout: 10000 }).catch((e) => { row.startClickErr = String(e.message).split('\n')[0].slice(0, 160); });
+      else await ev(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })));
+      // a START that did not take (a click that landed on something over the button, or was swallowed): say so, then try
+      // the button's own click, then a face button — the player's other ways in
+      for (let k = 0; k < 2; k++) {
+        const t0 = Date.now(); let ph = null;
+        while (Date.now() - t0 < 15000) { ph = await ev(() => window.__sessionStore?.view().phase); if (ph !== 'ready') break; await sleep(500); }
+        if (ph !== 'ready') break;
+        (row.startRetries = row.startRetries || []).push(k === 0 ? 'element.click()' : 'J');
+        if (k === 0) await ev(() => { const b = [...document.querySelectorAll('button')].find((x) => /TAP TO START/.test(x.textContent || '')); if (b) b.click(); });
+        else await ev(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })); window.dispatchEvent(new KeyboardEvent('keyup', { key: 'j' })); });
+      }
     }
     // play to the end of the script
-    let shots = [6, 12, 21].filter((x) => x < PLAY_S); let thr = false, first = null, pauseShot = false, touchDone = false;
+    let shots = (process.env.SHOT_AT ?? '6,12').split(',').map(Number).filter((x) => x < PLAY_S); let thr = false, first = null, pauseShot = false, touchDone = false;
     const tPlay = Date.now();
     for (;;) {
       const s = await ev(() => ({ t: window.__S?.t ?? -1, ph: window.__sessionStore?.view().phase, ps: window.__S?.pauseState, done: window.__S?.done, g: window.__gameS(), n: window.__rec.frames.length }));
