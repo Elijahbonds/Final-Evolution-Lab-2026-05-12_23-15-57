@@ -412,6 +412,8 @@ export class AssessRunner {
   private readonly handsUp = new HandsUpAnswer();
   /** SCREEN-EASY: what the pain prompt says first ("Three. Overhead squat: done."). */
   private painLead = '';
+  /** SCREEN-EASY: a line said ahead of the screen's last one (the wall skipped). */
+  private finishLead = '';
   /** SCREEN-EASY: frames in a row on the wrong leg (a single-leg squat), and whether the right leg is up now. */
   private wrongLegN = 0;
   private stanceUp = false;
@@ -564,20 +566,22 @@ export class AssessRunner {
       }
       case 'position': {
         const d = this.part!.def;
-        this.stillGate.reset();
         // a side-on part needs its own side toward the lens (the tested shin is the near one)
         const wrongSide = d.view === 'side' && !!d.near && framing.ok && frame.image.length >= 33 && nearSide(frame.image) !== d.near;
         // SCREEN-EASY: no fix is said over the set-up line (it says where to stand; a fix said now would cut it off)
         const talk = now >= this.lineDoneAt;
-        if (wrongSide) { this.gate.reset(); if (talk) this.say(facingCue('side', d.near)); break; }
+        if (wrongSide) { this.gate.reset(); this.stillGate.reset(); if (talk) this.say(facingCue('side', d.near)); break; }
         // SCREEN-EASY: a single-leg squat on the wrong leg waits for the right one (it would be read as the other side)
         this.readStance(d, frame);
-        if (this.wrongLegN >= WRONG_LEG_FRAMES) { this.gate.reset(); if (talk) this.say(OTHER_LEG[d.side!]); break; }
+        if (this.wrongLegN >= WRONG_LEG_FRAMES) { this.gate.reset(); this.stillGate.reset(); if (talk) this.say(OTHER_LEG[d.side!]); break; }
+        // SCREEN-EASY: the still hold runs while the set-up line is said (it used to start only after it: 0.9 s a part of
+        // standing still, already still); a frame out of place starts it again
+        if (framing.ok && !trackingLost(frame)) this.stillGate.step(true, frame.t); else this.stillGate.reset();
         // SCREEN-EASY: the countdown waits for the set-up line to be said (a new line cuts off the one before)
         if (this.gate.ready(framing, frame.t) && now >= this.lineDoneAt) {
           this.gate.reset();
           if (this.part!.def.calibrateSide && !this.calib.side) { this.calFrames = []; this.go('calibrateSide', now); }
-          else { this.stillGate.reset(); this.countdownReady = false; this.go('countdown', now); }
+          else { this.countdownReady = false; this.go('countdown', now); }
         } else if (!framing.ok && talk) {
           this.say(this.fixLine(framing) ?? framing.instruction);
         }
@@ -691,7 +695,7 @@ export class AssessRunner {
     if (step !== 'position') this.restartCapped = false;
     // SCREEN-EASY: every countdown starts from its still hold. The side-on stand went to 'countdown' with the last part's
     // countdownReady still true, so its 3-2-1 began at once, over the stand's own line.
-    if (step === 'countdown') { this.countdownReady = false; this.stillGate.reset(); }
+    if (step === 'countdown') this.countdownReady = false;
     if (step === 'pain') this.say('Any pain right now? Tap yes or no.', true);
     if (step === 'takeoff') this.say('Which foot do you take off from? Tap left or right.', true);
     if (step === 'calibrate') { this.calFrames = []; this.say(CALIBRATE_FRONT_LINE, true); }
@@ -716,7 +720,7 @@ export class AssessRunner {
     this.badSince = null;
     this.lostFrames = 0;
     this.go('position', now);
-    this.wrongLegN = 0; this.stanceUp = false;
+    this.wrongLegN = 0; this.stanceUp = false; this.stillGate.reset();
     // SCREEN A: dim is said here, before the countdown — never mid-rep (activeOk keeps it a warning only).
     this.say(this.setupOf(def), true);
     this.lineDoneAt = now + speechMs(this.setupOf(def)) - BETWEEN_LINES_MS;
@@ -764,7 +768,7 @@ export class AssessRunner {
     this.captures.T2 = {};
     this.part = null;
     while (this.parts[this.partIdx + 1]?.test === 'T2') this.partIdx++;
-    this.say(NO_WALL_SKIPPED, true);
+    this.finishLead = `${NO_WALL_SKIPPED} `;                        // said with the next line, so it is never replaced
     this.nextPart(now);
   }
 
@@ -777,6 +781,7 @@ export class AssessRunner {
     this.badSince = null;
     this.lostFrames = 0;
     this.gate.reset();
+    this.stillGate.reset();
     this.step = 'position';
     this.stepAt = this.now;
   }
@@ -959,7 +964,8 @@ export class AssessRunner {
     if (this.o.armsFree) this.result = { ...this.result, tests: this.result.tests.map((x) => this.armsFreeT5(x)) };
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
-    this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
+    this.say(this.result.pain ? PAIN_REFERRAL : `${this.finishLead}That is the screen done. Your results are on the screen.`, true);
+    this.finishLead = '';
     this.freeFrames();
   }
 

@@ -40,11 +40,13 @@ import { screenText } from '@/lib/share/screen';
 
 beforeEach(() => { h.reads = []; });
 const render = async () => renderToStaticMarkup(await TrainPage());
+// SCREEN-EASY (2026-10-28; test changed): the card is named for what it does, "Screen my movement" (was "Quick Screen")
+const CARD_TITLE = 'Screen my movement';
 const card = (html: string) => {
-  const at = html.indexOf('Quick Screen');
+  const at = html.indexOf(CARD_TITLE);
   if (at < 0) return null;
   const open = html.lastIndexOf('<a ', at);
-  return { href: /href="([^"]+)"/.exec(html.slice(open))?.[1] ?? '', line: /Quick Screen\s*<\/span>\s*<span[^>]*>([^<]*)<\/span>/.exec(html)?.[1] ?? '' };
+  return { href: /href="([^"]+)"/.exec(html.slice(open))?.[1] ?? '', line: new RegExp(`${CARD_TITLE}\\s*<\\/span>\\s*<span[^>]*>([^<]*)<\\/span>`).exec(html)?.[1] ?? '' };
 };
 
 describe('/train, the Quick Screen card', () => {
@@ -83,7 +85,7 @@ describe('/train, the Quick Screen card', () => {
   it('the Mirror card is still first, and the shelf keeps its other doors', async () => {
     const html = await render();
     expect(html.indexOf('The Mirror')).toBeGreaterThan(-1);
-    expect(html.indexOf('The Mirror')).toBeLessThan(html.indexOf('Quick Screen'));
+    expect(html.indexOf('The Mirror')).toBeLessThan(html.indexOf(CARD_TITLE));
     expect(html).toContain('Your programming');
   });
 });

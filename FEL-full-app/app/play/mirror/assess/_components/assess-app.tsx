@@ -11,6 +11,8 @@
 // writeTakeoff persists it for adults only) → the camera card → only then the camera → the checks → results.
 //   · VERTICAL-EASY (2026-10-27): the jump alone ("Measure my vertical", lib/vertical/door.ts) skips the take-off tap —
 //     it labels only the sided checks; "Do the full screen" after a jump asks it then (restAfterTakeoff).
+//   · SCREEN-EASY (2026-10-28): no run asks the take-off foot now (lib/screen/flow.ts: nothing on the result reads it);
+//     the runner gets null, unknown. The TakeoffStep and restAfterTakeoff stay for a check that needs it later.
 //   · SCREEN-MINOR-LOCK (PM 2026-10-21): the camera is for 18 or older only, until the parent flow ships. Under 18,
 //     "rather not say" or no age goes from the age answer straight to the camera-free card (`noCamera`, kid-results.tsx
 //     KidNoCamera): no grown-up step, no camera card, no camera asked for or mounted, and startCamera refuses on its own.
@@ -399,7 +401,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     if (modeRef.current === 'vertical') { carryRef.current = null; modeRef.current = 'full'; }
     else if (modeRef.current !== 'full') modeRef.current = 'rest';
     setJumpView(null);
-    if (!takeoffAskedRef.current) { setRestAfterTakeoff(true); setPhase('takeoff'); return; }
+    // SCREEN-EASY: the take-off foot is not asked any more (lib/screen/flow.ts): straight back to the camera
     void startCamera();
   };
   // the camera off, back to the camera card (the flow's step before the camera)
