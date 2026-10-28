@@ -2,6 +2,7 @@
 // renders it with the data it read, and the phone rig renders the same component.
 import { Gem, Shirt, Store, CalendarDays, PersonStanding, Settings, PenLine } from 'lucide-react';
 import type { ProfileV2Data } from '@/lib/profile-v2/assemble';
+import type { PosterKey } from '@/lib/profile-v2/athletePoster';
 import { ProgressHeader } from './progress-header';
 import { StatsSection } from './stats-section';
 import { BadgesSection } from './badges-section';
@@ -32,10 +33,11 @@ export function ProfileActions() {
   );
 }
 
-export function ProfileBody({ data }: { data: ProfileV2Data }) {
+/** `poster`: the device key for the athlete's kept picture (app/profile/page.tsx; lib/profile-v2/athletePoster.ts). */
+export function ProfileBody({ data, poster = null }: { data: ProfileV2Data; poster?: PosterKey | null }) {
   return (
     <>
-      <ProgressHeader data={data} />
+      <ProgressHeader data={data} poster={poster} />
       <StatsSection data={data} />
       <BadgesSection data={data} />
       <SquadSection data={data} />
