@@ -64,7 +64,7 @@
 //
 // Pure: the caller feeds it frames and a clock, and renders what it returns.
 import { checkFraming, framingLine, type FramingCheck, type FramingFrame, type FramingIssue } from './framing';
-import { TURN_CUE, screenFor, type ScreenId, type ScreenStation, type CheckResult } from './screen';
+import { TURN_CUE, screenRunFor, type ScreenId, type ScreenOrder, type ScreenStation, type CheckResult } from './screen';
 import {
   STATION_THRESHOLDS, gradeScreenStation, notReadStation, resultsFromGrades, retestHintFor, toCheckResult,
   type GraderFrame, type GraderPoint, type StationGrade, type UnreadableReason,
@@ -104,6 +104,8 @@ export interface RunnerState {
    * now reads the variant from here.
    */
   screen: ScreenId;
+  /** TOOLS-EASY: the order its stations are walked in (stationIndex counts in this order). */
+  order: ScreenOrder;
   phase: RunnerPhase;
   stationIndex: number;
   station: ScreenStation | null;
@@ -203,10 +205,13 @@ export function mergeRetest(first: readonly StationGrade[], retest: readonly Sta
 export interface ScreenRunnerOptions {
   /** The camera image's width over its height, for the graders (stationGraders GradeOptions.aspect). */
   aspect?: number;
+  /** TOOLS-EASY (2026-10-28): the walk-through order (lib/mirror/screen.ts screenRunFor). Default: the protocol's. */
+  order?: ScreenOrder;
 }
 
 export class ScreenRunner {
   private readonly stations: ScreenStation[];
+  readonly order: ScreenOrder;
   private index = 0;
   private heldMs = 0;
   private lastTickMs: number | null = null;
@@ -240,7 +245,8 @@ export class ScreenRunner {
   private firstTryHeld = true;
 
   constructor(readonly screen: ScreenId, opts: ScreenRunnerOptions = {}) {
-    this.stations = screenFor(screen);
+    this.order = opts.order ?? 'protocol';
+    this.stations = screenRunFor(screen, this.order);   // TOOLS-EASY: the Mirror walks it front-on first
     this.aspect = opts.aspect;
   }
 
@@ -387,7 +393,7 @@ export class ScreenRunner {
 
   private state(phase: RunnerPhase, st: ScreenStation | null, remainingSec: number, say: string, framing: FramingCheck, stationIndex = this.index): RunnerState {
     return {
-      screen: this.screen, phase, stationIndex, station: st, remainingSec, say, framing,
+      screen: this.screen, order: this.order, phase, stationIndex, station: st, remainingSec, say, framing,
       results: [...this.results], grades: [...this.grades], stations: this.records.map((r) => ({ ...r, grades: [...r.grades] })),
       sayAgain: this.sayAgain,
     };

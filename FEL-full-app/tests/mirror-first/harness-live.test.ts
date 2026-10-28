@@ -171,7 +171,8 @@ describe.each([
   ['Press / Row', undefined],
   ['Squat (the breathe stage: the pacer\'s seconds change every frame)', /^Squat$/],
   ['Lunge', /^Lunge$/],
-  ['Jump', /^Jump$/],
+  // test changed (TOOLS-EASY, 2026-10-28; flagged): the Jump tab no longer starts a camera (its own reader measured a
+  // third vertical number), so it has no live frames to budget; the test below holds what it does instead
   ['Screen (the runner\'s countdown changes every frame)', /^Screen$/],
 ] as const)('%s, live', (_name, tab) => {
   it(`3 s of 30 Hz camera frames re-render the page at most ~${BUDGET_HZ} times a second (it was every frame: 90)`, async () => {
@@ -185,6 +186,20 @@ describe.each([
     // ten a second, plus the odd event a frame produces (a screen station changing phase is painted at once)
     expect(renders).toBeLessThanOrEqual(3 * BUDGET_HZ + 4);
     expect(renders).toBeGreaterThanOrEqual(3 * BUDGET_HZ - 6); // and it still repaints: the readouts are live
+    m.unmount();
+  });
+});
+
+// TOOLS-EASY (2026-10-28): the Jump tab does not measure — no Start session, the front door is its one action
+describe('the Jump tab', () => {
+  it('offers "Measure my vertical" instead of a camera, and keeps no Start session', async () => {
+    const m = mount(() => MirrorHarness({ youth: 'adult', canSaveScan: false }));
+    attachRefs(m.tree as ReactNode);
+    button(m.tree as ReactNode, /^Jump$/).props.onClick();
+    await settle();
+    expect(findAll(m.tree as ReactNode, (el) => el.type === 'button' && /^Start session$/.test(textOf(el.props.children)))).toHaveLength(0);
+    expect(text(m)).toContain('Measure my vertical');
+    expect(text(m)).toContain('Your vertical is measured with one guided check');
     m.unmount();
   });
 });

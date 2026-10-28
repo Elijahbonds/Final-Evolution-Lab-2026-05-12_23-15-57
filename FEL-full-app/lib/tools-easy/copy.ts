@@ -17,3 +17,6 @@ export const takeCount = (n: number, of: number) => `${Math.min(n, of)} of ${of}
 
 /** The readiness check before the camera (card tier; was HOW_LINE, 25 words). */
 export const READINESS_HOW = 'Prop your phone up and step back. Hands on hips, then three big jumps.';
+
+/** The Mirror's Jump tab, which no longer measures (card tier). */
+export const JUMP_TAB_LINE = 'Your vertical is measured with one guided check: three jumps, about a minute. Your dunk progress is below.';

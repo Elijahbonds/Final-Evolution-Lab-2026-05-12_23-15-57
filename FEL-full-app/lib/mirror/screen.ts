@@ -125,7 +125,9 @@ export const MODIFIED_SCREEN: ScreenStation[] = [
   // P3 review (2026-09-26): "toes pointing straight ahead" — a foot turned in moves the heel point sideways from behind,
   // which read as a tilted heel line (stationGraders.ts heelLine.footTurnMaxDiff now reads it as 'feetTurned')
   { id: 'heels', view: 'back', cue: 'Turn around, back to the camera. Feet hip-width, toes straight ahead. Look ahead.', holdSec: 12, checks: [HEEL] },
-  { id: 'frontStack', view: 'front', cue: 'Turn and face the camera. Stand the same way. Do not fix anything.', holdSec: 14, checks: [KNEE, HIPS, SHOULDER_LEVEL] },
+  // TOOLS-EASY (2026-10-28): the walk-through starts here now (screenRunFor), facing the phone — the cue no longer says
+  // "Turn and face" or "Stand the same way" (the heels station it pointed back to comes last)
+  { id: 'frontStack', view: 'front', cue: 'Face the camera, feet hip-width, toes straight ahead. Do not fix anything.', holdSec: 14, checks: [KNEE, HIPS, SHOULDER_LEVEL] },
   // MIRROR-COACH P3 (2026-09-25): the cue puts their hands where the questions will ask about (lib/mirror/selfReport.ts)
   // and says the questions come at the end — the athlete is across the room and cannot tap anything mid-screen. It
   // used to be "Take one easy breath in and out." and nothing ever asked what they felt.
@@ -148,6 +150,22 @@ export const FULL_SCREEN: ScreenStation[] = [
 
 export function screenFor(id: ScreenId): ScreenStation[] {
   return id === 'full' ? FULL_SCREEN : MODIFIED_SCREEN;
+}
+
+/**
+ * THE ORDER THE ATHLETE IS WALKED THROUGH (TOOLS-EASY, 2026-10-28; SCREEN-EASY owner call 5, flagged). The protocol order
+ * above (the Playbook's: heels from behind first) is kept for everything that reads a screen — the stored results, the
+ * claims, the scoring, the corrective order — and is the runner's default (its tests walk it). The Mirror's live
+ * walk-through (mirror-harness.tsx, `order: 'frontFirst'`) runs the same stations front-on first, then side-on,
+ * then from behind: the athlete starts facing the phone, so the modified screen goes from four turns (back, front,
+ * side, front) to two (side, back). Each station's hold, checks and grader are unchanged; only when it comes.
+ */
+const VIEW_RANK: Record<StationView, number> = { front: 0, side: 1, back: 2 };
+const byView = (list: ScreenStation[]): ScreenStation[] => list.map((s, i) => ({ s, i })).sort((a, b) => VIEW_RANK[a.s.view] - VIEW_RANK[b.s.view] || a.i - b.i).map((x) => x.s);
+const RUN: Record<ScreenId, ScreenStation[]> = { modified: byView(MODIFIED_SCREEN), full: byView(FULL_SCREEN) };
+export type ScreenOrder = 'protocol' | 'frontFirst';
+export function screenRunFor(id: ScreenId, order: ScreenOrder = 'protocol'): ScreenStation[] {
+  return order === 'frontFirst' ? RUN[id === 'full' ? 'full' : 'modified'] : screenFor(id);
 }
 
 /** The one FIX line for a flagged check — what the result card shows under a flag (MIRROR-COACH P3). */
