@@ -16,7 +16,7 @@ export const BAR_SPEED_HREF = '/train/velocity';
 export const MIRROR_HREF = '/play/mirror?pattern=squat';
 
 export const JUMP_TESTS = 'Jump tests';
-export const JUMP_TESTS_LEDE = 'Squat jump, arm swing, one leg, the 10-5 bounce and the drop jump. Film it, read on this phone.';
+export const JUMP_TESTS_LEDE = 'Squat jump, one leg, the 10-5 bounce and the drop jump. Filmed and read on this phone.';
 export const JUMP_TESTS_ADULTS_ONLY = 'The jump tests are for 18 and over for now.';
 
 export interface ToolDoor { id: string; name: string; href: string }

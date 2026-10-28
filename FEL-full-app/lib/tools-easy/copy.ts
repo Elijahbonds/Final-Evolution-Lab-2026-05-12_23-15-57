@@ -27,4 +27,4 @@ export const TIPS_LABEL = 'More set-up tips';
 export const SLOWMO_LABEL = 'Read a slow-motion video instead';
 export const READY_LINE = 'Start your set.';
 export const RULER_WORD = 'Show the plate';
-export const RULER_LINE = 'The camera needs the plate or your height. End the set and type your height.';
+export const RULER_LINE = 'Or end the set and type your height.';

@@ -58,7 +58,7 @@ export function refusalLine(why: string | null | undefined): string {
   const r = rejectionFromInvalidWhy(why);
   if (r.reason !== 'other') return r.text;
   const w = (why ?? '').trim().replace(/\.$/, '');
-  return w ? `That one did not count: ${w}. Stand still on your spot, then jump again.` : 'That one did not count. Stand still on your spot, then jump again.';
+  return w ? `Not counted: ${w}. Stand still, then jump again.` : 'Not counted. Stand still, then jump again.';
 }
 
 /**
