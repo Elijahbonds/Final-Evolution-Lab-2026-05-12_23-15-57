@@ -100,7 +100,7 @@ class Driver {
     const off = !box || box.x + box.width / 2 > vw || box.x + box.width / 2 < 0;
     try {
       await loc.scrollIntoViewIfNeeded({ timeout: 3000 });
-      await loc.click({ timeout: 5000 });
+      await loc.click({ timeout: 15000 });
     } catch (e) { const t = String(e); this.c.steps.push(`✗ ${what}: ${t.split('\n')[0].slice(0, 90)}${/intercepts pointer events/.test(t) ? ` — ${(t.match(/<[^\n]*intercepts pointer events/) ?? [''])[0].slice(0, 160)}` : ''}`); return false; }
     this.c.taps++; this.c.steps.push(`${what}${off ? ' (was off screen: needed a sideways scroll)' : ''}`);
     return true;
@@ -149,7 +149,7 @@ const saveText = `(document.querySelector('[data-testid=save-state]')?.textConte
 const viewportReady = `!!window.__NEXUS_STUDIO__ && !Array.from(document.querySelectorAll('[data-testid=studio-canvas] ~ div')).some((d) => /Building the venue/.test(d.textContent || ''))`;
 
 async function open(page: Page, fresh: boolean) {
-  await page.goto(`${ORIGIN}/index.html${fresh ? '?fresh=1' : ''}`);
+  await page.goto(`${ORIGIN}/index.html${fresh ? '?fresh=1' : ''}`, { timeout: 120000 });
   await page.waitForFunction('document.body.dataset.a11yReady || document.body.dataset.a11yError', null, { timeout: 60000 });
   await page.waitForTimeout(500);
 }
@@ -254,7 +254,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       if (await colour.count()) {
         const box = await colour.boundingBox();
         if (!box || box.x > WIDTHS[width].width) notes.push('the inspector is off screen to the right');
-        await colour.fill('#ff3366'); d.c.taps += 2; d.c.steps.push('colour picker: open + pick');
+        await colour.fill('#ff3366', { timeout: 15000 }); d.c.taps += 2; d.c.steps.push('colour picker: open + pick');
         done = true;
       } else { deadEnd = 'the inspector (colour) is not reachable'; }
       await d.waitFor(`${objects} >= ${Math.max(0, before as number) + 1}`, 5000, 'autosave of the new light');
@@ -442,7 +442,8 @@ async function a11y(browser: Browser) {
   return out;
 }
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? chromiumExe(), headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+let browser = await launch();
 try {
   if (args.includes('--a11y')) {
     const r = await a11y(browser);
@@ -452,6 +453,8 @@ try {
     for (const width of widths) {
       const rows: TaskResult[] = [];
       for (const t of tasks) {
+        // a fresh browser per task: one wedged page (SwiftShader under load) must not take the rest of the run with it
+        await browser.close().catch(() => {}); browser = await launch();
         const r = await runTask(browser, width, t).catch((e): TaskResult => ({ task: t, width, done: false, deadEnd: `probe error: ${String(e).split('\n')[0].slice(0, 120)}`, taps: 0, keys: 0, chars: 0, rigS: 0, klmS: 0, steps: [], screen: null, notes: [] }));
         rows.push(r);
         console.log(`${width.padEnd(7)} ${t.padEnd(9)} ${r.done ? 'done' : 'DEAD END'} taps ${r.taps} keys ${r.keys} rig ${r.rigS}s klm ${r.klmS}s ${r.deadEnd ? `· ${r.deadEnd}` : ''} ${r.notes.join(' · ')}`);
