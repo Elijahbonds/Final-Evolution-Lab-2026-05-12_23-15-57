@@ -104,7 +104,10 @@ describe('3v3 make rates are unchanged per decision type', () => {
   it('teammateShoots still decides on the ring with matePct (RimDecides): the odds code is release\'s', () => {
     const shoots = src.slice(src.indexOf('async function teammateShoots('), src.indexOf('async function resolveMyShot('));
     expect(shoots).toMatch(/const dist = Vector3\.Distance\(body\.char\.root\.position, RIM\);/);
-    expect(shoots).toMatch(/const mateContest = proximityContest01\(/);
+    // hoops-p02 (test changed: the owner's "one contest model for all shooters", 2026-10-20): the mate's contest is the one model
+    // (hoops/contest) with the release's proximity read one knob away (hoops.oneContestOn 0); the odds code below is unchanged
+    expect(shoots).toMatch(/const mateContestOld = proximityContest01\(/);
+    expect(shoots).toMatch(/const mateContest = oneContestOn\(\) \? contestOn\(.*\)\.contest : mateContestOld;/);
     expect(shoots).toMatch(/const mateStyle: 'layup' \| 'jumper' = dist < LAYUP_RANGE \? 'layup' : 'jumper';/);
     expect(shoots).toMatch(/const mPct = matePct\(finish, dist, mateContest, mateStyle\);/);
     expect(shoots).toMatch(/const mv = rimVerdictFor\(mateMiss\.from, mPct, /);
