@@ -2,7 +2,7 @@
 import type { PartId } from './runner';
 import type { Rep } from './reps';
 
-export type RejectReason = 'outOfFrame' | 'tooFast' | 'lowConfidence' | 'heelUp' | 'handsOff' | 'noLanding' | 'tooHigh' | 'shallow' | 'other';
+export type RejectReason = 'moved' | 'outOfFrame' | 'tooFast' | 'lowConfidence' | 'heelUp' | 'handsOff' | 'noLanding' | 'tooHigh' | 'shallow' | 'other';
 
 export interface Rejection {
   reason: RejectReason;
@@ -10,19 +10,23 @@ export interface Rejection {
 }
 
 const SAY: Record<RejectReason, string> = {
+  moved: 'You moved from your spot. Go back to where you stood and jump again.',
   outOfFrame: 'You stepped out of the shot.',
   tooFast: 'Too fast. Slow down a little.',
   lowConfidence: 'The camera lost you for a moment.',
   heelUp: 'Keep your heel flat on the floor.',
-  handsOff: 'Keep your hands on your hips.',
-  noLanding: 'The camera never saw you land.',
-  tooHigh: 'The camera lost your feet on that jump. Once more.',
+  // VERTICAL-EASY (2026-10-27): each jump refusal says the one reason and the one fix, then "jump again" — the runner
+  // is already waiting for the next one (no button).
+  handsOff: 'Your hands left your hips. Keep them there and jump again.',
+  noLanding: 'I missed your landing. Step back a little and jump again.',
+  tooHigh: 'Your feet left the shot. Step back a little and jump again.',
   shallow: 'Go a little deeper on the next one.',
   other: 'That one did not count.',
 };
 
 export function rejectionFromInvalidWhy(why: string | null | undefined): Rejection {
   const w = (why ?? '').toLowerCase();
+  if (w.includes('stood')) return { reason: 'moved', text: SAY.moved };   // VERTICAL-EASY (lib/vertical/armsFree.ts)
   if (w.includes('land')) return { reason: 'noLanding', text: SAY.noLanding };
   if (w.includes('hand')) return { reason: 'handsOff', text: SAY.handsOff };
   if (w.includes('130') || w.includes('feet')) return { reason: 'tooHigh', text: SAY.tooHigh };

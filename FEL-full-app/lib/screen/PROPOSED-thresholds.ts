@@ -161,6 +161,10 @@ export const THRESHOLDS = {
   'calib.frontMs': spec(3000, '§3.3', 'ms', 'Standing still facing the camera'),
   'calib.sideMs': spec(2000, '§3.3', 'ms', 'Standing still side-on'),
   'calib.maxSway': spec(0.02, '§3.3', 'body-height fraction', 'Lane default: hip sway allowed during a calibration hold'),
+  // VERTICAL-EASY (2026-10-27, new, TUNED-flagged): a still athlete on a noisy camera was refused forever at 0.02
+  // VERTICAL-EASY (2026-10-27, new, TUNED-flagged): "Measure my vertical" reads arms free; a jump taken away from the stand
+  'vertical.standDrift': spec(0.08, '§4 T5', 'body-height fraction', 'Lane default (VERTICAL-EASY): arms-free jump refused when the feet before take-off sit this far from the stand\'s floor line (bench max 0.021; the owner\'s recorded take after 40 cm of travel 0.161)'),
+  'calib.swayFallback': spec(0.05, '§3.3', 'body-height fraction', 'Lane default (VERTICAL-EASY): sway allowed once a front stand has been refused (landmark jitter alone reads 0.016 at the bench\'s realistic noise, 0.03 at 2×)'),
   'calib.accept': spec({ spanShare: 0.9, frameShare: 0.6, minFrames: 5, minBodyHeight: 0.2 }, '§3.3', 'share / frames / image height', 'Lane default: a hold counts when it spans 90% of its time with 60% of its frames usable (at least 5), and the body is over 0.2 of the image tall (moved from calibration.ts)'),
 
   // ── geometry (spec §3.2) ──

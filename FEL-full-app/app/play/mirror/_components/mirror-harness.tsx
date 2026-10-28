@@ -15,6 +15,8 @@ import { REVIEW_COPY, levelWord, repsLine } from '@/lib/cue-style/review';
 import { MOVEMENT_NAMES } from '@/lib/cue-style/names';   // CUE-REWRITE: the review cards' words
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';   // VERTICAL-EASY: the one front door
+import { MEASURE_VERTICAL } from '@/lib/vertical/copy';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
@@ -1674,6 +1676,11 @@ export function MirrorHarness({
             </>
           ) : pattern === 'jump' ? (
             <>
+              {/* VERTICAL-EASY (2026-10-27): one front door for a vertical — the guided check (countdown, three jumps, JUMP-PRO's
+                  reader). This tab keeps its own dunk-progress read. */}
+              <Link href={MEASURE_VERTICAL_HREF} data-measure-vertical className="mb-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-4 text-[15px] font-bold text-white">
+                {MEASURE_VERTICAL}<span aria-hidden className="text-[#00E5FF]">→</span>
+              </Link>
               {/* WHAT YOU CAME BACK FOR. The best to beat, the rhythm you are keeping, the line over weeks, and
                   the next dunk named — the four the owner asked for, in the order they matter when you are
                   standing in a gym with your phone propped against a bag. */}
