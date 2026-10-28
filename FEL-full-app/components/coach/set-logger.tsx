@@ -50,7 +50,7 @@ function MinutesBox({ n, workSeconds, hintSeconds, onSeconds }: { n: number; wor
 }
 const RIR_HINT = 'Reps left: how many more clean reps you could have done.';
 
-export function SetLogger({ name, rows, unit, timed, simple = false, youth = false, repsHint, workHint, onChange }: {
+export function SetLogger({ name, rows, unit, timed, simple = false, youth = false, repsHint, workHint, onChange, only, compact = false, weightHint }: {
   name: string;
   rows: SetDraft[];
   unit: WeightUnit;
@@ -64,11 +64,18 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
   repsHint: string;
   workHint: string;
   onChange: (rows: SetDraft[]) => void;
+  /** PLAT-P06 (2026-10-28): the session player's inline row — this one set only (0-based), no add/remove footer. */
+  only?: number;
+  /** PLAT-P06: reps and weight only (no "same as above", reps left or effort): the player's rest sheet. */
+  compact?: boolean;
+  /** PLAT-P06: the weight box's placeholder (last time's, or this session's set before); "—" when absent. */
+  weightHint?: string;
 }) {
   const set = (i: number, patch: Partial<SetDraft>) => onChange(rows.map((r, k) => (k === i ? { ...r, ...patch } : r)));
   return (
     <div className="space-y-2" data-set-logger={name}>
       {rows.map((r, i) => {
+        if (only !== undefined && i !== only) return null;
         const n = i + 1;
         const anchor = rirAnchor(r.rir);
         // the anchor for the chip picked; the plain question once, on the first row, until one is picked
@@ -90,12 +97,12 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
               )}
               {!simple && (
                 <label className="flex flex-1 min-w-0 items-center gap-1 text-[11px] text-fel-dim">
-                  <input aria-label={`Set ${n} weight in ${unit}`} value={r.weight} onChange={(e) => set(i, { weight: e.target.value })} inputMode="decimal" placeholder="—" className={input} />{unit}
+                  <input aria-label={`Set ${n} weight in ${unit}`} value={r.weight} onChange={(e) => set(i, { weight: e.target.value })} inputMode="decimal" placeholder={weightHint || '—'} className={input} />{unit}
                 </label>
               )}
-              <button type="button" disabled={i === 0} onClick={() => onChange(copyPrevious(rows, i))} aria-label={`Set ${n}: same as set ${i}`} title="Same as the set above" className="shrink-0 rounded-md border border-white/10 p-1.5 text-white/50 disabled:opacity-20"><Copy className="h-3.5 w-3.5" /></button>
+              {!compact && <button type="button" disabled={i === 0} onClick={() => onChange(copyPrevious(rows, i))} aria-label={`Set ${n}: same as set ${i}`} title="Same as the set above" className="shrink-0 rounded-md border border-white/10 p-1.5 text-white/50 disabled:opacity-20"><Copy className="h-3.5 w-3.5" /></button>}
             </div>
-            {!simple && (
+            {!simple && !compact && (
               <>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                   <div className="flex items-center gap-1" role="group" aria-label={`Set ${n} reps left`}>
@@ -121,11 +128,11 @@ export function SetLogger({ name, rows, unit, timed, simple = false, youth = fal
           </div>
         );
       })}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
+      {only === undefined && <div className="flex flex-wrap items-center gap-2 text-xs">
         <button type="button" disabled={rows.length >= SET_LIMITS.maxSets} onClick={() => onChange([...rows, emptySetDraft()])} className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-white/70 disabled:opacity-30"><Plus className="h-3 w-3" /> Add a set</button>
         <button type="button" disabled={rows.length <= 1} onClick={() => onChange(rows.slice(0, -1))} className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-white/50 disabled:opacity-30"><Minus className="h-3 w-3" /> Remove the last</button>
         {!simple && <span className="ml-auto text-[11px] text-fel-quiet hidden sm:inline">Effort: {EFFORT_ANCHOR}</span>}
-      </div>
+      </div>}
     </div>
   );
 }

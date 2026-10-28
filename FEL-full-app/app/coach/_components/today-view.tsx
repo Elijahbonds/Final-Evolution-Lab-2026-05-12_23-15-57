@@ -73,10 +73,20 @@ import { EmptyState } from '@/components/ui/fel/empty-state';
 // ungated easier step arrives in `session.held` and is listed, one line each, above the first section (<GateHeldList>).
 // Neither is a rule of this file: it draws what the server sent.
 // `api` points the view at other endpoints (the dev harness app/dev/coach-today runs the same server code in memory).
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+//
+// PLAT-P06 (2026-10-28), "the coached athlete's loop" — owner: "autoplay, no extra taps, never confusing". Today is now a
+// LAUNCHER: the coach's reply on top (lib/coach/coachReply.ts: their newest word since the last session), the session's
+// name and ONE primary, Start today's session, which opens the phase-1 player with the coach's session
+// (components/session-player/coach-player.tsx, lib/session-player/fromCoachToday.ts: FEL's warm-up first, FEL's cool-down
+// last, set logging inside the player), then the week. Under it, one line each: How you feel, Check-in, Habits, Full
+// session and Messages, each opening its own sheet. Nothing was removed: the full session below is every card exactly as
+// it was (logging, timers, the Dial-Up Breath, the pain chips, the film link, Save and Done), behind "Full session", and
+// "How you feel" opens it at its top, where the pain follow-ups and the readiness check-in always sat. The thread and the
+// coach's comments are behind "Messages". Train → Today → Start: two taps to a running session.
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { CheckCircle2, ExternalLink, KeyRound, Loader2, MessageSquare, Video } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ExternalLink, KeyRound, Loader2, MessageSquare, Video, X } from 'lucide-react';
 import { GateHeldList, GateSwapLine } from '@/components/coach/protocol-gate-line';
 import { SetLogger, UnitSwitch, readWeightUnit, writeWeightUnit } from '@/components/coach/set-logger';
 // COACH-VIDEO-REVIEW (2026-10-24): film a set of a readable exercise; the camera counts and flags (components/coach/form-review)
@@ -84,16 +94,16 @@ import { FilmSetLink } from '@/components/coach/form-review/film-set-link';
 import { SetTimer } from '@/components/coach/set-timer';
 import { NextMorningFollowUps, PainCheckInChip } from '@/components/coach/pain-checkin';
 import { ReadinessCheckInCard } from '@/components/coach/readiness-checkin';
-import { WarmupPrep } from '@/components/coach/warmup-prep';
+import { WarmupPrep, planFor } from '@/components/coach/warmup-prep';
 import { CooldownCard } from '@/components/coach/cooldown-card';
 import { RAMP_API, RampBreath } from '@/components/coach/ramp-breath';
-import { needsAutoCooldown, showsGeneratedWarmup, todayWarmupKind } from '@/lib/coach/cooldown';
+import { generateCooldown, needsAutoCooldown, showsGeneratedWarmup, todayWarmupKind } from '@/lib/coach/cooldown';
 import { OFF_DAY_LINE, type WeekEntry } from '@/lib/coach/offDay';
-import type { WarmupReadiness } from '@/lib/coach/warmup';
+import { FALLBACK_WARMUP_CONTEXT, readWarmupContext, suggestedMinutes, type WarmupContext, type WarmupReadiness } from '@/lib/coach/warmup';
 import { SET_LOG_ERROR_COPY, convertDrafts, draftIsEmpty, draftsFor, draftsToInput, logLines, type SetDraft, type SetLogError, type WeightUnit } from '@/lib/coach/setLog';
 import { KEY_SET_LINE, NOTE_PROMPT, easierLine, repsPlaceholder, servedClaim, simpleLogging, supersetHint, todayLayout, type TodayExercise } from '@/lib/coach/today';
 import { nextTimedRow } from '@/lib/coach/setTimer';
-import type { OpenLog, TodayPayload } from '@/lib/coach/todayServer';
+import type { OpenLog } from '@/lib/coach/todayServer';
 // MIRROR-COACH P9 fix (2026-09-30): a screen prescription's note links the Mirror's written corrective (rule (e))
 import { CoachNote } from '@/components/coach/coach-note';
 // COACH-AI Phase 8 (2026-10-07): the thread's read markers ("N new", "Seen"; nothing until the pending SQL is applied)
@@ -115,6 +125,16 @@ import { CheckinCard, MY_CHECKINS_API } from '@/components/coach/parity/checkin-
 // COACH-DELIVERY (2026-10-26): the coach's calendar (COA-05) and branding (COA-04) on Today (wiring only)
 import { MY_SCHEDULE_API, MySchedule } from '@/components/coach/my-schedule';
 import { CoachBrandBar, MY_BRANDING_API } from '@/components/coach/brand-bar';
+// PLAT-P06 (2026-10-28): Today is the coached athlete's launcher; Start opens the phase-1 player with the coach's session
+import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { CoachSessionPlayer, readResume, resumeState, writeResume } from '@/components/session-player/coach-player';
+import { CoachReplyCard } from '@/components/session-player/coach-reply';
+import type { FinishResult } from '@/components/session-player/session-player';
+import { COACH_PLAYER_COPY as C } from '@/components/session-player/coach-copy';
+import { COACH_LOOK as L, LAUNCHER_KEYFRAMES } from '@/components/session-player/coach-look';
+import { fromCoachToday, type CoachSession } from '@/lib/session-player/fromCoachToday';
+import type { PlayerState } from '@/lib/session-player/machine';
+import type { TodayPayloadPlus } from '@/lib/coach/coachReply';
 
 export interface TodayApi { today: string; log: string; messages: string | null; warmup?: string | null; cooldown?: string | null; ramp?: string | null; availability?: string | null; planUpdates?: string | null; readiness?: string | null; habits?: string | null; checkins?: string | null; schedule?: string | null; branding?: string | null }
 export const TODAY_API: TodayApi = { today: '/api/coach/me/today', log: '/api/coach/me/log', messages: '/api/coach/messages', warmup: '/api/coach/me/warmup', cooldown: '/api/coach/me/cooldown', ramp: RAMP_API, availability: AVAILABILITY_API, planUpdates: PLAN_UPDATES_API, readiness: '/api/readiness/check', habits: MY_HABITS_API, checkins: MY_CHECKINS_API, schedule: MY_SCHEDULE_API, branding: MY_BRANDING_API };
@@ -138,8 +158,8 @@ interface FinishedSession { programId: string; sessionId: string; label: string;
 interface ExerciseDraft { sets: SetDraft[]; clientNote: string; videoUrl: string }
 interface Msg { id: string; body: string; mine: boolean; fromCoach: boolean; createdAt: string; readAt?: string | null; unread?: boolean }
 
-export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
-  const [data, setData] = useState<TodayPayload | null>(null);
+export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSession?: (has: boolean) => void }) {
+  const [data, setData] = useState<TodayPayloadPlus | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ExerciseDraft>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [unit, setUnit] = useState<WeightUnit>('kg');
@@ -157,9 +177,15 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
   const finishedRef = useRef<HTMLDivElement | null>(null);
   // after Done, bring the finished session's cool-down into view (it renders at the top; the thumb is at the bottom)
   useEffect(() => { if (finished) finishedRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }); }, [finished]);
+  // PLAT-P06 (2026-10-28): the launcher's sheets (one open at a time) and the player (frozen at Start: a reload behind it
+  // never swaps the session it is playing)
+  const [sheet, setSheet] = useState<SheetId | null>(null);
+  const [player, setPlayer] = useState<{ coach: CoachSession; initial?: PlayerState } | null>(null);
+  const [warmupCtx, setWarmupCtx] = useState<WarmupContext | null>(null);
+  const resumed = useRef(false);
 
   const load = useCallback(async () => {
-    const r = await fetch(api.today); const j: TodayPayload = await r.json(); setData(j);
+    const r = await fetch(api.today); const j: TodayPayloadPlus = await r.json(); setData(j);
     if (j.today) {
       const u = unitRef.current;
       const d: Record<string, ExerciseDraft> = {};
@@ -175,6 +201,12 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     }
   }, [api]);
   useEffect(() => { const u = readWeightUnit(); unitRef.current = u; setUnit(u); void load(); }, [load]);
+  // the warm-up's server context, for the player's warm-up (the full session's warm-up card reads its own)
+  useEffect(() => {
+    if (!api.warmup) { setWarmupCtx(FALLBACK_WARMUP_CONTEXT); return; }
+    fetch(api.warmup).then((r) => (r.ok ? r.json() : null)).then((j) => setWarmupCtx(j ? readWarmupContext(j) : FALLBACK_WARMUP_CONTEXT)).catch(() => setWarmupCtx(FALLBACK_WARMUP_CONTEXT));
+  }, [api.warmup]);
+  useEffect(() => { onSession?.(!!(data?.today && !data.hardStopped && data.today.session.exercises.length)); }, [data, onSession]);
 
   const switchUnit = (to: WeightUnit) => {
     const from = unitRef.current;
@@ -184,13 +216,17 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     setUnit(to); writeWeightUnit(to);
   };
 
+  const logBody = (complete: boolean) => {
+    if (!data?.today || !data.program) return null;
+    // MIRROR-COACH P8 FIX (2026-09-30): what this card served on each slot — the gate's easier step, or null for "as
+    // written" — so the coach's inbox never reads a logged easier step as the jump (the server checks the claim)
+    const logs = data.today.session.exercises.filter((e) => drafts[e.id]).map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl, servedExerciseId: servedClaim(e) }));
+    return JSON.stringify({ programId: data.program.id, sessionId: data.today.session.id, logs, complete });
+  };
   const submit = async (complete: boolean) => {
     if (!data?.today || !data.program) return;
     setBusy(true); setErrors({});
-    // MIRROR-COACH P8 FIX (2026-09-30): what this card served on each slot — the gate's easier step, or null for "as
-    // written" — so the coach's inbox never reads a logged easier step as the jump (the server checks the claim)
-    const logs = data.today.session.exercises.map((e) => ({ sessionExerciseId: e.id, sets: draftsToInput(drafts[e.id].sets, unit), clientNote: drafts[e.id].clientNote, videoUrl: drafts[e.id].videoUrl, servedExerciseId: servedClaim(e) }));
-    const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ programId: data.program.id, sessionId: data.today.session.id, logs, complete }) });
+    const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body: logBody(complete) });
     setBusy(false);
     if (!r.ok) {
       const j = await r.json().catch(() => ({})) as { error?: string; sessionExerciseId?: string; set?: number; message?: string; href?: string | null };
@@ -213,6 +249,25 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
     }
     void load();
   };
+  /** PLAT-P06: the player's save — the same log route and body as Save / Done; then the cool-down route when FEL's ran. */
+  const savePlayed = async (o: { complete: boolean; cooldown: boolean; keepalive?: boolean }): Promise<FinishResult> => {
+    const body = logBody(o.complete);
+    if (!body || !data?.today || !data.program) return { ok: false, line: null };
+    try {
+      const r = await fetch(api.log, { method: 'POST', headers: { 'content-type': 'application/json' }, body, ...(o.keepalive ? { keepalive: true } : {}) });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({})) as { error?: string; set?: number; message?: string };
+        const copy = j.error && j.error in SET_LOG_ERROR_COPY ? SET_LOG_ERROR_COPY[j.error as SetLogError] : null;
+        return { ok: false, line: j.message ?? (copy ? `${j.set ? `Set ${j.set}: ` : ''}${copy}` : null) };
+      }
+      if (o.complete && o.cooldown && api.cooldown) {
+        const sid = data.today.session.id;
+        await fetch(api.cooldown, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ programId: data.program.id, sessionId: sid }) })
+          .then((c) => { if (c.ok) markCooldown(sid); }).catch(() => {});
+      }
+      return { ok: true, line: null };
+    } catch { return { ok: false, line: null }; }
+  };
   const send = async () => {
     if (!data?.program || !msg.trim() || !api.messages) return;
     const r = await fetch(api.messages, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ programId: data.program.id, body: msg }) });
@@ -221,6 +276,25 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
 
   const layout = useMemo(() => todayLayout(data?.today?.session.exercises ?? []), [data]);
   const markCooldown = (sessionId: string) => setCooldownDoneIds((ids) => (ids.includes(sessionId) ? ids : [...ids, sessionId]));
+
+  /** PLAT-P06: the coach's session as the player plays it — FEL's warm-up and cool-down when Today shows them. */
+  const coachSession = (): CoachSession | null => {
+    if (!data?.today) return null;
+    const s = data.today.session;
+    const warm = s.exercises.length && todayWarmupKind(s.exercises, s.kind) === 'generated'
+      ? planFor(s.exercises, warmupCtx ?? FALLBACK_WARMUP_CONTEXT, suggestedMinutes(readiness), readiness) : null;
+    const cool = needsAutoCooldown(s.exercises, s.kind) && !data.open?.cooldownDone && !cooldownDoneIds.includes(s.id) ? generateCooldown(s.exercises) : null;
+    return fromCoachToday(data.today, { clips: data.clips ?? {}, warmup: warm, cooldown: cool });
+  };
+  const start = (initial?: PlayerState) => { const c = coachSession(); if (c && c.session.steps.length) { setSheet(null); setPlayer({ coach: c, initial }); } };
+  const closePlayer = () => { setPlayer(null); void load(); };
+  // back from filming a set: the session picks up where it stood, with no tap (components/session-player/coach-player.tsx)
+  useEffect(() => {
+    if (resumed.current || !data?.today || data.hardStopped || !warmupCtx) return;
+    resumed.current = true;
+    const r = readResume(data.today.session.id);
+    if (r) { writeResume(null); start(resumeState(r)); }
+  }, [data, warmupCtx]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   // MIRROR-COACH P5 FIX (2026-09-29, code review) — Finding "General training … is not gated by the intake's
@@ -246,22 +320,26 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
       <button type="button" onClick={() => setFinished(null)} className="px-1 text-xs text-fel-dim" data-finished-close>Close</button>
     </div>
   ) : null;
-  // COACH-PARITY: habits and check-ins come from the coach, not the program, so they show with or without one
+  // COACH-PARITY: habits and check-ins come from the coach, not the program, so they show with or without one.
+  // PLAT-P06: each in its own sheet behind one line (a row shows only once its sheet has something in it)
   const parity = (
     <>
-      {api.habits && <HabitsToday api={api.habits} />}
-      {api.checkins && <CheckinCard api={api.checkins} />}
+      {api.checkins && <LauncherSheet id="checkin" title={C.rows.checkin} open={sheet} onOpen={setSheet}><CheckinCard api={api.checkins} /></LauncherSheet>}
+      {api.habits && <LauncherSheet id="habits" title={C.rows.habits} open={sheet} onOpen={setSheet}><HabitsToday api={api.habits} /></LauncherSheet>}
       {/* COACH-DELIVERY COA-05 (2026-10-26): the coach's upcoming roster sessions (nothing until the pending SQL) */}
-      {api.schedule && <MySchedule api={api.schedule} />}
+      {api.schedule && <LauncherSheet id="schedule" title={C.rows.schedule} open={sheet} onOpen={setSheet}><MySchedule api={api.schedule} /></LauncherSheet>}
     </>
   );
   if (!data.program || !data.today) return (
     <div className="space-y-4">
+      <style>{LAUNCHER_KEYFRAMES}</style>
       {finishedCard}
-      {parity}
-      {/* premium-ui P8: the empty day as an empty state — a figure and the one line, not a grey box */}
-      <EmptyState title={data.program ? 'Program complete' : 'No program yet'}
-        line={data.program ? 'Program complete — nothing left on the plan. Talk to your coach about the next block.' : 'No active program yet. A certified coach assigns one from a Plan in Camp.'} />
+      {/* premium-ui P8: the empty day as an empty state — a figure and the one line, not a grey box. PLAT-P06: /training's
+          "No coach yet" lives here now (/training redirects to Today) */}
+      {data.program ? <EmptyState title="Program complete" line="Program complete — nothing left on the plan. Talk to your coach about the next block." />
+        : data.coached === false ? <EmptyState title={C.noCoachTitle} line={C.noCoachLine} testId="today-no-coach" action={<Link href="/modes" className={L.quietCta}>{C.noCoachCta}</Link>} />
+          : <EmptyState title="No program yet" line={data.coached ? C.noProgramLine : 'No active program yet. A certified coach assigns one from a Plan in Camp.'} />}
+      <nav className={`${L.rows} [&:not(:has([data-testid^=today-row]))]:hidden`} aria-label={C.rowsLabel}>{parity}</nav>
     </div>
   );
   const { program, today } = data;
@@ -277,15 +355,39 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
         onSets={(sets) => put({ sets })} onNote={(clientNote) => put({ clientNote })} onVideo={(videoUrl) => put({ videoUrl })} />
     );
   };
+  const playable = today.session.exercises.length > 0;
+  const unread = unreadInThread(thread);
   return (
     <div className="space-y-4" data-testid="today">
+      <style>{LAUNCHER_KEYFRAMES}</style>
       {finishedCard}
       {api.branding && <CoachBrandBar api={api.branding} />}
+      {/* PLAT-P06: the coach's note on top — their newest word since the last session (lib/coach/coachReply.ts) */}
+      {data.reply && <CoachReplyCard reply={data.reply} />}
       {api.availability && <MyAvailabilityLine endpoint={api.availability} />}
       {/* COACH-AI-DRAFT (2026-10-24): what the coach approved from this week's draft, and their note */}
       {api.planUpdates && <PlanUpdateCard api={api.planUpdates} coachName={program.coachName} />}
-      {parity}
       <ReadinessTodayLine note={today.readiness} api={api.readiness} />
+      {/* PLAT-P06: the launcher — today's session, ONE primary, the week */}
+      <section className={L.card} data-today-launcher data-session-kind={today.session.kind}>
+        <p className={L.eyebrow}>{program.name}</p>
+        <h2 className={L.title} data-today-title>{today.block.label} · {today.session.label}</h2>
+        {recovery && <p className={`${L.eyebrow} mt-1 text-[#7BD389]`} data-off-day-line>{OFF_DAY_LINE}</p>}
+        {playable && <div className={L.cta} data-today-start><PrimaryCta onClick={() => start()} testId="today-start">{C.start}</PrimaryCta></div>}
+        {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
+      </section>
+      <nav className={L.rows} aria-label={C.rowsLabel}>
+        {/* How you feel: the pain follow-ups and the readiness check-in, at the top of the full session (their place, as before) */}
+        <LauncherRow label={C.rows.feel} onClick={() => setSheet('plan')} testId="today-row-feel" />
+        {parity}
+        <LauncherRow label={C.rows.plan} side={`${today.index + 1}/${today.total}`} onClick={() => setSheet('plan')} testId="today-row-plan" />
+        {api.messages && <LauncherRow label={C.rows.thread} side={unread ? `${unread}` : undefined} onClick={() => setSheet('thread')} testId="today-row-thread" />}
+      </nav>
+
+      {/* The full session, as Today laid it out before PLAT-P06, behind "Full session": every card, its logging, its timers,
+          the warm-up and cool-down cards, Save and Done. The player logs into the same drafts. */}
+      <LauncherSheet id="plan" title={C.rows.plan} open={sheet} onOpen={setSheet} always>
+      <div className="space-y-4">
       <NextMorningFollowUps />
       <ReadinessCheckInCard onRead={(r) => setReadiness(r.level)} warmup={todayWarmupKind(today.session.exercises, today.session.kind)} />
       <div className="fel-card rounded-xl p-4" data-session-kind={today.session.kind}>
@@ -294,11 +396,10 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
             <div className="text-[11px] uppercase tracking-wider text-fel-dim">{program.name} · coach {program.coachName}</div>
             <div className="fel-heading text-lg text-white mt-1">{today.block.label} · {today.session.label}</div>
             <div className="text-xs text-fel-dim mt-0.5">Session {today.index + 1} of {today.total}</div>
-            {recovery && <div className="text-xs text-[#7BD389]/90 mt-1" data-off-day-line>{OFF_DAY_LINE}</div>}
+            {recovery && <div className="text-xs text-[#7BD389]/90 mt-1">{OFF_DAY_LINE}</div>}
           </div>
           {!recovery && <UnitSwitch unit={unit} onChange={switchUnit} />}
         </div>
-        {today.week && today.week.entries.length > 1 && <WeekStrip label={today.week.label} entries={today.week.entries} />}
       </div>
       {today.session.exercises.length === 0 && !today.session.held?.length && <div className="fel-card rounded-xl p-4 text-sm text-white/60">Your coach has made this session but not put anything in it yet.</div>}
       {/* MIRROR-COACH P8: items the protocol gate holds back today (no ungated easier step on their ladder) */}
@@ -330,22 +431,85 @@ export function TodayView({ api = TODAY_API }: { api?: TodayApi }) {
         <button disabled={busy} onClick={() => submit(false)} className="flex-1 rounded-xl border border-white/10 py-3 text-sm text-white/80">Save</button>
         <button disabled={busy} onClick={() => submit(true)} className="flex-1 rounded-xl bg-fel-cyan/15 border border-fel-cyan/40 py-3 text-sm font-medium text-fel-cyan flex items-center justify-center gap-2"><CheckCircle2 className="h-4 w-4" /> Done</button>
       </div>
-      {data.recentComments.length > 0 && (
-        <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">Coach comments</div>
-          {data.recentComments.map((c, i) => <div key={i} className="text-sm text-white/80"><span className="text-white/50">{c.exercise}:</span> {c.comment}</div>)}
-        </div>
-      )}
+      </div>
+      </LauncherSheet>
+
+      {/* The thread: the coach's comments and every message, the reply among them */}
       {api.messages && (
+        <LauncherSheet id="thread" title={C.rows.thread} open={sheet} onOpen={setSheet} always>
+        <div className="space-y-4">
+        {data.recentComments.length > 0 && (
+          <div className="fel-card rounded-xl p-4 space-y-2">
+            <div className="text-[11px] uppercase tracking-wider text-fel-dim">Coach comments</div>
+            {data.recentComments.map((c, i) => <div key={i} className="text-sm text-white/80"><span className="text-white/50">{c.exercise}:</span> {c.comment}</div>)}
+          </div>
+        )}
         <div className="fel-card rounded-xl p-4 space-y-2">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={program.id} role="client" /></div>
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><MessageSquare className="h-3.5 w-3.5" /> Thread with {program.coachName}<UnreadPill n={unread} /><LiveSessionLink programId={program.id} role="client" /></div>
           <ThreadMessages thread={thread} />
           <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your coach" className="flex-1 min-w-0 rounded-lg bg-white/5 border border-white/10 px-2 py-1.5 text-white text-sm" /><button onClick={send} className="rounded-lg border border-white/10 px-3 text-sm text-white/80">Send</button></div>
         </div>
+        </div>
+        </LauncherSheet>
+      )}
+
+      {player && (
+        <CoachSessionPlayer coach={player.coach} initial={player.initial} exercises={today.session.exercises} drafts={drafts} unit={unit} simpleLog={recovery}
+          reply={data.reply ?? null} onRows={(slot, sets) => setDrafts((s) => (s[slot] ? { ...s, [slot]: { ...s[slot], sets } } : s))}
+          save={savePlayed} onClose={closePlayer} />
       )}
     </div>
   );
 }
+
+/** PLAT-P06: the launcher's sheets. `plan`, `thread`: always mounted (the full session's cards and the thread keep their state
+ *  and reads), shown when open. The others: a row that shows once the sheet has something in it (nothing until the pending
+ *  SQL is applied), and the sheet. */
+type SheetId = 'plan' | 'thread' | 'checkin' | 'habits' | 'schedule';
+
+function LauncherRow({ label, side, onClick, testId }: { label: string; side?: string; onClick: () => void; testId?: string }) {
+  return (
+    <button type="button" className={L.row} onClick={onClick} data-testid={testId}>
+      <span>{label}</span>
+      <span className="flex items-center gap-2">{side && <span className={L.rowSide}>{side}</span>}<ChevronRight aria-hidden className="h-4 w-4 text-fel-soft" /></span>
+    </button>
+  );
+}
+
+function LauncherSheet({ id, title, open, onOpen, always = false, children }: {
+  id: SheetId; title: string; open: SheetId | null; onOpen: (s: SheetId | null) => void; always?: boolean; children: ReactNode;
+}) {
+  const body = useRef<HTMLDivElement | null>(null);
+  const [has, setHas] = useState(always);
+  // a parity sheet's row shows only once its card renders something (each renders nothing until its SQL is applied)
+  useEffect(() => {
+    if (always) return;
+    const el = body.current;
+    if (!el || typeof MutationObserver === 'undefined') return;
+    const check = () => setHas(el.childElementCount > 0);
+    const mo = new MutationObserver(check);
+    mo.observe(el, { childList: true, subtree: true });
+    check();
+    return () => mo.disconnect();
+  }, [always]);
+  const shown = open === id;
+  return (
+    <>
+      {!always && has && <LauncherRow label={title} onClick={() => onOpen(id)} testId={`today-row-${id}`} />}
+      <div hidden={!shown} data-today-sheet={id} data-open={shown ? '1' : '0'}>
+        <div className={L.sheetVeil} onClick={() => onOpen(null)} aria-hidden />
+        <div className={L.sheet} role="dialog" aria-modal="true" aria-label={title}>
+          <div className={L.sheetHead}>
+            <p className={L.sheetTitle}>{title}</p>
+            <button type="button" aria-label={C.close} className={L.sheetClose} onClick={() => onOpen(null)}><X className="h-5 w-5" /></button>
+          </div>
+          <div ref={body}>{children}</div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 
 /** Today's own cool-down card shows only when no just-finished session's card is up (MIRROR-COACH P6 FIX, 2026-09-29):
  *  both at once put the next session's done tap by the Done button, where the finished session's tap belonged. */

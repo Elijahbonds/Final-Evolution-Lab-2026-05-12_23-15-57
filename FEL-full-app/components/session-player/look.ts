@@ -41,6 +41,8 @@ export const LOOK = {
   setupBtn: 'grid h-11 w-11 shrink-0 place-items-center rounded-full text-fel-soft motion-safe:transition-transform active:scale-90',
   sheet: 'absolute inset-x-0 bottom-0 z-20 max-h-[70%] overflow-y-auto rounded-t-3xl border-t border-white/10 bg-fel-surface-2/95 px-5 pb-6 pt-4 shadow-[0_-12px_40px_rgba(0,0,0,0.6)] backdrop-blur-xl motion-safe:animate-[felSheetUp_220ms_cubic-bezier(0.16,0.8,0.3,1)]',
   sheetText: `mt-2 ${TYPE.body} text-fel-soft`,
+  // PLAT-P06: a coached session's lead card (the coach's reply) over the demo, under the top bar, while the ready count runs
+  lead: 'absolute inset-x-3 top-[76px] z-10',
   pausedVeil: 'pointer-events-none absolute inset-0 z-[5] grid place-items-center bg-black/55',
   finish: 'flex flex-1 flex-col items-center justify-center px-6 text-center',
   finishTitle: `mt-4 ${NUM} text-[72px] uppercase leading-none text-white`,

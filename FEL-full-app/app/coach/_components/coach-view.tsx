@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { MessageSquare, BookOpen, Video, CalendarCheck, Dumbbell } from 'lucide-react';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { TYPE } from '@/lib/design/type';
@@ -33,6 +34,9 @@ export function CoachView() {
   // until the server has said which, the client view is laid out but not shown: a coach never sees it flash and jump away
   const [known, setKnown] = useState(false);
   const [me, setMe] = useState<SharedBy | null>(null);
+  // PLAT-P06 (2026-10-28): while Today has a session to start, its Start is the page's one primary; Court session steps
+  // down to the quiet look beside it (it was the one primary on an athlete's /coach)
+  const [hasSession, setHasSession] = useState(false);
   useEffect(() => { fetch('/api/coach/programs').then((r) => r.json()).then((j) => setCoach(!!j.coachCertified || (j.programs ?? []).some((p: { role: string }) => p.role === 'coach'))).catch(() => {}).finally(() => setKnown(true)); }, []);
   // the compose screen's live preview must stamp the same "· Certified" the server will, so the identity
   // comes from the server rather than being assembled in the browser
@@ -60,7 +64,9 @@ export function CoachView() {
           <h1 className={`${TYPE.title} text-white`}>Coach</h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <PrimaryCta href="/coach/session" docked icon={<Dumbbell aria-hidden className="h-5 w-5" />}>Court session</PrimaryCta>
+          {hasSession && tab === 'today'
+            ? <Link href="/coach/session" className={`fel-press inline-flex min-h-11 items-center gap-2 rounded-full border border-white/20 px-4 ${TYPE.label} text-white/85`}><Dumbbell aria-hidden className="h-4 w-4" />Court session</Link>
+            : <PrimaryCta href="/coach/session" docked icon={<Dumbbell aria-hidden className="h-5 w-5" />}>Court session</PrimaryCta>}
         </div>
       </header>
       {/* Tab switcher: the kit's segmented look (a soft white pill on the lit tab; the accent stays for the action) */}
@@ -88,7 +94,7 @@ export function CoachView() {
       </div>
 
       {/* Tab content */}
-      {tab === 'today' && <TodayView />}
+      {tab === 'today' && <TodayView onSession={setHasSession} />}
       {tab === 'chat' && chatOn && <CoachChat />}
       {tab === 'catalogue' && <ExerciseCatalogue coach={false} />}
       {tab === 'form' && <FormFeedback />}

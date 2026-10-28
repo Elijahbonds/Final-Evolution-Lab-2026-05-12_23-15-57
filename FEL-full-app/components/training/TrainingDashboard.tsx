@@ -1,4 +1,8 @@
 'use client';
+// PLAT-P06 (2026-10-28): UNMOUNTED, kept on purpose. /training (the only page that mounted TrainingClientView) now
+// redirects to /coach → Today, the coached athlete's one home (app/training/page.tsx). Kept so the move is reversible:
+// restoring that page's previous version mounts this again. TrainingCoachDashboard was already unmounted (superseded by
+// the /coach builder; lib/coach/loop-baseline.test.ts).
 
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';

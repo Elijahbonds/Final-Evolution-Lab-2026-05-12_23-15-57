@@ -1,0 +1,316 @@
+{
+ "today": {
+  "program": {
+   "id": "p-1",
+   "name": "Off-season strength",
+   "coachName": "Dee"
+  },
+  "today": {
+   "block": {
+    "id": "b-2",
+    "order": 1,
+    "label": "Week 2",
+    "targetDate": null
+   },
+   "session": {
+    "id": "s-8",
+    "order": 2,
+    "label": "Day 2 · Lower",
+    "kind": "training",
+    "exercises": [
+     {
+      "id": "se-9",
+      "order": 1,
+      "exerciseId": "pe-goblet",
+      "name": "Goblet Squat",
+      "sets": 4,
+      "reps": "5",
+      "load": "RPE8",
+      "tempo": "3-1-1-0",
+      "restSeconds": 120,
+      "coachNote": "Own the bottom.",
+      "section": "key",
+      "isKeySet": true,
+      "supersetGroup": null,
+      "workSeconds": null,
+      "holdSeconds": null,
+      "setupCues": [
+       "tripod-down"
+      ],
+      "effortBand": null,
+      "dose": "4 × 5 @ RPE8",
+      "coaching": {
+       "cues": [
+        "Elbows inside the knees",
+        "Spread the floor",
+        "Chest proud"
+       ],
+       "faults": [
+        {
+         "fault": "Knees drift in",
+         "fix": "Push the knees out over the toes"
+        }
+       ],
+       "demo": null,
+       "easier": {
+        "id": "pe-box",
+        "name": "Box Squat"
+       },
+       "harder": null,
+       "pattern": {
+        "id": "squat",
+        "label": "Squat"
+       },
+       "brace": {
+        "id": "set",
+        "label": "Set brace",
+        "hint": "A brace built on purpose before the rep, as in a lift."
+       },
+       "equipment": [
+        "kettlebell"
+       ],
+       "setup": [
+        {
+         "id": "tripod-down",
+         "text": "Heel, big toe, little toe: press all three into the floor."
+        }
+       ],
+       "band": null,
+       "jumpLand": false
+      },
+      "timers": [
+       {
+        "kind": "rest",
+        "seconds": 120,
+        "label": "Rest 2:00"
+       }
+      ]
+     },
+     {
+      "id": "se-10",
+      "order": 2,
+      "exerciseId": "pe-split",
+      "name": "Split Squat",
+      "sets": 3,
+      "reps": "8 each side",
+      "load": "RPE7",
+      "tempo": "3-1-1-0",
+      "restSeconds": 75,
+      "coachNote": null,
+      "section": "assist",
+      "isKeySet": false,
+      "supersetGroup": "A",
+      "workSeconds": null,
+      "holdSeconds": null,
+      "setupCues": [],
+      "effortBand": null,
+      "dose": "3 × 8 each side @ RPE7",
+      "coaching": {
+       "cues": [
+        "Front shin stays tall"
+       ],
+       "faults": [],
+       "demo": null,
+       "easier": null,
+       "harder": null,
+       "pattern": {
+        "id": "lunge",
+        "label": "Lunge"
+       },
+       "brace": null,
+       "equipment": [],
+       "setup": [],
+       "band": null,
+       "jumpLand": false
+      },
+      "timers": [
+       {
+        "kind": "rest",
+        "seconds": 75,
+        "label": "Rest 1:15"
+       }
+      ]
+     },
+     {
+      "id": "se-11",
+      "order": 3,
+      "exerciseId": "pe-row",
+      "name": "Half-Kneeling Cable Row",
+      "sets": 3,
+      "reps": "10",
+      "load": "RPE7",
+      "tempo": "3-1-1-0",
+      "restSeconds": 75,
+      "coachNote": null,
+      "section": "assist",
+      "isKeySet": false,
+      "supersetGroup": "A",
+      "workSeconds": null,
+      "holdSeconds": null,
+      "setupCues": [],
+      "effortBand": null,
+      "dose": "3 × 10 @ RPE7",
+      "coaching": {
+       "cues": [
+        "Elbow to the back pocket"
+       ],
+       "faults": [],
+       "demo": null,
+       "easier": null,
+       "harder": null,
+       "pattern": {
+        "id": "pull",
+        "label": "Pull"
+       },
+       "brace": null,
+       "equipment": [],
+       "setup": [],
+       "band": null,
+       "jumpLand": false
+      },
+      "timers": [
+       {
+        "kind": "rest",
+        "seconds": 75,
+        "label": "Rest 1:15"
+       }
+      ]
+     },
+     {
+      "id": "se-12",
+      "order": 4,
+      "exerciseId": "pe-carry",
+      "name": "Suitcase Carry",
+      "sets": 2,
+      "reps": "30 s",
+      "load": "24kg",
+      "tempo": "3-1-1-0",
+      "restSeconds": 60,
+      "coachNote": null,
+      "section": "finish",
+      "isKeySet": false,
+      "supersetGroup": null,
+      "workSeconds": 30,
+      "holdSeconds": null,
+      "setupCues": [],
+      "effortBand": null,
+      "dose": "2 × 30 s @ 24kg",
+      "coaching": {
+       "cues": [
+        "Stand tall, no lean"
+       ],
+       "faults": [],
+       "demo": null,
+       "easier": null,
+       "harder": null,
+       "pattern": {
+        "id": "carry",
+        "label": "Carry"
+       },
+       "brace": null,
+       "equipment": [],
+       "setup": [],
+       "band": null,
+       "jumpLand": false
+      },
+      "timers": [
+       {
+        "kind": "work",
+        "seconds": 30,
+        "label": "Work 0:30"
+       },
+       {
+        "kind": "rest",
+        "seconds": 60,
+        "label": "Rest 1:00"
+       }
+      ]
+     }
+    ]
+   },
+   "index": 1,
+   "total": 4,
+   "week": {
+    "label": "Week 2",
+    "entries": [
+     {
+      "id": "s-3",
+      "label": "Day 1 · Lower",
+      "kind": "training",
+      "state": "done"
+     },
+     {
+      "id": "s-8",
+      "label": "Day 2 · Lower",
+      "kind": "training",
+      "state": "today"
+     },
+     {
+      "id": "s-13",
+      "label": "Off day",
+      "kind": "recovery",
+      "state": "upcoming"
+     },
+     {
+      "id": "s-14",
+      "label": "Day 3 · Lower",
+      "kind": "training",
+      "state": "upcoming"
+     }
+    ]
+   },
+   "lastTime": {
+    "se-9": {
+     "at": "2026-10-27T01:09:27.214Z",
+     "load": 24,
+     "reps": 5,
+     "rpe": 8,
+     "sets": 4,
+     "repsText": "5,5,5,5",
+     "loadText": "24 kg"
+    }
+   }
+  },
+  "open": null,
+  "recentComments": [],
+  "hardStopped": false,
+  "redFlagCopy": null,
+  "reply": {
+   "id": "m:m2",
+   "from": "Dee",
+   "body": "Nice work. Knees stayed out on every rep I saw. Same weight today, and own the bottom.",
+   "at": "2026-10-28T00:09:27.214Z",
+   "kind": "message",
+   "exercise": null
+  },
+  "clips": {
+   "se-9": "ex_squat",
+   "se-10": null,
+   "se-11": null,
+   "se-12": null
+  }
+ },
+ "messages": {
+  "messages": [
+   {
+    "id": "m1",
+    "programId": "p-1",
+    "authorId": "u1",
+    "body": "Day 1 done. Knees felt better on the last two sets.",
+    "createdAt": "2026-10-27T02:09:27.214Z",
+    "mine": true,
+    "fromCoach": false
+   },
+   {
+    "id": "m2",
+    "programId": "p-1",
+    "authorId": "coach",
+    "body": "Nice work. Knees stayed out on every rep I saw. Same weight today, and own the bottom.",
+    "createdAt": "2026-10-28T00:09:27.214Z",
+    "mine": false,
+    "fromCoach": true
+   }
+  ],
+  "reads": false
+ }
+}

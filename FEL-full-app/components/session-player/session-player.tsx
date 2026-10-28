@@ -16,7 +16,7 @@
 // Reduced motion (the app's setting, lib/a11y/reducedMotion.ts, which follows the phone's by default): the decorative
 // transitions go off. assumption: the demo keeps playing — it IS the instruction (the library stage only stops moving its
 // camera by itself).
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Check, Info, Pause, Play, SkipBack, Volume2, VolumeX, X } from 'lucide-react';
 import { AvatarDemo } from '@/components/library/avatar-demo';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
@@ -42,9 +42,21 @@ export interface SessionPlayerProps {
   initial?: PlayerState;
   clock?: Clock;
   voice?: VoiceOut;
+  // PLAT-P06 (2026-10-28), additions for a coached session (components/session-player/coach-player.tsx); each is optional
+  // and a player without them draws exactly what it did:
+  /** Shown over the demo while the ready count runs (clear of the set-up sheet): the coach's reply. */
+  lead?: ReactNode;
+  /** Drawn during a rest: the log row of the set just done (in the set-up sheet when that is open, never twice). */
+  restPanel?: (state: PlayerState) => ReactNode;
+  /** Told every state the player moves to (a coached session logs the set just done). */
+  onState?: (state: PlayerState) => void;
+  /** More of the step's own words in the "How to set up" sheet (the coach's cues); the sheet button shows for it too. */
+  sheetExtra?: ReactNode;
+  /** The finish button's words, in place of "Back to the program". */
+  doneLabel?: string;
 }
 
-export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock: clk, voice }: SessionPlayerProps) {
+export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock: clk, voice, lead, restPanel, sheetExtra, doneLabel, onState }: SessionPlayerProps) {
   const [saved, setSaved] = useState<FinishResult | null>(null);
   const [saving, setSaving] = useState(false);
   const save = useRef(onFinish);
@@ -57,6 +69,9 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
   const p = useSessionPlayer(session, { initial, clock: clk, voice, onFinish: runSave });
   const { state } = p;
   const [askEnd, setAskEnd] = useState(false);
+  const tell = useRef(onState);
+  tell.current = onState;
+  useEffect(() => { tell.current?.(state); }, [state]);
   const calm = useMemo(() => reducedMotion(), []);
   const step = session.steps[Math.min(state.step, session.steps.length - 1)];
 
@@ -103,7 +118,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
         </div>
         <div className={LOOK.bottom}>
           <div className={LOOK.cta} data-player-primary>
-            {failed ? <PrimaryCta onClick={runSave}>{T.tryAgain}</PrimaryCta> : <PrimaryCta onClick={onClose}>{T.backToProgram}</PrimaryCta>}
+            {failed ? <PrimaryCta onClick={runSave}>{T.tryAgain}</PrimaryCta> : <PrimaryCta onClick={onClose}>{doneLabel ?? T.backToProgram}</PrimaryCta>}
           </div>
         </div>
       </div>
@@ -117,6 +132,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
   const label = state.phase === 'ready' ? T.getReady : state.phase === 'rest' ? T.rest : null;
   const small = timedWork ? (d.small ? `s · ${d.small}` : 's') : counting ? null : d.small;
   const button = state.paused ? T.resume : state.phase === 'work' ? T.setDone : state.phase === 'rest' ? T.skipRest : T.startNow;
+  const restUi = state.phase === 'rest' && restPanel ? restPanel(state) : null;
   const fill = (i: number) => (i < state.step ? 1 : i === state.step ? (state.set - 1) / Math.max(1, step.sets) : 0);
   const total = session.steps.length;
 
@@ -144,6 +160,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
             {p.muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </button>
         </div>
+        {state.phase === 'ready' && lead && <div className={LOOK.lead} data-player-lead>{lead}</div>}
         {state.paused && (
           <div className={LOOK.pausedVeil + (askEnd ? ' pointer-events-auto' : '')} data-player-paused>
             {askEnd ? (
@@ -166,7 +183,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
               {label && <p className={LOOK.label} data-player-label>{label}{state.phase === 'rest' ? ` · ${T.next}` : ''}</p>}
               <h2 className={LOOK.name} data-player-name>{step.name}</h2>
             </div>
-            {!!step.setup && (
+            {(!!step.setup || !!sheetExtra) && (
               <button type="button" aria-label={T.howToSetUp} aria-expanded={p.sheet} className={LOOK.setupBtn} data-player-setup onClick={() => p.setSheet(!p.sheet)}><Info className="h-5 w-5" /></button>
             )}
           </div>
@@ -182,6 +199,7 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
             </div>
           )}
           {state.phase === 'work' && step.cue && <p className={LOOK.cue} data-player-cue>{step.cue}</p>}
+          {restUi && !p.sheet && <div className="mt-3" data-player-log>{restUi}</div>}
         </div>
         {p.sheet && (
           <div className={LOOK.sheet} data-player-sheet role="region" aria-label={T.howToSetUp}>
@@ -189,8 +207,10 @@ export function SessionPlayer({ session, mode, onFinish, onClose, initial, clock
               <p className={LOOK.label}>{T.howToSetUp}</p>
               <button type="button" aria-label={T.close} className={LOOK.setupBtn} onClick={() => p.setSheet(false)}><X className="h-5 w-5" /></button>
             </div>
-            <p className={LOOK.sheetText}>{step.setup}</p>
+            {restUi && <div className="mt-2" data-player-log>{restUi}</div>}
+            {!!step.setup && <p className={LOOK.sheetText}>{step.setup}</p>}
             {step.note && <p className={LOOK.sheetText} data-player-note>{step.note}</p>}
+            {sheetExtra}
           </div>
         )}
       </div>
