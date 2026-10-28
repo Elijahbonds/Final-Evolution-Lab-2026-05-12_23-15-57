@@ -11,11 +11,14 @@ import '@babylonjs/loaders/glTF';
 import { CharacterAnimator } from '../anim/CharacterAnimator';
 import { buildAuthoredClip, registerAuthoredClips } from '../anim/authored';
 import { scopeForMode } from '../anim/clipScope';
-import { KIT_BODY_URL, SCAN_BODY_URL } from '../core/heroBody';
+import { KIT_BODY_URL, SCAN_BODY_MOBILE_URL, SCAN_BODY_URL } from '../core/heroBody';
+import { EXERCISE_CLIPS } from '../anim/authored/exercise';
+import { boneNode } from '../anim/boneLookup';
 import { DRILL_DEMO_LOOPS, SCREEN_DEMO_LOOPS, STILL_DEMO_CLIP } from '@/lib/library/surfaceDemo';
 import { BIND_POSE_DEG, bindPoseDeviationDeg } from './poseGuard';
 
-const BODIES = { male: KIT_BODY_URL.male, female: KIT_BODY_URL.female, scan: SCAN_BODY_URL } as const;
+// DEMO-SPEED (2026-10-27): + the scan's phone file (heroBody SCAN_BODY_MOBILE_URL), which a phone's stage now loads for the scan
+const BODIES = { male: KIT_BODY_URL.male, female: KIT_BODY_URL.female, scan: SCAN_BODY_URL, scanMobile: SCAN_BODY_MOBILE_URL } as const;
 type Body = keyof typeof BODIES;
 /** One loop per movement pattern the library plays (lib/library/demo.ts), plus a borrowed court clip. */
 const PATTERN_LOOPS = ['ex_squat', 'ex_hinge', 'ex_lunge', 'ex_pushup', 'ex_press', 'ex_row', 'ex_curl', 'ex_plank', 'ex_crunch', 'ex_jump', 'ex_carry', 'ex_lateral_lunge', 'ex_bench_press', 'ex_wall_sit', 'ex_flow_bear_child', 'bball_layup_gather'];
@@ -74,4 +77,50 @@ describe('no demo surface shows the bind (T-) pose', () => {
     }
     expect(bad).toEqual([]);
   });
+});
+
+// DEMO-SPEED (2026-10-27), GATE 0 for the scan's phone file: the same 22 bones under the same names, and every authored loop a
+// surface can play (the library's exercise suite — the signature programs' loops are in it — and the drill / screen loops)
+// moves it exactly as it moves the full scan: off bind at every phase, every joint within 1 cm of the full scan's.
+describe('the scan\'s phone file plays every loop the full scan plays, the same way', () => {
+  const JOINTS = ['Hips', 'Head', 'LeftHand', 'RightHand', 'LeftFoot', 'RightFoot', 'LeftForeArm', 'RightLeg'];
+  it('has the full scan\'s skeleton: the same bones, by name, in the same order', () => {
+    const names = (b: Body) => rigs[b]!.sk.bones.map((x) => x.name);
+    expect(names('scanMobile')).toEqual(names('scan'));
+    expect(names('scan').length).toBe(22);
+  });
+  it('every authored loop builds on it, holds it off bind, and puts its joints where the full scan\'s go', () => {
+    const bad: string[] = [];
+    let worst = 0;
+    const clips = [...new Set([...EXERCISE_CLIPS, ...SURFACE_CLIPS])];
+    for (const clip of clips) {
+      const g: Partial<Record<Body, NonNullable<ReturnType<Scene['getAnimationGroupByName']>>>> = {};
+      for (const body of ['scan', 'scanMobile'] as const) {
+        const r = rigs[body]!;
+        reset(body);
+        if (!buildAuthoredClip(r.animator, r.scene, r.sk, clip)) { bad.push(`${body} ${clip}: did not build`); continue; }
+        const grp = r.scene.animationGroups.find((x) => x.name === clip);
+        if (!grp || grp.targetedAnimations.length === 0) { bad.push(`${body} ${clip}: no bound tracks`); continue; }
+        g[body] = grp;
+      }
+      if (!g.scan || !g.scanMobile) continue;
+      const D = (g.scan.to - g.scan.from) / 30;
+      for (let i = 0; i < 4; i++) {
+        const at: Partial<Record<Body, Vector3[]>> = {};
+        for (const body of ['scan', 'scanMobile'] as const) {
+          const r = rigs[body]!; const grp = g[body]!;
+          reset(body);
+          grp.start(false, 1, grp.from, grp.to, false); grp.goToFrame(grp.from + (D * i / 4) * 30); r.scene.render();
+          const d = bindPoseDeviationDeg(r.sk);
+          if (body === 'scanMobile' && (d == null || d < 15)) bad.push(`${body} ${clip} @${(D * i / 4).toFixed(2)}s: ${d?.toFixed(1)}° from bind`);
+          at[body] = JOINTS.map((j) => { const n = boneNode(r.sk, j)!; n.computeWorldMatrix(true); return n.getAbsolutePosition().clone(); });
+          grp.stop();
+        }
+        JOINTS.forEach((j, k) => { const e = Vector3.Distance(at.scan![k], at.scanMobile![k]); worst = Math.max(worst, e); if (e > 0.01) bad.push(`${clip} @${(D * i / 4).toFixed(2)}s ${j}: ${(e * 100).toFixed(1)} cm apart`); });
+      }
+    }
+    expect(bad).toEqual([]);
+    expect(clips.length).toBeGreaterThan(150);
+    expect(worst).toBeLessThan(0.01);
+  }, 240_000);
 });

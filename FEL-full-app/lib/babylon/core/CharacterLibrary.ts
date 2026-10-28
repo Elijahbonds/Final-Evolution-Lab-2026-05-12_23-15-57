@@ -23,7 +23,7 @@ import { snapToGround } from './groundSnap';                // M69: feet-on-cour
 import { PROCEDURAL_CHARACTERS } from '../characters/CharacterProvider';
 import { spawnProceduralAthlete } from '../characters/ProceduralAthlete';
 import { rosterUrlFor, normalizeHeroUrl, DEFAULT_HERO_URL, takeRivalRotation } from './athleteRoster';
-import { urlForHeroBody, KIT_BODY_URL } from './heroBody';
+import { urlForHeroBody, KIT_BODY_URL, scanUrlForTier } from './heroBody';
 import { installOpponentMotion, HERO_CAPTURE } from '../anim/opponentMotion';
 import { installStyleMotion } from '../anim/styleMotion';
 import { pickedVocab } from '../combat/styleVocab';
@@ -188,9 +188,11 @@ async function loadContainer(scene: Scene, url: string): Promise<AssetContainer>
  *  (the probe's old scene.textures basis could not see them); the mobile file is 24 MB. Only the DEFAULT hero is
  *  swapped — a dev override (?hero=) or an explicitly requested body always loads as asked, and the desktop tier's
  *  look is untouched. */
-const MOBILE_HERO_URL = '/models/elijah-meshy.mobile.glb';   // Ship Pass 6: the scan's decimated bake (54k verts, 1K textures)
+// Ship Pass 6: the scan's decimated bake (54k verts, 1K textures). DEMO-SPEED (2026-10-27): the file and the rule live in
+// heroBody.ts (SCAN_BODY_MOBILE_URL, scanUrlForTier) so the library stage's early fetch asks for the same file; DEFAULT_HERO_URL
+// is SCAN_BODY_URL (athleteRoster.cast.test holds both spellings).
 function tierOf(scene: Scene): QualityTier { return (scene.metadata?.felTier as QualityTier | undefined) ?? 'desktop'; }
-function heroUrlForTier(url: string, scene: Scene): string { return url === DEFAULT_HERO_URL && tierOf(scene) === 'mobile' ? MOBILE_HERO_URL : url; }
+function heroUrlForTier(url: string, scene: Scene): string { return scanUrlForTier(url, tierOf(scene)); }
 /** The hero for this scene's tier, falling back to the requested file if the tier's variant will not load — a
  *  texture variant can never brick a spawn (the roster's rule). */
 async function loadHero(scene: Scene, url: string): Promise<{ container: AssetContainer; url: string }> {
