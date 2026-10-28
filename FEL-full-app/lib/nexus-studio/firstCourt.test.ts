@@ -76,9 +76,9 @@ describe('the three steps', () => {
   });
 
   it('the fans sit on the sidelines, facing the court, clear of the play camera behind the near baseline', () => {
-    const v = activeVenue(starterProject())!;
-    const stands = addCommand(v, 'fans')!;
-    const st = execute(createStack(starterProject()), stands.cmd);
+    const p = starterProject();
+    const stands = addCommand(activeVenue(p)!, 'fans')!;
+    const st = execute(createStack(p), stands.cmd);
     const placed = activeVenue(st.doc)!.objects;
     for (const o of placed) {
       expect(Math.abs(Math.abs(o.t.p[0]) - 12)).toBeLessThan(1e-9);

@@ -65,7 +65,7 @@ export function FirstCourt({ venue, run, onWatch, onPlaced, onFinish, onSkip }: 
 
   const ring = (on: boolean) => (on ? `ring-2 ring-[color:var(--fel-cyan)] ring-offset-2 ring-offset-[color:var(--fel-surface)] ${calm ? '' : 'motion-safe:animate-pulse'}` : '');
   const choice = 'fel-press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full border px-4 font-sans text-[14px] font-semibold transition-colors';
-  const words = step < 3 ? GUIDE_STEPS[step] : GUIDE_DONE;
+  const words: { title: string; hint: string } = step === 3 ? GUIDE_DONE : GUIDE_STEPS[step];
 
   return (
     <section aria-label={FIRST_COURT_TITLE} data-testid="first-court" data-step={step}

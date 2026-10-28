@@ -106,7 +106,11 @@ class Driver {
     return true;
   }
   async key(k: string, what: string) { await this.page.keyboard.press(k); this.c.keys++; this.c.steps.push(`${k} (${what})`); }
-  async type(sel: string, text: string, what: string) { const l = this.page.locator(sel).filter({ visible: true }).first(); await l.click(); this.c.taps++; await l.fill(text); this.c.chars += text.length; this.c.steps.push(`type ${what}`); }
+  async type(sel: string, text: string, what: string): Promise<boolean> {
+    const l = this.page.locator(sel).filter({ visible: true }).first();
+    try { await l.click({ timeout: 5000 }); await l.fill(text, { timeout: 5000 }); } catch (e) { this.c.steps.push(`✗ type ${what}: ${String(e).split('\n')[0].slice(0, 90)}`); return false; }
+    this.c.taps++; this.c.chars += text.length; this.c.steps.push(`type ${what}`); return true;
+  }
   async waitFor(fn: string, ms: number, what: string): Promise<boolean> {
     const t0 = Date.now();
     const ok = await this.page.waitForFunction(fn, null, { timeout: ms }).then(() => true, () => false);
@@ -169,7 +173,8 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
   notes.push(ready ? `viewport ready in ${((Date.now() - tLoad) / 1000).toFixed(1)} s` : 'the viewport did not finish loading on the rig');
   d.reset();   // the first load is not part of any task's taps (it is reported apart as the viewport's load time)
   const t0 = Date.now();
-  const btn = (re: string) => `button:text-matches("${re}", "i"), [role=tab]:text-matches("${re}", "i")`;
+  // labels carry an icon and a space before the words: anchors allow the space
+  const btn = (raw: string) => { const re = raw.replace(/^\^/, '^\\\\s*').replace(/\$$/, '\\\\s*$'); return `button:text-matches("${re}", "i"), [role=tab]:text-matches("${re}", "i")`; };
   const aria = (re: string) => `button[aria-label*="${re}" i], button[title*="${re}" i]`;
   const before = await page.evaluate(objects);
 
@@ -203,8 +208,10 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
         const mood = page.locator('select[aria-label="Mood"]').filter({ visible: true }).first();
         if (!(await mood.count())) { deadEnd = 'the Mood list is not on screen'; break; }
         await mood.scrollIntoViewIfNeeded(); await mood.selectOption('nightGame'); d.c.taps += 2; d.c.steps.push('Mood list: open + Night game');
-        await d.tap('[role=tab]:text-matches("^\\s*stamps\\s*$", "i")', 'Stamps');
+        await d.tap('[role=tab]:text-matches("^\\\\s*stamps\\\\s*$", "i")', 'Stamps');
         await d.tap('button[aria-label="Place Flood corner set"]', 'Flood corner set');
+        // the placed stamp is now the selection, so the inspector shows the group: back to the court's own settings first
+        await d.key('Escape', 'deselect, to get the court settings back');
         const intro = page.locator('select[aria-label="Intro"]').filter({ visible: true }).first();
         if (await intro.count()) { await intro.scrollIntoViewIfNeeded(); await intro.selectOption('walkIn'); d.c.taps += 2; d.c.steps.push('Intro list: open + walk-in'); }
         await d.tap('button[aria-label="Preview the intro"]', 'Preview the intro');
@@ -265,7 +272,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       if (!(await d.tap(btn('from my closet'), 'From my Closet'))) { deadEnd = 'no way in from the Closet'; break; }
       await d.waitFor(`!!document.querySelector('[data-testid=closet-looks] button')`, 6000, 'the Closet’s looks');
       if (!(await d.tap('[data-testid=closet-looks] button', 'a saved look'))) { deadEnd = 'no saved look to pick'; break; }
-      if (!(await d.tap('[data-testid=character-row] button:text-matches("^cast in", "i")', 'Cast in the venue'))) { deadEnd = 'no cast button'; break; }
+      if (!(await d.tap('[data-testid=character-row] button:text-matches("^\\\\s*cast in", "i")', 'Cast in the venue'))) { deadEnd = 'no cast button'; break; }
       done = true;
       await page.waitForTimeout(300);
       notes.push(`after casting the Studio is on the ${await page.evaluate(`document.querySelector('[role=tab][aria-selected=true]')?.textContent?.trim()`)} track`);
@@ -302,7 +309,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       await d.tap('[data-testid=asset-list] button:has-text("Floodlight")', 'Floodlight (an edit)');
       await page.waitForTimeout(2200);
       const n = await page.evaluate(objects);
-      await page.reload(); await page.waitForFunction('document.body.dataset.a11yReady', null, { timeout: 60000 });
+      await open(page, false);   // the same device, a later visit (no ?fresh: storage kept)
       d.c.steps.push('reload (the creator comes back)');
       await d.waitFor(viewportReady, 150000, 'the viewport again');
       const after = await page.evaluate(objects);
@@ -312,8 +319,10 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       break;
     }
     case 'publish': {
-      const pub = page.locator(`${btn('publish|share')}, ${aria('publish')}, ${aria('share')}`).filter({ visible: true });
-      if (await pub.count()) { await d.tap(`${btn('publish|share')}, ${aria('publish')}, ${aria('share')}`, 'Publish / Share'); done = true; }
+      // a publish or share action (not "Paste a share code", which brings a look in)
+      const PUB = `${btn('^(publish|share)( |$)')}, button[aria-label^="Publish" i], button[aria-label^="Share" i]`;
+      const pub = page.locator(PUB).filter({ visible: true });
+      if (await pub.count()) { await d.tap(PUB, 'Publish / Share'); done = true; }
       else {
         deadEnd = 'no publish or share on this base: Export (.nexus.json) is the only way to hand a project on';
         const dl = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
@@ -397,7 +406,7 @@ try {
     for (const width of widths) {
       const rows: TaskResult[] = [];
       for (const t of tasks) {
-        const r = await runTask(browser, width, t);
+        const r = await runTask(browser, width, t).catch((e): TaskResult => ({ task: t, width, done: false, deadEnd: `probe error: ${String(e).split('\n')[0].slice(0, 120)}`, taps: 0, keys: 0, chars: 0, rigS: 0, klmS: 0, steps: [], screen: null, notes: [] }));
         rows.push(r);
         console.log(`${width.padEnd(7)} ${t.padEnd(9)} ${r.done ? 'done' : 'DEAD END'} taps ${r.taps} keys ${r.keys} rig ${r.rigS}s klm ${r.klmS}s ${r.deadEnd ? `· ${r.deadEnd}` : ''} ${r.notes.join(' · ')}`);
       }

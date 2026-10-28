@@ -130,16 +130,16 @@ export function NexusStudioApp() {
           })}
         </nav>
         <span className="ml-auto flex items-center gap-1">
-          <ToolButton title="New project" onClick={() => setAsking((a) => !a)} active={asking}><FilePlus2 className="h-4 w-4" /></ToolButton>
-          <ToolButton title="Help and keys" shortcut="?" onClick={() => setHelp(true)}><CircleHelp className="h-4 w-4" /></ToolButton>
+          <ToolButton title="New project" onClick={() => setAsking((a) => !a)} active={asking}><FilePlus2 className="h-4 w-4" /><span className="hidden xl:inline">New</span></ToolButton>
+          <ToolButton title="Help and keys" shortcut="?" onClick={() => setHelp(true)}><CircleHelp className="h-4 w-4" /><span className="hidden xl:inline">Help</span></ToolButton>
           <ToolButton title={studio.undoLabel ? `Undo ${studio.undoLabel}` : 'Undo'} shortcut="Ctrl+Z" disabled={!studio.canUndo} onClick={studio.undo}><Undo2 className="h-4 w-4" /></ToolButton>
           <ToolButton title={studio.redoLabel ? `Redo ${studio.redoLabel}` : 'Redo'} shortcut="Ctrl+Shift+Z" disabled={!studio.canRedo} onClick={studio.redo}><Redo2 className="h-4 w-4" /></ToolButton>
           <span className="mx-1 flex items-center gap-1 text-[12px]" style={{ color: studio.saveState === 'saved' ? C.dim : studio.saveState === 'error' || studio.saveState === 'no-storage' ? C.ember : C.gold }} title={studio.saveError ?? undefined} data-testid="save-state">
             <SaveIcon className="h-3.5 w-3.5" aria-hidden /> {SAVE_LABEL[studio.saveState]}
           </span>
           <ToolButton title="Save now" shortcut="Ctrl+S" onClick={() => studio.save()}><Save className="h-4 w-4" /></ToolButton>
-          <ToolButton title="Export the project (.nexus.json)" onClick={doExport}><Download className="h-4 w-4" /></ToolButton>
-          <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /></ToolButton>
+          <ToolButton title="Export the project (.nexus.json)" onClick={doExport}><Download className="h-4 w-4" /><span className="hidden xl:inline">Export</span></ToolButton>
+          <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /><span className="hidden xl:inline">Import</span></ToolButton>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void doImport(f); e.target.value = ''; }} />
           {track !== 'ai' && (
             <button type="button" onClick={playtest} className="ml-1 flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-semibold" style={{ background: C.cyan, color: '#050505' }} title="Open the mode with this venue (development build)">

@@ -30,7 +30,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { keys: 'R', does: 'Scale tool', scope: 'venue', key: 'r' },
   { keys: '1', does: 'Orbit the camera', scope: 'venue', key: '1' },
   { keys: '2', does: 'Pan the camera', scope: 'venue', key: '2' },
-  { keys: '3', does: 'Fly (W A S D, Q E)', scope: 'venue', key: '3' },
+  { keys: '3', does: 'Fly the camera (WASD)', scope: 'venue', key: '3' },
   { keys: 'F', does: 'Look at the selection', scope: 'venue', key: 'f' },
   { keys: 'G', does: 'Grid on or off', scope: 'venue', key: 'g' },
   { keys: 'N', does: 'Snap on or off', scope: 'venue', key: 'n' },

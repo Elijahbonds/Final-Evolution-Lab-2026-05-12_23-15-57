@@ -31,7 +31,8 @@ const studio = (): StudioApi => {
 describe('the shell', () => {
   const html = clean(renderToStaticMarkup(createElement(NexusStudioApp)));
   it('has a way back to FEL, a heading, New project and Help', () => {
-    expect(html).toMatch(/<a[^>]*href="\/play"[^>]*aria-label="Leave the Studio"/);
+    const back = /<a [^>]*aria-label="Leave the Studio"[^>]*>/.exec(html)?.[0] ?? '';
+    expect(back).toContain('href="/play"');
     expect(html).toMatch(/<h1[^>]*>Nexus Studio<\/h1>/);
     expect(html).toContain('aria-label="New project"');
     expect(html).toContain('aria-label="Help and keys"');
@@ -87,7 +88,7 @@ describe('empty states say what to do', () => {
     const h = clean(renderToStaticMarkup(createElement(AiVenuePanel, { studio: studio(), onBuildByHand: noop, onGuide: noop })));
     expect(h).toContain('Build by hand');
     expect(h).toContain('Make your first court');
-    expect(h).not.toContain('a night beach court with floodlights');   // no greyed-out examples while it is off
+    expect(h).not.toContain('a sunny clay court with palms');   // no greyed-out example chips while it is off
   });
   it('characters: none yet, and where they come from', () => {
     const h = clean(renderToStaticMarkup(createElement(CharactersTrack, { studio: studio() })));

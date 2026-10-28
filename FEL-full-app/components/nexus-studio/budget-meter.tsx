@@ -9,6 +9,8 @@ import { meterRows, modeRow, worst, PHONE_BODIES, type BudgetSample, type Level 
 import { C } from './ui';
 
 const TONE: Record<Level, string> = { ok: C.emerald, near: C.gold, over: C.crimson };
+/** STUDIO-EASY: the meter's headline in plain words; the numbers stay beside it for whoever wants them. */
+const VERDICT: Record<Level, string> = { ok: 'Light enough', near: 'Getting heavy', over: 'Too heavy' };
 
 export function BudgetMeter({ sample, budgetKey, phone, onPhone }: { sample: BudgetSample | null; budgetKey: string; phone: boolean; onPhone(v: boolean): void }) {
   const rows = sample ? meterRows(sample) : [];
@@ -17,7 +19,7 @@ export function BudgetMeter({ sample, budgetKey, phone, onPhone }: { sample: Bud
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-[12px]" data-testid="budget-meter" aria-live="polite">
       <span className="flex items-center gap-1.5 font-semibold uppercase tracking-[0.12em]" style={{ color: sample ? TONE[head] : C.dim }}>
-        <Gauge className="h-3.5 w-3.5" aria-hidden /> Budget · {sample ? (sample.tier === 'mobile' ? 'phone' : sample.tier === 'high' ? 'TV / high' : 'desktop') : '…'}
+        <Gauge className="h-3.5 w-3.5" aria-hidden /> {sample ? `${VERDICT[head]} for a ${sample.tier === 'mobile' ? 'phone' : sample.tier === 'high' ? 'TV' : 'computer'}` : 'Measuring…'}
       </span>
       {rows.map((r) => (
         <span key={r.key} className="flex items-center gap-1.5" title={`${r.label}: ${r.value} of ${r.ceiling} (${Math.round(r.share * 100)} %)`}>
