@@ -33,6 +33,10 @@ import { barSpeedDays, deviceStorage, keepDeviceSet, keptOf, readDeviceSets, typ
 import { addMilestones, MILESTONES, reached } from '@/lib/vbt/milestones';
 import type { VbtFeatures, VbtTier } from '@/lib/vbt/gate';
 import { E1RM_LINE, ESTIMATE_LINE, NOT_SAVED_LINE, PRIVACY_LINE, SLOWMO_LINE, TEEN_LINE, setResult, setupLines, sourceLine, speedText, statusLine, stopLine } from '@/lib/vbt/copy';
+import { lastComparableSet, vbtView } from '@/lib/results/vbt';
+import { RESULT_COPY } from '@/lib/results/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { LOOK } from '@/components/result-card/look';
 import { STRETCHES } from '@/lib/jump/slowmo';
 import type { Decoder } from '@/lib/jump/slowmoDecode';
 import { videoGrab, type Grab } from './frame-grab';
@@ -67,6 +71,8 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
   const [fresh, setFresh] = useState<string[]>([]);
   const [deviceSets, setDeviceSets] = useState<KeptSet[]>([]);
   const [filmedAt, setFilmedAt] = useState<number>(240);
+  /** PLAT-P03: when this set ended (the card compares it with the last set BEFORE it). */
+  const [setAt, setSetAt] = useState<number>(0);
   const live = useRef<VbtLive | null>(null);
   const off = useRef<(() => void)[]>([]);
   const wake = useRef<MirrorWakeLock | null>(null);
@@ -100,7 +106,9 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
   const settle = useCallback(async (v: LiveView) => {
     setView(v);
     setPhase('summary');
-    const set = keptOf(v, { day: today, at: Date.now(), lift: liftId, loadKg, warmup: warmup && !!features?.readiness && !!loadKg, band: null });
+    const at = Date.now();
+    setSetAt(at);
+    const set = keptOf(v, { day: today, at, lift: liftId, loadKg, warmup: warmup && !!features?.readiness && !!loadKg, band: null });
     const rec = { lift: liftId, mcv: v.read?.bestMcv ?? null, pv: v.read?.bestPv ?? null, release: v.throws?.length ? Math.max(...v.throws.map((t) => t.speed)) : null, fps: v.fps };
     if (set) setFresh(addMilestones(store(), [...reached(rec, ctx?.tier !== 'adult'), 'first_set']));
     if (!set || !features?.keep) { setKept('none'); return; }
@@ -302,12 +310,28 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
         )
       )}
 
-      {phase === 'summary' && view && (
+      {phase === 'summary' && view && (() => {
+        // PLAT-P03 (2026-10-28): the set is ONE result card — the best rep's speed, its ±, the arrow against the last set
+        // of this lift at this load (lib/results/vbt.ts: the tool's own real-change test), what it means (cue-rewrite's
+        // setResult, unchanged) and "Next set". Every rep, the loss, the stop line, where it was read from, the warm-up
+        // read, the load-velocity line and the milestones are under Details, unchanged.
+        const r = setResult({ bestMcv: read?.bestMcv ?? null, lossPct: read?.lossPct ?? null, stopPct });
+        const bestThrow = view.throws?.length ? view.throws.reduce((a, b) => (b.speed > a.speed ? b : a)) : null;
+        const card = vbtView({
+          liftName: lift.name, loadKg, fps: view.fps, throws: !!view.throws,
+          bestMcv: bestThrow ? bestThrow.speed : read?.bestMcv ?? null,
+          pm: bestThrow ? bestThrow.speedPm : counted.find((x) => x.mcv === read?.bestMcv)?.mcvPm ?? null,
+          repMcvs: counted.map((x) => x.mcv), last: lastComparableSet(history, liftId, loadKg, setAt),
+          line: view.throws ? '' : r.means, next: { label: RESULT_COPY.nextSet, href: null },
+        });
+        return (
         <div className="space-y-3" data-vbt-summary>
-          <div className="fel-card space-y-2 rounded-xl p-4">
+          <ResultCard view={card} onNext={() => { setPhase('setup'); setView(null); }} details={(
+          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-baseline justify-between">
               <div className="text-sm font-bold text-white">{lift.name}{loadKg ? ` · ${loadKg} kg` : ''}</div>
-              <div className="text-xs text-white/50" data-vbt-fps>{view.fps} fps</div>
+              <div className={LOOK.detail} data-vbt-fps>{view.fps} fps</div>
             </div>
             {view.throws ? (
               <ol className="space-y-1" data-vbt-throws>
@@ -321,18 +345,16 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
                   <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Slowed by</dt><dd className="font-bold tabular-nums text-white" data-vbt-sum-loss>{read?.lossPct != null ? `${read.lossPct}%` : '—'}</dd></div>
                 </dl>
                 <ol className="space-y-1" data-vbt-reps-list>
-                  {read?.reps.map((r) => (
-                    <li key={r.index} className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[13px] tabular-nums ${r.partial ? 'text-white/40' : 'text-white/85'}`} data-vbt-rep={r.index}>
-                      <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: zoneOf(r.mcv).color }} />Rep {r.index}{r.partial ? ' · partial' : r.bounce ? ' · bounce' : ''}</span>
-                      <span>{speedText(r.mcv, r.mcvPm)}{r.lossPct != null ? ` · −${r.lossPct}%` : ''}</span>
+                  {read?.reps.map((x) => (
+                    <li key={x.index} className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[13px] tabular-nums ${x.partial ? 'text-white/40' : 'text-white/85'}`} data-vbt-rep={x.index}>
+                      <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: zoneOf(x.mcv).color }} />Rep {x.index}{x.partial ? ' · partial' : x.bounce ? ' · bounce' : ''}</span>
+                      <span>{speedText(x.mcv, x.mcvPm)}{x.lossPct != null ? ` · −${x.lossPct}%` : ''}</span>
                     </li>
                   ))}
                 </ol>
                 {view.stop && <p className="text-xs text-[#FF4D8D]" data-vbt-sum-stop>{stopLine(stopPct)}</p>}
-                {/* CUE-REWRITE: what we saw / what it means / what next */}
-                {(() => { const r = setResult({ bestMcv: read?.bestMcv ?? null, lossPct: read?.lossPct ?? null, stopPct }); return (
-                  <div className="space-y-0.5 text-sm" data-vbt-result><p className="text-white/85">{r.saw}</p><p className="text-white/70" data-vbt-means>{r.means}</p><p className="font-bold text-white" data-vbt-next>{r.next.text}</p></div>
-                ); })()}
+                {/* CUE-REWRITE: what we saw / what it means / what next — the meaning is the card's line, all three here */}
+                <div className="space-y-0.5 text-sm" data-vbt-result><p className="text-white/85">{r.saw}</p><p className="text-white/70" data-vbt-means>{r.means}</p><p className="font-bold text-white" data-vbt-next>{r.next.text}</p></div>
               </>
             )}
             <p className="text-[11px] text-white/45" data-vbt-source>{sourceLine(view.source)} {ESTIMATE_LINE}</p>
@@ -342,7 +364,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
           </div>
 
           {warmRead && (
-            <div className="fel-card space-y-1 rounded-xl p-4" data-vbt-readiness data-band={warmRead.read.band}>
+            <div className="space-y-1" data-vbt-readiness data-band={warmRead.read.band}>
               <div className="text-[11px] uppercase tracking-wider text-white/40">Warm-up readiness · bar speed</div>
               <div className="text-lg font-black text-white">{BAND_LABEL[warmRead.read.band]}</div>
               <p className="text-sm text-white/70">
@@ -352,7 +374,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
           )}
 
           {profile && (
-            <div className="fel-card space-y-1 rounded-xl p-4" data-vbt-profile>
+            <div className="space-y-1" data-vbt-profile>
               <div className="text-[11px] uppercase tracking-wider text-white/40">Weight and bar speed · estimate</div>
               {profile.ok ? (
                 <>
@@ -363,6 +385,8 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
               ) : <p className="text-sm text-white/60">{profile.why === 'few_loads' ? 'Film a second and third weight (5 kg or more apart) to see how your speed changes with weight.' : 'The bar did not slow as the load rose: track the loads again.'}</p>}
             </div>
           )}
+          </div>
+          )} />
 
           {fresh.length > 0 && (
             <div className="fel-card rounded-xl p-4" data-vbt-milestones>
@@ -372,10 +396,9 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
               </ul>
             </div>
           )}
-
-          <button type="button" onClick={() => { setPhase('setup'); setView(null); }} data-vbt-again className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[#00E5FF] px-4 font-bold text-black">Next set</button>
         </div>
-      )}
+        );
+      })()}
       <p className="text-center text-xs text-white/40">
         <Link href="/train" className="underline">Back to Train</Link> · <Link href="/coach/velocity" className="underline" data-vbt-coach-door>Coaching? Your athletes&apos; bar speed</Link>
       </p>

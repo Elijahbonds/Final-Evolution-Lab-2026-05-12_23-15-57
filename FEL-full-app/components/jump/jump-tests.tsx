@@ -17,7 +17,9 @@ import { armSwingGain, asymmetry, PROTOCOLS, sideBest, readProtocolClip, type Pr
 import { poseDecoder, type Decoder } from '@/lib/jump/slowmoDecode';
 import { verifyJump } from '@/lib/jump/session';
 import { jumpKinematics, type JumpKinematics } from '@/lib/jump/velocity';
-import { historyId, keepJump, type JumpHistoryEntry } from '@/lib/jump/historyStore';
+import { historyId, keepJump, loadJumps, type JumpHistoryEntry } from '@/lib/jump/historyStore';
+import { jumpTestView, lastOfTest } from '@/lib/results/jump';
+import { ResultCard } from '@/components/result-card/result-card';
 import { logCapture, pilotEnabled } from '@/lib/jump/pilot';
 import { lbToKg } from '@/lib/jump/power';
 import type { ManualRead } from '@/lib/jump/manualFrames';
@@ -48,6 +50,12 @@ type Run =
 const LOADED: ReadonlySet<ProtocolId> = new Set(['sj', 'cmjHips']);
 /** A video verifies at the slow-mo rate (session.ts: jump.labFps), not the live camera's 50: said so. */
 const VIDEO_RATE_WORDS = 'a video needs 120 frames a second or more to verify (use your camera\'s Slo-mo)';
+/** The test's own buttons' words, now the result card's one step. */
+const KEEP_WORDS = 'Keep on this phone';
+const AGAIN_WORDS = 'Read another video';
+/** The 10-5's own sentences (the paragraph they were in, split at its full stops; the words are unchanged). */
+const RJ_MEANS = 'The bounce score (RSI) is time in the air divided by time on the floor: higher is springier.';
+const RJ_NEXT = 'Next: try to raise it with quicker contacts.';
 
 export function JumpTests({ adult, decode, storage = null, liveT5 = null, pilot = pilotEnabled() }: { adult: boolean; decode?: Decoder; storage?: ReachStorage | null; liveT5?: T5Extra | null; pilot?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -207,6 +215,8 @@ function TestResult({ id, pilot, run, onUpdate, storage, hipsBest }: {
   const shownCm = run.manual ? run.manual.heightCm : best?.heightCm ?? null;
   const shownPm = run.manual ? run.manual.plusMinusCm : best?.heightSdCm != null ? 1.96 * best.heightSdCm : null;
   const [entryId] = useState(() => historyId());
+  // PLAT-P03: the last result of this test kept on this phone, read once when the result arrives (before any keep)
+  const [last] = useState(() => lastOfTest(loadJumps(storage), id));
   const entryOf = (): JumpHistoryEntry | null => {
     if (!r.ok) return null;
     const k = best ? kin.get(best.index) : undefined;
@@ -231,19 +241,26 @@ function TestResult({ id, pilot, run, onUpdate, storage, hipsBest }: {
   // a manual change is a new result: kept under its own id
   const keep = () => { const e = entryOf(); if (e && keepJump(storage, run.manual ? { ...e, id: historyId() } : e, { adult: true })) onUpdate((old) => (old?.phase === 'done' ? { ...old, kept: true } : old!)); };
   const refused = r.t5.jumps.filter((j) => !j.valid).length;
-  return (
-    <div data-test-result={id} className="space-y-3">
+  const verifiedLine = v?.verified ? 'Verified jump' : `Not verified: ${v?.blocks[0] === 'frameRate' ? VIDEO_RATE_WORDS : BLOCK_WORDS[v?.blocks[0] ?? 'notValid']}`;
+  const canKeep = (id === 'rj105' ? r.rj?.best5RsiFlight != null : !!best) && !run.kept && !!storage;
+  const counted = id === 'rj105' ? r.rj?.best5RsiFlight != null : !!best && shownCm !== null;
+  // PLAT-P03 (2026-10-28): a counted test is ONE result card — the height (or the 10-5's bounce score), the arrow against
+  // the last one of this test kept on this phone (lib/results/jump.ts: the jump's own band), what it means, and the one
+  // step: keep it, or read another. Every other line the test reads is under Details, unchanged.
+  const line = id === 'rj105' ? (r.rj?.best5RsiFlight != null ? RJ_MEANS : r.rj?.why ?? '')
+    : id === 'cmjArms' ? armsLine(sideBest(r.t5), hipsBest) ?? verifiedLine : verifiedLine;
+  const card = counted ? jumpTestView({
+    test: id, bestCm: id === 'rj105' ? null : shownCm, plusMinusCm: shownPm, rsi: r.rj?.best5RsiFlight ?? null, last, line,
+    next: { label: canKeep ? KEEP_WORDS : AGAIN_WORDS, href: null },
+  }) : null;
+  const detail = (
+    <>
       {id === 'rj105' ? <Repeated read={r} /> : best && shownCm !== null ? (
         <>
-          <p data-test-best className="text-center text-[40px] font-black leading-none text-white">
-            {inch(shownCm)} in{shownPm !== null ? <span className="ml-2 text-[18px] font-bold text-white/70">±{pmIn(shownPm)}</span> : null}
-          </p>
-          <p className="text-center text-[16px] text-white/70">
+          <p className="text-[16px] text-white/70">
             {shownCm.toFixed(1)} cm · jump {best.index}{run.manual ? ' · manual frames' : ''} · read at {Math.round(r.fps)} frames a second{run.loadKg > 0 ? ` · holding ${Math.round(run.loadKg)} kg` : ''}
           </p>
-          <p data-test-verified={!!v?.verified} className="text-center text-[16px] font-bold" style={{ color: v?.verified ? '#00FF9D' : 'rgba(255,255,255,0.7)' }}>
-            {v?.verified ? 'Verified jump' : `Not verified: ${v?.blocks[0] === 'frameRate' ? VIDEO_RATE_WORDS : BLOCK_WORDS[v?.blocks[0] ?? 'notValid']}`}
-          </p>
+          <p data-test-verified={!!v?.verified} className="text-[16px] font-bold" style={{ color: v?.verified ? '#00FF9D' : 'rgba(255,255,255,0.7)' }}>{verifiedLine}</p>
         </>
       ) : <p data-test-none className="text-[18px] font-bold text-[#FFB020]">No jump counted for this test. The reason is beside each jump below.</p>}
       {id === 'sj' && best ? <p data-sj-ok className="text-[16px] text-white/80">Held squat, no dip before the take-off.</p> : null}
@@ -272,29 +289,32 @@ function TestResult({ id, pilot, run, onUpdate, storage, hipsBest }: {
             className="min-h-12 w-full rounded-2xl border border-white/20 px-4 text-[16px] font-bold text-white/90">Check the frames</button>
         )
       ) : null}
-      {(id === 'rj105' ? r.rj?.best5RsiFlight == null : !best) ? null : (
-        run.kept ? <p data-test-kept className="text-center text-[16px] font-bold text-[#00FF9D]">Kept in your history on this phone.</p> : (
-          <button type="button" data-test-keep onClick={keep} disabled={!storage} className="min-h-12 w-full rounded-2xl bg-white px-4 text-[16px] font-black text-black disabled:opacity-40">
-            Keep in my history on this phone
-          </button>
-        )
-      )}
-      <button type="button" onClick={again} className="min-h-12 w-full text-[16px] font-bold text-white/80 underline">Read another video</button>
+    </>
+  );
+  return (
+    <div data-test-result={id} className="space-y-3">
+      {card ? (
+        <ResultCard view={card} onNext={canKeep ? keep : again} details={<div className="space-y-3">{detail}</div>} />
+      ) : <div className="space-y-3">{detail}</div>}
+      {run.kept ? <p data-test-kept className="text-center text-[16px] font-bold text-[#00FF9D]">Kept in your history on this phone.</p> : null}
+      {canKeep || !card ? <button type="button" onClick={again} className="min-h-12 w-full text-[16px] font-bold text-white/80 underline">{AGAIN_WORDS}</button> : null}
     </div>
   );
+}
+
+/** The arm-swing gain, in words (the test's own sentence), or null when there is nothing to compare. */
+function armsLine(arms: ReturnType<typeof sideBest>, hips: ReturnType<typeof sideBest>): string | null {
+  if (!arms || !hips) return null;
+  const g = armSwingGain(arms, hips);
+  return g.real
+    ? `Your arm swing ${g.cm >= 0 ? 'added' : 'took off'} ${pmIn(Math.abs(g.cm))} in (${Math.abs(g.pct)}%) against your hands-on-hips jump.`
+    : `Your arm swing and hands-on-hips jumps are within the noise of each other (±${pmIn(g.bandCm)} in).`;
 }
 
 function ArmsGain({ arms, hips }: { arms: ReturnType<typeof sideBest>; hips: ReturnType<typeof sideBest> }) {
   if (!arms) return null;
   if (!hips) return <p data-arms-missing className="text-[16px] text-white/70">Do the hands-on-hips jump too to see what your arm swing adds.</p>;
-  const g = armSwingGain(arms, hips);
-  return (
-    <p data-arms-gain className="text-[16px] text-white/85">
-      {g.real
-        ? `Your arm swing ${g.cm >= 0 ? 'added' : 'took off'} ${pmIn(Math.abs(g.cm))} in (${Math.abs(g.pct)}%) against your hands-on-hips jump.`
-        : `Your arm swing and hands-on-hips jumps are within the noise of each other (±${pmIn(g.bandCm)} in).`}
-    </p>
-  );
+  return <p data-arms-gain className="text-[16px] text-white/85">{armsLine(arms, hips)}</p>;
 }
 
 function Repeated({ read }: { read: Extract<ProtocolRead, { ok: true }> }) {
@@ -304,10 +324,10 @@ function Repeated({ read }: { read: Extract<ProtocolRead, { ok: true }> }) {
     <div data-rj className="space-y-2">
       {rj.best5RsiFlight !== null ? (
         <>
-          <p data-rj-best className="text-center text-[40px] font-black leading-none text-white">Bounce score {rj.best5RsiFlight.toFixed(2)}</p>
-          <p className="text-center text-[16px] text-white/70">
-            Best 5 of {rj.counted} quick rebounds{est}: {(rj.best5ContactMs! / 1000).toFixed(2)} s on the floor, {inch(rj.best5HeightCm!)} in high. The bounce score (RSI) is time in the air divided by time on the floor: higher is springier. Next: try to raise it with quicker contacts.
-          </p>
+          <p data-rj-best className="text-[16px] font-bold text-white">Bounce score {rj.best5RsiFlight.toFixed(2)}</p>
+          <p className="text-[16px] text-white/70">Best 5 of {rj.counted} quick rebounds{est}: {(rj.best5ContactMs! / 1000).toFixed(2)} s on the floor, {inch(rj.best5HeightCm!)} in high.</p>
+          <p className="text-[16px] text-white/70">{RJ_MEANS}</p>
+          <p className="text-[16px] text-white/70">{RJ_NEXT}</p>
         </>
       ) : <p data-rj-why className="text-[18px] font-bold text-[#FFB020]">{rj.why}</p>}
       <p className="text-[16px] text-white/70">{rj.jumps} of 10 jumps read.</p>
