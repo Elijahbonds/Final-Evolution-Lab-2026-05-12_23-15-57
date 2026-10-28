@@ -116,7 +116,9 @@ async function sheetJob(): Promise<void> {
   // DEMO-LOOPS: W/H size the stage (390 × 292: the phone's), BODY picks the body (male | female | scan)
   const page = await browser.newPage({ viewport: { width: Number(process.env.W ?? 420), height: Number(process.env.H ?? 315) }, deviceScaleFactor: 1 }); await page.addInitScript(NAME_SHIM);
   const errors: string[] = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 200)); });
-  await page.goto(`${url}/${process.env.BODY ? `?body=${process.env.BODY}` : ''}#stage:idle_stand`);
+  // DEMO-SPEED: QS adds to the query (tier=mobile: the phone tier, whose scan is the phone file; tier=desktop: the full scan)
+  const qs = [process.env.BODY ? `body=${process.env.BODY}` : '', process.env.QS ?? ''].filter(Boolean).join('&');
+  await page.goto(`${url}/${qs ? `?${qs}` : ''}#stage:idle_stand`);
   await stageReady(page);
   for (const clip of names) {
     const before = errors.length;
