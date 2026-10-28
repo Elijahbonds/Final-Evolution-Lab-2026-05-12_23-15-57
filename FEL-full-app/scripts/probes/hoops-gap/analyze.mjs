@@ -41,6 +41,11 @@ if (R.scen === 'game') {
   // log shapes (digits stripped) — the AI's choices are read from these
   const shapes = {}; for (const l of log) { const k = l.m.replace(/-?\d+(\.\d+)?/g, '#').slice(0, 70); shapes[k] = (shapes[k] || 0) + 1; }
   out.logShapes = Object.entries(shapes).sort((a, b) => b[1] - a[1]).slice(0, process.argv.includes('--shapes') ? 200 : 60);
+  // hoops-p03: the rival's actions per possession (the kit's / team offence's log lines), screens and passes per their possession
+  { const ACT = /\[(1V1|3V3)-AI\] rival action (\w+)/; const TH = P.filter((p) => p.side === 'theirs');
+    const per = TH.map((p, i) => { const a = A.possessions.filter((q) => q.sec >= 0.3)[P.indexOf(p)]; const f0 = (a?.f0 ?? 0) + fIn0, f1 = (a?.f1 ?? 0) + fIn0 + 10; return log.filter((l) => l.f >= f0 && l.f <= f1).map((l) => (l.m.match(ACT) || [])[2]).filter(Boolean); });
+    const all = per.flat(); const cnt = {}; for (const x of all) cnt[x] = (cnt[x] || 0) + 1; const n = all.length; let bits = 0; for (const v of Object.values(cnt)) { const q = v / n; bits -= q * Math.log2(q); }
+    out.rivalActions = { possessions: per.length, distinct: Object.keys(cnt).length, bits: +bits.toFixed(2), mix: cnt, screenOr2Pass: per.filter((a) => a.includes('screen') || a.filter((x) => x === 'swing_pass').length >= 2).length, perPoss: per.map((a) => a.join(' ')) }; }
   out.motion = A.perBody; out.ball = A.ball; out.camera = A.camera; out.overlap = A.overlap; out.bot = R.bot; out.errors = [...(R.pageErrors || []), ...(R.hgErrors || [])];
 } else {
   const T = R.tests;

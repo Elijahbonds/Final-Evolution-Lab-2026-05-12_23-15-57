@@ -44,6 +44,8 @@ import { CHEST_LEAN_DEG } from '@/lib/babylon/hoops/contactPoses';
 import * as P2B from '@/lib/babylon/hoops/blocks';   // hoops-p02
 import { AI_BLOCK_JUMP_CHANCE } from '@/lib/babylon/core/HoopsDefense';   // hoops-p02
 import * as P2C from '@/lib/babylon/hoops/contest';   // hoops-p02
+import * as P3R from '@/lib/babylon/hoops/rivalOffense';   // hoops-p03
+import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
@@ -198,6 +200,31 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.contestCloseout')).toBe(P2C.CLOSEOUT_CONTEST);
     expect(def('hoops.contestCloseoutFullMps')).toBe(P2C.CLOSEOUT_FULL_MPS);
     expect(def('hoops.stealDiceOn')).toBe(STEAL_DICE_ON ? 1 : 0);
+    // hoops-p03 (1v1/3v3 phase 3): the rival's kit and the 3v3 team offence — defaults pinned
+    expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
+    expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
+    expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);
+    expect(def('hoops.rivalHesiGoMps')).toBe(P3R.RIVAL_HESI_GO_MPS);
+    expect(def('hoops.rivalSpinSec')).toBe(P3R.RIVAL_SPIN_SEC);
+    expect(def('hoops.rivalPostMinM')).toBe(P3R.RIVAL_POST_MIN_M);
+    expect(def('hoops.rivalPostMaxM')).toBe(P3R.RIVAL_POST_MAX_M);
+    expect(def('hoops.rivalPostMps')).toBe(P3R.RIVAL_POST_MPS);
+    expect(def('hoops.rivalPostMaxSec')).toBe(P3R.RIVAL_POST_MAX_SEC);
+    expect(def('hoops.rivalPostHookM')).toBe(P3R.RIVAL_POST_HOOK_M);
+    expect(def('hoops.rivalFloaterMinM')).toBe(P3R.RIVAL_FLOATER_MIN_M);
+    expect(def('hoops.rivalFloaterMaxM')).toBe(P3R.RIVAL_FLOATER_MAX_M);
+    expect(def('hoops.rivalSagM')).toBe(P3R.RIVAL_SAG_M);
+    expect(def('hoops.rivalPullUpRangeM')).toBe(P3R.RIVAL_PULLUP_RANGE_M);
+    expect(def('hoops.rivalAdaptK')).toBe(P3R.RIVAL_ADAPT_K);
+    expect(def('hoops.rivalClosingMps')).toBe(P3R.RIVAL_CLOSING_MPS);
+    expect(def('hoops.teamOffenseOn')).toBe(P3T.TEAM_OFFENSE_ON ? 1 : 0);
+    expect(def('hoops.rivalTakeBackM')).toBe(P3T.RIVAL_TAKE_BACK_M);
+    expect(def('hoops.rivalHandlerMps')).toBe(P3T.RIVAL_HANDLER_MPS);
+    expect(def('hoops.rivalProbeSec')).toBe(P3T.RIVAL_PROBE_SEC);
+    expect(def('hoops.rivalScreenWaitSec')).toBe(P3T.RIVAL_SCREEN_WAIT_SEC);
+    expect(def('hoops.rivalBudgetSec')).toBe(P3T.RIVAL_BUDGET_SEC);
+    expect(def('hoops.rivalAttackPullUpSec')).toBe(P3T.RIVAL_ATTACK_PULLUP_SEC);
+    expect(def('hoops.rivalPullUpMaxM')).toBe(P3T.RIVAL_PULLUP_MAX_M);
     expect(def('hoops.stripReachM')).toBe(STRIP_REACH_M);
     expect(def('hoops.stripShieldM')).toBe(STRIP_SHIELD_M);
     expect(def('hoops.stripBallMaxY')).toBe(STRIP_BALL_MAX_Y);
