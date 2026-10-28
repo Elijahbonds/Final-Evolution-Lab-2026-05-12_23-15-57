@@ -361,9 +361,9 @@ these yet — every default is flagged in the lane report). Group "Hoops · riva
   crossover and the in-and-out), `hoops.rivalClosingMps` 1.6 m/s (closing this fast is a bite: the hesitation), `hoops.rivalSagM` 2.6 m and
   `hoops.rivalPullUpRangeM` 6.2 m (in his lane but this far off, inside this range: PRO and ELITE pull up), `hoops.rivalAdaptK` 1 (× the
   tier's adapt rate: how hard he leans on what worked against you); the moves — `hoops.rivalHesiSec` 0.3 s, `hoops.rivalHesiGoMps` 5.8 m/s,
-  `hoops.rivalSpinSec` 0.6 s; the post-up — `hoops.rivalPostMinM` / `hoops.rivalPostMaxM` 2.6 / 5.6 m (the rim distances he posts from),
+  `hoops.rivalSpinSec` 0.6 s; the post-up — `hoops.rivalPostMinM` / `hoops.rivalPostMaxM` 2.6 / 10 m (the rim distances he posts from: a back-down from the check is in it — the rig's scripted defender holds him at the top, 9.4–9.9 m),
   `hoops.rivalPostMps` 1.4 m/s (the back-down), `hoops.rivalPostMaxSec` 1.6 s (then the turnaround), `hoops.rivalPostHookM` 2.3 m (inside it,
-  a hook); the floater's corridor `hoops.rivalFloaterMinM` / `hoops.rivalFloaterMaxM` 2.0 / 4.2 m. No make chance reads a knob here: a
+  a hook); the floater's corridor `hoops.rivalFloaterMinM` / `hoops.rivalFloaterMaxM` 2.0 / 5.0 m. No make chance reads a knob here: a
   floater and a fade are `rivalShotPct` 'jumper' from where they leave the hand, a hook a 'layup'.
 - The 3v3 rival TEAM OFFENCE (`hoops/teamOffense3v3.ts`): `hoops.teamOffenseOn` 1 (0 = the release's one lerped drive exactly);
   `hoops.rivalTakeBackM` 6.9 m (a fresh possession is taken back beyond the arc first; 0 = from where he is), `hoops.rivalHandlerMps`

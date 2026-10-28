@@ -72,7 +72,7 @@ export const RIVAL_HESI_GO_MPS = 5.8;
 export const RIVAL_SPIN_SEC = 0.6;
 /** The post-up: the rim distance band it is taken in (m). Knobs `hoops.rivalPostMinM` / `hoops.rivalPostMaxM`. */
 export const RIVAL_POST_MIN_M = 2.6;
-export const RIVAL_POST_MAX_M = 5.6;
+export const RIVAL_POST_MAX_M = 10;
 /** …the back-down's pace (m/s; the defender's body holds it, or gives ground). Knob `hoops.rivalPostMps`. */
 export const RIVAL_POST_MPS = 1.4;
 /** …the longest he works it before the turnaround (s). Knob `hoops.rivalPostMaxSec`. */
@@ -82,7 +82,7 @@ export const RIVAL_POST_HOOK_M = 2.3;
 /** The floater's corridor: a contained finish this far from the rim is a floater, not a step-back (m). Knobs
  *  `hoops.rivalFloaterMinM` / `hoops.rivalFloaterMaxM`. */
 export const RIVAL_FLOATER_MIN_M = 2.0;
-export const RIVAL_FLOATER_MAX_M = 4.2;
+export const RIVAL_FLOATER_MAX_M = 5.0;
 /** The sag read: a defender in the lane but this far off (m), inside the rival's range, gets a pull-up (PRO and up). Knob
  *  `hoops.rivalSagM`; 0 = never. */
 export const RIVAL_SAG_M = 2.6;

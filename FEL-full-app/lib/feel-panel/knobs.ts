@@ -1097,7 +1097,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'He only posts up this far or further from the rim…',
   },
   {
-    id: 'hoops.rivalPostMaxM', label: '1v1 rival: post-up to (rim distance)', def: 5.6, min: 3, max: 8, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    id: 'hoops.rivalPostMaxM', label: '1v1 rival: post-up to (rim distance)', def: 10, min: 3, max: 12, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_MAX_M',
     hint: '…and this close or closer.',
   },
@@ -1122,7 +1122,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Held in front this far from the rim or further…',
   },
   {
-    id: 'hoops.rivalFloaterMaxM', label: '1v1 rival: floater corridor to', def: 4.2, min: 2.5, max: 6, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    id: 'hoops.rivalFloaterMaxM', label: '1v1 rival: floater corridor to', def: 5, min: 2.5, max: 6, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_FLOATER_MAX_M',
     hint: '…and this close or closer, the finish can be a floater (a jumper\'s odds from there).',
   },
