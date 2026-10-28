@@ -46,7 +46,7 @@ import { showCuts, cutsSec } from '../core/DunkCuts';
 import { DunkFlight, DUNK_TRICKS, cueOf, cueVerdict, cueFireAt, CUE_BEAT_LABEL, type DunkTrick } from '../core/DunkSystem';   // IMPROVE (2026-10-06) #8: air tricks
 import { trickInput } from '../core/DunkAssist';
 import type { AmbientHandle } from '../visual/EffectsKit';
-import { duelNext, duelNeed, needLine, nextMatchLength, styleTierFor, type DuelState } from './dunkDuelRules';   // IMPROVE (2026-10-06) #3 #4 #5 #9
+import { duelNext, duelNeed, needLine, nextMatchLength, styleTierFor, RunPull, type DuelState } from './dunkDuelRules';   // IMPROVE (2026-10-06) #3 #4 #5 #9
 import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrary';
 import { FirstPress, PRESS_GRACE } from '../core/timingPress';
 import { TakeoffEcho, type LaunchCause } from '../core/slamPress';   // HOTFIX (2026-09-24): the take-off's A is not the slam
@@ -185,6 +185,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
   const _vel = new Vector3(), _faceV = new Vector3(), _want = new Vector3(), _camPos = new Vector3(), _camAt = new Vector3();   // #18 #20
   let style: Style = 'power';
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
+  const runPull = new RunPull();   // gameplay-clean (routed from dunk-flagship P5): RUN's pull, the body's and a hand's folded (dunkDuelRules)
   // A SLAM PRESSED A BEAT EARLY USED TO VANISH. The gate was `if (A && pressed && qteWindowOpen)`, so a player who
   // read the rise correctly and pressed slightly before the window got nothing at all — no slam, no miss, no word.
   // The press waits now and is scored from WHEN IT WAS PRESSED (core/timingPress), so early lands and lands badly,
@@ -349,7 +350,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
     armedAir = null; airTricks = []; flight.reset(); beatCalled = false; meter3d?.end(null); judgeHold = -1;   // IMPROVE (2026-10-06) #7 #8
     benchAcc = BENCH_TICK_SEC;   // IMPROVE (2026-10-06) #16: the new bench body's feed is filled on its first frame
     style = 'power'; charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
-    dunkBody.reset(); bodySlamClip = null;
+    dunkBody.reset(); bodySlamClip = null; runPull.endBody();
     runUpPeak = 0; launchSpeed01 = 0; holdRunSpeed = 0; obstacleClipped = false; toppling = false; obstacleOver = false; obstacleCleared = false;
     settleLatch = false; settleArmed = false; fovRelease(); setTrail('soft');   // juice soft: back to the runway
     setProp(ctx, 'none');
@@ -408,6 +409,7 @@ export const DunkDuelMode: ModeDefinition = (() => {
 
   /** `cause`: the player's press launched it (RUN let go, A on the run) or the mode did (the line, the watchdog) — core/slamPress. */
   function launchDunk(ctx: ModeContext, cause: LaunchCause = 'auto'): void {
+    runPull.endBody();   // the body's run ends at the take-off: RUN in the air is the hand's again (as DunkMode, dunk-flagship P5)
     if (phase === 'cinematic') return;
     setPhase('cinematic');
     stampCourt(ctx.scene, plantMarks(active().root.position, active().root.rotation.y, launchSpeed01));   // vis-hoops-dunk: the plant foot's scuff (visual only)
@@ -972,7 +974,12 @@ export const DunkDuelMode: ModeDefinition = (() => {
         SoundKit.play('uiTick', { pitch: prop === 'none' ? 1.2 : 0.8 });
       }
       if (e.t === 'trigger' && e.side === 'R') {
-        if (phase === 'approach' && e.value > 0.02) {
+        // THE BODY'S RUN IS NOT LET GO BY AN IDLE PAD (routed from dunk-flagship P5, DunkMode's same fix). The body's RT reaches
+        // this handler from onBody, past the bus's arbiter, while a seated pad re-sends its own (folded) trigger every frame
+        // (InputBus.pollPads) — an idle pad's 0 one frame after the body's jog started the run read as "RUN let go": the
+        // take-off on the first step. RUN is the deeper of the hand's and the body's pull; pad-only it is the pad's exactly.
+        const rt = runPull.take(e);
+        if (phase === 'approach' && rt > 0.02) {
           // DUNK-CONTROL-JUICE: HOLD = RUN, the contest's own (the duel's charge phase used to stand still in the gather crouch and
           // launch on the release — its HUD promised the hold-run it never had)
           setPhase('charge');
@@ -984,9 +991,9 @@ export const DunkDuelMode: ModeDefinition = (() => {
           mic?.say({ moment: 'dunk.run', priority: 2, crowd: { moment: 'crowd.hype', n: 2 } });
         }
         if (phase === 'charge') {
-          charge = Math.max(charge, e.value);
+          charge = Math.max(charge, rt);
           ctx.setHud({ charge: Math.round(charge * 100) });
-          if (e.value === 0) launchDunk(ctx, 'press');
+          if (rt === 0) { console.info(`[DUEL-LAUNCH] RUN let go (${e.src ?? 'pad'}) — the take-off`); launchDunk(ctx, 'press'); }
         }
       }
       // HOTFIX (2026-09-24): A ON THE RUN IS THE TAKE-OFF, as in the contest (DunkMode: "tap JUMP at the line"). Every duel hint
