@@ -1654,6 +1654,7 @@ export const DunkMode: ModeDefinition = (() => {
         if (e.btn === 'A' && phase === 'charge') {
           if (!runwayBeat) launchDunk(ctx, 'press');
         } else if (rt && !runwayBeat) {
+          const glassCharging = phase === 'charge';   // dunk P4: which live line the armed off-glass throw shows
           // DUNK-SOFTS-NAMED: a runway trick that cannot happen says so (it used to be a silent nothing)
           if (isOop(prop)) refuse(ctx, `${rt.label} — THE PASSER HAS THE BALL`);
           else if (lob.thrown) refuse(ctx, `${rt.label} — THE BALL IS ALREADY UP · CATCH IT`);
@@ -1661,7 +1662,7 @@ export const DunkMode: ModeDefinition = (() => {
           // Phase 4: THE GLASS THROW IS ARMED, NOT THROWN. Standing it could not be caught (a mid-board hit is a ~0.8 s flight; the
           // run in from the runway's start is ~1.4 s before the catch beat even starts — LOST on every standing sweep run), and on the
           // run its moment is narrow. Asked for anywhere, it goes up on the run at the moment its throw meets the board (glassPropDue).
-          else if (rt.id === 'offglass' && !glassArmed) { glassArmed = true; flash(ctx, 'OFF THE GLASS — IT GOES UP ON THE RUN', 900); ctx.setHud({ hint: phase === 'charge' ? 'OFF THE GLASS — KEEP RUNNING' : 'OFF THE GLASS — HOLD RT TO RUN' }); console.info('[LOB] off-glass armed: it goes up on the run'); }
+          else if (rt.id === 'offglass' && !glassArmed) { glassArmed = true; flash(ctx, 'OFF THE GLASS — IT GOES UP ON THE RUN', 900); ctx.setHud({ hint: glassCharging ? 'OFF THE GLASS — KEEP RUNNING' : 'OFF THE GLASS — HOLD RT TO RUN' }); console.info('[LOB] off-glass armed: it goes up on the run'); }
           else if (rt.id !== 'offglass') startRunwayBeat(ctx, rt);
         }
       }
