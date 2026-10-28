@@ -1069,6 +1069,128 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/contactPoses.ts CHEST_LEAN_DEG',
     hint: 'How far the defender\'s chest leans into the handler at full contact.',
   },
+  // hoops-p03 (1v1/3v3 phase 3 "rivals that play basketball"): the 1v1 rival's kit and reads (hoops/rivalOffense), the 3v3 team offence
+  // (hoops/teamOffense3v3). Every default is this lane's; the owner has felt none of them.
+  {
+    id: 'hoops.rivalKitOn', label: '1v1 rival: move kit (0 = the old script)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_KIT_ON',
+    hint: '1: the rival picks moves by reading you (crossover, hesitation, in-and-out, behind, spin, post-up) and a finish by tier. 0: the release\'s script exactly (an A/B).',
+  },
+  {
+    id: 'hoops.rivalTightM', label: '1v1 rival: a defender inside this is tight', def: 1.25, min: 0.8, max: 2, step: 0.05, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_TIGHT_M',
+    hint: 'Tight invites the spin, the hesitation and the post-up; further off, the crossover and the in-and-out.',
+  },
+  {
+    id: 'hoops.rivalHesiSec', label: '1v1 rival: the hesitation\'s sell', def: 0.3, min: 0.1, max: 0.8, step: 0.02, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_HESI_SEC',
+    hint: 'How long he crawls before the go.',
+  },
+  {
+    id: 'hoops.rivalHesiGoMps', label: '1v1 rival: the hesitation\'s go', def: 5.8, min: 3, max: 7, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_HESI_GO_MPS',
+    hint: 'The burst after the sell (your top speed is 6.4: a man who stayed down keeps up).',
+  },
+  {
+    id: 'hoops.rivalSpinSec', label: '1v1 rival: the spin', def: 0.6, min: 0.3, max: 1.2, step: 0.05, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_SPIN_SEC',
+    hint: 'Into your shoulder, then the roll off it.',
+  },
+  {
+    id: 'hoops.rivalPostMinM', label: '1v1 rival: post-up from (rim distance)', def: 2.6, min: 1.5, max: 4, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_MIN_M',
+    hint: 'He only posts up this far or further from the rim…',
+  },
+  {
+    id: 'hoops.rivalPostMaxM', label: '1v1 rival: post-up to (rim distance)', def: 10, min: 3, max: 12, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_MAX_M',
+    hint: '…and this close or closer.',
+  },
+  {
+    id: 'hoops.rivalPostMps', label: '1v1 rival: the back-down\'s pace', def: 1.4, min: 0.5, max: 3, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_MPS',
+    hint: 'How hard he backs you down (your body holds him, or gives ground).',
+  },
+  {
+    id: 'hoops.rivalPostMaxSec', label: '1v1 rival: the longest post-up', def: 1.6, min: 0.5, max: 3, step: 0.1, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_MAX_SEC',
+    hint: 'Then the turnaround fade.',
+  },
+  {
+    id: 'hoops.rivalPostHookM', label: '1v1 rival: the hook from inside', def: 2.3, min: 1.2, max: 3.5, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_HOOK_M',
+    hint: 'Backed down this close, the post ends in a hook (a layup\'s odds).',
+  },
+  {
+    id: 'hoops.rivalFloaterMinM', label: '1v1 rival: floater corridor from', def: 2, min: 1, max: 4, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_FLOATER_MIN_M',
+    hint: 'Held in front this far from the rim or further…',
+  },
+  {
+    id: 'hoops.rivalFloaterMaxM', label: '1v1 rival: floater corridor to', def: 5, min: 2.5, max: 6, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_FLOATER_MAX_M',
+    hint: '…and this close or closer, the finish can be a floater (a jumper\'s odds from there).',
+  },
+  {
+    id: 'hoops.rivalSagM', label: '1v1 rival: the sag read', def: 2.6, min: 0, max: 4, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_SAG_M',
+    hint: 'You in his lane but this far off: PRO and ELITE take the pull-up. 0 = never.',
+  },
+  {
+    id: 'hoops.rivalPullUpRangeM', label: '1v1 rival: the sag pull-up\'s range', def: 6.2, min: 3, max: 9, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_PULLUP_RANGE_M',
+    hint: 'The sag read only from inside this of the rim.',
+  },
+  {
+    id: 'hoops.rivalAdaptK', label: '1v1 rival: memory', def: 1, min: 0, max: 2, step: 0.05, unit: '×', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_ADAPT_K',
+    hint: 'How hard he leans on what worked against you (× the tier\'s adapt rate: ROOKIE 0, PRO 0.35, ELITE 0.75). 0 = no memory.',
+  },
+  {
+    id: 'hoops.rivalClosingMps', label: '1v1 rival: you are biting at', def: 1.6, min: 0.5, max: 4, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_CLOSING_MPS',
+    hint: 'Closing on him this fast reads as a bite: the hesitation.',
+  },
+  {
+    id: 'hoops.teamOffenseOn', label: '3v3 rivals: team offence (0 = one drive)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts TEAM_OFFENSE_ON',
+    hint: '1: their ball is a team\'s offence on bodies (take it back, probe, screen, swing, attack). 0: the release\'s one scripted drive exactly (an A/B).',
+  },
+  {
+    id: 'hoops.rivalTakeBackM', label: '3v3 rivals: take it back beyond', def: 6.9, min: 0, max: 9, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_TAKE_BACK_M',
+    hint: 'A fresh possession starts this far from the rim (0 = start where he is).',
+  },
+  {
+    id: 'hoops.rivalHandlerMps', label: '3v3 rivals: the handler\'s pace off the drive', def: 3.4, min: 2, max: 5, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_HANDLER_MPS',
+    hint: 'Taking it back, probing, waiting on the screen.',
+  },
+  {
+    id: 'hoops.rivalProbeSec', label: '3v3 rivals: the probe at the top', def: 1.6, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_PROBE_SEC',
+    hint: 'Sizing his man up before the screen, the swing or the attack (× the tier, ±30 %).',
+  },
+  {
+    id: 'hoops.rivalScreenWaitSec', label: '3v3 rivals: waits on the screen up to', def: 2.4, min: 0.5, max: 5, step: 0.1, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_SCREEN_WAIT_SEC',
+    hint: 'Then he goes without it.',
+  },
+  {
+    id: 'hoops.rivalBudgetSec', label: '3v3 rivals: the possession budget', def: 10, min: 4, max: 20, step: 0.5, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_BUDGET_SEC',
+    hint: 'Past this the handler attacks now (× the tier: ROOKIE 0.9, ELITE 1.05).',
+  },
+  {
+    id: 'hoops.rivalAttackPullUpSec', label: '3v3 rivals: held in front, pull up after', def: 0.8, min: 0.3, max: 3, step: 0.05, unit: 's', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_ATTACK_PULLUP_SEC',
+    hint: 'A drive held in front this long becomes a pull-up (inside the arc).',
+  },
+  {
+    id: 'hoops.rivalPullUpMaxM', label: '3v3 rivals: pull-up range', def: 6, min: 3, max: 8, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_PULLUP_MAX_M',
+    hint: 'The off-the-dribble pull-up is taken only inside this (the release\'s jumper base has no range term).',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

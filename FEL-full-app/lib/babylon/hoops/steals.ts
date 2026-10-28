@@ -35,11 +35,15 @@ export interface DriveStripInput {
   bumpAge: number;
   /** Planar gap poker → driver (m). */
   dist: number;
+  /** hoops-p03: the driver's BRAIN says how exposed his ball is (the team offence's move windows, as the 1v1 AttackerBrain's exposure does):
+   *  it replaces the sway read off his lateral speed. Absent = the sway read, as before. */
+  brainExposure01?: number;
 }
 
 /** 0..1 — how exposed the driver's ball is to a poke right now (1v1's AttackerBrain read, on the 3v3 driver's real motion). */
-export function driveExposure(i: Pick<DriveStripInput, 'moveExposed01' | 'velX' | 'velZ' | 'toRimX' | 'toRimZ' | 'phase'>): number {
+export function driveExposure(i: Pick<DriveStripInput, 'moveExposed01' | 'velX' | 'velZ' | 'toRimX' | 'toRimZ' | 'phase' | 'brainExposure01'>): number {
   if (i.phase !== 'drive') return 0;   // the check and the gather: the ball is in the protected hand / the two-hand gather
+  if (i.brainExposure01 !== undefined) return Math.max(Math.max(0, Math.min(1, i.brainExposure01)), Math.max(0, Math.min(1, i.moveExposed01 || 0)));
   const L = Math.hypot(i.toRimX, i.toRimZ);
   const lateral = L > 1e-6 ? Math.abs(i.velX * i.toRimZ - i.velZ * i.toRimX) / L : Math.hypot(i.velX, i.velZ);
   const sway = Math.min(1, lateral / EXPOSURE_LATERAL_SPEED);

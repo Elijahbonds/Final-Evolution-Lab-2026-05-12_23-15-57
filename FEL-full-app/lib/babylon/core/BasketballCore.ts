@@ -1340,7 +1340,10 @@ export const LAYUP_STRIDE_SPEED = 2.4;        // a layup is gathered IN STRIDE �
 export const HAND_UP_SEC = 0.7;                // a jump this recent still puts a hand in the shot …
 export const HAND_UP_CONTEST = 0.3;            // … worth this much contest
 
-export type AttackPhase = 'check' | 'drive' | 'sidestep' | 'blowby' | 'stepback' | 'gather' | 'released';
+export type AttackPhase = 'check' | 'drive' | 'sidestep' | 'blowby' | 'stepback' | 'gather' | 'released'
+  | 'hesi' | 'spin' | 'post';   // hoops-p03: the move kit's (hoops/rivalOffense) — the release's script never enters them
+/** hoops-p03: how a rival shot looks (the odds are its style's: a floater / fade is a 'jumper', a hook a 'layup'). */
+export type RivalShotLook = 'floater' | 'hook' | 'fade' | null;
 export interface AttackDecision {
   /** Wish velocity (m/s, planar). */
   wish: Vector3;
@@ -1355,6 +1358,22 @@ export interface AttackDecision {
   crossover: 'left' | 'right' | null;
   /** The release frame: the shot to take now. HOOPS-MOVE-KIT-A D1: a beaten defender (the blow-by) gets DUNKED on. */
   shot: 'layup' | 'jumper' | 'dunk' | null;
+  /** hoops-p03 (the move kit only): the action started this frame (hoops/rivalOffense RIVAL_ACTIONS) — the mode's clip and log. */
+  action?: string | null;
+  /** hoops-p03: his back is to the rim (the post-up, the turnaround's gather). */
+  backToRim?: boolean;
+  /** hoops-p03: how the shot looks (a floater, a hook, a fade); null = the release's own. */
+  look?: RivalShotLook;
+  /** hoops-p03: the side of HIS body a kit move started this frame goes to (the ball's end side on a behind-the-back) — the clip's. */
+  moveSide?: 'left' | 'right' | null;
+}
+/** hoops-p03: the brain's decision, delegated (hoops/rivalOffense RivalKit). It owns its per-possession state and writes the brain's
+ *  public t / phase / containedSec, which the mode reads. */
+export interface AttackerDelegate {
+  decide(b: AttackerBrain, dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean }): AttackDecision;
+  reset(b: AttackerBrain): void;
+  blowBy(b: AttackerBrain): void;
+  noteStolen(): void;
 }
 
 export class AttackerBrain {
@@ -1378,17 +1397,24 @@ export class AttackerBrain {
    *  DUNK on him. A defender who was never there (an unguarded drive) is just a layup line, which is what the open-drive
    *  check expects. */
   private beaten = false;
+  /** hoops-p03: the MOVE KIT and its reads (hoops/rivalOffense RivalKit, by tier) — when set, the decision is the kit's; null = the
+   *  release's script below, exactly (knob `hoops.rivalKitOn` 0). */
+  kit: AttackerDelegate | null = null;
   constructor(private rng: () => number = Math.random) { this.reset(); }
+  /** hoops-p03: hand the brain a kit (or null: the script). Starts a fresh possession on it. */
+  useKit(kit: AttackerDelegate | null): void { this.kit = kit; this.reset(); }
   /** The defender picked a crossover: fewer crossovers, more shuffles, from now on. */
-  noteStolen(): void { this.caution = Math.min(CROSSOVER_CHANCE - CROSSOVER_FLOOR, this.caution + CAUTION_PER_STEAL); }
+  noteStolen(): void { this.caution = Math.min(CROSSOVER_CHANCE - CROSSOVER_FLOOR, this.caution + CAUTION_PER_STEAL); this.kit?.noteStolen(); }
   reset(): void {
     this.caution = Math.max(0, this.caution - CAUTION_DECAY);
     this.t = 0; this.phase = 'check'; this.containedSec = 0; this.side = this.rng() < 0.5 ? -1 : 1;
     this.sideSec = 0; this.blowbySec = 0; this.gatherSec = 0; this.stepbackSec = 0; this.pending = null; this.beaten = false; this.swayPhase = this.rng() * Math.PI * 2;
+    this.kit?.reset(this);
   }
   /** A whiffed reach / a jump at nothing opens the lane: the rival goes NOW. No effect once the shot is up. */
-  blowBy(): void { if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; this.beaten = this.containedSec > 0.15; }
+  blowBy(): void { if (this.kit) { this.kit.blowBy(this); return; } if (this.phase === 'gather' || this.phase === 'released' || this.phase === 'check' || this.phase === 'stepback') return; this.phase = 'blowby'; this.blowbySec = 0; this.beaten = this.containedSec > 0.15; }
   decide(dt: number, self: Vector3, defender: Vector3, hoop: Vector3, opts: { defenderAirborne: boolean } = { defenderAirborne: false }): AttackDecision {
+    if (this.kit) return this.kit.decide(this, dt, self, defender, hoop, opts);
     this.t += dt;
     const zero = new Vector3(0, 0, 0);
     if (this.phase === 'released') return { wish: zero, phase: 'released', contained: false, exposure: 0, step: false, crossover: null, shot: null };

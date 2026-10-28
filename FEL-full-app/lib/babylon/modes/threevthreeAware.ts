@@ -86,6 +86,21 @@ export class Aware3v3<B extends AwareBody> {
     const p = b.char.root.position, ball = this.v.ball();
     return br instanceof DefenderBrain ? br.decide(dt, p, ball, this.v.rim, this.v.allies(), this.v.foes()) : br.decide(dt, p, ball, this.v.rim, this.v.foes(), this.v.allies());
   }
+  /** hoops-p03 (1v1/3v3 phase 3): their team-mate SETS A SCREEN for their handler (hoops/teamOffense3v3) — his spacing brain takes the
+   *  'screen' job (TeammateBrain: to the handler's defender's shoulder, plant, roll or pop). False when he is not swapped (the swap is
+   *  off, or he is boxing / chasing): no screen. */
+  callScreen(b: B): boolean {
+    if (!this.swapped(b) || !this.v.bodies().foes.includes(b)) return false;
+    this.sync();
+    const br = this.off.get(b); if (!br) return false;
+    br.setJob('screen');
+    return true;
+  }
+  /** The screen a body of theirs is running (its state while the job is screen / roll / pop; 'done' after), or null: no screen called. */
+  screenOf(b: B): { phase: 'approach' | 'set' | 'roll' | 'pop' | 'done' } | null {
+    const br = this.off.get(b); if (!br) return null;
+    return br.job === 'screen' || br.job === 'roll' || br.job === 'pop' ? { phase: br.screen.phase } : { phase: 'done' };
+  }
   /** A swapped body's job (for the mode's jobOf), or null. */
   job(b: B): string | null { const br = this.swapped(b) ? (this.def.get(b) ?? this.off.get(b) ?? null) : null; return br ? br.job : null; }
   /** A swapped body's chest target (for the mode's objectiveFor), or null: my teammate his job's (his man / the ball), their spacer the ball. */
