@@ -270,7 +270,35 @@ async function profileJob(label: string): Promise<void> {
   } finally { await browser.close(); close(); }
 }
 
+/** FCP only, many samples, labels interleaved (A B A B …): a fresh context per sample, the page closed 1.5 s after FCP. */
+async function fcpJob(ls: string[], reps: number): Promise<void> {
+  const sites = await Promise.all(ls.map((l) => serve(join(OUT, `.build-${l}`))));
+  const browser = await chromium.launch({ executablePath: chromiumExe(), headless: true, args: GL_ARGS });
+  const out: Record<string, { fcp: number[]; preFcpLong: number[] }> = Object.fromEntries(ls.map((l) => [l, { fcp: [], preFcpLong: [] }]));
+  try {
+    // r = -1: one warm-up visit per label, not counted (the first load on an origin compiles every script cold)
+    for (let r = -1; r < reps; r++) for (let i = 0; i < ls.length; i++) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+      await ctx.addInitScript(NAME_SHIM); await ctx.addInitScript(RECORDER);
+      const page = await ctx.newPage();
+      const cdp = await ctx.newCDPSession(page);
+      await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      await page.goto(`${sites[i].url}/#own`, { waitUntil: 'commit' });
+      await page.waitForFunction(() => (window as unknown as { __M?: { fcp: number | null } }).__M?.fcp != null, undefined, { timeout: 60_000 });
+      await page.waitForTimeout(1500);
+      const m = await page.evaluate(() => (window as unknown as { __M: { fcp: number; long: [number, number][] } }).__M);
+      if (r >= 0) out[ls[i]].fcp.push(Math.round(m.fcp)); if (r >= 0) out[ls[i]].preFcpLong.push(m.long.filter((l) => l[0] < m.fcp).reduce((a, l) => a + l[1], 0));
+      await ctx.close();
+    }
+  } finally { await browser.close(); for (const s of sites) s.close(); }
+  const med = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  const res = Object.fromEntries(Object.entries(out).map(([k, v]) => [k, { ...v, fcpMedian: med(v.fcp), preFcpLongMedian: med(v.preFcpLong) }]));
+  writeFileSync(join(OUT, 'fcp.json'), JSON.stringify(res, null, 2));
+  console.log(JSON.stringify(res));
+}
+
 if (job === 'build') { for (const l of labels.length ? labels : ['now']) await bundle(l); }
+else if (job === 'fcp') { await fcpJob(labels, Number(process.env.REPS ?? 5)); }
 else if (job === 'profile') { for (const l of labels) await profileJob(l); }
 else if (job === 'run') { for (const l of labels.length ? labels : ['now']) await run(l); }
 else throw new Error(`unknown job ${job}`);

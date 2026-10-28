@@ -98,6 +98,24 @@ itself, with no button (`components/profile-v2/athlete-stage.tsx`):
 exists: `/api/v1/hero-body` and `/api/v1/closet` answer only for the session's own account. Showing another person's
 athlete needs a new public read (or a picture the owner chooses to publish), which is an owner call (section 5).
 
+**Measured** (lane/profile-character, 2026-10-28; `scripts/probes/_profile-character.mts`: the real page modules, a
+release build, 390 px at DPR 3, CPU throttled 4×, SwiftShader GL, on a shared 4-CPU box — the GPU-side and absolute times
+are pessimistic; compare rows, not devices):
+
+| | Before (8983dad7) | After | Change |
+|---|---|---|---|
+| First contentful paint, median of 7 (interleaved, warm-up dropped) | 768 ms | 740 ms | −4% (the 3D never touches first paint) |
+| Long tasks before FCP, median of 7 | 451 ms | 456 ms | +1% |
+| What the stage shows at first paint | the SVG stick figure | first visit: the athlete's silhouette; repeat: the kept picture of your athlete (up 0.4 s after FCP) | |
+| Your real athlete on screen | only after a tap on "See in 3D" | first visit: the live 3D, by itself; repeat: the picture at once, then the 3D | |
+| The 3D's load, warm (old: See in 3D tapped; new: repeat visit) | 14.0 s of long tasks, worst 7.8 s, taps up to 1.36 s | 9.3 s, worst 2.8 s, taps ≤ 0.4 s (input delay ≤ 24 ms) | −33% total, −65% worst |
+| JS heap once settled | 5.6 MB (no 3D) / 43 MB (3D tapped) | 39.5 MB (3D) | the 3D's cost, now paid by default |
+
+The single biggest cut: a scene no mode owns is unscoped, so the spawn built every authored clip of every sport and
+installed the hoops captures (11 of the old 14 s spawn task in a CPU profile). The stage now stands in the exercise
+library's lazy clip scope (`felModeId 'library'`, not a standard-frame mode, so height and build still show). On a phone
+it also carries the screen's tier (`felTier`), so the scan body loads as its phone file (`elijah-meshy.mobile.glb`).
+
 **Large screens.** At `lg` and up, the athlete and the PRQ grade sit in a left column beside the four tiles, and every
 section turns into two columns. The phone layout fits 390 px with no horizontal overflow.
 
