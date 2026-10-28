@@ -17,7 +17,7 @@
 //
 // No Babylon in this file or anything it imports (lib/assess/replay.test.ts walks the drill surfaces' imports).
 import { readHeroBodyEarly } from '@/lib/babylon/core/heroBodyRead';
-import { scanUrlForTier, urlForHeroBody, type HeroBodyKind } from '@/lib/babylon/core/heroBody';
+import { SCAN_BODY_MOBILE_URL, SCAN_BODY_URL, scanUrlForTier, urlForHeroBody, type HeroBodyKind } from '@/lib/babylon/core/heroBody';
 import { deviceTierDecision } from '@/lib/babylon/scene/tierRule';
 
 /** The body file a stage on this device spawns, for a body kind and a tier (the rule CharacterLibrary loads by). */
@@ -89,6 +89,10 @@ export function warmDemoBody(): Promise<void> {
   warming = w;
   return w.done;
 }
+
+/** The body file a tier-picked URL stands for (the scan's phone file → the scan): what CharacterLibrary.load is asked for,
+ *  since it applies the scene's tier itself. */
+export function unscaledBodyUrl(url: string): string { return url === SCAN_BODY_MOBILE_URL ? SCAN_BODY_URL : url; }
 
 /** The file the warm-up fetched (null until the server's answer is in, or with no warm-up). For the rig and the tests. */
 export function warmedBodyUrl(): string | null { return warming?.url ?? null; }

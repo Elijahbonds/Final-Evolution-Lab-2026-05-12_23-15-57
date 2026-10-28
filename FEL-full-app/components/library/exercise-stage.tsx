@@ -31,7 +31,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AnatomyHandle } from '@/lib/babylon/library/anatomyLook';
 import type { DemoProp } from '@/lib/library/demo';
-import { warmDemoBody } from '@/lib/library/demoWarm';
+import { unscaledBodyUrl, warmDemoBody, warmedBodyUrl } from '@/lib/library/demoWarm';
 
 export type StageView = 'demo' | 'muscles';
 export type StageSide = 'front' | 'back';
@@ -97,6 +97,8 @@ function parkHost(host: StageHost): void {
 async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promise<StageHost | null> {
   // the body's file starts downloading now, while Babylon's chunks do (demoWarm: the same file the spawn below asks for)
   const body = warmDemoBody();
+  let bodyIn = false;
+  void body.then(() => { bodyIn = true; });
   const [
     { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color3, Color4, MeshBuilder, StandardMaterial, Mesh },
     { CharacterLibrary }, { DEFAULT_HERO_URL }, { reducedMotion }, { atBindPose, bindPoseDeviationDeg }, { buildAuthoredClip },
@@ -133,6 +135,10 @@ async function buildStage(first: ExerciseStageProps, gone: () => boolean): Promi
   const tier = deviceTierDecision().tier;
   scene.metadata.felTier = tier;
   installPhoneTextureCap(engine, tier);
+  // the body's file is in already (a warm visit, or the early fetch beat Babylon): its container starts loading now, before
+  // the camera, lights and floor are built — the spawn below picks up the same load (CharacterLibrary's per-scene cache)
+  const bodyUrl = warmedBodyUrl();
+  if (bodyIn && bodyUrl) void CharacterLibrary.load(scene, unscaledBodyUrl(bodyUrl)).catch(() => undefined);
   scene.clearColor = new Color4(0, 0, 0, 0);
   scene.skipPointerMovePicking = true;
   const cam = new ArcRotateCamera('libraryCam', FRONT_ALPHA - 0.45, 1.36, 3.5, new Vector3(0, 0.92, 0), scene);
