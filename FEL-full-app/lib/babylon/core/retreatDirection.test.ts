@@ -10,8 +10,10 @@ import { DribbleController, type DribbleResult } from './BasketballCore';
 const DT = 1 / 60;
 /** The 1v1 rim on the floor: RIM = (0, RIM_HEIGHT_M, −0.6) (modes/OneVOneMode.ts:243), copied as a literal so this test needs no scene. */
 const RIM_X = 0, RIM_Z = -0.6;
-/** Start spots (TUNE): spawn (OneVOneMode.ts:285 MY_SPAWN), wing, corner, deep. */
-const SPOTS: Record<string, [number, number]> = { spawn: [0, 5], wing: [4, 3], corner: [-6, 0], deep: [1, 8] };
+/** Start spots (TUNE): spawn (OneVOneMode.ts:285 MY_SPAWN), wing, corner, deep. The wing sits 1.25× farther out along its own bearing
+ *  from the rim than its first cut ([4, 3]): main's jog (97d1dd96, BasketballCore.ts) carries the 60-frame run-up from there to
+ *  1.495 m off the rim, under R0's 1.5 m guard; at [5, 3.9] the same run-up, at the same angle, ends ~2.8 m out. */
+const SPOTS: Record<string, [number, number]> = { spawn: [0, 5], wing: [5, 3.9], corner: [-6, 0], deep: [1, 8] };
 const HOLD = 60;           // TUNE: frames the pull-back is held
 const SETTLE = 18;         // TUNE: frames for a moving handler to plant and turn back (measured flip: f12, 200 ms)
 const EPS_V = 1e-6;        // TUNE: m/s, a float tolerance, not a gameplay allowance
