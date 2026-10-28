@@ -8,6 +8,9 @@ import { Motif } from './card-visual';
 import type { Topic, TopicId } from '@/lib/knowledge/types';
 import { TYPE } from '@/lib/design/type';
 
+/** The movement pack, built from the owner's book (lib/knowledge/playbookPack.ts): Learn's own subject, so it leads. */
+const PLAYBOOK_TOPIC: TopicId = 'playbook';
+
 export function TopicPicker({
   topics, initial, onDone, title = 'What do you want to learn?', cta = 'Start learning', onCancel,
 }: {
@@ -20,42 +23,52 @@ export function TopicPicker({
 }) {
   const [picked, setPicked] = useState<TopicId[]>(initial.filter((t) => topics.some((x) => x.id === t)));
   const toggle = (id: TopicId) => setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const lead = topics.filter((t) => t.id === PLAYBOOK_TOPIC);
+  const rest = topics.filter((t) => t.id !== PLAYBOOK_TOPIC);
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col px-4 pb-10 pt-20 md:px-8" data-learn-picker>
       <h1 className={`${TYPE.display} text-white`}>{title}</h1>
       {/* PREMIUM-UI P7: was 20 words ("Pick a few — bite-sized cards from these, mixed with quick reviews …") */}
       <p className={`${TYPE.small} mt-3 text-fel-soft`}>Pick a few. Change them any time.</p>
-      <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 lg:gap-3.5">
-        {topics.map((t) => {
-          const on = picked.includes(t.id);
-          return (
-            <button
-              key={t.id}
-              type="button"
-              aria-pressed={on}
-              data-pad-focus
-              data-topic={t.id}
-              onClick={() => toggle(t.id)}
-              className="fel-press relative flex min-h-[7.5rem] flex-col items-start gap-1.5 rounded-[20px] border p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:min-h-[9rem]"
-              style={{
-                borderColor: on ? t.accent : 'rgba(255,255,255,0.1)',
-                background: on ? `linear-gradient(140deg, ${t.accent}26, rgba(255,255,255,0.02))` : 'var(--fel-elev-1)',
-                boxShadow: 'var(--fel-highlight)',
-              }}
-            >
-              <Motif motif={t.motif} accent={t.accent} size={36} />
-              <span className={`${TYPE.body} font-semibold leading-tight text-white`}>{t.label}</span>
-              <span className={`${TYPE.small} line-clamp-2 text-fel-dim`}>{t.blurb}</span>
-              {on && (
-                <span className="absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full text-black" style={{ background: t.accent }}>
-                  <Check className="h-4 w-4" />
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      {/* PLAT-P04 (2026-10-27): the Playbook pack first, on its own row; the general packs under "More topics".
+          assumption: the twelve general packs stay on offer, one step down — the brief puts the Playbook first and keeps the
+          feed, and dropping a pack is the owner's call, not this lane's. */}
+      {[{ key: 'first', list: lead }, { key: 'more', list: rest }].map(({ key, list }) => list.length > 0 && (
+        <section key={key} data-topic-group={key} className="mt-6">
+          {key === 'more' && lead.length > 0 && <h2 className={`${TYPE.label} mb-2.5 text-fel-dim`}>More topics</h2>}
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4 lg:gap-3.5">
+            {list.map((t) => {
+              const on = picked.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={on}
+                  data-pad-focus
+                  data-topic={t.id}
+                  onClick={() => toggle(t.id)}
+                  className="fel-press relative flex min-h-[7.5rem] flex-col items-start gap-1.5 rounded-[20px] border p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 md:min-h-[9rem]"
+                  style={{
+                    borderColor: on ? t.accent : 'rgba(255,255,255,0.1)',
+                    background: on ? `linear-gradient(140deg, ${t.accent}26, rgba(255,255,255,0.02))` : 'var(--fel-elev-1)',
+                    boxShadow: 'var(--fel-highlight)',
+                  }}
+                >
+                  <Motif motif={t.motif} accent={t.accent} size={36} />
+                  <span className={`${TYPE.body} font-semibold leading-tight text-white`}>{t.label}</span>
+                  <span className={`${TYPE.small} line-clamp-2 text-fel-dim`}>{t.blurb}</span>
+                  {on && (
+                    <span className="absolute right-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full text-black" style={{ background: t.accent }}>
+                      <Check className="h-4 w-4" />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
       <div className="sticky bottom-0 mt-6 flex gap-3 bg-gradient-to-t from-[#050505] via-[#050505] to-transparent pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
         {onCancel && (
           <button type="button" data-pad-focus onClick={onCancel}
