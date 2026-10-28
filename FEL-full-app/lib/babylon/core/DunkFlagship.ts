@@ -165,3 +165,24 @@ export const OOP_BOUNCE_FLIGHT_SEC = 1.1;
 export const LOB_FRAME_LIFT = 1.0;
 /** (new) …eased in and out over this time constant (s): no step when the lob leaves the hand or is caught. */
 export const LOB_FRAME_TAU = 0.2;
+
+// ── Phase 5: YOUR REAL JUMP DRIVES THE FLIGHT ──────────────────────────────────────────────────────────────────────────────
+// The body path (lib/move/dunkBody) writes the take-off's power as the jump's predicted rise over a FIXED full rise (0.70 m:
+// DUNK_FULL_RISE_M, unchanged). Personalised (feel knob, OFF by default; lib/feel-panel refuses knobs in ranked, staked and
+// paid play), the full rise is the athlete's own VERIFIED best countermovement jump — a jump as big as your best is a full
+// take-off. Only a verified adult jump personalises it (lib/dunk/verifiedJump.ts, GET /api/dunk/verified-jump); anything else
+// keeps the fixed mapping.
+/** (new knob, default OFF) 1 = the body path's full rise is your verified best jump; 0 = the fixed 0.70 m. */
+export const REAL_JUMP_PERSONAL = 0;
+/** A verified jump outside this range (m) is clamped into it: a full take-off never asks for less than a hop or more than a pro. */
+export const REAL_JUMP_REF_MIN_M = 0.25, REAL_JUMP_REF_MAX_M = 0.95;
+/** The personal full rise (m) from a verified best jump (cm), or null when there is none. */
+export function personalFullRiseM(verifiedCm: number | null | undefined): number | null {
+  if (typeof verifiedCm !== 'number' || !Number.isFinite(verifiedCm) || verifiedCm <= 0) return null;
+  return Math.min(REAL_JUMP_REF_MAX_M, Math.max(REAL_JUMP_REF_MIN_M, verifiedCm / 100));
+}
+/** The take-off's power (0–1) for a predicted rise against a full rise: monotonic in the rise, 1 at the full rise and over. */
+export function riseToPower(riseM: number, fullRiseM: number): number {
+  if (!Number.isFinite(riseM) || !(fullRiseM > 0)) return 0;
+  return Math.max(0, Math.min(1, riseM / fullRiseM));
+}
