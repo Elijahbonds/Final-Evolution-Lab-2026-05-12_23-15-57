@@ -101,7 +101,7 @@ class Driver {
     try {
       await loc.scrollIntoViewIfNeeded({ timeout: 3000 });
       await loc.click({ timeout: 5000 });
-    } catch (e) { this.c.steps.push(`✗ ${what}: ${String(e).split('\n')[0].slice(0, 90)}`); return false; }
+    } catch (e) { const t = String(e); this.c.steps.push(`✗ ${what}: ${t.split('\n')[0].slice(0, 90)}${/intercepts pointer events/.test(t) ? ` — ${(t.match(/<[^\n]*intercepts pointer events/) ?? [''])[0].slice(0, 160)}` : ''}`); return false; }
     this.c.taps++; this.c.steps.push(`${what}${off ? ' (was off screen: needed a sideways scroll)' : ''}`);
     return true;
   }
@@ -323,7 +323,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
       const popup = page.waitForEvent('popup', { timeout: 4000 }).catch(() => null);
       if (!(await d.tap(btn('play-test|play test|^play'), 'Play-test'))) { deadEnd = 'no Play-test button on screen'; break; }
       const pop = await popup;
-      if (pop) { notes.push(`opens a new tab: ${new URL(pop.url()).pathname}${new URL(pop.url()).search.slice(0, 40)}…  (development builds only: production says “Play-test runs in a development build only”)`); await pop.close(); done = true; }
+      if (pop) { await pop.waitForLoadState('domcontentloaded').catch(() => {}); notes.push(`opens a new tab: ${new URL(pop.url()).pathname} (this rig is a development build; production: ${await page.evaluate(`(document.body.innerText.match(/test build[^\\n]*/) || [''])[0]`) || 'the game’s own page with ?share=, practice'})`); await pop.close(); done = true; }
       else { const msg = await page.locator('[role=status]').first().textContent().catch(() => ''); deadEnd = `no tab opened: ${msg}`; }
       break;
     }
@@ -338,7 +338,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
     }
     case 'reopen': {
       await d.tap('[data-testid=asset-list] button:has-text("Floodlight")', 'Floodlight (an edit)');
-      await page.waitForTimeout(2200);
+      await page.waitForFunction(`${objects} >= 1`, null, { timeout: 6000 }).catch(() => {});
       const n = await page.evaluate(objects);
       await open(page, false);   // the same device, a later visit (no ?fresh: storage kept)
       d.c.steps.push('reload (the creator comes back)');
@@ -365,7 +365,7 @@ async function runTask(browser: Browser, width: Width, task: Task): Promise<Task
         const refused = await page.locator('[data-testid=publish-refused] li').allTextContents().catch(() => []);
         notes.push(f ? `Publish passed and downloaded ${f.suggestedFilename()} (to commit; the merge publishes it)` : `Publish refused: ${refused.slice(0, 2).join(' | ')}`);
         const share = page.locator('[data-testid=share-make]').filter({ visible: true });
-        if (await share.count()) { await share.click(); await page.waitForTimeout(800); notes.push(`Make a share link: ${(await page.locator('[data-testid=share-refused], [data-testid=share-made]').first().textContent().catch(() => '')) ?? ''}`.slice(0, 160)); }
+        if (await share.count()) { await share.click({ timeout: 5000 }).catch(() => {}); await page.waitForTimeout(800); notes.push(`Make a share link: ${(await page.locator('[data-testid=share-refused], [data-testid=share-made]').first().textContent().catch(() => '')) ?? ''}`.slice(0, 160)); }
         done = !!f;
         if (!done) deadEnd = 'Publish did not finish on the rig';
       }

@@ -9,7 +9,7 @@
 // Ctrl/⌘+A select all · H hide / show · L lock / unlock · arrows nudge a grid step · Esc deselect / stop a preview.
 // §11: every one of these takes the whole selection, as one undo step.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MousePointer2, Move3d, Rotate3d, Scale3d, Orbit, Hand, Plane, Grid3x3, Magnet, Focus, ClipboardPaste } from 'lucide-react';
 import { catalogItem, type CatalogItem } from '@/lib/nexus-studio/catalog';
 import { moveObject, placeItem, addVenue, switchVenue } from '@/lib/nexus-studio/edits';
@@ -46,7 +46,7 @@ export function typingTarget(t: EventTarget | null): boolean {
 /** STUDIO-EASY: what the shell's first-court guide asks of the editor (play the intro in the viewport). */
 export interface VenueEditorHandle { previewIntro(kind: 'establish' | 'walkIn'): boolean }
 
-export function VenueEditor({ studio, onHandle }: { studio: StudioApi; onHandle?(h: VenueEditorHandle | null): void }) {
+export function VenueEditor({ studio, onHandle, overlay }: { studio: StudioApi; onHandle?(h: VenueEditorHandle | null): void; overlay?: ReactNode }) {
   const { venue, doc, selected, setSelected, selection, setSelection, clip, setClip, run, seal } = studio;
   const vp = useRef<ViewportHandle | null>(null);
   useEffect(() => {
@@ -229,7 +229,7 @@ export function VenueEditor({ studio, onHandle }: { studio: StudioApi; onHandle?
           onDeselect={() => { vp.current?.stopPreview(); setSelected(null); }}
           onDelete={() => del()} onDuplicate={() => dup()} onCopy={copy}
           onHide={() => flag('hidden')} onLock={() => flag('locked')} onNudge={nudge} onTurn={turn} />
-        <ViewportPanel ref={vp} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
+        <ViewportPanel ref={vp} overlay={overlay} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
           onPick={(id, mods) => setSelection(clickSelect(selection, id, mods.toggle || (multi && id !== null) ? 'toggle' : 'replace'))}
           onBox={(ids, mode) => setSelection(boxSelect(selection, ids, mode))}
           onTransform={onTransform} onGroupTransform={onGroupTransform} onStats={onStats} onPreviewEnd={() => setNote(null)}

@@ -40,6 +40,8 @@ export const TRACKS: ReadonlyArray<{ id: Track; label: string; phase: string }> 
 ];
 const TRACK_ICON: Record<Track, typeof Box> = { venue: Box, ai: Sparkles, characters: UserRound, scripts: Workflow };
 
+/** STUDIO-EASY: the short save state for a 1280 header (one row); the whole line from 2xl, and always in the tooltip. */
+const SHORT_SAVE: Record<SaveState, string> = { saved: 'Saved', unsaved: 'Unsaved', saving: 'Saving…', 'no-storage': 'Not kept: export', error: 'Not saved' };
 const SAVE_LABEL: Record<SaveState, string> = { saved: 'Saved on this device', unsaved: 'Unsaved changes', saving: 'Saving…', 'no-storage': 'Not kept on this device — export to keep', error: 'Not saved' };
 
 export function NexusStudioApp() {
@@ -149,7 +151,7 @@ export function NexusStudioApp() {
   const SaveIcon = studio.saveState === 'saved' ? Check : studio.saveState === 'no-storage' ? CloudOff : studio.saveState === 'error' ? AlertTriangle : Save;
 
   return (
-    <div className="flex h-[100dvh] min-h-0 flex-col" style={{ background: C.bg, color: C.text }} data-testid="nexus-studio">
+    <div className="flex h-[100dvh] min-h-0 flex-col" style={{ background: C.bg, color: C.text }} data-testid="nexus-studio" data-own-input>
       {track === 'venue' && <SkipLinks />}
       <header className="flex flex-wrap items-center gap-2 border-b px-3 py-1.5" style={{ borderColor: C.line, background: C.surface }}>
         {/* STUDIO-EASY: the Studio fills the screen (no app bar above it), so it carries its own way back */}
@@ -174,12 +176,12 @@ export function NexusStudioApp() {
           <ToolButton title="Help and keys" shortcut="?" onClick={() => setHelp(true)}><CircleHelp className="h-4 w-4" /><span className="hidden xl:inline">Help</span></ToolButton>
           <ToolButton title={studio.undoLabel ? `Undo ${studio.undoLabel}` : 'Undo'} shortcut="Ctrl+Z" disabled={!studio.canUndo} onClick={studio.undo}><Undo2 className="h-4 w-4" /></ToolButton>
           <ToolButton title={studio.redoLabel ? `Redo ${studio.redoLabel}` : 'Redo'} shortcut="Ctrl+Shift+Z" disabled={!studio.canRedo} onClick={studio.redo}><Redo2 className="h-4 w-4" /></ToolButton>
-          <span className="mx-1 flex items-center gap-1 text-[12px]" style={{ color: studio.saveState === 'saved' ? C.dim : studio.saveState === 'error' || studio.saveState === 'no-storage' ? C.ember : C.gold }} title={studio.saveError ?? undefined} data-testid="save-state">
-            <SaveIcon className="h-3.5 w-3.5" aria-hidden /> {SAVE_LABEL[studio.saveState]}
+          <span className="mx-1 flex items-center gap-1 text-[12px]" style={{ color: studio.saveState === 'saved' ? C.dim : studio.saveState === 'error' || studio.saveState === 'no-storage' ? C.ember : C.gold }} title={studio.saveError ?? SAVE_LABEL[studio.saveState]} data-testid="save-state">
+            <SaveIcon className="h-3.5 w-3.5" aria-hidden /> <span className="2xl:hidden">{SHORT_SAVE[studio.saveState]}</span><span className="hidden 2xl:inline">{SAVE_LABEL[studio.saveState]}</span>
           </span>
           <ToolButton title="Save now" shortcut="Ctrl+S" onClick={() => studio.save()}><Save className="h-4 w-4" /></ToolButton>
           <ToolButton title="Export the project (.nexus.json)" onClick={doExport}><Download className="h-4 w-4" /><span className="hidden xl:inline">Export</span></ToolButton>
-          <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /><span className="hidden xl:inline">Import</span></ToolButton>
+          <ToolButton title="Import a project" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /></ToolButton>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void doImport(f); e.target.value = ''; }} />
           {track !== 'ai' && (
             <button type="button" onClick={playtest} className="ml-1 flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-semibold" style={{ background: C.cyan, color: '#050505' }} title="Play your court in the game (practice: not ranked, earns nothing)">
@@ -194,14 +196,13 @@ export function NexusStudioApp() {
           <button type="button" onClick={() => setMessage(null)} className="text-[12px]" style={{ color: C.dim }}>Dismiss</button>
         </div>
       )}
-      {track === 'venue' && <VenueEditor studio={studio} onHandle={onHandle} />}
-      {track === 'venue' && guide && venue && (
-        // over the viewport: above the budget strip on a desktop (right of the 260 px left panel), a bottom card on a phone
-        <div className="pointer-events-none fixed inset-x-2 bottom-2 z-30 md:inset-x-auto md:bottom-12 md:left-[276px]">
+      {track === 'venue' && (
+        <VenueEditor studio={studio} onHandle={onHandle} overlay={guide && venue ? (
+          // over the 3D view's top-left corner: it never covers a panel, the toolbar or the budget strip
           <FirstCourt venue={venue} run={studio.run} onPlaced={(ids) => studio.setSelection(ids)}
             onWatch={() => editor.current?.previewIntro('walkIn') ?? false}
             onFinish={() => endGuide('done')} onSkip={() => endGuide('skipped')} onPlay={playtest} />
-        </div>
+        ) : undefined} />
       )}
       {help && <HelpSheet onClose={() => setHelp(false)} onGuide={startGuide} />}
       {projects && (
