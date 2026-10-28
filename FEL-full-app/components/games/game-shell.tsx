@@ -18,6 +18,7 @@ import { VirtualController } from './virtual-controller';
 import { ReplayInPlaceContext } from './replay-in-place';
 import { BodyControl } from './body-control';
 import { GraphicsToggle } from './graphics-toggle';
+import { PauseButton } from './pause-button';   // gameplay-clean: a pause a thumb can reach (ESC → START, every harness mode)
 import { GameCaptureHud } from '@/components/capture/game-capture-hud';
 import { LearnWhileYouWait } from '@/components/learn/learn-while-you-wait';
 import type { SessionTallies } from '@/lib/game-systems';
@@ -715,6 +716,7 @@ function GameShellInner({
               a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,
               so no mode file knows this exists. */}
           <div className="ml-auto flex items-center gap-3">
+            <PauseButton />
             <BodyControl />
           </div>
           {profile && (
@@ -754,6 +756,7 @@ function GameShellInner({
             while full-bleed — with the header up they would be a second copy of it. */}
         {fullBleed && !streamOn && (
           <div data-game-chrome data-fel-corner className="pointer-events-none absolute right-2 top-2 z-30 flex items-center gap-1.5">
+            <PauseButton />
             <Link
               href="/play"
               aria-label="Leave the game"

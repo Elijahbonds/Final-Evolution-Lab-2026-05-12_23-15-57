@@ -51,7 +51,9 @@ describe('the game header on a phone', () => {
     expect(at('<BodyControl />')).toBeLessThan(at('{profile.display.badge}'));
     expect(at('{profile.display.badge}')).toBeLessThan(at('<GraphicsToggle />'));
     expect(at('<GraphicsToggle />')).toBeLessThan(at('onClick={onFullscreen}'));
-    expect(header).toMatch(/<div className="ml-auto flex items-center gap-3">\s*<BodyControl \/>\s*<\/div>/);
+    // test changed (gameplay-clean, 2026-10-28): the pause (❚❚, 36 px, only while a game plays) joins BODY in the pushed-right
+    // group, before it. Row one on a 393 px phone: Home 75 + title 108 + pause 36 + BODY 76 + three 12 px gaps = 331 of 361.
+    expect(header).toMatch(/<div className="ml-auto flex items-center gap-3">\s*<PauseButton \/>\s*<BodyControl \/>\s*<\/div>/);
   });
 
   it('keeps the PRQ badge on one line, and only BODY pushes the controls right', () => {

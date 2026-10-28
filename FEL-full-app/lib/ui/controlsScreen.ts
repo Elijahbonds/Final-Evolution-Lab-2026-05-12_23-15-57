@@ -106,7 +106,8 @@ export function controlRows(modeId: string, device: ControlsDevice): ControlRow[
     if (device === 'pad') rows.push({ input: 'R-STICK', action: cfg.rStick });
     else if (device === 'touch') rows.push({ input: 'RIGHT PAD', action: cfg.rStick });
   }
-  if (device !== 'touch') rows.push({ input: device === 'pad' ? 'START' : 'ESC', action: 'PAUSE' });
+  // gameplay-clean (2026-10-28): touch has a pause now too — the ❚❚ beside the way out (components/games/pause-button.tsx)
+  rows.push({ input: device === 'pad' ? 'START' : device === 'keys' ? 'ESC' : '❚❚', action: 'PAUSE' });
   return rows;
 }
 

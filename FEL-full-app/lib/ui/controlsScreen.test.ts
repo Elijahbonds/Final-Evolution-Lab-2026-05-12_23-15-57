@@ -75,7 +75,8 @@ describe('controlRows — the list for the device in use', () => {
     expect(row(controlRows('dunk', 'keys'), 'LOOK')).toBeUndefined();   // no right stick on a keyboard
     expect(row(controlRows('dunk', 'pad'), 'PAUSE')).toBe('START');
     expect(row(controlRows('dunk', 'keys'), 'PAUSE')).toBe('ESC');
-    expect(row(controlRows('dunk', 'touch'), 'PAUSE')).toBeUndefined();
+    // test changed (gameplay-clean, 2026-10-28): touch had no pause to name; the shell's ❚❚ button is it now
+    expect(row(controlRows('dunk', 'touch'), 'PAUSE')).toBe('❚❚');
     expect(controlRows('who_scene_it', 'pad').some((r) => r.action === 'MOVE')).toBe(false);   // a quiz has no stick
   });
 

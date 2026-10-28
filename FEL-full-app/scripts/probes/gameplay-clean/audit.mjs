@@ -1,6 +1,6 @@
 // gameplay-clean audit driver (lane/gameplay-clean, 2026-10-28). Owner: "Gameplay needs to be really clean. All tools need
 // to be accessible, easy to use." One headless run per mode of the REAL /play page (./entry.tsx, built by ./build.mjs and
-// served statically), on a sideways phone (844x390, DPR 2, touch), with scripted keyboard play for PLAY_S seconds of game
+// served statically), on a sideways phone (844x390, touch; DPR 1 so a drawn photograph is affordable on software GL), with scripted keyboard play for PLAY_S seconds of game
 // time, recording what the player would see:
 //
 //   motion   animation pops (a bone's angular speed ≥ 600°/s and ≥ 3.5× its neighbourhood — the motion probe's rule), root
@@ -42,6 +42,7 @@ const RM = process.env.RM === '1';
 const TAG = process.env.TAG ?? (RM ? 'rm' : 'base');
 const QS = process.env.QS ?? '';
 const BOOT_S = Number(process.env.BOOT_S ?? 170);
+const MODE_WALL_S = Number(process.env.MODE_WALL_S ?? 300);   // the play loop's wall budget: past it, what was recorded is analysed (partial)
 fs.mkdirSync(OUT, { recursive: true });
 
 // ── the page's clock, input and recorder (installed before any module runs) ───────────────────────────────────────────
@@ -349,6 +350,8 @@ function analyze(mode, rec, S) {
   const ms = play.map((f) => f.ms).filter((x) => x > 0);
   const win = play.filter((f) => f.thr); const wms = win.map((f) => f.ms).filter((x) => x > 0);
   const dr = play.map((f) => f.d);
+  out.cpuMsMax = r2(ms.length ? Math.max(...ms) : null);
+  { const st = play.slice(0, 180).map((f) => f.ms).filter((x) => x > 0); out.startMaxMs = r2(st.length ? Math.max(...st) : null); }   // the first 3 s of play: a spawn or a load at START is a hitch the player feels
   out.cpuMsP50 = r2(pct(ms, 0.5)); out.cpuMsP95 = r2(pct(ms, 0.95));
   out.phoneCpuMsP50 = r2(pct(wms, 0.5)); out.phoneCpuMsP95 = r2(pct(wms, 0.95)); out.phoneFrames = wms.length;
   out.drawsMean = r2(dr.reduce((s, x) => s + x, 0) / Math.max(1, dr.length)); out.drawsP95 = pct(dr, 0.95); out.drawsMax = dr.length ? Math.max(...dr) : null; out.drawBudget = 600;
@@ -399,7 +402,7 @@ const b = await chromium.launch({ executablePath: process.env.CHROMIUM_EXE ?? '/
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 for (const mode of MODES) {
   const tWall0 = Date.now(); const row = { mode, tag: TAG, at: new Date().toISOString() };
-  const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: RM ? 'reduce' : 'no-preference' });
+  const ctx = await b.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: Number(process.env.DPR ?? 1), isMobile: true, hasTouch: true, reducedMotion: RM ? 'reduce' : 'no-preference' });
   await ctx.addInitScript({ content: INIT });
   const p = await ctx.newPage();
   const errs = []; const warnsN = { n: 0 };
@@ -411,9 +414,10 @@ for (const mode of MODES) {
   const shot = async (name) => {
     if (!SHOTS) return null;
     await ev(() => { window.__freeze = true; window.__drawOn = true; window.__drawnFrames = 0; });
-    const t0 = Date.now(); while (Date.now() - t0 < 20000) { if ((await ev(() => window.__drawnFrames)) >= 2) break; await sleep(150); }
+    const t0 = Date.now(); while (Date.now() - t0 < 60000) { if ((await ev(() => window.__drawnFrames)) >= 2) break; await sleep(150); }
     const f = path.join(OUT, `${mode}-${TAG}-${name}.jpg`);
-    await p.screenshot({ path: f, type: 'jpeg', quality: 62, scale: 'css' });
+    try { await p.screenshot({ path: f, type: 'jpeg', quality: 62, scale: 'css', timeout: 90000 }); }
+    catch (e) { (row.shotErr = row.shotErr || []).push(`${name}: ${String(e.message).split('\n')[0].slice(0, 80)}`); return null; }
     return f;
   };
   const unshot = () => ev((fast) => { window.__drawOn = !fast; window.__freeze = false; }, FAST);
@@ -467,7 +471,9 @@ for (const mode of MODES) {
       }
       if (!thr && s.t >= PLAY_S - PERF_S) { thr = true; await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 }); await ev(() => { window.__thr = true; }); }
       if (s.done || crashed) break;
-      if (Date.now() - tPlay > 14 * 60 * 1000) { row.timeout = true; break; }
+      if (Date.now() - tPlay > MODE_WALL_S * 1000) { row.partial = `wall budget: game ${r2(s.t)} s, phase ${s.ph}`; break; }
+      if (first === null && Date.now() - tPlay > 90000) { row.noPlay = `no playing phase 90 s after TAP TO START (phase ${s.ph})`; break; }
+      if (process.env.PROGRESS && (globalThis.__pg = (globalThis.__pg || 0) + 1) % 40 === 0) console.error(`[${mode}] wall ${((Date.now() - tPlay) / 1000).toFixed(0)}s game ${r2(s.g)} script ${r2(s.t)} phase ${s.ph} frames ${s.n}`);
       if (s.ph === 'ended' && s.t > 3) { row.endedAt = s.t; }
       await sleep(250);
     }
