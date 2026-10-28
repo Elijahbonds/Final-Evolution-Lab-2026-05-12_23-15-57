@@ -128,7 +128,7 @@ export async function sim3v3(tier: string, o: Opts) {
       } else if (touch) {
         // ── the handler ──
         touch.t += DT;
-        let gatherNow = false, k = 0.05, phase: 'drive' | 'gather' | 'check' = 'drive', moveExp = 0;
+        let gatherNow = false, k = 0.05, phase: 'drive' | 'gather' | 'check' = 'drive', brainExp: number | undefined;
         if (touch.kind === 'cs') { phase = touch.t >= 0.15 ? 'gather' : 'check'; if (touch.t >= TELL + 0.15) { release('jumper', true); break; } }
         else if (touch.kind === 'plan') {
           const view = { handler: H, handlerVel: foeMv[hi].vel, mates: [0, 1, 2].filter((i) => i !== hi).map((i) => foes[i]), defenders: mine, rim: RIM_FLOOR,
@@ -142,13 +142,13 @@ export async function sim3v3(tier: string, o: Opts) {
             flight = { from: H.clone(), to: foes[ti].clone(), ti, t: 0, T: d2(H, foes[ti]) / PASS_MPS }; continue;
           }
           const st = foeMv[hi].track(DT, s.wish); H.addInPlace(st.vel.scale(DT));
-          k = s.k; phase = s.phase === 'gather' || s.phase === 'done' ? 'gather' : 'drive';
+          k = s.k; phase = s.phase === 'gather' || s.phase === 'done' ? 'gather' : 'drive'; brainExp = s.exposure;
           gatherNow = !!s.gather;
           if (s.release) { const plan2 = plan.gatherFor === 'pullup' ? 'jumper' : (touch.tell as 'dunk' | 'layup' | 'jumper'); release(plan2 ?? 'layup', false); break; }
           if (gatherNow) touch.tell = plan.gatherFor === 'pullup' ? 'jumper' : decideFinish();
           // the probe move's exposure: the carry path's (a crossing move's ball crosses in the 1v1 window)
           if (s.move && crossesHand(s.move)) touch.intent = 'x' + s.move;
-          void moveExp; void moveFrame;
+          void moveFrame;
         } else {
           // the release's lerped drive
           const T = touch.sec!, kk = Math.min(1, touch.t / T); k = kk;
@@ -176,7 +176,7 @@ export async function sim3v3(tier: string, o: Opts) {
           nextPoke = t + 0.6 + rng() * 1.0;
           if (rng() < 0.5) {
             const v = foeMv[hi].vel; const moving = touch.kind === 'plan' ? v : new Vector3((H.x - prevH.x) / DT, 0, (H.z - prevH.z) / DT);
-            const r = driveStrip({ moveExposed01: 0, velX: moving.x, velZ: moving.z, toRimX: RIM.x - H.x, toRimZ: RIM.z - H.z, phase: touch.kind === 'cs' ? 'check' : phase, bumpAge: Infinity, dist: dd });
+            const r = driveStrip({ brainExposure01: brainExp, moveExposed01: 0, velX: moving.x, velZ: moving.z, toRimX: RIM.x - H.x, toRimZ: RIM.z - H.z, phase: touch.kind === 'cs' ? 'check' : phase, bumpAge: Infinity, dist: dd });
             if (r.connects) { steals++; end = 'steal'; break; } else meStun = 0.45;
           }
         }

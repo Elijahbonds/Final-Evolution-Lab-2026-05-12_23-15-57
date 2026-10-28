@@ -1162,7 +1162,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Taking it back, probing, waiting on the screen.',
   },
   {
-    id: 'hoops.rivalProbeSec', label: '3v3 rivals: the probe at the top', def: 1.4, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · rival offense',
+    id: 'hoops.rivalProbeSec', label: '3v3 rivals: the probe at the top', def: 1.6, min: 0, max: 4, step: 0.1, unit: 's', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_PROBE_SEC',
     hint: 'Sizing his man up before the screen, the swing or the attack (× the tier, ±30 %).',
   },

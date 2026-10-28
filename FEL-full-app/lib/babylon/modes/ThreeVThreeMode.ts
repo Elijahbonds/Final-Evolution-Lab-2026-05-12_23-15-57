@@ -540,6 +540,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let foePassTo: Body | null = null, foePassFrom: Body | null = null, foePassTok = -1, foeSwings = 0, foePassAge = 0;
   /** hoops-p03 (1v1/3v3 phase 3): their team OFFENCE (hoops/teamOffense3v3) for the tier this run plays — its possession clock and its passes. */
   let teamO: TeamOffense3v3 | null = null;
+  /** …its handler, and how exposed his ball is this frame (the planner's read; my poke uses it in place of his lateral speed). */
+  let teamDriver: Body | null = null, teamExposure = 0;
   const teamOff = (): TeamOffense3v3 | null => { if (!teamOffenseOn()) return (teamO = null); const t = runTier(); if (!teamO || teamO.tier !== t) teamO = new TeamOffense3v3(t); return teamO; };
   /** #2: what their shot in the air is worth (a goaltend on it awards this). */
   let foeShotPoints = 2;
@@ -1395,7 +1397,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         if (me.slot.intent.steal && driver && driverHasBall() && !driveStolen && !foeDunkFlight && meStunSec === 0 && distXZ(me.char.root.position, driver.char.root.position) < 1.6) {   // HOTFIX (2026-09-24): only on a man with the ball (above)
           me.tree.beat('bball_steal_reach', { fadeSec: 0.14 });
           // lane/hoops-round2 HOP-01 (owner 10-20: "3v3 steals like 1v1, no 30% coin flip"): 1v1's exposure read on his real ball (hoops/steals)
-          const strip = driveStrip({ moveExposed01: carries.get(driver)?.move?.exposed01 ?? 0, velX: driverVelEst.x, velZ: driverVelEst.z, toRimX: RIM.x - driver.char.root.position.x, toRimZ: RIM.z - driver.char.root.position.z, phase: driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check', bumpAge, dist: distXZ(me.char.root.position, driver.char.root.position) });
+          const strip = driveStrip({ brainExposure01: teamO && driver === teamDriver ? teamExposure : undefined, moveExposed01: carries.get(driver)?.move?.exposed01 ?? 0, velX: driverVelEst.x, velZ: driverVelEst.z, toRimX: RIM.x - driver.char.root.position.x, toRimZ: RIM.z - driver.char.root.position.z, phase: driveK > 0 && driveK >= 1 - GATHER_TELL_SEC / driveSec ? 'gather' : driveK > 0 ? 'drive' : 'check', bumpAge, dist: distXZ(me.char.root.position, driver.char.root.position) });
           // THE MIC calls the poke here, where it is decided: the knock-loose branch in opponentPossession also runs after a charge,
           // a reach-in, a parry-vault and a drive-by (each has its own call), so a call there would double up or mislabel them
           if (strip.connects) { driveStolen = true; box.steals++; mic?.say({ moment: 'game.steal', priority: 2, crowd: { moment: 'crowd.cheer', n: 2 } }); swing('steal'); putHud(ctx, { momentum }); if (synergy.add('steal')) igniteOverdrive(ctx); console.info(`[3V3-DEF] strip by me ${strip.onBump ? 'on the bump' : 'on the read'} exposure ${strip.exposure.toFixed(2)} bumpAge ${bumpAge.toFixed(2)}`); }
@@ -4177,6 +4179,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // keeps its standing release; a swing's catch is the same possession's next touch.
     const team = pullUp ? null : teamOff();
     if (team && !cont) team.beginPossession();
+    teamDriver = null; teamExposure = 0;
     const t0 = performance.now();
     const from = shooter.char.root.position.clone();
     // the ball rides the driver's hand (lock carry-forward: AI drives were
@@ -4296,7 +4299,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
           if (st.pass >= 0) { kickTo = others[st.pass] ?? null; foeDriveTick = null; res(); return; }
           const v = shooter.mover ? shooter.mover.track(fdt, st.wish).vel : new Vector3(st.wish.x, 0, st.wish.z);
           root.x += v.x * fdt; root.z += v.z * fdt;
-          driveK = st.k; driveMps = Math.hypot(v.x, v.z);
+          driveK = st.k; driveMps = Math.hypot(v.x, v.z); teamDriver = shooter; teamExposure = st.exposure;
           if (st.gather) tellAt(st.gather === 'pullup' ? 'jumper' : decideFinish(), st.k);
           if (takingCharge) drivePlanted = true;
           if (!contactDone && st.phase === 'attack' && intent === 'through' && bodiesMet(root, me.char.root.position, BODY_STANDOFF)) { meetBodies(st.k); foeDriveTick = null; res(); return; }

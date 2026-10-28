@@ -348,7 +348,7 @@ export class RivalKit implements AttackerDelegate {
       if (dist < postHookM()) { this.pending = 'layup'; this.look = 'hook'; }
       else if (this.postSec >= postMaxSec() || gaveRoom) { this.pending = 'jumper'; this.look = 'fade'; }
       if (this.pending) { b.phase = 'gather'; this.gatherSec = 0; return decision(ZERO(), 'gather', { look: this.look, backToRim: this.look === 'fade' }); }
-      return decision(wish, 'post', { contained: inLane, exposure, backToRim });
+      return decision(intoBody(wish, self, defender, POST_INTO_MPS), 'post', { contained: inLane, exposure, backToRim });
     } else if (this.move) {
       // A MOVE IN PROGRESS: its shape, on its side
       this.moveT += dt;
@@ -422,9 +422,25 @@ export class RivalKit implements AttackerDelegate {
       b.phase = 'gather'; this.gatherSec = 0;
       return decision(ZERO(), 'gather', { contained: inLane, action, look: this.look });
     }
-    return decision(wish, b.phase, { contained: inLane, exposure, step, crossover, action, backToRim, moveSide });
+    return decision(intoBody(wish, self, defender, 0), b.phase, { contained: inLane, exposure, step, crossover, action, backToRim, moveSide });
   }
 }
+/** A body against a body does not keep running into it (the bodies touch at the hard gap; a wish into the chest only made the contact
+ *  push him back every frame — the root's acceleration spikes): inside TOUCH_M of the man, the part of the wish INTO him is capped at
+ *  `intoMps` (the post-up leans in at POST_INTO_MPS; everything else stops at the chest and goes round). Pure. */
+export function intoBody(wish: Vector3, self: { x: number; z: number }, man: { x: number; z: number } | null, intoMps: number): Vector3 {
+  if (!man) return wish;
+  const dx = man.x - self.x, dz = man.z - self.z, d = Math.hypot(dx, dz);
+  if (d >= TOUCH_M || d < 1e-4) return wish;
+  const ux = dx / d, uz = dz / d, into = wish.x * ux + wish.z * uz;
+  if (into <= intoMps) return wish;
+  const cut = (into - intoMps) * Math.min(1, (TOUCH_M - d) / TOUCH_EASE_M);
+  return new Vector3(wish.x - ux * cut, 0, wish.z - uz * cut);
+}
+/** The bodies' contact range for intoBody (m): the 1v1 capsules' 1.10 m and a hair; the cut eases in over TOUCH_EASE_M. */
+export const TOUCH_M = 1.3, TOUCH_EASE_M = 0.2;
+/** The post-up's lean into the man's chest (m/s). */
+export const POST_INTO_MPS = 0.6;
 /** A possession's open run this long is a DRIVE (the action list's). */
 export const DRIVE_SAY_SEC = 0.5;
 /** Memory fades this much per possession (the defender may have changed what he does). */

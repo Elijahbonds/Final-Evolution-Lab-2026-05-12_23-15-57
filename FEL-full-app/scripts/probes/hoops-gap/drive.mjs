@@ -83,8 +83,9 @@ async function possLoop() {
   const out = [];
   const tag = MODE === 'onevone' ? '1V1' : '3V3';
   const CAP = Number(process.env.POSS_CAP_MS ?? 7000), TAIL = Number(process.env.POSS_TAIL_MS ?? 1500);
-  for (let k = 0; k < POSS * 2; k++) {
-    const side = k % 2 === 0 ? 'def' : 'off';
+  const SIDES = (process.env.POSS_SIDES ?? 'def,off').split(',');   // hoops-p03: POSS_SIDES=def plays their possessions only
+  for (let k = 0; k < POSS * SIDES.length; k++) {
+    const side = SIDES[k % SIDES.length];
     await ev(() => { window.__hg.bot.on = false; });
     // a trip to the line (an and-one, a shooting foul) is a dead ball the seams do not cancel, and the bot does not shoot free throws:
     // shoot them out (press, let go at the line meter's green) before the next possession, or every later possession is a statue
@@ -114,7 +115,7 @@ async function possLoop() {
     const rec = await ev((a) => ({ log: (window.__LOG || []).filter((l) => l.f >= a[0] && l.f <= a[1]).map((l) => l.m), banners: (window.__hud || []).filter((h) => h.f >= a[0] && h.f <= a[1] && h.banner).map((h) => String(h.banner)) }), [f0, f1]);
     out.push({ side, f0, f1, sec: +((f1 - f0) / 60).toFixed(2), ...rec });
     say(`poss ${k} ${side} ${out[out.length - 1].sec} s ${rec.banners.slice(0, 4).join(' | ')}`);
-    if (k % 2 === 1) { result.poss = out; await checkpoint('poss ' + k); }
+    if (k % SIDES.length === SIDES.length - 1) { result.poss = out; await checkpoint('poss ' + k); }
   }
   return out;
 }

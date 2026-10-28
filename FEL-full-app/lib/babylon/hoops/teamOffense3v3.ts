@@ -25,7 +25,8 @@ import { feel } from '../../feel-panel/feel';
 import { profileFor, type Tier, type TierProfile } from '../core/Difficulty';
 import { driveLateral, type DriveIntent } from '../core/DriveLine';
 import { cutOff, kickTarget, laneClear, openness, KICK_OPEN_M, KICK_READ_FROM_K, KICK_READ_TO_K, type XZ } from '../modes/threevthreeRules';
-import { KIT_WEIGHTS, KIT_CROSSES, moveFrame, pickWeighted, type KitMove, type RivalAction } from './rivalOffense';
+import { Vector3 } from '@babylonjs/core';
+import { KIT_WEIGHTS, KIT_CROSSES, moveFrame, pickWeighted, intoBody, type KitMove, type RivalAction } from './rivalOffense';
 
 // ── THE NUMBERS (feel knobs, group "Hoops · rival offense") ──────────────────────────────────────────────────────────────────
 /** 1 = the team offence on bodies; 0 = the release's one lerped drive exactly (the A/B). Knob `hoops.teamOffenseOn`. */
@@ -35,7 +36,7 @@ export const RIVAL_TAKE_BACK_M = 6.9;
 /** The handler's pace off the drive: clearing, probing, waiting on the screen (m/s). Knob `hoops.rivalHandlerMps`. */
 export const RIVAL_HANDLER_MPS = 3.4;
 /** The probe at the top, before he picks (s; × the tier's PROBE_K, ±30 %). Knob `hoops.rivalProbeSec`. */
-export const RIVAL_PROBE_SEC = 1.4;
+export const RIVAL_PROBE_SEC = 1.6;
 /** The longest he waits for the screener to plant (s). Knob `hoops.rivalScreenWaitSec`. */
 export const RIVAL_SCREEN_WAIT_SEC = 2.4;
 /** The possession budget (s; × the tier's BUDGET_K): past it he attacks now. Knob `hoops.rivalBudgetSec`. */
@@ -59,9 +60,9 @@ const pullUpMaxM = (): number => feel('hoops.rivalPullUpMaxM', RIVAL_PULLUP_MAX_
  *  screen and in a swing, how many passes a possession can hold, whether it reads the screen (reject / hit the roll man). */
 export interface TeamTier { probeK: number; budgetK: number; screenChance: number; swingChance: number; passes: number; readsScreen: boolean; movesPerProbe: number }
 export const TEAM_TIER: Readonly<Record<Tier, TeamTier>> = {
-  rookie: { probeK: 0.6, budgetK: 0.8, screenChance: 0.25, swingChance: 0.35, passes: 1, readsScreen: false, movesPerProbe: 1 },
-  pro: { probeK: 1, budgetK: 1, screenChance: 0.55, swingChance: 0.5, passes: 2, readsScreen: true, movesPerProbe: 2 },
-  elite: { probeK: 1.1, budgetK: 1.05, screenChance: 0.7, swingChance: 0.6, passes: 3, readsScreen: true, movesPerProbe: 2 },
+  rookie: { probeK: 0.6, budgetK: 0.8, screenChance: 0.3, swingChance: 0.35, passes: 1, readsScreen: false, movesPerProbe: 1 },
+  pro: { probeK: 1, budgetK: 1, screenChance: 0.65, swingChance: 0.5, passes: 2, readsScreen: true, movesPerProbe: 2 },
+  elite: { probeK: 1.1, budgetK: 1.05, screenChance: 0.75, swingChance: 0.6, passes: 3, readsScreen: true, movesPerProbe: 2 },
 };
 /** The tell before every release (s): the mode's GATHER_TELL_SEC (the block's window), unchanged. */
 export const TEAM_GATHER_TELL_SEC = 0.35;
@@ -102,6 +103,9 @@ export interface HandlerStep {
   release: boolean;
   /** 0..1, the possession's progress as the mode's driveK reads it (the gather is the last GATHER_TELL_SEC of it). */
   k: number;
+  /** 0..1, how exposed his ball is to a poke this frame (the move's window; a straight run is the 1v1 drive's protected 0.25) — the mode's
+   *  poke reads it (hoops/steals driveStrip `brainExposure01`) instead of his lateral speed, as the 1v1 rival's brain does. */
+  exposure: number;
 }
 
 const len = (x: number, z: number): number => Math.hypot(x, z);
@@ -117,7 +121,7 @@ export class TeamOffense3v3 {
   private phase: HandlerPhase = 'set'; private phaseT = 0; private fresh = true;
   private probeFor = 0; private movesLeft = 0; private move: KitMove | null = null; private moveT = 0; private moveSide: 1 | -1 = 1; private nextMoveAt = 0;
   private screenMate = -1; private useSide: 1 | -1 = 1; private containedT = 0; private kickRead = false; private gatherKind: 'rim' | 'pullup' = 'rim';
-  private intent: DriveIntent = 'around'; private attackFrom: XZ = ZERO; private attackLen = 1; private tellT = 0;
+  private attackMoves = 0; private intent: DriveIntent = 'around'; private attackFrom: XZ = ZERO; private attackLen = 1; private tellT = 0;
   constructor(readonly tier: Tier, private rng: () => number = Math.random) { this.tt = TEAM_TIER[tier]; this.profile = profileFor(tier); }
 
   /** A new possession (their ball from the check / a make / a board). */
@@ -140,7 +144,7 @@ export class TeamOffense3v3 {
 
   step(dt: number, v: TeamView): HandlerStep {
     this.elapsed += dt; this.phaseT += dt;
-    const out: HandlerStep = { wish: ZERO, phase: this.phase, action: null, move: null, moveSide: 1, callScreen: -1, pass: -1, gather: null, release: false, k: 0.05 };
+    const out: HandlerStep = { wish: ZERO, phase: this.phase, action: null, move: null, moveSide: 1, callScreen: -1, pass: -1, gather: null, release: false, k: 0.05, exposure: DRIVE_EXPOSURE };
     const tx = v.rim.x - v.handler.x, tz = v.rim.z - v.handler.z, rimDist = len(tx, tz) || 1;
     const dir = { x: tx / rimDist, z: tz / rimDist }, perp = { x: -dir.z, z: dir.x };
     // his man: the nearest of my team
@@ -176,7 +180,7 @@ export class TeamOffense3v3 {
         if (this.move) {
           this.moveT += dt;
           const f = moveFrame(this.move, this.moveT);
-          out.wish = vec(f.fwd * PROBE_FWD_K, f.lat * PROBE_LAT_K, this.moveSide);
+          out.wish = vec(f.fwd * PROBE_FWD_K, f.lat * PROBE_LAT_K, this.moveSide); out.exposure = f.exposure;
           if (f.done) { this.move = null; this.moveT = 0; if (!inLane && along < 0.4 && man) { this.startAttack(v); out.action = this.say('drive'); } }
           break;
         }
@@ -241,22 +245,46 @@ export class TeamOffense3v3 {
         const k = Math.min(1, len(ax, az) / this.attackLen);
         const end = { x: v.rim.x, z: v.rim.z + ATTACK_END_DZ };
         const ex = end.x - v.handler.x, ez = end.z - v.handler.z, el = len(ex, ez) || 1;
-        const ed = { x: ex / el, z: ez / el };
+        const ed = { x: ex / el, z: ez / el }, ep = { x: -ed.z, z: ed.x };
         const sp = attackMps(this.tier);
-        const bend = driveLateral({ at: v.handler, defender: man, dir: ed, k, intent: this.intent });
-        // the bend is a lateral wish toward the bent line (DriveLine's metres → a steer of up to BEND_GAIN m/s)
-        const bx = ed.z * bend, bz = -ed.x * bend;
-        out.wish = { x: ed.x * sp + bx * BEND_GAIN, z: ed.z * sp + bz * BEND_GAIN };
-        const ws = len(out.wish.x, out.wish.z); if (ws > sp) { out.wish = { x: out.wish.x / ws * sp, z: out.wish.z / ws * sp }; }
+        this.containedT = inLane ? this.containedT + dt : Math.max(0, this.containedT - dt * 0.5);
+        if (this.move) {
+          // a move to beat the man in front (the 1v1 kit's shape, full size): it works if his body leaves the lane
+          this.moveT += dt;
+          const f = moveFrame(this.move, this.moveT);
+          out.wish = { x: ed.x * f.fwd + ep.x * f.lat * this.moveSide, z: ed.z * f.fwd + ep.z * f.lat * this.moveSide }; out.exposure = f.exposure;
+          if (f.done) { this.move = null; this.moveT = 0; }
+        } else {
+          const bend = driveLateral({ at: v.handler, defender: man, dir: ed, k, intent: this.intent });
+          // the bend is a lateral wish toward the bent line (DriveLine's metres → a steer of up to BEND_GAIN m/s)
+          const bx = ed.z * bend, bz = -ed.x * bend;
+          out.wish = { x: ed.x * sp + bx * BEND_GAIN, z: ed.z * sp + bz * BEND_GAIN };
+          const ws = len(out.wish.x, out.wish.z); if (ws > sp) { out.wish = { x: out.wish.x / ws * sp, z: out.wish.z / ws * sp }; }
+          // held up in front: a move (the tier's kit), while he has moves left
+          if (inLane && this.containedT >= ATTACK_MOVE_AFTER_SEC && this.attackMoves > 0) {
+            const w: Record<KitMove, number> = { ...KIT_WEIGHTS[this.tier] }; w.post_up = 0; w.shuffle *= 0.3; if (manD > 1.4) w.spin *= 0.3;
+            const m = pickWeighted(w, this.rng());
+            if (m) {
+              this.move = m; this.moveT = 0; this.attackMoves--; this.containedT = 0;
+              const acr = man ? (man.x - v.handler.x) * ep.x + (man.z - v.handler.z) * ep.z : 0;
+              this.moveSide = Math.abs(acr) < 0.15 ? (this.rng() < 0.5 ? -1 : 1) : acr > 0 ? -1 : 1;
+              out.move = m; out.moveSide = this.moveSide;
+              if (m !== 'shuffle') out.action = this.say(m);
+            }
+          }
+        }
         // the kick read: once, cut off inside the read window with an open man
-        if (!this.kickRead && k >= KICK_READ_FROM_K && k <= KICK_READ_TO_K && cutOff(v.handler, ed, v.defenders)) {
+        if (!this.move && !this.kickRead && k >= KICK_READ_FROM_K && k <= KICK_READ_TO_K && cutOff(v.handler, ed, v.defenders)) {
           this.kickRead = true;
           const pick = kickTarget(v.handler, v.mates, v.defenders);
           if (pick >= 0 && this.passesLeft > 0 && this.rng() < this.tt.swingChance + 0.2) { out.pass = pick; break; }
         }
-        this.containedT = inLane ? this.containedT + dt : Math.max(0, this.containedT - dt * 0.5);
-        if (this.containedT >= attackPullUpSec() && rimDist <= pullUpMaxM() && rimDist > 2.4) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; out.action = null; break; }
-        if (el <= sp * TEAM_GATHER_TELL_SEC + 0.05) { this.gatherKind = 'rim'; this.go('gather'); out.gather = 'rim'; }
+        // still held in front with no moves left: the pull-up (inside the arc), the kick-out, or — late in the budget — a forced shot
+        const stuck = !this.move && this.containedT >= attackPullUpSec() && (this.attackMoves === 0 || this.containedT >= attackPullUpSec() * 2);
+        if (stuck && rimDist <= pullUpMaxM() && rimDist > 2.4) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
+        if (stuck && this.passesLeft > 0) { const pick = kickTarget(v.handler, v.mates, v.defenders); if (pick >= 0) { out.pass = pick; break; } }
+        if (stuck && this.elapsed >= this.budget + FORCED_AFTER_SEC) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
+        if (el <= sp * TEAM_GATHER_TELL_SEC + 0.05) { this.move = null; this.gatherKind = 'rim'; this.go('gather'); out.gather = 'rim'; }
         out.k = Math.min(1 - (TEAM_GATHER_TELL_SEC + 0.01), 0.1 + 0.8 * k);
         break;
       }
@@ -277,6 +305,8 @@ export class TeamOffense3v3 {
     if (this.phase === 'gather' || this.phase === 'done') out.k = Math.min(1, 1 - (TEAM_GATHER_TELL_SEC - Math.min(TEAM_GATHER_TELL_SEC, this.tellT)));
     else if (this.phase !== 'attack') out.k = 0.05;
     if (out.pass >= 0) out.wish = ZERO;
+    else if (man && out.wish !== ZERO) { const w = intoBody(new Vector3(out.wish.x, 0, out.wish.z), v.handler, man, 0); out.wish = { x: w.x, z: w.z }; }   // touch his chest, do not run through it
+    if (this.phase === 'gather' || this.phase === 'done' || this.phase === 'set') out.exposure = 0;
     return out;
   }
   /** The finish this gather is for. */
@@ -300,9 +330,13 @@ export class TeamOffense3v3 {
   private startAttack(v: TeamView): void {
     this.attackFrom = { x: v.handler.x, z: v.handler.z };
     this.attackLen = Math.max(1, len(v.rim.x - v.handler.x, v.rim.z + ATTACK_END_DZ - v.handler.z));
-    this.containedT = 0; this.kickRead = false; this.go('attack');
+    this.containedT = 0; this.kickRead = false; this.move = null; this.moveT = 0; this.attackMoves = this.tt.movesPerProbe; this.go('attack');
   }
 }
+/** On the attack, held in front this long before a move (s); past the budget by this, a shot is forced from anywhere (s). */
+export const ATTACK_MOVE_AFTER_SEC = 0.3, FORCED_AFTER_SEC = 2.5;
+/** A run with no move: the ball rides the hand away from the man (the 1v1 blow-by's protected 0.25; a poke needs a move's window). */
+export const DRIVE_EXPOSURE = 0.25;
 /** The triple-threat beat at a catch (s). */
 export const SET_SEC = 0.3;
 /** The take-back gives up after this (s): a body in the way. */
