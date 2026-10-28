@@ -20,6 +20,7 @@ import {
 import { addScript, addScriptNode, connectNodes, deleteFromScript, editScript, moveScriptNode, removeScript, setNodeParam, setScriptScope } from '@/lib/nexus-studio/edits';
 import type { StudioScript, StudioVenue } from '@/lib/nexus-studio/doc';
 import type { StudioApi } from './use-studio';
+import { EmptyState } from '@/components/ui/fel/empty-state';
 import { C, NumberField, PanelTitle, Row, Select, TextField, Toggle } from './ui';
 
 export const NODE_W = 196;
@@ -27,6 +28,7 @@ export const NODE_H = 64;
 const GROUP_COLOUR: Record<NodeGroup, string> = { event: '#00E5FF', condition: '#FFD700', action: '#00FF9D' };
 const GROUP_ICON = { event: Zap, condition: Filter, action: Sparkles } as const;
 const GROUP_LABEL: Record<NodeGroup, string> = { event: 'When', condition: 'Only if', action: 'Do' };
+const KEY_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 /** Pure: a node's one-line summary of its parameters. */
 export function paramSummary(n: Pick<ScriptNode, 'kind' | 'params'>): string {
@@ -103,7 +105,7 @@ export function ScriptsTrack({ studio }: { studio: StudioApi }) {
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[240px_1fr_280px]" data-testid="scripts-track">
       <aside className="flex min-h-0 flex-col overflow-y-auto border-r" style={{ borderColor: C.line, background: C.surface }}>
-        <PanelTitle right={<span className="text-[11px]" style={{ color: C.dim }}>{doc.scripts.length}</span>}>Scripts</PanelTitle>
+        <PanelTitle right={<span className="text-[12px]" style={{ color: C.dim }}>{doc.scripts.length}</span>}>Scripts</PanelTitle>
         <div className="flex flex-wrap gap-1 px-3 pb-2">
           <button type="button" onClick={() => { const r = addScript(doc, 'pointWon'); run(r.cmd); setActiveId(r.id); }} className="flex items-center gap-1 rounded-md border px-2 py-1 text-[12px]" style={{ borderColor: C.line, color: C.text }}><Plus className="h-3.5 w-3.5" aria-hidden /> Point won → cheer</button>
           <button type="button" onClick={() => { const r = addScript(doc, 'blank'); run(r.cmd); setActiveId(r.id); }} className="flex items-center gap-1 rounded-md border px-2 py-1 text-[12px]" style={{ borderColor: C.line, color: C.text }}><Plus className="h-3.5 w-3.5" aria-hidden /> Blank</button>
@@ -114,16 +116,29 @@ export function ScriptsTrack({ studio }: { studio: StudioApi }) {
               <button type="button" onClick={() => setActiveId(s.id)} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px]" style={{ background: s.id === script?.id ? 'rgba(0,229,255,0.1)' : 'transparent', color: s.enabled ? C.text : C.dim }}>
                 <Workflow className="h-3.5 w-3.5 shrink-0" style={{ color: s.id === script?.id ? C.cyan : C.dim }} aria-hidden />
                 <span className="truncate">{s.name}</span>
-                {s.venues && <span className="shrink-0 rounded px-1 text-[9px]" style={{ background: 'rgba(255,215,0,0.12)', color: C.gold }} title={`Runs in ${scopeSummary(s, doc.venues)}`}>{scopeSummary(s, doc.venues)}</span>}
-                <span className="ml-auto text-[10px]" style={{ color: C.dim }}>{s.nodes.length}</span>
+                {s.venues && <span className="shrink-0 rounded px-1 text-[12px]" style={{ background: 'rgba(255,215,0,0.12)', color: C.gold }} title={`Runs in ${scopeSummary(s, doc.venues)}`}>{scopeSummary(s, doc.venues)}</span>}
+                <span className="ml-auto text-[12px]" style={{ color: C.dim }}>{s.nodes.length}</span>
               </button>
             </li>
           ))}
-          {!doc.scripts.length && <li className="px-3 py-2 text-[12px]" style={{ color: C.dim }}>No scripts yet. Start from “Point won → cheer”.</li>}
+          {!doc.scripts.length && <li className="px-3 py-2 text-[12px]" style={{ color: C.dim }}>No scripts yet.</li>}
         </ul>
-        <p className="mt-auto px-3 py-3 text-[11px]" style={{ color: C.dim }}>A script runs in every venue this project play-tests, unless you pick its venues. Scripts only listen and put on a show: they never touch the score, the clock or the rules.</p>
+        <p className="mt-auto px-3 py-3 text-[12px]" style={{ color: C.dim }}>Scripts put on a show. They never change the score, the clock or the rules.</p>
       </aside>
-      {script ? <GraphCanvas key={script.id} script={script} run={run} seal={seal} /> : <div className="flex items-center justify-center text-[13px]" style={{ color: C.dim }}>Make a script to start.</div>}
+      {script ? <GraphCanvas key={script.id} script={script} run={run} seal={seal} /> : (
+        // STUDIO-EASY: the empty canvas says what a script is for and starts one in a tap
+        <div className="flex items-center justify-center p-6" data-testid="scripts-empty">
+          <EmptyState title="No scripts yet" line="A script makes the crowd cheer or a banner flash when something happens in the game."
+            action={
+              <span className="flex flex-wrap justify-center gap-2">
+                <button type="button" onClick={() => { const r = addScript(doc, 'pointWon'); run(r.cmd); setActiveId(r.id); }} data-testid="scripts-empty-start"
+                  className="min-h-11 rounded-full px-5 text-[14px] font-semibold" style={{ background: C.cyan, color: '#050505' }}>Start with: point won → cheer</button>
+                <button type="button" onClick={() => { const r = addScript(doc, 'blank'); run(r.cmd); setActiveId(r.id); }}
+                  className="min-h-11 rounded-full border px-5 text-[14px]" style={{ borderColor: C.line, color: C.text }}>Blank script</button>
+              </span>
+            } />
+        </div>
+      )}
       {script ? <ScriptSide script={script} venues={doc.venues} activeVenueId={doc.activeVenueId} run={run} seal={seal} onDelete={() => { const c = removeScript(doc, script.id); if (c) { run(c); setActiveId(null); } }} /> : <aside style={{ background: C.surface }} />}
     </div>
   );
@@ -166,7 +181,11 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
     setDrag(null);
   };
   const onKey = (e: RKeyboardEvent) => {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selected) { e.preventDefault(); const c = deleteFromScript(script, [selected]); if (c) { run(c); setSelected(null); } }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selected) { e.preventDefault(); const c = deleteFromScript(script, [selected]); if (c) { run(c); setSelected(null); } return; }
+    // STUDIO-EASY: a focused node moves with the arrows (one grid step, one undo step per run), so the graph needs no mouse
+    const n = selected ? byId.get(selected) : undefined;
+    const step = KEY_STEP[e.key];
+    if (n && step) { e.preventDefault(); run(moveScriptNode(script, n.id, n.x + step[0] * 24, n.y + step[1] * 24)); }
   };
   const wireFrom = drag?.kind === 'wire' ? byId.get(drag.from) : null;
 
@@ -200,6 +219,8 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
             const accepts = drag?.kind === 'wire' && wireFrom && edgeAllowed(wireFrom.kind, n.kind) && !wouldCycle(script.edges, wireFrom.id, n.id);
             return (
               <g key={n.id} transform={`translate(${n.x} ${n.y})`} data-testid="script-node" data-kind={n.kind}
+                tabIndex={0} role="button" aria-label={`${GROUP_LABEL[grp]}: ${NODE_SPECS[n.kind].label}${paramSummary(n) ? `, ${paramSummary(n)}` : ''}`} aria-pressed={on}
+                onFocus={() => setSelected(n.id)} onBlur={seal}
                 onPointerDown={(e) => { e.stopPropagation(); setSelected(n.id); const w = toWorld(e); setDrag({ kind: 'node', id: n.id, dx: w.x - n.x, dy: w.y - n.y }); try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* a synthetic event has no live pointer */ } }}
                 style={{ cursor: 'grab' }}>
                 <rect width={NODE_W} height={NODE_H} rx={10} fill="#0f141c" stroke={on ? '#ffffff' : accepts ? col : '#263142'} strokeWidth={on || accepts ? 2 : 1} />
@@ -217,7 +238,7 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
           })}
         </g>
       </svg>
-      <div className="pointer-events-none absolute bottom-2 left-3 text-[11px]" style={{ color: C.dim }}>Drag a node · drag from a node’s right dot to connect · Delete removes · drag empty space to pan · wheel to zoom · the map moves the view</div>
+      <div className="pointer-events-none absolute bottom-2 left-3 text-[12px]" style={{ color: C.dim }}>Drag a node, or Tab to it and use the arrows · connect from its right dot or “Then” · Delete removes</div>
       <Minimap nodes={script.nodes} edges={script.edges} view={view} canvas={size} selected={selected} onView={setView} />
       {selected && byId.get(selected) && <NodeInspector script={script} node={byId.get(selected)!} run={run} seal={seal} />}
     </section>
@@ -247,7 +268,8 @@ function NodeInspector({ script, node, run, seal }: { script: StudioScript; node
   return (
     <div className="absolute right-3 top-3 w-64 rounded-lg border pb-2" style={{ borderColor: C.line, background: 'rgba(12,12,17,0.94)' }} data-testid="node-inspector">
       <PanelTitle right={<button type="button" aria-label="Delete node" onClick={() => { const c = deleteFromScript(script, [node.id]); if (c) run(c); }} className="rounded p-0.5 hover:bg-white/5"><Trash2 className="h-3.5 w-3.5" style={{ color: C.dim }} /></button>}>{spec.label}</PanelTitle>
-      <p className="px-3 pb-1 text-[11px]" style={{ color: C.dim }}>{spec.hint}</p>
+      <p className="px-3 pb-1 text-[12px]" style={{ color: C.dim }}>{spec.hint}</p>
+      <NextField script={script} node={node} run={run} />
       {(spec.params as readonly ParamSpec[]).map((p) => {
         const v = node.params[p.key];
         const set = (val: string | number) => run(setNodeParam(script, node.id, p.key, val));
@@ -261,6 +283,20 @@ function NodeInspector({ script, node, run, seal }: { script: StudioScript; node
         );
       })}
     </div>
+  );
+}
+
+/** STUDIO-EASY: connect without dragging — the nodes this one may lead to, as a list (a keyboard and a phone can wire a graph). */
+function NextField({ script, node, run }: { script: StudioScript; node: ScriptNode; run: StudioApi['run'] }) {
+  if (groupOf(node.kind) === 'action') return null;
+  const options = script.nodes.filter((m) => m.id !== node.id && edgeAllowed(node.kind, m.kind) && !wouldCycle(script.edges, node.id, m.id)
+    && !script.edges.some((e) => e.from === node.id && e.to === m.id));
+  if (!options.length) return null;
+  return (
+    <Row label="Then">
+      <Select label="Connect to" value={'' as string} options={[{ value: '', label: 'Connect to…' }, ...options.map((m) => ({ value: m.id, label: `${GROUP_LABEL[groupOf(m.kind)]}: ${NODE_SPECS[m.kind].label}` }))]}
+        onChange={(id) => { if (!id) return; const c = connectNodes(script, node.id, id); if (c) run(c); }} />
+    </Row>
   );
 }
 
@@ -288,7 +324,7 @@ function ScopeField({ script, venues, activeVenueId, run }: { script: StudioScri
           ))}
         </ul>
       )}
-      {!every && !script.venues!.length && <p className="mt-1 text-[11px]" style={{ color: C.gold }}>Ticks no venue: the script runs nowhere.</p>}
+      {!every && !script.venues!.length && <p className="mt-1 text-[12px]" style={{ color: C.gold }}>Ticks no venue: the script runs nowhere.</p>}
     </div>
   );
 }
@@ -313,7 +349,7 @@ function ScriptSide({ script, venues, activeVenueId, run, seal, onDelete }: { sc
             <PanelTitle>{GROUP_LABEL[g]}</PanelTitle>
             <div className="flex flex-wrap gap-1 px-3">
               {NODE_KINDS.filter((k) => groupOf(k) === g).map((k) => (
-                <button key={k} type="button" onClick={() => place(k)} title={NODE_SPECS[k].hint} className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px]" style={{ borderColor: C.line, color: GROUP_COLOUR[g] }}>
+                <button key={k} type="button" onClick={() => place(k)} title={NODE_SPECS[k].hint} className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[12px]" style={{ borderColor: C.line, color: GROUP_COLOUR[g] }}>
                   <Icon className="h-3 w-3" aria-hidden /> {NODE_SPECS[k].label}
                 </button>
               ))}
@@ -322,7 +358,7 @@ function ScriptSide({ script, venues, activeVenueId, run, seal, onDelete }: { sc
         );
       })}
       {notes.length > 0 && (
-        <ul className="mx-3 mt-3 list-disc space-y-0.5 rounded-md border p-2 pl-6 text-[11px]" style={{ borderColor: C.line, color: C.gold }} data-testid="script-notes">
+        <ul className="mx-3 mt-3 list-disc space-y-0.5 rounded-md border p-2 pl-6 text-[12px]" style={{ borderColor: C.line, color: C.gold }} data-testid="script-notes">
           {notes.map((n) => <li key={n}>{n}</li>)}
         </ul>
       )}

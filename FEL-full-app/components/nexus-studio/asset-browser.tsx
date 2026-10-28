@@ -25,7 +25,7 @@ export function AssetBrowser({ onPlace }: { onPlace(item: CatalogItem): void }) 
   const groups = useMemo(() => groupCatalog(catalog(), query), [query]);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PanelTitle>Assets</PanelTitle>
+      <PanelTitle>Add to the court</PanelTitle>
       <div className="px-3 pb-2">
         <label className="flex items-center gap-2 rounded-md border px-2 py-1" style={{ borderColor: C.line }}>
           <Search className="h-3.5 w-3.5" style={{ color: C.dim }} aria-hidden />
@@ -36,15 +36,15 @@ export function AssetBrowser({ onPlace }: { onPlace(item: CatalogItem): void }) 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3" data-testid="asset-list">
         {groups.map(({ group, items }) => (
           <section key={group} className="pb-2">
-            <h3 className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: SWATCH[group] ?? C.dim }}>{group} <span style={{ color: C.dim }}>· {items.length}</span></h3>
+            <h3 className="px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.12em]" style={{ color: SWATCH[group] ?? C.dim }}>{group} <span style={{ color: C.dim }}>· {items.length}</span></h3>
             <ul className="grid grid-cols-2 gap-1 px-2">
               {items.map((c) => (
                 <li key={c.id}>
                   <button type="button" draggable onDragStart={(e) => { e.dataTransfer.setData(DRAG_MIME, c.id); e.dataTransfer.effectAllowed = 'copy'; }}
-                    onClick={() => onPlace(c)} title={`${c.label} — ${c.source}. Click to place at the view's centre, or drag into the view.`}
-                    className="w-full rounded-md border px-2 py-1.5 text-left transition-colors hover:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line, background: C.surface }}>
-                    <span className="block truncate text-[12px]" style={{ color: C.text }}>{c.label}</span>
-                    <span className="block truncate text-[10px]" style={{ color: C.dim }}>{c.source}</span>
+                    onClick={() => onPlace(c)} title={`${c.label}: tap to place it in the middle of the view, or drag it into the view (${c.source})`} aria-label={`Add ${c.label}`}
+                    className="flex min-h-10 w-full items-center rounded-md border px-2 py-1.5 text-left transition-colors hover:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line, background: C.surface }}>
+                    {/* STUDIO-EASY: the engine source ("FixtureLights · flood") moved to the tooltip and the search; the card says what it is */}
+                    <span className="block truncate text-[13px]" style={{ color: C.text }}>{c.label}</span>
                   </button>
                 </li>
               ))}

@@ -40,9 +40,16 @@ export function typingTarget(t: EventTarget | null): boolean {
   return el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'color', 'range'].includes(el.type ?? 'text');
 }
 
-export function VenueEditor({ studio }: { studio: StudioApi }) {
+/** STUDIO-EASY: what the shell's first-court guide asks of the editor (play the intro in the viewport). */
+export interface VenueEditorHandle { previewIntro(kind: 'establish' | 'walkIn'): boolean }
+
+export function VenueEditor({ studio, onHandle }: { studio: StudioApi; onHandle?(h: VenueEditorHandle | null): void }) {
   const { venue, doc, selected, setSelected, selection, setSelection, clip, setClip, run, seal } = studio;
   const vp = useRef<ViewportHandle | null>(null);
+  useEffect(() => {
+    onHandle?.({ previewIntro: (k) => vp.current?.previewIntro(k) ?? false });
+    return () => onHandle?.(null);
+  }, [onHandle]);
   const [tool, setTool] = useState<Tool>('move');
   const [camera, setCamera] = useState<CameraMode>('orbit');
   const [snap, setSnap] = useState<SnapSettings>(DEFAULT_SNAP);
@@ -196,8 +203,8 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
             {SNAP_MOVES.map((m) => <option key={m} value={m}>{m} m · {snap.turn}°</option>)}
           </select>
           <ToolButton title={clip ? `Paste ${clip.objects.length === 1 ? clip.objects[0].name : `${clip.objects.length} objects`} at the view's centre` : 'Paste (copy something first)'} shortcut="Ctrl+V" disabled={!clip} onClick={paste}><ClipboardPaste className="h-4 w-4" /></ToolButton>
-          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[11px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
-          {note && <span className="ml-2 text-[11px]" style={{ color: C.gold }}>{note}</span>}
+          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[12px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
+          {note && <span className="ml-2 text-[12px]" style={{ color: C.gold }}>{note}</span>}
         </div>
         <ViewportPanel ref={vp} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
           onPick={(id, mods) => setSelection(clickSelect(selection, id, mods.toggle ? 'toggle' : 'replace'))}

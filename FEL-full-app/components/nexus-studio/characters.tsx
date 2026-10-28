@@ -26,6 +26,7 @@ import { addCharacter, castCharacter, removeCharacter, renameCharacter, setChara
 import type { Command } from '@/lib/nexus-studio/commands';
 import type { StudioCharacter, StudioProject, StudioVenue } from '@/lib/nexus-studio/doc';
 import type { StudioApi } from './use-studio';
+import { EmptyState } from '@/components/ui/fel/empty-state';
 import { C, PanelTitle, Row, Select, TextField } from './ui';
 
 export interface ClosetLook { label: string; code: string; body: string }
@@ -80,11 +81,11 @@ function AddCharacter({ onAdd, compact }: { onAdd(c: { name: string; lookCode: s
       )}
       {mode === 'paste' && (
         <div className="mt-1.5 flex gap-1">
-          <input aria-label="Share code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="FEL2.…" className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 font-mono text-[11px] outline-none" style={{ borderColor: C.line, color: C.text }} />
+          <input aria-label="Share code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="FEL2.…" className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 font-mono text-[12px] outline-none" style={{ borderColor: C.line, color: C.text }} />
           <button type="button" disabled={busy || !code.trim()} onClick={() => void paste()} className="rounded-md px-2 py-1 text-[12px] font-semibold disabled:opacity-40" style={{ background: C.cyan, color: '#050505' }}>Add</button>
         </div>
       )}
-      {error && <p className="mt-1 text-[11px]" style={{ color: C.ember }} role="alert">{error}</p>}
+      {error && <p className="mt-1 text-[12px]" style={{ color: C.ember }} role="alert">{error}</p>}
     </div>
   );
 }
@@ -105,7 +106,7 @@ export function CastSlotField({ project, venue, run }: { project: StudioProject;
         <Select label="Player" value={current} options={[{ value: '', label: 'The player’s own look' }, ...project.characters.map((c) => ({ value: c.id, label: c.name }))]} onChange={(id) => run(castCharacter(venue, 'player', id || null))} />
       </Row>
       <Row label="In the crowd" hint={`Characters seated among the fans, in the stands' empty seats (up to ${CROWD_CAST_MAX}). Visual only; a phone keeps its card crowd.`}>
-        <span className="text-[11px]" style={{ color: crowd.length ? C.text : C.dim }} data-testid="crowd-cast-summary">{crowdSummary(project, venue)}</span>
+        <span className="text-[12px]" style={{ color: crowd.length ? C.text : C.dim }} data-testid="crowd-cast-summary">{crowdSummary(project, venue)}</span>
       </Row>
       {project.characters.length > 0 && (
         <div className="flex flex-wrap gap-1 px-3 pb-1">
@@ -114,7 +115,7 @@ export function CastSlotField({ project, venue, run }: { project: StudioProject;
             const full = !on && crowd.length >= CROWD_CAST_MAX;
             return (
               <button key={c.id} type="button" disabled={full} aria-pressed={on} onClick={() => { const cmd = toggleCrowdCast(venue, c.id); if (cmd) run(cmd); }}
-                className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: on ? C.gold : C.line, color: on ? C.gold : C.dim }}>
+                className="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] disabled:opacity-40" style={{ borderColor: on ? C.gold : C.line, color: on ? C.gold : C.dim }}>
                 <Users className="h-3 w-3" aria-hidden /> {c.name}
               </button>
             );
@@ -178,14 +179,14 @@ function ClosetEditPanel({ character, onApply, onCancel }: { character: StudioCh
   return (
     <div className="mx-3 my-2 rounded-lg border p-2" style={{ borderColor: C.gold, background: C.surface2 }} data-testid="closet-edit-panel" role="status">
       <p className="text-[12px]" style={{ color: C.text }}>Editing <b>{character.name}</b> in the Closet (another tab). Press <b>Back to Nexus Studio</b> there and the new look lands here as one step.</p>
-      <p className="mt-1 text-[11px]" style={{ color: C.dim }}>Or by hand: copy the code, paste it into the Closet (Code), edit, Share → copy, and paste the new code here.</p>
+      <p className="mt-1 text-[12px]" style={{ color: C.dim }}>Or by hand: copy the code, paste it into the Closet (Code), edit, Share → copy, and paste the new code here.</p>
       <div className="mt-1.5 flex flex-wrap items-center gap-1">
-        <button type="button" onClick={() => { void navigator.clipboard?.writeText(character.lookCode ?? '').then(() => setCopied(true), () => setCopied(false)); }} className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px]" style={{ borderColor: C.line, color: C.text }}><Copy className="h-3 w-3" aria-hidden /> {copied ? 'Copied' : 'Copy the code'}</button>
-        <input aria-label="Edited share code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="FEL2.…" className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-0.5 font-mono text-[11px] outline-none" style={{ borderColor: C.line, color: C.text }} />
-        <button type="button" disabled={!code.trim()} onClick={() => { void onApply(code.trim()).then(setError); }} className="rounded-md px-2 py-0.5 text-[11px] font-semibold disabled:opacity-40" style={{ background: C.cyan, color: '#050505' }}>Use this look</button>
+        <button type="button" onClick={() => { void navigator.clipboard?.writeText(character.lookCode ?? '').then(() => setCopied(true), () => setCopied(false)); }} className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-[12px]" style={{ borderColor: C.line, color: C.text }}><Copy className="h-3 w-3" aria-hidden /> {copied ? 'Copied' : 'Copy the code'}</button>
+        <input aria-label="Edited share code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="FEL2.…" className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-0.5 font-mono text-[12px] outline-none" style={{ borderColor: C.line, color: C.text }} />
+        <button type="button" disabled={!code.trim()} onClick={() => { void onApply(code.trim()).then(setError); }} className="rounded-md px-2 py-0.5 text-[12px] font-semibold disabled:opacity-40" style={{ background: C.cyan, color: '#050505' }}>Use this look</button>
         <button type="button" aria-label="Stop editing in the Closet" onClick={onCancel} className="rounded p-1 hover:bg-white/5"><X className="h-3.5 w-3.5" style={{ color: C.dim }} /></button>
       </div>
-      {error && <p className="mt-1 text-[11px]" style={{ color: C.ember }} role="alert">{error}</p>}
+      {error && <p className="mt-1 text-[12px]" style={{ color: C.ember }} role="alert">{error}</p>}
     </div>
   );
 }
@@ -198,12 +199,12 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
   return (
     <div className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6" data-testid="characters-track">
       <div className="w-full max-w-3xl rounded-xl border" style={{ borderColor: C.line, background: C.surface }}>
-        <PanelTitle right={<span className="text-[11px]" style={{ color: C.dim }}>Closet share codes · {doc.characters.length}</span>}>Characters</PanelTitle>
-        <p className="px-3 text-[12px]" style={{ color: C.dim }}>A character is a Closet look. Cast one as a venue’s player: the viewport stands it on the hero’s spot on the real rig, and Play-test dresses the mode’s hero in it. Seat up to {CROWD_CAST_MAX} among the fans (visual only). Edit the look itself in the Closet.</p>
+        <PanelTitle right={<span className="text-[12px]" style={{ color: C.dim }}>{doc.characters.length} {doc.characters.length === 1 ? 'character' : 'characters'}</span>}>Characters</PanelTitle>
+        <p className="px-3 text-[13px]" style={{ color: 'var(--fel-text-soft, #c3cad3)' }}>A character is a look from your Closet. Cast it as your player, or seat it with the fans.</p>
         <AddCharacter onAdd={(c) => run(addCharacter(doc, c).cmd)} />
         {closet.note && (
           <p className="mx-3 my-1 flex items-center justify-between rounded-md border px-2 py-1 text-[12px]" style={{ borderColor: C.line, color: C.emerald }} role="status" data-testid="closet-edit-note">
-            {closet.note}<button type="button" onClick={closet.dismiss} className="text-[11px]" style={{ color: C.dim }}>Dismiss</button>
+            {closet.note}<button type="button" onClick={closet.dismiss} className="text-[12px]" style={{ color: C.dim }}>Dismiss</button>
           </p>
         )}
         <ul className="divide-y" style={{ borderColor: C.line }}>
@@ -216,19 +217,19 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
               <div className="flex items-center gap-2 px-3 py-2">
                 <UserRound className="h-4 w-4 shrink-0" style={{ color: cast ? C.gold : C.dim }} aria-hidden />
                 <span className="w-44"><TextField label={`Name of ${c.name}`} value={c.name} onChange={(n) => run(renameCharacter(c.id, n))} onDone={seal} /></span>
-                <span className="min-w-0 flex-1 truncate font-mono text-[10px]" style={{ color: C.dim }} title={c.lookCode}>{c.lookCode?.slice(0, 18)}…</span>
+                <span className="min-w-0 flex-1 truncate font-mono text-[12px]" style={{ color: C.dim }} title={c.lookCode}>{c.lookCode?.slice(0, 18)}…</span>
                 {venue && (
-                  <button type="button" onClick={() => { run(castCharacter(venue, 'player', cast ? null : c.id)); if (!cast) onPreview?.(); }} className="shrink-0 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px]" style={{ borderColor: cast ? C.gold : C.line, color: cast ? C.gold : C.text }}>
+                  <button type="button" onClick={() => { run(castCharacter(venue, 'player', cast ? null : c.id)); if (!cast) onPreview?.(); }} className="shrink-0 whitespace-nowrap rounded-md border px-2 py-0.5 text-[12px]" style={{ borderColor: cast ? C.gold : C.line, color: cast ? C.gold : C.text }}>
                     {cast ? `Player in ${venue.name}` : `Cast in ${venue.name}`}
                   </button>
                 )}
                 {venue && (
                   <button type="button" disabled={crowdFull} aria-pressed={inCrowd} title={crowdFull ? `The crowd seats ${CROWD_CAST_MAX} characters at most` : 'Seat among the fans (visual only)'}
-                    onClick={() => { const cmd = toggleCrowdCast(venue, c.id); if (cmd) run(cmd); }} className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: inCrowd ? C.gold : C.line, color: inCrowd ? C.gold : C.text }}>
+                    onClick={() => { const cmd = toggleCrowdCast(venue, c.id); if (cmd) run(cmd); }} className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[12px] disabled:opacity-40" style={{ borderColor: inCrowd ? C.gold : C.line, color: inCrowd ? C.gold : C.text }}>
                     <Users className="h-3 w-3" aria-hidden /> {inCrowd ? 'In the crowd' : 'Seat in the crowd'}
                   </button>
                 )}
-                <button type="button" disabled={!c.lookCode} onClick={() => closet.start(c)} title="Open this look in the Closet Studio and bring the edit back" className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: closet.editing?.characterId === c.id ? C.gold : C.line, color: C.text }}>
+                <button type="button" disabled={!c.lookCode} onClick={() => closet.start(c)} title="Open this look in the Closet Studio and bring the edit back" className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[12px] disabled:opacity-40" style={{ borderColor: closet.editing?.characterId === c.id ? C.gold : C.line, color: C.text }}>
                   <PenLine className="h-3 w-3" aria-hidden /> Edit in the Closet
                 </button>
                 <button type="button" aria-label={`Delete ${c.name}`} onClick={() => { const cmd = removeCharacter(doc, c.id); if (cmd) run(cmd); }} className="rounded p-1 hover:bg-white/5"><Trash2 className="h-3.5 w-3.5" style={{ color: C.dim }} /></button>
@@ -237,7 +238,11 @@ export function CharactersTrack({ studio, onPreview }: { studio: StudioApi; onPr
               </li>
             );
           })}
-          {!doc.characters.length && <li className="px-3 py-3 text-[12px]" style={{ color: C.dim }}>No characters yet.</li>}
+          {!doc.characters.length && (
+            <li className="p-3" data-testid="characters-empty">
+              <EmptyState title="No characters yet" line="Tap From my Closet above to bring in a look you made." />
+            </li>
+          )}
         </ul>
       </div>
     </div>

@@ -168,7 +168,9 @@ export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(func
       )}
       {status !== 'ready' && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px]" style={{ color: status === 'error' ? C.crimson : C.dim }}>
-          {status === 'error' ? `The viewport could not start: ${error}` : 'Building the venue on the mode’s own engine path…'}
+          {status === 'error'
+            ? <span className="max-w-sm px-4 text-center">The 3D view could not start. Reload the page to try again.<span className="mt-1 block text-[12px]" style={{ color: C.dim }}>{error}</span></span>
+            : 'Loading the court…'}
         </div>
       )}
     </div>

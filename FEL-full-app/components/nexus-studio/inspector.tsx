@@ -82,12 +82,12 @@ function GroupFields({ objects, a }: { objects: readonly StudioObject[]; a: Grou
           <ToolButton title="Delete the selection" shortcut="Del" onClick={a.remove} disabled={allLocked}><Trash2 className="h-3.5 w-3.5" style={{ color: allLocked ? undefined : C.crimson }} /></ToolButton>
         </span>
       }>{objects.length} objects</PanelTitle>
-      <p className="px-3 pb-2 text-[11px]" style={{ color: C.dim }} data-testid="group-summary">{groupSummary(objects)}{locked ? ` · ${locked} locked (they stay put)` : ''}</p>
+      <p className="px-3 pb-2 text-[12px]" style={{ color: C.dim }} data-testid="group-summary">{groupSummary(objects)}{locked ? ` · ${locked} locked (they stay put)` : ''}</p>
       <Row label="Move / turn" hint="The gizmo moves, turns and scales the group about its centre; one undo step per drag">
         <span className="flex items-center gap-1">
           <ToolButton title="Turn the group 15° left" onClick={() => a.turn(15)}><RotateCcw className="h-3.5 w-3.5" /></ToolButton>
           <ToolButton title="Turn the group 15° right" onClick={() => a.turn(-15)}><RotateCw className="h-3.5 w-3.5" /></ToolButton>
-          <span className="text-[11px]" style={{ color: C.dim }}>W / E / R drag · arrows nudge</span>
+          <span className="text-[12px]" style={{ color: C.dim }}>W / E / R drag · arrows nudge</span>
         </span>
       </Row>
       <Row label="Show / lock">
@@ -99,7 +99,7 @@ function GroupFields({ objects, a }: { objects: readonly StudioObject[]; a: Grou
       <Row label="Stamp" hint="Keep this group in the project as a prefab stamp (the Stamps tab places it again)">
         <ToolButton title="Save selection as stamp" onClick={a.saveStamp}><PackagePlus className="h-3.5 w-3.5" /> <span>Save as stamp</span></ToolButton>
       </Row>
-      <p className="px-3 pt-2 text-[11px]" style={{ color: C.dim }}>Ctrl-click or Shift-click to add or drop one; Shift-drag a box in the view to add what it frames.</p>
+      <p className="px-3 pt-2 text-[12px]" style={{ color: C.dim }}>Ctrl-click or Shift-click to add or drop one; Shift-drag a box in the view to add what it frames.</p>
     </>
   );
 }
@@ -117,7 +117,7 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
           <ToolButton title="Delete" shortcut="Del" onClick={() => onDelete(o.id)} disabled={lock}><Trash2 className="h-3.5 w-3.5" style={{ color: lock ? undefined : C.crimson }} /></ToolButton>
         </span>
       }>Inspector</PanelTitle>
-      <p className="px-3 pb-2 text-[11px]" style={{ color: C.dim }}>{src}{lock ? ' · locked' : ''}</p>
+      <p className="px-3 pb-2 text-[12px]" style={{ color: C.dim }}>{src}{lock ? ' · locked' : ''}</p>
       <Row label="Name"><TextField label="Name" value={o.name} onChange={(v) => set({ name: v.slice(0, LIMITS.name) }, 'name')} onDone={seal} /></Row>
       <Row label="Position">
         <span className="grid grid-cols-3 gap-1">
@@ -142,7 +142,7 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
       )}
       {o.type === 'kitProp' && (
         <>
-          <Row label="Model"><code className="text-[11px]" style={{ color: C.dim }}>{o.kit}/{o.model}</code></Row>
+          <Row label="Model"><code className="text-[12px]" style={{ color: C.dim }}>{o.kit}/{o.model}</code></Row>
           <Row label="Tint" hint="A multiply over the kit's palette (VenueProps)">
             <span className="flex items-center gap-2">
               <Toggle label="Tint" on={!!o.tint} disabled={lock} onChange={(on) => set({ tint: on ? '#63d452' : undefined }, 'tint')} />
@@ -151,7 +151,7 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
           </Row>
         </>
       )}
-      {o.type === 'meshyProp' && <Row label="Scan"><code className="text-[11px]" style={{ color: C.dim }}>/models/meshy/{o.key}.glb</code></Row>}
+      {o.type === 'meshyProp' && <Row label="Scan"><code className="text-[12px]" style={{ color: C.dim }}>/models/meshy/{o.key}.glb</code></Row>}
       {o.type === 'fixture' && (
         <>
           <Row label="Role" hint="FixtureLights: a flood throws a spot, a lamp and a lantern a point light">
@@ -159,7 +159,7 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
           </Row>
           <Row label="Light"><ColorField label="Light colour" value={o.color} disabled={lock} onChange={(c) => set({ color: c }, 'light')} onDone={seal} /></Row>
           <Row label="Height (m)"><NumberField label="Height" value={o.height} step={0.5} min={LIMITS.fixtureHeight[0]} max={LIMITS.fixtureHeight[1]} disabled={lock} onChange={(h) => set({ height: h }, 'height')} onDone={seal} /></Row>
-          <p className="px-3 pt-1 text-[11px]" style={{ color: C.dim }}>Lights the venue on desktop and TV (FixtureLights); a phone draws the lit head only.</p>
+          <p className="px-3 pt-1 text-[12px]" style={{ color: C.dim }}>Lights the venue on desktop and TV (FixtureLights); a phone draws the lit head only.</p>
         </>
       )}
       {o.type === 'crowdStand' && (
@@ -175,13 +175,13 @@ function ObjectFields({ venue, object: o, run, seal, onDelete, onDuplicate }: In
           <Row label="Posture"><Select label="Posture" value={o.posture} disabled={lock} options={[{ value: 'seated', label: 'Seated' }, { value: 'standing', label: 'Standing' }]} onChange={(v) => set({ posture: v }, 'posture')} /></Row>
           <Row label="Benches"><Toggle label="Benches" on={o.benches} disabled={lock} onChange={(b) => set({ benches: b }, 'benches')} /></Row>
           <Row label="Empty seats"><NumberField label="Empty share" value={o.gaps} step={0.05} min={0} max={0.9} disabled={lock} onChange={(g) => set({ gaps: g }, 'gaps')} onDone={seal} /></Row>
-          <p className="px-3 pt-1 text-[11px]" style={{ color: C.dim }}>Fans face the stand's front (the arrow). No seat is laid between the play camera and the play.</p>
+          <p className="px-3 pt-1 text-[12px]" style={{ color: C.dim }}>Fans face the stand's front (the arrow). No seat is laid between the play camera and the play.</p>
         </>
       )}
       {o.type === 'decal' && (
         <Row label="Mark"><Select label="Mark" value={o.kind} disabled={lock} options={DECAL_KINDS.map((k) => ({ value: k, label: k }))} onChange={(k) => set({ kind: k }, 'mark')} /></Row>
       )}
-      {o.type === 'cameraMark' && <p className="px-3 text-[11px]" style={{ color: C.dim }}>Where the broadcast intro and the replay angles frame the play. Without one, the mode's own hero spot.</p>}
+      {o.type === 'cameraMark' && <p className="px-3 text-[12px]" style={{ color: C.dim }}>Where the broadcast intro and the replay angles frame the play. Without one, the mode's own hero spot.</p>}
     </>
   );
 }
@@ -205,7 +205,7 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
             set({ base: { spec: t.spec, target: t.key }, ...(ok ? {} : { weather: 'natural' as StudioWeather }) }, 'plays in');
           }} />
       </Row>
-      {target?.furniture && <p className="px-3 pb-1 text-[11px]" style={{ color: C.dim }}>{target.label} lays its own field over the {v.base.spec} ground (shown in the view); the floor colours apply under it.</p>}
+      {target?.furniture && <p className="px-3 pb-1 text-[12px]" style={{ color: C.dim }}>{target.label} lays its own field over the {v.base.spec} ground (shown in the view); the floor colours apply under it.</p>}
 
       {project && (<><PanelTitle>Cast</PanelTitle><CastSlotField project={project} venue={v} run={run} /></>)}
 
@@ -248,7 +248,7 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
 
       <PanelTitle>Weather</PanelTitle>
       {target?.modeWeather
-        ? <p className="px-3 text-[11px]" style={{ color: C.dim }} data-testid="mode-weather">{target.modeWeather}</p>
+        ? <p className="px-3 text-[12px]" style={{ color: C.dim }} data-testid="mode-weather">{target.modeWeather}</p>
         : (
           <Row label="Weather" hint="WeatherFx: the look only; the mode's handling never reads it">
             <Select label="Weather" value={v.weather} options={weathers.map((w) => ({ value: w.id as StudioWeather, label: w.name.charAt(0) + w.name.slice(1).toLowerCase() }))} onChange={(w) => set({ weather: w }, 'weather')} />
@@ -262,7 +262,7 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
           <ToolButton title="Preview the intro" disabled={v.intro === 'none'} onClick={() => { if (v.intro !== 'none') onPreviewIntro(v.intro); }}><Clapperboard className="h-3.5 w-3.5" /></ToolButton>
         </span>
       </Row>
-      <div className="px-3 pt-1 text-[11px]" style={{ color: C.dim }}>Replay angles (broadcastShots) — tick to keep, click the camera to look through it:</div>
+      <div className="px-3 pt-1 text-[12px]" style={{ color: C.dim }}>Replay angles (broadcastShots) — tick to keep, click the camera to look through it:</div>
       <ul className="grid grid-cols-2 gap-1 px-3 pt-1">
         {REPLAY_ANGLES.map((a) => {
           const on = v.replayAngles.includes(a);
@@ -277,7 +277,7 @@ function VenueFields({ venue: v, run, seal, onPreviewIntro, onPreviewReplay, pro
           );
         })}
       </ul>
-      <p className="px-3 pt-2 text-[11px]" style={{ color: C.dim }}>{target?.replays
+      <p className="px-3 pt-2 text-[12px]" style={{ color: C.dim }}>{target?.replays
         ? `${target.label} opens on the intro you pick and replays its big moments through the ticked angles, in this order${v.replayAngles.length ? '' : ' (none ticked: its own cut)'}.`
         : `${target?.label ?? 'This mode'} opens on the intro you pick. It has no replays, so the angles are kept for a mode that does.`}</p>
     </>

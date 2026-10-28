@@ -30,7 +30,7 @@ function StampRow({ s, onPlace, children }: { s: StudioStamp; onPlace(): void; c
         <Stamp className="h-3.5 w-3.5 shrink-0" style={{ color: C.gold }} aria-hidden />
         <span className="min-w-0">
           <span className="block truncate text-[12px]" style={{ color: C.text }}>{s.name}</span>
-          <span className="block truncate text-[10px]" style={{ color: C.dim }}>{stampSummary(s)}</span>
+          <span className="block truncate text-[12px]" style={{ color: C.dim }}>{stampSummary(s)}</span>
         </span>
       </button>
       {children}
@@ -63,7 +63,7 @@ export function StampShelf({ project, selectionCount, onPlace, onSave, onRename,
           className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 text-[12px] outline-none" style={{ borderColor: C.line, color: C.text }} />
         <ToolButton title="Save selection as stamp" disabled={!selectionCount || full} onClick={() => { onSave(name); setName(''); }}><PackagePlus className="h-4 w-4" /></ToolButton>
       </div>
-      {full && <p className="px-3 pb-1 text-[11px]" style={{ color: C.ember }}>A project keeps {LIMITS.stamps} stamps at most.</p>}
+      {full && <p className="px-3 pb-1 text-[12px]" style={{ color: C.ember }}>A project keeps {LIMITS.stamps} stamps at most.</p>}
       <ul className="grid gap-1 px-2" aria-label="Project stamps">
         {mine.map((s) => (
           <StampRow key={s.id} s={s} onPlace={() => onPlace(s)}>
@@ -74,7 +74,7 @@ export function StampShelf({ project, selectionCount, onPlace, onSave, onRename,
           </StampRow>
         ))}
       </ul>
-      {!mine.length && <p className="px-3 pt-1 text-[11px]" style={{ color: C.dim }}>Select a few objects (Shift-drag a box in the view), name them, and save them as a stamp. They are kept in the project and its export.</p>}
+      {!mine.length && <p className="px-3 pt-1 text-[12px]" style={{ color: C.dim }}>Select a few objects (Shift-drag a box in the view), name them, and save them as a stamp. They are kept in the project and its export.</p>}
     </div>
   );
 }

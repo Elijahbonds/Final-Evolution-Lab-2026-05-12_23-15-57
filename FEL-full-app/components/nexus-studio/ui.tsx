@@ -23,7 +23,7 @@ export const C = {
 export function PanelTitle({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (
     <div className="flex items-center justify-between px-3 pb-1.5 pt-3">
-      <h2 className="font-display text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: C.dim }}>{children}</h2>
+      <h2 className="font-display text-[12px] font-semibold uppercase tracking-[0.16em]" style={{ color: C.dim }}>{children}</h2>
       {right}
     </div>
   );
@@ -69,7 +69,7 @@ export function ColorField({ value, onChange, onDone, disabled, label }: { value
     <span className="flex items-center gap-2">
       <input type="color" aria-label={label} value={value} disabled={disabled} className="h-6 w-9 cursor-pointer rounded border bg-transparent p-0" style={{ borderColor: C.line }}
         onChange={(e) => onChange(e.target.value)} onBlur={() => onDone?.()} />
-      <code className="text-[11px]" style={{ color: C.dim }}>{value}</code>
+      <code className="text-[12px]" style={{ color: C.dim }}>{value}</code>
     </span>
   );
 }

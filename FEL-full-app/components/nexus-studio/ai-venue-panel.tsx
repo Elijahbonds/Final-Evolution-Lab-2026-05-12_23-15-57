@@ -56,7 +56,11 @@ export function aiRequestBody(venue: Parameters<typeof venueForAi>[0], ask: { pr
   return JSON.stringify('explain' in ask ? { mode: 'explain', venue: venueForAi(venue) } : { prompt: ask.prompt, venue: venueForAi(venue) });
 }
 
-export function AiVenuePanel({ studio, onApplied }: { studio: StudioApi; onApplied?(): void }) {
+export function AiVenuePanel({ studio, onApplied, onBuildByHand, onGuide }: {
+  studio: StudioApi; onApplied?(): void;
+  /** STUDIO-EASY: the way on when the AI builder is off — build by hand, or the first-court guide */
+  onBuildByHand?(): void; onGuide?(): void;
+}) {
   const [ai, markComingSoon] = useAiStatus('studio');
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
@@ -114,11 +118,18 @@ export function AiVenuePanel({ studio, onApplied }: { studio: StudioApi; onAppli
 
   return (
     <section className="flex min-h-0 flex-col" aria-label="Build a venue with CELL" data-testid="ai-venue-panel">
-      <PanelTitle right={<span className="text-[11px]" style={{ color: C.dim }}>Studio commands · one undo step</span>}>Build the venue with CELL</PanelTitle>
+      <PanelTitle right={<span className="text-[12px]" style={{ color: C.dim }}>Studio commands · one undo step</span>}>Build the venue with CELL</PanelTitle>
       {!available ? (
-        <p className="px-3 text-[12px]" style={{ color: ai === 'loading' ? C.dim : C.gold }} data-testid="ai-venue-status">
-          {ai === 'loading' ? 'Checking the AI builder…' : AI_COMING_SOON_MESSAGE.studio}
-        </p>
+        // STUDIO-EASY: "coming soon" was a dead end over a greyed-out form; it now says what to do instead, with the two ways on
+        <div className="mx-3 rounded-lg border p-3" style={{ borderColor: ai === 'loading' ? C.line : 'rgba(255,215,0,0.35)', background: C.surface2 }} data-testid="ai-venue-status" role="status">
+          <p className="text-[14px]" style={{ color: ai === 'loading' ? C.dim : C.gold }}>{ai === 'loading' ? 'Checking the AI builder…' : AI_COMING_SOON_MESSAGE.studio}</p>
+          {ai !== 'loading' && (onBuildByHand || onGuide) && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {onBuildByHand && <button type="button" onClick={onBuildByHand} className="min-h-10 rounded-md px-3 text-[13px] font-semibold" style={{ background: C.cyan, color: '#050505' }} data-testid="ai-build-by-hand">Build by hand</button>}
+              {onGuide && <button type="button" onClick={onGuide} className="min-h-10 rounded-md border px-3 text-[13px]" style={{ borderColor: C.line, color: C.text }}>Make your first court</button>}
+            </div>
+          )}
+        </div>
       ) : null}
       <div className="px-3 py-2">
         <textarea
@@ -132,8 +143,8 @@ export function AiVenuePanel({ studio, onApplied }: { studio: StudioApi; onAppli
             className="flex items-center gap-1.5 rounded-md px-3 py-1 text-[12px] font-semibold disabled:opacity-40" style={{ background: C.cyan, color: '#050505' }}>
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />} Build into “{venue?.name ?? 'venue'}”
           </button>
-          {AI_VENUE_EXAMPLES.map((x) => (
-            <button key={x} type="button" disabled={!available || busy} onClick={() => setPrompt(x)} className="rounded-full border px-2 py-0.5 text-[11px] disabled:opacity-40" style={{ borderColor: C.line, color: C.dim }}>{x}</button>
+          {available && AI_VENUE_EXAMPLES.map((x) => (
+            <button key={x} type="button" disabled={!available || busy} onClick={() => setPrompt(x)} className="rounded-full border px-2 py-0.5 text-[12px] disabled:opacity-40" style={{ borderColor: C.line, color: C.dim }}>{x}</button>
           ))}
         </div>
         <div className="mt-2 flex items-center gap-1.5">
@@ -141,13 +152,13 @@ export function AiVenuePanel({ studio, onApplied }: { studio: StudioApi; onAppli
             className="flex items-center gap-1.5 rounded-md border px-3 py-1 text-[12px] disabled:opacity-40" style={{ borderColor: C.line, color: C.text }}>
             {explaining ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <BookOpen className="h-3.5 w-3.5" aria-hidden />} Explain this venue
           </button>
-          <span className="text-[11px]" style={{ color: C.dim }}>Read only: CELL describes it, nothing changes.</span>
+          <span className="text-[12px]" style={{ color: C.dim }}>Read only: CELL describes it, nothing changes.</span>
         </div>
         {error && <p className="mt-2 text-[12px]" style={{ color: C.ember }} role="alert">{error}</p>}
       </div>
       {summary && (
         <div className="mx-3 mb-3 rounded-lg border p-2" style={{ borderColor: C.line, background: C.surface2 }} data-testid="ai-venue-summary">
-          <p className="flex items-center justify-between text-[11px] uppercase tracking-[0.14em]" style={{ color: C.dim }}>
+          <p className="flex items-center justify-between text-[12px] uppercase tracking-[0.14em]" style={{ color: C.dim }}>
             <span>CELL explains “{venue?.name ?? 'the venue'}” · no edits</span>
             <button type="button" onClick={() => setSummary(null)} aria-label="Close the summary" className="rounded p-0.5 hover:bg-white/5"><X className="h-3.5 w-3.5" /></button>
           </p>
@@ -156,11 +167,11 @@ export function AiVenuePanel({ studio, onApplied }: { studio: StudioApi; onAppli
       )}
       {review && (
         <div className="mx-3 mb-3 rounded-lg border p-2" style={{ borderColor: C.line, background: C.surface2 }} data-testid="ai-venue-review">
-          <p className="text-[11px] uppercase tracking-[0.14em]" style={{ color: C.dim }}>CELL proposes {pending!.edits.length} edit(s) — review, then apply</p>
+          <p className="text-[12px] uppercase tracking-[0.14em]" style={{ color: C.dim }}>CELL proposes {pending!.edits.length} edit(s) — review, then apply</p>
           <ol className="mt-1 max-h-56 list-decimal space-y-0.5 overflow-y-auto pl-5 text-[12px]" style={{ color: C.text }}>
-            {review.lines.map((l, i) => <li key={i} style={review.skipped[i] ? { color: C.dim, textDecoration: 'line-through' } : undefined}>{l}{review.skipped[i] && <span className="ml-1 text-[11px]" style={{ color: C.gold, textDecoration: 'none', display: 'inline-block' }}>({review.skipped[i]})</span>}</li>)}
+            {review.lines.map((l, i) => <li key={i} style={review.skipped[i] ? { color: C.dim, textDecoration: 'line-through' } : undefined}>{l}{review.skipped[i] && <span className="ml-1 text-[12px]" style={{ color: C.gold, textDecoration: 'none', display: 'inline-block' }}>({review.skipped[i]})</span>}</li>)}
           </ol>
-          {review.note && <p className="mt-1 text-[11px]" style={{ color: C.gold }}>{review.note}</p>}
+          {review.note && <p className="mt-1 text-[12px]" style={{ color: C.gold }}>{review.note}</p>}
           <div className="mt-2 flex gap-1.5">
             <button type="button" onClick={apply} disabled={!pending!.edits.length} className="flex items-center gap-1 rounded-md px-3 py-1 text-[12px] font-semibold disabled:opacity-40" style={{ background: C.emerald, color: '#050505' }}>
               <Check className="h-3.5 w-3.5" aria-hidden /> Apply as one step

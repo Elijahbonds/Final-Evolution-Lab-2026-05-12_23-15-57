@@ -70,6 +70,10 @@ export function tabForPath(pathname: string): TabDef | null {
 export function chromeHiddenFor(pathname: string): boolean {
   return pathname.startsWith('/play/')
     || pathname.startsWith('/dev/')
+    // STUDIO-EASY (2026-10-28): Nexus Studio is a full-screen editor with its own header and its own way back; the rail pushed its
+    // bottom strip off a desktop screen, the phone bar sat over it, and the menus' arrow-key focus moved focus while an arrow
+    // nudged the selection
+    || pathname === '/studio' || pathname.startsWith('/studio/')
     || pathname === '/story/boss'
     || pathname === '/story/rail';
 }
