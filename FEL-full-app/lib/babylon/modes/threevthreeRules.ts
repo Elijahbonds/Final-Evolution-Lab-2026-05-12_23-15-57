@@ -95,6 +95,8 @@ export function kickTarget(passer: XZ, mates: readonly XZ[], defenders: readonly
   });
   return best;
 }
+/** hoops-p03: the floor reads, as one set for the team offence (hoops/teamOffense3v3 imports no mode; the mode hands it these). */
+export const TEAM_READS = { cutOff, kickTarget, laneClear, openness, KICK_OPEN_M, KICK_READ_FROM_K, KICK_READ_TO_K } as const;
 /** The open receiver lets it go off the catch (not inside SHOOT_MIN_RIM_M: there he attacks). */
 export function catchAndShoot(open: number, distToRim: number, knobs: ThreeVThreeKnobs, roll: number): boolean {
   return open >= SHOOT_OPEN_M && distToRim >= SHOOT_MIN_RIM_M && roll < knobs.catchShoot;

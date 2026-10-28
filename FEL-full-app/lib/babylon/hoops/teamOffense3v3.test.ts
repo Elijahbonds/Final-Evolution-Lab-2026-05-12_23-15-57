@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { TeamOffense3v3, TEAM_TIER, TEAM_OFFENSE_ON, TEAM_GATHER_TELL_SEC, RIVAL_TAKE_BACK_M, RIVAL_BUDGET_SEC, type TeamView, type HandlerStep } from './teamOffense3v3';
 import { AiMover } from '../core/AiMovement';
+import { TEAM_READS } from '../modes/threevthreeRules';
 
 const DT = 1 / 60;
 const RIM = { x: 0, z: -0.6 };
@@ -11,7 +12,7 @@ type P = { x: number; z: number };
 
 /** A possession: the handler on an AiMover (as the mode moves him), his mates still, my defenders placed by `def`. */
 function play(tier: 'rookie' | 'pro' | 'elite', o: { start?: P; def?: (h: P, t: number) => P[]; mates?: P[]; screen?: (t: number) => TeamView['screen']; seed?: number; maxSec?: number } = {}) {
-  const team = new TeamOffense3v3(tier, seeded(o.seed ?? 7));
+  const team = new TeamOffense3v3(tier, TEAM_READS, seeded(o.seed ?? 7));
   team.beginPossession(); team.beginTouch({ fresh: true, intent: 'around' });
   const h = { ...(o.start ?? { x: 1, z: 2.5 }) };
   const mv = new AiMover(3.8);
@@ -69,7 +70,7 @@ describe('hoops/teamOffense3v3', () => {
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
       let called = -1;
       const screen = (t: number): TeamView['screen'] => (called < 0 ? null : { idx: 0, phase: t - called > 1.0 ? 'set' : 'approach', at: { x: 0.9, z: 7.0 } });
-      const team = new TeamOffense3v3('elite', seeded(seed)); team.beginPossession(); team.beginTouch({ fresh: false, intent: 'around' });
+      const team = new TeamOffense3v3('elite', TEAM_READS, seeded(seed)); team.beginPossession(); team.beginTouch({ fresh: false, intent: 'around' });
       const h = { x: 0, z: 8 }; const mv = new AiMover(3.8); let sawUse = false;
       for (let t = 0; t < 12; t += DT) {
         const s = team.step(DT, { handler: h, handlerVel: mv.vel, mates: [{ x: 0.9, z: 7 }, { x: 5, z: 4 }], defenders: [{ x: h.x + 0.3, z: h.z - 1.3 }, { x: 4, z: 3 }], rim: RIM, screen: screen(t) });
@@ -89,7 +90,7 @@ describe('hoops/teamOffense3v3', () => {
     expect(TEAM_TIER.elite.readsScreen).toBe(true);
   });
   it('a pass is counted against the tier\'s passes', () => {
-    const t = new TeamOffense3v3('rookie'); t.beginPossession();
+    const t = new TeamOffense3v3('rookie', TEAM_READS); t.beginPossession();
     expect(t.passesLeft).toBe(TEAM_TIER.rookie.passes);
     t.notePass();
     expect(t.passesLeft).toBe(TEAM_TIER.rookie.passes - 1);

@@ -24,9 +24,20 @@
 import { feel } from '../../feel-panel/feel';
 import { profileFor, type Tier, type TierProfile } from '../core/Difficulty';
 import { driveLateral, type DriveIntent } from '../core/DriveLine';
-import { cutOff, kickTarget, laneClear, openness, KICK_OPEN_M, KICK_READ_FROM_K, KICK_READ_TO_K, type XZ } from '../modes/threevthreeRules';
 import { Vector3 } from '@babylonjs/core';
 import { KIT_WEIGHTS, KIT_CROSSES, moveFrame, pickWeighted, intoBody, type KitMove, type RivalAction } from './rivalOffense';
+
+/** A planar point. */
+export interface XZ { x: number; z: number }
+/** The team's floor reads — the release's (modes/threevthreeRules: cutOff, kickTarget, laneClear, openness and the kick read's window),
+ *  handed in by the mode so this module imports no mode (hoops/hoopsWiring's guard); `threevthreeRules.TEAM_READS` is the set. */
+export interface TeamReads {
+  cutOff(driver: XZ, dir: XZ, defenders: readonly XZ[]): boolean;
+  kickTarget(passer: XZ, mates: readonly XZ[], defenders: readonly XZ[]): number;
+  laneClear(from: XZ, to: XZ, defenders: readonly XZ[]): boolean;
+  openness(p: XZ, defenders: readonly XZ[]): number;
+  KICK_OPEN_M: number; KICK_READ_FROM_K: number; KICK_READ_TO_K: number;
+}
 
 // ── THE NUMBERS (feel knobs, group "Hoops · rival offense") ──────────────────────────────────────────────────────────────────
 /** 1 = the team offence on bodies; 0 = the release's one lerped drive exactly (the A/B). Knob `hoops.teamOffenseOn`. */
@@ -122,7 +133,7 @@ export class TeamOffense3v3 {
   private probeFor = 0; private movesLeft = 0; private move: KitMove | null = null; private moveT = 0; private moveSide: 1 | -1 = 1; private nextMoveAt = 0;
   private screenMate = -1; private useSide: 1 | -1 = 1; private containedT = 0; private kickRead = false; private gatherKind: 'rim' | 'pullup' = 'rim';
   private attackMoves = 0; private intent: DriveIntent = 'around'; private attackFrom: XZ = ZERO; private attackLen = 1; private tellT = 0;
-  constructor(readonly tier: Tier, private rng: () => number = Math.random) { this.tt = TEAM_TIER[tier]; this.profile = profileFor(tier); }
+  constructor(readonly tier: Tier, private readonly R: TeamReads, private rng: () => number = Math.random) { this.tt = TEAM_TIER[tier]; this.profile = profileFor(tier); }
 
   /** A new possession (their ball from the check / a make / a board). */
   beginPossession(): void { this.elapsed = 0; this.passes = 0; this.screens = 0; this.actions = []; }
@@ -233,7 +244,7 @@ export class TeamOffense3v3 {
           const passed = len(v.handler.x - v.rim.x, v.handler.z - v.rim.z) < len(s.at.x - v.rim.x, s.at.z - v.rim.z) - 0.3;
           // the roll man, open, with a clear lane: hit him (PRO+), when the defence went with the ball
           const mate = v.mates[this.screenMate];
-          if (this.tt.readsScreen && s.phase === 'roll' && mate && this.passesLeft > 0 && inLane && openness(mate, v.defenders) >= KICK_OPEN_M && laneClear(v.handler, mate, v.defenders)) {
+          if (this.tt.readsScreen && s.phase === 'roll' && mate && this.passesLeft > 0 && inLane && this.R.openness(mate, v.defenders) >= this.R.KICK_OPEN_M && this.R.laneClear(v.handler, mate, v.defenders)) {
             out.pass = this.screenMate; break;
           }
           if (passed || this.phaseT > USE_MAX_SEC) this.startAttack(v);
@@ -274,15 +285,15 @@ export class TeamOffense3v3 {
           }
         }
         // the kick read: once, cut off inside the read window with an open man
-        if (!this.move && !this.kickRead && k >= KICK_READ_FROM_K && k <= KICK_READ_TO_K && cutOff(v.handler, ed, v.defenders)) {
+        if (!this.move && !this.kickRead && k >= this.R.KICK_READ_FROM_K && k <= this.R.KICK_READ_TO_K && this.R.cutOff(v.handler, ed, v.defenders)) {
           this.kickRead = true;
-          const pick = kickTarget(v.handler, v.mates, v.defenders);
+          const pick = this.R.kickTarget(v.handler, v.mates, v.defenders);
           if (pick >= 0 && this.passesLeft > 0 && this.rng() < this.tt.swingChance + 0.2) { out.pass = pick; break; }
         }
         // still held in front with no moves left: the pull-up (inside the arc), the kick-out, or — late in the budget — a forced shot
         const stuck = !this.move && this.containedT >= attackPullUpSec() && (this.attackMoves === 0 || this.containedT >= attackPullUpSec() * 2);
         if (stuck && rimDist <= pullUpMaxM() && rimDist > 2.4) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
-        if (stuck && this.passesLeft > 0) { const pick = kickTarget(v.handler, v.mates, v.defenders); if (pick >= 0) { out.pass = pick; break; } }
+        if (stuck && this.passesLeft > 0) { const pick = this.R.kickTarget(v.handler, v.mates, v.defenders); if (pick >= 0) { out.pass = pick; break; } }
         if (stuck && this.elapsed >= this.budget + FORCED_AFTER_SEC) { this.gatherKind = 'pullup'; this.go('gather'); out.gather = 'pullup'; break; }
         if (el <= sp * TEAM_GATHER_TELL_SEC + 0.05) { this.move = null; this.gatherKind = 'rim'; this.go('gather'); out.gather = 'rim'; }
         out.k = Math.min(1 - (TEAM_GATHER_TELL_SEC + 0.01), 0.1 + 0.8 * k);
@@ -322,7 +333,7 @@ export class TeamOffense3v3 {
       if (best >= 0) { this.screenMate = best; this.screens++; out.callScreen = best; out.action = this.say('screen'); this.go('screen'); return; }
     }
     if (!over && this.passesLeft > 0) {
-      const pick = kickTarget(v.handler, v.mates, v.defenders);
+      const pick = this.R.kickTarget(v.handler, v.mates, v.defenders);
       if (pick >= 0 && this.rng() < this.tt.swingChance) { out.pass = pick; return; }
     }
     this.startAttack(v); out.action = out.action ?? this.say('drive');

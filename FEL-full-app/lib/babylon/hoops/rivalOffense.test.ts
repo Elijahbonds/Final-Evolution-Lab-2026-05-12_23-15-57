@@ -151,13 +151,16 @@ describe('hoops/rivalOffense — a possession', () => {
     expect(rivalShotPct(2.2, 0.5, 'layup')).toBeCloseTo(0.74 - 0.21, 6);
   });
   it('a strip on a move teaches him: the move he lost it on is leaned on less', () => {
-    const b = new AttackerBrain(seeded(1)); const kit = new RivalKit('elite', seeded(2)); b.useKit(kit);
-    const self = new Vector3(0, 0, 8);
-    let lost: string | null = null;
-    for (let t = 0; t < 6 && !lost; t += DT) { const d = b.decide(DT, self, mirror(1.1)(t, self), RIM); self.addInPlace(d.wish.scale(DT)); if (d.exposure >= STEAL_EXPOSURE_MIN && d.phase !== 'drive') { lost = kit.actions[kit.actions.length - 1] ?? null; b.noteStolen(); } }
-    expect(lost).not.toBeNull();
-    const m = (lost === 'hesitation' || lost === 'in_and_out' || lost === 'crossover' ? lost : 'crossover') as KitMove;
-    expect(kit.memory[m]).toBeLessThan(0);
+    for (let seed = 1; seed < 40; seed++) {
+      const b = new AttackerBrain(seeded(seed)); const kit = new RivalKit('elite', seeded(seed + 100)); b.useKit(kit);
+      const self = new Vector3(0, 0, 8);
+      let lost: string | null = null;
+      for (let t = 0; t < 6 && !lost; t += DT) { const d = b.decide(DT, self, mirror(1.1)(t, self), RIM); self.addInPlace(d.wish.scale(DT)); if (d.exposure >= STEAL_EXPOSURE_MIN && d.phase !== 'drive') { lost = kit.actions[kit.actions.length - 1] ?? null; b.noteStolen(); } }
+      if (!lost || !['hesitation', 'in_and_out', 'crossover'].includes(lost)) continue;
+      expect(kit.memory[lost as KitMove]).toBeLessThan(0);
+      return;
+    }
+    throw new Error('no seed exposed the ball on a move');
   });
   it('the release\'s script is untouched without a kit (the brain\'s default)', () => {
     const b = new AttackerBrain(seeded(7));

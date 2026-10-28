@@ -56,7 +56,7 @@ export async function sim3v3(tier: string, o: Opts) {
     let offBr = foes.map((_, i) => new TeammateBrain(foeSpaceAngle(i)));
     const remark = () => { const m = assignMateMarks([mine[1], mine[2]], foes, hi); mateBr.forEach((b, i) => b.setMark(m[i])); offBr = foes.map((_, i) => new TeammateBrain(foeSpaceAngle(i))); };
     remark();
-    const plan = new TeamOffense3v3(tier as 'pro', rng); plan.beginPossession();
+    const plan = new TeamOffense3v3(tier as 'pro', rules.TEAM_READS, rng); plan.beginPossession();
     const acts: string[] = []; let passes = 0, screens = 0;
     let meStun = 0, jumpAge = Infinity, nextPoke = 0.5 + rng() * 0.9, gatherSeen = -1, jumped = false;
     let t = 0, end = '';

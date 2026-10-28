@@ -204,7 +204,7 @@ import { hornCall, overtimeSec, periodLabel, OVERTIME_BALL, OVERTIME_BANNER, OVE
 import { readTier, type Tier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #3: the shared OPPONENT pick
 import { hintSwap } from './onevoneRules';     // IMPROVE (2026-10-06) #7: the 1v1's hint dwell (the urgent lines share its prefixes)
 import {   // IMPROVE (2026-10-06): the threevthree items of docs/IMPROVEMENTS-2026-10-05.md, as pure logic
-  THREEV_TIER, tierForRun, cutOff, kickTarget, openness, catchAndShoot, KICK_READ_FROM_K, KICK_READ_TO_K, SWING_PICK_M,
+  THREEV_TIER, TEAM_READS, tierForRun, cutOff, kickTarget, openness, catchAndShoot, KICK_READ_FROM_K, KICK_READ_TO_K, SWING_PICK_M,
   rivalPoints, goaltendAward, rivalReleasePct, passPreviewLabel, MARK_COLOR, hintFor, emptyBox, lodFor, type Lod,
 } from './threevthreeRules';
 import type { FelInput } from '../core/InputBus';
@@ -542,7 +542,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
   let teamO: TeamOffense3v3 | null = null;
   /** …its handler, and how exposed his ball is this frame (the planner's read; my poke uses it in place of his lateral speed). */
   let teamDriver: Body | null = null, teamExposure = 0;
-  const teamOff = (): TeamOffense3v3 | null => { if (!teamOffenseOn()) return (teamO = null); const t = runTier(); if (!teamO || teamO.tier !== t) teamO = new TeamOffense3v3(t); return teamO; };
+  const teamOff = (): TeamOffense3v3 | null => { if (!teamOffenseOn()) return (teamO = null); const t = runTier(); if (!teamO || teamO.tier !== t) teamO = new TeamOffense3v3(t, TEAM_READS); return teamO; };
   /** #2: what their shot in the air is worth (a goaltend on it awards this). */
   let foeShotPoints = 2;
   /** #9: my box score for the end card. */
@@ -4358,7 +4358,8 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     driverDribbling = false; carries.get(shooter)?.update(0, 0, false);
     if (contactDone) return;
     if (possessionToken !== tok) return;
-    if (kickTo && !driveStolen) { if (team) { team.notePass(); console.info(`[3V3-AI] rival action swing_pass (foe${foes.indexOf(shooter)} → foe${foes.indexOf(kickTo)} at ${team.elapsed.toFixed(1)} s)`); } throwSwing(ctx, shooter, kickTo); return; }   // IMPROVE (2026-10-06) #1   // hoops-p03: a team pass counts
+    if (kickTo && !driveStolen && team) { team.notePass(); console.info(`[3V3-AI] rival action swing_pass (foe${foes.indexOf(shooter)} → foe${foes.indexOf(kickTo)} at ${team.elapsed.toFixed(1)} s)`); }   // hoops-p03: a team pass counts
+    if (kickTo && !driveStolen) { throwSwing(ctx, shooter, kickTo); return; }   // IMPROVE (2026-10-06) #1
     if (driveStolen) {
       // D2: the ball knocked LOOSE from his hand toward me; the possession follows once it settles
       driveStolen = false;
