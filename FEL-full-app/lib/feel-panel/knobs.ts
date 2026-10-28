@@ -961,6 +961,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'dunk.landLeadSec', label: 'Landing: absorb starts before touchdown', def: 0, min: 0, max: 0.25, step: 0.01, unit: 's', group: 'Dunk · landing',
     source: 'lib/babylon/core/DunkFlagship.ts LAND_LEAD_SEC',
     hint: 'How early the landing crouch fades in while you fall. 0 = on touchdown (as shipped). Measured: earlier makes the hips arrive faster into the same short crouch.',
+  },
+  {
+    id: 'dunk.realJumpPersonal', label: 'Body dunk: your verified jump is a full take-off', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · body',
+    source: 'lib/babylon/core/DunkFlagship.ts REAL_JUMP_PERSONAL',
+    hint: 'Off (as shipped): a 0.70 m jump fills the take-off. On: your own verified best jump (a saved Quick Screen, verified adult accounts only) fills it.',
   },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
   {
     id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',

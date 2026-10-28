@@ -25,14 +25,14 @@ export function ReadinessTrend({ points, title = 'Your readiness' }: { points: r
   return (
     <div className="fel-card space-y-2 rounded-xl p-4" data-readiness-trend>
       <div className="flex items-baseline justify-between gap-2">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">{title}</div>
-        <div className="text-[11px] text-white/45">{points.length} checks · {lows} Low</div>
+        <div className="text-[12px] uppercase tracking-wider text-fel-dim">{title}</div>
+        <div className="text-[12px] text-fel-dim">{points.length} checks · {lows} Low</div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-24 w-full" role="img" aria-label={`Best jump on ${points.length} daily checks, from ${(lo / 2.54).toFixed(1)} to ${(hi / 2.54).toFixed(1)} inches; ${lows} read Low.`}>
         <path d={path} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
         {points.map((p, i) => <circle key={p.day} cx={x(i)} cy={y(p.bestCm)} r={3.5} fill={DOT[p.band]}><title>{`${p.day}: ${(p.bestCm / 2.54).toFixed(1)} in, ${BAND_LABEL[p.band]}`}</title></circle>)}
       </svg>
-      <div className="flex justify-between text-[11px] text-white/40"><span>{points[0].day}</span><span>{points[points.length - 1].day}</span></div>
+      <div className="flex justify-between text-[12px] text-fel-dim"><span>{points[0].day}</span><span>{points[points.length - 1].day}</span></div>
     </div>
   );
 }
@@ -50,7 +50,7 @@ export function ReadinessTrendCard({ api = '/api/readiness/check' }: { api?: str
   return (
     <div className="mt-4 space-y-1">
       <ReadinessTrend points={points} title="Readiness this month" />
-      <p className="px-1 text-xs text-white/40"><Link href="/train/readiness" className="underline">Today&apos;s jump check</Link></p>
+      <p className="px-1 text-xs text-fel-dim"><Link href="/train/readiness" className="underline">Today&apos;s jump check</Link></p>
     </div>
   );
 }

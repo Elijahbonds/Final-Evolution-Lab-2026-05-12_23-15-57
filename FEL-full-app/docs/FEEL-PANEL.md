@@ -286,6 +286,11 @@ lane/dunk-flagship Phase 3 (group "Dunk · lobs"), new number: `dunk.oopLateCatc
 passer lobs on the take-off frame to this beat of the flight clip (the off-glass lob's hang beat). Before, it was a 0.35 s
 bullet thrown at 0.9 × the rise. Later gives a higher drop into the hand and less time before the slam window (1.05).
 **assumption:** the bounds (0.6 to 1.0) are safe, not tuned.
+lane/dunk-flagship Phase 5 (group "Dunk · body"), new, OFF by default: `dunk.realJumpPersonal` 0 (`DunkFlagship.ts`
+`REAL_JUMP_PERSONAL`): on, the body path's full take-off is the athlete's own VERIFIED best countermovement jump (a saved Quick
+Screen, read through GET /api/dunk/verified-jump: verified 18+ and opted in, checked at read time; lib/jump/seam.ts's verified
+rule) instead of the fixed 0.70 m; clamped to 0.25–0.95 m. No verified jump: the fixed mapping. Like every knob, never in
+ranked, staked or paid play.
 lane/dunk-flagship (group "Dunk · run-up"), new, default unchanged: `dunk.runwayStrideScale` 1 (`DunkFlagship.ts`
 `RUNWAY_STRIDE_SCALE`): the run-up's leg pace reference (3.6 ÷ 1.1 m/s, as shipped) × this. Re-paced to 3.95 m/s on the rig,
 the run-up skated less at a sprint and more at 2.5–5 m/s, no overall gain, so the shipped pace stays and this is the owner's

@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { ArrowUpFromLine, Camera, Swords, Users } from 'lucide-react';
+import { ArrowUpFromLine, Camera, ScanLine, Swords, Users } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { TabPage } from '@/components/shell/tab-page';
@@ -18,6 +18,7 @@ import { todayCardFor } from '@/lib/coach/todayCard';
 import { prisma } from '@/lib/db';
 import { t } from '@/lib/i18n';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
+import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,8 @@ export default async function PlayPage() {
             <Chip href="/multiplayer" icon={<Swords aria-hidden className="h-4 w-4 text-fel-crimson" />}>{t('play.versus')}</Chip>
             {/* VERTICAL-EASY (2026-10-27): the one front door to measuring a vertical, one tap from the signed-in home */}
             <Chip href={MEASURE_VERTICAL_HREF} testId="play-vertical-entry" icon={<ArrowUpFromLine aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.vertical')}</Chip>
+            {/* SCREEN-EASY (2026-10-28): the full movement screen's front door, one tap from the signed-in home */}
+            <Chip href={FULL_SCREEN_HREF} testId="play-screen-entry" icon={<ScanLine aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('play.screen')}</Chip>
           </>
         ),
       }}
