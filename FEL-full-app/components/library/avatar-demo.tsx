@@ -4,15 +4,33 @@
 // the authored loops, the bind-pose guard. `clip` is the loop that IS the movement (lib/library/surfaceDemo.ts); without
 // one, the body stands still in the start position, labelled "Demo coming" — never another movement, never a T-pose.
 // Until the stage is ready (and measured off its bind pose) the box says it is loading; if 3D fails, it says so.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { DEMO_COMING, STILL_DEMO_CLIP } from '@/lib/library/surfaceDemo';
+import { saveDataOn, warmDemoBody } from '@/lib/library/demoWarm';
 
 const ExerciseStage = dynamic(() => import('./exercise-stage'), { ssr: false, loading: () => null });
+
+let warmed = false;
+/**
+ * DEMO-SPEED (2026-10-27): a demo box is NEAR (use-auto-open.ts: within ~two screens) — when the browser is idle, start
+ * what its stage will need: the stage's chunk (Babylon) and the body's file (lib/library/demoWarm.ts). Once a page; never
+ * on a data-saver connection, and never with 3D switched off. The demo itself still opens only when its box is in view.
+ */
+export function warmAvatarDemo(): void {
+  if (warmed || typeof window === 'undefined') return;
+  warmed = true;
+  if (process.env.NEXT_PUBLIC_DISABLE_3D === '1' || saveDataOn()) return;
+  const go = () => { void warmDemoBody(); void import('./exercise-stage').catch(() => undefined); };
+  const idle = (window as unknown as { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  if (idle) idle(go, { timeout: 2000 }); else setTimeout(go, 500);
+}
 const NO_MUSCLES = { primary: [] as string[], secondary: [] as string[] };
 
 export function AvatarDemo({ clip }: { clip: string | null }) {
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  // DEMO-SPEED: the body's file starts now, while the stage's chunk downloads (not a speculative fetch: this demo is opening)
+  useEffect(() => { if (process.env.NEXT_PUBLIC_DISABLE_3D !== '1') void warmDemoBody(); }, []);
   const still = !clip;
   return (
     <div className="relative aspect-[4/3] w-full bg-gradient-to-b from-[#0b0b12] to-[#05050a] sm:aspect-video" data-avatar-demo={clip ?? 'still'} data-avatar-state={state}>
