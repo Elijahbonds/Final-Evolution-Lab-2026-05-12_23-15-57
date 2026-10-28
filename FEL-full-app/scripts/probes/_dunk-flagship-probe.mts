@@ -30,9 +30,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromiumExe } from './_chromium.mts';
-import { restPose, synthesize, type Joints } from '@/lib/pose/synth';
-import { armsSwing, hold, jogBeat, script, scriptedJump, type Beat } from '@/lib/pose/streamKit';
-import { bodyPackets } from '@/lib/pose/seamReplay';
+import * as SynthNs from '@/lib/pose/synth';
+import * as StreamKitNs from '@/lib/pose/streamKit';
+import * as SeamReplayNs from '@/lib/pose/seamReplay';
+import type { Joints } from '@/lib/pose/synth';
+import type { Beat } from '@/lib/pose/streamKit';
+// tsx compiles these .ts modules as CommonJS: from this ESM file their named exports are only on `default`
+const cjs = <T,>(ns: T): T => ((ns as { default?: T }).default ?? ns);
+const { restPose, synthesize } = cjs(SynthNs), { armsSwing, hold, jogBeat, script, scriptedJump } = cjs(StreamKitNs), { bodyPackets } = cjs(SeamReplayNs);
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3611';
 const PAGE = process.env.PAGE ?? 'base.html?mode=dunk';
@@ -135,6 +140,7 @@ const RECORDER = `(() => {
   window.__HUDLOG = []; let last = '';
   setInterval(() => { const h = window.__hud(); const s = [h.banner, h.hint, h.slamBeat].filter(Boolean).join(' | '); if (s && s !== last) { last = s; window.__HUDLOG.push({ t: performance.now(), s }); } }, 16);
   // the slam on the beat the mode publishes (slamBeat 'beat' = the window's centre), pressed in the page
+  const LATE_MS = ${Number(process.env.SLAM_LATE_MS ?? 70)};
   window.__armSlam = (mode) => {
     const t0 = performance.now();
     const tick = () => {
@@ -143,8 +149,8 @@ const RECORDER = `(() => {
       if (!(mode === 'open' ? (sb === 'open' || sb === 'beat') : sb === 'beat')) { requestAnimationFrame(tick); return; }
       const b = window.__PAD.buttons[0];
       const press = () => { b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now(); setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60); };
-      // Phase 5: 'late' = an ordinary make — the beat, then ~120 ms late (accuracy ~0.4, still inside the window)
-      if (mode === 'late') setTimeout(press, 120); else press();
+      // Phase 5: 'late' = an ordinary make — the beat, then SLAM_LATE_MS (default 70) late: 120 ms graded 0.15–0.27, an IRON miss
+      if (mode === 'late') setTimeout(press, LATE_MS); else press();
     };
     requestAnimationFrame(tick);
   };
@@ -189,7 +195,7 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
       if (/RIVAL/.test(String(w.__hud().banner ?? '')) || w.__hud().rivalSkip === true) { await tap(1, 60); await sleep(300); }
       await sleep(120);
     }
-    if (!ok) return { err: 'no approach' };
+    if (!ok) return { err: 'no approach: ' + document.body.innerText.replace(/\s+/g, ' ').slice(0, 240) };
     await sleep(500);
     const R = w.__rec; R.frames = []; R.f0 = w.__vc.C.frames; R.strip = c.strip ? c.strip.slice() : null; R.on = true; const t0 = now();
     const launchedAt = (): number | null => { const m = w.__smp.marks.find((x) => x.t >= t0 && /\[DUNK-LAUNCH\]/.test(x.msg)); return m ? m.t : null; };
@@ -204,7 +210,8 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
       if (!launch) { R.on = false; return { err: 'never launched (body)' }; }
       const end = launch + c.recMs; while (now() < end) await sleep(100);
       R.on = false;
-      return { t0, pressAt: null, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0), qa: [], hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
+      const qa = w.__FEL_QA__ ? w.__FEL_QA__.events(4000).filter((e) => e.t >= t0).map((e) => ({ t: e.t, kind: String(e.kind), name: String(e.key ?? '') })) : [];
+      return { t0, pressAt: null, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0), qa, hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
     }
     if (c.preY) {
       await tap(3, 60);
