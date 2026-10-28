@@ -185,6 +185,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE,
   contestTag, contestTier, aiShotRead,   // HOOPS-DEPTH S5
   BUMP_STRIP_WINDOW_SEC,   // lane/hoops-def-tell: the AI reach's exposure
+  AI_BUMP_STRIP_CHANCE, aiBumpStripChance, bumpStripCooldownMs,   // OV75-1: the bump strip per opponent tier
   SWAT_K_FROM, SWAT_K_TO, HAND_UP_FACING_COS,   // hoops-p02: the swat's flight window, the bump strip's square-up (the hand reads)
 } from '../core/HoopsDefense';
 import { AiReachTell, aiReachTellOn, aiReachGate, aiReachStunSec, AI_REACH_COOLDOWN_SEC, type ReachOutcome } from '../core/ReachTell';   // lane/hoops-def-tell (#273 T-A): the AI reach shows before it resolves
@@ -429,6 +430,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hintShown = '', hintAt = 0, hintPossession: Possession | null = null;
   /** #2: the OPPONENT pick's knobs for this run (PRO until load reads it). */
   let knobs = ONEVONE_TIER.pro;
+  /** OV75-1: the bump strip's odds and cooldown for this run's opponent tier — read with `knobs`, once per run, never per frame. */
+  let bumpStripChance = AI_BUMP_STRIP_CHANCE, bumpStripCooldown = 2500;
   /** #3: the win condition (first to 11 unless the player picked win-by-2 on the READY screen — onevoneRules.winBy2Requested). */
   let winCond: WinRule = winRule(TARGET_SCORE, false);
   /** #10: the last five graded releases (onevoneRules.pushPip), and #4: my box score for the end card. */
@@ -631,7 +634,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let foeLens: ReactiveDefender | null = null;   // lane/hoops-round2 HOP-02: that brain, perceiving me and the ball reactMs late
   let lastFoeJob = '';
   let foeSealing = false;                       // mirrors the brain's seal so the board can read it as real position
-  let lastBumpStripAt = 0;                       // D2: one bump-strip roll per 1.5 s
+  let lastBumpStripAt = 0;                       // D2: one bump-strip roll per bumpStripCooldown (2500 ms at PRO/ELITE)
   const ballWorld = (): Vector3 => ball.getAbsolutePosition();
   // hoops-p02: the two bodies as the block test sees them (hoops/blocks): planar root, the contest jump's age, the hands up
   const meBlocker = (): Blocker => ({ x: me.root.position.x, z: me.root.position.z, jumpAge: myJumpAge, handsUp: meHandUp });
@@ -993,10 +996,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       const r = readRules();
       if (r.knobs === knobs && r.winCond.winBy2 === winCond.winBy2) return;
       knobs = r.knobs; winCond = r.winCond;
+      bumpStripChance = aiBumpStripChance(runTier()); bumpStripCooldown = bumpStripCooldownMs(runTier());   // OV75-1
       foeBrain?.setAggression(knobs.defenderAggression);
       nerveTheAttacker();
       putHud(ctx, { winBy2: winCond.winBy2 });
-      console.info(`[1V1-RULES] at start: opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] at start: opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`} · bump strip ${bumpStripChance}`);
     },
 
     async load(ctx: ModeContext) {
@@ -1050,8 +1054,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       modeClock = 0; bannerUntil = 0; timers.length = 0; lastUpdateMs = -1; meFlightTick = null; foeFlightTick = null;
       hudMemo.clear(); hintShown = ''; hintAt = 0; hintPossession = null; pips = ''; box = emptyBox();
       knobs = ONEVONE_TIER[runTier()] ?? ONEVONE_TIER.pro;
+      bumpStripChance = aiBumpStripChance(runTier()); bumpStripCooldown = bumpStripCooldownMs(runTier());   // OV75-1
       winCond = winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' }));
-      console.info(`[1V1-RULES] opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`} · bump strip ${bumpStripChance}`);
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
@@ -2144,11 +2149,12 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (possession === 'mine' && carrying) meBumpAge = 0;   // #273 T-A: a contact on my carrier exposes the ball to the AI reach
             if (possession === 'defense' && (defPhase === 'check' || defPhase === 'drive')) bumpAge = 0;
             else if (c.severity === 'hard' && possession === 'mine' && carrying && !shooting && !dunking && !finish && !gather && foeStunSec === 0 && !foeFloored
-              && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > 2500) {
+              && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > bumpStripCooldown) {
               lastBumpStripAt = performance.now();   // I barrelled into him: one roll per collision, never on a defender bumping ME
               const facing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
               // hoops-p02: on the bump his hand still has to GET to the ball (hoops/steals: reach and my body's shield; the palm loose)
-              const bumpStrip = stealDiceOn() ? aiBumpStrips(foeVelLast.length() < 1.0, facing, roll)
+              // OV75-1: the dice path rolls this run's tier odds (bumpStripChance); both paths wait bumpStripCooldown between rolls
+              const bumpStrip = stealDiceOn() ? aiBumpStrips(foeVelLast.length() < 1.0, facing, roll, bumpStripChance)
                 : foeVelLast.length() < 1.0 && facing >= HAND_UP_FACING_COS && aiStripLands(foe.root.position, me.root.position, ballWorld(), true).lands;
               if (bumpStrip) { stripBall(ctx, 'STRIPPED ON THE BUMP!'); return; }
             }
