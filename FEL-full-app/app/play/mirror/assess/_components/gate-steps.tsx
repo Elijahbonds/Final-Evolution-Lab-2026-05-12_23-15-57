@@ -90,10 +90,9 @@ export function PainStep({ onAnswer }: { onAnswer: (hurts: boolean) => void }) {
     <StepCard testId="pain">
       <h2 className="text-[22px] font-black leading-tight">{PAIN_QUESTION}</h2>
       <p className="mt-1 text-[16px] text-white/60">{DISCLAIMER}</p>
-      {/* SCREEN-EASY: Train's card opens the full screen without the start card, so its privacy line is said here too */}
-      <p data-pain-privacy className="mt-1 text-[16px] text-white/60">
-        {VIDEO_STAYS}{' '}<Link href={PRIVACY_PATH} prefetch={false} data-privacy-link className="underline">{PRIVACY_LINK}</Link>
-      </p>
+      {/* SCREEN-EASY: Train's card opens the full screen without the start card, so its privacy line is said here too
+          (the privacy page itself is one tap away on the results, under "More detail") */}
+      <p data-pain-privacy className="mt-1 text-[16px] text-white/60">{VIDEO_STAYS}</p>
       <div className="mt-4 space-y-2.5">
         <button type="button" data-primary data-pain="no" onClick={() => onAnswer(false)} className={primaryBtn}>No, nothing hurts</button>
         <button type="button" data-pain="yes" onClick={() => onAnswer(true)} className={quietBtn}>Yes, something hurts</button>

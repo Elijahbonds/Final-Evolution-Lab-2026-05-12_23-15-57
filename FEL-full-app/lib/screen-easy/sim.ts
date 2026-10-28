@@ -77,7 +77,14 @@ export interface FullSimOptions {
   onView?: (v: RunnerView, f: PoseFrame) => void;
 }
 
-export interface PartLog { part: PartId; startMs: number; activeMs: number | null; endMs: number | null; attempts: number; refused: string[]; restarts: number }
+export interface PartLog {
+  part: PartId; startMs: number;
+  /** When the athlete is in place (they heard where, and got there: the MOVE_S assumption). */
+  arriveMs: number;
+  /** When the 3-2-1 began (null: the part started on "Go." alone). */
+  countMs: number | null;
+  activeMs: number | null; endMs: number | null; attempts: number; refused: string[]; restarts: number;
+}
 
 export interface FullSimResult {
   done: boolean;
@@ -200,13 +207,14 @@ export function simulateFullScreen(o: FullSimOptions = {}): FullSimResult {
     if (v.part && v.part !== curPart) {
       const d = parts.find((p) => p.id === v!.part)!;
       curPart = v.part;
-      logs.push({ part: d.id, startMs: t, activeMs: null, endMs: null, attempts: 0, refused: [], restarts: 0 });
+      logs.push({ part: d.id, startMs: t, arriveMs: t, countMs: null, activeMs: null, endMs: null, attempts: 0, refused: [], restarts: 0 });
       const line = v.say?.text ?? d.setup;
       const first = line.split(/(?<=[.!?])\s/)[0] ?? line;
       const to = placeOf(d);
       const legSwitch = !!lastLegPart && lastLegPart.test === d.test && lastLegPart.side !== d.side;
       const moveS = (o.wall === false && to.wall) ? 0 : moveSeconds(goal, to, legSwitch);
       goal = to; goalAt = t + speechMs(first) - 400 + moveS * 1000;
+      logs[logs.length - 1].arriveMs = Math.max(goalAt, awayUntil);
       lastLegPart = d.side ? d : null;
       stance = d.test === 'T3' ? d.side! : null;
       split = d.test === 'T2' ? d.side! : null;
@@ -214,6 +222,7 @@ export function simulateFullScreen(o: FullSimOptions = {}): FullSimResult {
     }
     const log = logs[logs.length - 1];
     if (log && v.step === 'active' && log.activeMs === null) log.activeMs = t;
+    if (log && v.step === 'countdown' && v.countdown !== null && log.countMs === null && log.activeMs === null) log.countMs = t;
     // "Go": do the move; a part still running a moment after the clip ended gets it again (the athlete heard why)
     if (v.step === 'active' && v.part) {
       const d = parts.find((p) => p.id === v!.part)!;

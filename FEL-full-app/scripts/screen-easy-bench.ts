@@ -79,6 +79,19 @@ if (process.argv[1]?.includes('screen-easy-bench')) {
   const rows = runBench(CONDITIONS.filter((c) => !only || c.name.includes(only)), fpsList, seeds);
   if (process.argv.includes('--json')) console.log(JSON.stringify(rows));
   else { console.log(benchTable(rows)); console.log('\nseconds by runner step (mean):\n'); console.log(stepTable(rows)); }
+  if (process.argv.includes('--parts')) {
+    // where the time goes, part by part (one realistic run): hearing the move and getting there (the athlete), waiting on
+    // the runner once in place (the set-up line, the 1 s shot hold, the still hold), the 3-2-1, the reps, then the beat after
+    const r = simulateFullScreen({ noise: true, dropRate: 0.01, fps: fpsList[0], seed: 1 });
+    const s = (ms: number) => (ms / 1000).toFixed(1);
+    console.log('\n| part | hear + get there | wait in place | 3-2-1 | reps | after (done beat / pain check) |\n|---|---|---|---|---|---|');
+    r.parts.forEach((p, i) => {
+      const next = r.parts[i + 1]?.startMs ?? r.numberMs!;
+      const go = p.countMs ?? p.activeMs!;
+      console.log(`| ${p.part} | ${s(p.arriveMs - p.startMs)} | ${s(Math.max(0, go - p.arriveMs))} | ${s(p.activeMs! - go)} | ${s(p.endMs! - p.activeMs!)} | ${s(next - p.endMs!)} |`);
+    });
+    console.log(`\nbefore the first part (framing + the 3 s stand): ${s(r.parts[0].startMs)} s; total ${s(r.numberMs!)} s`);
+  }
   if (process.argv.includes('--said')) {
     const r = simulateFullScreen({ noise: true, dropRate: 0.01, fps: fpsList[0], seed: 1 });
     for (const s of r.said) console.log(`${(s.at / 1000).toFixed(1).padStart(6)}  ${s.text}`);

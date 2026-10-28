@@ -105,7 +105,7 @@ export function LiveHud({ view, voiceOn = true, onPain, onTakeoff, onStop, onSki
             </div>
           ) : null}
           {sideOn && !framingOk && !noReading ? (
-            <p data-turn-side className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(18px,5vw,24px)] font-black text-[#00E5FF]">{SIDE_TURNED}</p>
+            <p data-turn-side className="absolute inset-x-3 top-[10rem] z-[6] text-center text-[clamp(16px,4.5vw,22px)] font-black text-[#00E5FF]">{SIDE_TURNED}</p>
           ) : null}
           {/* VERTICAL-EASY (2026-10-27): the setup says itself — a picture of where the device goes, then ONE big word: the
               fix ("Step back", "Whole body in view") in amber, or "Ready" in green with a tick. The full sentence sits under
