@@ -52,10 +52,11 @@ describe('one front door', () => {
 
 describe('the steps before the camera', () => {
   const run = (events: PreEvent[]) => events.reduce((s, e) => preStep(s, e), PRE_START);
-  it('the jump alone: age, pain, then the camera — two taps; the full screen still asks the take-off foot', () => {
+  // test changed (SCREEN-EASY, 2026-10-28): the full screen no longer asks the take-off foot either (lib/screen/flow.ts)
+  it('the jump alone: age, pain, then the camera — two taps; the full screen the same', () => {
     expect(run([{ type: 'start', kind: 'jump' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('cameraInfo');
     expect(run([{ type: 'start', kind: 'vertical' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('cameraInfo');
-    expect(run([{ type: 'start', kind: 'full' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('takeoff');
+    expect(run([{ type: 'start', kind: 'full' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]).step).toBe('cameraInfo');
   });
   it('under 18 is unchanged: the grown-up step, and never the camera (cameraAllowed, assess-app.tsx)', () => {
     expect(run([{ type: 'start', kind: 'jump' }, { type: 'age', age: '13-17' }]).step).toBe('grownUp');

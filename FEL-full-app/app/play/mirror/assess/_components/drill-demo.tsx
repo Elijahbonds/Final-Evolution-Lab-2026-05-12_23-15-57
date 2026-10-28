@@ -45,7 +45,8 @@ export function DrillDemo({ test, drill, initiallyOpen = false }: { test: TestId
           <AvatarDemo clip={SCREEN_DEMO_LOOPS[test]} />
         )}
       </div>
-      <p className="mt-1.5 text-[14px] leading-snug text-white/60">{DEMO_NOTE}</p>
+      {/* SCREEN-EASY: 16 px like every other line on the result (the premium rule: ≤ 4 sizes on a screen) */}
+      <p className="mt-1.5 text-[16px] leading-snug text-white/60">{DEMO_NOTE}</p>
     </div>
   );
 }
