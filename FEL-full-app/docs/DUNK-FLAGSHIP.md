@@ -210,15 +210,18 @@ Each frame records whether the ball's centre is inside the camera's view (projec
 |---|---|---|---|---|
 | Off the glass on the run (prop) | 0/8 (the original build 0/4 too: OVER THE GLASS) | **14/14** | 75 % → 100 % | 6.1–6.9 m/s |
 | Off the glass standing (Y) | 0/5 (LOST, 4 of them silent) | **5/5** (armed: goes up on the run) | 39 % → 100 % | 6.1–6.2 m/s |
-| Self-lob on the run (prop) | 7/7 | 7/7 (unchanged code) | 100 % | 0.7–3.0 m/s |
+| Self-lob on the run (prop) | 7/7 | 11/11 | 100 % | 0.7–3.1 m/s |
 | Self-lob standing (Y, then run) | 5/5 | 5/5 | 59 % → **100 %** | 2.8–6.9 m/s |
-| Bounce lob on the run (prop) | 6/6 | 6/6 (unchanged code) | 91 % | 3.5–6.2 m/s |
-| Bounce-bounce standing (Y, run on RUN!) | 5/5 | 5/5 (unchanged code) | 100 % | 0.8–4.5 m/s |
+| Bounce lob on the run (prop) | 6/6 | 7/7 | 91 % → **100 %** | 3.5–6.5 m/s |
+| Bounce-bounce standing (Y, run on RUN!) | 5/5 | 5/5 | 100 % | 0.5–5.4 m/s |
 | Alley-oop, passer, 4 attempts on one page | 4/4 from the DUNKER's hand from attempt 2 | 4/4 from the passer | 100 % | 4.5–4.7 m/s |
 | Glass oop (passer) | 0/2 (WIDE OF / OVER THE GLASS) | **6/6** | 100 % | 8.5–8.7 m/s |
 | Bounce oop (passer) | 0/6 (NEVER IN REACH) | **6/6** | 100 % | 3.4 m/s |
 
-The before arrival speed for the oops was the shipped bullet's 11.8 m/s (Phase 3); every after arrival is under it.
+After = the phase's head build except the passer's glass and bounce oops and the alley-oop (one build earlier: nothing after it
+touches them). **63 of 63 caught.** The before arrival speed for the oops was the shipped bullet's 11.8 m/s (Phase 3); every after
+arrival is under it. No LOST in any after run; the reason line was seen on the way (NEVER IN REACH, nearest 2.01 m; WIDE before
+the reach threshold existed). Two drawn runs (the glass, the standing self-lob, for the contact sheet) matched their FAST twins.
 
 ### What was wrong, and what changed
 - **The off-glass lob on the run went over the board, every time (0 of 8; the original build too).** The planner's own log said
