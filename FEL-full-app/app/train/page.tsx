@@ -27,6 +27,7 @@ import { enterDelay } from '@/components/ui/fel/page-enter';
 // A11-07: the page's words live in messages/en/train.json
 import { t } from '@/lib/i18n';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
+import { JUMP_TESTS_HREF, MIRROR_HREF } from '@/lib/tools-easy/door';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,14 +62,6 @@ export default async function TrainPage() {
       line: t('train.cards.vertical.line'),
     },
     {
-      // MIRROR-COACH P1 (2026-09-25): this said "Scored, with the corrective work written for you." Nothing grades the
-      // screen's stations yet (no app code calls ScreenRunner.record, so every screen came back unscored), and a camera
-      // number is an estimate, not a score. It now says what the Mirror does. Put "graded" back only for a station a
-      // grader actually scores (lib/workout/workout-copy.test.tsx holds the line).
-      href: '/play/mirror', group: 'measure' as Group, icon: ScanLine, accent: PALETTE.emerald, title: t('train.cards.mirror.title'),
-      line: t('train.cards.mirror.line'),
-    },
-    {
       // MIRROR-FIRST P1 (2026-10-07): the Quick Screen (/screen → /play/mirror/assess, no sign-in) was linked from nowhere
       // in the app. The screen asks its own age question first and, under 18 or unanswered, the camera-free card, for every
       // visitor — it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the
@@ -77,6 +70,12 @@ export default async function TrainPage() {
       // jump, which has its own card above; a ?run= start still asks the age question first.
       href: FULL_SCREEN_HREF, group: 'measure' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.quickScreen.title'),
       line: t('train.cards.quickScreen.line'),
+    },
+    {
+      // TOOLS-EASY (2026-10-28): the jump tests' own door — they were only under an adult's vertical result, inside
+      // "More detail" (8 taps and a whole vertical run). Adults only: the page checks and says so to anyone else.
+      href: JUMP_TESTS_HREF, group: 'measure' as Group, icon: ClipboardList, accent: PALETTE.emerald, title: t('train.cards.jumpTests.title'),
+      line: t('train.cards.jumpTests.line'),
     },
     {
       // COACH-READINESS (2026-10-25): the 30-second daily jump check (verified adults; the page says so to anyone else)
@@ -93,6 +92,16 @@ export default async function TrainPage() {
       // speed only; the page says so)
       href: '/train/velocity', group: 'measure' as Group, icon: Dumbbell, accent: PALETTE.cyan, title: t('train.cards.velocity.title'),
       line: t('train.cards.velocity.line'),
+    },
+    {
+      // TOOLS-EASY (2026-10-28): after the measuring tools, and straight to its squat coach (MIRROR_HREF); its Jump tab
+      // no longer measures (one vertical, the front door's).
+      // MIRROR-COACH P1 (2026-09-25): this said "Scored, with the corrective work written for you." Nothing grades the
+      // screen's stations yet (no app code calls ScreenRunner.record, so every screen came back unscored), and a camera
+      // number is an estimate, not a score. It now says what the Mirror does. Put "graded" back only for a station a
+      // grader actually scores (lib/workout/workout-copy.test.tsx holds the line).
+      href: MIRROR_HREF, group: 'measure' as Group, icon: ScanLine, accent: PALETTE.emerald, title: t('train.cards.mirror.title'),
+      line: t('train.cards.mirror.line'),
     },
     {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the

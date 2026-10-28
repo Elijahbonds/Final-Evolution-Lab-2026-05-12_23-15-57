@@ -32,7 +32,7 @@ const PAGE: Record<string, { before: [string, string]; after: [string, string] }
   jumps: { before: ['Your vertical', '(the jump tests sit under an adult\'s jump result, inside "More detail")'], after: ['Jump tests', 'Squat jump, arm swing, one leg, 10-5 bounce. Film it, then read it on this phone.'] },
   form: { before: ['Film a set', ''], after: ['Film a set', ''] },
 };
-function Page({ id, children }: { id: keyof typeof PAGE; children: ReactNode }) {
+function Page({ id, children }: { id: keyof typeof PAGE; children?: ReactNode }) {
   const [title, lede] = PAGE[id][__VER__ === 'before' ? 'before' : 'after'];
   return h('main', { className: 'mx-auto min-h-screen max-w-md bg-[#050505] px-4 py-6 pb-20' },
     h('p', { className: 'text-[12px] font-bold uppercase tracking-[0.18em] text-white/50' }, 'Train'),

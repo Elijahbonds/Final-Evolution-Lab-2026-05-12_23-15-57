@@ -10,14 +10,18 @@
 // NO ACCURACY CLAIM (owner, until the force-plate pilot): the heights are kept as numbers; no ± is passed on.
 // Pure: frames in, a view and the attempts out. Nothing here keeps or sends a frame.
 import type { PoseFrame } from '@/lib/pose/landmarks';
-import { calibrateFront, type FrontCalibration } from '@/lib/assess/calibration';
-import { detectFlights, gradeT5 } from '@/lib/assess/graders/t5-cmj';
+import type { FrontCalibration } from '@/lib/assess/calibration';
+import { gradeT5 } from '@/lib/assess/graders/t5-cmj';
 import { poseHz, type T5Extra } from '@/lib/assess/scoring';
-import { th } from '@/lib/assess/thresholds';
 import { JUMP_PHASE_MS, STAND_MS } from '@/lib/coach/readiness/thresholds';
+import { JumpJudge, StandRead, countWord, standLine } from '@/lib/tools-easy/liveJump';
 
 export type TakeStep = 'stand' | 'jump' | 'done';
-export interface TakeView { step: TakeStep; jumps: number; asked: number; why: string | null }
+/**
+ * TOOLS-EASY (2026-10-28): `refusal` is the last no-mark's reason and fix (a refused jump is still a no-mark, the coach's
+ * call — now with the why, so the coach can tell the athlete what to change); `say` is the newest line to say aloud.
+ */
+export interface TakeView { step: TakeStep; jumps: number; asked: number; why: string | null; refusal?: string | null; say?: { id: number; text: string } | null }
 export type TakeResult =
   | { ok: true; attempts: { value: number | null }[] }
   | { ok: false; why: string };
@@ -34,15 +38,22 @@ export class JumpTake {
   private why: string | null = null;
   private step: TakeStep = 'stand';
   private n = 0;
+  private refusal: string | null = null;
+  private say: { id: number; text: string } | null = null;
+  private readonly stand: StandRead;
+  private judge: JumpJudge | null = null;
   readonly asked: number;
 
   constructor(private readonly o: { jumps: number; aspect: number; cameraFps?: number | null }) {
     this.asked = Math.max(1, Math.round(o.jumps));
+    this.stand = new StandRead(o.aspect, STAND_MS);
   }
 
   view(): TakeView {
-    return { step: this.step, jumps: this.landed, asked: this.asked, why: this.why };
+    return { step: this.step, jumps: this.landed, asked: this.asked, why: this.why, refusal: this.refusal, say: this.say };
   }
+
+  private said(text: string): void { this.say = { id: (this.say?.id ?? 0) + 1, text }; }
 
   push(f: PoseFrame): TakeView {
     if (this.step === 'done') return this.view();
@@ -52,22 +63,29 @@ export class JumpTake {
     const t = f.t;
     if (this.step === 'stand') {
       const hold = this.frames.filter((x) => x.t >= t - STAND_MS);
-      const r = calibrateFront(hold, this.o.aspect, STAND_MS);
+      // TOOLS-EASY: the readiness check's stand, with the Quick Screen's accepted sway fallback
+      const r = this.stand.read(hold, t);
       if (r.ok) {
         this.front = r.value;
         this.standFrom = hold[0].t;
         this.calibratedAt = t;
         this.step = 'jump';
         this.why = null;
+        this.judge = new JumpJudge(this.o.aspect);
+        this.said('Jump!');
         this.frames = this.frames.filter((x) => x.t >= this.standFrom);
       } else {
-        this.why = r.why;
+        this.why = standLine(r.why);
         this.frames = this.frames.filter((x) => x.t >= t - STAND_MS - 500);
       }
       return this.view();
     }
-    const minMs = th('t5.flightMinMs'), settle = th('t5.landingWindowMs');
-    this.landed = detectFlights(this.frames, this.front!).filter((x) => x.landed && x.landT - x.takeoffT >= minMs && x.landT + settle <= t).length;
+    // every landed flight is an attempt, as before; TOOLS-EASY: each is judged as it lands, so a no-mark says why
+    for (const v of this.judge!.scan(this.frames, this.front!, t)) {
+      this.landed++;
+      if (v.valid) { this.refusal = null; this.said(countWord(this.landed)); }
+      else { this.refusal = v.line; this.said(`No mark. ${v.line}`); }
+    }
     if (this.landed >= this.asked || t - this.calibratedAt >= JUMP_PHASE_MS) this.step = 'done';
     return this.view();
   }

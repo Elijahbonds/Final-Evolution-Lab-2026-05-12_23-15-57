@@ -24,7 +24,7 @@ export default async function ReadinessPage() {
   if (!me) redirect(loginPath('/train/readiness'));
   const access = checkAccess({ signedIn: true, dobYear: await readDobYear(prisma, me, 'readiness_page') });
   return (
-    <TabPage eyebrow="Train" title="Readiness check" lede="Three jumps against your own normal: ready, normal or low, and why." accent="#00E5FF"
+    <TabPage eyebrow="Train" title="Readiness check" lede="Three jumps against your own normal. About 30 seconds." accent="#00E5FF"
       aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
       <div className="mx-auto max-w-md">
         {/* COACH-DELIVERY COA-03: the five-question survey beside the jump check, for a day with no room to jump (adults

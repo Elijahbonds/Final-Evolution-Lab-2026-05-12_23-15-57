@@ -9,7 +9,7 @@
     },
     "mirror": {
       "title": "The Mirror",
-      "line": "Squat coach and movement screen. Every number is an estimate."
+      "line": "A live coach for squat, lunge, hinge and push-up. Every number is an estimate."
     },
     "quickScreen": {
       "title": "Screen my movement",
@@ -17,7 +17,7 @@
     },
     "readiness": {
       "title": "Readiness check",
-      "line": "Three jumps against your normal; a low day eases. 18 and over."
+      "line": "Three jumps against your own normal. 30 seconds. 18 and over."
     },
     "drills": {
       "title": "Drills",
@@ -70,11 +70,15 @@
     },
     "sprint": {
       "title": "Sprint speed",
-      "line": "Camera-timed sprints and top speed, each with its ±. 18 and over."
+      "line": "Time a sprint with your camera. Every number is an estimate. 18 and over."
     },
     "velocity": {
       "title": "Bar speed",
-      "line": "Rep speed from your camera. Estimates, not lab numbers."
+      "line": "Rep speed from your camera, side-on. Every number is an estimate."
+    },
+    "jumpTests": {
+      "title": "Jump tests",
+      "line": "Squat jump, one leg, the 10-5 bounce, drop jump. 18 and over."
     }
   },
   "section": {
