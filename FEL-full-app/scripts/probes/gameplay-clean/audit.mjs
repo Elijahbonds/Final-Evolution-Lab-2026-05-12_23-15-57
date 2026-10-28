@@ -353,11 +353,26 @@ function analyze(mode, rec, S) {
     out.skateShare = r2(slides.length ? slides.filter((v) => v > 0.25).length / slides.length : null);
   } else out.skate = 'n/a (ride)';
   // camera cuts
-  const cuts = []; for (let i = 1; i < F.length; i++) { const a = F[i - 1].cam, b = F[i].cam; if (!a || !b || F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
-    // relative to the hero's own step: a chase camera behind a plane or a kart moves metres a frame and is not cutting
+  const cuts = []; const DE = new Array(F.length).fill(null), DA = new Array(F.length).fill(null);
+  for (let i = 1; i < F.length; i++) { const a = F[i - 1].cam, b = F[i].cam; if (!a || !b || F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
+    // relative to the hero's own step: a chase camera behind a plane or a kart moves metres a frame and is not cutting.
+    // The look is an ANGLE (the view direction, eye → target), not the target point: a target 10 m out moves a metre on a
+    // 6° turn (aero's raw: 523 "cuts" that were a chase cam banking with the plane)
     const hr = F[i].r && F[i - 1].r ? [F[i].r[0] - F[i - 1].r[0], F[i].r[1] - F[i - 1].r[1], F[i].r[2] - F[i - 1].r[2]] : [0, 0, 0];
-    const de = Math.hypot(b[0] - a[0] - hr[0], b[1] - a[1] - hr[1], b[2] - a[2] - hr[2]), dtg = Math.hypot(b[3] - a[3] - hr[0], b[4] - a[4] - hr[1], b[5] - a[5] - hr[2]);
-    if (de > 0.6 || dtg > 0.8) cuts.push({ t: F[i].t, eye: r2(de), tgt: r2(dtg) }); }
+    const de = Math.hypot(b[0] - a[0] - hr[0], b[1] - a[1] - hr[1], b[2] - a[2] - hr[2]);
+    const da = [a[3] - a[0], a[4] - a[1], a[5] - a[2]], db = [b[3] - b[0], b[4] - b[1], b[5] - b[2]];
+    const la = Math.hypot(...da), lb = Math.hypot(...db);
+    const dtg = la > 1e-6 && lb > 1e-6 ? Math.acos(Math.max(-1, Math.min(1, (da[0] * db[0] + da[1] * db[1] + da[2] * db[2]) / (la * lb)))) * 180 / Math.PI : 0;
+    DE[i] = de; DA[i] = dtg; }
+  // a SNAP is a one-frame spike against its own neighbourhood (±6 frames): a camera that steadily trails a boosting plane by
+  // 0.7 m a frame is following, not cutting
+  for (let i = 1; i < F.length; i++) {
+    if (DE[i] === null) continue;
+    const nb = (A) => { const v = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && A[k] != null) v.push(A[k]); return med(v) ?? 0; };
+    const eyeSnap = DE[i] > 0.6 && DE[i] > 4 * nb(DE), turnSnap = DA[i] > 15 && DA[i] > 4 * nb(DA);
+    if (eyeSnap || turnSnap) cuts.push({ t: F[i].t, eye: r2(DE[i]), turnDeg: r2(DA[i]) });
+  }
+
   // the intro (a crane, a reveal) may cut on purpose: the cuts more than 3 s after play (re)started are the ones a player feels as a snap
   const starts = []; for (let i = 1; i < F.length; i++) if (F[i].ph === 'playing' && F[i - 1].ph !== 'playing') starts.push(F[i].t);
   const inPlay = cuts.filter((c) => !starts.some((s0) => c.t >= s0 && c.t < s0 + 3));
