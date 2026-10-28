@@ -320,3 +320,60 @@ whole reads 23.4 cm against 25.4 — inside the camera's range — but it was ta
 guard refuses. `jump_two_foot_low` (four in-place rebounds, no travel) reads the same either way: 4 of 4, best 28.4 cm
 (truth 32.0; rebounds with 0.13 s contacts are not the protocol, `t5-cmj.test.ts` pins its mean error ≤ 6 cm). The repo holds
 no other recorded standing jump; an owner phone check of a still, arms-free jump is the next real number (§8).
+
+---
+
+## 8. Premium rule, screen by screen (390 px rig, `scripts/probes/_vertical-easy-phone.mts`)
+
+Each cell: font sizes on screen · button looks (the frame's back arrow included) · the primary's height (px) · visible
+words · sideways scroll (px). The live stage is drawn 3:4, a phone held upright (assumption: a portrait camera; the
+synthetic body is re-framed into it). Before = this lane's base; after = this lane, the front door (arms free).
+
+| Screen | Before | After |
+|---|---|---|
+| landing (signed out) | 4 · 2 · 56 · 25 · 0 | 4 · 2 · 56 · 28 · 0 (+ the "Measure my vertical" chip) |
+| start card | 3 · 4 · 52 · 73 · 0 | 3 · 4 · 76 · 72 · 0 (unchanged layout; 4 looks before and after — the Quick Screen's own card) |
+| age | 2 · 2 · – · 16 · 0 | 2 · 2 · – · 16 · 0 |
+| pain | 2 · 3 · 52 · 25 · 0 | 2 · 3 · 52 · 25 · 0 |
+| take-off foot | 2 · 3 · 52 · 31 · 0 | **gone** on the jump alone |
+| setup, something to fix | 3 · 1 · – · 30 · 0 | 3 · 1 · – · 22 · 0 |
+| setup, ready | 3 · 2 · – · 28 · 0 | 3 · 2 · – · 13 · 0 |
+| position (before the countdown) | **6** · 2 · – · 48 · 0 | 4 · 2 · – · 27 · 0 |
+| countdown | 4 · 2 · – · 11 · 0 | 4 · 2 · – · 11 · 0 |
+| "Jump!" | 3 · 2 · – · 10 · 0 | 4 · 2 · – · 11 · 0 |
+| a refused jump (voice off) | **6** · 2 · – · 35 · 0 | **5** · 2 · – · 30 · 0 |
+| pain check | 4 · 3 · – · 29 · 0 | 4 · 3 · – · 29 · 0 |
+| result | 4 · **4** · 52 · **174** · 0 | 4 · **3** · 52 · **74** · 0 |
+
+Held: 0 sideways scroll everywhere; one primary ≥ 48 px where a screen has one; ≤ 3 button looks everywhere but the start
+card (4, unchanged, the Quick Screen's own); ≤ 4 font sizes everywhere but the voice-off refusal view (5, was 6: the big
+rep number, the refusal box, the read badge and the stop button share the stage there — SCREEN A's layout).
+Contact sheet: `vertical-easy-before-after.jpg` in this lane's scratchpad (path in the PR body).
+
+## 9. Owner calls (recommendation first)
+
+1. **A server home for the arm-swing series.** Recommend: yes, as its own `kind` on the jump row, so the profile can show
+   "Vertical, with arm swing" beside the hands-on-hips line (never compared). Today it lives on the device only, because a
+   new kind needs a schema or allow-list change (not in this lane).
+2. **"Any pain in that one?" after the jumps.** Recommend: on the jump alone, move it onto the result as one "Something
+   hurt? Tap here" button (nothing kept if tapped) — saves 1 tap and about 4.5 s (the 3 s "done" card plus the tap). Kept
+   as is today: it is a SCREEN A safety rule.
+3. **VERT (`/play/irl`) measures a vertical with the phone's motion sensor.** Recommend: call it a game ("VERT — jump
+   game"), and link "Measure my vertical" from it, so a sensor number is never read as the vertical. Not changed here.
+4. **Readiness and combine live views.** Recommend a follow-up lane (after coach-queue lands) that gives them this setup
+   card and the refusal reasons. Their rules (hands on hips; coach-run) stay.
+5. **The Mirror's Jump tab** has its own reader (`DunkTracker`, cm only). Recommend: keep its dunk-progress panel, retire
+   its measuring, and send its "measure" to the front door (it now carries one link there).
+6. **`vertical.standDrift` on the hands-on-hips check too.** The same travelled jump would count there if the hands stayed
+   on the hips. Recommend: yes, after the owner's phone check.
+7. **Sign-offs:** `calib.swayFallback` 0.05 and the missed-frame no-reset are accepted (2026-10-27); `vertical.standDrift`
+   0.08 is new and waits on the owner.
+
+## 10. Owner phone check (5 minutes)
+
+On a phone, signed out: tap **Measure my vertical** on the landing → 18 or older → No, nothing hurts → allow the camera.
+Lean the phone on a bottle about hip high. Expect amber "Step back" / "Whole body in view" until the whole body shows,
+then a big green **Ready**; "3, 2, 1, Jump!"; three natural jumps **with an arm swing**, each counted with a beep, no
+button; "Any pain in that one?" → No; then **"Your vertical, with arm swing"** and one big number. Then: take one jump a
+big step forward from where you stood — expect "You moved from your spot. Go back to where you stood and jump again." Time
+it from the first tap to the number (target ≤ 60 s).
