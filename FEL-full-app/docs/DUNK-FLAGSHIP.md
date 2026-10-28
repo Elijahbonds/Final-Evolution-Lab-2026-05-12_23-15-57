@@ -269,3 +269,53 @@ Gate run on the phase's head (merged with `origin/lane/finish-release`; all thro
 warnings on the changed files · mode-list-check 32 modes · vitest (dunk mode and core, `reducedMotionGates`, `LobMarker`,
 `veniceBoardwalk`, `lib/feel-panel`, `tests/probes`) 59 files, 731 tests, all green · the 12 dunk-related headless suites 12 / 12.
 Contact sheet: `round9/dunk-flagship/shots/phase4-lobs.jpg`.
+
+## 9. Phase 5 — dunk feel: the iron, your real jump: results (lane/dunk-flagship-p5)
+
+Rig: the FAST sweep rig (Phase 4), checked again against drawn runs (Orbit, the body dunk strip: the same events). Contact sheet:
+`round9/dunk-flagship/shots/phase5-feel.jpg`.
+
+### Gate 1 — the slam beat scales with the slam
+| The slam press | Accuracy | Hit-stop | Shake |
+|---|---|---|---|
+| 110 ms late | 0.35–0.44 | **70 ms** | **0.120** for 140 ms (the shipped beat) |
+| 93 ms late | 0.44–0.52 | 70–76 ms | 0.120–0.132 |
+| 60 ms late | 0.64–0.69 | 83–86 ms | 0.146–0.152 |
+| body dunks (the body's own slam) | 0.82–0.92 | 94–100 ms | 0.168–0.179 |
+| on the beat | 0.93–0.95 | **100 ms** | **0.180** for 180 ms |
+
+**Fixed:** SLAM is still held at contact after any tap (contact lands ~33 ms after the press), so `slamImpact`'s rim-hang bonus
+(+0.15) applied to every make and an ordinary one came out at 75 ms / 0.129. The hang now adds only on an above-ordinary slam
+(accuracy > 0.5); the knobs and their defaults are unchanged. Found by the coordinator's read before the rig confirmed it.
+
+### Gate 2 — the rim, the net and the glass react on every make
+Every make punched the hoop (the rim spring, the net squash, a flash on 1 hoop material) and shook the glass (2 meshes):
+Venice 116 of 116 (every Phase 4 sweep make), Blossom 2/2, Canopy 2/2, Rooftop 2/2, Orbit 1/1. Orbit has to be measured drawn:
+its sky is near-black, so with FAST's empty frames the render watchdog reads a black display and stops the arena (a FAST
+artefact). Not reached by any venue, and not fixed: HoopJuice only looks for `meshy_hoop_*`, so the procedural fallback hoop
+(if the GLB failed to load) would flash and shake nothing.
+
+### Gate 3 — the real jump maps to the flight, monotonic
+A synthetic body (lib/pose's own streams: a jog, then a jump of 30 / 50 / 70 cm) published packet by packet into the rig's
+real bus, so the harness, BodySession and the mode's `onBody` run it:
+
+| Jump | Fixed mapping: power → apex | Personal (a verified 50 cm jump, knob on): power → apex |
+|---|---|---|
+| 30 cm (read 0.28 m) | 0.40 → 1.40 m | 0.55 → 1.50 m |
+| 50 cm (read 0.49 m) | 0.69 → 1.55 m | 0.97 → 1.71 m |
+| 70 cm (read 0.73 m) | 1.00 → 1.71 m | 1.00 → 1.71 m |
+
+**Fixed, a real bug:** before this phase every body dunk launched at the top of the runway (charge 0.05, run 0). The body's RUN
+reaches the mode from `onBody`, past the bus's arbiter, and a seated pad re-sends its own trigger every frame: an idle pad's RT 0,
+one frame after the jog started the run, read as RUN let go. RUN is now the deeper of the hand's and the body's pull (as the
+arbiter folds them); pad-only it is the pad's value exactly (the pad regression measured identical: apex 1.77, 100 ms). The
+launch log names its cause now. **Not fixed, flagged:** `DunkDuelMode` binds the same `DunkBodyBinder` the same way.
+
+### Gate 4 — only verified adult jumps personalise it
+`GET /api/dunk/verified-jump` (new, read-only) answers the caller's best countermovement jump (hands on hips) that
+`lib/jump/seam.ts` calls verified, from their saved Quick Screens, and only when the account is verified 18+ and opted in **now**
+(`canSaveScanNumbers`, read from the database at request time): a row saved under an older rule, a teen, or an adult who opted
+out reads `{ verified: false, heightCm: null }`. The device-only vertical of lane vertical-easy (#480) is not read. The mode reads
+it only with the knob `dunk.realJumpPersonal` on (OFF by default; lib/feel-panel refuses knobs in ranked, staked and paid play);
+`lib/move/dunkBody` is untouched (movement-play's). Tests: the real assessment POST, then this GET (adult, unverified jumps, a teen,
+opted out, no session, a failing database).
