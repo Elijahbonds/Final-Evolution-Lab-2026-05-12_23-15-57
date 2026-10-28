@@ -148,6 +148,9 @@ seed 7, 300 rival possessions a tier; before = `hoops.rivalKitOn` / `hoops.teamO
 The rig (`after/poss-*.json`, PRO): 1v1 possessions throw spin / crossover / hesitation / in-and-out / behind / step-back; 3v3 possessions
 run 12.6, 4.7, 7.0, 6.5 and 7.4 s with probes, a called and set screen, and a swing. The 1v1 layup rate moved because the kit makes a shot
 the script never took — a layup with the man he just beat on his hip; `rivalShotPct` / `rivalReleasePct` are untouched.
+On the rig the root accel p99 over one recorded 3v3 rival possession (`poss-threevthree-pro-s15-m2.json`) reads: the handler 59.8, the
+screener 99.6, the third man 33.0 and my mates 33.1 / 36.3 m/s² (release game, every foe: 122–137). Only bodies that touched someone are
+over 34. The movers are capped at 33; the rest is the contact separation pushing roots (`BodySeparation`, phase 7's single standoff).
 
 ## 4. Ranked gaps
 
