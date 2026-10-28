@@ -118,7 +118,8 @@ await shoot('list', async (p) => {
   return { programs: n, progress: prog };
 });
 await shoot('overview', async (p) => {
-  const items = await count(p, '[data-testid="today-session"] [data-item]');
+  // PLAT-P01: today's exercises are one line each in the collapsed list under Start (the player plays them)
+  const items = await count(p, '[data-testid="today-list"] [data-item]');
   const locked = await count(p, '[data-week][data-access="locked"]');
   check(items > 5, 'overview: week 1 session served');
   check(!!(await count(p, '[data-start]')), 'overview: a start button');
@@ -146,7 +147,8 @@ await shoot('pain', async (p) => {
   return { sections: [...new Set(sections)], held: await count(p, '[data-held] li'), seeSomeone: words };
 });
 await shoot('locked', async (p) => {
-  check(await count(p, '[data-testid="today-session"]') === 0, 'locked: no content');
+  // PLAT-P01: the today card stays (it holds the lock); no exercise and no Start inside it
+  check(await count(p, '[data-item]') === 0 && await count(p, '[data-start]') === 0, 'locked: no content');
   check(!!(await count(p, '[data-locked]')), 'locked: the lock');
   check(await count(p, '[data-checkout]') === 0, 'locked: no checkout while payments are off');
   return { lock: await text(p, '[data-locked]') };

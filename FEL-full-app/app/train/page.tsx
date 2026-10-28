@@ -111,7 +111,7 @@ export default async function TrainPage() {
       line: t('train.cards.iron.line'),
     },
     {
-      href: '/education/playbook', group: 'learn' as Group, icon: BookOpen, accent: PALETTE.violet, title: t('train.cards.playbook.title'),
+      href: '/learn', group: 'learn' as Group, icon: BookOpen, accent: PALETTE.violet, title: t('train.cards.playbook.title'),
       line: t('train.cards.playbook.line'),
     },
     {

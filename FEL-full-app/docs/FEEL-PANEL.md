@@ -281,6 +281,11 @@ lane/dunk-flagship (group "Dunk · lobs"), new numbers, default as shipped by th
 (`DunkFlagship.ts` `OOP_LOB_FLIGHT_SEC`: the ALLEY-OOP passer lobs the ball while the dunker is still running, this long
 before the catch beat; it was a 0.35 s pass thrown after the take-off). It moves only when the pass leaves and how high it
 arcs; the catch, the slam window and the card are unchanged. **assumption:** the bounds (0.5 to 1.6 s) are safe, not tuned.
+lane/dunk-flagship Phase 3 (group "Dunk · lobs"), new number: `dunk.oopLateCatchClipT` 0.8 (`DunkFlagship.ts`
+`OOP_LATE_CATCH_CLIP_T`): when the dunker leaves the floor before the passer's run-throw is due (A early, RT let go early), the
+passer lobs on the take-off frame to this beat of the flight clip (the off-glass lob's hang beat). Before, it was a 0.35 s
+bullet thrown at 0.9 × the rise. Later gives a higher drop into the hand and less time before the slam window (1.05).
+**assumption:** the bounds (0.6 to 1.0) are safe, not tuned.
 lane/dunk-flagship (group "Dunk · run-up"), new, default unchanged: `dunk.runwayStrideScale` 1 (`DunkFlagship.ts`
 `RUNWAY_STRIDE_SCALE`): the run-up's leg pace reference (3.6 ÷ 1.1 m/s, as shipped) × this. Re-paced to 3.95 m/s on the rig,
 the run-up skated less at a sprint and more at 2.5–5 m/s, no overall gain, so the shipped pace stays and this is the owner's
