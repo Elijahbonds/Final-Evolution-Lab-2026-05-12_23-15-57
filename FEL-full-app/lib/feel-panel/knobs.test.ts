@@ -18,7 +18,7 @@ import { JUMPER_HOP_ON, JUMPER_APEX_AFTER_RELEASE_SEC, JUMPER_MIN_LOAD_SEC, JUMP
 import { FT_SETUP_SEC, FT_ROUTINE_SEC, FT_SET_SEC, FT_RESULT_SEC, FT_DIST_NARROW_01 } from '@/lib/babylon/core/FreeThrows';
 import { BANK_SET_DEG, BANK_GLANCE_MS } from '@/lib/babylon/hoops/shotLooks';
 import { OVERTIME_3V3_SEC } from '@/lib/babylon/modes/threevthreeOvertime';
-import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
+import { OOP_LOB_FLIGHT_SEC, OOP_LATE_CATCH_CLIP_T, REAL_JUMP_PERSONAL, RUNWAY_STRIDE_SCALE, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG, LAND_LEAD_SEC } from '@/lib/babylon/core/DunkFlagship';   // dunk-flagship
 import { BALL_SIDE_SHADE_ON, SHADE_OFFSET_M, SHADE_REACT_SEC, SHADE_SHIFT_MPS, SHADE_FLIP_M, SHADE_RANGE_M, SHADE_RESEED_M } from '@/lib/babylon/core/BallSideShade';
 import { OFF_BALL_LOOK_ON, MAN_GLANCE_EVERY_SEC, MAN_GLANCE_SEC } from '@/lib/babylon/core/OffBallLook';   // lane/h3-aware
 import { POSSESSION_SWAP_ON, FOE_SPACE_ANGLE_K, HAS_BALL_M } from '@/lib/babylon/core/PossessionSwap';
@@ -41,6 +41,11 @@ import { AI_REACT_ROOKIE_MS, AI_REACT_PRO_MS, AI_REACT_ELITE_MS } from '@/lib/ba
 import { DOUBLE_TEAM_ON, DOUBLE_PAINT_M, DOUBLE_AFTER_SEC, DOUBLE_MAX_SEC, DOUBLE_COOLDOWN_SEC, SWITCH_ON_SCREEN_ON, SWITCH_HELP_M, SWITCH_COOLDOWN_SEC } from '@/lib/babylon/hoops/teamDefense';
 import { HAND_CHECK_ON, HAND_CHECK_REACH_OVER_M, HAND_CHECK_GAP_SEC, HAND_CHECK_FOUL_COUNT, HAND_CHECK_WINDOW_SEC, CONTACT_POSE_ON, CONTACT_EASE_IN_SEC, CONTACT_EASE_OUT_SEC } from '@/lib/babylon/hoops/handCheck';
 import { CHEST_LEAN_DEG } from '@/lib/babylon/hoops/contactPoses';
+import * as P2B from '@/lib/babylon/hoops/blocks';   // hoops-p02
+import { AI_BLOCK_JUMP_CHANCE } from '@/lib/babylon/core/HoopsDefense';   // hoops-p02
+import * as P2C from '@/lib/babylon/hoops/contest';   // hoops-p02
+import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
+import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
 function tsFiles(dir: string): string[] {
   const out: string[] = [];
@@ -171,7 +176,33 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.pokeRangeM')).toBe(POKE_RANGE);
     expect(def('hoops.pokeLeadSec')).toBe(POKE_LEAD_SEC);
     expect([AI_REACH_TELL_ON, AI_REACH_TELL_SEC, AI_REACH_STUN_SEC, AI_REACH_GATE, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, POKE_READ_ON, STEAL_RATE_PER_SEC, POKE_RANGE, POKE_LEAD_SEC])
-      .toEqual([true, 0.25, 0.35, 0.5, 0.22, 0.6, true, 1.2, 1.2, 0.1]);
+      .toEqual([true, 0.25, 0.35, 0.7, 0.22, 0.6, true, 1.2, 1.2, 0.1]);   // hoops-p02: AI_REACH_GATE TUNED 0.5 → 0.7
+    // hoops-p02 (1v1/3v3 phase 2): blocks, the contest, the AI strip, on-ball pressure — defaults pinned
+    expect(def('hoops.blockDiceOn')).toBe(P2B.BLOCK_DICE_ON ? 1 : 0);
+    expect(def('hoops.blkShoulderM')).toBe(P2B.SHOULDER_M);
+    expect(def('hoops.blkArmM')).toBe(P2B.ARM_M);
+    expect(def('hoops.blkContactM')).toBe(P2B.CONTACT_M);
+    expect(def('hoops.blkLookSec')).toBe(P2B.LOOK_SEC);
+    expect(def('hoops.blkReleaseJumperM')).toBe(P2B.RELEASE_JUMPER_M);
+    expect(def('hoops.blkReleaseLayupM')).toBe(P2B.RELEASE_LAYUP_M);
+    expect(def('hoops.aiBlockLeadSec')).toBe(P2B.AI_BLOCK_LEAD_SEC);
+    expect(def('hoops.aiBlockReactOn')).toBe(P2B.AI_BLOCK_REACT_ON ? 1 : 0);
+    expect(def('hoops.aiBlockJumpChance')).toBe(AI_BLOCK_JUMP_CHANCE);
+    expect(def('hoops.blkDeflectMps')).toBe(P2B.DEFLECT_MPS);
+    expect(def('hoops.blkDeflectUpMps')).toBe(P2B.DEFLECT_UP_MPS);
+    expect(def('hoops.oneContestOn')).toBe(P2C.ONE_CONTEST_ON ? 1 : 0);
+    expect(def('hoops.contestRangeM')).toBe(P2C.CONTEST_RANGE_M);
+    expect(def('hoops.contestDistW')).toBe(P2C.CONTEST_DIST_W);
+    expect(def('hoops.contestJump')).toBe(P2C.JUMP_CONTEST);
+    expect(def('hoops.contestJumpFloor')).toBe(P2C.JUMP_CONTEST_FLOOR);
+    expect(def('hoops.contestCloseout')).toBe(P2C.CLOSEOUT_CONTEST);
+    expect(def('hoops.contestCloseoutFullMps')).toBe(P2C.CLOSEOUT_FULL_MPS);
+    expect(def('hoops.stealDiceOn')).toBe(STEAL_DICE_ON ? 1 : 0);
+    expect(def('hoops.stripReachM')).toBe(STRIP_REACH_M);
+    expect(def('hoops.stripShieldM')).toBe(STRIP_SHIELD_M);
+    expect(def('hoops.stripBallMaxY')).toBe(STRIP_BALL_MAX_Y);
+    expect(def('hoops.onBallCushionM')).toBe(ONBALL_CUSHION_M);
+    expect(def('hoops.onBallCushionPerMps')).toBe(ONBALL_CUSHION_PER_MPS);
     expect(def('hoops.bodySepOn')).toBe(BODY_SEP_ON ? 1 : 0);
     expect(def('hoops.capsuleRadius1v1M')).toBe(ONEVONE_CAPSULE_RADIUS);
     expect(def('hoops.bodyHardGapM')).toBe(BODY_HARD_GAP);
@@ -231,6 +262,8 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.overtime3v3Sec')).toBe(OVERTIME_3V3_SEC);
     expect(def('dunk.oopLobFlightSec')).toBe(OOP_LOB_FLIGHT_SEC);   // dunk-flagship (new)
     expect(def('dunk.oopLateCatchClipT')).toBe(OOP_LATE_CATCH_CLIP_T); // dunk-flagship Phase 3 (new)
+    expect(def('dunk.realJumpPersonal')).toBe(REAL_JUMP_PERSONAL);     // dunk-flagship Phase 5 (new, off)
+    expect(REAL_JUMP_PERSONAL).toBe(0);
     expect(def('dunk.runwayStrideScale')).toBe(RUNWAY_STRIDE_SCALE); // dunk-flagship (new, default = the shipped pace)
     expect(def('dunk.slamHitStopBigMs')).toBe(SLAM_HITSTOP_BIG_MS);  // dunk-flagship TUNED (new; every make was 70)
     expect(def('dunk.slamShakeBig')).toBe(SLAM_SHAKE_BIG);

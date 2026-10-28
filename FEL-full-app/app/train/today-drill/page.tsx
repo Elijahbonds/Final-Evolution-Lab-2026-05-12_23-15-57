@@ -35,16 +35,16 @@ export default async function TodayDrillPage() {
   return (
     <div className="min-h-screen bg-[#050505] pb-20">
       <div className="mx-auto max-w-3xl space-y-5 px-4 pt-6">
-        <Link href="/train" className="inline-flex min-h-[44px] items-center gap-1.5 text-[14px] text-white/55 hover:text-white">
+        <Link href="/train" className="inline-flex min-h-[44px] items-center gap-1.5 text-[16px] text-fel-soft hover:text-white">
           <ArrowLeft aria-hidden className="h-4 w-4" /> Train
         </Link>
         {view.plan
           ? <TodayDrillRun view={view} dobYear={user?.dobYear ?? null} />
           : (
             <section className="space-y-2" data-daily-stopped>
-              <p className="font-mono text-[11px] font-bold uppercase tracking-[0.18em] text-[#00FF9D]">{DAILY_EYEBROW}</p>
+              <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-[#00FF9D]">{DAILY_EYEBROW}</p>
               <h1 className="text-3xl font-black text-white">Paused today</h1>
-              <p className="rounded-xl border border-amber-300/25 p-4 text-[15px] text-white/80">{STOPPED_LINE}</p>
+              <p className="rounded-xl border border-amber-300/25 p-4 text-[16px] text-white/80">{STOPPED_LINE}</p>
             </section>
           )}
       </div>

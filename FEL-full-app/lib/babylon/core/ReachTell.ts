@@ -28,8 +28,10 @@ export const POKE_READ_ON = true;
 // ── the reach (3v3's values moved here unchanged; 1v1 now reaches by the same rules) ──
 /** No AI defender starts two reaches inside this (s). Moved from ThreeVThreeMode, unchanged; not a knob (a cadence, not odds). */
 export const AI_REACH_COOLDOWN_SEC = 1.2;
-/** A steal intent in range becomes a reach this often. 3v3's 0.5, unchanged; NEW in 1v1 (was: every intent). Knob `hoops.aiReachGate`. */
-export const AI_REACH_GATE = 0.5;
+/** A steal intent in range becomes a reach this often. 3v3's 0.5; NEW in 1v1 (was: every intent). TUNED 0.5 → 0.7 (hoops-p02, coordinator
+ *  call 1A: with the strip decided by the hand on the ball the AI reached too rarely to stop anyone — 0 stops in 18 of my possessions
+ *  on the rig). Knob `hoops.aiReachGate`. */
+export const AI_REACH_GATE = 0.7;
 /** A reach that lands strips this often. 3v3's 0.22, unchanged; NEW in 1v1 (was: 1.0). Knob `hoops.aiStealChance`. */
 export const AI_STEAL_CHANCE = 0.22;
 /** …and this often inside the bump window (the ball out of the hand). 3v3's 0.6, unchanged; NEW in 1v1. Knob `hoops.aiStealOnBump`. */
@@ -96,6 +98,9 @@ export interface ReachFrame {
   carrierSpeed: number;
   foulSpeed: number;
   roll: () => number;
+  /** hoops-p02 (hoops/steals aiStripLands): his hand can get to the ball this frame. Set = the strip is that geometry, no roll; left
+   *  undefined = today's roll (`hoops.stealDiceOn` 1, or a caller that does not read the ball). */
+  handOnBall?: boolean;
 }
 export type ReachOutcome = 'strip' | 'whiff' | 'foul';
 
@@ -112,13 +117,16 @@ export interface AiReach {
   carrierSpeed: number;
   foulSpeed: number;
   roll: () => number;
+  /** hoops-p02: the hand on the ball at the resolve (ReachFrame.handOnBall); undefined = the roll. */
+  handOnBall?: boolean;
 }
 
 /** How a shown reach ends: a strip, a whiff (the reacher is stunned) or the reach-in foul on a moving handler. A reach never resolves
  *  before its tell (throws: a caller bug, never a silent strip). Rolls `roll` once, and only for a reach that can land. */
 export function resolveAiReach(r: AiReach, tellSec = aiReachTellSec()): ReachOutcome {
   if (!(r.tellSec >= tellSec)) throw new Error(`resolveAiReach before the tell (${r.tellSec}s < ${tellSec}s)`);
-  if (r.eligible && r.inRange && !r.movedDuringTell && r.roll() < (r.exposed ? aiStealOnBump() : aiStealChance())) return 'strip';
+  // hoops-p02: with the hand read the strip is geometry (his hand on the ball at the resolve), never a roll
+  if (r.eligible && r.inRange && !r.movedDuringTell && (r.handOnBall !== undefined ? r.handOnBall : r.roll() < (r.exposed ? aiStealOnBump() : aiStealChance()))) return 'strip';
   return r.onHim && r.carrierSpeed >= r.foulSpeed ? 'foul' : 'whiff';
 }
 
@@ -153,7 +161,7 @@ export class AiReachTell {
     const s = this.show!; this.show = null;
     return resolveAiReach({
       tellSec: s.t, eligible: f.eligible, inRange: f.inRange, movedDuringTell: f.moveMark > s.moveMark || !!f.spinning,
-      exposed: s.exposed, onHim: f.onHim, carrierSpeed: f.carrierSpeed, foulSpeed: f.foulSpeed, roll: f.roll,
+      exposed: s.exposed, onHim: f.onHim, carrierSpeed: f.carrierSpeed, foulSpeed: f.foulSpeed, roll: f.roll, handOnBall: f.handOnBall,
     }, s.t);
   }
 }

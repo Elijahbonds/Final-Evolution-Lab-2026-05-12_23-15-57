@@ -192,3 +192,130 @@ mode-list-check 32 modes · vitest (dunk mode and core, `reducedMotionGates`, `L
 
 Still open, carried: foot skate on the run-up (Phase 1 gate, not met at the default stride; re-checked in Phase 4). Not
 started: the landing-absorb re-author (an owner card, waiting for approval).
+
+## 8. Phase 4 — self-lob, off the glass, the bounce: results (lane/dunk-flagship-p4)
+
+### The instrument: a sweep rig fast enough for catch rates
+The browser rig ran one attempt every 5–8 minutes, too slow for a ≥95 % catch rate per lob type. `FAST=1` swaps the engine's two
+draw calls for the NullEngine's own no-ops: every update, animation, skinning matrix, camera and the recorder still run, only
+pixels are not drawn. **Validated against a drawn run of the same seed and build** (the Phase 3 oop r0): 54 of 54 game events
+identical and in order, the lob metrics identical, the root within 0.1 mm, the ball within 7 mm, the camera within 4.4 cm. An
+attempt now takes ~50–80 s including the page boot. `SWEEP=1` varies the run by rep (the walk before the run 0–0.9 s, the stick's
+depth); standing throws run on their cue (the RUN! flash, the glass's "armed", the self-lob's release) after a 0–0.4 s reaction.
+Each frame records whether the ball's centre is inside the camera's view (projected). Every lock hold stays under 14 minutes.
+
+### Catch rate per lob type (before = 3e3e7a37, the Phase 3 head; after = this phase)
+
+| Lob | Before | After | Ball in frame, worst run | Ball speed at the hand (after) |
+|---|---|---|---|---|
+| Off the glass on the run (prop) | 0/8 (the original build 0/4 too: OVER THE GLASS) | **14/14** | 75 % → 100 % | 6.1–6.9 m/s |
+| Off the glass standing (Y) | 0/5 (LOST, 4 of them silent) | **5/5** (armed: goes up on the run) | 39 % → 100 % | 6.1–6.2 m/s |
+| Self-lob on the run (prop) | 7/7 | 11/11 | 100 % | 0.7–3.1 m/s |
+| Self-lob standing (Y, then run) | 5/5 | 5/5 | 59 % → **100 %** | 2.8–6.9 m/s |
+| Bounce lob on the run (prop) | 6/6 | 7/7 | 91 % → **100 %** | 3.5–6.5 m/s |
+| Bounce-bounce standing (Y, run on RUN!) | 5/5 | 5/5 | 100 % | 0.5–5.4 m/s |
+| Alley-oop, passer, 4 attempts on one page | 4/4 from the DUNKER's hand from attempt 2 | 4/4 from the passer | 100 % | 4.5–4.7 m/s |
+| Glass oop (passer) | 0/2 (WIDE OF / OVER THE GLASS) | **6/6** | 100 % | 8.5–8.7 m/s |
+| Bounce oop (passer) | 0/6 (NEVER IN REACH) | **6/6** | 100 % | 3.4 m/s |
+
+After = the phase's head build except the passer's glass and bounce oops and the alley-oop (one build earlier: nothing after it
+touches them). **63 of 63 caught.** The before arrival speed for the oops was the shipped bullet's 11.8 m/s (Phase 3); every after
+arrival is under it. No LOST in any after run; the reason line was seen on the way (NEVER IN REACH, nearest 2.01 m; WIDE before
+the reach threshold existed). Two drawn runs (the glass, the standing self-lob, for the contact sheet) matched their FAST twins.
+
+### What was wrong, and what changed
+- **The off-glass lob on the run went over the board, every time (0 of 8; the original build too).** The planner's own log said
+  OFF THE BOARD. Its catch was the hang beat and it threw from a fixed 3.8 m: the run left plus 0.8 s of clip is a flight that has
+  to hang, so it met the glass over the board's top (4.03 m) from anywhere past ~1 m out (the mode's solver, swept). On the run it
+  now catches on the rise beat (`GLASS_RUN_CATCH_CLIP_T` 0.62) and the prop throws when its predicted throw meets the board low
+  enough (`glassThrowDue`, ≤ 0.75 m over the rim), or at the last release that clears the iron (`GLASS_RELEASE_MIN_M` 0.6).
+  `AUTO_GLASS_AHEAD_M` is gone (its note no longer matched the flight's timing).
+- **Its window is narrow, and the dribble made it late.** At a sprint the board can be met from only ~0.5 m of the run. A runway
+  beat waits for the dribbled ball to come back to the palm: mid-bounce the throw left up to 0.43 s late, at the line, under the
+  iron (CLANK). A glass throw on the way is now carried, not dribbled: the bounce stops at the next palm moment.
+- **The glass and bounce lobs re-aim at the take-off** when their own clock is off by more than two frames, as the plain lob has
+  since 2026-09-18 (through the glass solver before the board, the bounce solver before the bounces, a plain arc after).
+- **The standing off-glass throw could not be caught (0 of 5).** A mid-board hit is a ~0.8 s flight; the run in from the top of
+  the runway is ~1.4 s before the catch beat even starts. Y + up (or Y on the glass prop) now **arms** the throw: it goes up on the
+  run when due, and the HUD says so ("OFF THE GLASS — IT GOES UP ON THE RUN").
+- **The passer's glass oop** was thrown during the dunker's rise on the standing solve (a 1.16 s flight with ~0.55 s of rise left),
+  and from his wing spot the mirror point of his throw lies off the board (WIDE OF THE GLASS). He now stands at the elbow
+  (`OOP_GLASS_PASSER_X` −1.6, `OOP_GLASS_PASSER_FROM_RIM_M` 5.5) and throws on the run, wound up, like the plain oop (Phase 3).
+- **The passer's bounce oop** was a standing bounce-bounce thrown in the rise (3.1 s of flight). It is a single bounce thrown on the
+  run now (`OOP_BOUNCE_FLIGHT_SEC` 1.1). An early take-off gets the glass / the bounce if it still fits, else a plain lob, said on
+  the banner ("NO TIME FOR THE GLASS — ALLEY-OOP").
+- **From a night's second attempt the dunker kept the oop ball** (a Phase 3 regression). `setupProp` hands the passer the ball
+  only in the approach, and on a reset it ran before the phase was set; the old after-take-off throw hid it by snapping the ball
+  to the passer at the launch (a 3.4 m pop). The ball goes to the passer as each attempt starts.
+- **The lob stays in the picture.** The standing self-lob tops out ~6.4 m up and the runway camera (aimed ~2.4 m up, the rim as
+  its objective) lost it for up to 41 % of its flight. While a lob is in the air on the runway the camera's objective rises with
+  the ball (`LOB_FRAME_LIFT` 1, eased over `LOB_FRAME_TAU` 0.2 s); the shared camera is untouched.
+- **A whiff always says why.** "LOST THE SELF-LOB — MISSED" named the lob, not the reason. The flight keeps the ball's nearest
+  pass by the hand and the loss names it: TOO HIGH, TOO LOW, OUT AHEAD, BEHIND YOU, WIDE, or NEVER IN REACH (over 1.5 m).
+  OFF THE IRON and OVER THE GLASS already said theirs. No silent LOST in any sweep run after the change.
+
+### Foot skate (carried from Phase 1), re-checked with more reps
+Plain approach, 6 reps at the default stride, 5 at the knob's 1.1 (the sixth was cut by a container restart), FAST rig:
+
+| `dunk.runwayStrideScale` | Weighted foot skate, all | Run band (2.5–5 m/s) | Sprint band (5+ m/s) |
+|---|---|---|---|
+| 1.0 (shipped) | 1.22 m/s (1.01–1.46) | 0.98 | 1.72 |
+| 1.1 | **0.97 m/s** (0.85–1.11) | 0.71 | 1.51 |
+
+Rep for rep, 1.1 skates less on all five matched pairs (1.17 → 0.97 mean, −17 %). The Phase 1 gate is still not met at either
+value. The default stays 1.0: it is a tuned feel number and the owner's call. **Recommendation:** feel 1.1 on the panel.
+
+Gate run on the phase's head (merged with `origin/lane/finish-release`; all through the shared CPU slots): tsc 0 errors · eslint 0
+warnings on the changed files · mode-list-check 32 modes · vitest (dunk mode and core, `reducedMotionGates`, `LobMarker`,
+`veniceBoardwalk`, `lib/feel-panel`, `tests/probes`) 59 files, 731 tests, all green · the 12 dunk-related headless suites 12 / 12.
+Contact sheet: `round9/dunk-flagship/shots/phase4-lobs.jpg`.
+
+## 9. Phase 5 — dunk feel: the iron, your real jump: results (lane/dunk-flagship-p5)
+
+Rig: the FAST sweep rig (Phase 4), checked again against drawn runs (Orbit, the body dunk strip: the same events). Contact sheet:
+`round9/dunk-flagship/shots/phase5-feel.jpg`.
+
+### Gate 1 — the slam beat scales with the slam
+| The slam press | Accuracy | Hit-stop | Shake |
+|---|---|---|---|
+| 110 ms late | 0.35–0.44 | **70 ms** | **0.120** for 140 ms (the shipped beat) |
+| 93 ms late | 0.44–0.52 | 70–76 ms | 0.120–0.132 |
+| 60 ms late | 0.64–0.69 | 83–86 ms | 0.146–0.152 |
+| body dunks (the body's own slam) | 0.82–0.92 | 94–100 ms | 0.168–0.179 |
+| on the beat | 0.93–0.95 | **100 ms** | **0.180** for 180 ms |
+
+**Fixed:** SLAM is still held at contact after any tap (contact lands ~33 ms after the press), so `slamImpact`'s rim-hang bonus
+(+0.15) applied to every make and an ordinary one came out at 75 ms / 0.129. The hang now adds only on an above-ordinary slam
+(accuracy > 0.5); the knobs and their defaults are unchanged. Found by the coordinator's read before the rig confirmed it.
+
+### Gate 2 — the rim, the net and the glass react on every make
+Every make punched the hoop (the rim spring, the net squash, a flash on 1 hoop material) and shook the glass (2 meshes):
+Venice 116 of 116 (every Phase 4 sweep make), Blossom 2/2, Canopy 2/2, Rooftop 2/2, Orbit 1/1. Orbit has to be measured drawn:
+its sky is near-black, so with FAST's empty frames the render watchdog reads a black display and stops the arena (a FAST
+artefact). Not reached by any venue, and not fixed: HoopJuice only looks for `meshy_hoop_*`, so the procedural fallback hoop
+(if the GLB failed to load) would flash and shake nothing.
+
+### Gate 3 — the real jump maps to the flight, monotonic
+A synthetic body (lib/pose's own streams: a jog, then a jump of 30 / 50 / 70 cm) published packet by packet into the rig's
+real bus, so the harness, BodySession and the mode's `onBody` run it:
+
+| Jump | Fixed mapping: power → apex | Personal (a verified 50 cm jump, knob on): power → apex |
+|---|---|---|
+| 30 cm (read 0.28 m) | 0.40 → 1.40 m | 0.55 → 1.50 m |
+| 50 cm (read 0.49 m) | 0.69 → 1.55 m | 0.97 → 1.71 m |
+| 70 cm (read 0.73 m) | 1.00 → 1.71 m | 1.00 → 1.71 m |
+
+**Fixed, a real bug:** before this phase every body dunk launched at the top of the runway (charge 0.05, run 0). The body's RUN
+reaches the mode from `onBody`, past the bus's arbiter, and a seated pad re-sends its own trigger every frame: an idle pad's RT 0,
+one frame after the jog started the run, read as RUN let go. RUN is now the deeper of the hand's and the body's pull (as the
+arbiter folds them); pad-only it is the pad's value exactly (the pad regression measured identical: apex 1.77, 100 ms). The
+launch log names its cause now. **Not fixed, flagged:** `DunkDuelMode` binds the same `DunkBodyBinder` the same way.
+
+### Gate 4 — only verified adult jumps personalise it
+`GET /api/dunk/verified-jump` (new, read-only) answers the caller's best countermovement jump (hands on hips) that
+`lib/jump/seam.ts` calls verified, from their saved Quick Screens, and only when the account is verified 18+ and opted in **now**
+(`canSaveScanNumbers`, read from the database at request time): a row saved under an older rule, a teen, or an adult who opted
+out reads `{ verified: false, heightCm: null }`. The device-only vertical of lane vertical-easy (#480) is not read. The mode reads
+it only with the knob `dunk.realJumpPersonal` on (OFF by default; lib/feel-panel refuses knobs in ranked, staked and paid play);
+`lib/move/dunkBody` is untouched (movement-play's). Tests: the real assessment POST, then this GET (adult, unverified jumps, a teen,
+opted out, no session, a failing database).

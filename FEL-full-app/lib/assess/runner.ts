@@ -25,7 +25,7 @@ import type { PoseFrame } from '@/lib/pose/landmarks';
 import { checkFraming, FramingGate, type FramingCheck, type FramingIssue } from '@/lib/mirror/framing';
 import { calibrateFront, calibrateSide, type Calibration } from './calibration';
 import {
-  facingSign, fppa, heelHeight, hipDrop, kneeFlexion, kneeFlexionFront, kneeInsideRatio, lateralTrunkLean, nearSide, pelvicTilt,
+  facingSign, footClearance, fppa, heelHeight, hipDrop, kneeFlexion, kneeFlexionFront, kneeInsideRatio, lateralTrunkLean, nearSide, pelvicTilt,
   shoulderFlexion, tibiaAngle, trunkTibiaDiff,
 } from './geometry';
 import { PoseFilter } from '@/lib/pose/oneEuro';
@@ -49,6 +49,9 @@ import { PAIN_REFERRAL, reasonsFor, topFindings, type Reason } from './why';
 import { prqWritesFor, toRecord, type PrqWrite, type RecordDevice } from './prqWrite';
 import { liftArms, liftArmsTest } from '@/lib/vertical/armsFree';
 import { ARMS_FREE_SETUP } from '@/lib/vertical/copy';
+import { MOVE_CUE, NO_WALL_SKIPPED, OTHER_LEG, SETUP } from '@/lib/screen-easy/copy';
+import { HandsUpAnswer } from '@/lib/screen-easy/handsUp';
+import { BETWEEN_LINES_MS, speechMs } from '@/lib/cue-style/speech';
 
 const STILL_MS = 900;
 /**
@@ -58,18 +61,30 @@ const STILL_MS = 900;
  * 3×; a real sway of 5 % of body height (about 9 cm at the hips) is still refused.
  */
 export const CALIB_SWAY_FALLBACK: number = th('calib.swayFallback');
+/**
+ * (new, SCREEN-EASY 2026-10-28; TUNED — flagged in docs/SCREEN-EASY-AUDIT.md) A single-leg squat's stance, read before
+ * it starts: a foot more than this far off the floor (body-height fraction, 2× t5.contactLine) is the lifted one. Used to
+ * hold the wrong leg ("Other leg") and to start the second leg on "Go." without a 3-2-1 once the right leg is up.
+ */
+export const STANCE_FOOT_UP = 2 * th('t5.contactLine');
+/** Frames in a row on the wrong leg before the runner holds the part (a wobble is not a wrong leg): tracking loss's own count. */
+const WRONG_LEG_FRAMES = LOSS_FRAMES;
 
 function moveOf(part: PartId | null, parts: readonly PartDef[]): { index: number; total: number; name: string; cue: string } | null {
   if (!part) return null;
-  const test = parts.find((p) => p.id === part)?.test ?? null;
+  const at = parts.findIndex((p) => p.id === part);
+  const test = parts[at]?.test ?? null;
   if (!test) return null;
-  const order: TestId[] = [];
-  for (const p of parts) if (!order.includes(p.test)) order.push(p.test);
-  const index = order.indexOf(test) + 1;
+  // SCREEN-EASY: a move is a run of parts of one test (the screen runs the front-on parts first, then the side-on ones,
+  // so T1 is two moves: facing, then side-on)
+  let index = 0, total = 0;
+  for (let i = 0; i < parts.length; i++) {
+    if (i === 0 || parts[i].test !== parts[i - 1].test || parts[i].view !== parts[i - 1].view) total++;
+    if (i === at) index = total;
+  }
   const def = testDef(test);
-  const cue = part === 'T1-side' ? 'Turn side-on, left to the camera' : part.includes('right') && part.startsWith('T2')
-    ? 'Right side to the camera' : part.includes('right') && part.startsWith('T3') ? 'Right leg' : def.setup.split('.')[0];
-  return { index, total: order.length, name: def.short, cue };
+  const cue: string = MOVE_CUE[part] ?? def.setup.split('.')[0];
+  return { index, total, name: def.short, cue };
 }
 
 // ── the session result (the live flow and the replay grade the same way) ──
@@ -167,14 +182,20 @@ export interface PartDef {
 }
 
 const TRIES = th('run.maxAttempts'), LIMIT = th('run.maxMs');
+/**
+ * SCREEN-EASY (2026-10-28): the FRONT-ON parts first, then the SIDE-ON ones, and the wall last. Before, the order was
+ * T1 front, T1 side, T2 left, T2 right (at a wall), T3 left, T3 right, T5: three turns and a walk to a wall and back in
+ * the middle (docs/SCREEN-EASY-AUDIT.md §3). Each test is graded the same way whatever the order (gradeSession reads the
+ * captures in test order), and the pain check still comes after each TEST, when its last part ends.
+ */
 export const QUICK_PARTS: readonly PartDef[] = [
-  { id: 'T1-front', test: 'T1', view: 'front', target: th('t1.reps'), maxAttempts: TRIES.T1, maxMs: LIMIT.T1, label: null, setup: `Overhead squat, facing the camera. ${testDef('T1').setup}` },
-  { id: 'T1-side', test: 'T1', view: 'side', near: 'left', target: th('t1.reps'), maxAttempts: TRIES.T1, maxMs: LIMIT.T1, label: null, calibrateSide: true, setup: `Now side-on, left side to the camera. Same overhead squat, ${countWord(th('t1.reps'))} times.` },
-  { id: 'T2-left', test: 'T2', view: 'side', side: 'left', near: 'left', target: th('t2.reps'), maxAttempts: TRIES.T2, maxMs: LIMIT.T2, label: 'LEFT LEG', setup: `Ankle bend, left leg. Left side to the camera, left foot forward toward a wall. ${testDef('T2').setup}` },
-  { id: 'T2-right', test: 'T2', view: 'side', side: 'right', near: 'right', target: th('t2.reps'), maxAttempts: TRIES.T2, maxMs: LIMIT.T2, label: 'RIGHT LEG', setup: 'Now the right leg. Turn around so your right side faces the camera, right foot forward.' },
-  { id: 'T3-left', test: 'T3', view: 'front', side: 'left', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'LEFT LEG', setup: `Single-leg squat on your left leg, facing the camera. ${testDef('T3').setup}` },
-  { id: 'T3-right', test: 'T3', view: 'front', side: 'right', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'RIGHT LEG', setup: `Now on your right leg. Same thing, ${countWord(th('t3.reps'))} times.` },
-  { id: 'T5', test: 'T5', view: 'front', target: th('t5.reps'), maxAttempts: TRIES.T5, maxMs: LIMIT.T5, label: null, highFps: true, setup: `Jump. ${testDef('T5').setup}` },
+  { id: 'T1-front', test: 'T1', view: 'front', target: th('t1.reps'), maxAttempts: TRIES.T1, maxMs: LIMIT.T1, label: null, setup: SETUP['T1-front'] },
+  { id: 'T3-left', test: 'T3', view: 'front', side: 'left', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'LEFT LEG', setup: SETUP['T3-left'] },
+  { id: 'T3-right', test: 'T3', view: 'front', side: 'right', target: th('t3.reps'), maxAttempts: TRIES.T3, maxMs: LIMIT.T3, label: 'RIGHT LEG', setup: SETUP['T3-right'] },
+  { id: 'T5', test: 'T5', view: 'front', target: th('t5.reps'), maxAttempts: TRIES.T5, maxMs: LIMIT.T5, label: null, highFps: true, setup: SETUP.T5 },
+  { id: 'T1-side', test: 'T1', view: 'side', near: 'left', target: th('t1.reps'), maxAttempts: TRIES.T1, maxMs: LIMIT.T1, label: null, calibrateSide: true, setup: SETUP['T1-side'] },
+  { id: 'T2-left', test: 'T2', view: 'side', side: 'left', near: 'left', target: th('t2.reps'), maxAttempts: TRIES.T2, maxMs: LIMIT.T2, label: 'LEFT LEG', setup: SETUP['T2-left'] },
+  { id: 'T2-right', test: 'T2', view: 'side', side: 'right', near: 'right', target: th('t2.reps'), maxAttempts: TRIES.T2, maxMs: LIMIT.T2, label: 'RIGHT LEG', setup: SETUP['T2-right'] },
 ];
 
 /** T5 only: the jump-only screen. */
@@ -246,6 +267,14 @@ export interface RunnerView {
    * elsewhere. Two states only: no percentage is ever shown.
    */
   readQuality?: 'clear' | 'partial' | null;
+  /** SCREEN-EASY: the pain prompt takes both hands up as its "no" (the tap still works for either answer). */
+  handsUpAnswer?: boolean;
+  /** SCREEN-EASY: 0..1 through the hands-up hold. */
+  handsUpHold?: number;
+  /** SCREEN-EASY: the wall check is being set up, and "No wall here? Skip it" may end it (skipWall). */
+  canSkipWall?: boolean;
+  /** SCREEN-EASY: the single-leg squat waits for the other leg ("Other leg"). */
+  wrongLeg?: boolean;
 }
 
 /**
@@ -289,6 +318,8 @@ interface PartState {
   attempts: number;
   activeMs: number;
   heelYs: number[];
+  /** SCREEN-EASY: the filtered heel height at each frame index (the live heel check reads the same series as its floor). */
+  heelAt: Map<number, number>;
   facing: 1 | -1 | 0;
   lastFlightCount: number;
 }
@@ -375,6 +406,17 @@ export class AssessRunner {
   private firstT: number | null = null;
   private now = 0;
   private lastJumpScan = -Infinity;
+  /** SCREEN-EASY: the set-up line is still being said until then — the countdown waits for it (no line cut off). */
+  private lineDoneAt = -Infinity;
+  /** SCREEN-EASY: the pain prompt's hands-up "no". */
+  private readonly handsUp = new HandsUpAnswer();
+  /** SCREEN-EASY: what the pain prompt says first ("Three. Overhead squat: done."). */
+  private painLead = '';
+  /** SCREEN-EASY: a line said ahead of the screen's last one (the wall skipped). */
+  private finishLead = '';
+  /** SCREEN-EASY: frames in a row on the wrong leg (a single-leg squat), and whether the right leg is up now. */
+  private wrongLegN = 0;
+  private stanceUp = false;
 
   constructor(private readonly o: RunnerOptions) {
     this.parts = o.parts ?? QUICK_PARTS;
@@ -524,15 +566,23 @@ export class AssessRunner {
       }
       case 'position': {
         const d = this.part!.def;
-        this.stillGate.reset();
         // a side-on part needs its own side toward the lens (the tested shin is the near one)
         const wrongSide = d.view === 'side' && !!d.near && framing.ok && frame.image.length >= 33 && nearSide(frame.image) !== d.near;
-        if (wrongSide) { this.gate.reset(); this.say(facingCue('side', d.near)); break; }
-        if (this.gate.ready(framing, frame.t)) {
+        // SCREEN-EASY: no fix is said over the set-up line (it says where to stand; a fix said now would cut it off)
+        const talk = now >= this.lineDoneAt;
+        if (wrongSide) { this.gate.reset(); this.stillGate.reset(); if (talk) this.say(facingCue('side', d.near)); break; }
+        // SCREEN-EASY: a single-leg squat on the wrong leg waits for the right one (it would be read as the other side)
+        this.readStance(d, frame);
+        if (this.wrongLegN >= WRONG_LEG_FRAMES) { this.gate.reset(); this.stillGate.reset(); if (talk) this.say(OTHER_LEG[d.side!]); break; }
+        // SCREEN-EASY: the still hold runs while the set-up line is said (it used to start only after it: 0.9 s a part of
+        // standing still, already still); a frame out of place starts it again
+        if (framing.ok && !trackingLost(frame)) this.stillGate.step(true, frame.t); else this.stillGate.reset();
+        // SCREEN-EASY: the countdown waits for the set-up line to be said (a new line cuts off the one before)
+        if (this.gate.ready(framing, frame.t) && now >= this.lineDoneAt) {
           this.gate.reset();
           if (this.part!.def.calibrateSide && !this.calib.side) { this.calFrames = []; this.go('calibrateSide', now); }
-          else { this.stillGate.reset(); this.countdownReady = false; this.go('countdown', now); }
-        } else if (!framing.ok) {
+          else { this.countdownReady = false; this.go('countdown', now); }
+        } else if (!framing.ok && talk) {
           this.say(this.fixLine(framing) ?? framing.instruction);
         }
         break;
@@ -541,6 +591,10 @@ export class AssessRunner {
         if (!this.positionOk(framing)) { this.stillGate.reset(); this.countdownReady = false; this.go('position', now); break; }
         if (!this.countdownReady) {
           if (this.stillGate.step(framing.ok && !trackingLost(frame), frame.t) < 1) break;
+          if (now < this.lineDoneAt) break;                // SCREEN-EASY: the side-on stand's line is still being said
+          // SCREEN-EASY: the second side of a move, already in place, starts on "Go." — no second 3-2-1 (the turn for
+          // the ankle bend's other side is checked in 'position'; the single-leg squat's other leg is read up here)
+          if (this.secondSideReady(frame)) { this.go('active', now); this.pulse('start'); this.say('Go.', true); break; }
           this.countdownReady = true;
           this.stepAt = now;
           this.countN = Math.ceil(th('ui.timing').countdownMs / 1000);
@@ -574,6 +628,7 @@ export class AssessRunner {
               this.resetPart();
               this.pulse('retry');
               this.say(this.retryMessage, true);
+              this.lineDoneAt = now + speechMs(this.retryMessage) - BETWEEN_LINES_MS;
             } else if (!this.restartCapped) {
               // …after which it stops restarting: one forced line, then silence until framing returns
               this.restartCapped = true;
@@ -594,6 +649,11 @@ export class AssessRunner {
       }
       case 'partDone': {
         if (now - this.stepAt >= DONE_BEAT_MS) { this.donePart = null; this.retryMessage = null; this.startPart(now); }
+        break;
+      }
+      case 'painCheck': {
+        // SCREEN-EASY: both hands up, held, is the "no" — from where the athlete stands (lib/screen-easy/handsUp.ts)
+        if (this.handsUp.feed(frame)) this.answerPain(false, now);
         break;
       }
       case 'miniResult': {
@@ -633,18 +693,22 @@ export class AssessRunner {
     this.step = step;
     this.stepAt = now;
     if (step !== 'position') this.restartCapped = false;
+    // SCREEN-EASY: every countdown starts from its still hold. The side-on stand went to 'countdown' with the last part's
+    // countdownReady still true, so its 3-2-1 began at once, over the stand's own line.
+    if (step === 'countdown') this.countdownReady = false;
     if (step === 'pain') this.say('Any pain right now? Tap yes or no.', true);
     if (step === 'takeoff') this.say('Which foot do you take off from? Tap left or right.', true);
     if (step === 'calibrate') { this.calFrames = []; this.say(CALIBRATE_FRONT_LINE, true); }
-    if (step === 'calibrateSide') { this.calFrames = []; this.say(CALIBRATE_SIDE_LINE, true); }
-    if (step === 'painCheck') this.say(PAIN_CHECK_LINE, true);
+    if (step === 'calibrateSide') { this.calFrames = []; this.say(CALIBRATE_SIDE_LINE, true); this.lineDoneAt = now + speechMs(CALIBRATE_SIDE_LINE) - BETWEEN_LINES_MS; }
+    // SCREEN-EASY: the done line and the question are one line (the 3 s "done" card is gone), and the hands-up "no" is armed
+    if (step === 'painCheck') { this.handsUp.reset(); this.say(`${this.painLead}${PAIN_CHECK_LINE}`, true); this.painLead = ''; }
   }
 
   private startPart(now: number): void {
     const def = this.parts[this.partIdx];
     if (!def) return this.finishSession(now);
     this.part = {
-      def, frames: [], filter: new PoseFilter(), marks: [], valid: 0, attempts: 0, activeMs: 0, heelYs: [], facing: 0, lastFlightCount: 0,
+      def, frames: [], filter: new PoseFilter(), marks: [], valid: 0, attempts: 0, activeMs: 0, heelYs: [], heelAt: new Map(), facing: 0, lastFlightCount: 0,
       reps: def.test === 'T2' ? new RockCounter({ rise: th('t2.repRise') })
         : def.test === 'T3' ? new RepCounter({ enter: th('t3.repEnter'), exit: th('t3.repExit'), minPeak: th('t3.repMinPeak') })
         : def.test === 'T1' ? new RepCounter({ enter: th('t1.repEnter'), exit: th('t1.repExit'), minPeak: th('t1.repMinPeak') })
@@ -656,8 +720,10 @@ export class AssessRunner {
     this.badSince = null;
     this.lostFrames = 0;
     this.go('position', now);
+    this.wrongLegN = 0; this.stanceUp = false; this.stillGate.reset();
     // SCREEN A: dim is said here, before the countdown — never mid-rep (activeOk keeps it a warning only).
     this.say(this.setupOf(def), true);
+    this.lineDoneAt = now + speechMs(this.setupOf(def)) - BETWEEN_LINES_MS;
     if (this.lastFraming?.issues.includes('dim')) this.say(FRAMING_FIX_LINES.dim, true);
   }
 
@@ -669,15 +735,53 @@ export class AssessRunner {
   /** The part's setup line: the arms-free jump says its own (VERTICAL-EASY). */
   private setupOf(def: PartDef): string { return this.o.armsFree && def.test === 'T5' ? ARMS_FREE_SETUP : def.setup; }
 
+  /** SCREEN-EASY: a single-leg squat's stance on this frame — the wrong leg up counts toward a hold; the right one is noted. */
+  private readStance(d: PartDef, frame: PoseFrame): void {
+    const front = this.calib.front;
+    if (d.test !== 'T3' || !d.side || !front || !frame.present || frame.image.length < 33) { this.wrongLegN = 0; this.stanceUp = false; return; }
+    const lifted = (stance: Side) => footClearance(frame.image, frame.world, stance, front.bodyHeight, front.worldHeight) >= STANCE_FOOT_UP;
+    this.stanceUp = lifted(d.side);
+    this.wrongLegN = lifted(d.side === 'left' ? 'right' : 'left') ? this.wrongLegN + 1 : 0;
+  }
+
+  /**
+   * SCREEN-EASY: the second side of a move, already in place — the ankle bend's other side facing the lens (position
+   * checked it), the single-leg squat's other leg up on this frame. A first side, or a second side not yet in place,
+   * keeps its 3-2-1.
+   */
+  private secondSideReady(frame: PoseFrame): boolean {
+    const d = this.part?.def, prev = this.parts[this.partIdx - 1];
+    if (!d?.side || !prev || prev.test !== d.test || prev.side === d.side) return false;
+    if (d.test === 'T2') return true;
+    this.readStance(d, frame);
+    return d.test === 'T3' && this.stanceUp;
+  }
+
+  /**
+   * SCREEN-EASY: "No wall here? Skip it" — the ankle bend needs a wall; without one it is skipped, never guessed. Its
+   * parts are passed over (any side already done is dropped too: one side alone is not scored), and the screen goes on.
+   */
+  skipWall(now: number): void {
+    this.now = now;
+    const d = this.part?.def;
+    if (!d || d.test !== 'T2' || (this.step !== 'position' && this.step !== 'countdown')) return;
+    this.captures.T2 = {};
+    this.part = null;
+    while (this.parts[this.partIdx + 1]?.test === 'T2') this.partIdx++;
+    this.finishLead = `${NO_WALL_SKIPPED} `;                        // said with the next line, so it is never replaced
+    this.nextPart(now);
+  }
+
   private resetPart(): void {
     const p = this.part!;
-    this.part = { ...p, frames: [], filter: new PoseFilter(), marks: [], valid: 0, attempts: 0, activeMs: 0, heelYs: [], facing: 0, lastFlightCount: 0,
+    this.part = { ...p, frames: [], filter: new PoseFilter(), marks: [], valid: 0, attempts: 0, activeMs: 0, heelYs: [], heelAt: new Map(), facing: 0, lastFlightCount: 0,
       reps: p.reps instanceof RockCounter ? new RockCounter({ rise: th('t2.repRise') }) : p.reps ? new RepCounter({ ...(p.def.test === 'T3'
         ? { enter: th('t3.repEnter'), exit: th('t3.repExit'), minPeak: th('t3.repMinPeak') }
         : { enter: th('t1.repEnter'), exit: th('t1.repExit'), minPeak: th('t1.repMinPeak') }) }) : null };
     this.badSince = null;
     this.lostFrames = 0;
     this.gate.reset();
+    this.stillGate.reset();
     this.step = 'position';
     this.stepAt = this.now;
   }
@@ -697,6 +801,7 @@ export class AssessRunner {
         const fs = facingSign(img);
         if (fs) p.facing = fs;
         p.heelYs.push(img[SIDE[s].heel].y);
+        p.heelAt.set(i, img[SIDE[s].heel].y);
         v = p.facing ? tibiaAngle(img, s, a, p.facing) : NaN;
         break;
       }
@@ -759,7 +864,10 @@ export class AssessRunner {
         const s = p.def.side!, ys = [...p.heelYs].sort((x, y) => x - y);
         const floor = ys[Math.floor(th('t2.heelFloorPercentile') * (ys.length - 1))];
         const bodyH = this.calib.side?.bodyHeight ?? front?.bodyHeight ?? th('geom.nominalBodyHeight');
-        if (bottom && (floor - bottom[SIDE[s].heel].y) / bodyH > th('geom.heelRise')) return 'notRead';
+        // SCREEN-EASY: the bottom's heel from the same filtered series as the floor (it read one raw frame against a
+        // smoothed floor, so camera jitter alone refused about one rock a screen that the grader then counted)
+        const heelY = p.heelAt.get(rep.bottom) ?? bottom?.[SIDE[s].heel].y;
+        if (heelY !== undefined && (floor - heelY) / bodyH > th('geom.heelRise')) return 'notRead';
         return faults([rep.peak < bandOf('t2.tibia').fault!]);
       }
       case 'T3-left': case 'T3-right': {
@@ -821,8 +929,8 @@ export class AssessRunner {
     else if (d.test === 'T2') this.captures.T2[d.side!] = p.frames;
     else if (d.test === 'T3') this.captures.T3[d.side!] = p.frames;
     else if (d.id === 'T5') this.captures.T5 = p.frames;
-    const nextDef = this.parts[this.partIdx + 1];
-    const testDone = !nextDef || nextDef.test !== d.test;
+    // SCREEN-EASY: a test is done when no later part belongs to it (T1's two views are no longer next to each other)
+    const testDone = !this.parts.slice(this.partIdx + 1).some((x) => x.test === d.test);
     // the last count is said with the done line: "Three. Done." — one forced line, so it is never displaced
     const lastCount = p.valid >= d.target && p.valid > 0 && d.test !== 'T5' ? `${NUMBERS[p.valid - 1] ?? p.valid}. ` : '';
     // the part is done: a "Done" beat (visual + voice), then the next part's setup
@@ -835,9 +943,9 @@ export class AssessRunner {
       : this.armsFreeT5(gradeT5(this.captures.T5 ?? [], { ...ctx, cameraFps: this.o.cameraFps?.() ?? null }));
     this.graded.push(t);
     this.mini = { test: t.id, text: doneLine(t) };
-    this.say(`${lastCount}${this.mini.text}`, true);
+    this.painLead = `${lastCount}${this.mini.text} `;
     this.part = null;
-    this.go('miniResult', now);
+    this.go('painCheck', now);
   }
 
   private nextPart(now: number): void {
@@ -856,7 +964,8 @@ export class AssessRunner {
     if (this.o.armsFree) this.result = { ...this.result, tests: this.result.tests.map((x) => this.armsFreeT5(x)) };
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
-    this.say(this.result.pain ? PAIN_REFERRAL : 'That is the screen done. Your results are on the screen.', true);
+    this.say(this.result.pain ? PAIN_REFERRAL : `${this.finishLead}That is the screen done. Your results are on the screen.`, true);
+    this.finishLead = '';
     this.freeFrames();
   }
 
@@ -916,6 +1025,10 @@ export class AssessRunner {
       retryMessage: this.retryMessage,
       handsFree: this.handsFree,
       armsFree: !!this.o.armsFree,
+      handsUpAnswer: this.step === 'painCheck',
+      handsUpHold: this.step === 'painCheck' ? this.handsUp.progress(this.lastT ?? now) : 0,
+      canSkipWall: def?.test === 'T2' && (this.step === 'position' || this.step === 'countdown'),
+      wrongLeg: this.step === 'position' && this.wrongLegN >= WRONG_LEG_FRAMES,
       readQuality: READ_STEPS.has(this.step) && this.readStep === this.step && this.readShares.length
         ? (this.readShares.reduce((a, b) => a + b, 0) / this.readShares.length >= th('gate.minConfidence') ? 'clear' : 'partial') : null,
     };
@@ -929,7 +1042,7 @@ export class AssessRunner {
       case 'takeoff': return 'Which foot do you take off from?';
       case 'calibrate': return this.calWhy ?? 'Stand still facing the camera, arms by your sides.';
       case 'calibrateSide': return this.calWhy ?? 'Stand still side-on, left side to the camera.';
-      case 'position': return this.lastFraming && !this.lastFraming.ok
+      case 'position': return this.wrongLegN >= WRONG_LEG_FRAMES && def?.side ? OTHER_LEG[def.side] : this.lastFraming && !this.lastFraming.ok
         ? (this.lastFraming.worst === 'turned' ? facingCue(def!.view, def!.near) : this.lastFraming.instruction) : def ? this.setupOf(def) : '';
       case 'countdown': return 'Get ready.';
       case 'active': return def ? this.setupOf(def) : '';

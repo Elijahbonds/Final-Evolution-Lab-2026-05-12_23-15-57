@@ -25,7 +25,9 @@ describe('the live jump-only flow', () => {
     for (const seed of [1, 2]) {
       const r = simulateLiveJump({ fps: 60, seed, trials: TRIALS });
       expect(r.done).toBe(true);
-      expect(r.at.active! / 1000, `seed ${seed}`).toBeLessThan(10);              // 9 s of setup: hold 1 + stand 3 + hold 1 + still 0.9 + 3-2-1
+      // SCREEN-EASY (2026-10-28; window widened 10 → 11 s, flagged): the countdown now waits for the jump's set-up line
+      // ("Jump. Hands on hips, three jumps.", 2.4 s) to be said — it began at ~1.9 s and cut the line off
+      expect(r.at.active! / 1000, `seed ${seed}`).toBeLessThan(11);              // hold 1 + stand 3 + the line 2.4 + still 0.9 + 3-2-1
       expect(r.numberMs! / 1000).toBeLessThan(26);
     }
   }, 120_000);
