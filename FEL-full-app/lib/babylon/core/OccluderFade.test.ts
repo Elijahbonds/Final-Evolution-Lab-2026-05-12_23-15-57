@@ -74,7 +74,7 @@ describe('OccluderFade', () => {
     expect(r.pole.visibility).toBe(1);
   });
 
-  it('never fades a ball, the world, the floor, a see-through mesh or an opt-out', () => {
+  it('never fades a ball, the world, the floor, a body, a see-through mesh or an opt-out', () => {
     const base = { name: 'prop', radius: 1, visibility: 1, enabled: true, visible: true, hero: false, optOut: false, thinInstances: 0, materialAlpha: 1 };
     expect(fadeCandidate(base)).toBe(true);
     expect(fadeCandidate({ ...base, radius: OCCLUDER_MIN_RADIUS_M - 0.01 })).toBe(false);
@@ -86,6 +86,7 @@ describe('OccluderFade', () => {
     expect(fadeCandidate({ ...base, optOut: true })).toBe(false);
     expect(fadeCandidate({ ...base, materialAlpha: 0.3 })).toBe(false);
     expect(fadeCandidate({ ...base, thinInstances: 40 })).toBe(false);
+    expect(fadeCandidate({ ...base, skinned: true })).toBe(false);   // a rival or a horde fighter is the game, not scenery
   });
 
   it('steps the fade at 1/fadeSec per second, both ways', () => {

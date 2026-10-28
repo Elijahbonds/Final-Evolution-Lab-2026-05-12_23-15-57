@@ -9,6 +9,8 @@
 // the meshes on the line of sight. Each one fades to OCCLUDER_FADE_ALPHA over OCCLUDER_FADE_SEC, and fades back once it
 // has been off the line for OCCLUDER_HOLD_SEC (so a pole the camera sweeps past does not flicker). What is never faded:
 //   - the hero's own meshes (and anything parented to it: the ball in hand, a board, a kart);
+//   - any skinned mesh — a rival, a horde fighter, a teammate, their kit: a body in front of the hero is the game, not
+//     scenery (the karate audit's rays met enemy bodies and their jerseys as well as the arena wall);
 //   - anything smaller than OCCLUDER_MIN_RADIUS_M (a ball, a cone, a bottle: it cannot hide a body) or larger than
 //     OCCLUDER_MAX_RADIUS_M (the ground, the sky, an arena shell: fading those would fade the world);
 //   - the ground, floor, court, water, terrain and sky by name, a mesh that opts out (`metadata.felNoFade`), a mesh already
@@ -47,9 +49,9 @@ interface Faded { mesh: AbstractMesh; orig: number; origVisible: boolean; instan
 /** Pure: may this mesh be faded, given what we know of it. Exported for the test. */
 export function fadeCandidate(m: {
   name: string; radius: number; visibility: number; enabled: boolean; visible: boolean; hero: boolean; optOut: boolean;
-  thinInstances: number; materialAlpha: number;
+  thinInstances: number; materialAlpha: number; skinned?: boolean;
 }): boolean {
-  if (!m.enabled || !m.visible || m.hero || m.optOut) return false;
+  if (!m.enabled || !m.visible || m.hero || m.optOut || m.skinned) return false;
   if (m.thinInstances > 1) return false;
   if (m.radius < OCCLUDER_MIN_RADIUS_M || m.radius > OCCLUDER_MAX_RADIUS_M) return false;
   if (m.visibility < 0.5 || m.materialAlpha < 0.5) return false;   // already see-through: leave it to its owner
@@ -159,6 +161,7 @@ export class OccluderFade {
       optOut: Boolean((m.metadata as { felNoFade?: boolean } | null)?.felNoFade),
       thinInstances: (m as { thinInstanceCount?: number }).thinInstanceCount ?? 0,
       materialAlpha: mat?.alpha ?? 1,
+      skinned: Boolean(m.skeleton),
     }) && m.getTotalVertices() > 0;
   }
 }

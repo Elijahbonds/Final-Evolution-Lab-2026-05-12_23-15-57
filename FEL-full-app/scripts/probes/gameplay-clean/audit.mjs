@@ -122,7 +122,8 @@ function installRecorder(cfg) {
       if (!p) continue;
       const d = p.subtract(e); const len = d.length(); if (len < 0.3) continue;
       const ray = new Ray(e.clone(), d.scale(1 / len), len - 0.25);
-      const hit = scene.pickWithRay(ray, (m) => m.isEnabled() && m.isVisible && (m.visibility === undefined || m.visibility > 0.25) && !heroMeshes.has(m)
+      // the props and the world only: a skinned body (a rival, a horde fighter, their kit) in front of the hero is play, not a blocked view
+      const hit = scene.pickWithRay(ray, (m) => m.isEnabled() && m.isVisible && (m.visibility === undefined || m.visibility > 0.25) && !heroMeshes.has(m) && !m.skeleton
         && m.getTotalVertices && m.getTotalVertices() > 0 && !(m.material && m.material.alpha !== undefined && m.material.alpha < 0.3)
         && (m.getBoundingInfo().boundingSphere.radiusWorld > 0.3) && !/sky|ground|floor|court$|water|ocean|backdrop|dome|fog/i.test(m.name), false);
       if (hit && hit.hit) { blocked++; if (who < 0) who = ix(R.occIx, R.occNames, hit.pickedMesh ? hit.pickedMesh.name.slice(0, 40) : '?'); }
@@ -214,6 +215,7 @@ function auditScreen(where) {
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {
     const s = n.textContent.replace(/\s+/g, ' ').trim(); if (!s) continue;
     const el = n.parentElement; if (!el || el.closest('[aria-hidden="true"] svg, script, style, noscript')) continue;
+    if (el.closest('[data-testid="feel-tab"], [data-testid="feel-sheet"]')) continue;   // the owner's dev panel: the rig opens it; a player never sees it
     const range = document.createRange(); range.selectNodeContents(n); const r = range.getBoundingClientRect();
     if (r.width < 1 || r.height < 1 || r.right < 0 || r.bottom < 0 || r.left > vw || r.top > vh) continue;
     const op = effOpacity(el); if (op < 0.05) continue;
@@ -255,7 +257,7 @@ function auditScreen(where) {
     }
   } catch {}
   const q = (sel) => [...document.querySelectorAll(sel)].filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && effOpacity(e) > 0.05; });
-  const targets = q('button, a[href], [role="button"], input, select').map((e) => { const r = e.getBoundingClientRect(); return { s: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), w: Math.round(r.width), h: Math.round(r.height) }; });
+  const targets = q('button, a[href], [role="button"], input, select').filter((e) => !e.closest('[data-testid="feel-tab"]')).map((e) => { const r = e.getBoundingClientRect(); return { s: (e.getAttribute('aria-label') || e.textContent || '').trim().slice(0, 24), w: Math.round(r.width), h: Math.round(r.height) }; });
   const label = (re) => q('button, a[href], [role="button"]').some((e) => re.test((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')));
   const ss = window.__sessionStore ? window.__sessionStore.view() : null;
   return {
