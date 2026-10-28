@@ -899,3 +899,25 @@ wiring test fences the rules interpreter off the wallet, sessions, arena, ladder
 `aimSwingCore.ts`'s PLACE archetype with golf / penalty's tuned defaults copied (TUNED numbers flagged, the owner's eye judges),
 always a playtest run (practice, Q10 A), refused at publish with nothing to do. First milestone: a seeded scripted run gives
 bit-identical scores twice.
+
+## 14. Ease and access (2026-10-28, lane/studio-easy)
+
+The owner: "All tools need to be accessible, easy to use." The measured audit, the ranked friction and the before → after
+numbers are in `docs/STUDIO-EASY-AUDIT.md`. What changed in the editor:
+
+- **Make your first court:** a three-step guide over the 3D view on a first visit, plus "Make it for me", which builds the
+  whole court in one undo step and then offers "Play it". The guide's progress is kept under its own key,
+  `fel.nexusStudio.guide.v1`. The project format is unchanged.
+- **Projects:** New and Open on this device (`projectShelf.ts`, under `fel.nexusStudio.shelf.v1`).
+  - The open project keeps `fel.nexusStudio.v1` and its JSON.
+  - A swap is all or nothing.
+- **Play-test in a production build** uses the shipped share hand-off (`shareHandoff.ts`), as practice, on the game's own
+  page. A development build keeps the `/dev/mode` hand-off.
+- **Help ("?")** lists every key (`shortcuts.ts`). Undo, Redo and Save now work on every track.
+- **Keyboard:**
+  - skip links (the 3D view, settings, things to add);
+  - the asset grid is one Tab stop;
+  - script nodes take focus, move with the arrows, and connect from a list.
+- **App chrome:** `/studio` hides the app rail and tab bar (`chromeHiddenFor`) and owns its arrow keys (`data-own-input`).
+- **The AI builder** stays off by default, because it calls a paid model. It now says so in plain words and offers the two
+  ways on.
