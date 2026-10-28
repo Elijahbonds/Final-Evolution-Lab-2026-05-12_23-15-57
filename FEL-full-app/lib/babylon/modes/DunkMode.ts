@@ -2035,7 +2035,11 @@ export const DunkMode: ModeDefinition = (() => {
         const runMps = phase === 'charge' ? holdRunSpeed : Math.hypot(vel.x, vel.z);
         stillFor = phase === 'charge' || runMps > DRIBBLE_MOVE_MPS ? 0 : stillFor + dt;
         if (onRunway) strideTick(runMps);
-        const wantBounce = onRunway && ballOurs && !gatherLatched && (stillFor === 0 || (dribble.active && (stillFor < DRIBBLE_STOP_SEC || !atPalm(dribble.phase, 0.08))));
+        // Phase 4: A GLASS THROW ON THE WAY IS CARRIED, NOT DRIBBLED. Its window on the board is narrow (~0.5 m of the run at a sprint)
+        // and a beat waits for the ball to reach the palm: mid-bounce the throw left up to 0.43 s late — at the line, under the iron
+        // (measured: a CLANK on 2 of 7 sweep runs). The bounce stops at the next palm moment and the ball rides the hand to the throw.
+        const glassCarry = (prop === 'offglass' || glassArmed) && phase === 'charge' && !lob.thrown && !runwayBeat && (!dribble.active || atPalm(dribble.phase, 0.08));
+        const wantBounce = onRunway && ballOurs && !gatherLatched && !glassCarry && (stillFor === 0 || (dribble.active && (stillFor < DRIBBLE_STOP_SEC || !atPalm(dribble.phase, 0.08))));
         const pickUp = dribble.active && !wantBounce ? ball.getAbsolutePosition().clone() : null;
         // the gather's pick-up lets the dribble's arms go in 0.06 s (the shot's 0.14 s held both arms at their bounce pose 0.1 s into
         // push 1-2, so the two-foot swing reached BACK a beat after the push instead of on it — p8i close-up)
