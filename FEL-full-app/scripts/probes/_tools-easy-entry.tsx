@@ -29,7 +29,7 @@ const PAGE: Record<string, { before: [string, string]; after: [string, string] }
   combine: { before: ['Combine day', ''], after: ['Combine day', ''] },
   vbt: { before: ['Bar speed', 'Rep speed from your camera: zones, speed loss, and your load-velocity line. Estimates, not lab numbers.'], after: ['Bar speed', 'Rep speed from your camera, side-on. Every number is an estimate, not a lab number.'] },
   sprint: { before: ['Sprint speed', "Time a sprint, a flying 10 or a 5-10-5 with your phone's camera, and read your top speed. Every number is an estimate."], after: ['Sprint speed', 'Time a sprint with your phone\'s camera. Every number is an estimate.'] },
-  jumps: { before: ['Your vertical', '(the jump tests sit under an adult\'s jump result, inside "More detail")'], after: ['Jump tests', 'Squat jump, one leg, the 10-5 bounce and the drop jump. Filmed and read on this phone.'] },
+  jumps: { before: ['Your vertical', '(the jump tests sit under an adult\'s jump result, inside "More detail")'], after: ['Jump tests', 'Squat jump, one leg, 10-5 rebound jumps and the drop jump. Filmed and read on this phone.'] },
   form: { before: ['Film a set', ''], after: ['Film a set', ''] },
 };
 function Page({ id, children }: { id: keyof typeof PAGE; children?: ReactNode }) {

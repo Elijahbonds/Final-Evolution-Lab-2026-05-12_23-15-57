@@ -281,7 +281,8 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
       <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-black ${liveish ? '' : 'hidden'}`} style={{ aspectRatio: '3 / 4' }} data-camera-box>
         {/* Z-P4-4: the camera picture is shown in one place only, SelfView */}
         <SelfView className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }} />
-        {phase === 'live' && (
+        {/* TOOLS-EASY: before the first rep the setup card below says it once; the status box waits for the first number */}
+        {phase === 'live' && (head || !setup) && (
           <div className="absolute inset-x-3 top-3 rounded-xl bg-black/70 px-3 py-2 text-center" aria-live="polite" data-vbt-live>
             {head ? (
               <>
