@@ -129,6 +129,7 @@ import { CoachBrandBar, MY_BRANDING_API } from '@/components/coach/brand-bar';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { CoachSessionPlayer, readResume, resumeState, writeResume } from '@/components/session-player/coach-player';
 import { CoachReplyCard } from '@/components/session-player/coach-reply';
+import { Layer } from '@/components/session-player/layer';
 import type { FinishResult } from '@/components/session-player/session-player';
 import { COACH_PLAYER_COPY as C } from '@/components/session-player/coach-copy';
 import { COACH_LOOK as L, LAUNCHER_KEYFRAMES } from '@/components/session-player/coach-look';
@@ -454,9 +455,9 @@ export function TodayView({ api = TODAY_API, onSession }: { api?: TodayApi; onSe
       )}
 
       {player && (
-        <CoachSessionPlayer coach={player.coach} initial={player.initial} exercises={today.session.exercises} drafts={drafts} unit={unit} simpleLog={recovery}
+        <Layer><CoachSessionPlayer coach={player.coach} initial={player.initial} exercises={today.session.exercises} drafts={drafts} unit={unit} simpleLog={recovery}
           reply={data.reply ?? null} onRows={(slot, sets) => setDrafts((s) => (s[slot] ? { ...s, [slot]: { ...s[slot], sets } } : s))}
-          save={savePlayed} onClose={closePlayer} />
+          save={savePlayed} onClose={closePlayer} /></Layer>
       )}
     </div>
   );
@@ -479,23 +480,25 @@ function LauncherRow({ label, side, onClick, testId }: { label: string; side?: s
 function LauncherSheet({ id, title, open, onOpen, always = false, children }: {
   id: SheetId; title: string; open: SheetId | null; onOpen: (s: SheetId | null) => void; always?: boolean; children: ReactNode;
 }) {
-  const body = useRef<HTMLDivElement | null>(null);
+  // a state, not a ref: the body mounts a render later, inside the Layer's portal
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
   const [has, setHas] = useState(always);
   // a parity sheet's row shows only once its card renders something (each renders nothing until its SQL is applied)
   useEffect(() => {
     if (always) return;
-    const el = body.current;
+    const el = body;
     if (!el || typeof MutationObserver === 'undefined') return;
     const check = () => setHas(el.childElementCount > 0);
     const mo = new MutationObserver(check);
     mo.observe(el, { childList: true, subtree: true });
     check();
     return () => mo.disconnect();
-  }, [always]);
+  }, [always, body]);
   const shown = open === id;
   return (
     <>
       {!always && has && <LauncherRow label={title} onClick={() => onOpen(id)} testId={`today-row-${id}`} />}
+      <Layer>
       <div hidden={!shown} data-today-sheet={id} data-open={shown ? '1' : '0'}>
         <div className={L.sheetVeil} onClick={() => onOpen(null)} aria-hidden />
         <div className={L.sheet} role="dialog" aria-modal="true" aria-label={title}>
@@ -503,9 +506,10 @@ function LauncherSheet({ id, title, open, onOpen, always = false, children }: {
             <p className={L.sheetTitle}>{title}</p>
             <button type="button" aria-label={C.close} className={L.sheetClose} onClick={() => onOpen(null)}><X className="h-5 w-5" /></button>
           </div>
-          <div ref={body}>{children}</div>
+          <div ref={setBody}>{children}</div>
         </div>
       </div>
+      </Layer>
     </>
   );
 }
