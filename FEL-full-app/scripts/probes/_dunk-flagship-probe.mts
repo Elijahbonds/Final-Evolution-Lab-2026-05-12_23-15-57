@@ -141,8 +141,10 @@ const RECORDER = `(() => {
       if (performance.now() - t0 > 5000) return;
       const sb = window.__hud().slamBeat;
       if (!(mode === 'open' ? (sb === 'open' || sb === 'beat') : sb === 'beat')) { requestAnimationFrame(tick); return; }
-      const b = window.__PAD.buttons[0]; b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now();
-      setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60);
+      const b = window.__PAD.buttons[0];
+      const press = () => { b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now(); setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60); };
+      // Phase 5: 'late' = an ordinary make — the beat, then ~120 ms late (accuracy ~0.4, still inside the window)
+      if (mode === 'late') setTimeout(press, 120); else press();
     };
     requestAnimationFrame(tick);
   };
@@ -167,7 +169,7 @@ async function startInPage(settleMs: number): Promise<{ playing: boolean; frames
 }
 
 interface AttemptCfg { scen: string; seed: number; standMs: number; walkMs: number; walkY: number; holdMs: number; takeoff: 'auto' | 'press' | 'release'; pressAfterMs: number;
-  preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; body?: unknown[]; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'none'; recMs: number; strip: number[] | null }
+  preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; body?: unknown[]; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'late' | 'none'; recMs: number; strip: number[] | null }
 type AttemptOut = { err: string } | { t0: number; pressAt: number | null; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; hud: string[] };
 
 /** One attempt in the page, on the virtual clock. */

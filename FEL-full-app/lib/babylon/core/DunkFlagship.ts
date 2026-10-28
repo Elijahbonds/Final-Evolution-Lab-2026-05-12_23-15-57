@@ -66,7 +66,9 @@ export interface SlamImpact { hitStopMs: number; shake: number; shakeMs: number 
 /** The make's hit-stop and shake for a slam of accuracy `acc01` (and a rim hang adds a touch: the body hits the iron too). */
 export function slamImpact(acc01: number, hang: boolean, big = { hitStopMs: SLAM_HITSTOP_BIG_MS, shake: SLAM_SHAKE_BIG }, from = SLAM_BIG_FROM): SlamImpact {
   const a = Number.isFinite(acc01) ? Math.min(1, Math.max(0, acc01)) : 0;
-  const k = Math.min(1, Math.max(0, (a - from) / Math.max(1e-6, 1 - from)) + (hang ? 0.15 : 0));
+  // Phase 5: the hang adds only on an ABOVE-ordinary slam. At contact SLAM is still down from any tap (contact lands ~33 ms after the
+  // press), so `hang` was true on every make and an ordinary one came out at 75 ms / 0.129, not the shipped 70 / 0.12 (rig, Phase 5).
+  const k = Math.min(1, Math.max(0, (a - from) / Math.max(1e-6, 1 - from)) + (hang && a > from ? 0.15 : 0));
   return {
     hitStopMs: Math.round(SLAM_HITSTOP_MS + (big.hitStopMs - SLAM_HITSTOP_MS) * k),
     shake: SLAM_SHAKE + (big.shake - SLAM_SHAKE) * k,
