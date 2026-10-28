@@ -26,6 +26,7 @@
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 const require = createRequire(new URL('../../../package.json', import.meta.url).pathname);
 const { chromium } = require('playwright-core');
 
@@ -295,9 +296,15 @@ function analyze(mode, rec, S) {
       const w = speeds[i]?.[b]; if (w === null || w === undefined || w < 600) continue;
       if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
       const nb = []; for (let k = i - 6; k <= i + 6; k++) if (k !== i && speeds[k]?.[b] != null) nb.push(speeds[k][b]);
-      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '' });
+      const m = med(nb) ?? 0; if (w >= 3.5 * Math.max(m, 60)) pops.push({ t: F[i].t, i, bone: QN[b], degS: Math.round(w), clip: rec.clips[F[i].c] ?? '' });
     }
   }
+  // one EVENT is every bone that pops within 3 frames of another (a snap into a pose moves many bones at once); the
+  // control (karate, raw): RightUpLeg 70° then 63° in two frames, then held — the same pair at 3.35, 4.27, 5.40, 9.67 s
+  const byFrame = [...pops].sort((a, b) => a.i - b.i); const events = [];
+  for (const p0 of byFrame) { const last = events[events.length - 1]; if (last && p0.i - last.end <= 3) { last.end = p0.i; last.bones.add(p0.bone); last.peak = Math.max(last.peak, p0.degS); } else events.push({ t: p0.t, end: p0.i, bones: new Set([p0.bone]), peak: p0.degS }); }
+  out.popEvents = events.length; out.popEventsPerMin = r2(events.length / Math.max(1e-6, play.length / 3600));
+  out.popEventEx = events.sort((a, b) => b.peak - a.peak).slice(0, 4).map((e) => `${e.t}s ${e.peak}°/s ${[...e.bones].slice(0, 4).join('+')}`);
   out.pops = pops.length; out.popsPerMin = r2(pops.length / Math.max(1e-6, play.length / 3600)); out.popEx = pops.sort((a, b) => b.degS - a.degS).slice(0, 5);
   // root jumps (teleports) during play
   const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }
@@ -330,7 +337,9 @@ function analyze(mode, rec, S) {
   } else out.skate = 'n/a (ride)';
   // camera cuts
   const cuts = []; for (let i = 1; i < F.length; i++) { const a = F[i - 1].cam, b = F[i].cam; if (!a || !b || F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue;
-    const de = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), dtg = Math.hypot(b[3] - a[3], b[4] - a[4], b[5] - a[5]);
+    // relative to the hero's own step: a chase camera behind a plane or a kart moves metres a frame and is not cutting
+    const hr = F[i].r && F[i - 1].r ? [F[i].r[0] - F[i - 1].r[0], F[i].r[1] - F[i - 1].r[1], F[i].r[2] - F[i - 1].r[2]] : [0, 0, 0];
+    const de = Math.hypot(b[0] - a[0] - hr[0], b[1] - a[1] - hr[1], b[2] - a[2] - hr[2]), dtg = Math.hypot(b[3] - a[3] - hr[0], b[4] - a[4] - hr[1], b[5] - a[5] - hr[2]);
     if (de > 0.6 || dtg > 0.8) cuts.push({ t: F[i].t, eye: r2(de), tgt: r2(dtg) }); }
   // the intro (a crane, a reveal) may cut on purpose: the cuts more than 3 s after play (re)started are the ones a player feels as a snap
   const starts = []; for (let i = 1; i < F.length; i++) if (F[i].ph === 'playing' && F[i - 1].ph !== 'playing') starts.push(F[i].t);
@@ -394,6 +403,19 @@ function analyze(mode, rec, S) {
   out.pause = { state: S?.pauseState, after: r2(S?.pausedAfter), resumedAfter: r2(S?.resumedAfter) };
   out.clipsSeen = rec.clips.length;
   return out;
+}
+
+// ── re-analysis of saved recordings (REANALYZE=1: <outDir> holds <mode>-<tag>-raw.json.gz; the JSON rows are updated) ──
+if (process.env.REANALYZE === '1') {
+  for (const mode of MODES) {
+    const raw = path.join(OUT, `${mode}-${TAG}-raw.json.gz`), js = path.join(OUT, `${mode}-${TAG}.json`);
+    if (!fs.existsSync(raw) || !fs.existsSync(js)) { console.log(`${mode}: no recording`); continue; }
+    const { rec, S } = JSON.parse(zlib.gunzipSync(fs.readFileSync(raw)).toString());
+    const row = JSON.parse(fs.readFileSync(js, 'utf8'));
+    fs.writeFileSync(js, JSON.stringify(Object.assign(row, analyze(mode, rec, S)), null, 1));
+    console.log(`${mode}: re-analysed`);
+  }
+  process.exit(0);
 }
 
 // ── the run ───────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -485,7 +507,7 @@ for (const mode of MODES) {
     for (const f of rec.frames) if (f.t >= tEnd - PERF_S + 0.5) f.thr = true;
     Object.assign(row, analyze(mode, rec, S));
     row.wallS = r2((Date.now() - tWall0) / 1000);
-    if (process.env.KEEP_RAW === '1') fs.writeFileSync(path.join(OUT, `${mode}-${TAG}-raw.json`), JSON.stringify(rec));
+    fs.writeFileSync(path.join(OUT, `${mode}-${TAG}-raw.json.gz`), zlib.gzipSync(JSON.stringify({ rec, S })));
   } catch (e) { row.fail = String(e.message || e).slice(0, 200); }
   row.errors = [...new Set(errs)].slice(0, 12); row.badUrls = [...new Set(bad)]; row.errorCount = errs.length; row.warnCount = warnsN.n; row.crashed = crashed;
   try { row.scriptErr = await p.evaluate(() => window.__scriptErr ?? null); row.api = await p.evaluate(() => [...new Set(window.__api)].slice(0, 20)); } catch {}

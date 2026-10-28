@@ -205,6 +205,19 @@
     top: auto !important;
     bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
   }
+  /* gameplay-clean (2026-10-28): IN PLAY the capture menu (⋯, GameCaptureHud: top-left, 60x47 px, z 45) joins this bottom
+   * row, just left of the shell's buttons. At the top-left it sat on every mode's first HUD chip — measured on a sideways
+   * phone: golf's HOLE 1/5, baseball's INN 1/3 · OUTS, aero's PLACE. READY keeps it where it was (4d below lays the card's
+   * corner out around it), and so does the end card. 88 px = half the row (pause, leave, body, full screen: 4 × 36 + 3 × 6
+   * = 162) + its 6 px gap; scaled to the row's 36 px height from its own right edge. */
+  [data-fel-console]:not(:has([data-fel-fullbleed])):not(:has([data-end-screen])) > [data-capture-ui] {
+    top: auto !important;
+    bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
+    left: auto !important;
+    right: calc(50% + 88px) !important;
+    transform: scale(0.77);
+    transform-origin: right bottom;
+  }
   /* and a hint keeps to the gap between the thumb clusters (the compact deck reaches ~30 % in from each side) */
   [data-fel-console] > div:has(> canvas) > div.inset-x-0.text-center > span.fel-panel.font-mono {
     max-width: 44% !important;   /* !important: the base clamp rule below comes later in the file */

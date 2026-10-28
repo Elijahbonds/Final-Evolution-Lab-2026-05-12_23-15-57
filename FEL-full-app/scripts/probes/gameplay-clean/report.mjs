@@ -21,7 +21,7 @@ export function grade(r) {
   const errs = (r.errors ?? []).filter((e) => !RIG_ERR.test(e));
   const answered = r.pressCount ? r.pressAnswered / r.pressCount : null;
   const out = {
-    pops: g(r.popsPerMin, 1, 6),
+    pops: g(r.popEventsPerMin ?? r.popsPerMin, 2, 10),
     pose: g(Math.max(r.tposeFrames ?? 0, r.restPoseFrames ?? 0), 0, 30),
     skate: r.skate ? 'n/a' : r.skateMed == null ? '–' : g(r.skateMed, 0.15, 0.4),
     occl: r.heroHiddenPct == null ? '–' : (() => { const a = g(r.heroHiddenPct, 2, 8); const b = r.heroInFramePct == null ? 'G' : r.heroInFramePct >= 95 ? 'G' : r.heroInFramePct >= 80 ? 'A' : 'R'; return a === 'R' || b === 'R' ? 'R' : a === 'A' || b === 'A' ? 'A' : 'G'; })(),
@@ -41,13 +41,13 @@ export function grade(r) {
 }
 
 const lines = [];
-lines.push('| mode | boot→READY s | pops/min | T/rest | skate m/s | hero hidden % · in frame % | cam snaps (after intro) | HUD words · <12px · overlaps · low-contrast | phone CPU p50/p95 ms | draws mean/max | press→response ms (answered) | longest still s | pause | errors |');
+lines.push('| mode | boot→READY s | pop events/min | T/rest | skate m/s | hero hidden % · in frame % | cam snaps (after intro) | HUD words · <12px · overlaps · low-contrast | phone CPU p50/p95 ms | draws mean/max | press→response ms (answered) | longest still s | pause | errors |');
 lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
 for (const r of rows) {
   const k = grade(r);
   if (k.boot === 'R') { lines.push(`| ${r.mode} | **R** ${k.note} |||||||||||||`); continue; }
   const c = (x, s) => `${x} ${s}`;
-  lines.push(`| ${r.mode} | ${c(k.load, r.readyS)} | ${c(k.pops, r.popsPerMin)} | ${c(k.pose, `${r.tposeFrames}/${r.restPoseFrames}`)} | ${k.skate === 'n/a' ? 'n/a' : c(k.skate, r.skateMed)} | ${c(k.occl, `${r.heroHiddenPct} · ${r.heroInFramePct}`)} | ${c(k.cam, r.camCutsAfterIntro)} | ${c(k.hud, `${k.words} · ${k.small} · ${k.over} · ${k.lowC}`)} | ${c(k.perf, `${r.phoneCpuMsP50}/${r.phoneCpuMsP95}`)} | ${c(k.draws, `${r.drawsMean}/${r.drawsMax}`)} | ${c(k.input, `${r.respMsMed} (${r.pressAnswered}/${r.pressCount})`)} | ${c(k.stuck, r.longestStillS)} | ${c(k.pause, r.pause?.state ?? '')} | ${c(k.errors, k.errs.length)} |`);
+  lines.push(`| ${r.mode} | ${c(k.load, r.readyS)} | ${c(k.pops, r.popEventsPerMin ?? r.popsPerMin)} | ${c(k.pose, `${r.tposeFrames}/${r.restPoseFrames}`)} | ${k.skate === 'n/a' ? 'n/a' : c(k.skate, r.skateMed)} | ${c(k.occl, `${r.heroHiddenPct} · ${r.heroInFramePct}`)} | ${c(k.cam, r.camCutsAfterIntro)} | ${c(k.hud, `${k.words} · ${k.small} · ${k.over} · ${k.lowC}`)} | ${c(k.perf, `${r.phoneCpuMsP50}/${r.phoneCpuMsP95}`)} | ${c(k.draws, `${r.drawsMean}/${r.drawsMax}`)} | ${c(k.input, `${r.respMsMed} (${r.pressAnswered}/${r.pressCount})`)} | ${c(k.stuck, r.longestStillS)} | ${c(k.pause, r.pause?.state ?? '')} | ${c(k.errors, k.errs.length)} |`);
 }
 if (process.argv.includes('--json')) console.log(JSON.stringify(rows.map((r) => ({ mode: r.mode, ...grade(r) }))));
 else console.log(lines.join('\n'));
