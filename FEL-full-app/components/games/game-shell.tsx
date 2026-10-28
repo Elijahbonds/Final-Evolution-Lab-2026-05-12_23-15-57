@@ -158,6 +158,9 @@ function GameShellInner({
   // ECONOMY-SESSIONS-HARDEN: an agent or playtest run is started as one, so the server records it and pays nothing
   const agentRun = searchParams.get('agent') === '1';
   const playtestRun = searchParams.get('playtest') === '1';
+  // NEX-06 (owner 2026-10-20: "player content is practice-only, never ranked or staked"): a Studio share link's run is started as
+  // a playtest run, so the server records it and pays nothing (lib/nexus-studio/share.ts)
+  const shareRun = searchParams.has('share');
   // QA P0-01: `display` is what the header badge prints (the measured PRQ, lib/prq-display); prq / grade stay the modes'
   // difficulty inputs.
   const [profile, setProfile] = useState<{ prq: number; grade: PrqGrade; display: PrqDisplay } | null>(null);
@@ -210,7 +213,7 @@ function GameShellInner({
   const startServerRun = useCallback((): Promise<string | null> => {
     const url = `/api/sessions/start${agentRun ? '?agent=1' : ''}`;
     return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-      mode, ...(playtestRun ? { playtest: true } : {}),
+      mode, ...(playtestRun || shareRun ? { playtest: true } : {}),
       // TIER-SERVER: the head-to-head this run is for, so the server records its tier (PRO) at the start
       ...(arenaMatchId ? { arenaMatchId } : {}), ...(mpCode ? { mp: mpCode } : {}), ...(challengeCode ? { c: challengeCode } : {}),
     }) })
@@ -229,7 +232,7 @@ function GameShellInner({
         import('@/lib/agentRunHooks').then(({ setAgentRunHooksAllowed }) => setAgentRunHooksAllowed(false));
         return null;
       });
-  }, [mode, agentRun, playtestRun, arenaMatchId, mpCode, challengeCode]);
+  }, [mode, agentRun, playtestRun, shareRun, arenaMatchId, mpCode, challengeCode]);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<'idle' | 'minting' | 'copied'>('idle');
   const scheme = getScheme(mode);

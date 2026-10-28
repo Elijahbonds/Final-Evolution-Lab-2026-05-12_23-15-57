@@ -47,6 +47,13 @@ export interface PlaytestTarget {
   scoreKeys?: { me: string; them: string };
   /** config/mobileBudget.json row measured on this venue (the mode's own, or the closest one). */
   budgetKey: string;
+  /**
+   * NEX-04: the PLAYING AREA, one or more convex polygons of [x, z] corners on the ground — the surface the mode plays on and where its ball
+   * flies. A published venue may not put an object inside it (publishGate.ts), nor in the play camera's corridor (from
+   * `crowdView.camera.at` to `crowdView.focus`). Measured, not guessed: publishGate.test.ts holds that every stand the mode's own
+   * crowd lays and every prop of every place the owner ships for it is OUTSIDE, and the hero's spot and objective INSIDE.
+   */
+  playArea: ReadonlyArray<ReadonlyArray<readonly [number, number]>>;
   /** Opens the mode with a Studio venue: dev only (the load path is dev only). */
   route(venueParam: string): string;
   /**
@@ -71,6 +78,7 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     // visual/crowd/crowdVenues.ts TENNIS: the play camera stands behind the near baseline looking −z
     crowdView: { focus: [0, 1, -2], eye: [0, 4.4, 15.8], camera: { at: [0, 4.4, 15.8], into: [0, -1], margin: 5 } },
     budgetKey: 'tennis',
+    playArea: [[[-8, -17], [8, -17], [8, 17], [-8, 17]]],   // venueSpecs tennis ground 16 × 34, centred
     scoreKeys: { me: 'myPts', them: 'aiPts' },   // TiebreakMode hud()
     route: (v) => `/dev/mode/tiebreak?venue=${encodeURIComponent(v)}`,
     // Measured (§10.5, castFairness.test.ts): the rally's every outcome is TiebreakBlitz's clock (the window, the side, the AI's
@@ -93,6 +101,9 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     // visual/crowd/crowdVenues.ts FOOTBALL: the runner-cam trails the runner (−z) and always looks +z
     crowdView: { focus: [0, 1, 30], eye: [0, 4.3, 32], camera: { at: [0, 4.3, -18], into: [0, 1], margin: 22 } },
     budgetKey: 'football',
+    // FootballRushMode: FIELD_HALF_X 20 (the runner's clamp) from the start line (z 0, a 2 m run-up behind it) to the end stand's
+    // front edge (crowdVenues FOOTBALL fb_end, z 45.35): the field the run, the tackles and the touchdown replay use
+    playArea: [[[-20, -2], [20, -2], [20, 45], [-20, 45]]],
     route: (v) => `/dev/mode/football?venue=${encodeURIComponent(v)}`,
     modeWeather: 'Football Rush’s weather is gameplay (rain softens the cut, snow drags the run): it is picked on the mode’s own start screen, so a venue does not set it.',
     stepsOwnDirector: true,
@@ -119,6 +130,7 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     // visual/crowd/crowdVenues.ts VOLLEYBALL: the play camera stands behind the player's end looking −z
     crowdView: { focus: [0, 1, -2], eye: [0, 3.2, 10.8], camera: { at: [0, 3.2, 10.8], into: [0, -1], margin: 4.5 } },
     budgetKey: 'tennis',   // assumption: no volleyball row is measured; tennis is the same net-sport engine and court family
+    playArea: [[[-7.5, -12], [7.5, -12], [7.5, 12], [-7.5, 12]]],   // venueSpecs volleyball sand 15 × 24 (the 9 × 18 court, its run-off, the flags)
     scoreKeys: { me: 'score', them: 'foeScore' },   // NetSportMode pushHud
     route: (v) => `/dev/mode/volleyball?venue=${encodeURIComponent(v)}`,
     stepsOwnDirector: true,   // NetSportMode steps ctx.camDirector every frame (the net follow camera)
@@ -143,6 +155,10 @@ export const PLAYTEST_TARGETS: Record<string, PlaytestTarget> = {
     // visual/crowd/crowdVenues.ts DERBY: the camera stands behind the plate (z −3.4) looking out (+z)
     crowdView: { focus: [0, 1, 12], eye: [-1.8, 1.9, -3.4], camera: { at: [-1.8, 1.9, -3.4], into: [0, 1], margin: 6 } },
     budgetKey: 'football',   // assumption: no baseball row is measured; Football Rush's is the closest open field with stands
+    // FAIR territory out to the wall (crowdVenues DERBY: foul lines |x| = z, the wall z 24.6–38.3) — the wedge every hit flies over —
+    // and the plate with the batter's box; the foul-ground bleachers (their back rows ~0.4 m off the line) and the homer's
+    // grandstands stay outside
+    playArea: [[[0, 0], [25, 25], [0, 39], [-25, 25]], [[-2, -5], [2, -5], [2, 1], [-2, 1]]],
     scoreKeys: { me: 'score', them: 'rivalHomers' },   // DerbyMode's HUD: the points, and the rival's home runs so far
     route: (v) => `/dev/mode/derby?venue=${encodeURIComponent(v)}`,
     stepsOwnDirector: true,   // DerbyMode steps ctx.camDirector every frame (the plate, then the ball's flight)

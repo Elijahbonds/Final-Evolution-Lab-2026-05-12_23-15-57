@@ -103,8 +103,9 @@ export function ScriptsTrack({ studio }: { studio: StudioApi }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const script = doc.scripts.find((s) => s.id === activeId) ?? doc.scripts[0] ?? null;
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[240px_1fr_280px]" data-testid="scripts-track">
-      <aside className="flex min-h-0 flex-col overflow-y-auto border-r" style={{ borderColor: C.line, background: C.surface }}>
+    // NEX-05: stacked on a phone (the list, the graph, the script's settings), three columns from md up
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[240px_minmax(0,1fr)_280px] md:overflow-visible" data-testid="scripts-track">
+      <aside className="flex max-h-[32dvh] min-h-0 shrink-0 flex-col overflow-y-auto border-r md:max-h-none" style={{ borderColor: C.line, background: C.surface }}>
         <PanelTitle right={<span className="text-[12px]" style={{ color: C.dim }}>{doc.scripts.length}</span>}>Scripts</PanelTitle>
         <div className="flex flex-wrap gap-1 px-3 pb-2">
           <button type="button" onClick={() => { const r = addScript(doc, 'pointWon'); run(r.cmd); setActiveId(r.id); }} className="flex items-center gap-1 rounded-md border px-2 py-1 text-[12px]" style={{ borderColor: C.line, color: C.text }}><Plus className="h-3.5 w-3.5" aria-hidden /> Point won → cheer</button>
@@ -190,7 +191,7 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
   const wireFrom = drag?.kind === 'wire' ? byId.get(drag.from) : null;
 
   return (
-    <section className="relative min-h-0 overflow-hidden" style={{ background: '#07090d' }} aria-label="Script graph">
+    <section className="relative h-[55dvh] min-h-0 min-w-0 shrink-0 overflow-hidden md:h-auto" style={{ background: '#07090d' }} aria-label="Script graph">
       <svg ref={svgRef} className="h-full w-full touch-none outline-none" tabIndex={0} onKeyDown={onKey} data-testid="script-canvas"
         onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={() => setDrag(null)}
         onPointerDown={(e) => { if (e.target === svgRef.current) { setSelected(null); setDrag({ kind: 'pan', sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }); } }}

@@ -18,6 +18,7 @@ import { targetOf } from '@/lib/nexus-studio/targets';
 import { studioLoadAllowed } from '@/lib/nexus-studio/runtime';
 import { offerGuide, readGuideMark, writeGuideMark } from '@/lib/nexus-studio/firstCourt';
 import { shellCommand } from '@/lib/nexus-studio/shortcuts';
+import { useAiStatus } from '@/lib/abacus/useAiStatus';
 import { starterProject, useResolvedCast, useStudio, type SaveState } from './use-studio';
 import { VenueEditor, typingTarget, type VenueEditorHandle } from './venue-editor';
 import { FirstCourt } from './first-court';
@@ -41,12 +42,25 @@ const SAVE_LABEL: Record<SaveState, string> = { saved: 'Saved on this device', u
 export function NexusStudioApp() {
   const studio = useStudio();
   const [track, setTrack] = useState<Track>('venue');
+  // NEX-05 (owner 2026-10-20 Q8: "the whole editor, AI-first"): on a phone the Studio opens on the AI builder — describe a change,
+  // review it, apply it — and its tab comes first; every other track is one tap away
+  // STUDIO-EASY: only while the AI builder is ON — with the switch off (the default: it calls a paid model) a phone opened on a
+  // track that could do nothing, so it opens on the court and the first-court guide instead
+  const [aiState] = useAiStatus('studio');
+  const aiFirstDone = useRef(false);
+  useEffect(() => {
+    if (aiState !== 'available' || aiFirstDone.current) return;
+    aiFirstDone.current = true;
+    try { if (window.matchMedia('(max-width: 767px)').matches && !guideRef.current) setTrack('ai'); } catch { /* no matchMedia: desktop */ }
+  }, [aiState]);
   const [message, setMessage] = useState<string | null>(null);
+  const [cellOpen, setCellOpen] = useState(false);   // NEX-05: on a phone CELL's game-file builder is one tap away, below the venue builder
   const fileRef = useRef<HTMLInputElement | null>(null);
   const { doc, venue } = studio;
   const cast = useResolvedCast(doc, venue);
   // STUDIO-EASY: the first-court guide (an untouched first project opens on it), Help ("?"), and New project
   const [guide, setGuide] = useState(false);
+  const guideRef = useRef(guide); guideRef.current = guide;
   const [help, setHelp] = useState(false);
   const [asking, setAsking] = useState(false);
   const editor = useRef<VenueEditorHandle | null>(null);
@@ -116,20 +130,20 @@ export function NexusStudioApp() {
         <Link href="/play" aria-label="Leave the Studio" title="Back to FEL" className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/5" style={{ color: C.dim }}><ArrowLeft className="h-4 w-4" aria-hidden /></Link>
         <h1 className="font-display text-[13px] font-bold uppercase tracking-[0.22em]" style={{ color: C.cyan }}>Nexus Studio</h1>
         <input aria-label="Project name" value={doc.name} maxLength={60} onChange={(e) => studio.run(renameProject(e.target.value || 'Untitled project'))} onBlur={studio.seal}
-          className="w-44 rounded border bg-transparent px-2 py-0.5 text-[12px] outline-none focus:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line }} />
-        <nav className="ml-2 flex gap-1" role="tablist" aria-label="Studio tracks">
+          className="w-32 rounded border bg-transparent px-2 py-0.5 text-[12px] outline-none md:w-44 focus:border-[color:var(--fel-cyan)]" style={{ borderColor: C.line }} />
+        <nav className="flex flex-wrap gap-1 md:ml-2" role="tablist" aria-label="Studio tracks">
           {TRACKS.map((t) => {
             const Icon = TRACK_ICON[t.id];
             return (
               <button key={t.id} type="button" role="tab" aria-selected={track === t.id} onClick={() => setTrack(t.id)} title={t.phase}
-                className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px]"
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] max-md:min-h-10 ${t.id === 'ai' ? 'max-md:order-first' : ''}`}
                 style={{ background: track === t.id ? 'rgba(0,229,255,0.12)' : 'transparent', color: track === t.id ? C.cyan : C.dim }}>
                 <Icon className="h-3.5 w-3.5" aria-hidden /> {t.label}
               </button>
             );
           })}
         </nav>
-        <span className="ml-auto flex items-center gap-1">
+        <span className="flex flex-wrap items-center gap-1 md:ml-auto">
           <ToolButton title="New project" onClick={() => setAsking((a) => !a)} active={asking}><FilePlus2 className="h-4 w-4" /><span className="hidden xl:inline">New</span></ToolButton>
           <ToolButton title="Help and keys" shortcut="?" onClick={() => setHelp(true)}><CircleHelp className="h-4 w-4" /><span className="hidden xl:inline">Help</span></ToolButton>
           <ToolButton title={studio.undoLabel ? `Undo ${studio.undoLabel}` : 'Undo'} shortcut="Ctrl+Z" disabled={!studio.canUndo} onClick={studio.undo}><Undo2 className="h-4 w-4" /></ToolButton>
@@ -173,13 +187,16 @@ export function NexusStudioApp() {
       )}
       {help && <HelpSheet onClose={() => setHelp(false)} onGuide={startGuide} />}
       {track === 'ai' && (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(320px,420px)_1fr]">
-          <aside className="min-h-0 overflow-y-auto border-r" style={{ borderColor: C.line, background: C.surface }}>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[minmax(320px,420px)_minmax(0,1fr)] md:overflow-visible">
+          <aside className="min-h-0 shrink-0 border-b md:overflow-y-auto md:border-b-0 md:border-r" style={{ borderColor: C.line, background: C.surface }}>
             <AiVenuePanel studio={studio} onApplied={() => { setTrack('venue'); setMessage(`CELL’s edits are in “${venue?.name ?? 'the venue'}” as one step — Undo takes them back.`); }}
               onBuildByHand={() => setTrack('venue')} onGuide={startGuide} />
           </aside>
           {/* CELL's game-file builder, unchanged (its file holds the ABACUS guard lines) */}
-          <div className="relative min-h-0 overflow-hidden"><StudioShell /></div>
+          <button type="button" onClick={() => setCellOpen((v) => !v)} aria-expanded={cellOpen} className="min-h-11 border-b px-3 text-left text-[12px] md:hidden" style={{ borderColor: C.line, color: C.dim }} data-testid="cell-toggle">
+            {cellOpen ? 'Hide' : 'Show'} CELL’s game-file builder
+          </button>
+          <div className={`${cellOpen ? 'block' : 'hidden'} relative min-h-[70dvh] min-w-0 overflow-hidden md:block md:min-h-0`}><StudioShell /></div>
         </div>
       )}
       {track === 'characters' && <CharactersTrack studio={studio} onPreview={() => setTrack('venue')} />}

@@ -812,3 +812,90 @@ Football Rush's pattern (§11.4), for two court modes that open on the walk-in a
 - **shared file:** `components/closet-view.tsx` changed on `lane/finish-release` 2 hours before this work (the closet-studio merge,
   PR #304). LANES §3 says route a file changed in the last 24 hours; the round-5 brief assigns these follow-ups to this lane, so they
   are applied here, additive and edit-mode only, and flagged.
+
+## 14. Round 8: the Studio reaches players (2026-10-26, lane/nexus-publish)
+
+Owner decisions this round is built on (2026-10-20, docs/NEXUS-ROADMAP.md §4): the audience is the owner first (Q4 A), then an
+invited beta; committed JSON first, a published venue is the mode's DEFAULT with a one-tap Restore (Q1 A, Q2 A); competitive play
+gets the look of owner-published venues only (Q3 A); share links per Q5–Q7 (A); the phone gets the whole editor, AI-first (Q8 A).
+`/studio` stays HELD and unlinked. Nothing here changes a score, a timing window, a rule or a tuned number.
+
+### 14.1 NEX-01: owner-only (`audience.ts`)
+
+The audience is the review board's approvers (`creative-card-review.ts APPROVER_ROLES`: founder, admin). The role is read from the
+DATABASE on every request — the page gate (`app/studio/layout.tsx`: flag → login → role) and every write route
+(`/api/cell/venue`, `/api/studio/share`) — so a role taken away closes the Studio on the next request. Anyone else gets the same
+404 the off flag gives; a database error refuses. The beta and public widen `studioAudienceAllows`, in one place.
+
+### 14.2 NEX-03: the competitive stamp (`core/playFrame.ts`, one line in `ModeHarness.ts`)
+
+`playStampFor(search)`: competitive = any of `?arena= ?c= ?mp= ?signature= ?net= ?party= ?ranked=` (present, even empty; fail
+closed, the feel panel's rule); ranked = `?arena= ?signature= ?ranked=`. The harness stamps `felCompetitive` / `felRanked` on the
+scene in `onScene`, before the mode loads. `felRanked` is what `playFrame` always meant: every body on the standard frame (visual;
+reach was already frozen). In a competitive run a Studio venue is the published LOOK only (`runtime.ts lookOnly`): the mood, sky,
+floor, dressing, scans, fixtures, crowd, decals and weather — no scripts, no intro, no replay angles, no scripted shot, no cast, and
+never a dev `?venue=` or a share link. `mountStudioFor` ORs the scene's stamp with the page's.
+
+### 14.3 NEX-02: published venues (`published.ts`, `published/index.ts`)
+
+A publication is a reviewed file `lib/nexus-studio/published/<mode>/<venueId>.venue.json`
+(`{ kind: 'nexus-studio-published', version: 1, mode, publishedAt, phone, venue }`), listed in `published/index.ts`. It is read
+through `sanitizeVenueExport` and the publish gate AGAIN at load; a bad file is skipped (and fails CI: `published.test.ts`). It
+never carries a cast (§3.3 of the roadmap: a look code never leaves the device in a publication). Depths: FULL for the 4 targets
+(the extras through `mountStudioFor`); LOOK for Tennis (Tiebreak's court) and Baseball (Derby's park), through their place pick.
+`placeLooks.looksFor` lists a mode's publications FIRST — the default with no pick of the player's own — then the shipped places,
+`home` first; the splash shows **Restore <home>** while a published venue is the pick (`restorePlace`). With nothing published
+`looksFor` returns the shipped array itself. Nothing is published yet: the owner's PR adding a file is the publish, and its merge
+ships it. Publish in the editor: the budget meter's **Publish** opens a panel that runs the gate and downloads the file with its
+repo path.
+
+**Proof.** `publishedFairness.test.ts` (the old TiebreakMode, the §10.5 method) and `publishedFairnessNet.test.ts` (the LIVE tiebreak,
+`TennisTiebreakMode` on NetSportMode): one scripted match in a production build with the shipped place, the published venue at
+full depth and the published venue in an arena run — scores, judgements, HUD lines, clips, sounds, ball, ring, camera and the end
+are bit-identical; the venue's "point won" script fired its banner in normal play and not in the arena.
+**Measured finding:** NetSportMode rolls its AI on the global `Math.random`, which Babylon also draws from for every object's GUID,
+so any scene difference re-orders an unseeded stream (on one seeded stream the two runs ended 11 and 13). The odds are unchanged in
+production; the test gives the mode's rolls their own stream. Giving NetSportMode its own seeded RNG (as TiebreakBlitz has) is an
+owner call.
+
+### 14.4 NEX-04: the publish gate (`publishGate.ts`)
+
+1. **Keep-out:** `targets.ts playArea` (convex polygons: the spec's ground for Tiebreak and Volleyball, Football Rush's field to the
+   end stand, Derby's fair wedge plus the plate) and the play camera's corridor (camera → focus, 2 m each side). Every shipped crowd
+   stand and every shipped place prop is held outside, the hero and objective inside (`publishGate.test.ts`).
+2. **The phone budget:** the WORST phone-tier sample since the last edit, under `mobileBudget.json`'s ceiling (draws, meshes,
+   texture MB, skinned bodies); never measured on Phone = refused.
+3. **Readability:** no hazier, darker or lower line contrast than anything the game ships (fog ≤ 0.02, ambient ≥ 0.4, lines ≥
+   1.69:1 WCAG), recomputed from `VENUE_SPECS` and `PLACE_LOOKS` in the test.
+Every refusal is listed at once, by name and spot. Rig shots: `round8/nexus-publish/shots/publish/`.
+
+### 14.5 NEX-05: the Studio on a phone
+
+At < 768 px the Studio opens on the AI builder (its tab first), the header wraps, the venue editor puts the viewport first and a
+sheet below it (Add / Stamps / Scene / Inspect), and a thumb bar (`phone-bar.tsx`, 44 px targets) carries every keyboard-only
+command: multi-select (a tap toggles), select all, deselect, duplicate, copy, hide, lock, delete, nudge, turn. `TOUCH_PATHS` is the
+table; `phone-bar.test.tsx` reads the editor's own key handler. CELL's game-file builder is one tap away below the venue builder.
+Measured at 390 × 844 (touch): `scrollWidth` 390 on every track and sheet. Not done: Babylon's gizmo stays mouse-sized (the thumb
+bar's nudge and turn are the touch path for a move); a real-device check is the owner's.
+
+### 14.6 NEX-06: share links (`share.ts`; behind `STUDIO_SHARE_ENABLED`, off)
+
+`prisma/pending/2026-10-26-studio-share.sql` (one table, `StudioShareLink`; NOT applied — 503 `share_not_ready` until then). Made
+from the Publish panel by the Studio's audience (and, once the beta opens, verified adults; a teen never), screened, gated like a
+publication, never a cast; 192-bit token shown once, only its hash stored; the creator revokes, founder/admin take down — both null
+the payload. Opened at `/play/shared/[token]` by any signed-in account (HELD), which hands the venue to the mode for `?share=<id>`;
+GameShell starts that run as a playtest (unpaid, unranked) and the runtime never loads it in a competitive run.
+**Adapters until the safety lane merges:** the text screen runs on the party chat list (`shareScreen.ts`, TODO → `lib/safety/
+textScreen.ts`; the party matcher's measured over-masks — "as", "con", "night", "Nigel" — are let through), and Report posts to the
+safety lane's `POST /api/report` (`shareReport.ts`; needs `'studio_share'` in its `REPORT_TARGETS` and `resolveTarget`, routed).
+
+### 14.7 NEX-07 (next round, design note only): Target Attack as data
+
+Start only after NEX-01..05 merge (roadmap §2.6). Shape: a `StudioModeDef` beside `StudioVenue` in the project — archetype
+`targetAttack`, its parameters (spot, targets {position, size, points, kind still|pop|path}, shots or seconds, combo, win line, all
+clamped), the venue, presentation scripts, and RULE graphs in a SECOND vocabulary (add points, spawn target, end round) that only a
+generic `StudioMode` interpreter runs — shipped modes keep `scriptHost.ts` and `interpreter.wiring.test.ts` as they are, and a new
+wiring test fences the rules interpreter off the wallet, sessions, arena, ladder and PRQ. One route `/play/custom/[id]` (HELD), on
+`aimSwingCore.ts`'s PLACE archetype with golf / penalty's tuned defaults copied (TUNED numbers flagged, the owner's eye judges),
+always a playtest run (practice, Q10 A), refused at publish with nothing to do. First milestone: a seeded scripted run gives
+bit-identical scores twice.

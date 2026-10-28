@@ -10,14 +10,25 @@
 //   weather   → premium/WeatherFx over core/WeatherKit.fromPick
 //   intro     → the mode's `intro` getter + a director stepper (a mode with a fixed camera never steps the director)
 //
-// THE MODE'S LOAD PATH IS DEV-ONLY AND OPT-IN: `studioVenueFor` answers null in a production build and whenever the page
-// has no `?venue=`, so a mode that reads it behaves exactly as it shipped.
+// THREE SOURCES (NEX-02, NEX-06, round 8):
+//   dev        `?venue=` (a play-test hand-off): outside a production build only, and never in a competitive run.
+//   shared     `?share=<id>`: a share link's venue its landing handed over in this tab (shareHandoff.ts) — practice only, never
+//              in a competitive run; GameShell starts the run unpaid.
+//   published  a venue the owner published (published.ts: committed, reviewed JSON), when the player's place pick for the mode
+//              names it — which it does by default, since a published venue is first in the mode's place list.
+// With neither, `studioVenueFor` answers null and a mode that reads it behaves exactly as it shipped.
+//
+// THE COMPETITIVE STAMP (NEX-03): in an arena, challenge, async-challenge, ladder or live run (core/playFrame.ts playStampFor,
+// stamped on the scene by ModeHarness) a Studio venue is the LOOK only — the published one, never `?venue=` — with no scripts,
+// no camera actions (the intro, the replay angles, a script's shot) and no cast.
 
 import { Color3, Mesh, MeshBuilder, StandardMaterial, TransformNode, Vector3 } from '@babylonjs/core';
 import type { Scene } from '@babylonjs/core';
-import type { PlaceLook } from '../babylon/nexus/placeLooks';
-import { VENUE_PROP_SETS, type PropPlacement } from '../babylon/visual/venuePropSets';
+import { readPlaceLook, type PlaceLook } from '../babylon/nexus/placeLooks';
 import { propSetFor } from '../babylon/visual/VenueProps';
+import { isCompetitive, playStampFor } from '../babylon/core/playFrame';
+import { exportPlaceLook, publishedByPlace, publishedPlaceLook, type PublishedVenue } from './published';
+import { readShareHandoff } from './shareHandoff';
 import { spawnMeshyProp, type MeshyPropKey } from '../babylon/visual/meshyProps';
 import { mountGroundDecals, decalCap } from '../babylon/visual/GroundDecals';
 import { mountModeCrowd } from '../babylon/visual/crowd/modeCrowd';
@@ -47,87 +58,121 @@ export function studioLoadAllowed(env: string | undefined = process.env.NODE_ENV
 
 let cache: { key: string; exp: StudioVenueExport | null } | null = null;
 
+/** Where a mode's Studio venue came from, and whether the run is competitive (then it is the look only). */
+export interface StudioPick { exp: StudioVenueExport; source: 'dev' | 'shared' | 'published'; competitive: boolean; published?: PublishedVenue }
+
+const pageSearch = (): string => { try { return typeof window !== 'undefined' ? window.location.search : ''; } catch { return ''; } };
+
+/** The look only (NEX-03): no scripts, no camera actions, no cast — what a competitive run may load. */
+export function lookOnly(exp: StudioVenueExport): StudioVenueExport {
+  const { cast: _c, scripts: _s, ...rest } = exp;
+  void _c; void _s;
+  return { ...rest, intro: 'none', replayAngles: [] };
+}
+
 /**
- * The Studio venue this page asks `modeKey` to load, or null (no `?venue=`, a production build, a venue made for another
- * mode, nothing under that id, a mode with no play-test target row). Read three times per mount (mood, intro, look) and cached
- * on the page's query.
+ * The Studio venue `modeKey` loads on this page, and where it came from, or null. `o.competitive` overrides the page's own stamp
+ * (a mode's mount passes its scene's stamp; it is OR-ed with the page's, so a missing stamp fails closed).
  */
-export function studioVenueFor(modeKey: string, search?: string, kv?: KV | null, env?: string): StudioVenueExport | null {
-  if (!studioLoadAllowed(env)) return null;
+export function studioPickFor(modeKey: string, o: { search?: string; kv?: KV | null; env?: string; competitive?: boolean; files?: readonly unknown[] } = {}): StudioPick | null {
   // §13.3: only a play-test target loads a venue (targets.ts). NetSportMode reads its venue by its own modeId and builds Tennis
   // too; Tennis has no row (its weather is gameplay and it has had no review), so it never loads one, whatever the page carries.
   if (!targetOf(modeKey)) return null;
-  let q = search;
-  if (q === undefined) { try { q = typeof window !== 'undefined' ? window.location.search : ''; } catch { q = ''; } }
-  const param = new URLSearchParams(q).get('venue');
+  const q = o.search ?? pageSearch();
+  const competitive = o.competitive === true || playStampFor(q).felCompetitive;
+  if (!competitive && studioLoadAllowed(o.env)) {
+    const dev = devVenueFor(modeKey, q, o.kv, o.search !== undefined || o.kv !== undefined);
+    if (dev) return { exp: dev, source: 'dev', competitive: false };
+  }
+  // NEX-06: a share link's venue, handed over by its landing in this tab (practice only: never in a competitive run)
+  if (!competitive) {
+    const shared = readShareHandoff(new URLSearchParams(q).get('share'), sessionStore());
+    if (shared && shared.target === modeKey) return { exp: shared, source: 'shared', competitive: false };
+  }
+    // the published venue the player's place pick names (the mode's default place when one is published)
+  const pub = publishedByPlace(modeKey, placePick(modeKey, q), o.files);
+  if (!pub) return null;
+  return { exp: competitive ? lookOnly(pub.venue) : pub.venue, source: 'published', competitive, published: pub };
+}
+
+const sessionStore = (): Pick<Storage, 'getItem'> | null => { try { return typeof window !== 'undefined' ? window.sessionStorage ?? null : null; } catch { return null; } };
+
+/** The player's place pick for a mode on this page (`?place=`, then the remembered pick, then the list's first). */
+function placePick(modeKey: string, search: string): string | null {
+  const q = new URLSearchParams(search).get('place');
+  if (q) return q;
+  try { return readPlaceLook(modeKey)?.id ?? null; } catch { return null; }
+}
+
+/** The dev hand-off: `?venue=<id>` from this device's play-test storage, or `?venue=b64:` inline. Cached on the page's query. */
+function devVenueFor(modeKey: string, search: string, kv: KV | null | undefined, explicit: boolean): StudioVenueExport | null {
+  const param = new URLSearchParams(search).get('venue');
   if (!param) return null;
   const memo = `${modeKey}|${param}`;
-  if (kv === undefined && cache?.key === memo) return cache.exp;
+  if (!explicit && cache?.key === memo) return cache.exp;
   const exp = param.startsWith('b64:') ? decodeInline(param) : readPlaytest(kv === undefined ? browserKV() : kv, param);
   const ok = exp && exp.target === modeKey ? exp : null;
   if (exp && !ok) console.warn(`[NEXUS-STUDIO] ?venue= was made for "${exp.target}", not "${modeKey}" — ignored`);
-  if (kv === undefined) cache = { key: memo, exp: ok };
+  if (!explicit) cache = { key: memo, exp: ok };
   return ok;
+}
+
+/**
+ * The Studio venue this page asks `modeKey` to load, or null (no `?venue=` in a dev build and nothing published, a venue made for
+ * another mode, nothing under that id, a mode with no play-test target row). In a competitive run, the published look only.
+ * Read several times per mount (mood, intro, look); the dev hand-off is cached on the page's query.
+ */
+export function studioVenueFor(modeKey: string, search?: string, kv?: KV | null, env?: string): StudioVenueExport | null {
+  return studioPickFor(modeKey, { search, kv, env })?.exp ?? null;
 }
 /** Tests: forget the cached page answer. */
 export function resetStudioVenueCache(): void { cache = null; }
 
-/** The mood a mode lights with: the Studio venue's, else its own. */
+/** The mood a mode lights with: the Studio venue's, else its own. (The mood is the look: it holds in a competitive run.) */
 export function studioMood(modeKey: string, fallback: VenueMood): VenueMood { return studioVenueFor(modeKey)?.mood ?? fallback; }
-/** The broadcast intro a mode opens on: the Studio venue's, else none. */
+/** The broadcast intro a mode opens on: the Studio venue's, else none. A competitive run has no Studio camera action. */
 export function studioIntro(modeKey: string): IntroKind | undefined {
-  const i = studioVenueFor(modeKey)?.intro;
+  const pick = studioPickFor(modeKey);
+  if (!pick || pick.competitive) return undefined;
+  const i = pick.exp.intro;
   return i && i !== 'none' ? i : undefined;
 }
 
 /**
  * §11: the intro for a mode that HAS its own (Football Rush opens on the walk-in): with a Studio venue the venue's choice —
- * including 'none' — else the mode's own, exactly as it shipped.
+ * including 'none' — else the mode's own, exactly as it shipped. In a competitive run, always the mode's own (NEX-03).
  */
 export function studioIntroOr(modeKey: string, fallback: IntroKind | undefined): IntroKind | undefined {
-  const exp = studioVenueFor(modeKey);
-  if (!exp) return fallback;
-  return exp.intro !== 'none' ? exp.intro : undefined;
+  const pick = studioPickFor(modeKey);
+  if (!pick || pick.competitive) return fallback;
+  return pick.exp.intro !== 'none' ? pick.exp.intro : undefined;
 }
 
-/** §11: the replay angles a Studio venue picked for this mode's replays, or undefined (the replay director's own cut). */
+/** §11: the replay angles a Studio venue picked for this mode's replays, or undefined (the replay director's own cut, and always
+ *  in a competitive run). */
 export function studioReplayAngles(modeKey: string): ReplayAngle[] | undefined {
-  const a = studioVenueFor(modeKey)?.replayAngles;
+  const pick = studioPickFor(modeKey);
+  if (!pick || pick.competitive) return undefined;
+  const a = pick.exp.replayAngles;
   return a && a.length ? [...a] : undefined;
 }
 
 /** The dressing set's key for this export: registered on first use, so VenueProps and NexusVenue's surround see it. */
 export function studioPropSetKey(exp: StudioVenueExport): string | null | undefined {
-  const base = exp.baseDressing === 'keep' ? propSetFor(exp.spec) : null;
-  if (!exp.kit.length) return exp.baseDressing === 'keep' ? undefined : null;
-  const placements: PropPlacement[] = [
-    ...(base ? VENUE_PROP_SETS[base] ?? [] : []),
-    ...exp.kit.map((k) => ({ kit: k.kit, model: k.model, at: k.at, yaw: k.yaw, scale: k.scale, ...(k.tint ? { tint: k.tint } : {}) })),
-  ];
-  const key = `studio_${exp.venueId}`;
-  VENUE_PROP_SETS[key] = placements;
-  return key;
+  return studioLook(exp).propSet;
 }
 
-/** The export as the PlaceLook mountVenue lays over the spec. */
+/** The export as the PlaceLook mountVenue lays over the spec (published.ts exportPlaceLook, the dev hand-off's id and set key). */
 export function studioLook(exp: StudioVenueExport): PlaceLook {
-  const L = exp.look;
-  const propSet = studioPropSetKey(exp);
-  return {
-    id: 'studio', name: exp.name, sub: 'NEXUS STUDIO', tint: '#00e5ff',
-    ...(L.sky ? { sky: { ...L.sky } } : {}),
-    ...(L.backdrop ? { backdrop: L.backdrop } : {}),
-    ...(L.paintedSky ? { paintedSky: true } : {}),
-    ...(L.ground ? { ground: { ...L.ground } } : {}),
-    ...(propSet !== undefined ? { propSet } : {}),
-    props: L.props.map((p) => ({ kind: p.kind, position: [...p.position] as [number, number, number], rotationY: p.rotationY, scale: p.scale, ...(p.color ? { color: p.color } : {}) })),
-  };
+  return exportPlaceLook(exp, { id: 'studio', sub: 'NEXUS STUDIO', tint: '#00e5ff', setKey: `studio_${exp.venueId}`, baseSet: propSetFor(exp.spec) });
 }
 
-/** The PlaceLook for `modeKey` when the page carries a Studio venue for it (the mode's one-line `look:` hook). */
+/** The PlaceLook for `modeKey` when the page carries a Studio venue for it (the mode's one-line `look:` hook). A published venue
+ *  is the same PlaceLook its splash entry is (published.ts publishedPlaceLook). */
 export function studioLookFor(modeKey: string): PlaceLook | undefined {
-  const exp = studioVenueFor(modeKey);
-  return exp ? studioLook(exp) : undefined;
+  const pick = studioPickFor(modeKey);
+  if (!pick) return undefined;
+  return pick.published ? publishedPlaceLook(pick.published) : studioLook(pick.exp);
 }
 
 // ── the layers ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -332,20 +377,24 @@ export function mountStudioExtras(ctx: StudioModeCtx, exp: StudioVenueExport, op
 }
 
 /**
- * A mode's one-line hook: the extras for the Studio venue this page carries for `modeKey`, or null. A venue that casts a
- * player (track 3) seats that look as the session's identity HERE — before the mode's load() spawns its hero — so the
- * mode's own spawn (CharacterLibrary.spawn → resolveIdentity → the body file → applyIdentity) dresses the hero in it.
- * Dispose forgets it, so the next mount resolves the player's own look again.
+ * A mode's one-line hook: the extras for the Studio venue this page carries for `modeKey` (or the published one the player's
+ * place pick names), or null. A venue that casts a player (track 3; a dev hand-off only — a publication carries no cast) seats
+ * that look as the session's identity HERE — before the mode's load() spawns its hero — so the mode's own spawn
+ * (CharacterLibrary.spawn → resolveIdentity → the body file → applyIdentity) dresses the hero in it. Dispose forgets it, so the
+ * next mount resolves the player's own look again.
+ * NEX-03: the scene's competitive stamp (ModeHarness) is read here, OR-ed with the page's: in a competitive run the extras are the
+ * look only — no scripts, no intro stepper, no cast (lookOnly).
  */
 export function mountStudioFor(modeKey: string, ctx: StudioModeCtx): StudioExtras | null {
-  const exp = studioVenueFor(modeKey);
-  if (!exp) return null;
-  console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals${exp.cast?.player ? `, cast: ${exp.cast.player.name}` : ''}`);
+  const pick = studioPickFor(modeKey, { competitive: isCompetitive(ctx.scene?.metadata) });
+  if (!pick) return null;
+  const exp = pick.exp;
+  console.info(`[NEXUS-STUDIO] ${modeKey}: "${exp.name}" (${pick.source}${pick.competitive ? ', competitive: the look only' : ''}) — ${exp.kit.length} kit props, ${exp.meshy.length} scans, ${exp.fixtures.length} fixtures, ${exp.crowd?.stands.length ?? 0} stands, ${exp.decals.length} decals${exp.cast?.player ? `, cast: ${exp.cast.player.name}` : ''}`);
   const cast = exp.cast?.player ?? null;
   // the cast's own height and build only where this mode's fairness review allows it (targets.ts castFrame), else the standard frame
   if (cast) primeIdentity(castIdentity(cast, { frame: castFrameFor(modeKey) }));
   // a mode that steps its own director (Football Rush's follow camera) runs the intro itself; a second stepper would double it
-  const extras = mountStudioExtras(ctx, exp, { stepIntro: targetOf(modeKey)?.stepsOwnDirector !== true });
+  const extras = mountStudioExtras(ctx, exp, { stepIntro: !pick.competitive && targetOf(modeKey)?.stepsOwnDirector !== true });
   return {
     layers: extras.layers, scripts: extras.scripts,
     dispose() { extras.dispose(); if (cast) invalidateIdentity(); },

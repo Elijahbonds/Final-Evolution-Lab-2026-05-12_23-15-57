@@ -112,11 +112,16 @@ export async function playRally(rig: RallyRig, o: { script?: readonly RallyMove[
   const camDirector = new CameraDirector(scene, camera, 'court');
   const groundLock = new GroundLock(scene);
   const hud: string[] = [];
+  let modeHud: Record<string, number> = {};
   let end: unknown[] | null = null;
   rig.clipLog.length = 0;
   const ctx = {
     scene, camera, camDirector, groundLock,
-    setHud: (h: Record<string, unknown>) => { hud.push(JSON.stringify(h)); },
+    setHud: (h: Record<string, unknown>) => {
+      hud.push(JSON.stringify(h));
+      // a Studio script's banner posts only its own `studio*` keys (scriptHost.ts): the frame record reads the MODE's latest HUD
+      if (Object.keys(h).some((k) => !k.startsWith('studio'))) modeHud = h as Record<string, number>;
+    },
     end: (...a: unknown[]) => { end = a; },
     heroRef: { current: null }, objectiveRef: { current: null },
     lights: { tier: 'low', rest: { exposure: 1, vignette: 0 } },
@@ -158,7 +163,7 @@ export async function playRally(rig: RallyRig, o: { script?: readonly RallyMove[
       else if (move === 'wrong' && openFor === 3) { press(f, side === 'left' ? 'right' : 'left'); acted = true; }
     }
     const cam = camera.position, tgt = camera.getTarget();
-    const last = hud.length ? JSON.parse(hud[hud.length - 1]) as Record<string, number> : {};
+    const last = modeHud;
     frames.push([last.myPts ?? -1, last.aiPts ?? -1, last.rally ?? -1, last.bestRally ?? -1, last.warmup ?? -1,
       ball.position.x, ball.position.y, ball.position.z, ring.isVisible ? ring.visibility : -1, cam.x, cam.y, cam.z, tgt.x, tgt.y, tgt.z]);
   }
