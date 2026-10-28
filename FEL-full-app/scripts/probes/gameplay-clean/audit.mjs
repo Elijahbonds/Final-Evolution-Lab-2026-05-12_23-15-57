@@ -334,6 +334,21 @@ function analyze(mode, rec, S) {
         if (planted && rootV > 0.5 && rootV < 15) slides.push(Math.hypot(pb[0] - pa[0], pb[2] - pa[2]) / dt);
       }
     }
+    // CONTACT skate (the robust one): each foot's lowest frame in a stride (a local minimum of the toe's height over ±5 frames)
+    // while the hero moves; at a real contact the foot stands still, so its ground speed there over the root's is the slide
+    // (karate's raw: the toe at floor height sliding 0.8 → 11.7 m/s under a 3.7 m/s root at the run's start)
+    const cv = [], cr = [];
+    for (const fi of [3, 4]) for (let i = 6; i < play.length - 6; i++) {
+      const y = play[i].j?.[fi]?.[1]; if (y == null) continue; let min = true;
+      for (let k = i - 5; k <= i + 5 && min; k++) { const yk = play[k].j?.[fi]?.[1]; if (yk != null && yk < y - 1e-6) min = false; }
+      if (!min) continue; const a = play[i - 1], b2 = play[i + 1]; if (!a.r || !b2.r || !a.j?.[fi] || !b2.j?.[fi]) continue;
+      const dtt = Math.max(1e-3, b2.t - a.t); const rv = Math.hypot(b2.r[0] - a.r[0], b2.r[2] - a.r[2]) / dtt; if (rv < 0.8 || rv > 15) continue;
+      const v = Math.hypot(b2.j[fi][0] - a.j[fi][0], b2.j[fi][2] - a.j[fi][2]) / dtt; cv.push(v); cr.push(v / rv);
+    }
+    out.contacts = cv.length; out.contactSlideMed = r2(med(cv)); out.contactSlideRatio = r2(med(cr));
+    // through the floor: the toes below the hero's own root height (a grounded hero stands at its root)
+    const pen = play.filter((f) => f.j?.[3] && f.j?.[4] && f.r).map((f) => Math.min(f.j[3][1], f.j[4][1]) - f.r[1]);
+    out.toeBelowRootP01 = r2(pct(pen, 0.01));
     out.skateFrames = slides.length; out.skateMed = r2(med(slides)); out.skateP90 = r2(pct(slides, 0.9));
     out.skateShare = r2(slides.length ? slides.filter((v) => v > 0.25).length / slides.length : null);
   } else out.skate = 'n/a (ride)';
