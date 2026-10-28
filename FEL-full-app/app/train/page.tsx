@@ -1,6 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
@@ -25,6 +25,7 @@ import { ListRow } from '@/components/ui/fel/cards';
 import { enterDelay } from '@/components/ui/fel/page-enter';
 // A11-07: the page's words live in messages/en/train.json
 import { t } from '@/lib/i18n';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,12 @@ export default async function TrainPage() {
   ]);
 
   const cards = [
+    {
+      // VERTICAL-EASY (2026-10-27; owner: "It needs to be way easier to measure vertical"): the one front door, first in
+      // Measure — one tap from this page into the jump-only run (it asks its own age question; under 18, no camera).
+      href: MEASURE_VERTICAL_HREF, group: 'measure' as Group, icon: ArrowUpFromLine, accent: PALETTE.cyan, title: t('train.cards.vertical.title'),
+      line: t('train.cards.vertical.line'),
+    },
     {
       // MIRROR-COACH P1 (2026-09-25): this said "Scored, with the corrective work written for you." Nothing grades the
       // screen's stations yet (no app code calls ScreenRunner.record, so every screen came back unscored), and a camera
