@@ -123,6 +123,10 @@ export interface BootSplashProps {
   /** CONTROLS SCREEN (2026-10-06): the one-line controls a host was built with (the board and timing hosts' `hint`),
    *  shown on the CONTROLS panel for a mode that writes no static hint of its own. */
   controls?: string;
+  /** COUCH TURNS (lane/hoops-couch, 2026-10-24): a host's own READY options, under the mode's (the 3PT's SHOOTERS picker). */
+  readyExtra?: React.ReactNode;
+  /** COUCH TURNS: a host's line under the title on READY (the 3PT's hand-over card: whose run it is). */
+  readyLead?: React.ReactNode;
 }
 
 /** The splash: the card, and body play beside it (the check over a pause, the corner self-view in play). */
@@ -384,6 +388,7 @@ export function SplashCard(props: BootSplashProps) {
         {props.goal && (props.phase === 'ready' || props.phase === 'loading') && (
           <p className="max-w-md text-[12px] font-bold tracking-[0.18em] text-white/85">{props.goal}</p>
         )}
+        {(props.phase === 'ready' || props.phase === 'loading') && props.readyLead}
 
         {props.phase === 'loading' && (
           <div className="w-56">
@@ -784,6 +789,7 @@ export function SplashCard(props: BootSplashProps) {
         {/* 3PT OPTIONS (IMPROVE 2026-10-06 #5 #6 #8): the shot input, and — never on a staked / head-to-head run — the practice rack
             and the money rack */}
         {props.modeId === 'threepoint' && (props.phase === 'ready' || props.phase === 'loading') && <ThreePointOptions />}
+        {(props.phase === 'ready' || props.phase === 'loading') && props.readyExtra}
 
         {/* CARD SLOT (FINISH-RELEASE, 2026-09-15): the creator card beside the setting and the items, on every mode —
             and the button map it carries, so a player can read what every press does before the first one. */}

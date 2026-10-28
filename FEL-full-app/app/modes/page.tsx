@@ -44,10 +44,10 @@ function ModeCard({ tile }: { tile: ModeTile }) {
       </span>
       <span className="min-w-0">
         <span className="fel-heading block truncate text-[15px] font-bold text-white">{tile.name} <PartyBadge modeKey={tile.key} className="ml-1" /></span>
-        <span className="mt-0.5 block truncate font-mono text-[10.5px] uppercase tracking-[0.12em] text-white/35">
+        <span className="mt-0.5 block truncate font-sans text-[12px] uppercase tracking-[0.14em] text-fel-quiet">
           {tile.venue}
         </span>
-        <span className="mt-2 block text-[12.5px] leading-relaxed text-white/48">{tile.desc}</span>
+        <span className="mt-2 block text-[14px] leading-relaxed text-fel-dim">{tile.desc}</span>
       </span>
     </Link>
   );
@@ -66,13 +66,14 @@ function ModeSection({
 }) {
   if (!tiles.length) return null;
   return (
-    <section className="rounded-3xl border border-white/[0.06] bg-white/[0.018] p-4 md:p-5">
+    <section className="fel-surface p-4 md:p-5">
       <header className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="fel-heading text-[19px] font-black text-white">{title}</h2>
-          <p className="mt-1 text-[12.5px] text-white/45">{blurb}</p>
+          <h2 className="fel-heading text-[20px] font-bold text-white"><span aria-hidden className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ background: accent }} />{title}</h2>
+          <p className="mt-1 text-[14px] text-fel-dim">{blurb}</p>
         </div>
-        <p className="font-mono text-[11px] font-bold tabular-nums" style={{ color: accent }}>
+        {/* P10: the count in the text ladder (it was the family accent at 11 px, 4.27:1 for the darker accents) */}
+        <p className="font-sans text-[12px] font-semibold tabular-nums text-fel-dim">
           {tiles.length} {tiles.length === 1 ? 'mode' : 'modes'}
         </p>
       </header>

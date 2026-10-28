@@ -158,6 +158,13 @@ import {
   FreestyleDeck, FREE_CUE_COLOR, freeSpanAt, nextFreeSpan, routeFreestyle, freeStyleFor, legendLine, freeName, varietyBonus, exitGraceForgives,
   type FreeSpan, type PadSlot,
 } from '../dance/freestyle';
+// lane/dance-extras-2 (owner 2026-10-24): FREE DANCE — the song with its judge off (X on the pick screen, free play only). The decisions
+// are pure and tested in dance/freeDance.ts; here: the switch, the presses (each one a move off the freestyle deck), the band in full and
+// the run's end (score 0, `freeDance` in the stats: recorded unpaid by app/api/sessions).
+import {
+  freeDanceBlock, freeDanceSlot, freeDanceStats, fillBand, pickControls, FREE_DANCE_CHIP, FREE_DANCE_SCORE, FREE_DANCE_OUTCOME, FREE_GO_HINT,
+  freeDanceHeadline,
+} from '../dance/freeDance';
 
 /** Clips are authored at 120 BPM; the animator rescales them per track. */
 const CLIP_REF_BPM = 120;
@@ -495,6 +502,11 @@ export const DanceMode: ModeDefinition = (() => {
   /** lane/dance-options: the buttons that took a slot in the section being danced (its VARIETY), and the song beat of the last press made
    *  inside a section (the EXIT GRACE reads it). */
   let freeButtons = new Set<PadSlot>();
+  /** lane/dance-extras-2: FREE DANCE is on (the pick screen's X), whether this page offers it at all (freeDanceBlock), and the
+   *  moves danced in the free run under way. Free dance is never remembered: every visit starts judged. */
+  let freeDance = false;
+  let freeOffered = false;
+  let freeMoves = 0;
   let freeLastPress: number | null = null;
   /** #10 / #13: STYLE — groove taps and held freezes. Its own tally: never added to the (Arena-staked) score. */
   let style = 0;
@@ -1078,6 +1090,32 @@ export const DanceMode: ModeDefinition = (() => {
     else ctx.end(outcome, r.score, stats);
   }
 
+  /**
+   * lane/dance-extras-2: a FREE-DANCE run's end. No judge ran, so there is no grade, best, combo or STYLE to report: the card says FREE
+   * DANCE and how many moves were danced, and the run posts score FREE_DANCE_SCORE (0) with `freeDance` / `endless` in its stats
+   * (freeDanceStats) — app/api/sessions records it unpaid (lib/session-payout.ts isFreeDanceSession). The stage does what finish() does
+   * with it: the dancer settles, the kit stops, a shipped song plays its outro, and REPLAY comes back to the pick screen.
+   */
+  function finishFree(ctx: ModeContext): void {
+    if (ended) return;
+    ended = true;
+    perf.stop();
+    kit?.dispose();
+    bio.beat = null; beatUntil = 0; bio.dejected = false;
+    body?.loop(SPORT_CLIP.idle, { fadeSec: 0.3 });
+    currentClip = null;
+    if (track.song && band instanceof SongStemBand) {   // the same outro finish() plays: the song's own last section, faded
+      const { startSec, endSec } = outroRange(track.song);
+      band.playOutro(startSec, Math.min(endSec - startSec, 6));
+    }
+    banner.cancel(); hold = null;
+    crowd?.cheer(0.6);
+    ctx.setHud({ banner: freeDanceHeadline(freeMoves), round: track.name, cues: [], nextStep: 'FREE DANCE IS ON · X ON THE PICK SCREEN TURNS IT OFF', nextStepIn: null, instruments: '' });
+    const stats = freeDanceStats({ moves: freeMoves, bpm: track.bpm, difficulty: track.difficulty });
+    if (ctx.continuous) ctx.card(FREE_DANCE_OUTCOME, FREE_DANCE_SCORE, stats);
+    else ctx.end(FREE_DANCE_OUTCOME, FREE_DANCE_SCORE, stats);
+  }
+
   // ── the pick screen ───────────────────────────────────────────────────
 
   /** MUSIC-SUITE P2: where to fix a late-feeling room. The pick screen publishes only round / banner / nextStep, and the
@@ -1121,6 +1159,7 @@ export const DanceMode: ModeDefinition = (() => {
    *  device's best on the focused track at that level (#4). */
   function pickLine(): string {
     const best = bestLine(readBest(track.id, level));
+    if (freeDance) return `${pickBanner(track)}  ·  ${FREE_DANCE_CHIP}`;   // lane/dance-extras-2: no level, MATCH or best is in play
     return `${pickBanner(track)}  ·  ${level.toUpperCase()}${matchMode ? '  ·  MATCH A B X Y' : ''}${best ? `  ·  ${best}` : ''}`;
   }
 
@@ -1134,11 +1173,13 @@ export const DanceMode: ModeDefinition = (() => {
   function showPick(ctx: ModeContext): void {
     playPreview(track);
     publishPad('pick');
+    padStore.set({ freeDance: freeOffered ? freeDance : null });   // lane/dance-extras-2: X is FREE ON / OFF only where it is offered
     ctx.setHud({
       round: pickRound(),
       banner: pickLine(),
       // short: on a phone this panel sits beside the TAP button. IMPROVE (#11 / #12): ▲ ▼ the level, Y the MATCH buttons
-      nextStep: '◀ ▶ TRACK · ▲ ▼ LEVEL · Y MATCH · A START',
+      // (lane/dance-extras-2: and X FREE, where free dance is offered)
+      nextStep: pickControls(freeOffered),
       nextStepIn: null,
       score: 0,
       combo: 0,
@@ -1165,6 +1206,17 @@ export const DanceMode: ModeDefinition = (() => {
     SoundKit.play('uiTick', { pitch: what === 'match' ? 1.4 : what === 'up' ? 1.1 : 1, volume: 0.3 });
     ctx.setHud({ banner: pickLine() });
     publishPad('pick');
+  }
+
+  /** lane/dance-extras-2: X on the pick screen switches FREE DANCE — only where it is offered (freeDance.ts freeDanceBlock); anywhere
+   *  else X does nothing there, as before. Browsing, like the other options (the auto-start waits again). */
+  function toggleFreeDance(ctx: ModeContext): void {
+    if (!freeOffered) return;
+    freeDance = !freeDance;
+    pickSec = pickTimer(pickSec, { type: 'browse' }, PICK_TIMEOUT_SEC).sec;
+    SoundKit.play('uiTick', { pitch: freeDance ? 1.6 : 0.8, volume: 0.3 });
+    ctx.setHud({ banner: pickLine() });
+    padStore.set({ freeDance });
   }
 
   /** IMPROVE (2026-10-06, #8): GO AGAIN in place — a finished run back to the pick screen on the same stage (the engine,
@@ -1218,7 +1270,9 @@ export const DanceMode: ModeDefinition = (() => {
     const freeSecs = freeSpansFor(track);
     const routine = chartForLevel(mine ?? generateRoutine({ bars: track.bars, difficulty: track.difficulty, seed: track.seed }), level, freeSecs);
     resetImproveRun();
+    freeMoves = 0;   // lane/dance-extras-2
     freeSpans = freeSecs;
+    if (freeDance) freeSpans = [];   // lane/dance-extras-2: a free-dance run is one long freestyle, with no sections to enter
     // MUSIC-SUITE P9 re-land (2026-10-13): an authored chart brings its OWN style taps (accents, doubles, freestyle slots —
     // dance/chart.ts, via styleBeatsFor); any other chart (the export, a community song, a fallback) keeps the computed
     // groove beats. Either way they pay STYLE only, never a step and never score.
@@ -1267,6 +1321,7 @@ export const DanceMode: ModeDefinition = (() => {
     }
     band?.setClock((sec) => clock.audio(sec));
     bandJoined = new Set();
+    if (freeDance) fillBand(band as never, STEM_ORDER);   // lane/dance-extras-2: the whole band from the first beat — nothing is earned
     kit?.retune(track.bpm, kitPattern(track.id));
 
     // The clock is armed on the first PLAYING tick (update), not here: on a
@@ -1276,6 +1331,10 @@ export const DanceMode: ModeDefinition = (() => {
     countArmed = false;
     ctx.setHud({ round: track.name, banner: '4', nextStep: '', nextStepIn: null });
     publishPad('play');
+    if (freeDance) {   // lane/dance-extras-2: every button names the move it will dance, for the whole song
+      padStore.set({ mode: 'free', free: freeDeck.legend() });
+      ctx.setHud({ cues: [], nextStep: `${FREE_DANCE_CHIP} · ${legendLine(freeDeck.legend())}` });
+    }
     console.log(`[FEL-DANCE] track ${track.id} ${track.bpm}bpm ${track.bars} bars d${track.difficulty} · kit voices ${kit?.voices ?? 0}`);
   }
 
@@ -1372,6 +1431,29 @@ export const DanceMode: ModeDefinition = (() => {
     padStore.set({ free: legend });
     ctx.setHud({ nextStep: `YOUR MOVE · ${legendLine(legend)}`, nextStepIn: null });
     return true;
+  }
+
+  /**
+   * lane/dance-extras-2: ONE PRESS IN A FREE-DANCE RUN (dance/freeDance.ts). Only while the song plays (the count-in takes none), and not
+   * while the song clock is held (a pause, the count back in). The press is a move: its button (freeDanceSlot — a trigger pull or SPACE is
+   * an A) dances the next move off the freestyle deck, exactly as inside a chart's freestyle section, and the pad and the HUD name what
+   * each button dances next. Nothing here reaches the judge (perf), the score, the combo or STYLE; releases are not moves.
+   */
+  function freeDancePress(ctx: ModeContext, e: FelInput, tap: boolean): void {
+    if (phase !== 'playing') return;
+    const slot = freeDanceSlot(e, tap);
+    if (!slot) return;
+    const a = audioNow();
+    if (!clock.accepting(a, MISS_AFTER)) return;
+    const bd = beatDuration(track.bpm);
+    const pick = freeDeck.press(slot);
+    playStep({ clipId: pick.clipId, beat: (clock.song(a) - latencySec - startAt) / bd, holdBeats: CLIP_BY_ID.get(pick.clipId)?.beats ?? 4, mirrored: pick.mirrored });
+    freeMoves++;
+    ctx.juice.scorePop(me.root.position.add(new Vector3(0, 2.1, 0)), freeName(pick.clipId), '#fde047');
+    SoundKit.play('uiTick', { pitch: 1.3, volume: 0.2 });
+    const legend = freeDeck.legend();
+    padStore.set({ free: legend });
+    ctx.setHud({ nextStep: `${FREE_DANCE_CHIP} · ${legendLine(legend)}`, nextStepIn: null, round: freeDanceHeadline(freeMoves) });
   }
 
   /** lane/dance-extras: the section begins — the cue the player sees and hears: a banner, the HUD chip, the pad's buttons turning into
@@ -1575,6 +1657,9 @@ export const DanceMode: ModeDefinition = (() => {
       compared = comparedRun(typeof window !== 'undefined' ? window.location.search : null);
       level = compared ? 'normal' : parseLevel(readPref(LEVEL_KEY));
       matchMode = !compared && readPref(MATCH_KEY) === '1';
+      // lane/dance-extras-2: free dance is free play only (never an Arena duel, a challenge, the ladder, a head-to-head chart…), and off
+      freeOffered = freeDanceBlock(typeof window !== 'undefined' ? window.location.search : null) === null;
+      freeDance = false;
       resetImproveRun();
       replayHook = () => replayToPick(ctx);
       // MUSIC-SUITE P8: read once per load, not every frame — see the `stillCam`/`reduceFlash` fields' own doc.
@@ -1671,8 +1756,12 @@ export const DanceMode: ModeDefinition = (() => {
         // IMPROVE (2026-10-06): ▲ ▼ the level (#11), Y the MATCH buttons (#12)
         else if (e.t === 'dpad' && e.pressed && (e.dir === 'up' || e.dir === 'down')) changeOption(ctx, e.dir);
         else if (e.t === 'button' && e.pressed && e.btn === 'Y' && e.src !== 'space') changeOption(ctx, 'match');
+        // lane/dance-extras-2: X switches FREE DANCE (a no-op where it is not offered)
+        else if (e.t === 'button' && e.pressed && e.btn === 'X' && e.src !== 'space') toggleFreeDance(ctx);
         return;
       }
+      // lane/dance-extras-2: FREE DANCE takes every press before the judge's chain: a press is a move, never a tap to judge
+      if (freeDance) { freeDancePress(ctx, e, t.tap); return; }
       // IMPROVE (2026-10-06, #13): a held freeze ends on ITS tap's release — judged against the freeze's last beat
       if (hold && phase === 'playing' && isReleaseOf(hold.src, e)) {
         const ac = audioNow();
@@ -1782,7 +1871,7 @@ export const DanceMode: ModeDefinition = (() => {
           const digit = Math.min(4, Math.ceil(remaining / bd));
           if (digit !== countDigit) { countDigit = digit; countHud.banner = `${digit}`; }
           const nowMs = performance.now();
-          if (nowMs - laneAt >= LANE_HUD_MS) { laneAt = nowMs; laneInto(countHud, perf.upcoming(heard, LANE_UPCOMING), heard); }
+          if (!freeDance && nowMs - laneAt >= LANE_HUD_MS) { laneAt = nowMs; laneInto(countHud, perf.upcoming(heard, LANE_UPCOMING), heard); }   // lane/dance-extras-2: no lane in free dance
           if (countHud.banner !== undefined || countHud.cues !== undefined) ctx.setHud(countHud);
           // MUSIC-SUITE P8 FIX (2026-09-29): decision #8 ("front, audience view, moving on the beat") used to go
           // quiet for the entire 4-beat count-in — this early `return` skipped straight past the applyStageCamera
@@ -1802,7 +1891,7 @@ export const DanceMode: ModeDefinition = (() => {
         // rather than waiting for the player's first judged step to publish it at all.
         // MUSIC-SUITE P7 ("your beat"): the hint names what is actually being earned — your song's own parts, not a
         // generic "move family", when the room is playing YourSongBand.
-        const goHint = band instanceof YourSongBand
+        const goHint = freeDance ? FREE_GO_HINT : band instanceof YourSongBand
           ? "Your song is the band — hit on the beat and each of your own parts joins it"
           : 'Every move family is an instrument — hit on the beat and the band builds';
         flashBanner(ctx, 'GO', 500, { hint: goHint, instruments: instrumentsHud() });   // IMPROVE (#2): the one clear time
@@ -1811,7 +1900,7 @@ export const DanceMode: ModeDefinition = (() => {
         queueStoop(band instanceof YourSongBand ? 'dance.ownsong' : 'dance.callresponse');
       }
 
-      perf.update(heard);
+      if (!freeDance) perf.update(heard);   // lane/dance-extras-2: free dance — no step fires, is judged or is missed
       band?.update(now);
       if (!isSongTrack) kit?.update(now);   // MUSIC-SUITE P7 (six-songs): the song's own bed+drums stems are the floor
 
@@ -1858,13 +1947,13 @@ export const DanceMode: ModeDefinition = (() => {
       if (hud.banner !== undefined || nowMs - laneAt >= LANE_HUD_MS) {
         laneAt = nowMs;
         if (songBeat >= 0) hud.beatPulse = 1 - (songBeat % 1);
-        laneInto(hud, upcoming, heard);
+        if (!freeDance) laneInto(hud, upcoming, heard);   // lane/dance-extras-2: nothing to keep up with in free dance
         ctx.setHud(hud);
       }
 
       // The routine is over one full beat after the last step's window closes,
       // so a final PERFECT is never cut off by the results screen.
-      if (songBeat > perf.totalBeats + 1) finish(ctx);
+      if (songBeat > perf.totalBeats + 1) { if (freeDance) finishFree(ctx); else finish(ctx); }   // lane/dance-extras-2: a free run ends unjudged
     },
 
     dispose() {

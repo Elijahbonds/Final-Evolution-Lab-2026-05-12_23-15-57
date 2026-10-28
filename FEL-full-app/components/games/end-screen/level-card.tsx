@@ -34,15 +34,15 @@ export function LevelCard({ fill, gained, active, instant, ms, onLevelUp }: {
             style={{ width: `${width}%`, transition: glide ? `width ${glideMs}ms cubic-bezier(0.16,0.8,0.3,1)` : 'none' }}
           />
         </div>
-        <span className="shrink-0 font-mono text-white/60">LV {cur.level + 1}</span>
-        <span className="shrink-0 font-mono text-[0.85em] text-white/70">+{Math.round(gained).toLocaleString('en-US')} XP</span>
+        <span className="shrink-0 font-display tabular-nums text-white/60">LV {cur.level + 1}</span>
+        <span className="shrink-0 font-display tabular-nums text-[0.85em] text-white/70">+{Math.round(gained).toLocaleString('en-US')} XP</span>
       </div>
       {showUp ? (
         <p data-level-up className="mt-[0.25em] flex items-center justify-center gap-[0.35em] text-center font-bold text-[#00FF9D]" style={instant ? undefined : { animation: 'fel-rise 320ms cubic-bezier(0.2,1.4,0.4,1) both' }}>
           <ChevronsUp className="h-[1.1em] w-[1.1em]" /> LEVEL UP! Level {fill.levelAfter}
         </p>
       ) : (
-        <p className="mt-[0.2em] text-center font-mono text-[0.75em] text-white/50">
+        <p className="mt-[0.2em] text-center font-display tabular-nums text-[0.75em] text-white/50">
           {Math.max(0, last.need - last.to).toLocaleString('en-US')} XP to level {fill.levelAfter + 1}
         </p>
       )}

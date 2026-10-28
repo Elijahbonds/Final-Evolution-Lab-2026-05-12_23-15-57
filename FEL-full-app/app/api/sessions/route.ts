@@ -20,7 +20,7 @@ import { SCAN_SAVE_REFUSED, canSaveScanNumbers } from '@/lib/privacy/scanSaveGat
 import {
   roomStats, sessionWon, sessionAccuracy, isEndlessSession, sessionPayout, readMusicSet, sessionScoreCap, isCatalogueMode,
   ENDLESS_SESSION_CEILING, ROOM_STATS_FORWARDED, isCreationSession, streakStep, creationNextDueAt, finitePayCapScore,
-  type StreakProfile, type StreakStep,
+  isFreeDanceSession, FREE_DANCE_REASON, type StreakProfile,
 } from '@/lib/session-payout';
 import type { Prisma } from '@/public/_prisma/client';
 import { canonicalModeKey } from '@/lib/game-data';
@@ -33,6 +33,7 @@ import {
 } from '@/lib/sessions/sessionRuns';
 import { applyEconomyCaps, dailyCapMessage } from '@/lib/economy-caps';
 import { sumEarnedToday, lockPlayerForDailyCap } from '@/lib/economy-caps-db';
+import { claimPlayStreak } from '@/lib/streak/claim';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,38 +126,8 @@ async function verifiedMusicDuel(userId: string, arenaMatchId: unknown): Promise
   }
 }
 
-/**
- * STREAK-CLAIM-RACE (merge review 2026-09-28; owner sign-off 2026-10-14): a play session's streak step, CLAIMED inside the
- * run's paying transaction and conditional on the profile this request read. The step was decided from a read taken
- * before the transaction and written back unconditionally, and the ledger's key is per run, so N runs finishing at once
- * each paid the day's streak Lab Credits (measured: due, two finishes paid 20 + 20; owed, three finishes after one
- * creation paid 35 LC each). Returns whether this run won the claim; a run that did not pays no streak share.
- *   due    conditional on the lastStreakAt it read: every writer that opens a streak day (a play here, a creation session
- *          above) moves lastStreakAt, so one claim per day wins. Not on lastActiveAt — a lesson writes that
- *          (lib/knowledge/server/learnRoutes.ts, app/api/education/complete/route.ts), and it must not cost a run the day.
- *          Writes streakDays, and lastStreakAt and lastActiveAt from one stamp.
- *   owed   conditional on both: the creation-opened day (lastActiveAt < lastStreakAt) is still unpaid. Writes only
- *          lastActiveAt, which closes the debt.
- *   lost   writes nothing — not even lastActiveAt: a run that lost to a creation opening the day would erase the
- *          creation's owed LC, which the next run pays.
- *   neither  no streakDays or lastStreakAt (writing back what it read was itself a lost update — it could undo another
- *          run's claim and open the day again), and lastActiveAt only moves forward: an older stamp written under a
- *          newer due claim's lastStreakAt would read as a creation-opened day and pay its LC again.
- */
-async function claimPlayStreak(tx: Prisma.TransactionClient, userId: string, seen: StreakProfile | null | undefined, step: StreakStep, stamp: Date): Promise<boolean> {
-  const lastStreakAt = seen?.lastStreakAt == null ? null : new Date(seen.lastStreakAt);
-  const lastActiveAt = seen?.lastActiveAt == null ? null : new Date(seen.lastActiveAt);
-  if (step.due || step.owed) {
-    // both columns are NOT NULL (@default(now())): a read without them is no row state to claim against
-    if (!lastStreakAt || (step.owed && !lastActiveAt)) return false;
-    const r = step.due
-      ? await tx.playerProfile.updateMany({ where: { userId, lastStreakAt }, data: { streakDays: step.streakDays, lastStreakAt: stamp, lastActiveAt: stamp } })
-      : await tx.playerProfile.updateMany({ where: { userId, lastStreakAt, lastActiveAt: lastActiveAt as Date }, data: { lastActiveAt: stamp } });
-    return r.count > 0;
-  }
-  await tx.playerProfile.updateMany({ where: { userId, lastActiveAt: { lt: stamp } }, data: { lastActiveAt: stamp } });
-  return false;
-}
+// STREAK-CLAIM-RACE: claimPlayStreak moved to lib/streak/claim.ts UNCHANGED (DAILY-DRILL, 2026-10-24), so the daily drill's
+// claim uses the same race-safe step instead of a copy. Its full rule is written there.
 
 /**
  * PRQ-ATTR-RACE (found 2026-10-14; owner sign-off 2026-10-16): a run's trained attributes, each the row's own value + the
@@ -287,6 +258,13 @@ export async function POST(req: Request) {
     }
     const score = check.ok ? check.score : (unruled as { ok: true; score: number }).score;
     const noRules = !check.ok;
+    // lane/dance-extras-2 (owner 2026-10-24): a FREE DANCE run (the Cypher with its judge off) has no score, so a free-dance post
+    // with one is never recorded as a scored run — refused here, like every other impossible score. One with score 0 is recorded
+    // unpaid below (lib/session-payout.ts isFreeDanceSession).
+    const freeDance = isFreeDanceSession(rulesMode, stats);
+    if (freeDance && score !== 0) {
+      return send(await refuse(userId, mode, 'SCORE_INVALID', 422, { detail: 'free_dance_scored', limit: 0 }, { id: run.id, close: 'rejected', score, durationMs }));
+    }
     // OWNER DECISION: a floor-only mode (Prove It) pays as a score of 0 and no win — the played floor — and keeps its
     // validated score on the history row (modeScoreRules.ts payFloorOnly)
     const floorOnly = check.ok && check.rule.payFloorOnly === true;
@@ -362,8 +340,9 @@ export async function POST(req: Request) {
     // of a staked set never spends the player's one Arena pay for that duel.)
     // OWNER DECISION: a mode with no rules row yet (NO_RULES) is recorded the same way — and, returning here, it never
     // reaches the paying transaction either, so it never makes the pay-once claim (verifiedMusicDuel above only reads).
-    if (!run.payoutEligible || noRules || run.agentRun) {
-      const reason = run.agentRun ? 'AGENT' : !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : 'NO_RULES';
+    // lane/dance-extras-2: and a FREE DANCE run (FREE_DANCE): judged by nobody, paid nothing, no GameSession row for a rival or a best
+    if (!run.payoutEligible || noRules || run.agentRun || freeDance) {
+      const reason = run.agentRun ? 'AGENT' : !run.payoutEligible ? run.ineligibleReason ?? 'UNPAID' : noRules ? 'NO_RULES' : FREE_DANCE_REASON;
       await recordServerEvent({ name: 'session_unpaid', userId, props: { mode, score, won, duration, reason } });
       return send(await closeRun(prisma, run.id, {
         status: RUN_STATUS.recorded, score, durationMs, now,

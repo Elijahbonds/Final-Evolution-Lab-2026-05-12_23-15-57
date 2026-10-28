@@ -170,7 +170,7 @@ function AnalogStick({ bus, side, label }: { bus: InputBus; side: 'L' | 'R'; lab
       onPointerMove={onMove}
       onPointerUp={() => { active.current = null; setVec(0, 0); }}
       onPointerCancel={() => { active.current = null; setVec(0, 0); }}
-      className="relative h-24 w-24 touch-none rounded-full border border-white/15 bg-white/5 backdrop-blur-sm">
+      className="fel-chrome-glass relative h-24 w-24 touch-none rounded-full border border-white/15 bg-white/5 backdrop-blur-sm">
       <div ref={knob}
         className="absolute left-1/2 top-1/2 -ml-6 -mt-6 h-12 w-12 rounded-full bg-white/20 shadow-lg transition-transform duration-75" />
       <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black tracking-widest text-white/30">

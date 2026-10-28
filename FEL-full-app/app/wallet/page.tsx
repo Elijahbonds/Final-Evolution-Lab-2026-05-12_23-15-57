@@ -7,6 +7,7 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { LedgerHistory } from '@/components/wallet/ledger-history';
 import { ExchangeWidget } from '@/components/wallet/exchange-widget';
 import { purchasesEnabledFromEnv, shardSaleCopy } from '@/lib/wallet/purchases';
+import { allowlistPermits } from '@/lib/payments/allowlist';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export default async function WalletPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect(loginPath('/wallet'));
   // FEATURES-UX-SHOP: "Get Shards" led to a store that said COMING SOON — the button now carries the purchases truth itself.
-  const shardCopy = shardSaleCopy(purchasesEnabledFromEnv());
+  const shardCopy = shardSaleCopy(purchasesEnabledFromEnv() && allowlistPermits('shards'));
   return (
     <div className="min-h-screen bg-[#050505] pb-24">
       <div className="mx-auto flex max-w-3xl flex-wrap items-center gap-2 px-4 pt-4">

@@ -106,6 +106,22 @@ export function leadClause(text: string): string {
 
 const words = (s: string) => s.split(/\s+/).filter(Boolean);
 
+/**
+ * CUE-REWRITE (2026-10-27) — THE LIVE DIRECTION CUE. A cue of five words or fewer that names a body part WITH the way it
+ * moves ("Knees out over toes", "Heels down", "Shoulders over hips", "Slow down. Knees out.") passes rules 3–4. Why: the
+ * owner's playtest said the cues were weird and unclear, and the style guide's live cue is 2–5 words said mid-rep (the
+ * brief's own examples are "Knees out" and "Chest up", which rules 3–4 failed). A body part with its direction, at that
+ * length, is the plainest thing a person can act on mid-rep; the external-focus wording still leads wherever it is
+ * equally clear ("Push the floor away"), and every longer line keeps rules 3–4. Rules 1–2 (no muscle, nothing to
+ * squeeze) apply to every cue, this one included. RELAXED, flagged for the owner (docs/CUE-AUDIT.md, owner call 1).
+ */
+export const DIRECTION_WORDS =
+  /\b(out|in|up|down|back|level|tall|wide|still|forward|under|over|apart|together|straight|flat|long|low|lower|high|even|equally|middle|quiet|soft|stacked|square|below|past|away)\b/i;
+export const DIRECTION_CUE_MAX_WORDS = 5;
+export function isDirectionCue(text: string): boolean {
+  return words(text).length <= DIRECTION_CUE_MAX_WORDS && DIRECTION_WORDS.test(text);
+}
+
 /** Why a cue fails the policy (empty = it passes). */
 export function lintCue(text: string, tier: CueTier): CueFinding[] {
   const out: CueFinding[] = [];
@@ -120,7 +136,7 @@ export function lintCue(text: string, tier: CueTier): CueFinding[] {
     const after = words(leadClause(text.slice(m.index! + m[0].length))).slice(0, 4).join(' ');
     if ((BODY_WORDS.test(after) || MUSCLE_WORDS.test(after)) && !WORLD_WORDS.test(after)) out.push({ rule: 'squeeze', word: `${m[0]} ${after}`.trim() });
   }
-  if (tier === 'attention' && BODY_WORDS.test(text)) {
+  if (tier === 'attention' && BODY_WORDS.test(text) && !isDirectionCue(text)) {
     const lead = leadClause(text);
     const body = BODY_WORDS.exec(lead);
     if (body && !WORLD_WORDS.test(lead) && !EFFECT_WORDS.test(lead)) out.push({ rule: 'leads', word: body[0] });

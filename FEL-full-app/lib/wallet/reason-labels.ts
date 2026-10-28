@@ -32,6 +32,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   MP_MATCH_WON: { label: 'Multiplayer match won', kind: 'earn' },
   MP_MATCH_PLAYED: { label: 'Multiplayer match played', kind: 'earn' },
   REFERRAL_BONUS: { label: 'Referral bonus', kind: 'earn' },
+  REFERRAL_WEEK_ONE: { label: 'Referral reward: first week', kind: 'earn' },   // CHALLENGES-2
   // HOTFIX (2026-09-24): the Playbook's chapter shards (5d8e23c, 2026-09-20) shipped without a label, so the ledger read
   // "edu chapter complete" and wallet-tests has been red in CI ever since.
   EDU_CHAPTER_COMPLETE: { label: 'Playbook chapter complete', kind: 'earn' },
@@ -48,6 +49,7 @@ export const REASON_LABELS: Record<string, ReasonLabel> = {
   DEAD_BUY_REFUND: { label: 'Refund: it delivered nothing', kind: 'refund' },
   // MUSIC-SUITE P6 (owner decision #23): a zero-shard row; its metadata.note names the kit.
   KIT_GRANDFATHER_2026_09: { label: 'Music kit kept: unlocked before Sep 20, 2026', kind: 'admin' },
+  DAILY_DRILL_COMPLETE: { label: "Today's drill done", kind: 'earn' },   // DAILY-DRILL (2026-10-24)
 };
 
 export function reasonLabel(code: string): ReasonLabel {

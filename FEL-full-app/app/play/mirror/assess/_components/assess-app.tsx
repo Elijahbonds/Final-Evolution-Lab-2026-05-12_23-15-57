@@ -9,6 +9,10 @@
 // "Does anything hurt right now?" → "Which foot do you take off from when you jump?" (SCREEN A, tap: Left / Right /
 // Not sure — kept in takeoffRef, page memory only, so "Do the full screen" and "Run it again" never re-ask it;
 // writeTakeoff persists it for adults only) → the camera card → only then the camera → the checks → results.
+//   · VERTICAL-EASY (2026-10-27): the jump alone ("Measure my vertical", lib/vertical/door.ts) skips the take-off tap —
+//     it labels only the sided checks; "Do the full screen" after a jump asks it then (restAfterTakeoff).
+//   · SCREEN-EASY (2026-10-28): no run asks the take-off foot now (lib/screen/flow.ts: nothing on the result reads it);
+//     the runner gets null, unknown. The TakeoffStep and restAfterTakeoff stay for a check that needs it later.
 //   · SCREEN-MINOR-LOCK (PM 2026-10-21): the camera is for 18 or older only, until the parent flow ships. Under 18,
 //     "rather not say" or no age goes from the age answer straight to the camera-free card (`noCamera`, kid-results.tsx
 //     KidNoCamera): no grown-up step, no camera card, no camera asked for or mounted, and startCamera refuses on its own.
@@ -59,7 +63,7 @@ import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
 } from '@/lib/screen/copy';
 import { isKid, type AgeBand } from '@/lib/screen/age';
-import { cameraAllowed, clearScreen, keepResult, localForClear, lockAge, lockSessionAge, readAge, readSessionAge, resetAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
+import { cameraAllowed, clearScreen, keepResult, mayPersist, localForClear, lockAge, lockSessionAge, readAge, readSessionAge, resetAge, tabStorage, writeTakeoff, type GateRecord } from '@/lib/screen/store';
 import { PRE_START, preStep, type PreEvent, type PreState, type ScreenKind } from '@/lib/screen/flow';
 import { forgetIntakeMemory } from '@/lib/health/intakeForget';
 import { ASSESS_PATH, RESULTS_PATH, SCREEN_HOME } from '@/lib/screen/routes';
@@ -73,11 +77,22 @@ import { screenPose } from './screen-pose';
 import { LiveHud } from './live-hud';
 import { AgeStep, CameraInfoStep, GrownUpStep, PainStep, PainStopStep, StartStep, TakeoffStep } from './gate-steps';
 import { JumpResult } from './jump-result';
+import { JumpSessionCard } from '@/components/jump/jump-session-card';
+import { SlowMoUpload } from '@/components/jump/slowmo-upload';
+import { JumpMore } from '@/components/jump/jump-more';
+import { deviceStorage, keepVertical, lastVerticalCm } from '@/lib/vertical/series';
+import { lastKeptCheckCm } from '@/lib/vertical/result';
 import { ScreenFrame, StepCard, primaryBtn, quietBtn } from './screen-ui';
 import { useLeaveGuard } from './use-leave-guard';
 
 type Phase = 'intro' | 'age' | 'grownUp' | 'pain' | 'painStop' | 'takeoff' | 'cameraInfo' | 'starting' | 'device' | 'running' | 'stopped' | 'toResults' | 'kidResults' | 'jumpResult' | 'cameraError' | 'noCamera';
-interface JumpView { heightCm: number | null; plusMinusCm: number | null; attempts: number; jumpIn: number | null; lastIn: number | null; kid: boolean; trust: { level: TrustLevel; reasons: readonly TrustReason[] } | null }
+interface JumpView {
+  heightCm: number | null; plusMinusCm: number | null; attempts: number; counted: number; jumpIn: number | null; lastIn: number | null; kid: boolean;
+  /** VERTICAL-EASY: "Measure my vertical" (arms free) — its own series; lastCm is that series' last one on this device. */
+  armSwing: boolean; lastCm: number | null;
+  /** MIRROR-TRUST-RATING: the jump height's trust, adults only (a kid's view never shows it). */
+  trust: { level: TrustLevel; reasons: readonly TrustReason[] } | null;
+}
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'takeoff', 'cameraInfo', 'starting', 'device', 'running'];
 /** SCREEN A: while a rep is up, nobody reads — the caption bar hides on these steps (voice off keeps it). */
@@ -120,6 +135,8 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const camRunRef = useRef(0);                                   // the current camera start; a newer one (or a back) cancels it
   const lastJumpRef = useRef<number | null>(null);
   const takeoffRef = useRef<Side | null>(null);                 // the take-off tap (SCREEN A); an under-18's lives here only
+  const takeoffAskedRef = useRef(false);                          // VERTICAL-EASY: the jump alone does not ask it
+  const [restAfterTakeoff, setRestAfterTakeoff] = useState(false); // "Do the full screen" after a jump: ask it, then go on
   const modeRef = useRef<ScreenKind | 'rest'>(initialRun ?? 'full');
   const carryRef = useRef<TestResult | null>(null);
   const carryTrustRef = useRef<MeasureTrust[]>([]);
@@ -219,25 +236,34 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     const summary = v.result ? summarize(v.result) : null;
     if (summary && v.result?.trust.length) summary.trust = keptTrust(v.result.trust);   // MIRROR-TRUST-RATING: beside it, never in the grading
     if (!summary || v.result?.pain) { setPhase('stopped'); return; }
-    if (modeRef.current === 'jump') {
+    if (modeRef.current === 'jump' || modeRef.current === 'vertical') {
+      const armSwing = modeRef.current === 'vertical';
       const t5 = v.result?.tests.find((t) => t.id === 'T5') ?? null;
       carryRef.current = t5;
       // MIRROR-TRUST-RATING: the jump's trust rows ride with the carried jump (priorTrust), kept as they were rated
       carryTrustRef.current = (v.result?.trust ?? []).filter((r) => r.id.startsWith('jump.'));
-      const kidView = keepResult(tabStorage(), gateRef.current, summary) === 'kid';
-      const jumpTrust = kidView ? null : v.result?.trust.find((r) => r.id === 'jump.height') ?? null;
+      // VERTICAL-EASY: the arm-swing series is never written as the screen's result (that is the hands-on-hips series);
+      // 18 or older keep it on this device instead (lib/vertical/series.ts), and the last one there is "what it means"
+      const kid = armSwing ? !mayPersist(gateRef.current) : keepResult(tabStorage(), gateRef.current, summary) === 'kid';
+      const store = !kid ? deviceStorage() : null;
+      const lastCm = kid ? null : armSwing ? lastVerticalCm(store) : lastKeptCheckCm(store);
+      if (armSwing && !kid && t5?.t5) keepVertical(store, t5.t5, { adult: true });
+      const jumpTrust = kid ? null : v.result?.trust.find((r) => r.id === 'jump.height') ?? null;
       const view: JumpView = {
+        armSwing, lastCm,
         heightCm: t5?.t5?.bestHeightCm ?? null,
         plusMinusCm: t5?.t5?.heightPlusMinusCm ?? null,
         attempts: t5?.t5?.jumps.length ?? 0,
+        counted: t5?.t5?.jumps.filter((j) => j.valid).length ?? 0,
         jumpIn: summary.jumpBestIn,
         lastIn: lastJumpRef.current,
-        kid: kidView,
+        kid,
         trust: jumpTrust ? { level: jumpTrust.level, reasons: jumpTrust.reasons } : null,
       };
       if (view.kid) lastJumpRef.current = summary.jumpBestIn ?? lastJumpRef.current;
       // DRILLS round 3: the landing check, for a verified adult who opted in (the server says); a kid's run sends nothing
-      void maybeSaveLandingCheck({ kid: view.kid, tests: v.result!.tests, takeoffLeg: v.result!.takeoffLeg, pain: v.result!.pain }, device);
+      // VERTICAL-EASY: only the hands-on-hips jump check sends it — the arm-swing series stays on this device
+      if (!armSwing) void maybeSaveLandingCheck({ kid: view.kid, tests: v.result!.tests, takeoffLeg: v.result!.takeoffLeg, pain: v.result!.pain }, device);
       setJumpView(view);
       setPhase('jumpResult');
       return;
@@ -269,7 +295,9 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     const runner = new AssessRunner({
       // the pre-camera take-off tap (SCREEN A), null for "Not sure": the runner is never left to guess a foot
       aspect, takeoffLeg: takeoffRef.current, painAsked: true, handsFree: true, cameraFps: () => cameraFpsRef.current,
-      ...(kind === 'jump' ? { parts: JUMP_PARTS } : {}),
+      ...(kind === 'jump' || kind === 'vertical' ? { parts: JUMP_PARTS } : {}),
+      // VERTICAL-EASY (owner, 2026-10-27: "allow arm swing"): the front door reads a natural jump, arms free
+      ...(kind === 'vertical' ? { armsFree: true } : {}),
       ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined, priorTrust: carryRef.current ? carryTrustRef.current : undefined } : {}),
     });
     runnerRef.current = runner;
@@ -354,20 +382,37 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   // kept in takeoffRef for the whole page so "Do the full screen" and "Run it again" reuse it without asking again.
   const answerTakeoffPre = (side: Side | null) => {
     takeoffRef.current = side;
+    takeoffAskedRef.current = true;
+    // VERTICAL-EASY: asked after a jump, on the way into the rest of the screen — the camera starts again from here
+    if (restAfterTakeoff) {
+      if (side) writeTakeoff(tabStorage(), gateRef.current, side);
+      setRestAfterTakeoff(false);
+      doFull();                                                  // asked now, so it goes straight to the camera
+      return;
+    }
     if (side) writeTakeoff(tabStorage(), gateRef.current, side);
     pre({ type: 'takeoff', side });
   };
   const cameraOn = () => pre({ type: 'cameraOn' });
   const resetRun = () => { camRunRef.current++; cleanup(); setView(null); viewRef.current = null; setCaption(''); highFpsRef.current = false; };
-  const restart = () => { resetRun(); setKid(null); setJumpView(null); pre({ type: 'restart' }); };
+  const restart = () => { resetRun(); setKid(null); setJumpView(null); setRestAfterTakeoff(false); pre({ type: 'restart' }); };
   // "Run it again": a new Start (age is asked again; the take-off tap is not — it stays in takeoffRef). A jump-only
   // result repeats the jump; after the full screen, the full screen.
   const runAgain = () => {
-    const kind: ScreenKind = modeRef.current === 'jump' ? 'jump' : 'full';
+    const kind: ScreenKind = modeRef.current === 'jump' || modeRef.current === 'vertical' ? modeRef.current : 'full';
     resetRun(); setKid(null); setJumpView(null); modeRef.current = kind; pre({ type: 'start', kind });
   };
   // Continue this run through T1–T3. The jump already graded is carried. Age and pain are not asked again.
-  const doFull = () => { modeRef.current = 'rest'; setJumpView(null); void startCamera(); };
+  // VERTICAL-EASY: a jump-only run never asked the take-off foot; the sided checks need it, so it is asked here, once.
+  // VERTICAL-EASY: after "Measure my vertical" the whole screen runs, its own jump hands on hips — an arm-swing jump is
+  // never carried into the hands-on-hips series.
+  const doFull = () => {
+    if (modeRef.current === 'vertical') { carryRef.current = null; modeRef.current = 'full'; }
+    else if (modeRef.current !== 'full') modeRef.current = 'rest';
+    setJumpView(null);
+    // SCREEN-EASY: the take-off foot is not asked any more (lib/screen/flow.ts): straight back to the camera
+    void startCamera();
+  };
   // the camera off, back to the camera card (the flow's step before the camera)
   const cameraBack = () => { setStopAsk(false); resetRun(); pre({ type: 'back' }); };
 
@@ -388,6 +433,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     runnerRef.current?.answerTakeoff(side, now());
   };
   const reportPain = () => runnerRef.current?.reportPain(now());
+  const skipWall = () => runnerRef.current?.skipWall(now());          // SCREEN-EASY: no wall, the ankle bend is skipped
 
   const cam = status?.camera;
   const aspect = cam?.width && cam.height ? `${cam.width} / ${cam.height}` : '4 / 3';
@@ -398,7 +444,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const back: string | (() => void) = phase === 'intro' || phase === 'toResults' ? introBack
     : phase === 'running' ? () => setStopAsk(true)
     : phase === 'starting' || phase === 'device' ? cameraBack
-    : phase === 'stopped' || phase === 'kidResults' || phase === 'jumpResult' || phase === 'noCamera' ? restart
+    : phase === 'stopped' || phase === 'kidResults' || phase === 'jumpResult' || phase === 'noCamera' || (phase === 'takeoff' && restAfterTakeoff) ? restart
     : () => pre({ type: 'back' });
 
   if (phase === 'cameraError') return <CameraHelp why={status?.why ?? null} onRetry={() => void startCamera()} onBack={restart} />;
@@ -419,7 +465,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
         </button>
       </div>
     ) : undefined}>
-      {phase === 'intro' ? <StartStep onJump={() => startNew('jump')} onFull={() => startNew('full')} /> : null}
+      {phase === 'intro' ? <StartStep onJump={() => startNew('vertical')} onFull={() => startNew('full')} /> : null}
       {phase === 'age' ? <AgeStep onAnswer={answerAge} /> : null}
       {phase === 'grownUp' ? <GrownUpStep onContinue={grownUp} /> : null}
       {phase === 'noCamera' ? <KidNoCamera onRestart={restart} /> : null}
@@ -455,7 +501,21 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       ) : null}
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
       {phase === 'jumpResult' && jumpView ? (
-        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} kid={jumpView.kid} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} trust={jumpView.trust} />
+        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} counted={jumpView.counted} kid={jumpView.kid} armSwing={jumpView.armSwing} lastCm={jumpView.lastCm} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} trust={jumpView.trust}
+          more={(
+            <>
+              {/* JUMP-PRO: every jump with its ±, the set, the tip and the verified mark — adults only. MIRROR-TRUST-RATING hook:
+                  PR #424 passes jumpView.trust?.level as trustLevel (its Low hides the number, and this card with it).
+                  VERTICAL-EASY: these three now sit under the result's "More detail", one tap away. */}
+              {jumpView && !jumpView.kid ? <JumpSessionCard t5={carryRef.current?.t5 ?? null} trustLevel={jumpView.trust?.level ?? null} /> : null}
+              {/* MIRROR-TRUST-RATING: a Low jump hides the number, so the slow-mo card (its number) goes with it, as the session card does */}
+              {jumpView?.trust?.level !== 'low' && (jumpView && !jumpView.kid ? <SlowMoUpload /> : null)}
+              {/* JUMP-PRO 2: the approach (touch height), the drop jump (RSI), the standing reach and power — adults only.
+                  JUMP-TESTS: the jump tests, the history kept on the device (CSV) and the take-off speed read the live check's t5. */}
+              {/* MIRROR-TRUST-RATING: on a Low jump JumpMore gets no live read (hideLive: no best height, no ±, no t5), so it shows no number of this jump */}
+              {jumpView && !jumpView.kid ? <JumpMore adult bestHeightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} t5={carryRef.current?.t5 ?? null} hideLive={jumpView.trust?.level === 'low'} /> : null}
+            </>
+          )} />
       ) : null}
 
       {live ? (
@@ -470,7 +530,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
               autoContinue={begin} okSinceRef={deviceOkSince} />
           ) : null}
           {phase === 'running' && view ? (
-            <LiveHud view={view} voiceOn={voice.on} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} />
+            <LiveHud view={view} voiceOn={voice.on} onPain={answerPain} onTakeoff={answerTakeoff} onStop={reportPain} onSkipWall={skipWall} />
           ) : null}
         </div>
       ) : null}

@@ -25,7 +25,7 @@ describe('the shot before the rep', () => {
     const c = checkFraming(shot());
     expect(c.ok).toBe(true);
     expect(c.worst).toBeNull();
-    expect(c.instruction).toMatch(/good shot/i);
+    expect(c.instruction).toMatch(/^Good\. Start/);   // test changed: copy rewrite (CUE-REWRITE) — same meaning
   });
 
   it('catches feet out of frame FIRST — the one that silently ruins a squat', () => {
@@ -39,7 +39,7 @@ describe('the shot before the rep', () => {
     const close = checkFraming(shot({ headY: 0.01, ankleY: 0.96 }));
     expect(close.issues).toContain('tooClose');
     expect(checkFraming(shot({ headY: 0.35, ankleY: 0.70 })).worst).toBe('tooFar');
-    expect(checkFraming(shot({ headY: 0.35, ankleY: 0.70 })).instruction).toMatch(/come forward/i);
+    expect(checkFraming(shot({ headY: 0.35, ankleY: 0.70 })).instruction).toMatch(/come a little closer/i)   /* test changed: copy rewrite — same meaning */;
   });
 
   // MIRROR-COACH P4 baseline F6 (2026-09-25): bodyFill is head-to-ankle height, which a deep squat or lunge shrinks
@@ -60,7 +60,7 @@ describe('the shot before the rep', () => {
   it('spots a body turned side-on, because knee tracking cannot be read from the side', () => {
     const c = checkFraming(shot({ shoulderSpan: 0.06 }));
     expect(c.issues).toContain('turned');
-    expect(c.instruction).toMatch(/square/i);
+    expect(c.instruction).toMatch(/face the camera straight on/i);   // test changed: copy rewrite — same meaning (square-on)
   });
 
   it('spots drift out of the middle, and poor visibility', () => {
@@ -71,7 +71,7 @@ describe('the shot before the rep', () => {
   it('says ONE thing at a time even when several are wrong', () => {
     const c = checkFraming(shot({ ankleY: 0.995, centre: 0.8, vis: 0.4 }));
     expect(c.issues.length).toBeGreaterThan(1);
-    expect(c.instruction).toBe('Your feet are out of shot. Tilt the phone down or step back.');
+    expect(c.instruction).toBe('Feet in the shot. Tilt the phone down or step back.');   // test changed: copy rewrite — same meaning
   });
 
   it('an empty frame asks you to step in rather than reporting six faults', () => {
@@ -100,7 +100,7 @@ describe('the shot before the rep', () => {
     // and the squat is unchanged: square-on passes, side-on is the fault
     expect(checkFraming(squareOn, 'front').ok).toBe(true);
     expect(checkFraming(sideOn, 'front').issues).toContain('turned');
-    expect(checkFraming(sideOn, 'front').instruction).toMatch(/square-on/i);
+    expect(checkFraming(sideOn, 'front').instruction).toMatch(/straight on/i);   // test changed: copy rewrite — same meaning
   });
 });
 

@@ -101,9 +101,10 @@ export function ParentCard() {
  * mount next-auth (a session request, `nextauth.message` in localStorage) or set a guest cookie.
  */
 export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quick Screen' }: { children: ReactNode; right?: ReactNode; back?: string | (() => void); title?: string }) {
-  const arrow = 'grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/70';
+  const arrow = 'fel-press grid h-12 w-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/80';
   return (
-    <div data-screen-frame className="relative min-h-screen bg-[#050505] text-white" style={{ fontFamily: SYSTEM_FONT_STACK }}>
+    // PREMIUM-UI P6 (2026-10-27): the frame on the design system's ink and glow; the system font stays (gate 1)
+    <div data-screen-frame className="relative min-h-screen bg-fel-bg text-white [background-image:var(--fel-page-glow)]" style={{ fontFamily: SYSTEM_FONT_STACK }}>
       <div className="relative mx-auto max-w-[560px] px-4 pb-10 pt-3">
         <header className="mb-3 flex items-center gap-3">
           {typeof back === 'function' ? (
@@ -130,12 +131,13 @@ export function ScreenFrame({ children, right, back = SCREEN_HOME, title = 'Quic
 /** One step's card: a heading and its primary action inside the first screen (gate 1). */
 export function StepCard({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
-    <section data-step={testId} className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+    <section data-step={testId} className="fel-surface !rounded-3xl p-5">
       {children}
     </section>
   );
 }
 
-export const primaryBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#00E5FF] px-6 py-3.5 text-[16px] font-black text-black disabled:opacity-40';
-export const outlineBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#00E5FF] px-6 py-3 text-[16px] font-bold text-[#00E5FF]';
-export const quietBtn = 'inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-[16px] font-bold text-white';
+// PREMIUM-UI P6: the one accent as the kit's pill (gradient, glow, press); the outline and quiet ones press too
+export const primaryBtn = 'fel-press inline-flex min-h-12 w-full items-center justify-center rounded-full bg-gradient-to-b from-[#4df0ff] via-[#00E5FF] to-[#00c8e0] px-6 py-3.5 text-[16px] font-black text-[#021014] shadow-[0_10px_28px_-8px_rgba(0,229,255,0.55),inset_0_1px_0_rgba(255,255,255,0.45)] disabled:opacity-40';
+export const outlineBtn = 'fel-press inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-[#00E5FF] px-6 py-3 text-[16px] font-bold text-[#00E5FF]';
+export const quietBtn = 'fel-press inline-flex min-h-12 w-full items-center justify-center rounded-full border border-white/20 px-6 py-3 text-[16px] font-bold text-white';

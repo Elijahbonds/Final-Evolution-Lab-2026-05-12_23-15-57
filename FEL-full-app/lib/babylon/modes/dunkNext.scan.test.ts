@@ -339,7 +339,8 @@ describe('phase 7 — the live take-off read', () => {
 
 describe('phase 8 — the hang pump', () => {
   it('RUN pressed again in the air is the pump — the player\'s own, never before the rise, once a flight', () => {
-    expect(DUNK).toMatch(/\{ const down = e\.value > 0, edge = down && !runDownWas; runDownWas = down;[^\n]*\n\s*if \(edge && phase === 'cinematic'\) hangPump\(ctx\);/);
+    // dunk-flagship Phase 5: RUN is the folded hand/body pull `rt` (an idle pad's 0 no longer lets go of the body's run)
+    expect(DUNK).toMatch(/\{ const down = rt > 0, edge = down && !runDownWas; runDownWas = down;[^\n]*\n\s*if \(edge && phase === 'cinematic'\) hangPump\(ctx\);/);
     const hp = fn('hangPump');
     expect(hp).toMatch(/if \(phase !== 'cinematic' \|\| turn !== 'player'\) return;/);
     expect(hp).toMatch(/if \(clipTime < EASTBAY_TIMING\.rise\) return;/);

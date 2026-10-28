@@ -66,10 +66,20 @@ describe('STATIC: mirror-harness.tsx', () => {
   const src = read('../../app/play/mirror/_components/mirror-harness.tsx');
   const code = stripComments(src);
 
-  it('makes no direct fetch at all: every /api/mirror/* call goes through mirrorSave(canSaveScan, fetch, …)', () => {
-    expect(code.match(/\bfetch\(/g)).toBeNull();
+  // test changed (#326, cursor-bundle-2): was "no direct fetch at all". The one direct fetch is the consent toggle —
+  // POST /api/account/scan-save with { granted } and nothing else, the same call prove-it.tsx and dunk-film.tsx make, and
+  // the server refuses it from anyone but a verified adult. It carries no Mirror result, so the rule this test exists for
+  // (no movement data leaves the page except through mirrorSave) is unchanged and still pinned below.
+  it('makes no direct /api/mirror fetch: every Mirror result call goes through mirrorSave(canSaveMirror, fetch, …)', () => {
+    expect(code.match(/\bfetch\(/g)).toHaveLength(1);
+    const at = code.indexOf("fetch('/api/account/scan-save', {");
+    expect(at).toBeGreaterThan(-1);
+    const call = code.slice(at, code.indexOf('});', at));
+    expect(call).toContain("method: 'POST'");
+    expect(call).toContain('body: JSON.stringify({ granted: next })');
+    expect(call).not.toMatch(/\/api\/mirror|reading|summary|attempt|metrics/);
     const urls = code.match(/'\/api\/mirror\/[a-z]+'/g) ?? [];
-    const guarded = code.match(/mirrorSave\(canSaveScan, fetch, '\/api\/mirror\/[a-z]+'/g) ?? [];
+    const guarded = code.match(/mirrorSave\(canSaveMirror, fetch, '\/api\/mirror\/[a-z]+'/g) ?? [];
     expect(urls.length).toBe(4);                 // sessions POST, dunks POST, the dunk-history read, screen POST
     expect(guarded.length).toBe(urls.length);
   });
@@ -81,7 +91,29 @@ describe('STATIC: mirror-harness.tsx', () => {
 
   it('canSaveScan defaults to false (a missing prop never saves)', () => {
     // MIRROR-MOVES P2 (2026-10-07): a third prop (initialPattern, the `?pattern=` tab) follows — the default under test is unchanged
-    expect(code).toMatch(/export function MirrorHarness\(\{ youth = 'unknownAge', canSaveScan = false[,}]/);
+    expect(code).toContain('canSaveScan = false,');
+    expect(code).toContain('scanSaveEligible = false,');
+    expect(code).toContain('const canSaveMirror = mirrorCanSave({ canSaveScan, scanSaveEligible, grantedHere: scanSaveGranted });');
+  });
+
+  it('offers verified adults the same scan-save opt-in before Mirror posts can run', () => {
+    expect(src).toContain("import { ScanSaveCard } from '@/components/privacy/scan-save-card';");
+    expect(code).toContain('data-mirror-scan-save-opt-in');
+    expect(code).toContain('{!live && !paused && scanSaveOffered && (');
+    expect(code).toContain('<ScanSaveCard checked={scanSaveChecked} disabled={scanSaveBusy}');
+    expect(code).toContain("fetch('/api/account/scan-save'");
+    expect(code.indexOf('const canSaveMirror = mirrorCanSave(')).toBeLessThan(code.indexOf("mirrorSave(canSaveMirror, fetch, '/api/mirror/sessions'"));
+  });
+
+  it('saves follow the server-confirmed grant, not the ticked box (cursor-bundle-2 hardening of #326)', () => {
+    const at = code.indexOf('async function setMirrorScanSave(next: boolean) {');
+    const body = code.slice(at, code.indexOf('\n  }\n', at));
+    expect(body).toContain('if (!scanSaveOffered) return;');
+    expect(body).toContain('if (!next) setScanSaveGranted(false);');
+    // the grant is recorded only after the ok answer, and the box goes back to what it was on a failure
+    expect(body.indexOf('setScanSaveGranted(next);')).toBeGreaterThan(body.indexOf('if (!res.ok) {'));
+    expect(body.match(/setScanSaveChecked\(before\)/g)).toHaveLength(2);
+    expect(code).not.toMatch(/canSaveMirror = [^;]*scanSaveChecked/);
   });
 
   it('writes nothing to browser storage', () => {
@@ -100,7 +132,7 @@ describe('STATIC: mirror-harness.tsx', () => {
   });
 
   it('a screen that was not sent keeps its local score, is marked unsaved, and says NOT_SAVED_ON_DEVICE', () => {
-    const at = code.indexOf("mirrorSave(canSaveScan, fetch, '/api/mirror/screen'");
+    const at = code.indexOf("mirrorSave(canSaveMirror, fetch, '/api/mirror/screen'");
     const tail = code.slice(at, at + 1400);
     expect(tail).toMatch(/if \(!pending\) \{\s*setScreenMessage\(NOT_SAVED_ON_DEVICE\);\s*setSavedScreenId\('unsaved'\);\s*return;\s*\}/);
     expect(code.indexOf('setScreenSummary(scoreScreen(')).toBeLessThan(at);
@@ -108,12 +140,12 @@ describe('STATIC: mirror-harness.tsx', () => {
   });
 
   it('a jump that was not sent shows the offline path\'s on-device line', () => {
-    const at = code.indexOf("mirrorSave(canSaveScan, fetch, '/api/mirror/dunks', {");
+    const at = code.indexOf("mirrorSave(canSaveMirror, fetch, '/api/mirror/dunks', {");
     expect(code.slice(at, at + 600)).toContain('if (!pending) { setDunkSaid(progressLine(readProgress([attempt]), attempt)); return; }');
   });
 
   it('the dunk-history read is skipped before anything is set up when mirrorSave says no', () => {
-    const at = code.indexOf("const pending = mirrorSave(canSaveScan, fetch, '/api/mirror/dunks');");
+    const at = code.indexOf("const pending = mirrorSave(canSaveMirror, fetch, '/api/mirror/dunks');");
     expect(at).toBeGreaterThan(-1);
     expect(code.slice(at, at + 200)).toMatch(/if \(!pending\) return;\s*let live = true;/);
   });
@@ -150,5 +182,25 @@ describe('STATIC: health-intake-gate.tsx', () => {
 
   it('writes nothing to browser storage', () => {
     expect(code).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie/);
+  });
+
+  it('transient status errors have an in-flow retry action, not only refresh copy', () => {
+    const errorView = view('error');
+    expect(errorView).toContain('onClick={retryStatus}');
+    expect(errorView).toContain('Try again');
+    expect(code).toContain('void fetchStatus().then(applyServerStatus).catch(() => setStage(\'error\'))');
+  });
+});
+
+describe('STATIC: guardian-consent-gate.tsx', () => {
+  const src = read('../../app/play/mirror/_components/guardian-consent-gate.tsx');
+  const code = stripComments(src);
+  const view = (stage: string) => { const i = code.indexOf(`if (stage === '${stage}'`); expect(i).toBeGreaterThan(-1); return code.slice(i, code.indexOf('\n  }\n', i)); };
+
+  it('transient status errors have an in-flow retry action, not only refresh copy', () => {
+    const errorView = view('error');
+    expect(errorView).toContain('onClick={retryStatus}');
+    expect(errorView).toContain('Try again');
+    expect(code).toContain('void fetchStatus().then(applyStatus).catch(() => setStage(\'error\'))');
   });
 });

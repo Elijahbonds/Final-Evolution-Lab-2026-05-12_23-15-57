@@ -41,6 +41,13 @@ vi.mock('@/lib/coach/warmupServer', () => ({
 }));
 vi.mock('@/components/shell/tab-page', () => ({ TabPage: (p: { children?: ReactNode }) => createElement('div', null, p.children) }));
 vi.mock('@/components/shell/doors-row', () => ({ DoorsRow: () => null }));
+// DAILY-DRILL (2026-10-24; test changed): /train now also draws today's drill, which reads the account's age on purpose
+// (its gates are the drills page's and profile v2's; tests/daily-drill and lib/daily-drill test those reads). It is
+// stood in for here, so "the Drills card reads no age" below still measures the Drills card and nothing else.
+vi.mock('@/lib/daily-drill/load', async (orig) => ({
+  ...(await orig<typeof import('@/lib/daily-drill/load')>()),
+  loadDailyDrill: async () => { h.ops.push('loadDailyDrill'); return null; },
+}));
 
 import DrillsPage from '@/app/play/drills/page';
 import TrainPage from '@/app/train/page';
@@ -163,6 +170,7 @@ describe('linked from /train and from the Playbook', () => {
     expect(html).toMatch(/<a [^>]*href="\/play\/drills"/);
     expect(text(html)).toContain('Drills');
     expect(h.ops.some((o) => o.startsWith('user.'))).toBe(false);
+    expect(h.ops).toContain('loadDailyDrill');
   });
 
   it('a chapter 6 drill lesson offers "Run it on camera" to its drill; a concept lesson does not', () => {

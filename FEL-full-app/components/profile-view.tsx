@@ -2,32 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { healthEraseToast, healthStoredLine } from '@/lib/health/healthDataCopy';
-import { MasteryBadge } from '@/components/mastery-badge';
-import { motion } from 'framer-motion';
-import { PRQ_ATTRS } from '@/lib/prq';
-import { readPrqDisplay } from '@/lib/prq-display';
+import { prqDisplay } from '@/lib/prq-display';
 import { ROSTER } from '@/lib/game-data';
 import { AvatarFigure } from '@/components/avatar-figure';
-import { Flame, Sparkles, Coins, Gem, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
+import { Sparkles, Check, Plus, X, Loader2, Download, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
-import { levelFor } from '@/lib/player-level';
 
-const ATTR_LABELS: Record<string, string> = {
-  strength: 'Strength',
-  speed: 'Speed',
-  endurance: 'Endurance',
-  agility: 'Agility',
-  power: 'Power',
-  flexibility: 'Flexibility',
-  recovery: 'Recovery',
-  mental: 'Mental',
-};
+// PROFILE V2 (owner 2026-10-24): this file used to BE the profile — a header, the athlete roster, mode mastery, the PRQ
+// attributes, data rights and health data, one long page that fetched four things after it hydrated. The profile is now
+// app/profile/page.tsx (server-read, components/profile-v2/**); what stayed here are the EDITING and SETTINGS panels,
+// each exported and mounted where it belongs:
+//   · AthletePicker, PrqFoundation → /profile/edit
+//   · PrqDataRights, HealthDataSection → /account
+// Mode mastery moved to the profile's Badges block (server-read).
 
-export function ProfileView({ userName, email }: { userName: string; email: string }) {
-  const [data, setData] = useState<any>(null);
+/** Pick the roster body you're building toward (PATCH /api/profile). The current pick comes from the server. */
+export function AthletePicker({ initialKey }: { initialKey: string | null }) {
+  const [current, setCurrent] = useState<string | null>(initialKey);
   const [saving, setSaving] = useState<string | null>(null);
-
   const selectAvatar = async (key: string) => {
     if (saving) return;
     setSaving(key);
@@ -38,97 +31,16 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
         body: JSON.stringify({ avatarKey: key }),
       });
       const j = r?.ok ? await r.json() : null;
-      if (j?.profile) setData(j);
-    } catch {}
+      if (j?.profile) setCurrent(j.profile.avatarKey ?? key);
+      else toast.error('That didn\'t save.');
+    } catch { toast.error('That didn\'t save.'); }
     setSaving(null);
   };
-
-  useEffect(() => {
-    let live = true;
-    fetch('/api/profile')
-      .then((r) => (r?.ok ? r.json() : null))
-      .then((j) => {
-        if (live && j?.profile) setData(j);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  // QA P0-01: the chip and the ring show the MEASURED PRQ; data.prq/data.grade are the seeded gameplay numbers
-  const grade = data ? readPrqDisplay(data) : null;
-  const p = data?.profile;
-  const currentAvatar = ROSTER.find((r) => r.key === p?.avatarKey) ?? null;
-  // IMPROVE (2026-10-06, owner decision): the player level, read off the account XP shown below (lib/player-level.ts)
-  const lv = typeof p?.xp === 'number' ? levelFor(p.xp) : null;
-
   return (
-    <main className="py-2">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="fel-panel rounded-xl p-6">
-        <div className="flex flex-wrap items-center gap-5">
-          <div
-            className="flex h-20 w-20 items-center justify-center rounded-full border-2 text-3xl font-bold fel-heading"
-            style={{ borderColor: grade?.grade?.color ?? '#00E5FF', color: grade?.grade?.color ?? '#00E5FF', boxShadow: `0 0 28px ${grade?.grade?.color ?? '#00E5FF'}44` }}
-          >
-            {currentAvatar ? <AvatarFigure avatar={currentAvatar} size={54} cosmeticAssetId={p?.cosmeticAssetId} /> : (userName?.[0] ?? 'A').toUpperCase()}
-          </div>
-          <div>
-            {/* The name is the page's own <h1> (TabPage) -- printing it again here made one screen carry the same
-                headline twice. This block identifies the ATHLETE: archetype first, then the account it belongs to. */}
-            {currentAvatar ? (
-              <p className="fel-heading text-[22px] font-bold leading-none" style={{ color: currentAvatar.accent }}>
-                {currentAvatar.name}
-              </p>
-            ) : (
-              <p className="fel-heading text-[22px] font-bold leading-none text-white">{userName}</p>
-            )}
-            <p className="mt-1.5 font-mono text-[11px] text-white/45">{email}</p>
-            {grade && (
-              <span
-                className="fel-heading mt-2 inline-block rounded px-2.5 py-0.5 text-sm font-bold"
-                style={{ background: `${grade?.color}1c`, color: grade?.color, border: `1px solid ${grade?.color}55` }}
-              >
-                {grade.badge}
-              </span>
-            )}
-            {lv && (
-              <div data-player-level={lv.level} className="mt-2 flex items-center gap-2">
-                <span className="fel-heading text-sm font-bold text-[#00FF9D]">LEVEL {lv.level}</span>
-                <span className="h-1.5 w-28 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-label="Player level progress" aria-valuemin={0} aria-valuemax={lv.need} aria-valuenow={lv.into}>
-                  <span className="block h-full rounded-full bg-[#00FF9D]" style={{ width: `${Math.min(100, (lv.into / lv.need) * 100)}%` }} />
-                </span>
-                <span className="font-mono text-[11px] text-white/50">{lv.into.toLocaleString('en-US')}/{lv.need.toLocaleString('en-US')} XP</span>
-              </div>
-            )}
-          </div>
-          <div className="ml-auto grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-4">
-            {[
-              { icon: Coins, label: 'Credits', value: data?.wallet?.lc ?? p?.labCredits, color: '#FFD700' },
-              { icon: Sparkles, label: 'XP', value: p?.xp, color: '#00FF9D' },
-              // Wallet first, like Credits above it. PlayerProfile.shards is a second field with the same name that
-              // spend() never touches, so it reads 0 while the rail and the card shelf show the real balance.
-              { icon: Gem, label: 'Shards', value: data?.wallet?.shards ?? p?.shards, color: '#A855F7' },
-              { icon: Flame, label: 'Streak', value: p?.streakDays, color: '#FF3366' },
-            ].map((s) => {
-              const Icon = s.icon;
-              return (
-                <div key={s.label} className="text-center">
-                  <div className="flex items-center justify-center gap-1 font-mono text-xl font-bold" style={{ color: s.color }}>
-                    <Icon className="h-4 w-4" />
-                    {s.value ?? '–'}
-                  </div>
-                  <div className="text-[10px] uppercase tracking-wider text-white/70">{s.label}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </motion.div>
-
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+    <>
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="fel-heading text-[19px] font-bold text-white">SELECT YOUR ATHLETE</h2>
+          <h2 className="fel-heading text-[19px] font-bold text-white">YOUR ATHLETE</h2>
           <p className="text-xs text-white/45">Pick the body type you're building toward. Your athlete shows up across the Lab.</p>
         </div>
         <a
@@ -142,17 +54,16 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
         Face, gear, and card skin live in the <a href="/closet" className="text-[#C79BFF]/80 underline underline-offset-2 hover:text-[#C79BFF]">Closet</a> — or scan your face there and let it build you.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {ROSTER.map((r, i) => {
-          const selected = p?.avatarKey === r.key;
+        {ROSTER.map((r) => {
+          const selected = current === r.key;
           return (
-            <motion.button
+            <button
               key={r.key}
-              initial={{ y: 10 }}
-              animate={{ y: 0 }}
-              transition={{ delay: 0.03 * i }}
+              type="button"
               onClick={() => selectAvatar(r.key)}
               disabled={!!saving}
-              className={`fel-card relative rounded-lg p-3 text-left transition-all ${selected ? '' : 'opacity-95 hover:opacity-100'}`}
+              aria-pressed={selected}
+              className={`fel-card relative rounded-lg p-3 text-left transition-opacity ${selected ? '' : 'opacity-95 hover:opacity-100'}`}
               style={selected ? { borderColor: `${r.accent}88`, boxShadow: `0 0 20px ${r.accent}33` } : undefined}
             >
               {selected && (
@@ -168,51 +79,10 @@ export function ProfileView({ userName, email }: { userName: string; email: stri
                 {r.sex} · {r.build} · {r.bias.join(' / ')}
               </div>
               <p className="mt-1 hidden text-center text-[11px] leading-snug text-white/70 sm:block">{r.tagline}</p>
-            </motion.button>
+            </button>
           );
         })}
       </div>
-
-      <MasteryPanel />
-      <PrqFoundation />
-      <PrqDataRights />
-      <HealthDataSection />
-    </main>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// M13.3 Mastery panel — per-mode graded ladder badges (never decay)
-// ---------------------------------------------------------------------------
-function MasteryPanel() {
-  const [map, setMap] = useState<Record<string, { tier: string; tierIndex: number }>>({});
-  useEffect(() => {
-    let live = true;
-    fetch('/api/mastery')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => { if (live && j?.mastery) setMap(j.mastery); })
-      .catch(() => {});
-    return () => { live = false; };
-  }, []);
-  const entries = Object.entries(map).filter(([, v]) => v.tierIndex > 0);
-  return (
-    <>
-      <h2 className="fel-heading mt-8 text-[19px] font-bold text-white">MODE MASTERY</h2>
-      <p className="text-xs text-white/45">Earned on a rolling window of your best sessions per mode. Tiers never decay.</p>
-      {entries.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.02] p-4 text-sm text-white/40">
-          No mastery tiers yet — play any mode a few times to start climbing Bronze → Venice Legend.
-        </p>
-      ) : (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {entries.map(([mode, v]) => (
-            <div key={mode} className="fel-card flex items-center justify-between rounded-lg p-3">
-              <span className="fel-heading text-sm font-bold uppercase text-white/80">{mode}</span>
-              <MasteryBadge tierIndex={v.tierIndex} />
-            </div>
-          ))}
-        </div>
-      )}
     </>
   );
 }
@@ -228,7 +98,7 @@ interface PrqVecAttr {
   measured: { value: number; unit: string; source: string; measuredAt: string; entryId: string } | null;
 }
 
-function PrqDataRights() {
+export function PrqDataRights() {
   const [deleting, setDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -265,7 +135,7 @@ function PrqDataRights() {
       <h3 className="fel-heading text-lg font-bold text-white mb-1">YOUR DATA RIGHTS</h3>
       {/* REVIEW (2026-09-24, D5): both buttons cover the movement history too (lib/prq-data-rights.ts), the numbers
           worked out from the camera that the privacy policy sends people here to export or delete */}
-      <p className="text-xs text-white/40 mb-4">
+      <p className="text-xs text-fel-dim mb-4">
         Export or delete your PRQ measurements and your movement history (jumps, dunks, form reads and screens worked out from the camera) at any time.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -326,7 +196,7 @@ interface HealthConsentApiView {
 }
 
 
-function HealthDataSection() {
+export function HealthDataSection() {
   const [view, setView] = useState<HealthConsentApiView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);       // which control is mid-request, so only it spins
   const [showErase, setShowErase] = useState(false);
@@ -391,7 +261,7 @@ function HealthDataSection() {
       <h3 className="fel-heading flex items-center gap-2 text-lg font-bold text-white mb-1">
         <ShieldCheck className="h-4 w-4 text-[#00E5FF]" /> HEALTH DATA
       </h3>
-      <p className="text-xs text-white/40 mb-4">
+      <p className="text-xs text-fel-dim mb-4">
         Your health intake, pain check-ins, daily check-ins and Dial-Up Breath uses, kept separately from the rest of your account: opt-in only, stored on FEL
         only, never sold, never used for ads, never in a share link, and never scored or paid. See Privacy §5.
       </p>
@@ -399,7 +269,7 @@ function HealthDataSection() {
       <div className="flex items-center justify-between rounded-lg border border-white/10 p-3">
         <div>
           <div className="text-sm font-bold text-white">Health data collection</div>
-          <div className="text-xs text-white/40">
+          <div className="text-xs text-fel-dim">
             {granted
               ? `On${view?.healthData.grantedAt ? ` since ${new Date(view.healthData.grantedAt).toLocaleDateString()}` : ''} — ${healthStoredLine(view?.counts)}`
               : 'Off — nothing is being collected.'}
@@ -467,7 +337,7 @@ function HealthDataSection() {
   );
 }
 
-function PrqFoundation() {
+export function PrqFoundation() {
   const [attrs, setAttrs] = useState<PrqVecAttr[]>([]);
   const [prq, setPrq] = useState<{ score: number; measured: number; total: number } | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -542,17 +412,19 @@ function PrqFoundation() {
         </button>
       </div>
 
-      {prq && (
-        <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#A855F7]/30 bg-[#A855F7]/10 px-4 py-2 font-mono text-lg font-bold text-[#A855F7]">
-          PRQ {prq.measured > 0 ? prq.score.toFixed(1) : '—'}
-          <span className="text-xs font-normal text-white/40">
-            ({prq.measured}/{prq.total} measured)
-          </span>
-        </div>
-      )}
+      {prq && (() => {
+        // the same badge every surface prints (lib/prq-display): "PRQ —" until something is measured
+        const d = prqDisplay(prq);
+        return (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-lg border px-4 py-2 font-mono text-lg font-bold" style={{ color: d.color, borderColor: `${d.color}4d`, background: `${d.color}1a` }}>
+            {d.label}
+            <span className="text-xs font-normal text-white/40">({d.coverage} measured)</span>
+          </div>
+        );
+      })()}
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {attrs.map((attr, i) => {
+        {attrs.map((attr) => {
           const m = attr.measured;
           const val = m?.value ?? null;
           const color = val === null
@@ -561,13 +433,7 @@ function PrqFoundation() {
           // 'camera' = a body-camera jump, an estimate: the label says so (lib/prq.ts PRQ_CAMERA_SOURCE)
           const sourceLabel = m?.source === 'drillResult' ? 'Drill' : m?.source === 'device' ? 'Device' : m?.source === 'manual' ? 'Manual' : m?.source === 'camera' ? 'Camera est.' : null;
           return (
-            <motion.div
-              key={attr.key}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.04 * i }}
-              className="fel-card rounded-lg p-4"
-            >
+            <div key={attr.key} className="fel-card rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-white/80">{attr.label}</span>
                 {val !== null ? (
@@ -580,12 +446,9 @@ function PrqFoundation() {
               </div>
               {val !== null && (
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(val, 100)}%` }}
-                    transition={{ duration: 0.8, delay: 0.1 + 0.04 * i }}
+                  <div
                     className="h-full rounded-full"
-                    style={{ background: `linear-gradient(90deg, ${color}88, ${color})`, boxShadow: `0 0 10px ${color}66` }}
+                    style={{ width: `${Math.min(val, 100)}%`, background: `linear-gradient(90deg, ${color}88, ${color})` }}
                   />
                 </div>
               )}
@@ -603,18 +466,14 @@ function PrqFoundation() {
                   + Log measurement
                 </button>
               )}
-            </motion.div>
+            </div>
           );
         })}
       </div>
 
       {/* Manual Entry Form */}
       {showForm && (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="fel-panel mt-6 rounded-xl p-5"
-        >
+        <div className="fel-panel mt-6 rounded-xl p-5">
           <div className="flex items-center justify-between">
             <h3 className="fel-heading text-lg font-bold text-white">LOG PRQ ENTRY</h3>
             <button onClick={() => setShowForm(false)} className="text-white/40 hover:text-white">
@@ -669,7 +528,7 @@ function PrqFoundation() {
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'SAVE ENTRY'}
           </button>
-        </motion.div>
+        </div>
       )}
     </>
   );

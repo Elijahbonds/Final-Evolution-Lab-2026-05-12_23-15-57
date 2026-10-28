@@ -11,6 +11,8 @@
 
 import { prisma } from './db';
 import { hasActivePro, FEL_PRO_WEEKLY_USD } from './progression/upgradeGate';
+import { coachProPriceCents, usdPlain } from './coach-business/config';
+import { proBuyHref } from './payments/proBuy';
 
 export interface ProStatus {
   isPro: boolean;
@@ -50,7 +52,8 @@ export function paywall(feature: string, freeAlternative: string): PaywallBody {
     feature,
     message: `${feature} is part of FEL Pro.`,
     weeklyUsd: FEL_PRO_WEEKLY_USD,
-    checkout: { weekly: '/api/stripe/checkout?product=FEL_PRO', monthly: '/api/stripe/checkout?product=FEL_PRO_MONTHLY' },
+    // PAYMENTS-READY: the buy page (a GET link to the POST-only checkout route answered 405)
+    checkout: { weekly: proBuyHref('weekly'), monthly: proBuyHref('monthly') },
     free: freeAlternative,
   };
 }
@@ -109,17 +112,22 @@ export interface B2BPaywallBody extends PaywallBody {
   tier: B2BTier;
 }
 
+/** Where a B2B paywall's upgrade link goes: the Coach Pro card on /coach/business. */
+export const B2B_UPGRADE_HREF = '/coach/business#pro';
+
 /** The 402 body for a B2B surface. Names the tier and what the caller can still do. */
 export function b2bPaywall(feature: string, tier: B2BTier, freeAlternative: string): B2BPaywallBody {
-  const price = tier === 'coach' ? 39 : 199;
-  const key = tier === 'coach' ? 'FEL_COACH' : 'FEL_FACILITY';
+  // FEL Coach's price is the one config value (COACH_PRO_PRICE_USD_CENTS, default $39); Facility's is unchanged.
+  const price = tier === 'coach' ? usdPlain(coachProPriceCents()) : '$199';
   return {
     error: 'pro_required',
     feature,
     tier,
-    message: `${feature} is part of ${tier === 'coach' ? 'FEL Coach' : 'FEL Facility'} ($${price}/month).`,
+    message: `${feature} is part of ${tier === 'coach' ? 'FEL Coach' : 'FEL Facility'} (${price}/month).`,
     weeklyUsd: FEL_PRO_WEEKLY_USD,
-    checkout: { weekly: `/api/stripe/checkout?product=${key}`, monthly: `/api/stripe/checkout?product=${key}` },
+    // PAYMENTS-READY: the coach plan card, where Coach Pro (= FEL Coach) is sold. FEL Facility has no buy page yet, so
+    // its link goes there too (a GET to the POST-only checkout route answered 405).
+    checkout: { weekly: B2B_UPGRADE_HREF, monthly: B2B_UPGRADE_HREF },
     free: freeAlternative,
   };
 }

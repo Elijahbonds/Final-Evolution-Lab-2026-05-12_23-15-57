@@ -54,6 +54,7 @@ import { hoopsPose, HOOPS_INPUT_IDLE, RELEASE_SEC, type HoopsPostureInput, type 
 import { slewYaw, yawTo, yawOfVel } from '../core/Biomech';
 import { RELEASE_FRAME_01, syncedShotSpeed } from '../core/BallHandling';
 import { releaseFrameOf, riseStartOf } from '../anim/opponentMotion';
+import { CATCH_HOP_CLIP } from '../anim/authored/shotKit';   // hoops-shot-content: the catch-and-shoot hop
 import { readShotInputMode, DEFAULT_SHOT_INPUT, type ShotInputMode } from '../core/ShotInputMode';   // HOOPS-10PHASE-2 phase 2
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered   // HOOPS MOVEMENT: the release frame of the clip that plays
 import { type SpawnedCharacter } from '../core/CharacterLibrary';
@@ -443,7 +444,7 @@ function syncRacks(): void {
  */
 function setFeet(): void {
   if (!player) return;
-  beats?.beat('bball_pullup_gather', { fadeSec: 0.1, holdEnd: true });   // HOOPS MOTION phase 3d: held on its loaded frame until the shot cuts it
+  beats?.beat(CATCH_HOP_CLIP, { fadeSec: 0.1, holdEnd: true });   // HOOPS MOTION phase 3d: held on its loaded frame until the shot cuts it (hoops-shot-content: a hop into the set — the pull-up gather's set key in the same 0.3 s)
   beats?.loop(WATCH_IDLE, { fadeSec: 0.2 });   // …and after the shot's chain, the body settles here (the set is in flight: not played now)
   console.info('[3PT-SET] feet set — loaded for the release');
 }

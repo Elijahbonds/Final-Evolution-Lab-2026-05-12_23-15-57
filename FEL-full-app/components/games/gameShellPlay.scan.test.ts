@@ -122,7 +122,9 @@ describe('refusals on the end card (the arena integrity pass, re-applied)', () =
     expect(card).toContain("data-end-trophy={won ? 'gold' : 'dim'}");
     expect(card).toMatch(/\{headline\}\s*<\/motion\.h2>/);
     expect(card).toMatch(/\{proofLine && \(\s*<button[^>]*onClick=\{guard\(share\.onProof\)\}/);
-    expect(card).toMatch(/\{!arenaRefused && \(\s*<button[^>]*onClick=\{guard\(share\.onChallenge\)\}/);
+    // TEST CHANGED (lane/dance-extras-2, 2026-10-24): the challenge button is also held back for a FREE DANCE run (no score to beat);
+    // the refused-Arena rule this pins is unchanged
+    expect(card).toMatch(/\{!arenaRefused && !isFreeDanceResult\(run as never\) && \(\s*<button[^>]*onClick=\{guard\(share\.onChallenge\)\}/);
     expect(card.match(/share\.on(Proof|Challenge)\b/g)).toHaveLength(2);   // those two buttons are the only mints
     expect(shell).toContain('share={{ state: shareState, url: shareUrl, onChallenge: () => void shareChallenge(), onProof: shareProof }}');
     expect(shell.match(/shareChallenge\(/g)).toHaveLength(2);   // shareProof's mint and the card's challenge button

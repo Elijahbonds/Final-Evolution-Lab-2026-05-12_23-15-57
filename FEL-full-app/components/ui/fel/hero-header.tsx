@@ -1,0 +1,56 @@
+// HERO HEADER (lane/premium-ui P1). Full-bleed: a real image (a venue, a 3D scene capture) or a figure (the player's
+// avatar), a scrim that fades it into the ink, and the headline sitting on the dark part of it — the Nike / Fitness+
+// opening. No `isolate` here: the docked primary CTA (position: fixed) lives in the content layer (z-10), which must
+// paint above the page below the hero, not inside a stacking context the page's content covers. The image is decoration (alt=""); the words carry the meaning. Six words of headline, twelve of line.
+import Image from 'next/image';
+import type { ReactNode } from 'react';
+import { TYPE } from '@/lib/design/type';
+
+const HEIGHT = {
+  /** the landing: the whole first screen */
+  full: 'min-h-[100svh]',
+  /** a tab: most of a phone's first screen, the image still reads */
+  tall: 'min-h-[400px] md:min-h-[440px]',
+  /** a sub-page */
+  short: 'min-h-[240px] md:min-h-[280px]',
+} as const;
+
+export function HeroHeader({
+  image, imagePosition = 'center', media, eyebrow, title, line, children, height = 'tall', accent = 'var(--fel-accent)',
+  priority = true, as: Tag = 'header', testId, dockSpace = false,
+}: {
+  /** a public/ image path (credited in lib/credits/credits.ts) */
+  image?: string;
+  imagePosition?: string;
+  /** a figure instead of (or over) the image: the player's avatar */
+  media?: ReactNode;
+  eyebrow?: string;
+  title: ReactNode;
+  line?: ReactNode;
+  /** the actions: ONE primary (PrimaryCta) and at most a couple of chips */
+  children?: ReactNode;
+  height?: keyof typeof HEIGHT;
+  accent?: string;
+  priority?: boolean;
+  as?: 'header' | 'section' | 'div';
+  testId?: string;
+  /** room under the actions on a phone for a docked primary that sits over this hero (a full-screen hero) */
+  dockSpace?: boolean;
+}) {
+  return (
+    <Tag data-fel-hero data-testid={testId} className={`relative flex w-full flex-col overflow-hidden ${HEIGHT[height]}`}>
+      {image && (
+        <Image src={image} alt="" fill priority={priority} sizes="100vw" className="z-0 object-cover" style={{ objectPosition: imagePosition }} />
+      )}
+      {media && <div aria-hidden className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">{media}</div>}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0" style={{ background: 'var(--fel-scrim)' }} />
+      {/* data-couch-scale (P5): on a TV driven by a pad or a remote, the headline and actions zoom with the page column */}
+      <div data-couch-scale className={`relative z-10 mx-auto mt-auto flex w-full max-w-[1080px] flex-col gap-3 px-5 pt-28 ${dockSpace ? 'pb-28' : 'pb-7'} md:pb-9`}>
+        {eyebrow && <p className={TYPE.label} style={{ color: accent }}>{eyebrow}</p>}
+        <h1 className={`${TYPE.display} max-w-[14ch] text-white [text-shadow:0_2px_24px_rgba(0,0,0,0.55)]`}>{title}</h1>
+        {line && <p className={`${TYPE.small} max-w-md text-fel-soft`}>{line}</p>}
+        {children && <div className="mt-3 flex flex-wrap items-center gap-3">{children}</div>}
+      </div>
+    </Tag>
+  );
+}

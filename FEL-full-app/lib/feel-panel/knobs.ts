@@ -157,6 +157,290 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/BallSideShade.ts SHADE_RESEED_M',
     hint: 'A handler who moved this far between two reads (a check, a switch) is a new look: no beat, he is simply on the ball side.',
   },
+  // lane/h3-handler (owner 2026-10-24: the #312 / #314 ports): the dribble at rest, the protect, the move ease ("Hoops · handle (rest)")
+  // and the jump shot's hop ("Hoops · jump shot"). Defaults are the ported numbers; the 0/1 rows are each feature's A/B.
+  {
+    id: 'hoops.protectDribbleOn', label: 'Protect plays a dribble on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts PROTECT_DRIBBLE_ON',
+    hint: 'A/B (#312): 1 = the protect at rest plays the idle dribble loop; 0 = the defender\'s stance (no ball arm), as before.',
+  },
+  {
+    id: 'hoops.restBounceOn', label: 'Bounce on the clip at rest on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts REST_BOUNCE_ON',
+    hint: 'A/B (#312): 1 = the rest tempo and the bounce locked to the clip hand; 0 = the loop at its capture pace, the bounce on its own clock.',
+  },
+  {
+    id: 'hoops.restTempoIdle', label: 'Rest dribble tempo (× capture)', def: 1.2, min: 0.8, max: 1.8, step: 0.05, unit: '×', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts REST_TEMPO_IDLE',
+    hint: 'How fast the idle dribble loop plays at rest (1.2 = 1.56 bounces a second).',
+  },
+  {
+    id: 'hoops.restTempoProtect', label: 'Protect dribble tempo (× capture)', def: 1.45, min: 0.8, max: 2, step: 0.05, unit: '×', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts REST_TEMPO_PROTECT',
+    hint: 'How fast the dribble plays in the protect: low and hard (1.45 = 1.88 bounces a second).',
+  },
+  {
+    id: 'hoops.clipLockGain', label: 'Clip lock: pull', def: 3, min: 0, max: 6, step: 0.1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts CLIP_LOCK_GAIN',
+    hint: 'How hard the bounce is pulled onto the clip hand\'s tops (0 = it keeps its own clock).',
+  },
+  {
+    id: 'hoops.clipLockHzMax', label: 'Clip lock: fastest bounce', def: 2.6, min: 1.5, max: 3.5, step: 0.05, unit: 'Hz', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts CLIP_LOCK_HZ_MAX',
+    hint: 'The locked bounce never runs faster than this.',
+  },
+  {
+    id: 'hoops.clipLockMaxMps', label: 'Clip lock: at rest under', def: 0.4, min: 0.1, max: 1, step: 0.05, unit: 'm/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts CLIP_LOCK_MAX_MPS',
+    hint: 'The clip lock runs while the body moves slower than this.',
+  },
+  {
+    id: 'hoops.eyesOnDefenderOn', label: 'Eyes on the defender on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts EYES_ON_DEFENDER_ON',
+    hint: 'A/B (#312): 1 = sizing him up, the eyes go to his chest (a glance at the rim now and then); 0 = the rim, as before.',
+  },
+  {
+    id: 'hoops.readRangeM', label: 'Eyes: read a defender within', def: 3.5, min: 1.5, max: 6, step: 0.05, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_RANGE_M',
+    hint: 'A defender inside this (and between you and the rim) is read.',
+  },
+  {
+    id: 'hoops.readSpeed01', label: 'Eyes: read at speed up to', def: 0.42, min: 0.1, max: 0.8, step: 0.01, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_SPEED01',
+    hint: 'Moving faster than this (share of top speed) the eyes stay on the rim.',
+  },
+  {
+    id: 'hoops.readGlanceEverySec', label: 'Eyes: rim glance every', def: 2.4, min: 0.8, max: 6, step: 0.1, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_GLANCE_EVERY_SEC',
+    hint: 'How often the eyes flick to the rim while sizing him up.',
+  },
+  {
+    id: 'hoops.readGlanceSec', label: 'Eyes: rim glance lasts', def: 0.55, min: 0, max: 1.5, step: 0.05, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts READ_GLANCE_SEC',
+    hint: 'How long that glance lasts (0 = never glances).',
+  },
+  {
+    id: 'hoops.protectGuardOn', label: 'Protect guard on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts PROTECT_GUARD_ON',
+    hint: 'A/B (#312): 1 = in the protect the bounce goes back by the hip and the off forearm comes across as a bar; 0 = as before.',
+  },
+  {
+    id: 'hoops.guardBackM', label: 'Guard: bounce back by', def: 0.22, min: 0, max: 0.4, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BACK_M',
+    hint: 'How far back beside the hip the protect\'s bounce goes.',
+  },
+  {
+    id: 'hoops.guardOutM', label: 'Guard: bounce wider by', def: 0.06, min: 0, max: 0.2, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_OUT_M',
+    hint: 'How much wider the protect\'s bounce goes.',
+  },
+  {
+    id: 'hoops.guardDropM', label: 'Guard: palm lower by', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_DROP_M',
+    hint: 'How much lower the palm meets the ball in the protect.',
+  },
+  {
+    id: 'hoops.guardSec', label: 'Guard: ease', def: 0.15, min: 0.02, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_SEC',
+    hint: 'How fast the guard comes on and goes off.',
+  },
+  {
+    id: 'hoops.guardBarXM', label: 'Guard bar: across', def: 0.15, min: -0.1, max: 0.4, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BAR_X_M',
+    hint: 'Where the off hand sits across the front (toward the ball side).',
+  },
+  {
+    id: 'hoops.guardBarYM', label: 'Guard bar: height', def: 1.06, min: 0.8, max: 1.4, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BAR_Y_M',
+    hint: 'How high the off hand\'s bar sits.',
+  },
+  {
+    id: 'hoops.guardBarZM', label: 'Guard bar: forward', def: 0.34, min: 0.1, max: 0.6, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/RestDribble.ts GUARD_BAR_Z_M',
+    hint: 'How far in front of the body the bar sits.',
+  },
+  {
+    id: 'hoops.protectPostureOn', label: 'Protect posture on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_POSTURE_ON',
+    hint: 'A/B (#312): 1 = in the protect the chest turns side-on, the eyes hold him and the hips sink; 0 = the protect stance as before.',
+  },
+  {
+    id: 'hoops.protectTurnDeg', label: 'Protect: chest turn off him', def: 50, min: 0, max: 80, step: 1, unit: '°', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_TURN_DEG',
+    hint: 'How far the chest turns off the defender toward the ball (the off shoulder into him).',
+  },
+  {
+    id: 'hoops.protectEyes', label: 'Protect: eyes weight', def: 0.9, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_EYES',
+    hint: 'How hard the head turns to the defender in the protect (was 0.6).',
+  },
+  {
+    id: 'hoops.protectChestAim', label: 'Protect: chest aim weight', def: 0.8, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/core/HoopsLook.ts PROTECT_CHEST_AIM',
+    hint: 'How much of the side-on turn the chest takes (was 0).',
+  },
+  {
+    id: 'hoops.protectSinkM', label: 'Protect: hips lower by', def: 0.06, min: 0, max: 0.15, step: 0.01, unit: 'm', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/ProtectSink.ts PROTECT_SINK_M',
+    hint: 'How much lower the hips sit in the protect (the feet and hands stay put).',
+  },
+  {
+    id: 'hoops.protectSinkSec', label: 'Protect: sink ease', def: 0.18, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/ProtectSink.ts PROTECT_SINK_SEC',
+    hint: 'How fast the protect\'s sink goes in and comes out.',
+  },
+  {
+    id: 'hoops.moveEaseOn', label: 'Move hand-over ease on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_EASE_ON',
+    hint: 'A/B (#314): 1 = an arm cannot whip at a move\'s start or end (no entry pops); 0 = as before.',
+  },
+  {
+    id: 'hoops.moveEaseSec', label: 'Move ease: hand-over window', def: 0.2, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_EASE_SEC',
+    hint: 'How long the gentle limit holds at a move\'s start and end.',
+  },
+  {
+    id: 'hoops.moveEaseRateDeg', label: 'Move ease: arm limit in the hand-over', def: 1000, min: 300, max: 3000, step: 50, unit: '°/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_EASE_RATE_DEG',
+    hint: 'The fastest an arm bone may turn in that window.',
+  },
+  {
+    id: 'hoops.moveArmRateDeg', label: 'Move ease: arm limit mid-move', def: 1800, min: 600, max: 5000, step: 50, unit: '°/s', group: 'Hoops · handle (rest)',
+    source: 'lib/babylon/anim/MoveEase.ts MOVE_ARM_RATE_DEG',
+    hint: 'The fastest an arm bone may turn through the rest of a move.',
+  },
+  {
+    id: 'hoops.jumperHopOn', label: 'Jumper hop timed to the release on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_HOP_ON',
+    hint: 'A/B (#314, TUNED): 1 = the load on the floor, the apex at the release, ~0.5 s in the air; 0 = the old float (~0.9-1.0 s). Never moves the release timing.',
+  },
+  {
+    id: 'hoops.jumperApexAfterReleaseSec', label: 'Jumper: apex after the release', def: 0.03, min: -0.1, max: 0.15, step: 0.01, unit: 's', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_APEX_AFTER_RELEASE_SEC',
+    hint: 'The top of the jump lands this long after the ball leaves (the body only; the release timing never moves).',
+  },
+  {
+    id: 'hoops.jumperMinLoadSec', label: 'Jumper: least load on the floor', def: 0.08, min: 0, max: 0.25, step: 0.01, unit: 's', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_MIN_LOAD_SEC',
+    hint: 'The dip before take-off is at least this long.',
+  },
+  {
+    id: 'hoops.jumperHangOn', label: 'Jumper hang on a late release on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_HANG_ON',
+    hint: 'A/B (#314): 1 = held past the release frame, the shot hangs at the set point; 0 = the clip runs on and loops, as before.',
+  },
+  {
+    id: 'hoops.jumperHangScale', label: 'Jumper: hang pace', def: 0.1, min: 0, max: 0.5, step: 0.01, unit: '×', group: 'Hoops · jump shot',
+    source: 'lib/babylon/core/JumperHop.ts JUMPER_HANG_SCALE',
+    hint: 'How slowly the held shot drifts once it hangs (0 = frozen).',
+  },
+  // lane/h3-aware (owner 2026-10-24: #313 / #315 ported): TUNED (new) unless the hint names a release value
+  {
+    id: 'hoops.offBallLookOn', label: 'Off-ball look on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/OffBallLook.ts OFF_BALL_LOOK_ON',
+    hint: 'A/B: 0 is the release feed (the offence off the ball looks at the rim, every defender\'s chest on the job).',
+  },
+  {
+    id: 'hoops.manGlanceEverySec', label: 'Off-ball D: a glance at his man every', def: 1.6, min: 0.4, max: 4, step: 0.1, unit: 's', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/OffBallLook.ts MAN_GLANCE_EVERY_SEC',
+    hint: 'An off-ball defender watches the ball and checks his man this often.',
+  },
+  {
+    id: 'hoops.manGlanceSec', label: 'Off-ball D: the glance lasts', def: 0.4, min: 0, max: 1.2, step: 0.05, unit: 's', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/OffBallLook.ts MAN_GLANCE_SEC',
+    hint: 'How long the eyes stay on the man before they go back to the ball (0: never).',
+  },
+  {
+    id: 'hoops.possessionSwapOn', label: 'Their ball: roles swap on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/PossessionSwap.ts POSSESSION_SWAP_ON',
+    hint: 'A/B: 0 is release (my teammates run their offence on D; their men off the ball stand in the paint).',
+  },
+  {
+    id: 'hoops.foeSpaceAngleK', label: 'Their ball: wing angle of their spacers', def: 0.3, min: 0, max: 0.5, step: 0.05, unit: '×π', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/PossessionSwap.ts FOE_SPACE_ANGLE_K',
+    hint: 'Their men off the ball hold the wings at ± this share of π from the top (0: all at the top).',
+  },
+  {
+    id: 'hoops.hasBallM', label: 'D: his man has the ball inside', def: 1.0, min: 0.6, max: 2.0, step: 0.1, unit: 'm', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/PossessionSwap.ts HAS_BALL_M',
+    hint: 'Release 1.8: a screener beside the handler read as the handler and two defenders went to the ball.',
+  },
+  {
+    id: 'hoops.defenseStanceOn', label: 'D stance raised on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFENSE_STANCE_ON',
+    hint: 'A/B: 0 is release (the deep capture\'s near-kneel, the table\'s forward lean).',
+  },
+  {
+    id: 'hoops.defenseRaiseM', label: 'D stance: hips raised by', def: 0.15, min: 0, max: 0.25, step: 0.01, unit: 'm', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFENSE_RAISE_M',
+    hint: 'The standing stance and the box-out sit this much taller; the feet stay put.',
+  },
+  {
+    id: 'hoops.raiseReach', label: 'D stance: leg reach cap', def: 0.97, min: 0.85, max: 1.0, step: 0.01, unit: '', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts RAISE_REACH',
+    hint: 'The raise stops where a leg would pass this share of its length (the knee keeps a bend).',
+  },
+  {
+    id: 'hoops.stanceEaseSec', label: 'D stance: ease in / out', def: 0.18, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts STANCE_EASE_SEC',
+    hint: 'How fast the raise comes on and goes off between the stance and a slide.',
+  },
+  {
+    id: 'hoops.defendLeanDeg', label: 'D stance: lower-back lean', def: -6, min: -15, max: 15, step: 1, unit: '°', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFEND_LEAN_DEG',
+    hint: 'The defend / slide windows\' lean with the stance on (release 10 / 8: + bends forward).',
+  },
+  {
+    id: 'hoops.defendSpine1Deg', label: 'D stance: mid-back pitch', def: 2, min: -10, max: 12, step: 1, unit: '°', group: 'Hoops · 3v3 awareness',
+    source: 'lib/babylon/core/DefenseStance.ts DEFEND_SPINE1_DEG',
+    hint: 'The defend / slide windows\' Spine1 with the stance on (release 8).',
+  },
+  // lane/h3-aware (#315 H3e): my teammate with the ball — TUNED (new)
+  {
+    id: 'hoops.mateReadOn', label: 'Teammate reads with the ball on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_READ_ON',
+    hint: 'A/B: 0 is release (he dribbles until you call for it; a 1 %-a-frame shot inside 3.5 m of the ring).',
+  },
+  {
+    id: 'hoops.mateSettleSec', label: 'Teammate: a beat after the catch', def: 0.35, min: 0, max: 1, step: 0.05, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_SETTLE_SEC',
+    hint: 'He catches it before any read.',
+  },
+  {
+    id: 'hoops.mateReadSec', label: 'Teammate: swing it on after', def: 0.9, min: 0.3, max: 2.5, step: 0.05, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_READ_SEC',
+    hint: 'With nothing on, he moves it to the open man (you first) this long after the catch.',
+  },
+  {
+    id: 'hoops.mateHoldMaxSec', label: 'Teammate: holds it at most', def: 1.8, min: 0.6, max: 4, step: 0.1, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_HOLD_MAX_SEC',
+    hint: 'Then a look in range, else the swing.',
+  },
+  {
+    id: 'hoops.mateShootRangeM', label: 'Teammate: shoots off the catch inside', def: 7.3, min: 3, max: 9, step: 0.1, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_SHOOT_RANGE_M',
+    hint: 'Open (2.4 m from his nearest man) and inside this of the rim: the shot. The make rate is the ring\'s, unchanged.',
+  },
+  {
+    id: 'hoops.mateDriveFromM', label: 'Teammate: drives a clear lane from', def: 8.5, min: 3, max: 11, step: 0.1, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_DRIVE_FROM_M',
+    hint: 'Nobody on his line to the rim and inside this: he puts it on the floor.',
+  },
+  {
+    id: 'hoops.mateFinishM', label: 'Teammate: finishes the drive at', def: 2.4, min: 1, max: 4, step: 0.1, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_FINISH_M',
+    hint: 'The drive\'s shot goes up this close to the rim.',
+  },
+  {
+    id: 'hoops.mateDriveMaxSec', label: 'Teammate: drive lasts at most', def: 1.6, min: 0.5, max: 3, step: 0.1, unit: 's', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_DRIVE_MAX_SEC',
+    hint: 'A drive that has not got there by now pulls up.',
+  },
+  {
+    id: 'hoops.mateLaneM', label: 'Teammate: a clear lane is', def: 0.9, min: 0.3, max: 1.5, step: 0.05, unit: 'm', group: 'Hoops · teammate',
+    source: 'lib/babylon/modes/threevthreeMate.ts MATE_LANE_M',
+    hint: 'No defender within this of his line to the rim.',
+  },
   // ── lane/hoops-def-tell (#273 T-A): the AI reach shows a tell before it resolves; the poke reads the ball (core/ReachTell) ──
   {
     id: 'hoops.aiReachTellOn', label: 'AI reach tell on (1) / off (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
@@ -174,7 +458,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How long a defender whose reach missed is stuck (the lane his miss opens).',
   },
   {
-    id: 'hoops.aiReachGate', label: 'AI reach: intent becomes a reach', def: 0.5, min: 0, max: 1, step: 0.01, unit: '', group: 'Hoops · defense',
+    id: 'hoops.aiReachGate', label: 'AI reach: intent becomes a reach', def: 0.7, min: 0, max: 1, step: 0.01, unit: '', group: 'Hoops · defense',
     source: 'lib/babylon/core/ReachTell.ts AI_REACH_GATE',
     hint: 'Odds: the share of the AI\'s steal intents in range that become a reach (one reach per 1.2 s at most).',
   },
@@ -207,6 +491,132 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'hoops.pokeLeadSec', label: 'Poke: lead on a moving ball', def: 0.1, min: 0, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · defense',
     source: 'lib/babylon/core/ReachTell.ts POKE_LEAD_SEC',
     hint: 'The poke aims this far ahead of a moving ball (0 = at the ball).',
+  },
+  // ── hoops-p02 (1v1/3v3 ten-phase pass, phase 2 "defence is skill, not dice"): blocks, the contest, the AI strip, on-ball pressure ──
+  {
+    id: 'hoops.blockDiceOn', label: 'Blocks: dice (1) / hand meets ball (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts BLOCK_DICE_ON',
+    hint: 'A/B: 1 puts today\'s block rolls back exactly (aiBlockChance, checkBlock\'s window, jumpSwats, goaltending with no touch).',
+  },
+  {
+    id: 'hoops.blkShoulderM', label: 'Blocks: shoulder height', def: 1.55, min: 1.2, max: 1.9, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts SHOULDER_M',
+    hint: 'The shoulder the reaching arm swings from, standing; it rides the contest jump.',
+  },
+  {
+    id: 'hoops.blkArmM', label: 'Blocks: arm (shoulder to fingertips)', def: 0.85, min: 0.5, max: 1.2, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts ARM_M',
+    hint: 'How far the hand gets from the shoulder. With the shoulder: the standing reach.',
+  },
+  {
+    id: 'hoops.blkContactM', label: 'Blocks: ball meets hand within', def: 0.14, min: 0.05, max: 0.4, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts CONTACT_M',
+    hint: 'The ball centre this close to the reach is a touch (the ball radius and a fingertip).',
+  },
+  {
+    id: 'hoops.blkReleaseJumperM', label: 'Blocks: a jumper leaves the hand at', def: 2.6, min: 1.8, max: 3.2, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts RELEASE_JUMPER_M',
+    hint: 'Above the shooter\'s feet. The block reads the ball from here when the drawn ball is still lower (the release fires before the arms are up).',
+  },
+  {
+    id: 'hoops.blkReleaseLayupM', label: 'Blocks: a layup leaves the hand at', def: 2.5, min: 1.8, max: 3.3, step: 0.01, unit: 'm', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts RELEASE_LAYUP_M',
+    hint: 'Above the shooter\'s feet, for a layup / reverse / scoop and the other finishes at the rim.',
+  },
+  {
+    id: 'hoops.blkLookSec', label: 'Blocks: release flight a hand can meet', def: 0.25, min: 0.05, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts LOOK_SEC',
+    hint: 'How much of a released shot\'s flight is read for a block.',
+  },
+  {
+    id: 'hoops.aiBlockJumpChance', label: 'AI block: jumps at my gather this often', def: 0.45, min: 0, max: 1, step: 0.01, unit: '', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/core/HoopsDefense.ts AI_BLOCK_JUMP_CHANCE',
+    hint: 'In range at my gather, the AI leaves the floor (timed to my release) this often; otherwise a hand up. His choice — the block is his hand on the ball.',
+  },
+  {
+    id: 'hoops.aiBlockReactOn', label: 'AI block: wait out its reaction (1) / jump off the read (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts AI_BLOCK_REACT_ON',
+    hint: '1: the AI\'s block jump never leaves before its tier\'s reaction (420 / 220 / 120 ms) after my gather — it then misses quick finishes.',
+  },
+  {
+    id: 'hoops.aiBlockLeadSec', label: 'AI block: leaves the floor before the release', def: 0.25, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts AI_BLOCK_LEAD_SEC',
+    hint: 'The AI times its jump this long before the release it expects (the green). Never before its reaction lets it.',
+  },
+  {
+    id: 'hoops.blkDeflectMps', label: 'Blocks: ball off the hand, speed', def: 2.4, min: 0.5, max: 6, step: 0.1, unit: 'm/s', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts DEFLECT_MPS',
+    hint: 'How fast a blocked ball leaves along the line it was hit.',
+  },
+  {
+    id: 'hoops.blkDeflectUpMps', label: 'Blocks: ball off the hand, lift', def: 1.4, min: 0, max: 4, step: 0.1, unit: 'm/s', group: 'Hoops · blocks (hand meets ball)',
+    source: 'lib/babylon/hoops/blocks.ts DEFLECT_UP_MPS',
+    hint: 'Up off a rising hand (a falling hand spikes it down a little).',
+  },
+  {
+    id: 'hoops.oneContestOn', label: 'Contest: one model (1) / per shooter (0)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts ONE_CONTEST_ON',
+    hint: 'A/B: 0 puts each shooter\'s old contest formula back exactly.',
+  },
+  {
+    id: 'hoops.contestRangeM', label: 'Contest: distance reaches 0 at', def: 2.6, min: 1.5, max: 4, step: 0.05, unit: 'm', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CONTEST_RANGE_M',
+    hint: 'Planar. Today: 2.2 on my jumper, 3.0 on theirs and my mates\'.',
+  },
+  {
+    id: 'hoops.contestDistW', label: 'Contest: distance weight', def: 1, min: 0, max: 1.5, step: 0.05, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CONTEST_DIST_W',
+    hint: 'How much the distance alone contests.',
+  },
+  {
+    id: 'hoops.contestJump', label: 'Contest: a jump at its top adds', def: 0.32, min: 0, max: 0.6, step: 0.01, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts JUMP_CONTEST',
+    hint: 'Today a flat 0.3 for 0.7 s; now on the jump\'s curve.',
+  },
+  {
+    id: 'hoops.contestJumpFloor', label: 'Contest: share at take-off / landing', def: 0.35, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts JUMP_CONTEST_FLOOR',
+    hint: 'Of the jump\'s contest, what a jump just leaving or coming down adds.',
+  },
+  {
+    id: 'hoops.contestCloseout', label: 'Contest: a full closeout adds', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: '', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CLOSEOUT_CONTEST',
+    hint: 'A defender running AT the shooter (not past him) adds up to this.',
+  },
+  {
+    id: 'hoops.contestCloseoutFullMps', label: 'Contest: full closeout speed', def: 3, min: 1, max: 6, step: 0.1, unit: 'm/s', group: 'Hoops · contest',
+    source: 'lib/babylon/hoops/contest.ts CLOSEOUT_FULL_MPS',
+    hint: 'Speed along the line to the shooter for the full closeout.',
+  },
+  {
+    id: 'hoops.stealDiceOn', label: 'AI strip: dice (1) / hand on the ball (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STEAL_DICE_ON',
+    hint: 'A/B: 1 puts today\'s strip rolls back exactly (0.22 a reach, 0.6 on the bump, 0.18 a bump strip).',
+  },
+  {
+    id: 'hoops.stripReachM', label: 'AI strip: hand reaches the ball within', def: 1.2, min: 0.5, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STRIP_REACH_M',
+    hint: 'Planar, the reacher to the ball, when his reach resolves.',
+  },
+  {
+    id: 'hoops.stripShieldM', label: 'AI strip: handler body shields within', def: 0.25, min: 0, max: 0.6, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STRIP_SHIELD_M',
+    hint: 'A ball whose line to the reacher passes this close to the handler is behind his body.',
+  },
+  {
+    id: 'hoops.stripBallMaxY', label: 'AI strip: ball off the palm below', def: 0.85, min: 0.3, max: 1.5, step: 0.01, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/steals.ts STRIP_BALL_MAX_Y',
+    hint: 'Above this the ball is held at the top of the dribble (the bump window ignores it).',
+  },
+  {
+    id: 'hoops.onBallCushionM', label: 'On-ball: most room on a moving handler', def: 1.35, min: 0, max: 4, step: 0.05, unit: 'm', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pressure.ts ONBALL_CUSHION_M',
+    hint: 'The on-ball defender\'s cushion on a dribbler is capped at this. 0 = today\'s contain lever, uncapped.',
+  },
+  {
+    id: 'hoops.onBallCushionPerMps', label: 'On-ball: more room per m/s of the handler', def: 0.3, min: 0, max: 0.8, step: 0.01, unit: 's', group: 'Hoops · defense',
+    source: 'lib/babylon/hoops/pressure.ts ONBALL_CUSHION_PER_MPS',
+    hint: 'The cushion grows by this × his speed: a sprint at the defender gets room to give ground in, a probing dribble gets pressure.',
   },
   // ── lane/hoops-def-tell (#273 T-C): two bodies never stand inside each other, and never pop apart (core/BodySeparation) ──
   {
@@ -370,11 +780,13 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/HoopsBlocks.ts FOUL_LATE_PCT',
     hint: 'Not in play yet (BLK-2). Odds: a late press that makes contact is a foul this often.',
   },
-  // ── hoops-reverse (#311's H3a, ported): the ball handler's stick — every default is the release value (core/HoopsStick) ──
+  // ── hoops-reverse (#311's H3a, ported): the ball handler's stick (core/HoopsStick). hoops-p01 (controls that answer): five defaults are
+  //    the 1v1 / 3v3 handler's TUNED ones (H3a's own numbers — jogTau, jogAccel, loadScale, the two stops) and three rows are new; the dunk
+  //    approach (GEARS_HOOPS) keeps the release values unless a knob is dialled. RELEASE_STICK_PRESET is the release stick in one paste. ──
   {
-    id: 'hoops.jogTau', label: 'Jog: lag to top speed', def: 0.17, min: 0.05, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_JOG_TAU',
-    hint: 'How quickly a pushed stick reaches jog speed (lower = snappier). H3a: 0.10.',
+    id: 'hoops.jogTau', label: 'Jog: lag to top speed', def: 0.1, min: 0.05, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_JOG_TAU',
+    hint: 'How quickly a pushed stick reaches jog speed (lower = snappier). TUNED 0.17 → 0.10 (H3a\'s); release 0.17.',
   },
   {
     id: 'hoops.sprintTau', label: 'Sprint: lag to top speed', def: 0.15, min: 0.05, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · movement',
@@ -382,9 +794,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How quickly the turbo reaches sprint speed (lower = snappier). H3a: 0.10.',
   },
   {
-    id: 'hoops.jogAccel', label: 'Jog: acceleration cap', def: 15, min: 5, max: 40, step: 1, unit: 'm/s²', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_JOG_ACCEL',
-    hint: 'The most the handler gains per second toward a jog. H3a: 22.',
+    id: 'hoops.jogAccel', label: 'Jog: acceleration cap', def: 22, min: 5, max: 40, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_JOG_ACCEL',
+    hint: 'The most the handler gains per second toward a jog. TUNED 15 → 22 (H3a\'s); release 15.',
   },
   {
     id: 'hoops.sprintAccel', label: 'Sprint: acceleration cap', def: 24, min: 5, max: 40, step: 1, unit: 'm/s²', group: 'Hoops · movement',
@@ -392,9 +804,9 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'The most the handler gains per second toward a sprint. H3a: 26.',
   },
   {
-    id: 'hoops.loadScale', label: 'First step: load', def: 0.45, min: 0.2, max: 1, step: 0.05, unit: '', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_LOAD_SCALE',
-    hint: 'Share of the acceleration on the first step from a standstill (1 = no loaded step). H3a: 0.7.',
+    id: 'hoops.loadScale', label: 'First step: load', def: 0.7, min: 0.2, max: 1, step: 0.05, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_LOAD_SCALE',
+    hint: 'Share of the acceleration on the first step from a standstill (1 = no loaded step). TUNED 0.45 → 0.7 (H3a\'s); release 0.45.',
   },
   {
     id: 'hoops.gearDownDecel', label: 'Off the turbo: ease-down', def: 9, min: 3, max: 30, step: 1, unit: 'm/s²', group: 'Hoops · movement',
@@ -402,14 +814,14 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'How fast the speed eases down when the turbo is let go with the stick held. H3a: 12.',
   },
   {
-    id: 'hoops.stopDecelLow', label: 'Stop: brake from a walk', def: 22, min: 8, max: 60, step: 1, unit: 'm/s²', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_STOP_DECEL_LOW',
-    hint: 'The brake when the stick is released at a walk. H3a: 32.',
+    id: 'hoops.stopDecelLow', label: 'Stop: brake from a walk', def: 32, min: 8, max: 60, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_STOP_DECEL_LOW',
+    hint: 'The brake when the stick is released at a walk. TUNED 22 → 32 (H3a\'s); release 22.',
   },
   {
-    id: 'hoops.stopDecelHigh', label: 'Stop: brake from a sprint', def: 11, min: 5, max: 60, step: 1, unit: 'm/s²', group: 'Hoops · movement',
-    source: 'lib/babylon/core/HoopsStick.ts HOOPS_STOP_DECEL_HIGH',
-    hint: 'The brake when the stick is released at top speed (lower = a longer slide). H3a: 26.',
+    id: 'hoops.stopDecelHigh', label: 'Stop: brake from a sprint', def: 26, min: 5, max: 60, step: 1, unit: 'm/s²', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_STOP_DECEL_HIGH',
+    hint: 'The brake when the stick is released at top speed (lower = a longer slide). TUNED 11 → 26 (H3a\'s); release 11 (a sprint slid 1.4 m).',
   },
   {
     id: 'hoops.plantDecel', label: 'Plant: bleed on a hard cut', def: 47.6, min: 10, max: 80, step: 0.2, unit: 'm/s²', group: 'Hoops · movement',
@@ -456,11 +868,206 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/core/HoopsStick.ts HOOPS_RETREAT_SPEED_K',
     hint: 'The backpedal (the stick held against the facing) tops out at this share of a jog. Forward runs, sprints and slides never. 1 = no cap.',
   },
+  // hoops-p01 (new): the ball handler's answers — GEARS_HANDLER only (the dunk approach never reads them)
+  {
+    id: 'hoops.firstStepMps', label: 'First step: the answer to the press', def: 0.3, min: 0, max: 1.5, step: 0.05, unit: 'm/s', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_FIRST_STEP_MPS',
+    hint: 'A stick pushed from a standstill starts the body at this speed on the press\'s own frame, then the ramp. 0 = none (release).',
+  },
+  {
+    id: 'hoops.reversePlantHold', label: 'Reversal: plant holds the old line (1) / brakes through (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_REVERSE_PLANT_HOLD',
+    hint: '1 = release: a stick thrown back at pace keeps sliding the old way for the plant (0.12 s) before it brakes. 0 = the plant brakes straight through zero.',
+  },
+  {
+    id: 'hoops.reverseLaunchSec', label: 'Reversal: push-off launch', def: 0.2, min: 0, max: 0.6, step: 0.05, unit: 's', group: 'Hoops · movement',
+    source: 'lib/babylon/core/HoopsStick.ts HANDLER_REVERSE_LAUNCH_SEC',
+    hint: 'Out of a reversal the first step the new way is a launch (no loaded step, a move\'s boost) for this long. 0 = a loaded step (release).',
+  },
   // ── hoops-overtime (NB-3): a 3v3 level at the horn is sudden-death overtime on its own clock (modes/threevthreeOvertime) ──
   {
     id: 'hoops.overtime3v3Sec', label: 'Overtime clock 3v3', def: 30, min: 10, max: 90, step: 5, unit: 's', group: 'Hoops · rules',
     source: 'lib/babylon/modes/threevthreeOvertime.ts OVERTIME_3V3_SEC',
     hint: 'A 3v3 tied at the horn plays sudden death on this clock: the next bucket wins; still level when it runs out, another overtime.',
+  },
+  // ── hoops-shot-content (hoops round 2): the free-throw trip's beats and the bank's look (presentation; no window, no odds) ──
+  {
+    id: 'hoops.ftSetupSec', label: 'Free throw: whistle to the line', def: 0.9, min: 0.3, max: 2.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_SETUP_SEC',
+    hint: 'The dead-ball setup: the cut to the shooter on the stripe before the routine starts.',
+  },
+  {
+    id: 'hoops.ftRoutineSec', label: 'Free throw: routine', def: 1.2, min: 0.4, max: 3.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_ROUTINE_SEC',
+    hint: 'The dribbles at the stripe before the ball comes up to the set.',
+  },
+  {
+    id: 'hoops.ftSetSec', label: 'Free throw: the set', def: 0.3, min: 0.1, max: 1.0, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_SET_SEC',
+    hint: 'The ball up to the set before the line meter can start (a press during it waits).',
+  },
+  {
+    id: 'hoops.ftResultSec', label: 'Free throw: result shown', def: 1.1, min: 0.4, max: 2.5, step: 0.05, unit: 's', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_RESULT_SEC',
+    hint: 'How long a free throw\'s make or miss is shown before the next one (or the end of the trip).',
+  },
+  {
+    id: 'hoops.ftDistNarrow01', label: 'Free throw: jumper narrowing at the line', def: 0, min: 0, max: 1, step: 0.05, unit: '', group: 'Hoops · shooting',
+    source: 'lib/babylon/core/FreeThrows.ts FT_DIST_NARROW_01',
+    hint: 'Share of a jumper\'s distance narrowing the line\'s green takes: 0 = the full open window (±65 ms, owner 2026-10-24), 1 = a jumper from 4.19 m (±59 ms).',
+  },
+  {
+    id: 'hoops.bankSetDeg', label: 'Bank: angled set', def: 12, min: 0, max: 25, step: 1, unit: '°', group: 'Hoops · shooting',
+    source: 'lib/babylon/hoops/shotLooks.ts BANK_SET_DEG',
+    hint: 'How far the shooter turns toward the glass while R1 "called glass" is held in the bank band (look only; the ball\'s route is unchanged).',
+  },
+  {
+    id: 'hoops.bankGlanceMs', label: 'Bank: glance at the glass', def: 1100, min: 300, max: 2500, step: 50, unit: 'ms', group: 'Hoops · shooting',
+    source: 'lib/babylon/hoops/shotLooks.ts BANK_GLANCE_MS',
+    hint: 'How long the eyes stay on the square after the set and the release of a called bank.',
+  },
+  // ── tiebreak-cam (2026-10-23): Tennis and its tiebreak variant, a phone held upright only ──
+  {
+    id: 'tennis.portraitHeroMargin', label: 'Upright: keep the player this far in', def: 0.15, min: 0.05, max: 0.35, step: 0.01, unit: '', group: 'Tennis · camera',
+    source: 'lib/babylon/modes/netPortraitCam.ts PORTRAIT_HERO_MARGIN',
+    hint: 'Share of the frame width kept between the player and each side edge; the camera turns only when he would come closer. Wide screens never.',
+  },  // ── dunk-flagship (owner playtest 2026-10-27: "smoother movement, better lobs") ──
+  {
+    id: 'dunk.runwayStrideScale', label: 'Run-up: stride length', def: 1, min: 0.8, max: 1.4, step: 0.01, unit: '×', group: 'Dunk · run-up',
+    source: 'lib/babylon/core/DunkFlagship.ts RUNWAY_STRIDE_SCALE',
+    hint: 'The run-up\'s legs are paced to the run at 1 (as shipped). Higher = slower, longer steps for the same speed (feet slide forward); lower = quicker steps (feet slide back).',
+  },
+  {
+    id: 'dunk.oopLobFlightSec', label: 'Alley-oop: lob time in the air', def: 1.0, min: 0.5, max: 1.6, step: 0.05, unit: 's', group: 'Dunk · lobs',
+    source: 'lib/babylon/core/DunkFlagship.ts OOP_LOB_FLIGHT_SEC',
+    hint: 'How long the passer\'s lob hangs, release to the catch. Longer = a higher, slower arc thrown earlier in your run.',
+  },
+  {
+    id: 'dunk.oopLateCatchClipT', label: 'Alley-oop: catch beat when you jump early', def: 0.8, min: 0.6, max: 1.0, step: 0.05, unit: 's', group: 'Dunk · lobs',
+    source: 'lib/babylon/core/DunkFlagship.ts OOP_LATE_CATCH_CLIP_T',
+    hint: 'If you leave the floor before the passer has thrown, he lobs it as you jump and you catch it this far into your flight. Later = a higher drop into your hand, less time before the slam.',
+  },
+  {
+    id: 'dunk.slamHitStopBigMs', label: 'Slam: freeze on a perfect flush', def: 100, min: 70, max: 160, step: 5, unit: 'ms', group: 'Dunk · slam',
+    source: 'lib/babylon/core/DunkFlagship.ts SLAM_HITSTOP_BIG_MS',
+    hint: 'How long the game holds on the iron for a perfect slam. An ordinary make stays at 70 ms; cleaner slams grow toward this.',
+  },
+  {
+    id: 'dunk.slamShakeBig', label: 'Slam: shake on a perfect flush', def: 0.18, min: 0.12, max: 0.3, step: 0.01, unit: '', group: 'Dunk · slam',
+    source: 'lib/babylon/core/DunkFlagship.ts SLAM_SHAKE_BIG',
+    hint: 'Camera shake for a perfect slam. An ordinary make stays at 0.12. Reduced motion turns shake off.',
+  },
+  {
+    id: 'dunk.landLeadSec', label: 'Landing: absorb starts before touchdown', def: 0, min: 0, max: 0.25, step: 0.01, unit: 's', group: 'Dunk · landing',
+    source: 'lib/babylon/core/DunkFlagship.ts LAND_LEAD_SEC',
+    hint: 'How early the landing crouch fades in while you fall. 0 = on touchdown (as shipped). Measured: earlier makes the hips arrive faster into the same short crouch.',
+  },
+  {
+    id: 'dunk.realJumpPersonal', label: 'Body dunk: your verified jump is a full take-off', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Dunk · body',
+    source: 'lib/babylon/core/DunkFlagship.ts REAL_JUMP_PERSONAL',
+    hint: 'Off (as shipped): a 0.70 m jump fills the take-off. On: your own verified best jump (a saved Quick Screen, verified adult accounts only) fills it.',
+  },  // ── hoops-round2 (HOP-02, owner 2026-10-20): the AI defenders react late by difficulty (hoops/reaction; never in ranked / staked) ──
+  {
+    id: 'hoops.aiReactRookieMs', label: 'AI reaction: ROOKIE', def: 420, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',
+    source: 'lib/babylon/hoops/reaction.ts AI_REACT_ROOKIE_MS',
+    hint: 'How late a ROOKIE defender sees a change of direction (a cross, a stop, a reversal); a straight run is tracked with no lag.',
+  },
+  {
+    id: 'hoops.aiReactProMs', label: 'AI reaction: PRO', def: 220, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',
+    source: 'lib/babylon/hoops/reaction.ts AI_REACT_PRO_MS',
+    hint: 'How late a PRO defender sees a change of direction. Staked and head-to-head runs always play PRO at this default.',
+  },
+  {
+    id: 'hoops.aiReactEliteMs', label: 'AI reaction: ELITE', def: 120, min: 0, max: 800, step: 10, unit: 'ms', group: 'Hoops · AI reaction',
+    source: 'lib/babylon/hoops/reaction.ts AI_REACT_ELITE_MS',
+    hint: 'How late an ELITE defender sees a change of direction.',
+  },
+  // ── hoops-round2 (HOP-03, owner 2026-10-20): 3v3 team defence, the switch on a screen and the double team (hoops/teamDefense) ──
+  {
+    id: 'hoops.doubleTeamOn', label: 'Double team (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts DOUBLE_TEAM_ON',
+    hint: '1: a ball held deep in the paint draws a second defender. 0: one man on the ball, as before (an A/B).',
+  },
+  {
+    id: 'hoops.doublePaintM', label: 'Double: ball this close to the rim', def: 3.0, min: 1.5, max: 5.0, step: 0.1, unit: 'm', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts DOUBLE_PAINT_M',
+    hint: 'The ball inside this of the rim starts the double clock.',
+  },
+  {
+    id: 'hoops.doubleAfterSec', label: 'Double: after this long there', def: 0.45, min: 0.1, max: 2.0, step: 0.05, unit: 's', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts DOUBLE_AFTER_SEC',
+    hint: 'How long the ball stays deep before the help comes.',
+  },
+  {
+    id: 'hoops.doubleMaxSec', label: 'Double: lasts at most', def: 2.0, min: 0.5, max: 5.0, step: 0.1, unit: 's', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts DOUBLE_MAX_SEC',
+    hint: 'The doubler goes back to his man after this, if the ball has not been passed.',
+  },
+  {
+    id: 'hoops.doubleCooldownSec', label: 'Double: none again for', def: 4.0, min: 0, max: 10, step: 0.5, unit: 's', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts DOUBLE_COOLDOWN_SEC',
+    hint: 'No new double for this long after one ends.',
+  },
+  {
+    id: 'hoops.switchOnScreenOn', label: 'Switch on a screen (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts SWITCH_ON_SCREEN_ON',
+    hint: '1: a pick on the ball defender makes the screener\'s man take the ball. 0: he fights through, as before (an A/B).',
+  },
+  {
+    id: 'hoops.switchHelpM', label: 'Switch: the helper this close', def: 2.6, min: 1.0, max: 4.0, step: 0.1, unit: 'm', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts SWITCH_HELP_M',
+    hint: 'The screener\'s defender switches onto the ball only from this close to the handler.',
+  },
+  {
+    id: 'hoops.switchCooldownSec', label: 'Switch: one per', def: 1.5, min: 0.3, max: 5.0, step: 0.1, unit: 's', group: 'Hoops · team defense',
+    source: 'lib/babylon/hoops/teamDefense.ts SWITCH_COOLDOWN_SEC',
+    hint: 'No two switches closer together than this.',
+  },
+  // ── hoops-round2 (HOP-04, owner 2026-10-20): hand-checks (too many = a foul) and the contact poses (hoops/handCheck, hoops/contactPoses) ──
+  {
+    id: 'hoops.handCheckOn', label: 'Hand-checks (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts HAND_CHECK_ON',
+    hint: '1: the on-ball defender\'s forearm on the hip is counted, and too many is a foul. 0: nothing counted or drawn (an A/B).',
+  },
+  {
+    id: 'hoops.handCheckReachOverM', label: 'Hand-check: reach past the hard gap', def: 0.15, min: 0, max: 0.5, step: 0.01, unit: 'm', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts HAND_CHECK_REACH_OVER_M',
+    hint: 'The forearm is on the hip inside the bodies\' hard gap (BODY_STANDOFF, unchanged) plus this.',
+  },
+  {
+    id: 'hoops.handCheckGapSec', label: 'Hand-check: off this long to count again', def: 0.3, min: 0.05, max: 1.5, step: 0.05, unit: 's', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts HAND_CHECK_GAP_SEC',
+    hint: 'A hand that comes back sooner is the same touch.',
+  },
+  {
+    id: 'hoops.handCheckFoulCount', label: 'Hand-check: touches that foul', def: 4, min: 2, max: 10, step: 1, unit: '', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts HAND_CHECK_FOUL_COUNT',
+    hint: 'This many touches inside the window is the HAND-CHECK whistle.',
+  },
+  {
+    id: 'hoops.handCheckWindowSec', label: 'Hand-check: inside this long', def: 5, min: 1, max: 15, step: 0.5, unit: 's', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts HAND_CHECK_WINDOW_SEC',
+    hint: 'The window the touches are counted in.',
+  },
+  {
+    id: 'hoops.contactPoseOn', label: 'Contact poses (0 = off)', def: 1, min: 0, max: 1, step: 1, unit: '', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts CONTACT_POSE_ON',
+    hint: '1: forearm toward the hip, the arm bar, the chest in at the hard gap (drawn only). 0: the clips alone, as before.',
+  },
+  {
+    id: 'hoops.contactEaseInSec', label: 'Contact pose: eases in over', def: 0.12, min: 0.02, max: 0.5, step: 0.01, unit: 's', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts CONTACT_EASE_IN_SEC',
+    hint: 'How fast the contact pose comes on.',
+  },
+  {
+    id: 'hoops.contactEaseOutSec', label: 'Contact pose: eases out over', def: 0.2, min: 0.02, max: 0.8, step: 0.01, unit: 's', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/handCheck.ts CONTACT_EASE_OUT_SEC',
+    hint: 'How fast it lets go.',
+  },
+  {
+    id: 'hoops.contactChestLeanDeg', label: 'Contact pose: chest lean in', def: 7, min: 0, max: 15, step: 1, unit: '°', group: 'Hoops · contact',
+    source: 'lib/babylon/hoops/contactPoses.ts CHEST_LEAN_DEG',
+    hint: 'How far the defender\'s chest leans into the handler at full contact.',
   },
 ];
 

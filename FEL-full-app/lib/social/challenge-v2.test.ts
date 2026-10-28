@@ -79,11 +79,14 @@ describe('CHALLENGE-SIGN-V2: service', () => {
     const row = rows.get(minted.code)!;
     expect(row.payload.v).toBe(2);
     expect(row.payload.ghost).toEqual([{ t: 0, kind: 'dunk1', court: 'venice' }]);
-    const r = await resolveAttempt({ code: minted.code, attemptScore: 50, attemptTag: 'ME' });
+    // CHALLENGES-2 (test changed): a signed-in winner. A guest's win no longer mints an ownerless rematch (owner: a guest
+    // signs up to rematch), and this test is about the rematch row's signature, so it plays as an account.
+    const r = await resolveAttempt({ code: minted.code, attemptScore: 50, attemptTag: 'ME', userId: 'u1' });
+    if (!r || r === 'expired') throw new Error('resolved');
     expect(r?.targetScore).toBe(40);
     expect(r?.beat).toBe(true);
     expect(rows.get(r!.rematch!.code)!.payload.v).toBe(2);
-    expect((await resolveAttempt({ code: r!.rematch!.code, attemptScore: 1 }))?.targetScore).toBe(50);
+    expect(((await resolveAttempt({ code: r!.rematch!.code, attemptScore: 1 })) as { targetScore: number }).targetScore).toBe(50);
   });
 
   it('7b. a nested ghost edit on a stored v2 row is forged (null), where v1 would have let it through', async () => {

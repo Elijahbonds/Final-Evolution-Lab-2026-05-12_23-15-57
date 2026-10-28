@@ -1,20 +1,9 @@
-import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import { authOptions } from '@/lib/auth';
-import { loginPath } from '@/lib/auth/safeNext';
-import { EducationView } from '@/components/education-view';
-// EDU-LINKS (2026-10-07): the Playbook's door on /education (the movement course was unlinked from here).
-import { PlaybookCard } from '@/components/education/playbook-card';
 
-export const dynamic = 'force-dynamic';
-
-export default async function EducationPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect(loginPath('/education'));
-  return (
-    <div className="min-h-screen bg-[#050505] pb-20">
-      <PlaybookCard />
-      <EducationView />
-    </div>
-  );
+// /education → /learn (PLAT-P04, 2026-10-27). Learn is one home now: the Playbook course, Practice, the feed and, at the
+// bottom, the Academy that used to be this page (owner call §5.2 (a): moved, its Lab Credits unchanged). A redirect, so
+// old links and bookmarks still land, and undoing it is restoring this file. /education/playbook/** stays the course's
+// own address.
+export default function EducationPage(): never {
+  return redirect('/learn');
 }

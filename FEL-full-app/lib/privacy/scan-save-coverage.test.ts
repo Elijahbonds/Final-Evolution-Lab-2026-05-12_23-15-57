@@ -9,10 +9,16 @@ import { SCAN_SAVE_ROUTES } from './scanSaveGate';
 
 const ROOT = join(__dirname, '../..');
 
+/** Generated code is not a write site. The Prisma client under lib/generated/prisma (PRISMA-PUBLIC step 1,
+ *  docs/PRISMA-PUBLIC-PLAN.md) is the same artifact as public/_prisma/client, which this walk never read; its index.d.ts
+ *  documents `.create` / `.upsert` on every model. Only that one directory is skipped; every hand-written lib file is read. */
+const GENERATED = new Set([join(ROOT, 'lib/generated/prisma')]);
+
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
+    if (GENERATED.has(p)) continue;
     if (statSync(p).isDirectory()) out.push(...walk(p));
     else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name)) out.push(p);
   }
@@ -26,6 +32,14 @@ const DETECTORS: { what: string; re: RegExp }[] = [
   { what: 'AthleteBuild (prq)', re: new RegExp(`\\bathleteBuild\\s*\\.\\s*${WRITE}\\b`) },
   { what: 'CampSession (deltas)', re: new RegExp(`\\bcampSession\\s*\\.\\s*${WRITE}\\b`) },
   { what: 'PrqEntry', re: new RegExp(`\\bprqEntry\\s*\\.\\s*${WRITE}\\b|\\bcreatePrqEntry\\s*\\(|\\bwriteFormPlan\\s*\\(|\\bwriteForm\\s*\\(`) },
+  // COACH-VIDEO-REVIEW (2026-10-24): the filmed-set table (pending SQL, raw writes), and the calls that reach it
+  { what: 'CoachFormReview', re: /INSERT\s+INTO\s+"?CoachFormReview\b|\bsubmitFormReview\s*\(|\binsertFormReview\s*\(/ },
+  // COACH-READINESS (2026-10-25): the daily jump check's numbers (pending SQL, raw writes), and the calls that reach them
+  { what: 'ReadinessJumpCheck', re: /INSERT\s+INTO\s+"?ReadinessJumpCheck\b|\bkeepCheck\s*\(|\bsaveCheck\s*\(/ },
+  // COMBINE-DAY (2026-10-25): a coach's combine results (pending SQL, raw writes), and the calls that reach them
+  { what: 'CombineResult', re: /INSERT\s+INTO\s+"?CombineResult\b|\bwriteResults\s*\(|\bsaveCombine\s*\(/ },
+  // VBT (2026-10-25): a tracked set's bar-speed numbers (pending SQL, raw writes), and the calls that reach them
+  { what: 'VbtSet', re: /INSERT\s+INTO\s+"?VbtSet\b|\bkeepSet\s*\(|\bsaveSet\s*\(/ },
   { what: 'raw SQL', re: /INSERT\s+INTO\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b|UPDATE\s+"?(?:WorkoutScan|PrqEntry|MirrorSession|AthleteBuild|CampSession)\b/i },
 ];
 
@@ -52,6 +66,13 @@ describe('every movement write site is gated, routed, or named as not movement',
     expect(DETECTORS.some((d) => d.re.test(synthetic))).toBe(true);
     expect(DETECTORS.some((d) => d.re.test('await tx.prqEntry.createMany({ data })'))).toBe(true);
     expect(DETECTORS.some((d) => d.re.test('await prisma.workoutScan.findMany({ where })'))).toBe(false);
+  });
+
+  it('control: only the generated client is skipped; the rest of lib/ is still walked', () => {
+    expect(files.some((f) => f.startsWith('lib/generated/'))).toBe(false);
+    expect(files).toContain('lib/move/formWrite.ts');
+    expect(files).toContain('lib/prq-entries.ts');
+    expect(GENERATED.size).toBe(1);
   });
 
   it('no write site is uncovered (app/dev and tests excluded)', () => {

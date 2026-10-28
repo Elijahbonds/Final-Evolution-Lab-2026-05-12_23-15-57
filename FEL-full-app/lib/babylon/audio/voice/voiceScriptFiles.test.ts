@@ -105,7 +105,7 @@ describe('the production voice script', () => {
     const cues = [...block.slice(0, block.indexOf('\n};')).matchAll(/^\s+(?:cue|escalate|regress): '((?:[^'\\]|\\.)*)',/gm)].map((m) => m[1].replace(/\\'/g, "'"));
     expect(cues.length).toBe(24);
     const spoken = [
-      ...cues, 'There it is. Own it.',
+      ...cues, "That's it. Keep it.",   // test changed: copy rewrite (CUE-REWRITE) — the confirmation's new words
       ...(['noBody', 'cutOffBottom', 'cutOffTop', 'turned', 'tooClose', 'tooFar', 'offCentre', 'dim'] as const).map((i) => framingLine(i)),
       SIDE_TURNED, DEEPER_LINE, SQUARE_UP_LINE, refusalLine('implausible_vertical'), refusalLine('implausible_flight'),
       ...MODIFIED_SCREEN.map((s) => s.cue), ...FULL_SCREEN.map((s) => s.cue), ...Object.values(TURN_CUE), NEXT_LINE, MOVE_ON_LINE, PART_READ_LINE,

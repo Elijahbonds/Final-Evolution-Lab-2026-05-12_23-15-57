@@ -23,7 +23,7 @@
 //      (makeGeometryUnique); the loaded container and the GLB are untouched.
 //   3. Two-tone: the sole triangles (the bottom SOLE_THICKNESS of the shoe) move to a sibling mesh with a light matte
 //      material whose names carry no `shoe`, so tintSlot leaves the sole light while the upper takes the tint.
-// A spawn whose skeleton has not posed the shoe yet (parked rivals measure a 0.16 m boot) gets the geometry pass on
+// A spawn whose skeleton has not posed the shoe yet (MIN_POSED_SHOE_HEIGHT) gets the geometry pass on
 // its first rendered frame instead. Everything here is best-effort and never throws into the spawn: a fake mesh (unit
 // tests), a mesh without a skeleton or without geometry gets the material pass or nothing.
 import { Color3, Matrix, Mesh, PBRMaterial, Vector3, VertexBuffer } from '@babylonjs/core';
@@ -50,9 +50,18 @@ const COLLAR_HEIGHT = 0.035;
  */
 const SOLE_THICKNESS = 0.05;
 const SOLE_COLOR = '#F4F2EC';
-/** A skinned shoe shorter than this has not been posed yet (a parked rival's skeleton at spawn, measured 0.16 m
- *  for a 0.5 m boot); its geometry pass waits for the first render. */
-const MIN_POSED_SHOE_HEIGHT = 0.19;
+/**
+ * A skinned shoe shorter than this has not been posed yet; its geometry pass waits for the first render.
+ *
+ * KIT-NO-HIGH-BOOTS (owner, 2026-10-24: "fix the sole band"): was 0.19, set when the kit shoe was a 0.51 m knee boot
+ * (a parked rival's skeleton measured that boot at 0.16). The kit now ships one low-cut shoe on all 28 kit/hero/rival
+ * bodies, and on the real spawn path (CharacterLibrary.spawn, desktop and mobile, player and rival) it measures
+ * 0.147–0.161 m POSED — under 0.19, so every spawn retried for 180 frames, settled 'late:unposed', and never got its
+ * light sole. Unposed frames measure ~0 (no bone matrices yet) or ~0.0002 m (a spawn at root scale 0.001; isShrunk also
+ * holds those back), and the same parked distortion on a 0.15 m shoe would read ~0.05 m. 0.12 sits 18 % under the
+ * lowest posed shoe and well over every unposed reading. Pinned by garmentFixes.lowShoe.test.ts.
+ */
+export const MIN_POSED_SHOE_HEIGHT = 0.12;
 /** Frames the late geometry pass keeps waiting for a shrunk / unposed shoe (a materialise tween is ~20). */
 const LATE_WAIT_FRAMES = 180;
 
@@ -97,12 +106,20 @@ function fixShoe(mesh: Mesh, itemId: string): string {
     // 0.0002 m shoe on its first frame — 'unposed' for good, and the collar flare that waits on `late:` then ran on the
     // shrunk body (see bodyMask.isShrunk). So the late pass keeps waiting while the mesh is shrunk or unposed, frame by
     // frame, up to LATE_WAIT_FRAMES before it settles for 'unposed'.
+    // KIT-NO-HIGH-BOOTS (2026-10-24): "frame by frame" did not hold. An observer added to the observable that is calling
+    // it runs in that same notify (Babylon's Observable walks its live list — measured: one notify ran the retry 181
+    // times), so every wait burnt all LATE_WAIT_FRAMES in the first frame and a shrunk spawn settled 'late:shrunk' with
+    // no sole. The retry now re-arms from the scene's after-render, which is the next frame's before-render.
     let waited = 0;
     const late = () => {
       try {
         const shrunk = isShrunk(mesh);
         const r = shrunk ? null : fixShoeGeometry(mesh, itemId, skeleton, positions, indices);
-        if (r === null && waited++ < LATE_WAIT_FRAMES) { mesh.onBeforeRenderObservable.addOnce(late); return; }
+        if (r === null && waited++ < LATE_WAIT_FRAMES) {
+          const scene = mesh.getScene();
+          scene.onAfterRenderObservable.addOnce(() => { if (!mesh.isDisposed()) mesh.onBeforeRenderObservable.addOnce(late); });
+          return;
+        }
         mesh.metadata = { ...(mesh.metadata ?? {}), felGarmentFix: `${notes.join('+')}+late:${r ?? (shrunk ? 'shrunk' : 'unposed')}` };
       } catch (e) { console.warn(`[FEL-KIT] late shoe fix skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
     };
@@ -294,6 +311,49 @@ function foldShaft(mesh: Mesh, skeleton: Skeleton, positions: FloatArray, world:
     out[v * 3] = p.x; out[v * 3 + 1] = p.y; out[v * 3 + 2] = p.z;
   }
   return { positions: out, skin: newMi && newMw ? { mi: newMi, mw: newMw } : null };
+}
+
+/**
+ * KIT-NO-HIGH-BOOTS (2026-10-20): the pass-2 tee, shorts and low sock are a flat colour with NO UVs (only the shoe kept a
+ * map), and Creator paint (creator/paint/renderPaint) draws a garment into a texture through its UVs — without them a
+ * garment layer never showed. So a shown garment without UVs gets an atlas here, before any other fix reads its
+ * geometry: each triangle its own cell, which unwelds the mesh (3 vertices a triangle, every attribute copied, so it
+ * renders and skins exactly as before; the edge flare welds by position). A cell's triangle sits GARMENT_UV_PAD texels
+ * in at the smallest garment paint size, inside what the paint's dilation fills, so filtering never reads a neighbour.
+ * Only this clone's geometry changes; a mesh with morph targets (none ship) is left alone.
+ */
+const GARMENT_UV_PAD = 3 / 512;
+export function ensureGarmentUVs(mesh: AbstractMesh): boolean {
+  if (!(mesh instanceof Mesh) || mesh.isVerticesDataPresent(VertexBuffer.UVKind) || mesh.morphTargetManager) return false;
+  const ind = mesh.getIndices();
+  if (!ind || ind.length < 3 || !mesh.isVerticesDataPresent(VertexBuffer.PositionKind)) return false;
+  try {
+    const tris = Math.floor(ind.length / 3), corners = tris * 3;
+    // read every attribute before writing any: the position write resets the vertex count the others are read with
+    const src = mesh.getVerticesDataKinds().map((kind) => ({ kind, size: mesh.getVertexBuffer(kind)!.getSize(), data: mesh.getVerticesData(kind)! }));
+    mesh.makeGeometryUnique();
+    src.sort((a, b) => Number(b.kind === VertexBuffer.PositionKind) - Number(a.kind === VertexBuffer.PositionKind));
+    for (const { kind, size, data } of src) {
+      const out = new Float32Array(corners * size);
+      for (let i = 0; i < corners; i++) for (let k = 0; k < size; k++) out[i * size + k] = data[ind[i] * size + k];
+      mesh.setVerticesData(kind, out, false, size);
+    }
+    const n = Math.ceil(Math.sqrt(tris)), cell = 1 / n, pad = Math.min(GARMENT_UV_PAD, cell / 4);
+    const uv = new Float32Array(corners * 2);
+    for (let t = 0; t < tris; t++) {
+      const u0 = (t % n) * cell, v0 = Math.floor(t / n) * cell;
+      uv.set([u0 + pad, v0 + pad, u0 + cell - pad, v0 + pad, u0 + pad, v0 + cell - pad], t * 6);
+    }
+    mesh.setVerticesData(VertexBuffer.UVKind, uv, false, 2);
+    const seq = new Uint32Array(corners);
+    for (let i = 0; i < corners; i++) seq[i] = i;
+    mesh.setIndices(seq, corners, false);
+    mesh.refreshBoundingInfo();
+    return true;
+  } catch (e) {
+    console.warn(`[FEL-KIT] garment UVs skipped on ${mesh.name}: ${String((e as Error)?.message ?? e).slice(0, 120)}`);
+    return false;
+  }
 }
 
 /**

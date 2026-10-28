@@ -1,18 +1,37 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { Activity, BookOpen, ClipboardList, Dumbbell, Footprints, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
+import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
 import { TabPage } from '@/components/shell/tab-page';
+// DAILY-DRILL (value round item 3): today's drill from the weakest measured number, for every account
+import { DailyDrillCard } from '@/components/daily-drill/daily-drill-card';
+import { loadDailyDrill } from '@/lib/daily-drill/load';
+import { loadWarmupContext } from '@/lib/coach/warmupServer';
 import { DoorsRow } from '@/components/shell/doors-row';
 // MIRROR-PROGRESS (2026-10-07): a coached athlete's door to today's session, first on the page (nothing for anyone else)
 import { TodayCard } from '@/components/coach/today-card';
 import { todayCardFor } from '@/lib/coach/todayCard';
+// PROGRESS CARD (value round item 1): the weekly door to /profile/week; reads nothing
+import { WeekCardEntry } from '@/components/progress-card/week-entry';
+// SIGNATURE-PROGRAMS (2026-10-25): FEL's four signature programs. The card is the same for everyone (this page reads no
+// age to draw its cards — tests/drills, tests/mirror-first); the athlete's week shows on /train/programs.
+import { TRAIN_LINE_IDLE } from '@/lib/signature/copy';
+import { PALETTE } from '@/lib/design/palette';
+import { TYPE } from '@/lib/design/type';
+import { ListRow } from '@/components/ui/fel/cards';
+import { enterDelay } from '@/components/ui/fel/page-enter';
+// A11-07: the page's words live in messages/en/train.json
+import { t } from '@/lib/i18n';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 
 export const dynamic = 'force-dynamic';
+
+type Group = 'measure' | 'program' | 'learn';
+const GROUPS: readonly Group[] = ['measure', 'program', 'learn'];
 
 /**
  * TRAIN — the Mirror, the programming, the coach and the fuel, on one shelf.
@@ -26,73 +45,112 @@ export default async function TrainPage() {
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!me) redirect(loginPath('/train'));
 
-  const [coachLink, coachesAnyone, programCount, todayCard] = await Promise.all([
+  const [coachLink, coachesAnyone, programCount, todayCard, dailyDrill] = await Promise.all([
     prisma.coachClient.findFirst({ where: { clientId: me, endedAt: null }, select: { coach: { select: { name: true } } } }).catch(() => null),
     prisma.coachClient.findFirst({ where: { coachId: me, endedAt: null }, select: { id: true } }).catch(() => null),
     prisma.coachingProgram.count({ where: { clientId: me } }).catch(() => 0),
     todayCardFor(prisma, me),
+    loadDailyDrill(prisma, me, { warmupContext: (id, now) => loadWarmupContext(prisma, id, now) }).catch(() => null),
   ]);
 
   const cards = [
+    {
+      // VERTICAL-EASY (2026-10-27; owner: "It needs to be way easier to measure vertical"): the one front door, first in
+      // Measure — one tap from this page into the jump-only run (it asks its own age question; under 18, no camera).
+      href: MEASURE_VERTICAL_HREF, group: 'measure' as Group, icon: ArrowUpFromLine, accent: PALETTE.cyan, title: t('train.cards.vertical.title'),
+      line: t('train.cards.vertical.line'),
+    },
     {
       // MIRROR-COACH P1 (2026-09-25): this said "Scored, with the corrective work written for you." Nothing grades the
       // screen's stations yet (no app code calls ScreenRunner.record, so every screen came back unscored), and a camera
       // number is an estimate, not a score. It now says what the Mirror does. Put "graded" back only for a station a
       // grader actually scores (lib/workout/workout-copy.test.tsx holds the line).
-      href: '/play/mirror', icon: ScanLine, accent: '#00FF9D', title: 'The Mirror',
-      line: 'A squat coach and a movement screen on your own camera. It cues what it can see, and every number it shows is an estimate.',
-      tag: 'Start a screen',
+      href: '/play/mirror', group: 'measure' as Group, icon: ScanLine, accent: PALETTE.emerald, title: t('train.cards.mirror.title'),
+      line: t('train.cards.mirror.line'),
     },
     {
       // MIRROR-FIRST P1 (2026-10-07): the Quick Screen (/screen → /play/mirror/assess, no sign-in) was linked from nowhere
-      // in the app. It goes in at its front door, never a deep link past it: the screen asks its own age question first and,
-      // under 18 or unanswered, the grown-up step (app/play/mirror/assess/_components/gate-steps.tsx), for every visitor —
-      // it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the screen has
-      // no fetch (assess-app.tsx "KIDS SEND NOTHING"), and results stay in the tab.
-      href: '/screen', icon: Timer, accent: '#00E5FF', title: 'Quick Screen',
-      line: 'A free movement check on this camera: your jump in about a minute, or the full screen in about five. Nothing is sent.',
-      tag: 'Check it',
+      // in the app. The screen asks its own age question first and, under 18 or unanswered, the camera-free card, for every
+      // visitor — it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the
+      // screen has no fetch (assess-app.tsx "KIDS SEND NOTHING"), and results stay in the tab.
+      // SCREEN-EASY (2026-10-28): straight to the full screen (lib/screen-easy/door.ts) — /screen's first button is the
+      // jump, which has its own card above; a ?run= start still asks the age question first.
+      href: FULL_SCREEN_HREF, group: 'measure' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.quickScreen.title'),
+      line: t('train.cards.quickScreen.line'),
+    },
+    {
+      // COACH-READINESS (2026-10-25): the 30-second daily jump check (verified adults; the page says so to anyone else)
+      href: '/train/readiness', group: 'measure' as Group, icon: Activity, accent: PALETTE.emerald, title: t('train.cards.readiness.title'),
+      line: t('train.cards.readiness.line'),
+    },
+    {
+      // SPRINT-SPEED (2026-10-25): sprint and agility timed by the phone's camera (verified adults; the page says so to anyone else)
+      href: '/train/speed', group: 'measure' as Group, icon: Gauge, accent: '#00FF9D', title: t('train.cards.sprint.title'),
+      line: t('train.cards.sprint.line'),
+    },
+    {
+      // VBT (2026-10-25; wired by coach-delivery 2026-10-27, docs/VBT.md §7.1): camera bar speed (13+; a teen sees technique
+      // speed only; the page says so)
+      href: '/train/velocity', group: 'measure' as Group, icon: Dumbbell, accent: PALETTE.cyan, title: t('train.cards.velocity.title'),
+      line: t('train.cards.velocity.line'),
     },
     {
       // DRILLS (2026-10-07, Mirror & coaching Phase 6): the Playbook's ch. 5 wake-up and ch. 6 jump-and-land drills on the
       // camera (/play/drills). The page reads the age and today's checks itself and holds back the jumps they say to;
       // this card reads nothing, so it is the same for every account.
-      href: '/play/drills', icon: Footprints, accent: '#00FF9D', title: 'Drills',
-      line: "The Playbook's wake-up and jump-and-land drills, on your camera. Follow the targets; nothing is sent.",
-      tag: 'Run a drill',
+      href: '/play/drills', group: 'measure' as Group, icon: Footprints, accent: PALETTE.emerald, title: t('train.cards.drills.title'),
+      line: t('train.cards.drills.line'),
     },
     {
-      href: '/training', icon: ClipboardList, accent: '#00E5FF', title: 'Your programming',
-      line: coachLink?.coach?.name ? `Written by ${coachLink.coach.name}.` : programCount > 0 ? 'Your blocks and sessions.' : 'No coach yet — an invite link puts their programming here.',
-      tag: programCount > 0 || coachLink ? 'Open' : 'How it works',
+      href: '/training', group: 'program' as Group, icon: ClipboardList, accent: PALETTE.cyan, title: t('train.cards.programming.title'),
+      line: coachLink?.coach?.name ? t('train.cards.programming.lineCoach', { name: coachLink.coach.name }) : t(programCount > 0 ? 'train.cards.programming.lineBlocks' : 'train.cards.programming.lineNone'),
     },
     {
-      href: '/play/training', icon: Dumbbell, accent: '#FFD700', title: 'Iron Paradise',
-      line: 'The gym floor. Lift, jump, and put a number on it.',
-      tag: 'Train',
+      // SIGNATURE-PROGRAMS (2026-10-25): approved programs only (lib/signature/access.ts); the list shows the athlete's week
+      href: '/train/programs', group: 'program' as Group, icon: Layers, accent: PALETTE.emerald, title: t('train.cards.signature.title'),
+      line: TRAIN_LINE_IDLE,
     },
     {
-      href: '/education/playbook', icon: BookOpen, accent: '#A855F7', title: 'The Playbook',
-      line: 'Ten chapters on how the body actually moves, from the book. Every drill is one you can run tonight.',
-      tag: 'Learn',
+      // EXERCISE-LIBRARY (2026-10-25): the shared library — search it or ask it; approved entries only for athletes
+      href: '/train/library', group: 'program' as Group, icon: Library, accent: PALETTE.cyan, title: t('train.cards.library.title'),
+      line: t('train.cards.library.line'),
     },
     {
-      href: '/kitchens', icon: UtensilsCrossed, accent: '#FF7A2F', title: 'Fuel',
+      href: '/play/training', group: 'learn' as Group, icon: Dumbbell, accent: PALETTE.gold, title: t('train.cards.iron.title'),
+      line: t('train.cards.iron.line'),
+    },
+    {
+      href: '/learn', group: 'learn' as Group, icon: BookOpen, accent: PALETTE.violet, title: t('train.cards.playbook.title'),
+      line: t('train.cards.playbook.line'),
+    },
+    {
+      href: '/kitchens', group: 'learn' as Group, icon: UtensilsCrossed, accent: PALETTE.ember, title: t('train.cards.fuel.title'),
       // MIRROR-COACH P1 review (2026-09-25): was "Your meal prescription from your own movement screen". The Kitchens
       // input is sliders the athlete sets (sample numbers "until a Mirror scan lands": your-build-panel.tsx), not their
       // screen, and "prescription" is a treatment word (lib/share/screen.ts). Said as what it is.
-      line: 'Meals keyed to the numbers you enter, and the kitchens behind it.',
-      tag: 'Eat',
+      line: t('train.cards.fuel.line'),
+    },
+    {
+      // TEAMS-SQUADS (2026-10-25): squads (friends) and teams (a coach's) — daily drills together, a weekly league
+      href: '/squads', group: 'program' as Group, icon: Users, accent: PALETTE.cyan, title: t('train.cards.squads.title'),
+      line: t('train.cards.squads.line'),
     },
     ...(coachesAnyone ? [{
-      href: '/coach', icon: Users, accent: '#A855F7', title: 'Your roster',
-      line: 'The athletes you coach, what they have done this fortnight, and who is drifting.',
-      tag: 'Coach',
+      href: '/coach', group: 'program' as Group, icon: Users, accent: PALETTE.violet, title: t('train.cards.roster.title'),
+      line: t('train.cards.roster.line'),
+    }] : []),
+    // COMBINE-DAY (2026-10-25): a coach's tryout / testing day; a coached athlete's own combine numbers
+    ...(coachesAnyone ? [{
+      href: '/coach/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combine.title'),
+      line: t('train.cards.combine.line'),
+    }] : []),
+    ...(coachLink ? [{
+      href: '/train/combine', group: 'program' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.combines.title'),
+      line: t('train.cards.combines.line'),
     }] : []),
     {
-      href: '/profile', icon: Activity, accent: '#7B61FF', title: 'Where you stand',
-      line: 'PRQ, your grade, and what has moved since the last screen.',
-      tag: 'Read',
+      href: '/profile', group: 'measure' as Group, icon: Activity, accent: PALETTE.indigo, title: t('train.cards.standing.title'),
+      line: t('train.cards.standing.line'),
     },
   ];
 
@@ -100,49 +158,34 @@ export default async function TrainPage() {
   // Paradise card's '/play/training' today) stays in the array above, unlisted, and comes back with the list entry.
   const shown = cards.filter((c) => !isUnlistedPlayHref(c.href));
 
+  // PREMIUM-UI P4 (2026-10-27): Muscle Beach full-bleed; today's drill first — it IS the screen's one primary (its card
+  // carries the start); then the rest as list rows in three groups, each one line of twelve words or fewer. The shelf used
+  // to be sixteen cards of a paragraph each: the owner's "walls of small text".
+  const SECTION: Record<Group, string> = { measure: t('train.section.measure'), program: t('train.section.program'), learn: t('train.section.learn') };
+  const groupOf = (g: Group) => shown.filter((c) => c.group === g);
+  let n = 0;
   return (
     <TabPage
-      eyebrow="Train"
-      title="The work between games"
-      lede="Screen it, program it, eat for it. This is the loop the games are the proof of."
-      accent="#00FF9D"
+      eyebrow={t('train.eyebrow')}
+      title={t('train.title')}
+      lede={t('train.lede')}
+      hero={{ image: '/backdrops/training.jpg', imagePosition: '50% 60%' }}
     >
+      <DailyDrillCard view={dailyDrill} />
       <TodayCard view={todayCard} />
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {shown.map((c, i) => {
-          const Icon = c.icon;
-          return (
-            <li key={c.href} className="fel-rise" style={{ ['--fel-rise-delay' as string]: `${i * 45}ms` }}>
-              <Link
-                href={c.href}
-                className="group flex h-full gap-4 rounded-2xl border border-white/8 bg-white/[0.02] p-5
-                           transition-all duration-300 hover:-translate-y-0.5 hover:border-white/15
-                           hover:bg-white/[0.045] hover:shadow-[0_18px_40px_-24px_rgba(0,0,0,0.9)]"
-                // the colour arrives on approach rather than sitting there shouting
-              >
-                <span
-                  aria-hidden
-                  className="grid h-11 w-11 shrink-0 place-items-center rounded-xl transition-transform duration-300 group-hover:scale-105"
-                  style={{ background: `${c.accent}14`, boxShadow: `inset 0 0 0 1px ${c.accent}33` }}
-                >
-                  <Icon className="h-[19px] w-[19px]" style={{ color: c.accent }} strokeWidth={2.1} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="fel-heading block text-[16px] font-bold leading-tight text-white">{c.title}</span>
-                  <span className="mt-1.5 block text-[13px] leading-relaxed text-white/45">{c.line}</span>
-                  {/* One colour moment per card. The icon tile carries the accent because it is the destination's
-                      identity; the call to action repeating it gave five cards ten coloured marks on a page whose
-                      own colour is green, and the eye had nowhere to land. */}
-                  <span className="mt-3 inline-block font-mono text-[10px] font-bold uppercase tracking-[0.16em]
-                                   text-white/40 transition-colors group-hover:text-white/75">
-                    {c.tag} →
-                  </span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <WeekCardEntry />
+      {GROUPS.map((g) => (
+        <section key={g} aria-labelledby={`train-${g}`} className="mt-8 first:mt-0">
+          <h2 id={`train-${g}`} className={`${TYPE.label} mb-2 px-1 text-fel-dim`}>{SECTION[g]}</h2>
+          <ul className="fel-surface flex flex-col p-1.5">
+            {groupOf(g).map((c) => (
+              <li key={c.href} className="fel-enter" style={enterDelay(n++)}>
+                <ListRow href={c.href} icon={c.icon} accent={c.accent} title={c.title} line={c.line} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
       <DoorsRow tab="train" />
     </TabPage>
   );
