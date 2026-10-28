@@ -30,6 +30,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromiumExe } from './_chromium.mts';
+import * as SynthNs from '@/lib/pose/synth';
+import * as StreamKitNs from '@/lib/pose/streamKit';
+import * as SeamReplayNs from '@/lib/pose/seamReplay';
+import type { Joints } from '@/lib/pose/synth';
+import type { Beat } from '@/lib/pose/streamKit';
+// tsx compiles these .ts modules as CommonJS: from this ESM file their named exports are only on `default`
+const cjs = <T,>(ns: T): T => ((ns as { default?: T }).default ?? ns);
+const { restPose, synthesize } = cjs(SynthNs), { armsSwing, hold, jogBeat, script, scriptedJump } = cjs(StreamKitNs), { bodyPackets } = cjs(SeamReplayNs);
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:3611';
 const PAGE = process.env.PAGE ?? 'base.html?mode=dunk';
@@ -40,6 +48,22 @@ const STRIP = process.env.STRIP === '1';
 const SEED = Number(process.env.SEED ?? 7);
 const W = Number(process.env.VW ?? 480), H = Number(process.env.VH ?? 270);
 const SCALE = Number(process.env.HWSCALE ?? 2);
+// Phase 5: body:<cm> — a synthetic body dunk (lib/pose's own streams, as lib/move/dunkBody.test.ts shoots them: a jog, then a jump of
+// that rise with the arms driven through the apex) published packet by packet into the page's bus on the virtual clock, so the
+// real harness → BodySession → the mode's onBody runs it. SLAM=open|beat|none overrides the pad's slam (sloppy vs on the beat).
+function bodyStream(riseCm: number) {
+  const R = restPose(), v0 = Math.sqrt(2 * 9.81 * riseCm / 100);
+  const J = scriptedJump(R, v0, 0.28, 0.12, false);
+  const apex = J.tOff + (J.tLand - J.tOff) / 2;
+  const pose = (t: number): Joints => {
+    const body = J.pose(t); let u = 0;
+    if (t > 0 && t < J.tOff) u = -0.15 + 1.15 * Math.min(1, t / J.tOff);
+    else if (t >= J.tOff && t < apex + 0.12) u = 1 - (t - J.tOff) / (apex + 0.12 - J.tOff);
+    return armsSwing(body, u);
+  };
+  const beats: Beat[] = [hold(R, 1.2), jogBeat(R, 1.35, 2.6, 0.22), [J.end, pose], hold(R, 1.5)];
+  return bodyPackets(synthesize(script(beats), { seed: 17, noise: false, fps: 30 }).frames);
+}
 const FAST = process.env.FAST === '1', SWEEP = process.env.SWEEP === '1', PER_PAGE = Number(process.env.PER_PAGE ?? 4);
 fs.mkdirSync(OUT, { recursive: true });
 const VCLOCK_JS = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '_vclock-page.js'), 'utf8');
@@ -116,14 +140,17 @@ const RECORDER = `(() => {
   window.__HUDLOG = []; let last = '';
   setInterval(() => { const h = window.__hud(); const s = [h.banner, h.hint, h.slamBeat].filter(Boolean).join(' | '); if (s && s !== last) { last = s; window.__HUDLOG.push({ t: performance.now(), s }); } }, 16);
   // the slam on the beat the mode publishes (slamBeat 'beat' = the window's centre), pressed in the page
+  const LATE_MS = ${Number(process.env.SLAM_LATE_MS ?? 70)};
   window.__armSlam = (mode) => {
     const t0 = performance.now();
     const tick = () => {
       if (performance.now() - t0 > 5000) return;
       const sb = window.__hud().slamBeat;
       if (!(mode === 'open' ? (sb === 'open' || sb === 'beat') : sb === 'beat')) { requestAnimationFrame(tick); return; }
-      const b = window.__PAD.buttons[0]; b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now();
-      setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60);
+      const b = window.__PAD.buttons[0];
+      const press = () => { b.pressed = true; b.value = 1; window.__PAD.timestamp = performance.now(); setTimeout(() => { b.pressed = false; b.value = 0; window.__PAD.timestamp = performance.now(); }, 60); };
+      // Phase 5: 'late' = an ordinary make — the beat, then SLAM_LATE_MS (default 70) late: 120 ms graded 0.15–0.27, an IRON miss
+      if (mode === 'late') setTimeout(press, LATE_MS); else press();
     };
     requestAnimationFrame(tick);
   };
@@ -148,7 +175,7 @@ async function startInPage(settleMs: number): Promise<{ playing: boolean; frames
 }
 
 interface AttemptCfg { scen: string; seed: number; standMs: number; walkMs: number; walkY: number; holdMs: number; takeoff: 'auto' | 'press' | 'release'; pressAfterMs: number;
-  preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'none'; recMs: number; strip: number[] | null }
+  preY: boolean; postYMs?: number; cueRe?: string; reactMs?: number; body?: unknown[]; runY: boolean; air: [number, number] | null; slam: 'beat' | 'open' | 'late' | 'none'; recMs: number; strip: number[] | null }
 type AttemptOut = { err: string } | { t0: number; pressAt: number | null; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; hud: string[] };
 
 /** One attempt in the page, on the virtual clock. */
@@ -168,11 +195,24 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
       if (/RIVAL/.test(String(w.__hud().banner ?? '')) || w.__hud().rivalSkip === true) { await tap(1, 60); await sleep(300); }
       await sleep(120);
     }
-    if (!ok) return { err: 'no approach' };
+    if (!ok) return { err: 'no approach: ' + document.body.innerText.replace(/\s+/g, ' ').slice(0, 240) };
     await sleep(500);
     const R = w.__rec; R.frames = []; R.f0 = w.__vc.C.frames; R.strip = c.strip ? c.strip.slice() : null; R.on = true; const t0 = now();
     const launchedAt = (): number | null => { const m = w.__smp.marks.find((x) => x.t >= t0 && /\[DUNK-LAUNCH\]/.test(x.msg)); return m ? m.t : null; };
     await sleep(c.standMs);
+    if (c.body) {   // Phase 5: the synthetic body, each packet at its own time (rebased to the page's clock), then the release
+      type Pk = { arrivedAt: number; final?: true };
+      const bus = (window as unknown as { __bus: { publishBody(p: Pk): void } }).__bus;
+      const pk = c.body as Pk[]; const a0 = pk[0].arrivedAt, p0 = now();
+      for (const p of pk) { const due = p0 + (p.arrivedAt - a0); while (now() < due) await sleep(4); bus.publishBody({ ...p, arrivedAt: now() }); }
+      bus.publishBody({ ...pk[pk.length - 1], arrivedAt: now(), final: true });
+      const launch = launchedAt();
+      if (!launch) { R.on = false; return { err: 'never launched (body)' }; }
+      const end = launch + c.recMs; while (now() < end) await sleep(100);
+      R.on = false;
+      const qa = w.__FEL_QA__ ? w.__FEL_QA__.events(4000).filter((e) => e.t >= t0).map((e) => ({ t: e.t, kind: String(e.kind), name: String(e.key ?? '') })) : [];
+      return { t0, pressAt: null, frames: R.frames, marks: w.__smp.marks.filter((m) => m.t >= t0), qa, hud: w.__HUDLOG.filter((h) => h.t >= t0).map((h) => h.s) };
+    }
     if (c.preY) {
       await tap(3, 60);
       if (c.cueRe) {   // SWEEP, standing: the player runs on the cue (the RUN! flash, or the release itself) after a reaction time
@@ -241,6 +281,8 @@ function cfgFor(scen: string, rep: number): AttemptCfg {
   // standing throws: the RUN! cue (glass, bounce) or the release (the plain self-lob: run as it leaves), then a 0–0.4 s reaction
   const react = [0, 100, 200, 300, 400][rep % 5];
   const stand = (b: AttemptCfg): AttemptCfg => SWEEP ? { ...b, cueRe: b.scen === 'selflob' ? '^\\[LOB\\] SELF-LOB from' : '^\\[LOB\\] (RUN!|off-glass armed)', reactMs: react, standMs: 300 + (rep % 3) * 150 } : b;
+  if (process.env.SLAM) base.slam = process.env.SLAM as AttemptCfg['slam'];
+  if (scen.startsWith('body:')) return { ...base, walkMs: 0, standMs: 300, slam: 'none', body: bodyStream(Number(scen.slice(5))) };
   switch (scen) {
     case 'selflobrun': case 'glass': case 'bounce': return run({ ...base, walkMs: 300 + jit });
     case 'glassstand': case 'bouncestand': return stand({ ...base, walkMs: 0, standMs: 300 + jit, preY: true });
