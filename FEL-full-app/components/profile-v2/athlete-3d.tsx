@@ -55,12 +55,13 @@ export default function Athlete3D(props: Athlete3DProps) {
         const { Engine, Scene, ArcRotateCamera, HemisphericLight, DirectionalLight, Vector3, Color4, Color3 } = await import('@babylonjs/core');
         mark('babylon');
         await yieldToPage();
-        const [{ CharacterLibrary }, { DEFAULT_HERO_URL }, { resolveIdentity }, { atBindPose }, { reducedMotion }] = await Promise.all([
+        const [{ CharacterLibrary }, { DEFAULT_HERO_URL }, { resolveIdentity }, { atBindPose }, { reducedMotion }, { detectRenderTier }] = await Promise.all([
           import('@/lib/babylon/core/CharacterLibrary'),
           import('@/lib/babylon/core/athleteRoster'),
           import('@/lib/babylon/core/playerIdentity'),
           import('@/lib/babylon/library/poseGuard'),
           import('@/lib/a11y/reducedMotion'),
+          import('@/lib/babylon/scene/QualityTier'),
         ]);
         mark('modules');
         await yieldToPage();
@@ -76,6 +77,11 @@ export default function Athlete3D(props: Athlete3DProps) {
         // need and its own lazy scope (clipScope.ts 'library': the core clips at spawn, the rest on demand), so the profile
         // stands in it too. Not a standard-frame mode (playFrame.ts), so the player's height and build still show.
         (scene.metadata ??= {}).felModeId = 'library';
+        // THE PHONE BODY (coordinator 2026-10-28, beside lane demo-speed): a phone gets the scan's phone file and the mobile
+        // skin/motion variants by CharacterLibrary's own rule — the scene's tier (`felTier`, heroUrlForTier). The tier is
+        // decided on the SCREEN, not this canvas: every stage canvas is phone-sized, so the canvas would call a desktop a phone.
+        scene.metadata.felTier = detectRenderTier({ clientWidth: window.innerWidth, clientHeight: window.innerHeight },
+          { hardwareScalingLevel: liveScale, effectiveDpr: 1 / liveScale, backingWidth: canvas.width, backingHeight: canvas.height, limitedBy: null }, engine);
         scene.clearColor = new Color4(0, 0, 0, 0);
         scene.skipPointerMovePicking = true;
         const cam = new ArcRotateCamera('profileCam', PROFILE_CAM.alpha, PROFILE_CAM.beta, PROFILE_CAM.radius, new Vector3(0, PROFILE_CAM.y, 0), scene);

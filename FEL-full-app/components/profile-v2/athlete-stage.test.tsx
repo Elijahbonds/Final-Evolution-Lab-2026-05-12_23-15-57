@@ -57,4 +57,14 @@ describe('the athlete stage', () => {
     expect(scopeForMode('library')?.lazy).toBe(true);
     expect(isStandardFrame({ modeId: 'library' })).toBe(false);   // the player's own height and build still show
   });
+
+  it('a phone gets the phone body: the scene carries the tier CharacterLibrary reads, decided on the screen, not the small canvas', async () => {
+    const s = src('athlete-3d.tsx');
+    expect(s).toMatch(/scene\.metadata\.felTier = detectRenderTier\(\{ clientWidth: window\.innerWidth, clientHeight: window\.innerHeight \}/);
+    const { autoTier } = await import('@/lib/babylon/scene/QualityTier');
+    const phone = autoTier({ touch: true, coarsePointer: true, cssWidth: 390, cssHeight: 844, limitedBy: null, gpu: 'unknown', legacy: false } as Parameters<typeof autoTier>[0]);
+    const laptop = autoTier({ touch: false, coarsePointer: false, cssWidth: 1440, cssHeight: 900, limitedBy: null, gpu: 'unknown', legacy: false } as Parameters<typeof autoTier>[0]);
+    const stageCanvas = autoTier({ touch: false, coarsePointer: false, cssWidth: 520, cssHeight: 300, limitedBy: null, gpu: 'unknown', legacy: false } as Parameters<typeof autoTier>[0]);
+    expect([phone.tier, laptop.tier, stageCanvas.tier]).toEqual(['mobile', 'desktop', 'mobile']);   // why the canvas is not asked
+  });
 });
