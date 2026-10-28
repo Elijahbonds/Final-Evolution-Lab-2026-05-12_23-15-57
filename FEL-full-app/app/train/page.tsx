@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { Activity, ArrowUpFromLine, BookOpen, ClipboardList, Dumbbell, Footprints, Gauge, Layers, Library, UtensilsCrossed, Users, ScanLine, Timer } from 'lucide-react';
 import { authOptions } from '@/lib/auth';
+import { FULL_SCREEN_HREF } from '@/lib/screen-easy/door';
 import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isUnlistedPlayHref } from '@/lib/unlisted-modes';
@@ -69,11 +70,12 @@ export default async function TrainPage() {
     },
     {
       // MIRROR-FIRST P1 (2026-10-07): the Quick Screen (/screen → /play/mirror/assess, no sign-in) was linked from nowhere
-      // in the app. It goes in at its front door, never a deep link past it: the screen asks its own age question first and,
-      // under 18 or unanswered, the grown-up step (app/play/mirror/assess/_components/gate-steps.tsx), for every visitor —
-      // it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the screen has
-      // no fetch (assess-app.tsx "KIDS SEND NOTHING"), and results stay in the tab.
-      href: '/screen', group: 'measure' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.quickScreen.title'),
+      // in the app. The screen asks its own age question first and, under 18 or unanswered, the camera-free card, for every
+      // visitor — it does not read the account, so the same card is right for a teen and an adult. Nothing is sent: the
+      // screen has no fetch (assess-app.tsx "KIDS SEND NOTHING"), and results stay in the tab.
+      // SCREEN-EASY (2026-10-28): straight to the full screen (lib/screen-easy/door.ts) — /screen's first button is the
+      // jump, which has its own card above; a ?run= start still asks the age question first.
+      href: FULL_SCREEN_HREF, group: 'measure' as Group, icon: Timer, accent: PALETTE.cyan, title: t('train.cards.quickScreen.title'),
       line: t('train.cards.quickScreen.line'),
     },
     {
