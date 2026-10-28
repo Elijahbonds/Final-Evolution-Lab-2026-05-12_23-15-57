@@ -20,8 +20,19 @@ describe('every age band → the right next step', () => {
     expect(mayPersist(c.gate)).toBe(true);
   });
 
-  it('SCREEN A: pain "no" → takeoff → camera card, for jump and full alike; "Not sure" is an answer (null)', () => {
-    for (const kind of ['jump', 'full'] as const) {
+  // test changed (VERTICAL-EASY, 2026-10-27): was "for jump and full alike". The jump alone no longer asks the take-off
+  // foot (it labels only the full screen's sided checks); the full screen still asks it, exactly as before.
+  it('VERTICAL-EASY: the jump alone goes from pain "no" straight to the camera card; back returns to the pain question', () => {
+    const t = run([{ type: 'start', kind: 'jump' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
+    expect(t.step).toBe('cameraInfo');
+    expect(t.kind).toBe('jump');
+    expect(run([{ type: 'cameraOn' }], t).step).toBe('camera');
+    expect(backStep(t).step).toBe('pain');
+    expect(run([{ type: 'takeoff', side: 'left' }], t).step).toBe('cameraInfo');   // nothing to answer: unchanged
+  });
+
+  it('SCREEN A: pain "no" → takeoff → camera card for the full screen; "Not sure" is an answer (null)', () => {
+    for (const kind of ['full'] as const) {
       const t = run([{ type: 'start', kind }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
       expect(t.step, kind).toBe('takeoff');
       expect(t.kind, kind).toBe(kind);

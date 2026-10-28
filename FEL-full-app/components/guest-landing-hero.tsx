@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Flame, Trophy, ArrowRight } from 'lucide-react';
+import { Flame, Trophy, ArrowRight, ArrowUpFromLine } from 'lucide-react';
 import { track, flush } from '@/lib/analytics';
 import { EmailCapture } from '@/components/marketing/email-capture';
 import { joinLabEnabled } from '@/lib/marketing/joinLab';
@@ -9,6 +9,7 @@ import { HeroHeader } from '@/components/ui/fel/hero-header';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
 import { Chip } from '@/components/ui/fel/chip';
 import { t } from '@/lib/i18n';
+import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';
 
 /**
  * M13 Step 1 — the logged-out landing. One promise: "60 seconds to a dunk."
@@ -46,6 +47,8 @@ export function GuestLandingHero() {
         <Chip href="/login" icon={<Trophy aria-hidden className="h-4 w-4 text-fel-gold" />}>{t('landing.login')}</Chip>
         {/* MULTIPLAYER (2026-10-06): a friend's TV shows a code — the guest's one-step way into their game */}
         <Chip href="/join" testId="landing-join" icon={<ArrowRight aria-hidden className="h-4 w-4" />}>{t('landing.join')}</Chip>
+        {/* VERTICAL-EASY (2026-10-27): measuring a vertical needs no account (the Quick Screen sends nothing) — one tap */}
+        <Chip href={MEASURE_VERTICAL_HREF} testId="landing-vertical" icon={<ArrowUpFromLine aria-hidden className="h-4 w-4 text-fel-cyan" />}>{t('landing.vertical')}</Chip>
       </HeroHeader>
 
       {/* JOIN-LAB-HIDE: the Join the Lab email form stays hidden until the switch is on (lib/marketing/joinLab.ts). */}

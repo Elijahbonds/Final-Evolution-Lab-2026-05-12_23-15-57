@@ -7,6 +7,7 @@ import type { ScreenKind } from '@/lib/screen/flow';
 // stable address is /screen. ?run=jump or ?run=full is the button the person pressed, not a tracking tag.
 export default function MirrorAssessPage({ searchParams }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const raw = searchParams?.run;
-  const run: ScreenKind | null = raw === 'jump' || raw === 'full' ? raw : null;
+  // VERTICAL-EASY: ?run=vertical is "Measure my vertical" (arms free); ?run=jump the hands-on-hips jump check
+  const run: ScreenKind | null = raw === 'jump' || raw === 'vertical' || raw === 'full' ? raw : null;
   return <AssessApp initialRun={run} />;
 }
