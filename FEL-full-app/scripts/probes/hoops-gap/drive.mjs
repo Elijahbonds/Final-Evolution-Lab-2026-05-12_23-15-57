@@ -140,7 +140,9 @@ if (SCEN === 'game') {
   result.snaps = await ev(() => window.__hg.snaps || []);   // hoops-p02: the defence snapshots
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'poss') {   // hoops-p02: the possession loop alone
-  result.poss = await possLoop(); result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
+  if (process.env.POSS_MOTION) await ev(() => window.__hg.start());   // hoops-p03: record the bodies over the loop (per-body root accel p99, pops)
+  result.poss = await possLoop();
+  if (process.env.POSS_MOTION) { await ev(() => window.__hg.stop()); result.analysis = await ev(() => window.__hg.analyse()); } result.log = await ev(() => window.__LOG); result.hud = await ev(() => window.__hud); result.snaps = await ev(() => window.__hg.snaps || []);
   { const names = await ev(() => Object.keys(window.__hg.strips).filter((k) => k.startsWith('auto-'))); for (const nm of names) await saveStrip(nm); result.autoStrips = names; }
 } else if (SCEN === 'input') {
   const S = (fn, arg) => ev(fn, arg);
