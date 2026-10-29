@@ -216,6 +216,7 @@ import { HOOPERS } from '../audio/mic/cast';
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
+import { applyInertialBlend } from '../anim/inertialize';   // AF-1: inertial clip transitions, behind the anim.inertial knob (default off)
 /** H2c (dev log): the defender states the stepping pass added or re-routed. */
 const H2C_STEP_STATES: ReadonlySet<string> = new Set(['defend_run', 'defend_run_right', 'run', 'closeout']);   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
@@ -1021,6 +1022,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       foe.secondary?.setLookTarget(() => ball?.position ?? null);
       neverBindPose(foe.animator, SPORT_CLIP.idle); installSafePlay(foe.animator, 'onevone-foe');
       ctx.groundLock?.track(foe.root, foe.skeleton);
+      applyInertialBlend(me.animator); applyInertialBlend(foe.animator);   // AF-1: off (the knob's default) leaves both bodies linear
       // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): both players' dunk family onto the right hand
       console.info(`[DUNK-HAND] 1v1 right-handed dunks: ${rightHandDunks(me.animator, me.skeleton)} / ${rightHandDunks(foe.animator, foe.skeleton)} clips mirrored`);
       // HOOPS MOTION phase 3 (owner round 2: right-handed everywhere): the whole bball_* family too, captures included (built by
