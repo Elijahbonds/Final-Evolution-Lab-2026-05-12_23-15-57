@@ -203,7 +203,13 @@ export interface NightReport {
 
 const avg = (xs: number[]): number => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-export function nightReport(card: DunkCard): NightReport {
+/** CONTROLLER-TRY-FIX: the advice for a night whose misses mostly came up short of the iron (a clean slam that never reached the rim). */
+export const SHORT_MISS_ADVICE = 'Clean slam — you came up short. Carry more speed into the plant.';
+
+/** What the mode knows that the card does not (optional, added only): how many of the card's misses came up short of the iron. */
+export interface NightReportOpts { shortMisses?: number }
+
+export function nightReport(card: DunkCard, opts: NightReportOpts = {}): NightReport {
   const made = card.attempts.filter((a) => a.made);
   const best = card.attempts.reduce<DunkAttempt | null>((m, a) => (!m || a.total > m.total ? a : m), null);
   const scored = card.attempts.filter((a) => a.exec !== undefined);
@@ -223,6 +229,9 @@ export function nightReport(card: DunkCard): NightReport {
   else if (exec < 6) advice = `The beat is costing you: ${exec.toFixed(1)} of 10 on execution. Let the cue go by and slam on NOW!`;
   else if (diff < 5) advice = 'Clean night, easy dunks. Call a harder one — the panel pays for what you try.';
   else if (look < 5) advice = 'Big dunks, quiet ones. Call your style on the runway and hang on the rim.';
+  // CONTROLLER-TRY-FIX: when at least half the night's misses fell short of the rim, the timing was not the lever — the run-up was
+  const short = Math.min(card.misses, Math.max(0, Math.floor(opts.shortMisses ?? 0)));
+  if (short > 0 && short * 2 >= card.misses) advice = SHORT_MISS_ADVICE;
   const headline = best ? `YOUR NIGHT: ${card.total} · BEST ${best.total}` : `YOUR NIGHT: ${card.total}`;
   return { headline, lines, advice };
 }

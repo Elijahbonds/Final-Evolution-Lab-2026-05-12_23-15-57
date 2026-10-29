@@ -24,6 +24,7 @@ import { MODE_VERBS } from '../babylon/ui/modeVerbs';
 import { buttonMap, slotModeKey } from '../creator/cardSlot';
 import { staticControlsFor } from '../babylon/ui/staticControls';
 import { panelLinesFor, BODY_BOOST_LINE, PANEL_MAX_CHARS, PANEL_GROUPS } from '../babylon/ui/panelLines';
+import { relabelInput, withButtons, type PadFamily } from '../input/padLabels';
 
 export type ControlsDevice = 'pad' | 'keys' | 'touch';
 export const CONTROLS_DEVICES: readonly ControlsDevice[] = ['pad', 'keys', 'touch'];
@@ -75,8 +76,10 @@ function translate(input: string, device: ControlsDevice, labels: Record<string,
   return input.replace(/\b([ABXY])\b/g, (_, b: string) => labels[b] || b);
 }
 
-/** The rows for one device: the stick, the face verbs (from what they emit), the moves, boost, look and pause. */
-export function controlRows(modeId: string, device: ControlsDevice): ControlRow[] {
+/** The rows for one device: the stick, the face verbs (from what they emit), the moves, boost, look and pause.
+ *  CONTROLLER-TRY-FIX item 4: on a pad, `family` names the buttons as that controller does (an Xbox pad's R2 is RT); no family — or
+ *  'generic' — is today's words exactly. */
+export function controlRows(modeId: string, device: ControlsDevice, family?: PadFamily): ControlRow[] {
   const key = slotModeKey(modeId);
   const cfg = MODE_VERBS[key] ?? MODE_VERBS.default;
   const labels: Record<string, string> = {};
@@ -99,7 +102,9 @@ export function controlRows(modeId: string, device: ControlsDevice): ControlRow[
   for (const r of buttonMap(modeId)) {
     if (r.group === 'verb') continue;   // the verbs above, from what they emit
     if (r.group === 'move' && TRICK.test(r.input)) continue;   // a trick-table move: one line per button (moveLines)
-    const input = translate(r.input, device, labels);
+    // a system row may say what it is on the keys or the touch deck itself (the dunk's L2 has no key: null, no row)
+    const own = device === 'keys' ? r.keys : device === 'touch' ? r.touch : undefined;
+    const input = own !== undefined ? own : translate(r.input, device, labels);
     if (input) rows.push({ input, action: r.action });
   }
   if (cfg.rStick && cfg.rStick !== 'FLICK') {
@@ -107,7 +112,7 @@ export function controlRows(modeId: string, device: ControlsDevice): ControlRow[
     else if (device === 'touch') rows.push({ input: 'RIGHT PAD', action: cfg.rStick });
   }
   if (device !== 'touch') rows.push({ input: device === 'pad' ? 'START' : 'ESC', action: 'PAUSE' });
-  return rows;
+  return device === 'pad' && family ? rows.map((r) => ({ ...r, input: relabelInput(r.input, family) })) : rows;
 }
 
 /** A board's trick-table move as the card slot writes it: an optional direction, then a face button ('← + B', 'Y'). */
@@ -118,7 +123,7 @@ const TRICK = /^(?:([←↑→↓]) \+ )?([ABXY])$/;
  * each. The surf's nine trick rows were five lines of the grid — the panel's whole height on a sideways phone. The
  * button is the device's: the letter on a pad, its key on the keys (InputBus KEYMAP), its verb on the touch deck.
  */
-export function moveLines(modeId: string, device: ControlsDevice): string[] {
+export function moveLines(modeId: string, device: ControlsDevice, family?: PadFamily): string[] {
   const cfg = MODE_VERBS[slotModeKey(modeId)] ?? MODE_VERBS.default;
   const labels: Record<string, string> = {};
   cfg.buttons.forEach((b, i) => { if (b.emit && b.label) labels[FACE[i]] = b.label; });
@@ -130,7 +135,7 @@ export function moveLines(modeId: string, device: ControlsDevice): string[] {
     if (m[1]) g.dir.push(`${m[1]}${r.action}`); else g.plain.push(r.action);
     byBtn.set(m[2], g);
   }
-  const name = (b: string): string => device === 'pad' ? b : device === 'keys' ? KEY_OF[b] ?? b : labels[b] ?? b;
+  const name = (b: string): string => device === 'pad' ? relabelInput(b, family) : device === 'keys' ? KEY_OF[b] ?? b : labels[b] ?? b;
   // the arrow is each directed move's own bullet: one row of a sideways phone holds the surf's five B moves
   const lines = [...byBtn].map(([b, g]) => `${name(b)}: ${[...g.plain, g.dir.join(' ')].filter(Boolean).join(' · ')}`);
   // and two short buttons share a row ('Y: →720 … · X: BOARDSLIDE'): Gate Crasher's sideways-phone card has no row spare
@@ -189,13 +194,17 @@ export function titledGroups(modeKey: string): ControlsGroup[] | null {
 }
 
 /** The device's rows; then its trick lines (a board's table), then the mode's own lines — in its titled groups, if it has them. */
-export function controlsSheet(modeId: string, device: ControlsDevice, opts: { body?: boolean; fallback?: string } = {}): ControlsSheet {
-  const moves = moveLines(modeId, device);
+/** CONTROLLER-TRY-FIX item 4: `opts.family` (a pad's label family) names the buttons in the rows and the lines on a pad; without it the sheet
+ *  is exactly what it was. */
+export function controlsSheet(modeId: string, device: ControlsDevice, opts: { body?: boolean; fallback?: string; family?: PadFamily } = {}): ControlsSheet {
+  const family = device === 'pad' ? opts.family : undefined;
+  const moves = moveLines(modeId, device, family);
   const titled = titledGroups(slotModeKey(modeId));
   const groups: ControlsGroup[] = titled
     ? [...(moves.length ? [{ lines: moves }] : []), ...titled]
     : [{ lines: [...moves, ...controlLines(modeId, opts)] }];
-  return { device, rows: controlRows(modeId, device), lines: groups.flatMap((g) => g.lines), groups };
+  const named = family ? groups.map((g) => ({ ...g, lines: g.lines.map((l) => withButtons(l, family)) })) : groups;
+  return { device, rows: controlRows(modeId, device, family), lines: named.flatMap((g) => g.lines), groups: named };
 }
 
 /** The smallest the panel's rows and lines may step down to so a list fits its box (ControlsPanel's fit): 10 px → 8.5 px. */
