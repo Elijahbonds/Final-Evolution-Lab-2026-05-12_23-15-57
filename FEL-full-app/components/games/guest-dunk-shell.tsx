@@ -303,7 +303,10 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
         </div>
       </header>
 
-      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
+      {/* CONTROLLER-TRY-FIX item 1 (C1): while the stage is live the game owns the pad (lib/nav/focus.ts OWNS_INPUT), so the site's menu
+          focus stands aside: pad A no longer focuses and clicks the header QUIT, and pad B no longer runs history.back(). The age step,
+          the claim sheet and the result modal keep pad navigation (the attribute is off there). The age gate itself is untouched. */}
+      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4" data-own-input={gate !== 'ask' && !claimOpen && !result ? '' : undefined}>
         {gate === 'ask' ? (
           <div className="py-10" data-testid="guest-age-step">
             <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} />

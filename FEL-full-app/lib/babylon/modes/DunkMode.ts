@@ -491,6 +491,9 @@ export const DunkMode: ModeDefinition = (() => {
   let style: Style = 'power';
   let prop: Prop = 'none';
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
+  /** CONTROLLER-TRY-FIX: this attempt's jam came up SHORT OF THE IRON (set beside its `qteHit = false`), so the miss says that, not a timing
+   *  word — a CLEAN-graded press that falls short is not TOO EARLY (C3, run4 log l.94-102). Cleared with qteHit on every attempt. */
+  let shortOfIron = false;
   let ring: PlayerRingHandle | null = null;   // PLAYER RING
   const NET_THROW_MIN = 4, NET_THROW_MAX = 12;   // NET EXIT (2026-09-17): m/s down the net — a loose slam drops it, a perfect one fires it (and it bounces off the floor and away)
   let sinceRelease = 0, releasePos = new Vector3();
@@ -689,6 +692,7 @@ export const DunkMode: ModeDefinition = (() => {
   // is the description of each attempt, small enough to ride in the JSON payload MatchEvent already has.
   let card = emptyCard();
   let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
+  let nightShort = 0;   // CONTROLLER-TRY-FIX: tonight's scored misses that came up short of the iron (the night report's advice)
   /** Every card the player has posted tonight — P8: the standard the rival is watching, not just the scoreboard. */
   const playerCards: number[] = [];
   /** The player's average card so far (0 before the first one). */
@@ -2435,7 +2439,7 @@ export const DunkMode: ModeDefinition = (() => {
               const away = new Vector3(bp.x - rim.x, 0, bp.z - rim.z); if (away.lengthSquared() > 1e-6) away.normalize(); else away.set(0, 0, 1);
               const shortAt = jamSec;
               releaseBall(ball); ball.position.copyFrom(bp); releasePos.copyFrom(bp); ballSim.launch(bp.clone(), new Vector3(away.x * 1.2, 0.4, away.z * 1.2)); looseBall = true;
-              qteHit = false; jamSec = -1; sinceRelease = 0; dropToFloor = true; dropVy = 0; setTrail('off'); armSettle();
+              shortOfIron = true; qteHit = false; jamSec = -1; sinceRelease = 0; dropToFloor = true; dropVy = 0; setTrail('off'); armSettle();
               console.info(`[HANDS] short of the iron ${shortAt.toFixed(2)} s after the press: iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m — a miss, no contact`);
               dunkHooks.miss('short', hookWho());
               flash(ctx, 'SHORT OF THE IRON', 900);
@@ -3110,7 +3114,7 @@ export const DunkMode: ModeDefinition = (() => {
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
-    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = hs('Right') === 'Left';
+    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; ebState.inLeftHand = hs('Right') === 'Left';
     meterSpan = EASTBAY_TIMING.extend + slamWindowNow() / 2 + 0.16; meter3d?.begin(slamGreen());
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
@@ -3251,6 +3255,7 @@ export const DunkMode: ModeDefinition = (() => {
   function missKind(): MissKind {
     if (obstacleClipped) return 'prop';
     if (lob.live || lob.lost) return 'lob';
+    if (shortOfIron) return 'short';   // CONTROLLER-TRY-FIX: the jam fell short of the rim — the booth's iron lines, no timing word
     if (slamTiming?.zone === 'late') return 'late';   // DUNK-LIVE-TIMING-FIX LP-01(b): a late iron miss is called late, as the strip and the chip read it
     return slamSeen ? 'early' : 'noSlam';
   }
@@ -3260,6 +3265,9 @@ export const DunkMode: ModeDefinition = (() => {
     // Every press inside the accepted window (the buffer's edge through the close) is a MAKE, so a miss with a press on
     // the record is a press that came in front of it — say that, not "off the iron": it is the one thing the player can fix.
     const named = namedTricks();
+    // CONTROLLER-TRY-FIX (C3): the jam came up short of the rim — whatever the press's grade (a CLEAN press can fall short), say that
+    // first: SHORT OF THE IRON — MISSED, the branch's own word (its 900 ms flash), never TOO EARLY or LATE.
+    if (shortOfIron) { const s = 'SHORT OF THE IRON'; return named ? `${named} · ${s}` : s; }
     // DUNK-LIVE-TIMING-FIX LP-01(a): a press inside the window more than ~0.7 of its half past the beat is iron too (execution under
     // RIM_CLEAN). The strip and the chip read that zone (slamReadout) as LATE, so the banner does too: one verdict — LATE — MISSED, the
     // mirror of TOO EARLY (PM copy, 2026-10-28).
@@ -4536,6 +4544,7 @@ export const DunkMode: ModeDefinition = (() => {
           judges: missScores.map((j) => j.score), total: missTotal, made: false,
           diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
         });
+        if (shortOfIron) nightShort++;   // CONTROLLER-TRY-FIX: a scored miss that came up short (the night report's advice)
       }
       if (turn === 'rival') rivalScored = true;   // dunk-next phase 4: his card is the panel's now — a skip only hurries it
       if (dunkOff > 0) dunkOffCards[turn === 'rival' ? 'rival' : 'player'] = { total: missTotal, execution: 0, difficulty: missDiff, style: missStyle };   // endless dunk-offs: the numbers the tiebreak reads
@@ -4923,7 +4932,7 @@ export const DunkMode: ModeDefinition = (() => {
     cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
     armedAir = null; spin.reset(); replaySpinYaw = 0; clearBeats(ctx);   // dunk-next: the strip goes with the attempt
     playClip(SPORT_CLIP.idle, { loop: true });
-    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
     dunkBody.reset(); bodySlamClip = null; bodyRT = 0;
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
@@ -5413,9 +5422,11 @@ export const DunkMode: ModeDefinition = (() => {
     // who lost by four had no way to know whether it went on the beat, on ambition, or on the two they threw at the
     // iron early — which is the one thing that decides whether the next night goes better. The panel already publishes
     // the three numbers per attempt; the card carries them now, and the report names ONE thing to change.
-    const report = nightReport(card);
+    const report = nightReport(card, { shortMisses: nightShort });   // CONTROLLER-TRY-FIX: the short misses, for the advice
     console.info(`[DUNK-NIGHT] ${report.headline} · ${report.lines.join(' · ')} · ${report.advice}`);
-    later(() => { if (phase === 'contestOver') flash(ctx, `${report.headline} — ${report.advice}`); }, 1400);
+    // CONTROLLER-TRY-FIX (C6): the report goes INTO the night card (hud.nightReport, one caption under the headline), not onto the
+    // banner channel — the banner ran across the CUT AT THE LINE card (06_…png). The host draws no banner while the card is up.
+    later(() => { if (phase === 'contestOver') ctx.setHud({ nightReport: `${report.headline} — ${report.advice}` }); }, 1400);
   }
 
   /** GO AGAIN — the whole contest resets INSIDE the mode. Nothing is disposed and
@@ -5434,6 +5445,7 @@ export const DunkMode: ModeDefinition = (() => {
     // night 1's dunks on it, and the card no longer added up to the score ctx.card sends out beside it. A card that
     // disagrees with its own score is exactly what an integrity check refuses. load() already opened a fresh one.
     card = emptyCard();
+    nightShort = 0;   // CONTROLLER-TRY-FIX: the short misses are the night's too
     hype = 0; chain = 0;
     ended = false; finishing = false; cancelLiveCeleb(); celebFace = null;
     usedCombos.clear(); momentum.reset(); flight.reset();
@@ -5451,7 +5463,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.heroRef.current = player.root;
     ctx.camDirector.suspended = false;
     ctx.setHud({
-      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '', rivalSkip: false, nightUnlock: '',
+      nightCard: null, nightReport: '', nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '', rivalSkip: false, nightUnlock: '',
       round: `1/${TOTAL_ROUNDS}`, score: 0, rivalScore: 0, hype: 0, chain: 0,
     });
     crowd.onScore(0);

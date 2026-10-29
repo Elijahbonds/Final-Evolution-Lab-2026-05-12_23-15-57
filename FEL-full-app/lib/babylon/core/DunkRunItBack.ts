@@ -42,7 +42,8 @@ export function runBackHint(s: Stakes): string {
 }
 
 /** What went wrong, as the booth hears it. */
-export type MissKind = 'prop' | 'lob' | 'early' | 'late' | 'noSlam';   // 'late': DUNK-LIVE-TIMING-FIX LP-01(b), a press past the beat that hit iron (the iron lines, as early)
+export type MissKind = 'prop' | 'lob' | 'early' | 'late' | 'short' | 'noSlam';   // 'late': DUNK-LIVE-TIMING-FIX LP-01(b), a press past the beat that hit iron (the iron lines, as early)
+// 'short': CONTROLLER-TRY-FIX, the jam came up short of the rim (the iron lines too: no lines of its own)
 /** The iron lines: a press that met the rim and lost. The early miss's, and the late one's too (DUNK-LIVE-TIMING-FIX LP-01(b): no lines of its own). */
 const IRON_LINES: readonly string[] = ['THE RIM SAID NO', 'IRON 1, DUNKER 0', 'ALL ARM, NO TIMING'];
 /** The booth's blooper calls — light, never mean, never the same line twice in a row for the same miss (bloopLine walks them). */
@@ -51,6 +52,7 @@ export const BLOOPER_LINES: Readonly<Record<MissKind, readonly string[]>> = {
   lob: ['THE TOSS HAD OTHER PLANS', 'NOBODY HOME FOR THAT LOB', 'THE BALL WENT SOLO'],
   early: IRON_LINES,
   late: IRON_LINES,
+  short: IRON_LINES,
   noSlam: ['FORGOT THE DUNK PART', 'ALL THAT AIR AND NO FLUSH', 'HE JUST… HUNG OUT UP THERE'],
 };
 

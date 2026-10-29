@@ -20,6 +20,7 @@ import { MODES } from '@/lib/babylon/modes/dunkRegistry';
 import { TouchOverlay } from '@/lib/babylon/ui/TouchOverlay';
 import { PadChips } from '@/lib/babylon/ui/PadChips';
 import { HostLobby } from '@/components/controller-link/host-lobby';
+import { familyFor, withButtons, type PadFamily } from '@/lib/input/padLabels';
 import { controllerConfigFor } from '@/lib/controller-link/schemas/registry';
 import { toInputBus } from '@/lib/controller-link/modeBridge';
 import { hnode, hnum } from './hud-format';
@@ -81,6 +82,9 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
   const [bootAttempt, setBootAttempt] = useState(0);
   // CONTROLLER-UNIVERSAL-MULTI: the chips and the phone link need the bus in RENDER, and busRef alone never re-renders
   const [bus, setBus] = useState<InputBus | null>(null);
+  // CONTROLLER-TRY-FIX item 4: the first pad's label family (an Xbox pad says RT, not R2); null with no pad = the hint as the mode wrote it
+  const [padFamily, setPadFamily] = useState<PadFamily | null>(null);
+  useEffect(() => (bus ? bus.onPads((pads) => setPadFamily(pads.length ? familyFor(pads[0].profileId) : null)) : undefined), [bus]);
 
   const retryBoot = useCallback(() => {
     endedRef.current = false;
@@ -230,7 +234,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
 
   const judging = Array.isArray(hud.judgeReveal) && (hud.judgeReveal as HudScoreCard[]).length > 0;
   // the banner's text (none while the judges hold the screen), and whether it rides high (the dunker is in the air)
-  const bannerText = !judging && typeof hud.banner === 'string' ? hud.banner : '';
+  // CONTROLLER-TRY-FIX item 5 (C6): no banner while the night card is up — the report is ON the card (hud.nightReport)
+  const bannerText = !judging && !card && typeof hud.banner === 'string' ? hud.banner : '';
   const bannerUp = bannerText !== '' && hud.bannerHigh === true;
   // the timing verdict: how the dunk was actually landed, under the judges' cards' slot
   const timing = !judging && typeof hud.slamTiming === 'string' && hud.slamTiming !== '' && phase === 'playing';
@@ -384,7 +389,7 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
           )}
         </div>
       ) : null}
-      {!judging && !bannerUp && <HudBanner text={bannerText} tone="you" size="score" className="top-[38%]" />}
+      {!judging && !bannerUp && !card && <HudBanner text={bannerText} tone="you" size="score" className="top-[38%]" />}
 
       {hud.poster && typeof hud.poster === 'object' && !Array.isArray(hud.poster) && phase === 'playing' && (
         <DunkPoster poster={hud.poster as HudPoster} onClose={() => setHud((h) => ({ ...h, poster: null }))} />
@@ -408,7 +413,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
         const t = decodeTakeoff(hud.takeoff);
         const beats = typeof hud.beats === 'string' && hud.beats ? hud.beats : '';
         const cutting = typeof hud.cut === 'string' && hud.cut;
-        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? hud.hint : '';
+        // CONTROLLER-TRY-FIX item 4: the live hint names the pad's own buttons (withButtons; the mode's words are unchanged, null = as written)
+        const hint = typeof hud.hint === 'string' && hud.hint && phase === 'playing' ? withButtons(hud.hint, padFamily) : '';
         const takeoff = t && phase === 'playing' && !judging && !beats ? t : null;
         const strip = beats && phase === 'playing' && !judging && !cutting ? beats : '';
         const mic = phase === 'playing' && !judging && typeof hud.mic === 'string' && hud.mic ? hud.mic : '';
@@ -459,6 +465,10 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
             <HudText as="div" size="banner" tone={card === 'WON' ? 'score' : 'text'} className="mt-1 uppercase" style={{ fontWeight: 800 }}>
               {card === 'WON' ? 'YOU TOOK THE CARD' : typeof hud.nightField === 'string' && hud.nightField.startsWith('CUT') ? 'CUT AT THE LINE' : 'RIVAL TOOK THE CARD'}
             </HudText>
+            {/* CONTROLLER-TRY-FIX item 5 (C6): the night report, one caption under the headline (it was a banner across this card) */}
+            {typeof hud.nightReport === 'string' && hud.nightReport ? (
+              <HudText as="div" size="caption" alpha={0.8} className="mt-1" data-night-report>{hud.nightReport}</HudText>
+            ) : null}
             {/* dunk-next phase 5: how the field went — the champion, the final, or where the cut fell */}
             {typeof hud.nightField === 'string' && hud.nightField ? (
               <HudText as="div" size="label" tone="score" className="mt-1 uppercase">{hud.nightField}</HudText>
@@ -527,7 +537,8 @@ export default function DunkBabylon({ onEnd, onCard, cardSlot, continuous = fals
       {controllerConfig && bus && (
         <HostLobby config={controllerConfig} onInput={onControllerInput} onPadInput={onPhonePad} collapsed={phase === 'playing'} lazy={process.env.NODE_ENV === 'production'} anchor="left-4 top-14" bus={bus} />
       )}
-      {bus && <PadChips bus={bus} className="left-4 bottom-4" />}
+      {/* CONTROLLER-TRY-FIX item 2: the lobby line says "connected" (top-left, 4 s), so no second toast here; and no chip while a run is live */}
+      {bus && <PadChips bus={bus} className="left-4 bottom-4" toast={false} quiet={phase !== 'playing'} />}
 
       {/* M35: THE single touch control surface — one overlay per mode, ever. */}
       {(phase === 'playing' || phase === 'countdown') && busRef.current && (

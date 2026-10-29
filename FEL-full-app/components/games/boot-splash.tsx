@@ -19,6 +19,7 @@ import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { bootErrorRequiresPageReload } from './boot-error';
+import { detectPadFamily } from '@/lib/input/padLabels';
 import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -414,6 +415,8 @@ export function SplashCard(props: BootSplashProps) {
             TAP TO START
           </button>
         )}
+        {/* CONTROLLER-TRY-FIX item 4 (C5): with a pad in, the card says the pad starts it too (any real press wakes play, StartWake) */}
+        {props.phase === 'ready' && <PadStartLine />}
         {/* MOVEMENT PLAY P3 (2026-09-24): the hands-up START, said once the camera sees you (it wakes a calibrated body,
             BodySession). The line reads the session itself, so the splash does not re-render with the ring, and holds
             its room while the camera is on, so the card does not jump when a detection is missed (the step-4a review).
@@ -836,4 +839,19 @@ export function ejectTransition(mount: HTMLElement): Promise<void> {
     requestAnimationFrame(() => { el.style.transform = 'translateY(0)'; });
     setTimeout(() => { resolve(); setTimeout(() => el.remove(), 400); }, 360);
   });
+}
+
+/** CONTROLLER-TRY-FIX item 4 (C5): 'or press any button' under TAP TO START while a pad is in — the night card's own words
+ *  (dunk-babylon). Read after mount (the browser's pads), so the server's markup is the old card exactly; nothing without a pad. */
+export const PAD_START_LINE = 'or press any button';
+export function PadStartLine() {
+  const [pad, setPad] = useState(false);
+  useEffect(() => {
+    const read = (): void => setPad(detectPadFamily() !== null);
+    read();
+    window.addEventListener('gamepadconnected', read);
+    window.addEventListener('gamepaddisconnected', read);
+    return () => { window.removeEventListener('gamepadconnected', read); window.removeEventListener('gamepaddisconnected', read); };
+  }, []);
+  return pad ? <span data-pad-start-line className="mt-1 font-mono text-xs text-white/60">{PAD_START_LINE}</span> : null;
 }
