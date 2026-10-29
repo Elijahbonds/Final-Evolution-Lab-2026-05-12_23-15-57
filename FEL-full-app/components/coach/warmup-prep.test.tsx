@@ -88,7 +88,7 @@ describe('WarmupPrep', () => {
     const withPrime = [ex('p1', 0, 'prime', 'locomotion', false, true), ...SQUAT_DAY];
     const m = text(html({ exercises: withPrime, contextUrl: null, initialContext: { ...ADULT_HEEL, isYouth: true } }));
     expect(m).not.toContain('data-kind="primer"');
-    expect(m).toContain('data-step="build-the-rhythm"');
+    expect(m).not.toContain('data-step="build-the-rhythm"');
     expect(m).toContain(NOTE_COPY.coach_prime);
     expect(m).toContain(NOTE_COPY.coach_impact);
     // a walk (locomotion, not jump work) in the same Prime keeps a youth athlete's jumps off (the P6 review's blocker)

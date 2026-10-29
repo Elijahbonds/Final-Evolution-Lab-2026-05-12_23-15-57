@@ -29,7 +29,7 @@ export const T3_THRESHOLDS: ThresholdId[] = [
 ];
 
 const other = (s: Side): Side => (s === 'left' ? 'right' : 'left');
-const points = (s: Side) => [23, 24, 11, 12, SIDE[s].knee, SIDE[s].ankle];
+export const points = (s: Side) => [23, 24, 11, 12, SIDE[s].knee, SIDE[s].ankle];
 
 interface RepRead { index: number; metrics: MetricResult[]; score: number; balanceLost: 'touchDown' | 'hop' | null; frame: number }
 

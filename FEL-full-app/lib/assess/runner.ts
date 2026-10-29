@@ -22,6 +22,7 @@
 //
 // Pure: frames and a clock in, a view out. The page renders the view, speaks `say`, and answers the prompts.
 import type { PoseFrame } from '@/lib/pose/landmarks';
+import { trustFor, type MeasureTrust } from '@/lib/screen/trust';
 import { checkFraming, FramingGate, type FramingCheck, type FramingIssue } from '@/lib/mirror/framing';
 import { calibrateFront, calibrateSide, type Calibration } from './calibration';
 import {
@@ -112,6 +113,11 @@ export interface SessionResult {
   /** What the screen would write to PRQ (the server recomputes it from the record; this is the preview). */
   prqPreview: PrqWrite[];
   takeoffLeg: Side | null;
+  /**
+   * MIRROR-TRUST-RATING: how clearly the camera saw each measure (High / Medium / Low and the reasons). A label beside
+   * the result: it changes no band, score, priority, lane, clean or complete. Worked out here, on the device.
+   */
+  trust: MeasureTrust[];
 }
 
 const QUICK_ORDER: TestId[] = ['T1', 'T2', 'T3', 'T5'];
@@ -121,7 +127,7 @@ const QUICK_ORDER: TestId[] = ['T1', 'T2', 'T3', 'T5'];
  * `prior` fills a test that has no capture (a jump already graded, carried into the rest of the screen).
  * A capture always grades fresh. The prior object is kept as-is when it is used.
  */
-export function gradeSession(cap: SessionCapture, prior?: Partial<Record<TestId, TestResult>>): SessionResult {
+export function gradeSession(cap: SessionCapture, prior?: Partial<Record<TestId, TestResult>>, priorTrust?: readonly MeasureTrust[]): SessionResult {
   const ctx = { calibration: cap.calibration, aspect: cap.calibration.aspect, ...(cap.poseHz ? { poseHz: cap.poseHz } : {}) };
   const tests: TestResult[] = [];
   let stopped = false;
@@ -146,7 +152,8 @@ export function gradeSession(cap: SessionCapture, prior?: Partial<Record<TestId,
     assessmentId: 'preview-00000000', mode: 'quick', measuredAt: new Date(0), device: { class: 'desktop', model: null, poseHz: 0, cameraFps: null, width: 0, height: 0 },
     takeoffLeg: cap.takeoffLeg ?? null, tests, mqs: m,
   }));
-  return { mode: 'quick', tests, mqs: m, reasons, findings: pain ? [] : topFindings(tests, ctxWhy), pain, prqPreview: preview, takeoffLeg: cap.takeoffLeg ?? null };
+  const trust = pain ? [] : trustFor(cap, tests, priorTrust);
+  return { mode: 'quick', tests, mqs: m, reasons, findings: pain ? [] : topFindings(tests, ctxWhy), pain, prqPreview: preview, takeoffLeg: cap.takeoffLeg ?? null, trust };
 }
 
 function skipped(id: TestId): TestResult {
@@ -342,6 +349,8 @@ export interface RunnerOptions {
   parts?: readonly PartDef[];
   /** Tests already graded this run (the jump), used when this pass has no capture for them. */
   priorTests?: Partial<Record<TestId, TestResult>>;
+  /** MIRROR-TRUST-RATING: the carried-in jump's trust rows, kept as they were rated (with priorTests). */
+  priorTrust?: readonly MeasureTrust[];
   cameraFps?: () => number | null;
   /**
    * VERTICAL-EASY (owner, 2026-10-27: "allow arm swing"): "Measure my vertical" reads a natural jump, arms free — T5's
@@ -960,7 +969,7 @@ export class AssessRunner {
       T2: Object.keys(this.captures.T2).length ? this.captures.T2 : undefined,
       T3: Object.keys(this.captures.T3).length ? this.captures.T3 : undefined,
       T5: this.captures.T5 ?? undefined, painAfter: this.painAfter, takeoffLeg: this.takeoff, cameraFps: this.o.cameraFps?.() ?? null,
-    }, this.o.priorTests);
+    }, this.o.priorTests, this.o.priorTrust);
     if (this.o.armsFree) this.result = { ...this.result, tests: this.result.tests.map((x) => this.armsFreeT5(x)) };
     this.step = this.result.pain ? 'stopped' : 'done';
     this.stepAt = now;
@@ -974,7 +983,7 @@ export class AssessRunner {
     this.painAfter = current;
     if (!current) {
       // pain before any test: nothing was measured, nothing is scored
-      this.result = { mode: 'quick', tests: [], mqs: null, reasons: {}, findings: [], pain: true, prqPreview: [], takeoffLeg: this.takeoff };
+      this.result = { mode: 'quick', tests: [], mqs: null, reasons: {}, findings: [], pain: true, prqPreview: [], takeoffLeg: this.takeoff, trust: [] };
       this.step = 'stopped';
       this.stepAt = now;
       this.say(PAIN_REFERRAL, true);
