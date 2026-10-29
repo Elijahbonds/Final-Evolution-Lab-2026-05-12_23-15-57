@@ -106,6 +106,7 @@ import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
+import { applyInertialBlend } from '../anim/inertialize';   // AF-1: inertial clip transitions, behind the anim.inertial knob (default off)
 import { takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
 import { runBackOffered, runBackReady, runBackHint, bloopLine, type MissKind } from '../core/DunkRunItBack';   // dunk-next phase 8: the blooper and RUN IT BACK
 import { gradePump, pumpOpen, pumpMsAt, pumpEndsAt, pumpRefusalLine, PUMP_MIN_MS } from '../core/DunkHangPump';   // dunk-next phase 8: the hang pump
@@ -1229,6 +1230,7 @@ export const DunkMode: ModeDefinition = (() => {
     });
     neverBindPose(body.animator, SPORT_CLIP.idle);
     installSafePlay(body.animator, 'dunk-rival');
+    applyInertialBlend(body.animator);   // AF-1: off (the knob's default) leaves the rival linear
     // DUNK MOTION phase 11: the rival is right-handed too (owner: "every dunk, every body") — and he dunks through the player's own
     // pipeline on his turn, so he needs the same mirrored family
     if (RIGHT_HANDED) {
@@ -1436,6 +1438,7 @@ export const DunkMode: ModeDefinition = (() => {
       });
       neverBindPose(player.animator, SPORT_CLIP.idle);
       installSafePlay(player.animator, 'dunk-player');
+      applyInertialBlend(player.animator);   // AF-1: off (the knob's default) leaves the player linear
       // DUNK MOTION phase 8: RIGHT-HANDED — the dunk family (authored and captured) mirrored onto the other side of this body
       if (RIGHT_HANDED) {
         const groups = (player.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
