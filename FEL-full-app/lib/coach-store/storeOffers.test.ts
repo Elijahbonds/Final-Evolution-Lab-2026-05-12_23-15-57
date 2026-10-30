@@ -4,9 +4,9 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  FOUNDERS_OFFER_KEY, FOUNDERS_PRICE_CENTS, FOUNDERS_PRICE_LOCK_PENDING, FOUNDERS_REVIEWS_PER_MONTH_PENDING, FOUNDERS_SPOTS,
-  OFFER_COPY, REVIEW_BUTTON_LABEL, REVIEW_OFFER_KEY, REVIEW_OFFER_PATH, REVIEW_PRICE_CENTS, REVIEW_TURNAROUND_BUSINESS_DAYS_PENDING,
-  REVIEW_WEEKLY_CAP_PENDING, STORE_OFFERS, TERMS_REFUND_HREF, getStoreOffers, reviewOfferHref, storeOfferByKey,
+  FOUNDERS_OFFER_KEY, FOUNDERS_PRICE_CENTS, FOUNDERS_PRICE_LOCKED_FOR_LIFE, FOUNDERS_PRICE_LOCK_WORDING, FOUNDERS_RESCREEN_WEEKS_PENDING, FOUNDERS_REVIEWS_PER_MONTH, FOUNDERS_SPOTS,
+  OFFER_COPY, REVIEW_BUTTON_LABEL, REVIEW_OFFER_KEY, REVIEW_OFFER_PATH, REVIEW_PRICE_CENTS, REVIEW_TURNAROUND_BUSINESS_DAYS,
+  REVIEW_WEEKLY_CAP, STORE_OFFERS, TERMS_REFUND_HREF, getStoreOffers, reviewOfferHref, storeOfferByKey,
 } from './storeOffers';
 import { STORE_PRICES } from './storePrices';
 import { coachManifest } from './manifest';
@@ -23,11 +23,14 @@ describe('STORE-OFFER-1: the two offers', () => {
     expect([REVIEW_PRICE_CENTS, FOUNDERS_PRICE_CENTS, FOUNDERS_SPOTS]).toEqual([9900, 12900, 10]);
     expect(storeOfferByKey(REVIEW_OFFER_KEY)?.title).toBe('Dunk & Jump Review');
   });
-  it('Research\'s four open calls sit in named PENDING constants: cap 8/week, 3 business days, price lock on, 2 reviews/month', () => {
-    expect([REVIEW_WEEKLY_CAP_PENDING, REVIEW_TURNAROUND_BUSINESS_DAYS_PENDING, FOUNDERS_PRICE_LOCK_PENDING, FOUNDERS_REVIEWS_PER_MONTH_PENDING]).toEqual([8, 3, true, 2]);
+  it('Elijah\'s picks (11:54 PM): cap 8/week, 3 business days, Founders $129 locked for life, 2 reviews/month', () => {
+    expect([REVIEW_WEEKLY_CAP, REVIEW_TURNAROUND_BUSINESS_DAYS, FOUNDERS_PRICE_LOCKED_FOR_LIFE, FOUNDERS_REVIEWS_PER_MONTH]).toEqual([8, 3, true, 2]);
+    expect(FOUNDERS_PRICE_LOCK_WORDING).toBe('locked for life');
+    expect(FOUNDERS_RESCREEN_WEEKS_PENDING).toBe('6–8');   // still Elijah's to confirm
     const r = OFFER_COPY[REVIEW_OFFER_KEY].bullets.join('\n'), f = OFFER_COPY[FOUNDERS_OFFER_KEY].bullets.join('\n');
     expect(r).toContain('Back within 3 business days'); expect(r).toContain('Limited to 8 reviews per week');
-    expect(f).toContain('2 video reviews per month'); expect(f).toContain('Founders price stays $129 as long as you stay subscribed');
+    expect(f).toContain('2 video reviews per month'); expect(f).toContain('Founders price $129, locked for life'); expect(f).not.toMatch(/as long as you stay subscribed/);
+    expect(f.split(FOUNDERS_PRICE_LOCK_WORDING).length - 1).toBe(1);   // the wording comes from the one constant, once
   });
   it('adults only: every buyer is verified_adult, every manifest parses, and the copy says 18+', () => {
     for (const row of STORE_OFFERS) {

@@ -10,15 +10,18 @@ import { isCoachStoreEnabled } from '@/lib/flags';
 import { MAX_CLIPS, MAX_CLIP_SECONDS } from './constants';
 import type { StorePriceRow } from './storePrices';
 
-// ── Research's four open calls: PENDING ELIJAH. Named here so each is one edit when he answers. ──
-/** PENDING ELIJAH (Research open call 1): Dunk & Jump Reviews per week. */
-export const REVIEW_WEEKLY_CAP_PENDING = 8;
-/** PENDING ELIJAH (Research open call 2): business days to deliver a review. */
-export const REVIEW_TURNAROUND_BUSINESS_DAYS_PENDING = 3;
-/** PENDING ELIJAH (Research open call 3): does the Founders price stay $129 for as long as the member stays subscribed. */
-export const FOUNDERS_PRICE_LOCK_PENDING = true;
-/** PENDING ELIJAH (Research open call 4): video reviews a Founders member gets per month. */
-export const FOUNDERS_REVIEWS_PER_MONTH_PENDING = 2;
+// ── Research's four calls, DECIDED: Elijah, 2026-10-29 11:54 PM PT ("Yes, use Research's store defaults: 8 reviews a week,
+// 3 business days, Founders $129 locked for life, 2 reviews a month"). ──
+/** Dunk & Jump Reviews per week. */
+export const REVIEW_WEEKLY_CAP = 8;
+/** Business days to deliver a review. */
+export const REVIEW_TURNAROUND_BUSINESS_DAYS = 3;
+/** The Founders price stays $129 for the member's life. */
+export const FOUNDERS_PRICE_LOCKED_FOR_LIFE = true;
+/** Video reviews a Founders member gets per month. */
+export const FOUNDERS_REVIEWS_PER_MONTH = 2;
+/** The price-lock words, ONE place: Research may revise them. */
+export const FOUNDERS_PRICE_LOCK_WORDING = 'locked for life';
 /** The copy's bracketed re-screen cadence "[6–8] weeks" (also Elijah's to confirm). */
 export const FOUNDERS_RESCREEN_WEEKS_PENDING = '6–8';
 
@@ -63,7 +66,7 @@ export interface OfferCopy {
   finePrint: string;
 }
 
-/** The copy draft, with Research's open calls filled from the PENDING constants above. */
+/** The copy draft, with Research's calls filled from the constants above (the re-screen cadence still PENDING). */
 export const OFFER_COPY: Readonly<Record<string, OfferCopy>> = {
   [REVIEW_OFFER_KEY]: {
     key: REVIEW_OFFER_KEY,
@@ -73,8 +76,8 @@ export const OFFER_COPY: Readonly<Record<string, OfferCopy>> = {
     body: 'Upload a clip of your approach and takeoff (side view plus front view if you can). I\'ll personally review your plant, takeoff and arm swing, and send back a video breakdown with the 2–3 fixes that matter most and the drills to fix them.',
     bullets: [
       'One clip set, one personal video review from Elijah Bonds',
-      `Back within ${REVIEW_TURNAROUND_BUSINESS_DAYS_PENDING} business days`,
-      `Limited to ${REVIEW_WEEKLY_CAP_PENDING} reviews per week. When this week is full, you'll see the next open week.`,
+      `Back within ${REVIEW_TURNAROUND_BUSINESS_DAYS} business days`,
+      `Limited to ${REVIEW_WEEKLY_CAP} reviews per week. When this week is full, you'll see the next open week.`,
       'For adults 18+.',
     ],
     finePrint: 'This is a coaching and postural assessment, never a medical diagnosis. It doesn\'t promise any jump height. If you have pain or an injury, see a licensed clinician first. Refunds follow our Terms and refund page.',
@@ -86,9 +89,9 @@ export const OFFER_COPY: Readonly<Record<string, OfferCopy>> = {
     headline: `Train with me every month. Only ${FOUNDERS_SPOTS} spots.`,
     bullets: [
       'Your program, written by Elijah and updated monthly',
-      `${FOUNDERS_REVIEWS_PER_MONTH_PENDING} video reviews per month`,
+      `${FOUNDERS_REVIEWS_PER_MONTH} video reviews per month`,
       `Mirror movement screen at the start and every ${FOUNDERS_RESCREEN_WEEKS_PENDING} weeks to track progress`,
-      ...(FOUNDERS_PRICE_LOCK_PENDING ? ['Founders price stays $129 as long as you stay subscribed'] : []),
+      ...(FOUNDERS_PRICE_LOCKED_FOR_LIFE ? [`Founders price $129, ${FOUNDERS_PRICE_LOCK_WORDING}`] : []),
       'Cancel anytime, effective at the end of the billing period',
       'For adults 18+.',
     ],
