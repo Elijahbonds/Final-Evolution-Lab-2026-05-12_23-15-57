@@ -19,11 +19,12 @@
 // Cached per scene (`scene.metadata.felCrowdBake`): every crowd in a scene shares the bake, and it dies with the scene.
 
 import { BakedVertexAnimationManager, Constants, LoadAssetContainerAsync, Matrix, RawTexture, Texture, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, AnimationGroup, AssetContainer, Mesh, PBRMaterial, Scene, Skeleton, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, AnimationGroup, AssetContainer, Material, Mesh, PBRMaterial, Scene, Skeleton, TransformNode } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { gateContainerRig } from '../../anim/rigNormalize';
 import { boneNode } from '../../anim/boneLookup';
 import { buildCrowdClip } from './crowdClips';
+import { CROWD_FRONT_URLS, forgeFrontOn } from './crowdFront';
 import { CLOCK_T0, CROWD_CLIPS, CROWD_FPS, layoutClips, type ClipRange, type CrowdClipName } from './crowdVat';
 
 /** The five bodies, in the order a seat's `body` index picks them. */
@@ -36,10 +37,17 @@ export interface CrowdBody {
   /** The mesh's world matrix as loaded (the glTF root's handedness flip included) and its inverse. */
   w0: Matrix;
   w0inv: Matrix;
+  /** VENUE-SMOOTH-1: a forge part keeps its own material (the Meshy bodies all share the bake's one). */
+  material?: Material | null;
 }
+
+/** VENUE-SMOOTH-1: a forge rival on the front row — every skinned part of it, each its own block, all on its one skeleton's VAT. */
+export interface CrowdFrontBody { parts: CrowdBody[] }
 
 export interface CrowdBake {
   bodies: CrowdBody[];
+  /** VENUE-SMOOTH-1: the front row's forge bodies (empty when they would not load: the Meshy bodies then fill every row). */
+  front: CrowdFrontBody[];
   material: PBRMaterial;
   ranges: Record<CrowdClipName, ClipRange>;
   rows: number;
@@ -115,16 +123,64 @@ async function buildBake(scene: Scene): Promise<CrowdBake | null> {
     return null;
   }
   for (const b of bodies) b.mesh.material = material;
+  const frontBake = !forgeFrontOn() ? null : await bakeFront(scene, ranges, rows).catch((e) => { console.warn('[FEL-CROWD] front row bake failed', (e as Error)?.message ?? e); return null; });
+  const front = frontBake?.front ?? [];
   // the four material-less bodies came in with no material, the first one's other maps are gone: nothing else to drop
   return {
-    bodies, material, ranges, rows,
-    setClock(t: number) { for (const b of bodies) b.manager.time = CLOCK_T0 + t; },
+    bodies, front, material, ranges, rows,
+    setClock(t: number) { for (const b of bodies) b.manager.time = CLOCK_T0 + t; for (const m of frontBake?.managers ?? []) m.time = CLOCK_T0 + t; },
     dispose() {
       for (const b of bodies) { b.manager.texture?.dispose(); b.manager.dispose(); }
+      frontBake?.dispose();
       material?.dispose(true, true);
       for (const c of containers) c.dispose();
     },
   };
+}
+
+/** VENUE-SMOOTH-1: bake the forge front-row bodies. A forge rival is several skinned parts on one skeleton; parts with the same
+ *  load transform share one VAT (the bake reads the mesh only for that transform). Materials load: each part keeps its own. */
+async function bakeFront(scene: Scene, ranges: Record<CrowdClipName, ClipRange>, rows: number): Promise<{ front: CrowdFrontBody[]; managers: BakedVertexAnimationManager[]; dispose(): void }> {
+  const containers: AssetContainer[] = [], managers: BakedVertexAnimationManager[] = [], front: CrowdFrontBody[] = [];
+  const dispose = (): void => { for (const m of managers) { m.texture?.dispose(); m.dispose(); } for (const c of containers) c.dispose(); };
+  try {
+    for (let i = 0; i < CROWD_FRONT_URLS.length; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise<void>((r) => { const o = scene.onAfterRenderObservable.addOnce(() => r()); scene.onDisposeObservable.addOnce(() => { scene.onAfterRenderObservable.remove(o); r(); }); });
+      if (scene.isDisposed) break;
+      const url = CROWD_FRONT_URLS[i];
+      // eslint-disable-next-line no-await-in-loop
+      const c = await LoadAssetContainerAsync(url, scene);
+      gateContainerRig(c, url);
+      for (const m of c.meshes) m.name = `__crowd_front_${i}_${m.name}`;
+      containers.push(c);
+      if (scene.isDisposed) throw new Error('scene disposed during the crowd load');
+      c.addAllToScene();
+      const sk = c.skeletons[0];
+      const skinned = c.meshes.filter((m) => !!m.skeleton && m.getTotalVertices() > 0) as Mesh[];
+      skinned.sort((a, b) => b.getTotalVertices() - a.getTotalVertices());
+      const baked: { w0: Matrix; manager: BakedVertexAnimationManager }[] = [];
+      const parts: CrowdBody[] = [];
+      for (const mesh of skinned) {
+        const w0 = mesh.computeWorldMatrix(true).clone();
+        let manager = baked.find((b) => b.w0.equalsWithEpsilon(w0, 1e-6))?.manager;
+        if (!manager) {
+          const data = bakeBody(scene, sk, mesh, ranges, rows);
+          const tex = RawTexture.CreateRGBATexture(data, (sk.bones.length + 1) * 4, rows, scene, false, false, Texture.NEAREST_NEAREST, Constants.TEXTURETYPE_FLOAT);
+          tex.name = `crowd_front_vat_${i}_${baked.length}`;
+          manager = new BakedVertexAnimationManager(scene);
+          manager.texture = tex; manager.time = CLOCK_T0;
+          baked.push({ w0, manager }); managers.push(manager);
+        }
+        mesh.bakedVertexAnimationManager = manager;
+        parts.push({ mesh, manager, w0, w0inv: w0.clone().invert(), material: mesh.material });
+      }
+      foldSkeleton(sk);
+      for (const m of c.meshes) { m.setEnabled(false); m.isPickable = false; }
+      if (parts.length) front.push({ parts });
+    }
+  } catch (e) { dispose(); throw e; }
+  return { front, managers, dispose };
 }
 
 /** The shared look: the base colour only (the emissive map is black, the normal map flat, the metal-rough map unused). */
