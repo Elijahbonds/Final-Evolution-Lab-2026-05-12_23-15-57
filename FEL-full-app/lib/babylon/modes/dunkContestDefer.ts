@@ -14,6 +14,12 @@ export const PRELOAD_CAP_MS = 20000;
 /** The burst particles a landing and its replay draw (the landing's dust, the net, the slam's sparks and confetti), warmed under the court. */
 export const PRELOAD_BURSTS = ['dust', 'net', 'sparks', 'confetti'] as const;
 
+/** RUNUP-STALL-2b (knob dunk.preloadSet): the rivals who can walk out for the final in place of tonight's foe: every field
+ *  dunker who is neither you nor him (the cut's `opp`, DunkMode.finishCut). Classic nights have no field: nobody. */
+export function finalistCandidates(field: ReadonlyArray<{ id: string }>, foeId: string, playerId: string): string[] {
+  return field.map((d) => d.id).filter((id, i, all) => id !== foeId && id !== playerId && all.indexOf(id) === i);
+}
+
 /** The only phases a queued contest set (and its props, voice banks and walk-out) may start in. */
 export const QUIET_DUNK_PHASES = ['rivalTurn', 'fieldCut', 'contestOver'] as const;
 

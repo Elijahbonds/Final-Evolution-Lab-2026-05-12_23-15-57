@@ -144,7 +144,7 @@ import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11
 import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
 import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
-import { createContestDefer, isQuietDunkPhase, whenQuietBeat, DUNK_PRELOAD_SET_ON, PRELOAD_CAP_MS, PRELOAD_BURSTS } from './dunkContestDefer';   // RUNUP-STALL-1
+import { createContestDefer, isQuietDunkPhase, whenQuietBeat, DUNK_PRELOAD_SET_ON, PRELOAD_CAP_MS, PRELOAD_BURSTS, finalistCandidates } from './dunkContestDefer';   // RUNUP-STALL-1
 import { Onlookers } from '../visual/Onlookers';   // RUNUP-STALL-2 (a): the preload waits for the rail's bodies
 import { warmSceneShaders } from '../core/warmShaders';   // RUNUP-STALL-2 (a)
 
@@ -1252,7 +1252,9 @@ export const DunkMode: ModeDefinition = (() => {
   async function swapRivalBody(ctx: ModeContext, who: DunkRival): Promise<void> {
     const token = ++rivalSwapToken;
     let next: SpawnedCharacter;
-    try { next = await spawnRivalBody(ctx, who); } catch (e) { console.error('[DUNK-RIVAL] body swap failed; keeping the current body', e); return; }
+    const kept = takeFinalistBody(ctx, who.id);   // RUNUP-STALL-2b: the preload (knob on) already set this finalist up, hidden
+    if (kept) next = kept;
+    else try { next = await spawnRivalBody(ctx, who); } catch (e) { console.error('[DUNK-RIVAL] body swap failed; keeping the current body', e); return; }
     while (turn !== 'player' && token === rivalSwapToken && !ctx.scene.isDisposed) await new Promise((r) => setTimeout(r, 250));
     if (token !== rivalSwapToken || ctx.scene.isDisposed) { ctx.groundLock?.untrack(next.root); next.dispose(); return; }
     const old = rival;
@@ -1332,6 +1334,8 @@ export const DunkMode: ModeDefinition = (() => {
       await dunkVenue?.mountDressing();
       await Onlookers.settled(ctx.scene);
       if (ctx.scene.isDisposed) return;
+      await prespawnFinalists(ctx);   // RUNUP-STALL-2b: both possible finalists, hidden (their shaders warm below with the rest)
+      if (ctx.scene.isDisposed) return;
       for (const kind of PRELOAD_BURSTS) EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05);   // the slam's particles, under the court
       const pairs = await warmSceneShaders(ctx.scene);
       console.info(`[DUNK-PRELOAD] in after ${Math.round(performance.now() - t0)} ms (${pairs} shader pairs)`);
@@ -1339,6 +1343,38 @@ export const DunkMode: ModeDefinition = (() => {
     try { await Promise.race([work, new Promise<void>((r) => setTimeout(r, PRELOAD_CAP_MS))]); }
     catch (e) { console.warn('[DUNK-PRELOAD] failed; the set loads between rounds', e); }
     finally { preloadHold = false; }
+  }
+  // ── RUNUP-STALL-2b: THE FINALISTS, SET UP AHEAD (knob dunk.preloadSet; only the preload fills this) ─────────────────────
+  // AM's c9e199db trace: the cut's walk-out (finishCut → swapRivalBody) set up a whole body (431 + 338 ms) at the start of your
+  // final run-up. With the knob on, the preload spawns both rivals who can walk out, hidden and off the ground lock, one at
+  // a time; the swap takes the one who made the cut and the other goes. Knob off: the map stays empty and the swap spawns.
+  const finalistBodies = new Map<string, SpawnedCharacter>();
+  async function prespawnFinalists(ctx: ModeContext): Promise<void> {
+    for (const id of finalistCandidates(field, foe.id, PLAYER_ID)) {
+      if (finalistBodies.has(id) || ctx.scene.isDisposed) continue;
+      try {
+        const body = await spawnRivalBody(ctx, rivalById(id));
+        ctx.groundLock?.untrack(body.root);
+        body.root.setEnabled(false);
+        if (ctx.scene.isDisposed) { body.dispose(); return; }
+        finalistBodies.set(id, body);
+      } catch (e) { console.warn(`[DUNK-PRELOAD] finalist ${id} did not set up — the cut spawns him`, e); }
+    }
+  }
+  /** The hidden finalist for `id`, shown and back on the ground lock; the other hidden finalists are dropped. Null: spawn him. */
+  function takeFinalistBody(ctx: ModeContext, id: string): SpawnedCharacter | null {
+    const body = finalistBodies.get(id) ?? null;
+    if (!body) return null;
+    finalistBodies.delete(id);
+    dropFinalistBodies(ctx);
+    body.root.setEnabled(true);
+    ctx.groundLock?.track(body.root, body.skeleton);
+    console.info(`[DUNK-PRELOAD] ${id} walks out on the body the preload set up`);
+    return body;
+  }
+  function dropFinalistBodies(ctx: ModeContext | null): void {   // null: the mode is going (its ground lock with it)
+    for (const body of finalistBodies.values()) { ctx?.groundLock?.untrack(body.root); body.dispose(); }
+    finalistBodies.clear();
   }
   /** The corner props: the bus (Orbit's shuttle) across the right corner, the tent across the left. A face counts for the
    *  rebound and the wall run once its prop stands on it (parkedPanes) — nobody kicks off a bus they cannot see. */
@@ -2773,6 +2809,7 @@ export const DunkMode: ModeDefinition = (() => {
       stopWalkOut(); walkCue = null; walkOut = null;
       clearProps(); SoundKit.stopAmbient(); feet = { L: null, R: null };
       sparePasser?.dispose(); sparePasser = null;   // IMPROVE (2026-10-06): the kept passer goes with the mode
+      dropFinalistBodies(null);   // RUNUP-STALL-2b: unused hidden finalists go with the mode
       dunkVenue?.dispose(); dunkVenue = null;  // M74
       for (const p of sideProps) p.dispose(); sideProps = [];
     },
@@ -5281,6 +5318,7 @@ export const DunkMode: ModeDefinition = (() => {
   function startField(ctx: ModeContext): void {
     nightFmt = nightFormat(typeof location !== 'undefined' ? location.search : '');
     field = nightFmt === 'field' ? newField(foe) : [];
+    dropFinalistBodies(ctx);   // RUNUP-STALL-2b: a new field has its own finalists (the preload sets them up again, knob on)
     console.info(`[DUNK-FIELD] night format: ${nightFmt}${nightFmt === 'classic' ? ' (a staked / ladder run — one rival, four dunks)' : ''}`);
     fieldStage = 'round1'; fieldChamp = ''; fieldNote = ''; cutSeq++; fieldCombos.clear();
     ctx.setHud({ field: field.length ? encodeField(field, 'round1') : '', nightField: '' });
