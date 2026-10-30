@@ -5,6 +5,15 @@
 // PM (v2/v3): an ALLOW-list. Only these phases are quiet; approach is NOT (the run-up starts there), judging is NOT (the
 // replay and the judges' reveal play there), and neither is the run, the flight or the landing. DunkMode has no replay phase: a replay is its `replaying` flag, so it counts as not quiet too.
 
+/** RUNUP-STALL-2 (a): the feel knob `dunk.preloadSet`. 0 (default): the contest set loads between rounds, as in c9e199db.
+ *  1: the six bodies (his body and the five onlookers) load and set up, and the landing and replay shaders compile, behind
+ *  the contest intro on the first runway: the run is held until they are in (or PRELOAD_CAP_MS passes), so nothing loads in play. */
+export const DUNK_PRELOAD_SET_ON = 0;
+/** The longest the first runway is held for the preload; past it the night goes on and the set falls back to the between-rounds path. */
+export const PRELOAD_CAP_MS = 20000;
+/** The burst particles a landing and its replay draw (the landing's dust, the net, the slam's sparks and confetti), warmed under the court. */
+export const PRELOAD_BURSTS = ['dust', 'net', 'sparks', 'confetti'] as const;
+
 /** The only phases a queued contest set (and its props, voice banks and walk-out) may start in. */
 export const QUIET_DUNK_PHASES = ['rivalTurn', 'fieldCut', 'contestOver'] as const;
 

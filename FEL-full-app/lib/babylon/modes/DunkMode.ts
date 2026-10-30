@@ -144,7 +144,9 @@ import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11
 import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
 import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
-import { createContestDefer, isQuietDunkPhase, whenQuietBeat } from './dunkContestDefer';   // RUNUP-STALL-1
+import { createContestDefer, isQuietDunkPhase, whenQuietBeat, DUNK_PRELOAD_SET_ON, PRELOAD_CAP_MS, PRELOAD_BURSTS } from './dunkContestDefer';   // RUNUP-STALL-1
+import { Onlookers } from '../visual/Onlookers';   // RUNUP-STALL-2 (a): the preload waits for the rail's bodies
+import { warmSceneShaders } from '../core/warmShaders';   // RUNUP-STALL-2 (a)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -1295,7 +1297,13 @@ export const DunkMode: ModeDefinition = (() => {
     });
   }
   /** His body, tried again (backing off) until it lands: on a dead line the night waits at his turn instead of failing. */
+  let rivalBringing: Promise<void> | null = null;   // RUNUP-STALL-2: one load of his body at a time (the preload and the contest set share it)
   async function bringRival(ctx: ModeContext): Promise<void> {
+    if (rivalBringing) return rivalBringing;
+    rivalBringing = bringRivalOnce(ctx);
+    try { await rivalBringing; } finally { rivalBringing = null; }
+  }
+  async function bringRivalOnce(ctx: ModeContext): Promise<void> {
     for (let tries = 0; !rival && !ctx.scene.isDisposed; tries++) {
       try {
         // spawnNpc is explicit: the rival must NEVER wear the player's identity, or you end up dunking against yourself.
@@ -1306,6 +1314,31 @@ export const DunkMode: ModeDefinition = (() => {
         await new Promise((r) => setTimeout(r, wait));
       }
     }
+  }
+  // ── RUNUP-STALL-2 (a): THE PRELOAD (feel knob dunk.preloadSet, default off) ────────────────────────────────────────────
+  // Knob on: behind the contest intro on the first runway, his body, then the venue dressing and its five onlookers (one a
+  // frame), then every shader the scene will draw, the slam's sparks and confetti included. The run is held (beginRun)
+  // until it is all in, or PRELOAD_CAP_MS passes. The contest set still starts after dunk 1 (its mark, its soundtrack, its
+  // corner props and voices); his body and the onlookers are already here by then, so it has nothing heavy left to set up.
+  let preloadHold = false;
+  async function preloadContestSet(ctx: ModeContext): Promise<void> {
+    if (preloadHold || ctx.scene.isDisposed) return;
+    preloadHold = true;
+    const t0 = performance.now();
+    console.info('[DUNK-PRELOAD] the contest loads behind the intro (his body, the onlookers, the shaders)');
+    const work = (async () => {
+      await bringRival(ctx);
+      if (ctx.scene.isDisposed) return;
+      await dunkVenue?.mountDressing();
+      await Onlookers.settled(ctx.scene);
+      if (ctx.scene.isDisposed) return;
+      for (const kind of PRELOAD_BURSTS) EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05);   // the slam's particles, under the court
+      const pairs = await warmSceneShaders(ctx.scene);
+      console.info(`[DUNK-PRELOAD] in after ${Math.round(performance.now() - t0)} ms (${pairs} shader pairs)`);
+    })();
+    try { await Promise.race([work, new Promise<void>((r) => setTimeout(r, PRELOAD_CAP_MS))]); }
+    catch (e) { console.warn('[DUNK-PRELOAD] failed; the set loads between rounds', e); }
+    finally { preloadHold = false; }
   }
   /** The corner props: the bus (Orbit's shuttle) across the right corner, the tent across the left. A face counts for the
    *  rebound and the wall run once its prop stands on it (parkedPanes) — nobody kicks off a bus they cannot see. */
@@ -1404,6 +1437,7 @@ export const DunkMode: ModeDefinition = (() => {
       // contest set; your own song is a local mixdown and walks out now, as it always did.
       contestSetStarted = false; rivalArrival = null; awaitingRival = false;
       contestDefer.reset();
+      rivalBringing = null; preloadHold = false;
       if (walkCue) void walkPlayer.prepare(walkCue, (line) => ctx.setHud({ walkOutNow: line }));
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       // FIRST-DUNK-BUDGET: the venue's dressing (its CC0 set, the parked bus and sedan, the onlookers) waits for the contest set
@@ -1521,6 +1555,7 @@ export const DunkMode: ModeDefinition = (() => {
       });
       if (turn === 'player' && isStaticControlsHint(runwayHint)) ctx.setHud({ hint: liveRunwayHint() });   // DUNK-LIVE-TIMING-FIX LP-04: input is live (setPhase('approach')), so is the run line
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
+      if (feel('dunk.preloadSet', DUNK_PRELOAD_SET_ON) >= 0.5) void preloadContestSet(ctx);   // RUNUP-STALL-2 (a): knob on only
       readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
     },
 
@@ -3689,6 +3724,7 @@ export const DunkMode: ModeDefinition = (() => {
    *  already down when the runway opened. */
   function beginRun(ctx: ModeContext): void {
     if (phase !== 'approach') return;
+    if (preloadHold) { refuse(ctx, 'THE CONTEST IS GETTING READY'); return; }   // RUNUP-STALL-2 (a): knob on, dunk 1 waits for the preload
     flushPropSetup(ctx);   // IMPROVE (2026-10-06): a pick still settling is built now (it starts rolling when it lands: setupProp)
     setPhase('charge');
     obstacle?.start();   // a rolling prop comes when you commit to the run (owner, 2026-09-16)
@@ -5125,6 +5161,9 @@ export const DunkMode: ModeDefinition = (() => {
       // between-dunks beat. It waits out a running replay, then starts the set itself.)
       if (!rivalArrival && !ctx.scene.isDisposed && !ended) {
         await whenQuietBeat(() => !replaying, () => ctx.scene.isDisposed);
+        // RUNUP-STALL-2 (b): his turn opens on its own beat BEFORE his body is asked for, so the set never starts in judging.
+        // awaitingRival holds the watchdog (and with it advanceAfterRivalTurn) and every judging advance while he loads.
+        if (!ctx.scene.isDisposed && !ended) setPhase('rivalTurn');
         contestHisTurn = true; try { startContestSet(ctx); } finally { contestHisTurn = false; }
       }
       try { await rivalArrival; } finally { awaitingRival = false; }

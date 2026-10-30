@@ -48,6 +48,14 @@ export const MAX_BODIES = 8;
 const SEEDS = ['#3E5A70', '#F25F5C', '#2EC4B6', '#FFBF47', '#5B8DEF', '#B07CF5', '#7BD389', '#E27D60'];
 
 export class Onlookers {
+  /** RUNUP-STALL-2: the one-per-frame queues still running, per scene (Onlookers.settled). */
+  private static queues = new WeakMap<object, Set<Promise<void>>>();
+  private settle: (() => void) | null = null;
+  /** Resolves once every one-per-frame crowd in the scene has had all its bodies land (or fail). Nothing running: at once. */
+  static settled(scene: Scene): Promise<void> {
+    const q = Onlookers.queues.get(scene);
+    return q && q.size ? Promise.all([...q]).then(() => undefined) : Promise.resolve();
+  }
   private figures: Figure[] = [];
   private t = 0;
   private cheerT = 0;
@@ -83,6 +91,7 @@ export class Onlookers {
     const chosen = spots.filter((_, i) => i % step === 0).slice(0, MAX_BODIES);
     this.requested = chosen.length;
     this.unperf = registerPerfTarget(scene, this);
+    let landed: () => void = () => {};
     const spawnOne = (p: Vector3, i: number): Promise<void> => {
       const seed = SEEDS[(i + tint.length) % SEEDS.length];
       const yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z);   // face the action
@@ -99,8 +108,16 @@ export class Onlookers {
           try { this.onSpawn?.(char.root); } catch (e) { console.warn('[FEL-ONLOOKERS] onSpawn failed', (e as Error)?.message ?? e); }
           if (this.still) this.hold(char);
         })
-        .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
+        .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e))
+        .finally(() => landed());
     };
+    if (opts.oneBodyPerFrame) {   // RUNUP-STALL-2: Onlookers.settled resolves when the last of these lands (or the crowd is disposed)
+      let left = chosen.length;
+      const queue = new Promise<void>((r) => { this.settle = r; });
+      landed = () => { if (--left <= 0) this.settle?.(); };
+      let set = Onlookers.queues.get(scene); if (!set) Onlookers.queues.set(scene, (set = new Set()));
+      set.add(queue); void queue.then(() => set!.delete(queue));
+    }
     if (opts.oneBodyPerFrame) void onePerFrame(chosen.map((p, i) => () => spawnOne(p, i)), (cb) => { scene.onBeforeRenderObservable.addOnce(cb); }, () => this.disposed);
     else chosen.forEach((p, i) => { void spawnOne(p, i); });
   }
@@ -202,6 +219,7 @@ export class Onlookers {
     this.unperf?.(); this.unperf = null;
     this.held = [];
     this.disposed = true;
+    this.settle?.();   // RUNUP-STALL-2: a disposed crowd asks for nothing more, so nobody waits on it
     for (const f of this.figures) f.char.dispose();
     this.figures = [];
   }
