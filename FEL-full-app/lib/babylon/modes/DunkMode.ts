@@ -141,7 +141,8 @@ import { landMarks, plantMarks, stampCourt } from '../hoops/courtMarks';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
-import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
+import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';
+import { createFlightGate } from './flightGate';   // PERF-834-LCP (b): no late-asset work between takeoff and the slam   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
 import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
 
@@ -1266,6 +1267,8 @@ export const DunkMode: ModeDefinition = (() => {
   // dressing and its onlookers, the corner bus and tent, the booth's voices and a catalogue walk-out. A guest who leaves after
   // one dunk never downloads it.
   let contestSetStarted = false;
+  // PERF-834-LCP (b): every late step waits while a dunk is in the air (takeoff → the slam / finishAttempt) — see flightGate.ts
+  const flightGate = createFlightGate(() => phase === 'cinematic' || (phase === 'resolve' && !finishing), () => !ended);
   let rivalArrival: Promise<void> | null = null;
   let awaitingRival = false;   // his turn is up and his body is still on its way: the judging beat holds (rivalRound)
   function startContestSet(ctx: ModeContext): void {
@@ -1292,6 +1295,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** His body, tried again (backing off) until it lands: on a dead line the night waits at his turn instead of failing. */
   async function bringRival(ctx: ModeContext): Promise<void> {
     for (let tries = 0; !rival && !ctx.scene.isDisposed; tries++) {
+      await flightGate.clear();   // PERF-834-LCP (b): no request starts in a flight (a retry lands after the slam)
       try {
         // spawnNpc is explicit: the rival must NEVER wear the player's identity, or you end up dunking against yourself.
         rival = await spawnRivalBody(ctx, foe);
@@ -1301,6 +1305,8 @@ export const DunkMode: ModeDefinition = (() => {
         await new Promise((r) => setTimeout(r, wait));
       }
     }
+    // PERF-834-LCP (b): the rest of the contest set (dressing, bus, tent, voices, walk-out) rides on this promise — it starts after a slam
+    await flightGate.clear();
   }
   /** The corner props: the bus (Orbit's shuttle) across the right corner, the tent across the left. A face counts for the
    *  rebound and the wall run once its prop stands on it (parkedPanes) — nobody kicks off a bus they cannot see. */
@@ -1309,12 +1315,14 @@ export const DunkMode: ModeDefinition = (() => {
     // ORBIT parks a SPACE SHUTTLE where every other court parks the hoopbus (owner, 2026-09-18: "make the bus a space shuttle
     // in the space one", then his own Meshy export: "swap that shuttle in for the other one" — baked to 6.4 m by scripts/meshy/bake-prop.py)
     const rideKey = ride.kind === 'shuttle' ? 'shuttle' : 'hoopbus';
-    void copyKitModel(scene, 'meshy', rideKey, `dunk_${rideKey}`).then((r) => {
+    void copyKitModel(scene, 'meshy', rideKey, `dunk_${rideKey}`).then(async (r) => {
+      await flightGate.clear();   // PERF-834-LCP (b): a prop that lands mid-flight parks after the slam
       if (scene.isDisposed) return;
       parkOnPane(r, panes[0], 6.4); sideProps.push(r); parkedPanes.push(panes[0]);
       const { max } = r.getHierarchyBoundingVectors(true); console.info(`[DUNK-PARKOUR] ${rideKey} parked on the right corner (roof ${max.y.toFixed(2)} m)`);
     }).catch((e) => console.warn(`[DUNK-PARKOUR] ${rideKey} did not load`, e));
-    if (ride.kind !== 'shuttle') void copyKitModel(scene, 'racing', 'tent', 'dunk_tent').then((root) => {
+    if (ride.kind !== 'shuttle') void copyKitModel(scene, 'racing', 'tent', 'dunk_tent').then(async (root) => {
+      await flightGate.clear();   // PERF-834-LCP (b)
       if (scene.isDisposed) return;
       parkOnPane(root, panes[1], 4.2); sideProps.push(root); parkedPanes.push(panes[1]);
       console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
