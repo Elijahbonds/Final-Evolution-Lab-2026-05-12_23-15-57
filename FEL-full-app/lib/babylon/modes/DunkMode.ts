@@ -144,6 +144,7 @@ import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11
 import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
 import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
+import { createContestDefer, isQuietDunkPhase, whenQuietBeat } from './dunkContestDefer';   // RUNUP-STALL-1
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -1268,8 +1269,12 @@ export const DunkMode: ModeDefinition = (() => {
   let contestSetStarted = false;
   let rivalArrival: Promise<void> | null = null;
   let awaitingRival = false;   // his turn is up and his body is still on its way: the judging beat holds (rivalRound)
+  const contestDefer = createContestDefer();   // RUNUP-STALL-1: a set asked for mid-dunk waits for the landing (update() starts it)
+  const dunkQuiet = (): boolean => isQuietDunkPhase(phase) && !replaying;   // only rivalTurn/fieldCut/contestOver, no replay running
+  let contestHisTurn = false;   // RUNUP-STALL-1 v3: his turn is up (rivalRound) and needs his body: the set starts now, between dunks
   function startContestSet(ctx: ModeContext): void {
     if (contestSetStarted || ctx.scene.isDisposed) return;
+    if (!contestHisTurn && !contestDefer.ask(dunkQuiet())) { console.info('[DUNK-BUDGET] not a quiet beat — the contest set waits for one'); return; }
     contestSetStarted = true;
     console.info('[DUNK-BUDGET] dunk 1 is in — the contest set loads now (his body first)');
     // FDB-2 (2026-10-17): the same moment on the page's own clock. AM's run counted CASS's body (rivals/jinx.glb) "before dunk 1",
@@ -1280,7 +1285,7 @@ export const DunkMode: ModeDefinition = (() => {
     // FDB-2 (PM, 2026-10-17): the menu soundtrack's first song (a 0.43–0.51 MB preview) waited on /try for this moment; it starts now
     soundtrackFirstDunkIn();
     rivalArrival = bringRival(ctx);
-    void rivalArrival.finally(() => {
+    void rivalArrival.finally(() => whenQuietBeat(dunkQuiet, () => ctx.scene.isDisposed)).then(() => {   // RUNUP-STALL-1: and what follows him waits for a quiet beat
       if (ctx.scene.isDisposed) return;
       // the venue's set and the corner props in one breath: the tent and the bus are each one download, shared (copyKitModel)
       void dunkVenue?.mountDressing();
@@ -1398,6 +1403,7 @@ export const DunkMode: ModeDefinition = (() => {
       // PIPELINES: no song → a soundtrack track. FIRST-DUNK-BUDGET: that track is the catalogue's (a download) and comes with the
       // contest set; your own song is a local mixdown and walks out now, as it always did.
       contestSetStarted = false; rivalArrival = null; awaitingRival = false;
+      contestDefer.reset();
       if (walkCue) void walkPlayer.prepare(walkCue, (line) => ctx.setHud({ walkOutNow: line }));
       // M74: try Nexus venue first; fallback to VenueKit if no spec
       // FIRST-DUNK-BUDGET: the venue's dressing (its CC0 set, the parked bus and sedan, the onlookers) waits for the contest set
@@ -1834,6 +1840,7 @@ export const DunkMode: ModeDefinition = (() => {
     },
 
     update(ctx: ModeContext, dt: number) {
+      if (contestDefer.tick(dunkQuiet())) startContestSet(ctx);   // RUNUP-STALL-1: the set asked for mid-dunk starts on the first quiet beat
       // A RUN HELD THROUGH THE WAIT STILL COUNTS (2026-09-19). The run started on a trigger EVENT inside the approach,
       // so a finger already down when the runway opened — held through the judges' card and the rival's turn, which is
       // exactly what a player does between attempts — produced no event and no run: the attempt launched off a walk
@@ -5113,6 +5120,13 @@ export const DunkMode: ModeDefinition = (() => {
       startContestSet(ctx);   // the guard, not the path: dunk 1 has always started it by now
       awaitingRival = true;
       console.info('[DUNK-BUDGET] his turn is up — waiting on his body');
+      // RUNUP-STALL-1: a set still queued (not a quiet beat yet) has no arrival to wait on: wait for the beat, then start it
+      // (rivalRound runs in judging and sets rivalTurn only once he is here, so it cannot wait for the allow-list: his turn IS the
+      // between-dunks beat. It waits out a running replay, then starts the set itself.)
+      if (!rivalArrival && !ctx.scene.isDisposed && !ended) {
+        await whenQuietBeat(() => !replaying, () => ctx.scene.isDisposed);
+        contestHisTurn = true; try { startContestSet(ctx); } finally { contestHisTurn = false; }
+      }
       try { await rivalArrival; } finally { awaitingRival = false; }
       if (!rival || ended || ctx.scene.isDisposed) return;
     }

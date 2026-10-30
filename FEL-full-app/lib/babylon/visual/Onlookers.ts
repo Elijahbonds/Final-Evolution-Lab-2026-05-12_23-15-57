@@ -13,6 +13,7 @@ import { CharacterLibrary, type SpawnedCharacter } from '../core/CharacterLibrar
 import { DEFAULT_HERO_URL } from '../core/athleteRoster';
 import { registerPerfTarget } from '../core/perfGuard';
 import type { PerfLevel } from '../core/PerfGovernor';
+import { onePerFrame } from '../core/onePerFrame';   // RUNUP-STALL-1 v3
 
 interface Figure { char: SpawnedCharacter; root: TransformNode; baseY: number; phase: number; bounds: BoundingInfo; parked: boolean; hidden?: boolean; resting: boolean; age: number }
 
@@ -30,6 +31,9 @@ export interface OnlookersOpts {
   /** IMPROVE (2026-10-06, Brain Brawl #18): while nobody is cheering, write the idle breathe-bob at most this often (s)
    *  instead of every frame — each write recomputes the body's world matrix. A cheer still moves every frame. */
   idleBobStepSec?: number;
+  /** RUNUP-STALL-1 v3: request and set up the bodies one at a time, the next on the frame after the last one lands, so no two
+   *  bodies' setup (pose bind, body mask) share a frame. Off by default (every crowd but the dunk's deferred rail is unchanged). */
+  oneBodyPerFrame?: boolean;
 }
 /** A body rests this long after it lands and after a cheer ends (s): its clip has posed it (a clip held before its
  *  first evaluated frame would leave the bind pose) and the fade-in has finished. */
@@ -79,10 +83,10 @@ export class Onlookers {
     const chosen = spots.filter((_, i) => i % step === 0).slice(0, MAX_BODIES);
     this.requested = chosen.length;
     this.unperf = registerPerfTarget(scene, this);
-    chosen.forEach((p, i) => {
+    const spawnOne = (p: Vector3, i: number): Promise<void> => {
       const seed = SEEDS[(i + tint.length) % SEEDS.length];
       const yaw = Math.atan2(lookAt.x - p.x, lookAt.z - p.z);   // face the action
-      void CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
+      return CharacterLibrary.spawn(scene, DEFAULT_HERO_URL, { position: p.clone(), yawRad: yaw, tint: seed, startClip: 'idle', identity: false })
         .then((char) => {
           if (this.disposed) { char.dispose(); return; }
           // A9.9: past ~14 m from the camera, no ink hull and no cast shadow. Best-effort: a scene the LOD cannot watch must not
@@ -96,7 +100,9 @@ export class Onlookers {
           if (this.still) this.hold(char);
         })
         .catch((e) => console.warn('[FEL-ONLOOKERS] body did not spawn', (e as Error)?.message ?? e));
-    });
+    };
+    if (opts.oneBodyPerFrame) void onePerFrame(chosen.map((p, i) => () => spawnOne(p, i)), (cb) => { scene.onBeforeRenderObservable.addOnce(cb); }, () => this.disposed);
+    else chosen.forEach((p, i) => { void spawnOne(p, i); });
   }
 
   /** Call once a frame. A slow breathe, plus the tail of any cheer in progress. */
