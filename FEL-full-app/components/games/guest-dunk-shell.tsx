@@ -70,6 +70,11 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   const started = useRef(false);
   const judged = useRef(false);
 
+  // PERF-834-LCP (a): the age step's buttons are in the server HTML before React attaches their handlers — a tap at ~2 s was
+  // dropped and the page sat on the question for minutes (DIAG Q1). They stay disabled, with a "Loading…" line, until mount.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+
   // A browser that already carries the block flag skips the question. Reads only; sends nothing.
   useEffect(() => {
     if (gate === 'ask' && ageBlockPresent()) setGate('blocked');
@@ -309,14 +314,19 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
       <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4" data-own-input={gate !== 'ask' && !claimOpen && !result ? '' : undefined}>
         {gate === 'ask' ? (
           <div className="py-10" data-testid="guest-age-step">
-            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} />
+            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} ready={hydrated} />
             <button
               type="button"
               onClick={() => setGate('local')}
-              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white"
+              disabled={!hydrated}
+              aria-busy={!hydrated}
+              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white disabled:cursor-wait disabled:opacity-40"
             >
               Play without saving
             </button>
+            {!hydrated && (
+              <p role="status" className="mt-2 text-center font-mono text-[11px] text-white/40">Loading…</p>
+            )}
           </div>
         ) : babylon ? (
           // G7: NO `key={gameKey}` on this one. The Babylon dunk resets itself in place;
