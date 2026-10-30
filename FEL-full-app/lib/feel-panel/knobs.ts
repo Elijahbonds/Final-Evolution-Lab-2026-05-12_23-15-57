@@ -1080,6 +1080,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
   },
+  // AF-11 (ANIM-FEEL-SPEC 2026-10-28): the shot holds its last frame (gather deferred to AF-11b) instead of wrapping, default OFF — off is the loop, unchanged.
+  {
+    id: 'anim.holdLast', label: 'Shot holds last frame on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts ANIM_HOLD_LAST_ON',
+    hint: 'On: the jumpshot freezes on its last frame while the shot lasts, instead of wrapping.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
