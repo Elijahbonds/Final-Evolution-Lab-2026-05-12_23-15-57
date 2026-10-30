@@ -1,10 +1,11 @@
 // STORE-OFFER-1: the $99 Dunk & Jump Review and Founders Coaching (10 spots, $129/month) — flag-off data beside STORE_PRICES.
 import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  FOUNDERS_OFFER_KEY, FOUNDERS_PRICE_CENTS, FOUNDERS_PRICE_LOCKED_FOR_LIFE, FOUNDERS_PRICE_LOCK_WORDING, FOUNDERS_RESCREEN_WEEKS_PENDING, FOUNDERS_REVIEWS_PER_MONTH, FOUNDERS_SPOTS,
+  FOUNDERS_OFFER_KEY, FOUNDERS_PRICE_CENTS, FOUNDERS_PRICE_LOCKED_FOR_LIFE, FOUNDERS_PRICE_LOCK_WORDING, FOUNDERS_RESCREEN_WEEKS, FOUNDERS_REVIEWS_PER_MONTH, FOUNDERS_SPOTS,
   OFFER_COPY, REVIEW_BUTTON_LABEL, REVIEW_OFFER_KEY, REVIEW_OFFER_PATH, REVIEW_PRICE_CENTS, REVIEW_TURNAROUND_BUSINESS_DAYS,
   REVIEW_WEEKLY_CAP, STORE_OFFERS, TERMS_REFUND_HREF, getStoreOffers, reviewOfferHref, storeOfferByKey,
 } from './storeOffers';
@@ -17,6 +18,14 @@ import { OfferCard } from '@/components/coach-store/offer-card';
 const ORIGINAL = process.env.COACH_STORE_ENABLED;
 afterEach(() => { if (ORIGINAL === undefined) delete process.env.COACH_STORE_ENABLED; else process.env.COACH_STORE_ENABLED = ORIGINAL; });
 
+describe('STORE-OFFER-1: every open call is decided', () => {
+  it('storeOffers exports no *_PENDING constant and its source names none', async () => {
+    const mod = await import('./storeOffers');
+    expect(Object.keys(mod).filter((k) => k.endsWith('_PENDING'))).toEqual([]);
+    expect(readFileSync(join(__dirname, 'storeOffers.ts'), 'utf8')).not.toMatch(/[A-Z_]+_PENDING\b/);
+  });
+});
+
 describe('STORE-OFFER-1: the two offers', () => {
   it('are Elijah\'s picks: $99 one-time review, $129/month Founders with 10 spots', () => {
     expect(STORE_OFFERS.map((r) => [r.key, r.priceCents, r.billing])).toEqual([[REVIEW_OFFER_KEY, 9900, 'one_time'], [FOUNDERS_OFFER_KEY, 12900, 'month']]);
@@ -26,7 +35,9 @@ describe('STORE-OFFER-1: the two offers', () => {
   it('Elijah\'s picks (11:54 PM): cap 8/week, 3 business days, Founders $129 locked for life, 2 reviews/month', () => {
     expect([REVIEW_WEEKLY_CAP, REVIEW_TURNAROUND_BUSINESS_DAYS, FOUNDERS_PRICE_LOCKED_FOR_LIFE, FOUNDERS_REVIEWS_PER_MONTH]).toEqual([8, 3, true, 2]);
     expect(FOUNDERS_PRICE_LOCK_WORDING).toBe('locked for life');
-    expect(FOUNDERS_RESCREEN_WEEKS_PENDING).toBe('6–8');   // still Elijah's to confirm
+    expect(FOUNDERS_RESCREEN_WEEKS).toBe(6);   // Elijah, 12:16 AM: every 6 weeks
+    expect(OFFER_COPY[FOUNDERS_OFFER_KEY].bullets.join('\n')).toContain('Mirror movement screen at the start and every 6 weeks to track progress');
+    expect(OFFER_COPY[FOUNDERS_OFFER_KEY].bullets.join('\n')).not.toContain('6–8');
     const r = OFFER_COPY[REVIEW_OFFER_KEY].bullets.join('\n'), f = OFFER_COPY[FOUNDERS_OFFER_KEY].bullets.join('\n');
     expect(r).toContain('Back within 3 business days'); expect(r).toContain('Limited to 8 reviews per week');
     expect(f).toContain('2 video reviews per month'); expect(f).toContain('Founders price $129, locked for life'); expect(f).not.toMatch(/as long as you stay subscribed/);

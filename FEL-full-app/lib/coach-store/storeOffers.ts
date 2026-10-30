@@ -22,8 +22,8 @@ export const FOUNDERS_PRICE_LOCKED_FOR_LIFE = true;
 export const FOUNDERS_REVIEWS_PER_MONTH = 2;
 /** The price-lock words, ONE place: Research may revise them. */
 export const FOUNDERS_PRICE_LOCK_WORDING = 'locked for life';
-/** The copy's bracketed re-screen cadence "[6–8] weeks" (also Elijah's to confirm). */
-export const FOUNDERS_RESCREEN_WEEKS_PENDING = '6–8';
+/** Weeks between a Founders member's Mirror re-screens (Elijah, 2026-10-30 12:16 AM PT: "Founders rescreen every 6 weeks"). */
+export const FOUNDERS_RESCREEN_WEEKS = 6;
 
 /** Elijah's picks (9:33 PM PT). */
 export const REVIEW_PRICE_CENTS = 9900;
@@ -66,7 +66,7 @@ export interface OfferCopy {
   finePrint: string;
 }
 
-/** The copy draft, with Research's calls filled from the constants above (the re-screen cadence still PENDING). */
+/** The copy draft, with Research's calls filled from the constants above (all decided). */
 export const OFFER_COPY: Readonly<Record<string, OfferCopy>> = {
   [REVIEW_OFFER_KEY]: {
     key: REVIEW_OFFER_KEY,
@@ -90,7 +90,7 @@ export const OFFER_COPY: Readonly<Record<string, OfferCopy>> = {
     bullets: [
       'Your program, written by Elijah and updated monthly',
       `${FOUNDERS_REVIEWS_PER_MONTH} video reviews per month`,
-      `Mirror movement screen at the start and every ${FOUNDERS_RESCREEN_WEEKS_PENDING} weeks to track progress`,
+      `Mirror movement screen at the start and every ${FOUNDERS_RESCREEN_WEEKS} weeks to track progress`,
       ...(FOUNDERS_PRICE_LOCKED_FOR_LIFE ? [`Founders price $129, ${FOUNDERS_PRICE_LOCK_WORDING}`] : []),
       'Cancel anytime, effective at the end of the billing period',
       'For adults 18+.',
