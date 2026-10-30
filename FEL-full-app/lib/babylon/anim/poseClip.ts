@@ -21,6 +21,7 @@ import { bindFrame } from './bindFrame';
 import { plantLeg } from './FootPlanting';
 import { smoothByDefault, smoothQuatKeys, smoothScalarKeys, HOOPS_MOTION_MODES, hoopsMotionModeOf, type Q4 } from './smoothKeys';
 import { HOOPS_OVERHEAD_CLIPS } from './authored/hoopsOverhead';   // (a data table: the clip-scope test reads anim/authored/ as data)
+import { bodyScaleOf, bodyScaleOn, worldUpScaleOf } from './bodyScale';   // COACH-SCALE-191: one body scale (anim.bodyScale, default off)
 
 export type Deg3 = [number, number, number];
 export interface PoseKey {
@@ -225,16 +226,16 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
   // Body height ratio = the hips' height ABOVE THE ROOT. This read the hips' absolute y, so a body spawned above y = 0 built
   // every clip over-scaled: the dancer stands on a 0.7 m podium and every hand target came out 1.73× — the idle's hanging
   // hands sat at its face for the whole routine (ANIM-READABILITY creative, 2026-09-07). Identical for a body at y = 0.
-  const rootY = root ? root.getAbsolutePosition().y : 0;
   // EVERYONE-BODY-MOCAP-OPPONENTS (2026-09-14): the body is sized by its HIP JOINTS (the UpLeg bones the legs hang from),
   // not the Hips bone. The female kit body — and nova / ember / frost / sage, baked from it — puts the Hips bone 8 cm lower
   // than the male's over IDENTICAL legs (Hips 0.878 vs 0.958, UpLegs 0.910 on both, leg 0.844 on both; rig-measured),
   // so every clip on a female body was built at 0.915× and its crouch landed the ankles 9 cm under the floor. On the
   // forge hero, the male kit and the scan the two measures agree (0.910 / 0.910 = 0.958 / 0.96 within 0.2%).
-  const upLegs = ['LeftUpLeg', 'RightUpLeg'].map((n) => nodes.get(n)).filter((n): n is TransformNode => !!n);
-  const scale = upLegs.length
-    ? (upLegs.reduce((a, n) => a + n.getAbsolutePosition().y, 0) / upLegs.length - rootY) / REF_HIP_JOINT_Y || 1
-    : (hips.getAbsolutePosition().y - rootY) / REF_HIPS_Y || 1;
+  // COACH-SCALE-191: the same math (hip joints over the root, else the Hips bone), now one function — bodyScale.ts bodyScaleOf
+  const scale = bodyScaleOf(sk, root);
+  // COACH-SCALE-191 (anim.bodyScale on): the Hips key is in its PARENT's frame; divide by that frame's world scale so the drop is
+  // scaled ONCE (a uniformly scaled root, the 1.91 coach, rendered it ×1.1066 again). Off: 1, the key exactly as before.
+  const hipsLocalPerWorld = bodyScaleOn() ? 1 / worldUpScaleOf(hips.parent as TransformNode | null) : 1;
   // Targets are WORLD-AXIS offsets from the root's position — the same frame the
   // rig tests and the arm-solver tool always measured in (+x = the hero's right
   // at bind). The root's import matrix carries a handedness mirror, so pushing
@@ -367,7 +368,7 @@ export function buildPoseClip(scene: Scene, sk: Skeleton, name: string, duration
     const touched = new Set<string>(Object.keys(key.bones ?? {}));
     for (const side of ['Left', 'Right'] as const) { if (key.hands?.[side] || key.handsRel?.[side] || key.handsBody?.[side]) for (const b of ARM_BONES) if (b.startsWith(side)) touched.add(b); if (key.feet?.[side] || key.kneesFront) for (const b of LEG_BONES) if (b.startsWith(side)) touched.add(b); }
     for (const bone of touched) { const n = nodes.get(bone); if (n?.rotationQuaternion) push(bone, key.t, n.rotationQuaternion); }
-    if (key.hipsY != null) hipsY.push([key.t, key.hipsY * scale]);
+    if (key.hipsY != null) hipsY.push([key.t, hipsLocalPerWorld === 1 ? key.hipsY * scale : key.hipsY * scale * hipsLocalPerWorld]);
   }
   restore();
   // DUNK MOTION phase 2: the joint-space cubic between the poses (slow-in / slow-out, velocity continuous through a key,

@@ -1079,6 +1079,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.inertialHalfLifeK', label: 'Inertial offset half-life × fade time', def: 0.5, min: 0.1, max: 1.5, step: 0.05, unit: '×', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
+  },  // COACH-SCALE-191 (2026-10-29): one body scale for the 1.91 m coach, default OFF — off, every clip builds exactly as before.
+  {
+    id: 'anim.bodyScale', label: 'Body scale: Hips key scaled once in world (1) / as authored (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · body',
+    source: 'lib/babylon/anim/bodyScale.ts ANIM_BODY_SCALE_ON',
+    hint: 'On: a body under a scaled root (the 1.91 m coach) drops its hips by the clip\'s depth × its own size once, not twice, so crouches stop sinking through the floor. Takes effect on the next spawn.',
   },
 ];
 

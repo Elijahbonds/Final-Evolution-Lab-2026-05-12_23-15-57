@@ -149,6 +149,21 @@ export function strideRef(captured: boolean): StrideRef {
 }
 
 /**
+ * COACH-SCALE-191: a stride reference for a body `s`× the forge hero (bodyScale.ts bodyScaleOf). Every speed scales with the
+ * leg (stride ∝ leg length; 3D Art measured the 1.91 coach's natural foot speed up ~11%); the rate ceilings are unitless and stay.
+ * strideRef itself is unchanged (its identity with HOOPS_STRIDE_CAPTURE is pinned). s = 1 returns `ref` itself.
+ */
+export function strideRefScaled(ref: StrideRef, s: number): StrideRef {
+  if (s === 1 || !Number.isFinite(s) || s <= 0) return ref;
+  const m = (v: number | undefined) => (v == null ? undefined : v * s);
+  const by = ref.byState ? Object.fromEntries(Object.entries(ref.byState).map(([k, v]) => [k, v * s])) : undefined;
+  const out: StrideRef = { ...ref, run: ref.run * s, slide: ref.slide * s };
+  if (ref.walk != null) out.walk = m(ref.walk); if (ref.jog != null) out.jog = m(ref.jog); if (ref.sprint != null) out.sprint = m(ref.sprint);
+  if (by) out.byState = by;
+  return out;
+}
+
+/**
  * Rate limits.
  *
  * A clip pushed past these stops reading as running and starts reading as a cartoon, so the planter absorbs the
