@@ -15,7 +15,7 @@ export function ScreenStart({ reviewHref = null }: { reviewHref?: string | null 
       {/* STORE-OFFER-1: "Book a review", after the screen's own two buttons — only while the store flag is on (the offer page
           itself is sign-in and verified-adult only) */}
       {reviewHref && (
-        <Link href={reviewHref} data-action="book-review" className="mx-auto mt-6 block text-center font-mono text-xs text-[#FFD700] underline">
+        <Link href={reviewHref} data-action="book-review" className="mx-auto mt-6 block text-center font-mono text-sm text-[#FFD700] underline">
           {REVIEW_BUTTON_LABEL}
         </Link>
       )}
