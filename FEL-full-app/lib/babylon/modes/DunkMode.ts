@@ -1328,21 +1328,38 @@ export const DunkMode: ModeDefinition = (() => {
     preloadHold = true;
     const t0 = performance.now();
     console.info('[DUNK-PRELOAD] the contest loads behind the intro (his body, the onlookers, the shaders)');
+    // RUNUP-STALL-3: a frame between the heavy steps (each body, the particles, each shader batch), and the card's bar
+    const frame = (): Promise<void> => nextFrameOf(ctx);
+    const progress = (f: number): void => { ctx.setHud({ preloadReady: Math.round(Math.max(0, Math.min(1, f)) * 100) / 100 }); };
+    progress(0);
     const work = (async () => {
       await bringRival(ctx);
       if (ctx.scene.isDisposed) return;
+      progress(0.15); await frame();
       await dunkVenue?.mountDressing();
+      progress(0.2); await frame();
       await Onlookers.settled(ctx.scene);
       if (ctx.scene.isDisposed) return;
+      progress(0.5); await frame();
       await prespawnFinalists(ctx);   // RUNUP-STALL-2b: both possible finalists, hidden (their shaders warm below with the rest)
       if (ctx.scene.isDisposed) return;
+      progress(0.65);
+      await frame();
       for (const kind of PRELOAD_BURSTS) EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05);   // the slam's particles, under the court
-      const pairs = await warmSceneShaders(ctx.scene);
+      await frame();
+      progress(0.7);
+      const pairs = await warmSceneShaders(ctx.scene);   // RUNUP-STALL-3: WARM_BATCH pairs a frame on the scene's own clock
+      progress(1);
       console.info(`[DUNK-PRELOAD] in after ${Math.round(performance.now() - t0)} ms (${pairs} shader pairs)`);
     })();
     try { await Promise.race([work, new Promise<void>((r) => setTimeout(r, PRELOAD_CAP_MS))]); }
     catch (e) { console.warn('[DUNK-PRELOAD] failed; the set loads between rounds', e); }
     finally { preloadHold = false; }
+    if (!ctx.scene.isDisposed) ctx.setHud({ preloadReady: null });   // RUNUP-STALL-3: the card goes with the hold
+  }
+  /** RUNUP-STALL-3: resolves on the scene's next frame (at once on a disposed scene). */
+  function nextFrameOf(ctx: ModeContext): Promise<void> {
+    return new Promise((r) => { if (ctx.scene.isDisposed) r(); else ctx.scene.onBeforeRenderObservable.addOnce(() => r()); });
   }
   // ── RUNUP-STALL-2b: THE FINALISTS, SET UP AHEAD (knob dunk.preloadSet; only the preload fills this) ─────────────────────
   // AM's c9e199db trace: the cut's walk-out (finishCut → swapRivalBody) set up a whole body (431 + 338 ms) at the start of your
@@ -1352,6 +1369,7 @@ export const DunkMode: ModeDefinition = (() => {
   async function prespawnFinalists(ctx: ModeContext): Promise<void> {
     for (const id of finalistCandidates(field, foe.id, PLAYER_ID)) {
       if (finalistBodies.has(id) || ctx.scene.isDisposed) continue;
+      await nextFrameOf(ctx);   // RUNUP-STALL-3: one body a frame
       try {
         const body = await spawnRivalBody(ctx, rivalById(id));
         ctx.groundLock?.untrack(body.root);
