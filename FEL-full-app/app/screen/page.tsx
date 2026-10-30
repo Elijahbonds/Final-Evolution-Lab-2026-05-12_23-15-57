@@ -1,4 +1,5 @@
 import { ScreenStart } from './screen-start';
+import { reviewOfferHref } from '@/lib/coach-store/storeOffers';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,5 +9,5 @@ export const dynamic = 'force-dynamic';
  * The pose runtime loads only after a button opens /play/mirror/assess.
  */
 export default function ScreenEntry() {
-  return <ScreenStart />;
+  return <ScreenStart reviewHref={reviewOfferHref()} />;   // STORE-OFFER-1: null (no button) while the store flag is off
 }
