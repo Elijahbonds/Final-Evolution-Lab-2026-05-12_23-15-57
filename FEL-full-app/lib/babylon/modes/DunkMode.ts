@@ -90,6 +90,8 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
+import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
+import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, isDubble, DUBBLE_HEAD_TOP, DUBBLE_APEX_M, dubbleArc, dubbleArcPower, type ObstacleKind } from '../core/DunkObstacles';
@@ -2269,7 +2271,7 @@ export const DunkMode: ModeDefinition = (() => {
           // still and `update()` aims at the subject lerped toward the objective, so the dunker AND the rim
           // stay in shot for the whole flight. Placed low and to the baseline side, which is where the
           // under-basket camera actually lives.
-          ctx.camDirector.setFixed(new Vector3(rim.x + 2.9, 1.15, rim.z + 1.9), 1.5, true);
+          { const c = rimCutSpot(rim, camAspect(ctx)); ctx.camDirector.setFixed(new Vector3(c.at.x, c.at.y, c.at.z), c.aimH, true); }   // CAMERA TIP: knob off = rim + (2.9, 1.15, 1.9), 1.5
         }
 
         // alley-oop: teammate releases the toss partway through the rise;
@@ -2715,6 +2717,8 @@ export const DunkMode: ModeDefinition = (() => {
         lobFrameLift += (want - lobFrameLift) * lowPassK(dt, LOB_FRAME_TAU);
         ctx.camDirector.update(player.root.position, vel, lobFrameLift > 0.01 ? _lobObj.copyFrom(rim).addInPlaceFromFloats(0, lobFrameLift, 0) : rim);
       }
+      if (dunkFramingOn()) camFramingStep(ctx);   // CAMERA TIP (knob on only): the run-up overlay, and the hoop keep-out after a dunk
+      else if (camTuneKey) { camTuneKey = ''; ctx.camDirector.tuneFollow(null); }   // the knob turned back off: today's preset again
     },
 
     dispose() {
@@ -4894,6 +4898,21 @@ export const DunkMode: ModeDefinition = (() => {
   /** dunk-next phase 8: the retryable miss on the table (performance.now() of the call; -1 = none), the beat's own token, the bloopers. */
   let runBackAt = -1, runBackSeq = 0, bloopN = 0, runBackHud = false;
   /** RUN IT BACK: the miss beat ends now and the runway is back. Only on the player's retryable miss, only from RUN_BACK_MIN_MS. */
+  // CAMERA TIP (2026-10-29, cam.dunkFraming, default off — none of this runs with the knob off)
+  let camTuneKey = '';
+  function camAspect(ctx: ModeContext): number {
+    const e = ctx.scene.getEngine(); const h = e.getRenderHeight(); return h > 0 ? e.getRenderWidth() / h : 1;
+  }
+  function camFramingStep(ctx: ModeContext): void {
+    const runUp = phase === 'approach' || phase === 'charge';
+    const t = runUpTune({ runUp, speed: Math.abs(holdRunSpeed), aspect: camAspect(ctx) });
+    const k = tuneKey(t); if (k !== camTuneKey) { camTuneKey = k; ctx.camDirector.tuneFollow(t); }
+    if (phase === 'resolve' || phase === 'judging') {
+      const cam = ctx.scene.activeCamera as import('@babylonjs/core').TargetCamera | null; if (!cam) return;
+      const p = cam.position, c = clearOfHoop({ x: p.x, y: p.y, z: p.z }, DUNK_BACKBOARD_Z);
+      if (c.x !== p.x || c.y !== p.y || c.z !== p.z) { p.set(c.x, c.y, c.z); cam.setTarget(player.root.position.add(new Vector3(0, 1.3, 0))); }
+    }
+  }
   function runItBack(ctx: ModeContext): boolean {
     if (runBackAt < 0 || phase !== 'judging' || turn !== 'player') return false;
     if (!runBackReady(performance.now() - runBackAt)) return false;

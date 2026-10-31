@@ -1079,6 +1079,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     id: 'anim.inertialHalfLifeK', label: 'Inertial offset half-life × fade time', def: 0.5, min: 0.1, max: 1.5, step: 0.05, unit: '×', group: 'Anim · transitions',
     source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
     hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
+  },  // CAMERA TIP (2026-10-29): the dunk contest's camera fixes (QA items 1-3, 8), default OFF — off is today's framing (2K High feel).
+  {
+    id: 'cam.dunkFraming', label: 'Dunk camera fixes on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Camera · dunk',
+    source: 'lib/babylon/core/dunkCamFraming.ts CAM_DUNK_FRAMING_ON',
+    hint: 'On: the phone slam cut pulls back and aims between the dunker and the rim, the reset camera stays out of the hoop and pole, the run-up camera sits higher and further back, and the phone idle view comes closer.',
   },
   // AF-11 (ANIM-FEEL-SPEC 2026-10-28): the shot holds its last frame (gather deferred to AF-11b) instead of wrapping, default OFF — off is the loop, unchanged.
   {
