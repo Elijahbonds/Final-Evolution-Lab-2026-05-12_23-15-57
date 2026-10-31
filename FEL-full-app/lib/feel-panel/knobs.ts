@@ -1091,6 +1091,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/basketballTree.ts ANIM_HOLD_LAST_ON',
     hint: 'On: the jumpshot freezes on its last frame while the shot lasts, instead of wrapping.',
   },
+  // VENUE-SMOOTH-1 (2026-10-30): forge rivals on each crowd stand's front row, the Meshy bodies behind. Default OFF (PM).
+  {
+    id: 'crowd.forgeFront', label: 'Forge rivals in the crowd front row on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Crowd',
+    source: 'lib/babylon/visual/crowd/crowdFront.ts CROWD_FORGE_FRONT_ON',
+    hint: 'On: the front row of every stand is forge rivals (about 31k triangles each), the five Meshy fans sit behind. Off: the Meshy crowd in every row, no forge body loads. Read when the crowd bakes (next venue).',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));
