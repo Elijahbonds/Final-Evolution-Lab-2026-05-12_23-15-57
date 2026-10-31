@@ -147,6 +147,7 @@ import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 
 import { createContestDefer, isQuietDunkPhase, whenQuietBeat, DUNK_PRELOAD_SET_ON, PRELOAD_CAP_MS, PRELOAD_BURSTS, finalistCandidates } from './dunkContestDefer';   // RUNUP-STALL-1
 import { Onlookers } from '../visual/Onlookers';   // RUNUP-STALL-2 (a): the preload waits for the rail's bodies
 import { warmSceneShaders } from '../core/warmShaders';   // RUNUP-STALL-2 (a)
+import { setMaskOnePerFrame } from '../core/bodyMask';   // RUNUP-STALL-4 (knob dunk.preloadSet)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
 /** Venice DualShock pad (2026-09-05): a miss is one beat, not the full judged reveal — the next run-up follows at once. */
@@ -1326,6 +1327,8 @@ export const DunkMode: ModeDefinition = (() => {
   async function preloadContestSet(ctx: ModeContext): Promise<void> {
     if (preloadHold || ctx.scene.isDisposed) return;
     preloadHold = true;
+    setMaskOnePerFrame(ctx.scene, true);   // RUNUP-STALL-4: each body's mask fitting on its own frame (this scene, knob on)
+    dunkVenue?.paceDressing?.();   // RUNUP-STALL-4: the venue's dressing jobs one a frame
     const t0 = performance.now();
     console.info('[DUNK-PRELOAD] the contest loads behind the intro (his body, the onlookers, the shaders)');
     // RUNUP-STALL-3: a frame between the heavy steps (each body, the particles, each shader batch), and the card's bar
@@ -1344,8 +1347,7 @@ export const DunkMode: ModeDefinition = (() => {
       await prespawnFinalists(ctx);   // RUNUP-STALL-2b: both possible finalists, hidden (their shaders warm below with the rest)
       if (ctx.scene.isDisposed) return;
       progress(0.65);
-      await frame();
-      for (const kind of PRELOAD_BURSTS) EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05);   // the slam's particles, under the court
+      for (const kind of PRELOAD_BURSTS) { await frame(); EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05); }   // the slam's particles, under the court: one kind a frame
       await frame();
       progress(0.7);
       const pairs = await warmSceneShaders(ctx.scene);   // RUNUP-STALL-3: WARM_BATCH pairs a frame on the scene's own clock

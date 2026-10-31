@@ -91,7 +91,7 @@ describe('RUNUP-STALL-2 (a): the knob', () => {
 describe('RUNUP-STALL-2 (a): the preload loads all six bodies and the shaders before dunk 1', () => {
   const pre = between(dunk, 'async function preloadContestSet(ctx: ModeContext)', '\n  /** The corner props');
   it('order: his body, the dressing (the rail), the five onlookers landed, the burst particles, then every shader', () => {
-    const order = ['await bringRival(ctx);', 'await dunkVenue?.mountDressing();', 'await Onlookers.settled(ctx.scene);', 'for (const kind of PRELOAD_BURSTS) EffectsKit.burst(', 'await warmSceneShaders(ctx.scene);'];
+    const order = ['await bringRival(ctx);', 'await dunkVenue?.mountDressing();', 'await Onlookers.settled(ctx.scene);', 'for (const kind of PRELOAD_BURSTS) { await frame(); EffectsKit.burst(', 'await warmSceneShaders(ctx.scene);'];
     const at = order.map((s) => pre.indexOf(s));
     for (const i of at) expect(i).toBeGreaterThan(-1);
     expect([...at].sort((a, b) => a - b)).toEqual(at);

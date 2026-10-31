@@ -25,7 +25,7 @@
 // container's geometry are untouched: the body takes a unique geometry once, and its loaded indices are kept on the mesh
 // so every re-mask starts from the full body.
 import { BoundingInfo, Matrix, Vector3 } from '@babylonjs/core';
-import type { AbstractMesh, IndicesArray, Mesh, TransformNode } from '@babylonjs/core';
+import type { AbstractMesh, IndicesArray, Mesh, Scene, TransformNode } from '@babylonjs/core';
 import { boneNode } from '../anim/boneLookup';
 import { tubeCoverage, trimSpan, type TubeSpan } from './accessoryFit';
 
@@ -610,6 +610,29 @@ export function worldScaleOf(mesh: AbstractMesh): number { const W = mesh.comput
  */
 export function isShrunk(mesh: AbstractMesh): boolean { return worldScaleOf(mesh) < SHRUNK_SCALE; }
 
+// RUNUP-STALL-4 (2026-10-30, PM: behind dunk.preloadSet only): a scene can ask for its bodies' mask fittings ONE PER FRAME.
+// AM's 4c95bc64 trace had several bodies' fittings land on the same after-render callback (a 1,404 ms task). Opted in, a
+// fitting that is due joins the scene's queue and the queue runs one fitting per rendered frame. Not opted in (every scene
+// unless DunkMode's preload turns it on): a fitting runs on the callback, exactly as before.
+const maskPaced = new WeakSet<object>();
+const maskQueues = new WeakMap<object, Array<() => void>>();
+/** Turn the one-fitting-a-frame queue on (or off) for `scene`. */
+export function setMaskOnePerFrame(scene: Scene, on: boolean): void { if (on) maskPaced.add(scene); else maskPaced.delete(scene); }
+/** Whether `scene` fits its bodies one per frame. */
+export function masksOnePerFrame(scene: Scene): boolean { return maskPaced.has(scene); }
+function queueMask(scene: Scene, job: () => void): void {
+  let q = maskQueues.get(scene);
+  if (q) { q.push(job); return; }
+  maskQueues.set(scene, (q = [job]));
+  const drain = () => {
+    const next = q!.shift();
+    if (!next) { maskQueues.delete(scene); return; }   // a frame with nothing left: the queue closes
+    next();
+    scene.onAfterRenderObservable.addOnce(drain);   // stays open a frame: bodies due on this same callback join it
+  };
+  drain();   // the first is due now (this callback); the rest one per rendered frame
+}
+
 /** Mask `meshes`' body under its shown garments after the next rendered frame (coalesced: the last call's mesh list wins). */
 export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   const body = meshes.find((m) => isBodyMesh(m.name) && (m as Mesh).skeleton);
@@ -623,6 +646,11 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   const run = () => {
     if (body.isDisposed()) { pending.delete(body); return; }
     if (isShrunk(body) && waited++ < SHRUNK_WAIT_FRAMES) { scene.onAfterRenderObservable.addOnce(run); return; }   // mid spawn-in: wait for its real size
+    if (maskPaced.has(scene)) { queueMask(scene, fit); return; }   // RUNUP-STALL-4: opted in, one fitting a frame
+    fit();
+  };
+  const fit = () => {
+    if (body.isDisposed()) { pending.delete(body); return; }
     const list = pending.get(body); pending.delete(body);
     if (!list) return;
     try { maskBodyNow(body as Mesh, list); } catch (e) { console.warn(`[FEL-KIT] body mask skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }

@@ -90,7 +90,7 @@ describe('RUNUP-STALL-3 (2): the shader warm-up is spread over frames', () => {
 describe('RUNUP-STALL-3 (2): the preload yields between its heavy steps', () => {
   const pre = between(dunk, 'async function preloadContestSet(ctx: ModeContext)', '\n  /** RUNUP-STALL-3: resolves on the scene');
   it('a frame after his body, after the dressing, after the onlookers, before and after the particles', () => {
-    const order = ['await bringRival(ctx);', 'await frame();', 'await dunkVenue?.mountDressing();', 'await frame();', 'await Onlookers.settled(ctx.scene);', 'await frame();', 'await prespawnFinalists(ctx);', 'await frame();', 'for (const kind of PRELOAD_BURSTS) EffectsKit.burst(', 'await frame();', 'const pairs = await warmSceneShaders(ctx.scene);'];
+    const order = ['await bringRival(ctx);', 'await frame();', 'await dunkVenue?.mountDressing();', 'await frame();', 'await Onlookers.settled(ctx.scene);', 'await frame();', 'await prespawnFinalists(ctx);', 'for (const kind of PRELOAD_BURSTS) { await frame(); EffectsKit.burst(', 'await frame();', 'const pairs = await warmSceneShaders(ctx.scene);'];
     let at = -1;
     for (const s of order) { const i = pre.indexOf(s, at + 1); expect(i, s).toBeGreaterThan(at); at = i; }
     expect(pre).toContain('const frame = (): Promise<void> => nextFrameOf(ctx);');
