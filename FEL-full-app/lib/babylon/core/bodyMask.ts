@@ -632,6 +632,23 @@ function steppedJob(scene: Scene, it: Iterator<unknown, unknown>, onError: (e: u
 export function setMaskOnePerFrame(scene: Scene, on: boolean): void { if (on) maskPaced.add(scene); else maskPaced.delete(scene); }
 /** Whether `scene` fits its bodies one per frame. */
 export function masksOnePerFrame(scene: Scene): boolean { return maskPaced.has(scene); }
+// RUNUP-STALL-6 (2026-10-31, AM's df51b03e gate: knob on, the page never reached TAP TO START, 7-9 GB at 100% CPU).
+// Babylon's Observable.notifyObservers walks its LIVE observer array (`for (const obs of this._observers)`), so an
+// onAfterRenderObservable.addOnce made INSIDE an after-render callback runs in the same pass, not the next frame, and
+// scene.getFrameId() only moves in render(). STALL-5's first-draw wait (`getFrameId() <= schedFrame + 1` → addOnce(run))
+// therefore re-added itself forever in one notification, a new Observer each time; and STALL-4's drain ran the whole
+// queue in one frame. A paced re-wait now hops through the scene's NEXT before-render (a different observable, so it
+// lands on the next frame's after-render), and the first-draw wait is capped.
+/** RUNUP-STALL-6: `cb` on the next frame's after-render (a scene without onBeforeRenderObservable, e.g. a test's: its
+ *  next after-render notification, as before). */
+export function nextAfterRender(scene: Scene, cb: () => void): void {
+  const before = (scene as { onBeforeRenderObservable?: { addOnce(cb: () => void): unknown } }).onBeforeRenderObservable;
+  if (before) before.addOnce(() => { scene.onAfterRenderObservable.addOnce(cb); });
+  else scene.onAfterRenderObservable.addOnce(cb);
+}
+/** RUNUP-STALL-6: the most frames a paced fitting waits out its body's first draw. */
+export const FIRST_DRAW_WAIT_MAX = 3;
+
 function queueMask(scene: Scene, job: () => void): void {
   let q = maskQueues.get(scene);
   if (q) { q.push(job); return; }
@@ -640,7 +657,7 @@ function queueMask(scene: Scene, job: () => void): void {
     const next = q!.shift();
     if (!next) { maskQueues.delete(scene); return; }   // a frame with nothing left: the queue closes
     next();
-    scene.onAfterRenderObservable.addOnce(drain);   // stays open a frame: bodies due on this same callback join it
+    nextAfterRender(scene, drain);   // stays open a frame: bodies due on this same callback join it (RUNUP-STALL-6: the NEXT frame)
   };
   drain();   // the first is due now (this callback); the rest one per rendered frame
 }
@@ -654,14 +671,14 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   const first = !pending.has(body);
   pending.set(body, meshes);
   if (!first) return;
-  let waited = 0;
+  let waited = 0, gapWaits = 0;   // RUNUP-STALL-6: gapWaits caps the paced first-draw wait
   const schedFrame = typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' ? (scene as unknown as { getFrameId(): number }).getFrameId() : 0;   // RUNUP-STALL-5
   const run = () => {
     if (body.isDisposed()) { pending.delete(body); return; }
     if (isShrunk(body) && waited++ < SHRUNK_WAIT_FRAMES) { scene.onAfterRenderObservable.addOnce(run); return; }   // mid spawn-in: wait for its real size
     // RUNUP-STALL-5: opted in, the fitting waits out the frame the body first drew on (its world-matrix walk is that frame's
     // task), then runs one step a frame. (A scene without a frame counter, e.g. a test's, has no such frame to wait out.)
-    if (maskPaced.has(scene) && typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' && (scene as unknown as { getFrameId(): number }).getFrameId() <= schedFrame + 1) { scene.onAfterRenderObservable.addOnce(run); return; }
+    if (maskPaced.has(scene) && typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' && (scene as unknown as { getFrameId(): number }).getFrameId() <= schedFrame + 1 && gapWaits++ < FIRST_DRAW_WAIT_MAX) { nextAfterRender(scene, run); return; }   // RUNUP-STALL-6: the next frame, capped
     if (maskPaced.has(scene)) { queueMask(scene, steppedFit()); return; }   // RUNUP-STALL-4: opted in, one fitting a frame
     fit();
   };
