@@ -1345,6 +1345,7 @@ export const DunkMode: ModeDefinition = (() => {
       if (ctx.scene.isDisposed) return;
       progress(0.5); await frame();
       await prespawnFinalists(ctx);   // RUNUP-STALL-2b: both possible finalists, hidden (their shaders warm below with the rest)
+      for (const b of [rival, ...finalistBodies.values()]) { if (!b || ctx.scene.isDisposed) continue; await frame(); motionFor(b); }   // RUNUP-STALL-5: his and the finalists' motion layers, one body a frame (the swaps reuse them)
       if (ctx.scene.isDisposed) return;
       progress(0.65);
       for (const kind of PRELOAD_BURSTS) { await frame(); EffectsKit.burst(ctx.scene, new Vector3(0, -60, 0), kind, 0.05); }   // the slam's particles, under the court: one kind a frame
@@ -1414,6 +1415,28 @@ export const DunkMode: ModeDefinition = (() => {
       console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
     }).catch((e) => console.warn('[DUNK-PARKOUR] tent did not load', e));
   }
+  // RUNUP-STALL-5 (2026-10-30, knob dunk.preloadSet): THE SWAP BETWEEN TURNS. AM's desktop gate on 99d89dd5 had two 77 ms tasks,
+  // judging → approach (rivalRound → swapBodies) and judging → fieldCut (endRivalTurn → swapBodies): each swap re-ran bindBody,
+  // whose MotionLayers.forBody reads the new dunker's hand meshes' skinned vertices for the wrist axis (handPointsFromMeshes).
+  // With the knob on, a body's layers are built once (the preload builds his and the finalists') and a swap reuses them, reset.
+  // Off: built on every bind, exactly as before.
+  const motionByBody = new WeakMap<object, MotionLayers>();
+  const motionCacheOn = (): boolean => feel('dunk.preloadSet', DUNK_PRELOAD_SET_ON) >= 0.5;
+  /** Knob on: this body's layers from an earlier bind (or the preload), reset; null (always, knob off): bindBody builds them. */
+  function motionReused(b: typeof player): MotionLayers | null {
+    if (!motionCacheOn()) return null;
+    const hit = motionByBody.get(b.skeleton) ?? null;
+    hit?.reset();
+    return hit;
+  }
+  /** Knob on: keep the layers bindBody built for this body. */
+  function motionKeep(b: typeof player, m: MotionLayers): void { if (motionCacheOn()) motionByBody.set(b.skeleton, m); }
+  /** The preload: build a body's layers ahead of its first bind (knob on: the preload is the only caller). */
+  function motionFor(b: typeof player): MotionLayers {
+    const hit = motionReused(b); if (hit) return hit;
+    const m = MotionLayers.forBody(b.skeleton, { bind: bindFrame(b.skeleton), meshes: b.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0) as never, wrists: true });
+    motionKeep(b, m); return m;
+  }
   function bindBody(ctx: ModeContext): void {
     // A+ P8 H1: the arm chains once (the eastbay's left hand carries the ball after the hand-off); the reach is applied
     // AFTER the clips evaluate, on top of the frame's pose — the slot the dribble's HandIK and foot planting use
@@ -1428,8 +1451,11 @@ export const DunkMode: ModeDefinition = (() => {
     // HOOPS MOTION phase 3c: the limb followers, the wrists (their axis off the body's own hand mesh) and the hinged arms are built by
     // MotionLayers.forBody — this construction, lifted so every hoops body can mount the same layers; the contest calls them from the
     // same places as before (applyLimbDrag / applyWrists / the hinge observer below)
+    const reusedMotion = motionReused(player);   // RUNUP-STALL-5: with dunk.preloadSet on, a body's layers are built once (null: build)
+    if (reusedMotion) motion = reusedMotion; else
     motion = MotionLayers.forBody(player.skeleton, { bind: hipsBf, arms, meshes: player.root.getChildMeshes(false).filter((m) => !!m.skeleton && m.getTotalVertices() > 0) as never, wrists: true });
     limbDrag = motion.drag; wristLayer = motion.wrists;
+    motionKeep(player, motion);   // RUNUP-STALL-5 (knob on only)
     if (ikScene && handIkObs) ikScene.onAfterAnimationsObservable.remove(handIkObs);
     ikScene = ctx.scene; handIkObs = ctx.scene.onAfterAnimationsObservable.add(handIkApply);
     dribble?.dispose();

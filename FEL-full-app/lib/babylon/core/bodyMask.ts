@@ -616,6 +616,18 @@ export function isShrunk(mesh: AbstractMesh): boolean { return worldScaleOf(mesh
 // unless DunkMode's preload turns it on): a fitting runs on the callback, exactly as before.
 const maskPaced = new WeakSet<object>();
 const maskQueues = new WeakMap<object, Array<() => void>>();
+// RUNUP-STALL-5: a queued fitting is a stepped job (maskBodySteps): the queue runs ONE STEP a frame (the body's skin, then the
+// garments, then the mask), so no fitting is one task. `queueMask` takes a plain job too (one step).
+type MaskJob = () => void;
+/** A stepped job as a queue entry: each call runs the next step; it re-queues itself at the head until done. */
+function steppedJob(scene: Scene, it: Iterator<unknown, unknown>, onError: (e: unknown) => void): MaskJob {
+  const job: MaskJob = () => {
+    let done = true;
+    try { done = !!it.next().done; } catch (e) { onError(e); }
+    if (!done) maskQueues.get(scene)?.unshift(job);
+  };
+  return job;
+}
 /** Turn the one-fitting-a-frame queue on (or off) for `scene`. */
 export function setMaskOnePerFrame(scene: Scene, on: boolean): void { if (on) maskPaced.add(scene); else maskPaced.delete(scene); }
 /** Whether `scene` fits its bodies one per frame. */
@@ -643,11 +655,27 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
   pending.set(body, meshes);
   if (!first) return;
   let waited = 0;
+  const schedFrame = typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' ? (scene as unknown as { getFrameId(): number }).getFrameId() : 0;   // RUNUP-STALL-5
   const run = () => {
     if (body.isDisposed()) { pending.delete(body); return; }
     if (isShrunk(body) && waited++ < SHRUNK_WAIT_FRAMES) { scene.onAfterRenderObservable.addOnce(run); return; }   // mid spawn-in: wait for its real size
-    if (maskPaced.has(scene)) { queueMask(scene, fit); return; }   // RUNUP-STALL-4: opted in, one fitting a frame
+    // RUNUP-STALL-5: opted in, the fitting waits out the frame the body first drew on (its world-matrix walk is that frame's
+    // task), then runs one step a frame. (A scene without a frame counter, e.g. a test's, has no such frame to wait out.)
+    if (maskPaced.has(scene) && typeof (scene as { getFrameId?: () => number }).getFrameId === 'function' && (scene as unknown as { getFrameId(): number }).getFrameId() <= schedFrame + 1) { scene.onAfterRenderObservable.addOnce(run); return; }
+    if (maskPaced.has(scene)) { queueMask(scene, steppedFit()); return; }   // RUNUP-STALL-4: opted in, one fitting a frame
     fit();
+  };
+  const warnSkip = (e: unknown) => console.warn(`[FEL-KIT] body mask skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`);
+  /** RUNUP-STALL-5: the same fitting as `fit`, as a stepped queue job (one step a frame). */
+  const steppedFit = (): MaskJob => {
+    const b = body as AbstractMesh;   // (narrowed above; a generator's closure does not keep it)
+    function* steps(): Generator<void, void> {
+      if (b.isDisposed()) { pending.delete(b); return; }
+      const list = pending.get(b); pending.delete(b);
+      if (!list) return;
+      yield* maskBodySteps(b as Mesh, list);
+    }
+    return steppedJob(scene, steps(), warnSkip);
   };
   const fit = () => {
     if (body.isDisposed()) { pending.delete(body); return; }
@@ -660,6 +688,14 @@ export function scheduleBodyMask(meshes: AbstractMesh[]): void {
 
 /** Mask now (the skeleton must hold a pose — after a render). Returns the result, or null when nothing could be measured. */
 export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<string, number>): MaskResult | null {
+  // RUNUP-STALL-5: the fitting's steps, run to the end in this call (exactly the work, and the order, it always did)
+  const it = maskBodySteps(body, meshes, why);
+  for (;;) { const r = it.next(); if (r.done) return r.value; }
+}
+/** RUNUP-STALL-5: maskBodyNow in steps — it yields after the body's skin and after the garments' skins, so a paced queue
+ *  (setMaskOnePerFrame) can put each on its own frame. Run straight through it is maskBodyNow. A body disposed while the
+ *  steps wait is left alone. */
+export function* maskBodySteps(body: Mesh, meshes: AbstractMesh[], why?: Record<string, number>): Generator<void, MaskResult | null> {
   const md = (body.metadata ??= {}) as { felBodyIndices0?: IndicesArray; felBodyMask?: { hidden: Uint8Array; hiddenBySlot: Record<string, number>; trisBefore: number; trisAfter: number } };
   if (!md.felBodyIndices0) {
     const ind = body.getIndices(); if (!ind) return null;
@@ -670,6 +706,8 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
   const bodySkin = skinnedWorld(body); if (!bodySkin) return null;
   meshes = withSiblings(body, meshes);
   try { fitShortsUnderTop(body, bodySkin, meta.felBodyIndices0!, meshes); } catch (e) { console.warn(`[FEL-KIT] waistband fit skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
+  yield;   // RUNUP-STALL-5: step 1 done (the body's skin)
+  if (body.isDisposed()) return null;
   const bySlot = new Map<string, MaskSurface[]>();
   for (const m of meshes) {
     const slot = maskSlotOf(m.name); if (!slot || !m.isVisible || m.isDisposed() || !(m as Mesh).skeleton) continue;
@@ -682,6 +720,8 @@ export function maskBodyNow(body: Mesh, meshes: AbstractMesh[], why?: Record<str
     const s = skinnedWorld(m as Mesh, slot === 'shoes' ? undefined : (m as { __felFlare0?: Float32Array }).__felFlare0); const ind = (m as Mesh).getIndices(); if (!s || !ind) continue;
     (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ P: s.P, N: s.N, ind });
   }
+  yield;   // RUNUP-STALL-5: step 2 done (the garments' skins)
+  if (body.isDisposed()) return null;
   try { trimTubesUnderTops(body, bySlot.get('tops') ?? []); } catch (e) { console.warn(`[FEL-KIT] accessory trim skipped: ${String((e as Error)?.message ?? e).slice(0, 140)}`); }
   const mi = body.getVerticesData('matricesIndices'), mw = body.getVerticesData('matricesWeights');
   const bones = body.skeleton!.bones;
