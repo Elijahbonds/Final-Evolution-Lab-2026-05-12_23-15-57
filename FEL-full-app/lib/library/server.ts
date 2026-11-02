@@ -122,7 +122,8 @@ export async function searchLibrary(viewer: LibraryViewer, params: URLSearchPara
   const drafts = viewer.isCoach && params.get('drafts') === '1';
   const offset = Math.max(0, Number(params.get('offset') ?? 0) || 0);
   const limit = Math.min(48, Math.max(1, Number(params.get('limit') ?? 24) || 24));
-  const r = search(index, q, filtersFromParams(params), { drafts, youth: viewer.youth, offset, limit });
+  // PLAT-P08 (2026-11-02): the search screen ranks moving demos first inside the first page (engine.ts demosFirst)
+  const r = search(index, q, filtersFromParams(params), { drafts, youth: viewer.youth, offset, limit, demosFirst: true });
   const approved = index.docs.filter((e) => e.review.status === 'approved' && (!viewer.youth || e.youthOk)).length;
   return {
     ...r, hits: r.hits.map((h) => ({ ...toCard(h.entry), variants: h.variants.map(toVariantRef) })),

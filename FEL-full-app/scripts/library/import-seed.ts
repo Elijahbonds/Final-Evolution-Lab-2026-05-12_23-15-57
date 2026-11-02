@@ -27,6 +27,7 @@ import { dupKey, semanticKey } from '../../lib/library/validate';
 import { PREHAB_NOTE, type CategoryId, type EquipmentId, type Laterality, type LevelId, type MovementPattern, type MuscleId, type Plane, type SportTag } from '../../lib/library/vocab';
 import { DATA, fillSetup, gate, writeEntries, writeFilesIndex } from './common';
 import { GENERAL_FAMILY, SEED_FAMILIES, type SeedFamily, type SeedRow } from './seedFamilies';
+import { applyCueStyle } from './authoring/cue-style';
 
 /** The reviewer recorded on every seed entry: the owner's standing decision, not a person's click. */
 export const SEED_REVIEWER = 'owner:seed-auto-approve-2026-10-25';
@@ -93,6 +94,16 @@ function categoryFor(f: SeedFamily, r: SeedRow): CategoryId {
 
 const LEVEL: Record<string, LevelId> = { beginner: 'beginner', intermediate: 'intermediate', expert: 'advanced' };
 
+/**
+ * A seed entry's words: its family's set-up (filled for its equipment and side), cues and faults, in the CUE-STYLE
+ * wording (PLAT-P08, ./authoring/cue-style.ts — so a re-import keeps CUE-REWRITE's lines). A pure function of facts the
+ * entry stores (family, equipment, laterality), so tests/library-p8/generator.test.ts checks it against disk without
+ * the download.
+ */
+export function seedWords(f: SeedFamily, equipment: readonly EquipmentId[], lat: Laterality): Pick<LibraryExercise, 'setup' | 'cues' | 'faults'> {
+  return applyCueStyle({ setup: fillSetup(f.setup, equipment, lat !== 'bilateral'), cues: [...f.cues], faults: f.faults.map((x) => ({ ...x })) });
+}
+
 export function mapRow(r: SeedRow, sha: string): { entry: LibraryExercise; family: string } {
   const n = r.name.toLowerCase().replace(/[^a-z0-9' ]+/g, ' ').replace(/\s+/g, ' ').trim();
   const f = SEED_FAMILIES.find((x) => x.match(n, r)) ?? GENERAL_FAMILY;
@@ -128,7 +139,7 @@ export function mapRow(r: SeedRow, sha: string): { entry: LibraryExercise; famil
     pattern, plane: planeFor(f, n, pattern), laterality: lat, category, level, equipment,
     primaryMuscles: primary.length ? primary : (f.muscles ?? ['abs']), secondaryMuscles: secondary,
     sportTags: sport, goals: [...new Set(f.goals)], skillLayer: f.skillLayer, braceMode: f.braceMode,
-    setup: fillSetup(f.setup, equipment, lat !== 'bilateral'), cues: [...f.cues], faults: f.faults.map((x) => ({ ...x })),
+    ...seedWords(f, equipment, lat),
     regressionId: null, progressionId: null, cautions: cautions.slice(0, 4), lowLoad: [...(f.lowLoad ?? [])], youthOk,
     prehabNote: category === 'prehab' ? PREHAB_NOTE : null, dosage: { ...f.dosage },
     demo: { clipKey: f.clip ?? clipKeyFor(pattern, f.id), videoUrl: null, imageRef: r.images[0] ? `https://raw.githubusercontent.com/yuhonas/free-exercise-db/${sha}/exercises/${r.images[0]}` : null },

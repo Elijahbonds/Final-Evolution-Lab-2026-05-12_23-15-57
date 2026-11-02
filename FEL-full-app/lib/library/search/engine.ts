@@ -25,6 +25,7 @@ import { PATTERN_INFO } from '@/lib/coach/catalogue';
 import { SKILL_LAYERS } from '@/lib/coach/taxonomy';
 import type { LibraryExercise } from '../types';
 import { SYNONYM_GROUPS } from './synonyms';
+import { demoFor } from '../demo';
 import { editDistance, terms, typoBudget, words, STOP, stem } from './text';
 
 // ── filters and facets ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -68,7 +69,34 @@ export interface SearchOptions {
   preferLevel?: string;
   /** Group variants under their base (default true). false = one hit per entry (the review screen, the tests' controls). */
   group?: boolean;
+  /**
+   * PLAT-P08 (2026-11-02): moving demos first. Inside the first DEMO_FIRST_WINDOW results (relevance decides which ones
+   * those are), the entries whose demo is a faithful loop (lib/library/demo.ts demoFor) come before the ones that would
+   * show "Demo coming", each side keeping its relevance order. Off by default: Ask (lib/library/ask/**) and its top-5
+   * bench rank exactly as before; the library's own search screen turns it on (lib/library/server.ts searchLibrary).
+   */
+  demosFirst?: boolean;
   now?: () => number;
+}
+
+/** The results the moving-demos-first order applies to: a phone's first two screens of tiles. (new) */
+export const DEMO_FIRST_WINDOW = 24;
+
+const movesCache = new WeakMap<LibraryIndex, Uint8Array>();
+/** Per doc: 1 when its demo is a faithful loop (computed once per index). */
+function movesOf(index: LibraryIndex): Uint8Array {
+  let m = movesCache.get(index);
+  if (!m) { m = Uint8Array.from(index.docs, (e) => (demoFor(e)?.clip ? 1 : 0)); movesCache.set(index, m); }
+  return m;
+}
+
+/** Stable: within the window, moving entries first, each side in its own order. */
+function demosFirstOrder(index: LibraryIndex, ranked: RankedGroup[]): void {
+  const moves = movesOf(index);
+  const n = Math.min(DEMO_FIRST_WINDOW, ranked.length);
+  const head = ranked.slice(0, n);
+  const ordered = [...head.filter((g) => moves[g.rep]), ...head.filter((g) => !moves[g.rep])];
+  ranked.splice(0, n, ...ordered);
 }
 
 export interface SearchHit {
@@ -484,6 +512,7 @@ export function search(index: LibraryIndex, q: string, filters: SearchFilters = 
   const scored = !(textless && !boost.size && prefer === null && !opts.boostPrimary?.length);
   const ranked = opts.group === false ? matched.map((d) => ({ rep: d, members: [d] })) : groupHits(index, matched, score, scored);
   if (scored && ranked.length > 1) diversify(index, ranked, score);
+  if (opts.demosFirst && ranked.length > 1) demosFirstOrder(index, ranked);
   const round = (d: number) => Math.round(score[d] * 1000) / 1000;
   return {
     query: q, total: matched.length, groups: ranked.length,
