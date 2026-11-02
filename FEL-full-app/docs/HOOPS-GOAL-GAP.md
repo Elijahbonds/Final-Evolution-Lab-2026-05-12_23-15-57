@@ -152,6 +152,22 @@ On the rig the root accel p99 over one recorded 3v3 rival possession (`poss-thre
 screener 99.6, the third man 33.0 and my mates 33.1 / 36.3 m/s² (release game, every foe: 122–137). Only bodies that touched someone are
 over 34. The movers are capped at 33; the rest is the contact separation pushing roots (`BodySeparation`, phase 7's single standoff).
 
+### 3d. Phase 4 (feet and transitions, lane/hoops-p04) — before → after, the rig, same seed
+
+| bar | before | after |
+|---|---|---|
+| C6 the ball rises after the shot press (frames; bar ≤ 4) | 14, 13, 7 | 1, 11, 1 (the 11 is the pull-up gather's own dip) |
+| the rival's jumper leaves the hand (ball height at the release, same frame, same contest) | 1v1 0.77 / 0.80 m (hands 0.93 m); 3v3 0.97 m | 1v1 1.96 / 1.97 m (hands 1.65–1.81 m); 3v3 1.94 m |
+| M2 1v1 pops over 4 possessions (hero / rival), severe | 39 / 42, severe 6 / 11 | 35 / 32, severe 3 / 8 |
+| M2 3v3 pops in one rival possession (all six bodies) | 80 | 75 |
+| M1 planted-foot slide p90 (1v1 hero / rival; input run hero) | 8.2 / 2.45; 2.56 cm | 8.19 / 2.29; 1.48 cm |
+| M3 root snaps | 0 | 0 |
+
+What is left over the bars, by where the rig puts it (severe pops with the log line beside them): the hero's thigh at 8–10 000 °/s on
+his own possession with no move logged (frames 342 / 348 of seed 7, unchanged by the plant-lock fade); the arms on a gear change out
+of the rest dribble ("gear stop → sprint") and on the guard hand's cross ("guard hand crosses") — the rest-dribble layers (anim/RestDribble,
+core/HoopsLook) snapping on and off; the rival's arm at the start of a kit move.
+
 ## 4. Ranked gaps
 
 Ranked by what the owner feels first × how far from the bar. "Shared" = touches one of the shared hoops files.
