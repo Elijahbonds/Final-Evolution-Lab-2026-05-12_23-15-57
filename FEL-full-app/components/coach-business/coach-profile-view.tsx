@@ -66,7 +66,7 @@ export function CoachProfileView(p: CoachProfileViewProps) {
             {p.highlights.map((h) => (
               <li key={h.id} className="rounded-2xl border border-emerald-300/20 bg-emerald-300/5 p-4 text-sm leading-relaxed text-white/85">
                 <p>“{h.text}”</p>
-                <p className="mt-2 text-xs text-white/50">Shared by a client</p>
+                <p className="mt-2 text-xs text-white/40">Shared by a client</p>
               </li>
             ))}
           </ul>
@@ -88,7 +88,7 @@ export function CoachProfileView(p: CoachProfileViewProps) {
                   <h3 className="text-lg font-bold">{k.title}</h3>
                   <p className="text-base font-black text-cyan-200">{packagePriceLabel(k.priceCents, k.kind)}</p>
                 </div>
-                <p className="text-xs font-bold uppercase tracking-wider text-white/50">
+                <p className="text-xs font-bold uppercase tracking-wider text-white/40">
                   {PACKAGE_KIND_LABELS[k.kind]}{k.sessions ? ` · ${k.sessions} sessions` : ''}{k.spotsLeft !== null && k.spotsLeft > 0 ? ` · ${k.spotsLeft} ${k.spotsLeft === 1 ? 'spot' : 'spots'} open` : ''}
                 </p>
                 {k.summary ? <p className="mt-2 text-sm text-white/70">{k.summary}</p> : null}

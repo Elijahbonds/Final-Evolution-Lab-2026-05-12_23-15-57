@@ -41,7 +41,7 @@ export function fixSource(src: string): { out: string; size: number; colour: num
     size++;
     return num != null ? `fontSize:${sp}12` : `fontSize:${sp}${q}12px${q}`;
   });
-  out = out.replace(/(?<![\w/-])((?:[a-z0-9-]+:)*)(!?)text-([a-z]+(?:-[a-z]+)?(?:-\d{2,3})?)(?:\/(\d{1,3}))?(?![\w\-[/])/g, (m, variants: string, bang: string, name: string, alpha?: string) => {
+  out = out.replace(/(?<![\w/-])((?:[a-z0-9-]+:)*)(!?)text-([a-z]+(?:-[a-z]+){0,2}(?:-\d{2,3})?)(?:\/(\d{1,3}))?(?![\w\-[/])/g, (m, variants: string, bang: string, name: string, alpha?: string) => {
     if (/(^|:)(group-|peer-)?disabled:/.test(variants)) return m;
     const found = scan.scanTextColours(m);
     if (!found.length) return m;

@@ -174,7 +174,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setFilterCat(null)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterCat ? 'bg-fel-violet/15 text-fel-violet border border-fel-violet/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterCat ? 'bg-fel-violet/15 text-fel-violet-text border border-fel-violet/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
             >
               All Categories
             </button>
@@ -182,7 +182,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
               <button
                 key={c.id}
                 onClick={() => setFilterCat(filterCat === c.id ? null : c.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterCat === c.id ? 'bg-fel-violet/15 text-fel-violet border border-fel-violet/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterCat === c.id ? 'bg-fel-violet/15 text-fel-violet-text border border-fel-violet/30' : 'bg-[#16161a] text-fel-dim border border-white/6 hover:text-white/60'}`}
               >
                 {c.name}
               </button>
@@ -222,7 +222,7 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
                           <span className="text-[12px] text-fel-quiet">{ex.category.name}</span>
                         )}
                         {ex.targetPrqStat && (
-                          <span className="text-[12px] text-fel-violet/70 flex items-center gap-0.5">
+                          <span className="text-[12px] text-fel-violet-text flex items-center gap-0.5">
                             <Target className="h-3 w-3" />{ex.targetPrqStat}
                           </span>
                         )}
@@ -284,7 +284,7 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
               Phase {ex.phase} · Ch{ex.chapter}
             </span>
             {ex.category?.name && (
-              <span className="text-xs text-fel-violet/60">{ex.category.name}</span>
+              <span className="text-xs text-fel-violet-text">{ex.category.name}</span>
             )}
           </div>
           {ex.tags && (

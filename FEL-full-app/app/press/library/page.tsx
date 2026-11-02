@@ -30,7 +30,7 @@ export default async function LibraryPage() {
     return (
       <PressFrame signedIn={false}>
         <section className="mt-8">
-          <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
           <div className="mt-3 rounded-2xl border border-white/10 bg-[#101010] p-6">
             <p className="text-lg text-white">Log in to listen to your books.</p>
             <p className="mt-2 max-w-lg text-sm text-white/55">
@@ -57,7 +57,7 @@ export default async function LibraryPage() {
     return (
       <PressFrame signedIn>
         <section className="mt-8">
-          <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
           <p className="mt-4 max-w-lg text-sm text-white/60" role="status">
             Audiobooks are for verified adults (18+). If you&apos;re 18 or older,{' '}
             <Link className="font-semibold text-[#F5C518] underline" href="/age?next=%2Fpress%2Flibrary">confirm your birth year</Link>, then come back.
@@ -86,7 +86,7 @@ export default async function LibraryPage() {
   return (
     <PressFrame signedIn>
       <section className="mt-8">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">My Library</h2>
         <p className="mt-2 text-sm text-white/55">{email}</p>
         {failed ? (
           <p className="mt-4 text-sm text-[#ff8b8b]">{UNAVAILABLE}</p>
@@ -114,7 +114,7 @@ export default async function LibraryPage() {
                 <h3 className="text-lg font-semibold text-white">
                   <Link href={`/press/${book.slug}`} className="hover:underline">{book.title}</Link>
                 </h3>
-                <p className="mt-1 text-[12px] uppercase tracking-wider text-white/50">Audiobook · stream only</p>
+                <p className="mt-1 text-[11px] uppercase tracking-wider text-white/40">Audiobook · stream only</p>
                 <div className="mt-4">
                   <AudioPlayer bookSlug={book.slug} bookTitle={book.title} chapters={chapters} />
                 </div>

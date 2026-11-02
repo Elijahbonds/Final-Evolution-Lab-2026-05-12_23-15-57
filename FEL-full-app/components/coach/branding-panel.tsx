@@ -50,7 +50,7 @@ export function BrandingPanel({ api = COACH_BRANDING_API }: { api?: string }) {
   const preview: Branding = { name: name || null, accent, logoUrl: board.branding?.logoUrl ?? null };
   return (
     <details className="fel-card min-w-0 rounded-xl p-4" data-branding-panel>
-      <summary className="flex cursor-pointer items-center gap-2 text-[12px] uppercase tracking-wider text-white/50"><Palette className="h-3.5 w-3.5" /> Your brand</summary>
+      <summary className="flex cursor-pointer items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><Palette className="h-3.5 w-3.5" /> Your brand</summary>
       <div className="mt-3 space-y-2">
         <input aria-label="Brand name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="e.g. Dee Strength" className={input} />
         <div className="flex items-center gap-2">
@@ -65,11 +65,11 @@ export function BrandingPanel({ api = COACH_BRANDING_API }: { api?: string }) {
               {board.branding?.logoUrl && <button type="button" onClick={() => void post({ action: 'logo_clear' }).then(load)} className="min-h-10 rounded-lg border border-white/10 px-3 text-sm text-white/50">Remove logo</button>}
               <input ref={file} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => void upload(e.target.files?.[0])} />
             </>
-          ) : <span className="self-center text-xs text-white/50">Logo uploads are not on yet.</span>}
+          ) : <span className="self-center text-xs text-white/40">Logo uploads are not on yet.</span>}
         </div>
         {msg && <p className="text-xs text-white/60">{msg}</p>}
         <div className="rounded-lg border border-white/8 p-2" style={{ borderTopColor: accent, borderTopWidth: 3 }}><BrandMark b={preview} /></div>
-        <p className="text-[12px] text-white/50">Shown on your coach page, your athletes&apos; Today, and under your invite emails.</p>
+        <p className="text-[11px] text-white/40">Shown on your coach page, your athletes&apos; Today, and under your invite emails.</p>
       </div>
     </details>
   );

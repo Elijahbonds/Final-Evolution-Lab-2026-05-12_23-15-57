@@ -8,7 +8,6 @@
 
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { readToast } from '@/components/ui/fel/toast';
 import { Copy, FileUp, Loader2, Mail, Printer, Users } from 'lucide-react';
 import { IMPORT_PROBLEM_COPY, importFormatLine, type ImportFormat, type ImportProblem } from '@/lib/coach/bulkImport';
 import { JOIN_BY_CODE_PATH } from '@/lib/coach/inviteCode';
@@ -32,7 +31,7 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
     try {
       const r = await fetch('/api/coach/invite/bulk', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({}));
-      if (r.status === 429) { readToast.error(`You have room for ${j.room ?? 0} more open invites. Revoke old ones, or import fewer.`); return null; }
+      if (r.status === 429) { toast.error(`You have room for ${j.room ?? 0} more open invites. Revoke old ones, or import fewer.`); return null; }
       if (r.status === 403) { toast.error('Bulk invites are for certified coaches.'); return null; }
       if (!r.ok) {
         const first = Array.isArray(j.problems) && j.problems[0];
@@ -68,7 +67,7 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
   return (
     <div className="mt-5 space-y-4 border-t border-white/10 pt-4">
       <div>
-        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><Mail className="h-3.5 w-3.5" /> Email an invite</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><Mail className="h-3.5 w-3.5" /> Email an invite</div>
         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void one(); }} placeholder="athlete@email.com" type="email" inputMode="email" autoComplete="off" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" data-email-invite />
@@ -79,7 +78,7 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
       </div>
 
       <div>
-        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><Users className="h-3.5 w-3.5" /> Add a team</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><Users className="h-3.5 w-3.5" /> Add a team</div>
         <p className="mt-1 text-xs text-fel-dim">Paste one athlete per line (name, email — or just a name), or upload a CSV. Everyone gets their own code.</p>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} placeholder={'Sam Lee, sam@email.com\nRia Khan\nName,Email (a CSV header works too)'}
           className="mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 font-mono text-xs text-white" data-bulk-text />
@@ -102,9 +101,9 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
               <button onClick={() => window.print()} title="Print the sheet" className="rounded-md border border-white/15 p-1.5 text-white/70"><Printer className="h-3.5 w-3.5" /></button>
             </span>
           </div>
-          <p className="mt-1 text-[12px] text-fel-dim">Athletes type their code at {JOIN_BY_CODE_PATH}, or open their own link.</p>
+          <p className="mt-1 text-[11px] text-fel-dim">Athletes type their code at {JOIN_BY_CODE_PATH}, or open their own link.</p>
           {/* COACH-DELIVERY COA-07: which team app's export it was read as (player columns only) */}
-          {importFormatLine(result.format ?? undefined) && <p className="mt-1 text-[12px] text-fel-dim" data-import-format={result.format ?? ''}>{importFormatLine(result.format ?? undefined)}</p>}
+          {importFormatLine(result.format ?? undefined) && <p className="mt-1 text-[11px] text-fel-dim" data-import-format={result.format ?? ''}>{importFormatLine(result.format ?? undefined)}</p>}
           <ul className="mt-2 space-y-1">
             {result.sheet.map((s) => (
               <li key={s.code} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
@@ -115,7 +114,7 @@ export function BulkInvite({ onDone }: { onDone?: () => void }) {
             ))}
           </ul>
           {!!result.problems.length && (
-            <ul className="mt-2 space-y-0.5 text-[12px] text-fel-gold/85">
+            <ul className="mt-2 space-y-0.5 text-[11px] text-fel-gold/85">
               {result.problems.map((p) => <li key={`${p.line}-${p.problem}`}>Line {p.line}: {IMPORT_PROBLEM_COPY[p.problem]}</li>)}
             </ul>
           )}

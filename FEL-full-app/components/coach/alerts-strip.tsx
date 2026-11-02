@@ -44,7 +44,7 @@ export function AlertsStrip({ alerts, shownIds }: { alerts: readonly CoachAlert[
           ))}
         </ul>
       )}
-      <button onClick={() => void email()} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1 text-[12px] text-white/70 disabled:opacity-50" data-alerts-email>
+      <button onClick={() => void email()} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-white/70 disabled:opacity-50" data-alerts-email>
         {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mail className="h-3 w-3" />} Email me these {total} alert{total === 1 ? '' : 's'}
       </button>
     </div>

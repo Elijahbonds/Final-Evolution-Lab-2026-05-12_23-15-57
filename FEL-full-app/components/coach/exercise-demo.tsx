@@ -68,7 +68,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 py-2 text-[12px] font-bold tracking-widest transition-colors ${
+              className={`flex-1 py-2 text-[11px] font-bold tracking-widest transition-colors ${
                 tab === t ? 'bg-white/[0.06] text-fel-cyan' : 'text-fel-dim hover:text-white/70'
               }`}
             >
@@ -85,7 +85,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
       {tab === 'avatar' && hasAvatar && (
         <div className="relative">
           <ExerciseAvatarCanvas stat={exercise.targetPrqStat || ''} clip={exercise.clip ?? undefined} />
-          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[12px] font-bold tracking-wider text-fel-cyan">
+          <span className="absolute left-2 top-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-fel-cyan">
             YOUR AVATAR
           </span>
         </div>
@@ -111,7 +111,7 @@ export function ExerciseDemo({ exercise }: { exercise: ExerciseDemoData }) {
             <Dumbbell className="h-10 w-10 text-fel-quiet" />
           </div>
           {!hasVideo && (
-            <p className="mt-3 text-center text-[12px] text-fel-dim">
+            <p className="mt-3 text-center text-[11px] text-fel-dim">
               Follow the cues below.
             </p>
           )}

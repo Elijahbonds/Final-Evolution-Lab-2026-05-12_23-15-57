@@ -46,7 +46,7 @@ export function CoachGateLine({ gate }: { gate: CoachGateView }) {
   const open = gate.state === 'open' || gate.state === 'open_youth';
   const Icon = open ? ShieldCheck : ShieldHalf;
   return (
-    <div className={`flex items-start gap-1.5 border-t border-white/6 px-2 py-1.5 text-[12px] ${open ? 'text-white/50' : 'text-fel-gold/85'}`} data-coach-gate={gate.state}>
+    <div className={`flex items-start gap-1.5 border-t border-white/6 px-2 py-1.5 text-[11px] ${open ? 'text-white/50' : 'text-fel-gold/85'}`} data-coach-gate={gate.state}>
       <Icon className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" /> <span>{gate.line}</span>
     </div>
   );

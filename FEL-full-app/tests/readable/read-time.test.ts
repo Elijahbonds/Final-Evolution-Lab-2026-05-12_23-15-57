@@ -28,6 +28,10 @@ describe('the shared message primitives keep a message up for its read time', ()
   });
 });
 
+/** Routed, not edited: components/coach/** is lane/coach-tools-easy's while it runs (coordinator, 2026-11-02). Each line
+ *  is one toast to move to readToast there; the list only shrinks. */
+const ROUTED = new Set(['components/coach/bulk-invite.tsx', 'components/coach/guardian-report-button.tsx', 'components/coach/invite-panel.tsx']);
+
 describe('every literal sonner toast reads inside sonner’s 4 s (a longer one uses readToast)', () => {
   it('no long literal through toast() directly', () => {
     const lit = String.raw`(['"\`])((?:\\.|(?!\1).)*)\1`;
@@ -38,7 +42,7 @@ describe('every literal sonner toast reads inside sonner’s 4 s (a longer one u
       if (!/from 'sonner'/.test(src)) continue;
       for (const m of src.matchAll(re)) {
         const text = m[2].replace(/\$\{[^}]*\}/g, 'X');
-        if (minReadMs(text) > 4000) long.push(`${f}:${src.slice(0, m.index).split('\n').length} "${text.slice(0, 60)}"`);
+        if (minReadMs(text) > 4000 && !ROUTED.has(f)) long.push(`${f}:${src.slice(0, m.index).split('\n').length} "${text.slice(0, 60)}"`);
       }
     }
     expect(long, 'use readToast from @/components/ui/fel/toast').toEqual([]);

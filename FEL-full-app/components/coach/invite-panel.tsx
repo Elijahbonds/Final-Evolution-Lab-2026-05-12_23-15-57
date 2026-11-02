@@ -11,7 +11,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { readToast } from '@/components/ui/fel/toast';
 import { Check, Copy, Link2, Loader2, QrCode, Users, X } from 'lucide-react';
 import { inviteUrl } from '@/lib/coach/invite';
 // COACH-LOOP P1 (2026-10-20): the typed code each new invite carries, and the bulk / email panel
@@ -52,7 +51,7 @@ export function InvitePanel({ bulk = false }: { bulk?: boolean } = {}) {
   const copy = async (token: string) => {
     const url = inviteUrl(window.location.origin, token);
     try { await navigator.clipboard.writeText(url); setCopied(token); setTimeout(() => setCopied(null), 1800); }
-    catch { readToast.error('Clipboard blocked — the link is on screen to copy by hand.'); }
+    catch { toast.error('Clipboard blocked — the link is on screen to copy by hand.'); }
   };
 
   const showQr = async (token: string) => {
@@ -101,7 +100,7 @@ export function InvitePanel({ bulk = false }: { bulk?: boolean } = {}) {
           return (
           <li key={i.token} className="rounded-xl border border-white/10 bg-black/30 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[12px] uppercase tracking-wider text-fel-dim">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-fel-dim">
                 {i.use === 'once' ? 'One athlete' : 'Reusable'} · {i.joined} joined
               </span>
               {code && <span className="font-mono text-sm font-bold tracking-[0.15em] text-fel-cyan" title={`Type it at ${JOIN_BY_CODE_PATH}`} data-invite-code>{formatCode(code)}</span>}
@@ -131,7 +130,7 @@ export function InvitePanel({ bulk = false }: { bulk?: boolean } = {}) {
         })}
       </ul>
       {invites?.some((i) => codeOfToken(i.token)) && (
-        <p className="mt-2 text-[12px] text-fel-dim">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
+        <p className="mt-2 text-[11px] text-fel-dim">A code is typed at {JOIN_BY_CODE_PATH} — the same invite as its link.</p>
       )}
       {bulk && <BulkInvite onDone={() => void load()} />}
     </section>

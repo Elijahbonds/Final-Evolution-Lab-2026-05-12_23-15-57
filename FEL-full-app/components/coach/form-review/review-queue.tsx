@@ -100,7 +100,7 @@ function Opened({ item, api, onReviewed }: { item: QueueItemView; api: string; o
       )}
       {item.status === 'unreviewed' ? (
         <div className="space-y-2" data-reply>
-          <label className="block text-[12px] uppercase tracking-wider text-fel-dim" htmlFor={`cue-${item.id}`}>Cue from the catalogue</label>
+          <label className="block text-[11px] uppercase tracking-wider text-fel-dim" htmlFor={`cue-${item.id}`}>Cue from the catalogue</label>
           <select id={`cue-${item.id}`} value={cueId} onChange={(e) => setCueId(e.target.value)} data-reply-cue
             className="w-full min-w-0 rounded-lg border border-white/10 bg-[#0f0f13] px-2 py-2 text-sm text-white">
             <option value="">No cue</option>
@@ -145,7 +145,7 @@ export function FormReviewQueue({ api = FORM_REVIEW_QUEUE_API }: { api?: string 
   return (
     <div id={FORM_REVIEW_ANCHOR} className="fel-card space-y-3 rounded-xl p-4" data-form-review-queue>
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><ScanLine className="h-3.5 w-3.5" /> Form reviews</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ScanLine className="h-3.5 w-3.5" /> Form reviews</div>
         <div className="text-xs text-fel-gold" data-review-count>{waiting.length} to review</div>
       </div>
       {!data.available ? (

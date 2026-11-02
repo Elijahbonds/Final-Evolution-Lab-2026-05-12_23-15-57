@@ -62,13 +62,13 @@ export function AssignProgram({ program, roster, onDone }: { program: { id: stri
       {open && (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-1.5">
-            <button onClick={() => pickGroup(others.map((o) => o.clientId))} className="rounded-md border border-white/15 px-2 py-1 text-[12px] text-white/80">Everyone</button>
+            <button onClick={() => pickGroup(others.map((o) => o.clientId))} className="rounded-md border border-white/15 px-2 py-1 text-[11px] text-white/80">Everyone</button>
             {groups.map((g) => (
-              <button key={g.name} onClick={() => pickGroup(g.clientIds)} className="max-w-full truncate rounded-md border border-white/15 px-2 py-1 text-[12px] text-white/80" title={`Everyone on ${g.name}`}>
+              <button key={g.name} onClick={() => pickGroup(g.clientIds)} className="max-w-full truncate rounded-md border border-white/15 px-2 py-1 text-[11px] text-white/80" title={`Everyone on ${g.name}`}>
                 On {g.name} ({g.clientIds.length})
               </button>
             ))}
-            <button onClick={() => setPicked(new Set())} className="rounded-md border border-white/10 px-2 py-1 text-[12px] text-white/50">None</button>
+            <button onClick={() => setPicked(new Set())} className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-white/50">None</button>
           </div>
           <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
             {others.map((o) => (

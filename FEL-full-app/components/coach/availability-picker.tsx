@@ -40,7 +40,7 @@ export function AvailabilityPicker({ clientId, value, onSaved }: { clientId: str
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 pt-1" data-availability={value.status}>
-      <span className="text-[12px] uppercase tracking-wider text-fel-quiet">Availability</span>
+      <span className="text-[10px] uppercase tracking-wider text-fel-quiet">Availability</span>
       {AVAILABILITY_STATUSES.map((s) => (
         <button
           key={s}
@@ -49,13 +49,13 @@ export function AvailabilityPicker({ clientId, value, onSaved }: { clientId: str
           aria-pressed={value.status === s}
           title={AVAILABILITY_LABEL[s].coach}
           onClick={() => save(s, s === 'full' ? '' : returnBy)}
-          className={`rounded-md border px-2 py-0.5 text-[12px] ${value.status === s ? TONE[s] : 'border-white/10 text-white/50'}`}
+          className={`rounded-md border px-2 py-0.5 text-[11px] ${value.status === s ? TONE[s] : 'border-white/10 text-white/50'}`}
         >
           {AVAILABILITY_LABEL[s].short}
         </button>
       ))}
       {value.status !== 'full' && (
-        <label className="flex items-center gap-1 text-[12px] text-fel-dim">
+        <label className="flex items-center gap-1 text-[11px] text-fel-dim">
           back
           <input
             type="date"

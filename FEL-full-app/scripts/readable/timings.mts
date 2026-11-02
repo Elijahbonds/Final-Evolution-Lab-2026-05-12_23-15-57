@@ -20,11 +20,11 @@ interface Site { file: string; line: number; kind: string; text: string; ms: num
 const DEFAULTS: Record<string, number> = { banner: 1100, callout: 700, toast: 4000 };
 const sites: Site[] = [];
 const lit = String.raw`(['"\`])((?:\\.|(?!\1).)*)\1`;
-/** floored: the primitive itself applies readableMs now (JuiceKit, readToast / felToast), so the player gets max(ms, need). */
+/** floored: the primitive itself applies readableMs now (JuiceKit, the banner channels, readToast / felToast), so the player gets max(ms, need). */
 const PATTERNS: { kind: string; re: RegExp; msGroup: number | null; floored?: boolean }[] = [
   { kind: 'banner', re: new RegExp(String.raw`juice\??\.banner\(\s*${lit}(?:\s*,\s*[^,()]+(?:\([^)]*\))?)?(?:\s*,\s*(\d[\d_]*))?`, 'g'), msGroup: 3, floored: true },
   { kind: 'callout', re: new RegExp(String.raw`juice\??\.callout\(\s*${lit}(?:\s*,\s*[^,()]+(?:\([^)]*\))?)?(?:\s*,\s*(\d[\d_]*))?`, 'g'), msGroup: 3, floored: true },
-  { kind: 'flash', re: new RegExp(String.raw`banners?\??\.(?:flash|show)\(\s*${lit}\s*,\s*(\d[\d_]*)`, 'g'), msGroup: 3 },
+  { kind: 'flash', re: new RegExp(String.raw`banners?\??\.(?:flash|show)\(\s*${lit}\s*,\s*(\d[\d_]*)`, 'g'), msGroup: 3, floored: true },
   { kind: 'toast', re: new RegExp(String.raw`\btoast(?:\.(?:success|error|warning|info|message))?\(\s*${lit}`, 'g'), msGroup: null },
   { kind: 'toast', re: new RegExp(String.raw`\b(?:readToast(?:\.(?:success|error|warning|info|message))?|felToast)\(\s*${lit}`, 'g'), msGroup: null, floored: true },
 ];

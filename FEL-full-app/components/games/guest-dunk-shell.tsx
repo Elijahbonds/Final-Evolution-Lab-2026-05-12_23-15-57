@@ -321,12 +321,12 @@ export function GuestDunkShell({ challengeCode, reviewHref = null }: { challenge
               onClick={() => setGate('local')}
               disabled={!hydrated}
               aria-busy={!hydrated}
-              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white disabled:cursor-wait disabled:opacity-40"
+              className="mx-auto mt-4 block min-h-[44px] px-4 font-sans text-[14px] font-medium text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline disabled:cursor-wait disabled:opacity-60"
             >
               Play without saving
             </button>
             {!hydrated && (
-              <p role="status" className="mt-2 text-center font-mono text-[11px] text-white/40">Loading…</p>
+              <p role="status" className="mt-2 text-center font-mono text-[12px] text-white/50">Loading…</p>
             )}
           </div>
         ) : babylon ? (

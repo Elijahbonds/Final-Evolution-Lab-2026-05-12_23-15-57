@@ -19,13 +19,13 @@ export function OneVOneWinBy2() {
   const flip = () => { const next = !on; writeWinBy2Pick(next); setOn(next); };
   return (
     <div className="mt-3 flex flex-col items-center gap-1.5" data-onevone-winby2>
-      <p className="text-[12px] font-black tracking-[0.3em] text-white/50">RULES</p>
+      <p className="text-[9px] font-black tracking-[0.3em] text-white/45">RULES</p>
       <button type="button" role="switch" aria-checked={on} onClick={flip}
         aria-label={`Win by 2 — ${on ? 'on' : 'off'}`}
-        className={`rounded-full border px-3 py-1 text-[12px] font-black tracking-wider transition ${on ? 'border-[var(--fel-gold)] bg-[var(--fel-gold)] text-black' : 'border-white/30 text-white/80 hover:bg-white/10'}`}>
+        className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-wider transition ${on ? 'border-[var(--fel-gold)] bg-[var(--fel-gold)] text-black' : 'border-white/30 text-white/80 hover:bg-white/10'}`}>
         WIN BY 2 · {on ? 'ON' : 'OFF'}
       </button>
-      <p className="max-w-[24rem] text-[12px] leading-tight tracking-wide text-white/50">
+      <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">
         {on ? `To 11, but you must lead by 2 — the first to ${WIN_BY_2_CAP} wins whatever the margin.` : 'First to 11 wins.'}
       </p>
     </div>

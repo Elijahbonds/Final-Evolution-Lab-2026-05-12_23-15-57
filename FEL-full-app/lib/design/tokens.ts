@@ -46,6 +46,13 @@ export const COLOR = {
   /** A quiet secondary HUD read (HUD_RGB.info). --fel-info */
   info: '#9ad7ff',
 
+  /** READABLE (2026-11-02): the brand violet and indigo as SMALL TEXT. The accents themselves are 4.28:1 (#A855F7) and
+   *  4.03:1 (#7B61FF) on the raised panel, under 4.5:1; these are the same hues, lightened the least that clears 4.5:1 on
+   *  every surface (6 % and 9 % toward white). The accents stay for large text, icons and fills. --fel-violet-text,
+   *  --fel-indigo-text */
+  violetText: '#ad5ff7',
+  indigoText: '#876fff',
+
   /** The keyboard / pad / remote focus ring (the primary-action cyan). --fel-focus (new) */
   focus: PALETTE.cyan,
 } as const;
@@ -58,6 +65,7 @@ export const COLOR_VAR: Record<ColorToken, string> = {
   text: '--fel-text', textSoft: '--fel-text-soft', textDim: '--fel-text-dim', textQuiet: '--fel-text-quiet',
   cyan: '--fel-cyan', gold: '--fel-gold', ember: '--fel-ember', crimson: '--fel-crimson', emerald: '--fel-emerald',
   violet: '--fel-violet', indigo: '--fel-indigo', them: '--fel-them', info: '--fel-info', focus: '--fel-focus',
+  violetText: '--fel-violet-text', indigoText: '--fel-indigo-text',
 };
 
 /** The text steps, in order. */
@@ -79,6 +87,7 @@ export const TAILWIND_FEL = {
   text: COLOR.text, soft: COLOR.textSoft, dim: COLOR.textDim, quiet: COLOR.textQuiet,
   cyan: COLOR.cyan, gold: COLOR.gold, ember: COLOR.ember, crimson: COLOR.crimson, emerald: COLOR.emerald,
   violet: COLOR.violet, indigo: COLOR.indigo, them: COLOR.them, info: COLOR.info, focus: COLOR.focus,
+  'violet-text': COLOR.violetText, 'indigo-text': COLOR.indigoText,
 } as const;
 
 /** The focus ring every keyboard, pad and remote stop draws (2.4.7, and visible on every surface: 1.4.11's 3:1). */

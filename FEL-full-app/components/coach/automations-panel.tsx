@@ -65,13 +65,13 @@ export function AutomationsPanel({ api = COACH_AUTOMATIONS_API }: { api?: string
   return (
     <section className="fel-card min-w-0 space-y-3 rounded-xl p-4" data-automations-panel>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-white/50"><Zap className="h-3.5 w-3.5" /> Automations</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-white/40"><Zap className="h-3.5 w-3.5" /> Automations</div>
         <div className="flex gap-2">
           {!!board.automations?.length && <button type="button" onClick={() => void runNow()} className="flex min-h-10 items-center gap-1 rounded-lg border border-white/15 px-3 text-sm text-white/75" data-automation-run><Play className="h-4 w-4" /> Run now</button>}
           {!adding && <button type="button" onClick={() => { setAdding(true); pick('join'); }} className="flex min-h-10 items-center gap-1 rounded-lg border border-[#00E5FF]/50 px-3 text-sm text-[#00E5FF]" data-automation-new><Plus className="h-4 w-4" /> New</button>}
         </div>
       </div>
-      <p className="text-xs text-white/50">Posts into each athlete&apos;s program thread as you. Never an email. Teens need a guardian&apos;s coach-training consent first.</p>
+      <p className="text-xs text-white/45">Posts into each athlete&apos;s program thread as you. Never an email. Teens need a guardian&apos;s coach-training consent first.</p>
       {msg && <p className="text-xs text-white/60" data-automation-msg>{msg}</p>}
       {adding && (
         <div className="space-y-2 rounded-lg bg-white/[0.03] p-3" data-automation-form>

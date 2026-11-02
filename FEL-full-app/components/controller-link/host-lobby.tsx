@@ -302,7 +302,7 @@ function Badge({ children, tone, onClick }: { children: React.ReactNode; tone: s
       role={onClick ? 'button' : undefined}
       data-testid="host-lobby-badge"
       onClick={onClick}
-      className={`${onClick ? 'pointer-events-auto cursor-pointer hover:bg-white/10' : 'pointer-events-none'} rounded-full border px-3 py-1 font-mono text-[12px]`}
+      className={`${onClick ? 'pointer-events-auto inline-flex min-h-[44px] cursor-pointer items-center hover:bg-white/10' : 'pointer-events-none py-1'} rounded-full border px-3 font-mono text-[12px]`}
       style={{ borderColor: `${tone}55`, color: tone, background: '#000000aa' }}
     >
       {children}

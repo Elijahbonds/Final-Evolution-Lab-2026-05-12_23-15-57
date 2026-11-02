@@ -97,7 +97,7 @@ export function DraftsBoard({ data, busy = null, notes = {}, onNote = () => {}, 
   return (
     <section aria-labelledby="drafts-heading" className="fel-card rounded-xl p-4 space-y-3" data-testid="drafts-inbox">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="drafts-heading" className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim">
+        <h2 id="drafts-heading" className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim">
           <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" /> {DRAFTS_COPY.heading}
         </h2>
         <span className="text-xs text-fel-gold" data-pending={pending}>{pending} to decide · week of {data.weekKey}</span>
@@ -132,8 +132,8 @@ export function DraftCard({ draft: d, approvals, busy, note, onNote, onDecide, o
       <header className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-base font-semibold text-white">{d.name}</h3>
-          {d.band === 'teen' && <span className="rounded-full border border-white/20 px-2 py-0.5 text-[12px] uppercase tracking-wide text-white/60">Under 18 · conservative</span>}
-          {d.engine === 'rules+ai' && <span className="inline-flex items-center gap-1 rounded-full border border-fel-cyan/40 px-2 py-0.5 text-[12px] text-fel-cyan" title={DRAFTS_COPY.ai}><Sparkles className="h-3 w-3" aria-hidden="true" />AI wording</span>}
+          {d.band === 'teen' && <span className="rounded-full border border-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-white/60">Under 18 · conservative</span>}
+          {d.engine === 'rules+ai' && <span className="inline-flex items-center gap-1 rounded-full border border-fel-cyan/40 px-2 py-0.5 text-[10px] text-fel-cyan" title={DRAFTS_COPY.ai}><Sparkles className="h-3 w-3" aria-hidden="true" />AI wording</span>}
         </div>
         <p className="text-xs text-white/50">{d.context[0]}</p>
         {d.summary && <p className="text-sm italic text-white/70" data-ai-summary>{d.summary}</p>}
@@ -145,9 +145,9 @@ export function DraftCard({ draft: d, approvals, busy, note, onNote, onDecide, o
 
       {canDecide && (
         <div className="space-y-2">
-          <label className="block text-[12px] uppercase tracking-wider text-fel-dim" htmlFor={`note-${d.clientId}`}>{DRAFTS_COPY.noteLabel}</label>
+          <label className="block text-[11px] uppercase tracking-wider text-fel-dim" htmlFor={`note-${d.clientId}`}>{DRAFTS_COPY.noteLabel}</label>
           <input id={`note-${d.clientId}`} value={note} maxLength={280} onChange={(e) => onNote(e.target.value)} placeholder={DRAFTS_COPY.notePlaceholder}
-            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/50" />
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30" />
           <button type="button" onClick={onApproveSafe} disabled={!safe.length || busy === `safe:${d.clientId}`} data-testid="approve-all-safe"
             className="min-h-11 w-full rounded-lg bg-[#39FF14]/15 px-3 text-sm font-semibold text-[#39FF14] disabled:opacity-40 sm:w-auto">
             {DRAFTS_COPY.approveAllSafe} ({safe.length})
@@ -179,14 +179,14 @@ function ChangeRow({ draft, change: c, canDecide, busy, youth, onDecide }: { dra
       <div className="flex flex-wrap items-start justify-between gap-2">
         <span className="min-w-0 flex-1 text-sm font-medium text-white">{c.title}</span>
         <span className="flex shrink-0 items-center gap-1.5">
-          <span className={`rounded-full border px-2 py-0.5 text-[12px] font-semibold uppercase tracking-wide ${SAFETY_STYLE[c.safety]}`}>{SAFETY_LABEL[c.safety]}</span>
-          <span className="text-[12px] text-fel-dim">{CONFIDENCE_LABEL[c.confidence]}</span>
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${SAFETY_STYLE[c.safety]}`}>{SAFETY_LABEL[c.safety]}</span>
+          <span className="text-[10px] text-fel-dim">{CONFIDENCE_LABEL[c.confidence]}</span>
         </span>
       </div>
       <p className="text-xs text-white/70">{c.reason}</p>
       {c.aiNote && <p className="text-xs text-fel-cyan/85"><Sparkles className="mr-1 inline h-3 w-3" aria-hidden="true" />{c.aiNote}</p>}
       {(c.ops.length > 0 || c.evidence.length > 0 || c.method) && (
-        <details className="text-[12px] text-white/50">
+        <details className="text-[11px] text-white/50">
           <summary className="cursor-pointer select-none">The data and the edits</summary>
           <ul className="mt-1 space-y-0.5 pl-4">
             {c.ops.map((o, i) => <li key={`o${i}`} className="text-white/70">{opLine(o)}</li>)}
@@ -207,11 +207,11 @@ function ChangeRow({ draft, change: c, canDecide, busy, youth, onDecide }: { dra
         <div className="space-y-2 pt-1" data-editing>
           {rows.map((r, i) => (
             <fieldset key={i} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <legend className="col-span-full pb-1 text-[12px] text-white/50">{r.label}</legend>
-              <label className="text-[12px] text-fel-dim">Sets<input inputMode="numeric" value={r.sets} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, sets: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
-              <label className="text-[12px] text-fel-dim">Reps<input value={r.reps} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, reps: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
-              <label className="text-[12px] text-fel-dim">Load<input value={r.load} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, load: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
-              <label className="text-[12px] text-fel-dim">Band<select value={r.effortBand} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, effortBand: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-[#0f0f13] px-2 py-1.5 text-sm text-white"><option value="">None</option>{bands.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}</select></label>
+              <legend className="col-span-full pb-1 text-[11px] text-white/50">{r.label}</legend>
+              <label className="text-[10px] text-fel-dim">Sets<input inputMode="numeric" value={r.sets} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, sets: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
+              <label className="text-[10px] text-fel-dim">Reps<input value={r.reps} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, reps: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
+              <label className="text-[10px] text-fel-dim">Load<input value={r.load} maxLength={24} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, load: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white" /></label>
+              <label className="text-[10px] text-fel-dim">Band<select value={r.effortBand} onChange={(e) => setRows((rs) => rs.map((x, k) => (k === i ? { ...x, effortBand: e.target.value } : x)))} className="mt-0.5 w-full rounded border border-white/10 bg-[#0f0f13] px-2 py-1.5 text-sm text-white"><option value="">None</option>{bands.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}</select></label>
             </fieldset>
           ))}
           <div className="flex flex-wrap gap-2">

@@ -17,7 +17,7 @@ export function ThreadMessages({ thread }: { thread: readonly ThreadMsg[] }) {
           >
             {m.body}
           </div>
-          {m.id === seen && <div data-seen className="text-right text-[12px] text-fel-dim mt-0.5">Seen</div>}
+          {m.id === seen && <div data-seen className="text-right text-[10px] text-fel-dim mt-0.5">Seen</div>}
         </div>
       ))}
     </div>
@@ -27,5 +27,5 @@ export function ThreadMessages({ thread }: { thread: readonly ThreadMsg[] }) {
 /** "N new", or nothing. */
 export function UnreadPill({ n }: { n: number | null }) {
   if (!n) return null;
-  return <span data-unread-count={n} className="ml-1 rounded-full bg-fel-gold/15 px-1.5 py-0.5 text-[12px] font-medium normal-case tracking-normal text-fel-gold">{n} new</span>;
+  return <span data-unread-count={n} className="ml-1 rounded-full bg-fel-gold/15 px-1.5 py-0.5 text-[10px] font-medium normal-case tracking-normal text-fel-gold">{n} new</span>;
 }

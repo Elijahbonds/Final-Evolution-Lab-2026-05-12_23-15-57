@@ -189,7 +189,7 @@ export function TagRow({ pattern, braceMode, layer, category }: { pattern: Movem
       {pattern ? <span className="rounded-full border border-fel-cyan/30 px-2 py-0.5 text-fel-cyan/90">{PATTERN_INFO[pattern].label}</span>
         : <span className="rounded-full border border-fel-gold/30 px-2 py-0.5 text-fel-gold/80">no pattern</span>}
       {braceMode && <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/60">{BRACE_INFO[braceMode].label}</span>}
-      {l && <span className="rounded-full border border-fel-violet/30 px-2 py-0.5 text-fel-violet/90">{l.label}</span>}
+      {l && <span className="rounded-full border border-fel-violet/30 px-2 py-0.5 text-fel-violet-text">{l.label}</span>}
       {category && <span className="text-fel-quiet">{category}</span>}
     </div>
   );

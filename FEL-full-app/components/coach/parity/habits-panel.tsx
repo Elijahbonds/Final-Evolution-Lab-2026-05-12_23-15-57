@@ -59,7 +59,7 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
   return (
     <section className="fel-card space-y-3 rounded-xl p-4" data-habits-panel>
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[12px] uppercase tracking-wider text-fel-dim"><ListChecks className="h-3.5 w-3.5" /> Habits</div>
+        <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-fel-dim"><ListChecks className="h-3.5 w-3.5" /> Habits</div>
         {!adding && <button type="button" onClick={() => setAdding(true)} className="flex min-h-10 items-center gap-1 rounded-lg border border-fel-cyan/50 px-3 text-sm text-fel-cyan" data-habit-new><Plus className="h-4 w-4" /> New</button>}
       </div>
       {msg && <p className="text-xs text-white/60" data-habit-msg>{msg}</p>}
@@ -103,7 +103,7 @@ export function HabitsPanel({ api = COACH_HABITS_API }: { api?: string }) {
           <li key={h.id} className="space-y-1 rounded-lg bg-white/[0.03] p-3" data-habit={h.id}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0"><div className="truncate text-sm font-semibold text-white">{h.label}</div><div className="text-xs text-fel-dim">{h.line} · {h.scope === 'team' ? `Team: ${h.assignedTo}` : h.assignedTo}</div></div>
-              <button type="button" onClick={() => void fetch(api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'archive', id: h.id }) }).then(() => load())} className="shrink-0 text-[12px] text-fel-quiet">Archive</button>
+              <button type="button" onClick={() => void fetch(api, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'archive', id: h.id }) }).then(() => load())} className="shrink-0 text-[11px] text-fel-quiet">Archive</button>
             </div>
             <ul className="space-y-1">
               {h.athletes.map((a) => (

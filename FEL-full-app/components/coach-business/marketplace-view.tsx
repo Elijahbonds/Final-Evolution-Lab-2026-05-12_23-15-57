@@ -20,14 +20,14 @@ export function MarketplaceView({ q, cards, ready }: { q: MarketQuery; cards: Ma
 
       <nav className="mt-6 space-y-3" aria-label="Filter coaches">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Sport</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Sport</p>
           <div className="flex flex-wrap gap-2">
             <Chip href={marketHref(q, { sport: null })} on={!q.sport}>Any sport</Chip>
             {SPORTS.map(([k, l]) => <Chip key={k} href={marketHref(q, { sport: k })} on={q.sport === k}>{l}</Chip>)}
           </div>
         </div>
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Goal</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Goal</p>
           <div className="flex flex-wrap gap-2">
             <Chip href={marketHref(q, { goal: null })} on={!q.goal}>Any goal</Chip>
             {MARKET_GOALS.map(([k, l]) => <Chip key={k} href={marketHref(q, { goal: k })} on={q.goal === k}>{l}</Chip>)}
