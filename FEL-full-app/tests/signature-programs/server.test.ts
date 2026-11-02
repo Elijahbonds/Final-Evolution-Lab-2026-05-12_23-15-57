@@ -2,7 +2,7 @@
 // 500s before the SQL, every program a draft), draft vs approved for the athlete and the admin, start / done / the
 // checkpoint decision, the free week vs FEL Pro on the server, youth keeping progress on the phone, the streak and XP once,
 // and the owner's review refusing a program with a problem.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ prisma: new Proxy({}, { get: () => { throw new Error('the real database is not used here'); } }) }));
 
@@ -42,7 +42,13 @@ const viewer = (id: string, role?: string) => signatureViewer(id, role, deps());
 const approve = (id: string) => db.reviews.set(id, { programId: id, status: 'approved', reviewerId: 'owner', note: null, edits: {}, updatedAt: NOW });
 const setRow = (id: string, status: string) => db.reviews.set(id, { programId: id, status, reviewerId: 'owner', note: null, edits: {}, updatedAt: NOW });
 
+// The fake db stamps startedAt with new Date(), so the wall clock must read NOW too, or the checkpoint test's retest
+// window drifts with the calendar (it went red on 2026-11-02, a week after NOW). Only Date is faked; timers stay real.
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(NOW);
   db = fakeSignatureDb(true);
   pro = new Set();
   dob = new Map([['adult', 1990], ['admin', 1985], ['teen', 2011]]);

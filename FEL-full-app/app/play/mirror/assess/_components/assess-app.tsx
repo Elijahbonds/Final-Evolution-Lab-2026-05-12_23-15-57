@@ -56,7 +56,8 @@ import type { TestResult } from '@/lib/assess/scoring';
 import type { Side } from '@/lib/assess/protocol';
 import { maybeSaveAdultScreen } from '@/lib/privacy/screenHistoryClient';
 import { landingDevice, maybeSaveLandingCheck } from '@/lib/privacy/landingCheckSave';
-import { summarize } from '@/lib/screen/checks';
+import { keptTrust, summarize } from '@/lib/screen/checks';
+import type { MeasureTrust, TrustLevel, TrustReason } from '@/lib/screen/trust-rows';
 import { clearReplay, holdReplay } from '@/lib/screen/rep-memory';
 import {
   COACH_READY, LEAVE_BODY, LEAVE_GO, LEAVE_STAY, LEAVE_TITLE, PAIN_STOP, SLOW_DEVICE_LINE, STOP_CHECKS_BODY, STOP_CHECKS_GO, STOP_CHECKS_TITLE,
@@ -89,6 +90,8 @@ interface JumpView {
   heightCm: number | null; plusMinusCm: number | null; attempts: number; counted: number; jumpIn: number | null; lastIn: number | null; kid: boolean;
   /** VERTICAL-EASY: "Measure my vertical" (arms free) — its own series; lastCm is that series' last one on this device. */
   armSwing: boolean; lastCm: number | null;
+  /** MIRROR-TRUST-RATING: the jump height's trust, adults only (a kid's view never shows it). */
+  trust: { level: TrustLevel; reasons: readonly TrustReason[] } | null;
 }
 /** From the age question to the results: the browser's Back asks before it leaves (S-6). */
 const MID_FLOW: readonly Phase[] = ['age', 'grownUp', 'pain', 'takeoff', 'cameraInfo', 'starting', 'device', 'running'];
@@ -136,6 +139,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
   const [restAfterTakeoff, setRestAfterTakeoff] = useState(false); // "Do the full screen" after a jump: ask it, then go on
   const modeRef = useRef<ScreenKind | 'rest'>(initialRun ?? 'full');
   const carryRef = useRef<TestResult | null>(null);
+  const carryTrustRef = useRef<MeasureTrust[]>([]);
   const booted = useRef(false);
   const [jumpView, setJumpView] = useState<JumpView | null>(null);
   const deviceOkSince = useRef<number | null>(null);
@@ -230,17 +234,21 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
     cleanup();                                                   // the camera stops the moment the screen ends
     clearReplay();                                               // MIRROR step 2: a new screen never shows the last one's rep
     const summary = v.result ? summarize(v.result) : null;
+    if (summary && v.result?.trust.length) summary.trust = keptTrust(v.result.trust);   // MIRROR-TRUST-RATING: beside it, never in the grading
     if (!summary || v.result?.pain) { setPhase('stopped'); return; }
     if (modeRef.current === 'jump' || modeRef.current === 'vertical') {
       const armSwing = modeRef.current === 'vertical';
       const t5 = v.result?.tests.find((t) => t.id === 'T5') ?? null;
       carryRef.current = t5;
+      // MIRROR-TRUST-RATING: the jump's trust rows ride with the carried jump (priorTrust), kept as they were rated
+      carryTrustRef.current = (v.result?.trust ?? []).filter((r) => r.id.startsWith('jump.'));
       // VERTICAL-EASY: the arm-swing series is never written as the screen's result (that is the hands-on-hips series);
       // 18 or older keep it on this device instead (lib/vertical/series.ts), and the last one there is "what it means"
       const kid = armSwing ? !mayPersist(gateRef.current) : keepResult(tabStorage(), gateRef.current, summary) === 'kid';
       const store = !kid ? deviceStorage() : null;
       const lastCm = kid ? null : armSwing ? lastVerticalCm(store) : lastKeptCheckCm(store);
       if (armSwing && !kid && t5?.t5) keepVertical(store, t5.t5, { adult: true });
+      const jumpTrust = kid ? null : v.result?.trust.find((r) => r.id === 'jump.height') ?? null;
       const view: JumpView = {
         armSwing, lastCm,
         heightCm: t5?.t5?.bestHeightCm ?? null,
@@ -250,6 +258,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
         jumpIn: summary.jumpBestIn,
         lastIn: lastJumpRef.current,
         kid,
+        trust: jumpTrust ? { level: jumpTrust.level, reasons: jumpTrust.reasons } : null,
       };
       if (view.kid) lastJumpRef.current = summary.jumpBestIn ?? lastJumpRef.current;
       // DRILLS round 3: the landing check, for a verified adult who opted in (the server says); a kid's run sends nothing
@@ -289,7 +298,7 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       ...(kind === 'jump' || kind === 'vertical' ? { parts: JUMP_PARTS } : {}),
       // VERTICAL-EASY (owner, 2026-10-27: "allow arm swing"): the front door reads a natural jump, arms free
       ...(kind === 'vertical' ? { armsFree: true } : {}),
-      ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined } : {}),
+      ...(kind === 'rest' ? { parts: REST_PARTS, priorTests: carryRef.current ? { T5: carryRef.current } : undefined, priorTrust: carryRef.current ? carryTrustRef.current : undefined } : {}),
     });
     runnerRef.current = runner;
     lastSayRef.current = 0;
@@ -492,17 +501,19 @@ export function AssessApp({ initialRun = null }: { initialRun?: ScreenKind | nul
       ) : null}
       {phase === 'kidResults' && kid ? <KidResults jumpIn={kid.jumpIn} lastIn={kid.lastIn} onRunAgain={runAgain} /> : null}
       {phase === 'jumpResult' && jumpView ? (
-        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} counted={jumpView.counted} kid={jumpView.kid} armSwing={jumpView.armSwing} lastCm={jumpView.lastCm} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain}
+        <JumpResult heightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} attempts={jumpView.attempts} counted={jumpView.counted} kid={jumpView.kid} armSwing={jumpView.armSwing} lastCm={jumpView.lastCm} jumpIn={jumpView.jumpIn} lastIn={jumpView.lastIn} onFull={doFull} onAgain={runAgain} trust={jumpView.trust}
           more={(
             <>
               {/* JUMP-PRO: every jump with its ±, the set, the tip and the verified mark — adults only. MIRROR-TRUST-RATING hook:
-                  pass jumpView.trust?.level as trustLevel once PR #424 lands (its Low hides the number, and this card with it).
+                  PR #424 passes jumpView.trust?.level as trustLevel (its Low hides the number, and this card with it).
                   VERTICAL-EASY: these three now sit under the result's "More detail", one tap away. */}
-              {jumpView && !jumpView.kid ? <JumpSessionCard t5={carryRef.current?.t5 ?? null} trustLevel={null} /> : null}
-              {jumpView && !jumpView.kid ? <SlowMoUpload /> : null}
+              {jumpView && !jumpView.kid ? <JumpSessionCard t5={carryRef.current?.t5 ?? null} trustLevel={jumpView.trust?.level ?? null} /> : null}
+              {/* MIRROR-TRUST-RATING: a Low jump hides the number, so the slow-mo card (its number) goes with it, as the session card does */}
+              {jumpView?.trust?.level !== 'low' && (jumpView && !jumpView.kid ? <SlowMoUpload /> : null)}
               {/* JUMP-PRO 2: the approach (touch height), the drop jump (RSI), the standing reach and power — adults only.
                   JUMP-TESTS: the jump tests, the history kept on the device (CSV) and the take-off speed read the live check's t5. */}
-              {jumpView && !jumpView.kid ? <JumpMore adult bestHeightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} t5={carryRef.current?.t5 ?? null} /> : null}
+              {/* MIRROR-TRUST-RATING: on a Low jump JumpMore gets no live read (hideLive: no best height, no ±, no t5), so it shows no number of this jump */}
+              {jumpView && !jumpView.kid ? <JumpMore adult bestHeightCm={jumpView.heightCm} plusMinusCm={jumpView.plusMinusCm} t5={carryRef.current?.t5 ?? null} hideLive={jumpView.trust?.level === 'low'} /> : null}
             </>
           )} />
       ) : null}
