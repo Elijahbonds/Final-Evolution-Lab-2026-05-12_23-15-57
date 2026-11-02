@@ -16,9 +16,11 @@ import { CONTROLS_SHEET } from '@/lib/babylon/adventure/host/inputMap';
 import type { BRResult } from '@/lib/babylon/adventure/br/match';
 import { AdventureRadial } from './radial';
 
+/** The route's name, as app/play/adventure-br/page.tsx titles it. */
+export const ADVENTURE_BR_TITLE = 'Adventure Battle Royale';
 const MODE_KEY = 'adventure_br';
 
-export function AdventureBRStage() {
+export function AdventureBRStage({ signedIn = false }: { signedIn?: boolean } = {}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const busRef = useRef<InputBus | null>(null);
   const mountedRef = useRef(false);
@@ -49,13 +51,16 @@ export function AdventureBRStage() {
         input: bus,
         onPhase: (p, d) => { if (!disposed) { setPhase(p); if (p === 'error') setErr(String(d)); } },
         onHud: (h) => { if (!disposed) setHud((prev) => ({ ...prev, ...h })); },
+        // PUBLIC-POLISH (2026-11-02, live sweep D4): a guest's spawn does not ask the closet (it was a 401 and a console
+        // error on every guest load); the page read the session, as /play/adventure's does
+        guest: !signedIn,
         // the end screen: the result as the sink gets it (nothing is posted: no reward route for the BR yet)
         resultSink: async (r) => { if (!disposed) setResult((r as { detail?: BRResult }).detail ?? null); },
       }).then((s) => { if (disposed) s(); else stop = s; })
         .catch((e) => { if (!disposed) setErr(String(e?.message ?? e)); });
     }, 0);
     return () => { disposed = true; mountedRef.current = false; stop?.(); clearTimeout(startTimer); };
-  }, []);
+  }, [signedIn]);
 
   const start = () => busRef.current?.emit({ t: 'button', btn: 'START', pressed: true });
   const playing = (phase === 'playing' || phase === 'countdown') && !result;
@@ -66,7 +71,8 @@ export function AdventureBRStage() {
       {playing && <Hud hud={hud} />}
       {(phase === 'ready' || phase === 'loading') && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 bg-black/70 p-4">
-          <p className="text-[10px] tracking-[0.3em] text-white/50">THE ADVENTURE · BATTLE ROYALE [PLACEHOLDER] · 12 FIGHTERS · NO GUNS</p>
+          {/* PUBLIC-POLISH (2026-11-02, live sweep J5): the route's own name (its page title), not "[PLACEHOLDER]" */}
+          <p className="text-[10px] tracking-[0.3em] text-white/50">{`${ADVENTURE_BR_TITLE.toUpperCase()} · 12 FIGHTERS · NO GUNS`}</p>
           <Controls />
           <button type="button" disabled={phase !== 'ready'} onClick={(e) => { e.currentTarget.blur(); start(); }}
             className="rounded bg-[#00E5FF] px-6 py-2 font-bold text-black disabled:opacity-40" data-testid="br-start">
