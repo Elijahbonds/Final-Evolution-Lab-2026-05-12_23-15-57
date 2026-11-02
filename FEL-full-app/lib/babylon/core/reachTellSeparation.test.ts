@@ -129,7 +129,7 @@ describe('K-ST2: resolveAiReach', () => {
     expect(resolveAiReach(base({ roll: miss, onHim: false, carrierSpeed: 3 }))).toBe('whiff');
   });
   it('the moved constants keep 3v3\'s old values; the tell is 0.25 s', () => {
-    expect([AI_REACH_COOLDOWN_SEC, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, AI_REACH_GATE, AI_REACH_STUN_SEC]).toEqual([1.2, 0.22, 0.6, 0.5, 0.35]);
+    expect([AI_REACH_COOLDOWN_SEC, AI_STEAL_CHANCE, AI_STEAL_ON_BUMP, AI_REACH_GATE, AI_REACH_STUN_SEC]).toEqual([1.2, 0.22, 0.6, 0.7, 0.35]);   // hoops-p02: AI_REACH_GATE TUNED 0.5 → 0.7 (coordinator call 1A)
     expect(AI_REACH_TELL_SEC).toBe(0.25);
   });
 });

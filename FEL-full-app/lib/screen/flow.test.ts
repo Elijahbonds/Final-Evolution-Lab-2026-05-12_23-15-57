@@ -2,19 +2,18 @@
 // grown-up is with me" for under 18 or no age, then pain, then the camera card; "yes" to pain never reaches the camera;
 // nothing skips the grown-up step; a locked age skips the question; the back arrow stays inside the flow.
 import { describe, expect, it } from 'vitest';
-import { PRE_START, backStep, preStep, type PreEvent, type PreState, type PreStep } from './flow';
+import { ASKS_TAKEOFF, PRE_START, backStep, preStep, type PreEvent, type PreState, type PreStep } from './flow';
 import { AGE_BANDS, linksAllowed, needsGrownUp } from './age';
 import { mayPersist } from './store';
 
 const run = (events: PreEvent[], from: PreState = PRE_START): PreState => events.reduce((s, e) => preStep(s, e, new Date('2026-09-29T12:00:00Z')), from);
 
 describe('every age band → the right next step', () => {
-  it('18 or older: age → pain → the take-off tap → the camera card → camera; the gate allows keeping the result', () => {
+  // test changed (SCREEN-EASY, 2026-10-28): no run asks the take-off foot now (lib/screen/flow.ts ASKS_TAKEOFF)
+  it('18 or older: age → pain → the camera card → camera; the gate allows keeping the result', () => {
     const s = run([{ type: 'start' }, { type: 'age', age: '18+' }]);
     expect(s.step).toBe('pain');
-    const t = run([{ type: 'pain', hurts: false }], s);
-    expect(t.step).toBe('takeoff');                                    // SCREEN A: the take-off tap sits between
-    const c = run([{ type: 'takeoff', side: 'left' }], t);
+    const c = run([{ type: 'pain', hurts: false }], s);
     expect(c.step).toBe('cameraInfo');
     expect(run([{ type: 'cameraOn' }], c).step).toBe('camera');
     expect(mayPersist(c.gate)).toBe(true);
@@ -31,14 +30,15 @@ describe('every age band → the right next step', () => {
     expect(run([{ type: 'takeoff', side: 'left' }], t).step).toBe('cameraInfo');   // nothing to answer: unchanged
   });
 
-  it('SCREEN A: pain "no" → takeoff → camera card for the full screen; "Not sure" is an answer (null)', () => {
-    for (const kind of ['full'] as const) {
+  // test changed (SCREEN-EASY, 2026-10-28): was "pain no → takeoff → camera card for the full screen". No run asks it.
+  it('SCREEN-EASY: pain "no" → the camera card for every kind; no run asks the take-off foot', () => {
+    expect([...ASKS_TAKEOFF]).toEqual([]);
+    for (const kind of ['full', 'jump', 'vertical'] as const) {
       const t = run([{ type: 'start', kind }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
-      expect(t.step, kind).toBe('takeoff');
+      expect(t.step, kind).toBe('cameraInfo');
       expect(t.kind, kind).toBe(kind);
-      const c = run([{ type: 'takeoff', side: null }], t);             // Not sure
-      expect(c.step, kind).toBe('cameraInfo');
-      expect(run([{ type: 'cameraOn' }], c).step, kind).toBe('camera');
+      expect(run([{ type: 'takeoff', side: null }], t).step, kind).toBe('cameraInfo');   // nothing to answer: unchanged
+      expect(run([{ type: 'cameraOn' }], t).step, kind).toBe('camera');
     }
     // the take-off tap cannot be reached before the pain answer, and answers nowhere else
     expect(run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'takeoff', side: 'left' }]).step).toBe('pain');
@@ -87,13 +87,12 @@ describe('nothing skips the grown-up step, and the camera waits for the camera c
     expect(run([{ type: 'start' }, { type: 'pain', hurts: false }]).step).toBe('age');
   });
 
-  it('S-3: "no" to pain shows the take-off tap, then the camera card; only its button reaches the camera', () => {
-    const t = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
-    expect(t.step).toBe('takeoff');
-    const p = run([{ type: 'takeoff', side: 'right' }], t);
+  // test changed (SCREEN-EASY): no take-off tap between pain and the camera card
+  it('S-3: "no" to pain shows the camera card; only its button reaches the camera', () => {
+    const p = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
     expect(p.step).toBe('cameraInfo');
     expect(run([{ type: 'cameraOn' }], p).step).toBe('camera');
-    expect(run([{ type: 'cameraOn' }], t).step).toBe('takeoff');        // no card shown yet: the button does nothing
+    expect(run([{ type: 'cameraOn' }], run([{ type: 'start' }, { type: 'age', age: '18+' }])).step).toBe('pain');   // no card shown yet: the button does nothing
     expect(run([{ type: 'cameraOn' }]).step).toBe('intro');
   });
 
@@ -158,14 +157,13 @@ describe('S-2: the back arrow is one step back, inside the flow', () => {
     expect(backStep(at('painStop'))).toEqual(PRE_START);
   });
 
-  it('the take-off tap → pain; the camera card → the take-off tap; the camera → the camera card; the start stays', () => {
+  // test changed (SCREEN-EASY): the camera card's back is the pain question (no take-off tap between)
+  it('the take-off tap → pain; the camera card → pain; the camera → the camera card; the start stays', () => {
     const p = run([{ type: 'start' }, { type: 'age', age: '18+' }, { type: 'pain', hurts: false }]);
-    expect(p.step).toBe('takeoff');
-    const b = preStep(p, { type: 'back' });                              // SCREEN A: back from the take-off tap is pain
-    expect(b.step).toBe('pain');
-    expect(b.gate).toEqual(p.gate);
-    const c = preStep(p, { type: 'takeoff', side: 'left' });
-    expect(backStep(c).step).toBe('takeoff');
+    expect(backStep({ ...p, step: 'takeoff' }).step).toBe('pain');      // SCREEN A: back from the take-off tap is pain
+    const c = p;
+    expect(c.step).toBe('cameraInfo');
+    expect(backStep(c).step).toBe('pain');
     expect(backStep(c).gate).toEqual(p.gate);
     expect(backStep({ ...c, step: 'camera' }).step).toBe('cameraInfo');
     expect(backStep(PRE_START)).toBe(PRE_START);

@@ -1,7 +1,14 @@
+'use client';
+
 // RunResult — one camera run's numbers, every one an estimate with its ± (SPRINT-SPEED, 2026-10-25).
 import type { RunResult } from '@/lib/sprint/session';
 import { modelSpeed } from '@/lib/sprint/trace';
+import type { SprintRecord } from '@/lib/sprint/store';
 import { AGILITY_BETA_LINE, ESTIMATE_LINE, FV_SLOPE_LINE, MOVEMENT_LINE, REACTION_LINE, mph, speedWithBand, timeWithBand, RESULT_MEANS, RESULT_NEXT } from '@/lib/sprint/copy';
+import { sprintView } from '@/lib/results/sprint';
+import { RESULT_COPY } from '@/lib/results/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { LOOK } from '@/components/result-card/look';
 
 export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { ok: true }>['trace']> }) {
   const pts = trace.curve;
@@ -28,55 +35,69 @@ export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { 
   );
 }
 
-export function RunResultCard({ result }: { result: RunResult }) {
+/**
+ * One run's result (PLAT-P03, 2026-10-28): the result card (components/result-card) — the time (or the top speed), its ±,
+ * "estimate", the arrow against the last comparable run on this phone (lib/results/sprint.ts: the two reads' own ±), what
+ * it means and "Run it again". Everything else the run read — the splits, the speed chart, the sprint profile, the tips,
+ * how it was started and timed, the estimate line and the next step — is under Details, unchanged.
+ *
+ * `onAgain` is the speed page's own (/train/speed). Without it (combine day's camera timer) the card is embedded: no
+ * button, no "See all", no comparison unless `last` is given.
+ */
+export function RunResultCard({ result, last = null, onAgain, note = null }: { result: RunResult; last?: SprintRecord | null; onAgain?: () => void; note?: string | null }) {
   if (!result.ok) {
     return <div role="alert" className="fel-card rounded-xl p-4 text-sm text-[#FFB020]" data-sprint-result="failed">{result.why}</div>;
   }
   const r = result;
   const tr = r.trace;
+  // the card's line is the meaning's first sentence; the whole line (its estimate caveat too) is in Details, unchanged
+  const view = sprintView(r, last, RESULT_MEANS.split('. ')[0] + '.', { label: RESULT_COPY.runAgain, href: null });
   return (
-    <div className="fel-card space-y-3 rounded-xl p-4" data-sprint-result={r.test}>
-      <div className="text-[11px] uppercase tracking-wider text-white/45">{r.label} · camera estimate</div>
-      {r.timeS !== null && (
-        <div className="font-mono text-4xl font-black tabular-nums text-white" data-sprint-time>{timeWithBand(r.timeS, r.sdS)}</div>
-      )}
-      {tr && (
-        <div className="space-y-1">
-          <div className="font-mono text-3xl font-black tabular-nums text-white" data-sprint-top>{speedWithBand(tr.topSpeed, tr.topSpeedSd)}</div>
-          <div className="text-xs text-white/55">Top speed seen ({mph(tr.topSpeed)} mph), over {Math.round(tr.seenM[1] - tr.seenM[0])} m in view.</div>
+    <div data-sprint-result={r.test}>
+      <ResultCard view={view} onNext={onAgain} seeAll={!!onAgain} reveal={!!onAgain} details={(
+        <div className="space-y-3">
+          <div className={LOOK.detail}>{r.label} · camera estimate</div>
+          {r.timeS !== null && <div className={`${LOOK.detail} font-bold text-white`} data-sprint-time>{timeWithBand(r.timeS, r.sdS)}</div>}
+          {tr && (
+            <div className="space-y-1">
+              <div className={`${LOOK.detail} font-bold text-white`} data-sprint-top>{speedWithBand(tr.topSpeed, tr.topSpeedSd)}</div>
+              <div className={LOOK.detail}>Top speed seen ({mph(tr.topSpeed)} mph), over {Math.round(tr.seenM[1] - tr.seenM[0])} m in view.</div>
+            </div>
+          )}
+          {r.splits.length > 0 && (
+            <dl className="grid grid-cols-2 gap-2 text-center" data-sprint-splits>
+              {r.splits.map((s) => (
+                <div key={s.label} className="rounded-lg bg-white/5 p-2"><dt className={LOOK.detail}>{s.label}</dt><dd className="font-bold tabular-nums text-white">{r.test === 'flying' ? s.s.toFixed(s.label === 'mph' ? 1 : 2) : `${s.s.toFixed(2)} s`}</dd></div>
+              ))}
+            </dl>
+          )}
+          {tr && <SpeedChart trace={tr} />}
+          {tr?.model && tr.profile && (
+            <div className="space-y-1.5" data-sprint-profile>
+              <div className={LOOK.detail}>Sprint profile · estimate</div>
+              <dl className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg bg-white/5 p-2"><dt className={LOOK.detail}>Top speed (curve)</dt><dd className="font-bold text-white" data-sprint-vmax>{speedWithBand(tr.model.vmax, tr.model.vmaxSd)}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className={LOOK.detail}>Time to speed up</dt><dd className="font-bold text-white">{tr.model.tau.toFixed(2)} s ± {Math.max(0.01, 2 * tr.model.tauSd).toFixed(2)}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className={LOOK.detail}>Starting push</dt><dd className="font-bold text-white">{tr.profile.f0PerKg.toFixed(1)} N/kg{tr.profile.f0N ? ` · ${Math.round(tr.profile.f0N)} N` : ''}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className={LOOK.detail}>Max power</dt><dd className="font-bold text-white">{tr.profile.pmaxPerKg.toFixed(1)} W/kg{tr.profile.pmaxW ? ` · ${Math.round(tr.profile.pmaxW)} W` : ''}</dd></div>
+              </dl>
+              <p className={LOOK.detail}>{tr.profile.withAir ? 'Air resistance included (from height and body mass).' : 'Per kilogram, without air resistance (no body mass given).'} Strength-to-speed balance (force-velocity slope) {tr.profile.slopePerKg.toFixed(2)}. {FV_SLOPE_LINE}</p>
+            </div>
+          )}
+          <ul className={`space-y-1 ${LOOK.detail}`}>
+            {r.startKind === 'go' && <li data-sprint-reaction>{REACTION_LINE}</li>}
+            {r.startKind === 'movement' && <li>{MOVEMENT_LINE}</li>}
+            {r.test === 'agility' && <li>{AGILITY_BETA_LINE}</li>}
+            {r.tips.map((t) => <li key={t} className="text-[#FFB020]">{t}</li>)}
+            <li>Pose rate {r.poseHz} frames a second.</li>
+            <li data-sprint-estimate>{ESTIMATE_LINE}</li>
+          </ul>
+          {/* CUE-REWRITE: what the number means and the one next step, word for word */}
+          <p className={LOOK.detail} data-sprint-means>{RESULT_MEANS}</p>
+          <p className={`${LOOK.detail} font-bold text-white`} data-sprint-next>{RESULT_NEXT}</p>
+          {note ? <p className={LOOK.detail} data-sprint-note>{note}</p> : null}
         </div>
-      )}
-      {r.splits.length > 0 && (
-        <dl className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4" data-sprint-splits>
-          {r.splits.map((s) => (
-            <div key={s.label} className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">{s.label}</dt><dd className="font-bold tabular-nums text-white">{r.test === 'flying' ? s.s.toFixed(s.label === 'mph' ? 1 : 2) : `${s.s.toFixed(2)} s`}</dd></div>
-          ))}
-        </dl>
-      )}
-      {tr && <SpeedChart trace={tr} />}
-      {tr?.model && tr.profile && (
-        <div className="space-y-1.5" data-sprint-profile>
-          <div className="text-[11px] uppercase tracking-wider text-white/45">Sprint profile · estimate</div>
-          <dl className="grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Top speed (curve)</dt><dd className="font-bold text-white" data-sprint-vmax>{speedWithBand(tr.model.vmax, tr.model.vmaxSd)}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Time to speed up</dt><dd className="font-bold text-white">{tr.model.tau.toFixed(2)} s ± {Math.max(0.01, 2 * tr.model.tauSd).toFixed(2)}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Starting push</dt><dd className="font-bold text-white">{tr.profile.f0PerKg.toFixed(1)} N/kg{tr.profile.f0N ? ` · ${Math.round(tr.profile.f0N)} N` : ''}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Max power</dt><dd className="font-bold text-white">{tr.profile.pmaxPerKg.toFixed(1)} W/kg{tr.profile.pmaxW ? ` · ${Math.round(tr.profile.pmaxW)} W` : ''}</dd></div>
-          </dl>
-          <p className="text-[11px] text-white/45">{tr.profile.withAir ? 'Air resistance included (from height and body mass).' : 'Per kilogram, without air resistance (no body mass given).'} Strength-to-speed balance (force-velocity slope) {tr.profile.slopePerKg.toFixed(2)}. {FV_SLOPE_LINE}</p>
-        </div>
-      )}
-      <ul className="space-y-1 text-xs text-white/55">
-        {r.startKind === 'go' && <li data-sprint-reaction>{REACTION_LINE}</li>}
-        {r.startKind === 'movement' && <li>{MOVEMENT_LINE}</li>}
-        {r.test === 'agility' && <li>{AGILITY_BETA_LINE}</li>}
-        {r.tips.map((t) => <li key={t} className="text-[#FFB020]">{t}</li>)}
-        <li>Pose rate {r.poseHz} frames a second.</li>
-        <li data-sprint-estimate>{ESTIMATE_LINE}</li>
-      </ul>
-      {/* CUE-REWRITE: what the number means, and the one next step */}
-      <p className="text-sm text-white/75" data-sprint-means>{RESULT_MEANS}</p>
-      <p className="text-sm font-bold text-white" data-sprint-next>{RESULT_NEXT}</p>
+      )} />
     </div>
   );
 }

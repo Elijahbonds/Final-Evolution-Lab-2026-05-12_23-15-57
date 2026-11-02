@@ -43,7 +43,8 @@ describe('jump-only, then the rest of the screen', () => {
   it('the jump parts are T5 only, and the rest has no T5', () => {
     expect(JUMP_PARTS.map((p) => p.id)).toEqual(['T5']);
     expect(REST_PARTS.some((p) => p.test === 'T5')).toBe(false);
-    expect(REST_PARTS.map((p) => p.test)).toEqual(['T1', 'T1', 'T2', 'T2', 'T3', 'T3']);
+    // SCREEN-EASY (2026-10-28; test changed): front-on first (T1 facing, T3 each leg), then side-on (T1, the wall last)
+    expect(REST_PARTS.map((p) => p.test)).toEqual(['T1', 'T3', 'T3', 'T1', 'T2', 'T2']);
   });
 
   it('a jump-only run never walks T1, T2 or T3', () => {

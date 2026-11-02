@@ -26,6 +26,10 @@ import { readDay, viewOf, type CoachRuleCtx, type ReadinessView, type TrendPoint
 import { SelfView } from '@/components/games/body-play';
 import { ReadinessTrend } from './readiness-trend';
 import { BAND_STYLE } from './band';
+import { readinessView } from '@/lib/results/readiness';
+import { RESULT_COPY } from '@/lib/results/copy';
+import { ResultCard } from '@/components/result-card/result-card';
+import { LOOK } from '@/components/result-card/look';
 
 export const READINESS_API = '/api/readiness/check';
 
@@ -126,10 +130,10 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
   if (ctx && !ctx.ok) return null;
   return (
     <div className="space-y-4" data-readiness-check>
-      <div className={`fel-card space-y-2 rounded-xl p-4 ${phase === 'live' || phase === 'starting' ? 'hidden' : ''}`}>
-        <div className="text-[11px] uppercase tracking-wider text-white/40">Daily readiness · 30 seconds</div>
+      <div className={`fel-card space-y-2 rounded-xl p-4 ${phase === 'live' || phase === 'starting' || phase === 'result' ? 'hidden' : ''}`}>
+        <div className="text-[12px] uppercase tracking-wider text-fel-dim">Daily readiness · 30 seconds</div>
         <p className="text-sm text-white/75">{HOW_LINE}</p>
-        <p className="text-xs text-white/45">{NOT_A_DIAGNOSIS}</p>
+        <p className="text-xs text-fel-dim">{NOT_A_DIAGNOSIS}</p>
         {ctx && ctx.coaches.length > 0 && (
           <ul className="space-y-0.5 text-xs text-white/55" data-readiness-rules>
             {ctx.coaches.map((c) => <li key={c.coachId}>{c.ruleLine}</li>)}
@@ -146,14 +150,14 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
 
       {phase !== 'result' && phase !== 'live' && phase !== 'starting' && !doneToday && (
         <div className="fel-card space-y-2 rounded-xl p-4" data-readiness-feel>
-          <div className="text-sm font-semibold text-white">How do you feel? <span className="font-normal text-white/45">(optional)</span></div>
+          <div className="text-sm font-semibold text-white">How do you feel? <span className="font-normal text-fel-dim">(optional)</span></div>
           <div className="flex gap-2" role="radiogroup" aria-label="How do you feel, 1 to 5">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} type="button" role="radio" aria-checked={feel === n} onClick={() => setFeel(feel === n ? null : n)} data-feel={n}
                 className={`min-h-11 flex-1 rounded-lg border text-base font-bold ${feel === n ? 'border-[#00E5FF] bg-[#00E5FF]/15 text-[#00E5FF]' : 'border-white/15 text-white/70'}`}>{n}</button>
             ))}
           </div>
-          <div className="flex justify-between text-[11px] text-white/40"><span>Drained</span><span>Great</span></div>
+          <div className="flex justify-between text-[12px] text-fel-dim"><span>Drained</span><span>Great</span></div>
         </div>
       )}
 
@@ -188,30 +192,37 @@ export function ReadinessCheck({ api = READINESS_API }: { api?: string }) {
       )}
 
       {view && phase === 'result' && (
-        <div className="fel-card space-y-3 rounded-xl p-4" data-readiness-result data-band={view.band}>
-          <div className="flex items-center gap-3">
-            <span className={`rounded-lg border px-3 py-1.5 text-lg font-black ${BAND_STYLE[view.band]}`} data-readiness-band>{view.label}</span>
-            {view.band !== 'building' && view.dropPct != null && <span className="text-sm text-white/60">{view.dropPct > 0 ? '−' : '+'}{Math.abs(view.dropPct)}% vs your normal</span>}
-          </div>
-          <p className="text-[15px] font-semibold leading-snug text-white" data-readiness-line>{view.line}</p>
-          {view.next && <p className="text-sm text-white/80" data-readiness-next>{view.next}</p>}
-          <dl className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Best</dt><dd className="font-bold tabular-nums text-white" data-readiness-best>{cmIn(view.bestCm)}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Average</dt><dd className="font-bold tabular-nums text-white">{cmIn(view.meanCm)}</dd></div>
-            <div className="rounded-lg bg-white/5 p-2"><dt className="text-[11px] text-white/45">Your normal</dt><dd className="font-bold tabular-nums text-white">{view.baselineCm != null ? cmIn(view.baselineCm) : '—'}</dd></div>
-          </dl>
-          {view.feel != null && <p className="text-xs text-white/50">You said you feel {view.feel} of 5.</p>}
-          <p className="flex items-center gap-1.5 text-xs text-white/50" data-readiness-kept={kept ?? ''}>
-            {kept === 'server' ? <><CheckCircle2 className="h-3.5 w-3.5 text-[#00FF9D]" /> Saved to your history.</> : NOT_SAVED_LINE}
-          </p>
-          {!view.solo && !view.coachTold && view.band === 'low' && kept !== 'server' && (
-            <p className="text-xs text-white/50">Your coach was not told and today&apos;s session is as written: only a saved check reaches them.</p>
-          )}
+        // PLAT-P03 (2026-10-28): the day is ONE result card — today's best jump, the arrow against your normal (the read's
+        // own band: lib/results/readiness.ts), the band's next line, and "Done". The band, the reason, best / average /
+        // normal, how you said you feel and where it is kept are under Details, unchanged.
+        <div data-readiness-result data-band={view.band}>
+          <ResultCard view={readinessView(view, { label: RESULT_COPY.done, href: '/train' })} details={(
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className={`rounded-lg border px-3 py-1.5 text-lg font-black ${BAND_STYLE[view.band]}`} data-readiness-band>{view.label}</span>
+                {view.band !== 'building' && view.dropPct != null && <span className={LOOK.detail}>{view.dropPct > 0 ? '−' : '+'}{Math.abs(view.dropPct)}% vs your normal</span>}
+              </div>
+              <p className={`${LOOK.detail} font-semibold text-white`} data-readiness-line>{view.line}</p>
+              {view.next && <p className={LOOK.detail} data-readiness-next>{view.next}</p>}
+              <dl className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-white/5 p-2"><dt className="text-[12px] text-fel-dim">Best</dt><dd className="font-bold tabular-nums text-white" data-readiness-best>{cmIn(view.bestCm)}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className="text-[12px] text-fel-dim">Average</dt><dd className="font-bold tabular-nums text-white">{cmIn(view.meanCm)}</dd></div>
+                <div className="rounded-lg bg-white/5 p-2"><dt className="text-[12px] text-fel-dim">Your normal</dt><dd className="font-bold tabular-nums text-white">{view.baselineCm != null ? cmIn(view.baselineCm) : '—'}</dd></div>
+              </dl>
+              {view.feel != null && <p className={LOOK.detail}>You said you feel {view.feel} of 5.</p>}
+              <p className={`flex items-center gap-1.5 ${LOOK.detail}`} data-readiness-kept={kept ?? ''}>
+                {kept === 'server' ? <><CheckCircle2 className="h-3.5 w-3.5 text-[#00FF9D]" /> Saved to your history.</> : NOT_SAVED_LINE}
+              </p>
+              {!view.solo && !view.coachTold && view.band === 'low' && kept !== 'server' && (
+                <p className={LOOK.detail}>Your coach was not told and today&apos;s session is as written: only a saved check reaches them.</p>
+              )}
+            </div>
+          )} />
         </div>
       )}
 
       {trend.length > 1 && phase !== 'live' && <ReadinessTrend points={trend} />}
-      <p className="text-center text-xs text-white/40"><Link href="/train" className="underline">Back to Train</Link></p>
+      <p className="text-center text-xs text-fel-dim"><Link href="/train" className="underline">Back to Train</Link></p>
     </div>
   );
 }

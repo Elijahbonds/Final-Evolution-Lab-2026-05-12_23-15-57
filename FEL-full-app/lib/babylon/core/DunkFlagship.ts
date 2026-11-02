@@ -66,7 +66,9 @@ export interface SlamImpact { hitStopMs: number; shake: number; shakeMs: number 
 /** The make's hit-stop and shake for a slam of accuracy `acc01` (and a rim hang adds a touch: the body hits the iron too). */
 export function slamImpact(acc01: number, hang: boolean, big = { hitStopMs: SLAM_HITSTOP_BIG_MS, shake: SLAM_SHAKE_BIG }, from = SLAM_BIG_FROM): SlamImpact {
   const a = Number.isFinite(acc01) ? Math.min(1, Math.max(0, acc01)) : 0;
-  const k = Math.min(1, Math.max(0, (a - from) / Math.max(1e-6, 1 - from)) + (hang ? 0.15 : 0));
+  // Phase 5: the hang adds only on an ABOVE-ordinary slam. At contact SLAM is still down from any tap (contact lands ~33 ms after the
+  // press), so `hang` was true on every make and an ordinary one came out at 75 ms / 0.129, not the shipped 70 / 0.12 (rig, Phase 5).
+  const k = Math.min(1, Math.max(0, (a - from) / Math.max(1e-6, 1 - from)) + (hang && a > from ? 0.15 : 0));
   return {
     hitStopMs: Math.round(SLAM_HITSTOP_MS + (big.hitStopMs - SLAM_HITSTOP_MS) * k),
     shake: SLAM_SHAKE + (big.shake - SLAM_SHAKE) * k,
@@ -89,4 +91,100 @@ export function timeToFloor(heightM: number, vyDown: number, g = 9.81): number {
   if (heightM <= 0) return 0;
   const v = Math.max(0, vyDown);
   return (-v + Math.sqrt(v * v + 2 * g * heightM)) / g;
+}
+
+// ── Phase 4: A WHIFF ALWAYS SAYS WHY ───────────────────────────────────────────────────────────────────────────────────────
+// A lob the hand never met ended as "LOST THE SELF-LOB — MISSED": the lob was named, the reason was not (the iron and the glass
+// said theirs: OFF THE IRON, OVER THE GLASS). The flight now keeps the ball's nearest pass by the hand, and the loss names the
+// side it went by — the one thing the player can change next time (when to throw, how far out to leave).
+export type WhiffWhy = 'TOO HIGH' | 'TOO LOW' | 'OUT AHEAD' | 'BEHIND YOU' | 'WIDE' | 'NEVER IN REACH';
+/** Where the ball went by the hand: `d` is ball − hand at their nearest (m), `fwd` the run's direction toward the rim (any
+ *  length, horizontal). The largest of the three offsets names it; no sample at all → NEVER IN REACH. */
+/** (new) A nearest pass farther than this from the hand (m) was never a catch to miss: NEVER IN REACH. */
+export const WHIFF_REACH_M = 1.5;
+export function whiffWhy(d: { x: number; y: number; z: number } | null, fwd: { x: number; z: number }): WhiffWhy {
+  if (!d || ![d.x, d.y, d.z].every(Number.isFinite) || Math.hypot(d.x, d.y, d.z) > WHIFF_REACH_M) return 'NEVER IN REACH';
+  const n = Math.hypot(fwd.x, fwd.z) || 1, fx = fwd.x / n, fz = fwd.z / n;
+  const along = d.x * fx + d.z * fz, side = Math.abs(d.x * -fz + d.z * fx), up = d.y;
+  const m = Math.max(Math.abs(up), Math.abs(along), side);
+  if (m === Math.abs(up)) return up > 0 ? 'TOO HIGH' : 'TOO LOW';
+  if (m === Math.abs(along)) return along > 0 ? 'OUT AHEAD' : 'BEHIND YOU';
+  return 'WIDE';
+}
+
+// ── Phase 4: THE OFF-GLASS LOB ON THE RUN MEETS THE BOARD ────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep, the OFF THE GLASS prop on the run): 0 of 4 caught, every throw OVER THE GLASS — the planner's own
+// log said "OFF THE BOARD" (it met the glass 4.08–4.77 m up; the board's top is 4.03). Its catch was the HANG beat (0.8 clip s) and
+// it left from a fixed 3.8 m: the run left plus 0.8 s is a flight that has to hang, so from anywhere past ~1 m out it meets the
+// glass over the board's top (the mode's own solver, swept: 4.03 m at 1.0 m out at 7 m/s, at 0.3 m at 4 m/s). On the run it now
+// aims at the RISE beat (a shorter flight: mid-board from 0.5–2.5 m out) and the prop throws when its predicted throw would meet
+// the board low enough — not at a fixed distance.
+/** (new) The running off-glass lob's catch beat (flight clip s): the rise beat, the plain lob's. Standing keeps the hang beat. */
+export const GLASS_RUN_CATCH_CLIP_T = 0.62;
+/** (new) The prop throws once its predicted throw meets the glass at most this far over the rim (m; the board's top is 0.975). */
+export const GLASS_AIM_TOP_OVER_RIM_M = 0.75;
+/** (new) …or once the release would be this close to the take-off line (m): nearer, the throw passes under the iron's front lip
+ *  (the model and the old rig note agree: inside 0.5 m it clanks), so this is the last moment it still can go. */
+export const GLASS_RELEASE_MIN_M = 0.6;
+/** The self-lob clip's release height over the floor (m; the rig's logged releases, 1.86–1.89). */
+export const SELF_LOB_RELEASE_Y = 1.88;
+/** Throw the off-glass prop now? `hitY` is where the predicted throw meets the glass (Infinity: no solution), `distAtRelease` the
+ *  release's distance to the take-off line. */
+export function glassThrowDue(hitY: number, rimY: number, distAtRelease: number, minDist = GLASS_RELEASE_MIN_M, topOverRim = GLASS_AIM_TOP_OVER_RIM_M): boolean {
+  if (distAtRelease <= minDist) return true;
+  return Number.isFinite(hitY) && hitY <= rimY + topOverRim;
+}
+
+// ── Phase 4: THE PASSER'S OFF-GLASS OOP ─────────────────────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep): 0 of 2 caught. The passer threw during the dunker's rise with the STANDING solve, which picks a
+// ~1.16 s flight for a mid-board hit while ~0.55 s of the rise was left; and from his oop spot on the wing (x −3.4) the mirror point
+// of a throw to the catch lies off the board (it met the glass's plane at x −2.2: WIDE OF THE GLASS). He now stands at the elbow,
+// where the mirror point is on the board, and throws on the run like the plain oop (Phase 3), timed so it meets the board this far
+// over the rim; the launch's re-aim (Phase 4) corrects what the run did after.
+/** (new) The glass oop's passer: this far left of the rim's line (m) … */
+export const OOP_GLASS_PASSER_X = -1.6;
+/** (new) … and this far out from the rim (m): the mirror point of his throw to the catch lands ~0.55 m left of the board's centre. */
+export const OOP_GLASS_PASSER_FROM_RIM_M = 5.5;
+/** (new) Where his throw meets the board (m over the rim; the board's top is 0.975). */
+export const OOP_GLASS_HIT_OVER_RIM_M = 0.6;
+/** The mirror point on a board at `boardZ` of a throw from `from` to `to` (x only, the flat reflection): where the glass is met. */
+export function glassMirrorX(from: { x: number; z: number }, to: { x: number; z: number }, boardZ: number): number {
+  const a = Math.abs(from.z - boardZ), b = Math.abs(to.z - boardZ);
+  return from.x + (to.x - from.x) * (a / Math.max(1e-6, a + b));
+}
+
+// ── Phase 4: THE PASSER'S BOUNCE OOP ─────────────────────────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep): 0 of 6 caught — thrown during the rise on the STANDING solve, a bounce-BOUNCE with a 3.1 s flight
+// (LOST: NEVER IN REACH, 2.9 m from the hand). He now throws it on the run, one bounce, timed like the plain oop.
+/** (new) The bounce oop's flight, release to the catch (s): at least this, or the bounce's own shortest flight plus a margin. */
+export const OOP_BOUNCE_FLIGHT_SEC = 1.1;
+
+// ── Phase 4: THE LOB STAYS IN THE PICTURE ───────────────────────────────────────────────────────────────────────────────────
+// Measured before (rig sweep): the standing self-lob thrown from the top of the runway tops out ~6.4 m up; the runway camera
+// (runner + the rim as its objective, aimed ~2.4 m up) had it out of frame for half its flight — in frame 59–64 % of it.
+/** (new) While a lob is in the air on the runway, the camera's objective (the rim) rises by this share of the ball's height over
+ *  the rim — the camera's own capped bias then tilts the frame up with it. */
+export const LOB_FRAME_LIFT = 1.0;
+/** (new) …eased in and out over this time constant (s): no step when the lob leaves the hand or is caught. */
+export const LOB_FRAME_TAU = 0.2;
+
+// ── Phase 5: YOUR REAL JUMP DRIVES THE FLIGHT ──────────────────────────────────────────────────────────────────────────────
+// The body path (lib/move/dunkBody) writes the take-off's power as the jump's predicted rise over a FIXED full rise (0.70 m:
+// DUNK_FULL_RISE_M, unchanged). Personalised (feel knob, OFF by default; lib/feel-panel refuses knobs in ranked, staked and
+// paid play), the full rise is the athlete's own VERIFIED best countermovement jump — a jump as big as your best is a full
+// take-off. Only a verified adult jump personalises it (lib/dunk/verifiedJump.ts, GET /api/dunk/verified-jump); anything else
+// keeps the fixed mapping.
+/** (new knob, default OFF) 1 = the body path's full rise is your verified best jump; 0 = the fixed 0.70 m. */
+export const REAL_JUMP_PERSONAL = 0;
+/** A verified jump outside this range (m) is clamped into it: a full take-off never asks for less than a hop or more than a pro. */
+export const REAL_JUMP_REF_MIN_M = 0.25, REAL_JUMP_REF_MAX_M = 0.95;
+/** The personal full rise (m) from a verified best jump (cm), or null when there is none. */
+export function personalFullRiseM(verifiedCm: number | null | undefined): number | null {
+  if (typeof verifiedCm !== 'number' || !Number.isFinite(verifiedCm) || verifiedCm <= 0) return null;
+  return Math.min(REAL_JUMP_REF_MAX_M, Math.max(REAL_JUMP_REF_MIN_M, verifiedCm / 100));
+}
+/** The take-off's power (0–1) for a predicted rise against a full rise: monotonic in the rise, 1 at the full rise and over. */
+export function riseToPower(riseM: number, fullRiseM: number): number {
+  if (!Number.isFinite(riseM) || !(fullRiseM > 0)) return 0;
+  return Math.max(0, Math.min(1, riseM / fullRiseM));
 }

@@ -44,7 +44,7 @@ describe("DunkMode: the take-off's A is not the slam", () => {
   it("only the player's two presses launch as 'press' (A on the run, RUN let go); the line, beats, the bus and the watchdog are the mode's", () => {
     expect(DUNK.match(/launchDunk\(ctx, 'press'\)/g)).toHaveLength(2);
     expect(onInput).toMatch(/if \(e\.btn === 'A' && phase === 'charge'\) \{\s*if \(!runwayBeat\) launchDunk\(ctx, 'press'\);/);
-    expect(onInput).toMatch(/if \(e\.value === 0\) launchDunk\(ctx, 'press'\);/);
+    expect(onInput).toMatch(/if \(rt === 0\) \{ console\.info\([^\n]*\); launchDunk\(ctx, 'press'\); \}/);   // dunk-flagship Phase 5: the let-go of the folded hand/body pull `rt`, its source logged
     expect(DUNK.match(/launchDunk\(ctx0?!?\)/g)!.length).toBeGreaterThanOrEqual(4);   // the line, the beat's end, the bus, the watchdog
   });
 

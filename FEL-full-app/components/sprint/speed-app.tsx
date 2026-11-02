@@ -17,6 +17,7 @@ import { BODY_POINTS, BODY_POINT_LABEL, type BodyPointKind } from '@/lib/sprint/
 import { YD } from '@/lib/sprint/cameraSprint';
 import { toRecord, type RunConfig, type RunResult, type StartMode } from '@/lib/sprint/session';
 import { clearRuns, keepRun, readRuns, runStorage, runsCsv, TEST_LABEL, type SprintRecord, type SprintTest } from '@/lib/sprint/store';
+import { lastComparable } from '@/lib/results/sprint';
 import { timeWithBand, speedWithBand } from '@/lib/sprint/copy';
 import { csvFileName } from '@/lib/csv/csv';
 import { downloadCsv } from '@/lib/csv/download';
@@ -53,6 +54,8 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
   const [last, setLast] = useState<RunResult | null>(null);
   const [runs, setRuns] = useState<SprintRecord[]>([]);
   const [kept, setKept] = useState<boolean | null>(null);
+  // PLAT-P03: the last comparable run on this phone, read BEFORE this one is kept (the card's arrow)
+  const [prior, setPrior] = useState<SprintRecord | null>(null);
   useEffect(() => { setRuns(readRuns(runStorage())); }, []);
 
   const base: RunBase = useMemo(() => {
@@ -72,6 +75,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
     setLast(r);
     if (!r.ok) { setKept(null); return; }
     const store = runStorage();
+    setPrior(lastComparable(readRuns(store), r));
     const ok = keepRun(store, toRecord(r, cfg));
     setKept(ok);
     setRuns(readRuns(store));
@@ -79,8 +83,17 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
 
   const exportCsv = () => { downloadCsv(csvFileName('sprint-times'), runsCsv(runs)); };
 
+  // PLAT-P03: a result is the screen. The card comes first; the set-up, the settings and the history fold away until
+  // "Run it again" (the runner stays mounted, so the camera and the tapped lines are still there for the next run).
+  const showing = !!last;
+  const again = () => setLast(null);
+
   return (
-    <div className="space-y-4" data-speed-app>
+    <div className="space-y-4" data-speed-app data-sprint-showing={showing ? 'result' : 'setup'}>
+      {last && <RunResultCard result={last} last={prior} onAgain={again} note={last.ok && kept !== null ? (kept ? 'Kept in your history on this phone.' : 'Could not keep it on this phone (storage is off).') : null} />}
+      {last?.ok && kept !== null && <span hidden data-sprint-kept={kept ? 'device' : 'none'} />}
+
+      <div className={`space-y-4 ${showing ? 'hidden' : ''}`}>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Test">
         {TESTS.map((t) => <Chip key={t} on={test === t} onClick={() => { setTest(t); setLast(null); }} data={`test:${t}`}>{TEST_LABEL[t]}{t === 'agility' ? ' (beta)' : ''}</Chip>)}
       </div>
@@ -142,9 +155,6 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
 
       <SprintRunner base={base} onResult={onResult} />
 
-      {last && <RunResultCard result={last} />}
-      {last?.ok && kept !== null && <p className="text-xs text-white/50" data-sprint-kept={kept ? 'device' : 'none'}>{kept ? 'Kept in your history on this phone.' : 'Could not keep it on this phone (storage is off).'}</p>}
-
       <section className="fel-card space-y-2 rounded-xl p-4" data-sprint-history>
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-white">History <span className="font-normal text-white/45">(this phone)</span></div>
@@ -164,6 +174,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
           </ul>
         )}
       </section>
+      </div>
       <p className="text-center text-xs text-white/40"><Link href="/train" className="underline">Back to Train</Link></p>
     </div>
   );

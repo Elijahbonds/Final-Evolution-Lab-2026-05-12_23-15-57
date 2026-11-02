@@ -3,6 +3,7 @@
 // it, never a placeholder value (lib/profile-v2/tiles.ts).
 import type { ProfileV2Data } from '@/lib/profile-v2/assemble';
 import { AthleteStage } from './athlete-stage';
+import type { PosterKey } from '@/lib/profile-v2/athletePoster';
 import { DeviceFormTile } from './device-form-tile';
 import { TileView } from './tile';
 import { StatRing } from '@/components/ui/fel/stat-ring';
@@ -10,13 +11,14 @@ import { TYPE } from '@/lib/design/type';
 
 const ACCENT: Record<string, string> = { jump: '#00E5FF', form: '#00FF9D', reaction: '#FFD700', streak: '#FF7A2F' };
 
-export function ProgressHeader({ data, viewer = false }: { data: ProfileV2Data; viewer?: boolean }) {
+export function ProgressHeader({ data, viewer = false, poster = null }: { data: ProfileV2Data; viewer?: boolean; poster?: PosterKey | null }) {
   const { identity, prq } = data;
   return (
     <section aria-label="Progress" className={`grid gap-3 lg:gap-5 ${viewer ? '' : 'lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]'}`}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 lg:grid-cols-1">
-        {/* 3D shows the SIGNED-IN player's own body (resolveIdentity), so another person's profile gets the poster only */}
-        <AthleteStage avatarKey={identity.avatarKey} cosmeticAssetId={identity.cosmeticAssetId} name={identity.name} accent={prq.color} allow3d={!viewer} />
+        {/* PROFILE-CHARACTER: your own athlete, by itself (the kept picture, then the live 3D). The 3D draws the SIGNED-IN
+            player's own body (resolveIdentity), so another person's profile gets the athlete's silhouette */}
+        <AthleteStage name={identity.name} accent={prq.color} viewer={viewer} poster={viewer ? null : poster} />
         {/* PRQ as a ring (premium-ui P4, the Whoop read): how full at a glance, the grade's band colour, the status under the
             number; nothing measured is an empty track and a dash, never a number. */}
         <div className="fel-surface flex w-[150px] flex-col items-center justify-center gap-2 p-4 text-center lg:w-auto lg:flex-row lg:justify-start lg:gap-5 lg:p-5 lg:text-left">

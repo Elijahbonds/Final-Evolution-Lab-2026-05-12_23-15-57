@@ -13,6 +13,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, ClipboardCheck, Gem, RotateCcw, X } from 'lucide-react';
 import { readDeviceChecks, recordDeviceCheck, writeDeviceChecks } from '@/lib/education/checkDevice';
+import { chapterView } from '@/lib/results/small';
+import { ResultCard } from '@/components/result-card/result-card';
+import { LOOK as RESULT_LOOK } from '@/components/result-card/look';
+
+/** The score and what it paid take the screen (the check is the chapter's last block: room to scroll it to the top). */
+const FILL_LOOK = RESULT_LOOK.fill;
+import { CHIP_BUTTON } from './look';
 
 export interface CheckQuestion { id: string; question: string; options: string[]; draft: boolean }
 export interface CheckInfo {
@@ -46,6 +53,8 @@ export function ChapterCheck({ chapter }: { chapter: number }) {
   const [result, setResult] = useState<CheckResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  /** PLAT-P03: the best score this device kept for the chapter before this try (the card's arrow), if any. */
+  const [bestBefore, setBestBefore] = useState<number | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -73,7 +82,9 @@ export function ChapterCheck({ chapter }: { chapter: number }) {
         // Nothing was kept on the server for this account: the device keeps the best score.
         let store: Storage | null = null;
         try { store = window.localStorage; } catch { store = null; }
-        writeDeviceChecks(store, recordDeviceCheck(readDeviceChecks(store), chapter, j.score, j.passed === true));
+        const before = readDeviceChecks(store);
+        setBestBefore(before[String(chapter)]?.best ?? null);
+        writeDeviceChecks(store, recordDeviceCheck(before, chapter, j.score, j.passed === true));
       }
     } catch {
       setError(true);
@@ -87,7 +98,7 @@ export function ChapterCheck({ chapter }: { chapter: number }) {
   if (!info?.available) return null;
   return (
     <ChapterCheckView
-      info={info} picked={picked} result={result} busy={busy} error={error}
+      info={info} picked={picked} result={result} busy={busy} error={error} bestBefore={bestBefore}
       onPick={(id, option) => setPicked((p) => ({ ...p, [id]: option }))}
       onSubmit={submit} onRetry={retry}
     />
@@ -95,8 +106,10 @@ export function ChapterCheck({ chapter }: { chapter: number }) {
 }
 
 /** The check, drawn from its state. Exported so it renders in a test without a network. */
-export function ChapterCheckView({ info, picked, result, busy, error, onPick, onSubmit, onRetry }: {
+export function ChapterCheckView({ info, picked, result, busy, error, onPick, onSubmit, onRetry, bestBefore = null }: {
   info: CheckInfo; picked: Record<string, string>; result: CheckResult | null; busy: boolean; error: boolean;
+  /** PLAT-P03: this device's best before this try, for the arrow (null: nothing kept here, no arrow). */
+  bestBefore?: number | null;
   onPick: (id: string, option: string) => void; onSubmit: () => void; onRetry: () => void;
 }) {
   const questions = info.questions ?? [];
@@ -114,12 +127,12 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
           {CHECK_COPY.draft}
         </p>
       )}
-      <p className="mt-2 text-[13px] text-white/60">
+      {!result && <p className="mt-2 text-[13px] text-white/60">
         {CHECK_COPY.rule(mark)}{' '}
         {info.saves === false ? CHECK_COPY.device
           : info.passedBefore ? CHECK_COPY.passedBefore
           : info.worth ? CHECK_COPY.worth(info.worth) : null}
-      </p>
+      </p>}
 
       <ol className="mt-4 space-y-5">
         {questions.map((q, n) => {
@@ -128,7 +141,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
             <li key={q.id} data-check-question={q.id} data-verdict={v === undefined ? undefined : v ? 'right' : 'wrong'}>
               <fieldset disabled={!!result || busy}>
                 <legend className="flex gap-2 text-[14px] font-bold leading-snug text-white/90">
-                  <span className="font-mono text-white/40">{n + 1}.</span>
+                  <span className="font-mono text-fel-dim">{n + 1}.</span>
                   <span>{q.question}</span>
                   {v !== undefined && (v
                     ? <Check aria-label="right" className="h-4 w-4 shrink-0 text-[#00FF9D]" strokeWidth={3} />
@@ -138,7 +151,7 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
                   {q.options.map((o) => (
                     <label
                       key={o}
-                      className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-[13.5px] leading-snug text-white/75 ${
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-[14px] leading-snug text-white/75 ${
                         picked[q.id] === o ? 'border-[#A855F7]/60 bg-[#A855F7]/[0.08]' : 'border-white/8'}`}
                     >
                       <input
@@ -157,36 +170,36 @@ export function ChapterCheckView({ info, picked, result, busy, error, onPick, on
 
       {error && <p data-check-error role="alert" className="mt-4 text-[13px] font-bold text-[#FF3366]">{CHECK_COPY.error}</p>}
 
-      {result ? (
-        <div data-check-result={result.passed ? 'pass' : 'fail'} role="status" className="mt-5">
+      {/* PLAT-P03 (2026-10-28): the score is ONE result card, where the submit button was (it scrolls itself into view) — the %, the arrow against this device's best for
+          the chapter (a score has no noise: the same score is "the same"), and the check's own pass / fail line. The
+          reader's docked "Next chapter" is the screen's one primary, so the card has none; a fail keeps "Try again". */}
+      {result && (
+        <div data-check-result={result.passed ? 'pass' : 'fail'} role="status" className={`mt-4 ${FILL_LOOK}`}>
+          <ResultCard primary={false} seeAll={false} fill={false}
+            view={chapterView({ score: result.score, bestBefore, line: result.passed ? CHECK_COPY.pass(result.score) : CHECK_COPY.fail(result.score, result.passMark), next: { label: '', href: null } })} />
           {result.passed ? (
-            <p className="flex flex-wrap items-center gap-2 text-[15px] font-black text-[#00FF9D]">
-              {CHECK_COPY.pass(result.score)}
-              {result.awarded > 0 && (
-                <span data-check-awarded className="inline-flex items-center gap-1 text-white">
-                  <Gem aria-hidden className="h-4 w-4 text-[#A855F7]" /> +{result.awarded} shards
-                </span>
-              )}
-              {result.bonus > 0 && (
-                <span data-check-bonus className="inline-flex items-center gap-1 text-white">
-                  + {result.bonus} for finishing the Playbook
-                </span>
-              )}
-            </p>
+            (result.awarded > 0 || result.bonus > 0) && (
+              <p className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[14px] font-bold text-white">
+                {result.awarded > 0 && (
+                  <span data-check-awarded className="inline-flex items-center gap-1">
+                    <Gem aria-hidden className="h-4 w-4 text-[#A855F7]" /> +{result.awarded} shards
+                  </span>
+                )}
+                {result.bonus > 0 && <span data-check-bonus className="inline-flex items-center gap-1">+ {result.bonus} for finishing the Playbook</span>}
+              </p>
+            )
           ) : (
-            <>
-              <p className="text-[15px] font-black text-white">{CHECK_COPY.fail(result.score, result.passMark)}</p>
-              <p className="mt-1 text-[13px] text-white/55">{CHECK_COPY.failNext}</p>
-              <button
-                type="button" onClick={onRetry} data-check-retry
-                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-[13px] font-bold text-white/75 hover:border-white/30"
-              >
+            <div className="mt-3 text-center">
+              <p className="text-[14px] text-fel-soft">{CHECK_COPY.failNext}</p>
+              <button type="button" onClick={onRetry} data-check-retry className={`${CHIP_BUTTON} mt-3`}>
                 <RotateCcw aria-hidden className="h-4 w-4" /> {CHECK_COPY.retry}
               </button>
-            </>
+            </div>
           )}
         </div>
-      ) : (
+      )}
+
+      {result ? null : (
         <button
           type="button" onClick={onSubmit} disabled={!all || busy} data-check-submit
           className="mt-5 w-full rounded-xl bg-[#A855F7] px-5 py-3 text-[14px] font-bold text-white transition-opacity disabled:opacity-40"

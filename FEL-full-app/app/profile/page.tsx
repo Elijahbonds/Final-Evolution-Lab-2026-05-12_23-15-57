@@ -5,6 +5,7 @@ import { loginPath } from '@/lib/auth/safeNext';
 import { prisma } from '@/lib/db';
 import { isCoachStoreEnabled } from '@/lib/flags';
 import { loadProfile, type ProfileDb } from '@/lib/profile-v2/load';
+import { ownerKey, serverLookStamp } from '@/lib/profile-v2/athletePoster';
 import { TabPage } from '@/components/shell/tab-page';
 import { DoorsRow } from '@/components/shell/doors-row';
 import { ProfileBody, ProfileActions } from '@/components/profile-v2/profile-body';
@@ -24,14 +25,22 @@ export const dynamic = 'force-dynamic';
  * logging a measurement) moved to /profile/edit, and the settings (motion, data rights, health data) to /account.
  *
  * Everything on it is read on the server in one batch (lib/profile-v2/load.ts) — the page used to draw an empty shell
- * and fetch eight things after it hydrated. The 3D athlete loads only when asked for.
+ * and fetch eight things after it hydrated. The athlete is the player's own 3D body, loaded by itself after the first
+ * paint, with this device's kept picture of it shown at once (components/profile-v2/athlete-stage.tsx).
  */
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   const me = (session?.user as { id?: string } | undefined)?.id;
   if (!session || !me) redirect(loginPath('/profile'));
 
-  const data = await loadProfile(prisma as unknown as ProfileDb, me);
+  // PROFILE-CHARACTER: the athlete's kept picture is this account's and this look's (lib/profile-v2/athletePoster.ts) —
+  // the look rows' last change, read beside the profile (two unique-key reads; a failed one only means "re-take it")
+  const [data, look, build] = await Promise.all([
+    loadProfile(prisma as unknown as ProfileDb, me),
+    prisma.avatarLook.findUnique({ where: { userId: me }, select: { updatedAt: true } }).catch(() => null),
+    prisma.athleteBuild.findUnique({ where: { userId: me }, select: { updatedAt: true } }).catch(() => null),
+  ]);
+  const poster = { owner: ownerKey(me), stamp: serverLookStamp(look?.updatedAt, build?.updatedAt) };
 
   return (
     // PREMIUM-UI P4 (2026-10-27): the Venice sunset full-bleed with the athlete's name on it; the athlete and the PRQ ring
@@ -44,7 +53,7 @@ export default async function ProfilePage() {
         chips: <ProfileActions />,
       }}
     >
-      <ProfileBody data={data} />
+      <ProfileBody data={data} poster={poster} />
 
       {/* #337: the athlete status card (components/profile/athlete-status-card.tsx), placed under the profile body */}
       <AthleteStatusSection userId={me} />

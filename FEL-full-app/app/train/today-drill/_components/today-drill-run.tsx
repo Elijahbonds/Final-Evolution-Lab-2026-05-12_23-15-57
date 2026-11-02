@@ -72,7 +72,7 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
     });
   }, [plan.key]);
 
-  if (!drill) return <p className="text-[14px] text-white/70" data-daily-unavailable>Today&apos;s drill could not be built on this page. Reload to try again.</p>;
+  if (!drill) return <p className="text-[16px] text-fel-soft" data-daily-unavailable>Today&apos;s drill could not be built on this page. Reload to try again.</p>;
 
   if (stage === 'hurt') return <HurtPanel drillName={plan.name} />;
   if (stage === 'live') {
@@ -98,7 +98,7 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
     <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-[#050505]/95 px-4 py-3 md:bottom-0" data-daily-start-bar>
       <div className="mx-auto max-w-3xl">
         <button type="button" onClick={() => setStage('live')} data-daily-start
-          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-6 text-[18px] font-black tracking-wide text-black">
+          className="flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl bg-[#00FF9D] px-6 text-[20px] font-black tracking-wide text-black">
           <Camera aria-hidden className="h-5 w-5" /> {done ? START_AGAIN_LABEL : START_LABEL}
         </button>
       </div>
@@ -108,11 +108,11 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
   return (
     <div className="space-y-5 pb-28" data-daily-page={plan.key} data-daily-newcomer={newcomer ? '1' : '0'}>
       <header className="space-y-2">
-        <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-white/40" data-daily-book>{plan.name}</p>
-        <h1 className="text-[36px] font-black leading-[1.02] tracking-tight text-white">{guide.title}</h1>
-        <p className="text-[17px] font-semibold leading-snug text-white/90" data-daily-why>{whyNumber(view.focus, view.skill)}</p>
+        <p className="font-sans text-[12px] font-semibold uppercase tracking-[0.14em] text-fel-dim" data-daily-book>{plan.name}</p>
+        <h1 className="font-display text-[30px] font-bold leading-[1] tracking-[0.005em] text-white">{guide.title}</h1>
+        <p className="text-[16px] font-semibold leading-snug text-white/90" data-daily-why>{whyNumber(view.focus, view.skill)}</p>
         {newcomer && (
-          <p className="flex items-center gap-2 text-[15px] text-white/70" data-daily-improves>
+          <p className="flex items-center gap-2 text-[16px] text-fel-soft" data-daily-improves>
             <Sparkles aria-hidden className="h-4 w-4 shrink-0 text-[#00FF9D]" />{guide.improves}
           </p>
         )}
@@ -122,23 +122,23 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
         {needChips(guide.jumps, plan.minutes).map((c) => {
           const Icon = CHIP_ICON[c.id];
           return (
-            <li key={c.id} data-daily-need={c.id} aria-label={c.label} title={c.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-[13px] font-semibold text-white/85">
+            <li key={c.id} data-daily-need={c.id} aria-label={c.label} title={c.label} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1.5 text-[12px] font-semibold text-white/85">
               <Icon aria-hidden className="h-4 w-4 text-[#00E5FF]" />{c.text}
             </li>
           );
         })}
       </ul>
 
-      {newcomer && <p className="rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-3 py-2 text-[14px] text-white/85" data-daily-explainer>{FIRST_TIME_LINE}</p>}
+      {newcomer && <p className="rounded-xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-3 py-2 text-[16px] text-white/85" data-daily-explainer>{FIRST_TIME_LINE}</p>}
 
       {plan.heldNote && (
-        <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[13px] leading-snug text-amber-100/90" data-daily-held>
+        <p className="rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-3 py-2 text-[16px] leading-snug text-amber-100/90" data-daily-held>
           {plan.heldNote}{' '}
           {plan.heldHref && <a href={plan.heldHref} className="font-bold underline">See what&apos;s needed</a>}
         </p>
       )}
 
-      <p className="flex items-center gap-3 font-mono text-[14px] font-bold tracking-wide text-[#00FF9D]" data-daily-reward={reward.done ? 'done' : 'open'}>
+      <p className="flex items-center gap-3 font-sans text-[16px] font-bold tracking-wide text-[#00FF9D]" data-daily-reward={reward.done ? 'done' : 'open'}>
         {reward.done && <CheckCircle2 aria-label="Done today" className="h-4 w-4" />}
         <span>{reward.credits}</span>
         {reward.day !== null && <span className="inline-flex items-center gap-1 text-[#FFB020]" aria-label={`Day ${reward.day} of your streak`}><Flame aria-hidden className="h-4 w-4" />{reward.day}</span>}
@@ -149,15 +149,15 @@ export function TodayDrillRun({ view, dobYear }: { view: DailyDrillView; dobYear
       {newcomer && (
         <ol className="space-y-2" data-daily-steps={steps.length}>
           {steps.map((s, i) => (
-            <li key={s} className="flex items-center gap-3 text-[17px] font-semibold text-white">
-              <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 font-mono text-[15px] font-black text-[#00FF9D]">{i + 1}</span>
+            <li key={s} className="flex items-center gap-3 text-[16px] font-semibold text-white">
+              <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 font-sans text-[16px] font-black text-[#00FF9D]">{i + 1}</span>
               {s}
             </li>
           ))}
         </ol>
       )}
       <ul className="flex flex-wrap gap-2" data-daily-cues={guide.cues.length}>
-        {guide.cues.map((c) => <li key={c} className="rounded-2xl bg-[#00E5FF]/[0.10] px-4 py-2.5 text-[18px] font-black text-white">{c}</li>)}
+        {guide.cues.map((c) => <li key={c} className="rounded-2xl bg-[#00E5FF]/[0.10] px-4 py-2.5 text-[20px] font-black text-white">{c}</li>)}
       </ul>
       {startButton}
     </div>
