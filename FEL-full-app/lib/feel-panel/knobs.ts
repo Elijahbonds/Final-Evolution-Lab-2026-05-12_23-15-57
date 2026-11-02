@@ -1214,17 +1214,17 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Offence to defence, and a loop after a beat or a hold.',
   },
   {
-    id: 'hoops.beatFadeFloorSec', label: 'Transitions: a beat\'s shortest fade', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    id: 'hoops.beatFadeFloorSec', label: 'Transitions: shortest beat fade', def: 0.1, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hoopsTransitions.ts BEAT_FADE_FLOOR_SEC',
     hint: 'A move, a reach, a shot: the clip starts on the press, its weight comes in no faster than this.',
   },
   {
-    id: 'hoops.priorityFadeSec', label: 'Transitions: a priority cut\'s shortest fade', def: 0.08, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    id: 'hoops.priorityFadeSec', label: 'Transitions: shortest priority-cut fade', def: 0.08, min: 0, max: 0.3, step: 0.01, unit: 's', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hoopsTransitions.ts PRIORITY_FADE_SEC',
     hint: 'A stagger, the floor, a dunk.',
   },
   {
-    id: 'hoops.minHoldSec', label: 'Transitions: a loop\'s minimum hold', def: 0.22, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    id: 'hoops.minHoldSec', label: 'Transitions: minimum loop hold', def: 0.22, min: 0, max: 0.6, step: 0.01, unit: 's', group: 'Hoops · transitions',
     source: 'lib/babylon/anim/hoopsTransitions.ts MIN_HOLD_SEC',
     hint: 'A loop plays at least this long before a sibling loop replaces it (the old dwell, now for every loop group).',
   },
