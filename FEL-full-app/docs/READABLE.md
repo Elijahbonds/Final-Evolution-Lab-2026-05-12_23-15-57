@@ -97,8 +97,44 @@ _Filled from the runs below._
 
 ## 4. What was fixed
 
-_Filled below._
+Token and shared-component fixes first; per-screen edits only for the live sweep's named items.
+
+| Fix | Where | What it moves |
+|---|---|---|
+| **The 12 px floor**, one mechanical rule | `scripts/readable/codemod.mts` over every user-facing file not held by a live lane | `text-[9–11.5px]`, `text-[<0.75rem]` and inline `fontSize < 12` → 12 px (`TYPE.label`) |
+| **Muted text to AA** | the same codemod | a `text-<colour>/<alpha>` under 4.5:1 on ink, card and raised panel → the smallest alpha that clears all three (white `/15–/45` → `/50`); `neutral/slate/zinc/gray-500/600` → their `-400` |
+| **Brand text tints** | `lib/design/tokens.ts`, `app/theme.css` (`--fel-violet-text`, `--fel-indigo-text`), `text-fel-violet-text` | violet `#A855F7` → `#ad5ff7`, indigo `#7B61FF` → `#876fff`, for small text only (4.28 / 4.03 → 4.66 / 4.64:1 on the raised panel); the accents stay for large text, icons and fills |
+| **HUD sizes** | `components/games/tv-hud/tokens.ts` `HUD_TYPE` | phone caption / label / body 10 / 11 / 12 → 12 / 12 / 14 px; 1080p 24.3 / 27.6 / 30.4 → 27 / 27.6 / 31.5 px |
+| **HUD text edge** | `HUD_TEXT_SHADOW` | a tight `0 0 2px` dark edge before the glow: a bare meter label went from 1.4–2.9:1 to clean over every backdrop |
+| **JuiceKit text** | `lib/babylon/premium/juiceStyles.ts` (new), `JuiceKit.ts` | banner and score pop get the dark edge; the callout plate .62 → .82 and its font 12 → 14 px on a phone; one banner at a time |
+| **Read time** | JuiceKit `banner`/`callout`, `HudLowerThird`, `BannerChannel`, `BannerSlot`, `BannerQueue`, `felToast`, `readToast` (new) | on screen for max(own time, words × 0.3 s + 1 s); a queued beat is shown sooner rather than dropped |
+| **Reflow at 150 % font** | `components/shell/status-rail.tsx` | the rail wraps (min-h-14) instead of a fixed h-14, so the wallet cluster no longer pushes every page 95 px sideways |
+| **Live sweep J6, J8, J11, J12, J13** | `learn/topic-picker`, `games/guest-dunk-shell`, `challenges/guest-challenge-run`, `public-chrome`, `controller-link/host-lobby`, `party/join-form` | an opaque disabled CTA (no titles through it) and 3-line blurbs; 12–14 px controls with 40–44 px targets; a legible disabled JOIN |
+
+### Guards
+
+- `tests/readable/source-floor.test.ts` (vitest, no browser): the per-file ratchet on sub-12 px sizes and sub-AA text
+  colours. `tests/readable/source-baseline.json` holds what is left, with the reason for each line.
+- `tests/readable/read-time.test.ts`: the shared primitives keep the read time; no literal sonner toast over ten words.
+- `lib/readable/rules.test.ts`: the numbers and the judgments, including the 2.85:1 control.
+- The rig, on demand, with JSON output (section 2).
 
 ## 5. Left, and owner calls
 
-_Filled below._
+**Routed, not edited** (each line is in `tests/readable/source-baseline.json` with its lane): `components/coach/**`
+(coach-tools-easy), the session player and `lib/coach/today` (plat-p07), the hoops modes (hoops-p04), the dunk modes
+(dunk-flagship-p6), and public-polish's files (`app/modes`, `party-hub`, the adventure stages, `lib/policies.ts`,
+`coach/business/thanks`, `press/receipt`). The fix in each is the same codemod line; run
+`npx tsx scripts/readable/codemod.mts --write` once the lane lands, then `source-baseline.mts --write`.
+
+**Body copy at 14 px.** The rig counts runs of more than 12 words drawn at `TYPE.small` (14 px) on a phone. That is
+the type scale used past its own "≤ 12 words" line; the fix is per screen (use `TYPE.body`), and most of it is the
+owner's long-form copy (terms, credits, lesson text), so it is reported here, not rewritten.
+
+**Coverage.** The rig renders a page module with the server stubbed. Pages that need a record (`notFound()` without
+one), pages that mount Babylon (`/play/*` hosts: no WebGL here), and pages whose client code needs a populated API
+shape do not render on it; the HUD is covered over recorded frames instead. Each route's JSON says why it did not render.
+
+**Themes.** One theme (dark). No `prefers-contrast` and no reduced-transparency handling exist. Recommendation: under
+`prefers-reduced-transparency`, make `.fel-glass` and the tab bar solid `--fel-bg` (one CSS rule in `app/globals.css`);
+not done here because no screen measured a blur-backed miss.
