@@ -36,6 +36,8 @@ const read = (p: string) => fs.readFileSync(p, 'utf8');
 const relPlay = (p: string) => path.relative(PLAY, p);
 
 const SHELL_EXEMPT_ROUTES: Record<string, string> = {
+  // STUDIO-EASY (2026-10-28): /play/shared is a 404 index (its share links, /play/shared/[token], are the HELD landing, not a mode)
+  shared: 'a 404 index: Nexus Studio share links live under it (app/play/shared/[token], HELD); no mode plays here, so no GameShell',
   calibrate: 'timing calibration utility; it does not record a play session',
   'map-preview': 'auth-gated map preview, not a playable mode',
   mirror: 'Train-owned pose screen; mirror-coach owns its camera/session contract',
