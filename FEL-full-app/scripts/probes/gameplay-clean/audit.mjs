@@ -515,6 +515,13 @@ for (const mode of MODES) {
       st = await ev(() => ({ ph: window.__sessionStore?.view().phase ?? null, dev: !!window.__FEL_DEV__, tap: /TAP TO START/.test(document.body.innerText), err: (document.body.innerText || '').match(/Something went wrong|couldn.t load|error/i)?.[0] ?? null }));
       if (st.ph === 'ready' || st.ph === 'playing' || st.ph === 'error' || crashed) break;
       if (Date.now() - tB > BOOT_S * 1000) break;
+      // a host with a start card BEFORE it boots the mode (tiebreak: useStartWake, "any key … or tap on the card"): no harness
+      // phase at all until something is pressed — the rig presses, once, and says so
+      if (st.ph === null && !row.preStartPress && Date.now() - tB > 20000) {
+        row.preStartPress = (await ev(() => (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 160)));
+        if (SHOTS) await p.screenshot({ path: path.join(OUT, `${mode}-${TAG}-0prestart.jpg`), type: 'jpeg', quality: 62, scale: 'css', timeout: 60000 }).catch(() => {});
+        await ev(() => { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'j' })); window.dispatchEvent(new KeyboardEvent('keyup', { key: 'j' })); });
+      }
       await sleep(400);
     }
     row.readyS = r2((Date.now() - tWall0) / 1000); row.bootPhase = st.ph;
