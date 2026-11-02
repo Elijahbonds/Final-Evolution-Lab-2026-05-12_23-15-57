@@ -326,7 +326,7 @@ and lede above the tool, which adds three font sizes (12, 28, 15 px) to every sc
 | combine, the stand | 5 · 1 · 1 · 25 · 0 | 6 · 1 · 1 · 25 · 0 |
 | combine, a no-mark | 5 · 1 · 1 · 25 · 0 | 7 · 1 · 1 · 36 · 0 |
 | bar speed, set-up | 6 · 9 · 21 · 187 · 0 | 6 · 6 · 16 · 115 · 0 |
-| bar speed, live before the first rep | 5 · 2 · 3 · 45 · 0 | 6 · 2 · 3 · 49 · 0 |
+| bar speed, live before the first rep | 5 · 2 · 3 · 45 · 0 | 6 · 2 · 3 · 49 · 0, rigged before the last fix: the status box above the card, which repeated it, is now hidden until the first number |
 | sprint, set-up | 7 · 6 · 20 · 204 · 0 | 7 · 6 · 8 · 146 · 0 |
 | sprint, camera on | 6 · 5 · 21 · 214 · 0 | 6 · 2 · 3 · 58 · 0 |
 | jump tests (after: the door) | 4 · 1 · 1 · 24 · 0 | 5 · 1 · 5 · 62 · 0 |
@@ -407,3 +407,24 @@ Contact sheet: `tools-easy-before-after.jpg` in this lane's scratchpad (the path
    line", then the run.
 6. **The Mirror** (from Train). Expect it to open on the squat. Expect the Jump tab to show only "Measure my vertical"
    and your dunk progress. On the Screen tab, expect the stations front-on first, then side-on, then from behind.
+
+## 9. The gate (at `82e88b7c` merged in, 2026-11-02)
+
+| Step | Result |
+|---|---|
+| `tsc --noEmit` | 0 errors |
+| `ci-suite` | 209 passed, 0 failed, 11 skipped (the DB suites) |
+| `vitest run` | 2,040 files passed, 3 failed, 6 skipped; 27,243 tests passed, 3 failed, 54 skipped, 1 todo |
+| `eslint` on this lane's files | 0 errors, 0 warnings (6 files outside the lint config's reach) |
+
+None of the three vitest failures is this lane's:
+- **`lib/session-payout.test.ts` and `lib/sessions/modeScoreRules.test.ts`:** "where the captures are on this machine" —
+  each needs a capture file this container does not have.
+- **`tests/signature-programs/server.test.ts`:** "a checkpoint week decides from the retests". Its fake database stamps
+  `startedAt` with the real clock (`tests/helpers/fakeSignatureDb.ts:44`, `new Date()`), while the test's own clock is
+  fixed at 2026-10-25. Since the real date passed the test's 14-day window, the retest falls before the start and the
+  decision reads "continue".
+- This lane touches nothing any of the three read. Flagged to the coordinator.
+
+This lane's own suites: `tests/tools-easy` (3 files, 57 tests), and the changed `tests/mirror-first` and
+`scripts/mirror-coach-tests.ts`.
