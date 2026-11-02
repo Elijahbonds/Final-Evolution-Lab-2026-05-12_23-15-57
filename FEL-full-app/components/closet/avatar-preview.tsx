@@ -134,8 +134,8 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
     let cleanup: (() => void) | null = null;
     (async () => {
       const { Engine, Scene, ArcRotateCamera, Vector3 } = await import('@babylonjs/core');
-      const { applyCanvasFit, fitCanvas } = await import('@/lib/babylon/core/canvasFit');
-      const { detectQualityTier } = await import('@/lib/babylon/scene/QualityTier');
+      const { applyCanvasFit } = await import('@/lib/babylon/core/canvasFit');
+      const { deviceTierDecision } = await import('@/lib/babylon/scene/tierRule');
       const { CharacterLibrary } = await import('@/lib/babylon/core/CharacterLibrary');
       const { applyIdentity } = await import('@/lib/babylon/core/playerIdentity');
       const { applyPresentation, stampPresentation } = await import('@/lib/babylon/creator/shape/presentation');
@@ -154,8 +154,12 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
       if (disposed || !canvasRef.current) return;
 
       const box = canvasRef.current;
-      const fit0 = fitCanvas({ cssWidth: box.clientWidth || 260, cssHeight: box.clientHeight || 260, dpr: window.devicePixelRatio || 1 });
-      const tier = detectQualityTier(box, fit0);
+      // DEMO-SPEED-3 (owner-approved 2026-10-28): the tier is the SCREEN's (tierRule deviceTierDecision), as the library stage and
+      // the profile decide it — not this canvas's box. Read off the box, a desktop Closet whose stage is under 700 px tall was
+      // a "phone-sized viewport": the phone shading, the scan's and the kit bodies' phone files, no antialiasing. 'high'
+      // reads as 'desktop' here (the Studio's two-tier view, QualityTier BaseTier).
+      const screenTier = deviceTierDecision().tier;
+      const tier: 'mobile' | 'desktop' = screenTier === 'mobile' ? 'mobile' : 'desktop';
       const engine = new Engine(box, tier === 'desktop', { alpha: true, adaptToDeviceRatio: false, stencil: false });
       applyCanvasFit(engine, box);
       const scene = new Scene(engine);

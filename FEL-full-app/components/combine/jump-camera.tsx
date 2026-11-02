@@ -11,6 +11,11 @@ import { poseService } from '@/lib/pose/PoseService';
 import { MirrorWakeLock, type WakeLockApiLike } from '@/lib/mirror/liveCamera';
 import { JumpTake, type TakeView } from '@/lib/combine/jumpTake';
 import { SelfView, CAMERA_NOTE } from '@/components/games/body-play';
+// TOOLS-EASY (2026-10-28): the shared setup card, the one voice, and each no-mark's reason and fix
+import { JumpTakeHud } from '@/components/tools-easy/jump-take-hud';
+import { useOneVoice } from '@/components/tools-easy/use-one-voice';
+import { SetupReader, type SetupWord } from '@/lib/tools-easy/setup';
+import { STOP_AND_READ, TAKE_STAND_LINE } from '@/lib/tools-easy/copy';
 
 type Phase = 'idle' | 'starting' | 'live' | 'reading';
 
@@ -18,6 +23,8 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
   const [phase, setPhase] = useState<Phase>('idle');
   const [live, setLive] = useState<TakeView>({ step: 'stand', jumps: 0, asked: jumps, why: null });
   const [why, setWhy] = useState<string | null>(null);
+  const [setup, setSetup] = useState<SetupWord | null>(null);
+  const voice = useOneVoice('combine');
   const take = useRef<JumpTake | null>(null);
   const off = useRef<(() => void)[]>([]);
   const wake = useRef<MirrorWakeLock | null>(null);
@@ -35,6 +42,7 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
     const t = take.current;
     take.current = null;
     release();
+    voice.hush();
     if (!t) return;
     setPhase('reading');
     const r = t.finish();
@@ -42,7 +50,7 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
     if (!r.ok) { setWhy(r.why); return; }
     setWhy(null);
     onAttempts(r.attempts);
-  }, [onAttempts, release]);
+  }, [onAttempts, release, voice]);
 
   const start = useCallback(async () => {
     setWhy(null);
@@ -57,36 +65,40 @@ export function JumpCamera({ jumps, athlete, onAttempts }: { jumps: number; athl
     const t = new JumpTake({ jumps, aspect: cam && cam.height ? cam.width / cam.height : 4 / 3, cameraFps: cam?.frameRate ?? null });
     take.current = t;
     let done = false;
+    const reader = new SetupReader('front');
+    let shownWord = '', saidId = 0;
+    voice.say(`${athlete}. ${TAKE_STAND_LINE}`);
     off.current.push(svc.onFrame((fr) => {
       if (done) return;
-      const v = t.push({ t: fr.t, present: fr.present, image: fr.present ? fr.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [], ...(fr.world ? { world: fr.world } : {}) });
+      const f = { t: fr.t, present: fr.present, image: fr.present ? fr.image.map((l) => ({ x: l.x, y: l.y, z: l.z, v: l.v })) : [], ...(fr.world ? { world: fr.world } : {}) };
+      const v = t.push(f);
       setLive(v);
+      if (v.step === 'stand') {
+        const w = reader.push(f);
+        if (w.word !== shownWord) { shownWord = w.word; setSetup(w); if (!w.ready) voice.say(w.word); }
+      }
+      if (v.say && v.say.id !== saidId) { saidId = v.say.id; voice.say(v.say.text); }
       if (v.step === 'done') { done = true; finish(); }
     }));
     setLive({ step: 'stand', jumps: 0, asked: jumps, why: null });
+    setSetup(null);
     setPhase('live');
-  }, [finish, jumps]);
+  }, [athlete, finish, jumps, voice]);
 
   const on = phase === 'live' || phase === 'starting';
-  const caption = live.step === 'stand' ? (live.why ?? `${athlete}: hold still, hands on hips…`) : live.step === 'jump' ? `Jump ${Math.min(live.jumps + 1, live.asked)} of ${live.asked}` : 'Reading the jumps…';
   return (
     <div className="space-y-3" data-combine-camera={phase}>
       {/* collapsed (not unmounted) outside a take: the camera attaches to it on Start (the readiness check's pattern) */}
       <div className={`relative overflow-hidden rounded-xl border border-white/10 bg-black ${on ? '' : 'hidden'}`} style={{ aspectRatio: '3 / 4', maxHeight: '62vh' }}>
         <SelfView className="absolute inset-0 h-full w-full rounded-none" style={{ aspectRatio: 'auto' }} />
         {phase === 'live' && (
-          <div className="absolute inset-x-3 top-3 rounded-lg bg-black/65 px-3 py-2 text-center text-white" aria-live="polite" data-combine-caption>
-            <div className="text-lg font-black">{caption}</div>
-            <div className="mt-1 flex justify-center gap-1.5" aria-hidden>
-              {Array.from({ length: live.asked }, (_, i) => <span key={i} className={`h-2 w-6 rounded-full ${i < live.jumps ? 'bg-fel-emerald' : 'bg-white/25'}`} />)}
-            </div>
-          </div>
+          <div data-combine-caption><JumpTakeHud v={live} setup={setup} who={athlete} /></div>
         )}
       </div>
       {why && <p role="alert" className="text-sm text-[#FFB020]" data-combine-why>{why}</p>}
       {on ? (
         <button type="button" onClick={finish} data-combine-stop className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 font-bold text-black">
-          <Square className="h-4 w-4" /> Stop and read the jumps
+          <Square className="h-4 w-4" /> {STOP_AND_READ}
         </button>
       ) : (
         <button type="button" onClick={() => void start()} disabled={phase === 'reading'} data-combine-start-camera

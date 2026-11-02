@@ -29,6 +29,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 import { CONTROLS_DEVICES, DEVICE_LABEL, controlsSheet, detectDevice, fitScale, type ControlsDevice } from '@/lib/ui/controlsScreen';
+import { detectPadFamily, type PadFamily } from '@/lib/input/padLabels';
 
 /** How much of the panel's content its box cuts off: the panel's own overflow and its lines' scroll box. */
 function cutPx(panel: HTMLElement): number {
@@ -50,15 +51,18 @@ export function ControlsPanel({ modeId, hint, chooser = true, className = '' }: 
   const view = useSyncExternalStore(sessionStore.subscribe, sessionStore.view, sessionStore.view);
   const body = view.body !== 'off';
   const [device, setDevice] = useState<ControlsDevice>(() => detectDevice());
+  // CONTROLLER-TRY-FIX item 4: the pad in use names its own buttons (an Xbox pad's RT, a DualSense's CROSS); null = the generic words
+  const [family, setFamily] = useState<PadFamily | null>(null);
   useEffect(() => {
     // a pad plugged in (or first pressed) while the card is up is the device in use
-    const on = (): void => setDevice('pad');
-    const off = (): void => setDevice(detectDevice());
+    const on = (): void => { setDevice('pad'); setFamily(detectPadFamily()); };
+    const off = (): void => { setDevice(detectDevice()); setFamily(detectPadFamily()); };
+    setFamily(detectPadFamily());   // after mount only: the server's markup (and a test's) is the generic words
     window.addEventListener('gamepadconnected', on);
     window.addEventListener('gamepaddisconnected', off);
     return () => { window.removeEventListener('gamepadconnected', on); window.removeEventListener('gamepaddisconnected', off); };
   }, []);
-  const sheet = useMemo(() => controlsSheet(modeId, device, { body, fallback: hint }), [modeId, device, body, hint]);
+  const sheet = useMemo(() => controlsSheet(modeId, device, { body, fallback: hint, family: family ?? undefined }), [modeId, device, body, hint, family]);
   const ref = useRef<HTMLSpanElement>(null);
   useIsoLayoutEffect(() => {
     const panel = ref.current;

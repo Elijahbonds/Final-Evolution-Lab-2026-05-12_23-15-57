@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { MEASURE_VERTICAL_HREF } from '@/lib/vertical/door';   // VERTICAL-EASY: the one front door
 import { MEASURE_VERTICAL } from '@/lib/vertical/copy';
+import { JUMP_TAB_LINE } from '@/lib/tools-easy/copy';
 import { ArrowLeft, Loader2, PauseCircle, ScanLine, Volume2, VolumeX } from 'lucide-react';
 import { NOT_SAVED_ON_DEVICE, mirrorSave } from './mirror-save';   // R-HEALTH-CLIENT: no save request unless the server said so
 // MIRROR-FIRST P1 (2026-10-07): the camera, the pose runtime, the screen-awake lock and the pause on a hidden tab live in
@@ -513,7 +514,9 @@ export function MirrorHarness({
   const start = useCallback(async () => {
     // A fresh runner per session, so a second screen is a second screen rather than a resumed one.
     if (patternRef.current === 'screen') {
-      runnerRef.current = new ScreenRunner(screenIdRef.current);
+      // TOOLS-EASY (2026-10-28; SCREEN-EASY owner call 5, flagged): front-on first, then side-on, then from behind — two
+      // turns instead of four; the stations, holds and graders are the protocol's (lib/mirror/screen.ts screenRunFor)
+      runnerRef.current = new ScreenRunner(screenIdRef.current, { order: 'frontFirst' });
       screenSentRef.current = false;
       lastSaidRef.current = '';
       runnerKeyRef.current = '';
@@ -1368,6 +1371,15 @@ export function MirrorHarness({
                   End session
                 </button>
               </>
+            ) : !live && pattern === 'jump' ? (
+              // TOOLS-EASY (2026-10-28; VERTICAL-EASY owner call 5): the Jump tab no longer measures. It read a vertical
+              // with its own reader (DunkTracker: no stand, no countdown, cm only) — a third number that could disagree
+              // with "Measure my vertical" and the jump check. Its one action is now the front door; the dunk progress
+              // below (what you jumped before) stays.
+              <Link href={MEASURE_VERTICAL_HREF} data-measure-vertical-primary
+                className="rounded-2xl bg-[#00E5FF] px-7 py-3 text-[14px] font-black text-black shadow-[0_10px_40px_-12px_#00E5FF]">
+                {MEASURE_VERTICAL}
+              </Link>
             ) : !live ? (
               <>
                 <button
@@ -1678,9 +1690,8 @@ export function MirrorHarness({
             <>
               {/* VERTICAL-EASY (2026-10-27): one front door for a vertical — the guided check (countdown, three jumps, JUMP-PRO's
                   reader). This tab keeps its own dunk-progress read. */}
-              <Link href={MEASURE_VERTICAL_HREF} data-measure-vertical className="mb-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#00E5FF]/30 bg-[#00E5FF]/[0.06] px-4 text-[15px] font-bold text-white">
-                {MEASURE_VERTICAL}<span aria-hidden className="text-[#00E5FF]">→</span>
-              </Link>
+              {/* TOOLS-EASY (2026-10-28): the door is the stage's one action now (above); this says why there is no camera here */}
+              <p data-jump-tab-line className="mb-4 text-[15px] text-white/75">{JUMP_TAB_LINE}</p>
               {/* WHAT YOU CAME BACK FOR. The best to beat, the rhythm you are keeping, the line over weeks, and
                   the next dunk named — the four the owner asked for, in the order they matter when you are
                   standing in a gym with your phone propped against a bag. */}

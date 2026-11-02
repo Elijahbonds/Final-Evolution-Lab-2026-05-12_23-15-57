@@ -23,10 +23,11 @@ import { isKid, type AgeBand } from '@/lib/screen/age';
 import { PRIVACY_PATH } from '@/lib/screen/routes';
 import {
   CHECK_MEANING, DISCLAIMER, DONE_CLEAR, GREEN_MEANING, GREEN_NEXT, KINDLE_BOOK_LABEL, KINDLE_BOOK_URL, NOTHING_TO_RANK,
-  PRIVACY_LINK, SCREENSHOT_LINE, SCREEN_TEST_NAMES, TRY_THIS, UNREAD_MEANING, UNREAD_NEXT, WIN_LINE,
+  PRIVACY_LINK, SCREENSHOT_LINE, SCREEN_TEST_NAMES, TRY_THIS, TRUST_INFO_LINE, TRUST_WORDS, UNREAD_MEANING, UNREAD_NEXT, WIN_LINE,
   JUMP_BEST_MEANS, JUMP_BEST_NEXT,
 } from '@/lib/screen/copy';
-import { BandChip, EarlyTag, PreviewLabel, StopLine, primaryBtn, quietBtn, BAND_COLOUR } from './screen-ui';
+import { BandChip, EarlyTag, PreviewLabel, StopLine, TrustChip, TrustReasonLine, primaryBtn, quietBtn, BAND_COLOUR } from './screen-ui';
+import { worstTrust } from '@/lib/screen/trust-rows';
 import { ChevronDown } from 'lucide-react';
 import { MORE_DETAIL, OVERALL_WORK_LINE } from '@/lib/screen-easy/copy';
 import { KidResults } from './kid-results';
@@ -71,6 +72,7 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
 }) {
   const s = summary;
   if (isKid(age)) return <KidResults jumpIn={s.jumpBestIn} lastIn={null} onRunAgain={onRunAgain} />;
+  const jumpTrust = s.trust?.find((r) => r.id === 'jump.height') ?? null;
   const cards = checkCards(s);
   // SCREEN-EASY (2026-10-28): ONE screen — the big read, then at most TOP_PRIORITIES priority cards, each what we saw /
   // what it means / what to do next (docs/CUE-STYLE.md §4), then the one next step. Everything else (the other checks,
@@ -82,12 +84,20 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
     const word = band ?? 'unread';
     const pad = isTop ? 'p-3.5' : 'px-3.5 py-2.5';
     const cueText = isTop ? 'text-[16px] text-white/85' : 'text-[16px] text-white/75';
+    // MIRROR-TRUST-RATING: the card's trust is its worst row's (a sided row: its worse side); the jump height has its own block
+    const trust = s.trust ? worstTrust(s.trust.filter((r) => r.id !== 'jump.height' && checkById(r.id).test === test)) : null;
     return (
-      <li key={test} data-check-card={test} data-priority={isTop ? test : undefined} aria-label={`${SCREEN_TEST_NAMES[test]}: ${word === 'unread' ? 'not read' : word}`}
+      <li key={test} data-check-card={test} data-priority={isTop ? test : undefined} aria-label={`${SCREEN_TEST_NAMES[test]}: ${word === 'unread' ? 'not read' : word}${trust ? `, ${TRUST_WORDS[trust.level]}` : ''}`}
         className={`rounded-2xl border border-white/10 bg-white/[0.03] ${pad}`} style={{ borderLeft: `4px solid ${BAND_COLOUR[word]}` }}>
         {isTop ? <p data-top-priority className="text-[16px] font-bold uppercase tracking-[0.14em] text-white/55">Top priority</p> : null}
         <p className={isTop ? 'text-[16px] font-black leading-snug' : 'text-[16px] font-bold leading-snug'}>{SCREEN_TEST_NAMES[test]}</p>
         <div className="mt-0.5"><BandChip band={band} /></div>
+        {trust ? (
+          <div data-trust-row className="mt-0.5">
+            <TrustChip level={trust.level} reasons={trust.reasons} />
+            <TrustReasonLine level={trust.level} reasons={trust.reasons} />
+          </div>
+        ) : null}
         {row ? (
           <>
             <p data-check-row={row.id} className="mt-1 text-[16px] font-bold leading-snug text-white/90">
@@ -131,6 +141,8 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
         <p className="mt-2 text-[16px] font-bold leading-snug text-white/85">{read.line}</p>
       </section>
 
+      {/* MIRROR-TRUST-RATING: the one info line, above the cards and "Your checks" */}
+      {s.trust?.length ? <p data-trust-info className="px-1 text-[16px] leading-snug text-white/70">{TRUST_INFO_LINE}</p> : null}
       {top.length ? <ul data-check-cards data-priorities className="space-y-2">{top.map(card)}</ul> : null}
 
       <div data-next-step className="pt-1">
@@ -147,9 +159,25 @@ export function ResultsView({ summary, age, onClear, onRunAgain, trainWithElijah
           {rest.length ? <ul data-check-cards className="space-y-2">{rest.map((c, i) => card(c, top.length + i))}</ul> : null}
           {s.jumpBestIn !== null ? (
             <section data-personal-best className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-              <p className="text-[16px] text-white/80">Your best jump: <b className="text-[16px] text-white">{aboutInches(s.jumpBestIn)}</b></p>
-              <p data-means className="text-[16px] text-white/70">{JUMP_BEST_MEANS}</p>
-              <p data-next className="text-[16px] text-white/55">{JUMP_BEST_NEXT}</p>
+              {jumpTrust?.level === 'low' ? (
+                // a Low jump hides the inches and shows only the reason (MIRROR-TRUST-RATING §5)
+                <div data-jump-trust-hidden>
+                  <TrustChip level="low" reasons={jumpTrust.reasons} />
+                  <TrustReasonLine level="low" reasons={jumpTrust.reasons} />
+                </div>
+              ) : (
+                <>
+                  <p className="text-[16px] text-white/80">Your best jump: <b className="text-[16px] text-white">{aboutInches(s.jumpBestIn)}</b></p>
+                  {jumpTrust ? (
+                    <div data-trust-row className="mt-0.5">
+                      <TrustChip level={jumpTrust.level} reasons={jumpTrust.reasons} />
+                      <TrustReasonLine level={jumpTrust.level} reasons={jumpTrust.reasons} />
+                    </div>
+                  ) : null}
+                  <p data-means className="text-[16px] text-white/70">{JUMP_BEST_MEANS}</p>
+                  <p data-next className="text-[16px] text-white/55">{JUMP_BEST_NEXT}</p>
+                </>
+              )}
             </section>
           ) : null}
           {trainWithElijahHref && !isKid(age) ? (

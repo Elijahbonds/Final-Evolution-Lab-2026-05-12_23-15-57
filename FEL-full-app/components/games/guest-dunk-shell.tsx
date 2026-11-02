@@ -11,6 +11,7 @@ import { track, flush } from '@/lib/analytics';
 import { AgeStep, ageBlockPresent, writeAgeBlockFlag } from '@/components/age-step';
 import { ageScreenOutcome } from '@/lib/privacy/ageScreen';
 import type { GameProps, GameResult } from '@/components/games/game-shell';
+import { REVIEW_BUTTON_LABEL } from '@/lib/coach-store/storeOffers';   // STORE-OFFER-1 (a constant: no flag read on the client)
 
 const spinner = () => (
   <div className="flex h-[60vh] items-center justify-center">
@@ -38,7 +39,7 @@ const DunkBabylon = dynamicImport(() => import('@/components/games/dunk-babylon'
  */
 type GuestGate = 'ask' | 'blocked' | 'local' | 'adult';
 
-export function GuestDunkShell({ challengeCode }: { challengeCode?: string | null }) {
+export function GuestDunkShell({ challengeCode, reviewHref = null }: { challengeCode?: string | null; reviewHref?: string | null }) {
   // Engine selection must match /play/dunk: isBabylon FIRST, then the 3D
   // fallback. This shell checked only is3D, so the guest path — the PLAY NOW
   // button, and therefore the first thing every new player ever sees — mounted
@@ -69,6 +70,11 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
   const online = useRef(false);
   const started = useRef(false);
   const judged = useRef(false);
+
+  // PERF-834-LCP (a): the age step's buttons are in the server HTML before React attaches their handlers — a tap at ~2 s was
+  // dropped and the page sat on the question for minutes (DIAG Q1). They stay disabled, with a "Loading…" line, until mount.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
 
   // A browser that already carries the block flag skips the question. Reads only; sends nothing.
   useEffect(() => {
@@ -303,17 +309,25 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
         </div>
       </header>
 
-      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4">
+      {/* CONTROLLER-TRY-FIX item 1 (C1): while the stage is live the game owns the pad (lib/nav/focus.ts OWNS_INPUT), so the site's menu
+          focus stands aside: pad A no longer focuses and clicks the header QUIT, and pad B no longer runs history.back(). The age step,
+          the claim sheet and the result modal keep pad navigation (the attribute is off there). The age gate itself is untouched. */}
+      <div className="relative mx-auto w-full max-w-[1200px] flex-1 px-2 py-3 sm:px-4" data-own-input={gate !== 'ask' && !claimOpen && !result ? '' : undefined}>
         {gate === 'ask' ? (
           <div className="py-10" data-testid="guest-age-step">
-            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} />
+            <AgeStep mode="signup" onLocked={onAgeLocked} onBlocked={onAgeBlocked} ready={hydrated} />
             <button
               type="button"
               onClick={() => setGate('local')}
-              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white"
+              disabled={!hydrated}
+              aria-busy={!hydrated}
+              className="mx-auto mt-4 block font-mono text-xs text-white/45 transition-colors hover:text-white disabled:cursor-wait disabled:opacity-40"
             >
               Play without saving
             </button>
+            {!hydrated && (
+              <p role="status" className="mt-2 text-center font-mono text-[11px] text-white/40">Loading…</p>
+            )}
           </div>
         ) : babylon ? (
           // G7: NO `key={gameKey}` on this one. The Babylon dunk resets itself in place;
@@ -373,6 +387,17 @@ export function GuestDunkShell({ challengeCode }: { challengeCode?: string | nul
                   GO AGAIN
                 </button>
                 {claimLink}
+                {/* STORE-OFFER-1: "Book a review" — only when the server passed the review listing (store flag on) and the age step
+                    said adult (the existing gate; "Play without saving" never shows it) */}
+                {reviewHref && gate === 'adult' && (
+                  <Link
+                    href={reviewHref}
+                    data-action="book-review"
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#FFD700]/40 px-6 py-3 font-mono text-xs text-[#FFD700] transition-colors hover:bg-[#FFD700]/10"
+                  >
+                    {REVIEW_BUTTON_LABEL} <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                )}
 
                 <div className="mt-4 flex items-center justify-center gap-3">
                   {resultHref && (

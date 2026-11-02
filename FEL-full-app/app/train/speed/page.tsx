@@ -23,7 +23,7 @@ export default async function SpeedPage() {
   if (!me) redirect(loginPath('/train/speed'));
   const adult = verifiedAdult(await readDobYear(prisma, me, 'sprint_speed_page'));
   return (
-    <TabPage eyebrow="Train" title="Sprint speed" lede="Time a sprint, a flying 10 or a 5-10-5 with your phone's camera, and read your top speed. Every number is an estimate." accent="#00FF9D"
+    <TabPage eyebrow="Train" title="Sprint speed" lede="Time a sprint with your phone's camera. Every number is an estimate." accent="#00FF9D"
       aside={<Link href="/train" className="rounded-xl border border-white/10 px-3 py-2 text-[12px] font-bold text-white/75 hover:bg-white/[0.05] hover:text-white">← Train</Link>}>
       <div className="mx-auto max-w-md">
         {adult ? <SpeedApp /> : (
