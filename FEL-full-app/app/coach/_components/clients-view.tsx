@@ -50,6 +50,8 @@ import type { QueueCard, QueueSourceKey } from '@/lib/coach/queue';
 import type { RosterStripRow } from '@/lib/coach/queueServer';
 import type { SharedBy } from '@/lib/share/shareable';
 import { TAP } from './look';
+import { MessagesInbox } from '@/components/coach-tools/messages-inbox';
+import { INBOX_COPY, sheetTabFor, unreadFor } from '@/lib/coach-tools/inbox';
 import { TodayView } from './today-view';
 import { SendView } from './send-view';
 import { ExerciseCatalogue } from './exercise-catalogue';
@@ -64,8 +66,12 @@ type Msg = ThreadMsg;
 interface RosterRow { clientId: string; name: string; programs: { id: string; name: string; isActive: boolean }[]; card: { slug: string; published: boolean; rarity: string; prq: number; topScore: number; wins: number } | null; prq: Record<string, number> | null; prqDelta: Record<string, number> | null; sessions: number; wins: number; resiliency: { attempts: number; retryRate: number }; games?: number; gamesAtCap?: boolean; coachedSessions?: number; coverage?: CoverageStripData | null }
 interface QueueBody { items: QueueCard[]; dark: QueueSourceKey[]; roster: RosterStripRow[] }
 
-type Screen = 'setup' | 'drafts' | 'reviews' | 'attention' | 'builder' | 'send' | 'exercises' | 'form' | 'today' | 'chat';
-const SCREEN_TITLE: Record<Screen, string> = { setup: 'Setup', drafts: 'Drafts', reviews: 'Filmed sets', attention: 'Roster check', builder: 'Builder', send: 'Send', exercises: 'Exercises', form: 'Form Check', today: 'My training', chat: 'AI coach' };
+type Screen = 'setup' | 'drafts' | 'reviews' | 'attention' | 'builder' | 'send' | 'exercises' | 'form' | 'today' | 'chat' | 'messages';
+// COACH-TOOLS-EASY (2026-11-02): each tool named for what it is (it was "Roster check", "Filmed sets", "Drafts", "Send",
+// "Form Check"), and Messages added (there was no list of threads)
+const SCREEN_TITLE: Record<Screen, string> = { setup: 'Setup', drafts: 'Weekly plan updates', reviews: 'Form reviews', attention: 'Readiness and alerts', builder: 'Builder', send: 'Text a plan or drill', exercises: 'Exercises', form: 'My form check', today: 'My training', chat: 'AI coach', messages: INBOX_COPY.title };
+/** The tools, in the order a coach reaches for them (COACH-TOOLS-EASY). */
+const TOOL_ORDER: Screen[] = ['messages', 'reviews', 'drafts', 'attention', 'send', 'exercises', 'form', 'today'];
 const EMPTY: QueueBody = { items: [], dark: [], roster: [] };
 
 export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | null; chatOn?: boolean } = {}) {
@@ -74,6 +80,10 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
   const [screen, setScreen] = useState<Screen | null>(null);
   const [openInvites, setOpenInvites] = useState(0);
   useEffect(() => { fetch('/api/coach/queue').then((r) => (r.ok ? r.json() : null)).then((j) => setQueue(j && Array.isArray(j.items) ? j : EMPTY)).catch(() => setQueue(EMPTY)); }, []);
+  // COACH-TOOLS-EASY: the unread counts on the home too (the inbox's order, and the sheet opening on Thread); the read
+  // markers' pending-SQL seam answers { available: false } and nothing is counted then
+  const [unreadHome, setUnreadHome] = useState<UnreadView | null>(null);
+  useEffect(() => { fetch('/api/coach/messages/unread').then((r) => (r.ok ? r.json() : null)).then((j) => setUnreadHome(j)).catch(() => {}); }, []);
   useEffect(() => { fetch('/api/coach/invite').then((r) => (r.ok ? r.json() : null)).then((j) => setOpenInvites(Array.isArray(j?.invites) ? j.invites.length : 0)).catch(() => {}); }, []);
 
   // ── the athlete workspace: read the first time a sheet opens, then kept ─────────────────────────────────────────
@@ -115,7 +125,7 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
       const t: Msg[] = j.messages ?? [];
       setThread(t);
       // the thread is on screen: the client's messages in it are read now (the "N new" stays for this visit)
-      void markReadIfNeeded('/api/coach/messages/read', selected, t).then((did) => { if (did) setUnread((u) => clearProgram(u, selected)); });
+      void markReadIfNeeded('/api/coach/messages/read', selected, t).then((did) => { if (did) { setUnread((u) => clearProgram(u, selected)); setUnreadHome((u) => clearProgram(u, selected)); } });
     }).catch(() => setThread([]));
   }, [selected, sheetTab]);
 
@@ -146,10 +156,31 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
   };
 
   const emptyRoster = !!queue && !queue.roster.length && !queue.items.length;
+  const unreadNow = unread ?? unreadHome;
+  const programIdOf = (id: string) => queue?.roster.find((r) => r.id === id)?.programId ?? null;
+  /** An athlete's sheet, on their thread when they have written and it is unread (COACH-TOOLS-EASY). */
+  const openAthlete = (id: string) => setSheet({ id, tab: sheetTabFor(unreadFor(unreadNow, programIdOf(id))) });
+  const threadDot = !!sheet && (unreadFor(unreadNow, programIdOf(sheet.id)) ?? 0) > 0;
   const prog = theirs.find((p) => p.tree.id === selected) ?? null;
   const sheetName = queue?.roster.find((r) => r.id === sheet?.id)?.name ?? roster.find((r) => r.clientId === sheet?.id)?.name ?? theirs[0]?.clientName ?? 'Athlete';
   const sheetDays = queue?.roster.find((r) => r.id === sheet?.id)?.days ?? [];
   const sessionsOf = (inbox?.items ?? []).filter((it) => theirs.some((p) => p.tree.id === it.program.id));
+
+  // the coach's tools: plain rows, under the work — only once the queue has answered, so nothing jumps down the page
+  const tools = queue && (
+    <nav aria-label="Coach tools" className="mt-2" data-coach-tools>
+      {TOOL_ORDER.slice(0, 4).map((s) => (
+        <button key={s} type="button" className={LOOK.row} onClick={() => setScreen(s)} data-coach-tool={s}><span>{SCREEN_TITLE[s]}</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></button>
+      ))}
+      {/* COACH-TOOLS-EASY: combine day was only in Setup (7 taps to start one): a row of its own */}
+      <Link href="/coach/combine" className={LOOK.row} data-coach-tool="combine"><span>Combine day</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
+      <Link href="/coach/session" className={LOOK.row}><span>Court session</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
+      {[...TOOL_ORDER.slice(4), ...(chatOn ? ['chat' as const] : [])].map((s) => (
+        <button key={s} type="button" className={LOOK.row} onClick={() => setScreen(s)} data-coach-tool={s}><span>{SCREEN_TITLE[s]}</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></button>
+      ))}
+      <Link href="/coach/business" className={LOOK.row}><span>Your coaching business</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
+    </nav>
+  );
 
   return (
     // COACH-DELIVERY COA-06: the 44 px tap floor for everything here (./look.ts)
@@ -169,23 +200,21 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
         </div>
       ) : (
         <>
+          {/* COACH-TOOLS-EASY: on a desktop, the queue on the left and the roster and the tools on the right */}
+          <div className={LOOK.columns} data-coach-columns>
           <CoachQueue items={queue?.items ?? null} dark={queue?.dark ?? []} onOpen={openCard} />
-          <RosterStrip roster={queue?.roster ?? []} onOpen={(id) => setSheet({ id, tab: 'week' })} />
+          <div>
+          <RosterStrip roster={queue?.roster ?? []} onOpen={openAthlete} />
+          {tools}
+          </div>
+          </div>
         </>
       )}
-
-      {/* the coach's tools: plain rows, under the work — only once the queue has answered, so nothing jumps down the page */}
-      {queue && <nav aria-label="Coach tools" className="mt-2" data-coach-tools>
-        <Link href="/coach/session" className={LOOK.row}><span>Court session</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
-        {(['attention', 'reviews', 'drafts', 'send', 'exercises', 'form', 'today', ...(chatOn ? ['chat' as const] : [])] as Screen[]).map((s) => (
-          <button key={s} type="button" className={LOOK.row} onClick={() => setScreen(s)} data-coach-tool={s}><span>{SCREEN_TITLE[s]}</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></button>
-        ))}
-        <Link href="/coach/business" className={LOOK.row}><span>Your coaching business</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
-      </nav>}
+      {emptyRoster && tools}
       </div>
 
       {sheet && (
-        <AthleteSheet name={sheetName} initial={sheet.tab} onClose={() => setSheet(null)} className={TAP}>
+        <AthleteSheet name={sheetName} initial={sheet.tab} onClose={() => setSheet(null)} className={TAP} dots={{ thread: threadDot }}>
           {(tab) => !programs || !inbox ? <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div> : (
             <>
               {theirs.length > 1 && (tab === 'thread' || tab === 'program') && (
@@ -247,7 +276,7 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
                 <div className="space-y-3" data-sheet-thread>
                   <div className="flex items-center gap-2"><UnreadPill n={unreadInThread(thread)} /><LiveSessionLink programId={prog.tree.id} role="coach" /></div>
                   <ThreadMessages thread={thread} />
-                  <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your client" className={LOOK.input} /><button type="button" onClick={send} className={LOOK.solid}>Send</button></div>
+                  <div className="flex gap-2"><input value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void send(); }} placeholder="Message your athlete" className={LOOK.input} /><button type="button" onClick={send} className={LOOK.solid}>Send</button></div>
                 </div>
               ) : <p className={LOOK.quiet}>A thread starts with their first program.</p>)}
               {tab === 'program' && (
@@ -282,6 +311,7 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
       {screen && (
         <FullScreen title={screen === 'builder' && prog ? prog.tree.name : SCREEN_TITLE[screen]} onClose={() => setScreen(null)} testId={screen} className={TAP}>
           {screen === 'setup' && <SetupScreen />}
+          {screen === 'messages' && <MessagesInbox roster={queue?.roster ?? []} unread={unreadNow} onOpen={(id) => { setScreen(null); openAthlete(id); }} />}
           {screen === 'drafts' && <DraftsInbox />}
           {screen === 'reviews' && <FormReviewQueue />}
           {/* NEEDS YOU TODAY's full board: triage, drift, pain and readiness behind their own consent rules (lib/coach/attention.ts) */}
