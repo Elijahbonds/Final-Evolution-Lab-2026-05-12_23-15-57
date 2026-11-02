@@ -27,7 +27,8 @@ import {
   resultMeans, resultSaw,
 } from '@/lib/vertical/copy';
 import { changeOf } from '@/lib/vertical/result';
-import { primaryBtn, quietBtn } from './screen-ui';
+import { primaryBtn, quietBtn, TrustChip, TrustReasonLine } from './screen-ui';
+import type { TrustLevel, TrustReason } from '@/lib/screen/trust-rows';
 
 /** The one quiet look on this screen besides the primary: a text button (premium rule: ≤ 3 button looks with the back arrow). */
 const LINK = 'fel-press inline-flex min-h-12 w-full items-center justify-center text-[16px] font-bold text-white/80 underline underline-offset-4';
@@ -35,7 +36,7 @@ const LINK = 'fel-press inline-flex min-h-12 w-full items-center justify-center 
 /** Where "Done" goes: the app's front door (signed in it opens Play; signed out, the landing). */
 export const RESULT_DONE_HREF = '/';
 
-export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, kid, jumpIn, lastIn, onFull, onAgain, lastCm = null, armSwing = false, more = null }: {
+export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, kid, jumpIn, lastIn, onFull, onAgain, lastCm = null, armSwing = false, more = null, trust = null }: {
   heightCm: number | null;
   /** Jumps that counted (default: every attempt). */
   counted?: number;
@@ -53,6 +54,8 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
   armSwing?: boolean;
   /** An adult's detail cards (session card, slow-mo, more tests), shown under "More detail". */
   more?: ReactNode;
+  /** MIRROR-TRUST-RATING: the jump height's trust, adults only (a kid's view never shows it). */
+  trust?: { level: TrustLevel; reasons: readonly TrustReason[] } | null;
 }) {
   const [unit, setUnit] = useState<JumpUnit>(() => readJumpUnit(tabStorage()));
   const pick = (u: JumpUnit) => { setUnit(u); writeJumpUnit(tabStorage(), u); };
@@ -63,11 +66,19 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
     : Math.max(1, Math.round(unit === 'cm' ? plusMinusCm : inches(plusMinusCm)));
   const u = unit === 'cm' ? 'cm' : 'in';
   const estimate = v === null ? '' : `about ${Math.round(v)}${pm === null ? '' : ` ±${pm}`} ${u}`;
+  const t = kid ? null : trust;
+  // MIRROR-TRUST-RATING: a Low jump hides the number and shows only the reason; Medium shows the number with the reason as a caution
+  const hidden = t?.level === 'low';
   return (
     <div data-jump-result={kid ? 'kid' : 'adult'} className="space-y-4">
       <section className="rounded-3xl border border-white/15 bg-white/[0.04] p-5 text-center">
         <p data-jump-label={armSwing ? 'arm-swing' : 'hands-on-hips'} className="text-[16px] font-bold uppercase tracking-[0.16em] text-white/60">{armSwing ? RESULT_LABEL_SWING : RESULT_LABEL}</p>
-        {v !== null ? (
+        {v !== null && hidden ? (
+          <div data-jump-trust-hidden className="mt-2">
+            <TrustChip level="low" reasons={t!.reasons} />
+            <TrustReasonLine level="low" reasons={t!.reasons} />
+          </div>
+        ) : v !== null ? (
           <p data-jump-number aria-label={estimate} className="mt-2 flex items-baseline justify-center gap-2 font-black leading-none text-white">
             <span className="sr-only">about </span>
             <span className="text-[88px] tracking-tight">{Math.round(v)}</span>{' '}
@@ -76,8 +87,16 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
         ) : (
           <p data-jump-missing className="mt-2 text-[28px] font-black leading-tight">{KID_NO_JUMP}</p>
         )}
+        {v !== null && t && !hidden ? (
+          <div data-trust-row className="mt-1">
+            <TrustChip level={t.level} reasons={t.reasons} />
+            <TrustReasonLine level={t.level} reasons={t.reasons} />
+          </div>
+        ) : null}
         <ul data-jump-lines className="mx-auto mt-4 max-w-sm space-y-2 text-left text-[16px] leading-snug">
-          {v !== null ? (
+          {v !== null && hidden ? (
+            <li data-jump-next className="text-white/80">{RESULT_NEXT}</li>
+          ) : v !== null ? (
             <>
               <li data-jump-saw className="font-bold text-white">{resultSaw(counted ?? attempts, `${Math.round(v)} ${u}`)}</li>
               <li data-jump-meaning className="text-white/80">{resultMeans(change)}</li>
@@ -102,7 +121,7 @@ export function JumpResult({ heightCm, plusMinusCm = null, attempts, counted, ki
       <details data-jump-more className="[&_summary::-webkit-details-marker]:hidden">
         <summary className={`${LINK} cursor-pointer list-none`}>{RESULT_MORE}</summary>
         <div className="mt-3 space-y-3 text-left">
-          {v !== null ? <p data-jump-estimate className="text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE} Today: {estimate}.</p> : null}
+          {v !== null && !hidden ? <p data-jump-estimate className="text-[16px] leading-snug text-white/75">{JUMP_ESTIMATE_LINE} Today: {estimate}.</p> : null}
           <p data-jump-attempts className="text-[16px] text-white/75">{attempts} jumps, best one shown</p>
           <div className="flex justify-center gap-2" role="group" aria-label="Units">
             <button type="button" data-unit="in" aria-pressed={unit === 'in'} onClick={() => pick('in')} className={`${quietBtn} max-w-[10rem] ${unit === 'in' ? 'border-[#00E5FF] text-[#00E5FF]' : ''}`}>Inches</button>

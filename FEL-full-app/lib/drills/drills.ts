@@ -161,6 +161,7 @@ export const WAKE_UP: Drill = {
     },
     {
       id: 'build-the-rhythm', name: 'Build the Rhythm', durationSec: 120, presence: 'required',
+      adultOnly: true,   // YOUTH-CONTACT-CAP (PM 2026-10-26): 2 × POGO_WARMUP_COUNT = 60 pogo contacts, over the teen 55
       source: { book: PB, chapter: 5, section: 'Phase 5: Build the Rhythm (2 minutes)' },
       cue: 'Pogos: bounce on the balls of the feet, knees stiff, quick and quiet.',
       targets: [
@@ -238,6 +239,7 @@ const rest = (id: string, durationSec: number): DrillPhase => ({
 export const POGO_BILATERAL: Drill = {
   id: 'pogo-bilateral',
   name: 'Pogo Progression: Both Feet',
+  adultOnly: true,   // YOUTH-CONTACT-CAP (PM 2026-10-26): 3 × BILATERAL_CONTACTS = 60 contacts, over the teen 55
   blurb: 'Weeks 1–2 of the pogo progression: three sets of 20 quick, stiff, quiet contacts.',
   source: { book: PB, chapter: 6, section: 'Drill 2: The Oscillatory Pogo Progression' },
   checks: ['kneeBend15', 'armsOpposition'],

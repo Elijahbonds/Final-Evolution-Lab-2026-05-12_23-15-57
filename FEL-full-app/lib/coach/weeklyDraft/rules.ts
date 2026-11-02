@@ -36,6 +36,7 @@ import {
   rowClientLine, swapClientLine,
 } from './copy';
 import { easeStep, progressStep, readExposure, regressStep, setsOf, volumeDownStep, type ExposureVerdict, type Step } from './dose';
+import { contactDeltas, sessionContacts } from './contacts';
 import { classify, type SafetyContext } from './safety';
 import {
   DELOAD_MEAN_EFFORT, DELOAD_MIN_EXPOSURES, DRAFT_LOOKBACK_DAYS, EXPOSURES_TO_DECIDE, FORM_DROP_PTS, JUMP_DROP_IN, READINESS_LOW_DAYS,
@@ -329,6 +330,8 @@ export function draftForClient(f: DraftFacts): ClientDraft {
     youth, painOpen, availability: f.availability, lowCompliance,
     easierWeek: cands.some((x) => (x.kind === 'deload' || x.kind === 'ease_off') && x.ops.length > 0),
     formDropPatterns, catalogue: cat,
+    // YOUTH-CONTACT-CAP: each open session's jump contacts as the coach wrote them (youth rules only)
+    ...(youth ? { sessionContacts: Object.fromEntries(open.map((s) => [s.id, sessionContacts(s.exercises, cat)])) } : {}),
   };
   const changes = settle(cands, ctx, held);
   const guard = { ...draft.guard, lowCompliance, easierWeek: ctx.easierWeek, formDropPatterns: [...formDropPatterns] };
@@ -341,12 +344,16 @@ export function settle(cands: readonly Candidate[], ctx: SafetyContext, held: He
   const claimed = new Set<string>();
   const out: DraftChange[] = [];
   const sorted = [...cands].sort((a, b) => b.priority - a.priority);
+  // YOUTH-CONTACT-CAP: the running count, so two changes that each fit cannot together take a session past the cap
+  const running: Record<string, number> | undefined = ctx.sessionContacts ? { ...ctx.sessionContacts } : undefined;
+  const live: SafetyContext = running ? { ...ctx, sessionContacts: running } : ctx;
   for (const c of sorted) {
-    const s = classify(c, ctx);
+    const s = classify(c, live);
     if (s.safety === 'unsafe') { held.push({ title: c.title, why: s.why ?? 'Not safe to draft.' }); continue; }
     const ops = c.ops.filter((op) => op.action !== 'update' || !claimed.has(op.sessionExerciseId));
     if (c.ops.length && !ops.length) continue; // every row it would change is already changed by a more careful one
     for (const op of ops) if (op.action === 'update') claimed.add(op.sessionExerciseId);
+    if (running) for (const d of contactDeltas(ops, ctx.catalogue)) running[d.sessionId] = (running[d.sessionId] ?? d.before) + d.delta;
     out.push({ ...c, ops, safety: s.safety, id: changeId(c.kind, { e: c.exerciseName, ops: ops.map(opSignature) }) });
   }
   return out.sort((a, b) => b.priority - a.priority || a.title.localeCompare(b.title));

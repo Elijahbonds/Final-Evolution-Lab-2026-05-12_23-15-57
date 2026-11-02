@@ -35,8 +35,8 @@ export const T1_THRESHOLDS: ThresholdId[] = [
   't1.heelRiseReps', 't1.valgus', 't1.lateralShift', 't1.weights', 'score.meanWorst', 'score.bands03',
 ];
 
-const FRONT_POINTS = [23, 24, 25, 26, 27, 28];
-const sidePoints = (s: Side) => [SIDE[s].shoulder, SIDE[s].hip, SIDE[s].knee, SIDE[s].ankle, SIDE[s].wrist, SIDE[s].heel, SIDE[s].footIndex];
+export const FRONT_POINTS = [23, 24, 25, 26, 27, 28];
+export const sidePoints = (s: Side) => [SIDE[s].shoulder, SIDE[s].hip, SIDE[s].knee, SIDE[s].ankle, SIDE[s].wrist, SIDE[s].heel, SIDE[s].footIndex];
 const repThresholds = () => ({ enter: th('t1.repEnter'), exit: th('t1.repExit'), minPeak: th('t1.repMinPeak') });
 
 interface Scored { rep: Rep; metrics: MetricResult[]; score: number; worstFrame: Record<string, number> }
