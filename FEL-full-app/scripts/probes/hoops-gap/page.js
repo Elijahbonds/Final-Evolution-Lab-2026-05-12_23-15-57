@@ -196,7 +196,7 @@
         const gx = dp.x + rx / rl * 1.0, gz = dp.z + rz / rl * 1.0; const ex = gx - me.x, ez = gz - me.z, el = Math.hypot(ex, ez);
         steer(ex, ez, el < 0.15 ? 0 : Math.min(1, 0.3 + el));
         const dd = Math.hypot(dp.x - me.x, dp.z - me.z);
-        if (dd < 1.6 && t >= P.nextPoke) { if (rnd() < 0.5) { tap('X'); bot.pokes++; } P.nextPoke = t + (0.6 + rnd() * 1.0) * 1000; }
+        if (!CFG.noPoke && dd < 1.6 && t >= P.nextPoke) { if (rnd() < 0.5) { tap('X'); bot.pokes++; } P.nextPoke = t + (0.6 + rnd() * 1.0) * 1000; }
         const ph = atkPhase();
         if (ph === 'gather' && !P.gatherSeen) P.gatherSeen = t;
         if (!P.blocked && P.gatherSeen && t - P.gatherSeen >= 220 && dd < 2.4) { P.blocked = true; tap('Y'); bot.blocks++; }
