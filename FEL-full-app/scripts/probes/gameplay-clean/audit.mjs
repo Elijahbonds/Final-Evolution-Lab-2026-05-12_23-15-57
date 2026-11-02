@@ -72,6 +72,12 @@ const INIT = `(() => {
     if (ts !== lastTs) { lastTs = ts; if (window.__vtOn && !window.__freeze) { vt += 1000 / 60; window.__vtFrames++; try { window.__onVtFrame && window.__onVtFrame(); } catch (e) { window.__scriptErr = String(e); } runDue(); } }
     cb(window.__vtOn ? vt : ts);
   });
+  // shader programs linked, by phase: a link during PLAY is a hitch the player feels (PerfMonitor's own rule)
+  window.__links = { ready: 0, playing: 0, other: 0, playMs: 0, firstPlayMs: 0 };
+  for (const C of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) { if (!C) continue; const lp = C.prototype.linkProgram;
+    C.prototype.linkProgram = function (prog) { const t = realNow(); const r = lp.call(this, prog); const ms = realNow() - t;
+      const ph = window.__sessionStore ? window.__sessionStore.view().phase : null; const L = window.__links;
+      if (ph === 'playing') { L.playing++; L.playMs += ms; if ((window.__gameS ? window.__gameS() : 99) < 1) L.firstPlayMs += ms; } else if (ph === 'ready') L.ready++; else L.other++; return r; }; }
   window.__errs = []; window.addEventListener('error', (e) => window.__errs.push('error: ' + (e.message || '').slice(0, 200)));
 })()`;
 
@@ -123,10 +129,15 @@ function installRecorder(cfg) {
       const d = p.subtract(e); const len = d.length(); if (len < 1.2) continue;
       const ray = new Ray(e.clone(), d.scale(1 / len), len - 1.0);   // a metre short: the hero's own gear and vehicle (aero's scarf, a wingtip) is not a blocked view
       // the props and the world only: a skinned body (a rival, a horde fighter, their kit) in front of the hero is play, not a blocked view
-      const hit = scene.pickWithRay(ray, (m) => m.isEnabled() && m.isVisible && (m.visibility === undefined || m.visibility > 0.25) && !heroMeshes.has(m) && !m.skeleton
+      const hits = scene.multiPickWithRay(ray, (m) => m.isEnabled() && m.isVisible && (m.visibility === undefined || m.visibility > 0.25) && !heroMeshes.has(m) && !m.skeleton
         && m.getTotalVertices && m.getTotalVertices() > 0 && !(m.material && m.material.alpha !== undefined && m.material.alpha < 0.3)
-        && (m.getBoundingInfo().boundingSphere.radiusWorld > 0.3) && !/sky|ground|floor|court$|water|ocean|backdrop|dome|fog/i.test(m.name), false);
-      if (hit && hit.hit) { blocked++; if (who < 0) who = ix(R.occIx, R.occNames, hit.pickedMesh ? hit.pickedMesh.name.slice(0, 40) : '?'); }
+        && (m.getBoundingInfo().boundingSphere.radiusWorld > 0.3) && !/sky|ground|floor|court$|water|ocean|backdrop|dome|fog/i.test(m.name));
+      // only a face the player can SEE blocks the view: a single-sided wall seen from behind is culled (the combat rings'
+      // walls between an outside camera and the fighters: drawn through, picked anyway — 51–54 % "hidden" that was not)
+      const hit = (hits || []).sort((x, y) => x.distance - y.distance).find((h) => { const m = h.pickedMesh; const mat = m && m.material;
+        if (mat && mat.backFaceCulling === false) return true; const n = h.getNormal(true, true); if (!n) return true;
+        return n.x * ray.direction.x + n.y * ray.direction.y + n.z * ray.direction.z < 0; });
+      if (hit) { blocked++; if (who < 0) who = ix(R.occIx, R.occNames, hit.pickedMesh ? hit.pickedMesh.name.slice(0, 40) : '?'); }
     }
     return [blocked, who];
   };
@@ -570,6 +581,7 @@ for (const mode of MODES) {
     fs.writeFileSync(path.join(OUT, `${mode}-${TAG}-raw.json.gz`), zlib.gzipSync(JSON.stringify({ rec, S })));
   } catch (e) { row.fail = String(e.message || e).slice(0, 200); }
   row.errors = [...new Set(errs)].slice(0, 12); row.badUrls = [...new Set(bad)]; row.errorCount = errs.length; row.warnCount = warnsN.n; row.crashed = crashed;
+  try { row.links = await p.evaluate(() => window.__links); } catch {}
   try { row.scriptErr = await p.evaluate(() => window.__scriptErr ?? null); row.api = await p.evaluate(() => [...new Set(window.__api)].slice(0, 20)); } catch {}
   fs.writeFileSync(path.join(OUT, `${mode}-${TAG}.json`), JSON.stringify(row, null, 1));
   console.log(`${mode.padEnd(17)} ready ${row.readyS}s play ${row.firstPlayS}s frames ${row.frames} pops ${row.pops} cuts ${row.camCuts} hidden ${row.heroHiddenPct}% cpu ${row.cpuMsP50}/${row.cpuMsP95} phone ${row.phoneCpuMsP50}/${row.phoneCpuMsP95} draws ${row.drawsMean}/${row.drawsMax} resp ${row.respMsMed}ms pause ${row.pause?.state} err ${row.errorCount}${row.fail ? ' FAIL ' + row.fail : ''} (${row.wallS}s)`);

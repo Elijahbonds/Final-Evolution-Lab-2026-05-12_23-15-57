@@ -65,6 +65,19 @@ describe('OccluderFade', () => {
     expect(inst.isVisible).toBe(true);
   });
 
+  it('a single-sided wall seen from behind is already see-through: not faded; seen from the front: faded', () => {
+    const r = rig();
+    r.pole.position.x = 20; r.pole.computeWorldMatrix(true);
+    const front = MeshBuilder.CreatePlane('wall_front', { width: 3, height: 3 }, r.scene);   // its face looks back at the camera (-z)
+    front.position.set(0, 1.5, -5); front.computeWorldMatrix(true);
+    const back = MeshBuilder.CreatePlane('wall_back', { width: 3, height: 3 }, r.scene);
+    back.position.set(0, 1.5, -3); back.rotation.y = Math.PI; back.computeWorldMatrix(true);   // its face looks away: culled from here
+    r.fade.start();
+    r.frames(30);
+    expect(front.visibility).toBeLessThan(0.5);
+    expect(back.visibility).toBe(1);
+  });
+
   it('is off for the hoops modes (their lanes own the call)', () => {
     for (const id of ['dunk', 'onevone', 'threevthree']) expect(OCCLUDER_FADE_OFF.has(id)).toBe(true);
     const r = rig('dunk');

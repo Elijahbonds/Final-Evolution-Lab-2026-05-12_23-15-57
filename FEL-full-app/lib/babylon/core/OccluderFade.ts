@@ -60,6 +60,17 @@ export function fadeCandidate(m: {
   return !WORLD_NAME.test(m.name);
 }
 
+/** Is the face the ray met one the player sees? A single-sided wall seen from behind is culled, so it is already
+ *  see-through: the combat rings' walls between an outside camera and the fighters are drawn through, and fading them would
+ *  only change the far side of the ring. A double-sided material is always seen. */
+export function facesCamera(hit: { pickedMesh: AbstractMesh | null; getNormal(useWorld?: boolean, useVerticesNormals?: boolean): Vector3 | null },
+  dir: Vector3): boolean {
+  const mat = hit.pickedMesh?.material;
+  if (mat && mat.backFaceCulling === false) return true;
+  const n = hit.getNormal(true, true);
+  return !n || Vector3.Dot(n, dir) < 0;
+}
+
 /** Pure: the next fade level (1 = solid, 0 = fully faded) moving toward `want` at 1/fadeSec per second. */
 export function stepLevel(level: number, want: 0 | 1, dt: number, fadeSec: number): number {
   const rate = fadeSec > 0 ? dt / fadeSec : 1;
@@ -147,6 +158,7 @@ export class OccluderFade {
       const hits = this.scene.multiPickWithRay(this.ray, (m) => this.pickable(m)) ?? [];
       for (const hit of hits) {
         const m = hit.pickedMesh; if (!m) continue;
+        if (!facesCamera(hit, this.ray.direction)) continue;   // a culled back face is already see-through
         const f = this.faded.get(m.uniqueId);
         if (f) { f.lastSeen = this.t; continue; }
         const instance = m.getClassName() === 'InstancedMesh';
