@@ -1082,12 +1082,12 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'Tight invites the spin, the hesitation and the post-up; further off, the crossover and the in-and-out.',
   },
   {
-    id: 'hoops.rivalHesiSec', label: '1v1 rival: the hesitation\'s sell', def: 0.3, min: 0.1, max: 0.8, step: 0.02, unit: 's', group: 'Hoops · rival offense',
+    id: 'hoops.rivalHesiSec', label: '1v1 rival: hesitation sell time', def: 0.3, min: 0.1, max: 0.8, step: 0.02, unit: 's', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_HESI_SEC',
     hint: 'How long he crawls before the go.',
   },
   {
-    id: 'hoops.rivalHesiGoMps', label: '1v1 rival: the hesitation\'s go', def: 5.8, min: 3, max: 7, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    id: 'hoops.rivalHesiGoMps', label: '1v1 rival: hesitation burst speed', def: 5.8, min: 3, max: 7, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_HESI_GO_MPS',
     hint: 'The burst after the sell (your top speed is 6.4: a man who stayed down keeps up).',
   },
@@ -1107,7 +1107,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: '…and this close or closer.',
   },
   {
-    id: 'hoops.rivalPostMps', label: '1v1 rival: the back-down\'s pace', def: 1.4, min: 0.5, max: 3, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    id: 'hoops.rivalPostMps', label: '1v1 rival: back-down pace', def: 1.4, min: 0.5, max: 3, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_POST_MPS',
     hint: 'How hard he backs you down (your body holds him, or gives ground).',
   },
@@ -1137,7 +1137,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'You in his lane but this far off: PRO and ELITE take the pull-up. 0 = never.',
   },
   {
-    id: 'hoops.rivalPullUpRangeM', label: '1v1 rival: the sag pull-up\'s range', def: 6.2, min: 3, max: 9, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
+    id: 'hoops.rivalPullUpRangeM', label: '1v1 rival: pull-up range when you sag', def: 6.2, min: 3, max: 9, step: 0.1, unit: 'm', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/rivalOffense.ts RIVAL_PULLUP_RANGE_M',
     hint: 'The sag read only from inside this of the rim.',
   },
@@ -1162,7 +1162,7 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     hint: 'A fresh possession starts this far from the rim (0 = start where he is).',
   },
   {
-    id: 'hoops.rivalHandlerMps', label: '3v3 rivals: the handler\'s pace off the drive', def: 3.4, min: 2, max: 5, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
+    id: 'hoops.rivalHandlerMps', label: '3v3 rivals: handler pace off the drive', def: 3.4, min: 2, max: 5, step: 0.1, unit: 'm/s', group: 'Hoops · rival offense',
     source: 'lib/babylon/hoops/teamOffense3v3.ts RIVAL_HANDLER_MPS',
     hint: 'Taking it back, probing, waiting on the screen.',
   },
