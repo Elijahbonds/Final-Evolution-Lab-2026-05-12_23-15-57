@@ -281,3 +281,24 @@ Auto-merged, both sides kept: `venue-editor.tsx`, `characters.tsx`, `budget-mete
 
 Its table stays behind the pending-schema seam: `prisma/pending/2026-10-26-studio-share.sql` plus the data-rights
 registry entry. `schema.prisma` and `public/_prisma/**` are untouched.
+
+## 7. Gate (merged with `lane/finish-release` 82e88b7c, Node 22, database variables unset)
+
+| Step | Result |
+|---|---|
+| `tsc --noEmit` | 0 errors |
+| `ci-suite` | 208 passed, 1 failed (`input-contract-tests.ts`), 11 skipped (the DB suites). The one failure came from this lane's new `/play/shared` index page; it is fixed with a reviewed exemption, and `input-contract-tests.ts` (12 checks) and `smokeTest.ts` (10 checks) pass when re-run alone. |
+| `vitest run` | 2,050 files passed, 4 failed, 6 skipped; 27,336 tests passed, 4 failed, 54 skipped, 1 todo |
+
+The 4 vitest failures:
+
+1. **`lib/feel-panel/sessionGate.test.ts`.** The GameShell pin read
+   `...(playtestRun ? …)`. nexus-publish made it `playtestRun || shareRun`, so a share run also starts unpaid. The pin now
+   accepts that form; its meaning is unchanged. Fixed and re-run: `lib/feel-panel` and `components/nexus-studio` pass
+   (139 tests).
+2. **`lib/session-payout.test.ts`** (environmental). This "where the captures are on this machine" test runs only when
+   `~/Claude/outbox` exists. On this container that folder holds one unrelated file (`vbt-routed.md`, 2026-10-25), so the
+   cited capture files are missing. The test reads no file this lane changed.
+3. **`lib/sessions/modeScoreRules.test.ts`** (environmental). Same cause as 2.
+4. **`tests/signature-programs/server.test.ts`**, "a checkpoint week decides from the retests". The release's own test,
+   pinned to `NOW = 2026-10-25`. No file it reads differs from `82e88b7c`, so it fails on the release as well.
