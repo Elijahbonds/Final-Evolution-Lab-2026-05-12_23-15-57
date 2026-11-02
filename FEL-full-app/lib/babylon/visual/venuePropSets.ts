@@ -112,6 +112,12 @@ export const VENICE_BOARDWALK_ROW = {
   runupCamZ: 8.01,
 } as const;
 
+/** VENUE-SMOOTH-1 (2026-10-29): 3D Art's market tent v2 (public/models/props/smooth/, CREDITS.md there) for the Kenney
+ *  `tent` of 'venice-court-meshy' (1v1, 3v3): a sagging striped canopy on steel poles, a unit tent placed at the Kenney tent's
+ *  own scale. NOT in 'venice-dunk': VenueProps.shared.test.ts:39 and :70 pin the dunk set's Kenney tents (its corner tent is a
+ *  copy of the set's, one download). */
+export const SMOOTH_TENT = { kit: 'smooth', model: 'market_tent_v2_lod0' } as const;
+
 export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
   // Court locations (docs/SPEC-COURT-LOCATIONS.md) — placed for the dunk camera: sides at x ±11–13, a back row behind the
   // crowd tier at z −20…−26; nothing inside the court (x ±8, z ±14) or the player's clamp (x ±6).
@@ -146,16 +152,14 @@ export const VENUE_PROP_SETS: Record<string, PropPlacement[]> = {
     // DUNK-VISUAL-POLISH: this was six EMPTY terracotta troughs evenly spaced down the boardwalk — once the court stopped
     // being a black slick they were the clearest 'placeholder' read left in frame (shot 2026-09-09: a dotted orange line
     // along the grass, nothing in any of them). A planted hedge does the same midground job and reads as a place.
-    ...line('nature', 'plant_bushLarge', [21, -33], [21, 33], 6, 0, 2.6),
-    { kit: 'racing', model: 'tent', at: [33, 0, -21], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [33, 0, 18], yaw: -Math.PI / 2, scale: 2.6 },
-    { kit: 'racing', model: 'tent', at: [22, 0, -48], yaw: 0, scale: 2.6 },
+    // VENUE-SMOOTH-1 (3D Art's shrub removal list, 2026-10-29): the flat-card hedge here, the bushes beside the court, the
+    // grass clumps behind both baselines and the faceted low fence are gone — 36 placements, as the dunk set already did.
+    { ...SMOOTH_TENT, at: [33, 0, -21], yaw: -Math.PI / 2, scale: 2.6 }, { ...SMOOTH_TENT, at: [33, 0, 18], yaw: -Math.PI / 2, scale: 2.6 },
+    { ...SMOOTH_TENT, at: [22, 0, -48], yaw: 0, scale: 2.6 },
     { kit: 'meshy', model: 'hoopbus', at: [30, 0, -46], yaw: Math.PI / 2 }, { kit: 'meshy', model: 'sedan', at: [29, 0, 44], yaw: Math.PI / 2 },
-    ...line('nature', 'plant_bushLarge', [-13, -18], [-13, 18], 5, 0, 3.0), ...line('nature', 'plant_bush', [13, -20], [13, 20], 6, 0, 2.6),
     // props+depth pass 2026-09-05 — NEAR: apron detail nobody trips on
-    ...line('city-suburban', 'fence-low', [-12.5, -12], [-12.5, 12], 7, Math.PI / 2, 2.0), ...line('nature', 'grass_large', [-11, -15.5], [11, -15.5], 6, 0, 2.4),
-    ...line('nature', 'grass_large', [-11, 15.5], [11, 15.5], 6, 0, 2.4),
     // MID: the boardwalk gains life — a third tent, two more shop fronts on the far line, lamps down the west grass
-    { kit: 'racing', model: 'tent', at: [33, 0, 40], yaw: -Math.PI / 2, scale: 2.6 }, { kit: 'racing', model: 'tent', at: [-22, 0, -48], yaw: 0, scale: 2.6 },
+    { ...SMOOTH_TENT, at: [33, 0, 40], yaw: -Math.PI / 2, scale: 2.6 }, { ...SMOOTH_TENT, at: [-22, 0, -48], yaw: 0, scale: 2.6 },
     ...line('racing', 'lightPostModern', [-15, -36], [-15, 36], 4, 0, 2.4), { kit: 'racing', model: 'flagRed', at: [21, 0, -40], scale: 2.4 }, { kit: 'racing', model: 'flagGreen', at: [21, 0, 40], scale: 2.4 },
     // FAR: silhouettes for depth — a palm line down the sand and across the north shore (owner 2026-09-17: the rocks at the water's edge read as brown blobs floating on the horizon — gone, no eye sores)
     ...line('nature', 'tree_palmTall', [-30, -60], [-30, 60], 7, 0.3, 5.2), ...line('nature', 'tree_palmDetailedTall', [-40, -62], [40, -62], 6, 0, 5.0),

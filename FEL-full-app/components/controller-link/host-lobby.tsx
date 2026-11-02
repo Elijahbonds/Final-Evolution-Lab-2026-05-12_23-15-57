@@ -147,7 +147,9 @@ export function HostLobby({ config, onInput, collapsed, onPeers, onPadInput, laz
   const showPanel = open ?? (connected.length > 0 && !collapsed);
   if (!showPanel) {
     // The USB line sits under the badge until play starts: plugging a pad in needs no tap at all, only a button press.
-    const usbLine = bus && (!collapsed || (justJoined && pads.length > 0) || pads.length > 0) ? (
+    // CONTROLLER-TRY-FIX item 2 (C2): in play the "P1 … connected" line holds only JOINED_MS after a join, then clears — a trailing
+    // `|| pads.length > 0` kept it up for the whole session, over the scoreboard (live walkthrough Part 4)
+    const usbLine = bus && (!collapsed || (justJoined && pads.length > 0)) ? (
       <span
         data-testid="usb-connect-hint"
         className={`rounded-full px-3 py-0.5 text-[10px] ${pads.length ? 'text-[#22d3ee]' : 'text-white/70'}`}
