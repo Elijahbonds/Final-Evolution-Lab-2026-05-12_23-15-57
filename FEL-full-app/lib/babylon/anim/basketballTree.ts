@@ -23,6 +23,7 @@ import { moveFadeSec } from '../core/HandleSystem';   // F4: one turbo crossover
 import { MOVE_LEGS_BEAT, type MoveLegs } from './moveLegs';   // H2: the legs keep running under a handle move
 import { protectClip, protectDribbles, restTempoFor } from './RestDribble';   // lane/h3-handler (#312 port): the dribble at rest
 import { transitionFor, transitionRuleOn } from './hoopsTransitions';   // hoops-p04: one blend + minimum-hold rule for every clip change
+import { feel } from '../../feel-panel/feel';   // hoops-p04: the plant lock's release fade
 
 // ── Blend tree ─────────────────────────────────────────────────────────────
 export type BasketballAnimState =
@@ -408,6 +409,10 @@ export class BasketballAnimTree {
 
 // ── Foot plant (two-bone IK contact lock) ──────────────────────────────────
 export const PLANT_LOCK_SEC = 0.18;
+/** hoops-p04: the plant lock's release fade (s): the pin slides back to the clip's ankle over this instead of in one frame. 0 = the old
+ *  one-frame release. Knob `hoops.plantReleaseFadeSec`. */
+export const PLANT_RELEASE_FADE_SEC = 0.12;
+const plantReleaseFadeSec = (): number => feel('hoops.plantReleaseFadeSec', PLANT_RELEASE_FADE_SEC);
 
 export class FootPlant {
   // 2026-09-03: BoneIKController wrote bone matrices that this linked-node rig
@@ -415,7 +420,7 @@ export class FootPlant {
   // "explosion"). The pin is now the node-space two-bone solver, applied in
   // onAfterAnimationsObservable so the clip's own leg pose is what gets pinned
   // (the harness updates modes BEFORE the clips evaluate).
-  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; hip: TransformNode; knee: TransformNode; ankle: TransformNode } | null = null;
+  private lock: { foot: 'Left' | 'Right'; pin: Vector3; left: number; hip: TransformNode; knee: TransformNode; ankle: TransformNode; fadeLeft: number | null } | null = null;
   /**
    * IMPROVE (2026-10-06, 1v1 #17): ONE after-animations observer for the body's life, gated on the lock. Every plant-and-cut added
    * an observer and every release removed it (a list splice a cut, both bodies). It is added on the FIRST plant — where every
@@ -431,7 +436,11 @@ export class FootPlant {
     const l = this.lock;
     if (!l) return;
     l.ankle.computeWorldMatrix(true);
-    this.target.set(l.pin.x, l.ankle.getAbsolutePosition().y, l.pin.z);   // the clip keeps its height
+    const a = l.ankle.getAbsolutePosition();
+    // hoops-p04: THE PIN LETS GO OVER A FADE. The lock used to end in one frame — the leg jumped from the pin back to the clip's own
+    // ankle (the rig read the hero's thigh at 8–10 000 °/s on such frames): the target now slides from the pin to the clip's ankle
+    const w = l.fadeLeft === null ? 1 : Math.max(0, l.fadeLeft) / Math.max(1e-3, plantReleaseFadeSec());
+    this.target.set(a.x + (l.pin.x - a.x) * w, a.y, a.z + (l.pin.z - a.z) * w);   // the clip keeps its height
     plantLeg(l.hip, l.knee, l.ankle, this.target, this.mesh.forward);
   };
 
@@ -439,7 +448,8 @@ export class FootPlant {
    *  plant start so the cut rotates around a fixed contact point. The factory
    *  argument is kept for callers; no scene node is needed any more. */
   plant(_sceneFootTarget?: (name: string) => TransformNode): void {
-    if (this.lock) return;
+    if (this.lock && this.lock.fadeLeft === null) return;
+    if (this.lock) this.release();   // hoops-p04: a new plant during a release fade takes the foot afresh
     const lf = findBone(this.skeleton, 'LeftFoot');
     const rf = findBone(this.skeleton, 'RightFoot');
     if (!lf || !rf) return;
@@ -453,7 +463,7 @@ export class FootPlant {
     ankle.computeWorldMatrix(true);
     const pin = ankle.getAbsolutePosition().clone();
     this.obs ??= this.mesh.getScene().onAfterAnimationsObservable.add(this.pinLeg);   // IMPROVE (2026-10-06) #17: once, then gated on the lock
-    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, hip, knee, ankle };
+    this.lock = { foot: side, pin, left: PLANT_LOCK_SEC, hip, knee, ankle, fadeLeft: null };
     claimLeg(this.skeleton, side, pin);   // HOOPS MOTION phase 3d (S30): the one writer of this leg until release() — FootPlanting stands off
   }
 
@@ -461,7 +471,9 @@ export class FootPlant {
   update(dt: number): void {
     if (!this.lock) return;
     this.lock.left -= dt;
-    if (this.lock.left <= 0) this.release();
+    // hoops-p04: the window over, the pin FADES (plantReleaseFadeSec) and then lets go; a fade of 0 lets go at once, as before
+    if (this.lock.left <= 0 && this.lock.fadeLeft === null) { const f = plantReleaseFadeSec(); if (f <= 0) { this.release(); return; } this.lock.fadeLeft = f; return; }
+    if (this.lock.fadeLeft !== null) { this.lock.fadeLeft -= dt; if (this.lock.fadeLeft <= 0) this.release(); }
   }
 
   release(): void {

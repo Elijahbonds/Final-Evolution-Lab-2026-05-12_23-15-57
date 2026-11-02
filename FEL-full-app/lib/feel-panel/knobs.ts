@@ -1238,6 +1238,11 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/hoops/releaseTiming.ts JUMPER_FROM_RISE_ON',
     hint: '1: the hero\'s jumper skips its load dip (the ball rises on the press) and is paced from the rise to the green. 0: from its first frame.',
   },
+  {
+    id: 'hoops.plantReleaseFadeSec', label: 'Transitions: plant lock release fade', def: 0.12, min: 0, max: 0.4, step: 0.01, unit: 's', group: 'Hoops · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts PLANT_RELEASE_FADE_SEC',
+    hint: 'A planted foot slides back to the clip over this when the cut lock ends, instead of in one frame. 0 = the old one-frame release.',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

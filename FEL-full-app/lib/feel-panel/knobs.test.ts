@@ -48,6 +48,7 @@ import * as P3R from '@/lib/babylon/hoops/rivalOffense';   // hoops-p03
 import * as P3T from '@/lib/babylon/hoops/teamOffense3v3';   // hoops-p03
 import * as P4T from '@/lib/babylon/anim/hoopsTransitions';   // hoops-p04
 import * as P4R from '@/lib/babylon/hoops/releaseTiming';   // hoops-p04
+import { PLANT_RELEASE_FADE_SEC } from '@/lib/babylon/anim/basketballTree';   // hoops-p04
 import { STEAL_DICE_ON, STRIP_REACH_M, STRIP_SHIELD_M, STRIP_BALL_MAX_Y } from '@/lib/babylon/hoops/steals';   // hoops-p02
 import { ONBALL_CUSHION_M, ONBALL_CUSHION_PER_MPS } from '@/lib/babylon/hoops/pressure';   // hoops-p02
 
@@ -213,6 +214,7 @@ describe('the feel knob catalogue', () => {
     expect(def('hoops.minHoldSec')).toBe(P4T.MIN_HOLD_SEC);
     expect(def('hoops.releaseToClipOn')).toBe(P4R.RELEASE_TO_CLIP_ON ? 1 : 0);
     expect(def('hoops.jumperFromRiseOn')).toBe(P4R.JUMPER_FROM_RISE_ON ? 1 : 0);
+    expect(def('hoops.plantReleaseFadeSec')).toBe(PLANT_RELEASE_FADE_SEC);
     expect(def('hoops.rivalKitOn')).toBe(P3R.RIVAL_KIT_ON ? 1 : 0);
     expect(def('hoops.rivalTightM')).toBe(P3R.RIVAL_TIGHT_M);
     expect(def('hoops.rivalHesiSec')).toBe(P3R.RIVAL_HESI_SEC);
