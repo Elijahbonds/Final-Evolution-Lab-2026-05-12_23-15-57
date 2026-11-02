@@ -79,7 +79,8 @@ describe('the feel gate: where an override may apply', () => {
   it('GameShell turns the SAME ?playtest=1 into the server\'s unpaid start (the pin this gate leans on)', () => {
     const shell = readFileSync('components/games/game-shell.tsx', 'utf8');
     expect(shell).toContain("const playtestRun = searchParams.get('playtest') === '1';");
-    expect(shell).toMatch(/\.\.\.\(playtestRun \? \{ playtest: true \} : \{\}\)/);
+    // nexus-publish (NEX-06, merged by studio-easy): a share link's run rides the same unpaid start — `playtestRun || shareRun`
+    expect(shell).toMatch(/\.\.\.\(playtestRun(?: \|\| shareRun)? \? \{ playtest: true \} : \{\}\)/);
   });
 
   it('where the gate allows, the server decides the run does NOT pay (decideRunEligibility, the start route\'s own rule)', () => {

@@ -57,8 +57,10 @@ const AGAIN_WORDS = 'Read another video';
 const RJ_MEANS = 'The bounce score (RSI) is time in the air divided by time on the floor: higher is springier.';
 const RJ_NEXT = 'Next: try to raise it with quicker contacts.';
 
-export function JumpTests({ adult, decode, storage = null, liveT5 = null, pilot = pilotEnabled() }: { adult: boolean; decode?: Decoder; storage?: ReachStorage | null; liveT5?: T5Extra | null; pilot?: boolean }) {
-  const [open, setOpen] = useState(false);
+// TOOLS-EASY (2026-10-28): `startOpen` — the jump tests' own door (/train/jumps) opens on the list, with no "More jump
+// tests" button first; under a jump result it still starts closed.
+export function JumpTests({ adult, decode, storage = null, liveT5 = null, pilot = pilotEnabled(), startOpen = false }: { adult: boolean; decode?: Decoder; storage?: ReachStorage | null; liveT5?: T5Extra | null; pilot?: boolean; startOpen?: boolean }) {
+  const [open, setOpen] = useState(startOpen);
   const [pick, setPick] = useState<ProtocolId | 'single' | null>(null);
   const [runs, setRuns] = useState<Partial<Record<ProtocolId, Run>>>({});
   const [fvReads, setFvReads] = useState<FvRead[]>([]);

@@ -7,6 +7,9 @@ import { MARKET_GOALS } from '@/lib/coach-business/market';
 import type { PackageAction } from '@/lib/coach-business/packages';
 import { loginPath } from '@/lib/auth/safeNext';
 import { BUYER_TERMS } from '@/lib/payments/terms';
+import { BuyEntry } from '@/components/shop/buy-sheet';
+import { payCoachPackage } from '@/lib/shop/checkout';
+import type { ShopItem } from '@/lib/shop/model';
 
 export const BUSINESS_API = '/api/coach/business';
 
@@ -23,6 +26,8 @@ function signInFirst(slug: string): string {
   return loginPath(`/coach/${slug}`);
 }
 
+/** The pre-PLAT-P07 inline Book (tick, then Book): kept for components/coach-business pages outside the shop front and pinned
+ *  by tests/coach-business/payments-ready-ui.test.tsx. The coach page books through PackageBuy (the shop's buy sheet). */
 export function BookButton({ slug, packageId }: { slug: string; packageId: string }) {
   const [sent, setSent] = useState<Sent>({ kind: 'idle' });
   // PAYMENTS-READY: the buyer ticks the store terms before Stripe is called (the server checks the same version).
@@ -97,6 +102,14 @@ export function ApplyForm({ slug, packageId, label = 'Apply' }: { slug: string; 
       {sent.kind === 'error' ? <p role="alert" className="text-sm text-amber-200">{sent.text}</p> : null}
     </div>
   );
+}
+
+/** PLAT-P07 (2026-11-02): Book through the shop's buy sheet — what you get (the package's own lines), the store terms
+ *  (the same version the route checks), then pay (POST /api/coach/business/checkout, unchanged). */
+export function PackageBuy({ slug, item, includes }: { slug: string; item: ShopItem; includes: readonly string[] }) {
+  const terms = BUYER_TERMS.coach_package;
+  return <BuyEntry item={item} label="Book" action="book" includes={includes} terms={{ href: terms.href }}
+    pay={() => payCoachPackage(fetch, { slug, packageId: item.id, termsVersion: terms.version })} />;
 }
 
 export function PackageCta({ slug, packageId, action }: { slug: string; packageId: string; action: PackageAction }) {

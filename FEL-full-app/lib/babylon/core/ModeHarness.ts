@@ -48,6 +48,7 @@ import { PerfMonitor, budgetForTier } from './PerfMonitor';          // M67: dev
 import { mountPerfGuard } from './perfGuard';
 import { mountHitchProbe } from './hitchProbe';
 import { mountPerfStats } from './perfStats';
+import { pagePlayStamp } from './playFrame';   // NEX-03: the competitive-context stamp
 import { setGradeExposure } from '../scene/gradeUniform';                // PERF-LAG (2026-10-24): the per-frame exposure beat as a uniform                         // PERF-LAG (2026-10-24): anonymous fps + time-to-first-playable to game_diag                     // S1 HITCH (2026-10-22): worst frame, p5 fps, and builds / clones / compiles after the intro                       // PERF-GUARD (2026-10-06): paced frames, adaptive quality, idle
 import { setReady, clearReady } from './readyMarker';  // M67: smoke-test readiness gate
 import { installAgentBridge, agentBridge, agentEnabled } from './AgentBridge';  // M69: agent control plane
@@ -376,6 +377,7 @@ async function mountMode(def: ModeDefinition, opts: HarnessOpts, seam: BodySeam,
       hitch = mountHitchProbe({ scene, publish: devOrAgentHooks() });
       perfStats = mountPerfStats({ engine, tier, guard: () => { const g = guard.snapshot(); return g.policy.governor || g.policy.pacing ? g : null; } });   // PERF-LAG
       if (opts.heroOverride) scene.metadata.felHeroOverride = opts.heroOverride;   // dev rollout flag (?hero=)
+      Object.assign(scene.metadata, pagePlayStamp());   // NEX-03: felCompetitive / felRanked from the page's ?arena= ?c= ?mp= ?signature= (playFrame.ts), before the mode loads
       // M69: publish the agent control bridge (no-op unless ?agent=1). Idempotent —
       // re-registers the same mode list and re-binds window.__NEXUS_AGENT__ each mount.
       installAgentBridge(AGENT_MODES);
