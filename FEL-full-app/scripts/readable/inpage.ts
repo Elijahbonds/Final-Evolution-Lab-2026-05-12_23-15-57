@@ -25,6 +25,8 @@ export interface Run {
   hud: boolean;
   /** Something behind the run is a picture: an <img>, <video>, <canvas> or a url() background. */
   overMedia: boolean;
+  /** A fixed layer is drawn over the run's middle right now (scroll it clear before reading its pixels). */
+  occluded: boolean;
   /** How it is cut off, if it is: the clipping box's overrun in px, or an ellipsis / line clamp hiding the rest. */
   clip: null | { how: 'overflow' | 'ellipsis' | 'line-clamp' | 'viewport'; px: number; by: string };
   path: string;
@@ -106,7 +108,8 @@ function clipOf(el: Element, box: Rect): Run['clip'] {
       return { how: 'ellipsis', px: (p as HTMLElement).scrollWidth - (p as HTMLElement).clientWidth, by: pathOf(p) };
     }
     const clamp = s.getPropertyValue('-webkit-line-clamp');
-    if (clamp && clamp !== 'none' && (p as HTMLElement).scrollHeight > (p as HTMLElement).clientHeight + 2) {
+    // a clamped teaser inside a link is a summary of what the link opens: the whole text is one tap away
+    if (clamp && clamp !== 'none' && !p.closest('a[href]') && (p as HTMLElement).scrollHeight > (p as HTMLElement).clientHeight + 2) {
       return { how: 'line-clamp', px: (p as HTMLElement).scrollHeight - (p as HTMLElement).clientHeight, by: pathOf(p) };
     }
     const ox = s.overflowX, oy = s.overflowY;
@@ -144,6 +147,14 @@ function mediaBehind(el: Element, box: Rect): boolean {
   return false;
 }
 
+function occludedByFixed(el: Element, box: Rect): boolean {
+  if (inFixed(el)) return false;
+  const x = (box.left + box.right) / 2, y = (box.top + box.bottom) / 2;
+  if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
+  const hit = document.elementFromPoint(x, y);
+  return !!hit && hit !== el && !el.contains(hit) && inFixed(hit);
+}
+
 /** Every visible run of text on the page (each element with text of its own), plus each empty field's placeholder. */
 export function collect(): Run[] {
   const out: Run[] = [];
@@ -175,7 +186,7 @@ export function collect(): Run[] {
       placeholder: false,
       key: isKeyInfo(text, { tag: el.tagName, role: el.closest('[role="alert"],[role="status"]')?.getAttribute('role') ?? null, inControl: !!control }),
       hud: !!el.closest('[data-readable-hud],[data-hud-frame]'),
-      overMedia: mediaBehind(el, box), clip: clipOf(el, box), path: pathOf(el),
+      overMedia: mediaBehind(el, box), occluded: occludedByFixed(el, box), clip: clipOf(el, box), path: pathOf(el),
     });
   }
   // placeholders that are the only text in an empty field
@@ -191,7 +202,7 @@ export function collect(): Run[] {
     out.push({
       id: idOf(f), text: f.placeholder.slice(0, 160), words: wordCount(f.placeholder), tag: 'placeholder', px: Math.round(px * 100) / 100,
       weight: Number(fs.fontWeight) || 400, fg: fg0 ? { ...fg0, a: fg0.a * opacityOf(f) } : null, rects: [box], box, fixed: inFixed(f),
-      ariaHidden: false, disabled: f.disabled, placeholder: true, key: false, hud: !!f.closest('[data-readable-hud]'), overMedia: false, clip: null, path: pathOf(f),
+      ariaHidden: false, disabled: f.disabled, placeholder: true, key: false, hud: !!f.closest('[data-readable-hud]'), overMedia: false, occluded: occludedByFixed(f, box), clip: null, path: pathOf(f),
     });
   }
   return out;
@@ -245,11 +256,14 @@ export interface Collision { a: string; b: string }
 
 /** Two different runs drawn on top of each other (in the viewport now). */
 export function collisions(): Collision[] {
-  const runs = collect().filter((r) => r.box.bottom > 0 && r.box.top < innerHeight);
+  // a clipped run's hidden lines are not drawn (it is reported as clipped), and a fixed bar over scrolling text is the
+  // covered() check's question (it can be scrolled clear), so neither counts here
+  const runs = collect().filter((r) => r.box.bottom > 0 && r.box.top < innerHeight && !r.clip);
   const out: Collision[] = [];
   for (let i = 0; i < runs.length; i++) {
     for (let j = i + 1; j < runs.length; j++) {
       const A = runs[i], B = runs[j];
+      if (A.fixed !== B.fixed) continue;
       let hit = false;
       for (const ra of A.rects) { for (const rb of B.rects) if (textCollides({ rect: ra, text: A.text }, { rect: rb, text: B.text })) { hit = true; break; } if (hit) break; }
       if (hit) out.push({ a: A.text.slice(0, 50), b: B.text.slice(0, 50) });
@@ -263,6 +277,20 @@ export function hScroll(): number {
   return Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
 
+/** What sticks out past the right edge (the outermost such elements), for a sideways-scroll finding. */
+export function hScrollCulprits(): string[] {
+  const vw = document.documentElement.clientWidth;
+  const out: string[] = [];
+  for (const el of Array.from(document.body.querySelectorAll('*'))) {
+    const r = el.getBoundingClientRect();
+    if (r.right <= vw + 1 || r.width < 1) continue;
+    if (el.parentElement && el.parentElement.getBoundingClientRect().right > vw + 1) continue;
+    out.push(`${pathOf(el)} (${Math.round(r.right - vw)}px)`);
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+
 /** Make every glyph transparent (scrims, panels and text shadows stay), so the next screenshot is what is BEHIND the text. */
 export function hideText(on: boolean): void {
   let st = document.getElementById('readable-hide');
@@ -272,5 +300,5 @@ export function hideText(on: boolean): void {
     ::placeholder { color: transparent !important; } svg text, svg tspan { fill: transparent !important; stroke: transparent !important; }`;
 }
 
-declare global { interface Window { __readable: { collect: typeof collect; covered: typeof covered; collisions: typeof collisions; hScroll: typeof hScroll; hideText: typeof hideText } } }
-window.__readable = { collect, covered, collisions, hScroll, hideText };
+declare global { interface Window { __readable: { collect: typeof collect; covered: typeof covered; collisions: typeof collisions; hScroll: typeof hScroll; hScrollCulprits: typeof hScrollCulprits; hideText: typeof hideText } } }
+window.__readable = { collect, covered, collisions, hScroll, hScrollCulprits, hideText };

@@ -504,7 +504,7 @@ export default function PoseRecorder() {
               </button>
             )}
           </div>
-          <p className="mt-2 text-white/40">
+          <p className="mt-2 text-white/50">
             Each take: the lead-in to walk back, then 3-2-1 (recorded, standing ready), then GO. A beep marks each count,
             GO and the end.
             {video && video.videoWidth ? ` Camera ${video.videoWidth}×${video.videoHeight}.` : ''} {device}.
@@ -522,7 +522,7 @@ export default function PoseRecorder() {
               <option value="play">Movement play (the owner&apos;s detector takes)</option>
               <option value="capture">Mirror capture (owner + 2 adults, 2 phones)</option>
             </select>
-            {takeCount > 0 && <span className="text-white/40">Download (or reload) to switch sets.</span>}
+            {takeCount > 0 && <span className="text-white/50">Download (or reload) to switch sets.</span>}
           </label>
 
           {set === 'capture' && (
@@ -568,7 +568,7 @@ export default function PoseRecorder() {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-white">{i + 1}. {s.label}</div>
-                    <div className={t && bodyPct < 90 ? 'text-[#FFD700]' : 'text-white/40'}>
+                    <div className={t && bodyPct < 90 ? 'text-[#FFD700]' : 'text-white/50'}>
                       {t
                         ? `${t.frames.length} frames · ${t.detectFps} fps · body ${bodyPct}% · ${((t.endT - t.goT) / 1000).toFixed(1)} s`
                         : `${s.seconds} s after GO`}
@@ -599,7 +599,7 @@ export default function PoseRecorder() {
           >
             Download all takes (.json): {takeCount} take{takeCount === 1 ? '' : 's'}, ~{((totalFrames * BYTES_PER_FRAME) / 1e6).toFixed(1)} MB
           </button>
-          <p className="leading-relaxed text-white/40">
+          <p className="leading-relaxed text-white/50">
             {set === 'capture'
               ? 'The phone saves it in its Downloads (Files › Downloads on an iPhone). Send it to the owner by cable, AirDrop or Nearby Share: never a chat app or email. '
               : 'The browser saves it on this Mac (usually ~/Downloads). '}

@@ -4,7 +4,7 @@
 //   - app/theme.css's --fel-* custom properties (the console identity, measured and written down 2026-09-20),
 //   - lib/design/palette.ts (the same accents as hex, for colours built from data: `${accent}14`),
 //   - components/games/tv-hud/tokens.ts's HUD_RGB (the HUD's ten tones, eight of them the theme's accents),
-// and, in practice, a fourth: ad-hoc Tailwind on every page (`text-white/35`, `bg-[#050505]`, `border-[#00E5FF]/45`).
+// and, in practice, a fourth: ad-hoc Tailwind on every page (`text-white/50`, `bg-[#050505]`, `border-[#00E5FF]/45`).
 // The fourth is where the accessibility audit's contrast misses came from: white at 30–45 % on the page ink is 2.5:1
 // to 4.46:1, under the WCAG 1.4.3 floor of 4.5:1 for body text.
 //

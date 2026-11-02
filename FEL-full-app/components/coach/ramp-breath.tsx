@@ -108,7 +108,7 @@ export function RampRun({ spec, sec, onStop }: { spec: PacerSpec; sec: number; o
             is the one live region */}
         <BreathPacer spec={spec} elapsedSec={sec} size="sm" id="ramp" count="breath" />
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="text-[11px] uppercase tracking-wider text-fel-dim">{RAMP_NAME}</div>
+          <div className="text-[12px] uppercase tracking-wider text-fel-dim">{RAMP_NAME}</div>
           <div className="text-sm text-white" aria-live="polite" data-ramp-now>{rampLineAt(spec, sec)}</div>
           <button type="button" onClick={onStop} data-ramp-stop className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2 py-1 text-xs text-white/80">
             <Square className="h-3 w-3" aria-hidden="true" /> Stop

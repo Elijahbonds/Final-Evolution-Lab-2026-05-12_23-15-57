@@ -196,8 +196,8 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
             {SNAP_MOVES.map((m) => <option key={m} value={m}>{m} m · {snap.turn}°</option>)}
           </select>
           <ToolButton title={clip ? `Paste ${clip.objects.length === 1 ? clip.objects[0].name : `${clip.objects.length} objects`} at the view's centre` : 'Paste (copy something first)'} shortcut="Ctrl+V" disabled={!clip} onClick={paste}><ClipboardPaste className="h-4 w-4" /></ToolButton>
-          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[11px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
-          {note && <span className="ml-2 text-[11px]" style={{ color: C.gold }}>{note}</span>}
+          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[12px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
+          {note && <span className="ml-2 text-[12px]" style={{ color: C.gold }}>{note}</span>}
         </div>
         <ViewportPanel ref={vp} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
           onPick={(id, mods) => setSelection(clickSelect(selection, id, mods.toggle ? 'toggle' : 'replace'))}

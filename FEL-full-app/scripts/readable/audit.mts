@@ -23,6 +23,8 @@
 //     --plant                      the control scene only: exits 1 unless exactly the planted faults are flagged
 //     --hud                        the HUD-over-frame scenes only
 //     --redo                       re-read routes already on disk
+//     --redo-before=<epoch ms>     re-read only the routes read before then
+//     --inpage-only                rebuild the rig's page script (readable.js) in the frozen bundle, nothing else
 //
 // Writes <outDir>/<label>/routes/<route>.json (one per route), shots/<route>-<config>.jpg (the first screen, every
 // failing run boxed in red), and, from scripts/readable/summary.mts, summary.json.
@@ -99,6 +101,12 @@ async function bundle(): Promise<void> {
   writeFileSync(join(BUILD, 'built.txt'), new Date().toISOString());
 }
 
+if (args.includes('--inpage-only')) {
+  // the rig's own page script changed: rebuild readable.js in place, the app bundle stays frozen
+  await build({ entryPoints: [join(ROOT, 'scripts/readable/inpage.ts')], outfile: join(BUILD, 'readable.js'), bundle: true, format: 'iife', platform: 'browser', tsconfig: join(ROOT, 'tsconfig.json'), logLevel: 'error' });
+  console.log(`inpage → ${BUILD}/readable.js`);
+  process.exit(0);
+}
 if (args.includes('--build-only') || !existsSync(join(BUILD, 'index.html'))) {
   await bundle();
   console.log(`built → ${BUILD}`);
@@ -188,7 +196,7 @@ async function readPage(page: Page, cfg: Config, shot: string | null): Promise<{
     if (r.clip && (r.key || r.clip.how !== 'line-clamp')) findings.push({ rule: 'clipped', text: r.text, detail: `${r.clip.how} ${r.clip.px}px by ${r.clip.by}`, key: r.key, path: r.path });
   }
   const hscroll = await evalJ<number>('window.__readable.hScroll()');
-  if (hscroll > 2) findings.push({ rule: 'hscroll', text: '(page)', detail: `${hscroll}px sideways` });
+  if (hscroll > 2) findings.push({ rule: 'hscroll', text: '(page)', detail: `${hscroll}px sideways: ${(await evalJ<string[]>('window.__readable.hScrollCulprits()')).join('; ')}` });
   const coverTop = await evalJ<Cover[]>("window.__readable.covered('top')");
   const seenCollide = new Set<string>();
   const addCollisions = (cs: Collision[]) => { for (const c of cs) { const k = `${c.a}|${c.b}`; if (!seenCollide.has(k)) { seenCollide.add(k); findings.push({ rule: 'overlap-text', text: c.a, detail: `under/over "${c.b}"` }); } } };
@@ -208,7 +216,7 @@ async function readPage(page: Page, cfg: Config, shot: string | null): Promise<{
     steps++;
     const runs = await evalJ<Run[]>('window.__readable.collect()');
     if (y !== 0) addCollisions(await evalJ<Collision[]>('window.__readable.collisions()'));
-    const todo = runs.filter((r) => !done.has(r.id) && (!r.fixed || y === 0) && visibleShare(r.box, H) > 0.95);
+    const todo = runs.filter((r) => !done.has(r.id) && !r.occluded && (!r.fixed || y === 0) && visibleShare(r.box, H) > 0.95);
     if (!todo.length) continue;
     const A = await raw(await page.screenshot({ type: 'png' }));
     if (y === 0 && shot) await page.screenshot({ type: 'jpeg', quality: 70, path: shot });
@@ -311,7 +319,8 @@ const configs = (flag('configs')?.split(',') ?? CONFIGS.map((c) => c.name)).map(
 let did = 0;
 for (const route of only ?? allRoutes) {
   const file = join(OUT, 'routes', `${slug(route)}.json`);
-  if (existsSync(file) && !args.includes('--redo')) continue;
+  // --redo-before=<epoch ms>: re-read a route last read before then (the rig's page script changed since)
+  if (existsSync(file) && !args.includes('--redo') && Date.parse(JSON.parse(readFileSync(file, 'utf8')).when) >= Number(flag('redo-before') ?? 0)) continue;
   if ((Date.now() - T0) / 1000 > BUDGET_S) { console.log(`budget reached after ${did} routes; run again to continue`); break; }
   const res: Record<string, unknown> = { route, when: new Date().toISOString() };
   for (const cfg of configs) {

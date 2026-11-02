@@ -152,7 +152,7 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
 
       {tab === 'academy' && !track && (
         <div className="rounded-2xl bg-neutral-900 p-4">
-          {rows === null && <p className="text-sm text-neutral-500">Reading your library…</p>}
+          {rows === null && <p className="text-sm text-neutral-400">Reading your library…</p>}
           {rows?.length === 0 && (
             <p className="text-sm text-neutral-400">No songs of yours on this device yet. Make one in the Academy and press <b>PUBLISH TO LIBRARY</b>, then come back, or upload a file.</p>
           )}
@@ -161,7 +161,7 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
               <li key={r.id} className="flex items-center gap-3 py-2">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold text-neutral-100">{r.title || 'Untitled'}</div>
-                  <div className="text-[11px] text-neutral-500">{r.bpm} BPM · {r.kit}{r.usesFlip ? ' · Flip rows are not in this render' : ''}</div>
+                  <div className="text-[12px] text-neutral-400">{r.bpm} BPM · {r.kit}{r.usesFlip ? ' · Flip rows are not in this render' : ''}</div>
                 </div>
                 <button disabled={!!busy} onClick={() => void fromLibrary(r.id)} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-black disabled:opacity-40">Use this song</button>
               </li>
@@ -174,7 +174,7 @@ export default function MusicSource({ entry, userId, publicCreator, onMade }: {
         <label className="block rounded-2xl border border-dashed border-neutral-700 bg-neutral-900 p-6 text-center text-sm text-neutral-300">
           {handoffMissing && <span className="mb-2 block text-xs text-amber-300">{entry.from === 'song-render' ? 'Your render is not on this page any more: choose the mix you downloaded (⬇ MIX).' : 'Choose the file again.'}</span>}
           <span className="block font-bold text-neutral-100">Choose an audio file</span>
-          <span className="mt-1 block text-xs text-neutral-500">mp3, m4a, wav or webm · up to 4 minutes and 8 MB · only music you made or own every right to</span>
+          <span className="mt-1 block text-xs text-neutral-400">mp3, m4a, wav or webm · up to 4 minutes and 8 MB · only music you made or own every right to</span>
           <input type="file" accept="audio/*,.mp3,.m4a,.wav,.webm" className="mt-3 block w-full text-xs" onChange={(e) => void fromFile(e.target.files?.[0])} />
         </label>
       )}

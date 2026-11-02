@@ -26,7 +26,7 @@ export function ChatSection({ s }: { s: PartyState }) {
   };
   return (
     <section aria-label="Party chat" className="space-y-2">
-      <h3 className="font-mono text-[10px] tracking-[0.25em] text-white/45">CHAT</h3>
+      <h3 className="font-mono text-[12px] tracking-[0.25em] text-white/50">CHAT</h3>
       <ol
         ref={feedRef}
         role="log"
@@ -35,9 +35,9 @@ export function ChatSection({ s }: { s: PartyState }) {
         data-testid="party-feed"
         className="max-h-56 min-h-[4rem] space-y-1 overflow-y-auto rounded-lg bg-black/30 p-2 text-sm"
       >
-        {s.feed.length === 0 ? <li className="text-xs text-white/35">Nothing yet. Say hi! Messages aren&apos;t saved — they&apos;re gone when you leave.</li> : null}
+        {s.feed.length === 0 ? <li className="text-xs text-white/50">Nothing yet. Say hi! Messages aren&apos;t saved — they&apos;re gone when you leave.</li> : null}
         {s.feed.map((f) => (
-          <li key={f.key} data-kind={f.kind} className={f.kind === 'system' ? 'text-xs italic text-white/45' : ''}>
+          <li key={f.key} data-kind={f.kind} className={f.kind === 'system' ? 'text-xs italic text-white/50' : ''}>
             {f.kind === 'system' ? f.text : (
               <>
                 <span className={`font-bold ${f.self ? 'text-[#00E5FF]' : 'text-white/85'}`}>{f.self ? 'You' : f.name}: </span>
@@ -87,10 +87,10 @@ export function ChatSection({ s }: { s: PartyState }) {
           </button>
         </form>
       ) : (
-        <p data-testid="party-text-locked" className="text-xs text-white/45">Typed chat is for verified 18+ accounts. Quick chat and emotes work for everyone.</p>
+        <p data-testid="party-text-locked" className="text-xs text-white/50">Typed chat is for verified 18+ accounts. Quick chat and emotes work for everyone.</p>
       )}
-      {s.rights.text && preview !== text.trim() && text.trim() ? <p className="text-[11px] text-white/40">The party will see: {preview}</p> : null}
-      {s.rights.text ? <p className="text-[11px] text-white/35">{text.length}/{CHAT_MAX_LEN} · typed chat reaches 18+ members only</p> : null}
+      {s.rights.text && preview !== text.trim() && text.trim() ? <p className="text-[12px] text-white/50">The party will see: {preview}</p> : null}
+      {s.rights.text ? <p className="text-[12px] text-white/50">{text.length}/{CHAT_MAX_LEN} · typed chat reaches 18+ members only</p> : null}
     </section>
   );
 }

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Check, Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import type { Chapter, Lesson } from '@/lib/education/course';
 import { chapterProgress, lessonId, nextChapterHref } from '@/lib/education/course';
 // EDU-LINKS (2026-10-07), Mirror & coaching plan Phase 5: "Next chapter" opens the next chapter, a lesson that teaches a
@@ -96,7 +97,7 @@ export function ChapterReader({ chapter, filmFor, startAt }: { chapter: Chapter;
     } catch {
       // EDU-LINKS (2026-10-07): this promised the place was saved on the device, and nothing saved it — the lesson was
       // not kept anywhere, so a reload lost it. Say what happened instead.
-      toast.error('Could not save that lesson. Check your connection and tap it again.');
+      readToast.error('Could not save that lesson. Check your connection and tap it again.');
     } finally {
       setBusy(false);
     }

@@ -32,12 +32,12 @@ function SignatureCard({ sig }: { sig: Sig }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="fel-heading text-lg font-bold text-white">{sig.modeLabel}</div>
-          <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-2.5 py-0.5 font-mono text-[10px] text-[#FFD700]">
+          <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-2.5 py-0.5 font-mono text-[12px] text-[#FFD700]">
             {sig.modifier.name}
           </div>
         </div>
         <div className="text-right">
-          <div className="flex items-center gap-1 font-mono text-xs text-white/40">
+          <div className="flex items-center gap-1 font-mono text-xs text-white/50">
             <Target className="h-3.5 w-3.5" /> TARGET
           </div>
           <div className="fel-heading text-2xl font-bold text-[#00E5FF]">{sig.targetScore}</div>
@@ -46,7 +46,7 @@ function SignatureCard({ sig }: { sig: Sig }) {
 
       <p className="mt-2 text-xs text-white/55">{sig.modifier.blurb}</p>
 
-      <div className="mt-3 flex items-center justify-between font-mono text-[11px]">
+      <div className="mt-3 flex items-center justify-between font-mono text-[12px]">
         <span className="text-white/50">
           Your best:{' '}
           <span className={beaten ? 'text-[#00FF9D]' : 'text-white/80'}>
@@ -54,7 +54,7 @@ function SignatureCard({ sig }: { sig: Sig }) {
           </span>
           {beaten && <span className="ml-1 text-[#00FF9D]">✓ beaten</span>}
         </span>
-        <span className="text-white/40">Week {sig.weekKey}</span>
+        <span className="text-white/50">Week {sig.weekKey}</span>
       </div>
 
       {sig.canAttempt ? (
@@ -65,17 +65,17 @@ function SignatureCard({ sig }: { sig: Sig }) {
           <Play className="h-4 w-4" /> PLAY TODAY&apos;S ATTEMPT
         </Link>
       ) : (
-        <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 font-mono text-xs text-white/40">
+        <div className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 px-4 py-2.5 font-mono text-xs text-white/50">
           <Lock className="h-3.5 w-3.5" /> Come back tomorrow — 1 attempt/day
         </div>
       )}
 
       <div className="mt-4">
-        <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-white/40">
+        <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[12px] uppercase tracking-wide text-white/50">
           <Trophy className="h-3.5 w-3.5 text-[#FFD700]" /> Leaderboard
         </div>
         {sig.leaderboard.length === 0 ? (
-          <div className="rounded-lg border border-white/5 py-4 text-center font-mono text-[11px] text-white/30">
+          <div className="rounded-lg border border-white/5 py-4 text-center font-mono text-[12px] text-white/50">
             Be the first to post a score.
           </div>
         ) : (
@@ -83,7 +83,7 @@ function SignatureCard({ sig }: { sig: Sig }) {
             {sig.leaderboard.map((r) => (
               <li key={r.rank} className="flex items-center justify-between rounded-md bg-white/[0.03] px-3 py-1.5 font-mono text-xs">
                 <span className="text-white/70">
-                  <span className="mr-2 text-white/40">#{r.rank}</span>
+                  <span className="mr-2 text-white/50">#{r.rank}</span>
                   {r.name}
                 </span>
                 <span className="font-bold text-[#00E5FF]">{r.score}</span>

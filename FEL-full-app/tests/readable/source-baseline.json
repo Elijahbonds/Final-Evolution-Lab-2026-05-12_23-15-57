@@ -1,0 +1,107 @@
+{
+ "note": "tests/readable/source-floor.test.ts: a file may not rise above its line; numbers only go down. docs/READABLE.md.",
+ "totals": {
+  "size": 143,
+  "colour": 56
+ },
+ "files": {
+  "app/coach/_components/exercise-catalogue.tsx": {
+   "colour": 4,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "app/coach/_components/my-catalogue.tsx": {
+   "colour": 1,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "app/coach/_components/today-view.tsx": {
+   "size": 15,
+   "why": "routed: lane/plat-p06-athlete-loop is editing it"
+  },
+  "app/coach/admin/_components/kb-admin.tsx": {
+   "colour": 1,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "app/play/adventure-br/stage.tsx": {
+   "size": 11,
+   "colour": 3,
+   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
+  },
+  "app/play/adventure/stage.tsx": {
+   "size": 11,
+   "colour": 2,
+   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
+  },
+  "app/press/receipt/page.tsx": {
+   "size": 1,
+   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
+  },
+  "app/training/page.tsx": {
+   "size": 2,
+   "colour": 2,
+   "why": "routed: lane/plat-p06-athlete-loop is editing it"
+  },
+  "components/coach/set-logger.tsx": {
+   "size": 9,
+   "colour": 1,
+   "why": "routed: lane/plat-p06-athlete-loop is editing it"
+  },
+  "components/education/chapter-list.tsx": {
+   "colour": 1,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "components/games/boot-splash.tsx": {
+   "size": 53,
+   "colour": 31,
+   "why": "routed: lane/studio-easy and main (sync-main-1102) are editing it"
+  },
+  "components/games/guest-dunk-shell.tsx": {
+   "colour": 1,
+   "why": "routed: main (PERF-834) rewrote the 'Play without saving' button"
+  },
+  "components/groups/groups-home.tsx": {
+   "colour": 1,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "components/groups/teams-panel.tsx": {
+   "colour": 2,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "components/nexus-studio/ai-venue-panel.tsx": {
+   "size": 7,
+   "why": "routed: lane/studio-easy is editing it (trial merge conflicted, 2026-11-02)"
+  },
+  "components/nexus-studio/asset-browser.tsx": {
+   "size": 2,
+   "why": "routed: lane/studio-easy is editing it (trial merge conflicted, 2026-11-02)"
+  },
+  "components/nexus-studio/characters.tsx": {
+   "size": 15,
+   "why": "routed: lane/studio-easy is editing it (trial merge conflicted, 2026-11-02)"
+  },
+  "components/nexus-studio/scene-tree.tsx": {
+   "size": 2,
+   "why": "routed: lane/studio-easy is editing it (trial merge conflicted, 2026-11-02)"
+  },
+  "components/nexus-studio/script-editor.tsx": {
+   "size": 9,
+   "why": "routed: lane/studio-easy is editing it (trial merge conflicted, 2026-11-02)"
+  },
+  "components/nexus-studio/studio-app.tsx": {
+   "size": 2,
+   "why": "routed: lane/studio-easy is editing it (trial merge conflicted, 2026-11-02)"
+  },
+  "components/party/social/party-hub.tsx": {
+   "size": 2,
+   "colour": 4,
+   "why": "routed: lane/public-polish holds it (coordinator, 2026-11-02)"
+  },
+  "components/profile-v2/badges-section.tsx": {
+   "colour": 2,
+   "why": "owner call: text-fel-violet / text-fel-indigo, a signed-off accent, is under 4.5:1 on the raised panel (docs/READABLE.md §5)"
+  },
+  "lib/babylon/ui/PadChips.tsx": {
+   "size": 2,
+   "why": "routed: main (sync-main-1102) changed it"
+  }
+ }
+}

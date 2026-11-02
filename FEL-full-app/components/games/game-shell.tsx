@@ -709,7 +709,7 @@ function GameShellInner({
           </Link>
           <div className="min-w-0">
             <h1 className="fel-heading text-xl font-bold leading-none text-white">{title}</h1>
-            <p className="font-mono text-[10px] text-white/40">{venue}</p>
+            <p className="font-mono text-[12px] text-white/50">{venue}</p>
           </div>
           {/* BODY CONTROL, for every mode at once. It is an input device, not a mode feature — poseControl maps
               a body to the same FelInput a gamepad produces and emitToLive posts it to whichever bus is running,

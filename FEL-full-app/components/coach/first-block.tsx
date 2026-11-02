@@ -90,11 +90,11 @@ export function FirstBlockDraft({ program, blank, onTree }: { program: { id: str
               <summary className="cursor-pointer text-white/70">{w.label}</summary>
               {w.days.map((d) => (
                 <div key={d.label} className="mt-1 space-y-0.5">
-                  <div className="text-white/45">{d.label}</div>
+                  <div className="text-white/50">{d.label}</div>
                   {d.items.map((l) => (
                     <label key={l.id} className="flex min-w-0 items-start gap-2" title={l.why} data-first-block-line>
                       <input type="checkbox" className="mt-0.5" checked={!off.has(l.id)} onChange={() => setOff((s) => { const n = new Set(s); if (n.has(l.id)) n.delete(l.id); else n.add(l.id); return n; })} />
-                      <span className="min-w-0 break-words text-white/85">{l.name} <span className="text-white/45">{l.sets ?? ''}×{l.reps ?? (l.workSeconds ? `${l.workSeconds}s` : '')} · {l.section}</span>{l.section === 'prep' ? <span className="block text-[11px] text-[#FFD700]/70">{l.why}</span> : null}</span>
+                      <span className="min-w-0 break-words text-white/85">{l.name} <span className="text-white/50">{l.sets ?? ''}×{l.reps ?? (l.workSeconds ? `${l.workSeconds}s` : '')} · {l.section}</span>{l.section === 'prep' ? <span className="block text-[12px] text-[#FFD700]/70">{l.why}</span> : null}</span>
                     </label>
                   ))}
                 </div>

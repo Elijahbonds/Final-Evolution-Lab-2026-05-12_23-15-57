@@ -11,6 +11,7 @@
 // only draws them.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { readToast } from '@/components/ui/fel/toast';
 import { BookOpen, Loader2, Pencil, Play, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import {
   BRACE_INFO, BRACE_MODES, CATALOGUE_CATEGORIES, CATALOGUE_ERROR_COPY, CATALOGUE_LIMITS, PATTERN_INFO, PATTERNS,
@@ -93,10 +94,10 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
   const submit = async (it: CatalogueItem) => {
     const r = await fetch(`/api/coach/programs/exercises/${it.id}/submit`, { method: 'POST' });
     const j = await r.json().catch(() => ({}));
-    if (r.status === 503) { toast.message('Submitting to the library opens once its review tables are set up.'); return; }
+    if (r.status === 503) { readToast.message('Submitting to the library opens once its review tables are set up.'); return; }
     if (!r.ok) { toast.error(errorCopy(j.error)); return; }
     toast.success(r.status === 201 ? `${it.name} sent to the library for review` : `${it.name} is already waiting for review`);
-    if (Array.isArray(j.notes) && j.notes.length) toast.warning('Heads-up: a cue reads as a body-part or medical cue, so the reviewer may ask for a reword.');
+    if (Array.isArray(j.notes) && j.notes.length) readToast.warning('Heads-up: a cue reads as a body-part or medical cue, so the reviewer may ask for a reword.');
   };
 
   if (!items) return <div className="flex justify-center py-16 text-fel-dim"><Loader2 className="h-5 w-5 animate-spin" /></div>;
@@ -143,7 +144,7 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {(['all', ...PATTERNS, 'untagged'] as Filter[]).map((f) => (
-              <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-lg text-[11px] border ${filter === f ? 'bg-fel-cyan/15 text-fel-cyan border-fel-cyan/30' : 'bg-[#16161a] text-fel-dim border-white/6 hover:text-white/60'}`}>
+              <button key={f} onClick={() => setFilter(f)} className={`px-2.5 py-1 rounded-lg text-[12px] border ${filter === f ? 'bg-fel-cyan/15 text-fel-cyan border-fel-cyan/30' : 'bg-[#16161a] text-fel-dim border-white/6 hover:text-white/60'}`}>
                 {f === 'all' ? 'All' : f === 'untagged' ? 'No pattern' : PATTERN_INFO[f].label}
               </button>
             ))}
@@ -155,10 +156,10 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white truncate">{it.name}</span>
-                      {it.demoVideoUrl && <Play className="h-3.5 w-3.5 shrink-0 text-fel-crimson/70" aria-label="has a demo video" />}
+                      {it.demoVideoUrl && <Play className="h-3.5 w-3.5 shrink-0 text-fel-crimson/100" aria-label="has a demo video" />}
                     </div>
                     <TagRow pattern={it.pattern} braceMode={it.braceMode} layer={it.skillLayer} category={it.category} />
-                    <div className="mt-1 text-[11px] text-fel-dim">
+                    <div className="mt-1 text-[12px] text-fel-dim">
                       {it.primaryCues.length} cue{it.primaryCues.length === 1 ? '' : 's'} · {(it.commonFaults ?? []).length} fault{(it.commonFaults ?? []).length === 1 ? '' : 's'}
                       {it.regressionOfId && byId.get(it.regressionOfId) && <> · easier: {byId.get(it.regressionOfId)!.name}</>}
                       {it.progressionOfId && byId.get(it.progressionOfId) && <> · harder: {byId.get(it.progressionOfId)!.name}</>}
@@ -184,7 +185,7 @@ export function MyCatalogue({ onBrowseKb, onChange, refreshKey = 0 }: { onBrowse
 export function TagRow({ pattern, braceMode, layer, category }: { pattern: MovementPattern | null; braceMode: BraceMode | null; layer: string | null; category?: string }) {
   const l = skillLayer(layer);
   return (
-    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px]">
       {pattern ? <span className="rounded-full border border-fel-cyan/30 px-2 py-0.5 text-fel-cyan/90">{PATTERN_INFO[pattern].label}</span>
         : <span className="rounded-full border border-fel-gold/30 px-2 py-0.5 text-fel-gold/80">no pattern</span>}
       {braceMode && <span className="rounded-full border border-white/15 px-2 py-0.5 text-white/60">{BRACE_INFO[braceMode].label}</span>}
@@ -199,9 +200,9 @@ function Field({ label, hint, error, group, children }: { label: string; hint?: 
   const Tag = group ? 'div' : 'label';
   return (
     <Tag className="block space-y-1" {...(group ? { role: 'group', 'aria-label': label } : {})}>
-      <span className="block text-[11px] uppercase tracking-wider text-fel-dim">{label}</span>
+      <span className="block text-[12px] uppercase tracking-wider text-fel-dim">{label}</span>
       {children}
-      {error ? <span className="block text-xs text-fel-crimson">{error}</span> : hint ? <span className="block text-[11px] text-fel-quiet">{hint}</span> : null}
+      {error ? <span className="block text-xs text-fel-crimson">{error}</span> : hint ? <span className="block text-[12px] text-fel-quiet">{hint}</span> : null}
     </Tag>
   );
 }
@@ -262,7 +263,7 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
       if (!r.ok) { setErr({ field: j.field ?? (j.error === 'name_taken' ? 'name' : undefined), message: errorCopy(j.error) }); return; }
       if (Array.isArray(j.warnings) && j.warnings.length) {
         const words = [...new Set(j.warnings.map((w: { found: string }) => `"${w.found}"`))].join(', ');
-        toast.warning(`Saved. Heads-up: ${words} reads as medical language. Your athlete sees these cues, so describe the movement instead.`);
+        readToast.warning(`Saved. Heads-up: ${words} reads as medical language. Your athlete sees these cues, so describe the movement instead.`);
       } else toast.success(initial ? 'Saved' : 'Added to your catalogue');
       onSaved();
     } finally { setBusy(false); }
@@ -317,12 +318,12 @@ function CatalogueEditor({ initial, others, onCancel, onSaved }: { initial: Cata
       </Field>
       {suggestions.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[11px] text-fel-quiet">Set-up cues for a {PATTERN_INFO[pattern!].label.toLowerCase()}{freeSlot < 0 ? ' (clear a cue slot to use one)' : ', tap to use as a cue'}:</div>
+          <div className="text-[12px] text-fel-quiet">Set-up cues for a {PATTERN_INFO[pattern!].label.toLowerCase()}{freeSlot < 0 ? ' (clear a cue slot to use one)' : ', tap to use as a cue'}:</div>
           <div className="flex flex-wrap gap-1.5">
             {suggestions.map((s) => (
               <button key={s.id} type="button" disabled={freeSlot < 0 || d.cues.includes(s.text)}
                 onClick={() => set('cues', d.cues.map((x, j) => (j === freeSlot ? s.text : x)))}
-                className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 disabled:opacity-35 hover:border-fel-cyan/40">{s.text}</button>
+                className="rounded-lg border border-white/10 px-2 py-1 text-[12px] text-white/70 disabled:opacity-35 hover:border-fel-cyan/40">{s.text}</button>
             ))}
           </div>
         </div>

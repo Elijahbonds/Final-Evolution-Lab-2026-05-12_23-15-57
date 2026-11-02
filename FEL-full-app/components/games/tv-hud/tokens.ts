@@ -4,7 +4,7 @@
 //
 // Owner, after playing on a TV (2026-10-06): "all modes are going to need dense visual passes to make it feel more like a
 // Polished AAA Title." The audit (docs/VISUAL-PASS-PLAN.md A7) found 21 hand-built host bezels, 127 uses of
-// text-[9px]/[10px]/[11px], `font-display` used 0 times, and a hex palette of up to 15 colours per host.
+// text-[12px]/[10px]/[11px], `font-display` used 0 times, and a hex palette of up to 15 colours per host.
 //
 // HOW THE SIZES WORK WITH CONSOLE VIEW. GameShell already scales every host's HUD with the screen's HEIGHT
 // (lib/ui/consoleView.ts: CSS `zoom` by the stage's --fel-hud-zoom, 1 on a phone, HUD_ZOOM_MAX = 2.25 at 1080 px) and draws it
@@ -14,6 +14,11 @@
 // layout covers no more of the play area than it did), and at least TV_MIN_READ_PX once the 1080p zoom applies.
 import { HUD_ZOOM_MAX, TV_SAFE } from '@/lib/ui/consoleView';
 import { cuePalette, onColorVisionChange, readColorVision, shapeCues, type ColorVision } from '@/lib/a11y/colorVision';
+import { readableMs } from '@/lib/readable/rules';
+
+/** READABLE (2026-11-02): how long a passing HUD message stays up — its own ms or its read time (words × 0.3 s + 1 s),
+ *  whichever is longer (lib/readable/rules.ts). */
+export const hudReadMs = (text: string, ms: number): number => readableMs(text, ms);
 
 // ── Palette ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -107,8 +112,11 @@ export const HUD_PLATE = {
   shadow: '0 2px 10px rgba(0, 0, 0, 0.35)',
 } as const;
 
-/** The text shadow on HUD text that sits on the scene without a plate (a combo pot, a cue label). */
-export const HUD_TEXT_SHADOW = '0 1px 2px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.45)';
+/** The text shadow on HUD text that sits on the scene without a plate (a combo pot, a cue label, a meter's name).
+ *  READABLE (2026-11-02): a tight dark edge first (0 0 2px at 0.95). Measured over the modes' own backdrops, a meter's
+ *  POWER / READY on the old shadow (0 1px 2px 0.85 + a 10 px glow) was 1.4–2.9:1 over snow, sky and sunlit sand; the
+ *  edge sits right under the strokes, so the letters hold their contrast on the brightest frame. */
+export const HUD_TEXT_SHADOW = '0 0 2px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.5)';
 
 // ── The 10-foot type scale ───────────────────────────────────────────────────────────────────────────────────────────
 
@@ -132,16 +140,22 @@ export interface HudTypeStep {
 
 /**
  * The steps, smallest first. `caption` is the floor: no readable HUD text is smaller. Rendered px at 1080p (zoom 2.25)
- * in brackets: caption 10 → 24.3, label 11 → 27.6, body 12 → 30.4, value 14 → 36, stat 18 → 46.1, score 24 → 60.8,
+ * in brackets: caption 12 → 27, label 12 → 27.6, body 14 → 31.5, value 14 → 36, stat 18 → 46.1, score 24 → 60.8,
  * banner 24 → 65.3, hero 30 → 81.
+ *
+ * READABLE (lane/readable, 2026-11-02; docs/READABLE.md): the three small steps were 10 / 11 / 12 px on a phone — under
+ * the app's 12 px floor (TYPE.label) and, for a hint or a readout the player reads mid-play, under the HUD's 14 px. Now
+ * caption 10 → 12, label 11 → 12, body 12 → 14 on a phone; the growth is set so the TV sizes stay where they were or
+ * just above (caption 24.3 → 27, label 27.6 → 27.6, body 30.4 → 31.5). A phone's HUD text is a little bigger; the TV's
+ * barely moves. Flagged for the owner's eye: these are the HUD's look.
  */
 export const HUD_TYPE = {
   /** A unit, a tick label, a chip's small print. */
-  caption: { phone: 10, growth: 0.64, leading: 1.15, tracking: 0.06, weight: 600 },
+  caption: { phone: 12, growth: 0, leading: 1.15, tracking: 0.06, weight: 600 },
   /** A chip's label (HR, OUTS, FLOW), a meter's name. */
-  label: { phone: 11, growth: 1, leading: 1.15, tracking: 0.08, weight: 700 },
+  label: { phone: 12, growth: 0.2, leading: 1.15, tracking: 0.08, weight: 700 },
   /** A readout line (PIN 142m · WIND 3), a hint. */
-  body: { phone: 12, growth: 1.2, leading: 1.2, tracking: 0.03, weight: 600 },
+  body: { phone: 14, growth: 0, leading: 1.2, tracking: 0.03, weight: 600 },
   /** A chip's value. */
   value: { phone: 14, growth: 1.6, leading: 1.1, tracking: 0.02, weight: 700 },
   /** A secondary number (the rival's total, a pot's line). */

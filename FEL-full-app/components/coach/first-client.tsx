@@ -26,7 +26,7 @@ export function FirstClientChecklist({ state }: { state: FirstClientState }) {
       <ol className="space-y-2">
         {STEPS.map((s, i) => (
           <li key={s.id} className="flex min-w-0 gap-2 text-sm" data-first-client-step={s.id} data-done={done.has(s.id) ? 'true' : undefined}>
-            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${done.has(s.id) ? 'border-[#00FF9D] bg-[#00FF9D]/15 text-[#00FF9D]' : 'border-white/25 text-white/60'}`}>{done.has(s.id) ? <Check className="h-3 w-3" /> : i + 1}</span>
+            <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[12px] ${done.has(s.id) ? 'border-[#00FF9D] bg-[#00FF9D]/15 text-[#00FF9D]' : 'border-white/25 text-white/60'}`}>{done.has(s.id) ? <Check className="h-3 w-3" /> : i + 1}</span>
             <span className="min-w-0">
               <span className="block text-white">{s.title}</span>
               <span className="block text-xs text-white/55">{s.line}{s.href ? <> <a href={s.href} className="text-[#00E5FF] underline">{s.id === 'invite' ? 'Invite now' : 'Sessions'}</a></> : null}</span>

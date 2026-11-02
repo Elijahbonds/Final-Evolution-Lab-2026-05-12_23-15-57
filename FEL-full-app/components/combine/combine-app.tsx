@@ -153,7 +153,7 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
       {numbersOnly && <p className="text-xs text-fel-dim">{numbersOnly}</p>}
       {drafts.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-[11px] uppercase tracking-wider text-fel-dim">On this phone</h2>
+          <h2 className="text-[12px] uppercase tracking-wider text-fel-dim">On this phone</h2>
           <ul className="space-y-2">
             {drafts.map((d) => {
               const p = d.stations.reduce((t, s) => { const x = stationProgress(d, s.id); return { done: t.done + x.done, total: t.total + x.total }; }, { done: 0, total: 0 });
@@ -176,7 +176,7 @@ export function CombineApp({ api = COMBINE_API, dobYear = null }: { api?: string
       )}
       {savedOnly.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-[11px] uppercase tracking-wider text-fel-dim">On your account</h2>
+          <h2 className="text-[12px] uppercase tracking-wider text-fel-dim">On your account</h2>
           <ul className="space-y-2">
             {savedOnly.map((e) => (
               <li key={e.id} className="fel-card flex items-center gap-3 rounded-xl p-3">

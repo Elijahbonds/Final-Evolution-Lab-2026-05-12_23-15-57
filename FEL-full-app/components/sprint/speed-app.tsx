@@ -128,7 +128,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
         {test === 'flying' && (
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs text-white/60">Lines apart (m)<input inputMode="decimal" value={flyM} onChange={(e) => setFlyM(e.target.value)} data-sprint-fly-m className="mt-1 min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-base text-white" /></label>
-            <label className="text-xs text-white/60">Phone to lane (m, optional)<input inputMode="decimal" value={camM} onChange={(e) => setCamM(e.target.value)} placeholder="e.g. 15" className="mt-1 min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-base text-white placeholder:text-white/30" /></label>
+            <label className="text-xs text-white/60">Phone to lane (m, optional)<input inputMode="decimal" value={camM} onChange={(e) => setCamM(e.target.value)} placeholder="e.g. 15" className="mt-1 min-h-11 w-full rounded-lg border border-white/15 bg-black/40 px-3 text-base text-white placeholder:text-white/50" /></label>
           </div>
         )}
         {test === 'trace' && (
@@ -157,7 +157,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
 
       <section className="fel-card space-y-2 rounded-xl p-4" data-sprint-history>
         <div className="flex items-center justify-between">
-          <div className="text-sm font-semibold text-white">History <span className="font-normal text-white/45">(this phone)</span></div>
+          <div className="text-sm font-semibold text-white">History <span className="font-normal text-white/50">(this phone)</span></div>
           <div className="flex gap-2">
             <button type="button" onClick={exportCsv} disabled={!runs.length} data-sprint-csv className="flex min-h-10 items-center gap-1.5 rounded-lg border border-white/20 px-3 text-xs font-bold text-white disabled:opacity-40"><Download className="h-3.5 w-3.5" /> CSV</button>
             <button type="button" onClick={() => { if (window.confirm('Clear every run kept on this phone?')) { clearRuns(runStorage()); setRuns([]); } }} disabled={!runs.length} aria-label="Clear history" className="flex min-h-10 items-center rounded-lg border border-white/20 px-3 text-white/70 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -167,7 +167,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
           <ul className="divide-y divide-white/10" data-sprint-history-list>
             {runs.slice(0, 30).map((r) => (
               <li key={r.id} className="flex items-baseline justify-between gap-3 py-2 text-sm">
-                <span className="min-w-0 truncate text-white/80">{r.label} <span className="text-white/40">· {new Date(r.at).toLocaleDateString()}</span></span>
+                <span className="min-w-0 truncate text-white/80">{r.label} <span className="text-white/50">· {new Date(r.at).toLocaleDateString()}</span></span>
                 <span className="shrink-0 font-mono tabular-nums text-white">{r.timeS !== null ? timeWithBand(r.timeS, r.sdS) : r.topSpeed !== null ? speedWithBand(r.topSpeed, r.topSpeedSd) : '—'}</span>
               </li>
             ))}
@@ -175,7 +175,7 @@ export function SpeedApp({ adult = true }: { adult?: boolean }) {
         )}
       </section>
       </div>
-      <p className="text-center text-xs text-white/40"><Link href="/train" className="underline">Back to Train</Link></p>
+      <p className="text-center text-xs text-white/50"><Link href="/train" className="underline">Back to Train</Link></p>
     </div>
   );
 }

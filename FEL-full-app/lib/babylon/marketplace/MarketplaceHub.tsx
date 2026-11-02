@@ -202,7 +202,7 @@ export default function MarketplaceHub({
               {l.payload.imageDataUrl && <img src={l.payload.imageDataUrl} alt={l.title} style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />}
               <div style={{ minWidth: 150 }}>
                 <div style={{ fontWeight: 700 }}>{l.title}{l.sellerHasPass ? ' ✦' : ''}</div>
-                <div style={{ fontSize: 11, opacity: 0.75 }}>{l.sellerName} · {l.kind} · {l.sales} sold</div>
+                <div style={{ fontSize: 12, opacity: 0.75 }}>{l.sellerName} · {l.kind} · {l.sales} sold</div>
                 <div style={{ fontSize: 12 }}>{l.blurb}</div>
               </div>
               <div style={{ fontWeight: 800, color: '#e8b84a' }}>{l.priceShards}◈{preview ? ' list price, locked in preview' : ''}</div>
@@ -315,7 +315,7 @@ export default function MarketplaceHub({
               <div key={p.listingId + p.at} style={S.card}>
                 <div style={{ minWidth: 150 }}>
                   <div style={{ fontWeight: 700 }}>{l.title}</div>
-                  <div style={{ fontSize: 11, opacity: 0.75 }}>{l.kind} · {preview ? `${p.paidShards}◈ legacy preview receipt, not charged` : `bought for ${p.paidShards}◈`}</div>
+                  <div style={{ fontSize: 12, opacity: 0.75 }}>{l.kind} · {preview ? `${p.paidShards}◈ legacy preview receipt, not charged` : `bought for ${p.paidShards}◈`}</div>
                 </div>
                 {l.kind === 'book' && <button style={S.btn} onClick={() => setReading(reading?.id === l.id ? null : l)}>READ</button>}
                 {l.kind === 'audiobook' && l.payload.audioDataUrl && <audio controls src={l.payload.audioDataUrl} style={{ height: 32 }} />}

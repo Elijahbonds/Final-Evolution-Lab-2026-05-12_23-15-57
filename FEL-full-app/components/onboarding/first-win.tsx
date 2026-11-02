@@ -58,7 +58,7 @@ export function FirstWin(props: FirstWinProps) {
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 py-6 pb-28" data-first-win={path} data-first-win-done={done ? 'true' : 'false'}>
-      <p className="font-mono text-[10.5px] font-bold uppercase tracking-[0.18em]" style={{ color: w.accent }}>
+      <p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em]" style={{ color: w.accent }}>
         Your first win · about {w.aboutSec} seconds
       </p>
       <h1 className="fel-heading mt-1 text-3xl font-black leading-tight text-white">{w.title}</h1>
@@ -71,7 +71,7 @@ export function FirstWin(props: FirstWinProps) {
             <ol className="space-y-1.5">
               {w.steps.map((s, i) => (
                 <li key={s.text} className="flex gap-2 text-[13.5px] leading-snug text-white/75">
-                  <span className="font-mono text-[11px] font-bold" style={{ color: w.accent }}>{i + 1}</span>
+                  <span className="font-mono text-[12px] font-bold" style={{ color: w.accent }}>{i + 1}</span>
                   <span>{s.text}</span>
                 </li>
               ))}
@@ -169,7 +169,7 @@ function Breath({ onDone, accent }: { onDone: () => void; accent: string }) {
           <span className="font-mono text-sm text-white/70">{at && at.beat !== 'done' ? Math.ceil(at.left) : ''}</span>
         </span>
       </div>
-      <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-white/55">
+      <p className="mt-3 font-mono text-[12px] uppercase tracking-wider text-white/55">
         {at && at.round > 0 ? `Breath ${Math.min(at.round, rounds)} of ${rounds}` : `${rounds} breaths`}
       </p>
     </div>
@@ -194,10 +194,10 @@ function PlaybookCard({ card, onDone, accent }: { card: LessonCard | null; onDon
   return (
     <div>
       <article className="rounded-xl border p-4" style={{ borderColor: `${accent}40`, background: `${accent}0D` }} data-playbook-card={card.id}>
-        <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: accent }}>The Playbook</p>
+        <p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em]" style={{ color: accent }}>The Playbook</p>
         <h2 className="fel-heading mt-1 text-xl font-bold text-white">{card.headline}</h2>
         {card.lines.map((l) => <p key={l} className="mt-2 text-[14px] leading-relaxed text-white/80">{l}</p>)}
-        <p className="mt-3 text-[11px] leading-snug text-white/45">{card.source}</p>
+        <p className="mt-3 text-[12px] leading-snug text-white/50">{card.source}</p>
       </article>
       <button type="button" onClick={gotIt} disabled={!ready} data-card-got-it
         className="mt-4 inline-flex min-h-11 items-center rounded-xl px-5 text-sm font-bold text-black disabled:opacity-50" style={{ background: accent }}>

@@ -145,7 +145,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
           </div>
         )}
         {started && phase === 'playing' && (
-          <div className="pointer-events-none absolute bottom-3 right-3 font-mono text-[11px] text-white/50">
+          <div className="pointer-events-none absolute bottom-3 right-3 font-mono text-[12px] text-white/50">
             PRQ {prq.toFixed(0)} · {gradeRef.current.label}
           </div>
         )}
@@ -164,7 +164,7 @@ export default function TiebreakGame({ grade, prq, onEnd }: GameProps) {
               First to {TARGET}, win by 2. The ball comes in on one side — swing <span className="text-[#00FF9D]">← / →</span> when the green ring closes on it. The window tightens as the rally and the lead grow.
             </p>
             <button onClick={() => setStarted(true)} className="rounded-lg bg-[#00FF9D] px-8 py-3 font-bold text-black transition hover:bg-[#00d986]">FIRST SERVE</button>
-            <p className="font-mono text-[11px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
+            <p className="font-mono text-[12px] tracking-widest text-white/50">ANY KEY · ANY BUTTON · TAP</p>
           </div>
         )}
       </div>

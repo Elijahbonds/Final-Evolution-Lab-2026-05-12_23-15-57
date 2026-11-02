@@ -30,7 +30,7 @@ export function SpeedChart({ trace }: { trace: NonNullable<Extract<RunResult, { 
         <text x={10} y={14} fill="#ffffff80" fontSize={9}>{(vMax / 1.1).toFixed(1)} m/s</text>
         <text x={312} y={116} fill="#ffffff80" fontSize={9} textAnchor="end">{(t1 - t0).toFixed(1)} s in view</text>
       </svg>
-      <figcaption className="text-[11px] text-white/45">Green: the speed the camera saw. {fit ? 'Dashed: the smooth sprint curve that fits it best.' : ''}</figcaption>
+      <figcaption className="text-[12px] text-white/50">Green: the speed the camera saw. {fit ? 'Dashed: the smooth sprint curve that fits it best.' : ''}</figcaption>
     </figure>
   );
 }

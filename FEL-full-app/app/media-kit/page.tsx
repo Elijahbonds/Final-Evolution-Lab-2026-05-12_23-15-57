@@ -56,13 +56,13 @@ export default async function MediaKitPage() {
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {audience.stats.map((s) => (
             <div key={s.label} className="rounded-xl border border-white/10 bg-[#141414] p-4">
-              <p className="text-[11px] uppercase tracking-wider text-white/45">{s.label}</p>
+              <p className="text-[12px] uppercase tracking-wider text-white/50">{s.label}</p>
               <p className="fel-heading mt-1 text-3xl text-white">{s.value}</p>
             </div>
           ))}
         </div>
         {audience.isExample ? (
-          <p className="mt-2 text-[11px] text-white/35">Fixture numbers, not real stats.</p>
+          <p className="mt-2 text-[12px] text-white/50">Fixture numbers, not real stats.</p>
         ) : null}
       </section>
 

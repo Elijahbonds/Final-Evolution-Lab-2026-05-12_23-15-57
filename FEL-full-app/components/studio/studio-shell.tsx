@@ -120,7 +120,7 @@ function CodeViewer({ path, content }: { path: string; content: string }) {
   const lines = content.split('\n').length;
   return (
     <div className="flex text-[12px] font-mono leading-relaxed">
-      <div className="select-none border-r border-white/10 px-3 py-3 text-right text-white/20">
+      <div className="select-none border-r border-white/10 px-3 py-3 text-right text-white/50">
         {Array.from({ length: lines }, (_, i) => (
           <div key={i}>{i + 1}</div>
         ))}
@@ -198,7 +198,7 @@ function statusIcon(status: string) {
     case 'failed':
       return <AlertCircle className="h-4 w-4 text-[#FF3366]" />;
     default:
-      return <Clock className="h-4 w-4 text-white/30" />;
+      return <Clock className="h-4 w-4 text-white/50" />;
   }
 }
 
@@ -214,7 +214,7 @@ function PlanMessageCard({ plan }: { plan: BuildPlanData }) {
             {plan.projectTitle || 'Build Plan'}
           </span>
           {plan.estimatedComplexity && (
-            <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 font-mono text-[10px] text-white/50">
+            <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 font-mono text-[12px] text-white/50">
               {plan.estimatedComplexity}
             </span>
           )}
@@ -229,26 +229,26 @@ function PlanMessageCard({ plan }: { plan: BuildPlanData }) {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold text-white/90">{lane.title}</span>
                 <span
-                  className="rounded-full px-1.5 py-0.5 font-mono text-[9px]"
+                  className="rounded-full px-1.5 py-0.5 font-mono text-[12px]"
                   style={{ background: `${roleColor(lane.role)}22`, color: roleColor(lane.role) }}
                 >
                   {lane.role}
                 </span>
               </div>
-              <p className="mt-0.5 text-[11px] text-white/40 leading-snug">{lane.description}</p>
+              <p className="mt-0.5 text-[12px] text-white/50 leading-snug">{lane.description}</p>
             </div>
           </div>
         ))}
       </div>
       <button
         onClick={() => setShowJson((s) => !s)}
-        className="flex w-full items-center gap-1.5 border-t border-white/10 px-4 py-2 text-[10px] font-mono uppercase tracking-wider text-white/35 hover:text-white/60 transition-colors"
+        className="flex w-full items-center gap-1.5 border-t border-white/10 px-4 py-2 text-[12px] font-mono uppercase tracking-wider text-white/50 hover:text-white/60 transition-colors"
       >
         {showJson ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         {showJson ? 'hide' : 'view'} json
       </button>
       {showJson && (
-        <pre className="max-h-64 overflow-auto border-t border-white/10 bg-black/40 p-3 text-[10px] text-white/50 font-mono">
+        <pre className="max-h-64 overflow-auto border-t border-white/10 bg-black/40 p-3 text-[12px] text-white/50 font-mono">
           {JSON.stringify(plan, null, 2)}
         </pre>
       )}
@@ -267,7 +267,7 @@ export function StudioShell() {
     <div className="flex h-screen items-center justify-center bg-[#050505] text-white">
       {/* NP-1: while the Studio AI is off, nothing is shown (hidden, never labelled). */}
       {ai === 'coming_soon' ? null : (
-        <Loader2 className="h-6 w-6 animate-spin text-white/40" aria-label="Loading" />
+        <Loader2 className="h-6 w-6 animate-spin text-white/50" aria-label="Loading" />
       )}
     </div>
   );
@@ -786,7 +786,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
               </div>
               <div>
                 <h1 className="font-display text-lg font-bold tracking-tight">NEXUS STUDIO</h1>
-                <p className="font-mono text-[10px] text-white/40">CELL × NEXUS</p>
+                <p className="font-mono text-[12px] text-white/50">CELL × NEXUS</p>
               </div>
             </div>
 
@@ -799,7 +799,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
             </button>
 
             <div className="mt-3 flex-1 overflow-y-auto px-3 pb-4">
-              <p className="mb-2 font-mono text-[10px] uppercase tracking-widest text-white/30">Projects</p>
+              <p className="mb-2 font-mono text-[12px] uppercase tracking-widest text-white/50">Projects</p>
               {projects.map((p) => (
                 <button
                   key={p.id}
@@ -811,20 +811,20 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                   }`}
                 >
                   <span className="block truncate text-sm font-medium text-white/80">{p.title}</span>
-                  <span className="font-mono text-[10px] text-white/30">
+                  <span className="font-mono text-[12px] text-white/50">
                     {p.genre || 'untitled'} · {p.status}
                   </span>
                 </button>
               ))}
               {projects.length === 0 && (
-                <p className="text-center text-xs text-white/25 py-8">No projects yet</p>
+                <p className="text-center text-xs text-white/50 py-8">No projects yet</p>
               )}
             </div>
 
             <div className="border-t border-white/10 px-4 py-3">
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-[#00FF9D] animate-pulse" />
-                <span className="font-mono text-[10px] text-white/40">CELL online</span>
+                <span className="font-mono text-[12px] text-white/50">CELL online</span>
               </div>
             </div>
           </motion.aside>
@@ -861,7 +861,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
               {panel === 'costs' && <DollarSign className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">{panel.toUpperCase()}</span>
               {panel === 'files' && files.length > 0 && (
-                <span className="ml-0.5 rounded-full bg-white/10 px-1.5 text-[9px] text-white/60">
+                <span className="ml-0.5 rounded-full bg-white/10 px-1.5 text-[12px] text-white/60">
                   {files.length}
                 </span>
               )}
@@ -872,7 +872,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 <span className="h-1.5 w-1.5 rounded-full bg-[#00FF9D]" />
               )}
               {panel === 'costs' && costs && costs.total.costUsd > 0 && (
-                <span className="ml-0.5 rounded-full bg-[#00FF9D]/15 px-1.5 text-[9px] text-[#00FF9D]">
+                <span className="ml-0.5 rounded-full bg-[#00FF9D]/15 px-1.5 text-[12px] text-[#00FF9D]">
                   {fmtUsd(costs.total.costUsd)}
                 </span>
               )}
@@ -882,7 +882,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
           <div className="flex-1" />
 
           {projectId && (
-            <span className="hidden md:inline font-mono text-[10px] text-white/30">
+            <span className="hidden md:inline font-mono text-[12px] text-white/50">
               {building ? 'building…' : projectStatus}
             </span>
           )}
@@ -934,7 +934,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                           <>
                             {msg.role !== 'user' && (
                               <span
-                                className="mb-1 block font-mono text-[10px] uppercase tracking-wider"
+                                className="mb-1 block font-mono text-[12px] uppercase tracking-wider"
                                 style={{ color: roleColor(msg.role) }}
                               >
                                 {msg.role}
@@ -943,7 +943,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                             <div className="text-sm text-white/80 whitespace-pre-wrap break-words font-mono leading-relaxed">
                               {msg.content}
                               {streaming && msg.role !== 'user' && msg.content === '' && (
-                                <span className="inline-flex items-center gap-1 text-white/40">
+                                <span className="inline-flex items-center gap-1 text-white/50">
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> CELL is thinking…
                                 </span>
                               )}
@@ -994,7 +994,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                     )}
                   </button>
                 </div>
-                <p className="mt-2 text-center font-mono text-[10px] text-white/25">
+                <p className="mt-2 text-center font-mono text-[12px] text-white/50">
                   CELL × NEXUS — Claude Fable 5 (architect) · GPT-5.4 (builder) · Claude Sonnet 5 (critic)
                 </p>
               </div>
@@ -1013,7 +1013,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                         {buildPlan.projectTitle || 'BUILD PLAN'}
                       </h2>
                       {buildPlan.summary && (
-                        <p className="text-xs text-white/40">{buildPlan.summary}</p>
+                        <p className="text-xs text-white/50">{buildPlan.summary}</p>
                       )}
                     </div>
                     {laneProgress && (building || projectStatus === 'ready') && (
@@ -1086,7 +1086,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-sm font-bold text-white/90">{lane.title}</span>
                               <span
-                                className="rounded-full px-2 py-0.5 font-mono text-[10px]"
+                                className="rounded-full px-2 py-0.5 font-mono text-[12px]"
                                 style={{
                                   background: `${roleColor(lane.role)}22`,
                                   color: roleColor(lane.role),
@@ -1095,10 +1095,10 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                                 {lane.role}
                               </span>
                             </div>
-                            <p className="mt-0.5 text-xs text-white/45">{lane.description}</p>
+                            <p className="mt-0.5 text-xs text-white/50">{lane.description}</p>
                           </div>
                           {lane.dependencies?.length > 0 && (
-                            <span className="hidden md:inline font-mono text-[10px] text-white/25">
+                            <span className="hidden md:inline font-mono text-[12px] text-white/50">
                               deps: {lane.dependencies.join(', ')}
                             </span>
                           )}
@@ -1120,9 +1120,9 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <div className="text-center">
-                    <Layers className="mx-auto h-12 w-12 text-white/15 mb-4" />
-                    <p className="text-white/40 text-sm">No build plan yet</p>
-                    <p className="text-white/25 text-xs mt-1">Chat with CELL to generate one</p>
+                    <Layers className="mx-auto h-12 w-12 text-white/50 mb-4" />
+                    <p className="text-white/50 text-sm">No build plan yet</p>
+                    <p className="text-white/50 text-xs mt-1">Chat with CELL to generate one</p>
                   </div>
                 </div>
               )}
@@ -1136,7 +1136,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 <>
                   <div className="flex items-center gap-2 border-b border-white/10 bg-[#0a0a0a]/80 px-4 py-2">
                     <FileCode2 className="h-3.5 w-3.5 text-[#A855F7]" />
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                    <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">
                       Project Files
                     </span>
                     <div className="flex-1" />
@@ -1184,11 +1184,11 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                       {selectedFile ? (
                         <>
                           <div className="flex items-center gap-2 border-b border-white/10 px-4 py-1.5">
-                            <span className="truncate font-mono text-[11px] text-white/50">
+                            <span className="truncate font-mono text-[12px] text-white/50">
                               {selectedFile}
                             </span>
                             {files.find((f) => f.path === selectedFile)?.summary && (
-                              <span className="hidden truncate text-[10px] text-white/25 lg:inline">
+                              <span className="hidden truncate text-[12px] text-white/50 lg:inline">
                                 — {files.find((f) => f.path === selectedFile)?.summary}
                               </span>
                             )}
@@ -1198,7 +1198,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                                 projectId && selectedFile && regenerateFile(projectId, selectedFile)
                               }
                               disabled={!!regenerating || building}
-                              className="flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-white/60 transition-colors hover:border-[#00E5FF]/40 hover:text-[#00E5FF] disabled:opacity-40"
+                              className="flex items-center gap-1.5 rounded-md border border-white/15 px-2.5 py-1 text-[12px] text-white/60 transition-colors hover:border-[#00E5FF]/40 hover:text-[#00E5FF] disabled:opacity-40"
                             >
                               {regenerating === selectedFile ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -1219,7 +1219,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                           </div>
                         </>
                       ) : (
-                        <div className="flex h-full items-center justify-center text-sm text-white/30">
+                        <div className="flex h-full items-center justify-center text-sm text-white/50">
                           Select a file to view
                         </div>
                       )}
@@ -1229,9 +1229,9 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <div className="text-center">
-                    <FileCode2 className="mx-auto mb-4 h-12 w-12 text-white/15" />
-                    <p className="text-sm text-white/40">No files yet</p>
-                    <p className="mt-1 text-xs text-white/25">Build the project to generate files</p>
+                    <FileCode2 className="mx-auto mb-4 h-12 w-12 text-white/50" />
+                    <p className="text-sm text-white/50">No files yet</p>
+                    <p className="mt-1 text-xs text-white/50">Build the project to generate files</p>
                   </div>
                 </div>
               )}
@@ -1244,7 +1244,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
               {artifactHtml ? (
                 <>
                   <div className="flex items-center gap-2 border-b border-white/10 bg-[#0a0a0a]/80 px-4 py-2">
-                    <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                    <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">
                       Live Preview
                     </span>
                     <div className="flex-1" />
@@ -1279,7 +1279,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                     <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-[#00E5FF]" />
                     <p className="text-white/60 text-sm">CELL is building your app…</p>
                     {laneProgress && (
-                      <p className="mt-1 font-mono text-xs text-white/35">
+                      <p className="mt-1 font-mono text-xs text-white/50">
                         {laneProgress.done}/{laneProgress.total} lanes complete
                       </p>
                     )}
@@ -1295,10 +1295,10 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 <div className="flex h-full items-center justify-center">
                   <div className="text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                      <Play className="h-8 w-8 text-white/20" />
+                      <Play className="h-8 w-8 text-white/50" />
                     </div>
-                    <p className="text-white/40 text-sm">No preview yet</p>
-                    <p className="text-white/25 text-xs mt-1">
+                    <p className="text-white/50 text-sm">No preview yet</p>
+                    <p className="text-white/50 text-xs mt-1">
                       {buildPlan
                         ? 'Start a build from the PLAN tab to generate your app'
                         : 'Chat with CELL, then build to see a live preview'}
@@ -1322,7 +1322,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
             <div className="flex h-full flex-col">
               <div className="flex items-center gap-2 border-b border-white/10 bg-[#0a0a0a]/80 px-4 py-2">
                 <DollarSign className="h-3.5 w-3.5 text-[#00FF9D]" />
-                <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+                <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">
                   Build Cost & Tokens
                 </span>
                 <div className="flex-1" />
@@ -1341,10 +1341,10 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 <div className="flex h-full items-center justify-center">
                   <div className="text-center">
                     <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
-                      <DollarSign className="h-8 w-8 text-white/20" />
+                      <DollarSign className="h-8 w-8 text-white/50" />
                     </div>
-                    <p className="text-white/40 text-sm">No cost data yet</p>
-                    <p className="text-white/25 text-xs mt-1">Run a build to see token usage and cost per lane</p>
+                    <p className="text-white/50 text-sm">No cost data yet</p>
+                    <p className="text-white/50 text-xs mt-1">Run a build to see token usage and cost per lane</p>
                   </div>
                 </div>
               ) : (
@@ -1352,19 +1352,19 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                   {/* Cumulative totals */}
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div className="rounded-xl border border-[#00FF9D]/25 bg-[#00FF9D]/5 p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Total Cost</div>
+                      <div className="text-[12px] uppercase tracking-wider text-white/50">Total Cost</div>
                       <div className="mt-1 font-mono text-lg font-bold text-[#00FF9D]">{fmtUsd(costs.total.costUsd)}</div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Input Tokens</div>
+                      <div className="text-[12px] uppercase tracking-wider text-white/50">Input Tokens</div>
                       <div className="mt-1 font-mono text-lg font-bold text-white/80">{fmtTok(costs.total.inputTokens)}</div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Output Tokens</div>
+                      <div className="text-[12px] uppercase tracking-wider text-white/50">Output Tokens</div>
                       <div className="mt-1 font-mono text-lg font-bold text-white/80">{fmtTok(costs.total.outputTokens)}</div>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                      <div className="text-[10px] uppercase tracking-wider text-white/40">Escalations</div>
+                      <div className="text-[12px] uppercase tracking-wider text-white/50">Escalations</div>
                       <div className="mt-1 font-mono text-lg font-bold text-[#FFD700]">{costs.total.escalations}</div>
                     </div>
                   </div>
@@ -1374,11 +1374,11 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                     <div>
                       <div className="mb-2 flex items-center gap-2">
                         <Zap className="h-3.5 w-3.5 text-[#00E5FF]" />
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">Latest Build — Per Lane</span>
+                        <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">Latest Build — Per Lane</span>
                       </div>
                       <div className="overflow-hidden rounded-xl border border-white/10">
                         <table className="w-full text-left text-xs">
-                          <thead className="bg-white/5 text-white/40">
+                          <thead className="bg-white/5 text-white/50">
                             <tr>
                               <th className="px-3 py-2 font-medium">Lane</th>
                               <th className="px-3 py-2 font-medium">Model</th>
@@ -1394,14 +1394,14 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-white/80">{l.laneTitle}</span>
                                     {l.escalated && (
-                                      <span className="rounded bg-[#FFD700]/15 px-1 text-[9px] text-[#FFD700]">esc</span>
+                                      <span className="rounded bg-[#FFD700]/15 px-1 text-[12px] text-[#FFD700]">esc</span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-white/30">{l.role}</div>
+                                  <div className="text-[12px] text-white/50">{l.role}</div>
                                 </td>
                                 <td className="px-3 py-2">
                                   <span className="text-white/60">{l.model}</span>
-                                  <div className="text-[10px] text-white/30">{l.provider}</div>
+                                  <div className="text-[12px] text-white/50">{l.provider}</div>
                                 </td>
                                 <td className="px-3 py-2 text-right font-mono text-white/50">{fmtTok(l.inputTokens)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-white/50">{fmtTok(l.outputTokens)}</td>
@@ -1419,18 +1419,18 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                     <div>
                       <div className="mb-2 flex items-center gap-2">
                         <TrendingUp className="h-3.5 w-3.5 text-[#A855F7]" />
-                        <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">Build History</span>
+                        <span className="font-mono text-[12px] uppercase tracking-wider text-white/50">Build History</span>
                       </div>
                       <div className="space-y-1.5">
                         {costs.builds.map((b) => (
                           <div key={b.buildId} className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.02] px-3 py-2 text-xs">
-                            <span className="font-mono text-white/30">{b.buildId.slice(0, 8)}</span>
-                            <span className="text-white/40">{b.calls} calls</span>
+                            <span className="font-mono text-white/50">{b.buildId.slice(0, 8)}</span>
+                            <span className="text-white/50">{b.calls} calls</span>
                             {b.escalations > 0 && (
                               <span className="text-[#FFD700]">{b.escalations} esc</span>
                             )}
                             <div className="flex-1" />
-                            <span className="font-mono text-white/40">{fmtTok(b.inTok + b.outTok)} tok</span>
+                            <span className="font-mono text-white/50">{fmtTok(b.inTok + b.outTok)} tok</span>
                             <span className="font-mono font-bold text-[#00FF9D]">{fmtUsd(b.costUsd)}</span>
                           </div>
                         ))}
@@ -1438,7 +1438,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                     </div>
                   )}
 
-                  <p className="pt-2 text-center text-[10px] text-white/25">
+                  <p className="pt-2 text-center text-[12px] text-white/50">
                     Costs routed through the platform are estimates based on the underlying model&apos;s list price.
                   </p>
                 </div>
@@ -1468,7 +1468,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 <Settings className="h-4 w-4 text-[#A855F7]" />
                 <span className="text-sm font-bold text-white">Model & Budget Settings</span>
                 <div className="flex-1" />
-                <button onClick={() => setShowSettings(false)} className="rounded-md p-1 text-white/40 hover:bg-white/10 hover:text-white">
+                <button onClick={() => setShowSettings(false)} className="rounded-md p-1 text-white/50 hover:bg-white/10 hover:text-white">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -1477,10 +1477,10 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 {/* Budget */}
                 <div>
                   <label className="text-xs font-semibold text-white/70">Budget cap (USD)</label>
-                  <p className="mb-2 text-[11px] text-white/35">Builds stop gracefully once this cap is reached, saving completed lanes. 0 = no cap.</p>
+                  <p className="mb-2 text-[12px] text-white/50">Builds stop gracefully once this cap is reached, saving completed lanes. 0 = no cap.</p>
                   <div className="flex gap-2">
                     <div className="flex flex-1 items-center rounded-lg border border-white/15 bg-white/5 px-3">
-                      <span className="text-white/40">$</span>
+                      <span className="text-white/50">$</span>
                       <input
                         type="number"
                         min={0}
@@ -1488,7 +1488,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                         value={budgetInput}
                         onChange={(e) => setBudgetInput(e.target.value)}
                         placeholder="0.00"
-                        className="w-full bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/25"
+                        className="w-full bg-transparent px-2 py-2 text-sm text-white outline-none placeholder:text-white/50"
                       />
                     </div>
                     <button
@@ -1505,7 +1505,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                 <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
                   <div>
                     <div className="text-xs font-semibold text-white/70">Prefer cheapest capable model</div>
-                    <div className="text-[11px] text-white/35">Start every lane on the cheapest model, escalate only on failure.</div>
+                    <div className="text-[12px] text-white/50">Start every lane on the cheapest model, escalate only on failure.</div>
                   </div>
                   <button
                     onClick={() => togglePreferCheap(!(settings?.preferCheap ?? true))}
@@ -1521,7 +1521,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                     <KeyRound className="h-3.5 w-3.5 text-[#FFD700]" />
                     <label className="text-xs font-semibold text-white/70">Your provider API keys (optional)</label>
                   </div>
-                  <p className="mb-3 text-[11px] text-white/35">
+                  <p className="mb-3 text-[12px] text-white/50">
                     Add a key to route that provider&apos;s models directly (billed to you, often cheaper). Without a key, the platform routes it for you. Keys are encrypted and never shown again.
                   </p>
                   <div className="space-y-2">
@@ -1533,17 +1533,17 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                           <div className="mb-2 flex items-center gap-2">
                             <span className="text-xs font-medium text-white/80">{label}</span>
                             {existing ? (
-                              <span className="rounded bg-[#00FF9D]/15 px-1.5 py-0.5 font-mono text-[10px] text-[#00FF9D]">
+                              <span className="rounded bg-[#00FF9D]/15 px-1.5 py-0.5 font-mono text-[12px] text-[#00FF9D]">
                                 ••••{existing.hint}
                               </span>
                             ) : (
-                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/40">platform-routed</span>
+                              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[12px] text-white/50">platform-routed</span>
                             )}
                             {existing && (
                               <button
                                 onClick={() => deleteKey(prov)}
                                 disabled={savingSettings}
-                                className="ml-auto rounded p-1 text-white/30 hover:bg-white/10 hover:text-[#FF3366] disabled:opacity-40"
+                                className="ml-auto rounded p-1 text-white/50 hover:bg-white/10 hover:text-[#FF3366] disabled:opacity-40"
                                 title="Remove key"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -1556,7 +1556,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                               value={keyInputs[prov] || ''}
                               onChange={(e) => setKeyInputs((k) => ({ ...k, [prov]: e.target.value }))}
                               placeholder={existing ? 'Replace key…' : `Paste ${label} API key…`}
-                              className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/25 focus:border-[#A855F7]/50"
+                              className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs text-white outline-none placeholder:text-white/50 focus:border-[#A855F7]/50"
                             />
                             <button
                               onClick={() => saveKey(prov)}
@@ -1570,7 +1570,7 @@ export function StudioWorkspace({ onComingSoon }: { onComingSoon: () => void }) 
                       );
                     })}
                   </div>
-                  {keyError && <p className="mt-2 text-[11px] text-[#FF3366]">{keyError}</p>}
+                  {keyError && <p className="mt-2 text-[12px] text-[#FF3366]">{keyError}</p>}
                 </div>
               </div>
             </motion.div>

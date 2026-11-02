@@ -12,7 +12,7 @@ export function SocialProof({ quotes }: { quotes?: readonly SocialQuote[] }) {
         {shown.map((q) => (
           <li key={q.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <blockquote className="text-[14px] leading-relaxed text-white/85">&ldquo;{q.text}&rdquo;</blockquote>
-            <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-white/55">
+            <p className="mt-3 font-mono text-[12px] uppercase tracking-wider text-white/55">
               {q.credit} · {q.role === 'coach' ? 'Coach' : 'Parent'}
             </p>
           </li>

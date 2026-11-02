@@ -32,7 +32,7 @@ export default async function WorkWithUsPage({ searchParams }: { searchParams: {
         {open ? (
           <>
             <InquiryForm budgets={BUDGET_RANGES} profile={profile?.slug ?? null} source={source} />
-            <p className="mt-4 text-[11px] text-white/35">
+            <p className="mt-4 text-[12px] text-white/50">
               We store your name, email and message to reply to you, and delete them after 12 months. See the <Link href="/privacy" className="underline">privacy policy</Link>.
             </p>
           </>

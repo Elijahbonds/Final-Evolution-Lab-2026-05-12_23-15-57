@@ -17,11 +17,25 @@
 // PRESENTATION ONLY: it draws the words it is handed. Motion follows the app's reduced-motion answer (a fade where it would slide).
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { HUD_PLATE, hudColor, hudType, type HudTone } from './tokens';
+import { HUD_PLATE, hudColor, hudReadMs, hudType, type HudTone } from './tokens';
 import { useHudReducedMotion } from './use-hud-motion';
 
 /** How long a card stays up, ms. */
 export const LOWER_THIRD_MS = 2400;
+
+/** The words a node shows (strings and numbers, nested), for the read time. */
+function wordsOf(n: ReactNode): string {
+  if (typeof n === 'string' || typeof n === 'number') return String(n);
+  if (Array.isArray(n)) return n.map(wordsOf).join(' ');
+  if (n && typeof n === 'object' && 'props' in n) return wordsOf((n as { props: { children?: ReactNode } }).props.children);
+  return '';
+}
+
+/** READABLE (2026-11-02): how long the card stays up — the host's hold, or the read time of everything on it
+ *  (words × 0.3 s + 1 s), whichever is longer. "UP NEXT · PLAYER 2 · DUNK 4 OF 6 · WINDMILL" is 3.7 s, not 2.4 s. */
+export function lowerThirdHoldMs(holdMs: number, ...parts: ReactNode[]): number {
+  return hudReadMs(parts.map(wordsOf).join(' '), holdMs);
+}
 
 /** Pure: does this key fire the card? (a non-empty key that is not the one already shown.) */
 export function lowerThirdFires(shownKey: string | null, key: unknown): key is string {
@@ -55,7 +69,8 @@ export function HudLowerThird({ cardKey, tone = 'you', kicker, title, sub, aside
     seen.current = cardKey;
     setShown(cardKey);
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => { timer.current = null; setShown(null); }, holdMs);
+    timer.current = setTimeout(() => { timer.current = null; setShown(null); }, lowerThirdHoldMs(holdMs, kicker, title, sub, aside));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the card's words are read when it fires, not re-armed as they change
   }, [cardKey, enabled, holdMs]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
   return (

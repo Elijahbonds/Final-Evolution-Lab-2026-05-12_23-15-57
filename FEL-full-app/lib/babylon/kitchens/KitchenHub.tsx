@@ -93,8 +93,8 @@ export default function KitchenHub({
     btnAlt: { padding: '6px 12px', borderRadius: 8, border: '1px solid #ffb347', background: 'transparent', color: '#ffb347', cursor: 'pointer', fontSize: 13 },
     card: { padding: 12, borderRadius: 10, background: 'rgba(0,0,0,0.3)', marginTop: 8 },
     tagRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 },
-    tag: { fontSize: 11, padding: '3px 8px', borderRadius: 10, background: '#3a2a14', color: '#e8cf9e' },
-    compliance: { marginTop: 14, padding: '8px 12px', borderLeft: '3px solid #ffb347', fontSize: 11, opacity: 0.8, lineHeight: 1.5 },
+    tag: { fontSize: 12, padding: '3px 8px', borderRadius: 10, background: '#3a2a14', color: '#e8cf9e' },
+    compliance: { marginTop: 14, padding: '8px 12px', borderLeft: '3px solid #ffb347', fontSize: 12, opacity: 0.8, lineHeight: 1.5 },
     note: { marginTop: 10, padding: '8px 12px', borderRadius: 8, background: '#8a6a3a', color: '#fff', width: 'fit-content' },
     notLive: { marginTop: 8, padding: '6px 10px', borderRadius: 8, border: '1px solid #ffb347', fontSize: 12, color: '#ffd9a0' },
   };

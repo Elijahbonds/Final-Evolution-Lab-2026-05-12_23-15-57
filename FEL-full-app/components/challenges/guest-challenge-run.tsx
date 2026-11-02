@@ -75,15 +75,15 @@ export function GuestChallengeRun({ code, modeKey, title, targetScore, theirName
     <div className="mx-auto w-full max-w-[1200px] px-2 py-3 sm:px-4">
       <div className="mb-3 flex items-center justify-between gap-3 px-2">
         <div className="min-w-0">
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{title}</div>
+          <div className="font-mono text-[12px] uppercase tracking-[0.2em] text-white/50">{title}</div>
           <div className="truncate text-sm text-white/80">Beat {fmt(targetScore)} from {theirName}</div>
         </div>
-        <a href={`/c/${encodeURIComponent(code)}`} className="shrink-0 rounded-md border border-white/15 px-2.5 py-1 font-mono text-[10px] text-white/45">QUIT</a>
+        <a href={`/c/${encodeURIComponent(code)}`} className="inline-flex min-h-[40px] min-w-[44px] shrink-0 items-center justify-center rounded-md border border-white/25 px-3 font-mono text-[12px] text-white/75">QUIT</a>
       </div>
       {gate === 'ask' ? (
         <div className="py-6" data-testid="challenge-age-step">
           <AgeStep mode="signup" onLocked={(year) => (ageScreenOutcome(year) === 'adult' ? startGuest() : setGate('local'))} onBlocked={() => { writeAgeBlockFlag(); setGate('blocked'); }} />
-          <button type="button" onClick={() => setGate('local')} className="mx-auto mt-4 block font-mono text-xs text-white/45 hover:text-white">
+          <button type="button" onClick={() => setGate('local')} className="mx-auto mt-4 block min-h-[44px] px-4 font-sans text-[14px] font-medium text-white/70 underline-offset-4 hover:text-white hover:underline">
             Play without saving
           </button>
         </div>

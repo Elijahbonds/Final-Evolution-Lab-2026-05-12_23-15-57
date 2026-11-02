@@ -46,7 +46,7 @@ function Pill({ label, active, onClick, disabled, title }: { label: string; acti
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">{title}</div>
+      <div className="text-[12px] font-semibold uppercase tracking-wider text-white/50">{title}</div>
       {children}
     </div>
   );
@@ -64,10 +64,10 @@ export function HairTab(p: HairTabProps) {
         <Scissors className="h-4 w-4 text-cyan-400" />
         <div className="min-w-0 flex-1">
           <div className="text-xs font-semibold text-white/80">Hair — {p.style}</div>
-          <div className="text-[10px] text-white/40">Every style is built to fit your head. Free.</div>
+          <div className="text-[12px] text-white/50">Every style is built to fit your head. Free.</div>
         </div>
       </div>
-      {p.covered && <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[11px] text-amber-200">Your hood or helmet is covering the hair right now.</div>}
+      {p.covered && <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">Your hood or helmet is covering the hair right now.</div>}
 
       <Section title="Style">
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Hair packs">
@@ -81,7 +81,7 @@ export function HairTab(p: HairTabProps) {
                 className="min-h-[56px] rounded-xl border px-3 py-2 text-left transition"
                 style={{ borderColor: on ? '#00E5FF' : 'rgba(255,255,255,0.1)', backgroundColor: on ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.03)' }}>
                 <div className="text-xs font-semibold text-white/90">{s}</div>
-                <div className="mt-0.5 text-[10px] leading-snug text-white/45">{HAIR_STYLE_BLURB[s] ?? ''}</div>
+                <div className="mt-0.5 text-[12px] leading-snug text-white/50">{HAIR_STYLE_BLURB[s] ?? ''}</div>
               </button>
             );
           })}

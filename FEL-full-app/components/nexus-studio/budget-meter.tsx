@@ -15,7 +15,7 @@ export function BudgetMeter({ sample, budgetKey, phone, onPhone }: { sample: Bud
   const head = worst(rows);
   const ref = modeRow(budgetKey);
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-[11px]" data-testid="budget-meter" aria-live="polite">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-[12px]" data-testid="budget-meter" aria-live="polite">
       <span className="flex items-center gap-1.5 font-semibold uppercase tracking-[0.12em]" style={{ color: sample ? TONE[head] : C.dim }}>
         <Gauge className="h-3.5 w-3.5" aria-hidden /> Budget · {sample ? (sample.tier === 'mobile' ? 'phone' : sample.tier === 'high' ? 'TV / high' : 'desktop') : '…'}
       </span>

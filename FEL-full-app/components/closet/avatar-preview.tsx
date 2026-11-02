@@ -582,7 +582,7 @@ export default function AvatarPreview(props: AvatarPreviewProps) {
         {knob('rotate', 'Turn the part: drag round the ring', { left: 'var(--ring)', top: 0 }, '⟳')}
         {knob('scale', 'Resize the part: drag out or in', { left: 'calc(var(--ring) * 0.7071)', top: 'calc(var(--ring) * 0.7071)' }, '⤡')}
       </div>
-      {perfOn && <pre ref={perfRef} className="pointer-events-none absolute left-2 top-24 z-20 rounded bg-black/70 px-2 py-1 font-mono text-[10px] leading-tight text-emerald-300" />}
+      {perfOn && <pre ref={perfRef} className="pointer-events-none absolute left-2 top-24 z-20 rounded bg-black/70 px-2 py-1 font-mono text-[12px] leading-tight text-emerald-300" />}
     </div>
   );
 }

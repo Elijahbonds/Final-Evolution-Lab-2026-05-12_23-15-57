@@ -346,7 +346,7 @@ export function VelocitySession({ api = VBT_API, grab, decoder }: { api?: string
                 </dl>
                 <ol className="space-y-1" data-vbt-reps-list>
                   {read?.reps.map((x) => (
-                    <li key={x.index} className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[13px] tabular-nums ${x.partial ? 'text-white/40' : 'text-white/85'}`} data-vbt-rep={x.index}>
+                    <li key={x.index} className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1 text-[13px] tabular-nums ${x.partial ? 'text-white/50' : 'text-white/85'}`} data-vbt-rep={x.index}>
                       <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: zoneOf(x.mcv).color }} />Rep {x.index}{x.partial ? ' · partial' : x.bounce ? ' · bounce' : ''}</span>
                       <span>{speedText(x.mcv, x.mcvPm)}{x.lossPct != null ? ` · −${x.lossPct}%` : ''}</span>
                     </li>

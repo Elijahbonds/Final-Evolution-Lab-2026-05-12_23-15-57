@@ -215,24 +215,24 @@ export function ExerciseCatalogue({ coach = false }: { coach?: boolean }) {
                         <span className="text-sm font-medium text-white truncate">{ex.name}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full border" style={{ color: LEVEL_COLORS[ex.bounceLevel] || '#999', borderColor: (LEVEL_COLORS[ex.bounceLevel] || '#999') + '40' }}>
+                        <span className="text-[12px] px-2 py-0.5 rounded-full border" style={{ color: LEVEL_COLORS[ex.bounceLevel] || '#999', borderColor: (LEVEL_COLORS[ex.bounceLevel] || '#999') + '40' }}>
                           {ex.bounceLevel}
                         </span>
                         {ex.category?.name && (
-                          <span className="text-[10px] text-fel-quiet">{ex.category.name}</span>
+                          <span className="text-[12px] text-fel-quiet">{ex.category.name}</span>
                         )}
                         {ex.targetPrqStat && (
-                          <span className="text-[10px] text-fel-violet/70 flex items-center gap-0.5">
+                          <span className="text-[12px] text-fel-violet/70 flex items-center gap-0.5">
                             <Target className="h-3 w-3" />{ex.targetPrqStat}
                           </span>
                         )}
-                        {ex.tags?.pattern && <span className="text-[10px] text-fel-cyan/60">{PATTERN_INFO[ex.tags.pattern].label}</span>}
+                        {ex.tags?.pattern && <span className="text-[12px] text-fel-cyan/60">{PATTERN_INFO[ex.tags.pattern].label}</span>}
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {coach && mineKeys.has(nameKey(copyNameOf(ex))) && <Check className="h-4 w-4 text-[#7BD389]" aria-label="in your catalogue" />}
-                      {ex.videoUrl && <Play className="h-4 w-4 text-fel-crimson/60" />}
-                      <ChevronRight className="h-4 w-4 text-fel-quiet group-hover:text-white/40 transition-colors" />
+                      {ex.videoUrl && <Play className="h-4 w-4 text-fel-crimson/100" />}
+                      <ChevronRight className="h-4 w-4 text-fel-quiet group-hover:text-white/50 transition-colors" />
                     </div>
                   </div>
                 </button>
@@ -290,7 +290,7 @@ function ExerciseDetail({ exercise: ex, onClose, catalogue }: { exercise: Exerci
           {ex.tags && (
             <div className="mt-2 space-y-1">
               <TagRow pattern={ex.tags.pattern} braceMode={ex.tags.braceMode} layer={ex.tags.skillLayer} />
-              <p className="text-[11px] text-fel-quiet">Why these tags: {ex.tags.why}</p>
+              <p className="text-[12px] text-fel-quiet">Why these tags: {ex.tags.why}</p>
             </div>
           )}
           {catalogue && (
@@ -359,7 +359,7 @@ function KbCueCard({ ex }: { ex: Exercise }) {
   return (
     <div className="space-y-2" data-testid="kb-cue-card">
       <div className="flex items-center gap-3 rounded-xl bg-[#16161a] p-4">
-        <Dumbbell className="h-8 w-8 shrink-0 text-white/30" aria-hidden />
+        <Dumbbell className="h-8 w-8 shrink-0 text-white/50" aria-hidden />
         <div className="min-w-0 space-y-1">
           <p className="text-[12px] text-white/55">No 3D demo for this one. Follow the cues:</p>
           <ul className="space-y-0.5 text-[13px] text-white/85">{cues.map((c) => <li key={c}>{c}</li>)}</ul>
