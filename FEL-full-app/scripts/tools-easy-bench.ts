@@ -33,13 +33,17 @@ export const CONDITIONS: Cond[] = [
   { name: 'first two with arm swing', blocks: [{ trials: [{ heightM: 0.44 }, { heightM: 0.46 }], style: { armSwing: true } }, { trials: hips(5) }] },
 ];
 
+/** The base's takes, copied from git objects into this scratch folder (not committed; see the header). A variable, so
+ *  the type-check never looks for a folder that only exists while the bench runs. */
+const BEFORE = '../.tools-easy-before/';
+
 async function maker(fps: number): Promise<() => TakeLike> {
   const aspect = 4 / 3;   // the synth's camera is 640 × 480
   if (tool === 'readiness') {
-    const m = impl === 'before' ? await import('../.tools-easy-before/capture') : await import('../lib/coach/readiness/capture');
+    const m = (impl === 'before' ? await import(BEFORE + 'capture') : await import('../lib/coach/readiness/capture')) as typeof import('../lib/coach/readiness/capture');
     return () => new m.ReadinessCapture({ aspect, cameraFps: fps }) as unknown as TakeLike;
   }
-  const m = impl === 'before' ? await import('../.tools-easy-before/jumpTake') : await import('../lib/combine/jumpTake');
+  const m = (impl === 'before' ? await import(BEFORE + 'jumpTake') : await import('../lib/combine/jumpTake')) as typeof import('../lib/combine/jumpTake');
   return () => new m.JumpTake({ jumps: 3, aspect, cameraFps: fps }) as unknown as TakeLike;
 }
 
