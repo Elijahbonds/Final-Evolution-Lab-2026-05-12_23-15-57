@@ -14,7 +14,10 @@ import PlayLayout from '@/app/play/layout';
 import { setAgentRunHooksAllowed } from '@/lib/agentRunHooks';
 import { sessionStore } from '@/lib/babylon/core/sessionStore';
 
-type Loader = () => Promise<ComponentType>;
+/** The combat loaders take the account's birth year (the page reads it on the server); the rig's player has none on file. */
+type LoaderProps = { dobYear?: number | null; dob?: string | null };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- three loaders require dobYear; every loader is rendered with it
+type Loader = () => Promise<ComponentType<any>>;
 /** Registry key → its /play route's loader (app/play/<route>/_components/loader.tsx). */
 export const ROUTES: Record<string, [string, Loader]> = {
   aeroaces: ['aero-aces', () => import('@/app/play/aero-aces/_components/loader').then((m) => m.AeroAcesLoader)],
@@ -76,5 +79,5 @@ window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 (async () => {
   if (!route) { document.body.textContent = `no route for ${key}`; return; }
   const Loader = await route[1]();
-  createRoot(document.getElementById('root')!).render(h(PlayLayout, null, h(Loader)));
+  createRoot(document.getElementById('root')!).render(h(PlayLayout, null, h(Loader, { dobYear: null, dob: null } satisfies LoaderProps)));
 })();
