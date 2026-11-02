@@ -82,10 +82,13 @@ describe('/train, the Quick Screen card', () => {
     expect(h.reads.some((r) => r.startsWith('user.'))).toBe(false);
   });
 
-  it('the Mirror card is still first, and the shelf keeps its other doors', async () => {
+  // test changed (TOOLS-EASY, 2026-10-28; flagged): the Measure group now lists the measuring tools first, in one order
+  // (lib/tools-easy/door.ts MEASURE_TOOLS), and the Mirror's live coach after them. The Mirror card is still on the shelf,
+  // still one tap; the old pin said it came before the Quick Screen card.
+  it('the Mirror card is still on the shelf, after the Quick Screen card, and the shelf keeps its other doors', async () => {
     const html = await render();
     expect(html.indexOf('The Mirror')).toBeGreaterThan(-1);
-    expect(html.indexOf('The Mirror')).toBeLessThan(html.indexOf(CARD_TITLE));
+    expect(html.indexOf('The Mirror')).toBeGreaterThan(html.indexOf(CARD_TITLE));
     expect(html).toContain('Your programming');
   });
 });
