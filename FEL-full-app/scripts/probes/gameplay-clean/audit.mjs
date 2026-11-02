@@ -327,15 +327,22 @@ function analyze(mode, rec, S) {
   const jumps = []; for (let i = 1; i < F.length; i++) { if (F[i].ph !== 'playing' || F[i - 1].ph !== 'playing') continue; const d = dist(F[i].r, F[i - 1].r); if (d !== null && d > 0.35) jumps.push({ t: F[i].t, m: r2(d) }); }
   out.rootJumps = jumps.length; out.rootJumpEx = jumps.slice(0, 4);
   // T-pose (arms out level) and rest-pose frames
-  let tpose = 0, restF = 0;
+  // a T-pose is HELD: arms level and spread for 6+ frames in a row (football's and freerun's hits were 2-frame passes
+  // through level arms on a jump — the raw shows each one after a jump press)
+  let tpose = 0, restF = 0, tposeHeld = 0, tRun = 0;
   for (const f of play) {
+    const isT = (() => { const j = f.j; if (!j || !j[8] || !j[9] || !j[10] || !j[11] || !j[5] || !j[6]) return false;
+      const lv = (a, b) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const l = Math.hypot(...d); return l > 0 ? Math.abs(d[1]) / l : 1; };
+      return lv(j[8], j[10]) < 0.26 && lv(j[9], j[11]) < 0.26 && lv(j[10], j[5]) < 0.3 && lv(j[11], j[6]) < 0.3 && dist(j[5], j[6]) > dist(j[8], j[9]) * 3.4; })();
+    tRun = isT ? tRun + 1 : 0; if (tRun === 6) tposeHeld += 6; else if (tRun > 6) tposeHeld++;
     if (f.rest !== null && f.rest !== undefined && f.rest >= 0.9) restF++;
     const j = f.j; if (!j || !j[8] || !j[9] || !j[10] || !j[11] || !j[5] || !j[6]) continue;
     const lvl = (a, b) => { const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; const l = Math.hypot(...d); return l > 0 ? Math.abs(d[1]) / l : 1; };
     const span = dist(j[5], j[6]), shoulders = dist(j[8], j[9]);
     if (lvl(j[8], j[10]) < 0.26 && lvl(j[9], j[11]) < 0.26 && lvl(j[10], j[5]) < 0.3 && lvl(j[11], j[6]) < 0.3 && span > shoulders * 3.4) tpose++;
   }
-  out.tposeFrames = tpose; out.restPoseFrames = restF; out.skeleton = rec.skel;
+  out.tposeFramesAny = tpose;
+  out.tposeFrames = tposeHeld; out.restPoseFrames = restF; out.skeleton = rec.skel;
   // foot skate: a planted foot (within 4 cm of its own floor, slow vertically) sliding while the hero moves
   if (!RIDE.has(mode)) {
     const slides = [];
@@ -582,6 +589,7 @@ for (const mode of MODES) {
   } catch (e) { row.fail = String(e.message || e).slice(0, 200); }
   row.errors = [...new Set(errs)].slice(0, 12); row.badUrls = [...new Set(bad)]; row.errorCount = errs.length; row.warnCount = warnsN.n; row.crashed = crashed;
   try { row.links = await p.evaluate(() => window.__links); } catch {}
+  try { row.hitch = await p.evaluate(() => (window.__FEL_HITCH__ && window.__FEL_HITCH__.report ? window.__FEL_HITCH__.report() : null)); } catch {}   // the harness's own S1 probe: builds / clones / new programs split at the intro
   try { row.scriptErr = await p.evaluate(() => window.__scriptErr ?? null); row.api = await p.evaluate(() => [...new Set(window.__api)].slice(0, 20)); } catch {}
   fs.writeFileSync(path.join(OUT, `${mode}-${TAG}.json`), JSON.stringify(row, null, 1));
   console.log(`${mode.padEnd(17)} ready ${row.readyS}s play ${row.firstPlayS}s frames ${row.frames} pops ${row.pops} cuts ${row.camCuts} hidden ${row.heroHiddenPct}% cpu ${row.cpuMsP50}/${row.cpuMsP95} phone ${row.phoneCpuMsP50}/${row.phoneCpuMsP95} draws ${row.drawsMean}/${row.drawsMax} resp ${row.respMsMed}ms pause ${row.pause?.state} err ${row.errorCount}${row.fail ? ' FAIL ' + row.fail : ''} (${row.wallS}s)`);
