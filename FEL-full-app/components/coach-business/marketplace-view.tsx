@@ -21,7 +21,7 @@ function Filter({ label, on, children }: { label: string; on: boolean; children:
   return (
     <details className="group">
       <summary className={`${L.chip} ${on ? L.chipOn : 'border border-white/15'} cursor-pointer list-none`}>{label} <span aria-hidden className="ml-1 transition-transform group-open:rotate-180">▾</span></summary>
-      <div className="mt-2 flex flex-wrap gap-2">{children}</div>
+      <div className="mt-2 hidden flex-wrap gap-2 group-open:flex">{children}</div>
     </details>
   );
 }
