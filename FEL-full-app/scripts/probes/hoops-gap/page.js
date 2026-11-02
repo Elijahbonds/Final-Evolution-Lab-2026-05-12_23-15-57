@@ -109,8 +109,19 @@
       if (B[0]) { const hp = (B[0].hips || B[0].root).getAbsolutePosition(); const tm = scene.getTransformMatrix(); const v = V3.TransformCoordinates(hp, tm); const rel = hp.subtract(cp); scr[F * 3] = v.x; scr[F * 3 + 1] = v.y; scr[F * 3 + 2] = (rel.x * fw.x + rel.y * fw.y + rel.z * fw.z) > 0 ? 1 : 0; }
     }
     poss[F] = possCode();
+    if (CFG.clipLog) {   // hoops-p04b: which clips each body is playing (logged on change), so a pop or a skate has a state
+      const per = B.map(() => []);
+      for (const g of scene.animationGroups) {
+        if (!g.isPlaying) continue;
+        let bi = clipBody.get(g);
+        if (bi === undefined) { const t = g.targetedAnimations[0] && g.targetedAnimations[0].target; bi = -1; for (let k = 0; k < B.length; k++) if (t && (B[k].set.has(t) || B[k].root === t)) { bi = k; break; } clipBody.set(g, bi); }
+        if (bi >= 0 && bi < per.length) { const w = g.weight < 0 ? 1 : g.weight; if (w > 0.02) per[bi].push(g.name.replace(/_c\d+$/, '') + ':' + w.toFixed(1)); }
+      }
+      per.forEach((a, k) => { const sig = a.sort().join(' '); if (sig !== lastClips[k]) { lastClips[k] = sig; if (HG.clips.length < 6000) HG.clips.push([HG.frame, B[k].id, sig]); } });
+    }
     F++;
   };
+  const clipBody = new WeakMap(); const lastClips = []; HG.clips = [];
   scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } });
   HG.start = () => { HG.rec = true; HG.f0 = HG.frame; F = 0; for (const b of B) b.prevQ = WATCH.map(() => null); };
   HG.stop = () => { HG.rec = false; return F; };
@@ -328,7 +339,7 @@
           const nb = []; for (let k = Math.max(1, i - 6); k <= Math.min(n - 1, i + 6); k++) if (k !== i) nb.push(w[k]); nb.sort((a, b) => a - b);
           const med = nb[Math.floor(nb.length / 2)] || 0; const side = Math.max(w[i - 3] || 0, w[i + 3] || 0);
           if (/Arm|Leg|Hand|Foot/.test(WATCH[j]) && w[i] > 1500) R.whips++;
-          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) { R.severe++; if ((R.severeAt || (R.severeAt = [])).length < 60) R.severeAt.push([HG.f0 + i, WATCH[j], Math.round(w[i])]); }   /* hoops-p04: where the severe pops are */ R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
+          if (w[i] >= 600 && w[i] >= 3.5 * Math.max(med, 60) && w[i] >= 3 * side) { R.pops++; if (opts.popFrames && (R.popAt || (R.popAt = [])).length < 3000) R.popAt.push(i); if (w[i] >= 3000) { R.severe++; if ((R.severeAt || (R.severeAt = [])).length < 60) R.severeAt.push([HG.f0 + i, WATCH[j], Math.round(w[i])]); }   /* hoops-p04: where the severe pops are */ if (opts.popList && (R.popList || (R.popList = [])).length < 400) R.popList.push([HG.f0 + i, WATCH[j], Math.round(w[i])]);   /* hoops-p04b: every pop, where */ R.popBones[WATCH[j]] = (R.popBones[WATCH[j]] || 0) + 1; const sg = segOf(i); if (sg >= 0) { const P = out.possessions[sg]; (P.pops || (P.pops = {}))[B[bi].id] = (P.pops[B[bi].id] || 0) + 1; } }
         }
       }
       // root snaps (> 20 deg of yaw in one frame) and root jumps (0.25-0.5 m in one frame) outside resets
@@ -352,7 +363,7 @@
         const o = (i * NB + bi) * K, p = ((i - 1) * NB + bi) * K;
         for (const [fa, ob] of [[4, 7], [7, 4]]) {
           const y = pos[o + fa + 1], yWas = pos[p + fa + 1], yo = pos[o + ob + 1]; if (!isFinite(y) || !isFinite(yWas)) continue;
-          if (y < floorY + 0.05 && (!isFinite(yo) || y <= yo) && !(y - yWas > 0.002)) { const s = Math.hypot(pos[o + fa] - pos[p + fa], pos[o + fa + 2] - pos[p + fa + 2]); slides.push(s); if (vel[i] > 0.5) { movingPlanted++; movingSlide += s; } }
+          if (y < floorY + 0.05 && (!isFinite(yo) || y <= yo) && !(y - yWas > 0.002)) { const s = Math.hypot(pos[o + fa] - pos[p + fa], pos[o + fa + 2] - pos[p + fa + 2]); slides.push(s); if (opts.popList && s > 0.05 && (R.skateAt || (R.skateAt = [])).length < 400) R.skateAt.push([HG.f0 + i, fa === 4 ? 'L' : 'R', Math.round(s * 1000) / 10]); if (vel[i] > 0.5) { movingPlanted++; movingSlide += s; } }
         }
       }
       R.plantedFrames = slides.length; R.slideP90Cm = r2(pctl(slides, 0.9) * 100); R.skates = slides.filter((s) => s > 0.05).length;
