@@ -210,7 +210,49 @@ A floodlight, then its colour.
 
 ## 5. The fixes, before → after
 
-AFTER_TABLE
+Measured on the "after" bundle (`00b6255b` code; the later commits are docs, the probe and the release merges). "est." is the
+keystroke-level estimate. On the rig Play-test and "Play it" open the development hand-off, because the rig is a
+development build; the production path is held by `lib/nexus-studio/playtestLive.test.ts` against the shipped runtime.
+
+### Tasks
+
+| Task | Desktop before → after | Phone before → after |
+|---|---|---|
+| Start a new project | **Dead end → 2 taps** (Projects, New project), est. 5.3 s. The old project moves to the list | **Dead end → 2 taps**, est. 5.3 s |
+| A first court that looks like something | **7 taps + 1 key, est. 21.1 s, from 4 places, hidden Esc → 2 taps, est. 5.3 s** ("Make it for me" (1), "Play it" (2)) | **7 + 1, est. 20.2 s, sideways scroll → 2 taps, est. 6.3 s** |
+| Place and edit an element | 3 + 1, est. 11.6 s → 3 + 1, est. 11.2 s; undo exact | 3 + 1 with the inspector **off screen** → the inspector is a sheet tab. **Open:** the probe's colour fill timed out on the phone after the merge (not diagnosed: no extra rig runs); the owner's phone check covers it |
+| Arrow keys after placing | **Nudge + focus jumped** to the next control → **nudge only, focus stays on the 3D view** | Same fix, measured |
+| AI builder, switch off (default) | "Coming soon" over a greyed form, **dead end** → an honest line (it runs on a paid AI service) and **Build by hand / Make your first court** | Same |
+| AI builder, switch on | 4 + 1, est. 14.9 s → 4 + 1, est. 14.6 s; one Ctrl+Z takes it back | 4 + 1, est. 14.3 → 14.5 s |
+| Character | 4 taps, est. 10.6 s → same. With no saved look the message now says how to make one, with an Open the Closet link | Same |
+| Script | 2 taps → 2 taps (or 1 from the new empty state); **0 → 5 graph nodes take focus**; nodes move with the arrows and connect from a list | Same |
+| Test-play | 1 tap; **production dead end → plays in production** on the game's own page as practice | Same |
+| Save | 0 taps, autosave 1.7 s → 0 taps, 1.9 s | 0 taps, 1.3 → 1.5 s |
+| Reopen | Restored → restored, and the other projects are listed under Projects | Same |
+| Publish / share | **Dead end → Publish: 2 taps** (Publish, Check and download): it passed and downloaded the reviewed venue file to commit. "Make a share link" says "Share links are not switched on" (`STUDIO_SHARE_ENABLED` is off: an owner call) | **Dead end → 2 taps**; it passed on the phone too (the phone measure ran first) |
+
+### Across tasks
+
+| | Before | After |
+|---|---|---|
+| Phone page width at 390 | 735 px (overflow 345) | **390** (no sideways scroll), on every task screen measured |
+| Desktop page height at 800 | 857 (the budget strip below the fold) | **800** |
+| Text runs under 12 px (desktop, first screen) | 35 of 85 | **0 of 90** (the script graph's SVG node labels measured 10 to 11 px; raised to 12 px after the measure, not re-measured) |
+| Distinct font sizes (desktop, first screen) | 6 (10–20) | 4 (12–20) |
+| Words on the first screen (desktop) | 139, engine words included | 173, including the guide's card (about 30 words); the engine words are gone |
+
+### Accessibility
+
+| Check | Before | After |
+|---|---|---|
+| Static scan per track (desktop and phone) | 0 critical, 0 serious, 1 moderate (landmark) | Same: 0 / 0 / 1 |
+| Tab pass, desktop | 120+ stops, the viewport **not reached**; 12 Tabs to the first asset | **62 stops in all; the 3D view at Tab 26**, the first asset at 14; skip links are first |
+| Tab pass, phone | 22 serious focus-obscured (the TabBar) | **1 serious** (the canvas focus ring sits under the sheet's edge) |
+| New finding | — | 1 critical focus-visible: the 3D view's canvas showed no ring when focused (it was never reached before). Fixed after the measure: the canvas's `outline-none` now gives way to the focus ring on `:focus-visible` (not re-measured) |
+| Reduced motion | 0 animations running | 0 (the guide's hint pulse is off under reduced motion, the device's setting or the app's) |
+| 200 % zoom (640 × 400) | Sideways scroll, 735 in 640 | **No sideways scroll** (640) |
+| Keyboard on every track | Ctrl+Z / Ctrl+S on Venues only | Undo, Redo, Save and "?" on every track; Help lists every key |
+
 
 ## 6. The nexus-publish merge (coordinator decision 1)
 

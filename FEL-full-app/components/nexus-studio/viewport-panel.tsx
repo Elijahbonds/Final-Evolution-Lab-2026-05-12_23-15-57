@@ -163,7 +163,7 @@ export const ViewportPanel = forwardRef<ViewportHandle, ViewportPanelProps>(func
         const at = vp.groundAt(e.clientX - r.left, e.clientY - r.top) ?? vp.focusPoint();
         cbs.current.onDropItem(id, at);
       }}>
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full outline-none" style={{ touchAction: 'none' }} tabIndex={0} aria-label="Venue viewport: drag to orbit, right-drag to pan, wheel to zoom, click to select, Shift- or Ctrl-click to add, Shift-drag to box-select" data-testid="studio-canvas" />
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--fel-focus,#00E5FF)]" style={{ touchAction: 'none' }} tabIndex={0} aria-label="Venue viewport: drag to orbit, right-drag to pan, wheel to zoom, click to select, Shift- or Ctrl-click to add, Shift-drag to box-select" data-testid="studio-canvas" />
       {p.overlay && <div className="pointer-events-none absolute inset-x-2 top-2 z-20 md:right-auto">{p.overlay}</div>}
       {box && (
         <div aria-hidden data-testid="select-box" className="pointer-events-none absolute border"

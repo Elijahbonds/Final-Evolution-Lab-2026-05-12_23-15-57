@@ -226,9 +226,9 @@ function GraphCanvas({ script, run, seal }: { script: StudioScript; run: StudioA
                 style={{ cursor: 'grab' }}>
                 <rect width={NODE_W} height={NODE_H} rx={10} fill="#0f141c" stroke={on ? '#ffffff' : accepts ? col : '#263142'} strokeWidth={on || accepts ? 2 : 1} />
                 <rect width={NODE_W} height={20} rx={10} fill={col} fillOpacity={0.16} />
-                <text x={12} y={14} fontSize={10} fontWeight={700} letterSpacing={1.4} fill={col}>{GROUP_LABEL[grp].toUpperCase()}</text>
+                <text x={12} y={14} fontSize={12} fontWeight={700} letterSpacing={1.4} fill={col}>{GROUP_LABEL[grp].toUpperCase()}</text>
                 <text x={12} y={36} fontSize={13} fontWeight={600} fill="#f2f5f9">{NODE_SPECS[n.kind].label}</text>
-                <text x={12} y={53} fontSize={11} fill="#8b97a5">{paramSummary(n).slice(0, 30)}</text>
+                <text x={12} y={54} fontSize={12} fill="#8b97a5">{paramSummary(n).slice(0, 26)}</text>
                 {grp !== 'event' && <circle cx={0} cy={NODE_H / 2} r={6} fill="#0f141c" stroke={col} strokeWidth={2} />}
                 {grp !== 'action' && (
                   <circle cx={NODE_W} cy={NODE_H / 2} r={7} fill={col} stroke="#0f141c" strokeWidth={2} style={{ cursor: 'crosshair' }} data-testid="script-port"
