@@ -109,7 +109,7 @@ const GRIDIRON: readonly [string, string, number, string, Partial<Variant>?][] =
   ['Kick-Step Footwork', 'kick-step', 1, 'From the stance, kick-step back and set, square to the cone, twice.'],
   ['Over-the-Hurdle Shuffle', 'hurdle-shuffle', 1, 'Shuffle over each small hurdle without touching it, eyes on the cone ahead.', { equipment: ['mini-hurdle'] }],
   ['Ball-Security Cone Weave', 'ball-security', 0, 'Weave the cones with the football high and tight, switching arms at each cone.', { equipment: ['cone'] }],
-  ['Three-Point Stance Get-Off to 10 m', 'stance-10', 1, 'From the three-point stance, explode out on the call and sprint to the cone.'],
+  ['Three-Point Stance Get-Off to 10 m', 'stance-10', 1, 'From the three-point stance, push off on the call and sprint to the cone.'],
   ['Backpedal Weave', 'backpedal-weave', 1, 'Backpedal and weave left and right on the partner\'s point, eyes on the partner.'],
   ['Comeback Route Footwork', 'comeback', 1, 'Sprint to the cone, sink, and come back toward the line in two quick steps.'],
   ['Slant Route Footwork', 'slant', 0, 'Three hard steps up the field, plant, and cut inside on the slant line.'],

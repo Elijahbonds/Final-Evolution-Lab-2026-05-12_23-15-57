@@ -19,6 +19,7 @@ import { useSoundtrackStage } from '@/components/soundtrack/soundtrack-stage';
 import { ControlsPanel } from './controls-panel';
 import { BodyPlayReady, BodyPlayReadyLine, BodyPlayLayer } from './body-play';
 import { bootErrorRequiresPageReload } from './boot-error';
+import { detectPadFamily } from '@/lib/input/padLabels';
 import { PlayAsSwitcher } from '@/components/closet/play-as-switcher';   // CREATOR-PLAN phase 4a: "Play as …" a saved character
 import { BASKETBALL_MODE_IDS, COURT_LOCATIONS, readCourtLocation, readyCourtLocations, writeCourtLocation, type CourtLocationId } from '@/lib/babylon/nexus/courtLocations';
 import { BALL_SKINS, readBallSkin, readyBallSkins, writeBallSkin, type BallSkinId } from '@/lib/babylon/nexus/ballSkins';
@@ -35,6 +36,7 @@ import { arenasFor, readCombatArena, writeCombatArena, COMBAT_MODE_IDS, type Com
 import { COURT_LAYOUTS, COURT_LAYOUT_MODES, readCourtLayout, writeCourtLayout, type CourtLayoutId } from '@/lib/babylon/nexus/courtLayout';   // COURT LAYOUT (2026-09-18): the 3v3's chokepoint
 import { SET_LENGTH_MODES, setLengthsFor, setLengthLabel, readSetLength, writeSetLength, setLengthLocked, type SetLengthId } from '@/lib/babylon/nexus/setLength';   // IMPROVE (2026-10-06): volleyball's short set, tennis's quick match
 import { looksFor, readPlaceLook, writePlaceLook } from '@/lib/babylon/nexus/placeLooks';
+import { restorePlace } from '@/lib/nexus-studio/published';   // NEX-02: Restore the shipped place over a published Studio venue
 import { tierList, readTier, writeTier, profileFor, type Tier } from '@/lib/babylon/core/Difficulty';
 import { headToHeadRun } from '@/lib/babylon/modes/onevoneRules';
 import { OneVOneWinBy2 } from './onevone-win-by-2';   // owner 2026-10-06: the 1v1's win-by-2 pick
@@ -291,6 +293,7 @@ export function SplashCard(props: BootSplashProps) {
   const placeList = looksFor(props.modeId);
   const [placeId, setPlaceId] = useState<string>('home');
   useEffect(() => { if (placeList.length) setPlaceId(readPlaceLook(props.modeId)?.id ?? 'home'); }, [placeList.length, props.modeId]);
+  const restore = restorePlace(placeList, placeId);
   const pickPlace = (id: string) => {
     if (id === placeId) return;
     writePlaceLook(props.modeId, id);
@@ -414,6 +417,8 @@ export function SplashCard(props: BootSplashProps) {
             TAP TO START
           </button>
         )}
+        {/* CONTROLLER-TRY-FIX item 4 (C5): with a pad in, the card says the pad starts it too (any real press wakes play, StartWake) */}
+        {props.phase === 'ready' && <PadStartLine />}
         {/* MOVEMENT PLAY P3 (2026-09-24): the hands-up START, said once the camera sees you (it wakes a calibrated body,
             BodySession). The line reads the session itself, so the splash does not re-render with the ring, and holds
             its room while the camera is on, so the card does not jump when a detection is missed (the step-4a review).
@@ -538,6 +543,13 @@ export function SplashCard(props: BootSplashProps) {
               ))}
             </div>
             <p className="max-w-[24rem] text-[9px] leading-tight tracking-wide text-white/40">{placeList.find((l) => l.id === placeId)?.sub ?? ''}</p>
+            {/* NEX-02 (owner 2026-10-20): a venue the owner published from Nexus Studio is the default place; one tap puts the shipped one back */}
+            {restore && (
+              <button type="button" onClick={() => pickPlace(restore.id)} data-testid="place-restore"
+                className="rounded-full border border-white/25 px-3 py-1 text-[9px] font-black tracking-[0.2em] text-white/70 transition hover:bg-white/10">
+                RESTORE {restore.name.toUpperCase()}
+              </button>
+            )}
           </div>
         )}
 
@@ -836,4 +848,19 @@ export function ejectTransition(mount: HTMLElement): Promise<void> {
     requestAnimationFrame(() => { el.style.transform = 'translateY(0)'; });
     setTimeout(() => { resolve(); setTimeout(() => el.remove(), 400); }, 360);
   });
+}
+
+/** CONTROLLER-TRY-FIX item 4 (C5): 'or press any button' under TAP TO START while a pad is in — the night card's own words
+ *  (dunk-babylon). Read after mount (the browser's pads), so the server's markup is the old card exactly; nothing without a pad. */
+export const PAD_START_LINE = 'or press any button';
+export function PadStartLine() {
+  const [pad, setPad] = useState(false);
+  useEffect(() => {
+    const read = (): void => setPad(detectPadFamily() !== null);
+    read();
+    window.addEventListener('gamepadconnected', read);
+    window.addEventListener('gamepaddisconnected', read);
+    return () => { window.removeEventListener('gamepadconnected', read); window.removeEventListener('gamepaddisconnected', read); };
+  }, []);
+  return pad ? <span data-pad-start-line className="mt-1 font-mono text-xs text-white/60">{PAD_START_LINE}</span> : null;
 }

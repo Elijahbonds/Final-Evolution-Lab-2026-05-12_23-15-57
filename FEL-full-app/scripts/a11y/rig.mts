@@ -65,6 +65,9 @@ export interface RigOptions {
   /** load the faces the way production does (premium-ui P10, for layout-shift numbers): font-display swap, behind
    *  next/font's own size-adjusted Arial fallbacks — the overrides are copied from the live CSS (2026-10-27) */
   prodFonts?: boolean;
+  /** STUDIO-EASY (2026-10-28): the packages left out of the bundle (default: MediaPipe and Babylon). The Studio's rig bundles
+   *  Babylon, because its viewport is the mode's own engine path and the tasks it measures click into it. */
+  external?: string[];
 }
 
 // next/font/local's generated fallbacks, as served by final-evolution-lab.web.app on 2026-10-27 (deterministic per font file)
@@ -82,7 +85,7 @@ const common = {
   define: { 'process.env.NODE_ENV': '"development"' }, tsconfig: join(ROOT, 'tsconfig.json'), plugins: [stubs],
   banner: { js: 'var process = globalThis.process || { env: { NODE_ENV: "development" } }; var __dirname = "/";' },
   loader: { '.png': 'empty', '.jpg': 'empty', '.svg': 'empty', '.woff2': 'empty', '.wasm': 'empty', '.glb': 'empty' } as Record<string, 'empty'>,
-  external: ['@mediapipe/tasks-vision', '@babylonjs/*'],
+  external: opts.external ?? ['@mediapipe/tasks-vision', '@babylonjs/*'],
 };
 await build({ ...common, entryPoints: [opts.entry ?? join(ROOT, 'scripts/a11y/entry.tsx')], outfile: join(BUILD, 'pages.js'), splitting: false });
 await build({ ...common, entryPoints: [join(ROOT, 'scripts/a11y/inpage.ts')], outfile: join(BUILD, 'inpage.js') });

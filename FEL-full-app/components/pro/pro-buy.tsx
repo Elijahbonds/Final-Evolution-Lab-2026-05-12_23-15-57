@@ -1,10 +1,21 @@
 'use client';
 // PAYMENTS-READY: the FEL Pro buy screen (/pro). Weekly or monthly at the existing prices, the store-terms tick, and a
-// button that POSTs /api/stripe/checkout and goes to Stripe. While FEL Pro is not on sale it shows one line and no
-// button. Every refusal (18+, terms, closed, already Pro) is the route's own answer (lib/payments/proBuy.ts).
+// button that POSTs /api/stripe/checkout and goes to Stripe. Every refusal (18+, terms, closed, already Pro) is the route's
+// own answer (lib/payments/proBuy.ts).
+//
+// PLAT-P07 (2026-11-02): the shop front's shape. A hero, what Pro gives in three lines (an owner draft:
+// components/pro/pro-copy.ts), the two plans as the one product card, then ONE primary that opens the one buy sheet
+// (what you get → the terms tick → pay, components/shop/buy-sheet.tsx). While FEL Pro is not on sale every plan card
+// says Opens soon and there is no button: no checkout call can be made.
 import { useState } from 'react';
-import { loginPath } from '@/lib/auth/safeNext';
-import { buyPro, PRO_CLOSED_LINE, PRO_PLANS, proBuyHref, proPriceLabel, type ProPlan } from '@/lib/payments/proBuy';
+import { PRO_CLOSED_LINE, type ProPlan } from '@/lib/payments/proBuy';
+import { proItems } from '@/lib/shop/model';
+import { payPro } from '@/lib/shop/checkout';
+import { ProductCard } from '@/components/shop/product-card';
+import { BuyEntry } from '@/components/shop/buy-sheet';
+import { OpensSoon } from '@/components/shop/opens-soon';
+import { SHOP_LOOK as L } from '@/components/shop/look';
+import { PRO_COPY as T, PRO_LINES } from './pro-copy';
 
 export interface ProBuyProps {
   /** isPurchaseOpen('fel_pro') on the server: VIRTUAL_PURCHASES_ENABLED and PURCHASES_ALLOWLIST. */
@@ -12,59 +23,40 @@ export interface ProBuyProps {
   plan: ProPlan;
   prices: Record<ProPlan, number>;
   terms: { version: string; href: string };
-  /** What Pro does, from the product's own description (lib/stripe.ts). */
+  /** What Pro does, from the product's own description (lib/stripe.ts): the sheet's "what you get". */
   description: string;
 }
 
 export function ProBuy({ open, plan: initial, prices, terms, description }: ProBuyProps) {
   const [plan, setPlan] = useState<ProPlan>(initial);
-  const [agreed, setAgreed] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-
-  const buy = async () => {
-    if (!agreed) return;
-    setBusy(true);
-    setNote(null);
-    const out = await buyPro(fetch, plan, terms.version);
-    if (out.kind === 'redirect') { window.location.href = out.url; return; }
-    if (out.kind === 'sign_in') { window.location.href = loginPath(proBuyHref(plan)); return; }
-    if (out.kind === 'terms_changed') setAgreed(false);
-    setBusy(false);
-    setNote(out.message);
-  };
-
+  const items = proItems(prices, open);
+  const chosen = items.find((i) => i.id === plan) ?? items[0];
   return (
-    <main className="mx-auto max-w-lg space-y-4 px-4 py-8 text-white" data-pro-buy={open ? 'open' : 'closed'}>
-      <h1 className="text-2xl font-black">FEL Pro</h1>
-      <p className="text-sm text-white/70">{description}</p>
-      {!open ? (
-        <p className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm text-white/80" data-pro-closed>{PRO_CLOSED_LINE}</p>
-      ) : (
-        <>
-          <fieldset className="space-y-2">
-            <legend className="text-xs font-bold uppercase tracking-wider text-white/50">Choose how to pay</legend>
-            {PRO_PLANS.map((p) => (
-              <label key={p} className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm ${plan === p ? 'border-cyan-300 bg-cyan-300/10' : 'border-white/15'}`} data-plan={p}>
-                <span className="flex items-center gap-2">
-                  <input type="radio" name="plan" value={p} checked={plan === p} onChange={() => setPlan(p)} />
-                  <span className="font-bold">{p === 'weekly' ? 'Weekly' : 'Monthly'}</span>
-                </span>
-                <span>{proPriceLabel(prices[p], p)}</span>
-              </label>
+    <main className={L.page} data-pro-buy={open ? 'open' : 'closed'}>
+      <p className={L.eyebrow}>{T.eyebrow}</p>
+      <h1 className={L.title}>{T.title}</h1>
+      <ul className={`${L.includes} mt-4`} data-pro-lines>
+        {PRO_LINES.map((l) => <li key={l} className="flex gap-2"><span aria-hidden className="text-fel-cyan">✓</span><span>{l}</span></li>)}
+      </ul>
+      {open ? (
+        <section className={L.section} aria-label={T.plans}>
+          <ul className={L.grid}>
+            {items.map((i) => (
+              <li key={i.id} data-plan={i.id}>
+                <label className={`block cursor-pointer rounded-2xl ${plan === i.id ? 'ring-2 ring-fel-cyan' : ''}`}>
+                  <input type="radio" name="plan" value={i.id} checked={plan === i.id} onChange={() => setPlan(i.id as ProPlan)} className="sr-only" />
+                  <ProductCard item={i}>{null}</ProductCard>
+                </label>
+              </li>
             ))}
-          </fieldset>
-          <label className="flex items-start gap-2 text-sm text-white/80" data-buyer-terms>
-            <input type="checkbox" className="mt-1" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-            <span>I agree to the <a className="font-bold text-cyan-300 underline" href={terms.href} target="_blank" rel="noopener noreferrer">store terms</a>.</span>
-          </label>
-          <button type="button" onClick={buy} disabled={!agreed || busy} data-action="buy-pro"
-            className="min-h-11 w-full rounded-xl bg-cyan-300 px-4 text-sm font-bold text-black disabled:opacity-60">
-            {busy ? 'Opening checkout…' : `Get FEL Pro · ${proPriceLabel(prices[plan], plan)}`}
-          </button>
-        </>
+          </ul>
+          <BuyEntry item={chosen} label={T.get} primary includes={[description]} terms={{ href: terms.href }}
+            pay={() => payPro(fetch, { plan: chosen.id as ProPlan, termsVersion: terms.version })} />
+        </section>
+      ) : (
+        // not on sale: one Opens soon, no plan to pick, no button (no checkout call can be made)
+        <section className={L.section}><OpensSoon /><p className="sr-only" data-pro-closed>{PRO_CLOSED_LINE}</p></section>
       )}
-      {note ? <p role="alert" className="text-sm text-amber-200">{note}</p> : null}
     </main>
   );
 }

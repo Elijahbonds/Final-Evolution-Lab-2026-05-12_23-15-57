@@ -18,6 +18,31 @@
 import type { AnimationGroup, Scene, Observer } from '@babylonjs/core';
 import { resolveClip } from './clipResolver';
 import { ledgerFor, requestAllowed, scopeFallback, suiteOfClip, type ClipScope } from './clipScope';
+import { inertialDt, inertialHalfLife, inertialStep, quatFromAxisAngle, quatMul, quatMulConj, quatToAxisAngle, type Quat } from './inertialize';
+
+/** AF-1: how a clip switch with fadeSec > 0 blends — 'linear' (the weight crossfade, the default) or 'inertial' (inertialize.ts). */
+export type BlendMode = 'linear' | 'inertial';
+
+/** AF-1: the slice of a Babylon TransformNode / Bone the inertial blend reads and writes (duck-typed: this file imports no values). */
+interface InertialQuat { x: number; y: number; z: number; w: number; set(x: number, y: number, z: number, w: number): unknown; clone(): InertialQuat }
+interface InertialVec { x: number; y: number; z: number; set(x: number, y: number, z: number): unknown; clone(): InertialVec }
+interface InertialNode { name: string; rotationQuaternion?: InertialQuat | null; position?: InertialVec | null; getClassName?(): string }
+/** AF-1: one animated node's history (the last two poses the animator showed) and its live offset. */
+interface InertialTrack {
+  last: Quat | null; prior: Quat | null;
+  lastP: [number, number, number] | null; priorP: [number, number, number] | null;
+  axis: [number, number, number]; x: number; v: number; rotOn: boolean;
+  pOff: [number, number, number]; pVel: [number, number, number]; posOn: boolean;
+  halfLife: number; hips: boolean; bone: boolean;
+  /** The inertial frame number the pose was last recorded on (history older than the frame before is stale). */
+  stamp: number;
+  scratchQ: InertialQuat | null; scratchP: InertialVec | null;
+}
+/** AF-1: a switch's starting velocity is capped (a teleported or re-spawned pose must not fling the offset). */
+const INERTIAL_MAX_ANG_VEL = 30, INERTIAL_MAX_LIN_VEL = 10;
+const INERTIAL_HIPS = /(^|[:_|])hips$/i;
+/** AF-1: a node a clip keys — its rotation (rotationQuaternion track) and/or, on the Hips, its position (position track). */
+interface InertialTarget { n: InertialNode; rot: boolean; pos: boolean }
 
 export interface PlayOpts {
   loop?: boolean;
@@ -60,6 +85,15 @@ export class CharacterAnimator {
   /** SHARED-ANIM-BUS: the mode's clip scope (clipScope.ts). null = unscoped (every suite). */
   private scope: ClipScope | null = null;
   private refusedOnce = new Set<string>();
+  /** AF-1: the blend mode (default 'linear' — nothing below runs until setBlendMode('inertial')). */
+  private blend: BlendMode = 'linear';
+  private inertialObs: Observer<Scene> | null = null;
+  /** AF-1: a clip switch waiting for the next evaluated frame, at this half-life (s). */
+  private inertialSwitch: { halfLife: number } | null = null;
+  private inertialTracks = new Map<InertialNode, InertialTrack>();
+  private inertialTargets = new Map<AnimationGroup, InertialTarget[]>();
+  private inertialHistDt = 0;
+  private inertialFrameNo = 0;
 
   constructor(private scene: Scene, groups: AnimationGroup[]) {
     for (const g of groups) this.register(g);
@@ -186,6 +220,18 @@ export class CharacterAnimator {
       if (prev && prev !== next) this.retire(prev); else prev?.stop();   // HOOPS MOTION phase 3d: a cut with no fade retires too
       this.fadingOut = null;
       next.setWeightForAllAnimatables(1);
+      if (this.blend === 'inertial') this.inertialCut();   // AF-1: a hard cut stays a hard cut — no offset carries across it
+      return;
+    }
+    if (this.blend === 'inertial') {
+      // AF-1: INERTIAL SWITCH — the new clip takes the body at full weight NOW and the outgoing clip is retired on this frame; the
+      // difference from the pose the body last showed decays out over the next frames (inertialFrame). fadingOut stays null, so a
+      // freeze started under this switch joins the current clip at weight 1.
+      if (prev && prev !== next) this.retire(prev);
+      this.fadingOut = null;
+      this.fadingOutWeight = 1;
+      next.setWeightForAllAnimatables(1);
+      this.inertialSwitch = { halfLife: inertialHalfLife(fadeSec) };
       return;
     }
     this.fadingOut = prev && prev !== next ? prev : null;
@@ -398,6 +444,7 @@ export class CharacterAnimator {
     this.dropPendingFreezes();
     this.fadeObs?.remove();
     this.fadeObs = null;
+    if (this.blend === 'inertial') this.inertialCut();   // AF-1: a parked body carries no offset into its next owner
     this.fadingOut = null;
     this.current = null;
     this.currentName = '';
@@ -407,7 +454,151 @@ export class CharacterAnimator {
   dispose(): void {
     this.dropPendingFreezes();
     this.fadeObs?.remove();
+    this.inertialObs?.remove(); this.inertialObs = null;   // AF-1
     this.endObs.forEach((o, g) => g.onAnimationGroupEndObservable.remove(o as never));
     this.groups.forEach((g) => g.stop());
+  }
+
+  /** AF-1: the blend mode this body's clip switches use. */
+  get blendMode(): BlendMode { return this.blend; }
+
+  /**
+   * AF-1: switch this body's clip transitions between the linear crossfade and the inertial blend (inertialize.ts). 'inertial'
+   * mounts one insert-first after-animations observer (ahead of FootPlanting / LandingAbsorb / LimbDrag, so they act on the
+   * blended pose); 'linear' removes it and drops any live offset. The modes opt in behind the `anim.inertial` knob.
+   */
+  setBlendMode(mode: BlendMode): void {
+    if (mode === this.blend) return;
+    this.blend = mode;
+    if (mode === 'inertial') {
+      this.inertialObs = this.scene.onAfterAnimationsObservable.add(() => this.inertialFrame(), undefined, true);
+    } else {
+      this.inertialObs?.remove(); this.inertialObs = null;
+      this.inertialCut();
+      this.inertialTracks.clear();
+    }
+  }
+
+  /** AF-1: drop the pending switch and every live offset (history stays: it is what the body showed). */
+  private inertialCut(): void {
+    this.inertialSwitch = null;
+    this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; t.x = 0; t.v = 0; });
+  }
+
+  /** AF-1: the nodes a clip keys — rotation-quaternion tracks, plus the Hips' position track — once per group. Only KEYED channels
+   *  carry an offset: a channel nobody rewrites each frame would accumulate it. */
+  private inertialTargetsOf(g: AnimationGroup): InertialTarget[] {
+    let list = this.inertialTargets.get(g);
+    if (list) return list;
+    const by = new Map<InertialNode, InertialTarget>();
+    for (const ta of g.targetedAnimations) {
+      const n = ta.target as InertialNode | null;
+      if (!n || typeof n.name !== 'string') continue;
+      const prop = ta.animation.targetProperty;
+      const rot = prop === 'rotationQuaternion' && !!n.rotationQuaternion;
+      const pos = (prop === 'position' || prop.startsWith('position.')) && INERTIAL_HIPS.test(n.name) && !!n.position;
+      if (!rot && !pos) continue;
+      const e = by.get(n) ?? { n, rot: false, pos: false };
+      e.rot ||= rot; e.pos ||= pos;
+      by.set(n, e);
+    }
+    list = [...by.values()];
+    this.inertialTargets.set(g, list);
+    return list;
+  }
+
+  private inertialTrack(n: InertialNode): InertialTrack {
+    let t = this.inertialTracks.get(n);
+    if (!t) {
+      t = {
+        last: null, prior: null, lastP: null, priorP: null,
+        axis: [1, 0, 0], x: 0, v: 0, rotOn: false, pOff: [0, 0, 0], pVel: [0, 0, 0], posOn: false,
+        halfLife: 0, hips: INERTIAL_HIPS.test(n.name), bone: n.getClassName?.() === 'Bone', stamp: -1, scratchQ: null, scratchP: null,
+      };
+      this.inertialTracks.set(n, t);
+    }
+    return t;
+  }
+
+  /** AF-1: one frame of the inertial blend — start a pending switch's offsets, decay the live ones, apply them, record the pose. */
+  private inertialFrame(): void {
+    const cur = this.current;
+    if (!cur) return;
+    const dt = inertialDt(this.scene.getEngine().getDeltaTime() / 1000, this.scene.animationTimeScale);
+    const targets = this.inertialTargetsOf(cur);
+    const frame = ++this.inertialFrameNo;
+    const sw = this.inertialSwitch;
+    if (sw) {
+      this.inertialSwitch = null;
+      this.inertialTracks.forEach((t) => { t.rotOn = false; t.posOn = false; });
+      const hd = this.inertialHistDt;
+      for (const { n, rot, pos } of targets) {
+        const t = this.inertialTrack(n);
+        t.halfLife = sw.halfLife;
+        const fresh = t.stamp === frame - 1;   // the body showed this node's pose on the frame before
+        const rq = rot ? n.rotationQuaternion : null;
+        if (rq && fresh && t.last) {
+          const now: Quat = [rq.x, rq.y, rq.z, rq.w];
+          const { axis, angle } = quatToAxisAngle(quatMulConj(t.last, now));
+          let v0 = 0;
+          if (t.prior && hd > 0) {
+            const w = quatToAxisAngle(quatMulConj(t.last, t.prior));
+            v0 = (w.angle / hd) * (w.axis[0] * axis[0] + w.axis[1] * axis[1] + w.axis[2] * axis[2]);
+            v0 = Math.max(-INERTIAL_MAX_ANG_VEL, Math.min(INERTIAL_MAX_ANG_VEL, v0));
+          }
+          if (angle > 1e-9 || Math.abs(v0) > 1e-9) { t.axis = axis; t.x = angle; t.v = v0; t.rotOn = true; }
+        }
+        const p = pos ? n.position : null;
+        if (p && fresh && t.lastP) {
+          t.pOff = [t.lastP[0] - p.x, t.lastP[1] - p.y, t.lastP[2] - p.z];
+          t.pVel = [0, 0, 0];
+          if (t.priorP && hd > 0) {
+            for (let i = 0; i < 3; i++) {
+              t.pVel[i] = Math.max(-INERTIAL_MAX_LIN_VEL, Math.min(INERTIAL_MAX_LIN_VEL, (t.lastP[i] - t.priorP[i]) / hd));
+            }
+          }
+          t.posOn = true;
+        }
+      }
+    } else if (dt > 0) {
+      this.inertialTracks.forEach((t) => {
+        if (t.rotOn) {
+          const s = inertialStep(t.x, t.v, t.halfLife, dt);
+          t.x = s.x; t.v = s.v;
+          if (Math.abs(t.x) < 1e-7 && Math.abs(t.v) < 1e-6) { t.rotOn = false; t.x = 0; t.v = 0; }
+        }
+        if (t.posOn) {
+          let live = false;
+          for (let i = 0; i < 3; i++) {
+            const s = inertialStep(t.pOff[i], t.pVel[i], t.halfLife, dt);
+            t.pOff[i] = s.x; t.pVel[i] = s.v;
+            if (Math.abs(s.x) >= 1e-7 || Math.abs(s.v) >= 1e-6) live = true;
+          }
+          if (!live) t.posOn = false;
+        }
+      });
+    }
+    for (const { n, rot, pos } of targets) {
+      const t = this.inertialTrack(n);
+      const rq = rot ? n.rotationQuaternion : null;
+      if (rq && t.rotOn) {
+        const q = quatMul(quatFromAxisAngle(t.axis, t.x), [rq.x, rq.y, rq.z, rq.w]);
+        if (t.bone) { const sq = (t.scratchQ ??= rq.clone()); sq.set(q[0], q[1], q[2], q[3]); n.rotationQuaternion = sq; }
+        else rq.set(q[0], q[1], q[2], q[3]);
+      }
+      const p = pos ? n.position : null;
+      if (p && t.posOn) {
+        const x = p.x + t.pOff[0], y = p.y + t.pOff[1], z = p.z + t.pOff[2];
+        if (t.bone) { const sp = (t.scratchP ??= p.clone()); sp.set(x, y, z); n.position = sp; }
+        else p.set(x, y, z);
+      }
+      const contiguous = t.stamp === frame - 1;
+      const shown = rot ? n.rotationQuaternion : null;
+      if (shown) { t.prior = contiguous ? t.last : null; t.last = [shown.x, shown.y, shown.z, shown.w]; }
+      const sp = pos ? n.position : null;
+      if (sp) { t.priorP = contiguous ? t.lastP : null; t.lastP = [sp.x, sp.y, sp.z]; }
+      t.stamp = frame;
+    }
+    this.inertialHistDt = dt;
   }
 }

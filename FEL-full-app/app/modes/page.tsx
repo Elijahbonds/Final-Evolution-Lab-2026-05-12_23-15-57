@@ -4,6 +4,7 @@ import { TabPage } from '@/components/shell/tab-page';
 import { FAMILIES, OFF_SHELF, SHELF_MODE_COUNT, shelvedModes, type Family } from '@/lib/nav/families';
 import { modeMenuMetaFor, visibleModeEntries } from '@/lib/mode-menu';
 import { PartyBadge } from '@/components/party/party-badge';   // MULTIPLAYER: the games friends can play together
+import { ModesSignInNote, SignInChip } from '@/components/modes/sign-in-to-play';   // PUBLIC-POLISH: say sign-in first
 
 type ModeTile = {
   key: string;
@@ -48,6 +49,7 @@ function ModeCard({ tile }: { tile: ModeTile }) {
           {tile.venue}
         </span>
         <span className="mt-2 block text-[14px] leading-relaxed text-fel-dim">{tile.desc}</span>
+        <SignInChip />
       </span>
     </Link>
   );
@@ -99,14 +101,17 @@ export default function ModesPage() {
     <TabPage
       eyebrow="Modes"
       title="All live modes"
-      lede={`${SHELF_MODE_COUNT} shelf modes plus ${offShelf.length} training-floor ${offShelf.length === 1 ? 'entry' : 'entries'}. Every card has a route, venue and play contract.`}
+      // PUBLIC-POLISH (2026-11-02, live sweep J7): plain words. It read "34 shelf modes plus 1 training-floor entry. Every
+      // card has a route, venue and play contract." — the shelf's own vocabulary, on a page visitors land on.
+      lede={`${SHELF_MODE_COUNT} games, grouped by sport, plus ${offShelf.length} training ${offShelf.length === 1 ? 'tool' : 'tools'} at the end. Pick one and play.`}
       accent="#00E5FF"
     >
       <div className="space-y-5">
+        <ModesSignInNote />
         {sections.map((section) => <ModeSection key={section.title} {...section} />)}
         <ModeSection
           title="Training floor"
-          blurb={offShelf.map((tile) => OFF_SHELF[tile.key]).filter(Boolean).join(' · ') || 'Mode surfaces that live outside the Play shelf.'}
+          blurb={offShelf.map((tile) => OFF_SHELF[tile.key]).filter(Boolean).join(' · ') || 'Training tools that live outside the game list.'}
           accent="#00FF9D"
           tiles={offShelf}
         />

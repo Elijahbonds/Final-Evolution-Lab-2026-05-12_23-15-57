@@ -40,6 +40,15 @@ export function isNexusStudioEnabled(): boolean {
   return envOn('NEXUS_STUDIO_ENABLED');
 }
 
+/**
+ * NEX-06 (owner 2026-10-20): Studio SHARE LINKS — a creator's venue played by link (lib/nexus-studio/share.ts). Default OFF: every
+ * share route and the /play/shared landing are a 404 while unset. Separate from NEXUS_STUDIO_ENABLED (the editor), so the owner can
+ * use the Studio without links reaching anyone.
+ */
+export function isStudioShareEnabled(): boolean {
+  return envOn('STUDIO_SHARE_ENABLED');
+}
+
 /** Standard 403 body for a disabled feature. */
 export const FEATURE_DISABLED = { error: 'feature_disabled', message: 'This feature is not currently enabled.' } as const;
 

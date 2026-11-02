@@ -12,8 +12,9 @@ export interface DoseParts {
   small: string | null;
 }
 
-// a leading count, an optional "x N" (sets of N-second reps: "6 x 5 s"), and a short unit (m, s)
-const HEAD = /^(\d+(?:\s*[x×]\s*\d+)?(?:\s*(?:m|s|sec)\b)?)[,\s]*(.*)$/i;
+// a leading count (or a range: a coach's "8-10" — PLAT-P06, it split as "8" + "-10"), an optional "x N" (sets of
+// N-second reps: "6 x 5 s"), and a short unit (m, s)
+const HEAD = /^(\d+(?:\s*[-–]\s*\d+)?(?:\s*[x×]\s*\d+)?(?:\s*(?:m|s|sec)\b)?)[,\s]*(.*)$/i;
 
 const sets = (st: Pick<Step, 'sets'>, head: string): string => (st.sets > 1 ? `${st.sets} × ${head}` : head);
 
@@ -28,7 +29,7 @@ export function doseParts(st: Pick<Step, 'sets' | 'reps' | 'workSeconds'>): Dose
   }
   const m = HEAD.exec(text);
   if (!m) return { big: sets(st, text || '1'), small: null };
-  const head = m[1].replace(/\s*[x×]\s*/i, ' × ').replace(/\s+/g, ' ');
+  const head = m[1].replace(/\s*[x×]\s*/i, ' × ').replace(/\s*[-–]\s*/, '-').replace(/\s+/g, ' ');
   return { big: sets(st, head), small: m[2].trim() || null };
 }
 

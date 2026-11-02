@@ -55,6 +55,17 @@ describe('the Draco decoder is ours, never the CDN', () => {
  */
 const DRACO_FILES = [
   {
+    url: MESHY_PROP_URL('hoopbus'), bytes: 849_568,
+    // NEW PIN (HOOPBUS-SWAP, 2026-10-29): the corner bus was the float GLB 5a4df83d… (4,736,976 B); now 3D Art's Draco bus, 3,887,408 B smaller.
+    // Two of its three images are re-encoded to WebP, so the image and JSON pins are the new file's own (measured from it), not the replaced one's.
+    sha: 'b9cb9ecd77dfc3aedcb6ea3cb896bee6ef33ced554b99952d73d582ed5b3cfe8',
+    required: ['EXT_texture_webp', 'KHR_draco_mesh_compression'], textures: 3,
+    imgSha: '3092c8a00a237f577efa26fa6fe7c17a8f1e56499c603959946a344157d6025f', jsonSha: '7ff734e1fceeeca0ce61936d328a9c9b86f96e068f558d34947e3137460d2d4f',
+    // same mesh, material and triangles as 5a4df83d (verts 96,087 → 96,123: Draco splits seams); bounds and UVs measured from this file —
+    // its max y/z sit 0.17 / 0.19 mm off 5a4df83d's (4.17371, 2.07073), past the 0.1 mm the pin holds, so they are this file's
+    meshes: [{ name: 'Mesh_0', material: 'Material.001', verts: 96_123, tris: 111_926, min: [-4.49905, -0.00179, -2.07107], max: [4.49989, 4.17388, 2.07054], uv: [[0.00003, 0.99995], [0.00141, 0.99986]] }],
+  },
+  {
     url: MESHY_PROP_URL('hoop'), bytes: 893_740,
     // PIN MOVED (FDB-4) from FDB-2's 4b74e6d3702b23fc28d31ddbafa6515d6c9480929ff9785113287afc74f26d0d (int8 normals / uint16 UVs, which
     // only Babylon's worker path normalizes) to 3D Art's float-attribute Draco hoop: 21,844 B smaller and path-independent.
