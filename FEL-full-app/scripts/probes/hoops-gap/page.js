@@ -122,6 +122,37 @@
     F++;
   };
   const clipBody = new WeakMap(); const lastClips = []; HG.clips = [];
+  // hoops-p04b: THE STAGE TRACER (CFG.stageLog). Which layer moved a bone: the after-animations observers are wrapped, each one's change to
+  // the traced bones (in → out, as a rotation) is kept per frame, and a frame where that change itself turns over 600 deg/s against the frame
+  // before is logged against the layer — [frame, body, bone, stage, deg/s]. Stage 'clip' is the evaluated clips' own speed (what the
+  // animations left before the first observer). Observers are named by their index and the head of their source.
+  const TRACE = ['LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand'];
+  HG.stageEv = []; HG.stageNames = {};
+  if (CFG.stageLog) {
+    const tq = (bi, j) => { const t = B[bi] && B[bi].w[WATCH.indexOf(TRACE[j])]; const q = t && lqOf(t); return q ? [q.x, q.y, q.z, q.w] : null; };
+    const angQ = (a, b) => { if (!a || !b) return 0; const d = Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]); return 2 * Math.acos(Math.min(1, d)) * 180 / Math.PI; };
+    // the offset in → out as a quaternion: conj(in) * out
+    const off = (a, b) => { if (!a || !b) return null; const [ax, ay, az, aw] = [-a[0], -a[1], -a[2], a[3]]; const [bx, by, bz, bw] = b; return [aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx, aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz]; };
+    const snap = () => B.map((b, bi) => TRACE.map((n, j) => tq(bi, j)));
+    const prevOff = new Map(); let prevClip = null;
+    const note = (bi, j, stage, deg) => { if (HG.rec && HG.stageEv.length < 3000) HG.stageEv.push([HG.frame + 1, B[bi].id, TRACE[j], stage, Math.round(deg * 60)]); };
+    const obsv = scene.onAfterAnimationsObservable;
+    obsv.add(() => { try {
+      const cur = snap();
+      if (prevClip) cur.forEach((row, bi) => row.forEach((q, j) => { const d = angQ(q, prevClip[bi] && prevClip[bi][j]); if (d * 60 > 600) note(bi, j, 'clip', d); }));
+      prevClip = cur;
+      for (let k = 0; k < obsv.observers.length; k++) {
+        const o = obsv.observers[k]; if (o.__hg) continue; o.__hg = true;
+        const label = 'obs' + k + ' ' + String(o.callback).replace(/\s+/g, ' ').slice(0, 90); const cb = o.callback; const key = label;
+        HG.stageNames[key] = true;
+        o.callback = function (ev, st) {
+          let before = null; try { before = HG.rec ? snap() : null; } catch (e) { before = null; } const r = cb.call(this, ev, st);
+          if (before) try { const after = snap(); after.forEach((row, bi) => row.forEach((q, j) => { const of = off(before[bi][j], q); const pk = key + '|' + bi + '|' + j; const po = prevOff.get(pk); if (of && po) { const d = angQ(of, po); if (d * 60 > 600) note(bi, j, key, d); } prevOff.set(pk, of); })); } catch (e) { if (HG.errors.length < 20) HG.errors.push('stage ' + String(e && e.message || e).slice(0, 120)); }
+          return r;
+        };
+      }
+    } catch (e) { if (HG.errors.length < 20) HG.errors.push('stage0 ' + String(e && e.message || e).slice(0, 120)); } }, undefined, true);   // first: the clips as evaluated
+  }
   scene.onAfterRenderObservable.add(() => { HG.frame++; window.__frameNo = HG.frame; try { record(); } catch (e) { if (HG.errors.length < 20) HG.errors.push('rec ' + String(e && e.message || e).slice(0, 160)); } });
   HG.start = () => { HG.rec = true; HG.f0 = HG.frame; F = 0; for (const b of B) b.prevQ = WATCH.map(() => null); };
   HG.stop = () => { HG.rec = false; return F; };
