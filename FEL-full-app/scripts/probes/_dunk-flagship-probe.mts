@@ -79,7 +79,7 @@ const BTN_I: Record<Btn, number> = { A: 0, B: 1, X: 2, Y: 3 }, DPAD_I: Record<Di
 const JN = ['Hips', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase', 'LeftHand', 'RightHand', 'Head'];
 const QN = ['Hips', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'LeftShoulder', 'RightShoulder', 'LeftArm', 'RightArm', 'LeftForeArm', 'RightForeArm', 'LeftHand', 'RightHand', 'LeftUpLeg', 'RightUpLeg', 'LeftLeg', 'RightLeg', 'LeftFoot', 'RightFoot', 'LeftToeBase', 'RightToeBase'];
 
-interface Frame { lv?: number; inf?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
+interface Frame { occ?: string[] | null; lv?: number; inf?: number; t: number; f: number; rp: number[]; yaw: number; j: (number[] | null)[]; q: number[]; ball: number[] | null; bpar: string; cam: number[]; tgt: number[]; clips: [string, number][]; ts: number }
 interface Rec { scen: string; rep: number; frames: Frame[]; marks: { t: number; msg: string }[]; qa: { t: number; kind: string; name: string }[]; pressAt: number | null; t0: number; hud: string[]; err?: string }
 
 const PAD_INIT = `(() => {
@@ -130,7 +130,21 @@ const RECORDER = `(() => {
     const lv = (ringM && ringM.isVisible && ringM.isEnabled() ? 1 : 0) + (shadowM && shadowM.isVisible && shadowM.isEnabled() ? 2 : 0);
     let inf = 0; if (b) { const a = b.getAbsolutePosition(), M = scene.getTransformMatrix().m; const w = a.x * M[3] + a.y * M[7] + a.z * M[11] + M[15];
       if (w > 0) { const nx = (a.x * M[0] + a.y * M[4] + a.z * M[8] + M[12]) / w, ny = (a.x * M[1] + a.y * M[5] + a.z * M[9] + M[13]) / w; inf = Math.abs(nx) <= 1 && Math.abs(ny) <= 1 ? 1 : 0; } }
-    R.frames.push({ inf, t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
+    // Phase 7: OCCL=1 — what stands between the camera and the hero: rays from the camera to the hips and the head (every 2nd
+    // frame), every visible mesh on them that is not the hero's own, the ball or the floor (a prop parked in a corner, a tree)
+    let occ = null;
+    if (${process.env.OCCL === '1'} && (f % 2 === 0) && jn[0] && jn[7]) {
+      const cpos = cam.globalPosition || cam.position; const hit = new Set();
+      for (const n of [jn[0], jn[7]]) {
+        const to = n.getAbsolutePosition(); const d = to.subtract(cpos); const len = d.length(); if (len < 0.5) continue;
+        const RayC = scene.createPickingRay(0, 0, null, cam).constructor; const ray = new RayC(cpos, d.scale(1 / len), len - 0.35);
+        const hs = scene.multiPickWithRay(ray, (m) => m.isEnabled() && m.isVisible && m.visibility > 0.05 && !targets.has(m) && !m.isDescendantOf(rootRef) && m !== b
+          && !/ground|floor|terrain|court(?!side)|sky|backdrop|dome/i.test(m.name)) || [];
+        for (const h of hs) if (h.hit && h.pickedMesh) { let r = h.pickedMesh; while (r.parent) r = r.parent; hit.add(h.pickedMesh.name + '<' + r.name + '>'); }
+      }
+      occ = hit.size ? [...hit].slice(0, 4) : [];
+    }
+    R.frames.push({ occ, inf, t: performance.now(), f, rp: [r4(rp.x), r4(rp.y), r4(rp.z)], yaw: r5(yaw), j, q, ball, bpar, cam: [r4(cp.x), r4(cp.y), r4(cp.z)], tgt: tg, clips, ts: scene.animationTimeScale ?? 1, lv });
     if (R.frames.length > 4000) R.frames.shift();
     // the frame strip: pause the clock ON this frame so node photographs exactly it
     if (R.strip && R.strip.length && (f - R.f0) >= R.strip[0]) { R.strip.shift(); R.stripN++; R.stripWait = true; window.__vc.pause(); }
@@ -192,6 +206,8 @@ async function attemptInPage(c: AttemptCfg): Promise<AttemptOut> {
     while (now() - a0 < 40000) {
       const t = document.body.innerText;
       if (/HOLD to run|Pick your PROP|FINAL ROUND|PRACTICE/.test(t) && !/SLAM!|CONFER|CARD|RIVAL ROUND/.test(t) && /· playing/.test(t)) { ok = true; break; }
+      // P7: a continuous night's card (?continuous=1): any button is GO AGAIN, night N+1 in place on the same page
+      if (w.__hud().nightCard) { await tap(0, 60); await sleep(500); }
       // the rival's turn: skip it (B), it is not what this measures
       if (/RIVAL/.test(String(w.__hud().banner ?? '')) || w.__hud().rivalSkip === true) { await tap(1, 60); await sleep(300); }
       await sleep(120);
@@ -267,15 +283,23 @@ async function boot(b: Browser, prop: string | null): Promise<{ p: Page; errors:
   await p.evaluate(RECORDER);
   // Phase 6: SIDECAM=1 films the dunker from the side — the camera is placed beside the hips every frame AFTER the mode's own camera
   // update (onBeforeRender runs inside scene.render, after the harness's update), looking across the run; nothing else changes.
-  if (process.env.SIDECAM === '1') await p.evaluate(() => {
+  // SIDECAM_SIDE=1 / -1: that side only (the control); unset, the clear side
+  if (process.env.SIDECAM === '1') await p.evaluate((force: number) => {
     const dev = (window as unknown as { __FEL_DEV__: { scene: any; hero(): any } }).__FEL_DEV__; const sc = dev.scene;
     sc.onBeforeRenderObservable.add(() => {
       const h = dev.hero(); if (!h || !sc.activeCamera) return; let root = h; while (root.parent) root = root.parent;
       const hips = sc.skeletons.flatMap((k: any) => k.bones).map((b: any) => b.getTransformNode()).find((n: any) => n && /Hips$/.test(n.name) && n.isDescendantOf(root));
       const c = hips ? hips.getAbsolutePosition() : root.getAbsolutePosition(); const cam = sc.activeCamera;
-      cam.position.set(c.x + 6.2, Math.max(1.2, c.y + 0.2), c.z - 0.4); if (cam.setTarget) cam.setTarget(c.clone ? c.clone() : c);
+      // Phase 7: the side with a clear line to the hips (from dunk 2 the hoopbus parks on the right corner, where this camera
+      // stood): checked every 15 frames, sticky while it stays clear
+      const w = window as unknown as { __sideX?: number; __sideN?: number }; w.__sideN = (w.__sideN ?? 0) + 1;
+      const clear = (sx: number): boolean => { const from = c.add(new c.constructor(sx * 6.2, Math.max(1.2, c.y + 0.2) - c.y, -0.4)); const d = c.subtract(from); const len = d.length();
+        const RayC = sc.createPickingRay(0, 0, null, cam).constructor; const hs = sc.multiPickWithRay(new RayC(from, d.scale(1 / len), len - 0.4), (m: any) => m.isEnabled() && m.isVisible && m.visibility > 0.05 && !m.isDescendantOf(root) && m.name !== 'ball' && !/ground|floor|terrain|court(?!side)|sky|backdrop|dome/i.test(m.name)) || [];
+        return !hs.some((x: any) => x.hit); };
+      if (force) w.__sideX = force; else if (w.__sideX === undefined || (w.__sideN % 15 === 0 && !clear(w.__sideX))) w.__sideX = clear(1) ? 1 : clear(-1) ? -1 : 1;
+      cam.position.set(c.x + w.__sideX * 6.2, Math.max(1.2, c.y + 0.2), c.z - 0.4); if (cam.setTarget) cam.setTarget(c.clone ? c.clone() : c);
     });
-  });
+  }, Number(process.env.SIDECAM_SIDE ?? 0));
   // Phase 6: GATE 0 — the hero's rig as loaded: bone names (the FEL 22-bone spec, unprefixed: rigNormalize's gate), and its rest
   if (process.env.GATE0 === '1') {
     const g = await p.evaluate(() => {
@@ -302,6 +326,9 @@ async function boot(b: Browser, prop: string | null): Promise<{ p: Page; errors:
     sc.onBeforeRenderObservable.add(() => { const R = w.__rec; on = !!(R && R.on && R.strip && R.strip.length && (w.__vc.C.frames - R.f0) >= R.strip[0] - 3); });
   });
   const st = await p.evaluate(startInPage, 2500);
+  // Phase 7: NEWMESH=1 — the scene's meshes at the start, so every attempt can name what appeared (or moved) since
+  if (process.env.NEWMESH === '1') await p.evaluate(() => { const w = window as unknown as { __FEL_DEV__: { scene: any }; __mesh0: Record<number, string> }; w.__mesh0 = {};
+    for (const m of w.__FEL_DEV__.scene.meshes) { const c = m.getBoundingInfo().boundingSphere.centerWorld; w.__mesh0[m.uniqueId] = `${c.x.toFixed(2)},${c.y.toFixed(2)},${c.z.toFixed(2)}`; } });
   console.log(`[boot] ${url} start ${JSON.stringify(st)}`);
   return { p, errors };
 }
@@ -354,6 +381,10 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     const p = pg.p;
     const shotsDir = path.join(OUT, 'strip', s.replace(':', '-'));
     if (stripOn) fs.mkdirSync(shotsDir, { recursive: true });
+    if (process.env.NEWMESH === '1') console.log('  [NEWMESH] before ' + s + ': ' + JSON.stringify(await p.evaluate(() => { const w = window as unknown as { __FEL_DEV__: { scene: any }; __mesh0: Record<number, string> };
+      const out: string[] = []; for (const m of w.__FEL_DEV__.scene.meshes) { if (!m.isEnabled() || !m.isVisible) continue; m.computeWorldMatrix(true); const c = m.getBoundingInfo().boundingSphere.centerWorld; const at = `${c.x.toFixed(2)},${c.y.toFixed(2)},${c.z.toFixed(2)}`;
+        const was = w.__mesh0[m.uniqueId]; if (was === at || m.skeleton || Math.abs(c.x) > 16 || c.z < -25 || c.z > 8) continue; let r = m; while (r.parent) r = r.parent; out.push(`${m.name}<${r.name}>@${at}${was ? ' (was ' + was + ')' : ' NEW'} r${m.getBoundingInfo().boundingSphere.radiusWorld.toFixed(2)}`); }
+      return out.slice(0, 80); })));
     const run = p.evaluate(attemptInPage, cfg);
     let done = false; let res: AttemptOut | null = null;
     run.then((r) => { res = r; done = true; }, (e) => { res = { err: String(e).slice(0, 200) }; done = true; });
@@ -378,6 +409,11 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
     out.push({ scen: s, rep, ...r });
     fs.writeFileSync(path.join(OUT, `rec-${scen}.json`), JSON.stringify(out));   // each attempt saved as it lands: a killed run keeps what it measured
     console.log(`  ${s}#${rep}: ${r.frames.length} frames, ${r.marks.length} marks${pg.errors.length ? ' · errors ' + pg.errors.length : ''}`);
+    if (process.env.OCCL === '1') {   // Phase 7: the line of sight, summed over the attempt (every 2nd frame is checked)
+      const fr = (r.frames as Frame[]).filter((x) => Array.isArray(x.occ)); const bad = fr.filter((x) => x.occ!.length);
+      const by: Record<string, number> = {}; for (const x of bad) for (const n of x.occ!) by[n] = (by[n] ?? 0) + 1;
+      console.log(`  [OCCL] ${s}#${rep}: ${bad.length} of ${fr.length} checked frames blocked${bad.length ? ' — ' + Object.entries(by).sort((p, q) => q[1] - p[1]).slice(0, 6).map(([n, k]) => `${n} ×${k}`).join(', ') : ''}`);
+    }
   }
   if (pg) await pg.p.context().close();
   return out;
