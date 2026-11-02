@@ -9,9 +9,9 @@ import { SHOP_LOOK as L } from './look';
 export interface EarnLine { label: string; amount: string; href: string }
 
 export const WALLET_COPY = {
-  lc: { name: 'Lab Credits', line: 'Earned by training. Spent on drills and unlocks.' },
-  coins: { name: 'Coins', line: 'Bought in the Coin Store. Spent on unlocks.' },
-  shards: { name: 'Shards', line: 'For group workouts and 1-on-1 sessions.' },
+  lc: { name: 'Lab Credits', line: 'Earned by training.' },
+  coins: { name: 'Coins', line: 'Bought in the Coin Store.' },
+  shards: { name: 'Shards', line: 'For group and 1-on-1 sessions.' },
   earn: 'Earn today',
   spend: 'Spend',
 } as const;

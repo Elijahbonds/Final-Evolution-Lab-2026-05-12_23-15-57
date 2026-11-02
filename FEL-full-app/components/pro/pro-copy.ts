@@ -6,8 +6,8 @@
 //   · playing and the PRQ scan stay free (the same description) — said so nobody thinks the basics are behind it.
 // No price, fee or renewal wording here: the prices are the products' own, and the store terms are the owner's (OWN-04).
 export const PRO_LINES = [
-  'Every week of the signature programs, not just the first.',
-  'Keep the attribute upgrades you earn.',
+  'Every signature program week, not just the first.',
+  'Keep the upgrades you earn.',
   'Playing and the PRQ scan stay free.',
 ] as const;
 

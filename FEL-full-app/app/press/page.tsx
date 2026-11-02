@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { BOOKS, featuredBook, PARTNERS, publicBookDescription } from '@/lib/books/bookCatalog';
+import { BOOKS, BOOK_PUBLIC_DESCRIPTION_FALLBACK, featuredBook, PARTNERS, publicBookDescription } from '@/lib/books/bookCatalog';
 import { isPurchaseOpen } from '@/lib/payments/allowlist';
 import { bookItem } from '@/lib/shop/model';
 import { ProductCard } from '@/components/shop/product-card';
@@ -39,7 +39,7 @@ export default async function PressPage() {
   const audio = BOOKS.flatMap((book) => {
     const offer = book.offers.find((o) => o.format === 'audiobook');
     if (!offer || !bookFormatAllowed(offer.format)) return [];
-    return [{ book, offer, item: bookItem({ slug: book.slug, title: book.title, description: publicBookDescription(book) }, offer, { formatAllowed: bookOfferAllowed(offer), purchasesOpen: booksOpen }) }];
+    return [{ book, offer, item: bookItem({ slug: book.slug, title: book.title, description: publicBookDescription(book), placeholder: publicBookDescription(book) === BOOK_PUBLIC_DESCRIPTION_FALLBACK || /pending confirmation/i.test(publicBookDescription(book)) }, offer, { formatAllowed: bookOfferAllowed(offer), purchasesOpen: booksOpen }) }];
   });
   const lead = audio.find((a) => a.book.slug === featured.slug) ?? audio[0] ?? null;
   return (
@@ -49,10 +49,9 @@ export default async function PressPage() {
         <ul className={L.grid}>
           {(lead ? [lead, ...audio.filter((a) => a !== lead)] : audio).map(({ book, offer, item }) => (
             <li key={book.slug} data-book={book.slug}>
-              <ProductCard item={item} side={offer.priceIsExample ? <span className="text-[#ff6b6b]">Example</span> : null}>
+              <ProductCard item={item} titleHref={`/press/${book.slug}`} side={offer.priceIsExample ? <span className="text-[#ff6b6b]">Example</span> : null}>
                 <BookBuy item={item} back={`/press/${book.slug}`} />
               </ProductCard>
-              <Link href={`/press/${book.slug}`} className={`${L.cardSide} mt-2 inline-flex min-h-11 items-center`}>Free sample</Link>
             </li>
           ))}
         </ul>

@@ -8,11 +8,11 @@ import { OpensSoon } from './opens-soon';
 import { SHOP_COPY as T } from './shop-copy';
 import { SHOP_LOOK as L } from './look';
 
-export function ProductCard({ item, href, side, children }: { item: ShopItem; href?: string; side?: ReactNode; children?: ReactNode }) {
+export function ProductCard({ item, href, titleHref, side, children }: { item: ShopItem; href?: string; titleHref?: string; side?: ReactNode; children?: ReactNode }) {
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <h3 className={L.cardTitle}>{item.title}</h3>
+        <h3 className={L.cardTitle}>{titleHref ? <Link href={titleHref} className="underline-offset-4 hover:underline">{item.title}</Link> : item.title}</h3>
         {side ? <span className={L.cardSide}>{side}</span> : null}
       </div>
       {item.oneLine ? <p className={L.cardLine}>{item.oneLine}</p> : null}

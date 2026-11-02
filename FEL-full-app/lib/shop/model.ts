@@ -32,12 +32,14 @@ export interface ShopItem {
 
 /** The most words a product card may show: title, one line and price (the brief's ≤ 20). */
 export const CARD_MAX_WORDS = 20;
+/** A coach on the /coaches list: name, a few words of their headline, the "from" price (their page has the rest). (new) */
+export const COACH_CARD_MAX_WORDS = 12;
 export const wordsOf = (s: string | null | undefined): number => (s ?? '').split(/\s+/).filter((x) => /[A-Za-z0-9]/.test(x)).length;
 
 /** The card's one line, trimmed to what fits beside the title and the price (whole words, an ellipsis when cut). */
-export function cardLine(title: string, line: string | null, price: string | null): string | null {
+export function cardLine(title: string, line: string | null, price: string | null, max: number = CARD_MAX_WORDS): string | null {
   if (!line) return null;
-  const room = CARD_MAX_WORDS - wordsOf(title) - wordsOf(price);
+  const room = max - wordsOf(title) - wordsOf(price);
   if (room <= 0) return null;
   const words = line.trim().split(/\s+/);
   let kept: string[] = [], n = 0;
@@ -66,8 +68,8 @@ export function storeListingItem(l: { id: string; title: string; description: st
 }
 
 /** A book offer (lib/books/bookCatalog.ts): sells only when the offer is a direct sale, its format is allowed and books are open. */
-export function bookItem(b: { slug: string; title: string; description: string | null }, o: { id: string; priceCents: number; directSale: boolean }, open: { formatAllowed: boolean; purchasesOpen: boolean; owned?: boolean }): ShopItem {
-  return item({ id: o.id, kind: 'book', title: b.title, oneLine: b.description, cents: o.priceCents, cadence: 'once',
+export function bookItem(b: { slug: string; title: string; description: string | null; placeholder?: boolean }, o: { id: string; priceCents: number; directSale: boolean }, open: { formatAllowed: boolean; purchasesOpen: boolean; owned?: boolean }): ShopItem {
+  return item({ id: o.id, kind: 'book', title: b.title, oneLine: b.placeholder ? null : b.description, cents: o.priceCents, cadence: 'once',
     state: open.owned ? 'owned' : o.directSale && open.formatAllowed && open.purchasesOpen ? 'buy' : 'opens_soon' });
 }
 
@@ -85,5 +87,5 @@ export function proItems(prices: { weekly: number; monthly: number }, open: bool
 export function coachCardItem(c: { slug: string; displayName: string; headline: string | null; fromPriceCents: number | null; fromMonthly: boolean; acceptingClients: boolean }): ShopItem {
   const cadence: ShopCadence = c.fromMonthly ? 'month' : 'once';
   const price = c.fromPriceCents === null ? null : `from ${shopPriceLabel(c.fromPriceCents, cadence)}`;
-  return { id: c.slug, kind: 'coach_package', title: c.displayName, oneLine: cardLine(c.displayName, c.headline, price), priceLabel: price, cadence, state: c.acceptingClients ? 'buy' : 'opens_soon' };
+  return { id: c.slug, kind: 'coach_package', title: c.displayName, oneLine: cardLine(c.displayName, c.headline, price, COACH_CARD_MAX_WORDS), priceLabel: price, cadence, state: c.acceptingClients ? 'buy' : 'opens_soon' };
 }
