@@ -18,8 +18,12 @@ describe('the hooks (1v1 and 3v3)', () => {
       // the meter's pace is still syncedShotSpeed's, computed before the rise is built and handed to the held clip unchanged.
       // The clip and its release key come from riseClipFor (hoops-shot-content: 'jumpshot' at releaseFrameOf, or the step-back's own).
       expect(s).toMatch(/const rc = riseClipFor\(kind, /);
-      expect(s).toMatch(/const sync = syncedShotSpeed\(clipSec, shotMeter\.riseSec, greenInRise01, rc\.release01\)/);
-      expect(s).toMatch(/hold\(rc\.clip, \{ speedRatio: sync, fadeSec: 0\.08 \}\)/);
+      // test changed (hoops-p04, routed from phase 1: the ball rode the jumper's load dip for ~14 frames after the press): the rise is
+      // entered at the clip's rise (riseStartOf, behind hoops.jumperFromRiseOn), so the release fraction is measured FROM the rise and the
+      // held clip starts there — the pace is still syncedShotSpeed's, computed before the rise is built and handed to the clip unchanged.
+      expect(s).toMatch(/const rise01 = jumperFromRiseOn\(\) \? Math\.min\(riseStartOf\([\w.]+, rc\.clip, 0\), rc\.release01\) : 0;/);
+      expect(s).toMatch(/const sync = syncedShotSpeed\(clipSec, shotMeter\.riseSec, greenInRise01, rc\.release01 - rise01\)/);
+      expect(s).toMatch(/hold\(rc\.clip, \{ speedRatio: sync, fadeSec: 0\.08, from01: rise01 \}\)/);
     });
   }
 });
