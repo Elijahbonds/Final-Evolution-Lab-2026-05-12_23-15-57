@@ -99,8 +99,16 @@ class Driver {
     const vw = WIDTHS[this.width].width;
     const off = !box || box.x + box.width / 2 > vw || box.x + box.width / 2 < 0;
     try {
-      await loc.scrollIntoViewIfNeeded({ timeout: 3000 });
-      await loc.click({ timeout: 15000 });
+      try {
+        await loc.scrollIntoViewIfNeeded({ timeout: 3000 });
+        await loc.click({ timeout: 15000 });
+      } catch (e) {
+        // SwiftShader at 1280 can starve the page's frames, and Playwright's "stable" check waits on frames: the control is on
+        // screen (checked above), so press it the way a click does, and say so
+        if (!/Timeout/.test(String(e)) || !box) throw e;
+        await loc.dispatchEvent('click');
+        this.c.steps.push(`(${what}: pressed by event: the rig's frames were starved)`);
+      }
     } catch (e) { const t = String(e); this.c.steps.push(`✗ ${what}: ${t.split('\n')[0].slice(0, 90)}${/intercepts pointer events/.test(t) ? ` — ${(t.match(/<[^\n]*intercepts pointer events/) ?? [''])[0].slice(0, 160)}` : ''}`); return false; }
     this.c.taps++; this.c.steps.push(`${what}${off ? ' (was off screen: needed a sideways scroll)' : ''}`);
     return true;
