@@ -25,9 +25,11 @@
 // hold in progress still counts as seen (the ring is the hold). And READY keeps its line's room whenever the camera is
 // on (invisible while it has nothing to say), so the card does not move when the body steps in or out of frame.
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { sessionStore, type SessionView } from '@/lib/babylon/core/sessionStore';
 import { ControlsPanel } from './controls-panel';
+import { detectDevice } from '@/lib/ui/controlsScreen';
+import { detectPadFamily, pauseDeviceLine, type PadFamily } from '@/lib/input/padLabels';
 
 export const PAUSED_HEADLINE = 'PAUSED — TAP TO RESUME';
 /** The camera sees you: the hold resumes (the ring fills with it). Also the READY line, under TAP TO START. */
@@ -37,6 +39,16 @@ export const STEP_BACK_LINE = 'Step back into frame, then raise both hands';
 /** The reader is still calibrating (the Body button was just switched on, or re-centred): the hold counts only once it
  *  has a still stand to measure from. On the pause and on READY, where calibrating mostly happens. */
 export const CALIBRATING_LINE = 'Stand still, whole body in frame, then raise both hands';
+
+/**
+ * CONTROLLER-TRY-FIX item 4 (C5): the line under the pinned headline that names the device's own button — 'Press START' on a generic
+ * pad, 'Press MENU' on an Xbox pad, 'Press OPTIONS' on a PlayStation pad, 'Press ESC' on the keys (any real press resumes,
+ * ModeHarness; the words are PM copy). A touch screen keeps the headline's TAP alone: null. The headline itself is unchanged.
+ */
+export function pauseHowLine(env: { padFamily: PadFamily | null; touch: boolean }): string | null {
+  if (env.padFamily) return pauseDeviceLine(env.padFamily);
+  return env.touch ? null : pauseDeviceLine('keyboard');
+}
 
 /** A body line: its words, whether the hold's ring shows, and whether it is only holding its room (READY). */
 export interface BodyLine { text: string; ring: boolean; shown: boolean }
@@ -107,10 +119,20 @@ export function BodyReadyLine({ className }: { className?: string }) {
 export function PausedLayer({ onResume, modeId, hint }: { onResume: () => void; modeId?: string; hint?: string }) {
   const view = useSyncExternalStore(sessionStore.subscribe, sessionStore.view, sessionStore.view);
   const line = pausedLine(view);
+  // read after mount (the browser's pads), so the server's markup is the old screen exactly
+  const [how, setHow] = useState<string | null>(null);
+  useEffect(() => {
+    const read = (): void => setHow(pauseHowLine({ padFamily: detectPadFamily(), touch: detectDevice() === 'touch' }));
+    read();
+    window.addEventListener('gamepadconnected', read);
+    window.addEventListener('gamepaddisconnected', read);
+    return () => { window.removeEventListener('gamepadconnected', read); window.removeEventListener('gamepaddisconnected', read); };
+  }, []);
   return (
     <button type="button" onClick={onResume} className="absolute inset-0 flex items-center justify-center bg-black/60">
       <span className="flex flex-col items-center gap-3 text-center">
         <span className="fel-heading text-3xl font-bold text-white">{PAUSED_HEADLINE}</span>
+        {how && <span data-pause-device-line className="font-mono text-xs font-bold tracking-wider text-white/70">{how}</span>}
         {line && <HandsUpLine line={line} progress={view.handsUp01} />}
         {modeId && <ControlsPanel modeId={modeId} hint={hint} chooser={false} className="max-h-[60vh]" />}
       </span>

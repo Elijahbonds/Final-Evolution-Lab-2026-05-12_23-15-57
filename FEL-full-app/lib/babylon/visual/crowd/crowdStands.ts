@@ -21,7 +21,8 @@ import { BoundingInfo, Color3, Matrix, Mesh, MeshBuilder, PBRMaterial, Quaternio
 import type { AbstractMesh, Observer, Scene } from '@babylonjs/core';
 import { registerPerfTarget } from '../../core/perfGuard';
 import type { PerfLevel } from '../../core/PerfGovernor';
-import { crowdBake, type CrowdBake } from './crowdBake';
+import { crowdBake, type CrowdBake, type CrowdBody } from './crowdBake';
+import { fanBody, frontRowOf } from './crowdFront';
 import { CARD_H, CARD_POSES, CARD_W, cardMaterial, cardQuad, paintAtlas, snapshotAtlas, type CardAtlas, type CardPose } from './crowdCards';
 import { SEAT_TOP_M } from './crowdClips';
 import { layoutSeats, splitSeats, crowdTierOf, type CrowdVenue, type Seat, type CrowdTierName } from './crowdLayout';
@@ -99,7 +100,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
   let still = false;
   let bake: CrowdBake | null = null;
   const blocks: FanBlock[] = [];
-  const fanBlock: { block: FanBlock; slot: number }[] = [];
+  const fanBlock: { block: FanBlock; slot: number }[][] = [];   // VENUE-SMOOTH-1: a forge fan is one slot in each of its parts' blocks
   const cardMeshes: Mesh[][] = [];   // [variant][pose]
   const cardBufs: Float32Array[][] = [];
   const cardSlot: { variant: number; slot: number; pose: CardPose; placed: boolean; yaw: number }[] = [];
@@ -114,16 +115,19 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
   // ── the fans ────────────────────────────────────────────────────────────────────────────────────────────────────
   const buildFans = (b: CrowdBake): void => {
     const byKey = new Map<string, number[]>();
+    const frontRow = frontRowOf(seats);   // VENUE-SMOOTH-1: forge bodies on each stand's front row, the Meshy bodies behind
     fans.forEach((s, i) => {
-      const body = s.body % b.bodies.length;
-      const k = `${s.stand}|${body}`;
+      const fb = fanBody(s, frontRow, b.front.length, b.bodies.length);
+      const k = `${s.stand}|${fb.front ? 'f' : ''}${fb.index}`;
       (byKey.get(k) ?? byKey.set(k, []).get(k)!).push(i);
     });
     const place = new Matrix(), q = new Quaternion(), p = new Vector3();
     for (const [k, list] of byKey) {
       const [stand, bodyS] = k.split('|');
-      const body = b.bodies[Number(bodyS)];
-      const mesh = body.mesh.clone(`${CROWD_MESH}${stand}_${bodyS}`, null, true) as Mesh;
+      const parts: CrowdBody[] = bodyS.startsWith('f') ? b.front[Number(bodyS.slice(1))].parts : [b.bodies[Number(bodyS)]];
+      for (let pi = 0; pi < parts.length; pi++) {
+      const body = parts[pi];
+      const mesh = body.mesh.clone(`${CROWD_MESH}${stand}_${bodyS}${parts.length > 1 ? `_${pi}` : ''}`, null, true) as Mesh;
       // its OWN geometry: a thin instance's extra buffers (the VAT numbers) are set on the geometry, so two blocks sharing
       // one would share one settings buffer (and a disposed block would leave the others drawing with none)
       mesh.makeGeometryUnique();
@@ -132,7 +136,7 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       mesh.isPickable = false;
       mesh.receiveShadows = true;
       mesh.bakedVertexAnimationManager = body.manager;
-      mesh.material = b.material;
+      mesh.material = body.material ?? b.material;
       mesh.freezeWorldMatrix(body.w0);
       const mats = new Float32Array(16 * list.length), settings = new Float32Array(4 * list.length);
       const index = new Map<number, number>();
@@ -159,18 +163,18 @@ export function mountCrowd(scene: Scene, venue: CrowdVenue, opts: CrowdOptions =
       mesh.doNotSyncBoundingInfo = true;
       const block: FanBlock = { mesh, settings, index, dirty: false };
       blocks.push(block);
-      list.forEach((fi, j) => { fanBlock[fi] = { block, slot: j }; });
+      list.forEach((fi, j) => { (fanBlock[fi] ??= []).push({ block, slot: j }); });
       owned.push(mesh);
+      }
     }
   };
 
   const applyFan = (c: ClipChange): void => {
-    const fb = fanBlock[c.fan];
-    if (!fb || !bake) return;
+    const fbs = fanBlock[c.fan];
+    if (!fbs || !bake) return;
     const r = bake.ranges[c.clip];
     const off = c.idle && c.since === -Infinity ? loopOffset(r, all[c.fan].phase) : startOffset(c.since, r);
-    fb.block.settings.set([r.start, r.end, off, r.speed], fb.slot * 4);
-    fb.block.dirty = true;
+    for (const fb of fbs) { fb.block.settings.set([r.start, r.end, off, r.speed], fb.slot * 4); fb.block.dirty = true; }
   };
 
   // ── the cards ───────────────────────────────────────────────────────────────────────────────────────────────────
