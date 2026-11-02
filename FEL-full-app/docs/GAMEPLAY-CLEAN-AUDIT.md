@@ -253,10 +253,23 @@ Not found, which matters too:
 | 4 | The pause's CONTROLS panel is backed at black/85, up from /60. | `paused-layer.tsx` | The HUD's banners and meters showed through the list (golf: 4 overlapping texts) → photograph §4b |
 | 5 | A HOLD X = GUARD row for karate, karate VS and mixed combat. | `lib/creator/cardSlot.ts` | Guard on the sheet: 0 / 3 → 3 / 3 (pad HOLD X, keys HOLD L, touch HOLD DASH) |
 | 6 | An inert stick ring where the left stick does nothing. | `TouchOverlay.tsx` (+1), test | A live MOVE stick that answered nothing: baseball, sprint, brain brawl, who-scene-it → the dashed ring |
-| 7 | Tiebreak's FIRST SERVE card is drawn above the boot splash. | `tiebreak-game.tsx` | LOADING ARENA… for 170 s, twice → after-run §4b |
+| 7 | Tiebreak's FIRST SERVE card is drawn above the boot splash (z-10 → z-50). | `tiebreak-game.tsx` | LOADING ARENA… for 170 s, twice → **still black on a sideways phone**: the host's box has no height there (§4b, Phase 2) |
 | 8 | The duel's RUN is the deeper of the hand's pull and the body's (routed from dunk P5). | `DunkDuelMode.ts`, `dunkDuelRules.ts` (+ test) | A replayed body jog with an idle pad: launched one event after the first pull → no launch until the body lets go |
 
 <!-- AFTER:BEGIN -->
+### 4b. Measured after
+
+One hold on the gate lock, after the baseline. The after-build is this lane's fixes on release 82e88b7c, run through the
+same rig and script.
+
+| Mode | Before | After |
+|---|---|---|
+| dunk duel | Hero hidden 16.1 % (`dd_tower_frame`). No touch pause. The ⋯ was at the top-left by the scoreboard. | Hidden **3.6 %** (tower frame ×7 samples, not ×48). The photograph shows ❚❚ and ⋯ in the bottom row. Pause and resume work. |
+| freerun | Hidden 9.0 % (`fr_wall` ×23, `fr_ledge` ×11) | Hidden **2.1 %**: the wall fades; the ledge is still met (×11). Phone CPU p95 98 → 43 ms. That is not a claim for this lane: the box's load differed. |
+| tiebreak | LOADING ARENA… for 170 s, twice, with no harness phase | **Not fixed by the z-index alone: a new finding.** On a sideways phone the host's game box (`aspect-[16/10]` inside the console stage) has **no height**. Before the first press the screen is black, apart from the shell's buttons. In play only its two SWING buttons show, with no court at all (photographs `tiebreak-after-0prestart`, `-2play5`). The card is above the splash now, but its box is not on screen. Phase 2. |
+
+The unit tests for the other fixes are listed in §4 (pause through a real InputBus, the touch sheet's row, the guard rows,
+the dead stick, the duel's RUN fold, and the fade's 7 cases).
 <!-- AFTER:END -->
 
 ## 5. For the dunk and hoops lanes (routed, not changed here)
