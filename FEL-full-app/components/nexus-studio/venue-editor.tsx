@@ -9,7 +9,7 @@
 // Ctrl/⌘+A select all · H hide / show · L lock / unlock · arrows nudge a grid step · Esc deselect / stop a preview.
 // §11: every one of these takes the whole selection, as one undo step.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { MousePointer2, Move3d, Rotate3d, Scale3d, Orbit, Hand, Plane, Grid3x3, Magnet, Focus, ClipboardPaste } from 'lucide-react';
 import { catalogItem, type CatalogItem } from '@/lib/nexus-studio/catalog';
 import { moveObject, placeItem, addVenue, switchVenue } from '@/lib/nexus-studio/edits';
@@ -29,6 +29,9 @@ import { StampShelf, STAMP_DRAG_PREFIX } from './stamp-shelf';
 import { Inspector } from './inspector';
 import { ViewportPanel, type ViewportHandle } from './viewport-panel';
 import { BudgetMeter } from './budget-meter';
+import { PublishPanel } from './publish-panel';
+import { PhoneBar } from './phone-bar';
+import { worstPhone, type PhoneSample } from '@/lib/nexus-studio/publishGate';
 import { C, ToolButton } from './ui';
 
 /** Pure: is this key event aimed at a text field (where the editor's shortcuts must not fire)? */
@@ -40,9 +43,16 @@ export function typingTarget(t: EventTarget | null): boolean {
   return el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'color', 'range'].includes(el.type ?? 'text');
 }
 
-export function VenueEditor({ studio }: { studio: StudioApi }) {
+/** STUDIO-EASY: what the shell's first-court guide asks of the editor (play the intro in the viewport). */
+export interface VenueEditorHandle { previewIntro(kind: 'establish' | 'walkIn'): boolean }
+
+export function VenueEditor({ studio, onHandle, overlay }: { studio: StudioApi; onHandle?(h: VenueEditorHandle | null): void; overlay?: ReactNode }) {
   const { venue, doc, selected, setSelected, selection, setSelection, clip, setClip, run, seal } = studio;
   const vp = useRef<ViewportHandle | null>(null);
+  useEffect(() => {
+    onHandle?.({ previewIntro: (k) => vp.current?.previewIntro(k) ?? false });
+    return () => onHandle?.(null);
+  }, [onHandle]);
   const [tool, setTool] = useState<Tool>('move');
   const [camera, setCamera] = useState<CameraMode>('orbit');
   const [snap, setSnap] = useState<SnapSettings>(DEFAULT_SNAP);
@@ -50,6 +60,14 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
   const [phone, setPhone] = useState(false);
   const [left, setLeft] = useState<'scene' | 'assets' | 'stamps'>('assets');
   const [stats, setStats] = useState<BudgetSample | null>(null);
+  // NEX-04: the worst phone-tier sample since the venue last changed — what Publish's budget gate reads
+  const [phoneSample, setPhoneSample] = useState<PhoneSample | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  // NEX-05 (phone): which sheet is open under the viewport on a narrow screen, and multi-select (a tap toggles, as Ctrl-click does)
+  const [sheet, setSheet] = useState<'left' | 'inspect' | null>('left');
+  const [multi, setMulti] = useState(false);
+  const onStats = useCallback((s: BudgetSample) => { setStats(s); setPhoneSample((p) => worstPhone(p, s)); }, []);
+  useEffect(() => { setPhoneSample(null); }, [venue]);   // an edit asks for a fresh measurement
   const [note, setNote] = useState<string | null>(null);
 
   const object = venue?.objects.find((o) => o.id === selected) ?? null;
@@ -99,6 +117,20 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
     if (r) { run(r.cmd); setLeft('stamps'); setNote('Saved as a stamp — it is in the Stamps tab and the project'); }
   }, [venue, selection, doc, run]);
 
+  // the arrows' nudge, shared with the phone bar's (NEX-05): one grid step; a group steps together, coalesced per run of nudges
+  const nudge = useCallback((dx: number, dz: number) => {
+    if (!selected || !venue) return;
+    if (selection.length > 1) {
+      // §11: the group steps together (one coalesced step per run of nudges)
+      const step = snap.on ? snap.move : 0.1;
+      const c = groupTransformCommand(venue, selection, { move: [dx * step, 0, dz * step], turn: 0, scale: 1 }, { label: 'Nudge', group: `nudge:${selection.join(',')}` });
+      if (c) run(c);
+      return;
+    }
+    const t = vp.current?.nudge(selected, dx, dz);
+    if (t) run({ ...moveObject(venue, selected, t, 'Nudge'), group: `nudge:${selected}` });
+  }, [selected, selection, venue, snap, run]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (typingTarget(e.target)) return;
@@ -131,16 +163,7 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
         case 'arrowleft': case 'arrowright': case 'arrowup': case 'arrowdown': {
           if (!selected || !venue) break;
           e.preventDefault();
-          const dx = k === 'arrowleft' ? -1 : k === 'arrowright' ? 1 : 0, dz = k === 'arrowup' ? -1 : k === 'arrowdown' ? 1 : 0;
-          if (selection.length > 1) {
-            // §11: the group steps together (one coalesced step per run of nudges)
-            const step = snap.on ? snap.move : 0.1;
-            const c = groupTransformCommand(venue, selection, { move: [dx * step, 0, dz * step], turn: 0, scale: 1 }, { label: 'Nudge', group: `nudge:${selection.join(',')}` });
-            if (c) run(c);
-            break;
-          }
-          const t = vp.current?.nudge(selected, dx, dz);
-          if (t) run({ ...moveObject(venue, selected, t, 'Nudge'), group: `nudge:${selected}` });
+          nudge(k === 'arrowleft' ? -1 : k === 'arrowright' ? 1 : 0, k === 'arrowup' ? -1 : k === 'arrowdown' ? 1 : 0);
           break;
         }
         default: return;
@@ -148,15 +171,17 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [studio, selected, selection, venue, camera, del, dup, copy, paste, flag, clip, snap, run, setSelected, setSelection]);
+  }, [studio, selected, selection, venue, camera, del, dup, copy, paste, flag, clip, nudge, run, setSelected, setSelection]);
 
   if (!venue) return null;
   const target = targetOf(venue.base.target) ?? PLAYTEST_TARGETS[DEFAULT_TARGET];
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[260px_1fr_300px]">
-      <aside className="flex min-h-0 flex-col border-r" style={{ borderColor: C.line, background: C.surface }} aria-label="Scene and assets">
-        <div className="flex gap-1 px-2 pt-2" role="tablist">
+    // NEX-05: on a phone the viewport comes first, then a sheet (assets / stamps / scene, or the inspector) chosen by the tabs under
+    // it; from md up, the three columns as before
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col md:grid md:grid-cols-[260px_minmax(0,1fr)_300px]" data-testid="venue-editor">
+      <aside className={`${sheet === 'left' ? 'flex' : 'hidden'} order-3 min-h-0 flex-1 flex-col overflow-y-auto border-r md:order-none md:flex md:flex-none md:overflow-visible`} style={{ borderColor: C.line, background: C.surface }} aria-label="Scene and assets">
+        <div className="hidden gap-1 px-2 pt-2 md:flex" role="tablist">
           {(['assets', 'stamps', 'scene'] as const).map((t) => (
             <button key={t} type="button" role="tab" aria-selected={left === t} onClick={() => setLeft(t)} className="flex-1 rounded-md py-1 text-[12px] capitalize"
               style={{ background: left === t ? 'rgba(0,229,255,0.12)' : 'transparent', color: left === t ? C.cyan : C.dim }}>{t === 'scene' ? `Scene · ${venue.objects.length}` : t === 'stamps' ? 'Stamps' : 'Assets'}</button>
@@ -178,7 +203,7 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
         )}
       </aside>
 
-      <section className="flex min-h-0 flex-col" aria-label="Viewport">
+      <section className="order-1 flex h-[62dvh] min-h-0 min-w-0 shrink-0 flex-col md:order-none md:h-auto" aria-label="Viewport">
         <div className="flex flex-wrap items-center gap-1 border-b px-2 py-1" style={{ borderColor: C.line, background: C.surface }} role="toolbar" aria-label="Viewport tools">
           <ToolButton title="Select" shortcut="Q" active={tool === 'select'} onClick={() => setTool('select')}><MousePointer2 className="h-4 w-4" /></ToolButton>
           <ToolButton title="Move" shortcut="W" active={tool === 'move'} onClick={() => setTool('move')}><Move3d className="h-4 w-4" /></ToolButton>
@@ -196,23 +221,43 @@ export function VenueEditor({ studio }: { studio: StudioApi }) {
             {SNAP_MOVES.map((m) => <option key={m} value={m}>{m} m · {snap.turn}°</option>)}
           </select>
           <ToolButton title={clip ? `Paste ${clip.objects.length === 1 ? clip.objects[0].name : `${clip.objects.length} objects`} at the view's centre` : 'Paste (copy something first)'} shortcut="Ctrl+V" disabled={!clip} onClick={paste}><ClipboardPaste className="h-4 w-4" /></ToolButton>
-          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[11px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
-          {note && <span className="ml-2 text-[11px]" style={{ color: C.gold }}>{note}</span>}
+          {selection.length > 1 && <span className="ml-1 rounded px-1.5 py-0.5 text-[12px]" style={{ color: C.cyan, background: 'rgba(0,229,255,0.10)' }} data-testid="selection-count">{selection.length} selected</span>}
+          {note && <span className="ml-2 text-[12px]" style={{ color: C.gold }}>{note}</span>}
         </div>
-        <ViewportPanel ref={vp} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
-          onPick={(id, mods) => setSelection(clickSelect(selection, id, mods.toggle ? 'toggle' : 'replace'))}
+        <PhoneBar count={selection.length} multi={multi} onMulti={setMulti}
+          onSelectAll={() => setSelection(venue.objects.filter((o) => !o.hidden).map((o) => o.id))}
+          onDeselect={() => { vp.current?.stopPreview(); setSelected(null); }}
+          onDelete={() => del()} onDuplicate={() => dup()} onCopy={copy}
+          onHide={() => flag('hidden')} onLock={() => flag('locked')} onNudge={nudge} onTurn={turn} />
+        <ViewportPanel ref={vp} overlay={overlay} venue={venue} cast={cast} selection={selection} tool={tool} camera={camera} snap={snap} grid={grid} phone={phone}
+          onPick={(id, mods) => setSelection(clickSelect(selection, id, mods.toggle || (multi && id !== null) ? 'toggle' : 'replace'))}
           onBox={(ids, mode) => setSelection(boxSelect(selection, ids, mode))}
-          onTransform={onTransform} onGroupTransform={onGroupTransform} onStats={setStats} onPreviewEnd={() => setNote(null)}
+          onTransform={onTransform} onGroupTransform={onGroupTransform} onStats={onStats} onPreviewEnd={() => setNote(null)}
           onDropItem={(id, at) => {
             if (id.startsWith(STAMP_DRAG_PREFIX)) { const st = allStamps(doc).find((x) => x.id === id.slice(STAMP_DRAG_PREFIX.length)); if (st) stampPlace(st, at); return; }
             const item = catalogItem(id); if (item) place(item, at);
           }} />
         <div className="border-t" style={{ borderColor: C.line, background: C.surface }}>
-          <BudgetMeter sample={stats} budgetKey={target.budgetKey} phone={phone} onPhone={(v) => { setStats(null); setPhone(v); }} />
+          <BudgetMeter sample={stats} budgetKey={target.budgetKey} phone={phone} onPhone={(v) => { setStats(null); setPhone(v); }}
+            onPublish={() => setPublishing((x) => !x)} publishing={publishing} />
+          {publishing && (
+            <PublishPanel venue={venue} project={doc} phoneSample={phoneSample} onMeasurePhone={() => { setStats(null); setPhone(true); }} onClose={() => setPublishing(false)} />
+          )}
         </div>
       </section>
 
-      <aside className="flex min-h-0 flex-col border-l" style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector">
+      {/* NEX-05: the phone's sheet tabs (the left panel's three, and the inspector) */}
+      <nav className="order-2 flex gap-1 border-y px-2 py-1 md:hidden" style={{ borderColor: C.line, background: C.surface }} role="tablist" aria-label="Panels">
+        {([['assets', 'Add'], ['stamps', 'Stamps'], ['scene', 'Scene'], ['inspect', 'Inspect']] as const).map(([id, label]) => {
+          const on = id === 'inspect' ? sheet === 'inspect' : sheet === 'left' && left === id;
+          return (
+            <button key={id} type="button" role="tab" aria-selected={on} data-testid={`sheet-${id}`}
+              onClick={() => { if (id === 'inspect') setSheet(on ? null : 'inspect'); else { setLeft(id); setSheet(on ? null : 'left'); } }}
+              className="h-10 flex-1 rounded-md text-[12px]" style={{ background: on ? 'rgba(0,229,255,0.12)' : 'transparent', color: on ? C.cyan : C.dim }}>{label}</button>
+          );
+        })}
+      </nav>
+      <aside className={`${sheet === 'inspect' ? 'flex' : 'hidden'} order-3 min-h-0 flex-1 flex-col overflow-y-auto border-l md:order-none md:flex md:flex-none md:overflow-visible`} style={{ borderColor: C.line, background: C.surface }} aria-label="Inspector" id="studio-inspector" tabIndex={-1}>
         <Inspector venue={venue} project={doc} object={object} run={run} seal={seal} onDelete={(id) => del([id])} onDuplicate={(id) => dup([id])}
           group={group} groupActions={{ duplicate: () => dup(), copy, remove: () => del(), flag: (k) => flag(k), turn, saveStamp: () => saveStamp() }}
           onPreviewIntro={(k) => { const ok = vp.current?.previewIntro(k); setNote(ok ? 'Previewing the intro — Esc to stop' : 'Reduced motion is on: the intro is skipped, as in the mode'); }}
