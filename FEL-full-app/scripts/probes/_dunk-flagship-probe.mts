@@ -289,7 +289,18 @@ async function boot(b: Browser, prop: string | null): Promise<{ p: Page; errors:
   }
   // FAST (Phase 4 sweeps): the NullEngine's own no-op draws — the frame's update, animation, skinning matrices, camera and the
   // recorder all still run; nothing is rasterised (SwiftShader's pixels were most of an attempt's wall time)
-  if (FAST) await p.evaluate(() => { const e = (window as unknown as { __FEL_DEV__: { scene: { getEngine(): Record<string, unknown> } } }).__FEL_DEV__.scene.getEngine(); e.drawElementsType = () => {}; e.drawArraysType = () => {}; });
+  if (FAST && !STRIP) await p.evaluate(() => { const e = (window as unknown as { __FEL_DEV__: { scene: { getEngine(): Record<string, unknown> } } }).__FEL_DEV__.scene.getEngine(); e.drawElementsType = () => {}; e.drawArraysType = () => {}; });
+  // Phase 6: FAST with a STRIP draws only the strip's frames (and the 3 before each, so a shadow map or a one-frame lag is
+  // warm): the 16 side strips drawn whole took ~14 min a trick under the shared CPU load. The draw is switched on for those
+  // frames in onBeforeRender (before the render targets and the camera's pass); the photo is taken on the paused frame.
+  if (FAST && STRIP) await p.evaluate(() => {
+    const w = window as unknown as { __FEL_DEV__: { scene: any }; __vc: { C: { frames: number } }; __rec: { on: boolean; strip: number[] | null; f0: number } };
+    const sc = w.__FEL_DEV__.scene; const e = sc.getEngine(); const proto = Object.getPrototypeOf(e);
+    const de = proto.drawElementsType, da = proto.drawArraysType; let on = false;
+    e.drawElementsType = function (this: unknown, ...a: unknown[]) { if (on) return de.apply(this, a); };
+    e.drawArraysType = function (this: unknown, ...a: unknown[]) { if (on) return da.apply(this, a); };
+    sc.onBeforeRenderObservable.add(() => { const R = w.__rec; on = !!(R && R.on && R.strip && R.strip.length && (w.__vc.C.frames - R.f0) >= R.strip[0] - 3); });
+  });
   const st = await p.evaluate(startInPage, 2500);
   console.log(`[boot] ${url} start ${JSON.stringify(st)}`);
   return { p, errors };
@@ -353,7 +364,8 @@ async function runScen(b: Browser, scen: string, reps: number): Promise<Rec[]> {
         if (wait) {
           await p.evaluate(() => { const o = document.getElementById('o'); if (o) o.style.display = 'none'; }).catch(() => {});
           await p.screenshot({ path: path.join(shotsDir, `f${String(++k).padStart(2, '0')}.jpg`), quality: 70, type: 'jpeg' });
-          await p.evaluate(() => { const w = window as unknown as DunkWin; w.__rec.stripWait = false; w.__vc.resume(); });
+          // the status line back (Phase 6, STRIP_ALL): hidden, '· playing' left innerText and the page's next attempt read "no approach"
+          await p.evaluate(() => { const w = window as unknown as DunkWin; const o = document.getElementById('o'); if (o) o.style.display = ''; w.__rec.stripWait = false; w.__vc.resume(); });
           continue;
         }
       }
