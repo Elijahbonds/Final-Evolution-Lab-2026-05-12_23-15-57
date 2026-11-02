@@ -26,6 +26,7 @@ import { doseLine } from '@/lib/session-player/dose';
 import type { Session } from '@/lib/session-player/model';
 import type { FinishResult } from '@/components/session-player/session-player';
 import { PrimaryCta } from '@/components/ui/fel/primary-cta';
+import { warmAvatarDemo } from '@/components/library/avatar-demo';
 import { Chip } from '@/components/ui/fel/chip';
 import { SIG_LOOK } from './look';
 
@@ -147,6 +148,11 @@ export function ProgramPage({ initial, clips = {} }: { initial: ProgramView; cli
     : view.weeks;
   const finished = deviceMode ? !!device && !today : view.finished;
   const play = useMemo(() => playMode(view, today), [view, today]);
+  // DEMO-SPEED-2 (coordinator 2026-10-28): Start opens the player on a demo, so the demo is warmed here, on idle, while the
+  // person reads the page: the stage's code and their body's file (avatar-demo.tsx warmAvatarDemo; never on Save-Data or
+  // with 3D off). Only when today's session can be played and has a loop to show.
+  const hasDemo = !!today && !!play && !today.blocked && today.items.some((it) => !!clips[it.ex]);
+  useEffect(() => { if (hasDemo) warmAvatarDemo(); }, [hasDemo]);
 
   /** Start: ONE tap from this page to the first set running (the player counts in by itself). */
   const start = () => {
