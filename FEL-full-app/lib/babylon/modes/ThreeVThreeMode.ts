@@ -179,6 +179,7 @@ import { TeamOffense3v3, teamOffenseOn, crossesHand } from '../hoops/teamOffense
 import { KIT_RENDER, type KitMove } from '../hoops/rivalOffense';   // hoops-p03: the handler's kit moves
 import { jumperPace, finishPace, jumperFromRiseOn } from '../hoops/releaseTiming';   // hoops-p04: the rival's shot leaves on the clip's release; the hero's rise skips the load
 import { riseStartOf } from '../anim/opponentMotion';   // hoops-p04
+import { applyInertialBlend } from '../anim/inertialize';   // AF-1: inertial clip transitions, behind the anim.inertial knob (default off)
 import { Aware3v3 } from './threevthreeAware';   // lane/h3-aware (#313 H3c): the bodies off the ball watch it, their possession plays both ends, a real D stance
 import { MateBall, mateReadOn, RELEASE_ROLL_RIM_M, RELEASE_ROLL_PER_FRAME } from './threevthreeMate';   // lane/h3-aware (#315 H3e): my teammate with the ball reads and plays
 /** H2c (dev log): the defender states the stepping pass added or re-routed. */
@@ -1033,6 +1034,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
         const char = ai
           ? await CharacterPipeline.spawnNpc(ctx.scene, cfg.heroUrl, { position: pos, tint, rosterSeed: `${tint}@${pos.x.toFixed(1)},${pos.z.toFixed(1)}`, startClip: SPORT_CLIP.idle })   // rival bodies (2026-10-16): one person per spot, not one per team
           : await CharacterPipeline.spawnPlayer(ctx.scene, cfg.heroUrl, { position: pos, startClip: SPORT_CLIP.idle });
+        applyInertialBlend(char.animator);   // AF-1: off (the knob's default) leaves the body linear
         // TEAM KITS (suite pass, 2026-09-16). Six kit bodies in the roster's own tops read as one pickup crowd — the eye
         // had no way to tell a teammate from a defender but the hero's purple. The AI bodies wear their team's jersey
         // (the tint used to be only a roster SEED; the roster's baked kit ignored it); the hero keeps the wardrobe he

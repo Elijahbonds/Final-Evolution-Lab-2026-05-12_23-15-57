@@ -50,7 +50,9 @@ export function drillsAccess(ctx: Pick<WarmupContext, 'isYouth' | 'painDecision'
 
   const drills = ROUTE_DRILLS.map((d): DrillAccess => {
     const held = d.id === WAKE_UP.id ? wakeHeld : drillHeld;
-    const keep = d.phases.filter((p) => !(held && phaseImpact(p)));
+    // YOUTH-CONTACT-CAP (PM 2026-10-26): an adults-only drill or phase (Pogo Both Feet, the Wake-Up's 60 pogos) is held
+    // for a youth athlete on its own, whatever the warm-up's switches say
+    const keep = d.phases.filter((p) => !(held && phaseImpact(p)) && !(youthHold && (d.adultOnly || p.adultOnly)));
     const out = d.phases.filter((p) => !keep.includes(p));
     // a drill whose only phases left would be rests is not a drill
     const runs = keep.some((p) => p.presence === 'required');

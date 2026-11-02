@@ -2,9 +2,9 @@
 // Babylon-free (the drill surfaces' import graph; lib/assess/replay.test.ts walks it from the Quick Screen too).
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { demoBodyUrl, resetDemoWarm, warmDemoBody, warmedBodyUrl } from './demoWarm';
+import { demoBodyUrl, resetDemoWarm, unscaledBodyUrl, warmDemoBody, warmedBodyUrl } from './demoWarm';
 import { readHeroBodyEarly, takeHeroBodyRead } from '@/lib/babylon/core/heroBodyRead';
-import { KIT_BODY_URL, SCAN_BODY_MOBILE_URL, SCAN_BODY_URL } from '@/lib/babylon/core/heroBody';
+import { KIT_BODY_MOBILE_URL, KIT_BODY_URL, SCAN_BODY_MOBILE_URL, SCAN_BODY_URL } from '@/lib/babylon/core/heroBody';
 import { autoTier, explainQualityTier } from '@/lib/babylon/scene/tierRule';
 import * as QualityTier from '@/lib/babylon/scene/QualityTier';
 
@@ -16,13 +16,16 @@ afterEach(() => {
 });
 
 describe('the demo body the early start fetches', () => {
-  it('is the file CharacterLibrary spawns: the scan\'s phone file on a phone, every other body as it is', () => {
+  // DEMO-SPEED-2: the kit bodies have phone files now (heroBody bodyUrlForTier); this asserted they did not — changed on purpose
+  it('is the file CharacterLibrary spawns: each body\'s phone file on a phone, the full file elsewhere', () => {
     expect(demoBodyUrl('scan', 'mobile')).toBe(SCAN_BODY_MOBILE_URL);
     expect(demoBodyUrl('scan', 'desktop')).toBe(SCAN_BODY_URL);
     expect(demoBodyUrl('scan', 'high')).toBe(SCAN_BODY_URL);
-    expect(demoBodyUrl('kit-female', 'mobile')).toBe(KIT_BODY_URL.female);
-    expect(demoBodyUrl('kit-male', 'mobile')).toBe(KIT_BODY_URL.male);
-    expect(demoBodyUrl(null, 'mobile')).toBe(KIT_BODY_URL.male);   // a guest
+    expect(demoBodyUrl('kit-female', 'mobile')).toBe(KIT_BODY_MOBILE_URL.female);
+    expect(demoBodyUrl('kit-male', 'mobile')).toBe(KIT_BODY_MOBILE_URL.male);
+    expect(demoBodyUrl(null, 'mobile')).toBe(KIT_BODY_MOBILE_URL.male);   // a guest
+    expect(demoBodyUrl('kit-male', 'desktop')).toBe(KIT_BODY_URL.male);
+    for (const [phone, full] of [[SCAN_BODY_MOBILE_URL, SCAN_BODY_URL], [KIT_BODY_MOBILE_URL.male, KIT_BODY_URL.male], [KIT_BODY_MOBILE_URL.female, KIT_BODY_URL.female], [KIT_BODY_URL.male, KIT_BODY_URL.male]]) expect(unscaledBodyUrl(phone)).toBe(full);
   });
 
   it('fetches the server\'s body once, and hands the hero-body answer to the spawn\'s identity read', async () => {

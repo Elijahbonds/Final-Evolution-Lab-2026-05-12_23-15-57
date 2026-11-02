@@ -1243,6 +1243,34 @@ export const FEEL_KNOBS: readonly FeelKnob[] = [
     source: 'lib/babylon/anim/basketballTree.ts PLANT_RELEASE_FADE_SEC',
     hint: 'A planted foot slides back to the clip over this when the cut lock ends, instead of in one frame. 0 = the old one-frame release.',
   },
+  // AF-1 (ANIM-FEEL-SPEC 2026-10-28): inertialized clip transitions, default OFF — off is the linear crossfade, unchanged.
+  {
+    id: 'anim.inertial', label: 'Inertial clip transitions on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_ON',
+    hint: 'On: a clip switch cuts to the new clip at once and the old pose\'s difference decays out (no mid-blend pose). Takes effect on the next spawn.',
+  },
+  {
+    id: 'anim.inertialHalfLifeK', label: 'Inertial offset half-life × fade time', def: 0.5, min: 0.1, max: 1.5, step: 0.05, unit: '×', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/inertialize.ts ANIM_INERTIAL_HALF_LIFE_K',
+    hint: 'How long the old pose takes to wash out, as a fraction of each clip switch\'s fade time. Only read when inertial transitions are on.',
+  },  // CAMERA TIP (2026-10-29): the dunk contest's camera fixes (QA items 1-3, 8), default OFF — off is today's framing (2K High feel).
+  {
+    id: 'cam.dunkFraming', label: 'Dunk camera fixes on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Camera · dunk',
+    source: 'lib/babylon/core/dunkCamFraming.ts CAM_DUNK_FRAMING_ON',
+    hint: 'On: the phone slam cut pulls back and aims between the dunker and the rim, the reset camera stays out of the hoop and pole, the run-up camera sits higher and further back, and the phone idle view comes closer.',
+  },
+  // AF-11 (ANIM-FEEL-SPEC 2026-10-28): the shot holds its last frame (gather deferred to AF-11b) instead of wrapping, default OFF — off is the loop, unchanged.
+  {
+    id: 'anim.holdLast', label: 'Shot holds last frame on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Anim · transitions',
+    source: 'lib/babylon/anim/basketballTree.ts ANIM_HOLD_LAST_ON',
+    hint: 'On: the jumpshot freezes on its last frame while the shot lasts, instead of wrapping.',
+  },
+  // VENUE-SMOOTH-1 (2026-10-30): forge rivals on each crowd stand's front row, the Meshy bodies behind. Default OFF (PM).
+  {
+    id: 'crowd.forgeFront', label: 'Forge rivals in the crowd front row on (1) / off (0)', def: 0, min: 0, max: 1, step: 1, unit: '', group: 'Crowd',
+    source: 'lib/babylon/visual/crowd/crowdFront.ts CROWD_FORGE_FRONT_ON',
+    hint: 'On: the front row of every stand is forge rivals (about 31k triangles each), the five Meshy fans sit behind. Off: the Meshy crowd in every row, no forge body loads. Read when the crowd bakes (next venue).',
+  },
 ];
 
 export const FEEL_KNOB_BY_ID: ReadonlyMap<string, FeelKnob> = new Map(FEEL_KNOBS.map((k) => [k.id, k]));

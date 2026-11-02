@@ -30,6 +30,14 @@ export const REGRESS_LOAD_SHARE = 0.1;
 
 /** Sets ceilings a draft may write. Adults 5, under youth rules 4 (owner decision #6: conservative for minors). */
 export const MAX_DRAFT_SETS = { adult: 5, youth: 4 } as const;
+/**
+ * YOUTH-CONTACT-CAP (2026-10-26). TUNE: jump/landing contacts a session may hold under youth rules (13–17). The owner's
+ * youth rule is 55 a session; programs/DUNK-PROGRAM.md:46 aims lower (30–50), which a coach is free to write. A contact
+ * is one rep of protocol-gated work, counted as sets × the top of the rep range (./contacts.ts).
+ */
+export const MAX_TEEN_SESSION_CONTACTS = 55;
+// Elijah's rule (programs/DUNK-PROGRAM.md §4): about 110 jump contacts a week and under 900 for the whole 8 weeks
+// under 18. Not read by any code yet (the draft engine sees one week's sessions, not a week's or a program's total).
 /** An easier week never takes a row below this many sets. */
 export const MIN_EASE_SETS = 2;
 
