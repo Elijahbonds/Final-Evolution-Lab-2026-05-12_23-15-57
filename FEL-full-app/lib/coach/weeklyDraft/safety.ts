@@ -14,12 +14,16 @@
 //   · never Full throttle (a top set is the coach's to write by hand), never an RPE past MAX_DRAFT_RPE;
 //   · never a swap to, or an add of, protocol-gated work (plyometrics, depth drops): FEL's jump checks gate those, and a
 //     coach adds them by hand (lib/coach/protocolGate.ts);
-//   · everything that only eases, regresses or adds low-load prep work is 'safe'; any progression that passes is 'review'.
+//   · everything that only eases, regresses or adds low-load prep work is 'safe'; any progression that passes is 'review';
+//   · YOUTH-CONTACT-CAP (2026-10-26): more reps (or a longer hold) is an increase, as more sets is; under youth rules a
+//     session never goes past MAX_TEEN_SESSION_CONTACTS jump contacts, no jump set or rep is ever added (PM ruling
+//     2026-10-26), and no set is added to a max-effort isometric (./contacts.ts).
 //
 // Pure, client-safe.
 
 import { isProtocolGated } from '../protocolGate';
 import { EFFORT_BANDS, PIN_EXERCISE, bandAllowed } from '../taxonomy';
+import { contactProblem, isMaxEffortIsometric, jumpVolumeUp, repsUp } from './contacts';
 import { maxSets, numericLoad, rpeOf } from './dose';
 import { MAX_DRAFT_RPE } from './thresholds';
 import type { DraftCatalogueRow, DraftChange, DraftOp, SafetyClass } from './types';
@@ -34,6 +38,11 @@ export interface SafetyContext {
   /** Movement patterns whose Mirror form dropped this week (squat, lunge). */
   formDropPatterns: ReadonlySet<string>;
   catalogue: ReadonlyMap<string, DraftCatalogueRow>;
+  /**
+   * Under youth rules: each session's jump contacts as written now, by session id (the rules engine reads the program,
+   * approval reads the rows fresh). Without it, a change is judged by the rows it touches alone.
+   */
+  sessionContacts?: Readonly<Record<string, number>>;
 }
 
 const bandIndex = (id: string | null) => (id ? EFFORT_BANDS.findIndex((b) => b.id === id) : -1);
@@ -78,6 +87,10 @@ export function readOp(op: DraftOp, ctx: Pick<SafetyContext, 'youth' | 'catalogu
 
   const { before: b, after: a } = op;
   if (a.sets > b.sets) increase = true;
+  if (repsUp(b.reps, a.reps)) increase = true;
+  if (ctx.youth && a.sets > b.sets && isMaxEffortIsometric(b, rowOf(b.exerciseId))) {
+    problems.push(`${b.exerciseName} is a max-effort isometric. Under 18 it gets no more sets: max-effort isometrics are for adults.`);
+  }
   if (a.sets > maxSets(ctx.youth)) problems.push(`A draft writes at most ${maxSets(ctx.youth)} sets${ctx.youth ? ' for an athlete under 18' : ''}.`);
   if (a.sets < 1) problems.push('A row needs at least one set.');
   const nb = numericLoad(b.load), na = numericLoad(a.load);
@@ -102,6 +115,13 @@ export function classify(change: Pick<DraftChange, 'ops' | 'exerciseName'>, ctx:
   const reads = change.ops.map((op) => readOp(op, ctx));
   const problem = reads.flatMap((r) => r.problems)[0];
   if (problem) return { safety: 'unsafe', why: problem };
+  if (ctx.youth) {
+    const contacts = contactProblem(change.ops, ctx.catalogue, ctx.sessionContacts);
+    if (contacts) return { safety: 'unsafe', why: contacts };
+    if (jumpVolumeUp(change.ops, ctx.catalogue)) {
+      return { safety: 'unsafe', why: 'Under 18: a draft never adds jump sets or reps. More jumps are your call: add them by hand if you want them.' };
+    }
+  }
   const increase = reads.some((r) => r.increase);
   if (!increase) return { safety: 'safe', why: null };
   if (ctx.painOpen) return { safety: 'unsafe', why: 'A pain flag is open. Nothing moves up until it has settled.' };
