@@ -30,13 +30,27 @@ export const BODY_TYPES: readonly BodyType[] = ['male', 'female'];
 export const DEFAULT_BODY_TYPE: BodyType = 'male';
 
 /** The scan's phone file (Ship Pass 6: the decimated bake, 54k verts, 1K textures): the same 22 bones, rest pose and skin as
- *  SCAN_BODY_URL. CharacterLibrary loads it in its place on the mobile tier (scanUrlForTier) — and so does anything that
+ *  SCAN_BODY_URL. CharacterLibrary loads it in its place on the mobile tier (bodyUrlForTier) — and so does anything that
  *  fetches the body ahead of a spawn (the library stage's early start), so the two always ask for the same file. */
 export const SCAN_BODY_MOBILE_URL = '/models/elijah-meshy.mobile.glb';
 
-/** THE RULE for the scan's phone file: the scan on the mobile tier is its phone file; every other body and tier is as asked. */
-export function scanUrlForTier(url: string, tier: string | null | undefined): string {
-  return url === SCAN_BODY_URL && tier === 'mobile' ? SCAN_BODY_MOBILE_URL : url;
+/** DEMO-SPEED-2 (coordinator 2026-10-28, owner call 1): the kit bodies' phone files. Baked from KIT_BODY_URL with
+ *  `scripts/avatar/import-mpfb.mts <kit> <out> --textures-only` (skin 1024², every other map 512² — the sizes the phone
+ *  texture cap already uploaded them at): nodes, skins, inverse binds, vertices, morph targets and materials are the
+ *  kit file's, unchanged (GATE 0: heroBody.test, poseGuard.test). 2.1 MB each, against 2.9 / 3.0 MB. */
+export const KIT_BODY_MOBILE_URL: Record<BodyType, string> = {
+  male: '/models/candidates/fel-kit-male.mobile.glb',
+  female: '/models/candidates/fel-kit-female.mobile.glb',
+};
+
+/** THE RULE for a body's phone file: on the mobile tier the scan and the kit bodies load their phone files; every other
+ *  file and every other tier load as asked. */
+export function bodyUrlForTier(url: string, tier: string | null | undefined): string {
+  if (tier !== 'mobile') return url;
+  if (url === SCAN_BODY_URL) return SCAN_BODY_MOBILE_URL;
+  if (url === KIT_BODY_URL.male) return KIT_BODY_MOBILE_URL.male;
+  if (url === KIT_BODY_URL.female) return KIT_BODY_MOBILE_URL.female;
+  return url;
 }
 
 export function urlForHeroBody(kind: HeroBodyKind): string {
@@ -46,7 +60,7 @@ export function urlForHeroBody(kind: HeroBodyKind): string {
 /** Every file that IS a player body — an opponent spawn must never land on one of these. */
 export function isPlayerBodyUrl(url: string): boolean {
   return url === SCAN_BODY_URL || url === KIT_BODY_URL.male || url === KIT_BODY_URL.female
-    || url === SCAN_BODY_MOBILE_URL;
+    || url === SCAN_BODY_MOBILE_URL || url === KIT_BODY_MOBILE_URL.male || url === KIT_BODY_MOBILE_URL.female;
 }
 
 /** Parse the server allowlist. Case- and whitespace-insensitive; empty entries dropped. */
