@@ -16,6 +16,7 @@ import { LocalPartyFallback } from '@/components/party/social/party-hub';
 import { termsMarkdown } from '@/lib/legal/terms-markdown';
 import { TERMS_CONTENT } from '@/lib/policies';
 import ModesPage from '@/app/modes/page';
+import { StartStep } from '@/app/play/mirror/assess/_components/gate-steps';
 import CoachBusinessThanksPage from '@/app/coach/business/thanks/page';
 
 type Status = 'loading' | 'authenticated' | 'unauthenticated';
@@ -166,5 +167,14 @@ describe('/terms layout (J9)', () => {
     // no partial match inside a longer path
     expect(termsMarkdown('at /purchase-terms.')).toContain('<a href="/purchase-terms">/purchase-terms</a>.');
     expect(termsMarkdown('at /purchase-terms.')).not.toContain('<a href="/terms">');
+  });
+});
+
+describe('/screen start buttons (J15)', () => {
+  it('the link form centres its label like the button form does', () => {
+    const links = renderToStaticMarkup(createElement(StartStep, { jumpHref: '/play/mirror/assess?run=vertical', fullHref: '/play/mirror/assess?run=full' }));
+    const anchors = links.match(/<a [^>]*data-run="(jump|full)"[^>]*>/g) ?? [];
+    expect(anchors).toHaveLength(2);
+    for (const a of anchors) expect(a).toMatch(/class="[^"]*\btext-center\b/);
   });
 });
