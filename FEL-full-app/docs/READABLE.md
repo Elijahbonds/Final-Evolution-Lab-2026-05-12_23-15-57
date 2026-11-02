@@ -1,0 +1,104 @@
+# Readable: the standard, the audit and the guards
+
+**Owner, 2026-11-02:** "We need to make sure people can read what they're looking at always."
+
+The lane is `lane/readable`. This file says what "readable" means here, as numbers, why each number is what it is, how
+it is measured, what was fixed and what still fails.
+
+## 1. The standard
+
+Each rule is a number in `lib/readable/rules.ts` (`READABLE`), so the rig, the source guard and this page cannot drift.
+
+| Rule | The number | Why this number |
+|---|---|---|
+| **Smallest text** | Nothing a user must read is under **12 px**. | 12 px is the type scale's smallest role, `TYPE.label` (`lib/design/type.ts`, premium-ui P1), which the owner has seen and signed off. The menus were designed down to it; everything smaller was an ad-hoc `text-[9–11.5px]` from before the scale (premium-ui counted 33 such sizes). |
+| **Body copy on a phone** | A run of more than 12 words is at least **16 px** at 390 px wide. | 16 px is `TYPE.body` and iOS's default body size; under 16 px iOS Safari also zooms a focused field. "More than 12 words" is the line `TYPE.small` draws: a supporting line of up to 12 words may be 14 px. |
+| **HUD text during play** | Must-read HUD text is at least **14 px** on a 390 px phone, and at least **24 px** on a 1080p TV. A label or unit beside a value may sit at the 12 px floor. | 14 px is the smallest size the type scale uses for reading (`TYPE.small`); HUD text is read at a glance, in motion, over a moving scene, so it cannot be smaller than menu text that is read at rest. A label (HR, OUTS) is learned once and then recognised by place, so it keeps the app-wide floor. 24 px at 1080p is the HUD's own 10-foot floor (`TV_MIN_READ_PX`, A9.13). Console view zooms the HUD with the screen's height (`lib/ui/consoleView.ts`, ×2.25 at 1080 px), so 12 px on a phone draws at 27 px on the TV. |
+| **Contrast** | WCAG 2.2 AA (1.4.3): **4.5:1**, or **3:1** for large text (24 px, or 18.66 px at weight 700+). Measured from the **rendered pixels** behind each glyph, not from CSS. Placeholder text counts. A disabled control is exempt (1.4.3), but is counted separately. | AA is the floor the a11y lane adopted (`lib/a11y/wcag.ts`). Pixels, because a computed background colour does not know about a gradient, a translucent panel over a photo, or the 3D scene. |
+| **Text over 3D, video, camera or a photo** | It sits on a scrim or a plate, or carries a tight dark edge, so the 4.5:1 / 3:1 holds on the **worst** frame. | A frame changes every 16 ms; the one that matters is the brightest. The rig measures the HUD over ten real backdrops (snow, sky, sunlit court…), plus pure white and mid-grey. |
+| **Never clipped** | No key information — a number, a score, a price, a time, an error, a heading or a control's label — is cut off at 390 px, at 200 % zoom (1280 × 800 at 200 %, a 640 × 400 CSS viewport), or with the root font at 150 % (iOS larger text). | These are the three ways a phone or a laptop shrinks the room text has. 150 % is the top of the brief's 125–150 % (the worst case). |
+| **Never overlapping** | No text is left under the tab bar, the status rail, the HUD or a toast once the page is scrolled as far as it goes; no two runs of text are drawn on each other. | A run under a bar at the end of the page can never be scrolled clear. |
+| **Up long enough to read** | A toast, banner, callout or lower third that goes away by itself stays up at least **words × 0.3 s + 1 s**, unless it persists or can be re-read. | 0.3 s a word is 200 words a minute, a slow reader's pace; the 1 s is noticing that something arrived and moving the eyes to it. |
+| **Themes** | Both themes, if the app has two; `prefers-contrast`; reduced transparency where a blur carries text. | The app has **one theme** (dark: `<html class="dark">`, ink `#050505`) and no `prefers-contrast` or `prefers-reduced-transparency` handling anywhere (searched 2026-11-02). Every contrast number here is on the dark theme. Blur-backed text (`fel-glass`, the toasts) is measured as drawn; see section 5 for the reduced-transparency call. |
+
+## 2. How it is measured
+
+### The rig (`scripts/readable/audit.mts`)
+
+Every `app/**/page.tsx` except `app/dev` and `app/api`, discovered from the tree, so a new route is audited the day it
+lands. Each page is the real module rendered on the accessibility rig's stubbed server (`scripts/a11y/rig.mts`: no
+database, every API answers "nothing yet", so each screen shows what a new account sees), with each route's nested
+layouts, between the real StatusRail and TabBar, served over http from a random local port so `public/` images load.
+
+Four set-ups per route: **phone** 390 × 844, **desktop** 1280 × 800, **zoom200** (1280 × 800 at 200 %), **font150**
+(390 × 844, root font 150 %).
+
+For every visible run of text (`scripts/readable/inpage.ts`): the rendered size (the computed font size times any CSS
+zoom), the colour with every ancestor's opacity folded in, the boxes of its glyphs, what clips it (an overflow-hidden
+ancestor it runs past, an ellipsis, a line clamp, the viewport) and what covers it (a fixed or sticky layer, another run).
+
+**Contrast from pixels.** Each viewport is shot twice: once as is, and once with every glyph made transparent — scrims,
+panels and text shadows stay. The second shot is exactly what is behind the text. The ink is where the two shots differ;
+the run's ratio is its colour (with its opacity) against the background pixel under each ink pixel, and the run's figure
+is the 10th percentile, so one stray bright pixel does not fail a run but a bright patch behind a third of the letters
+does (`pixelContrast`). Text with no solid colour (gradient-clipped, an SVG fill) is read from its own pixels.
+
+**The HUD over real frames.** The 3D scene cannot draw in this container (no WebGL in headless Chromium here), so the
+HUD is measured over recorded frames instead: the shared TV HUD pieces (scorebug, chips, meter, banner, lower third,
+hint line) and JuiceKit's banner, score pop and callout, at phone size and at 1080p (zoom 2.25), over ten of the modes'
+own backdrops (`public/backdrops/*.jpg`) plus pure white and mid-grey.
+
+```
+npx tsx scripts/readable/audit.mts <outDir> <label> --build-only                       # bundle (no browser)
+flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> --plant
+flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> --hud
+flock /home/user/wt/gate-queue.lock timeout 900 npx tsx scripts/readable/audit.mts <outDir> <label> [--budget=780]
+npx tsx scripts/readable/summary.mts <outDir> <label> [--vs=<before label>]             # totals, worst screens, contact sheet
+```
+
+The crawl resumes: each route is written to `<outDir>/<label>/routes/<route>.json` when it finishes, and a run stops
+starting new routes after `--budget` seconds, so a crawl is several ≤ 15-minute lock holds. Output is JSON plus a JPG of
+each first screen with every failing run boxed in red.
+
+### Validating the rig
+
+`--plant` renders a control page: five known faults beside known-good text, and exits 1 unless the rig flags exactly
+the faults (section 3 has the result).
+
+| Planted | Expected |
+|---|---|
+| 11 px `#999` on white | under 12 px **and** contrast (2.85:1) |
+| "Score 12,345 points" in a 70 px overflow-hidden box | clipped (key information) |
+| bare white 16 px caption on the snowboard backdrop | unreadable over an image |
+| two runs drawn on each other | overlap |
+| the page's last line under a fixed bottom bar, with no room to scroll it clear | overlap with fixed |
+| **good:** 16 px `#f2f5f9` on the ink; the 12 px label step in `--fel-text-dim`; a 32 px bold number in `--fel-text-quiet`; a scrimmed caption on the same snow; text inside the fixed bar | nothing |
+
+### The source guard (`tests/readable/source-floor.test.ts`, vitest)
+
+Fast, no browser: every user-facing `.ts`/`.tsx` under `app/`, `components/` and `lib/` (not `app/dev`, tests or
+scans) is read by `lib/readable/sourceScan.ts` for
+
+- a Tailwind `text-[Npx]` / `text-[Nrem]` or an inline `fontSize` under 12 px, and
+- a `text-<colour>[/<alpha>]` class under 4.5:1 on the app's three text surfaces (ink, card, raised panel). Dark solid
+  colours (ink on a lit chip) and `disabled:` variants are not judged.
+
+It is a ratchet: `tests/readable/source-baseline.json` holds what is left per file, a file may never rise above its line,
+and a new file is held to zero. Lower a line when you fix one: `npx tsx scripts/readable/source-baseline.mts --write`.
+
+### Timings (`scripts/readable/timings.mts`)
+
+Every message call with a literal text — JuiceKit `banner()`/`callout()`, the modes' banner channels, sonner toasts —
+against the read time.
+
+## 3. Results
+
+_Filled from the runs below._
+
+## 4. What was fixed
+
+_Filled below._
+
+## 5. Left, and owner calls
+
+_Filled below._
