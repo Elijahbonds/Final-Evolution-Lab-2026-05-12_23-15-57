@@ -66,7 +66,7 @@ export const PLYO: Family[] = [
     variants: [
       { name: 'Squat Jump', v: 'squat-jump', level: 'beginner', setup: 'Sink into a quarter squat and hold still for a two-count, hands on the hips.', cue: 'From the still start, push the floor away and jump straight up.', aliases: ['Static Squat Jump'] },
       { name: 'Countermovement Jump', v: 'cmj', level: 'beginner', aliases: ['CMJ', 'Vertical Jump'] },
-      { name: 'Countermovement Jump to Stick', v: 'cmj-stick', level: 'beginner', cue: 'Jump as high as you can and stick the landing still and silent.' },
+      { name: 'Countermovement Jump to Stick', v: 'cmj-stick', level: 'beginner', cue: 'Jump up tall and stick the landing still and silent.' },
       { name: 'Repeated Countermovement Jump', v: 'cmj-repeat', level: 'intermediate', cue: 'Land and jump again straight away, quick off the floor.', dosage: reps(4, '5', 75) },
       { name: 'Tuck Jump', v: 'tuck', level: 'advanced', cue: 'Jump and pull the knees up toward the ceiling, then land quiet.', youthOk: true },
       { name: 'Split Jump', v: 'split', level: 'intermediate', ladder: 'split', setup: 'Split stance, feet hip-width side to side, back heel up.', cue: 'Jump straight up from the split and land in the same split, quiet.', aliases: ['Split Squat Jump'] },
