@@ -4,7 +4,7 @@
 // `squatStage` for EVERYTHING ELSE. The Movement Screen fell into that last arm, so its chip read the guided squat's
 // untouched first stage, BREATHE, from the first station to the last (P1 report, "Minor"). A map over every pattern
 // cannot miss one: the screen now shows the station it is on.
-import { screenFor, type ScreenId } from './screen';
+import { screenRunFor, type ScreenId, type ScreenOrder } from './screen';
 import type { RunnerPhase } from './screenRunner';
 import type { SquatStage } from './squatStage';
 import type { LungeStage } from './lungeStage';
@@ -24,7 +24,7 @@ export interface ChipInput {
   /** The lunge's per-side session stage (MIRROR-COACH P4 lane 1) — 'left', 'right' or 'review'. */
   lungeStage: LungeStage;
   /** Screen: the runner's latest state (null before its first tick). */
-  runner: { screen: ScreenId; phase: RunnerPhase; stationIndex: number } | null;
+  runner: { screen: ScreenId; phase: RunnerPhase; stationIndex: number; order?: ScreenOrder } | null;
   /** MIRROR-MOVES P2: the hinge's and the push-up's session stage (sideRepStage.ts). Absent reads as setup. */
   hingeStage?: SideRepStageName;
   pushupStage?: SideRepStageName;
@@ -48,7 +48,7 @@ export const shortCheckLabel = (label: string): string => label.split(/[,(]/)[0]
 export function screenChip(runner: ChipInput['runner']): string {
   if (!runner) return 'Get set';
   if (runner.phase === 'complete') return 'Screen complete';
-  const stations = screenFor(runner.screen);
+  const stations = screenRunFor(runner.screen, runner.order);   // TOOLS-EASY: the runner's own walk-through order
   const i = Math.min(Math.max(0, runner.stationIndex), stations.length - 1);
   const what = stations[i]?.checks[0]?.label;
   return `Station ${i + 1} of ${stations.length}${what ? ` · ${shortCheckLabel(what)}` : ''}`;

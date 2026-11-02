@@ -95,7 +95,7 @@ describe('the budget meter', () => {
     expect(html).toContain('650<span');
     expect(html).toContain('/600');
     expect(html).toContain('tennis on a phone');
-    expect(html.replace(/<!-- -->/g, '')).toContain('Budget · phone');
+    expect(html.replace(/<!-- -->/g, '')).toContain('Too heavy for a phone');   // STUDIO-EASY: the headline in plain words (was "Budget · phone"); 650 of 600 draws is over
   });
 });
 

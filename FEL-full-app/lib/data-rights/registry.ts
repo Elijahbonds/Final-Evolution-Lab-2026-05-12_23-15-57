@@ -347,6 +347,9 @@ export const REGISTRY: Record<string, TableRights> = {
   CombineEntrant: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "That the athlete was on a coach's combine; it goes with them (the foreign key cascades the same way)." }] },
   CombineResult: { subjects: [{ col: 'athleteId', export: true, erase: 'delete', why: "The athlete's own combine numbers (jump, approach and drill reads, hand-timed times). Other athletes' results stay with the coach's combine (the foreign key cascades the same way)." }] },
 
+  // NEXUS-PUBLISH (lane/nexus-publish, NEX-06, prisma/pending/2026-10-26-studio-share.sql): Studio venue share links
+  StudioShareLink: { omit: ['tokenHash'], subjects: [{ col: 'creatorId', export: true, erase: 'delete', why: "The creator's own share links (the venue they shared, its name, the display name shown on it, how often it was opened). Erasing the creator deletes them, and every link stops working (the foreign key cascades the same way). The token's hash is never exported: it is a credential." }] },
+
   // COACH-PARITY (lane/coach-parity, prisma/pending/2026-10-26-coach-parity.sql): check-in forms and coach habits
   CoachCheckinForm: { subjects: [{ col: 'coachId', export: true, erase: 'delete', why: "The coach's own forms. The assignments and the answers under them cascade with them (the athletes' answers to an erased coach's form go too: owner call, docs/COACH-PARITY.md)." }] },
   CoachCheckinAssign: {

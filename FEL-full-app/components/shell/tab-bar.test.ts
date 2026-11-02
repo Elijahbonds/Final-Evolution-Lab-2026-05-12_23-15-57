@@ -77,6 +77,11 @@ describe('where the shell hides itself', () => {
     expect(chromeHiddenFor('/dev/shelf/cards')).toBe(true);
   });
 
+  it('gets out of the way of Nexus Studio, a full-screen editor with its own way back', () => {
+    expect(chromeHiddenFor('/studio')).toBe(true);
+    expect(chromeHiddenFor('/studios')).toBe(false);
+  });
+
   it('stays on the shelf itself, which is a page and not a game', () => {
     expect(chromeHiddenFor('/play')).toBe(false);
   });

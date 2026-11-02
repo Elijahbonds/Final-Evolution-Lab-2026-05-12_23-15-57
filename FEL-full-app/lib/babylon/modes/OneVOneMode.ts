@@ -156,7 +156,7 @@ import {
   resolveBodyCollision, classifyShot, ANKLE_BREAK_STUN_SEC,
   TurboMeter, ShotArc, checkDriveDunk, checkBlock, BLOCK_RANGE, DUNK_PCT,
   STEAL_EXPOSURE_MIN, AttackerBrain, RIVAL_DRIVE_SPEED, DUNK_RANGE, rivalShotPct, handUpContest, distXZ, HAND_UP_SEC, HAND_UP_CONTEST, proximityContest01,
-  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF } from '../core/BasketballCore';
+  SHOT_QUALITY_PCT, type ShotQuality, type ShotContext, type PostShot, type ShotStyle, BODY_STANDOFF, type RivalShotLook } from '../core/BasketballCore';
 import { DribbleStateMachine, syncedShotSpeed } from '../core/BallHandling';   // (hoops-shot-content: the release frame of the clip that plays is read in hoops/shotLooks.riseClipFor)
 import { refuse } from '../core/Refusal';   // MECHANICS PASS: a press that cannot act is answered
 import { ContactSystem, HARD_CONTACT_SPEED, FOUL_CLOSING_SPEED } from '../core/ContactSystem';
@@ -185,6 +185,7 @@ import {   // HOOPS-MOVE-KIT-A amendment (D1–D3): the defense contest package
   AI_BLOCK_JUMP_CHANCE, AI_BLOCK_RANGE,
   contestTag, contestTier, aiShotRead,   // HOOPS-DEPTH S5
   BUMP_STRIP_WINDOW_SEC,   // lane/hoops-def-tell: the AI reach's exposure
+  AI_BUMP_STRIP_CHANCE, aiBumpStripChance, bumpStripCooldownMs,   // OV75-1: the bump strip per opponent tier
   SWAT_K_FROM, SWAT_K_TO, HAND_UP_FACING_COS,   // hoops-p02: the swat's flight window, the bump strip's square-up (the hand reads)
 } from '../core/HoopsDefense';
 import { AiReachTell, aiReachTellOn, aiReachGate, aiReachStunSec, AI_REACH_COOLDOWN_SEC, type ReachOutcome } from '../core/ReachTell';   // lane/hoops-def-tell (#273 T-A): the AI reach shows before it resolves
@@ -215,6 +216,7 @@ import { HOOPERS } from '../audio/mic/cast';
 import type { MicEvent } from '../audio/mic/MicDirector';
 import { EffectsKit, applyTrail, type TrailLevel } from '../visual/EffectsKit';
 import { retreatFor, closeoutFor, defendRunFor, approachFor } from '../anim/basketballTree';
+import { applyInertialBlend } from '../anim/inertialize';   // AF-1: inertial clip transitions, behind the anim.inertial knob (default off)
 /** H2c (dev log): the defender states the stepping pass added or re-routed. */
 const H2C_STEP_STATES: ReadonlySet<string> = new Set(['defend_run', 'defend_run_right', 'run', 'closeout']);   // DEFENSE-LOOK (2026-09-17)
 import { mountPlayerRing, type PlayerRingHandle } from '../visual/PlayerRing';   // PLAYER RING (2026-09-17): stamina at the feet, the creator glyph over the head
@@ -236,6 +238,7 @@ import { PlayerShotClock, playerShotClockSec } from '../core/ShotClock';   // la
 import { runTier } from '../core/Difficulty';   // IMPROVE (2026-10-06) #2 + QA #259/#262: the OPPONENT pick, PRO on a staked / head-to-head run (every mode reads runTier)
 import { ReactiveDefender } from '../hoops/reaction';   // lane/hoops-round2 HOP-02: the rival defender reacts late by tier (420 / 220 / 120 ms)
 import { aiReactMs } from '../hoops/reaction';   // hoops-p02: the AI's block jump is never before it could have read my shot
+import { RivalKit, rivalKitOn, KIT_RENDER, type KitMove } from '../hoops/rivalOffense';   // hoops-p03 (1v1/3v3 phase 3): the rival's move kit and reads
 import { blockDiceOn, meetsRelease, releaseFrom, handOnBall, deflect, aiBlockJumpAtSec, type Blocker, type P3 } from '../hoops/blocks';   // hoops-p02 (1v1/3v3 phase 2): the hand meets the ball, for everyone
 import { oneContestOn, contestFrom, closingSpeed } from '../hoops/contest';   // hoops-p02: one contest model for every shooter
 import { stealDiceOn, aiStripLands } from '../hoops/steals';   // hoops-p02: the AI's strip is a hand on the ball
@@ -429,6 +432,8 @@ export const OneVOneMode: ModeDefinition = (() => {
   let hintShown = '', hintAt = 0, hintPossession: Possession | null = null;
   /** #2: the OPPONENT pick's knobs for this run (PRO until load reads it). */
   let knobs = ONEVONE_TIER.pro;
+  /** OV75-1: the bump strip's odds and cooldown for this run's opponent tier — read with `knobs`, once per run, never per frame. */
+  let bumpStripChance = AI_BUMP_STRIP_CHANCE, bumpStripCooldown = 2500;
   /** #3: the win condition (first to 11 unless the player picked win-by-2 on the READY screen — onevoneRules.winBy2Requested). */
   let winCond: WinRule = winRule(TARGET_SCORE, false);
   /** #10: the last five graded releases (onevoneRules.pushPip), and #4: my box score for the end card. */
@@ -468,6 +473,10 @@ export const OneVOneMode: ModeDefinition = (() => {
   let defPhase: DefensePhase = 'over';
   const attacker = new AttackerBrain();
   /** Push the scoreboard into the rival's shot selection. Called wherever a possession starts. */
+  // hoops-p03: the rival's MOVE KIT for the tier this run plays (hoops/rivalOffense) — kept across possessions (his memory of what worked
+  // on me), rebuilt only when the tier or the knob changes; `hoops.rivalKitOn` 0 = the release's script
+  let kitTier: string | null = null;
+  const kitTheAttacker = (): void => { const want = rivalKitOn() ? runTier() : null; if (want === kitTier) return; kitTier = want; attacker.kit = want ? new RivalKit(want) : null; };
   const nerveTheAttacker = (): void => { attacker.patience = attackerPatience(nerve(rivalStanding()).aggression, knobs); };   // IMPROVE (2026-10-06) #2: × the tier (PRO ×1: the old 1 / max(0.5, aggression))
   let gatherShown = false, stepbackShown = false;
   let myJumpAge = Infinity;
@@ -631,7 +640,7 @@ export const OneVOneMode: ModeDefinition = (() => {
   let foeLens: ReactiveDefender | null = null;   // lane/hoops-round2 HOP-02: that brain, perceiving me and the ball reactMs late
   let lastFoeJob = '';
   let foeSealing = false;                       // mirrors the brain's seal so the board can read it as real position
-  let lastBumpStripAt = 0;                       // D2: one bump-strip roll per 1.5 s
+  let lastBumpStripAt = 0;                       // D2: one bump-strip roll per bumpStripCooldown (2500 ms at PRO/ELITE)
   const ballWorld = (): Vector3 => ball.getAbsolutePosition();
   // hoops-p02: the two bodies as the block test sees them (hoops/blocks): planar root, the contest jump's age, the hands up
   const meBlocker = (): Blocker => ({ x: me.root.position.x, z: me.root.position.z, jumpAge: myJumpAge, handsUp: meHandUp });
@@ -993,10 +1002,11 @@ export const OneVOneMode: ModeDefinition = (() => {
       const r = readRules();
       if (r.knobs === knobs && r.winCond.winBy2 === winCond.winBy2) return;
       knobs = r.knobs; winCond = r.winCond;
+      bumpStripChance = aiBumpStripChance(runTier()); bumpStripCooldown = bumpStripCooldownMs(runTier());   // OV75-1
       foeBrain?.setAggression(knobs.defenderAggression);
       nerveTheAttacker();
       putHud(ctx, { winBy2: winCond.winBy2 });
-      console.info(`[1V1-RULES] at start: opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] at start: opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`} · bump strip ${bumpStripChance}`);
     },
 
     async load(ctx: ModeContext) {
@@ -1017,6 +1027,7 @@ export const OneVOneMode: ModeDefinition = (() => {
       foe.secondary?.setLookTarget(() => ball?.position ?? null);
       neverBindPose(foe.animator, SPORT_CLIP.idle); installSafePlay(foe.animator, 'onevone-foe');
       ctx.groundLock?.track(foe.root, foe.skeleton);
+      applyInertialBlend(me.animator); applyInertialBlend(foe.animator);   // AF-1: off (the knob's default) leaves both bodies linear
       // DUNK MOTION phase 11 (owner: right-handed "every dunk, every body"): both players' dunk family onto the right hand
       console.info(`[DUNK-HAND] 1v1 right-handed dunks: ${rightHandDunks(me.animator, me.skeleton)} / ${rightHandDunks(foe.animator, foe.skeleton)} clips mirrored`);
       // HOOPS MOTION phase 3 (owner round 2: right-handed everywhere): the whole bball_* family too, captures included (built by
@@ -1050,8 +1061,9 @@ export const OneVOneMode: ModeDefinition = (() => {
       modeClock = 0; bannerUntil = 0; timers.length = 0; lastUpdateMs = -1; meFlightTick = null; foeFlightTick = null;
       hudMemo.clear(); hintShown = ''; hintAt = 0; hintPossession = null; pips = ''; box = emptyBox();
       knobs = ONEVONE_TIER[runTier()] ?? ONEVONE_TIER.pro;
+      bumpStripChance = aiBumpStripChance(runTier()); bumpStripCooldown = bumpStripCooldownMs(runTier());   // OV75-1
       winCond = winRule(TARGET_SCORE, typeof window !== 'undefined' && winBy2Requested(window.location.search, { picked: readWinBy2Pick(), dev: process.env.NODE_ENV === 'development' }));
-      console.info(`[1V1-RULES] opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`}`);
+      console.info(`[1V1-RULES] opponent ${runTier()} (poke ${knobs.defenderAggression}, drive ×${knobs.attackerAggression}) · ${winCond.winBy2 ? `win by 2, cap ${winCond.cap}` : `first to ${winCond.target}`} · bump strip ${bumpStripChance}`);
       if (typeof window !== 'undefined') {
         const q = Number(new URLSearchParams(window.location.search).get('handle'));
         if (Number.isFinite(q) && q > 0) { handle = Math.max(0, Math.min(100, q)); console.info(`[1V1-HANDLE] handle ${handle} (override)`); }
@@ -2144,11 +2156,12 @@ export const OneVOneMode: ModeDefinition = (() => {
             if (possession === 'mine' && carrying) meBumpAge = 0;   // #273 T-A: a contact on my carrier exposes the ball to the AI reach
             if (possession === 'defense' && (defPhase === 'check' || defPhase === 'drive')) bumpAge = 0;
             else if (c.severity === 'hard' && possession === 'mine' && carrying && !shooting && !dunking && !finish && !gather && foeStunSec === 0 && !foeFloored
-              && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > 2500) {
+              && c.attacker === 'me' && c.attackerSpeed >= 4.0 && performance.now() - lastBumpStripAt > bumpStripCooldown) {
               lastBumpStripAt = performance.now();   // I barrelled into him: one roll per collision, never on a defender bumping ME
               const facing = facingCos(foe.root.rotation.y, foe.root.position, me.root.position);
               // hoops-p02: on the bump his hand still has to GET to the ball (hoops/steals: reach and my body's shield; the palm loose)
-              const bumpStrip = stealDiceOn() ? aiBumpStrips(foeVelLast.length() < 1.0, facing, roll)
+              // OV75-1: the dice path rolls this run's tier odds (bumpStripChance); both paths wait bumpStripCooldown between rolls
+              const bumpStrip = stealDiceOn() ? aiBumpStrips(foeVelLast.length() < 1.0, facing, roll, bumpStripChance)
                 : foeVelLast.length() < 1.0 && facing >= HAND_UP_FACING_COS && aiStripLands(foe.root.position, me.root.position, ballWorld(), true).lands;
               if (bumpStrip) { stripBall(ctx, 'STRIPPED ON THE BUMP!'); return; }
             }
@@ -2259,10 +2272,11 @@ export const OneVOneMode: ModeDefinition = (() => {
                                            // were looking at a vector only ever written while I had the ball, so a
                                            // driver measured 0.0 m/s all the way to the rim (probe: driver peak 0.0).
           // a driver faces the rim through a sidestep (a crossover, not a run sideways); a blow-by runs its line
-          face(foe.root, dec.phase === 'blowby' && sp > 0.5 ? Math.atan2(dec.wish.x, dec.wish.z) : Math.atan2(RIM.x - foe.root.position.x, RIM.z - foe.root.position.z));
+          face(foe.root, dec.backToRim ? Math.atan2(foe.root.position.x - RIM.x, foe.root.position.z - RIM.z) : dec.phase === 'blowby' && sp > 0.5 ? Math.atan2(dec.wish.x, dec.wish.z) : Math.atan2(RIM.x - foe.root.position.x, RIM.z - foe.root.position.z));   // hoops-p03: the post-up backs him down
           // the gather / step-back are mode-owned beats — the tree's loop choice must not race them (a 'protect'
           // stance played on the gather's first frame popped the hand 0.45 m)
-          if (dec.phase !== 'gather' && dec.phase !== 'stepback') foeAnimTree.update({
+          if (dec.action) rivalKitBeat(dec.action, dec.moveSide ?? null);   // hoops-p03: the kit's move (its clip) and the action's log line
+          if (dec.phase !== 'gather' && dec.phase !== 'stepback' && dec.phase !== 'post') foeAnimTree.update({
             dtSec: dt,   // IMPROVE (2026-10-06) #9: the stride smoothing on this frame's dt (it assumed 60 fps)
             speedMps: sp,
             speed01: Math.min(1, sp / RIVAL_DRIVE_SPEED), crossover: false, nearestDefender: dist,
@@ -2358,7 +2372,7 @@ export const OneVOneMode: ModeDefinition = (() => {
             bannerFlash(ctx, 'REACH — THEY GO BY', 700);
           }
 
-          if (dec.shot === 'dunk') foeDunk(ctx); else if (dec.shot) releaseRival(ctx, dec.shot);   // D1: the beaten lane is a DUNK — swat it
+          if (dec.shot === 'dunk') foeDunk(ctx); else if (dec.shot) releaseRival(ctx, dec.shot, dec.look ?? null);   // D1: the beaten lane is a DUNK — swat it   // hoops-p03: a floater / hook / fade looks like one
         } else if (defPhase === 'shot') {
           // the shot is up: the rival crashes the board when the ball is loose, else holds the follow-through / a stance
           const wish = new Vector3(0, 0, 0);
@@ -2516,7 +2530,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     if (hoopsFx?.deadBall(() => startDefense(ctx, banner))) return;   // vis-hoops-court: a replay of the possession's best moment first
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
-    defPhase = 'check'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
+    defPhase = 'check'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false; goaltendCalled = false; paintSec = 0;
     threat = { ...THREAT_IDLE }; stickHeld = 0; stickPeak = 0; burstArmed = false; jabEligible = false; spinGather = 0; posterVictim = null; victimSlide = null; foeReact = null; strongHand = STRONG_HAND_IDLE; tapRelease = null; hopRelease = null; foeStealReach.reset();   // #273: a showing reach ends with the possession
     meMotion.reset(); foeMotion.reset(); foeMover.stop(); foeFootPlant?.release(); meLayers?.reset(); foeLayers?.reset();   // a check-up moves bodies metres in a frame; that is not acceleration (nor a drag, nor a lean)
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
@@ -2546,14 +2560,24 @@ export const OneVOneMode: ModeDefinition = (() => {
   }
 
   /** The rival's release: block check, contest (+ a hand up), the make roll, the arc. */
-  function releaseRival(ctx: ModeContext, style: 'layup' | 'jumper'): void {
+  /** hoops-p03: the kit's move on his body — the handle renderer (no decision, no impulse: the kit moves him), the post-up's hold — and one
+   *  log line per action (the rig's variety read). */
+  function rivalKitBeat(action: string, side: 'left' | 'right' | null): void {
+    console.info(`[1V1-AI] rival action ${action}${side ? ` ${side}` : ''}`);
+    if (action === 'post_up') { foeAnimTree.hold('bball_post_up', { fadeSec: 0.12 }); return; }
+    const mv = (KIT_RENDER as Readonly<Record<string, string | null>>)[action as KitMove] ?? null;
+    if (!mv || mv === 'crossover') return;   // the crossover keeps its own render (dec.crossover, above)
+    requestMove(foeHost(), { move: mv as 'hesi', hint: side ?? undefined, decide: { kind: 'none' }, clip: mv === 'spin' ? 'bball_spin' : undefined, fadeSec: 0.12, speedRatio: 1, path: mv === 'behind_back' ? undefined : false });
+  }
+  function releaseRival(ctx: ModeContext, style: 'layup' | 'jumper', look: RivalShotLook = null): void {
     defPhase = 'shot'; gatherShown = false;
     foeShotWin = 'release'; foeShotSec = 0;   // BIOMECH-HOOPS-WAVE1: release → follow-through until the arc resolves
     foeCarry?.update(0, 0, false);
     releaseBall(ball);
     // a jumper rises out of the gather hold; a layup leaves the hand at the top of the layup gather beat, which plays out
     // (a jumpshot cut in over it popped the hand 0.37 m)
-    if (style === 'jumper') foeAnimTree.beat('jumpshot', { fadeSec: 0.1, onSettle: () => { if (defPhase === 'shot') foeAnimTree.beat('bball_follow_through', { fadeSec: 0.2 }); } });   // BIOMECH-HOOPS-WAVE1 G5: the rival holds his follow-through too
+    if (style === 'jumper') foeAnimTree.beat(look === 'floater' ? 'bball_floater' : look === 'fade' ? 'bball_fadeaway' : 'jumpshot', { fadeSec: 0.1, onSettle: () => { if (defPhase === 'shot') foeAnimTree.beat('bball_follow_through', { fadeSec: 0.2 }); } });   // BIOMECH-HOOPS-WAVE1 G5: the rival holds his follow-through too   // hoops-p03: the floater / the fade
+    else if (look === 'hook') foeAnimTree.beat('bball_hook', { fadeSec: 0.1 });   // hoops-p03: the post's hook (a layup's odds)
     // BLOCK check — a timed jump in range erases it. A jumper needs the blocker INSIDE the step-back (1.2 m — from further
     // out a hand up is a contest, below); a layup at the rim can be chased down from BLOCK_RANGE.
     const blockRange = style === 'jumper' ? 1.2 : BLOCK_RANGE;
@@ -3824,7 +3848,7 @@ export const OneVOneMode: ModeDefinition = (() => {
     possessionToken++;
     possession = 'defense'; carrying = false; shooting = false; dunking = false; currentShot = null;
     // straight to 'drive', never 'check': they already have the ball at the rim, there is nothing to check up for
-    defPhase = 'drive'; attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false;
+    defPhase = 'drive'; kitTheAttacker(); attacker.reset(); nerveTheAttacker(); gatherShown = false; stepbackShown = false;
     myJumpAge = Infinity; meStunSec = 0; reachCooldown = 0; defContest = 0;
     arc.active = false; meShotWin = 'none'; foeShotWin = 'none';
     if (gather || finish || spin || posting) meAnimTree.release();

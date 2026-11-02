@@ -13,11 +13,11 @@
 // Pure: frames in, a view and a result out. No camera, no clock but the frames' own.
 
 import type { PoseFrame } from '@/lib/pose/landmarks';
-import { calibrateFront, type FrontCalibration } from '@/lib/assess/calibration';
-import { detectFlights, gradeT5 } from '@/lib/assess/graders/t5-cmj';
+import type { FrontCalibration } from '@/lib/assess/calibration';
+import { gradeT5 } from '@/lib/assess/graders/t5-cmj';
 import { poseHz, type T5Extra } from '@/lib/assess/scoring';
-import { th } from '@/lib/assess/thresholds';
 import { jr } from '@/lib/jump/PROPOSED-jump';
+import { JumpJudge, StandRead, countWord, standLine } from '@/lib/tools-easy/liveJump';
 import { JUMP_PHASE_MS, JUMPS_ASKED, MIN_JUMPS, STAND_MS } from './thresholds';
 import type { DayJumps } from './types';
 
@@ -29,6 +29,13 @@ export interface CaptureView {
   jumps: number;
   /** What to fix to get the stand read (calibrateFront's own words), while standing. */
   why: string | null;
+  /**
+   * TOOLS-EASY (2026-10-28): the last refused jump's reason and fix ("Your hands left your hips. Keep them there and jump
+   * again."), shown and said until the next jump counts. Before, a refused jump filled a slot without a word.
+   */
+  refusal: string | null;
+  /** TOOLS-EASY: the newest line to say aloud (the page's one voice says it in full). Its id changes per line. */
+  say: { id: number; text: string } | null;
 }
 
 export type CaptureResult =
@@ -49,12 +56,20 @@ export class ReadinessCapture {
   private why: string | null = null;
   private step: CaptureStep = 'stand';
   private n = 0;
+  private refusal: string | null = null;
+  private say: { id: number; text: string } | null = null;
+  private readonly stand: StandRead;
+  private judge: JumpJudge | null = null;
 
-  constructor(private readonly o: { aspect: number; cameraFps?: number | null }) {}
+  constructor(private readonly o: { aspect: number; cameraFps?: number | null }) {
+    this.stand = new StandRead(o.aspect, STAND_MS);
+  }
 
   view(): CaptureView {
-    return { step: this.step, jumps: this.landed, why: this.why };
+    return { step: this.step, jumps: this.landed, why: this.why, refusal: this.refusal, say: this.say };
   }
+
+  private said(text: string): void { this.say = { id: (this.say?.id ?? 0) + 1, text }; }
 
   push(f: PoseFrame): CaptureView {
     if (this.step === 'done') return this.view();
@@ -64,25 +79,33 @@ export class ReadinessCapture {
     const t = f.t;
     if (this.step === 'stand') {
       const hold = this.frames.filter((x) => x.t >= t - STAND_MS);
-      const r = calibrateFront(hold, this.o.aspect, STAND_MS);
+      // TOOLS-EASY: the same stand, with the Quick Screen's accepted sway fallback from the second refused stand
+      const r = this.stand.read(hold, t);
       if (r.ok) {
         this.front = r.value;
         this.standFrom = hold[0].t;
         this.calibratedAt = t;
         this.step = 'jump';
         this.why = null;
+        this.judge = new JumpJudge(this.o.aspect);
+        this.said('Jump!');
         // the frames before the stand are not part of the take
         this.frames = this.frames.filter((x) => x.t >= this.standFrom);
       } else {
-        this.why = r.why;
+        this.why = standLine(r.why);
         // keep only what a stand could still use
         this.frames = this.frames.filter((x) => x.t >= t - STAND_MS - 500);
       }
       return this.view();
     }
-    // jumping: count the landed flights (each long enough to be an attempt, its landing window seen)
-    const minMs = th('t5.flightMinMs'), settle = th('t5.landingWindowMs');
-    this.landed = detectFlights(this.frames, this.front!).filter((x) => x.landed && x.landT - x.takeoffT >= minMs && x.landT + settle <= t).length;
+    // jumping: each flight that has landed (long enough to be an attempt, its landing window seen) is judged as it lands,
+    // by T5's own grader. TOOLS-EASY (2026-10-28; TUNED, flagged): only a jump that counts fills one of the three; a
+    // refused one says its reason and its fix and the check waits for the next. Before, every landed flight filled a slot,
+    // and two refused jumps meant "Do the check again" after the take. The number is still gradeT5 over the whole take.
+    for (const v of this.judge!.scan(this.frames, this.front!, t)) {
+      if (v.valid) { this.landed++; this.refusal = null; this.said(countWord(this.landed)); }
+      else { this.refusal = v.line; this.said(v.line!); }
+    }
     if (this.landed >= JUMPS_ASKED || t - this.calibratedAt >= JUMP_PHASE_MS) this.step = 'done';
     return this.view();
   }

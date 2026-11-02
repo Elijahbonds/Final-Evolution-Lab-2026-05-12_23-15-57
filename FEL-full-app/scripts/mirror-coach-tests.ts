@@ -195,7 +195,9 @@ function runSquat(audit: SquatAudit, fault: SquatPose, t0 = 700): SquatFault[] {
   ok(h.includes('stepSquatSession(squatSessionRef.current'), 'the squat stage steps through the pure stepSquatSession');
   ok(!/setSquatStage\(\(/.test(code), 'no setSquatStage((…) => …) updater (it counted reps and fired cues as side effects)');
   // the screen: the runner follows the picker, the post carries the variant that ran, and nothing ungraded is scored
-  ok(h.includes('new ScreenRunner(screenIdRef.current)'), 'the screen runner is built from the picker\'s CURRENT value');
+  // test changed (TOOLS-EASY, 2026-10-28): the runner now also takes its walk order ({ order: 'frontFirst' }); the check is
+  // the same — it is built from the picker's current value
+  ok(/new ScreenRunner\(screenIdRef\.current[,)]/.test(h), 'the screen runner is built from the picker\'s CURRENT value');
   // MIRROR-COACH P3 (2026-09-26): …with every grade beside the results, for the server's regrade (stationGraders.ts)
   ok(h.includes('submitScreen(runner.results, runner.screen, runner.grades)'), 'the screen posts the variant the runner ran, with its grades');
   // MIRROR-COACH P3 follow-up (2026-09-28): End posts what the screen read so far (it posted nothing unless complete); the

@@ -10,7 +10,8 @@
 //   4. the change is in the draft and not decided yet (a second tap returns the first decision: idempotent);
 //   5. an edit only touches sets, reps, load and band, and the edited change is classified again (./safety.ts) with the
 //      week's guard and a FRESH read of the coach's catalogue — an edit cannot make a held change, and a change that has
-//      become unsafe since (a row re-tagged as jump work) is refused;
+//      become unsafe since (a row re-tagged as jump work) is refused; under youth rules the touched sessions' jump
+//      contacts are read fresh too (YOUTH-CONTACT-CAP: at most MAX_TEEN_SESSION_CONTACTS a session);
 //   6. every row is still exactly as drafted (no stale write over the coach's own later edit) and has no logged work;
 //   7. every write validates (lib/coach/loop.ts validateExerciseSpec) before the first one is sent.
 // Then the decision is CLAIMED in the audit table (who, when, before, after), the builder writes, and the coach's note,
@@ -23,6 +24,7 @@ import { mergeSpecUpdate, validateExerciseSpec } from '../loop';
 import { logHasContent } from '../setLog';
 import { readTeenGate, type TeenGateDb } from '../teenGateServer';
 import { isEffortBandId } from '../taxonomy';
+import { sessionContacts } from './contacts';
 import { classify } from './safety';
 import { claimDecision, decisionsFor, draftById, draftsReady, dropClaim, settleDecision, type Decision, type RawDb, type StoredDecision } from './store';
 import { NOTE_MAX_CHARS } from './thresholds';
@@ -126,9 +128,21 @@ export async function decideChange(db: ApproveDb, coachId: string, input: Decide
   // 5. judged again, by what it writes now, against the week's guard and the coach's catalogue as it is today
   const catalogue = await db.programExercise.findMany({ where: { coachId }, select: { id: true, name: true, category: true, pattern: true, skillLayer: true, regressionOfId: true, progressionOfId: true } });
   const youth = gate.band === 'teen' || draft.guard.youth;
+  const catMap = new Map(catalogue.map((r) => [r.id, r as unknown as DraftCatalogueRow]));
+  // YOUTH-CONTACT-CAP: under youth rules, each touched session's jump contacts as its rows are NOW (other approved
+  // changes and the coach's own edits included), so the edited change is judged against the real session
+  let contacts: Record<string, number> | undefined;
+  if (youth) {
+    contacts = {};
+    for (const sid of new Set(change.ops.flatMap((op) => (op.action === 'update' ? [op.sessionId] : [])))) {
+      const rows = await db.sessionExercise.findMany({ where: { sessionId: sid }, select: { exerciseId: true, sets: true, reps: true } });
+      contacts[sid] = sessionContacts(rows, catMap);
+    }
+  }
   const s = classify(change, {
     ...draft.guard, youth, formDropPatterns: new Set(draft.guard.formDropPatterns),
-    catalogue: new Map(catalogue.map((r) => [r.id, r as unknown as DraftCatalogueRow])),
+    catalogue: catMap,
+    ...(contacts ? { sessionContacts: contacts } : {}),
   });
   if (s.safety === 'unsafe') return fail(input.decision === 'edit' ? 400 : 409, input.decision === 'edit' ? 'edit_unsafe' : 'no_longer_safe', s.why ?? undefined);
 

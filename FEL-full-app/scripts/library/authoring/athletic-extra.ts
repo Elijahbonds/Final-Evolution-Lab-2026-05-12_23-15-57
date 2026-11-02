@@ -18,7 +18,7 @@ export const ATHLETIC_EXTRA: Family[] = [
     ],
     dosage: contacts(4, 10, 75),
     variants: [
-      { name: 'Power Skip', v: 'power-skip', level: 'beginner', cue: 'Skip as high as you can off the floor, knee and opposite arm driving up.', goals: ['vertical', 'warmup'] },
+      { name: 'Power Skip', v: 'power-skip', level: 'beginner', cue: 'Skip high off the floor, knee and opposite arm driving up.', goals: ['vertical', 'warmup'] },
       { name: 'Alternate-Leg Bound', v: 'alternate', level: 'intermediate', aliases: ['Running Bound'] },
       { name: 'Single-Leg Bound Series', v: 'single-leg', level: 'advanced', laterality: 'unilateral', cue: 'Bound on the same leg down the lane, quick and springy on each contact.', dosage: contacts(3, 6, 90) },
       { name: 'Bound to Sprint', v: 'to-sprint', level: 'advanced', cue: 'Four bounds into a ten-metre sprint, the rhythm unbroken.' },
