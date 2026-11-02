@@ -16,7 +16,7 @@ const HERE = resolve(import.meta.dirname, '../..');
 const OUT = resolve(process.argv[2] ?? join(HERE, '.coach-tools-shots'));
 const VER = process.argv[3] ?? 'after';
 const ROOT = resolve(process.argv[4] ?? HERE);
-const ALL = ['home', 'sheet', 'thread', 'drafts', 'reviews', 'reply', 'attention', 'setup', 'combine', 'combine-setup', 'business'];
+const ALL = ['home', 'sheet', 'thread', 'drafts', 'reviews', 'reply', 'attention', 'setup', 'combine', 'combine-setup', 'business', 'messages'];
 const SCENES = process.argv[5] ? process.argv[5].split(',') : ALL;
 mkdirSync(OUT, { recursive: true });
 const WIDTHS = [390, 1280];
@@ -61,6 +61,7 @@ async function drive(page: Page, scene: string): Promise<void> {
   const click = async (sel: string) => { await page.waitForSelector(sel, { timeout: 20000 }); await page.click(sel); await page.waitForTimeout(500); };
   if (scene === 'home') { await page.waitForSelector('[data-queue-card]', { timeout: 20000 }); return; }
   if (scene === 'sheet' || scene === 'thread') { await click('[data-roster-row="a8"]'); await page.waitForSelector('[data-sheet-body]', { timeout: 20000 }); if (scene === 'thread') await click('[data-sheet-tab="thread"]'); return; }
+  if (scene === 'messages') { const has = await page.$('[data-coach-tool="messages"]'); if (has) await click('[data-coach-tool="messages"]'); return; }
   if (['drafts', 'reviews', 'attention'].includes(scene)) { await click(`[data-coach-tool="${scene}"]`); await page.waitForTimeout(800); return; }
   if (scene === 'setup') { await click('[data-coach-setup-open]'); return; }
   if (scene === 'reply') { await click('[data-queue-card="review"] [data-queue-action="cue"]'); return; }

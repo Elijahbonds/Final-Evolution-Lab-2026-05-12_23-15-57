@@ -311,7 +311,7 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
       {screen && (
         <FullScreen title={screen === 'builder' && prog ? prog.tree.name : SCREEN_TITLE[screen]} onClose={() => setScreen(null)} testId={screen} className={TAP}>
           {screen === 'setup' && <SetupScreen />}
-          {screen === 'messages' && <MessagesInbox roster={queue?.roster ?? []} unread={unreadNow} onOpen={(id) => { setScreen(null); openAthlete(id); }} />}
+          {screen === 'messages' && <MessagesInbox roster={queue?.roster ?? []} unread={unreadNow} onOpen={(id) => { setScreen(null); setSheet({ id, tab: 'thread' }); }} />}
           {screen === 'drafts' && <DraftsInbox />}
           {screen === 'reviews' && <FormReviewQueue />}
           {/* NEEDS YOU TODAY's full board: triage, drift, pain and readiness behind their own consent rules (lib/coach/attention.ts) */}
