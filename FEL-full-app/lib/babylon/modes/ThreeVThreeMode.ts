@@ -2951,7 +2951,7 @@ const CHARGE_RANGE = BODY_STANDOFF + 0.5;
     // hoops-p04 (routed from phase 1: the ball rose 14 frames after the press, riding the jumper's load dip): the rise is entered at the
     // clip's RISE (anim/opponentMotion CAPTURE_RISE_START_01, as the 3PT shooter's is) and paced from there, so the release still lands on
     // the green; `hoops.jumperFromRiseOn` 0 = the clip from its first frame, as before
-    const rise01 = jumperFromRiseOn() ? Math.min(riseStartOf(me.animator, rc.clip, 0), rc.release01) : 0;
+    const rise01 = jumperFromRiseOn() ? Math.min(riseStartOf(me.char.animator, rc.clip, 0), rc.release01) : 0;
     const sync = syncedShotSpeed(clipSec, shotMeter.riseSec, greenInRise01, rc.release01 - rise01);
     riseHop = new JumperRise(shotMeter.riseSec, greenInRise01, JUMPER_HOP_APEX, sync);   // lane/h3-handler (#314 port): DEFENSE-LOOK's hop, leaving the floor after the load, the apex at the release
     me.tree.hold(rc.clip, { speedRatio: sync, fadeSec: 0.08, from01: rise01 });
