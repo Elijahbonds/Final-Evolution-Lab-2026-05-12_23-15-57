@@ -16,7 +16,7 @@ interface GroupRow {
   people: number; minSeats: number; maxSeats: number; waitlist: number; line: string; notice: { line: string } | null; startLabel: string; endLabel: string; sessions: SessionRow[];
 }
 interface Board {
-  available: boolean; role?: 'owner' | 'trainer'; groups?: GroupRow[];
+  available: boolean; role?: 'owner' | 'trainer'; groups?: GroupRow[]; todo?: string[];
   makeups?: { slotKey: string; gymName: string; label: string; taken: number }[];
   oneOnOne?: { id: string; client: string; trainer: string; gymName: string; startsAt: string; status: string; paid: boolean; priceLabel: string }[];
   gyms?: { id: string; name: string; address: string | null }[];
@@ -162,6 +162,7 @@ export function CoachGroups() {
   const owner = board.role === 'owner';
   return (
     <section data-coach-groups>
+      {(board.todo ?? []).length ? <ul className="mb-4 flex flex-col gap-1" data-owner-todo>{(board.todo ?? []).map((t) => <li key={t} className={L.cardLine}>· {t}</li>)}</ul> : null}
       <ul className="flex flex-col gap-3">
         {(board.groups ?? []).map((g) => <GroupPanel key={g.id} g={g} gyms={board.gyms} owner={owner} act={act} />)}
       </ul>

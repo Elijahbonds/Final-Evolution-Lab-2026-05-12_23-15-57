@@ -287,6 +287,17 @@ describe('1:1 sessions', () => {
     ]);
   });
 
+  it('the owner\'s to-do says what online 1:1 needs, a listing that charges another price than $75, and blank gyms', async () => {
+    as('owner');
+    expect((await json(await coachGET(get('/api/group-booking/coach')))).body.todo).toEqual([
+      'Online 1:1 opens when your coach store has a live 1:1 listing ($75, 60 min).', 'Add the address for 3 gyms (Gyms, below).',
+    ]);
+    vi.stubEnv('COACH_STORE_ENABLED', '1');
+    state.listings.push({ id: 'L60', creatorId: 'owner', active: true, itemKey: 'coach-store:elijah:live_1on1:60:one_time', priceUsd: 9000 });
+    state.gyms = { '24hr-victory': 'a', '24hr-topanga': 'b', 'la-fitness-balboa': 'c' };
+    expect((await json(await coachGET(get('/api/group-booking/coach')))).body.todo).toEqual(['Your online 1:1 listing charges $90; your price is $75. Change the listing to match.']);
+  });
+
   it('online with the coach store on and a live 1:1 listing: that listing\'s own price, handed to its book page', async () => {
     vi.stubEnv('COACH_STORE_ENABLED', '1');
     state.listings.push({ id: 'L60', creatorId: 'owner', active: true, itemKey: 'coach-store:elijah:live_1on1:60:one_time', priceUsd: 7500 });

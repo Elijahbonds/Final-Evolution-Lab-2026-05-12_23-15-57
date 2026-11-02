@@ -380,8 +380,18 @@ export async function coachBoard(db: GroupDb, userId: string, now: Date = new Da
     m.taken++;
     makeupSlots.set(s.slotKey, m);
   }
+  // The owner's short to-do: the online 1:1 price the owner set (config) vs the coach-store listing that charges, and blank gyms.
+  const todo: string[] = [];
+  if (role.role === 'owner') {
+    const p = await ownerProfile(db, role.ownerId);
+    const listing = await onlineListing(db, role.ownerId, p?.published ? p.slug : null);
+    if (!listing) todo.push(`Online 1:1 opens when your coach store has a live 1:1 listing (${dollars(cfg.onlineCents)}, ${cfg.onlineMinutes} min).`);
+    else if (listing.priceCents !== cfg.onlineCents) todo.push(`Your online 1:1 listing charges ${dollars(listing.priceCents)}; your price is ${dollars(cfg.onlineCents)}. Change the listing to match.`);
+    const blank = gyms.filter((g) => !g.address).length;
+    if (blank) todo.push(`Add the address for ${blank} gym${blank === 1 ? '' : 's'} (Gyms, below).`);
+  }
   return res(200, {
-    available: true, role: role.role,
+    available: true, role: role.role, todo,
     groups: groups.map((g) => {
       const people = new Set((passes ?? []).filter((p) => p.groupId === g.id).map((p) => p.userId)).size;
       const notice = cutoffNotice(g, people, now);
