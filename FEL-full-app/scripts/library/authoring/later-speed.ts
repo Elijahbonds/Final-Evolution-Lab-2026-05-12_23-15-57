@@ -182,7 +182,7 @@ const LADDER: readonly [string, string, number, string, Variant['plane']][] = [
   ['Ladder Single-Leg Lateral Hops', 'sl-lat', 2, 'One foot, side-on: hop into each square, quiet on every contact.', 'frontal'],
   ['Ladder Crossover Steps', 'crossover-steps', 1, 'Cross over into each square on the floor, moving forward down the ladder.', 'multi'],
   ['Ladder Two In, Two Out Lateral', 'two-in-two-out', 1, 'Side-on: two steps in, two steps out, along the ladder on the floor.', 'frontal'],
-  ['Ladder to Sprint', 'to-sprint', 1, 'Two feet in each square, then explode out of the ladder to the cone.', 'sagittal'],
+  ['Ladder to Sprint', 'to-sprint', 1, 'Two feet in each square, then sprint out of the ladder to the cone.', 'sagittal'],
 ];
 const QUICK: readonly [string, string, number, string][] = [
   ['Dot Drill', 'dot', 1, 'Hop the five dots on the floor in the pattern, quick and light.'],

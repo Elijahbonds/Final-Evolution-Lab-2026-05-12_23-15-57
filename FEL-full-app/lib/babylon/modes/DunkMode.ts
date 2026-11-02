@@ -90,6 +90,8 @@ import { DUNK_CONFIG as CFG } from './modeConfigs';
 import { readDisplaySetting } from '@/lib/controller-link/tvMode';   // TV MODE: the slam window widens on a mirrored display
 import { LAND_LEAD_SEC, timeToFloor, OOP_LOB_FLIGHT_SEC, OOP_WINDUP_SEC, OOP_LATE_CATCH_CLIP_T, whiffWhy, GLASS_RUN_CATCH_CLIP_T, GLASS_RELEASE_MIN_M, SELF_LOB_RELEASE_Y, glassThrowDue, OOP_GLASS_PASSER_X, OOP_GLASS_PASSER_FROM_RIM_M, OOP_GLASS_HIT_OVER_RIM_M, OOP_BOUNCE_FLIGHT_SEC, LOB_FRAME_LIFT, REAL_JUMP_PERSONAL, SLAM_BIG_FROM, personalFullRiseM, riseToPower, LOB_FRAME_TAU, oopThrowDue, RUNWAY_STRIDE_MPS, RUNWAY_STRIDE_SCALE, RUNWAY_RATE_MIN, RUNWAY_RATE_MAX, slamImpact, SLAM_HITSTOP_BIG_MS, SLAM_SHAKE_BIG } from '../core/DunkFlagship';   // DUNK-FLAGSHIP: the pass's numbers (feel-panel knobs)
 import { feel } from '../../feel-panel/feel';
+import { rimCutSpot, clearOfHoop, runUpTune, tuneKey, dunkFramingOn } from '../core/dunkCamFraming';   // CAMERA TIP: cam.dunkFraming (default off)
+import { DUNK_BACKBOARD_Z } from '../visual/venuePropSets';
 import { DunkFlight, DunkSpin, SPIN_720, SPIN_720_UPGRADE_BY, type SpinRecord, runwayTrickFor, cueOf, cueVerdict, cueFireAt, cueLastAt, CUE_BEAT_LABEL, SPIN_RESOLVE_T, runwayTeachLine, CATCH_DIFFICULTY, DUNK_TRICK_ID_BY_CLIP, type RunwayTrick, type DunkTrick } from '../core/DunkSystem';
 import { paneLobVelocity, lobVelocity, lobFlightTime, runTimeToLine, runTimeToLineGather, type GatherStride, canCatch, LOB_CATCH_CLIP_T, glassLobVelocity, bounceLobVelocity, bounceLobMinTime, bounceOntoVelocity, rimRing, FLOOR_E, FLOOR_FRICTION, GLASS_E_N, GLASS_E_T, type V3 } from '../core/DunkLob';
 import { OBSTACLE_SPECS, OBSTACLE_KINDS, PROP_CAM, clipsObstacle, heightAt, nextObstacle, propCamSpot, propCutDue, isDubble, DUBBLE_HEAD_TOP, DUBBLE_APEX_M, dubbleArc, dubbleArcPower, type ObstacleKind } from '../core/DunkObstacles';
@@ -106,6 +108,7 @@ import { missBeat } from '../core/MissFlavour';
 import { spawnDunkObstacle, type DunkObstacle } from './dunkObstacleProps';
 import { LOST_FOUND_HANDOFF, BETWEEN_LEGS_HANDOFF, BEHIND_BACK_SWAP, DOUBLE_EASTBAY_FIRST, DOUBLE_EASTBAY_SECOND, FRONT_SWAP_AT, FRONT_SWAP_BLEND } from '../anim/authored/dunkTricks';
 import { boneNode } from '../anim/boneLookup';
+import { applyInertialBlend } from '../anim/inertialize';   // AF-1: inertial clip transitions, behind the anim.inertial knob (default off)
 import { takeoffFor, takeoffTell, rangeLabel } from '../core/DunkApproach';
 import { runBackOffered, runBackReady, runBackHint, bloopLine, type MissKind } from '../core/DunkRunItBack';   // dunk-next phase 8: the blooper and RUN IT BACK
 import { gradePump, pumpOpen, pumpMsAt, pumpEndsAt, pumpRefusalLine, PUMP_MIN_MS } from '../core/DunkHangPump';   // dunk-next phase 8: the hang pump
@@ -140,7 +143,9 @@ import { landMarks, plantMarks, stampCourt } from '../hoops/courtMarks';
 import { ModeMic } from '../audio/mic/ModeMic';   // THE MIC (2026-09-24): the court's MC, the sidekick, the crowd and the rivals, on the mic
 import { dunkStingers } from '../audio/mic/names';
 import { DUNK_RIVAL_VOICES } from '../audio/mic/cast';   // DUNK MOTION phase 11: the rival's pad decides like a player
-import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
+import { soundtrackFirstDunkIn } from '@/lib/soundtrack/client';
+import { createFlightGate } from './flightGate';   // PERF-834-LCP (b): no late-asset work between takeoff and the slam   // FDB-2: /try's soundtrack waits for dunk 1 (policy.holdsForFirstDunk)
+import { isStaticControlsHint } from '../ui/staticControls';   // DUNK-LIVE-TIMING-FIX LP-04: the runway's default line is static (the harness blanks it in play)
 import { HOOP, DUNK_RIM_RADIUS } from '../core/courtDims';   // HOOP-UNIFY step 1: the glass box and the ring read the shared dims (values unchanged)
 
 type Phase = 'approach' | 'charge' | 'cinematic' | 'resolve' | 'judging' | 'rivalTurn' | 'fieldCut' | 'contestOver';   // fieldCut: dunk-next phase 5 (the highlights, the cut)
@@ -490,6 +495,9 @@ export const DunkMode: ModeDefinition = (() => {
   let style: Style = 'power';
   let prop: Prop = 'none';
   let charge = 0, clipTime = 0, qteHit = false, qteWindowOpen = false, qteAccuracy = 0;
+  /** CONTROLLER-TRY-FIX: this attempt's jam came up SHORT OF THE IRON (set beside its `qteHit = false`), so the miss says that, not a timing
+   *  word — a CLEAN-graded press that falls short is not TOO EARLY (C3, run4 log l.94-102). Cleared with qteHit on every attempt. */
+  let shortOfIron = false;
   let ring: PlayerRingHandle | null = null;   // PLAYER RING
   const NET_THROW_MIN = 4, NET_THROW_MAX = 12;   // NET EXIT (2026-09-17): m/s down the net — a loose slam drops it, a perfect one fires it (and it bounces off the floor and away)
   let sinceRelease = 0, releasePos = new Vector3();
@@ -688,6 +696,7 @@ export const DunkMode: ModeDefinition = (() => {
   // is the description of each attempt, small enough to ride in the JSON payload MatchEvent already has.
   let card = emptyCard();
   let makes = 0, misses = 0, bestChain = 0;   // PACK #3: the proof card's make/miss line
+  let nightShort = 0;   // CONTROLLER-TRY-FIX: tonight's scored misses that came up short of the iron (the night report's advice)
   /** Every card the player has posted tonight — P8: the standard the rival is watching, not just the scoreboard. */
   const playerCards: number[] = [];
   /** The player's average card so far (0 before the first one). */
@@ -1224,6 +1233,7 @@ export const DunkMode: ModeDefinition = (() => {
     });
     neverBindPose(body.animator, SPORT_CLIP.idle);
     installSafePlay(body.animator, 'dunk-rival');
+    applyInertialBlend(body.animator);   // AF-1: off (the knob's default) leaves the rival linear
     // DUNK MOTION phase 11: the rival is right-handed too (owner: "every dunk, every body") — and he dunks through the player's own
     // pipeline on his turn, so he needs the same mirrored family
     if (RIGHT_HANDED) {
@@ -1259,6 +1269,8 @@ export const DunkMode: ModeDefinition = (() => {
   // dressing and its onlookers, the corner bus and tent, the booth's voices and a catalogue walk-out. A guest who leaves after
   // one dunk never downloads it.
   let contestSetStarted = false;
+  // PERF-834-LCP (b): every late step waits while a dunk is in the air (takeoff → the slam / finishAttempt) — see flightGate.ts
+  const flightGate = createFlightGate(() => phase === 'cinematic' || (phase === 'resolve' && !finishing), () => !ended);
   let rivalArrival: Promise<void> | null = null;
   let awaitingRival = false;   // his turn is up and his body is still on its way: the judging beat holds (rivalRound)
   function startContestSet(ctx: ModeContext): void {
@@ -1285,6 +1297,7 @@ export const DunkMode: ModeDefinition = (() => {
   /** His body, tried again (backing off) until it lands: on a dead line the night waits at his turn instead of failing. */
   async function bringRival(ctx: ModeContext): Promise<void> {
     for (let tries = 0; !rival && !ctx.scene.isDisposed; tries++) {
+      await flightGate.clear();   // PERF-834-LCP (b): no request starts in a flight (a retry lands after the slam)
       try {
         // spawnNpc is explicit: the rival must NEVER wear the player's identity, or you end up dunking against yourself.
         rival = await spawnRivalBody(ctx, foe);
@@ -1294,6 +1307,8 @@ export const DunkMode: ModeDefinition = (() => {
         await new Promise((r) => setTimeout(r, wait));
       }
     }
+    // PERF-834-LCP (b): the rest of the contest set (dressing, bus, tent, voices, walk-out) rides on this promise — it starts after a slam
+    await flightGate.clear();
   }
   /** The corner props: the bus (Orbit's shuttle) across the right corner, the tent across the left. A face counts for the
    *  rebound and the wall run once its prop stands on it (parkedPanes) — nobody kicks off a bus they cannot see. */
@@ -1302,12 +1317,14 @@ export const DunkMode: ModeDefinition = (() => {
     // ORBIT parks a SPACE SHUTTLE where every other court parks the hoopbus (owner, 2026-09-18: "make the bus a space shuttle
     // in the space one", then his own Meshy export: "swap that shuttle in for the other one" — baked to 6.4 m by scripts/meshy/bake-prop.py)
     const rideKey = ride.kind === 'shuttle' ? 'shuttle' : 'hoopbus';
-    void copyKitModel(scene, 'meshy', rideKey, `dunk_${rideKey}`).then((r) => {
+    void copyKitModel(scene, 'meshy', rideKey, `dunk_${rideKey}`).then(async (r) => {
+      await flightGate.clear();   // PERF-834-LCP (b): a prop that lands mid-flight parks after the slam
       if (scene.isDisposed) return;
       parkOnPane(r, panes[0], 6.4); sideProps.push(r); parkedPanes.push(panes[0]);
       const { max } = r.getHierarchyBoundingVectors(true); console.info(`[DUNK-PARKOUR] ${rideKey} parked on the right corner (roof ${max.y.toFixed(2)} m)`);
     }).catch((e) => console.warn(`[DUNK-PARKOUR] ${rideKey} did not load`, e));
-    if (ride.kind !== 'shuttle') void copyKitModel(scene, 'racing', 'tent', 'dunk_tent').then((root) => {
+    if (ride.kind !== 'shuttle') void copyKitModel(scene, 'racing', 'tent', 'dunk_tent').then(async (root) => {
+      await flightGate.clear();   // PERF-834-LCP (b)
       if (scene.isDisposed) return;
       parkOnPane(root, panes[1], 4.2); sideProps.push(root); parkedPanes.push(panes[1]);
       console.info('[DUNK-PARKOUR] tent on the left corner (no sign)');
@@ -1431,6 +1448,7 @@ export const DunkMode: ModeDefinition = (() => {
       });
       neverBindPose(player.animator, SPORT_CLIP.idle);
       installSafePlay(player.animator, 'dunk-player');
+      applyInertialBlend(player.animator);   // AF-1: off (the knob's default) leaves the player linear
       // DUNK MOTION phase 8: RIGHT-HANDED — the dunk family (authored and captured) mirrored onto the other side of this body
       if (RIGHT_HANDED) {
         const groups = (player.animator as unknown as { groups: Map<string, AnimationGroup> }).groups;
@@ -1505,6 +1523,7 @@ export const DunkMode: ModeDefinition = (() => {
         rivalName: foe.name,
         dunkOff: '', nightDunkOff: '', beats: '', rivalSkip: false, takeoff: '', runBack: false,   // dunk-next: a reload starts with no dunk-off, no beat strip, no skip chip, no take-off read, no RUN IT BACK
       });
+      if (turn === 'player' && isStaticControlsHint(runwayHint)) ctx.setHud({ hint: liveRunwayHint() });   // DUNK-LIVE-TIMING-FIX LP-04: input is live (setPhase('approach')), so is the run line
       startField(ctx);   // dunk-next phase 5: tonight's four dunkers
       readUnlocks(); challenge = null; ctx.setHud({ challenge: '', nightUnlock: '' });   // dunk-next phase 6: the device's ladder
     },
@@ -1897,7 +1916,7 @@ export const DunkMode: ModeDefinition = (() => {
           if (tip && tip !== idleTipShown) { idleTipShown = tip; ctx.setHud({ hint: tip }); }
         } else {
           idleSec = 0;
-          if (idleTipShown) { idleTipShown = null; if (player.root.position.z > gatherLine() + 0.2) ctx.setHud({ hint: runwayHint }); }
+          if (idleTipShown) { idleTipShown = null; if (player.root.position.z > gatherLine() + 0.2) ctx.setHud({ hint: liveRunwayHint() }); }   // DUNK-LIVE-TIMING-FIX LP-04: the live line, not the blanked static one
         }
       }
 
@@ -2252,7 +2271,7 @@ export const DunkMode: ModeDefinition = (() => {
           // still and `update()` aims at the subject lerped toward the objective, so the dunker AND the rim
           // stay in shot for the whole flight. Placed low and to the baseline side, which is where the
           // under-basket camera actually lives.
-          ctx.camDirector.setFixed(new Vector3(rim.x + 2.9, 1.15, rim.z + 1.9), 1.5, true);
+          { const c = rimCutSpot(rim, camAspect(ctx)); ctx.camDirector.setFixed(new Vector3(c.at.x, c.at.y, c.at.z), c.aimH, true); }   // CAMERA TIP: knob off = rim + (2.9, 1.15, 1.9), 1.5
         }
 
         // alley-oop: teammate releases the toss partway through the rise;
@@ -2355,7 +2374,12 @@ export const DunkMode: ModeDefinition = (() => {
         if (qteWindowOpen && !wasOpen && !lob.live) {
           const held = slamLatch.open(openAt, holdSec);
           if (held && 'slamAt' in held) slamNow(ctx, held.slamAt);
-          else if (held) refuse(ctx, `TOO EARLY — ${Math.round(held.tooEarlySec * 1000)} ms BEFORE THE WINDOW`);
+          else if (held) {
+            // DUNK-LIVE-TIMING-FIX LP-01(d): the refused press goes on the strip where it was (cue / early), never as a 'miss' under a TOO EARLY
+            // banner. The strip only: slamTiming stays null, so the miss's sound (missBeat) and the chip are as before. The press was at openAt − tooEarlySec.
+            beatSlam = slamReadout(openAt - held.tooEarlySec, EASTBAY_TIMING.extend, 0, window / 2).zone; pushBeats(ctx);
+            refuse(ctx, `TOO EARLY — ${Math.round(held.tooEarlySec * 1000)} ms BEFORE THE WINDOW`);
+          }
         }
         if (clipTime >= closeAt) { meter3d?.end(lob.live ? 'brick' : 'late'); if (lob.live) lostLob(ctx); else resolveDunk(ctx); }   // the hand never met the toss — a miss, the ball bounces away
       }
@@ -2428,7 +2452,7 @@ export const DunkMode: ModeDefinition = (() => {
               const away = new Vector3(bp.x - rim.x, 0, bp.z - rim.z); if (away.lengthSquared() > 1e-6) away.normalize(); else away.set(0, 0, 1);
               const shortAt = jamSec;
               releaseBall(ball); ball.position.copyFrom(bp); releasePos.copyFrom(bp); ballSim.launch(bp.clone(), new Vector3(away.x * 1.2, 0.4, away.z * 1.2)); looseBall = true;
-              qteHit = false; jamSec = -1; sinceRelease = 0; dropToFloor = true; dropVy = 0; setTrail('off'); armSettle();
+              shortOfIron = true; qteHit = false; jamSec = -1; sinceRelease = 0; dropToFloor = true; dropVy = 0; setTrail('off'); armSettle();
               console.info(`[HANDS] short of the iron ${shortAt.toFixed(2)} s after the press: iron ${ringDistance(bp, rim, RIM_RADIUS).toFixed(3)} m — a miss, no contact`);
               dunkHooks.miss('short', hookWho());
               flash(ctx, 'SHORT OF THE IRON', 900);
@@ -2693,6 +2717,8 @@ export const DunkMode: ModeDefinition = (() => {
         lobFrameLift += (want - lobFrameLift) * lowPassK(dt, LOB_FRAME_TAU);
         ctx.camDirector.update(player.root.position, vel, lobFrameLift > 0.01 ? _lobObj.copyFrom(rim).addInPlaceFromFloats(0, lobFrameLift, 0) : rim);
       }
+      if (dunkFramingOn()) camFramingStep(ctx);   // CAMERA TIP (knob on only): the run-up overlay, and the hoop keep-out after a dunk
+      else if (camTuneKey) { camTuneKey = ''; ctx.camDirector.tuneFollow(null); }   // the knob turned back off: today's preset again
     },
 
     dispose() {
@@ -3103,7 +3129,7 @@ export const DunkMode: ModeDefinition = (() => {
     dubbleGrabbed = false; dubbleReachK = 0; straddleK = 0; dubblePassed = false; dubbleAir = null;
     launchX = player.root.position.x; launchBank = runBank; runBank = 0; airDriftX = 0;   // DUNK MOTION phase 7
     activeHandOff = null; ikSideK = 0;
-    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; ebState.inLeftHand = hs('Right') === 'Left';
+    clipTime = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; ebState.inLeftHand = hs('Right') === 'Left';
     meterSpan = EASTBAY_TIMING.extend + slamWindowNow() / 2 + 0.16; meter3d?.begin(slamGreen());
     // the broadcast cut is per-attempt: hand the follow camera back or the next runway is shot from the rim
     ctx.camDirector.mode = 'follow';
@@ -3235,10 +3261,17 @@ export const DunkMode: ModeDefinition = (() => {
    *  had landed perfectly read as "WINDMILL — MISSED" — the one line the eye saw on the flight where the trick fired and
    *  the SLAM press was eaten (99109f7). The trick is what you did; the slam is what you missed. The name still leads,
    *  because the judges scored it and the card names it, but it no longer wears the failure. */
+  /** DUNK-LIVE-TIMING-FIX LP-04: the runway line as the host will see it. The default line is a static button map, which the harness blanks
+   *  in play (staticControls.ts) and the READY card shows, so the runway shows the live run line instead (on the scan's LIVE list). The
+   *  practice / dunk-off / final-round lines are live already and pass through. The watchdog's line stays the fallback. */
+  const RUN_LIVE_HINT = 'HOLD to run — then tap jump';
+  function liveRunwayHint(): string { return isStaticControlsHint(runwayHint) ? RUN_LIVE_HINT : runwayHint; }
   /** dunk-next phase 8: what went wrong, as the booth's blooper hears it — missWhy's own reading, in four words. */
   function missKind(): MissKind {
     if (obstacleClipped) return 'prop';
     if (lob.live || lob.lost) return 'lob';
+    if (shortOfIron) return 'short';   // CONTROLLER-TRY-FIX: the jam fell short of the rim — the booth's iron lines, no timing word
+    if (slamTiming?.zone === 'late') return 'late';   // DUNK-LIVE-TIMING-FIX LP-01(b): a late iron miss is called late, as the strip and the chip read it
     return slamSeen ? 'early' : 'noSlam';
   }
   function missWhy(): string {
@@ -3247,6 +3280,13 @@ export const DunkMode: ModeDefinition = (() => {
     // Every press inside the accepted window (the buffer's edge through the close) is a MAKE, so a miss with a press on
     // the record is a press that came in front of it — say that, not "off the iron": it is the one thing the player can fix.
     const named = namedTricks();
+    // CONTROLLER-TRY-FIX (C3): the jam came up short of the rim — whatever the press's grade (a CLEAN press can fall short), say that
+    // first: SHORT OF THE IRON — MISSED, the branch's own word (its 900 ms flash), never TOO EARLY or LATE.
+    if (shortOfIron) { const s = 'SHORT OF THE IRON'; return named ? `${named} · ${s}` : s; }
+    // DUNK-LIVE-TIMING-FIX LP-01(a): a press inside the window more than ~0.7 of its half past the beat is iron too (execution under
+    // RIM_CLEAN). The strip and the chip read that zone (slamReadout) as LATE, so the banner does too: one verdict — LATE — MISSED, the
+    // mirror of TOO EARLY (PM copy, 2026-10-28).
+    if (slamTiming?.zone === 'late') { const late = 'LATE'; return named ? `${named} · ${late}` : late; }
     const why = slamSeen ? 'THREW IT AT THE IRON TOO EARLY' : 'NO SLAM';
     return named ? `${named} · ${why}` : why;
   }
@@ -4519,6 +4559,7 @@ export const DunkMode: ModeDefinition = (() => {
           judges: missScores.map((j) => j.score), total: missTotal, made: false,
           diff: missDiff, exec: 0, look: missStyle,   // P9: a miss is part of the night's numbers too
         });
+        if (shortOfIron) nightShort++;   // CONTROLLER-TRY-FIX: a scored miss that came up short (the night report's advice)
       }
       if (turn === 'rival') rivalScored = true;   // dunk-next phase 4: his card is the panel's now — a skip only hurries it
       if (dunkOff > 0) dunkOffCards[turn === 'rival' ? 'rival' : 'player'] = { total: missTotal, execution: 0, difficulty: missDiff, style: missStyle };   // endless dunk-offs: the numbers the tiebreak reads
@@ -4857,6 +4898,21 @@ export const DunkMode: ModeDefinition = (() => {
   /** dunk-next phase 8: the retryable miss on the table (performance.now() of the call; -1 = none), the beat's own token, the bloopers. */
   let runBackAt = -1, runBackSeq = 0, bloopN = 0, runBackHud = false;
   /** RUN IT BACK: the miss beat ends now and the runway is back. Only on the player's retryable miss, only from RUN_BACK_MIN_MS. */
+  // CAMERA TIP (2026-10-29, cam.dunkFraming, default off — none of this runs with the knob off)
+  let camTuneKey = '';
+  function camAspect(ctx: ModeContext): number {
+    const e = ctx.scene.getEngine(); const h = e.getRenderHeight(); return h > 0 ? e.getRenderWidth() / h : 1;
+  }
+  function camFramingStep(ctx: ModeContext): void {
+    const runUp = phase === 'approach' || phase === 'charge';
+    const t = runUpTune({ runUp, speed: Math.abs(holdRunSpeed), aspect: camAspect(ctx) });
+    const k = tuneKey(t); if (k !== camTuneKey) { camTuneKey = k; ctx.camDirector.tuneFollow(t); }
+    if (phase === 'resolve' || phase === 'judging') {
+      const cam = ctx.scene.activeCamera as import('@babylonjs/core').TargetCamera | null; if (!cam) return;
+      const p = cam.position, c = clearOfHoop({ x: p.x, y: p.y, z: p.z }, DUNK_BACKBOARD_Z);
+      if (c.x !== p.x || c.y !== p.y || c.z !== p.z) { p.set(c.x, c.y, c.z); cam.setTarget(player.root.position.add(new Vector3(0, 1.3, 0))); }
+    }
+  }
   function runItBack(ctx: ModeContext): boolean {
     if (runBackAt < 0 || phase !== 'judging' || turn !== 'player') return false;
     if (!runBackReady(performance.now() - runBackAt)) return false;
@@ -4906,7 +4962,7 @@ export const DunkMode: ModeDefinition = (() => {
     cutting = false; celebPick = null; soundGapUntil = 0; celebFace = null; ctx.setHud({ cut: '', call: '', poster: null });   // DUNK MOTION phase 12
     armedAir = null; spin.reset(); replaySpinYaw = 0; clearBeats(ctx);   // dunk-next: the strip goes with the attempt
     playClip(SPORT_CLIP.idle, { loop: true });
-    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
+    charge = 0; qteHit = false; qteWindowOpen = false; qteAccuracy = 0; shortOfIron = false; rimCamCut = false; hangSlowMoLatch = false; contactLatch = false;
     dunkHooks.reset();   // CONTACT-RIM-SOUND: the hooks latch per attempt, reset with contactLatch (DUNK-MODE-PLAN §11.2 H2)
     dunkBody.reset(); bodySlamClip = null; bodyRT = 0;
     jamSec = -1; jamContact = false; flushRealSec = 0; netRealSec = 0; hangOn = false; hangHeldSec = 0; lagLive = false; hoopJuice?.hold(false);   // DUNK-HANDS-RIM
@@ -4954,6 +5010,7 @@ export const DunkMode: ModeDefinition = (() => {
       hint: runwayHint,   // F4 (review): six controls in one line taught none of them (IMPROVE 2026-10-06: the line is kept for the standing tips to give back to)
       charge: 0, slamPulse: false,
     });
+    if (turn === 'player' && isStaticControlsHint(runwayHint)) ctx.setHud({ hint: liveRunwayHint() });   // DUNK-LIVE-TIMING-FIX LP-04: every attempt (RUN IT BACK too) opens with the live run line
     mic?.release();
     if (turn === 'player') {   // THE MIC: who is up — the attempt, and the pressure in the final round
       const moment = stakes.attemptsUsed >= 2 ? 'dunk.lastchance' : stakes.attemptsUsed === 1 ? 'dunk.retry'
@@ -5395,9 +5452,11 @@ export const DunkMode: ModeDefinition = (() => {
     // who lost by four had no way to know whether it went on the beat, on ambition, or on the two they threw at the
     // iron early — which is the one thing that decides whether the next night goes better. The panel already publishes
     // the three numbers per attempt; the card carries them now, and the report names ONE thing to change.
-    const report = nightReport(card);
+    const report = nightReport(card, { shortMisses: nightShort });   // CONTROLLER-TRY-FIX: the short misses, for the advice
     console.info(`[DUNK-NIGHT] ${report.headline} · ${report.lines.join(' · ')} · ${report.advice}`);
-    later(() => { if (phase === 'contestOver') flash(ctx, `${report.headline} — ${report.advice}`); }, 1400);
+    // CONTROLLER-TRY-FIX (C6): the report goes INTO the night card (hud.nightReport, one caption under the headline), not onto the
+    // banner channel — the banner ran across the CUT AT THE LINE card (06_…png). The host draws no banner while the card is up.
+    later(() => { if (phase === 'contestOver') ctx.setHud({ nightReport: `${report.headline} — ${report.advice}` }); }, 1400);
   }
 
   /** GO AGAIN — the whole contest resets INSIDE the mode. Nothing is disposed and
@@ -5416,6 +5475,7 @@ export const DunkMode: ModeDefinition = (() => {
     // night 1's dunks on it, and the card no longer added up to the score ctx.card sends out beside it. A card that
     // disagrees with its own score is exactly what an integrity check refuses. load() already opened a fresh one.
     card = emptyCard();
+    nightShort = 0;   // CONTROLLER-TRY-FIX: the short misses are the night's too
     hype = 0; chain = 0;
     ended = false; finishing = false; cancelLiveCeleb(); celebFace = null;
     usedCombos.clear(); momentum.reset(); flight.reset();
@@ -5433,7 +5493,7 @@ export const DunkMode: ModeDefinition = (() => {
     ctx.heroRef.current = player.root;
     ctx.camDirector.suspended = false;
     ctx.setHud({
-      nightCard: null, nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '', rivalSkip: false, nightUnlock: '',
+      nightCard: null, nightReport: '', nightNum: night, nightMakes: null, nightMisses: null, nightBest: null, nightDunkOff: '', dunkOff: '', rivalSkip: false, nightUnlock: '',
       round: `1/${TOTAL_ROUNDS}`, score: 0, rivalScore: 0, hype: 0, chain: 0,
     });
     crowd.onScore(0);

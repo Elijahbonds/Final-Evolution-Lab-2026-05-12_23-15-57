@@ -23,6 +23,9 @@ export interface ButtonRow {
   action: string;
   /** Grouping for the screen: the base verbs first, then the named moves. */
   group: 'verb' | 'move' | 'system';
+  /** CONTROLLER-TRY-FIX: what a system row is on the keys / the touch deck, when the generic translation would be wrong; null = none there. */
+  keys?: string | null;
+  touch?: string | null;
 }
 
 /** Splash / route ids that differ from the registry key. */
@@ -60,6 +63,18 @@ const SYSTEM_ROWS: Record<string, ButtonRow[]> = {
     { input: 'D-PAD ▲', action: 'PARTNER', group: 'system' },
     { input: 'D-PAD ▼', action: 'FUSE · RIDE', group: 'system' },
     { input: 'D-PAD ◀ ▶', action: 'SPELL SLOT', group: 'system' },
+  ],
+  // CONTROLLER-TRY-FIX item 4 (C5): the dunk's buttons the face verbs cannot say — on a pad the panel listed SLAM / STYLE / RUN / PROP and
+  // never Y, L1, R1, L2, the d-pad tricks or SELECT (DunkMode.ts: Y self-lob / runway tricks, L1 call your dunk, R1 practice runway,
+  // L2 the two-foot gather, d-pad + a face button in the air, SELECT the camera director, ModeHarness). The touch deck has none of
+  // them (its Y slot is RUN); the keyboard has no L2 (PM call: no key is bound for it), so that row is pad-only.
+  dunk: [
+    { input: 'Y', action: 'SELF-LOB · AIR TRICK', group: 'system', keys: 'I', touch: null },
+    { input: 'L1', action: 'CALL YOUR DUNK', group: 'system', keys: 'Q', touch: null },
+    { input: 'R1', action: 'PRACTICE', group: 'system', keys: 'E', touch: null },
+    { input: 'HOLD L2', action: 'GATHER (TWO-FOOT)', group: 'system', keys: null, touch: null },
+    { input: 'D-PAD + A/B/X/Y', action: 'AIR TRICK', group: 'system', touch: null },
+    { input: 'SELECT', action: 'CAMERA', group: 'system', keys: 'C', touch: null },
   ],
 };
 
