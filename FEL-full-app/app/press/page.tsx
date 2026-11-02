@@ -2,10 +2,14 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { BOOKS, featuredBook, PARTNERS, publicBookDescription } from '@/lib/books/bookCatalog';
-import { bookFormatAllowed } from '@/lib/books/bookTerms';
+import { isPurchaseOpen } from '@/lib/payments/allowlist';
+import { bookItem } from '@/lib/shop/model';
+import { ProductCard } from '@/components/shop/product-card';
+import { BookBuy } from '@/components/shop/book-buy';
+import { SHOP_LOOK as L } from '@/components/shop/look';
+import { bookFormatAllowed, bookOfferAllowed } from '@/lib/books/bookTerms';
 import { PressFrame } from '@/components/press/press-frame';
-import { BookCover } from '@/components/press/book-cover';
-import { CatalogCard, KindleLink, OfferCard } from '@/components/press/offer-card';
+import { KindleLink } from '@/components/press/offer-card';
 import { JoinForm } from '@/components/press/join-form';
 import { OwnerCopy } from '@/components/public-copy/owner-copy';
 import { PUBLIC_PAGE_COPY } from '@/lib/creator/creatorCatalog';
@@ -27,52 +31,38 @@ export default async function PressPage() {
   const featured = featuredBook();
   const featuredOffers = featured.offers.filter((o) => bookFormatAllowed(o.format));
 
+  // PLAT-P07 (2026-11-02): the shop front's shape. The audiobooks first, as the one product card (title, one line, the
+  // one price formatter) with the one buy sheet behind Buy (components/shop/book-buy.tsx); Opens soon while books are not
+  // on sale (isPurchaseOpen('books') and the offer's own direct sale and format, lib/books/bookTerms.ts). Ebooks, bundles
+  // and downloads stay hidden (EBOOK fail-closed). The About text moved under the books.
+  const booksOpen = isPurchaseOpen('books');
+  const audio = BOOKS.flatMap((book) => {
+    const offer = book.offers.find((o) => o.format === 'audiobook');
+    if (!offer || !bookFormatAllowed(offer.format)) return [];
+    return [{ book, offer, item: bookItem({ slug: book.slug, title: book.title, description: publicBookDescription(book) }, offer, { formatAllowed: bookOfferAllowed(offer), purchasesOpen: booksOpen }) }];
+  });
+  const lead = audio.find((a) => a.book.slug === featured.slug) ?? audio[0] ?? null;
   return (
     <PressFrame signedIn={session}>
-      {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
-      <section className="mt-8" data-press-about>
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">About Final Evolution Lab</h2>
-        <OwnerCopy parts={PUBLIC_PAGE_COPY.press.body} className="mt-2 max-w-2xl text-sm leading-relaxed text-white/75" />
-      </section>
-      <section className="mt-8">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">Featured</h2>
-        <div className="mt-3 grid gap-6 rounded-2xl border border-white/10 bg-[#101010] p-4 md:grid-cols-[220px_1fr] md:p-6">
-          <Link href={`/press/${featured.slug}`} className="block">
-            <BookCover title={featured.title} tall />
-          </Link>
-          <div>
-            {featured.eyebrow ? (
-              <p className="text-[11px] uppercase tracking-[0.16em] text-white/45">{featured.eyebrow}</p>
-            ) : null}
-            <h3 className="fel-heading mt-1 text-3xl text-white">
-              <Link href={`/press/${featured.slug}`}>{featured.title}</Link>
-            </h3>
-            <p className="mt-2 text-sm text-white/55">{publicBookDescription(featured)}</p>
-            <div className="mt-4 grid max-w-xs gap-3">
-              {featuredOffers.map((offer) => (
-                <OfferCard key={offer.id} book={featured} offer={offer} prominent />
-              ))}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Link href={`/press/${featured.slug}#sample`} className="rounded-md border border-white/15 px-3 py-2 text-xs font-semibold text-white/80 hover:border-white/40">
-                Free sample chapter
-              </Link>
-              <KindleLink book={featured} />
-            </div>
-            <p className="mt-3 text-[11px] text-white/35">
-              Checkout is secure and hosted by the payment provider. Sales tax is calculated at checkout when Stripe Tax is turned on.
-            </p>
-          </div>
-        </div>
+      <section className="mt-6" data-press-audiobooks>
+        <h2 className={L.sectionTitle}>Audiobooks</h2>
+        <ul className={L.grid}>
+          {(lead ? [lead, ...audio.filter((a) => a !== lead)] : audio).map(({ book, offer, item }) => (
+            <li key={book.slug} data-book={book.slug}>
+              <ProductCard item={item} side={offer.priceIsExample ? <span className="text-[#ff6b6b]">Example</span> : null}>
+                <BookBuy item={item} back={`/press/${book.slug}`} />
+              </ProductCard>
+              <Link href={`/press/${book.slug}`} className={`${L.cardSide} mt-2 inline-flex min-h-11 items-center`}>Free sample</Link>
+            </li>
+          ))}
+        </ul>
+        {featuredOffers.length === 0 ? <KindleLink book={featured} /> : null}
       </section>
 
-      <section className="mt-10">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">The catalog</h2>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {BOOKS.map((book) => (
-            <CatalogCard key={book.slug} book={book} />
-          ))}
-        </div>
+      {/* ONB-05: Appendix B as approved (2026-10-20); [OWNER: …] marks a blank the owner still fills. */}
+      <section className="mt-10" data-press-about>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#F5C518]">About Final Evolution Lab</h2>
+        <OwnerCopy parts={PUBLIC_PAGE_COPY.press.body} className="mt-2 max-w-2xl text-sm leading-relaxed text-white/75" />
       </section>
 
       <section className="mt-10">

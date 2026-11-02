@@ -1,11 +1,17 @@
 // COACH-BUSINESS: /coaches — find a coach by sport and goal. Filters are plain links (no script needed, crawlable).
+// PLAT-P07 (2026-11-02): the shop front's shape — a short hero, the sport and goal chips as one swipeable row each, then
+// the coaches as the one product card (components/shop/product-card.tsx: name, headline, "from" price, rating). A list
+// that cannot be read says Opens soon, never "not set up yet".
 import Link from 'next/link';
-import { MARKET_GOALS, SPORTS, goalLabel, marketHref, sportLabel, type MarketCard, type MarketQuery } from '@/lib/coach-business/market';
+import { MARKET_GOALS, SPORTS, marketHref, type MarketCard, type MarketQuery } from '@/lib/coach-business/market';
+import { coachCardItem } from '@/lib/shop/model';
+import { ProductCard } from '@/components/shop/product-card';
+import { OpensSoon } from '@/components/shop/opens-soon';
+import { SHOP_LOOK as L } from '@/components/shop/look';
 
 function Chip({ href, on, children }: { href: string; on: boolean; children: React.ReactNode }) {
   return (
-    <Link href={href} aria-current={on ? 'true' : undefined}
-      className={`inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-bold ${on ? 'border-cyan-300 bg-cyan-300 text-black' : 'border-white/15 text-white/75'}`}>
+    <Link href={href} aria-current={on ? 'true' : undefined} className={`${L.chip} ${on ? L.chipOn : ''}`}>
       {children}
     </Link>
   );
@@ -13,57 +19,40 @@ function Chip({ href, on, children }: { href: string; on: boolean; children: Rea
 
 export function MarketplaceView({ q, cards, ready }: { q: MarketQuery; cards: MarketCard[]; ready: boolean }) {
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 text-white" data-marketplace>
-      <p className="text-xs uppercase tracking-widest text-white/50">Final Evolution</p>
-      <h1 className="mt-1 text-3xl font-black">Find a coach</h1>
-      <p className="mt-2 max-w-2xl text-sm text-white/70">Coaches who train athletes online and in person. Pick a sport and a goal, open a coach, and apply or book.</p>
+    <main className={L.page} data-marketplace>
+      <p className={L.eyebrow}>Coaches</p>
+      <h1 className={L.title}>Find a coach</h1>
 
-      <nav className="mt-6 space-y-3" aria-label="Filter coaches">
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Sport</p>
-          <div className="flex flex-wrap gap-2">
-            <Chip href={marketHref(q, { sport: null })} on={!q.sport}>Any sport</Chip>
-            {SPORTS.map(([k, l]) => <Chip key={k} href={marketHref(q, { sport: k })} on={q.sport === k}>{l}</Chip>)}
-          </div>
+      <nav className="mt-6 space-y-2" aria-label="Filter coaches">
+        <div className={L.chips} aria-label="Sport">
+          <Chip href={marketHref(q, { sport: null })} on={!q.sport}>Any sport</Chip>
+          {SPORTS.map(([k, l]) => <Chip key={k} href={marketHref(q, { sport: k })} on={q.sport === k}>{l}</Chip>)}
         </div>
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wider text-white/40">Goal</p>
-          <div className="flex flex-wrap gap-2">
-            <Chip href={marketHref(q, { goal: null })} on={!q.goal}>Any goal</Chip>
-            {MARKET_GOALS.map(([k, l]) => <Chip key={k} href={marketHref(q, { goal: k })} on={q.goal === k}>{l}</Chip>)}
-          </div>
+        <div className={L.chips} aria-label="Goal">
+          <Chip href={marketHref(q, { goal: null })} on={!q.goal}>Any goal</Chip>
+          {MARKET_GOALS.map(([k, l]) => <Chip key={k} href={marketHref(q, { goal: k })} on={q.goal === k}>{l}</Chip>)}
         </div>
       </nav>
 
-      <section className="mt-8" aria-live="polite">
+      <section className="mt-6" aria-live="polite">
         {!ready ? (
-          <p className="text-sm text-white/60">The coach list is not set up yet.</p>
+          <OpensSoon />
         ) : cards.length === 0 ? (
-          <p className="text-sm text-white/60" data-empty>No coach matches that yet. Try another sport or goal.</p>
+          <p className={L.lede} data-empty>No coach matches that yet. Try another sport or goal.</p>
         ) : (
-          <ul className="grid gap-3 sm:grid-cols-2">
+          <ul className={L.grid}>
             {cards.map((c) => (
               <li key={c.slug} data-coach-card={c.slug}>
-                <Link href={`/coach/${c.slug}`} className="block h-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 hover:border-cyan-300/50">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <h2 className="text-lg font-bold">{c.displayName}</h2>
-                    {/* COACH-DELIVERY COA-10: client reviews */}
-                    {c.rating ? <p className="text-xs text-white/60" data-coach-rating>★ {c.rating.avg} · {c.rating.count} review{c.rating.count === 1 ? '' : 's'}</p> : null}
-                    {c.fromPriceCents !== null ? (
-                      <p className="shrink-0 text-sm font-bold text-cyan-200">from ${(c.fromPriceCents / 100).toFixed(0)}{c.fromMonthly ? '/mo' : ''}</p>
-                    ) : null}
-                  </div>
-                  {c.headline ? <p className="mt-1 text-sm text-white/70">{c.headline}</p> : null}
-                  <p className="mt-2 text-xs text-white/50">{[...c.sports.map(sportLabel), ...c.goals.map(goalLabel)].join(' · ')}</p>
-                  {!c.acceptingClients ? <p className="mt-2 text-xs font-bold text-amber-200">Not taking new clients</p> : null}
-                </Link>
+                {/* COACH-DELIVERY COA-10: client reviews, beside the name */}
+                <ProductCard item={coachCardItem(c)} href={`/coach/${c.slug}`}
+                  side={c.rating ? <span data-coach-rating>★ {c.rating.avg} · {c.rating.count}</span> : !c.acceptingClients ? 'Full' : null} />
               </li>
             ))}
           </ul>
         )}
       </section>
-      <p className="mt-8 text-xs text-white/50">Under 18? A parent or guardian contacts the coach, and the coach sends a join code your parent or guardian approves.</p>
-      <p className="mt-2 text-xs text-white/50">Coach on Final Evolution? <Link href="/coach/business" className="font-bold text-cyan-300 underline">Set up your page</Link></p>
+      <p className={`${L.lede} mt-8`}>Under 18? A parent or guardian contacts the coach, and the coach sends a join code your parent or guardian approves.</p>
+      <p className={`${L.lede} mt-2`}>Coach on Final Evolution? <Link href="/coach/business" className="font-semibold text-fel-cyan underline">Set up your page</Link></p>
     </main>
   );
 }
