@@ -181,6 +181,8 @@ export function ClientsView({ me = null, chatOn = false }: { me?: SharedBy | nul
           <button key={s} type="button" className={LOOK.row} onClick={() => setScreen(s)} data-coach-tool={s}><span>{SCREEN_TITLE[s]}</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></button>
         ))}
         <Link href="/coach/business" className={LOOK.row}><span>Your coaching business</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
+        {/* GROUP-BOOKING (2026-11-02): group classes — rosters, attendance, paid in person, gyms, trainers */}
+        <Link href="/coach/groups" className={LOOK.row} data-coach-tool="groups"><span>Groups</span><ChevronRight className="h-5 w-5 text-fel-dim" aria-hidden /></Link>
       </nav>}
       </div>
 

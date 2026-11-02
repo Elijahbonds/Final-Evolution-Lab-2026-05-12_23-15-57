@@ -11,7 +11,9 @@ export type ShopOutcome =
   | { kind: 'sign_in'; href: string }
   /** The store terms changed under the page: untick, say so. */
   | { kind: 'terms_changed'; line: string }
-  | { kind: 'line'; line: string; href?: string };
+  | { kind: 'line'; line: string; href?: string }
+  /** GROUP-BOOKING: the product was reserved with nothing to pay now ("Reserve, pay at the gym"): say so, no checkout. */
+  | { kind: 'done'; line: string };
 
 export const TERMS_CHANGED_LINE = 'The store terms were updated. Tick the box again.';
 export const CHECKOUT_FAILED_LINE = 'Checkout could not start. Try again.';
